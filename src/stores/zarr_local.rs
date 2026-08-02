@@ -92,6 +92,8 @@ impl DataStore for ZarrLocalStore {
             width,
             height,
             values: raw_data,
+            min_val: 0.0,
+            max_val: 100.0,
             shape: vec![height as u64, width as u64],
             current_timestep: timestep,
             max_timesteps: 1,

@@ -37,6 +37,8 @@ pub struct MatrixSlice {
     pub width: usize,
     pub height: usize,
     pub values: Vec<f32>,
+    pub min_val: f32,
+    pub max_val: f32,
     pub shape: Vec<u64>,
     pub current_timestep: usize,
     pub max_timesteps: usize,

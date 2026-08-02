@@ -1,3 +1,4 @@
+pub mod colormap;
 pub mod grid;
 pub mod icechunk;
 pub mod units;

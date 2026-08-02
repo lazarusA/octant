@@ -41,6 +41,7 @@ pub struct OctantApp {
     pub sphere_mode: u32,
     pub surface_displacement_strength: f32,
     pub surface_mode: u32,
+    pub show_colorbar: bool,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
     // LRU Cache & Prefetcher State
@@ -92,6 +93,7 @@ impl OctantApp {
             sphere_mode: 0,
             surface_displacement_strength: 0.3,
             surface_mode: 0,
+            show_colorbar: true,
             wgpu_render_state,
 
             lru_cache: SliceLruCache::new(default_cache_mb * 1024 * 1024),
@@ -218,6 +220,8 @@ impl OctantApp {
                 width: slice.width,
                 height: slice.height,
                 values: slice.values.clone(),
+                min_val: slice.min_val,
+                max_val: slice.max_val,
                 dataset_name: format!("{} ({})", slice.dataset_name, slice.variable_name),
                 max_timesteps: slice.max_timesteps,
             };
@@ -389,6 +393,8 @@ impl eframe::App for OctantApp {
                         width: slice.width,
                         height: slice.height,
                         values: slice.values,
+                        min_val: slice.min_val,
+                        max_val: slice.max_val,
                         dataset_name: format!("{} ({})", slice.dataset_name, slice.variable_name),
                         max_timesteps: slice.max_timesteps,
                     };
@@ -445,6 +451,7 @@ impl eframe::App for OctantApp {
         crate::ui::top_bar::show_top_bar(self, ctx);
         crate::ui::bottom_bar::show_bottom_bar(self, ctx);
         crate::ui::catalog::show_catalog_window(self, ctx);
+        crate::ui::colorbar::show_colorbar_overlay(self, ctx);
 
         // 4. Centered Drawing Canvas Area with Aspect Data Ratio
         egui::CentralPanel::default().show(ctx, |ui| {

@@ -4,6 +4,9 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.menu_button("🎨 Colormap", |ui| {
         ui.set_min_width(170.0);
 
+        ui.label(egui::RichText::new("Select Colormap Palette").small().weak());
+        ui.separator();
+
         let colormaps = [
             (0, "Viridis (Thermal)"),
             (1, "Plasma (Spectral)"),
@@ -29,5 +32,13 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.close_menu();
             }
         }
+
+        ui.separator();
+        ui.checkbox(&mut app.show_colorbar, "📊 Show Colorbar Legend");
     });
+
+    let bar_btn_label = if app.show_colorbar { "📊 Bar: On" } else { "📊 Bar: Off" };
+    if ui.button(egui::RichText::new(bar_btn_label).small()).clicked() {
+        app.show_colorbar = !app.show_colorbar;
+    }
 }

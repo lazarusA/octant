@@ -2,6 +2,8 @@ pub struct MatrixData {
     pub width: usize,
     pub height: usize,
     pub values: Vec<f32>,
+    pub min_val: f32,
+    pub max_val: f32,
     pub dataset_name: String,
     pub max_timesteps: usize,
 }
@@ -26,6 +28,8 @@ impl MatrixData {
             width,
             height,
             values: raw_data,
+            min_val: 0.0,
+            max_val: 100.0,
             dataset_name: format!("Random Matrix ({}x{})", width, height),
             max_timesteps: 1,
         })
