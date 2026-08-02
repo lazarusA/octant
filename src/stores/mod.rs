@@ -35,6 +35,16 @@ pub struct MatrixSlice {
     pub dataset_name: String,
 }
 
+impl MatrixSlice {
+    pub fn bytes_size(&self) -> usize {
+        self.values.len() * std::mem::size_of::<f32>()
+            + self.variable_name.len()
+            + self.dataset_name.len()
+            + std::mem::size_of::<Self>()
+    }
+}
+
+
 pub trait DataStore: Send + Sync {
     fn store_type(&self) -> &'static str;
     fn inspect(&self) -> Result<DatasetMetadata, Box<dyn Error>>;
