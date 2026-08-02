@@ -1,4 +1,5 @@
 use crate::app::OctantApp;
+use super::cache;
 
 pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
     egui::TopBottomPanel::bottom("octant_bottom_bar")
@@ -59,19 +60,9 @@ pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
                     ui.add(egui::Slider::new(&mut app.playback_fps, 1.0..=60.0).suffix(" FPS"));
                 });
 
-                // 7. Right metrics pill (RAM & Cache stats only)
+                // 7. Bottom Right: Cache Menu Dropdown
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let hits_rate = app.lru_cache.hit_rate();
-                    let current_mb = app.lru_cache.current_bytes() as f64 / (1024.0 * 1024.0);
-                    ui.label(
-                        egui::RichText::new(format!(
-                            "RAM: {:.1} MB | Hit Rate: {:.1}%",
-                            current_mb,
-                            hits_rate
-                        ))
-                        .small()
-                        .monospace(),
-                    );
+                    cache::show_cache_menu(app, ui);
                 });
             });
         });

@@ -11,7 +11,7 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         let max_bytes = app.lru_cache.max_bytes();
         let fraction = (current_bytes as f32 / max_bytes as f32).clamp(0.0, 1.0);
 
-        ui.label(egui::RichText::new("Memory Consumption (1GB Default Limit):").small());
+        ui.label(egui::RichText::new("RAM Memory Usage (1GB Default Limit):").small());
         ui.add(
             egui::ProgressBar::new(fraction).text(format!(
                 "{:.2} MB / {} MB ({:.1}%)",
@@ -36,7 +36,7 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         ));
 
         ui.small(format!(
-            "Hits: {} | Misses: {} (Hit Rate: {:.1}%)",
+            "Cache Hits: {} | Misses: {} (Hit Rate: {:.1}%)",
             app.lru_cache.hits(),
             app.lru_cache.misses(),
             app.lru_cache.hit_rate()
@@ -44,9 +44,9 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         let pending = app.prefetcher.pending_count();
         if pending > 0 {
-            ui.small(format!("🟢 Background Prefetching: {} queued", pending));
+            ui.small(format!("🟢 Background Prefetching: {} in-flight", pending));
         } else {
-            ui.small("⚪ Buffer Warm / Prefetch Idle");
+            ui.small("⚪ Buffer Warm / All Slices Cached");
         }
 
         ui.separator();

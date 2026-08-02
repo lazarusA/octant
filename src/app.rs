@@ -240,6 +240,9 @@ impl OctantApp {
 
 impl eframe::App for OctantApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Reset hover preview at start of frame
+        self.preview_colormap = None;
+
         // 1. Drain completed background prefetch results into LRU cache
         let completed_prefetches = self.prefetcher.poll_results();
         for res in completed_prefetches {

@@ -17,6 +17,7 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
 
             if response.hovered() {
                 app.preview_colormap = Some(id);
+                ui.ctx().request_repaint();
             }
 
             if response.clicked() {
