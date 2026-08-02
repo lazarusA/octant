@@ -71,7 +71,6 @@ impl SliceLruCache {
         self.evict_if_needed();
     }
 
-
     fn evict_if_needed(&mut self) {
         while self.current_bytes > self.max_bytes && !self.access_order.is_empty() {
             if let Some(oldest_key) = self.access_order.pop_front() {
@@ -157,20 +156,61 @@ impl SlicePrefetcher {
         self.pending.len()
     }
 
-    pub fn prefetch_ahead(
+    pub fn request_slice(&mut self, key: SliceCacheKey, cache: &SliceLruCache) {
+        if cache.contains(&key) || self.pending.contains(&key) {
+            return;
+        }
+
+        self.pending.insert(key.clone());
+
+        let tx = self.tx.clone();
+        let key_clone = key.clone();
+        let store_target_for_thread = key.store_target.clone();
+        let var_for_thread = key.variable_name.clone();
+
+        thread::spawn(move || {
+            let store: Box<dyn DataStore> = match key_clone.store_kind {
+                StoreKind::RemoteZarr => Box::new(ZarrRemoteStore::new(&store_target_for_thread)),
+                StoreKind::LocalZarr => Box::new(ZarrLocalStore::new(&store_target_for_thread)),
+                StoreKind::RemoteIcechunk => Box::new(IcechunkRemoteStore::new(&store_target_for_thread)),
+                StoreKind::LocalIcechunk => Box::new(IcechunkLocalStore::new(&store_target_for_thread)),
+                StoreKind::ProceduralRandom => {
+                    let _ = tx.send(PrefetchResult {
+                        key: key_clone,
+                        result: Err("Procedural random step".to_string()),
+                    });
+                    return;
+                }
+            };
+
+            let res = store
+                .fetch_slice(&var_for_thread, key_clone.timestep)
+                .map_err(|e| e.to_string());
+
+            let _ = tx.send(PrefetchResult {
+                key: key_clone,
+                result: res,
+            });
+        });
+    }
+
+    pub fn prefetch_chunk_aligned(
         &mut self,
         store_kind: StoreKind,
         store_target: &str,
         variable_name: &str,
         current_step: usize,
         max_steps: usize,
-        lookahead_count: usize,
+        chunk_time_size: usize,
+        configured_lookahead: usize,
         cache: &SliceLruCache,
     ) {
-        if max_steps <= 1 || lookahead_count == 0 {
+        if max_steps <= 1 {
             return;
         }
 
+        let effective_chunk_size = if chunk_time_size > 0 { chunk_time_size } else { 24 };
+        let lookahead_count = effective_chunk_size.max(configured_lookahead);
         let store_target_string = store_target.to_string();
 
         for offset in 1..=lookahead_count {

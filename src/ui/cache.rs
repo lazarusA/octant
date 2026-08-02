@@ -21,11 +21,18 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             )),
         );
 
+        let chunk_time_size = app
+            .active_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.variables.get(app.selected_variable_idx))
+            .and_then(|v| v.chunk_shape.first().copied())
+            .unwrap_or(46);
+
         ui.add_space(6.0);
         ui.small(format!(
-            "Cached Slices: {} | Target Lookahead: {} slices",
+            "Cached Slices: {} | Time Chunk Size: {} steps",
             app.lru_cache.cached_count(),
-            app.prefetch_lookahead
+            chunk_time_size
         ));
 
         ui.small(format!(

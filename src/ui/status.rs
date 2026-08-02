@@ -16,6 +16,16 @@ pub fn show_status_bar(app: &OctantApp, ui: &mut egui::Ui) {
 
         ui.separator();
 
+        // Non-blocking fetch badge
+        if app.is_fetching_slice {
+            ui.label(
+                egui::RichText::new("⏳ FETCHING")
+                    .small()
+                    .color(egui::Color32::GOLD),
+            );
+            ui.separator();
+        }
+
         // Playback state indicator
         if app.is_playing {
             ui.label(egui::RichText::new("▶ PLAYING").small().color(egui::Color32::from_rgb(255, 99, 71)));
@@ -24,3 +34,4 @@ pub fn show_status_bar(app: &OctantApp, ui: &mut egui::Ui) {
         }
     });
 }
+
