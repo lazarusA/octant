@@ -52,6 +52,27 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
     }
 
+    if app.active_plot_type == PlotType::Sphere {
+        ui.separator();
+
+        let style_label = match app.sphere_mode {
+            0 => "🌍 Smooth Globe",
+            1 => "🌋 Smooth Terrain",
+            2 => "📐 Flat Steps",
+            _ => "🧱 3D Radial Legos",
+        };
+        if ui.button(egui::RichText::new(style_label).small()).clicked() {
+            app.sphere_mode = (app.sphere_mode + 1) % 4;
+        }
+
+        if app.sphere_mode > 0 {
+            ui.add(
+                egui::Slider::new(&mut app.sphere_displacement_strength, 0.0..=5.0)
+                    .text("🌋 Height"),
+            );
+        }
+    }
+
     if app.active_plot_type == PlotType::Surface {
         ui.separator();
 

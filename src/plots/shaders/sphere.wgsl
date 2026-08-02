@@ -4,9 +4,9 @@ struct Uniforms {
     rotation_x: f32,
     aspect_ratio: f32,
     zoom: f32,
-    _pad0: u32,
-    _pad1: u32,
-    _pad2: u32,
+    displacement_strength: f32,
+    sphere_mode: u32,
+    width: u32,
 };
 
 @group(0) @binding(0)
@@ -19,6 +19,8 @@ struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) uv: vec2<f32>,
     @location(2) cell_index: u32,
+    @location(3) corner_index: u32,
+    @location(4) raw_normal: vec3<f32>,
 };
 
 struct VertexOutput {
@@ -28,11 +30,92 @@ struct VertexOutput {
     @location(2) normal: vec3<f32>,
 };
 
+fn spherical_to_cartesian(radius: f32, u: f32, v: f32) -> vec3<f32> {
+    let lon = (u - 0.5) * 2.0 * 3.14159265;
+    let lat = (0.5 - v) * 3.14159265;
+
+    let cos_lat = cos(lat);
+    let sin_lat = sin(lat);
+
+    let x = radius * cos_lat * sin(lon);
+    let y = radius * sin_lat;
+    let z = radius * cos_lat * cos(lon);
+
+    return vec3<f32>(x, y, z);
+}
+
 @vertex
-fn vs_main(model: VertexInput) -> VertexOutput {
+fn vs_main(
+    model: VertexInput,
+    @builtin(instance_index) instance_idx: u32,
+) -> VertexOutput {
     var out: VertexOutput;
 
-    // 1. Rotate 3D sphere vertex position around Y and X axes
+    var raw_val: f32;
+    var pos_3d: vec3<f32>;
+    var normal_3d: vec3<f32>;
+
+    if (uniforms.sphere_mode == 0u) {
+        // Mode 0: Smooth Sphere Projection
+        raw_val = data_buffer[model.cell_index];
+        pos_3d = model.position;
+        normal_3d = normalize(model.position);
+    } else if (uniforms.sphere_mode == 1u) {
+        // Mode 1: Smooth Terrain (Continuous deformed sphere landscape with smooth corner height interpolation & gradient normals!)
+        let max_data_idx = arrayLength(&data_buffer) - 1u;
+        let gx = min(model.corner_index % (uniforms.width + 1u), uniforms.width - 1u);
+        let gy = min(model.corner_index / (uniforms.width + 1u), max_data_idx / uniforms.width);
+        let data_idx = min(gy * uniforms.width + gx, max_data_idx);
+        raw_val = data_buffer[data_idx];
+
+        let dr = (raw_val / 100.0) * 0.4 * uniforms.displacement_strength;
+        pos_3d = spherical_to_cartesian(1.0 + dr, model.uv.x, model.uv.y);
+
+        // Compute local gradient surface normal for 3D peak and in-ward valley lighting
+        let val_left = data_buffer[gy * uniforms.width + max(gx, 1u) - 1u];
+        let val_right = data_buffer[gy * uniforms.width + min(gx + 1u, uniforms.width - 1u)];
+        let val_up = data_buffer[max(gy, 1u) - 1u * uniforms.width + gx];
+        let val_down = data_buffer[min(gy + 1u, max_data_idx / uniforms.width) * uniforms.width + gx];
+
+        let dh_du = ((val_right - val_left) / 100.0) * 0.4 * uniforms.displacement_strength;
+        let dh_dv = ((val_down - val_up) / 100.0) * 0.4 * uniforms.displacement_strength;
+
+        let base_norm = normalize(model.position);
+        normal_3d = normalize(base_norm + vec3<f32>(-dh_du, 0.0, -dh_dv));
+    } else if (uniforms.sphere_mode == 2u) {
+        // Mode 2: Flat Steps (Unsigned flat quad step elevation from unit sphere 1.0)
+        raw_val = data_buffer[model.cell_index];
+        let norm_val = clamp(raw_val / 100.0, 0.0, 1.0);
+        let dr = norm_val * 0.4 * uniforms.displacement_strength;
+        pos_3d = spherical_to_cartesian(1.0 + dr, model.uv.x, model.uv.y);
+        normal_3d = normalize(model.position);
+    } else {
+        // Mode 3: 3D Radial Lego Cubes (WebGPU Instanced Unit Cube draw!)
+        let grid_h = max(arrayLength(&data_buffer) / uniforms.width, 1u);
+        let cell_x = instance_idx % uniforms.width;
+        let cell_y = instance_idx / uniforms.width;
+
+        let max_idx = arrayLength(&data_buffer) - 1u;
+        let safe_idx = min(instance_idx, max_idx);
+        raw_val = data_buffer[safe_idx];
+
+        let dr = (raw_val / 100.0) * 0.4 * uniforms.displacement_strength;
+
+        let u = (f32(cell_x) + model.position.x) / f32(uniforms.width);
+        let v = (f32(cell_y) + model.position.y) / f32(grid_h);
+
+        var radius: f32;
+        if (dr >= 0.0) {
+            radius = mix(1.0, 1.0 + dr, model.position.z);
+        } else {
+            radius = mix(1.0 + dr, 1.0, model.position.z);
+        }
+
+        pos_3d = spherical_to_cartesian(radius, u, v);
+        normal_3d = model.raw_normal;
+    }
+
+    // Rigid 3D camera rotation around Y and X axes
     let cy = cos(uniforms.rotation_y);
     let sy = sin(uniforms.rotation_y);
     let cx = cos(uniforms.rotation_x);
@@ -40,9 +123,9 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 
     // Y-axis rotation
     let pos_y_rot = vec3<f32>(
-        cy * model.position.x + sy * model.position.z,
-        model.position.y,
-        -sy * model.position.x + cy * model.position.z
+        cy * pos_3d.x + sy * pos_3d.z,
+        pos_3d.y,
+        -sy * pos_3d.x + cy * pos_3d.z
     );
 
     // X-axis rotation
@@ -52,10 +135,19 @@ fn vs_main(model: VertexInput) -> VertexOutput {
         sx * pos_y_rot.y + cx * pos_y_rot.z
     );
 
-    // Normal vector after rotation (since sphere is centered at origin)
-    out.normal = normalize(pos_rot);
+    // Rigid rotation of normal vector for 3D directional lighting
+    let norm_y_rot = vec3<f32>(
+        cy * normal_3d.x + sy * normal_3d.z,
+        normal_3d.y,
+        -sy * normal_3d.x + cy * normal_3d.z
+    );
+    out.normal = normalize(vec3<f32>(
+        norm_y_rot.x,
+        cx * norm_y_rot.y - sx * norm_y_rot.z,
+        sx * norm_y_rot.y + cx * norm_y_rot.z
+    ));
 
-    // Perspective projection transformation using dynamic zoom (uniforms.zoom)
+    // Perspective projection transformation using dynamic zoom
     let cam_dist = clamp(uniforms.zoom, 1.1, 10.0);
     let cam_z = pos_rot.z - cam_dist;
     let fov_scale = 1.6;
@@ -67,7 +159,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 
     out.position = vec4<f32>(proj_x, proj_y, proj_z, -cam_z);
     out.uv = model.uv;
-    out.val = data_buffer[model.cell_index];
+    out.val = raw_val;
 
     return out;
 }
