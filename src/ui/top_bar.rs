@@ -11,7 +11,7 @@ pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
                 ui.label(egui::RichText::new("📐 Octant").strong().heading());
                 ui.separator();
 
-                // Dropdown menus
+                // Strict Menu Entries Order: Store, Variables, Colormap, Cache
                 store::show_store_menu(app, ui);
                 variables::show_variables_menu(app, ui);
                 colormap::show_colormap_menu(app, ui);

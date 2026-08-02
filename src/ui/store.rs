@@ -45,12 +45,34 @@ pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         ui.add_space(6.0);
         ui.label(egui::RichText::new("Target URL / Path:").strong());
-        ui.text_edit_singleline(&mut app.store_target_input);
-
-        ui.add_space(8.0);
-        if ui.button("🔍 Inspect Store Metadata").clicked() {
+        let res = ui.text_edit_singleline(&mut app.store_target_input);
+        if res.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
             app.inspect_active_store();
-            ui.close_menu();
         }
+
+        ui.separator();
+        ui.menu_button("ℹ About Store", |ui| {
+            ui.set_min_width(260.0);
+            ui.label(egui::RichText::new("Store Information").strong());
+            ui.separator();
+
+            if let Some(metadata) = &app.active_dataset_metadata {
+                ui.small(format!("Provider: {}", metadata.store_type));
+                ui.small(format!("Dataset: {}", metadata.name));
+                ui.small(format!("Variables: {}", metadata.variables.len()));
+            } else {
+                ui.small("No dataset metadata loaded.");
+            }
+
+            ui.add_space(4.0);
+            ui.label(egui::RichText::new("Location Target:").small().strong());
+            ui.small(&app.store_target_input);
+
+            ui.add_space(6.0);
+            if ui.button("🔄 Refresh Store Metadata").clicked() {
+                app.inspect_active_store();
+                ui.close_menu();
+            }
+        });
     });
 }

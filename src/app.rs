@@ -37,6 +37,7 @@ pub struct OctantApp {
 
     // Animation & Playback Controls
     pub is_fetching_slice: bool,
+    pub active_requested_key: Option<SliceCacheKey>,
     pub is_playing: bool,
     pub playback_fps: f32,
     pub loop_playback: bool,
@@ -67,6 +68,7 @@ impl OctantApp {
             prefetch_lookahead: 24,
 
             is_fetching_slice: false,
+            active_requested_key: None,
             is_playing: false,
             playback_fps: 15.0,
             loop_playback: true,
@@ -128,7 +130,7 @@ impl OctantApp {
     }
 
     pub fn load_selected_variable_slice(&mut self) {
-        let (var_name, timestep, max_steps, chunk_time_size) = {
+        let (var_name, max_steps, chunk_time_size) = {
             if let Some(metadata) = &self.active_dataset_metadata {
                 if let Some(var_info) = metadata.variables.get(self.selected_variable_idx) {
                     let max_steps = if var_info.shape.is_empty() {
@@ -141,7 +143,7 @@ impl OctantApp {
                     } else {
                         46
                     };
-                    (var_info.name.clone(), self.current_timestep, max_steps, chunk_time_size)
+                    (var_info.name.clone(), max_steps, chunk_time_size)
                 } else {
                     return;
                 }
@@ -150,12 +152,19 @@ impl OctantApp {
             }
         };
 
+        // Enforce bounds on current_timestep for new variable
+        if self.current_timestep >= max_steps {
+            self.current_timestep = 0;
+        }
+
         let cache_key = SliceCacheKey {
             store_kind: self.selected_store_kind,
             store_target: self.store_target_input.clone(),
             variable_name: var_name.clone(),
-            timestep,
+            timestep: self.current_timestep,
         };
+
+        self.active_requested_key = Some(cache_key.clone());
 
         // 1. Check LRU Cache HIT
         if let Some(slice) = self.lru_cache.get(&cache_key) {
@@ -168,7 +177,7 @@ impl OctantApp {
             };
             self.rebuild_pipeline_with_matrix_data(mdata);
             self.is_fetching_slice = false;
-            self.status_message = format!("🚀 Cache HIT for '{}' (step {})", slice.variable_name, timestep + 1);
+            self.status_message = format!("🚀 Cache HIT for '{}' (step {})", slice.variable_name, self.current_timestep + 1);
 
             // Trigger chunk-aligned prefetching ahead
             let total_steps = max_steps.max(slice.max_timesteps);
@@ -176,7 +185,7 @@ impl OctantApp {
                 self.selected_store_kind,
                 &self.store_target_input,
                 &var_name,
-                timestep,
+                self.current_timestep,
                 total_steps,
                 chunk_time_size,
                 self.prefetch_lookahead,
@@ -196,7 +205,7 @@ impl OctantApp {
 
         // 2. Cache MISS: Dispatch Non-Blocking Async Background Request!
         self.is_fetching_slice = true;
-        self.status_message = format!("⏳ Downloading slice for '{}' (step {})...", var_name, timestep + 1);
+        self.status_message = format!("⏳ Downloading slice for '{}' (step {})...", var_name, self.current_timestep + 1);
 
         self.prefetcher.request_slice(cache_key, &self.lru_cache);
 
@@ -204,7 +213,7 @@ impl OctantApp {
             self.selected_store_kind,
             &self.store_target_input,
             &var_name,
-            timestep,
+            self.current_timestep,
             max_steps,
             chunk_time_size,
             self.prefetch_lookahead,
@@ -230,24 +239,14 @@ impl OctantApp {
 impl eframe::App for OctantApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // 1. Drain completed background prefetch results into LRU cache
-        let active_var_name = self
-            .active_dataset_metadata
-            .as_ref()
-            .and_then(|m| m.variables.get(self.selected_variable_idx))
-            .map(|v| v.name.clone())
-            .unwrap_or_default();
-
         let completed_prefetches = self.prefetcher.poll_results();
         for res in completed_prefetches {
             if let Ok(slice) = res.result {
-                let is_active_step = res.key.store_kind == self.selected_store_kind
-                    && res.key.store_target == self.store_target_input
-                    && res.key.variable_name == active_var_name
-                    && res.key.timestep == self.current_timestep;
+                let is_active_target = self.active_requested_key.as_ref() == Some(&res.key);
 
                 self.lru_cache.put(res.key, slice.clone());
 
-                if is_active_step {
+                if is_active_target {
                     let mdata = MatrixData {
                         width: slice.width,
                         height: slice.height,
@@ -257,10 +256,11 @@ impl eframe::App for OctantApp {
                     };
                     self.rebuild_pipeline_with_matrix_data(mdata);
                     self.is_fetching_slice = false;
-                    self.status_message = format!("⚡ Loaded slice for '{}' (step {})", active_var_name, self.current_timestep + 1);
+                    self.status_message = format!("⚡ Loaded slice for '{}' (step {})", slice.variable_name, slice.current_timestep + 1);
                 }
             }
         }
+
 
 
         // 2. Playback Animation Timer Loop
