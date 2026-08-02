@@ -7,6 +7,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     }
 
     let mut open = app.show_catalog_window;
+    let mut should_close = false;
 
     egui::Window::new("📚 Dataset Catalog")
         .open(&mut open)
@@ -126,7 +127,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                                         if ui.add(btn).clicked() {
                                             app.selected_store_kind = entry.store_kind;
                                             app.store_target_input = entry.store.to_string();
-                                            open = false;
+                                            should_close = true;
                                             app.inspect_active_store();
                                         }
                                         ui.small(egui::RichText::new(format!("key: {}", entry.key)).monospace());
@@ -154,5 +155,8 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
             }
         });
 
+    if should_close {
+        open = false;
+    }
     app.show_catalog_window = open;
 }
