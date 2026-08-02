@@ -2,9 +2,7 @@ use crate::app::OctantApp;
 
 pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.menu_button("🎨 Colormap", |ui| {
-        ui.set_min_width(180.0);
-        ui.label(egui::RichText::new("GPU Colormap Routine").strong());
-        ui.separator();
+        ui.set_min_width(170.0);
 
         let colormaps = [
             (0, "Viridis (Thermal)"),
@@ -14,8 +12,16 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         ];
 
         for (id, name) in colormaps {
-            if ui.selectable_label(app.active_colormap == id, name).clicked() {
+            let is_active = app.active_colormap == id;
+            let response = ui.selectable_label(is_active, name);
+
+            if response.hovered() {
+                app.preview_colormap = Some(id);
+            }
+
+            if response.clicked() {
                 app.active_colormap = id;
+                app.preview_colormap = None;
                 ui.close_menu();
             }
         }

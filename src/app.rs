@@ -23,6 +23,7 @@ pub struct OctantApp {
     pub selected_variable_idx: usize,
     pub current_timestep: usize,
     pub active_colormap: u32,
+    pub preview_colormap: Option<u32>,
     pub status_message: String,
     pub is_loading: bool,
     pub matrix_data: Option<MatrixData>,
@@ -56,6 +57,7 @@ impl OctantApp {
             selected_variable_idx: 0,
             current_timestep: 0,
             active_colormap: 0,
+            preview_colormap: None,
             status_message: "Ready. Select store and click Inspect Store Metadata.".to_string(),
             is_loading: false,
             matrix_data: None,
@@ -320,11 +322,12 @@ impl eframe::App for OctantApp {
             let (rect, _) = ui.allocate_exact_size(rect.size(), egui::Sense::drag());
 
             if let Some(renderer) = &self.renderer {
+                let effective_colormap = self.preview_colormap.unwrap_or(self.active_colormap);
                 let callback = eframe::egui_wgpu::Callback::new_paint_callback(
                     rect,
                     MatrixCallback {
                         renderer: renderer.clone(),
-                        colormap: self.active_colormap,
+                        colormap: effective_colormap,
                         rect,
                     },
                 );
