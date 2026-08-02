@@ -32,21 +32,21 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
 
     // Position floating panel centered horizontally fixed right above the bottom toolbar
     let screen_rect = ctx.screen_rect();
-    let panel_w = 420.0;
-    let panel_h = 56.0;
+    let panel_w = 470.0;
+    let panel_h = 62.0;
 
     let center_x = screen_rect.center().x;
     let bottom_bar_top = screen_rect.max.y - 42.0; // Bottom bar height + margin
     let panel_min = Pos2::new(center_x - (panel_w / 2.0), bottom_bar_top - panel_h - 6.0);
 
-    // Render foreground floating area overlay
+    // Render borderless glassmorphic floating area overlay
     egui::Area::new(egui::Id::new("octant_colorbar_overlay"))
         .order(egui::Order::Foreground)
         .fixed_pos(panel_min)
         .show(ctx, |ui| {
             egui::Frame::window(&ui.style())
-                .fill(Color32::from_black_alpha(225))
-                .stroke(egui::Stroke::new(1.0f32, Color32::from_white_alpha(60)))
+                .fill(Color32::from_black_alpha(210))
+                .stroke(egui::Stroke::NONE)
                 .inner_margin(6.0)
                 .show(ui, |ui| {
                     ui.set_width(panel_w - 12.0);
@@ -54,16 +54,15 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                     ui.vertical_centered(|ui| {
                         ui.label(
                             egui::RichText::new(&var_name)
-                                .small()
                                 .strong()
-                                .color(Color32::from_gray(235)),
+                                .color(Color32::from_gray(245)),
                         );
 
-                        ui.add_space(2.0);
+                        ui.add_space(3.0);
 
                         // Reserve rect for horizontal gradient bar inside panel
-                        let bar_w = 380.0;
-                        let bar_h = 12.0;
+                        let bar_w = 410.0;
+                        let bar_h = 13.0;
 
                         let content_rect = ui.available_rect_before_wrap();
                         let bar_min_x = content_rect.center().x - (bar_w / 2.0);
@@ -107,13 +106,8 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                         }
 
                         ui.painter().add(Shape::mesh(mesh));
-                        ui.painter().rect_stroke(
-                            bar_rect,
-                            0.0,
-                            egui::Stroke::new(1.0f32, Color32::from_white_alpha(100)),
-                        );
 
-                        // 2. Draw 5 Horizontal Tick Marks & Text Labels (100% Inside Outer Box)
+                        // 2. Draw 5 Horizontal Tick Marks & Text Labels (Matching playback font size)
                         let ticks = [
                             (0.00, min_val),
                             (0.25, min_val + (max_val - min_val) * 0.25),
@@ -123,7 +117,7 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                         ];
 
                         let tick_y_start = bar_rect.max.y;
-                        let tick_y_end = tick_y_start + 3.0;
+                        let tick_y_end = tick_y_start + 4.0;
 
                         for (t_pos, val) in ticks {
                             let x = bar_rect.min.x + t_pos * bar_rect.width();
@@ -145,11 +139,11 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
 
                             let label_text = format_scientific_tick(val);
                             ui.painter().text(
-                                Pos2::new(x, tick_y_end + 1.0),
+                                Pos2::new(x, tick_y_end + 2.0),
                                 align,
                                 label_text,
-                                egui::FontId::proportional(9.0),
-                                Color32::from_gray(215),
+                                egui::FontId::proportional(11.0),
+                                Color32::from_gray(230),
                             );
                         }
 
