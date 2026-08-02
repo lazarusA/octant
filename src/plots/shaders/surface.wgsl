@@ -49,19 +49,28 @@ fn vs_main(
         let data_idx = min(gy * uniforms.width + gx, max_data_idx);
         raw_val = data_buffer[data_idx];
 
-        let norm_val = clamp(raw_val / 100.0, 0.0, 1.0);
-        let height = (norm_val - 0.5) * 1.5 * uniforms.displacement_strength;
+        let height = (raw_val / 100.0) * 0.8 * uniforms.displacement_strength;
         pos_3d = vec3<f32>(model.position.x, height, model.position.y);
-        normal_3d = normalize(vec3<f32>(0.0, 1.0 + uniforms.displacement_strength * 0.5, 0.0));
+
+        // Compute local gradient surface normal for 3D peak and in-ward valley lighting
+        let val_left = data_buffer[gy * uniforms.width + max(gx, 1u) - 1u];
+        let val_right = data_buffer[gy * uniforms.width + min(gx + 1u, uniforms.width - 1u)];
+        let val_up = data_buffer[max(gy, 1u) - 1u * uniforms.width + gx];
+        let val_down = data_buffer[min(gy + 1u, max_data_idx / uniforms.width) * uniforms.width + gx];
+
+        let dh_dx = ((val_right - val_left) / 100.0) * 0.8 * uniforms.displacement_strength;
+        let dh_dy = ((val_down - val_up) / 100.0) * 0.8 * uniforms.displacement_strength;
+
+        normal_3d = normalize(vec3<f32>(-dh_dx, 1.0, -dh_dy));
     } else if (uniforms.surface_mode == 1u) {
-        // Mode 1: Flat Steps
+        // Mode 1: Flat Steps (Unsigned: Extrudes upward from base 0.0)
         raw_val = data_buffer[model.cell_index];
         let norm_val = clamp(raw_val / 100.0, 0.0, 1.0);
-        let height = (norm_val - 0.5) * 1.5 * uniforms.displacement_strength;
+        let height = norm_val * 0.6 * uniforms.displacement_strength;
         pos_3d = vec3<f32>(model.position.x, height, model.position.y);
         normal_3d = vec3<f32>(0.0, 1.0, 0.0);
     } else {
-        // Mode 2: 3D Lego Cubes (GPU Instanced Unit Cube draw!)
+        // Mode 2: 3D Lego Cubes (Signed: Positive -> Upward, Negative -> In-ward/Downward)
         let grid_h = max(arrayLength(&data_buffer) / uniforms.width, 1u);
         let cell_x = instance_idx % uniforms.width;
         let cell_y = instance_idx / uniforms.width;
@@ -70,9 +79,7 @@ fn vs_main(
         let safe_idx = min(instance_idx, max_idx);
         raw_val = data_buffer[safe_idx];
 
-        let norm_val = clamp(raw_val / 100.0, 0.0, 1.0);
-        let height = (norm_val - 0.5) * 1.5 * uniforms.displacement_strength;
-        let base_y = -0.75;
+        let height = (raw_val / 100.0) * 0.8 * uniforms.displacement_strength;
 
         let scale_x = 2.0 * uniforms.aspect_ratio;
         let scale_y = 2.0;
@@ -85,7 +92,14 @@ fn vs_main(
 
         let world_x = mix(x0, x1, model.position.x);
         let world_z = mix(y0, y1, model.position.y);
-        let world_y = mix(base_y, height, model.position.z); // model.position.z is 1.0 for top, 0.0 for base!
+
+        // Positive values extrude upward from 0.0; negative values extrude downward/in-ward from 0.0
+        var world_y: f32;
+        if (height >= 0.0) {
+            world_y = mix(0.0, height, model.position.z);
+        } else {
+            world_y = mix(height, 0.0, model.position.z);
+        }
 
         pos_3d = vec3<f32>(world_x, world_y, world_z);
         normal_3d = model.raw_normal;

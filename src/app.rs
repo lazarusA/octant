@@ -86,7 +86,7 @@ impl OctantApp {
             sphere_rotation_x: 0.25,
             sphere_auto_rotate: true,
             sphere_zoom: 2.5,
-            surface_displacement_strength: 1.0,
+            surface_displacement_strength: 0.3,
             surface_mode: 0,
             wgpu_render_state,
 

@@ -96,7 +96,7 @@ impl SurfaceRenderer {
             rotation_x: 0.4,
             aspect_ratio: 1.0,
             zoom: 2.5,
-            displacement_strength: 1.0,
+            displacement_strength: 0.3,
             surface_mode: 0,
             width: width as u32,
         };
