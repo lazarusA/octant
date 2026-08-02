@@ -167,21 +167,20 @@ impl MatrixRenderer {
 
     fn build_mesh(data: &[f32], width: usize, height: usize) -> Vec<MatrixVertex> {
         let mut vertices = Vec::with_capacity(width * height * 6);
-        let aspect = width as f32 / height as f32;
-
-        let scale_x = 1.8 * (if aspect > 1.0 { 1.0 } else { aspect });
-        let scale_y = 1.8 * (if aspect > 1.0 { 1.0 / aspect } else { 1.0 });
+        let scale_x = 2.0;
+        let scale_y = 2.0;
 
         for y in 0..height {
             for x in 0..width {
                 let idx = y * width + x;
                 let val = data.get(idx).copied().unwrap_or(0.0);
 
-                let x0 = -0.5 * scale_x + (x as f32 / width as f32) * scale_x;
-                let x1 = -0.5 * scale_x + ((x + 1) as f32 / width as f32) * scale_x;
+                let x0 = -1.0 + (x as f32 / width as f32) * scale_x;
+                let x1 = -1.0 + ((x + 1) as f32 / width as f32) * scale_x;
 
-                let y0 = 0.5 * scale_y - (y as f32 / height as f32) * scale_y;
-                let y1 = 0.5 * scale_y - ((y + 1) as f32 / height as f32) * scale_y;
+                let y0 = 1.0 - (y as f32 / height as f32) * scale_y;
+                let y1 = 1.0 - ((y + 1) as f32 / height as f32) * scale_y;
+
 
                 let u0 = x as f32 / width as f32;
                 let u1 = (x + 1) as f32 / width as f32;

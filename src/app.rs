@@ -279,256 +279,32 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
-        // 3. Side Control Panel UI
-        egui::SidePanel::left("octant_controls")
-            .resizable(false)
-            .default_width(330.0)
-            .show(ctx, |ui| {
-                ui.add_space(8.0);
-                ui.heading("Octant Engine");
-                ui.small("Multiscale Cloud & Local Tensor Visualizer");
-                ui.separator();
+        // 3. Render Top Navigation Bar & Bottom Playback Toolbar
+        crate::ui::top_bar::show_top_bar(self, ctx);
+        crate::ui::bottom_bar::show_bottom_bar(self, ctx);
 
-                ui.label(egui::RichText::new("Data Store Provider:").strong());
-                let old_store_kind = self.selected_store_kind;
-                egui::ComboBox::from_id_salt("store_kind_select")
-                    .selected_text(match self.selected_store_kind {
-                        StoreKind::RemoteZarr => "🌐 Remote Zarr (HTTP/S3)",
-                        StoreKind::LocalZarr => "📁 Local Zarr (FileSystem)",
-                        StoreKind::RemoteIcechunk => "🧊 Remote Icechunk (HTTP/S3)",
-                        StoreKind::LocalIcechunk => "🧊 Local Icechunk (FileSystem)",
-                        StoreKind::ProceduralRandom => "🎲 Procedural Random Test",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.selected_store_kind, StoreKind::RemoteZarr, "🌐 Remote Zarr (HTTP/S3)");
-                        ui.selectable_value(&mut self.selected_store_kind, StoreKind::LocalZarr, "📁 Local Zarr (FileSystem)");
-                        ui.selectable_value(&mut self.selected_store_kind, StoreKind::RemoteIcechunk, "🧊 Remote Icechunk (HTTP/S3)");
-                        ui.selectable_value(&mut self.selected_store_kind, StoreKind::LocalIcechunk, "🧊 Local Icechunk (FileSystem)");
-                        ui.selectable_value(&mut self.selected_store_kind, StoreKind::ProceduralRandom, "🎲 Procedural Random Test");
-                    });
-
-                if old_store_kind != self.selected_store_kind {
-                    match self.selected_store_kind {
-                        StoreKind::RemoteZarr => {
-                            self.store_target_input = "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string();
-                        }
-                        StoreKind::LocalZarr => {
-                            self.store_target_input = "./data/sample_dataset.zarr".to_string();
-                        }
-                        StoreKind::RemoteIcechunk => {
-                            self.store_target_input = "https://s3.amazonaws.com/icechunk-demo/repository".to_string();
-                        }
-                        StoreKind::LocalIcechunk => {
-                            self.store_target_input = "./data/icechunk_repo".to_string();
-                        }
-                        StoreKind::ProceduralRandom => {
-                            self.store_target_input = "procedural://random".to_string();
-                        }
-                    }
-                    self.inspect_active_store();
-                }
-
-                ui.add_space(6.0);
-                ui.label(egui::RichText::new("Store Path / URL Target:").strong());
-                ui.text_edit_singleline(&mut self.store_target_input);
-                ui.add_space(4.0);
-
-                ui.horizontal(|ui| {
-                    if ui.button("🔍 Inspect Store Metadata").clicked() {
-                        self.inspect_active_store();
-                    }
-                });
-                ui.add_space(8.0);
-
-                // Variable Selection & Dynamic Metadata Inspection
-                let mut var_changed = false;
-                ui.group(|ui| {
-                    ui.label(egui::RichText::new("Extracted Dataset Metadata").strong());
-                    if let Some(metadata) = &self.active_dataset_metadata {
-                        ui.label(format!("Provider: {}", metadata.store_type));
-                        ui.label(format!("Store: {}", metadata.name));
-                        ui.label(format!("Variables Found: {}", metadata.variables.len()));
-
-                        if !metadata.variables.is_empty() {
-                            ui.add_space(4.0);
-                            ui.label(egui::RichText::new("Select Active Variable:").strong());
-                            let old_var_idx = self.selected_variable_idx;
-
-                            let current_var_name = metadata
-                                .variables
-                                .get(self.selected_variable_idx)
-                                .map(|v| v.name.as_str())
-                                .unwrap_or("Select Variable");
-
-                            egui::ComboBox::from_id_salt("var_extracted_select")
-                                .selected_text(current_var_name)
-                                .show_ui(ui, |ui| {
-                                    for (idx, var_info) in metadata.variables.iter().enumerate() {
-                                        ui.selectable_value(&mut self.selected_variable_idx, idx, &var_info.name);
-                                    }
-                                });
-
-                            if old_var_idx != self.selected_variable_idx {
-                                var_changed = true;
-                            }
-
-                            if let Some(var_info) = metadata.variables.get(self.selected_variable_idx) {
-                                ui.add_space(4.0);
-                                ui.small(format!("DType: {}", var_info.data_type));
-                                ui.small(format!("Shape: {:?}", var_info.shape));
-                                ui.small(format!("Dimensions: {:?}", var_info.dimension_names));
-                                ui.small(format!("Chunks: {:?}", var_info.chunk_shape));
-                                let size_mb = var_info.file_size as f64 / (1024.0 * 1024.0);
-                                ui.small(format!("File Size: {} bytes ({:.2} MB)", var_info.file_size, size_mb));
-                            }
-                        }
-                    } else {
-                        ui.label("No store metadata inspected.");
-                    }
-                    ui.add_space(4.0);
-                    ui.small(&self.status_message);
-                });
-
-                if var_changed {
-                    self.load_selected_variable_slice();
-                }
-                ui.add_space(8.0);
-
-                // Colormap selection
-                ui.label(egui::RichText::new("GPU Colormap Routine:").strong());
-                egui::ComboBox::from_id_salt("cmap_select")
-                    .selected_text(match self.active_colormap {
-                        0 => "Viridis (Thermal)",
-                        1 => "Plasma (Spectral)",
-                        2 => "Inferno (Radiance)",
-                        _ => "Magma",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.active_colormap, 0, "Viridis (Thermal)");
-                        ui.selectable_value(&mut self.active_colormap, 1, "Plasma (Spectral)");
-                        ui.selectable_value(&mut self.active_colormap, 2, "Inferno (Radiance)");
-                        ui.selectable_value(&mut self.active_colormap, 3, "Magma");
-                    });
-                ui.add_space(10.0);
-
-                // Playback & Animation Control Group
-                let max_steps = self.matrix_data.as_ref().map(|h| h.max_timesteps).unwrap_or(1);
-                ui.group(|ui| {
-                    ui.label(egui::RichText::new("🎬 Animation & Playback Controls").strong());
-                    ui.add_space(4.0);
-
-                    ui.horizontal(|ui| {
-                        let play_btn_text = if self.is_playing { "⏸ Pause" } else { "▶ Play" };
-                        if ui.button(egui::RichText::new(play_btn_text).strong()).clicked() {
-                            self.is_playing = !self.is_playing;
-                            self.last_step_time = std::time::Instant::now();
-                        }
-
-                        if ui.button("◀ Prev").clicked() {
-                            if self.current_timestep > 0 {
-                                self.current_timestep -= 1;
-                            } else if max_steps > 0 {
-                                self.current_timestep = max_steps - 1;
-                            }
-                            self.load_selected_variable_slice();
-                        }
-
-                        if ui.button("Next ▶").clicked() {
-                            if max_steps > 0 {
-                                self.current_timestep = (self.current_timestep + 1) % max_steps;
-                            }
-                            self.load_selected_variable_slice();
-                        }
-
-                        ui.checkbox(&mut self.loop_playback, "🔄 Loop");
-                    });
-
-                    ui.add_space(4.0);
-                    ui.horizontal(|ui| {
-                        ui.label("Playback Speed:");
-                        ui.add(egui::Slider::new(&mut self.playback_fps, 1.0..=60.0).suffix(" FPS"));
-                    });
-
-                    ui.add_space(4.0);
-                    let slider_max = max_steps.saturating_sub(1);
-                    ui.label(format!("Timestep Index: {} / {}", self.current_timestep + 1, max_steps));
-                    let slider_res = ui.add(
-                        egui::Slider::new(&mut self.current_timestep, 0..=slider_max)
-                            .text("Time Slice"),
-                    );
-                    if slider_res.drag_stopped() || slider_res.changed() && !self.is_playing {
-                        self.load_selected_variable_slice();
-                    }
-                });
-                ui.add_space(10.0);
-
-                // LRU Cache & Prefetcher Statistics Group
-                ui.group(|ui| {
-                    ui.label(egui::RichText::new("🧠 LRU Slice Cache & Prefetcher").strong());
-                    ui.add_space(4.0);
-
-                    let current_bytes = self.lru_cache.current_bytes();
-                    let current_mb = current_bytes as f64 / (1024.0 * 1024.0);
-                    let max_bytes = self.lru_cache.max_bytes();
-                    let fraction = (current_bytes as f32 / max_bytes as f32).clamp(0.0, 1.0);
-
-                    ui.label(egui::RichText::new("Memory Usage (1GB Default Limit):").small());
-                    ui.add(
-                        egui::ProgressBar::new(fraction).text(format!(
-                            "{:.2} MB / {} MB ({:.1}%)",
-                            current_mb,
-                            self.max_cache_mb,
-                            fraction * 100.0
-                        )),
-                    );
-
-                    ui.add_space(4.0);
-                    ui.small(format!(
-                        "Cached Slices: {} | Target Lookahead: {} slices",
-                        self.lru_cache.cached_count(),
-                        self.prefetch_lookahead
-                    ));
-
-                    ui.small(format!(
-                        "Hits: {} | Misses: {} (Hit Rate: {:.1}%)",
-                        self.lru_cache.hits(),
-                        self.lru_cache.misses(),
-                        self.lru_cache.hit_rate()
-                    ));
-
-                    let pending = self.prefetcher.pending_count();
-                    if pending > 0 {
-                        ui.small(format!("🟢 Background Prefetching: {} slices queued", pending));
-                    } else {
-                        ui.small("⚪ Buffer Warm / Prefetch Idle");
-                    }
-
-                    ui.add_space(6.0);
-                    ui.collapsing("⚙ Cache Settings", |ui| {
-                        let old_mb = self.max_cache_mb;
-                        ui.add(
-                            egui::Slider::new(&mut self.max_cache_mb, 256..=4096)
-                                .text("Max Capacity (MB)"),
-                        );
-                        if old_mb != self.max_cache_mb {
-                            self.lru_cache.set_max_bytes(self.max_cache_mb * 1024 * 1024);
-                        }
-
-                        ui.add(
-                            egui::Slider::new(&mut self.prefetch_lookahead, 12..=48)
-                                .text("Prefetch Lookahead Slices"),
-                        );
-
-                        if ui.button("🗑 Flush & Clear Cache").clicked() {
-                            self.lru_cache.clear();
-                        }
-                    });
-                });
-            });
-
-        // 4. Interactive Heatmap Matrix Canvas Area
+        // 4. Centered Drawing Canvas Area with Aspect Data Ratio
         egui::CentralPanel::default().show(ctx, |ui| {
-            let rect = ui.available_rect_before_wrap();
+            let available_rect = ui.available_rect_before_wrap();
+
+            // Enforce aspect data ratio (matrix.width / matrix.height)
+            let rect = if let Some(matrix) = &self.matrix_data {
+                let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.01);
+                let avail_w = available_rect.width();
+                let avail_h = available_rect.height();
+                let avail_aspect = avail_w / avail_h.max(1.0);
+
+                let (plot_w, plot_h) = if avail_aspect > data_aspect {
+                    (avail_h * data_aspect, avail_h)
+                } else {
+                    (avail_w, avail_w / data_aspect)
+                };
+
+                egui::Rect::from_center_size(available_rect.center(), egui::vec2(plot_w, plot_h))
+            } else {
+                available_rect
+            };
+
             let (rect, _) = ui.allocate_exact_size(rect.size(), egui::Sense::drag());
 
             if let Some(renderer) = &self.renderer {
@@ -543,63 +319,8 @@ impl eframe::App for OctantApp {
 
                 ui.painter().add(callback);
             }
-
-            // Overlay Heatmap & Playback Information Card
-            if let Some(matrix) = &self.matrix_data {
-                let overlay_rect = egui::Rect::from_min_size(
-                    rect.min + egui::vec2(16.0, 16.0),
-                    egui::vec2(380.0, 80.0),
-                );
-                ui.put(overlay_rect, |ui: &mut egui::Ui| {
-                    egui::Frame::popup(ui.style())
-                        .fill(egui::Color32::from_black_alpha(210))
-                        .rounding(6.0)
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label(
-                                    egui::RichText::new(&matrix.dataset_name)
-                                        .strong()
-                                        .color(egui::Color32::WHITE),
-                                );
-                                if self.is_playing {
-                                    ui.label(
-                                        egui::RichText::new("[▶ PLAYING]")
-                                            .small()
-                                            .color(egui::Color32::GREEN),
-                                    );
-                                } else {
-                                    ui.label(
-                                        egui::RichText::new("[⏸ PAUSED]")
-                                            .small()
-                                            .color(egui::Color32::LIGHT_GRAY),
-                                    );
-                                }
-                            });
-
-                            ui.small(format!(
-                                "Grid: {}x{} cells | Colormap: {} | Timestep: {}/{}",
-                                matrix.width,
-                                matrix.height,
-                                match self.active_colormap {
-                                    0 => "Viridis",
-                                    1 => "Plasma",
-                                    2 => "Inferno",
-                                    _ => "Magma",
-                                },
-                                self.current_timestep + 1,
-                                matrix.max_timesteps
-                            ));
-
-                            ui.small(format!(
-                                "LRU Cache: {} slices ({:.1} MB) | Hit Rate: {:.1}%",
-                                self.lru_cache.cached_count(),
-                                self.lru_cache.current_bytes() as f64 / (1024.0 * 1024.0),
-                                self.lru_cache.hit_rate()
-                            ));
-                        })
-                        .response
-                });
-            }
         });
     }
 }
+
+

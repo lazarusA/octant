@@ -3,7 +3,9 @@ pub mod cache;
 mod matrix_data;
 mod renderer;
 mod stores;
+pub mod ui;
 pub mod utils;
+
 
 
 use app::OctantApp;
