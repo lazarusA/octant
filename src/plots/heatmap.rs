@@ -4,16 +4,16 @@ use wgpu::util::DeviceExt;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub struct MatrixVertex {
+pub struct HeatmapVertex {
     pub position: [f32; 2],
     pub uv: [f32; 2],
     pub val: f32,
 }
 
-impl MatrixVertex {
+impl HeatmapVertex {
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<MatrixVertex>() as wgpu::BufferAddress,
+            array_stride: std::mem::size_of::<HeatmapVertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
                 wgpu::VertexAttribute {
@@ -38,14 +38,14 @@ impl MatrixVertex {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub struct MatrixUniforms {
+pub struct HeatmapUniforms {
     pub colormap: u32,
     pub _pad0: u32,
     pub _pad1: u32,
     pub _pad2: u32,
 }
 
-pub struct MatrixRenderer {
+pub struct HeatmapRenderer {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
@@ -53,7 +53,7 @@ pub struct MatrixRenderer {
     num_vertices: u32,
 }
 
-impl MatrixRenderer {
+impl HeatmapRenderer {
     pub fn new(
         device: &wgpu::Device,
         target_format: wgpu::TextureFormat,
@@ -61,12 +61,24 @@ impl MatrixRenderer {
         width: usize,
         height: usize,
     ) -> Self {
+        let shader_source = concat!(
+            include_str!("shaders/colormaps/viridis.wgsl"), "\n",
+            include_str!("shaders/colormaps/plasma.wgsl"), "\n",
+            include_str!("shaders/colormaps/inferno.wgsl"), "\n",
+            include_str!("shaders/colormaps/magma.wgsl"), "\n",
+            include_str!("shaders/colormaps/turbo.wgsl"), "\n",
+            include_str!("shaders/colormaps/coolwarm.wgsl"), "\n",
+            include_str!("shaders/colormaps/cividis.wgsl"), "\n",
+            include_str!("shaders/colormaps/mod.wgsl"), "\n",
+            include_str!("shaders/heatmap.wgsl")
+        );
+
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Matrix Heatmap Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+            label: Some("Heatmap Shader Module"),
+            source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
-        let initial_uniforms = MatrixUniforms {
+        let initial_uniforms = HeatmapUniforms {
             colormap: 0,
             _pad0: 0,
             _pad1: 0,
@@ -74,13 +86,13 @@ impl MatrixRenderer {
         };
 
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Matrix Uniform Buffer"),
+            label: Some("Heatmap Uniform Buffer"),
             contents: bytemuck::bytes_of(&initial_uniforms),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Matrix Bind Group Layout"),
+            label: Some("Heatmap Bind Group Layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::FRAGMENT,
@@ -94,7 +106,7 @@ impl MatrixRenderer {
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Matrix Bind Group"),
+            label: Some("Heatmap Bind Group"),
             layout: &bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
@@ -103,18 +115,18 @@ impl MatrixRenderer {
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Matrix Pipeline Layout"),
+            label: Some("Heatmap Pipeline Layout"),
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[],
         });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Matrix Render Pipeline"),
+            label: Some("Heatmap Render Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[MatrixVertex::desc()],
+                buffers: &[HeatmapVertex::desc()],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -141,7 +153,7 @@ impl MatrixRenderer {
         let vertices = Self::build_mesh(matrix_data, width, height);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Matrix Vertex Buffer"),
+            label: Some("Heatmap Vertex Buffer"),
             contents: bytemuck::cast_slice(&vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
@@ -156,7 +168,7 @@ impl MatrixRenderer {
     }
 
     pub fn update_colormap(&self, queue: &wgpu::Queue, colormap: u32) {
-        let uniforms = MatrixUniforms {
+        let uniforms = HeatmapUniforms {
             colormap,
             _pad0: 0,
             _pad1: 0,
@@ -165,7 +177,7 @@ impl MatrixRenderer {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
-    fn build_mesh(data: &[f32], width: usize, height: usize) -> Vec<MatrixVertex> {
+    fn build_mesh(data: &[f32], width: usize, height: usize) -> Vec<HeatmapVertex> {
         let mut vertices = Vec::with_capacity(width * height * 6);
         let scale_x = 2.0;
         let scale_y = 2.0;
@@ -181,16 +193,15 @@ impl MatrixRenderer {
                 let y0 = 1.0 - (y as f32 / height as f32) * scale_y;
                 let y1 = 1.0 - ((y + 1) as f32 / height as f32) * scale_y;
 
-
                 let u0 = x as f32 / width as f32;
                 let u1 = (x + 1) as f32 / width as f32;
                 let v0 = y as f32 / height as f32;
                 let v1 = (y + 1) as f32 / height as f32;
 
-                let v_tl = MatrixVertex { position: [x0, y0], uv: [u0, v0], val };
-                let v_tr = MatrixVertex { position: [x1, y0], uv: [u1, v0], val };
-                let v_bl = MatrixVertex { position: [x0, y1], uv: [u0, v1], val };
-                let v_br = MatrixVertex { position: [x1, y1], uv: [u1, v1], val };
+                let v_tl = HeatmapVertex { position: [x0, y0], uv: [u0, v0], val };
+                let v_tr = HeatmapVertex { position: [x1, y0], uv: [u1, v0], val };
+                let v_bl = HeatmapVertex { position: [x0, y1], uv: [u0, v1], val };
+                let v_br = HeatmapVertex { position: [x1, y1], uv: [u1, v1], val };
 
                 vertices.push(v_tl);
                 vertices.push(v_bl);
@@ -206,13 +217,13 @@ impl MatrixRenderer {
     }
 }
 
-pub struct MatrixCallback {
-    pub renderer: Arc<MatrixRenderer>,
+pub struct HeatmapCallback {
+    pub renderer: Arc<HeatmapRenderer>,
     pub colormap: u32,
     pub rect: egui::Rect,
 }
 
-impl eframe::egui_wgpu::CallbackTrait for MatrixCallback {
+impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
     fn prepare(
         &self,
         _device: &wgpu::Device,
@@ -246,3 +257,7 @@ impl eframe::egui_wgpu::CallbackTrait for MatrixCallback {
         rpass.draw(0..self.renderer.num_vertices, 0..1);
     }
 }
+
+// Backward compatibility alias during refactoring
+pub type MatrixRenderer = HeatmapRenderer;
+pub type MatrixCallback = HeatmapCallback;

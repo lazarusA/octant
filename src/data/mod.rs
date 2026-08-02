@@ -1,6 +1,7 @@
+pub mod matrix_data;
+
 use std::sync::Arc;
-use zarrs::array::{Array, ArrayBuilder, DataType, FillValue};
-use zarrs::array_subset::ArraySubset;
+use zarrs::array::{Array, ArrayBuilder, ArraySubset, FillValue};
 use zarrs::storage::store::MemoryStore;
 use zarrs::storage::WritableStorageTraits;
 
@@ -52,8 +53,8 @@ impl ZarrHeatmapData {
 
         let array = ArrayBuilder::new(
             shape.clone(),
-            DataType::Float32,
-            chunk_shape.try_into()?,
+            chunk_shape.as_slice(),
+            "float32",
             FillValue::from(0.0f32),
         )
         .build(store.clone(), array_path)?;
@@ -85,9 +86,9 @@ impl ZarrHeatmapData {
         }
 
         let subset = ArraySubset::new_with_shape(shape.clone());
-        array.store_array_subset_elements(&subset, &raw_data)?;
+        array.store_array_subset(&subset, &raw_data)?;
 
-        let read_values = array.retrieve_array_subset_elements::<f32>(&subset)?;
+        let read_values = array.retrieve_array_subset::<Vec<f32>>(&subset)?;
 
         Ok(Self {
             width,
@@ -138,7 +139,7 @@ impl ZarrHeatmapData {
             0..width as u64,
         ]);
 
-        let raw_values = array.retrieve_array_subset_elements::<f32>(&subset)?;
+        let raw_values = array.retrieve_array_subset::<Vec<f32>>(&subset)?;
 
         // Compute min and max across all valid matrix values
         let valid_vals: Vec<f32> = raw_values

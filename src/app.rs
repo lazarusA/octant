@@ -1,6 +1,6 @@
 use crate::cache::{SliceCacheKey, SliceLruCache, SlicePrefetcher};
-use crate::matrix_data::MatrixData;
-use crate::renderer::{MatrixCallback, MatrixRenderer};
+use crate::data::matrix_data::MatrixData;
+use crate::plots::{MatrixCallback, MatrixRenderer, PlotType};
 use crate::stores::{
     icechunk_local::IcechunkLocalStore, icechunk_remote::IcechunkRemoteStore,
     zarr_local::ZarrLocalStore, zarr_remote::ZarrRemoteStore, DataStore, DatasetMetadata, VariableInfo,
@@ -22,6 +22,7 @@ pub struct OctantApp {
     pub active_dataset_metadata: Option<DatasetMetadata>,
     pub selected_variable_idx: usize,
     pub current_timestep: usize,
+    pub active_plot_type: PlotType,
     pub active_colormap: u32,
     pub preview_colormap: Option<u32>,
     pub status_message: String,
@@ -62,6 +63,7 @@ impl OctantApp {
             active_dataset_metadata: None,
             selected_variable_idx: 0,
             current_timestep: 0,
+            active_plot_type: PlotType::Heatmap,
             active_colormap: 0,
             preview_colormap: None,
             status_message: "Ready. Select store and click Inspect Store Metadata.".to_string(),

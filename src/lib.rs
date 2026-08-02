@@ -1,9 +1,8 @@
 pub mod app;
 pub mod cache;
 pub mod catalog;
-pub mod matrix_data;
-pub mod pipeline;
-pub mod renderer;
+pub mod data;
+pub mod plots;
 pub mod stores;
 pub mod ui;
 pub mod utils;

@@ -1,8 +1,8 @@
 mod app;
 pub mod cache;
 pub mod catalog;
-mod matrix_data;
-mod renderer;
+pub mod data;
+pub mod plots;
 mod stores;
 pub mod ui;
 pub mod utils;

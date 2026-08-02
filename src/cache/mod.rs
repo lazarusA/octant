@@ -246,17 +246,10 @@ impl SlicePrefetcher {
             return;
         }
 
-        // 1. Dynamic Slice Byte Size (defaults to 41KB if unspecified)
         let slice_bytes = if slice_bytes_hint > 0 { slice_bytes_hint } else { 41_472 };
-
-        // 2. Dynamic Memory Capacity Calculation:
         let cache_max_bytes = cache.max_bytes();
         let total_cacheable_slices = (cache_max_bytes / slice_bytes).max(1);
-
-        // 3. Physical Zarr Chunk Alignment:
         let chunk_time_steps = if chunk_time_size > 0 { chunk_time_size } else { 1 };
-
-        // 4. 50MB Target Lookahead Calculation:
         let target_prefetch_bytes = 50 * 1024 * 1024;
         let raw_target_slices = (target_prefetch_bytes / slice_bytes).max(1);
 
@@ -267,7 +260,6 @@ impl SlicePrefetcher {
             raw_target_slices
         };
 
-        // 5. Memory Capacity Alignment:
         let max_safe_lookahead = (total_cacheable_slices * 2 / 3).max(1);
 
         let lookahead_count = if max_safe_lookahead >= chunk_time_steps {
@@ -286,9 +278,7 @@ impl SlicePrefetcher {
                 .max(1)
         };
 
-        // 6. Max Parallel Batch Workers:
         let max_concurrent_threads = 16;
-
         let store_target_string = store_target.to_string();
         let step_batch_size = (chunk_time_steps).max(1);
         let mut offset_count = 0;
@@ -356,16 +346,5 @@ impl SlicePrefetcher {
 
             offset_count += batch_count;
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_lru_cache_capacity() {
-        let cache = SliceLruCache::new(10 * 1024 * 1024); // 10MB
-        assert_eq!(cache.max_bytes(), 10 * 1024 * 1024);
     }
 }

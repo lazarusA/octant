@@ -9,6 +9,9 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             (1, "Plasma (Spectral)"),
             (2, "Inferno (Radiance)"),
             (3, "Magma (Density)"),
+            (4, "Turbo (Rainbow)"),
+            (5, "Coolwarm (Diverging)"),
+            (6, "Cividis (Accessible)"),
         ];
 
         for (id, name) in colormaps {
