@@ -11,8 +11,13 @@ pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
                 ui.label(egui::RichText::new("📐 Octant").strong().heading());
                 ui.separator();
 
-                // Dropdown menus: Store, Variables, Colormap
+                // Dropdown menus: Store, Catalog, Variables, Colormap
                 store::show_store_menu(app, ui);
+
+                if ui.button(egui::RichText::new("📚 Catalog").strong()).clicked() {
+                    app.show_catalog_window = true;
+                }
+
                 variables::show_variables_menu(app, ui);
                 colormap::show_colormap_menu(app, ui);
 

@@ -59,6 +59,12 @@ pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             app.inspect_active_store();
         }
 
+        ui.add_space(4.0);
+        if ui.button(egui::RichText::new("📚 Open Dataset Catalog...").strong()).clicked() {
+            app.show_catalog_window = true;
+            ui.close_menu();
+        }
+
         ui.separator();
         ui.menu_button("ℹ About Store", |ui| {
             ui.set_min_width(260.0);

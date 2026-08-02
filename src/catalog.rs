@@ -1,0 +1,290 @@
+use crate::app::StoreKind;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CatalogEntry {
+    pub key: &'static str,
+    pub label: &'static str,
+    pub subtitle: &'static str,
+    pub store: &'static str,
+    pub store_kind: StoreKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CatalogCategoryFilter {
+    All,
+    Zarr,
+    Icechunk,
+}
+
+pub static ZARR_CATALOG: &[CatalogEntry] = &[
+    CatalogEntry {
+        key: "seasfire",
+        label: "SeasFire Cube",
+        subtitle: "A Global Dataset for Seasonal Fire Modeling in the Earth System",
+        store: "https://s3.bgc-jena.mpg.de:9000/misc/seasfire_rechunked.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "ESDC",
+        label: "ESDC",
+        subtitle: "Earth System Data Cube v3.0.2",
+        store: "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "precipitation",
+        label: "Precipitation (EC-Earth3P-HR)",
+        subtitle: "Precipitation data from EC-Earth3P-HR highresSST-present",
+        store: "https://storage.googleapis.com/cmip6/CMIP6/HighResMIP/EC-Earth-Consortium/EC-Earth3P-HR/highresSST-present/r1i1p1f1/Amon/pr/gr/v20170811/",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "arco-ocean",
+        label: "ARCO-OCEAN",
+        subtitle: "Global Ocean Reanalysis Daily",
+        store: "https://ogs-arco-ocean.s3.eu-south-1.amazonaws.com/dataset/tres=1d/res=0p25/levels=10/",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "cmip6-mpi-esm1-2-hr-tas",
+        label: "CMIP6 MPI-ESM1-2-HR",
+        subtitle: "Historical Near-Surface Air Temperature",
+        store: "https://storage.googleapis.com/cmip6/CMIP6/CMIP/MPI-M/MPI-ESM1-2-HR/historical/r1i1p1f1/Amon/tas/gn/v20190710/",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "cmip6-pmip-ipsl-cm6a-lr-tas",
+        label: "CMIP6 PMIP IPSL-CM6A-LR",
+        subtitle: "Mid-Holocene Near-Surface Air Temperature",
+        store: "https://storage.googleapis.com/cmip6/CMIP6/PMIP/IPSL/IPSL-CM6A-LR/midHolocene/r1i1p1f3/Amon/tas/gr/v20180926/",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "cmip6-hadgem3-gc31-hm-tas",
+        label: "CMIP6 HighResMIP HadGEM3-GC31-HM",
+        subtitle: "Near-Surface Air Temperature",
+        store: "https://storage.googleapis.com/cmip6/CMIP6/HighResMIP/MOHC/HadGEM3-GC31-HM/highresSST-present/r1i1p1f1/Amon/tas/gn/v20170831/",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "indian-ocean-chl",
+        label: "Indian Ocean Physical and Biological Variables",
+        subtitle: "",
+        store: "https://storage.googleapis.com/nmfs_odp_nwfsc/CB/mind_the_chl_gap/IO.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "nasa-mur-sst",
+        label: "NASA MUR Sea Surface Temperature",
+        subtitle: "Multi-scale Ultra-high Resolution SST",
+        store: "https://mur-sst.s3.us-west-2.amazonaws.com/zarr-v1/",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "cmip6-gfdl-esm4-tos",
+        label: "CMIP6 NOAA GFDL-ESM4",
+        subtitle: "Historical Sea Surface Temperature",
+        store: "https://storage.googleapis.com/cmip6/CMIP6/CMIP/NOAA-GFDL/GFDL-ESM4/historical/r2i1p1f1/Omon/tos/gn/v20180701/",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "cmip6-awi-cm-1-1-mr-tos",
+        label: "CMIP6 AWI-CM-1-1-MR",
+        subtitle: "Historical Daily Sea Surface Temperature",
+        store: "https://cmip6-pds.s3.amazonaws.com/CMIP6/CMIP/AWI/AWI-CM-1-1-MR/historical/r1i1p1f1/Oday/tos/gn/v20181218/",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "carbonplan-antarctic-era5",
+        label: "CarbonPlan Antarctic ERA5 Reanalysis",
+        subtitle: "",
+        store: "https://carbonplan-share.s3.us-west-2.amazonaws.com/zarr-layer-examples/antarctic_era5.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "silam-dust",
+        label: "SILAM Global Dust Model Forecasts",
+        subtitle: "Dust",
+        store: "https://data.source.coop/bkr/silam-dust/silam_global_dust_v3.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "silam-dust-v2",
+        label: "SILAM Global Dust Model Forecasts (v2)",
+        subtitle: "Dust",
+        store: "https://data.source.coop/bkr/silam-dust/data.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "gefs-35day-direct",
+        label: "NOAA GEFS 35-day Ensemble Forecast",
+        subtitle: "",
+        store: "https://data.dynamical.org/noaa/gefs/forecast-35-day/latest.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+];
+
+pub static ICECHUNK_CATALOG: &[CatalogEntry] = &[
+    CatalogEntry {
+        key: "noaa-hrrr-forecast-48-hour-virtual",
+        label: "NOAA HRRR (High-Resolution Rapid Refresh)",
+        subtitle: "3 km resolution, Continental US, hourly steps out to 48 hours",
+        store: "https://dynamical-noaa-hrrr.s3.us-west-2.amazonaws.com/noaa-hrrr-forecast-48-hour-virtual/v0.5.0.icechunk/",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "chirps-daily",
+        label: "CHIRPS Daily Precipitation",
+        subtitle: "",
+        store: "https://data.source.coop/e4drr-project/observations/chirps_daily_icechunk",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "earthmover-era5-surface",
+        label: "Earthmover ERA5 Surface Reanalysis",
+        subtitle: "Multi-Variable",
+        store: "https://earthmover-icechunk-era5.s3.us-east-1.amazonaws.com/era5_surface_aws",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "noaa-gfs-forecast",
+        label: "NOAA GFS",
+        subtitle: "Global Weather Forecast",
+        store: "https://dynamical-noaa-gfs.s3.us-west-2.amazonaws.com/noaa-gfs-forecast/v0.2.7.icechunk/",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "dwd-icon-eu-forecast",
+        label: "DWD ICON-EU",
+        subtitle: "Numerical Weather Forecast",
+        store: "https://dynamical-dwd-icon-eu.s3.us-west-2.amazonaws.com/dwd-icon-eu-forecast-5-day/v0.2.0.icechunk/",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "ecmwf-aifs-single-forecast",
+        label: "ECMWF AIFS Single Forecast",
+        subtitle: "Artificial Intelligence Forecasting System",
+        store: "https://dynamical-ecmwf-aifs-single.s3.us-west-2.amazonaws.com/ecmwf-aifs-single-forecast/v0.1.0.icechunk/",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "metoffice-global-wave",
+        label: "UK Met Office Global Wave Forecast",
+        subtitle: "",
+        store: "https://data.source.coop/bkr/metoffice/metoffice_global_wave.icechunk",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "metoffice-global-deterministic-6h",
+        label: "UK Met Office Global Deterministic Atmosphere Forecast",
+        subtitle: "6-hourly 24hr",
+        store: "https://data.source.coop/bkr/metoffice/metoffice_global_deterministic_10km_6hourly_24hr.icechunk",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "nasa-geos-15min",
+        label: "NASA GEOS Atmospheric Reanalysis",
+        subtitle: "15-minute",
+        store: "https://data.source.coop/bkr/geos/geos_15min.icechunk",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "metoffice-global-deterministic-11h",
+        label: "UK Met Office Global Deterministic Atmosphere Forecast",
+        subtitle: "11-hour",
+        store: "https://data.source.coop/bkr/metoffice/metoffice_global_deterministic_10km_11hour.icechunk",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "metoffice-global-deterministic",
+        label: "UK Met Office Global Deterministic Atmosphere Forecast",
+        subtitle: "",
+        store: "https://data.source.coop/bkr/metoffice/metoffice_global_deterministic_10km.icechunk",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "noaa-hrrr-analysis",
+        label: "NOAA HRRR",
+        subtitle: "High-Resolution Rapid Refresh Analysis",
+        store: "https://dynamical-noaa-hrrr.s3.us-west-2.amazonaws.com/noaa-hrrr-analysis/v0.2.0.icechunk/",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "noaa-mrms-conus-hourly",
+        label: "NOAA MRMS CONUS",
+        subtitle: "Hourly Radar-Based Precipitation Analysis",
+        store: "https://dynamical-noaa-mrms.s3.amazonaws.com/noaa-mrms-conus-analysis-hourly/v0.3.0.icechunk/",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "ecmwf-aifs-ens-forecast",
+        label: "ECMWF AIFS Ensemble Forecast",
+        subtitle: "",
+        store: "https://dynamical-ecmwf-aifs-ens.s3.us-west-2.amazonaws.com/ecmwf-aifs-ens-forecast/v0.1.0.icechunk/",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "ecmwf-ifs-ens-15day",
+        label: "ECMWF IFS Ensemble 15-day Weather Forecast",
+        subtitle: "0.25°",
+        store: "https://dynamical-ecmwf-ifs-ens.s3.us-west-2.amazonaws.com/ecmwf-ifs-ens-forecast-15-day-0-25-degree/v0.1.0.icechunk/",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "noaa-gefs-35day-forecast",
+        label: "NOAA GEFS 35-day Ensemble Forecast",
+        subtitle: "",
+        store: "https://dynamical-noaa-gefs.s3.us-west-2.amazonaws.com/noaa-gefs-forecast-35-day/v0.2.0.icechunk/",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "silam-aerosol",
+        label: "SILAM Global Dust Model Forecasts",
+        subtitle: "Aerosol",
+        store: "https://data.source.coop/bkr/silam-dust/silam_aerosol.icechunk",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "cams-aerosol-analysis",
+        label: "CAMS Aerosol Analysis",
+        subtitle: "Copernicus CAMS Operational Archive",
+        store: "https://data.source.coop/bkr/cams/cams.icechunk",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "cams-aerosol-forecast",
+        label: "CAMS Aerosol Forecast",
+        subtitle: "Copernicus CAMS Operational Archive",
+        store: "https://data.source.coop/bkr/cams/cams_analysis_and_forecast.icechunk",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "nasa-rasi",
+        label: "NASA RASI",
+        subtitle: "Risk Analysis and Solutions Innovators",
+        store: "https://nasa-waterinsight.s3.us-west-2.amazonaws.com/virtual-zarr-store/icechunk/RASI/HISTORICAL/",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "alaska-hrrr",
+        label: "Alaska HRRR",
+        subtitle: "",
+        store: "https://data.source.coop/bkr/dmi/alaska_hrrr.icechunk",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+    CatalogEntry {
+        key: "ndvi-test",
+        label: "NDVI",
+        subtitle: "Normalized Difference Vegetation Index",
+        store: "https://data.source.coop/eeholmes/chlaz/icechunk",
+        store_kind: StoreKind::RemoteIcechunk,
+    },
+];
+
+pub fn get_catalog_entries(filter: CatalogCategoryFilter) -> Vec<&'static CatalogEntry> {
+    match filter {
+        CatalogCategoryFilter::All => ZARR_CATALOG.iter().chain(ICECHUNK_CATALOG.iter()).collect(),
+        CatalogCategoryFilter::Zarr => ZARR_CATALOG.iter().collect(),
+        CatalogCategoryFilter::Icechunk => ICECHUNK_CATALOG.iter().collect(),
+    }
+}

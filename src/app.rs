@@ -44,6 +44,11 @@ pub struct OctantApp {
     pub playback_fps: f32,
     pub loop_playback: bool,
     pub last_step_time: std::time::Instant,
+
+    // Catalog State
+    pub show_catalog_window: bool,
+    pub catalog_search_query: String,
+    pub catalog_category_filter: crate::catalog::CatalogCategoryFilter,
 }
 
 impl OctantApp {
@@ -77,6 +82,10 @@ impl OctantApp {
             playback_fps: 15.0,
             loop_playback: true,
             last_step_time: std::time::Instant::now(),
+
+            show_catalog_window: false,
+            catalog_search_query: String::new(),
+            catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
         };
 
         // App starts clean without auto-fetching. User clicks "Fetch Store Metadata" when ready.
@@ -321,6 +330,7 @@ impl eframe::App for OctantApp {
         // 3. Render Top Navigation Bar & Bottom Playback Toolbar
         crate::ui::top_bar::show_top_bar(self, ctx);
         crate::ui::bottom_bar::show_bottom_bar(self, ctx);
+        crate::ui::catalog::show_catalog_window(self, ctx);
 
         // 4. Centered Drawing Canvas Area with Aspect Data Ratio
         egui::CentralPanel::default().show(ctx, |ui| {
