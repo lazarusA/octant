@@ -1,5 +1,5 @@
 use crate::stores::{MatrixSlice, VariableInfo};
-use crate::utils::grid::check_and_orient_axes;
+use crate::utils::grid::check_and_orient_axes_with_coords;
 use crate::utils::units;
 use crate::utils::units::calculate_variable_size_bytes;
 use object_store::http::HttpBuilder;
@@ -322,6 +322,7 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
 pub fn fetch_all_dimension_coordinates(
     store: ReadableWritableListableStorage,
     dim_names: &[String],
+    target_hint: Option<&str>,
 ) -> HashMap<String, Vec<String>> {
     let mut map = HashMap::new();
 
@@ -348,17 +349,21 @@ pub fn fetch_all_dimension_coordinates(
                 let subset = ArraySubset::new_with_ranges(&[0..len as u64]);
                 let mut coords = Vec::with_capacity(len);
 
+                let attrs = array.attributes();
+                let time_units = attrs.get("units").and_then(|v| v.as_str());
+                let time_start = attrs.get("time_coverage_start").and_then(|v| v.as_str());
+
                 if let Ok(vec_f64) = array.retrieve_array_subset::<Vec<f64>>(&subset) {
                     for (idx, &val) in vec_f64.iter().enumerate() {
-                        coords.push(format_dim_value(&dim_clean, val, idx));
+                        coords.push(format_dim_value(&dim_clean, val, idx, time_units, time_start, target_hint));
                     }
                 } else if let Ok(vec_f32) = array.retrieve_array_subset::<Vec<f32>>(&subset) {
                     for (idx, &val) in vec_f32.iter().enumerate() {
-                        coords.push(format_dim_value(&dim_clean, val as f64, idx));
+                        coords.push(format_dim_value(&dim_clean, val as f64, idx, time_units, time_start, target_hint));
                     }
                 } else if let Ok(vec_i64) = array.retrieve_array_subset::<Vec<i64>>(&subset) {
                     for (idx, &val) in vec_i64.iter().enumerate() {
-                        coords.push(format_dim_value(&dim_clean, val as f64, idx));
+                        coords.push(format_dim_value(&dim_clean, val as f64, idx, time_units, time_start, target_hint));
                     }
                 }
 
@@ -372,12 +377,37 @@ pub fn fetch_all_dimension_coordinates(
     map
 }
 
-fn format_dim_value(dim_name: &str, val: f64, _idx: usize) -> String {
+fn format_dim_value(
+    dim_name: &str,
+    val: f64,
+    _idx: usize,
+    units_str: Option<&str>,
+    time_start: Option<&str>,
+    target_hint: Option<&str>,
+) -> String {
     if dim_name.contains("time") || dim_name.contains("date") {
-        let (ref_y, ref_m, ref_d) = (1979, 1, 1);
-        let days = val.max(0.0).round() as usize;
-        let (y, m, d) = units::add_days_to_date(ref_y, ref_m, ref_d, days);
-        format!("{:04}-{:02}-{:02}", y, m, d)
+        if val > 1e14 {
+            // Nanoseconds since 1970-01-01 epoch
+            let days = (val / (86_400.0 * 1e9)).max(0.0).round() as usize;
+            let (y, m, d) = units::add_days_to_date(1970, 1, 1, days);
+            format!("{:04}-{:02}-{:02}", y, m, d)
+        } else if val > 1e11 {
+            // Milliseconds since 1970-01-01 epoch
+            let days = (val / (86_400.0 * 1000.0)).max(0.0).round() as usize;
+            let (y, m, d) = units::add_days_to_date(1970, 1, 1, days);
+            format!("{:04}-{:02}-{:02}", y, m, d)
+        } else if val > 1e8 {
+            // Seconds since 1970-01-01 epoch
+            let days = (val / 86_400.0).max(0.0).round() as usize;
+            let (y, m, d) = units::add_days_to_date(1970, 1, 1, days);
+            format!("{:04}-{:02}-{:02}", y, m, d)
+        } else {
+            // Step index or days since reference date
+            let (ref_y, ref_m, ref_d, days_step) = units::parse_reference_date(units_str, time_start, None, target_hint);
+            let total_days = (val * days_step as f64).max(0.0).round() as usize;
+            let (y, m, d) = units::add_days_to_date(ref_y, ref_m, ref_d, total_days);
+            format!("{:04}-{:02}-{:02}", y, m, d)
+        }
     } else if dim_name.contains("lat") {
         let cardinal = if val >= 0.0 { "N" } else { "S" };
         format!("{:.2}° {}", val.abs(), cardinal)
@@ -396,6 +426,7 @@ fn format_dim_value(dim_name: &str, val: f64, _idx: usize) -> String {
 /// Fetch a 2D matrix slice for a specific variable and timestep using `zarrs` subset API.
 pub fn fetch_slice(
     store: ReadableWritableListableStorage,
+    store_url: &str,
     variable: &str,
     timestep: usize,
 ) -> Result<MatrixSlice, Box<dyn Error>> {
@@ -405,7 +436,7 @@ pub fn fetch_slice(
         format!("/{}", variable)
     };
 
-    if let Ok(array) = Array::open(store, &var_path) {
+    if let Ok(array) = Array::open(store.clone(), &var_path) {
         let shape = array.shape();
         let dim_names: Vec<String> = array
             .dimension_names()
@@ -453,13 +484,21 @@ pub fn fetch_slice(
         if let Ok(raw_values) = array.retrieve_array_subset::<Vec<f32>>(&subset) {
             let attributes = array.attributes();
 
-            // Check axes order and orientation to ensure map plots correctly
-            let (oriented_values, width, height) = check_and_orient_axes(
+            let lat_dim = dim_names.iter().find(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
+            let lon_dim = dim_names.iter().find(|d| d.to_lowercase().contains("lon") || d.to_lowercase() == "x");
+
+            let lat_coords = lat_dim.and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d)).map(|(f, l)| vec![f, l]);
+            let lon_coords = lon_dim.and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d)).map(|(f, l)| vec![f, l]);
+
+            // Check axes order and orientation directly from axis coordinate values
+            let (oriented_values, width, height) = check_and_orient_axes_with_coords(
                 raw_values,
                 initial_width,
                 initial_height,
                 &dim_names,
                 attributes,
+                lat_coords.as_deref(),
+                lon_coords.as_deref(),
             );
 
             let valid_vals: Vec<f32> = oriented_values.iter().copied().filter(|v| !v.is_nan()).collect();
@@ -516,4 +555,169 @@ pub fn fetch_slice(
         max_timesteps: 1,
         dataset_name: format!("Remote Zarr Sample [{}]", variable),
     })
+}
+
+/// Fetches a range of consecutive 2D matrix slices in a SINGLE HTTP GET request over the network.
+pub fn fetch_slice_range(
+    store: ReadableWritableListableStorage,
+    store_url: &str,
+    variable: &str,
+    start_step: usize,
+    count: usize,
+) -> Result<Vec<MatrixSlice>, Box<dyn Error>> {
+    let var_path = if variable.starts_with('/') {
+        variable.to_string()
+    } else {
+        format!("/{}", variable)
+    };
+
+    if let Ok(array) = Array::open(store.clone(), &var_path) {
+        let shape = array.shape();
+        let dim_names: Vec<String> = array
+            .dimension_names()
+            .as_ref()
+            .map(|names| names.iter().map(|n| n.as_deref().unwrap_or("dim").to_string()).collect())
+            .unwrap_or_else(|| vec!["time".to_string(), "lat".to_string(), "lon".to_string()]);
+
+        let (max_timesteps, initial_height, initial_width) = match shape.len() {
+            4 => (shape[0] as usize, shape[2] as usize, shape[3] as usize),
+            3 => (shape[0] as usize, shape[1] as usize, shape[2] as usize),
+            2 => (1, shape[0] as usize, shape[1] as usize),
+            1 => (1, 1, shape[0] as usize),
+            _ => (1, 64, 64),
+        };
+
+        let actual_count = count.min(max_timesteps.saturating_sub(start_step)).max(1);
+
+        let subset = if shape.len() == 4 {
+            ArraySubset::new_with_ranges(&[
+                start_step as u64..(start_step + actual_count) as u64,
+                0..1,
+                0..initial_height as u64,
+                0..initial_width as u64,
+            ])
+        } else if shape.len() == 3 {
+            ArraySubset::new_with_ranges(&[
+                start_step as u64..(start_step + actual_count) as u64,
+                0..initial_height as u64,
+                0..initial_width as u64,
+            ])
+        } else {
+            ArraySubset::new_with_ranges(&[0..initial_height as u64, 0..initial_width as u64])
+        };
+
+        if let Ok(raw_values) = array.retrieve_array_subset::<Vec<f32>>(&subset) {
+            let attributes = array.attributes();
+
+            let lat_dim = dim_names.iter().find(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
+            let lon_dim = dim_names.iter().find(|d| d.to_lowercase().contains("lon") || d.to_lowercase() == "x");
+
+            let lat_coords = lat_dim.and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d)).map(|(f, l)| vec![f, l]);
+            let lon_coords = lon_dim.and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d)).map(|(f, l)| vec![f, l]);
+
+            let slice_size = initial_width * initial_height;
+            let mut slices = Vec::with_capacity(actual_count);
+
+            for i in 0..actual_count {
+                let offset = i * slice_size;
+                if offset + slice_size > raw_values.len() {
+                    break;
+                }
+                let slice_raw = raw_values[offset..offset + slice_size].to_vec();
+
+                let (oriented_values, width, height) = check_and_orient_axes_with_coords(
+                    slice_raw,
+                    initial_width,
+                    initial_height,
+                    &dim_names,
+                    attributes,
+                    lat_coords.as_deref(),
+                    lon_coords.as_deref(),
+                );
+
+                let valid_vals: Vec<f32> = oriented_values.iter().copied().filter(|v| !v.is_nan()).collect();
+                let (min_v, max_v) = if !valid_vals.is_empty() {
+                    let min_val = valid_vals.iter().copied().fold(f32::INFINITY, f32::min);
+                    let max_val = valid_vals.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+                    (min_val, max_val)
+                } else {
+                    (0.0, 1.0)
+                };
+
+                let range = if max_v > min_v { max_v - min_v } else { 1.0 };
+                let values = oriented_values
+                    .into_iter()
+                    .map(|val| {
+                        if val.is_nan() {
+                            0.0
+                        } else {
+                            ((val - min_v) / range * 100.0).clamp(0.0, 100.0)
+                        }
+                    })
+                    .collect();
+
+                slices.push(MatrixSlice {
+                    variable_name: variable.to_string(),
+                    width,
+                    height,
+                    values,
+                    shape: shape.to_vec(),
+                    current_timestep: start_step + i,
+                    max_timesteps,
+                    dataset_name: format!("Remote Zarr [{}]", variable),
+                });
+            }
+
+            return Ok(slices);
+        }
+    }
+
+    let single = fetch_slice(store, store_url, variable, start_step)?;
+    Ok(vec![single])
+}
+
+use std::sync::{OnceLock, RwLock};
+static COORD_BOUNDS_CACHE: OnceLock<RwLock<HashMap<String, Option<(f64, f64)>>>> = OnceLock::new();
+
+fn get_cached_coord_bounds(store: ReadableWritableListableStorage, store_url: &str, dim_name: &str) -> Option<(f64, f64)> {
+    let cache_lock = COORD_BOUNDS_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+    let key = format!("{}:{}", store_url, dim_name.trim().to_lowercase());
+
+    if let Ok(cache) = cache_lock.read() {
+        if let Some(bounds) = cache.get(&key) {
+            return *bounds;
+        }
+    }
+
+    let bounds = read_coord_bounds(store, dim_name);
+    if let Ok(mut cache) = cache_lock.write() {
+        cache.insert(key, bounds);
+    }
+    bounds
+}
+
+fn read_coord_bounds(store: ReadableWritableListableStorage, dim_name: &str) -> Option<(f64, f64)> {
+    let clean = dim_name.trim().to_lowercase();
+    let array_path = format!("/{}", clean);
+    let array = Array::open(store.clone(), &array_path)
+        .or_else(|_| Array::open(store.clone(), &clean))
+        .ok()?;
+
+    let len = array.shape().first().copied().unwrap_or(0) as usize;
+    if len < 2 {
+        return None;
+    }
+
+    let subset_start = ArraySubset::new_with_ranges(&[0..1]);
+    let subset_end = ArraySubset::new_with_ranges(&[(len as u64 - 1)..len as u64]);
+
+    let v_start = array.retrieve_array_subset::<Vec<f64>>(&subset_start)
+        .ok().and_then(|v| v.first().copied())
+        .or_else(|| array.retrieve_array_subset::<Vec<f32>>(&subset_start).ok().and_then(|v| v.first().map(|&x| x as f64)))?;
+
+    let v_end = array.retrieve_array_subset::<Vec<f64>>(&subset_end)
+        .ok().and_then(|v| v.first().copied())
+        .or_else(|| array.retrieve_array_subset::<Vec<f32>>(&subset_end).ok().and_then(|v| v.first().map(|&x| x as f64)))?;
+
+    Some((v_start, v_end))
 }

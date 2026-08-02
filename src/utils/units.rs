@@ -14,18 +14,12 @@ pub fn calculate_variable_size_bytes(shape: &[u64], data_type: &str) -> u64 {
 /// Map of CF time unit names and short aliases to milliseconds per unit.
 pub fn unit_to_milliseconds(unit: &str) -> Option<u64> {
     let clean_unit = unit.trim().to_lowercase();
-    let singular = if clean_unit.ends_with('s') {
-        clean_unit.trim_end_matches('s')
-    } else {
-        &clean_unit
-    };
-
-    match singular {
-        "millisecond" | "msec" | "ms" => Some(1),
-        "second" | "sec" | "s" => Some(1_000),
-        "minute" | "min" => Some(60 * 1_000),
-        "hour" | "hr" | "h" => Some(60 * 60 * 1_000),
-        "day" | "d" => Some(24 * 60 * 60 * 1_000),
+    match clean_unit.as_str() {
+        "millisecond" | "milliseconds" | "msec" | "msecs" | "ms" => Some(1),
+        "second" | "seconds" | "sec" | "secs" | "s" => Some(1_000),
+        "minute" | "minutes" | "min" | "mins" => Some(60 * 1_000),
+        "hour" | "hours" | "hr" | "hrs" | "h" => Some(60 * 60 * 1_000),
+        "day" | "days" | "d" => Some(24 * 60 * 60 * 1_000),
         _ => None,
     }
 }
@@ -57,7 +51,7 @@ pub fn parse_reference_date(
     temp_res: Option<&str>,
     target_hint: Option<&str>,
 ) -> (usize, usize, usize, usize) {
-    // 1. Try explicit time_coverage_start (e.g. "1979-01-01T00:00:00")
+    // 1. Try explicit time_coverage_start (e.g. "1979-01-01T00:00:00" or "2001-01-01")
     let ref_date = time_start.and_then(parse_iso_date);
 
     // 2. Try temporal_resolution (e.g. "8D" -> 8, "16D" -> 16, "1D" -> 1)
@@ -71,11 +65,12 @@ pub fn parse_reference_date(
             8
         }
     } else if let Some(target) = target_hint {
-        if target.contains("16d") {
+        let target_lower = target.to_lowercase();
+        if target_lower.contains("16d") {
             16
-        } else if target.contains("8d") {
+        } else if target_lower.contains("8d") || target_lower.contains("seasfire") {
             8
-        } else if target.contains("1d") || target.contains("daily") {
+        } else if target_lower.contains("1d") || target_lower.contains("daily") {
             1
         } else {
             8
@@ -93,8 +88,17 @@ pub fn parse_reference_date(
         let lower = u.to_lowercase();
         if let Some((_, ref_part)) = lower.split_once(" since ") {
             if let Some((y, m, d)) = parse_iso_date(ref_part.trim()) {
-                return (y, m, d, days_step);
+                let step = if lower.starts_with("day") || lower.starts_with("d ") { 1 } else { days_step };
+                return (y, m, d, step);
             }
+        }
+    }
+
+    // 4. Target hint check for dataset specific reference dates
+    if let Some(target) = target_hint {
+        let target_lower = target.to_lowercase();
+        if target_lower.contains("seasfire") {
+            return (2001, 1, 1, days_step);
         }
     }
 
@@ -217,4 +221,157 @@ pub fn format_axis_value(
 
     // Fallback default
     format!("Step {} / {}", timestep + 1, max_timesteps)
+}
+
+/// Formats a numerical value with CF units or bare units into a human-readable location/duration/date string.
+pub fn parse_loc(val: Option<f64>, units_str: &str) -> Option<String> {
+    let v = val?;
+    let lower_units = units_str.trim().to_lowercase();
+
+    // 1. CF Absolute Datetime (e.g. "hours since 2024-01-01")
+    if let Some((unit_part, ref_date_str)) = lower_units.split_once(" since ") {
+        let (y, m, d) = parse_iso_date(ref_date_str.trim()).unwrap_or((1970, 1, 1));
+        let scale_ms = unit_to_milliseconds(unit_part.trim()).unwrap_or(1_000) as f64;
+        let total_ms = v * scale_ms;
+        let total_hours = (total_ms / 3_600_000.0).round() as i64;
+
+        let days_added = total_hours.div_euclid(24) as usize;
+        let hour_of_day = total_hours.rem_euclid(24) as usize;
+
+        let (res_y, res_m, res_d) = add_days_to_date(y, m, d, days_added);
+        return Some(format!("{:02}-{:02}-{:04} {:02}:00", res_m, res_d, res_y, hour_of_day));
+    }
+
+    // 2. Bare Time Duration (e.g. "hours", "seconds", "d")
+    if let Some(scale_ms) = unit_to_milliseconds(&lower_units) {
+        let ms = v * scale_ms as f64;
+        if ms == 0.0 {
+            if lower_units.contains("sec") || lower_units == "s" || lower_units.contains("hour") || lower_units == "h" || lower_units == "hr" || lower_units == "hrs" {
+                return Some("0 h".to_string());
+            }
+            return Some("0 ms".to_string());
+        }
+
+        // If unit is explicitly hour-based, keep in hours (e.g. 24 h -> "24 h")
+        if lower_units == "h" || lower_units == "hr" || lower_units == "hrs" || lower_units == "hour" || lower_units == "hours" {
+            return Some(format_num_with_unit(v, "h"));
+        }
+        // If unit is day-based, keep in days
+        if lower_units == "d" || lower_units == "day" || lower_units == "days" {
+            return Some(format_num_with_unit(v, "d"));
+        }
+
+        // For seconds or minutes, convert to coarsest unit
+        if ms >= 3_600_000.0 && ms % 3_600_000.0 == 0.0 {
+            let hours = ms / 3_600_000.0;
+            return Some(format_num_with_unit(hours, "h"));
+        }
+        if ms >= 60_000.0 && ms % 60_000.0 == 0.0 {
+            let mins = ms / 60_000.0;
+            return Some(format_num_with_unit(mins, "min"));
+        }
+        if ms >= 1_000.0 && ms % 1_000.0 == 0.0 {
+            let secs = ms / 1_000.0;
+            return Some(format_num_with_unit(secs, "s"));
+        }
+
+        if lower_units.contains("min") {
+            return Some(format_num_with_unit(v, "min"));
+        }
+        if lower_units.contains("sec") || lower_units == "s" {
+            return Some(format_num_with_unit(v, "s"));
+        }
+
+        return Some(format_num_with_unit(ms, "ms"));
+    }
+
+    // 3. Degrees (e.g. "degrees_east", "deg")
+    if lower_units.contains("deg") {
+        return Some(format!("{:.2}°", v));
+    }
+
+    // 4. Default fallback
+    Some(format!("{:.2}", v))
+}
+
+fn format_num_with_unit(v: f64, unit: &str) -> String {
+    if v.fract() == 0.0 {
+        format!("{:.0} {}", v, unit)
+    } else {
+        format!("{:.2} {}", v, unit)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_time_unit_hour_aliases() {
+        let (s1, _) = parse_time_unit(Some("hours since 2024-01-01"));
+        let (s2, _) = parse_time_unit(Some("h since 2024-01-01"));
+        let (s3, _) = parse_time_unit(Some("hr since 2024-01-01"));
+        let (s4, _) = parse_time_unit(Some("hrs since 2024-01-01"));
+
+        assert_eq!(s1, 3600000);
+        assert_eq!(s2, 3600000);
+        assert_eq!(s3, 3600000);
+        assert_eq!(s4, 3600000);
+    }
+
+    #[test]
+    fn test_parse_time_unit_other_aliases() {
+        assert_eq!(parse_time_unit(Some("min since 2024-01-01")).0, 60000);
+        assert_eq!(parse_time_unit(Some("mins since 2024-01-01")).0, 60000);
+        assert_eq!(parse_time_unit(Some("s since 2024-01-01")).0, 1000);
+        assert_eq!(parse_time_unit(Some("sec since 2024-01-01")).0, 1000);
+        assert_eq!(parse_time_unit(Some("secs since 2024-01-01")).0, 1000);
+        assert_eq!(parse_time_unit(Some("d since 2024-01-01")).0, 86400000);
+        assert_eq!(parse_time_unit(Some("ms since 2024-01-01")).0, 1);
+    }
+
+    #[test]
+    fn test_parse_time_unit_bare_duration() {
+        assert_eq!(parse_time_unit(Some("hours")).0, 3600000);
+        assert_eq!(parse_time_unit(Some("hour")).0, 3600000);
+        assert_eq!(parse_time_unit(Some("h")).0, 3600000);
+        assert_eq!(parse_time_unit(Some("hr")).0, 3600000);
+        assert_eq!(parse_time_unit(Some("hrs")).0, 3600000);
+        assert_eq!(parse_time_unit(Some("days")).0, 86400000);
+        assert_eq!(parse_time_unit(Some("minutes")).0, 60000);
+    }
+
+    #[test]
+    fn test_parse_loc_durations() {
+        assert_eq!(parse_loc(Some(12.0), "hours"), Some("12 h".to_string()));
+        assert_eq!(parse_loc(Some(24.0), "h"), Some("24 h".to_string()));
+        assert_eq!(parse_loc(Some(6.0), "hr"), Some("6 h".to_string()));
+        assert_eq!(parse_loc(Some(48.0), "hrs"), Some("48 h".to_string()));
+        assert_eq!(parse_loc(Some(0.0), "hour"), Some("0 h".to_string()));
+        assert_eq!(parse_loc(Some(12.5), "hours"), Some("12.50 h".to_string()));
+
+        assert_eq!(parse_loc(Some(0.0), "seconds"), Some("0 h".to_string()));
+        assert_eq!(parse_loc(Some(3600.0), "seconds"), Some("1 h".to_string()));
+        assert_eq!(parse_loc(Some(7200.0), "s"), Some("2 h".to_string()));
+        assert_eq!(parse_loc(Some(10800.0), "sec"), Some("3 h".to_string()));
+        assert_eq!(parse_loc(Some(30.0), "seconds"), Some("30 s".to_string()));
+        assert_eq!(parse_loc(Some(1800.0), "seconds"), Some("30 min".to_string()));
+        assert_eq!(parse_loc(Some(5.0), "d"), Some("5 d".to_string()));
+        assert_eq!(parse_loc(Some(500.0), "ms"), Some("500 ms".to_string()));
+    }
+
+    #[test]
+    fn test_parse_loc_datetime() {
+        assert_eq!(parse_loc(Some(12.0), "hours since 2024-01-01"), Some("01-01-2024 12:00".to_string()));
+        assert_eq!(parse_loc(Some(12.0), "h since 2024-01-01"), Some("01-01-2024 12:00".to_string()));
+        assert_eq!(parse_loc(Some(12.0), "hrs since 2024-01-01"), Some("01-01-2024 12:00".to_string()));
+    }
+
+    #[test]
+    fn test_parse_loc_degrees_and_fallback() {
+        assert_eq!(parse_loc(Some(-120.5), "degrees_east"), Some("-120.50°".to_string()));
+        assert_eq!(parse_loc(Some(45.0), "deg"), Some("45.00°".to_string()));
+        assert_eq!(parse_loc(Some(100.0), "hPa"), Some("100.00".to_string()));
+        assert_eq!(parse_loc(None, "hours"), None);
+    }
 }

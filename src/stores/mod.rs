@@ -56,4 +56,18 @@ pub trait DataStore: Send + Sync {
     fn store_type(&self) -> &'static str;
     fn inspect(&self) -> Result<DatasetMetadata, Box<dyn Error>>;
     fn fetch_slice(&self, variable: &str, timestep: usize) -> Result<MatrixSlice, Box<dyn Error>>;
+
+    fn fetch_slice_range(
+        &self,
+        variable: &str,
+        start_step: usize,
+        count: usize,
+    ) -> Result<Vec<MatrixSlice>, Box<dyn Error>> {
+        let mut slices = Vec::with_capacity(count);
+        for i in 0..count {
+            let slice = self.fetch_slice(variable, start_step + i)?;
+            slices.push(slice);
+        }
+        Ok(slices)
+    }
 }

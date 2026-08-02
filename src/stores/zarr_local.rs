@@ -3,7 +3,6 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use zarrs::array::{Array, ArraySubset};
 use zarrs::filesystem::FilesystemStore;
 
 pub struct ZarrLocalStore {
@@ -50,93 +49,31 @@ impl DataStore for ZarrLocalStore {
             });
         }
 
+        let store_path_str = self.path.to_string_lossy().to_string();
+        let dimension_coordinates = if let Ok(store) = FilesystemStore::new(&self.path) {
+            let store_arc = Arc::new(store);
+            let dim_names: Vec<String> = variables
+                .iter()
+                .flat_map(|v| v.dimension_names.clone())
+                .collect();
+            crate::utils::zarr::fetch_all_dimension_coordinates(store_arc, &dim_names, Some(&store_path_str))
+        } else {
+            std::collections::HashMap::new()
+        };
+
         Ok(DatasetMetadata {
             name: store_name,
             store_type: self.store_type().to_string(),
             variables,
-            dimension_coordinates: std::collections::HashMap::new(),
+            dimension_coordinates,
         })
     }
 
     fn fetch_slice(&self, variable: &str, timestep: usize) -> Result<MatrixSlice, Box<dyn Error>> {
-        let store = Arc::new(FilesystemStore::new(&self.path)?);
-        let var_path = if variable.starts_with('/') {
-            variable.to_string()
-        } else {
-            format!("/{}", variable)
-        };
-
-        if let Ok(array) = Array::open(store, &var_path) {
-            let shape = array.shape();
-            let (max_timesteps, height, width, local_time_idx) = match shape.len() {
-                4 => (
-                    shape[0] as usize,
-                    shape[2] as usize,
-                    shape[3] as usize,
-                    (timestep % (shape[0] as usize).max(1)) as u64,
-                ),
-                3 => (
-                    shape[0] as usize,
-                    shape[1] as usize,
-                    shape[2] as usize,
-                    (timestep % (shape[0] as usize).max(1)) as u64,
-                ),
-                2 => (1, shape[0] as usize, shape[1] as usize, 0u64),
-                1 => (1, 1, shape[0] as usize, 0u64),
-                _ => (1, 64, 64, 0u64),
-            };
-
-            let subset = if shape.len() == 4 {
-                ArraySubset::new_with_ranges(&[
-                    local_time_idx..(local_time_idx + 1),
-                    0..1,
-                    0..height as u64,
-                    0..width as u64,
-                ])
-            } else if shape.len() == 3 {
-                ArraySubset::new_with_ranges(&[
-                    local_time_idx..(local_time_idx + 1),
-                    0..height as u64,
-                    0..width as u64,
-                ])
-            } else if shape.len() == 2 {
-                ArraySubset::new_with_ranges(&[0..height as u64, 0..width as u64])
-            } else {
-                ArraySubset::new_with_shape(shape.to_vec())
-            };
-
-            if let Ok(raw_values) = array.retrieve_array_subset::<Vec<f32>>(&subset) {
-                let valid_vals: Vec<f32> = raw_values.iter().copied().filter(|v| !v.is_nan()).collect();
-                let (min_v, max_v) = if !valid_vals.is_empty() {
-                    let min_val = valid_vals.iter().copied().fold(f32::INFINITY, f32::min);
-                    let max_val = valid_vals.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-                    (min_val, max_val)
-                } else {
-                    (0.0, 1.0)
-                };
-
-                let range = if max_v > min_v { max_v - min_v } else { 1.0 };
-                let values = raw_values
-                    .into_iter()
-                    .map(|val| {
-                        if val.is_nan() {
-                            0.0
-                        } else {
-                            ((val - min_v) / range * 100.0).clamp(0.0, 100.0)
-                        }
-                    })
-                    .collect();
-
-                return Ok(MatrixSlice {
-                    variable_name: variable.to_string(),
-                    width,
-                    height,
-                    values,
-                    shape: shape.to_vec(),
-                    current_timestep: timestep,
-                    max_timesteps,
-                    dataset_name: format!("Local Zarr [{}]", variable),
-                });
+        let store_path_str = self.path.to_string_lossy().to_string();
+        if let Ok(store) = FilesystemStore::new(&self.path) {
+            if let Ok(slice) = crate::utils::zarr::fetch_slice(Arc::new(store), &store_path_str, variable, timestep) {
+                return Ok(slice);
             }
         }
 
@@ -160,6 +97,25 @@ impl DataStore for ZarrLocalStore {
             max_timesteps: 1,
             dataset_name: format!("Local Zarr Sample [{}]", variable),
         })
+    }
+
+    fn fetch_slice_range(
+        &self,
+        variable: &str,
+        start_step: usize,
+        count: usize,
+    ) -> Result<Vec<MatrixSlice>, Box<dyn Error>> {
+        if let Ok(store) = FilesystemStore::new(&self.path) {
+            let store_path_str = self.path.to_string_lossy().to_string();
+            if let Ok(slices) = crate::utils::zarr::fetch_slice_range(Arc::new(store), &store_path_str, variable, start_step, count) {
+                return Ok(slices);
+            }
+        }
+        let mut fallback = Vec::with_capacity(count);
+        for i in 0..count {
+            fallback.push(self.fetch_slice(variable, start_step + i)?);
+        }
+        Ok(fallback)
     }
 }
 

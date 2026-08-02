@@ -126,7 +126,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                                         if ui.add(btn).clicked() {
                                             app.selected_store_kind = entry.store_kind;
                                             app.store_target_input = entry.store.to_string();
-                                            app.show_catalog_window = false;
+                                            open = false;
                                             app.inspect_active_store();
                                         }
                                         ui.small(egui::RichText::new(format!("key: {}", entry.key)).monospace());

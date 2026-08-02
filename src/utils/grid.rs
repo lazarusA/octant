@@ -12,11 +12,23 @@ pub fn check_and_orient_axes(
     dim_names: &[String],
     attributes: &serde_json::Map<String, serde_json::Value>,
 ) -> (Vec<f32>, usize, usize) {
+    check_and_orient_axes_with_coords(raw_values, in_width, in_height, dim_names, attributes, None, None)
+}
+
+pub fn check_and_orient_axes_with_coords(
+    raw_values: Vec<f32>,
+    in_width: usize,
+    in_height: usize,
+    dim_names: &[String],
+    attributes: &serde_json::Map<String, serde_json::Value>,
+    lat_coords: Option<&[f64]>,
+    lon_coords: Option<&[f64]>,
+) -> (Vec<f32>, usize, usize) {
     if raw_values.len() != in_width * in_height {
         return (raw_values, in_width, in_height);
     }
 
-    // Determine if dimensions are ordered (X, Y) / (lon, lat) instead of (Y, X) / (lat, lon)
+    // 1. Determine if dimensions are ordered (X, Y) / (lon, lat) instead of (Y, X) / (lat, lon)
     let spatial_dims: Vec<String> = dim_names
         .iter()
         .map(|d| d.to_lowercase())
@@ -36,8 +48,6 @@ pub fn check_and_orient_axes(
         let mut transposed = vec![0.0f32; in_width * in_height];
         for r in 0..in_height {
             for c in 0..in_width {
-                // Input index: r * in_width + c
-                // Output transposed index: c * in_height + r
                 transposed[c * in_height + r] = raw_values[r * in_width + c];
             }
         }
@@ -46,28 +56,31 @@ pub fn check_and_orient_axes(
         (raw_values, in_width, in_height)
     };
 
-    // Check latitude orientation (South-to-North ascending vs North-to-South descending)
-    // Standard map texture display expects Row 0 = North (top).
-    // If attributes or metadata indicate ascending latitude (-90 to +90), flip Y vertically.
+    // 2. Determine Y (Latitude) orientation directly from axis coordinate values or explicit metadata
     let mut flip_y = false;
 
-    // Check attribute hints if present (e.g., "_ARRAY_DIMENSIONS" or "positive" / coordinate direction)
-    if let Some(positive_attr) = attributes.get("positive").and_then(|v| v.as_str()) {
-        if positive_attr.to_lowercase() == "up" || positive_attr.to_lowercase() == "north" {
-            flip_y = true;
+    if let Some(coords) = lat_coords {
+        if coords.len() >= 2 {
+            let first = coords.first().copied().unwrap_or(0.0);
+            let last = coords.last().copied().unwrap_or(0.0);
+            if first < last {
+                // Axis data ascends from South to North (Row 0 is South).
+                // Flip Y so North (+90) renders at top of screen (Row 0).
+                flip_y = true;
+            } else if first > last {
+                // Axis data descends from North to South (Row 0 is North).
+                // Row 0 is already at top of screen (North), do not flip Y.
+                flip_y = false;
+            }
         }
-    }
-
-    // Default heuristic for geospatial lat dimension: in most NetCDF/Zarr climate datasets with lat dimension,
-    // latitude coordinates are stored ascending [-90..90]. Unless specified as descending, perform Y-flip.
-    if dim_names.iter().any(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y") {
-        let is_descending = attributes
-            .get("latitude_orientation")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_lowercase() == "descending")
-            .unwrap_or(false);
-
-        if !is_descending {
+    } else if let Some(orientation) = attributes.get("latitude_orientation").and_then(|v| v.as_str()) {
+        if orientation.to_lowercase() == "ascending" {
+            flip_y = true;
+        } else if orientation.to_lowercase() == "descending" {
+            flip_y = false;
+        }
+    } else if let Some(positive_attr) = attributes.get("positive").and_then(|v| v.as_str()) {
+        if positive_attr.to_lowercase() == "up" {
             flip_y = true;
         }
     }
@@ -82,12 +95,23 @@ pub fn check_and_orient_axes(
         }
     }
 
-    // Check longitude orientation (East-to-West descending)
-    let flip_x = attributes
-        .get("longitude_orientation")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_lowercase() == "descending")
-        .unwrap_or(false);
+    // 3. Determine X (Longitude) orientation directly from axis coordinate values or explicit metadata
+    let mut flip_x = false;
+
+    if let Some(coords) = lon_coords {
+        if coords.len() >= 2 {
+            let first = coords.first().copied().unwrap_or(0.0);
+            let last = coords.last().copied().unwrap_or(0.0);
+            if first > last {
+                // Axis data descends (East to West). Flip X so West renders on left.
+                flip_x = true;
+            }
+        }
+    } else if let Some(orientation) = attributes.get("longitude_orientation").and_then(|v| v.as_str()) {
+        if orientation.to_lowercase() == "descending" {
+            flip_x = true;
+        }
+    }
 
     if flip_x && width > 1 {
         for r in 0..height {
@@ -99,4 +123,39 @@ pub fn check_and_orient_axes(
     }
 
     (current_values, width, height)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_grid_orientation_ascending_axis_data() {
+        // Ascending lat axis data: [-89.875, ..., 89.875] (Row 0 = South [10.0, 20.0], Row 1 = North [30.0, 40.0])
+        let raw = vec![10.0, 20.0, 30.0, 40.0];
+        let dim_names = vec!["lat".to_string(), "lon".to_string()];
+        let attrs = serde_json::Map::new();
+        let lat_axis = vec![-89.875, 89.875];
+
+        let (oriented, w, h) = check_and_orient_axes_with_coords(raw, 2, 2, &dim_names, &attrs, Some(&lat_axis), None);
+        assert_eq!(w, 2);
+        assert_eq!(h, 2);
+        // Ascending lat axis SHOULD flip Y so North [30.0, 40.0] moves to Row 0 (top of map)
+        assert_eq!(oriented, vec![30.0, 40.0, 10.0, 20.0]);
+    }
+
+    #[test]
+    fn test_grid_orientation_descending_axis_data() {
+        // Descending lat axis data: [89.875, ..., -89.875] (Row 0 = North [10.0, 20.0], Row 1 = South [30.0, 40.0])
+        let raw = vec![10.0, 20.0, 30.0, 40.0];
+        let dim_names = vec!["latitude".to_string(), "longitude".to_string()];
+        let attrs = serde_json::Map::new();
+        let lat_axis = vec![89.875, -89.875];
+
+        let (oriented, w, h) = check_and_orient_axes_with_coords(raw.clone(), 2, 2, &dim_names, &attrs, Some(&lat_axis), None);
+        assert_eq!(w, 2);
+        assert_eq!(h, 2);
+        // Descending lat axis should NOT flip Y, row 0 stays North [10.0, 20.0]
+        assert_eq!(oriented, raw);
+    }
 }

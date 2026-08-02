@@ -127,10 +127,16 @@ pub struct PrefetchResult {
     pub result: Result<MatrixSlice, String>,
 }
 
+pub struct BatchResult {
+    pub keys: Vec<SliceCacheKey>,
+    pub results: Result<Vec<MatrixSlice>, String>,
+}
+
 pub struct SlicePrefetcher {
-    tx: Sender<PrefetchResult>,
-    rx: Receiver<PrefetchResult>,
+    tx: Sender<BatchResult>,
+    rx: Receiver<BatchResult>,
     pending: HashSet<SliceCacheKey>,
+    active_worker_threads: usize,
 }
 
 impl SlicePrefetcher {
@@ -140,14 +146,42 @@ impl SlicePrefetcher {
             tx,
             rx,
             pending: HashSet::new(),
+            active_worker_threads: 0,
         }
     }
 
     pub fn poll_results(&mut self) -> Vec<PrefetchResult> {
         let mut results = Vec::new();
-        while let Ok(res) = self.rx.try_recv() {
-            self.pending.remove(&res.key);
-            results.push(res);
+        while let Ok(batch_res) = self.rx.try_recv() {
+            self.active_worker_threads = self.active_worker_threads.saturating_sub(1);
+            for key in &batch_res.keys {
+                self.pending.remove(key);
+            }
+
+            match batch_res.results {
+                Ok(slices) => {
+                    for slice in slices {
+                        let key = SliceCacheKey {
+                            store_kind: batch_res.keys[0].store_kind,
+                            store_target: batch_res.keys[0].store_target.clone(),
+                            variable_name: batch_res.keys[0].variable_name.clone(),
+                            timestep: slice.current_timestep,
+                        };
+                        results.push(PrefetchResult {
+                            key,
+                            result: Ok(slice),
+                        });
+                    }
+                }
+                Err(err_msg) => {
+                    for key in batch_res.keys {
+                        results.push(PrefetchResult {
+                            key,
+                            result: Err(err_msg.clone()),
+                        });
+                    }
+                }
+            }
         }
         results
     }
@@ -162,6 +196,7 @@ impl SlicePrefetcher {
         }
 
         self.pending.insert(key.clone());
+        self.active_worker_threads += 1;
 
         let tx = self.tx.clone();
         let key_clone = key.clone();
@@ -175,9 +210,9 @@ impl SlicePrefetcher {
                 StoreKind::RemoteIcechunk => Box::new(IcechunkRemoteStore::new(&store_target_for_thread)),
                 StoreKind::LocalIcechunk => Box::new(IcechunkLocalStore::new(&store_target_for_thread)),
                 StoreKind::ProceduralRandom => {
-                    let _ = tx.send(PrefetchResult {
-                        key: key_clone,
-                        result: Err("Procedural random step".to_string()),
+                    let _ = tx.send(BatchResult {
+                        keys: vec![key_clone],
+                        results: Err("Procedural random step".to_string()),
                     });
                     return;
                 }
@@ -185,11 +220,12 @@ impl SlicePrefetcher {
 
             let res = store
                 .fetch_slice(&var_for_thread, key_clone.timestep)
+                .map(|s| vec![s])
                 .map_err(|e| e.to_string());
 
-            let _ = tx.send(PrefetchResult {
-                key: key_clone,
-                result: res,
+            let _ = tx.send(BatchResult {
+                keys: vec![key_clone],
+                results: res,
             });
         });
     }
@@ -214,79 +250,122 @@ impl SlicePrefetcher {
         let slice_bytes = if slice_bytes_hint > 0 { slice_bytes_hint } else { 41_472 };
 
         // 2. Dynamic Memory Capacity Calculation:
-        // Total 2D matrix slices that fit in the LRU cache limit (e.g. 1GB / 4MB = ~250 slices)
         let cache_max_bytes = cache.max_bytes();
         let total_cacheable_slices = (cache_max_bytes / slice_bytes).max(1);
 
-        // 3. Dynamic Parallelism / Concurrency Cap:
-        // Cap max in-flight background requests so concurrent downloads target ~64MB total
-        let target_in_flight_bytes = 64 * 1024 * 1024;
-        let max_in_flight = (target_in_flight_bytes / slice_bytes).clamp(4, 12);
-
-        // 4. Agnostic Chunk-Aligned Lookahead Calculation:
-        // Physical chunk size along time dimension
+        // 3. Physical Zarr Chunk Alignment:
         let chunk_time_steps = if chunk_time_size > 0 { chunk_time_size } else { 1 };
 
-        // Allow prefetching up to 66% of total LRU cache capacity in advance
+        // 4. 50MB Target Lookahead Calculation:
+        let target_prefetch_bytes = 50 * 1024 * 1024;
+        let raw_target_slices = (target_prefetch_bytes / slice_bytes).max(1);
+
+        let num_full_chunks = raw_target_slices / chunk_time_steps;
+        let chunk_aligned_target = if num_full_chunks > 0 {
+            num_full_chunks * chunk_time_steps
+        } else {
+            raw_target_slices
+        };
+
+        // 5. Memory Capacity Alignment:
         let max_safe_lookahead = (total_cacheable_slices * 2 / 3).max(1);
 
-        // Target full configured lookahead (e.g. 24, 32, 48 steps ahead), bounded by cache capacity & max steps
-        let lookahead_count = configured_lookahead
-            .max(chunk_time_steps * 2)
-            .min(max_safe_lookahead)
-            .min(max_steps - 1)
-            .max(1);
+        let lookahead_count = if max_safe_lookahead >= chunk_time_steps {
+            let chunks_in_memory = max_safe_lookahead / chunk_time_steps;
+            let memory_aligned_limit = (chunks_in_memory * chunk_time_steps).max(chunk_time_steps);
+            configured_lookahead
+                .max(chunk_aligned_target)
+                .min(memory_aligned_limit)
+                .min(max_steps.saturating_sub(1))
+                .max(1)
+        } else {
+            configured_lookahead
+                .max(chunk_aligned_target)
+                .min(max_safe_lookahead)
+                .min(max_steps.saturating_sub(1))
+                .max(1)
+        };
+
+        // 6. Max Parallel Batch Workers:
+        let max_concurrent_threads = 16;
 
         let store_target_string = store_target.to_string();
+        let step_batch_size = (chunk_time_steps).max(1);
+        let mut offset_count = 0;
 
-        for offset in 1..=lookahead_count {
-            if self.pending.len() >= max_in_flight {
+        while offset_count < lookahead_count {
+            if self.active_worker_threads >= max_concurrent_threads {
                 break;
             }
 
-            let step = (current_step + offset) % max_steps;
-            let key = SliceCacheKey {
-                store_kind,
-                store_target: store_target_string.clone(),
-                variable_name: variable_name.to_string(),
-                timestep: step,
-            };
+            let start_step_in_batch = (current_step + 1 + offset_count) % max_steps;
+            let remaining = lookahead_count - offset_count;
+            let batch_count = step_batch_size.min(remaining).max(1);
 
-            if cache.contains(&key) || self.pending.contains(&key) {
-                continue;
+            let batch_keys: Vec<SliceCacheKey> = (0..batch_count)
+                .map(|i| SliceCacheKey {
+                    store_kind,
+                    store_target: store_target_string.clone(),
+                    variable_name: variable_name.to_string(),
+                    timestep: (start_step_in_batch + i) % max_steps,
+                })
+                .collect();
+
+            let needs_fetch = batch_keys.iter().any(|k| !cache.contains(k) && !self.pending.contains(k));
+
+            if needs_fetch {
+                for k in &batch_keys {
+                    self.pending.insert(k.clone());
+                }
+
+                self.active_worker_threads += 1;
+
+                let tx = self.tx.clone();
+                let store_kind_for_thread = store_kind;
+                let store_target_for_thread = store_target_string.clone();
+                let var_for_thread = variable_name.to_string();
+                let start_step_for_thread = start_step_in_batch;
+                let fetch_count = batch_count;
+                let thread_keys = batch_keys.clone();
+
+                thread::spawn(move || {
+                    let store: Box<dyn DataStore> = match store_kind_for_thread {
+                        StoreKind::RemoteZarr => Box::new(ZarrRemoteStore::new(&store_target_for_thread)),
+                        StoreKind::LocalZarr => Box::new(ZarrLocalStore::new(&store_target_for_thread)),
+                        StoreKind::RemoteIcechunk => Box::new(IcechunkRemoteStore::new(&store_target_for_thread)),
+                        StoreKind::LocalIcechunk => Box::new(IcechunkLocalStore::new(&store_target_for_thread)),
+                        StoreKind::ProceduralRandom => {
+                            let _ = tx.send(BatchResult {
+                                keys: thread_keys,
+                                results: Err("Procedural random step".to_string()),
+                            });
+                            return;
+                        }
+                    };
+
+                    let res = store
+                        .fetch_slice_range(&var_for_thread, start_step_for_thread, fetch_count)
+                        .map_err(|e| e.to_string());
+
+                    let _ = tx.send(BatchResult {
+                        keys: thread_keys,
+                        results: res,
+                    });
+                });
             }
 
-            self.pending.insert(key.clone());
-
-            let tx = self.tx.clone();
-            let key_clone = key.clone();
-            let store_target_for_thread = store_target_string.clone();
-            let var_for_thread = variable_name.to_string();
-
-            thread::spawn(move || {
-                let store: Box<dyn DataStore> = match key_clone.store_kind {
-                    StoreKind::RemoteZarr => Box::new(ZarrRemoteStore::new(&store_target_for_thread)),
-                    StoreKind::LocalZarr => Box::new(ZarrLocalStore::new(&store_target_for_thread)),
-                    StoreKind::RemoteIcechunk => Box::new(IcechunkRemoteStore::new(&store_target_for_thread)),
-                    StoreKind::LocalIcechunk => Box::new(IcechunkLocalStore::new(&store_target_for_thread)),
-                    StoreKind::ProceduralRandom => {
-                        let _ = tx.send(PrefetchResult {
-                            key: key_clone,
-                            result: Err("Procedural random step".to_string()),
-                        });
-                        return;
-                    }
-                };
-
-                let res = store
-                    .fetch_slice(&var_for_thread, key_clone.timestep)
-                    .map_err(|e| e.to_string());
-
-                let _ = tx.send(PrefetchResult {
-                    key: key_clone,
-                    result: res,
-                });
-            });
+            offset_count += batch_count;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lru_cache_capacity() {
+        let cache = SliceLruCache::new(10 * 1024 * 1024); // 10MB
+        assert_eq!(cache.max_bytes(), 10 * 1024 * 1024);
     }
 }

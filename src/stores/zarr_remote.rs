@@ -36,7 +36,18 @@ impl DataStore for ZarrRemoteStore {
     fn fetch_slice(&self, variable: &str, timestep: usize) -> Result<MatrixSlice, Box<dyn Error>> {
         let base_url = self.store_url.trim_end_matches('/');
         let store = zarr_utils::build_sync_store(base_url)?;
-        zarr_utils::fetch_slice(store, variable, timestep)
+        zarr_utils::fetch_slice(store, base_url, variable, timestep)
+    }
+
+    fn fetch_slice_range(
+        &self,
+        variable: &str,
+        start_step: usize,
+        count: usize,
+    ) -> Result<Vec<MatrixSlice>, Box<dyn Error>> {
+        let base_url = self.store_url.trim_end_matches('/');
+        let store = zarr_utils::build_sync_store(base_url)?;
+        zarr_utils::fetch_slice_range(store, base_url, variable, start_step, count)
     }
 }
 

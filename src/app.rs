@@ -226,23 +226,12 @@ impl OctantApp {
             return;
         }
 
-        // 2. Cache MISS: Dispatch Non-Blocking Async Background Request!
+        // 2. Cache MISS: Dispatch Non-Blocking Async Background Request for active slice ONLY!
         self.is_fetching_slice = true;
         self.status_message = format!("⏳ Downloading slice for '{}' (step {})...", var_name, self.current_timestep + 1);
 
+        // Fetch active slice first so 2D map renders immediately on screen
         self.prefetcher.request_slice(cache_key, &self.lru_cache);
-
-        self.prefetcher.prefetch_chunk_aligned(
-            self.selected_store_kind,
-            &self.store_target_input,
-            &var_name,
-            self.current_timestep,
-            max_steps,
-            chunk_time_size,
-            slice_bytes_hint,
-            self.prefetch_lookahead,
-            &self.lru_cache,
-        );
     }
 
     pub fn trigger_background_prefetch(&mut self) {
@@ -335,7 +324,6 @@ impl eframe::App for OctantApp {
 
         // 1. Drain completed background prefetch results into LRU cache
         let completed_prefetches = self.prefetcher.poll_results();
-        let has_new_slices = !completed_prefetches.is_empty();
         for res in completed_prefetches {
             if let Ok(slice) = res.result {
                 let is_active_target = self.active_requested_key.as_ref() == Some(&res.key);
@@ -357,8 +345,8 @@ impl eframe::App for OctantApp {
             }
         }
 
-        // Continuously replenish prefetch buffer during playback
-        if has_new_slices && self.is_playing {
+        // Continuously replenish prefetch buffer when active slice is rendered
+        if !self.is_fetching_slice {
             self.trigger_background_prefetch();
         }
 
