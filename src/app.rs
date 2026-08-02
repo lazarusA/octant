@@ -72,6 +72,7 @@ impl OctantApp {
                         shape: vec![64, 64],
                         dimension_names: vec!["y".to_string(), "x".to_string()],
                         chunk_shape: vec![64, 64],
+                        file_size: crate::utils::calculate_variable_size_bytes(&[64, 64], "float32"),
                     }],
                 });
                 self.selected_variable_idx = 0;
@@ -262,6 +263,8 @@ impl eframe::App for OctantApp {
                                 ui.small(format!("Shape: {:?}", var_info.shape));
                                 ui.small(format!("Dimensions: {:?}", var_info.dimension_names));
                                 ui.small(format!("Chunks: {:?}", var_info.chunk_shape));
+                                let size_mb = var_info.file_size as f64 / (1024.0 * 1024.0);
+                                ui.small(format!("File Size: {} bytes ({:.2} MB)", var_info.file_size, size_mb));
                             }
                         }
                     } else {

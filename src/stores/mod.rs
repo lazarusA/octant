@@ -19,6 +19,7 @@ pub struct VariableInfo {
     pub shape: Vec<u64>,
     pub dimension_names: Vec<String>,
     pub chunk_shape: Vec<u64>,
+    pub file_size: u64,
 }
 
 #[derive(Debug, Clone)]

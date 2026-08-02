@@ -1,0 +1,9 @@
+pub mod grid;
+pub mod icechunk;
+pub mod units;
+pub mod zarr;
+
+// Re-exports for convenience
+pub use grid::check_and_orient_axes;
+pub use units::{calculate_variable_size_bytes, parse_time_unit, unit_to_milliseconds};
+pub use zarr::{build_sync_store, discover_arrays_via_metadata, extract_store_variables, fetch_slice};

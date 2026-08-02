@@ -40,6 +40,7 @@ impl DataStore for IcechunkLocalStore {
                                     shape: vec![365, 64, 64],
                                     dimension_names: vec!["time".to_string(), "y".to_string(), "x".to_string()],
                                     chunk_shape: vec![30, 64, 64],
+                                    file_size: crate::utils::calculate_variable_size_bytes(&[365, 64, 64], "float32"),
                                 });
                             }
                         }
@@ -55,6 +56,7 @@ impl DataStore for IcechunkLocalStore {
                 shape: vec![365, 64, 64],
                 dimension_names: vec!["time".to_string(), "depth".to_string(), "lat".to_string()],
                 chunk_shape: vec![30, 64, 64],
+                file_size: crate::utils::calculate_variable_size_bytes(&[365, 64, 64], "float32"),
             });
             variables.push(VariableInfo {
                 name: "salinity".to_string(),
@@ -62,6 +64,7 @@ impl DataStore for IcechunkLocalStore {
                 shape: vec![365, 64, 64],
                 dimension_names: vec!["time".to_string(), "depth".to_string(), "lat".to_string()],
                 chunk_shape: vec![30, 64, 64],
+                file_size: crate::utils::calculate_variable_size_bytes(&[365, 64, 64], "float32"),
             });
         }
 

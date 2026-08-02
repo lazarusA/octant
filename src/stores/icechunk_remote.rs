@@ -36,6 +36,7 @@ impl DataStore for IcechunkRemoteStore {
                                         shape: vec![730, 128, 128],
                                         dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
                                         chunk_shape: vec![30, 64, 64],
+                                        file_size: crate::utils::calculate_variable_size_bytes(&[730, 128, 128], "float32"),
                                     });
                                 }
                             }
@@ -52,6 +53,7 @@ impl DataStore for IcechunkRemoteStore {
                 shape: vec![730, 128, 128],
                 dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
                 chunk_shape: vec![30, 64, 64],
+                file_size: crate::utils::calculate_variable_size_bytes(&[730, 128, 128], "float32"),
             });
             variables.push(VariableInfo {
                 name: "surface_solar_radiation".to_string(),
@@ -59,6 +61,7 @@ impl DataStore for IcechunkRemoteStore {
                 shape: vec![730, 128, 128],
                 dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
                 chunk_shape: vec![30, 64, 64],
+                file_size: crate::utils::calculate_variable_size_bytes(&[730, 128, 128], "float32"),
             });
         }
 

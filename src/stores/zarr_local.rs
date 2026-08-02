@@ -3,8 +3,7 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use zarrs::array::Array;
-use zarrs::array_subset::ArraySubset;
+use zarrs::array::{Array, ArraySubset};
 use zarrs::filesystem::FilesystemStore;
 
 pub struct ZarrLocalStore {
@@ -46,6 +45,7 @@ impl DataStore for ZarrLocalStore {
                 shape: vec![64, 64],
                 dimension_names: vec!["y".to_string(), "x".to_string()],
                 chunk_shape: vec![64, 64],
+                file_size: crate::utils::calculate_variable_size_bytes(&[64, 64], "float32"),
             });
         }
 
@@ -90,7 +90,7 @@ impl DataStore for ZarrLocalStore {
                 ArraySubset::new_with_shape(shape.to_vec())
             };
 
-            if let Ok(raw_values) = array.retrieve_array_subset_elements::<f32>(&subset) {
+            if let Ok(raw_values) = array.retrieve_array_subset::<Vec<f32>>(&subset) {
                 let valid_vals: Vec<f32> = raw_values.iter().copied().filter(|v| !v.is_nan()).collect();
                 let (min_v, max_v) = if !valid_vals.is_empty() {
                     let min_val = valid_vals.iter().copied().fold(f32::INFINITY, f32::min);
@@ -187,12 +187,15 @@ fn inspect_directory_for_zarr_variables(
                             .unwrap_or("float32")
                             .to_string();
 
+                        let file_size = crate::utils::calculate_variable_size_bytes(&shape, &data_type);
+
                         variables.push(VariableInfo {
                             name: var_name,
                             data_type,
                             shape,
                             dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
                             chunk_shape,
+                            file_size,
                         });
                     }
                 }

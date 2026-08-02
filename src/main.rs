@@ -2,6 +2,7 @@ mod app;
 mod matrix_data;
 mod renderer;
 mod stores;
+pub mod utils;
 
 use app::OctantApp;
 
