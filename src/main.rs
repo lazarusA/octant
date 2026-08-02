@@ -1,6 +1,7 @@
 mod app;
 mod matrix_data;
 mod renderer;
+mod stores;
 
 use app::OctantApp;
 
@@ -11,7 +12,7 @@ fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1150.0, 720.0])
-            .with_title("Octant Engine — Cloud Tensor Visualizer"),
+            .with_title("Octant Engine — Multiscale Tensor Visualizer"),
         ..Default::default()
     };
 

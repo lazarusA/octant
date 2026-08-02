@@ -11,8 +11,12 @@ wgpu = { version = "22.1", features = ["webgpu", "webgl"] }
 bytemuck = { version = "1.16", features = ["derive"] }
 glam = { version = "0.27", features = ["bytemuck"] }
 log = "0.4"
-zarrs = { version = "0.17", features = ["blosc"] }
+zarrs = { version = "0.17", features = ["blosc", "async"] }
+zarrs_object_store = "0.2"
+object_store = { version = "0.11", features = ["http", "cloud"] }
 reqwest = { version = "0.12", features = ["blocking", "json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.38", features = ["full"] }
