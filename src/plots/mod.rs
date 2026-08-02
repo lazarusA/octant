@@ -6,7 +6,7 @@ pub mod sphere;
 pub mod point_cloud;
 
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
-pub use surface::SurfacePlot;
+pub use surface::{SurfaceCallback, SurfaceRenderer, SurfacePlot};
 pub use block::BlockPlot;
 pub use volume::VolumePlot; 
 pub use sphere::{SphereCallback, SphereRenderer, SpherePlot};
@@ -27,7 +27,7 @@ impl PlotType {
     pub fn display_name(&self) -> &'static str {
         match self {
             PlotType::Heatmap => "2D Flatmap Heatmap",
-            PlotType::Surface => "3D Displaced Surface",
+            PlotType::Surface => "3D Surface / Blocks",
             PlotType::Block => "3D Voxel / Block",
             PlotType::Volume => "3D Volume Raycasting",
             PlotType::Sphere => "3D Globe Projection",

@@ -1,6 +1,8 @@
 use crate::cache::{SliceCacheKey, SliceLruCache, SlicePrefetcher};
 use crate::data::matrix_data::MatrixData;
-use crate::plots::{MatrixCallback, MatrixRenderer, PlotType, SphereCallback, SphereRenderer};
+use crate::plots::{
+    MatrixCallback, MatrixRenderer, PlotType, SphereCallback, SphereRenderer, SurfaceCallback, SurfaceRenderer,
+};
 use crate::stores::{
     icechunk_local::IcechunkLocalStore, icechunk_remote::IcechunkRemoteStore,
     zarr_local::ZarrLocalStore, zarr_remote::ZarrRemoteStore, DataStore, DatasetMetadata, VariableInfo,
@@ -30,10 +32,13 @@ pub struct OctantApp {
     pub matrix_data: Option<MatrixData>,
     pub renderer: Option<Arc<MatrixRenderer>>,
     pub sphere_renderer: Option<Arc<SphereRenderer>>,
+    pub surface_renderer: Option<Arc<SurfaceRenderer>>,
     pub sphere_rotation_y: f32,
     pub sphere_rotation_x: f32,
     pub sphere_auto_rotate: bool,
     pub sphere_zoom: f32,
+    pub surface_displacement_strength: f32,
+    pub surface_mode: u32,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
     // LRU Cache & Prefetcher State
@@ -76,10 +81,13 @@ impl OctantApp {
             matrix_data: None,
             renderer: None,
             sphere_renderer: None,
+            surface_renderer: None,
             sphere_rotation_y: 0.0,
             sphere_rotation_x: 0.25,
             sphere_auto_rotate: true,
             sphere_zoom: 2.5,
+            surface_displacement_strength: 1.0,
+            surface_mode: 0,
             wgpu_render_state,
 
             lru_cache: SliceLruCache::new(default_cache_mb * 1024 * 1024),
@@ -289,12 +297,15 @@ impl OctantApp {
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
             let same_dimensions = self.matrix_data.as_ref().map_or(false, |m| m.width == data.width && m.height == data.height);
 
-            if same_dimensions && self.renderer.is_some() && self.sphere_renderer.is_some() {
+            if same_dimensions && self.renderer.is_some() && self.sphere_renderer.is_some() && self.surface_renderer.is_some() {
                 if let Some(renderer) = &self.renderer {
                     renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
                 if let Some(sphere_renderer) = &self.sphere_renderer {
                     sphere_renderer.update_data(&wgpu_render_state.queue, &data.values);
+                }
+                if let Some(surface_renderer) = &self.surface_renderer {
+                    surface_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
             } else {
                 let renderer = MatrixRenderer::new(
@@ -311,8 +322,16 @@ impl OctantApp {
                     data.width,
                     data.height,
                 );
+                let surface_renderer = SurfaceRenderer::new(
+                    &wgpu_render_state.device,
+                    wgpu_render_state.target_format,
+                    &data.values,
+                    data.width,
+                    data.height,
+                );
                 self.renderer = Some(Arc::new(renderer));
                 self.sphere_renderer = Some(Arc::new(sphere_renderer));
+                self.surface_renderer = Some(Arc::new(surface_renderer));
             }
         }
         self.matrix_data = Some(data);
@@ -462,7 +481,7 @@ impl eframe::App for OctantApp {
                 }
             }
 
-            if self.sphere_auto_rotate && self.active_plot_type == PlotType::Sphere {
+            if self.sphere_auto_rotate && (self.active_plot_type == PlotType::Sphere || self.active_plot_type == PlotType::Surface) {
                 self.sphere_rotation_y += ui.ctx().input(|i| i.stable_dt).min(0.1) * 0.15;
                 ui.ctx().request_repaint();
             }
@@ -480,6 +499,24 @@ impl eframe::App for OctantApp {
                                 rotation_y: self.sphere_rotation_y,
                                 rotation_x: self.sphere_rotation_x,
                                 zoom: self.sphere_zoom,
+                                rect,
+                            },
+                        );
+                        ui.painter().add(callback);
+                    }
+                }
+                PlotType::Surface => {
+                    if let Some(surface_renderer) = &self.surface_renderer {
+                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                            rect,
+                            SurfaceCallback {
+                                renderer: surface_renderer.clone(),
+                                colormap: effective_colormap,
+                                rotation_y: self.sphere_rotation_y,
+                                rotation_x: self.sphere_rotation_x,
+                                zoom: self.sphere_zoom,
+                                displacement_strength: self.surface_displacement_strength,
+                                surface_mode: self.surface_mode,
                                 rect,
                             },
                         );
