@@ -61,17 +61,7 @@ impl HeatmapRenderer {
         width: usize,
         height: usize,
     ) -> Self {
-        let shader_source = concat!(
-            include_str!("shaders/colormaps/viridis.wgsl"), "\n",
-            include_str!("shaders/colormaps/plasma.wgsl"), "\n",
-            include_str!("shaders/colormaps/inferno.wgsl"), "\n",
-            include_str!("shaders/colormaps/magma.wgsl"), "\n",
-            include_str!("shaders/colormaps/turbo.wgsl"), "\n",
-            include_str!("shaders/colormaps/coolwarm.wgsl"), "\n",
-            include_str!("shaders/colormaps/cividis.wgsl"), "\n",
-            include_str!("shaders/colormaps/mod.wgsl"), "\n",
-            include_str!("shaders/heatmap.wgsl")
-        );
+        let shader_source = crate::assemble_plot_shader!(include_str!("shaders/heatmap.wgsl"));
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Heatmap Shader Module"),

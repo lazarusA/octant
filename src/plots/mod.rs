@@ -8,9 +8,8 @@ pub mod point_cloud;
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
 pub use surface::SurfacePlot;
 pub use block::BlockPlot;
-pub use volume::VolumePlot;
-pub use sphere::SpherePlot;
-pub use point_cloud::PointCloudPlot;
+pub use volume::VolumePlot; 
+pub use sphere::{SphereCallback, SphereRenderer, SpherePlot};
 
 /// Supported visualization plot types in Octant Engine
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -35,4 +34,22 @@ impl PlotType {
             PlotType::PointCloud => "3D Point Cloud",
         }
     }
+}
+
+/// Assembles a plot WGSL shader by prepending all shared WGSL colormap modules.
+#[macro_export]
+macro_rules! assemble_plot_shader {
+    ($plot_shader:expr) => {
+        concat!(
+            include_str!("shaders/colormaps/viridis.wgsl"), "\n",
+            include_str!("shaders/colormaps/plasma.wgsl"), "\n",
+            include_str!("shaders/colormaps/inferno.wgsl"), "\n",
+            include_str!("shaders/colormaps/magma.wgsl"), "\n",
+            include_str!("shaders/colormaps/turbo.wgsl"), "\n",
+            include_str!("shaders/colormaps/coolwarm.wgsl"), "\n",
+            include_str!("shaders/colormaps/cividis.wgsl"), "\n",
+            include_str!("shaders/colormaps/mod.wgsl"), "\n",
+            $plot_shader
+        )
+    };
 }

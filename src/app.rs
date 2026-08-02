@@ -1,6 +1,6 @@
 use crate::cache::{SliceCacheKey, SliceLruCache, SlicePrefetcher};
 use crate::data::matrix_data::MatrixData;
-use crate::plots::{MatrixCallback, MatrixRenderer, PlotType};
+use crate::plots::{MatrixCallback, MatrixRenderer, PlotType, SphereCallback, SphereRenderer};
 use crate::stores::{
     icechunk_local::IcechunkLocalStore, icechunk_remote::IcechunkRemoteStore,
     zarr_local::ZarrLocalStore, zarr_remote::ZarrRemoteStore, DataStore, DatasetMetadata, VariableInfo,
@@ -29,6 +29,11 @@ pub struct OctantApp {
     pub is_loading: bool,
     pub matrix_data: Option<MatrixData>,
     pub renderer: Option<Arc<MatrixRenderer>>,
+    pub sphere_renderer: Option<Arc<SphereRenderer>>,
+    pub sphere_rotation_y: f32,
+    pub sphere_rotation_x: f32,
+    pub sphere_auto_rotate: bool,
+    pub sphere_zoom: f32,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
     // LRU Cache & Prefetcher State
@@ -70,6 +75,11 @@ impl OctantApp {
             is_loading: false,
             matrix_data: None,
             renderer: None,
+            sphere_renderer: None,
+            sphere_rotation_y: 0.0,
+            sphere_rotation_x: 0.25,
+            sphere_auto_rotate: true,
+            sphere_zoom: 2.5,
             wgpu_render_state,
 
             lru_cache: SliceLruCache::new(default_cache_mb * 1024 * 1024),
@@ -284,7 +294,15 @@ impl OctantApp {
                 data.width,
                 data.height,
             );
+            let sphere_renderer = SphereRenderer::new(
+                &wgpu_render_state.device,
+                wgpu_render_state.target_format,
+                &data.values,
+                data.width,
+                data.height,
+            );
             self.renderer = Some(Arc::new(renderer));
+            self.sphere_renderer = Some(Arc::new(sphere_renderer));
         }
         self.matrix_data = Some(data);
     }
@@ -416,20 +434,60 @@ impl eframe::App for OctantApp {
                 available_rect
             };
 
-            let (rect, _) = ui.allocate_exact_size(rect.size(), egui::Sense::drag());
+            let (rect, response) = ui.allocate_exact_size(rect.size(), egui::Sense::drag());
 
-            if let Some(renderer) = &self.renderer {
-                let effective_colormap = self.preview_colormap.unwrap_or(self.active_colormap);
-                let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                    rect,
-                    MatrixCallback {
-                        renderer: renderer.clone(),
-                        colormap: effective_colormap,
-                        rect,
-                    },
-                );
+            if response.dragged() {
+                let delta = response.drag_delta();
+                self.sphere_rotation_y += delta.x * 0.008;
+                self.sphere_rotation_x = (self.sphere_rotation_x + delta.y * 0.008)
+                    .clamp(-std::f32::consts::FRAC_PI_2 + 0.05, std::f32::consts::FRAC_PI_2 - 0.05);
+            }
 
-                ui.painter().add(callback);
+            if response.hovered() {
+                let scroll = ui.input(|i| i.raw_scroll_delta.y);
+                if scroll != 0.0 {
+                    self.sphere_zoom = (self.sphere_zoom - scroll * 0.003).clamp(1.1, 8.0);
+                    ui.ctx().request_repaint();
+                }
+            }
+
+            if self.sphere_auto_rotate && self.active_plot_type == PlotType::Sphere {
+                self.sphere_rotation_y += ui.ctx().input(|i| i.stable_dt).min(0.1) * 0.15;
+                ui.ctx().request_repaint();
+            }
+
+            let effective_colormap = self.preview_colormap.unwrap_or(self.active_colormap);
+
+            match self.active_plot_type {
+                PlotType::Sphere => {
+                    if let Some(sphere_renderer) = &self.sphere_renderer {
+                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                            rect,
+                            SphereCallback {
+                                renderer: sphere_renderer.clone(),
+                                colormap: effective_colormap,
+                                rotation_y: self.sphere_rotation_y,
+                                rotation_x: self.sphere_rotation_x,
+                                zoom: self.sphere_zoom,
+                                rect,
+                            },
+                        );
+                        ui.painter().add(callback);
+                    }
+                }
+                _ => {
+                    if let Some(renderer) = &self.renderer {
+                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                            rect,
+                            MatrixCallback {
+                                renderer: renderer.clone(),
+                                colormap: effective_colormap,
+                                rect,
+                            },
+                        );
+                        ui.painter().add(callback);
+                    }
+                }
             }
         });
     }

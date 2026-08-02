@@ -1,5 +1,5 @@
 use crate::app::OctantApp;
-use super::{colormap, status, store, variables};
+use super::{colormap, plot_type, status, store, variables};
 
 pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
     egui::TopBottomPanel::top("octant_top_bar")
@@ -11,7 +11,7 @@ pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
                 ui.label(egui::RichText::new("📐 Octant").strong().heading());
                 ui.separator();
 
-                // Dropdown menus: Store, Catalog, Variables, Colormap
+                // Dropdown menus: Store, Catalog, Variables, Colormap, Plot Type
                 store::show_store_menu(app, ui);
 
                 if ui.button(egui::RichText::new("📚 Catalog").strong()).clicked() {
@@ -20,6 +20,7 @@ pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
 
                 variables::show_variables_menu(app, ui);
                 colormap::show_colormap_menu(app, ui);
+                plot_type::show_plot_type_menu(app, ui);
 
                 ui.separator();
                 let btn_text = if app.is_loading {
