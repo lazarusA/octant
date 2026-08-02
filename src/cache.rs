@@ -202,6 +202,7 @@ impl SlicePrefetcher {
         current_step: usize,
         max_steps: usize,
         chunk_time_size: usize,
+        slice_bytes_hint: usize,
         configured_lookahead: usize,
         cache: &SliceLruCache,
     ) {
@@ -209,11 +210,40 @@ impl SlicePrefetcher {
             return;
         }
 
-        let effective_chunk_size = if chunk_time_size > 0 { chunk_time_size } else { 24 };
-        let lookahead_count = effective_chunk_size.max(configured_lookahead);
+        // 1. Dynamic Slice Byte Size (defaults to 41KB if unspecified)
+        let slice_bytes = if slice_bytes_hint > 0 { slice_bytes_hint } else { 41_472 };
+
+        // 2. Dynamic Memory Capacity Calculation:
+        // Total 2D matrix slices that fit in the LRU cache limit (e.g. 1GB / 4MB = ~250 slices)
+        let cache_max_bytes = cache.max_bytes();
+        let total_cacheable_slices = (cache_max_bytes / slice_bytes).max(1);
+
+        // 3. Dynamic Parallelism / Concurrency Cap:
+        // Cap max in-flight background requests so concurrent downloads target ~64MB total
+        let target_in_flight_bytes = 64 * 1024 * 1024;
+        let max_in_flight = (target_in_flight_bytes / slice_bytes).clamp(4, 12);
+
+        // 4. Agnostic Chunk-Aligned Lookahead Calculation:
+        // Physical chunk size along time dimension
+        let chunk_time_steps = if chunk_time_size > 0 { chunk_time_size } else { 1 };
+
+        // Allow prefetching up to 66% of total LRU cache capacity in advance
+        let max_safe_lookahead = (total_cacheable_slices * 2 / 3).max(1);
+
+        // Target full configured lookahead (e.g. 24, 32, 48 steps ahead), bounded by cache capacity & max steps
+        let lookahead_count = configured_lookahead
+            .max(chunk_time_steps * 2)
+            .min(max_safe_lookahead)
+            .min(max_steps - 1)
+            .max(1);
+
         let store_target_string = store_target.to_string();
 
         for offset in 1..=lookahead_count {
+            if self.pending.len() >= max_in_flight {
+                break;
+            }
+
             let step = (current_step + offset) % max_steps;
             let key = SliceCacheKey {
                 store_kind,

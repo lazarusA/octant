@@ -134,7 +134,7 @@ impl OctantApp {
     }
 
     pub fn load_selected_variable_slice(&mut self) {
-        let (var_name, max_steps, chunk_time_size) = {
+        let (var_name, max_steps, chunk_time_size, slice_bytes_hint) = {
             if let Some(metadata) = &self.active_dataset_metadata {
                 if let Some(var_info) = metadata.variables.get(self.selected_variable_idx) {
                     let max_steps = if var_info.shape.len() <= 2 {
@@ -156,7 +156,16 @@ impl OctantApp {
                     } else {
                         46
                     };
-                    (var_info.name.clone(), max_steps, chunk_time_size)
+
+                    let slice_bytes = if var_info.shape.len() >= 2 {
+                        let w = var_info.shape[var_info.shape.len() - 1] as usize;
+                        let h = var_info.shape[var_info.shape.len() - 2] as usize;
+                        w * h * std::mem::size_of::<f32>()
+                    } else {
+                        64 * 64 * std::mem::size_of::<f32>()
+                    };
+
+                    (var_info.name.clone(), max_steps, chunk_time_size, slice_bytes)
                 } else {
                     return;
                 }
@@ -201,6 +210,7 @@ impl OctantApp {
                 self.current_timestep,
                 total_steps,
                 chunk_time_size,
+                slice_bytes_hint,
                 self.prefetch_lookahead,
                 &self.lru_cache,
             );
@@ -229,9 +239,49 @@ impl OctantApp {
             self.current_timestep,
             max_steps,
             chunk_time_size,
+            slice_bytes_hint,
             self.prefetch_lookahead,
             &self.lru_cache,
         );
+    }
+
+    pub fn trigger_background_prefetch(&mut self) {
+        if let Some(metadata) = &self.active_dataset_metadata {
+            if let Some(var_info) = metadata.variables.get(self.selected_variable_idx) {
+                let max_steps = if var_info.shape.len() <= 2 {
+                    1
+                } else {
+                    var_info.shape.first().copied().unwrap_or(1) as usize
+                };
+                if max_steps <= 1 {
+                    return;
+                }
+                let chunk_time_size = if !var_info.chunk_shape.is_empty() {
+                    var_info.chunk_shape[0] as usize
+                } else {
+                    46
+                };
+                let slice_bytes = if var_info.shape.len() >= 2 {
+                    let w = var_info.shape[var_info.shape.len() - 1] as usize;
+                    let h = var_info.shape[var_info.shape.len() - 2] as usize;
+                    w * h * std::mem::size_of::<f32>()
+                } else {
+                    64 * 64 * std::mem::size_of::<f32>()
+                };
+
+                self.prefetcher.prefetch_chunk_aligned(
+                    self.selected_store_kind,
+                    &self.store_target_input,
+                    &var_info.name,
+                    self.current_timestep,
+                    max_steps,
+                    chunk_time_size,
+                    slice_bytes,
+                    self.prefetch_lookahead,
+                    &self.lru_cache,
+                );
+            }
+        }
     }
 
     pub fn rebuild_pipeline_with_matrix_data(&mut self, data: MatrixData) {
@@ -285,6 +335,7 @@ impl eframe::App for OctantApp {
 
         // 1. Drain completed background prefetch results into LRU cache
         let completed_prefetches = self.prefetcher.poll_results();
+        let has_new_slices = !completed_prefetches.is_empty();
         for res in completed_prefetches {
             if let Ok(slice) = res.result {
                 let is_active_target = self.active_requested_key.as_ref() == Some(&res.key);
@@ -306,30 +357,42 @@ impl eframe::App for OctantApp {
             }
         }
 
+        // Continuously replenish prefetch buffer during playback
+        if has_new_slices && self.is_playing {
+            self.trigger_background_prefetch();
+        }
+
 
 
         // 2. Playback Animation Timer Loop
         if self.is_playing {
             let now = std::time::Instant::now();
             let frame_dur = std::time::Duration::from_secs_f32(1.0 / self.playback_fps.max(1.0));
-            if now.duration_since(self.last_step_time) >= frame_dur {
-                self.last_step_time = now;
-                let max_steps = self
-                    .matrix_data
-                    .as_ref()
-                    .map(|h| h.max_timesteps)
-                    .unwrap_or(1);
 
-                if max_steps > 1 {
-                    if self.current_timestep + 1 < max_steps {
-                        self.current_timestep += 1;
-                    } else if self.loop_playback {
-                        self.current_timestep = 0;
-                    } else {
-                        self.is_playing = false;
+            // Only advance playback when current requested slice is already loaded & rendered
+            if !self.is_fetching_slice {
+                if now.duration_since(self.last_step_time) >= frame_dur {
+                    self.last_step_time = now;
+                    let max_steps = self
+                        .matrix_data
+                        .as_ref()
+                        .map(|h| h.max_timesteps)
+                        .unwrap_or(1);
+
+                    if max_steps > 1 {
+                        if self.current_timestep + 1 < max_steps {
+                            self.current_timestep += 1;
+                        } else if self.loop_playback {
+                            self.current_timestep = 0;
+                        } else {
+                            self.is_playing = false;
+                        }
+                        self.load_selected_variable_slice();
                     }
-                    self.load_selected_variable_slice();
                 }
+            } else {
+                // Keep timer fresh while waiting for slice download
+                self.last_step_time = now;
             }
             ctx.request_repaint_after(frame_dur);
         } else {
