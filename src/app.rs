@@ -287,22 +287,33 @@ impl OctantApp {
 
     pub fn rebuild_pipeline_with_matrix_data(&mut self, data: MatrixData) {
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
-            let renderer = MatrixRenderer::new(
-                &wgpu_render_state.device,
-                wgpu_render_state.target_format,
-                &data.values,
-                data.width,
-                data.height,
-            );
-            let sphere_renderer = SphereRenderer::new(
-                &wgpu_render_state.device,
-                wgpu_render_state.target_format,
-                &data.values,
-                data.width,
-                data.height,
-            );
-            self.renderer = Some(Arc::new(renderer));
-            self.sphere_renderer = Some(Arc::new(sphere_renderer));
+            let same_dimensions = self.matrix_data.as_ref().map_or(false, |m| m.width == data.width && m.height == data.height);
+
+            if same_dimensions && self.renderer.is_some() && self.sphere_renderer.is_some() {
+                if let Some(renderer) = &self.renderer {
+                    renderer.update_data(&wgpu_render_state.queue, &data.values);
+                }
+                if let Some(sphere_renderer) = &self.sphere_renderer {
+                    sphere_renderer.update_data(&wgpu_render_state.queue, &data.values);
+                }
+            } else {
+                let renderer = MatrixRenderer::new(
+                    &wgpu_render_state.device,
+                    wgpu_render_state.target_format,
+                    &data.values,
+                    data.width,
+                    data.height,
+                );
+                let sphere_renderer = SphereRenderer::new(
+                    &wgpu_render_state.device,
+                    wgpu_render_state.target_format,
+                    &data.values,
+                    data.width,
+                    data.height,
+                );
+                self.renderer = Some(Arc::new(renderer));
+                self.sphere_renderer = Some(Arc::new(sphere_renderer));
+            }
         }
         self.matrix_data = Some(data);
     }

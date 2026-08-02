@@ -8,10 +8,13 @@ struct Uniforms {
 @group(0) @binding(0)
 var<uniform> uniforms: Uniforms;
 
+@group(0) @binding(1)
+var<storage, read> data_buffer: array<f32>;
+
 struct VertexInput {
     @location(0) position: vec2<f32>,
     @location(1) uv: vec2<f32>,
-    @location(2) val: f32,
+    @location(2) cell_index: u32,
 };
 
 struct VertexOutput {
@@ -25,12 +28,13 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.position = vec4<f32>(model.position, 0.0, 1.0);
     out.uv = model.uv;
-    out.val = model.val;
+    out.val = data_buffer[model.cell_index];
     return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let color = sample_colormap(uniforms.colormap, in.val / 100.0);
+    let norm_val = clamp(in.val / 100.0, 0.0, 1.0);
+    let color = sample_colormap(uniforms.colormap, norm_val);
     return vec4<f32>(color, 1.0);
 }

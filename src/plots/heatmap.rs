@@ -7,7 +7,7 @@ use wgpu::util::DeviceExt;
 pub struct HeatmapVertex {
     pub position: [f32; 2],
     pub uv: [f32; 2],
-    pub val: f32,
+    pub cell_index: u32,
 }
 
 impl HeatmapVertex {
@@ -29,7 +29,7 @@ impl HeatmapVertex {
                 wgpu::VertexAttribute {
                     offset: 16,
                     shader_location: 2,
-                    format: wgpu::VertexFormat::Float32,
+                    format: wgpu::VertexFormat::Uint32,
                 },
             ],
         }
@@ -48,9 +48,11 @@ pub struct HeatmapUniforms {
 pub struct HeatmapRenderer {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    data_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    num_vertices: u32,
+    num_indices: u32,
 }
 
 impl HeatmapRenderer {
@@ -81,27 +83,52 @@ impl HeatmapRenderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        // GPU Storage Buffer for 1D scalar data channel
+        let data_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Heatmap Data Storage Buffer"),
+            contents: bytemuck::cast_slice(matrix_data),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        });
+
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Heatmap Bind Group Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Heatmap Bind Group"),
             layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: data_buffer.as_entire_binding(),
+                },
+            ],
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -140,7 +167,7 @@ impl HeatmapRenderer {
             cache: None,
         });
 
-        let vertices = Self::build_mesh(matrix_data, width, height);
+        let (vertices, indices) = Self::build_mesh(width, height);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Heatmap Vertex Buffer"),
@@ -148,12 +175,20 @@ impl HeatmapRenderer {
             usage: wgpu::BufferUsages::VERTEX,
         });
 
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Heatmap Index Buffer"),
+            contents: bytemuck::cast_slice(&indices),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+
         Self {
             render_pipeline,
             vertex_buffer,
+            index_buffer,
+            data_buffer,
             uniform_buffer,
             bind_group,
-            num_vertices: vertices.len() as u32,
+            num_indices: indices.len() as u32,
         }
     }
 
@@ -167,15 +202,22 @@ impl HeatmapRenderer {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
-    fn build_mesh(data: &[f32], width: usize, height: usize) -> Vec<HeatmapVertex> {
-        let mut vertices = Vec::with_capacity(width * height * 6);
+    /// Fast GPU Storage Buffer data channel upload
+    pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
+        queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
+    }
+
+    fn build_mesh(width: usize, height: usize) -> (Vec<HeatmapVertex>, Vec<u32>) {
+        let num_quads = width * height;
+        let mut vertices = Vec::with_capacity(num_quads * 4);
+        let mut indices = Vec::with_capacity(num_quads * 6);
+
         let scale_x = 2.0;
         let scale_y = 2.0;
 
         for y in 0..height {
             for x in 0..width {
-                let idx = y * width + x;
-                let val = data.get(idx).copied().unwrap_or(0.0);
+                let cell_index = (y * width + x) as u32;
 
                 let x0 = -1.0 + (x as f32 / width as f32) * scale_x;
                 let x1 = -1.0 + ((x + 1) as f32 / width as f32) * scale_x;
@@ -188,22 +230,26 @@ impl HeatmapRenderer {
                 let v0 = y as f32 / height as f32;
                 let v1 = (y + 1) as f32 / height as f32;
 
-                let v_tl = HeatmapVertex { position: [x0, y0], uv: [u0, v0], val };
-                let v_tr = HeatmapVertex { position: [x1, y0], uv: [u1, v0], val };
-                let v_bl = HeatmapVertex { position: [x0, y1], uv: [u0, v1], val };
-                let v_br = HeatmapVertex { position: [x1, y1], uv: [u1, v1], val };
+                let base_idx = vertices.len() as u32;
 
-                vertices.push(v_tl);
-                vertices.push(v_bl);
-                vertices.push(v_tr);
+                vertices.push(HeatmapVertex { position: [x0, y0], uv: [u0, v0], cell_index });
+                vertices.push(HeatmapVertex { position: [x1, y0], uv: [u1, v0], cell_index });
+                vertices.push(HeatmapVertex { position: [x0, y1], uv: [u0, v1], cell_index });
+                vertices.push(HeatmapVertex { position: [x1, y1], uv: [u1, v1], cell_index });
 
-                vertices.push(v_tr);
-                vertices.push(v_bl);
-                vertices.push(v_br);
+                // Triangle 1: TL, BL, TR
+                indices.push(base_idx);
+                indices.push(base_idx + 2);
+                indices.push(base_idx + 1);
+
+                // Triangle 2: TR, BL, BR
+                indices.push(base_idx + 1);
+                indices.push(base_idx + 2);
+                indices.push(base_idx + 3);
             }
         }
 
-        vertices
+        (vertices, indices)
     }
 }
 
@@ -244,7 +290,8 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-        rpass.draw(0..self.renderer.num_vertices, 0..1);
+        rpass.set_index_buffer(self.renderer.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        rpass.draw_indexed(0..self.renderer.num_indices, 0, 0..1);
     }
 }
 

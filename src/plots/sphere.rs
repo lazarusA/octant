@@ -7,7 +7,7 @@ use wgpu::util::DeviceExt;
 pub struct SphereVertex {
     pub position: [f32; 3],
     pub uv: [f32; 2],
-    pub val: f32,
+    pub cell_index: u32,
 }
 
 impl SphereVertex {
@@ -29,7 +29,7 @@ impl SphereVertex {
                 wgpu::VertexAttribute {
                     offset: 20,
                     shader_location: 2,
-                    format: wgpu::VertexFormat::Float32,
+                    format: wgpu::VertexFormat::Uint32,
                 },
             ],
         }
@@ -52,9 +52,11 @@ pub struct SphereUniforms {
 pub struct SphereRenderer {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    data_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    num_vertices: u32,
+    num_indices: u32,
 }
 
 impl SphereRenderer {
@@ -89,27 +91,52 @@ impl SphereRenderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        // GPU Storage Buffer for 1D scalar data channel (4.1 MB for 720x1440 resolution)
+        let data_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Sphere Data Storage Buffer"),
+            contents: bytemuck::cast_slice(matrix_data),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        });
+
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Sphere Bind Group Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Sphere Bind Group"),
             layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: data_buffer.as_entire_binding(),
+                },
+            ],
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -149,7 +176,7 @@ impl SphereRenderer {
             cache: None,
         });
 
-        let vertices = Self::build_sphere_mesh(matrix_data, width, height);
+        let (vertices, indices) = Self::build_sphere_mesh(width, height);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Sphere Vertex Buffer"),
@@ -157,12 +184,20 @@ impl SphereRenderer {
             usage: wgpu::BufferUsages::VERTEX,
         });
 
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Sphere Index Buffer"),
+            contents: bytemuck::cast_slice(&indices),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+
         Self {
             render_pipeline,
             vertex_buffer,
+            index_buffer,
+            data_buffer,
             uniform_buffer,
             bind_group,
-            num_vertices: vertices.len() as u32,
+            num_indices: indices.len() as u32,
         }
     }
 
@@ -180,18 +215,24 @@ impl SphereRenderer {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
-    /// Build 1:1 discrete 3D sphere mesh matching matrix data resolution without interpolation.
-    fn build_sphere_mesh(data: &[f32], width: usize, height: usize) -> Vec<SphereVertex> {
+    /// Fast GPU Storage Buffer data channel upload (4.1 MB per frame, zero vertex re-allocation)
+    pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
+        queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
+    }
+
+    /// Build static 1:1 indexed 3D sphere mesh geometry.
+    fn build_sphere_mesh(width: usize, height: usize) -> (Vec<SphereVertex>, Vec<u32>) {
         let rings = height;
         let sectors = width;
         let radius = 1.0f32;
 
-        let mut vertices = Vec::with_capacity(rings * sectors * 6);
+        let num_quads = rings * sectors;
+        let mut vertices = Vec::with_capacity(num_quads * 4);
+        let mut indices = Vec::with_capacity(num_quads * 6);
 
         for r in 0..rings {
             for s in 0..sectors {
-                let idx = r * width + s;
-                let val = data.get(idx).copied().unwrap_or(0.0);
+                let cell_index = (r * width + s) as u32;
 
                 let u0 = s as f32 / sectors as f32;
                 let u1 = (s + 1) as f32 / sectors as f32;
@@ -203,22 +244,26 @@ impl SphereRenderer {
                 let p_bl = Self::spherical_to_cartesian(radius, u0, v1);
                 let p_br = Self::spherical_to_cartesian(radius, u1, v1);
 
-                let vert_tl = SphereVertex { position: p_tl, uv: [u0, v0], val };
-                let vert_tr = SphereVertex { position: p_tr, uv: [u1, v0], val };
-                let vert_bl = SphereVertex { position: p_bl, uv: [u0, v1], val };
-                let vert_br = SphereVertex { position: p_br, uv: [u1, v1], val };
+                let base_idx = vertices.len() as u32;
 
-                vertices.push(vert_tl);
-                vertices.push(vert_bl);
-                vertices.push(vert_tr);
+                vertices.push(SphereVertex { position: p_tl, uv: [u0, v0], cell_index });
+                vertices.push(SphereVertex { position: p_tr, uv: [u1, v0], cell_index });
+                vertices.push(SphereVertex { position: p_bl, uv: [u0, v1], cell_index });
+                vertices.push(SphereVertex { position: p_br, uv: [u1, v1], cell_index });
 
-                vertices.push(vert_tr);
-                vertices.push(vert_bl);
-                vertices.push(vert_br);
+                // Triangle 1: TL, BL, TR
+                indices.push(base_idx);
+                indices.push(base_idx + 2);
+                indices.push(base_idx + 1);
+
+                // Triangle 2: TR, BL, BR
+                indices.push(base_idx + 1);
+                indices.push(base_idx + 2);
+                indices.push(base_idx + 3);
             }
         }
 
-        vertices
+        (vertices, indices)
     }
 
     /// Map UV coordinates (u in [0..1], v in [0..1]) to 3D Cartesian coordinates [X, Y, Z] on sphere
@@ -278,7 +323,8 @@ impl eframe::egui_wgpu::CallbackTrait for SphereCallback {
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-        rpass.draw(0..self.renderer.num_vertices, 0..1);
+        rpass.set_index_buffer(self.renderer.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        rpass.draw_indexed(0..self.renderer.num_indices, 0, 0..1);
     }
 }
 

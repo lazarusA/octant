@@ -12,10 +12,13 @@ struct Uniforms {
 @group(0) @binding(0)
 var<uniform> uniforms: Uniforms;
 
+@group(0) @binding(1)
+var<storage, read> data_buffer: array<f32>;
+
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) uv: vec2<f32>,
-    @location(2) val: f32,
+    @location(2) cell_index: u32,
 };
 
 struct VertexOutput {
@@ -64,7 +67,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 
     out.position = vec4<f32>(proj_x, proj_y, proj_z, -cam_z);
     out.uv = model.uv;
-    out.val = model.val;
+    out.val = data_buffer[model.cell_index];
 
     return out;
 }
