@@ -16,7 +16,7 @@ var<uniform> uniforms: Uniforms;
 var<storage, read> data_buffer: array<f32>;
 
 struct VertexInput {
-    @location(0) position: vec3<f32>, // x, z, base_y_factor (1.0 = top face, 0.0 = bottom base)
+    @location(0) position: vec3<f32>, // x, y, z (unit cube 0..1 coordinates for instancing)
     @location(1) uv: vec2<f32>,
     @location(2) cell_index: u32,
     @location(3) corner_index: u32,
@@ -31,33 +31,65 @@ struct VertexOutput {
 };
 
 @vertex
-fn vs_main(model: VertexInput) -> VertexOutput {
+fn vs_main(
+    model: VertexInput,
+    @builtin(instance_index) instance_idx: u32,
+) -> VertexOutput {
     var out: VertexOutput;
 
-    // 1. Fetch scalar metric based on surface_mode (0 = Smooth Terrain, 1 = 3D Extruded Blocks)
     var raw_val: f32;
-    var height: f32;
-    var pos_y: f32;
+    var pos_3d: vec3<f32>;
+    var normal_3d: vec3<f32>;
 
     if (uniforms.surface_mode == 0u) {
+        // Mode 0: Smooth Terrain
         let max_data_idx = arrayLength(&data_buffer) - 1u;
         let gx = min(model.corner_index % (uniforms.width + 1u), uniforms.width - 1u);
         let gy = min(model.corner_index / (uniforms.width + 1u), max_data_idx / uniforms.width);
         let data_idx = min(gy * uniforms.width + gx, max_data_idx);
         raw_val = data_buffer[data_idx];
+
         let norm_val = clamp(raw_val / 100.0, 0.0, 1.0);
-        height = (norm_val - 0.5) * 1.5 * uniforms.displacement_strength;
-        pos_y = height;
-    } else {
+        let height = (norm_val - 0.5) * 1.5 * uniforms.displacement_strength;
+        pos_3d = vec3<f32>(model.position.x, height, model.position.y);
+        normal_3d = normalize(vec3<f32>(0.0, 1.0 + uniforms.displacement_strength * 0.5, 0.0));
+    } else if (uniforms.surface_mode == 1u) {
+        // Mode 1: Flat Steps
         raw_val = data_buffer[model.cell_index];
         let norm_val = clamp(raw_val / 100.0, 0.0, 1.0);
-        height = (norm_val - 0.5) * 1.5 * uniforms.displacement_strength;
-        let base_y = -0.75;
-        // Interpolate between base floor and top height using model.position.z
-        pos_y = mix(base_y, height, model.position.z);
-    }
+        let height = (norm_val - 0.5) * 1.5 * uniforms.displacement_strength;
+        pos_3d = vec3<f32>(model.position.x, height, model.position.y);
+        normal_3d = vec3<f32>(0.0, 1.0, 0.0);
+    } else {
+        // Mode 2: 3D Lego Cubes (GPU Instanced Unit Cube draw!)
+        let grid_h = max(arrayLength(&data_buffer) / uniforms.width, 1u);
+        let cell_x = instance_idx % uniforms.width;
+        let cell_y = instance_idx / uniforms.width;
 
-    let pos_3d = vec3<f32>(model.position.x, pos_y, model.position.y);
+        let max_idx = arrayLength(&data_buffer) - 1u;
+        let safe_idx = min(instance_idx, max_idx);
+        raw_val = data_buffer[safe_idx];
+
+        let norm_val = clamp(raw_val / 100.0, 0.0, 1.0);
+        let height = (norm_val - 0.5) * 1.5 * uniforms.displacement_strength;
+        let base_y = -0.75;
+
+        let scale_x = 2.0 * uniforms.aspect_ratio;
+        let scale_y = 2.0;
+
+        let x0 = -uniforms.aspect_ratio + (f32(cell_x) / f32(uniforms.width)) * scale_x;
+        let x1 = -uniforms.aspect_ratio + (f32(cell_x + 1u) / f32(uniforms.width)) * scale_x;
+
+        let y0 = -1.0 + (f32(cell_y) / f32(grid_h)) * scale_y;
+        let y1 = -1.0 + (f32(cell_y + 1u) / f32(grid_h)) * scale_y;
+
+        let world_x = mix(x0, x1, model.position.x);
+        let world_z = mix(y0, y1, model.position.y);
+        let world_y = mix(base_y, height, model.position.z); // model.position.z is 1.0 for top, 0.0 for base!
+
+        pos_3d = vec3<f32>(world_x, world_y, world_z);
+        normal_3d = model.raw_normal;
+    }
 
     // 2. Rotate 3D terrain/block position around Y and X camera axes
     let cy = cos(uniforms.rotation_y);
@@ -81,9 +113,9 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 
     // Rotate face normal vector for 3D directional lighting
     let norm_y_rot = vec3<f32>(
-        cy * model.raw_normal.x + sy * model.raw_normal.z,
-        model.raw_normal.y,
-        -sy * model.raw_normal.x + cy * model.raw_normal.z
+        cy * normal_3d.x + sy * normal_3d.z,
+        normal_3d.y,
+        -sy * normal_3d.x + cy * normal_3d.z
     );
     out.normal = normalize(vec3<f32>(
         norm_y_rot.x,
@@ -111,7 +143,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let norm_val = clamp(in.val / 100.0, 0.0, 1.0);
-    let base_color = sample_colormap(uniforms.colormap, norm_val);
+    var base_color = sample_colormap(uniforms.colormap, norm_val);
 
     // 3D Directional Lighting for surface terrain & block faces
     let light_dir = normalize(vec3<f32>(0.4, 0.8, 0.6));

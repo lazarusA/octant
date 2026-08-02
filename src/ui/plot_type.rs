@@ -55,9 +55,13 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     if app.active_plot_type == PlotType::Surface {
         ui.separator();
 
-        let style_label = if app.surface_mode == 0 { "🌊 Smooth Terrain" } else { "🧱 3D Blocks" };
+        let style_label = match app.surface_mode {
+            0 => "🌊 Smooth Terrain",
+            1 => "📐 Flat Steps",
+            _ => "🧱 3D Lego Cubes",
+        };
         if ui.button(egui::RichText::new(style_label).small()).clicked() {
-            app.surface_mode = if app.surface_mode == 0 { 1 } else { 0 };
+            app.surface_mode = (app.surface_mode + 1) % 3;
         }
 
         ui.add(

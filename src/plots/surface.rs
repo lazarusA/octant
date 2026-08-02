@@ -63,12 +63,15 @@ pub struct SurfaceUniforms {
 
 pub struct SurfaceRenderer {
     render_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
+    grid_vertex_buffer: wgpu::Buffer,
+    grid_index_buffer: wgpu::Buffer,
+    grid_num_indices: u32,
+    cube_vertex_buffer: wgpu::Buffer,
+    cube_index_buffer: wgpu::Buffer,
     data_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    num_indices: u32,
+    num_instances: u32,
     width: usize,
 }
 
@@ -125,7 +128,7 @@ impl SurfaceRenderer {
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
@@ -187,28 +190,43 @@ impl SurfaceRenderer {
             cache: None,
         });
 
-        let (vertices, indices) = Self::build_mesh(width, height);
-
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Surface Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
+        // 1. Static Grid Mesh for Smooth Terrain & Flat Steps
+        let (grid_vertices, grid_indices) = Self::build_grid_mesh(width, height);
+        let grid_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Surface Grid Vertex Buffer"),
+            contents: bytemuck::cast_slice(&grid_vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
+        let grid_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Surface Grid Index Buffer"),
+            contents: bytemuck::cast_slice(&grid_indices),
+            usage: wgpu::BufferUsages::INDEX,
+        });
 
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Surface Index Buffer"),
-            contents: bytemuck::cast_slice(&indices),
+        // 2. Unit Cube Template for GPU Instanced 3D Lego Cubes (576 bytes total!)
+        let (cube_vertices, cube_indices) = Self::build_unit_cube();
+        let cube_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Surface Unit Cube Vertex Buffer"),
+            contents: bytemuck::cast_slice(&cube_vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let cube_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Surface Unit Cube Index Buffer"),
+            contents: bytemuck::cast_slice(&cube_indices),
             usage: wgpu::BufferUsages::INDEX,
         });
 
         Self {
             render_pipeline,
-            vertex_buffer,
-            index_buffer,
+            grid_vertex_buffer,
+            grid_index_buffer,
+            grid_num_indices: grid_indices.len() as u32,
+            cube_vertex_buffer,
+            cube_index_buffer,
             data_buffer,
             uniform_buffer,
             bind_group,
-            num_indices: indices.len() as u32,
+            num_instances: (width * height) as u32,
             width,
         }
     }
@@ -241,17 +259,16 @@ impl SurfaceRenderer {
         queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
     }
 
-    fn build_mesh(width: usize, height: usize) -> (Vec<SurfaceVertex>, Vec<u32>) {
+    fn build_grid_mesh(width: usize, height: usize) -> (Vec<SurfaceVertex>, Vec<u32>) {
         let num_quads = width * height;
         let mut vertices = Vec::with_capacity(num_quads * 4);
         let mut indices = Vec::with_capacity(num_quads * 6);
 
-        // Dynamic data aspect ratio scaling matching tensor shape
         let data_aspect = (width as f32 / height as f32).max(0.1);
         let scale_x = 2.0 * data_aspect;
         let scale_y = 2.0;
 
-        let norm_up = [0.0, 1.0, 0.0];
+        let norm_top = [0.0, 1.0, 0.0];
 
         for y in 0..height {
             for x in 0..width {
@@ -275,23 +292,64 @@ impl SurfaceRenderer {
 
                 let base_idx = vertices.len() as u32;
 
-                // Top Face (position.z = 1.0 = top height)
-                vertices.push(SurfaceVertex { position: [x0, y0, 1.0], uv: [u0, v0], cell_index, corner_index: corner_tl, normal: norm_up });
-                vertices.push(SurfaceVertex { position: [x1, y0, 1.0], uv: [u1, v0], cell_index, corner_index: corner_tr, normal: norm_up });
-                vertices.push(SurfaceVertex { position: [x0, y1, 1.0], uv: [u0, v1], cell_index, corner_index: corner_bl, normal: norm_up });
-                vertices.push(SurfaceVertex { position: [x1, y1, 1.0], uv: [u1, v1], cell_index, corner_index: corner_br, normal: norm_up });
+                vertices.push(SurfaceVertex { position: [x0, y0, 1.0], uv: [u0, v0], cell_index, corner_index: corner_tl, normal: norm_top });
+                vertices.push(SurfaceVertex { position: [x1, y0, 1.0], uv: [u1, v0], cell_index, corner_index: corner_tr, normal: norm_top });
+                vertices.push(SurfaceVertex { position: [x0, y1, 1.0], uv: [u0, v1], cell_index, corner_index: corner_bl, normal: norm_top });
+                vertices.push(SurfaceVertex { position: [x1, y1, 1.0], uv: [u1, v1], cell_index, corner_index: corner_br, normal: norm_top });
 
-                // Triangle 1: TL, BL, TR
                 indices.push(base_idx);
                 indices.push(base_idx + 2);
                 indices.push(base_idx + 1);
 
-                // Triangle 2: TR, BL, BR
                 indices.push(base_idx + 1);
                 indices.push(base_idx + 2);
                 indices.push(base_idx + 3);
             }
         }
+
+        (vertices, indices)
+    }
+
+    /// Builds a static 24-vertex 3D Unit Cube template (576 bytes) for GPU Instanced 3D Lego Cubes!
+    fn build_unit_cube() -> (Vec<SurfaceVertex>, Vec<u32>) {
+        let mut vertices = Vec::with_capacity(24);
+        let mut indices = Vec::with_capacity(36);
+
+        let push_face = |verts: &mut Vec<SurfaceVertex>, inds: &mut Vec<u32>, p0: [f32; 3], p1: [f32; 3], p2: [f32; 3], p3: [f32; 3], norm: [f32; 3]| {
+            let base_idx = verts.len() as u32;
+            verts.push(SurfaceVertex { position: p0, uv: [0.0, 0.0], cell_index: 0, corner_index: 0, normal: norm });
+            verts.push(SurfaceVertex { position: p1, uv: [1.0, 0.0], cell_index: 0, corner_index: 0, normal: norm });
+            verts.push(SurfaceVertex { position: p2, uv: [0.0, 1.0], cell_index: 0, corner_index: 0, normal: norm });
+            verts.push(SurfaceVertex { position: p3, uv: [1.0, 1.0], cell_index: 0, corner_index: 0, normal: norm });
+
+            inds.push(base_idx);
+            inds.push(base_idx + 2);
+            inds.push(base_idx + 1);
+
+            inds.push(base_idx + 1);
+            inds.push(base_idx + 2);
+            inds.push(base_idx + 3);
+        };
+
+        let norm_top = [0.0, 1.0, 0.0];
+        let norm_bottom = [0.0, -1.0, 0.0];
+        let norm_front = [0.0, 0.0, -1.0];
+        let norm_back = [0.0, 0.0, 1.0];
+        let norm_left = [-1.0, 0.0, 0.0];
+        let norm_right = [1.0, 0.0, 0.0];
+
+        // 1. Top Face (z=1.0)
+        push_face(&mut vertices, &mut indices, [0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 1.0, 1.0], norm_top);
+        // 2. Bottom Base (z=0.0)
+        push_face(&mut vertices, &mut indices, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], norm_bottom);
+        // 3. Front Wall (y=0.0)
+        push_face(&mut vertices, &mut indices, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 1.0], norm_front);
+        // 4. Back Wall (y=1.0)
+        push_face(&mut vertices, &mut indices, [0.0, 1.0, 1.0], [1.0, 1.0, 1.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], norm_back);
+        // 5. Left Wall (x=0.0)
+        push_face(&mut vertices, &mut indices, [0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 1.0], norm_left);
+        // 6. Right Wall (x=1.0)
+        push_face(&mut vertices, &mut indices, [1.0, 0.0, 1.0], [1.0, 1.0, 1.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], norm_right);
 
         (vertices, indices)
     }
@@ -348,9 +406,18 @@ impl eframe::egui_wgpu::CallbackTrait for SurfaceCallback {
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
-        rpass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-        rpass.set_index_buffer(self.renderer.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        rpass.draw_indexed(0..self.renderer.num_indices, 0, 0..1);
+
+        if self.surface_mode == 2 {
+            // Mode 2: 3D Lego Cubes (GPU Instanced Unit Cube Draw)
+            rpass.set_vertex_buffer(0, self.renderer.cube_vertex_buffer.slice(..));
+            rpass.set_index_buffer(self.renderer.cube_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            rpass.draw_indexed(0..36, 0, 0..self.renderer.num_instances);
+        } else {
+            // Mode 0 (Smooth Terrain) & Mode 1 (Flat Steps)
+            rpass.set_vertex_buffer(0, self.renderer.grid_vertex_buffer.slice(..));
+            rpass.set_index_buffer(self.renderer.grid_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            rpass.draw_indexed(0..self.renderer.grid_num_indices, 0, 0..1);
+        }
     }
 }
 
