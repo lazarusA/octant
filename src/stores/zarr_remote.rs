@@ -29,6 +29,7 @@ impl DataStore for ZarrRemoteStore {
             name: dataset_name,
             store_type: self.store_type().to_string(),
             variables,
+            dimension_coordinates: std::collections::HashMap::new(),
         })
     }
 

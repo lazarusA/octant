@@ -39,6 +39,7 @@ pub struct OctantApp {
     // Animation & Playback Controls
     pub is_fetching_slice: bool,
     pub active_requested_key: Option<SliceCacheKey>,
+    pub metadata_rx: Option<std::sync::mpsc::Receiver<Result<DatasetMetadata, String>>>,
     pub is_playing: bool,
     pub playback_fps: f32,
     pub loop_playback: bool,
@@ -50,7 +51,7 @@ impl OctantApp {
         let wgpu_render_state = cc.wgpu_render_state.clone();
         let default_cache_mb = 1024; // Default 1GB cache size limit
 
-        let mut app = Self {
+        let app = Self {
             selected_store_kind: StoreKind::RemoteZarr,
             store_target_input: "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string(),
             active_dataset_metadata: None,
@@ -71,14 +72,14 @@ impl OctantApp {
 
             is_fetching_slice: false,
             active_requested_key: None,
+            metadata_rx: None,
             is_playing: false,
             playback_fps: 15.0,
             loop_playback: true,
             last_step_time: std::time::Instant::now(),
         };
 
-        // Perform initial store inspection and load
-        app.inspect_active_store();
+        // App starts clean without auto-fetching. User clicks "Fetch Store Metadata" when ready.
         app
     }
 
@@ -86,49 +87,41 @@ impl OctantApp {
         self.is_loading = true;
         self.status_message = format!("Inspecting {:?} metadata...", self.selected_store_kind);
 
-        let store: Box<dyn DataStore> = match self.selected_store_kind {
-            StoreKind::RemoteZarr => Box::new(ZarrRemoteStore::new(&self.store_target_input)),
-            StoreKind::LocalZarr => Box::new(ZarrLocalStore::new(&self.store_target_input)),
-            StoreKind::RemoteIcechunk => Box::new(IcechunkRemoteStore::new(&self.store_target_input)),
-            StoreKind::LocalIcechunk => Box::new(IcechunkLocalStore::new(&self.store_target_input)),
-            StoreKind::ProceduralRandom => {
-                let random_matrix = MatrixData::create_random_matrix(64, 64).unwrap();
-                self.active_dataset_metadata = Some(DatasetMetadata {
-                    name: "Procedural Test Store".to_string(),
-                    store_type: "Random Procedural".to_string(),
-                    variables: vec![VariableInfo {
-                        name: "random_matrix".to_string(),
-                        data_type: "float32".to_string(),
-                        shape: vec![64, 64],
-                        dimension_names: vec!["y".to_string(), "x".to_string()],
-                        chunk_shape: vec![64, 64],
-                        file_size: crate::utils::calculate_variable_size_bytes(&[64, 64], "float32"),
-                    }],
-                });
-                self.selected_variable_idx = 0;
-                self.rebuild_pipeline_with_matrix_data(random_matrix);
-                self.status_message = "Loaded procedural test matrix (64x64).".to_string();
-                self.is_loading = false;
-                return;
-            }
-        };
+        let store_kind = self.selected_store_kind;
+        let target_input = self.store_target_input.clone();
 
-        match store.inspect() {
-            Ok(metadata) => {
-                self.status_message = format!(
-                    "Inspected '{}' (Found {} variables)",
-                    metadata.name,
-                    metadata.variables.len()
-                );
-                self.active_dataset_metadata = Some(metadata);
-                self.selected_variable_idx = 0;
-                self.load_selected_variable_slice();
-            }
-            Err(err) => {
-                self.status_message = format!("Store inspect error: {}", err);
-            }
-        }
-        self.is_loading = false;
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.metadata_rx = Some(rx);
+
+        std::thread::spawn(move || {
+            let store: Box<dyn DataStore> = match store_kind {
+                StoreKind::RemoteZarr => Box::new(ZarrRemoteStore::new(&target_input)),
+                StoreKind::LocalZarr => Box::new(ZarrLocalStore::new(&target_input)),
+                StoreKind::RemoteIcechunk => Box::new(IcechunkRemoteStore::new(&target_input)),
+                StoreKind::LocalIcechunk => Box::new(IcechunkLocalStore::new(&target_input)),
+                StoreKind::ProceduralRandom => {
+                    let meta = DatasetMetadata {
+                        name: "Procedural Test Store".to_string(),
+                        store_type: "Random Procedural".to_string(),
+                        variables: vec![VariableInfo {
+                            name: "random_matrix".to_string(),
+                            data_type: "float32".to_string(),
+                            shape: vec![64, 64],
+                            dimension_names: vec!["y".to_string(), "x".to_string()],
+                            chunk_shape: vec![64, 64],
+                            file_size: crate::utils::calculate_variable_size_bytes(&[64, 64], "float32"),
+                            ..Default::default()
+                        }],
+                        dimension_coordinates: std::collections::HashMap::new(),
+                    };
+                    let _ = tx.send(Ok(meta));
+                    return;
+                }
+            };
+
+            let res = store.inspect().map_err(|e| e.to_string());
+            let _ = tx.send(res);
+        });
     }
 
     pub fn load_selected_variable_slice(&mut self) {
@@ -242,6 +235,35 @@ impl eframe::App for OctantApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Reset hover preview at start of frame
         self.preview_colormap = None;
+
+        // 0. Poll completed background metadata inspection
+        let mut metadata_done = false;
+        if let Some(rx) = &self.metadata_rx {
+            if let Ok(result) = rx.try_recv() {
+                metadata_done = true;
+                self.is_loading = false;
+                match result {
+                    Ok(metadata) => {
+                        self.status_message = format!(
+                            "Inspected '{}' (Found {} variables)",
+                            metadata.name,
+                            metadata.variables.len()
+                        );
+                        self.active_dataset_metadata = Some(metadata);
+                        self.selected_variable_idx = 0;
+                        self.load_selected_variable_slice();
+                    }
+                    Err(err) => {
+                        self.status_message = format!("Store inspect error: {}", err);
+                    }
+                }
+            } else {
+                ctx.request_repaint();
+            }
+        }
+        if metadata_done {
+            self.metadata_rx = None;
+        }
 
         // 1. Drain completed background prefetch results into LRU cache
         let completed_prefetches = self.prefetcher.poll_results();

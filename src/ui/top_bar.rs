@@ -16,6 +16,17 @@ pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
                 variables::show_variables_menu(app, ui);
                 colormap::show_colormap_menu(app, ui);
 
+                ui.separator();
+                let btn_text = if app.is_loading {
+                    "⏳ Fetching..."
+                } else {
+                    "🔍 Fetch Store Metadata"
+                };
+
+                if ui.add_enabled(!app.is_loading, egui::Button::new(egui::RichText::new(btn_text).small())).clicked() {
+                    app.inspect_active_store();
+                }
+
                 // Right status info
                 status::show_status_bar(app, ui);
             });

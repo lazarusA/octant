@@ -1,8 +1,10 @@
 use crate::stores::{MatrixSlice, VariableInfo};
 use crate::utils::grid::check_and_orient_axes;
+use crate::utils::units;
 use crate::utils::units::calculate_variable_size_bytes;
 use object_store::http::HttpBuilder;
 use object_store::ClientOptions;
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 use zarrs::array::{Array, ArraySubset};
@@ -42,9 +44,17 @@ pub fn extract_store_variables(
     store: ReadableWritableListableStorage,
     base_url: &str,
 ) -> Result<Vec<VariableInfo>, Box<dyn Error>> {
+    // 1. Try fast consolidated .zmetadata discovery first
+    if !base_url.is_empty() {
+        let discovered = discover_arrays_via_metadata(base_url);
+        if !discovered.is_empty() {
+            return Ok(discovered);
+        }
+    }
+
     let mut variables = Vec::new();
 
-    // 1. Check if store root contains a single Zarr array directly
+    // 2. Check if store root contains a single Zarr array directly
     if let Ok(array) = Array::open(store.clone(), "/") {
         let dim_names = array
             .dimension_names()
@@ -64,13 +74,8 @@ pub fn extract_store_variables(
             dimension_names: dim_names,
             chunk_shape,
             file_size,
+            ..Default::default()
         });
-    }
-
-    // 2. Fallback to consolidated .zmetadata or zarr.json / .zarray inspection if root inspection returned nothing
-    if variables.is_empty() {
-        let discovered = discover_arrays_via_metadata(base_url);
-        variables.extend(discovered);
     }
 
     Ok(variables)
@@ -127,7 +132,50 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
                                     .unwrap_or("float32")
                                     .to_string();
 
-                                let dimension_names = vec!["time".to_string(), "lat".to_string(), "lon".to_string()];
+                                let zattrs_key = if var_name == "data" {
+                                    ".zattrs".to_string()
+                                } else {
+                                    format!("{}/.zattrs", var_name)
+                                };
+
+                                let attrs_val = metadata_obj.get(&zattrs_key).or_else(|| metadata_obj.get(".zattrs"));
+
+                                let mut attributes = HashMap::new();
+                                let mut units = None;
+                                let mut long_name = None;
+                                let mut time_coverage_start = None;
+                                let mut time_coverage_end = None;
+                                let mut temporal_resolution = None;
+                                let mut dimension_names = vec!["time".to_string(), "lat".to_string(), "lon".to_string()];
+
+                                if let Some(attrs) = attrs_val.and_then(|a| a.as_object()) {
+                                    for (k, v_json) in attrs {
+                                        let val_str = if let Some(s) = v_json.as_str() {
+                                            s.to_string()
+                                        } else {
+                                            v_json.to_string()
+                                        };
+                                        attributes.insert(k.clone(), val_str.clone());
+
+                                        match k.as_str() {
+                                            "units" => units = Some(val_str),
+                                            "long_name" => long_name = Some(val_str),
+                                            "time_coverage_start" => time_coverage_start = Some(val_str),
+                                            "time_coverage_end" => time_coverage_end = Some(val_str),
+                                            "temporal_resolution" | "time_period" => temporal_resolution = Some(val_str),
+                                            "_ARRAY_DIMENSIONS" => {
+                                                if let Some(arr) = v_json.as_array() {
+                                                    dimension_names = arr
+                                                        .iter()
+                                                        .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                                                        .collect();
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+
                                 let file_size = calculate_variable_size_bytes(&shape, &data_type);
 
                                 if !variables.iter().any(|v: &VariableInfo| v.name == var_name) {
@@ -138,6 +186,12 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
                                         dimension_names,
                                         chunk_shape,
                                         file_size,
+                                        units,
+                                        long_name,
+                                        time_coverage_start,
+                                        time_coverage_end,
+                                        temporal_resolution,
+                                        attributes,
                                     });
                                 }
                             }
@@ -149,6 +203,73 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
     }
 
     // Fallback defaults if no variables listed in remote metadata
+    // 2. If .zmetadata was not found, check Zarr V3 zarr.json manifest
+    if variables.is_empty() {
+        let zarr_v3_url = format!("{}/zarr.json", base_url);
+        let resp_opt = client
+            .as_ref()
+            .and_then(|c| c.get(&zarr_v3_url).send().ok())
+            .or_else(|| reqwest::blocking::get(&zarr_v3_url).ok());
+
+        if let Some(resp) = resp_opt {
+            if resp.status().is_success() {
+                if let Ok(bytes) = resp.bytes() {
+                    if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                        if v.get("zarr_format").and_then(|f| f.as_u64()) == Some(3) {
+                            let shape: Vec<u64> = v.get("shape")
+                                .and_then(|s| s.as_array())
+                                .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
+                                .unwrap_or_else(|| vec![989, 72, 144]);
+
+                            let data_type = v.get("data_type")
+                                .and_then(|d| d.as_str())
+                                .unwrap_or("float32")
+                                .to_string();
+
+                            let mut attributes = HashMap::new();
+                            let mut units = None;
+                            let mut long_name = None;
+                            let mut dimension_names = vec!["time".to_string(), "lat".to_string(), "lon".to_string()];
+
+                            if let Some(attrs) = v.get("attributes").and_then(|a| a.as_object()) {
+                                for (k, v_json) in attrs {
+                                    let val_str = v_json.as_str().map(|s| s.to_string()).unwrap_or_else(|| v_json.to_string());
+                                    attributes.insert(k.clone(), val_str.clone());
+                                    match k.as_str() {
+                                        "units" => units = Some(val_str),
+                                        "long_name" => long_name = Some(val_str),
+                                        _ => {}
+                                    }
+                                }
+                            }
+
+                            if let Some(dims) = v.get("dimension_names").and_then(|d| d.as_array()) {
+                                dimension_names = dims.iter().filter_map(|e| e.as_str().map(|s| s.to_string())).collect();
+                            }
+
+                            let file_size = calculate_variable_size_bytes(&shape, &data_type);
+
+                            variables.push(VariableInfo {
+                                name: "data".to_string(),
+                                data_type,
+                                shape: shape.clone(),
+                                dimension_names,
+                                chunk_shape: shape,
+                                file_size,
+                                units,
+                                long_name,
+                                time_coverage_start: None,
+                                time_coverage_end: None,
+                                temporal_resolution: None,
+                                attributes,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if variables.is_empty() {
         let shape1 = vec![989, 72, 144];
         let shape2 = vec![989, 72, 144];
@@ -159,6 +280,12 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
             dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
             chunk_shape: vec![46, 72, 144],
             file_size: calculate_variable_size_bytes(&shape1, "float32"),
+            units: Some("°C".to_string()),
+            long_name: Some("Mean Air Temperature at 2 m".to_string()),
+            time_coverage_start: Some("1979-01-01T00:00:00".to_string()),
+            time_coverage_end: Some("2021-12-27T00:00:00".to_string()),
+            temporal_resolution: Some("8D".to_string()),
+            attributes: HashMap::new(),
         });
         variables.push(VariableInfo {
             name: "gross_primary_productivity".to_string(),
@@ -167,10 +294,91 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
             dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
             chunk_shape: vec![46, 72, 144],
             file_size: calculate_variable_size_bytes(&shape2, "float32"),
+            units: Some("gC m^-2 d^-1".to_string()),
+            long_name: Some("Gross Primary Productivity".to_string()),
+            time_coverage_start: Some("1979-01-01T00:00:00".to_string()),
+            time_coverage_end: Some("2021-12-27T00:00:00".to_string()),
+            temporal_resolution: Some("8D".to_string()),
+            attributes: HashMap::new(),
         });
     }
 
     variables
+}
+
+/// Fetch 1D coordinate array values for all dimensions present in the store (e.g. /time, /lat, /lon, /depth).
+pub fn fetch_all_dimension_coordinates(
+    store: ReadableWritableListableStorage,
+    dim_names: &[String],
+) -> HashMap<String, Vec<String>> {
+    let mut map = HashMap::new();
+
+    for dim in dim_names {
+        let dim_clean = dim.trim().to_lowercase();
+        if !dim_clean.contains("time")
+            && !dim_clean.contains("date")
+            && !dim_clean.contains("lat")
+            && !dim_clean.contains("lon")
+            && !dim_clean.contains("depth")
+            && !dim_clean.contains("pres")
+            && !dim_clean.contains("level")
+        {
+            continue;
+        }
+
+        let array_path = format!("/{}", dim_clean);
+
+        if let Ok(array) = Array::open(store.clone(), &array_path)
+            .or_else(|_| Array::open(store.clone(), &dim_clean))
+        {
+            let len = array.shape().first().copied().unwrap_or(0) as usize;
+            if len > 0 {
+                let subset = ArraySubset::new_with_ranges(&[0..len as u64]);
+                let mut coords = Vec::with_capacity(len);
+
+                if let Ok(vec_f64) = array.retrieve_array_subset::<Vec<f64>>(&subset) {
+                    for (idx, &val) in vec_f64.iter().enumerate() {
+                        coords.push(format_dim_value(&dim_clean, val, idx));
+                    }
+                } else if let Ok(vec_f32) = array.retrieve_array_subset::<Vec<f32>>(&subset) {
+                    for (idx, &val) in vec_f32.iter().enumerate() {
+                        coords.push(format_dim_value(&dim_clean, val as f64, idx));
+                    }
+                } else if let Ok(vec_i64) = array.retrieve_array_subset::<Vec<i64>>(&subset) {
+                    for (idx, &val) in vec_i64.iter().enumerate() {
+                        coords.push(format_dim_value(&dim_clean, val as f64, idx));
+                    }
+                }
+
+                if !coords.is_empty() {
+                    map.insert(dim_clean, coords);
+                }
+            }
+        }
+    }
+
+    map
+}
+
+fn format_dim_value(dim_name: &str, val: f64, _idx: usize) -> String {
+    if dim_name.contains("time") || dim_name.contains("date") {
+        let (ref_y, ref_m, ref_d) = (1979, 1, 1);
+        let days = val.max(0.0).round() as usize;
+        let (y, m, d) = units::add_days_to_date(ref_y, ref_m, ref_d, days);
+        format!("{:04}-{:02}-{:02}", y, m, d)
+    } else if dim_name.contains("lat") {
+        let cardinal = if val >= 0.0 { "N" } else { "S" };
+        format!("{:.2}° {}", val.abs(), cardinal)
+    } else if dim_name.contains("lon") {
+        let cardinal = if val >= 0.0 { "E" } else { "W" };
+        format!("{:.2}° {}", val.abs(), cardinal)
+    } else if dim_name.contains("pres") || dim_name.contains("level") {
+        format!("{:.0} hPa", val)
+    } else if dim_name.contains("depth") {
+        format!("{:.1} m", val)
+    } else {
+        format!("{:.2}", val)
+    }
 }
 
 /// Fetch a 2D matrix slice for a specific variable and timestep using `zarrs` subset API.

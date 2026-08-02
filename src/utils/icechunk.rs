@@ -19,6 +19,7 @@ pub fn extract_icechunk_manifest_variables(manifest_json: &serde_json::Value) ->
                     dimension_names: vec!["time".to_string(), "y".to_string(), "x".to_string()],
                     chunk_shape: vec![30, 64, 64],
                     file_size,
+                    ..Default::default()
                 });
             }
         }

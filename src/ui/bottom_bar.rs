@@ -39,9 +39,49 @@ pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
 
                 ui.separator();
 
-                // 5. Timestep timeline slider
+                // 5. Timestep timeline slider & Dimension-Agnostic Axis Reading
+                let active_var_info = app
+                    .active_dataset_metadata
+                    .as_ref()
+                    .and_then(|m| m.variables.get(app.selected_variable_idx));
+
+                let active_anim_dim = active_var_info
+                    .and_then(|v| v.dimension_names.first().cloned())
+                    .unwrap_or_else(|| "time".to_string());
+
+                let direct_coord_label = app
+                    .active_dataset_metadata
+                    .as_ref()
+                    .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
+                    .and_then(|coords| coords.get(app.current_timestep).cloned());
+
+                let formatted_axis = if let Some(coord_str) = direct_coord_label {
+                    coord_str
+                } else {
+                    let active_dim_name = active_var_info.and_then(|v| v.dimension_names.first().cloned());
+                    let active_units = active_var_info.and_then(|v| v.units.as_deref());
+                    let time_start = active_var_info.and_then(|v| v.time_coverage_start.as_deref());
+                    let temp_res = active_var_info.and_then(|v| v.temporal_resolution.as_deref());
+
+                    crate::utils::units::format_axis_value(
+                        app.current_timestep,
+                        max_steps,
+                        active_dim_name.as_deref(),
+                        active_units,
+                        time_start,
+                        temp_res,
+                        Some(&app.store_target_input),
+                    )
+                };
+
                 let slider_max = max_steps.saturating_sub(1);
-                ui.label(egui::RichText::new(format!("Step {} / {}", app.current_timestep + 1, max_steps)).small().monospace());
+                ui.label(
+                    egui::RichText::new(format!("📅 {}", formatted_axis))
+                        .small()
+                        .monospace()
+                        .strong(),
+                )
+                .on_hover_text(format!("Step {} / {}", app.current_timestep + 1, max_steps));
 
                 let slider_res = ui.add(
                     egui::Slider::new(&mut app.current_timestep, 0..=slider_max)

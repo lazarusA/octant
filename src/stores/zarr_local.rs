@@ -46,6 +46,7 @@ impl DataStore for ZarrLocalStore {
                 dimension_names: vec!["y".to_string(), "x".to_string()],
                 chunk_shape: vec![64, 64],
                 file_size: crate::utils::calculate_variable_size_bytes(&[64, 64], "float32"),
+                ..Default::default()
             });
         }
 
@@ -53,6 +54,7 @@ impl DataStore for ZarrLocalStore {
             name: store_name,
             store_type: self.store_type().to_string(),
             variables,
+            dimension_coordinates: std::collections::HashMap::new(),
         })
     }
 
@@ -196,6 +198,7 @@ fn inspect_directory_for_zarr_variables(
                             dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
                             chunk_shape,
                             file_size,
+                            ..Default::default()
                         });
                     }
                 }

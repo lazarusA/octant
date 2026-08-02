@@ -40,13 +40,22 @@ pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.store_target_input = "procedural://random".to_string();
                 }
             }
-            app.inspect_active_store();
         }
 
         ui.add_space(6.0);
         ui.label(egui::RichText::new("Target URL / Path:").strong());
         let res = ui.text_edit_singleline(&mut app.store_target_input);
         if res.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+            app.inspect_active_store();
+        }
+
+        ui.add_space(4.0);
+        let btn_label = if app.is_loading {
+            "⏳ Fetching Store Metadata..."
+        } else {
+            "🔍 Fetch / Load Store Metadata"
+        };
+        if ui.add_enabled(!app.is_loading, egui::Button::new(egui::RichText::new(btn_label).strong())).clicked() {
             app.inspect_active_store();
         }
 
