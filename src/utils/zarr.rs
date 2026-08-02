@@ -31,7 +31,7 @@ pub fn build_sync_store(url: &str) -> Result<ReadableWritableListableStorage, Bo
         .with_client_options(options)
         .build()?;
     let async_store = Arc::new(AsyncObjectStore::new(http_store));
-    let rt = Arc::new(tokio::runtime::Runtime::new()?);
+    let rt = Arc::new(tokio::runtime::Builder::new_current_thread().enable_all().build()?);
     let sync_store: ReadableWritableListableStorage = Arc::new(AsyncToSyncStorageAdapter::new(
         async_store,
         TokioBlockOn(rt.clone()),
@@ -146,7 +146,13 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
                                 let mut time_coverage_start = None;
                                 let mut time_coverage_end = None;
                                 let mut temporal_resolution = None;
-                                let mut dimension_names = vec!["time".to_string(), "lat".to_string(), "lon".to_string()];
+                                let mut dimension_names = match shape.len() {
+                                    1 => vec!["x".to_string()],
+                                    2 => vec!["lat".to_string(), "lon".to_string()],
+                                    3 => vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
+                                    4 => vec!["time".to_string(), "level".to_string(), "lat".to_string(), "lon".to_string()],
+                                    _ => (0..shape.len()).map(|i| format!("dim_{}", i)).collect(),
+                                };
 
                                 if let Some(attrs) = attrs_val.and_then(|a| a.as_object()) {
                                     for (k, v_json) in attrs {
@@ -229,7 +235,13 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
                             let mut attributes = HashMap::new();
                             let mut units = None;
                             let mut long_name = None;
-                            let mut dimension_names = vec!["time".to_string(), "lat".to_string(), "lon".to_string()];
+                            let mut dimension_names = match shape.len() {
+                                1 => vec!["x".to_string()],
+                                2 => vec!["lat".to_string(), "lon".to_string()],
+                                3 => vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
+                                4 => vec!["time".to_string(), "level".to_string(), "lat".to_string(), "lon".to_string()],
+                                _ => (0..shape.len()).map(|i| format!("dim_{}", i)).collect(),
+                            };
 
                             if let Some(attrs) = v.get("attributes").and_then(|a| a.as_object()) {
                                 for (k, v_json) in attrs {
@@ -280,25 +292,25 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
             dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
             chunk_shape: vec![46, 72, 144],
             file_size: calculate_variable_size_bytes(&shape1, "float32"),
-            units: Some("°C".to_string()),
-            long_name: Some("Mean Air Temperature at 2 m".to_string()),
-            time_coverage_start: Some("1979-01-01T00:00:00".to_string()),
-            time_coverage_end: Some("2021-12-27T00:00:00".to_string()),
-            temporal_resolution: Some("8D".to_string()),
+            units: Some("K".to_string()),
+            long_name: Some("2m Air Temperature".to_string()),
+            time_coverage_start: Some("1979-01-01".to_string()),
+            time_coverage_end: Some("2021-12-31".to_string()),
+            temporal_resolution: Some("16-day".to_string()),
             attributes: HashMap::new(),
         });
         variables.push(VariableInfo {
-            name: "gross_primary_productivity".to_string(),
+            name: "precipitation".to_string(),
             data_type: "float32".to_string(),
             shape: shape2.clone(),
             dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
             chunk_shape: vec![46, 72, 144],
             file_size: calculate_variable_size_bytes(&shape2, "float32"),
-            units: Some("gC m^-2 d^-1".to_string()),
-            long_name: Some("Gross Primary Productivity".to_string()),
-            time_coverage_start: Some("1979-01-01T00:00:00".to_string()),
-            time_coverage_end: Some("2021-12-27T00:00:00".to_string()),
-            temporal_resolution: Some("8D".to_string()),
+            units: Some("mm/day".to_string()),
+            long_name: Some("Precipitation Rate".to_string()),
+            time_coverage_start: Some("1979-01-01".to_string()),
+            time_coverage_end: Some("2021-12-31".to_string()),
+            temporal_resolution: Some("16-day".to_string()),
             attributes: HashMap::new(),
         });
     }
@@ -402,18 +414,31 @@ pub fn fetch_slice(
             .unwrap_or_else(|| vec!["time".to_string(), "lat".to_string(), "lon".to_string()]);
 
         let (max_timesteps, initial_height, initial_width, local_time_idx) = match shape.len() {
+            4 => (
+                shape[0] as usize,
+                shape[2] as usize,
+                shape[3] as usize,
+                (timestep % (shape[0] as usize).max(1)) as u64,
+            ),
             3 => (
                 shape[0] as usize,
                 shape[1] as usize,
                 shape[2] as usize,
-                (timestep % (shape[0] as usize)) as u64,
+                (timestep % (shape[0] as usize).max(1)) as u64,
             ),
             2 => (1, shape[0] as usize, shape[1] as usize, 0u64),
             1 => (1, 1, shape[0] as usize, 0u64),
             _ => (1, 64, 64, 0u64),
         };
 
-        let subset = if shape.len() == 3 {
+        let subset = if shape.len() == 4 {
+            ArraySubset::new_with_ranges(&[
+                local_time_idx..(local_time_idx + 1),
+                0..1,
+                0..initial_height as u64,
+                0..initial_width as u64,
+            ])
+        } else if shape.len() == 3 {
             ArraySubset::new_with_ranges(&[
                 local_time_idx..(local_time_idx + 1),
                 0..initial_height as u64,

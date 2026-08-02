@@ -137,10 +137,19 @@ impl OctantApp {
         let (var_name, max_steps, chunk_time_size) = {
             if let Some(metadata) = &self.active_dataset_metadata {
                 if let Some(var_info) = metadata.variables.get(self.selected_variable_idx) {
-                    let max_steps = if var_info.shape.is_empty() {
-                        1
+                    let max_steps = if var_info.shape.len() <= 2 {
+                        if let Some(first_dim) = var_info.dimension_names.first() {
+                            let name = first_dim.to_lowercase();
+                            if name == "time" || name == "t" || name.contains("step") {
+                                var_info.shape.first().copied().unwrap_or(1) as usize
+                            } else {
+                                1
+                            }
+                        } else {
+                            1
+                        }
                     } else {
-                        var_info.shape[0] as usize
+                        var_info.shape.first().copied().unwrap_or(1) as usize
                     };
                     let chunk_time_size = if !var_info.chunk_shape.is_empty() {
                         var_info.chunk_shape[0] as usize

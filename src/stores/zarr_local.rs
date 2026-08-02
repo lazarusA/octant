@@ -69,18 +69,31 @@ impl DataStore for ZarrLocalStore {
         if let Ok(array) = Array::open(store, &var_path) {
             let shape = array.shape();
             let (max_timesteps, height, width, local_time_idx) = match shape.len() {
+                4 => (
+                    shape[0] as usize,
+                    shape[2] as usize,
+                    shape[3] as usize,
+                    (timestep % (shape[0] as usize).max(1)) as u64,
+                ),
                 3 => (
                     shape[0] as usize,
                     shape[1] as usize,
                     shape[2] as usize,
-                    (timestep % (shape[0] as usize)) as u64,
+                    (timestep % (shape[0] as usize).max(1)) as u64,
                 ),
                 2 => (1, shape[0] as usize, shape[1] as usize, 0u64),
                 1 => (1, 1, shape[0] as usize, 0u64),
                 _ => (1, 64, 64, 0u64),
             };
 
-            let subset = if shape.len() == 3 {
+            let subset = if shape.len() == 4 {
+                ArraySubset::new_with_ranges(&[
+                    local_time_idx..(local_time_idx + 1),
+                    0..1,
+                    0..height as u64,
+                    0..width as u64,
+                ])
+            } else if shape.len() == 3 {
                 ArraySubset::new_with_ranges(&[
                     local_time_idx..(local_time_idx + 1),
                     0..height as u64,
