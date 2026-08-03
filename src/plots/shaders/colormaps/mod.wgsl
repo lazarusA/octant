@@ -81,10 +81,10 @@ fn evaluate_scaled_norm(val: f32, cmin: f32, cmax: f32, scale_type: u32, scale_p
     // 4: Exponential
     if (scale_type == 4u) {
         let norm_x = clamp((val - cmin) / range, 0.0, 1.0);
-        let exp_r = min(range, 10.0);
-        let num = exp(norm_x * exp_r) - 1.0;
-        let denom = exp(exp_r) - 1.0;
-        return select(norm_x, clamp(num / denom, 0.0, 1.0), denom != 0.0);
+        let k = select(3.0, scale_param, scale_param > 0.0);
+        let num = exp(norm_x * k) - 1.0;
+        let denom = exp(k) - 1.0;
+        return select(norm_x, clamp(num / denom, 0.0, 1.0), abs(denom) > 1e-5);
     }
 
     return clamp((val - cmin) / range, 0.0, 1.0);

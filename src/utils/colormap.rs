@@ -55,9 +55,9 @@ pub fn unscale_norm_to_value(t: f32, cmin: f32, cmax: f32, scale_type: u32, scal
             cmin + norm_x.clamp(0.0, 1.0) * range
         }
         4 => {
-            let exp_r = range.min(10.0);
-            let k = exp_r.exp() - 1.0;
-            let norm_x = if k != 0.0 { (1.0 + t * k).ln() / exp_r } else { t };
+            let k = if scale_param > 0.0 { scale_param } else { 3.0 };
+            let denom = k.exp() - 1.0;
+            let norm_x = if denom.abs() > 1e-5 { (1.0 + t * denom).ln() / k } else { t };
             cmin + norm_x.clamp(0.0, 1.0) * range
         }
         _ => cmin + t * range,
@@ -103,10 +103,10 @@ pub fn apply_color_scale_cpu(val: f32, cmin: f32, cmax: f32, scale_type: u32, sc
         }
         4 => {
             let norm_x = ((val - cmin) / range).clamp(0.0, 1.0);
-            let exp_r = range.min(10.0);
-            let num = (norm_x * exp_r).exp() - 1.0;
-            let denom = exp_r.exp() - 1.0;
-            if denom != 0.0 { (num / denom).clamp(0.0, 1.0) } else { norm_x }
+            let k = if scale_param > 0.0 { scale_param } else { 3.0 };
+            let num = (norm_x * k).exp() - 1.0;
+            let denom = k.exp() - 1.0;
+            if denom.abs() > 1e-5 { (num / denom).clamp(0.0, 1.0) } else { norm_x }
         }
         _ => ((val - cmin) / range).clamp(0.0, 1.0),
     }

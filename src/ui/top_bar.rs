@@ -135,7 +135,7 @@ fn show_secondary_toolbar(app: &mut OctantApp, ctx: &egui::Context) {
                         ui.selectable_value(&mut app.active_scale_type, 4, "Exponential");
                     });
 
-                if app.active_scale_type == 1 || app.active_scale_type == 2 {
+                if app.active_scale_type == 1 || app.active_scale_type == 2 || app.active_scale_type == 4 {
                     ui.label("Param:");
                     ui.add(egui::DragValue::new(&mut app.scale_param).speed(0.01).range(0.0001..=100.0));
                 }
