@@ -11,12 +11,8 @@ struct Uniforms {
     shininess: f32,
     light_direction: vec3<f32>,
     algorithm: u32,
-    colorrange: vec2<f32>,
     isovalue: f32,
     isorange: f32,
-    highclip_color: vec4<f32>,
-    lowclip_color: vec4<f32>,
-    nan_color: vec4<f32>,
     absorption: f32,
     samples: u32,
     diffuse: f32,
@@ -24,7 +20,6 @@ struct Uniforms {
     depth_shift: f32,
     picking: u32,
     object_id: u32,
-    colormap: u32,
     rotation_y: f32,
     rotation_x: f32,
     aspect_x: f32,
@@ -35,12 +30,8 @@ struct Uniforms {
     height: u32,
     depth: u32,
     screen_aspect: f32,
-    use_nan_color: u32,
-    use_lowclip: u32,
-    use_highclip: u32,
-    _pad1: u32,
-    _pad2: u32,
-    _pad3: u32,
+    _pad0: u32,
+    color: ColorUniforms,
 };
 
 @group(0) @binding(0)
@@ -117,37 +108,19 @@ fn no_solution(x: f32) -> bool {
 }
 
 fn get_lowclip_color() -> vec4<f32> {
-    return uniforms.lowclip_color;
+    return uniforms.color.lowclip_color;
 }
 
 fn get_highclip_color() -> vec4<f32> {
-    return uniforms.highclip_color;
+    return uniforms.color.highclip_color;
 }
 
 fn get_nan_color() -> vec4<f32> {
-    return uniforms.nan_color;
+    return uniforms.color.nan_color;
 }
 
-fn get_color_from_cmap(value: f32, colormap: u32, colorrange: vec2<f32>) -> vec4<f32> {
-    let cmin = colorrange.x;
-    let cmax = colorrange.y;
-    if (is_nan(value)) {
-        return get_nan_color();
-    } else if (value < cmin) {
-        return get_lowclip_color();
-    } else if (value > cmax) {
-        return get_highclip_color();
-    }
-    let range = max(cmax - cmin, 0.0001);
-    var i01 = clamp((value - cmin) / range, 0.0, 1.0);
-    let stepsize = 1.0 / 256.0;
-    i01 = (1.0 - stepsize) * i01 + 0.5 * stepsize;
-    let rgb = sample_colormap(colormap, i01);
-    return vec4<f32>(rgb, i01);
-}
-
-fn color_lookup(intensity: f32, colormap: u32, colorrange: vec2<f32>) -> vec4<f32> {
-    return get_color_from_cmap(intensity, colormap, colorrange);
+fn color_lookup(intensity: f32) -> vec4<f32> {
+    return evaluate_plot_color(intensity, uniforms.color);
 }
 
 fn color_lookup_indexed(colormap: u32, index: i32) -> vec4<f32> {
@@ -176,18 +149,7 @@ fn sample_volume_scalar(texCoord: vec3<f32>) -> f32 {
 
 fn sample_volume_rgba(pos: vec3<f32>) -> vec4<f32> {
     let s = sample_volume_scalar(pos);
-    return evaluate_plot_color(
-        s,
-        uniforms.colorrange.x,
-        uniforms.colorrange.y,
-        uniforms.colormap,
-        uniforms.nan_color,
-        uniforms.use_nan_color,
-        uniforms.lowclip_color,
-        uniforms.use_lowclip,
-        uniforms.highclip_color,
-        uniforms.use_highclip,
-    );
+    return evaluate_plot_color(s, uniforms.color);
 }
 
 fn gennormal(uvw: vec3<f32>) -> vec3<f32> {
@@ -268,8 +230,8 @@ fn volume_hitbox_threshold(vOrigin: vec3<f32>, rayDir: vec3<f32>, bounds: vec2<f
     var accumColor = vec3<f32>(0.0);
     var alphaAcc: f32 = 0.0;
 
-    let threshold_min = uniforms.colorrange.x;
-    let threshold_max = uniforms.colorrange.y;
+    let threshold_min = uniforms.color.cmin;
+    let threshold_max = uniforms.color.cmax;
 
     var t = bounds.x;
     for (var i = 0; i < samples_count; i = i + 1) {
@@ -292,19 +254,19 @@ fn volume_hitbox_threshold(vOrigin: vec3<f32>, rayDir: vec3<f32>, bounds: vec2<f
         var col: vec3<f32> = vec3<f32>(0.0);
         var alpha: f32 = 0.0;
 
-        if (is_nan_sample && uniforms.use_nan_color == 1u) {
-            col = uniforms.nan_color.rgb;
-            alpha = uniforms.nan_color.a;
-        } else if (is_low_sample && uniforms.use_lowclip == 1u) {
-            col = uniforms.lowclip_color.rgb;
-            alpha = uniforms.lowclip_color.a;
-        } else if (is_high_sample && uniforms.use_highclip == 1u) {
-            col = uniforms.highclip_color.rgb;
-            alpha = uniforms.highclip_color.a;
+        if (is_nan_sample && uniforms.color.use_nan_color == 1u) {
+            col = uniforms.color.nan_color.rgb;
+            alpha = uniforms.color.nan_color.a;
+        } else if (is_low_sample && uniforms.color.use_lowclip == 1u) {
+            col = uniforms.color.lowclip_color.rgb;
+            alpha = uniforms.color.lowclip_color.a;
+        } else if (is_high_sample && uniforms.color.use_highclip == 1u) {
+            col = uniforms.color.highclip_color.rgb;
+            alpha = uniforms.color.highclip_color.a;
         } else if (is_in_bounds) {
             let range = max(threshold_max - threshold_min, 0.0001);
             let sampLoc = clamp((d - threshold_min) / range, 0.0, 1.0);
-            col = sample_colormap(uniforms.colormap, sampLoc);
+            col = sample_colormap(uniforms.color.colormap, sampLoc);
             let alpha_exponent = max(uniforms.absorption, 0.1);
             alpha = clamp(pow(max(sampLoc, 0.001), 1.0 / alpha_exponent), 0.01, 1.0);
         }
@@ -327,7 +289,7 @@ fn volume_hitbox_threshold(vOrigin: vec3<f32>, rayDir: vec3<f32>, bounds: vec2<f
 fn isosurface(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var pos = front;
     var c = vec4<f32>(0.0);
-    let diffuse_color = color_lookup(uniforms.isovalue, uniforms.colormap, uniforms.colorrange);
+    let diffuse_color = color_lookup(uniforms.isovalue);
     let camdir = normalize(-dir);
     let step_size = length(dir);
     let samples_count = i32(max(uniforms.samples, 8u));
@@ -351,12 +313,12 @@ fn isosurface(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
 fn mip(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var pos = front + dir;
     var maximum: f32 = -1e30;
-    let highclip_visible = uniforms.highclip_color.a > 0.0;
+    let highclip_visible = uniforms.color.highclip_color.a > 0.0;
     let samples_count = i32(max(uniforms.samples, 8u));
 
     for (var i = 0; i < samples_count; i = i + 1) {
         let density = sample_volume_scalar(pos);
-        let consider_sample = (density < uniforms.colorrange.y) || highclip_visible;
+        let consider_sample = (density < uniforms.color.cmax) || highclip_visible;
         if (consider_sample && (maximum < density)) {
             maximum = density;
         }
@@ -365,7 +327,7 @@ fn mip(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     if (maximum == -1e30) {
         maximum = 1e30;
     }
-    return color_lookup(maximum, uniforms.colormap, uniforms.colorrange);
+    return color_lookup(maximum);
 }
 
 fn absorptionrgba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
@@ -417,7 +379,7 @@ fn volumeindexedrgba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
 
     for (var i = 0; i < samples_count; i = i + 1) {
         let index = i32(sample_volume_scalar(pos)) - 1;
-        let color_sample = color_lookup_indexed(uniforms.colormap, index);
+        let color_sample = color_lookup_indexed(uniforms.color.colormap, index);
 
         let opacity = clamp(step_size * color_sample.a * uniforms.absorption, 0.0, 1.0);
         color_sum = color_sum + (transmittance * opacity) * color_sample.rgb;
@@ -444,8 +406,8 @@ fn contours(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
 
     for (var i = 0; i < samples_count; i = i + 1) {
         let intensity = sample_volume_scalar(pos);
-        if (intensity >= uniforms.colorrange.x && intensity <= uniforms.colorrange.y) {
-            let color_sample = color_lookup(intensity, uniforms.colormap, uniforms.colorrange);
+        if (intensity >= uniforms.color.cmin && intensity <= uniforms.color.cmax) {
+            let color_sample = color_lookup(intensity);
             let opacity = clamp(step_size * max(color_sample.a, 0.1) * uniforms.absorption, 0.0, 1.0);
 
             let N = gennormal(pos);

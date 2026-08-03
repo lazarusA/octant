@@ -32,12 +32,8 @@ pub struct VolumeUniforms {
     pub shininess: f32,
     pub light_direction: [f32; 3],
     pub algorithm: u32,
-    pub colorrange: [f32; 2],
     pub isovalue: f32,
     pub isorange: f32,
-    pub highclip_color: [f32; 4],
-    pub lowclip_color: [f32; 4],
-    pub nan_color: [f32; 4],
     pub absorption: f32,
     pub samples: u32,
     pub diffuse: f32,
@@ -45,7 +41,6 @@ pub struct VolumeUniforms {
     pub depth_shift: f32,
     pub picking: u32,
     pub object_id: u32,
-    pub colormap: u32,
     pub rotation_y: f32,
     pub rotation_x: f32,
     pub aspect_x: f32,
@@ -56,12 +51,8 @@ pub struct VolumeUniforms {
     pub height: u32,
     pub depth: u32,
     pub screen_aspect: f32,
-    pub use_nan_color: u32,
-    pub use_lowclip: u32,
-    pub use_highclip: u32,
-    pub _pad1: u32,
-    pub _pad2: u32,
-    pub _pad3: u32,
+    pub _pad0: u32,
+    pub color: super::common::PlotColorParams,
 }
 
 pub struct VolumeRenderer {
@@ -89,7 +80,39 @@ impl VolumeRenderer {
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
-        // 3D Bounding Box Vertices [-1, 1]^3
+        let data_len = initial_data.len();
+        let depth = super::common::calculate_3d_depth(data_len, width, height);
+
+        let initial_uniforms = VolumeUniforms {
+            clip_planes: [[0.0; 4]; 8],
+            light_color: [1.0, 1.0, 1.0],
+            num_clip_planes: 0,
+            ambient: [0.2, 0.2, 0.2],
+            shininess: 32.0,
+            light_direction: [1.0, 1.0, 1.0],
+            algorithm: 0,
+            isovalue: 50.0,
+            isorange: 5.0,
+            absorption: 2.0,
+            samples: 64,
+            diffuse: 0.8,
+            specular: 0.2,
+            depth_shift: 0.0,
+            picking: 0,
+            object_id: 0,
+            rotation_y: 0.0,
+            rotation_x: 0.0,
+            aspect_x: 1.0,
+            aspect_y: 1.0,
+            aspect_z: 1.0,
+            zoom: 2.5,
+            width: width.max(1),
+            height: height.max(1),
+            depth,
+            screen_aspect: 1.0,
+            _pad0: 0,
+            color: super::common::PlotColorParams::default(),
+        };// 3D Bounding Box Vertices [-1, 1]^3
         let vertices = [
             // Front face
             VolumeVertex { position: [-1.0, -1.0,  1.0], uv: [0.0, 0.0] },
@@ -125,52 +148,11 @@ impl VolumeRenderer {
         });
 
         let initial_data_safe = if initial_data.is_empty() { vec![50.0; 64 * 64] } else { initial_data.to_vec() };
-        let depth = super::common::calculate_3d_depth(initial_data_safe.len(), width, height);
-
-        let uniforms = VolumeUniforms {
-            clip_planes: [[0.0; 4]; 8],
-            light_color: [1.0, 1.0, 1.0],
-            num_clip_planes: 0,
-            ambient: [0.2, 0.2, 0.2],
-            shininess: 32.0,
-            light_direction: [1.0, 1.0, 1.0],
-            algorithm: 0,
-            colorrange: [0.0, 100.0],
-            isovalue: 50.0,
-            isorange: 5.0,
-            highclip_color: [1.0, 0.0, 0.0, 1.0],
-            lowclip_color: [0.0, 0.0, 1.0, 1.0],
-            nan_color: [0.0, 0.0, 0.0, 0.0],
-            absorption: 2.0,
-            samples: 64,
-            diffuse: 0.8,
-            specular: 0.2,
-            depth_shift: 0.0,
-            picking: 0,
-            object_id: 0,
-            colormap: 0,
-            rotation_y: 0.0,
-            rotation_x: 0.0,
-            aspect_x: 1.0,
-            aspect_y: 1.0,
-            aspect_z: 1.0,
-            zoom: 2.5,
-            width: width.max(1),
-            height: height.max(1),
-            depth,
-            screen_aspect: 1.0,
-            use_nan_color: 0,
-            use_lowclip: 0,
-            use_highclip: 0,
-            _pad1: 0,
-            _pad2: 0,
-            _pad3: 0,
-        };
 
         let uniform_buffer = super::common::create_uniform_buffer(
             device,
             "Volume Uniform Buffer",
-            &uniforms,
+            &initial_uniforms,
         );
 
         let data_buffer = super::common::create_storage_buffer(
@@ -250,7 +232,7 @@ impl VolumeRenderer {
     pub fn update_uniforms(
         &self,
         queue: &wgpu::Queue,
-        colormap: u32,
+        color: &super::common::PlotColorParams,
         rot_y: f32,
         rot_x: f32,
         aspect_x: f32,
@@ -264,15 +246,7 @@ impl VolumeRenderer {
         algorithm: u32,
         isovalue: f32,
         isorange: f32,
-        cmin: f32,
-        cmax: f32,
         screen_aspect: f32,
-        nan_color: [f32; 4],
-        use_nan_color: bool,
-        lowclip_color: [f32; 4],
-        use_lowclip: bool,
-        highclip_color: [f32; 4],
-        use_highclip: bool,
     ) {
         let depth = super::common::calculate_3d_depth(self.data_len, width, height);
         let uniforms = VolumeUniforms {
@@ -283,12 +257,8 @@ impl VolumeRenderer {
             shininess: 32.0,
             light_direction: [1.0, 1.0, 1.0],
             algorithm,
-            colorrange: [cmin, cmax],
             isovalue,
             isorange,
-            highclip_color,
-            lowclip_color,
-            nan_color,
             absorption: opacity_scale,
             samples: step_count,
             diffuse: 0.8,
@@ -296,7 +266,6 @@ impl VolumeRenderer {
             depth_shift: 0.0,
             picking: 0,
             object_id: 0,
-            colormap,
             rotation_y: rot_y,
             rotation_x: rot_x,
             aspect_x,
@@ -307,12 +276,8 @@ impl VolumeRenderer {
             height: height.max(1),
             depth,
             screen_aspect,
-            use_nan_color: if use_nan_color { 1 } else { 0 },
-            use_lowclip: if use_lowclip { 1 } else { 0 },
-            use_highclip: if use_highclip { 1 } else { 0 },
-            _pad1: 0,
-            _pad2: 0,
-            _pad3: 0,
+            _pad0: 0,
+            color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -320,7 +285,7 @@ impl VolumeRenderer {
 
 pub struct VolumeCallback {
     pub renderer: Arc<VolumeRenderer>,
-    pub colormap: u32,
+    pub color_params: super::common::PlotColorParams,
     pub rot_y: f32,
     pub rot_x: f32,
     pub aspect_x: f32,
@@ -334,14 +299,6 @@ pub struct VolumeCallback {
     pub algorithm: u32,
     pub isovalue: f32,
     pub isorange: f32,
-    pub cmin: f32,
-    pub cmax: f32,
-    pub nan_color: [f32; 4],
-    pub use_nan_color: bool,
-    pub lowclip_color: [f32; 4],
-    pub use_lowclip: bool,
-    pub highclip_color: [f32; 4],
-    pub use_highclip: bool,
     pub rect: egui::Rect,
 }
 
@@ -357,7 +314,7 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
         let screen_aspect = super::common::compute_aspect_ratio(&self.rect);
         self.renderer.update_uniforms(
             queue,
-            self.colormap,
+            &self.color_params,
             self.rot_y,
             self.rot_x,
             self.aspect_x,
@@ -371,15 +328,7 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
             self.algorithm,
             self.isovalue,
             self.isorange,
-            self.cmin,
-            self.cmax,
             screen_aspect,
-            self.nan_color,
-            self.use_nan_color,
-            self.lowclip_color,
-            self.use_lowclip,
-            self.highclip_color,
-            self.use_highclip,
         );
         Vec::new()
     }

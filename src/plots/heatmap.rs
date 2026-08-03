@@ -39,17 +39,7 @@ impl HeatmapVertex {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct HeatmapUniforms {
-    pub colormap: u32,
-    pub cmin: f32,
-    pub cmax: f32,
-    pub use_nan_color: u32,
-    pub use_lowclip: u32,
-    pub use_highclip: u32,
-    pub _pad0: u32,
-    pub _pad1: u32,
-    pub nan_color: [f32; 4],
-    pub lowclip_color: [f32; 4],
-    pub highclip_color: [f32; 4],
+    pub color: super::common::PlotColorParams,
 }
 
 pub struct HeatmapRenderer {
@@ -78,17 +68,7 @@ impl HeatmapRenderer {
         });
 
         let initial_uniforms = HeatmapUniforms {
-            colormap: 0,
-            cmin: 0.0,
-            cmax: 100.0,
-            use_nan_color: 0,
-            use_lowclip: 0,
-            use_highclip: 0,
-            _pad0: 0,
-            _pad1: 0,
-            nan_color: [0.0, 0.0, 0.0, 0.0],
-            lowclip_color: [0.0, 0.0, 1.0, 1.0],
-            highclip_color: [1.0, 0.0, 0.0, 1.0],
+            color: super::common::PlotColorParams::default(),
         };
 
         let uniform_buffer = super::common::create_uniform_buffer(
@@ -178,48 +158,15 @@ impl HeatmapRenderer {
         }
     }
 
-    pub fn update_uniforms(
-        &self,
-        queue: &wgpu::Queue,
-        colormap: u32,
-        cmin: f32,
-        cmax: f32,
-        nan_color: [f32; 4],
-        use_nan_color: bool,
-        lowclip_color: [f32; 4],
-        use_lowclip: bool,
-        highclip_color: [f32; 4],
-        use_highclip: bool,
-    ) {
-        let uniforms = HeatmapUniforms {
-            colormap,
-            cmin,
-            cmax,
-            use_nan_color: if use_nan_color { 1 } else { 0 },
-            use_lowclip: if use_lowclip { 1 } else { 0 },
-            use_highclip: if use_highclip { 1 } else { 0 },
-            _pad0: 0,
-            _pad1: 0,
-            nan_color,
-            lowclip_color,
-            highclip_color,
-        };
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, color: &super::common::PlotColorParams) {
+        let uniforms = HeatmapUniforms { color: *color };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
     pub fn update_colormap(&self, queue: &wgpu::Queue, colormap: u32) {
-        self.update_uniforms(
-            queue,
-            colormap,
-            0.0,
-            100.0,
-            [0.0, 0.0, 0.0, 0.0],
-            false,
-            [0.0, 0.0, 1.0, 1.0],
-            false,
-            [1.0, 0.0, 0.0, 1.0],
-            false,
-        );
+        let mut color = super::common::PlotColorParams::default();
+        color.colormap = colormap;
+        self.update_uniforms(queue, &color);
     }
 
     /// Fast GPU Storage Buffer data channel upload
@@ -275,15 +222,7 @@ impl HeatmapRenderer {
 
 pub struct HeatmapCallback {
     pub renderer: Arc<HeatmapRenderer>,
-    pub colormap: u32,
-    pub cmin: f32,
-    pub cmax: f32,
-    pub nan_color: [f32; 4],
-    pub use_nan_color: bool,
-    pub lowclip_color: [f32; 4],
-    pub use_lowclip: bool,
-    pub highclip_color: [f32; 4],
-    pub use_highclip: bool,
+    pub color_params: super::common::PlotColorParams,
     pub rect: egui::Rect,
 }
 
@@ -296,18 +235,7 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
-        self.renderer.update_uniforms(
-            queue,
-            self.colormap,
-            self.cmin,
-            self.cmax,
-            self.nan_color,
-            self.use_nan_color,
-            self.lowclip_color,
-            self.use_lowclip,
-            self.highclip_color,
-            self.use_highclip,
-        );
+        self.renderer.update_uniforms(queue, &self.color_params);
         Vec::new()
     }
 

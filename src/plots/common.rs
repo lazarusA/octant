@@ -1,5 +1,41 @@
+use bytemuck::{Pod, Zeroable};
 use eframe::egui;
 use wgpu::util::DeviceExt;
+
+/// Standard GPU color, clipping, and range uniforms struct shared across all plots.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub struct PlotColorParams {
+    pub colormap: u32,
+    pub cmin: f32,
+    pub cmax: f32,
+    pub use_nan_color: u32,
+    pub use_lowclip: u32,
+    pub use_highclip: u32,
+    pub _pad0: u32,
+    pub _pad1: u32,
+    pub nan_color: [f32; 4],
+    pub lowclip_color: [f32; 4],
+    pub highclip_color: [f32; 4],
+}
+
+impl Default for PlotColorParams {
+    fn default() -> Self {
+        Self {
+            colormap: 0,
+            cmin: 0.0,
+            cmax: 100.0,
+            use_nan_color: 0,
+            use_lowclip: 0,
+            use_highclip: 0,
+            _pad0: 0,
+            _pad1: 0,
+            nan_color: [0.0, 0.0, 0.0, 0.0],
+            lowclip_color: [0.0, 0.0, 1.0, 1.0],
+            highclip_color: [1.0, 0.0, 0.0, 1.0],
+        }
+    }
+}
 
 /// Setup viewport and scissor rect on a wgpu RenderPass based on egui Rect and pixels_per_point.
 #[inline]

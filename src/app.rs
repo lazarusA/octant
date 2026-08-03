@@ -435,6 +435,23 @@ impl OctantApp {
         self.matrix_data = Some(data);
     }
 
+    pub fn get_color_params(&self) -> crate::plots::common::PlotColorParams {
+        let effective_colormap = self.preview_colormap.unwrap_or(self.active_colormap);
+        crate::plots::common::PlotColorParams {
+            colormap: effective_colormap,
+            cmin: self.color_range_min,
+            cmax: self.color_range_max,
+            use_nan_color: if self.use_nan_color { 1 } else { 0 },
+            use_lowclip: if self.use_lowclip { 1 } else { 0 },
+            use_highclip: if self.use_highclip { 1 } else { 0 },
+            _pad0: 0,
+            _pad1: 0,
+            nan_color: self.nan_color,
+            lowclip_color: self.lowclip_color,
+            highclip_color: self.highclip_color,
+        }
+    }
+
     pub fn get_3d_aspect_ratio(&self) -> (f32, f32, f32) {
         let (w, h, max_t) = self.matrix_data.as_ref().map_or((64, 64, 64), |m| {
             (m.width as u32, m.height as u32, m.max_timesteps as u32)
@@ -632,8 +649,6 @@ impl eframe::App for OctantApp {
                 ui.ctx().request_repaint();
             }
 
-            let effective_colormap = self.preview_colormap.unwrap_or(self.active_colormap);
-
             match self.active_plot_type {
                 PlotType::Sphere => {
                     if let Some(sphere_renderer) = &self.sphere_renderer {
@@ -641,20 +656,12 @@ impl eframe::App for OctantApp {
                             rect,
                             SphereCallback {
                                 renderer: sphere_renderer.clone(),
-                                colormap: effective_colormap,
+                                color_params: self.get_color_params(),
                                 rotation_y: self.sphere_rotation_y,
                                 rotation_x: self.sphere_rotation_x,
                                 zoom: self.sphere_zoom,
                                 displacement_strength: self.sphere_displacement_strength,
                                 sphere_mode: self.sphere_mode,
-                                cmin: self.color_range_min,
-                                cmax: self.color_range_max,
-                                nan_color: self.nan_color,
-                                use_nan_color: self.use_nan_color,
-                                lowclip_color: self.lowclip_color,
-                                use_lowclip: self.use_lowclip,
-                                highclip_color: self.highclip_color,
-                                use_highclip: self.use_highclip,
                                 rect,
                             },
                         );
@@ -667,20 +674,12 @@ impl eframe::App for OctantApp {
                             rect,
                             SurfaceCallback {
                                 renderer: surface_renderer.clone(),
-                                colormap: effective_colormap,
+                                color_params: self.get_color_params(),
                                 rotation_y: self.sphere_rotation_y,
                                 rotation_x: self.sphere_rotation_x,
                                 zoom: self.sphere_zoom,
                                 displacement_strength: self.surface_displacement_strength,
                                 surface_mode: self.surface_mode,
-                                cmin: self.color_range_min,
-                                cmax: self.color_range_max,
-                                nan_color: self.nan_color,
-                                use_nan_color: self.use_nan_color,
-                                lowclip_color: self.lowclip_color,
-                                use_lowclip: self.use_lowclip,
-                                highclip_color: self.highclip_color,
-                                use_highclip: self.use_highclip,
                                 rect,
                             },
                         );
@@ -696,7 +695,7 @@ impl eframe::App for OctantApp {
                             rect,
                             VolumeCallback {
                                 renderer: volume_renderer.clone(),
-                                colormap: effective_colormap,
+                                color_params: self.get_color_params(),
                                 rot_y: self.sphere_rotation_y,
                                 rot_x: self.sphere_rotation_x,
                                 aspect_x,
@@ -710,14 +709,6 @@ impl eframe::App for OctantApp {
                                 algorithm: self.volume_algorithm,
                                 isovalue: self.volume_isovalue,
                                 isorange: self.volume_isorange,
-                                cmin: self.color_range_min,
-                                cmax: self.color_range_max,
-                                nan_color: self.nan_color,
-                                use_nan_color: self.use_nan_color,
-                                lowclip_color: self.lowclip_color,
-                                use_lowclip: self.use_lowclip,
-                                highclip_color: self.highclip_color,
-                                use_highclip: self.use_highclip,
                                 rect,
                             },
                         );
@@ -733,7 +724,7 @@ impl eframe::App for OctantApp {
                             rect,
                             PointCloudCallback {
                                 renderer: point_cloud_renderer.clone(),
-                                colormap: effective_colormap,
+                                color_params: self.get_color_params(),
                                 rot_y: self.sphere_rotation_y,
                                 rot_x: self.sphere_rotation_x,
                                 aspect_x,
@@ -743,14 +734,6 @@ impl eframe::App for OctantApp {
                                 point_size: self.point_cloud_size,
                                 width,
                                 height,
-                                cmin: self.color_range_min,
-                                cmax: self.color_range_max,
-                                nan_color: self.nan_color,
-                                use_nan_color: self.use_nan_color,
-                                lowclip_color: self.lowclip_color,
-                                use_lowclip: self.use_lowclip,
-                                highclip_color: self.highclip_color,
-                                use_highclip: self.use_highclip,
                                 rect,
                             },
                         );
@@ -763,15 +746,7 @@ impl eframe::App for OctantApp {
                             rect,
                             MatrixCallback {
                                 renderer: renderer.clone(),
-                                colormap: effective_colormap,
-                                cmin: self.color_range_min,
-                                cmax: self.color_range_max,
-                                nan_color: self.nan_color,
-                                use_nan_color: self.use_nan_color,
-                                lowclip_color: self.lowclip_color,
-                                use_lowclip: self.use_lowclip,
-                                highclip_color: self.highclip_color,
-                                use_highclip: self.use_highclip,
+                                color_params: self.get_color_params(),
                                 rect,
                             },
                         );

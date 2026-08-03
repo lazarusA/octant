@@ -51,7 +51,6 @@ impl SurfaceVertex {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct SurfaceUniforms {
-    pub colormap: u32,
     pub rotation_y: f32,
     pub rotation_x: f32,
     pub aspect_ratio: f32,
@@ -59,17 +58,8 @@ pub struct SurfaceUniforms {
     pub displacement_strength: f32,
     pub surface_mode: u32,
     pub width: u32,
-    pub cmin: f32,
-    pub cmax: f32,
-    pub use_nan_color: u32,
-    pub use_lowclip: u32,
-    pub use_highclip: u32,
     pub _pad0: u32,
-    pub _pad1: u32,
-    pub _pad2: u32,
-    pub nan_color: [f32; 4],
-    pub lowclip_color: [f32; 4],
-    pub highclip_color: [f32; 4],
+    pub color: super::common::PlotColorParams,
 }
 
 pub struct SurfaceRenderer {
@@ -102,25 +92,15 @@ impl SurfaceRenderer {
         });
 
         let initial_uniforms = SurfaceUniforms {
-            colormap: 0,
             rotation_y: 0.0,
-            rotation_x: 0.4,
+            rotation_x: 0.0,
             aspect_ratio: 1.0,
             zoom: 2.5,
-            displacement_strength: 0.3,
+            displacement_strength: 0.5,
             surface_mode: 0,
             width: width as u32,
-            cmin: 0.0,
-            cmax: 100.0,
-            use_nan_color: 0,
-            use_lowclip: 0,
-            use_highclip: 0,
             _pad0: 0,
-            _pad1: 0,
-            _pad2: 0,
-            nan_color: [0.0, 0.0, 0.0, 0.0],
-            lowclip_color: [0.0, 0.0, 1.0, 1.0],
-            highclip_color: [1.0, 0.0, 0.0, 1.0],
+            color: super::common::PlotColorParams::default(),
         };
 
         let uniform_buffer = super::common::create_uniform_buffer(
@@ -229,24 +209,15 @@ impl SurfaceRenderer {
     pub fn update_uniforms(
         &self,
         queue: &wgpu::Queue,
-        colormap: u32,
+        color: &super::common::PlotColorParams,
         rotation_y: f32,
         rotation_x: f32,
         aspect_ratio: f32,
         zoom: f32,
         displacement_strength: f32,
         surface_mode: u32,
-        cmin: f32,
-        cmax: f32,
-        nan_color: [f32; 4],
-        use_nan_color: bool,
-        lowclip_color: [f32; 4],
-        use_lowclip: bool,
-        highclip_color: [f32; 4],
-        use_highclip: bool,
     ) {
         let uniforms = SurfaceUniforms {
-            colormap,
             rotation_y,
             rotation_x,
             aspect_ratio: aspect_ratio.max(0.1),
@@ -254,17 +225,8 @@ impl SurfaceRenderer {
             displacement_strength,
             surface_mode,
             width: self.width as u32,
-            cmin,
-            cmax,
-            use_nan_color: if use_nan_color { 1 } else { 0 },
-            use_lowclip: if use_lowclip { 1 } else { 0 },
-            use_highclip: if use_highclip { 1 } else { 0 },
             _pad0: 0,
-            _pad1: 0,
-            _pad2: 0,
-            nan_color,
-            lowclip_color,
-            highclip_color,
+            color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -337,20 +299,12 @@ impl SurfaceRenderer {
 
 pub struct SurfaceCallback {
     pub renderer: Arc<SurfaceRenderer>,
-    pub colormap: u32,
+    pub color_params: super::common::PlotColorParams,
     pub rotation_y: f32,
     pub rotation_x: f32,
     pub zoom: f32,
     pub displacement_strength: f32,
     pub surface_mode: u32,
-    pub cmin: f32,
-    pub cmax: f32,
-    pub nan_color: [f32; 4],
-    pub use_nan_color: bool,
-    pub lowclip_color: [f32; 4],
-    pub use_lowclip: bool,
-    pub highclip_color: [f32; 4],
-    pub use_highclip: bool,
     pub rect: egui::Rect,
 }
 
@@ -366,21 +320,13 @@ impl eframe::egui_wgpu::CallbackTrait for SurfaceCallback {
         let aspect_ratio = super::common::compute_aspect_ratio(&self.rect);
         self.renderer.update_uniforms(
             queue,
-            self.colormap,
+            &self.color_params,
             self.rotation_y,
             self.rotation_x,
             aspect_ratio,
             self.zoom,
             self.displacement_strength,
             self.surface_mode,
-            self.cmin,
-            self.cmax,
-            self.nan_color,
-            self.use_nan_color,
-            self.lowclip_color,
-            self.use_lowclip,
-            self.highclip_color,
-            self.use_highclip,
         );
         Vec::new()
     }

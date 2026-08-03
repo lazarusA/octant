@@ -23,7 +23,6 @@ impl PointCloudVertex {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct PointCloudUniforms {
-    pub colormap: u32,
     pub rotation_y: f32,
     pub rotation_x: f32,
     pub aspect_x: f32,
@@ -35,17 +34,8 @@ pub struct PointCloudUniforms {
     pub height: u32,
     pub depth: u32,
     pub screen_aspect: f32,
-    pub cmin: f32,
-    pub cmax: f32,
-    pub use_nan_color: u32,
-    pub use_lowclip: u32,
-    pub use_highclip: u32,
     pub _pad0: u32,
-    pub _pad1: u32,
-    pub _pad2: u32,
-    pub nan_color: [f32; 4],
-    pub lowclip_color: [f32; 4],
-    pub highclip_color: [f32; 4],
+    pub color: super::common::PlotColorParams,
 }
 
 pub struct PointCloudRenderer {
@@ -73,7 +63,24 @@ impl PointCloudRenderer {
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
-        // Unit quad template for point billboard
+        let instance_count = initial_data.len() as u32;
+        let depth = super::common::calculate_3d_depth(initial_data.len(), width, height);
+
+        let initial_uniforms = PointCloudUniforms {
+            rotation_y: 0.0,
+            rotation_x: 0.0,
+            aspect_x: 1.0,
+            aspect_y: 1.0,
+            aspect_z: 1.0,
+            zoom: 2.5,
+            point_size: 0.02,
+            width: width.max(1),
+            height: height.max(1),
+            depth,
+            screen_aspect: 1.0,
+            _pad0: 0,
+            color: super::common::PlotColorParams::default(),
+        };// Unit quad template for point billboard
         let vertices = [
             PointCloudVertex { position: [-0.5, -0.5] },
             PointCloudVertex { position: [ 0.5, -0.5] },
@@ -96,39 +103,11 @@ impl PointCloudRenderer {
         });
 
         let initial_data_safe = if initial_data.is_empty() { vec![50.0; 64 * 64] } else { initial_data.to_vec() };
-        let instance_count = initial_data_safe.len() as u32;
-        let depth = super::common::calculate_3d_depth(initial_data_safe.len(), width, height);
-
-        let uniforms = PointCloudUniforms {
-            colormap: 0,
-            rotation_y: 0.0,
-            rotation_x: 0.0,
-            aspect_x: 1.0,
-            aspect_y: 1.0,
-            aspect_z: 1.0,
-            zoom: 2.5,
-            point_size: 0.02,
-            width: width.max(1),
-            height: height.max(1),
-            depth,
-            screen_aspect: 1.0,
-            cmin: 0.0,
-            cmax: 100.0,
-            use_nan_color: 0,
-            use_lowclip: 0,
-            use_highclip: 0,
-            _pad0: 0,
-            _pad1: 0,
-            _pad2: 0,
-            nan_color: [0.0, 0.0, 0.0, 0.0],
-            lowclip_color: [0.0, 0.0, 1.0, 1.0],
-            highclip_color: [1.0, 0.0, 0.0, 1.0],
-        };
 
         let uniform_buffer = super::common::create_uniform_buffer(
             device,
             "Point Cloud Uniform Buffer",
-            &uniforms,
+            &initial_uniforms,
         );
 
         let data_buffer = super::common::create_storage_buffer(
@@ -208,7 +187,7 @@ impl PointCloudRenderer {
     pub fn update_uniforms(
         &self,
         queue: &wgpu::Queue,
-        colormap: u32,
+        color: &super::common::PlotColorParams,
         rot_y: f32,
         rot_x: f32,
         aspect_x: f32,
@@ -219,18 +198,9 @@ impl PointCloudRenderer {
         width: u32,
         height: u32,
         screen_aspect: f32,
-        cmin: f32,
-        cmax: f32,
-        nan_color: [f32; 4],
-        use_nan_color: bool,
-        lowclip_color: [f32; 4],
-        use_lowclip: bool,
-        highclip_color: [f32; 4],
-        use_highclip: bool,
     ) {
         let depth = super::common::calculate_3d_depth(self.instance_count as usize, width, height);
         let uniforms = PointCloudUniforms {
-            colormap,
             rotation_y: rot_y,
             rotation_x: rot_x,
             aspect_x,
@@ -242,17 +212,8 @@ impl PointCloudRenderer {
             height: height.max(1),
             depth,
             screen_aspect,
-            cmin,
-            cmax,
-            use_nan_color: if use_nan_color { 1 } else { 0 },
-            use_lowclip: if use_lowclip { 1 } else { 0 },
-            use_highclip: if use_highclip { 1 } else { 0 },
             _pad0: 0,
-            _pad1: 0,
-            _pad2: 0,
-            nan_color,
-            lowclip_color,
-            highclip_color,
+            color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -260,7 +221,7 @@ impl PointCloudRenderer {
 
 pub struct PointCloudCallback {
     pub renderer: Arc<PointCloudRenderer>,
-    pub colormap: u32,
+    pub color_params: super::common::PlotColorParams,
     pub rot_y: f32,
     pub rot_x: f32,
     pub aspect_x: f32,
@@ -270,14 +231,6 @@ pub struct PointCloudCallback {
     pub point_size: f32,
     pub width: u32,
     pub height: u32,
-    pub cmin: f32,
-    pub cmax: f32,
-    pub nan_color: [f32; 4],
-    pub use_nan_color: bool,
-    pub lowclip_color: [f32; 4],
-    pub use_lowclip: bool,
-    pub highclip_color: [f32; 4],
-    pub use_highclip: bool,
     pub rect: egui::Rect,
 }
 
@@ -293,7 +246,7 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         let screen_aspect = super::common::compute_aspect_ratio(&self.rect);
         self.renderer.update_uniforms(
             queue,
-            self.colormap,
+            &self.color_params,
             self.rot_y,
             self.rot_x,
             self.aspect_x,
@@ -304,14 +257,6 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
             self.width,
             self.height,
             screen_aspect,
-            self.cmin,
-            self.cmax,
-            self.nan_color,
-            self.use_nan_color,
-            self.lowclip_color,
-            self.use_lowclip,
-            self.highclip_color,
-            self.use_highclip,
         );
         Vec::new()
     }

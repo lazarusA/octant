@@ -51,7 +51,6 @@ impl SphereVertex {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct SphereUniforms {
-    pub colormap: u32,
     pub rotation_y: f32,
     pub rotation_x: f32,
     pub aspect_ratio: f32,
@@ -59,17 +58,8 @@ pub struct SphereUniforms {
     pub displacement_strength: f32,
     pub sphere_mode: u32,
     pub width: u32,
-    pub cmin: f32,
-    pub cmax: f32,
-    pub use_nan_color: u32,
-    pub use_lowclip: u32,
-    pub use_highclip: u32,
     pub _pad0: u32,
-    pub _pad1: u32,
-    pub _pad2: u32,
-    pub nan_color: [f32; 4],
-    pub lowclip_color: [f32; 4],
-    pub highclip_color: [f32; 4],
+    pub color: super::common::PlotColorParams,
 }
 
 pub struct SphereRenderer {
@@ -97,30 +87,20 @@ impl SphereRenderer {
         let shader_source = crate::assemble_plot_shader!(include_str!("shaders/sphere.wgsl"));
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("3D Globe Projection Shader Module"),
+            label: Some("Sphere Shader Module"),
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
         let initial_uniforms = SphereUniforms {
-            colormap: 0,
             rotation_y: 0.0,
-            rotation_x: 0.25,
+            rotation_x: 0.0,
             aspect_ratio: 1.0,
             zoom: 2.5,
-            displacement_strength: 0.3,
+            displacement_strength: 0.5,
             sphere_mode: 0,
             width: width as u32,
-            cmin: 0.0,
-            cmax: 100.0,
-            use_nan_color: 0,
-            use_lowclip: 0,
-            use_highclip: 0,
             _pad0: 0,
-            _pad1: 0,
-            _pad2: 0,
-            nan_color: [0.0, 0.0, 0.0, 0.0],
-            lowclip_color: [0.0, 0.0, 1.0, 1.0],
-            highclip_color: [1.0, 0.0, 0.0, 1.0],
+            color: super::common::PlotColorParams::default(),
         };
 
         let uniform_buffer = super::common::create_uniform_buffer(
@@ -232,24 +212,15 @@ impl SphereRenderer {
     pub fn update_uniforms(
         &self,
         queue: &wgpu::Queue,
-        colormap: u32,
+        color: &super::common::PlotColorParams,
         rotation_y: f32,
         rotation_x: f32,
         aspect_ratio: f32,
         zoom: f32,
         displacement_strength: f32,
         sphere_mode: u32,
-        cmin: f32,
-        cmax: f32,
-        nan_color: [f32; 4],
-        use_nan_color: bool,
-        lowclip_color: [f32; 4],
-        use_lowclip: bool,
-        highclip_color: [f32; 4],
-        use_highclip: bool,
     ) {
         let uniforms = SphereUniforms {
-            colormap,
             rotation_y,
             rotation_x,
             aspect_ratio: aspect_ratio.max(0.1),
@@ -257,17 +228,8 @@ impl SphereRenderer {
             displacement_strength,
             sphere_mode,
             width: self.width as u32,
-            cmin,
-            cmax,
-            use_nan_color: if use_nan_color { 1 } else { 0 },
-            use_lowclip: if use_lowclip { 1 } else { 0 },
-            use_highclip: if use_highclip { 1 } else { 0 },
             _pad0: 0,
-            _pad1: 0,
-            _pad2: 0,
-            nan_color,
-            lowclip_color,
-            highclip_color,
+            color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -348,20 +310,12 @@ impl SphereRenderer {
 
 pub struct SphereCallback {
     pub renderer: Arc<SphereRenderer>,
-    pub colormap: u32,
+    pub color_params: super::common::PlotColorParams,
     pub rotation_y: f32,
     pub rotation_x: f32,
     pub zoom: f32,
     pub displacement_strength: f32,
     pub sphere_mode: u32,
-    pub cmin: f32,
-    pub cmax: f32,
-    pub nan_color: [f32; 4],
-    pub use_nan_color: bool,
-    pub lowclip_color: [f32; 4],
-    pub use_lowclip: bool,
-    pub highclip_color: [f32; 4],
-    pub use_highclip: bool,
     pub rect: egui::Rect,
 }
 
@@ -377,21 +331,13 @@ impl eframe::egui_wgpu::CallbackTrait for SphereCallback {
         let aspect_ratio = super::common::compute_aspect_ratio(&self.rect);
         self.renderer.update_uniforms(
             queue,
-            self.colormap,
+            &self.color_params,
             self.rotation_y,
             self.rotation_x,
             aspect_ratio,
             self.zoom,
             self.displacement_strength,
             self.sphere_mode,
-            self.cmin,
-            self.cmax,
-            self.nan_color,
-            self.use_nan_color,
-            self.lowclip_color,
-            self.use_lowclip,
-            self.highclip_color,
-            self.use_highclip,
         );
         Vec::new()
     }

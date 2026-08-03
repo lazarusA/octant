@@ -1,5 +1,4 @@
 struct Uniforms {
-    colormap: u32,
     rotation_y: f32,
     rotation_x: f32,
     aspect_x: f32,
@@ -11,17 +10,8 @@ struct Uniforms {
     height: u32,
     depth: u32,
     screen_aspect: f32,
-    cmin: f32,
-    cmax: f32,
-    use_nan_color: u32,
-    use_lowclip: u32,
-    use_highclip: u32,
     _pad0: u32,
-    _pad1: u32,
-    _pad2: u32,
-    nan_color: vec4<f32>,
-    lowclip_color: vec4<f32>,
-    highclip_color: vec4<f32>,
+    color: ColorUniforms,
 };
 
 @group(0) @binding(0)
@@ -107,18 +97,7 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let eval_color = evaluate_plot_color(
-        in.val,
-        uniforms.cmin,
-        uniforms.cmax,
-        uniforms.colormap,
-        uniforms.nan_color,
-        uniforms.use_nan_color,
-        uniforms.lowclip_color,
-        uniforms.use_lowclip,
-        uniforms.highclip_color,
-        uniforms.use_highclip,
-    );
+    let eval_color = evaluate_plot_color(in.val, uniforms.color);
 
     if (eval_color.a <= 0.0) {
         discard;
