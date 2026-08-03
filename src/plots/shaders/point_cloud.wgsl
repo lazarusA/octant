@@ -10,7 +10,7 @@ struct Uniforms {
     width: u32,
     height: u32,
     depth: u32,
-    _pad0: u32,
+    screen_aspect: f32,
 };
 
 @group(0) @binding(0)
@@ -80,11 +80,12 @@ fn vs_main(
     let p_size = clamp(uniforms.point_size, 0.002, 0.2);
     let corner_pos = center_rot + vec3<f32>(model.position.x * p_size, model.position.y * p_size, 0.0);
 
-    // Perspective projection transformation using dynamic zoom
+    // Perspective projection transformation using dynamic zoom & screen aspect ratio
     let cam_dist = clamp(uniforms.zoom, 1.1, 10.0);
     let cam_z = corner_pos.z - cam_dist;
     let fov_scale = 1.6;
-    let proj_x = corner_pos.x * fov_scale;
+    let screen_asp = max(uniforms.screen_aspect, 0.1);
+    let proj_x = (corner_pos.x * fov_scale) / screen_asp;
     let proj_y = corner_pos.y * fov_scale;
 
     let proj_z = (cam_z + 15.0) / 30.0;

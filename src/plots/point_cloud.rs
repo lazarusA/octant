@@ -34,7 +34,7 @@ pub struct PointCloudUniforms {
     pub width: u32,
     pub height: u32,
     pub depth: u32,
-    pub _pad0: u32,
+    pub screen_aspect: f32,
 }
 
 pub struct PointCloudRenderer {
@@ -100,7 +100,7 @@ impl PointCloudRenderer {
             width: width.max(1),
             height: height.max(1),
             depth,
-            _pad0: 0,
+            screen_aspect: 1.0,
         };
 
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -217,6 +217,7 @@ impl PointCloudRenderer {
         point_size: f32,
         width: u32,
         height: u32,
+        screen_aspect: f32,
     ) {
         let depth = (self.instance_count / (width.max(1) * height.max(1))).max(1);
         let uniforms = PointCloudUniforms {
@@ -231,7 +232,7 @@ impl PointCloudRenderer {
             width: width.max(1),
             height: height.max(1),
             depth,
-            _pad0: 0,
+            screen_aspect,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -261,6 +262,7 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
+        let screen_aspect = self.rect.width() / self.rect.height().max(1.0);
         self.renderer.update_uniforms(
             queue,
             self.colormap,
@@ -273,6 +275,7 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
             self.point_size,
             self.width,
             self.height,
+            screen_aspect,
         );
         Vec::new()
     }
