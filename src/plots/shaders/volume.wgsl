@@ -35,8 +35,12 @@ struct Uniforms {
     height: u32,
     depth: u32,
     screen_aspect: f32,
+    use_nan_color: u32,
+    use_lowclip: u32,
+    use_highclip: u32,
     _pad1: u32,
     _pad2: u32,
+    _pad3: u32,
 };
 
 @group(0) @binding(0)
@@ -172,10 +176,18 @@ fn sample_volume_scalar(texCoord: vec3<f32>) -> f32 {
 
 fn sample_volume_rgba(pos: vec3<f32>) -> vec4<f32> {
     let s = sample_volume_scalar(pos);
-    let range = max(uniforms.colorrange.y - uniforms.colorrange.x, 0.0001);
-    let norm = clamp((s - uniforms.colorrange.x) / range, 0.0, 1.0);
-    let rgb = sample_colormap(uniforms.colormap, norm);
-    return vec4<f32>(rgb, norm);
+    return evaluate_plot_color(
+        s,
+        uniforms.colorrange.x,
+        uniforms.colorrange.y,
+        uniforms.colormap,
+        uniforms.nan_color,
+        uniforms.use_nan_color,
+        uniforms.lowclip_color,
+        uniforms.use_lowclip,
+        uniforms.highclip_color,
+        uniforms.use_highclip,
+    );
 }
 
 fn gennormal(uvw: vec3<f32>) -> vec3<f32> {
@@ -271,16 +283,22 @@ fn volume_hitbox_threshold(vOrigin: vec3<f32>, rayDir: vec3<f32>, bounds: vec2<f
         texCoord = clamp(texCoord, vec3<f32>(0.0), vec3<f32>(1.0 - epsilon));
 
         let d = sample_volume_scalar(texCoord);
-        let cond = (d >= threshold_min) && (d <= threshold_max);
+        let eval_col = evaluate_plot_color(
+            d,
+            threshold_min,
+            threshold_max,
+            uniforms.colormap,
+            uniforms.nan_color,
+            uniforms.use_nan_color,
+            uniforms.lowclip_color,
+            uniforms.use_lowclip,
+            uniforms.highclip_color,
+            uniforms.use_highclip,
+        );
 
-        if (cond) {
-            let range = max(threshold_max - threshold_min, 0.0001);
-            let sampLoc = clamp((d - threshold_min) / range, 0.0, 0.99);
-
-            let col = sample_colormap(uniforms.colormap, sampLoc);
-            let normalizedOpacity = clamp(sampLoc, 0.0, 1.0);
-            let alpha_exponent = max(uniforms.absorption, 0.1);
-            let alpha = clamp(pow(max(normalizedOpacity, 0.001), 1.0 / alpha_exponent), 0.01, 1.0);
+        if (eval_col.a > 0.0) {
+            let col = eval_col.rgb;
+            let alpha = eval_col.a * 0.2;
 
             accumColor = accumColor + (1.0 - alphaAcc) * alpha * col;
             alphaAcc = alphaAcc + alpha * (1.0 - alphaAcc);

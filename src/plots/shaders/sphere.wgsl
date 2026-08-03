@@ -7,6 +7,17 @@ struct Uniforms {
     displacement_strength: f32,
     sphere_mode: u32,
     width: u32,
+    cmin: f32,
+    cmax: f32,
+    use_nan_color: u32,
+    use_lowclip: u32,
+    use_highclip: u32,
+    _pad0: u32,
+    _pad1: u32,
+    _pad2: u32,
+    nan_color: vec4<f32>,
+    lowclip_color: vec4<f32>,
+    highclip_color: vec4<f32>,
 };
 
 @group(0) @binding(0)
@@ -166,8 +177,22 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let norm_val = clamp(in.val / 100.0, 0.0, 1.0);
-    let base_color = sample_colormap(uniforms.colormap, norm_val);
+    let eval_color = evaluate_plot_color(
+        in.val,
+        uniforms.cmin,
+        uniforms.cmax,
+        uniforms.colormap,
+        uniforms.nan_color,
+        uniforms.use_nan_color,
+        uniforms.lowclip_color,
+        uniforms.use_lowclip,
+        uniforms.highclip_color,
+        uniforms.use_highclip,
+    );
+
+    if (eval_color.a <= 0.0) {
+        discard;
+    }
 
     // 3D Directional Lighting (Light source at upper right front)
     let light_dir = normalize(vec3<f32>(0.5, 0.7, 0.9));
@@ -175,6 +200,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ambient = 0.35;
     let lighting = clamp(ambient + diffuse * 0.65, 0.3, 1.0);
 
-    let final_color = base_color * lighting;
-    return vec4<f32>(final_color, 1.0);
+    return vec4<f32>(eval_color.rgb * lighting, eval_color.a);
 }

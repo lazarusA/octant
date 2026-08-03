@@ -1,4 +1,4 @@
-// Shared Colormaps Evaluator
+// Shared Colormaps & Data Clipping Evaluator
 
 fn sample_colormap(colormap_id: u32, t: f32) -> vec3<f32> {
     let norm = clamp(t, 0.0, 1.0);
@@ -18,4 +18,39 @@ fn sample_colormap(colormap_id: u32, t: f32) -> vec3<f32> {
         return colormap_cividis(norm);
     }
     return colormap_viridis(norm);
+}
+
+fn evaluate_plot_color(
+    val: f32,
+    cmin: f32,
+    cmax: f32,
+    colormap_id: u32,
+    nan_color: vec4<f32>,
+    use_nan_color: u32,
+    lowclip_color: vec4<f32>,
+    use_lowclip: u32,
+    highclip_color: vec4<f32>,
+    use_highclip: u32,
+) -> vec4<f32> {
+    // 1. Detect NaN / Inf inputs or corrupt float samples
+    if (val != val || abs(val) > 1e30) {
+        return select(vec4<f32>(0.0, 0.0, 0.0, 0.0), nan_color, use_nan_color == 1u);
+    }
+
+    // 2. Values below cmin (Lowclip)
+    if (val < cmin) {
+        let default_low = vec4<f32>(sample_colormap(colormap_id, 0.0), 1.0);
+        return select(default_low, lowclip_color, use_lowclip == 1u);
+    }
+
+    // 3. Values above cmax (Highclip)
+    if (val > cmax) {
+        let default_high = vec4<f32>(sample_colormap(colormap_id, 1.0), 1.0);
+        return select(default_high, highclip_color, use_highclip == 1u);
+    }
+
+    // 4. In-bounds normalized colormap sampling
+    let range = max(cmax - cmin, 1e-6);
+    let norm_val = clamp((val - cmin) / range, 0.0, 1.0);
+    return vec4<f32>(sample_colormap(colormap_id, norm_val), 1.0);
 }

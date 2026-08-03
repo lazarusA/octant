@@ -35,6 +35,17 @@ pub struct PointCloudUniforms {
     pub height: u32,
     pub depth: u32,
     pub screen_aspect: f32,
+    pub cmin: f32,
+    pub cmax: f32,
+    pub use_nan_color: u32,
+    pub use_lowclip: u32,
+    pub use_highclip: u32,
+    pub _pad0: u32,
+    pub _pad1: u32,
+    pub _pad2: u32,
+    pub nan_color: [f32; 4],
+    pub lowclip_color: [f32; 4],
+    pub highclip_color: [f32; 4],
 }
 
 pub struct PointCloudRenderer {
@@ -101,6 +112,17 @@ impl PointCloudRenderer {
             height: height.max(1),
             depth,
             screen_aspect: 1.0,
+            cmin: 0.0,
+            cmax: 100.0,
+            use_nan_color: 0,
+            use_lowclip: 0,
+            use_highclip: 0,
+            _pad0: 0,
+            _pad1: 0,
+            _pad2: 0,
+            nan_color: [0.0, 0.0, 0.0, 0.0],
+            lowclip_color: [0.0, 0.0, 1.0, 1.0],
+            highclip_color: [1.0, 0.0, 0.0, 1.0],
         };
 
         let uniform_buffer = super::common::create_uniform_buffer(
@@ -197,6 +219,14 @@ impl PointCloudRenderer {
         width: u32,
         height: u32,
         screen_aspect: f32,
+        cmin: f32,
+        cmax: f32,
+        nan_color: [f32; 4],
+        use_nan_color: bool,
+        lowclip_color: [f32; 4],
+        use_lowclip: bool,
+        highclip_color: [f32; 4],
+        use_highclip: bool,
     ) {
         let depth = super::common::calculate_3d_depth(self.instance_count as usize, width, height);
         let uniforms = PointCloudUniforms {
@@ -212,6 +242,17 @@ impl PointCloudRenderer {
             height: height.max(1),
             depth,
             screen_aspect,
+            cmin,
+            cmax,
+            use_nan_color: if use_nan_color { 1 } else { 0 },
+            use_lowclip: if use_lowclip { 1 } else { 0 },
+            use_highclip: if use_highclip { 1 } else { 0 },
+            _pad0: 0,
+            _pad1: 0,
+            _pad2: 0,
+            nan_color,
+            lowclip_color,
+            highclip_color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -229,6 +270,14 @@ pub struct PointCloudCallback {
     pub point_size: f32,
     pub width: u32,
     pub height: u32,
+    pub cmin: f32,
+    pub cmax: f32,
+    pub nan_color: [f32; 4],
+    pub use_nan_color: bool,
+    pub lowclip_color: [f32; 4],
+    pub use_lowclip: bool,
+    pub highclip_color: [f32; 4],
+    pub use_highclip: bool,
     pub rect: egui::Rect,
 }
 
@@ -255,6 +304,14 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
             self.width,
             self.height,
             screen_aspect,
+            self.cmin,
+            self.cmax,
+            self.nan_color,
+            self.use_nan_color,
+            self.lowclip_color,
+            self.use_lowclip,
+            self.highclip_color,
+            self.use_highclip,
         );
         Vec::new()
     }

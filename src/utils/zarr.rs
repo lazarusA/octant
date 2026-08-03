@@ -510,17 +510,7 @@ pub fn fetch_slice(
                 (0.0, 1.0)
             };
 
-            let range = if max_v > min_v { max_v - min_v } else { 1.0 };
-            let values = oriented_values
-                .into_iter()
-                .map(|val| {
-                    if val.is_nan() {
-                        0.0
-                    } else {
-                        ((val - min_v) / range * 100.0).clamp(0.0, 100.0)
-                    }
-                })
-                .collect();
+            let values = oriented_values;
 
             return Ok(MatrixSlice {
                 variable_name: variable.to_string(),
@@ -648,17 +638,7 @@ pub fn fetch_slice_range(
                     (0.0, 1.0)
                 };
 
-                let range = if max_v > min_v { max_v - min_v } else { 1.0 };
-                let values = oriented_values
-                    .into_iter()
-                    .map(|val| {
-                        if val.is_nan() {
-                            0.0
-                        } else {
-                            ((val - min_v) / range * 100.0).clamp(0.0, 100.0)
-                        }
-                    })
-                    .collect();
+                let values = oriented_values;
 
                 slices.push(MatrixSlice {
                     variable_name: variable.to_string(),

@@ -59,6 +59,17 @@ pub struct SurfaceUniforms {
     pub displacement_strength: f32,
     pub surface_mode: u32,
     pub width: u32,
+    pub cmin: f32,
+    pub cmax: f32,
+    pub use_nan_color: u32,
+    pub use_lowclip: u32,
+    pub use_highclip: u32,
+    pub _pad0: u32,
+    pub _pad1: u32,
+    pub _pad2: u32,
+    pub nan_color: [f32; 4],
+    pub lowclip_color: [f32; 4],
+    pub highclip_color: [f32; 4],
 }
 
 pub struct SurfaceRenderer {
@@ -99,6 +110,17 @@ impl SurfaceRenderer {
             displacement_strength: 0.3,
             surface_mode: 0,
             width: width as u32,
+            cmin: 0.0,
+            cmax: 100.0,
+            use_nan_color: 0,
+            use_lowclip: 0,
+            use_highclip: 0,
+            _pad0: 0,
+            _pad1: 0,
+            _pad2: 0,
+            nan_color: [0.0, 0.0, 0.0, 0.0],
+            lowclip_color: [0.0, 0.0, 1.0, 1.0],
+            highclip_color: [1.0, 0.0, 0.0, 1.0],
         };
 
         let uniform_buffer = super::common::create_uniform_buffer(
@@ -147,7 +169,7 @@ impl SurfaceRenderer {
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: target_format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
                 compilation_options: Default::default(),
@@ -176,7 +198,7 @@ impl SurfaceRenderer {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        // 2. Unit Cube Template for GPU Instanced 3D Lego Cubes (576 bytes total!)
+        // 2. Unit Cube Template for GPU Instanced 3D Lego Cubes
         let (cube_vertices, cube_indices) = Self::build_unit_cube();
         let cube_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Surface Unit Cube Vertex Buffer"),
@@ -214,6 +236,14 @@ impl SurfaceRenderer {
         zoom: f32,
         displacement_strength: f32,
         surface_mode: u32,
+        cmin: f32,
+        cmax: f32,
+        nan_color: [f32; 4],
+        use_nan_color: bool,
+        lowclip_color: [f32; 4],
+        use_lowclip: bool,
+        highclip_color: [f32; 4],
+        use_highclip: bool,
     ) {
         let uniforms = SurfaceUniforms {
             colormap,
@@ -224,6 +254,17 @@ impl SurfaceRenderer {
             displacement_strength,
             surface_mode,
             width: self.width as u32,
+            cmin,
+            cmax,
+            use_nan_color: if use_nan_color { 1 } else { 0 },
+            use_lowclip: if use_lowclip { 1 } else { 0 },
+            use_highclip: if use_highclip { 1 } else { 0 },
+            _pad0: 0,
+            _pad1: 0,
+            _pad2: 0,
+            nan_color,
+            lowclip_color,
+            highclip_color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -302,6 +343,14 @@ pub struct SurfaceCallback {
     pub zoom: f32,
     pub displacement_strength: f32,
     pub surface_mode: u32,
+    pub cmin: f32,
+    pub cmax: f32,
+    pub nan_color: [f32; 4],
+    pub use_nan_color: bool,
+    pub lowclip_color: [f32; 4],
+    pub use_lowclip: bool,
+    pub highclip_color: [f32; 4],
+    pub use_highclip: bool,
     pub rect: egui::Rect,
 }
 
@@ -324,6 +373,14 @@ impl eframe::egui_wgpu::CallbackTrait for SurfaceCallback {
             self.zoom,
             self.displacement_strength,
             self.surface_mode,
+            self.cmin,
+            self.cmax,
+            self.nan_color,
+            self.use_nan_color,
+            self.lowclip_color,
+            self.use_lowclip,
+            self.highclip_color,
+            self.use_highclip,
         );
         Vec::new()
     }

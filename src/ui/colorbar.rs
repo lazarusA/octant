@@ -8,12 +8,8 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
 
     let effective_colormap = app.preview_colormap.unwrap_or(app.active_colormap);
 
-    // Read actual physical min_val and max_val from MatrixData
-    let (min_val, max_val) = if let Some(matrix) = &app.matrix_data {
-        (matrix.min_val, matrix.max_val)
-    } else {
-        (0.0f32, 100.0f32)
-    };
+    // Read active min_val and max_val bounds (locked or dynamic)
+    let (min_val, max_val) = (app.color_range_min, app.color_range_max);
 
     let var_name = if let Some(meta) = &app.active_dataset_metadata {
         meta.variables

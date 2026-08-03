@@ -79,9 +79,20 @@ pub struct OctantApp {
     pub show_right_panel: bool,
     pub selected_dim_indices: Vec<usize>,
     pub selected_dim_ranges: Vec<(usize, usize)>,
+
+    // Clipping & Color Range State
+    pub nan_color: [f32; 4],
+    pub use_nan_color: bool,
+    pub lowclip_color: [f32; 4],
+    pub use_lowclip: bool,
+    pub highclip_color: [f32; 4],
+    pub use_highclip: bool,
+    pub lock_color_bounds: bool,
+    pub color_range_min: f32,
+    pub color_range_max: f32,
+    pub global_data_min: f32,
+    pub global_data_max: f32,
 }
-
-
 
 impl OctantApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -144,6 +155,18 @@ impl OctantApp {
             show_right_panel: true,
             selected_dim_indices: Vec::new(),
             selected_dim_ranges: Vec::new(),
+
+            nan_color: [0.0, 0.0, 0.0, 0.0],
+            use_nan_color: false,
+            lowclip_color: [0.0, 0.0, 1.0, 1.0],
+            use_lowclip: false,
+            highclip_color: [1.0, 0.0, 0.0, 1.0],
+            use_highclip: false,
+            lock_color_bounds: false,
+            color_range_min: 0.0,
+            color_range_max: 100.0,
+            global_data_min: f32::INFINITY,
+            global_data_max: f32::NEG_INFINITY,
         };
 
 
@@ -398,6 +421,17 @@ impl OctantApp {
                 self.point_cloud_renderer = Some(Arc::new(point_cloud_renderer));
             }
         }
+
+        self.global_data_min = self.global_data_min.min(data.min_val);
+        self.global_data_max = self.global_data_max.max(data.max_val);
+
+        if !self.lock_color_bounds {
+            self.color_range_min = data.min_val;
+            self.color_range_max = data.max_val;
+            self.volume_cmin = data.min_val;
+            self.volume_cmax = data.max_val;
+        }
+
         self.matrix_data = Some(data);
     }
 
@@ -613,6 +647,14 @@ impl eframe::App for OctantApp {
                                 zoom: self.sphere_zoom,
                                 displacement_strength: self.sphere_displacement_strength,
                                 sphere_mode: self.sphere_mode,
+                                cmin: self.color_range_min,
+                                cmax: self.color_range_max,
+                                nan_color: self.nan_color,
+                                use_nan_color: self.use_nan_color,
+                                lowclip_color: self.lowclip_color,
+                                use_lowclip: self.use_lowclip,
+                                highclip_color: self.highclip_color,
+                                use_highclip: self.use_highclip,
                                 rect,
                             },
                         );
@@ -631,6 +673,14 @@ impl eframe::App for OctantApp {
                                 zoom: self.sphere_zoom,
                                 displacement_strength: self.surface_displacement_strength,
                                 surface_mode: self.surface_mode,
+                                cmin: self.color_range_min,
+                                cmax: self.color_range_max,
+                                nan_color: self.nan_color,
+                                use_nan_color: self.use_nan_color,
+                                lowclip_color: self.lowclip_color,
+                                use_lowclip: self.use_lowclip,
+                                highclip_color: self.highclip_color,
+                                use_highclip: self.use_highclip,
                                 rect,
                             },
                         );
@@ -660,8 +710,14 @@ impl eframe::App for OctantApp {
                                 algorithm: self.volume_algorithm,
                                 isovalue: self.volume_isovalue,
                                 isorange: self.volume_isorange,
-                                cmin: self.volume_cmin,
-                                cmax: self.volume_cmax,
+                                cmin: self.color_range_min,
+                                cmax: self.color_range_max,
+                                nan_color: self.nan_color,
+                                use_nan_color: self.use_nan_color,
+                                lowclip_color: self.lowclip_color,
+                                use_lowclip: self.use_lowclip,
+                                highclip_color: self.highclip_color,
+                                use_highclip: self.use_highclip,
                                 rect,
                             },
                         );
@@ -687,6 +743,14 @@ impl eframe::App for OctantApp {
                                 point_size: self.point_cloud_size,
                                 width,
                                 height,
+                                cmin: self.color_range_min,
+                                cmax: self.color_range_max,
+                                nan_color: self.nan_color,
+                                use_nan_color: self.use_nan_color,
+                                lowclip_color: self.lowclip_color,
+                                use_lowclip: self.use_lowclip,
+                                highclip_color: self.highclip_color,
+                                use_highclip: self.use_highclip,
                                 rect,
                             },
                         );
@@ -700,6 +764,14 @@ impl eframe::App for OctantApp {
                             MatrixCallback {
                                 renderer: renderer.clone(),
                                 colormap: effective_colormap,
+                                cmin: self.color_range_min,
+                                cmax: self.color_range_max,
+                                nan_color: self.nan_color,
+                                use_nan_color: self.use_nan_color,
+                                lowclip_color: self.lowclip_color,
+                                use_lowclip: self.use_lowclip,
+                                highclip_color: self.highclip_color,
+                                use_highclip: self.use_highclip,
                                 rect,
                             },
                         );

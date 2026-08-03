@@ -56,8 +56,12 @@ pub struct VolumeUniforms {
     pub height: u32,
     pub depth: u32,
     pub screen_aspect: f32,
+    pub use_nan_color: u32,
+    pub use_lowclip: u32,
+    pub use_highclip: u32,
     pub _pad1: u32,
     pub _pad2: u32,
+    pub _pad3: u32,
 }
 
 pub struct VolumeRenderer {
@@ -134,8 +138,8 @@ impl VolumeRenderer {
             colorrange: [0.0, 100.0],
             isovalue: 50.0,
             isorange: 5.0,
-            highclip_color: [0.0, 0.0, 0.0, 0.0],
-            lowclip_color: [0.0, 0.0, 0.0, 0.0],
+            highclip_color: [1.0, 0.0, 0.0, 1.0],
+            lowclip_color: [0.0, 0.0, 1.0, 1.0],
             nan_color: [0.0, 0.0, 0.0, 0.0],
             absorption: 2.0,
             samples: 64,
@@ -155,8 +159,12 @@ impl VolumeRenderer {
             height: height.max(1),
             depth,
             screen_aspect: 1.0,
+            use_nan_color: 0,
+            use_lowclip: 0,
+            use_highclip: 0,
             _pad1: 0,
             _pad2: 0,
+            _pad3: 0,
         };
 
         let uniform_buffer = super::common::create_uniform_buffer(
@@ -259,6 +267,12 @@ impl VolumeRenderer {
         cmin: f32,
         cmax: f32,
         screen_aspect: f32,
+        nan_color: [f32; 4],
+        use_nan_color: bool,
+        lowclip_color: [f32; 4],
+        use_lowclip: bool,
+        highclip_color: [f32; 4],
+        use_highclip: bool,
     ) {
         let depth = super::common::calculate_3d_depth(self.data_len, width, height);
         let uniforms = VolumeUniforms {
@@ -272,9 +286,9 @@ impl VolumeRenderer {
             colorrange: [cmin, cmax],
             isovalue,
             isorange,
-            highclip_color: [0.0, 0.0, 0.0, 0.0],
-            lowclip_color: [0.0, 0.0, 0.0, 0.0],
-            nan_color: [0.0, 0.0, 0.0, 0.0],
+            highclip_color,
+            lowclip_color,
+            nan_color,
             absorption: opacity_scale,
             samples: step_count,
             diffuse: 0.8,
@@ -293,8 +307,12 @@ impl VolumeRenderer {
             height: height.max(1),
             depth,
             screen_aspect,
+            use_nan_color: if use_nan_color { 1 } else { 0 },
+            use_lowclip: if use_lowclip { 1 } else { 0 },
+            use_highclip: if use_highclip { 1 } else { 0 },
             _pad1: 0,
             _pad2: 0,
+            _pad3: 0,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -318,6 +336,12 @@ pub struct VolumeCallback {
     pub isorange: f32,
     pub cmin: f32,
     pub cmax: f32,
+    pub nan_color: [f32; 4],
+    pub use_nan_color: bool,
+    pub lowclip_color: [f32; 4],
+    pub use_lowclip: bool,
+    pub highclip_color: [f32; 4],
+    pub use_highclip: bool,
     pub rect: egui::Rect,
 }
 
@@ -350,6 +374,12 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
             self.cmin,
             self.cmax,
             screen_aspect,
+            self.nan_color,
+            self.use_nan_color,
+            self.lowclip_color,
+            self.use_lowclip,
+            self.highclip_color,
+            self.use_highclip,
         );
         Vec::new()
     }

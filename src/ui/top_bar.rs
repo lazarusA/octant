@@ -37,4 +37,69 @@ pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
                 }
             });
         });
+
+    show_secondary_toolbar(app, ctx);
+}
+
+fn show_secondary_toolbar(app: &mut OctantApp, ctx: &egui::Context) {
+    egui::TopBottomPanel::top("octant_secondary_toolbar")
+        .exact_height(32.0)
+        .show(ctx, |ui| {
+            ui.add_space(2.0);
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("🎨 Clipping & Bounds:").strong().small());
+                ui.separator();
+
+                // 1. NaN Color Picker & Transparent Toggle
+                ui.checkbox(&mut app.use_nan_color, "Custom NaN Color")
+                    .on_hover_text("If unchecked, NaN and Inf values render transparently.");
+                if app.use_nan_color {
+                    ui.color_edit_button_rgba_unmultiplied(&mut app.nan_color);
+                }
+
+                ui.separator();
+
+                // 2. Low Clip Color Picker & Toggle
+                ui.checkbox(&mut app.use_lowclip, "Low Clip")
+                    .on_hover_text("If unchecked, values < cmin render using the colormap minimum value.");
+                if app.use_lowclip {
+                    ui.color_edit_button_rgba_unmultiplied(&mut app.lowclip_color);
+                }
+
+                ui.separator();
+
+                // 3. High Clip Color Picker & Toggle
+                ui.checkbox(&mut app.use_highclip, "High Clip")
+                    .on_hover_text("If unchecked, values > cmax render using the colormap maximum value.");
+                if app.use_highclip {
+                    ui.color_edit_button_rgba_unmultiplied(&mut app.highclip_color);
+                }
+
+                ui.separator();
+
+                // 4. Color Range Bounds (cmin, cmax) & Fixed Bounds Lock
+                ui.label("Min:");
+                ui.add(egui::DragValue::new(&mut app.color_range_min).speed(0.1));
+
+                ui.label("Max:");
+                ui.add(egui::DragValue::new(&mut app.color_range_max).speed(0.1));
+
+                let lock_label = if app.lock_color_bounds { "🔒 Bounds Locked" } else { "🔓 Bounds Dynamic" };
+                if ui.selectable_label(app.lock_color_bounds, lock_label)
+                    .on_hover_text("Lock min/max bounds so color mapping remains fixed across all timesteps and slices.")
+                    .clicked()
+                {
+                    app.lock_color_bounds = !app.lock_color_bounds;
+                }
+
+                if ui.button("↺ Reset").on_hover_text("Reset bounds to current slice data min/max").clicked() {
+                    if let Some(mdata) = &app.matrix_data {
+                        app.color_range_min = mdata.min_val;
+                        app.color_range_max = mdata.max_val;
+                        app.volume_cmin = mdata.min_val;
+                        app.volume_cmax = mdata.max_val;
+                    }
+                }
+            });
+        });
 }

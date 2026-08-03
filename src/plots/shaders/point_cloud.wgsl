@@ -11,6 +11,17 @@ struct Uniforms {
     height: u32,
     depth: u32,
     screen_aspect: f32,
+    cmin: f32,
+    cmax: f32,
+    use_nan_color: u32,
+    use_lowclip: u32,
+    use_highclip: u32,
+    _pad0: u32,
+    _pad1: u32,
+    _pad2: u32,
+    nan_color: vec4<f32>,
+    lowclip_color: vec4<f32>,
+    highclip_color: vec4<f32>,
 };
 
 @group(0) @binding(0)
@@ -96,9 +107,22 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let norm_val = clamp(in.val / 100.0, 0.0, 1.0);
-    let base_color = sample_colormap(uniforms.colormap, norm_val);
+    let eval_color = evaluate_plot_color(
+        in.val,
+        uniforms.cmin,
+        uniforms.cmax,
+        uniforms.colormap,
+        uniforms.nan_color,
+        uniforms.use_nan_color,
+        uniforms.lowclip_color,
+        uniforms.use_lowclip,
+        uniforms.highclip_color,
+        uniforms.use_highclip,
+    );
 
-    // Sharp 3D square point primitive
-    return vec4<f32>(base_color, 0.95);
+    if (eval_color.a <= 0.0) {
+        discard;
+    }
+
+    return eval_color;
 }
