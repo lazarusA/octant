@@ -86,7 +86,7 @@ impl PointCloudRenderer {
 
         let initial_data_safe = if initial_data.is_empty() { vec![50.0; 64 * 64] } else { initial_data.to_vec() };
         let instance_count = initial_data_safe.len() as u32;
-        let depth = (instance_count / (width.max(1) * height.max(1))).max(1);
+        let depth = super::common::calculate_3d_depth(initial_data_safe.len(), width, height);
 
         let uniforms = PointCloudUniforms {
             colormap: 0,
@@ -103,52 +103,31 @@ impl PointCloudRenderer {
             screen_aspect: 1.0,
         };
 
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Point Cloud Uniform Buffer"),
-            contents: bytemuck::bytes_of(&uniforms),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let uniform_buffer = super::common::create_uniform_buffer(
+            device,
+            "Point Cloud Uniform Buffer",
+            &uniforms,
+        );
 
-        let data_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Point Cloud Data Storage Buffer"),
-            contents: bytemuck::cast_slice(&initial_data_safe),
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        });
+        let data_buffer = super::common::create_storage_buffer(
+            device,
+            "Point Cloud Data Storage Buffer",
+            &initial_data_safe,
+        );
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Point Cloud Bind Group Layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-        });
+        let bind_group_layout = super::common::create_uniform_storage_bind_group_layout(
+            device,
+            "Point Cloud Bind Group Layout",
+            wgpu::ShaderStages::VERTEX_FRAGMENT,
+        );
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Point Cloud Bind Group"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: uniform_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: data_buffer.as_entire_binding() },
-            ],
-        });
+        let bind_group = super::common::create_uniform_storage_bind_group(
+            device,
+            "Point Cloud Bind Group",
+            &bind_group_layout,
+            &uniform_buffer,
+            &data_buffer,
+        );
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Point Cloud Pipeline Layout"),
@@ -219,7 +198,7 @@ impl PointCloudRenderer {
         height: u32,
         screen_aspect: f32,
     ) {
-        let depth = (self.instance_count / (width.max(1) * height.max(1))).max(1);
+        let depth = super::common::calculate_3d_depth(self.instance_count as usize, width, height);
         let uniforms = PointCloudUniforms {
             colormap,
             rotation_y: rot_y,
@@ -262,7 +241,7 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
-        let screen_aspect = self.rect.width() / self.rect.height().max(1.0);
+        let screen_aspect = super::common::compute_aspect_ratio(&self.rect);
         self.renderer.update_uniforms(
             queue,
             self.colormap,
@@ -286,14 +265,7 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         rpass: &mut wgpu::RenderPass<'static>,
         _callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
-        let ppp = info.pixels_per_point;
-        let px_x = (self.rect.min.x * ppp).max(0.0) as u32;
-        let px_y = (self.rect.min.y * ppp).max(0.0) as u32;
-        let px_w = (self.rect.width() * ppp).max(1.0) as u32;
-        let px_h = (self.rect.height() * ppp).max(1.0) as u32;
-
-        rpass.set_viewport(px_x as f32, px_y as f32, px_w as f32, px_h as f32, 0.0, 1.0);
-        rpass.set_scissor_rect(px_x, px_y, px_w, px_h);
+        super::common::setup_viewport_and_scissor(rpass, &self.rect, info.pixels_per_point);
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);

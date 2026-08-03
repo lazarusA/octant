@@ -1,3 +1,4 @@
+pub mod common;
 pub mod heatmap;
 pub mod surface;
 pub mod block;

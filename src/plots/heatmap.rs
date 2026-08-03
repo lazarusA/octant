@@ -77,59 +77,31 @@ impl HeatmapRenderer {
             _pad2: 0,
         };
 
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Heatmap Uniform Buffer"),
-            contents: bytemuck::bytes_of(&initial_uniforms),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let uniform_buffer = super::common::create_uniform_buffer(
+            device,
+            "Heatmap Uniform Buffer",
+            &initial_uniforms,
+        );
 
-        // GPU Storage Buffer for 1D scalar data channel
-        let data_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Heatmap Data Storage Buffer"),
-            contents: bytemuck::cast_slice(matrix_data),
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        });
+        let data_buffer = super::common::create_storage_buffer(
+            device,
+            "Heatmap Data Storage Buffer",
+            matrix_data,
+        );
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Heatmap Bind Group Layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-        });
+        let bind_group_layout = super::common::create_uniform_storage_bind_group_layout(
+            device,
+            "Heatmap Bind Group Layout",
+            wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+        );
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Heatmap Bind Group"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: data_buffer.as_entire_binding(),
-                },
-            ],
-        });
+        let bind_group = super::common::create_uniform_storage_bind_group(
+            device,
+            "Heatmap Bind Group",
+            &bind_group_layout,
+            &uniform_buffer,
+            &data_buffer,
+        );
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Heatmap Pipeline Layout"),
@@ -278,14 +250,7 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
         rpass: &mut wgpu::RenderPass<'static>,
         _callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
-        let ppp = info.pixels_per_point;
-        let px_x = (self.rect.min.x * ppp).max(0.0) as u32;
-        let px_y = (self.rect.min.y * ppp).max(0.0) as u32;
-        let px_w = (self.rect.width() * ppp).max(1.0) as u32;
-        let px_h = (self.rect.height() * ppp).max(1.0) as u32;
-
-        rpass.set_viewport(px_x as f32, px_y as f32, px_w as f32, px_h as f32, 0.0, 1.0);
-        rpass.set_scissor_rect(px_x, px_y, px_w, px_h);
+        super::common::setup_viewport_and_scissor(rpass, &self.rect, info.pixels_per_point);
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
