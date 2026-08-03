@@ -69,7 +69,12 @@ pub struct OctantApp {
     pub show_catalog_window: bool,
     pub catalog_search_query: String,
     pub catalog_category_filter: crate::catalog::CatalogCategoryFilter,
+
+    // Selection Panel State
+    pub show_right_panel: bool,
+    pub selected_dim_indices: Vec<usize>,
 }
+
 
 impl OctantApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -123,7 +128,11 @@ impl OctantApp {
             show_catalog_window: false,
             catalog_search_query: String::new(),
             catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
+
+            show_right_panel: true,
+            selected_dim_indices: Vec::new(),
         };
+
 
         // App starts clean without auto-fetching. User clicks "Fetch Store Metadata" when ready.
         app
@@ -428,9 +437,14 @@ impl eframe::App for OctantApp {
                             metadata.name,
                             metadata.variables.len()
                         );
+                        if let Some(first_var) = metadata.variables.first() {
+                            self.selected_dim_indices = vec![0; first_var.shape.len()];
+                        }
                         self.active_dataset_metadata = Some(metadata);
                         self.selected_variable_idx = 0;
+                        self.show_right_panel = true;
                         self.load_selected_variable_slice();
+
                     }
                     Err(err) => {
                         self.status_message = format!("Store inspect error: {}", err);
@@ -511,11 +525,13 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
-        // 3. Render Top Navigation Bar & Bottom Playback Toolbar
+        // 3. Render Top Navigation Bar & Bottom Playback Toolbar & Right Selection Panel
         crate::ui::top_bar::show_top_bar(self, ctx);
         crate::ui::bottom_bar::show_bottom_bar(self, ctx);
         crate::ui::catalog::show_catalog_window(self, ctx);
         crate::ui::colorbar::show_colorbar_overlay(self, ctx);
+        crate::ui::variables_panel::show_right_panel(self, ctx);
+
 
         // 4. Centered Drawing Canvas Area with Aspect Data Ratio
         egui::CentralPanel::default().show(ctx, |ui| {
