@@ -42,13 +42,13 @@ fn evaluate_scaled_norm(val: f32, cmin: f32, cmax: f32, scale_type: u32, scale_p
         return clamp((val - cmin) / range, 0.0, 1.0);
     }
 
-    // 1: Strict Logarithmic (strictly positive data required, fallback to linear if cmin <= 0)
+    // 1: Strict Logarithmic (strictly positive data, with numerical threshold for float noise <= 1e-15)
     if (scale_type == 1u) {
-        if (cmin <= 0.0) {
-            return clamp((val - cmin) / range, 0.0, 1.0);
-        }
-        let safe_min = max(cmin, 1e-12);
+        let safe_min = select(cmin, min(1e-12, cmax * 1e-6), cmin <= 1e-15);
         let safe_max = max(cmax, safe_min * 1.0001);
+        if (val <= safe_min) {
+            return 0.0;
+        }
         let safe_v = clamp(val, safe_min, safe_max);
 
         let log_v = log(safe_v);

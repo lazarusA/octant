@@ -71,7 +71,9 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
 
                         for i in 0..=num_segments {
                             let t = i as f32 / num_segments as f32; // 0.0 at left (min), 1.0 at right (max)
-                            let color = crate::utils::colormap::sample_colormap_rgb(effective_colormap, t);
+                            let raw_val = crate::utils::colormap::unscale_norm_to_value(t, min_val, max_val, app.active_scale_type, app.scale_param);
+                            let norm_scaled = crate::utils::colormap::apply_color_scale_cpu(raw_val, min_val, max_val, app.active_scale_type, app.scale_param);
+                            let color = crate::utils::colormap::sample_colormap_rgb(effective_colormap, norm_scaled);
 
                             let x = bar_rect.min.x + t * bar_rect.width();
 
@@ -103,19 +105,13 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
 
                         ui.painter().add(Shape::mesh(mesh));
 
-                        // 2. Draw 5 Horizontal Tick Marks & Text Labels (Matching playback font size)
-                        let ticks = [
-                            (0.00, min_val),
-                            (0.25, min_val + (max_val - min_val) * 0.25),
-                            (0.50, min_val + (max_val - min_val) * 0.50),
-                            (0.75, min_val + (max_val - min_val) * 0.75),
-                            (1.00, max_val),
-                        ];
-
+                        // 2. Draw 5 Horizontal Tick Marks & Text Labels (Unscaled to represent exact physical values for active scale)
+                        let tick_positions = [0.00, 0.25, 0.50, 0.75, 1.00];
                         let tick_y_start = bar_rect.max.y;
                         let tick_y_end = tick_y_start + 4.0;
 
-                        for (t_pos, val) in ticks {
+                        for t_pos in tick_positions {
+                            let val = crate::utils::colormap::unscale_norm_to_value(t_pos, min_val, max_val, app.active_scale_type, app.scale_param);
                             let x = bar_rect.min.x + t_pos * bar_rect.width();
 
                             // Tick line inside panel
@@ -147,7 +143,7 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                         let response = ui.allocate_rect(bar_rect, egui::Sense::hover());
                         if let Some(hover_pos) = response.hover_pos() {
                             let norm_x = ((hover_pos.x - bar_rect.min.x) / bar_rect.width()).clamp(0.0, 1.0);
-                            let hover_val = min_val + norm_x * (max_val - min_val);
+                            let hover_val = crate::utils::colormap::unscale_norm_to_value(norm_x, min_val, max_val, app.active_scale_type, app.scale_param);
                             response.on_hover_text(format!("Val: {}", format_scientific_tick(hover_val)));
                         }
                     });

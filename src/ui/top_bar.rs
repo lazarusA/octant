@@ -104,8 +104,8 @@ fn show_secondary_toolbar(app: &mut OctantApp, ctx: &egui::Context) {
                 ui.separator();
 
                 // 5. Color Scale Selection
-                let is_positive = app.color_range_min > 0.0;
-                if !is_positive && app.active_scale_type == 1 {
+                let is_valid_log = app.color_range_max > 0.0;
+                if !is_valid_log && app.active_scale_type == 1 {
                     app.active_scale_type = 0;
                 }
 
@@ -121,12 +121,12 @@ fn show_secondary_toolbar(app: &mut OctantApp, ctx: &egui::Context) {
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut app.active_scale_type, 0, "Linear");
                         
-                        ui.add_enabled_ui(is_positive, |ui| {
+                        ui.add_enabled_ui(is_valid_log, |ui| {
                             ui.selectable_value(&mut app.active_scale_type, 1, "Logarithmic")
-                                .on_hover_text(if is_positive {
-                                    "Strict logarithmic scale (min > 0)"
+                                .on_hover_text(if is_valid_log {
+                                    "Logarithmic scale (handles float noise <= 1e-15)"
                                 } else {
-                                    "Disabled: Logarithmic scale requires strictly positive values (min > 0)"
+                                    "Disabled: Logarithmic scale requires positive max bound"
                                 });
                         });
 
