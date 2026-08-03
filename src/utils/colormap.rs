@@ -28,8 +28,11 @@ pub fn unscale_norm_to_value(t: f32, cmin: f32, cmax: f32, scale_type: u32, scal
 
     match scale_type {
         1 => {
+            if cmin < -1e-15 {
+                return cmin + t * range;
+            }
             let safe_min = if cmin <= 1e-15 {
-                1e-12_f32.min(cmax * 1e-6)
+                (cmax * 0.001).max(1e-12)
             } else {
                 cmin
             };
@@ -70,8 +73,11 @@ pub fn apply_color_scale_cpu(val: f32, cmin: f32, cmax: f32, scale_type: u32, sc
 
     match scale_type {
         1 => {
+            if cmin < -1e-15 {
+                return ((val - cmin) / range).clamp(0.0, 1.0);
+            }
             let safe_min = if cmin <= 1e-15 {
-                1e-12_f32.min(cmax * 1e-6)
+                (cmax * 0.001).max(1e-12)
             } else {
                 cmin
             };
@@ -215,4 +221,137 @@ fn sample_cividis(t: f32) -> (f32, f32, f32) {
         [0.741, 0.702, 0.430],
         [0.996, 0.906, 0.145],
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_close(a: f32, b: f32, tol: f32) {
+        assert!((a - b).abs() <= tol, "Expected {} to be close to {} within tol {}", a, b, tol);
+    }
+
+    #[test]
+    fn test_1_linear_scale_identity() {
+        let min_val = 0.0;
+        let max_val = 100.0;
+        for &norm_x in &[0.0, 0.25, 0.5, 1.0] {
+            let val = min_val + norm_x * (max_val - min_val);
+            let scaled = apply_color_scale_cpu(val, min_val, max_val, 0, 1.0);
+            assert_close(scaled, norm_x, 1e-4);
+
+            let unscaled = unscale_norm_to_value(scaled, min_val, max_val, 0, 1.0);
+            assert_close(unscaled, val, 1e-4);
+        }
+    }
+
+    #[test]
+    fn test_2_log_scale_range_1_to_10() {
+        let min_val: f32 = 1.0;
+        let max_val: f32 = 10.0;
+        let n = 10;
+        let log_a = min_val.log10();
+        let log_b = max_val.log10();
+
+        for i in 0..n {
+            let t = i as f32 / (n - 1) as f32;
+            let log_val = log_a + t * (log_b - log_a);
+            let raw_val = 10.0_f32.powf(log_val);
+
+            let pos = apply_color_scale_cpu(raw_val, min_val, max_val, 1, 1.0);
+            assert_close(pos, t, 1e-4);
+
+            let restored = unscale_norm_to_value(pos, min_val, max_val, 1, 1.0);
+            assert_close(restored, raw_val, 1e-4);
+        }
+    }
+
+    #[test]
+    fn test_2_log_scale_range_0001_to_1() {
+        let min_val: f32 = 0.001;
+        let max_val: f32 = 1.0;
+        let n = 10;
+        let log_a = min_val.log10();
+        let log_b = max_val.log10();
+
+        for i in 0..n {
+            let t = i as f32 / (n - 1) as f32;
+            let log_val = log_a + t * (log_b - log_a);
+            let raw_val = 10.0_f32.powf(log_val);
+
+            let pos = apply_color_scale_cpu(raw_val, min_val, max_val, 1, 1.0);
+            assert_close(pos, t, 1e-4);
+
+            let restored = unscale_norm_to_value(pos, min_val, max_val, 1, 1.0);
+            assert_close(restored, raw_val, 1e-4);
+        }
+    }
+
+    #[test]
+    fn test_2_log_scale_zero_clipping() {
+        let min_val = 0.0;
+        let max_val = 1000.0;
+        let data_range = max_val - min_val;
+
+        assert_close(apply_color_scale_cpu(0.0, min_val, max_val, 1, 1.0), 0.0, 1e-4);
+        assert_close(apply_color_scale_cpu(0.001 * data_range, min_val, max_val, 1, 1.0), 0.0, 1e-4);
+        assert_close(apply_color_scale_cpu(0.01 * data_range, min_val, max_val, 1, 1.0), 0.3333, 1e-3);
+        assert_close(apply_color_scale_cpu(0.1 * data_range, min_val, max_val, 1, 1.0), 0.6667, 1e-3);
+        assert_close(apply_color_scale_cpu(1.0 * data_range, min_val, max_val, 1, 1.0), 1.0, 1e-4);
+    }
+
+    #[test]
+    fn test_3_symlog_offset_log_scale() {
+        let min_val = 0.0;
+        let max_val = 1000.0;
+        let c = 1.0;
+
+        assert_close(apply_color_scale_cpu(0.0, min_val, max_val, 2, c), 0.0, 1e-4);
+        assert_close(apply_color_scale_cpu(10.0, min_val, max_val, 2, c), 0.3472, 1e-3); // norm_x = 0.01
+        assert_close(apply_color_scale_cpu(100.0, min_val, max_val, 2, c), 0.6680, 1e-3); // norm_x = 0.1
+        assert_close(apply_color_scale_cpu(1000.0, min_val, max_val, 2, c), 1.0, 1e-4);
+
+        // Round-trip test
+        for &val in &[0.0, 10.0, 100.0, 500.0, 1000.0] {
+            let pos = apply_color_scale_cpu(val, min_val, max_val, 2, c);
+            let restored = unscale_norm_to_value(pos, min_val, max_val, 2, c);
+            assert_close(restored, val, 1e-3);
+        }
+    }
+
+    #[test]
+    fn test_4_symmetric_sqrt_diverging() {
+        let min_val = 0.0;
+        let max_val = 100.0;
+
+        assert_close(apply_color_scale_cpu(0.0, min_val, max_val, 3, 1.0), 0.0, 1e-4);
+        assert_close(apply_color_scale_cpu(25.0, min_val, max_val, 3, 1.0), 0.1464, 1e-3);
+        assert_close(apply_color_scale_cpu(50.0, min_val, max_val, 3, 1.0), 0.5, 1e-4);
+        assert_close(apply_color_scale_cpu(75.0, min_val, max_val, 3, 1.0), 0.8536, 1e-3);
+        assert_close(apply_color_scale_cpu(100.0, min_val, max_val, 3, 1.0), 1.0, 1e-4);
+
+        // Round-trip test
+        for &val in &[0.0, 10.0, 25.0, 50.0, 75.0, 90.0, 100.0] {
+            let pos = apply_color_scale_cpu(val, min_val, max_val, 3, 1.0);
+            let restored = unscale_norm_to_value(pos, min_val, max_val, 3, 1.0);
+            assert_close(restored, val, 1e-3);
+        }
+    }
+
+    #[test]
+    fn test_5_exponential_scale() {
+        let min_val = 0.0;
+        let max_val = 100.0;
+        let k = 3.0;
+
+        assert_close(apply_color_scale_cpu(0.0, min_val, max_val, 4, k), 0.0, 1e-4);
+        assert_close(apply_color_scale_cpu(100.0, min_val, max_val, 4, k), 1.0, 1e-4);
+
+        // Round-trip test
+        for &val in &[0.0, 10.0, 25.0, 50.0, 75.0, 100.0] {
+            let pos = apply_color_scale_cpu(val, min_val, max_val, 4, k);
+            let restored = unscale_norm_to_value(pos, min_val, max_val, 4, k);
+            assert_close(restored, val, 1e-3);
+        }
+    }
 }

@@ -104,7 +104,7 @@ fn show_secondary_toolbar(app: &mut OctantApp, ctx: &egui::Context) {
                 ui.separator();
 
                 // 5. Color Scale Selection
-                let is_valid_log = app.color_range_max > 0.0;
+                let is_valid_log = app.color_range_min >= -1e-15 && app.color_range_max > 0.0;
                 if !is_valid_log && app.active_scale_type == 1 {
                     app.active_scale_type = 0;
                 }
@@ -124,9 +124,9 @@ fn show_secondary_toolbar(app: &mut OctantApp, ctx: &egui::Context) {
                         ui.add_enabled_ui(is_valid_log, |ui| {
                             ui.selectable_value(&mut app.active_scale_type, 1, "Logarithmic")
                                 .on_hover_text(if is_valid_log {
-                                    "Logarithmic scale (handles float noise <= 1e-15)"
+                                    "Logarithmic scale (for non-negative data)"
                                 } else {
-                                    "Disabled: Logarithmic scale requires positive max bound"
+                                    "Disabled: Logarithmic scale requires non-negative data (min >= 0). Use Symlog for data with negative values."
                                 });
                         });
 
