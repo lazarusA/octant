@@ -81,15 +81,22 @@ pub fn show_right_panel(app: &mut OctantApp, ctx: &egui::Context) {
 
                 ui.add_space(8.0);
 
-                // 2. Dimension Index Selection & Sliders (x, y, z, time, level/depth)
+                // 2. Dimension Index Selection & Range Sliders (Dual Thumbs: Start and End per dimension)
                 ui.group(|ui| {
-                    ui.label(egui::RichText::new("🎛️ Dimension Selection Sliders").strong());
-                    ui.small("Adjust sliders for dimension indices (time, level, lat, lon). Unmapped extra dimensions will be collapsed to slice/volume.");
+                    ui.label(egui::RichText::new("🎛️ Dimension Selection & Slice Range Sliders").strong());
+                    ui.small("Select start and end index thumbs for each dimension (time, level, lat, lon). The selected ranges will be used for plotting.");
                     ui.separator();
 
                     let dim_count = var_info.shape.len();
                     if app.selected_dim_indices.len() != dim_count {
                         app.selected_dim_indices = vec![0; dim_count];
+                    }
+                    if app.selected_dim_ranges.len() != dim_count {
+                        app.selected_dim_ranges = var_info
+                            .shape
+                            .iter()
+                            .map(|&s| (0, (s as usize).saturating_sub(1)))
+                            .collect();
                     }
 
                     for (i, shape_dim) in var_info.shape.iter().enumerate() {
@@ -101,15 +108,22 @@ pub fn show_right_panel(app: &mut OctantApp, ctx: &egui::Context) {
                             .cloned()
                             .unwrap_or_else(|| format!("dim_{}", i));
 
-                        let mut current_idx = app.selected_dim_indices.get(i).copied().unwrap_or(0).min(max_idx);
+                        let (mut start_idx, mut end_idx) = app
+                            .selected_dim_ranges
+                            .get(i)
+                            .copied()
+                            .unwrap_or((0, max_idx));
 
-                        // Look up coordinate label if available
-                        let coord_label = dim_coords
+                        start_idx = start_idx.min(max_idx);
+                        end_idx = end_idx.clamp(start_idx, max_idx);
+
+                        // Look up start coordinate label
+                        let start_coord = dim_coords
                             .get(&dim_name.to_lowercase())
-                            .and_then(|coords| coords.get(current_idx).cloned())
+                            .and_then(|coords| coords.get(start_idx).cloned())
                             .unwrap_or_else(|| {
                                 crate::utils::units::format_axis_value(
-                                    current_idx,
+                                    start_idx,
                                     dim_size,
                                     Some(&dim_name),
                                     var_info.units.as_deref(),
@@ -119,32 +133,75 @@ pub fn show_right_panel(app: &mut OctantApp, ctx: &egui::Context) {
                                 )
                             });
 
-                        ui.vertical(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.label(egui::RichText::new(format!("{}:", dim_name)).strong().small());
-                                ui.label(egui::RichText::new(format!("{} (index {} / {})", coord_label, current_idx, dim_size)).small().monospace());
+                        // Look up end coordinate label
+                        let end_coord = dim_coords
+                            .get(&dim_name.to_lowercase())
+                            .and_then(|coords| coords.get(end_idx).cloned())
+                            .unwrap_or_else(|| {
+                                crate::utils::units::format_axis_value(
+                                    end_idx,
+                                    dim_size,
+                                    Some(&dim_name),
+                                    var_info.units.as_deref(),
+                                    var_info.time_coverage_start.as_deref(),
+                                    var_info.temporal_resolution.as_deref(),
+                                    app.active_dataset_metadata.as_ref().map(|m| m.name.as_str()),
+                                )
                             });
 
-                            let slider_res = ui.add(
-                                egui::Slider::new(&mut current_idx, 0..=max_idx)
-                                    .show_value(false)
-                                    .trailing_fill(true),
-                            );
+                        let selected_count = end_idx.saturating_sub(start_idx) + 1;
 
-                            if slider_res.changed() {
-                                if let Some(elem) = app.selected_dim_indices.get_mut(i) {
-                                    *elem = current_idx;
+                        ui.group(|ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(egui::RichText::new(format!("{}:", dim_name)).strong().small());
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    ui.label(egui::RichText::new(format!("({} / {} steps)", selected_count, dim_size)).small().weak());
+                                });
+                            });
+
+                            ui.small(format!("Range: {} ➔ {}", start_coord, end_coord));
+                            ui.add_space(2.0);
+
+                            ui.horizontal(|ui| {
+                                ui.label(egui::RichText::new("Start Thumb:").small());
+                                let start_slider = ui.add(
+                                    egui::Slider::new(&mut start_idx, 0..=max_idx)
+                                        .show_value(true)
+                                        .trailing_fill(true),
+                                );
+                                if start_slider.changed() && start_idx > end_idx {
+                                    end_idx = start_idx;
                                 }
-                                // If this is dimension 0 (time), sync current_timestep
-                                if i == 0 {
-                                    app.current_timestep = current_idx;
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label(egui::RichText::new("End Thumb:  ").small());
+                                let end_slider = ui.add(
+                                    egui::Slider::new(&mut end_idx, 0..=max_idx)
+                                        .show_value(true)
+                                        .trailing_fill(true),
+                                );
+                                if end_slider.changed() && end_idx < start_idx {
+                                    start_idx = end_idx;
                                 }
+                            });
+
+                            // Synchronize state
+                            if let Some(r) = app.selected_dim_ranges.get_mut(i) {
+                                *r = (start_idx, end_idx);
+                            }
+                            if let Some(idx_ref) = app.selected_dim_indices.get_mut(i) {
+                                *idx_ref = start_idx;
+                            }
+                            if i == 0 {
+                                app.current_timestep = start_idx;
                             }
                         });
 
                         ui.add_space(4.0);
                     }
                 });
+
 
                 ui.add_space(10.0);
 

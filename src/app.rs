@@ -73,7 +73,9 @@ pub struct OctantApp {
     // Selection Panel State
     pub show_right_panel: bool,
     pub selected_dim_indices: Vec<usize>,
+    pub selected_dim_ranges: Vec<(usize, usize)>,
 }
+
 
 
 impl OctantApp {
@@ -131,7 +133,9 @@ impl OctantApp {
 
             show_right_panel: true,
             selected_dim_indices: Vec::new(),
+            selected_dim_ranges: Vec::new(),
         };
+
 
 
         // App starts clean without auto-fetching. User clicks "Fetch Store Metadata" when ready.
@@ -439,7 +443,13 @@ impl eframe::App for OctantApp {
                         );
                         if let Some(first_var) = metadata.variables.first() {
                             self.selected_dim_indices = vec![0; first_var.shape.len()];
+                            self.selected_dim_ranges = first_var
+                                .shape
+                                .iter()
+                                .map(|&s| (0, (s as usize).saturating_sub(1)))
+                                .collect();
                         }
+
                         self.active_dataset_metadata = Some(metadata);
                         self.selected_variable_idx = 0;
                         self.show_right_panel = true;
