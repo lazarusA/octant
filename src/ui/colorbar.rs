@@ -77,67 +77,68 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
 
                         let bar_rect = Rect::from_min_size(widget_rect.min, Vec2::new(bar_w, 13.0));
 
-                        // 1. Build Horizontal Multi-stop Gradient Mesh (Left = t=0 min_val, Right = t=1 max_val)
-                        let num_segments = 128;
-                        let mut mesh = Mesh::default();
+                        // Check if categorical mode is active or unique entries exist
+                        let unique_vals = app.matrix_data.as_ref().and_then(|m| m.detect_unique_values());
+                        let is_categorical_active = app.is_categorical || unique_vals.is_some();
 
-                        for i in 0..=num_segments {
-                            let t = i as f32 / num_segments as f32; // 0.0 at left (min), 1.0 at right (max)
-                            let raw_val = crate::utils::colormap::unscale_norm_to_value(t, min_val, max_val, app.active_scale_type, app.scale_param);
-                            let norm_scaled = crate::utils::colormap::apply_color_scale_cpu(raw_val, min_val, max_val, app.active_scale_type, app.scale_param);
-                            let color = crate::utils::colormap::sample_colormap_rgb(effective_colormap, norm_scaled);
+                        if is_categorical_active {
+                            let cat_vals: Vec<f32> = if let Some(unique) = unique_vals {
+                                unique
+                            } else {
+                                // Default 10 equal bins across [min_val, max_val]
+                                let range = (max_val - min_val).max(1e-30);
+                                (0..10)
+                                    .map(|i| min_val + (i as f32 + 0.5) / 10.0 * range)
+                                    .collect()
+                            };
 
-                            let x = bar_rect.min.x + t * bar_rect.width();
+                            let num_cats = cat_vals.len();
 
-                            let idx_top = mesh.vertices.len() as u32;
-                            mesh.vertices.push(Vertex {
-                                pos: Pos2::new(x, bar_rect.min.y),
-                                uv: Pos2::ZERO,
-                                color,
-                            });
-                            mesh.vertices.push(Vertex {
-                                pos: Pos2::new(x, bar_rect.max.y),
-                                uv: Pos2::ZERO,
-                                color,
-                            });
+                            // 1. Build Discrete Color Band Mesh
+                            let mut mesh = Mesh::default();
+                            for i in 0..num_cats {
+                                let t_start = i as f32 / num_cats as f32;
+                                let t_end = (i + 1) as f32 / num_cats as f32;
 
-                            if i > 0 {
-                                let prev_top = idx_top - 2;
-                                let prev_bottom = idx_top - 1;
+                                let val = cat_vals[i];
+                                let norm_scaled = crate::utils::colormap::apply_color_scale_cpu(val, min_val, max_val, app.active_scale_type, app.scale_param);
+                                let color = crate::utils::colormap::sample_colormap_rgb(effective_colormap, norm_scaled);
 
-                                mesh.indices.push(prev_top);
-                                mesh.indices.push(prev_bottom);
-                                mesh.indices.push(idx_top + 1);
+                                let x_start = bar_rect.min.x + t_start * bar_rect.width();
+                                let x_end = bar_rect.min.x + t_end * bar_rect.width();
 
-                                mesh.indices.push(prev_top);
-                                mesh.indices.push(idx_top + 1);
-                                mesh.indices.push(idx_top);
+                                let idx = mesh.vertices.len() as u32;
+                                mesh.vertices.push(Vertex { pos: Pos2::new(x_start, bar_rect.min.y), uv: Pos2::ZERO, color });
+                                mesh.vertices.push(Vertex { pos: Pos2::new(x_start, bar_rect.max.y), uv: Pos2::ZERO, color });
+                                mesh.vertices.push(Vertex { pos: Pos2::new(x_end, bar_rect.min.y), uv: Pos2::ZERO, color });
+                                mesh.vertices.push(Vertex { pos: Pos2::new(x_end, bar_rect.max.y), uv: Pos2::ZERO, color });
+
+                                mesh.indices.extend_from_slice(&[idx, idx + 1, idx + 2, idx + 1, idx + 3, idx + 2]);
                             }
-                        }
+                            ui.painter().add(Shape::mesh(mesh));
 
-                        ui.painter().add(Shape::mesh(mesh));
+                            // Draw crisp outline around colorbar rect
+                            ui.painter().rect_stroke(
+                                bar_rect,
+                                0.0,
+                                egui::Stroke::new(1.0_f32, border_color),
+                            );
 
-                        // Draw crisp 1.0px dark outline around the colorbar rect
-                        ui.painter().rect_stroke(
-                            bar_rect,
-                            0.0,
-                            egui::Stroke::new(1.0_f32, border_color),
-                        );
-
-                        // 2. Generate and Render Scientific Major & Minor Ticks
-                        let ticks = generate_colorbar_ticks(min_val, max_val, app.active_scale_type, app.scale_param);
-
-                        for tick in ticks {
-                            let x = bar_rect.min.x + tick.t_pos * bar_rect.width();
-
-                            if tick.is_major {
-                                // Grid line divider across full colorbar height
+                            // 2. Draw Band Boundary Dividers
+                            for i in 1..num_cats {
+                                let t_div = i as f32 / num_cats as f32;
+                                let x_div = bar_rect.min.x + t_div * bar_rect.width();
                                 ui.painter().line_segment(
-                                    [Pos2::new(x, bar_rect.min.y), Pos2::new(x, bar_rect.max.y)],
-                                    egui::Stroke::new(1.0_f32, Color32::from_black_alpha(80)),
+                                    [Pos2::new(x_div, bar_rect.min.y), Pos2::new(x_div, bar_rect.max.y)],
+                                    egui::Stroke::new(1.0_f32, Color32::from_black_alpha(120)),
                                 );
+                            }
 
-                                // Major tick line extends 4.5px INWARD into gradient bar and 5.5px OUTWARD below
+                            // 3. Draw Centered Ticks and Centered Labels inside each discrete band
+                            for (i, &val) in cat_vals.iter().enumerate() {
+                                let t_center = (i as f32 + 0.5) / num_cats as f32;
+                                let x = bar_rect.min.x + t_center * bar_rect.width();
+
                                 let y_in = bar_rect.max.y - 4.5;
                                 let y_out = bar_rect.max.y + 5.5;
 
@@ -150,36 +151,117 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                                     egui::Stroke::new(1.2_f32, strong_text_color),
                                 );
 
-                                if let Some(label_text) = &tick.label {
-                                    let align = if tick.t_pos <= 0.01 {
-                                        egui::Align2::LEFT_TOP
-                                    } else if tick.t_pos >= 0.99 {
-                                        egui::Align2::RIGHT_TOP
-                                    } else {
-                                        egui::Align2::CENTER_TOP
-                                    };
+                                let label_text = format_scientific_tick(val);
+                                ui.painter().text(
+                                    Pos2::new(x, y_out + 2.0),
+                                    egui::Align2::CENTER_TOP,
+                                    label_text,
+                                    egui::FontId::proportional(11.0),
+                                    strong_text_color,
+                                );
+                            }
+                        } else {
+                            // Standard Continuous Gradient Mesh
+                            let num_segments = 128;
+                            let mut mesh = Mesh::default();
 
-                                    ui.painter().text(
-                                        Pos2::new(x, y_out + 2.0),
-                                        align,
-                                        label_text,
-                                        egui::FontId::proportional(11.0),
-                                        strong_text_color,
+                            for i in 0..=num_segments {
+                                let t = i as f32 / num_segments as f32;
+                                let raw_val = crate::utils::colormap::unscale_norm_to_value(t, min_val, max_val, app.active_scale_type, app.scale_param);
+                                let norm_scaled = crate::utils::colormap::apply_color_scale_cpu(raw_val, min_val, max_val, app.active_scale_type, app.scale_param);
+                                let color = crate::utils::colormap::sample_colormap_rgb(effective_colormap, norm_scaled);
+
+                                let x = bar_rect.min.x + t * bar_rect.width();
+
+                                let idx_top = mesh.vertices.len() as u32;
+                                mesh.vertices.push(Vertex {
+                                    pos: Pos2::new(x, bar_rect.min.y),
+                                    uv: Pos2::ZERO,
+                                    color,
+                                });
+                                mesh.vertices.push(Vertex {
+                                    pos: Pos2::new(x, bar_rect.max.y),
+                                    uv: Pos2::ZERO,
+                                    color,
+                                });
+
+                                if i > 0 {
+                                    let prev_top = idx_top - 2;
+                                    let prev_bottom = idx_top - 1;
+
+                                    mesh.indices.push(prev_top);
+                                    mesh.indices.push(prev_bottom);
+                                    mesh.indices.push(idx_top + 1);
+
+                                    mesh.indices.push(prev_top);
+                                    mesh.indices.push(idx_top + 1);
+                                    mesh.indices.push(idx_top);
+                                }
+                            }
+
+                            ui.painter().add(Shape::mesh(mesh));
+
+                            // Draw crisp outline around colorbar rect
+                            ui.painter().rect_stroke(
+                                bar_rect,
+                                0.0,
+                                egui::Stroke::new(1.0_f32, border_color),
+                            );
+
+                            // Continuous Major & Minor Ticks
+                            let ticks = generate_colorbar_ticks(min_val, max_val, app.active_scale_type, app.scale_param);
+
+                            for tick in ticks {
+                                let x = bar_rect.min.x + tick.t_pos * bar_rect.width();
+
+                                if tick.is_major {
+                                    ui.painter().line_segment(
+                                        [Pos2::new(x, bar_rect.min.y), Pos2::new(x, bar_rect.max.y)],
+                                        egui::Stroke::new(1.0_f32, Color32::from_black_alpha(80)),
+                                    );
+
+                                    let y_in = bar_rect.max.y - 4.5;
+                                    let y_out = bar_rect.max.y + 5.5;
+
+                                    ui.painter().line_segment(
+                                        [Pos2::new(x, y_in), Pos2::new(x, y_out)],
+                                        egui::Stroke::new(2.2_f32, Color32::from_black_alpha(180)),
+                                    );
+                                    ui.painter().line_segment(
+                                        [Pos2::new(x, y_in), Pos2::new(x, y_out)],
+                                        egui::Stroke::new(1.2_f32, strong_text_color),
+                                    );
+
+                                    if let Some(label_text) = &tick.label {
+                                        let align = if tick.t_pos <= 0.01 {
+                                            egui::Align2::LEFT_TOP
+                                        } else if tick.t_pos >= 0.99 {
+                                            egui::Align2::RIGHT_TOP
+                                        } else {
+                                            egui::Align2::CENTER_TOP
+                                        };
+
+                                        ui.painter().text(
+                                            Pos2::new(x, y_out + 2.0),
+                                            align,
+                                            label_text,
+                                            egui::FontId::proportional(11.0),
+                                            strong_text_color,
+                                        );
+                                    }
+                                } else {
+                                    let y_in = bar_rect.max.y - 3.0;
+                                    let y_out = bar_rect.max.y + 3.5;
+
+                                    ui.painter().line_segment(
+                                        [Pos2::new(x, y_in), Pos2::new(x, y_out)],
+                                        egui::Stroke::new(1.8_f32, Color32::from_black_alpha(180)),
+                                    );
+                                    ui.painter().line_segment(
+                                        [Pos2::new(x, y_in), Pos2::new(x, y_out)],
+                                        egui::Stroke::new(1.0_f32, text_color),
                                     );
                                 }
-                            } else {
-                                // Minor tick line extends 3.0px INWARD into gradient bar and 3.5px OUTWARD below
-                                let y_in = bar_rect.max.y - 3.0;
-                                let y_out = bar_rect.max.y + 3.5;
-
-                                ui.painter().line_segment(
-                                    [Pos2::new(x, y_in), Pos2::new(x, y_out)],
-                                    egui::Stroke::new(1.8_f32, Color32::from_black_alpha(180)),
-                                );
-                                ui.painter().line_segment(
-                                    [Pos2::new(x, y_in), Pos2::new(x, y_out)],
-                                    egui::Stroke::new(1.0_f32, text_color),
-                                );
                             }
                         }
 

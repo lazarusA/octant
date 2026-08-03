@@ -6,9 +6,32 @@ pub struct MatrixData {
     pub max_val: f32,
     pub dataset_name: String,
     pub max_timesteps: usize,
+    pub unique_values: Option<Vec<f32>>,
 }
 
 impl MatrixData {
+    pub fn new(
+        width: usize,
+        height: usize,
+        values: Vec<f32>,
+        min_val: f32,
+        max_val: f32,
+        dataset_name: String,
+        max_timesteps: usize,
+    ) -> Self {
+        let unique_values = Self::compute_unique_values(&values);
+        Self {
+            width,
+            height,
+            values,
+            min_val,
+            max_val,
+            dataset_name,
+            max_timesteps,
+            unique_values,
+        }
+    }
+
     /// Generates a random 2D scalar field for visualization
     pub fn create_random_matrix(width: usize, height: usize) -> Result<Self, Box<dyn std::error::Error>> {
         let mut raw_data = Vec::with_capacity(width * height);
@@ -24,14 +47,48 @@ impl MatrixData {
             }
         }
 
-        Ok(Self {
+        Ok(Self::new(
             width,
             height,
-            values: raw_data,
-            min_val: 0.0,
-            max_val: 100.0,
-            dataset_name: format!("Random Matrix ({}x{})", width, height),
-            max_timesteps: 1,
-        })
+            raw_data,
+            0.0,
+            100.0,
+            format!("Random Matrix ({}x{})", width, height),
+            1,
+        ))
+    }
+
+    /// Fast strided unique value detector (samples up to 2000 elements with early exit when > 20 unique values).
+    pub fn compute_unique_values(values: &[f32]) -> Option<Vec<f32>> {
+        if values.is_empty() {
+            return None;
+        }
+
+        let step = (values.len() / 2000).max(1);
+        let mut unique: Vec<f32> = Vec::with_capacity(24);
+
+        for &val in values.iter().step_by(step) {
+            if val.is_nan() || val.is_infinite() {
+                continue;
+            }
+            if !unique.iter().any(|&u| (u - val).abs() < 1e-5) {
+                unique.push(val);
+                if unique.len() > 20 {
+                    return None; // Exceeds 20 categories -> Continuous field
+                }
+            }
+        }
+
+        if unique.len() >= 2 {
+            unique.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            Some(unique)
+        } else {
+            None
+        }
+    }
+
+    /// Returns pre-cached unique values in O(1) constant time per frame.
+    pub fn detect_unique_values(&self) -> Option<Vec<f32>> {
+        self.unique_values.clone()
     }
 }

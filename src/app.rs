@@ -53,6 +53,7 @@ pub struct OctantApp {
     pub volume_cmax: f32,
     pub point_cloud_size: f32,
     pub show_colorbar: bool,
+    pub is_categorical: bool,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
     // LRU Cache & Prefetcher State
@@ -135,6 +136,7 @@ impl OctantApp {
             volume_cmax: 100.0,
             point_cloud_size: 0.02,
             show_colorbar: true,
+            is_categorical: false,
             wgpu_render_state,
 
             lru_cache: SliceLruCache::new(default_cache_mb * 1024 * 1024),
@@ -277,15 +279,15 @@ impl OctantApp {
 
         // 1. Check LRU Cache HIT
         if let Some(slice) = self.lru_cache.get(&cache_key) {
-            let mdata = MatrixData {
-                width: slice.width,
-                height: slice.height,
-                values: slice.values.clone(),
-                min_val: slice.min_val,
-                max_val: slice.max_val,
-                dataset_name: format!("{} ({})", slice.dataset_name, slice.variable_name),
-                max_timesteps: slice.max_timesteps,
-            };
+            let mdata = MatrixData::new(
+                slice.width,
+                slice.height,
+                slice.values.clone(),
+                slice.min_val,
+                slice.max_val,
+                format!("{} ({})", slice.dataset_name, slice.variable_name),
+                slice.max_timesteps,
+            );
             self.rebuild_pipeline_with_matrix_data(mdata);
             self.is_fetching_slice = false;
             self.status_message = format!("🚀 Cache HIT for '{}' (step {})", slice.variable_name, self.current_timestep + 1);
@@ -441,6 +443,21 @@ impl OctantApp {
 
     pub fn get_color_params(&self) -> crate::plots::common::PlotColorParams {
         let effective_colormap = self.preview_colormap.unwrap_or(self.active_colormap);
+
+        let (is_cat, num_cats) = if self.is_categorical {
+            if let Some(mdata) = &self.matrix_data {
+                if let Some(unique) = mdata.detect_unique_values() {
+                    (1, unique.len() as u32)
+                } else {
+                    (1, 10)
+                }
+            } else {
+                (1, 10)
+            }
+        } else {
+            (0, 10)
+        };
+
         crate::plots::common::PlotColorParams {
             colormap: effective_colormap,
             cmin: self.color_range_min,
@@ -450,6 +467,10 @@ impl OctantApp {
             use_highclip: if self.use_highclip { 1 } else { 0 },
             scale_type: self.active_scale_type,
             scale_param: self.scale_param,
+            is_categorical: is_cat,
+            num_categories: num_cats,
+            _pad0: 0,
+            _pad1: 0,
             nan_color: self.nan_color,
             lowclip_color: self.lowclip_color,
             highclip_color: self.highclip_color,
@@ -542,15 +563,15 @@ impl eframe::App for OctantApp {
                 self.lru_cache.put(res.key, slice.clone());
 
                 if is_active_target {
-                    let mdata = MatrixData {
-                        width: slice.width,
-                        height: slice.height,
-                        values: slice.values,
-                        min_val: slice.min_val,
-                        max_val: slice.max_val,
-                        dataset_name: format!("{} ({})", slice.dataset_name, slice.variable_name),
-                        max_timesteps: slice.max_timesteps,
-                    };
+                    let mdata = MatrixData::new(
+                        slice.width,
+                        slice.height,
+                        slice.values,
+                        slice.min_val,
+                        slice.max_val,
+                        format!("{} ({})", slice.dataset_name, slice.variable_name),
+                        slice.max_timesteps,
+                    );
                     self.rebuild_pipeline_with_matrix_data(mdata);
                     self.is_fetching_slice = false;
                     self.status_message = format!("⚡ Loaded slice for '{}' (step {})", slice.variable_name, slice.current_timestep + 1);

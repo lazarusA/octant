@@ -9,6 +9,10 @@ struct ColorUniforms {
     use_highclip: u32,
     scale_type: u32,
     scale_param: f32,
+    is_categorical: u32,
+    num_categories: u32,
+    _pad0: u32,
+    _pad1: u32,
     nan_color: vec4<f32>,
     lowclip_color: vec4<f32>,
     highclip_color: vec4<f32>,
@@ -111,7 +115,14 @@ fn evaluate_plot_color(val: f32, color: ColorUniforms) -> vec4<f32> {
         return select(default_high, color.highclip_color, color.use_highclip == 1u);
     }
 
-    // 4. In-bounds colormap sampling with direct scaling
-    let scaled_val = evaluate_scaled_norm(val, color.cmin, color.cmax, color.scale_type, color.scale_param);
+    // 4. In-bounds colormap sampling with direct scaling and optional categorical quantization
+    var scaled_val = evaluate_scaled_norm(val, color.cmin, color.cmax, color.scale_type, color.scale_param);
+
+    if (color.is_categorical == 1u) {
+        let num_cats = f32(max(color.num_categories, 1u));
+        let bin_idx = floor(clamp(scaled_val, 0.0, 0.999999) * num_cats);
+        scaled_val = (bin_idx + 0.5) / num_cats;
+    }
+
     return vec4<f32>(sample_colormap(color.colormap, scaled_val), 1.0);
 }

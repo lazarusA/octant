@@ -139,6 +139,9 @@ fn show_secondary_toolbar(app: &mut OctantApp, ctx: &egui::Context) {
                     ui.label("Param:");
                     ui.add(egui::DragValue::new(&mut app.scale_param).speed(0.01).range(0.0001..=100.0));
                 }
+
+                ui.toggle_value(&mut app.is_categorical, "🎨 Categorical")
+                    .on_hover_text("Enable Categorical / Discrete colorbar (auto-detects unique values, or defaults to 10 equal bins)");
             });
         });
 }
