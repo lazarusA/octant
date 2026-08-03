@@ -3,11 +3,16 @@ use crate::plots::PlotType;
 use super::cache;
 
 pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
-    egui::TopBottomPanel::bottom("octant_plot_controls_bar")
-        .exact_height(34.0)
+    let is_3d_mode = app.active_plot_type == PlotType::Sphere
+        || app.active_plot_type == PlotType::Surface
+        || app.active_plot_type == PlotType::Volume
+        || app.active_plot_type == PlotType::PointCloud;
+
+    egui::TopBottomPanel::top("octant_plot_controls_bar")
+        .default_height(34.0)
         .show(ctx, |ui| {
             ui.add_space(3.0);
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 match app.active_plot_type {
                     PlotType::Volume => {
                         ui.label(egui::RichText::new("☁️ Volume:").strong().small());
@@ -40,14 +45,24 @@ pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
                         });
 
                         ui.separator();
-                        ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("💧 Density"));
                         ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("🌫 Steps"));
 
-                        ui.separator();
-                        ui.add(egui::Slider::new(&mut app.volume_cmin, 0.0..=100.0).text("✂️ Min Clip"));
-                        ui.add(egui::Slider::new(&mut app.volume_cmax, 0.0..=100.0).text("📊 Max Range"));
+                        // Density slider (used in algorithms 0, 3, 4, 5, 6)
+                        if app.volume_algorithm != 1 && app.volume_algorithm != 2 {
+                            ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("💧 Density"));
+                        }
 
-                        if app.volume_algorithm == 0 || app.volume_algorithm == 6 {
+                        // Min Clip & Max Range sliders (used in algorithms 0, 1, 2, 6)
+                        if app.volume_algorithm == 0 || app.volume_algorithm == 1 || app.volume_algorithm == 2 || app.volume_algorithm == 6 {
+                            ui.separator();
+                            if app.volume_algorithm != 2 {
+                                ui.add(egui::Slider::new(&mut app.volume_cmin, 0.0..=100.0).text("✂️ Min Clip"));
+                            }
+                            ui.add(egui::Slider::new(&mut app.volume_cmax, 0.0..=100.0).text("📊 Max Range"));
+                        }
+
+                        // Isovalue & Isorange sliders (used specifically in Solid Isosurface algorithm 1)
+                        if app.volume_algorithm == 1 {
                             ui.separator();
                             ui.add(egui::Slider::new(&mut app.volume_isovalue, -100.0..=100.0).text("🎯 Isovalue"));
                             ui.add(egui::Slider::new(&mut app.volume_isorange, 0.1..=20.0).text("📏 Isorange"));
@@ -90,16 +105,21 @@ pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
                         ui.label(egui::RichText::new("🗺️ 2D Plane Heatmap Active").small().weak());
                     }
                 }
+
+                if is_3d_mode {
+                    ui.separator();
+                    ui.checkbox(&mut app.sphere_auto_rotate, "🎥 Rotate");
+                    if ui.button("🔄 Reset View").on_hover_text("Reset 3D camera orientation").clicked() {
+                        app.sphere_rotation_x = 0.25;
+                        app.sphere_rotation_y = 0.0;
+                        app.sphere_zoom = 2.5;
+                    }
+                }
             });
         });
 }
 
 pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
-    let is_3d_mode = app.active_plot_type == PlotType::Sphere
-        || app.active_plot_type == PlotType::Surface
-        || app.active_plot_type == PlotType::Volume
-        || app.active_plot_type == PlotType::PointCloud;
-
     egui::TopBottomPanel::bottom("octant_bottom_bar")
         .exact_height(38.0)
         .show(ctx, |ui| {
@@ -134,11 +154,6 @@ pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
 
                 // 4. Loop Toggle
                 ui.checkbox(&mut app.loop_playback, "🔄 Loop");
-
-                // 5. Auto-Rotate toggle for 3D modes
-                if is_3d_mode {
-                    ui.checkbox(&mut app.sphere_auto_rotate, "🎥 Rotate");
-                }
 
                 ui.separator();
 

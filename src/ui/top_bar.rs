@@ -23,26 +23,18 @@ pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
                 plot_type::show_plot_type_menu(app, ui);
 
                 if app.active_dataset_metadata.is_some() {
-                    let panel_label = if app.show_right_panel { "🎛️ Controls ◀" } else { "🎛️ Controls ▶" };
-                    if ui.button(egui::RichText::new(panel_label).strong()).on_hover_text("Toggle Right Variable Controls Panel").clicked() {
-                        app.show_right_panel = !app.show_right_panel;
-                    }
-                }
-
-                ui.separator();
-
-                let btn_text = if app.is_loading {
-                    "⏳ Fetching..."
+                    // Right status info and controls toggle on far right
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let panel_label = if app.show_right_panel { "🎛️ Controls ◀" } else { "🎛️ Controls ▶" };
+                        if ui.button(egui::RichText::new(panel_label).strong()).on_hover_text("Toggle Right Variable Controls Panel").clicked() {
+                            app.show_right_panel = !app.show_right_panel;
+                        }
+                        ui.separator();
+                        status::show_status_bar(app, ui);
+                    });
                 } else {
-                    "🔍 Fetch Store Metadata"
-                };
-
-                if ui.add_enabled(!app.is_loading, egui::Button::new(egui::RichText::new(btn_text).small())).clicked() {
-                    app.inspect_active_store();
+                    status::show_status_bar(app, ui);
                 }
-
-                // Right status info
-                status::show_status_bar(app, ui);
             });
         });
 }

@@ -5,25 +5,14 @@ pub fn show_right_panel(app: &mut OctantApp, ctx: &egui::Context) {
         return;
     }
 
-    egui::SidePanel::right("variable_control_panel")
-        .resizable(true)
+    let mut show_panel = app.show_right_panel;
+
+    egui::Window::new("📊 Variable Controls")
+        .open(&mut show_panel)
+        .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-15.0, 75.0))
         .default_width(340.0)
-        .min_width(280.0)
-        .max_width(550.0)
+        .resizable(true)
         .show(ctx, |ui| {
-            ui.add_space(4.0);
-
-            // Header bar
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("📊 Variable Controls").strong().heading());
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("✖").on_hover_text("Close Panel").clicked() {
-                        app.show_right_panel = false;
-                    }
-                });
-            });
-            ui.separator();
-
             let (var_info, dim_coords) = if let Some(meta) = &app.active_dataset_metadata {
                 if let Some(v) = meta.variables.get(app.selected_variable_idx) {
                     (v.clone(), meta.dimension_coordinates.clone())
@@ -212,4 +201,6 @@ pub fn show_right_panel(app: &mut OctantApp, ctx: &egui::Context) {
                 }
             });
         });
+
+    app.show_right_panel = show_panel;
 }

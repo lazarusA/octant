@@ -46,23 +46,4 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
     });
-
-    if app.active_plot_type == PlotType::Sphere
-        || app.active_plot_type == PlotType::Surface
-        || app.active_plot_type == PlotType::Volume
-        || app.active_plot_type == PlotType::PointCloud
-    {
-        ui.separator();
-
-        let pause_label = if app.sphere_auto_rotate { "⏸ Pause" } else { "▶ Rotate" };
-        if ui.button(egui::RichText::new(pause_label).small()).clicked() {
-            app.sphere_auto_rotate = !app.sphere_auto_rotate;
-        }
-
-        if ui.button(egui::RichText::new("↺ Reset View").small()).clicked() {
-            app.sphere_zoom = 2.5;
-            app.sphere_rotation_x = 0.4;
-            app.sphere_rotation_y = 0.0;
-        }
-    }
 }
