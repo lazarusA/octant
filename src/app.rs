@@ -779,6 +779,9 @@ impl eframe::App for OctantApp {
                     }
                 }
             }
+
+            // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle
+            crate::ui::hover_tooltip::show_hover_tooltip(self, ctx, ui, &response, rect);
         });
     }
 }
