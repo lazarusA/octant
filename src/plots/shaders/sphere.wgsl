@@ -45,6 +45,22 @@ fn spherical_to_cartesian(radius: f32, u: f32, v: f32) -> vec3<f32> {
     return vec3<f32>(x, y, z);
 }
 
+fn get_normalized_radial_dr(val: f32) -> f32 {
+    let cmin = uniforms.color.cmin;
+    let cmax = uniforms.color.cmax;
+    let range = max(cmax - cmin, 1e-6);
+
+    if (cmin < 0.0 && cmax > 0.0) {
+        // Signed data: 0.0 is base sphere surface (radius 1.0). Positive values bulge outward (> 1.0), negative values deform inward (< 1.0 crater)
+        let max_abs = max(abs(cmin), abs(cmax));
+        return clamp(val / max_abs, -1.0, 1.0) * 0.4 * uniforms.displacement_strength;
+    } else {
+        // Unsigned data: cmin is base sphere (1.0), cmax is max radius (1.0 + dr)
+        let norm_val = clamp((val - cmin) / range, 0.0, 1.0);
+        return norm_val * 0.4 * uniforms.displacement_strength;
+    }
+}
+
 @vertex
 fn vs_main(
     model: VertexInput,
@@ -69,7 +85,7 @@ fn vs_main(
         let data_idx = min(gy * uniforms.width + gx, max_data_idx);
         raw_val = data_buffer[data_idx];
 
-        let dr = (raw_val / 100.0) * 0.4 * uniforms.displacement_strength;
+        let dr = get_normalized_radial_dr(raw_val);
         pos_3d = spherical_to_cartesian(1.0 + dr, model.uv.x, model.uv.y);
 
         // Compute local gradient surface normal for 3D peak and in-ward valley lighting
@@ -78,16 +94,15 @@ fn vs_main(
         let val_up = data_buffer[max(gy, 1u) - 1u * uniforms.width + gx];
         let val_down = data_buffer[min(gy + 1u, max_data_idx / uniforms.width) * uniforms.width + gx];
 
-        let dh_du = ((val_right - val_left) / 100.0) * 0.4 * uniforms.displacement_strength;
-        let dh_dv = ((val_down - val_up) / 100.0) * 0.4 * uniforms.displacement_strength;
+        let dh_du = get_normalized_radial_dr(val_right) - get_normalized_radial_dr(val_left);
+        let dh_dv = get_normalized_radial_dr(val_down) - get_normalized_radial_dr(val_up);
 
         let base_norm = normalize(model.position);
         normal_3d = normalize(base_norm + vec3<f32>(-dh_du, 0.0, -dh_dv));
     } else if (uniforms.sphere_mode == 2u) {
-        // Mode 2: Flat Steps (Unsigned flat quad step elevation from unit sphere 1.0)
+        // Mode 2: Flat Steps
         raw_val = data_buffer[model.cell_index];
-        let norm_val = clamp(raw_val / 100.0, 0.0, 1.0);
-        let dr = norm_val * 0.4 * uniforms.displacement_strength;
+        let dr = get_normalized_radial_dr(raw_val);
         pos_3d = spherical_to_cartesian(1.0 + dr, model.uv.x, model.uv.y);
         normal_3d = normalize(model.position);
     } else {
@@ -100,7 +115,7 @@ fn vs_main(
         let safe_idx = min(instance_idx, max_idx);
         raw_val = data_buffer[safe_idx];
 
-        let dr = (raw_val / 100.0) * 0.4 * uniforms.displacement_strength;
+        let dr = get_normalized_radial_dr(raw_val);
 
         let u = (f32(cell_x) + model.position.x) / f32(uniforms.width);
         let v = (f32(cell_y) + model.position.y) / f32(grid_h);

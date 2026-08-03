@@ -31,6 +31,21 @@ struct VertexOutput {
     @location(2) normal: vec3<f32>,
 };
 
+fn get_normalized_height(val: f32) -> f32 {
+    let cmin = uniforms.color.cmin;
+    let cmax = uniforms.color.cmax;
+    let range = max(cmax - cmin, 1e-6);
+
+    if (cmin < 0.0 && cmax > 0.0) {
+        // Signed data: 0.0 is the base ground level. Positive values deform upward (+), negative values deform downward (-)
+        let max_abs = max(abs(cmin), abs(cmax));
+        return clamp(val / max_abs, -1.0, 1.0);
+    } else {
+        // Unsigned data: cmin is the base ground level (0.0), cmax is max height (+1.0)
+        return clamp((val - cmin) / range, 0.0, 1.0);
+    }
+}
+
 @vertex
 fn vs_main(
     model: VertexInput,
@@ -50,7 +65,8 @@ fn vs_main(
         let data_idx = min(gy * uniforms.width + gx, max_data_idx);
         raw_val = data_buffer[data_idx];
 
-        let height = (raw_val / 100.0) * 0.8 * uniforms.displacement_strength;
+        let norm_h = get_normalized_height(raw_val);
+        let height = norm_h * 0.8 * uniforms.displacement_strength;
         pos_3d = vec3<f32>(model.position.x, height, model.position.y);
 
         // Compute local gradient surface normal for 3D peak and in-ward valley lighting
@@ -59,15 +75,15 @@ fn vs_main(
         let val_up = data_buffer[max(gy, 1u) - 1u * uniforms.width + gx];
         let val_down = data_buffer[min(gy + 1u, max_data_idx / uniforms.width) * uniforms.width + gx];
 
-        let dh_dx = ((val_right - val_left) / 100.0) * 0.8 * uniforms.displacement_strength;
-        let dh_dy = ((val_down - val_up) / 100.0) * 0.8 * uniforms.displacement_strength;
+        let dh_dx = (get_normalized_height(val_right) - get_normalized_height(val_left)) * 0.8 * uniforms.displacement_strength;
+        let dh_dy = (get_normalized_height(val_down) - get_normalized_height(val_up)) * 0.8 * uniforms.displacement_strength;
 
         normal_3d = normalize(vec3<f32>(-dh_dx, 1.0, -dh_dy));
     } else if (uniforms.surface_mode == 1u) {
-        // Mode 1: Flat Steps (Unsigned: Extrudes upward from base 0.0)
+        // Mode 1: Flat Steps
         raw_val = data_buffer[model.cell_index];
-        let norm_val = clamp(raw_val / 100.0, 0.0, 1.0);
-        let height = norm_val * 0.6 * uniforms.displacement_strength;
+        let norm_h = get_normalized_height(raw_val);
+        let height = norm_h * 0.6 * uniforms.displacement_strength;
         pos_3d = vec3<f32>(model.position.x, height, model.position.y);
         normal_3d = vec3<f32>(0.0, 1.0, 0.0);
     } else {
@@ -80,7 +96,8 @@ fn vs_main(
         let safe_idx = min(instance_idx, max_idx);
         raw_val = data_buffer[safe_idx];
 
-        let height = (raw_val / 100.0) * 0.8 * uniforms.displacement_strength;
+        let norm_h = get_normalized_height(raw_val);
+        let height = norm_h * 0.8 * uniforms.displacement_strength;
 
         let scale_x = 2.0 * uniforms.aspect_ratio;
         let scale_y = 2.0;
