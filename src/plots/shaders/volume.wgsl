@@ -283,23 +283,33 @@ fn volume_hitbox_threshold(vOrigin: vec3<f32>, rayDir: vec3<f32>, bounds: vec2<f
         texCoord = clamp(texCoord, vec3<f32>(0.0), vec3<f32>(1.0 - epsilon));
 
         let d = sample_volume_scalar(texCoord);
-        let eval_col = evaluate_plot_color(
-            d,
-            threshold_min,
-            threshold_max,
-            uniforms.colormap,
-            uniforms.nan_color,
-            uniforms.use_nan_color,
-            uniforms.lowclip_color,
-            uniforms.use_lowclip,
-            uniforms.highclip_color,
-            uniforms.use_highclip,
-        );
 
-        if (eval_col.a > 0.0) {
-            let col = eval_col.rgb;
-            let alpha = eval_col.a * 0.2;
+        let is_nan_sample = (d != d || abs(d) > 1e30);
+        let is_low_sample = (d < threshold_min) && !is_nan_sample;
+        let is_high_sample = (d > threshold_max) && !is_nan_sample;
+        let is_in_bounds = (d >= threshold_min && d <= threshold_max) && !is_nan_sample;
 
+        var col: vec3<f32> = vec3<f32>(0.0);
+        var alpha: f32 = 0.0;
+
+        if (is_nan_sample && uniforms.use_nan_color == 1u) {
+            col = uniforms.nan_color.rgb;
+            alpha = uniforms.nan_color.a;
+        } else if (is_low_sample && uniforms.use_lowclip == 1u) {
+            col = uniforms.lowclip_color.rgb;
+            alpha = uniforms.lowclip_color.a;
+        } else if (is_high_sample && uniforms.use_highclip == 1u) {
+            col = uniforms.highclip_color.rgb;
+            alpha = uniforms.highclip_color.a;
+        } else if (is_in_bounds) {
+            let range = max(threshold_max - threshold_min, 0.0001);
+            let sampLoc = clamp((d - threshold_min) / range, 0.0, 1.0);
+            col = sample_colormap(uniforms.colormap, sampLoc);
+            let alpha_exponent = max(uniforms.absorption, 0.1);
+            alpha = clamp(pow(max(sampLoc, 0.001), 1.0 / alpha_exponent), 0.01, 1.0);
+        }
+
+        if (alpha > 0.0) {
             accumColor = accumColor + (1.0 - alphaAcc) * alpha * col;
             alphaAcc = alphaAcc + alpha * (1.0 - alphaAcc);
 
