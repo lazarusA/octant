@@ -92,6 +92,8 @@ pub struct OctantApp {
     pub color_range_max: f32,
     pub global_data_min: f32,
     pub global_data_max: f32,
+    pub active_scale_type: u32,
+    pub scale_param: f32,
 }
 
 impl OctantApp {
@@ -167,6 +169,8 @@ impl OctantApp {
             color_range_max: 100.0,
             global_data_min: f32::INFINITY,
             global_data_max: f32::NEG_INFINITY,
+            active_scale_type: 0,
+            scale_param: 1.0,
         };
 
 
@@ -444,8 +448,8 @@ impl OctantApp {
             use_nan_color: if self.use_nan_color { 1 } else { 0 },
             use_lowclip: if self.use_lowclip { 1 } else { 0 },
             use_highclip: if self.use_highclip { 1 } else { 0 },
-            _pad0: 0,
-            _pad1: 0,
+            scale_type: self.active_scale_type,
+            scale_param: self.scale_param,
             nan_color: self.nan_color,
             lowclip_color: self.lowclip_color,
             highclip_color: self.highclip_color,

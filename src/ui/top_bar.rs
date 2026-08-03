@@ -100,6 +100,45 @@ fn show_secondary_toolbar(app: &mut OctantApp, ctx: &egui::Context) {
                         app.volume_cmax = mdata.max_val;
                     }
                 }
+
+                ui.separator();
+
+                // 5. Color Scale Selection
+                let is_positive = app.color_range_min > 0.0;
+                if !is_positive && app.active_scale_type == 1 {
+                    app.active_scale_type = 0;
+                }
+
+                ui.label(egui::RichText::new("📈 Scale:").strong().small());
+                egui::ComboBox::from_id_salt("color_scale_dropdown")
+                    .selected_text(match app.active_scale_type {
+                        1 => "Logarithmic",
+                        2 => "Symlog (Log-Offset)",
+                        3 => "Sqrt (Diverging)",
+                        4 => "Exponential",
+                        _ => "Linear",
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut app.active_scale_type, 0, "Linear");
+                        
+                        ui.add_enabled_ui(is_positive, |ui| {
+                            ui.selectable_value(&mut app.active_scale_type, 1, "Logarithmic")
+                                .on_hover_text(if is_positive {
+                                    "Strict logarithmic scale (min > 0)"
+                                } else {
+                                    "Disabled: Logarithmic scale requires strictly positive values (min > 0)"
+                                });
+                        });
+
+                        ui.selectable_value(&mut app.active_scale_type, 2, "Symlog (Log-Offset)");
+                        ui.selectable_value(&mut app.active_scale_type, 3, "Sqrt (Diverging)");
+                        ui.selectable_value(&mut app.active_scale_type, 4, "Exponential");
+                    });
+
+                if app.active_scale_type == 1 || app.active_scale_type == 2 {
+                    ui.label("Param:");
+                    ui.add(egui::DragValue::new(&mut app.scale_param).speed(0.01).range(0.0001..=100.0));
+                }
             });
         });
 }
