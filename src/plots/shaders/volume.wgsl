@@ -1,4 +1,29 @@
+// Nothing type, to encode if some variable doesn't contain any data
+struct Nothing { // Nothing type, to encode if some variable doesn't contain any data
+    empty: bool, // empty structs are not allowed
+};
+
 struct Uniforms {
+    clip_planes: array<vec4<f32>, 8>,
+    light_color: vec3<f32>,
+    num_clip_planes: u32,
+    ambient: vec3<f32>,
+    shininess: f32,
+    light_direction: vec3<f32>,
+    algorithm: u32,
+    colorrange: vec2<f32>,
+    isovalue: f32,
+    isorange: f32,
+    highclip_color: vec4<f32>,
+    lowclip_color: vec4<f32>,
+    nan_color: vec4<f32>,
+    absorption: f32,
+    samples: u32,
+    diffuse: f32,
+    specular: f32,
+    depth_shift: f32,
+    picking: u32,
+    object_id: u32,
     colormap: u32,
     rotation_y: f32,
     rotation_x: f32,
@@ -6,11 +31,12 @@ struct Uniforms {
     aspect_y: f32,
     aspect_z: f32,
     zoom: f32,
-    displacement_strength: f32, // Density / Opacity scale
-    step_count: u32,            // Raymarching steps (e.g. 64)
     width: u32,
     height: u32,
     depth: u32,
+    screen_aspect: f32,
+    _pad1: u32,
+    _pad2: u32,
 };
 
 @group(0) @binding(0)
@@ -26,20 +52,20 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) local_pos: vec3<f32>,
+    @location(0) frag_vert: vec3<f32>,
 };
 
 @vertex
 fn vs_main(model: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 
-    // Unit bounding box scaled by 3D aspect ratio [aspect_x, aspect_y, aspect_z]
-    let pos_3d = vec3<f32>(
-        model.position.x * uniforms.aspect_x,
-        model.position.y * uniforms.aspect_y,
-        model.position.z * uniforms.aspect_z
+    // Centered object position [-0.5, 0.5] scaled by aspect ratio
+    let unit_pos = model.position * 0.5;
+    let pos_3d = unit_pos * vec3<f32>(
+        uniforms.aspect_x,
+        uniforms.aspect_y,
+        uniforms.aspect_z
     );
-    out.local_pos = model.position;
 
     // 3D Camera rotation around Y and X axes
     let cy = cos(uniforms.rotation_y);
@@ -59,93 +85,482 @@ fn vs_main(model: VertexInput) -> VertexOutput {
         sx * pos_y_rot.y + cx * pos_y_rot.z
     );
 
-    // Perspective projection transformation using dynamic zoom
+    out.frag_vert = pos_3d;
+
     let cam_dist = clamp(uniforms.zoom, 1.1, 10.0);
     let cam_z = pos_rot.z - cam_dist;
+    let dist_positive = max(-cam_z, 0.1);
+
     let fov_scale = 1.6;
-    let proj_x = pos_rot.x * fov_scale;
+    let screen_asp = max(uniforms.screen_aspect, 0.1);
+    let proj_x = (pos_rot.x * fov_scale) / screen_asp;
     let proj_y = pos_rot.y * fov_scale;
 
-    let proj_z = (cam_z + 15.0) / 30.0;
+    let z_near = 0.5;
+    let z_far = 30.0;
+    let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
 
-    out.position = vec4<f32>(proj_x, proj_y, proj_z, -cam_z);
+    out.position = vec4<f32>(proj_x, proj_y, proj_z, dist_positive);
     return out;
 }
 
-// Ray-box intersection algorithm
-fn ray_box_intersect(ray_origin: vec3<f32>, ray_dir: vec3<f32>, box_min: vec3<f32>, box_max: vec3<f32>) -> vec2<f32> {
-    let inv_dir = 1.0 / ray_dir;
-    let t0 = (box_min - ray_origin) * inv_dir;
-    let t1 = (box_max - ray_origin) * inv_dir;
+fn is_nan(val: f32) -> bool {
+    return val != val;
+}
 
-    let tmin = max(max(min(t0.x, t1.x), min(t0.y, t1.y)), min(t0.z, t1.z));
-    let tmax = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z));
+fn no_solution(x: f32) -> bool {
+    return abs(x) < 0.0001 || is_nan(x) || x > 1e20 || x < -1e20;
+}
 
-    return vec2<f32>(tmin, tmax);
+fn get_lowclip_color() -> vec4<f32> {
+    return uniforms.lowclip_color;
+}
+
+fn get_highclip_color() -> vec4<f32> {
+    return uniforms.highclip_color;
+}
+
+fn get_nan_color() -> vec4<f32> {
+    return uniforms.nan_color;
+}
+
+fn get_color_from_cmap(value: f32, colormap: u32, colorrange: vec2<f32>) -> vec4<f32> {
+    let cmin = colorrange.x;
+    let cmax = colorrange.y;
+    if (is_nan(value)) {
+        return get_nan_color();
+    } else if (value < cmin) {
+        return get_lowclip_color();
+    } else if (value > cmax) {
+        return get_highclip_color();
+    }
+    let range = max(cmax - cmin, 0.0001);
+    var i01 = clamp((value - cmin) / range, 0.0, 1.0);
+    let stepsize = 1.0 / 256.0;
+    i01 = (1.0 - stepsize) * i01 + 0.5 * stepsize;
+    let rgb = sample_colormap(colormap, i01);
+    return vec4<f32>(rgb, i01);
+}
+
+fn color_lookup(intensity: f32, colormap: u32, colorrange: vec2<f32>) -> vec4<f32> {
+    return get_color_from_cmap(intensity, colormap, colorrange);
+}
+
+fn color_lookup_indexed(colormap: u32, index: i32) -> vec4<f32> {
+    let norm = clamp(f32(max(index, 0)) / 255.0, 0.0, 1.0);
+    let rgb = sample_colormap(colormap, norm);
+    return vec4<f32>(rgb, 1.0);
+}
+
+fn sample_volume_scalar(texCoord: vec3<f32>) -> f32 {
+    if (texCoord.x < 0.0 || texCoord.x > 1.0 || texCoord.y < 0.0 || texCoord.y > 1.0 || texCoord.z < 0.0 || texCoord.z > 1.0) {
+        return 0.0;
+    }
+    let grid_w = max(uniforms.width, 1u);
+    let grid_h = max(uniforms.height, 1u);
+    let grid_d = max(uniforms.depth, 1u);
+    let total_len = arrayLength(&data_buffer);
+
+    let norm_y = 1.0 - texCoord.y;
+    let gx = u32(texCoord.x * f32(grid_w - 1u));
+    let gy = u32(norm_y * f32(grid_h - 1u));
+    let gz = u32(texCoord.z * f32(grid_d - 1u));
+
+    let idx = min(gz * grid_h * grid_w + gy * grid_w + gx, total_len - 1u);
+    return data_buffer[idx];
+}
+
+fn sample_volume_rgba(pos: vec3<f32>) -> vec4<f32> {
+    let s = sample_volume_scalar(pos);
+    let range = max(uniforms.colorrange.y - uniforms.colorrange.x, 0.0001);
+    let norm = clamp((s - uniforms.colorrange.x) / range, 0.0, 1.0);
+    let rgb = sample_colormap(uniforms.colormap, norm);
+    return vec4<f32>(rgb, norm);
+}
+
+fn gennormal(uvw: vec3<f32>) -> vec3<f32> {
+    let grid_w = f32(max(uniforms.width, 1u));
+    let grid_h = f32(max(uniforms.height, 1u));
+    let grid_d = f32(max(uniforms.depth, 1u));
+
+    let dx = vec3<f32>(1.0 / grid_w, 0.0, 0.0);
+    let dy = vec3<f32>(0.0, 1.0 / grid_h, 0.0);
+    let dz = vec3<f32>(0.0, 0.0, 1.0 / grid_d);
+
+    let nx = sample_volume_scalar(uvw - dx) - sample_volume_scalar(uvw + dx);
+    let ny = sample_volume_scalar(uvw - dy) - sample_volume_scalar(uvw + dy);
+    let nz = sample_volume_scalar(uvw - dz) - sample_volume_scalar(uvw + dz);
+
+    let grad = vec3<f32>(nx, ny, nz);
+    let len = length(grad);
+    if (len < 0.00001) {
+        return vec3<f32>(0.0, 1.0, 0.0);
+    }
+    return normalize(grad);
+}
+
+fn smooth_zero_max(x: f32) -> f32 {
+    let c: f32 = 0.00390625;
+    let xswap: f32 = 0.6406707120152759;
+    let yswap: f32 = 0.20508383900190955;
+    let shift: f32 = 1.0 + xswap - yswap;
+    var pow8: f32 = x + shift;
+    pow8 = pow8 * pow8;
+    pow8 = pow8 * pow8;
+    pow8 = pow8 * pow8;
+    if (x < yswap) {
+        return c * pow8;
+    } else {
+        return x;
+    }
+}
+
+fn blinnphong(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
+    let diff_coeff = smooth_zero_max(dot(L, -N)) + smooth_zero_max(dot(L, N));
+    let H = normalize(L + V);
+    let spec_coeff = pow(max(dot(H, -N), 0.0) + max(dot(H, N), 0.0), uniforms.shininess);
+    return uniforms.ambient * color + uniforms.light_color * (
+        uniforms.diffuse * diff_coeff * color +
+        uniforms.specular * spec_coeff
+    );
+}
+
+fn hitBox(orig: vec3<f32>, dir: vec3<f32>, scale_vec: vec3<f32>) -> vec2<f32> {
+    let box_min = -(scale_vec * 0.5);
+    let box_max = scale_vec * 0.5;
+    let inv_dir = 1.0 / dir;
+    let tmin_tmp = (box_min - orig) * inv_dir;
+    let tmax_tmp = (box_max - orig) * inv_dir;
+    let tmin = min(tmin_tmp, tmax_tmp);
+    let tmax = max(tmin_tmp, tmax_tmp);
+    let t0 = max(tmin.x, max(tmin.y, tmin.z));
+    let t1 = min(tmax.x, min(tmax.y, tmax.z));
+    return vec2<f32>(t0, t1);
+}
+
+// 0. Default Mode: Fast HitBox Threshold Volume Raymarching
+fn volume_hitbox_threshold(vOrigin: vec3<f32>, rayDir: vec3<f32>, bounds: vec2<f32>, scale_vec: vec3<f32>) -> vec4<f32> {
+    let safe_dir = max(abs(rayDir), vec3<f32>(0.0001));
+    let inc = 1.0 / safe_dir;
+    var delta = min(inc.x, min(inc.y, inc.z));
+    let samples_count = i32(max(uniforms.samples, 8u));
+    delta = delta / f32(samples_count);
+
+    var accumColor = vec3<f32>(0.0);
+    var alphaAcc: f32 = 0.0;
+
+    let threshold_min = uniforms.colorrange.x;
+    let threshold_max = uniforms.colorrange.y;
+
+    var t = bounds.x;
+    for (var i = 0; i < samples_count; i = i + 1) {
+        if (t >= bounds.y) {
+            break;
+        }
+        let p = vOrigin + rayDir * t;
+        var texCoord = p / scale_vec + vec3<f32>(0.5);
+
+        let epsilon: f32 = 0.000001;
+        texCoord = clamp(texCoord, vec3<f32>(0.0), vec3<f32>(1.0 - epsilon));
+
+        let d = sample_volume_scalar(texCoord);
+        let cond = (d >= threshold_min) && (d <= threshold_max);
+
+        if (cond) {
+            let range = max(threshold_max - threshold_min, 0.0001);
+            let sampLoc = clamp((d - threshold_min) / range, 0.0, 0.99);
+
+            let col = sample_colormap(uniforms.colormap, sampLoc);
+            let normalizedOpacity = clamp(sampLoc, 0.0, 1.0);
+            let alpha_exponent = max(uniforms.absorption, 0.1);
+            let alpha = clamp(pow(max(normalizedOpacity, 0.001), 1.0 / alpha_exponent), 0.01, 1.0);
+
+            accumColor = accumColor + (1.0 - alphaAcc) * alpha * col;
+            alphaAcc = alphaAcc + alpha * (1.0 - alphaAcc);
+
+            if (alphaAcc >= 0.99) {
+                break;
+            }
+        }
+        t = t + delta;
+    }
+
+    return vec4<f32>(accumColor, alphaAcc);
+}
+
+// Modes (Isosurface, MIP, Absorption, Additive, Indexed, Contours)
+fn isosurface(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
+    var pos = front;
+    var c = vec4<f32>(0.0);
+    let diffuse_color = color_lookup(uniforms.isovalue, uniforms.colormap, uniforms.colorrange);
+    let camdir = normalize(-dir);
+    let step_size = length(dir);
+    let samples_count = i32(max(uniforms.samples, 8u));
+
+    for (var i = 0; i < samples_count; i = i + 1) {
+        let density = sample_volume_scalar(pos);
+        if (abs(density - uniforms.isovalue) < uniforms.isorange) {
+            let N = gennormal(pos);
+            let L = uniforms.light_direction;
+            c = vec4<f32>(
+                blinnphong(N, camdir, L, diffuse_color.rgb),
+                diffuse_color.a
+            );
+            break;
+        }
+        pos = pos + dir;
+    }
+    return c;
+}
+
+fn mip(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
+    var pos = front + dir;
+    var maximum: f32 = -1e30;
+    let highclip_visible = uniforms.highclip_color.a > 0.0;
+    let samples_count = i32(max(uniforms.samples, 8u));
+
+    for (var i = 0; i < samples_count; i = i + 1) {
+        let density = sample_volume_scalar(pos);
+        let consider_sample = (density < uniforms.colorrange.y) || highclip_visible;
+        if (consider_sample && (maximum < density)) {
+            maximum = density;
+        }
+        pos = pos + dir;
+    }
+    if (maximum == -1e30) {
+        maximum = 1e30;
+    }
+    return color_lookup(maximum, uniforms.colormap, uniforms.colorrange);
+}
+
+fn absorptionrgba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
+    var pos = front;
+    var transmittance: f32 = 1.0;
+    var color_sum = vec3<f32>(0.0);
+    let step_size = length(dir);
+    let samples_count = i32(max(uniforms.samples, 8u));
+
+    for (var i = 0; i < samples_count; i = i + 1) {
+        let color_sample = sample_volume_rgba(pos);
+
+        let opacity = clamp(step_size * color_sample.a * uniforms.absorption, 0.0, 1.0);
+        color_sum = color_sum + (transmittance * opacity) * color_sample.rgb;
+        transmittance = transmittance * (1.0 - opacity);
+
+        if (transmittance <= 0.01) {
+            break;
+        }
+
+        pos = pos + dir;
+    }
+    if (1.0 - transmittance <= 0.0) {
+        return vec4<f32>(0.0);
+    }
+    return vec4<f32>(color_sum / (1.0 - transmittance), 1.0 - transmittance);
+}
+
+fn additivergba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
+    var pos = front;
+    var integrated_color = vec4<f32>(0.0);
+    let step_size = length(dir);
+    let samples_count = i32(max(uniforms.samples, 8u));
+
+    for (var i = 0; i < samples_count; i = i + 1) {
+        let density = uniforms.absorption * step_size * sample_volume_rgba(pos);
+        integrated_color = 1.0 - (1.0 - integrated_color) * (1.0 - density);
+        pos = pos + dir;
+    }
+    return integrated_color;
+}
+
+fn volumeindexedrgba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
+    var pos = front;
+    var transmittance: f32 = 1.0;
+    var color_sum = vec3<f32>(0.0);
+    let step_size = length(dir);
+    let samples_count = i32(max(uniforms.samples, 8u));
+
+    for (var i = 0; i < samples_count; i = i + 1) {
+        let index = i32(sample_volume_scalar(pos)) - 1;
+        let color_sample = color_lookup_indexed(uniforms.colormap, index);
+
+        let opacity = clamp(step_size * color_sample.a * uniforms.absorption, 0.0, 1.0);
+        color_sum = color_sum + (transmittance * opacity) * color_sample.rgb;
+        transmittance = transmittance * (1.0 - opacity);
+
+        if (transmittance <= 0.01) {
+            break;
+        }
+        pos = pos + dir;
+    }
+    if (1.0 - transmittance <= 0.0) {
+        return vec4<f32>(0.0);
+    }
+    return vec4<f32>(color_sum / (1.0 - transmittance), 1.0 - transmittance);
+}
+
+fn contours(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
+    var pos = front;
+    var transmittance: f32 = 1.0;
+    var color_sum = vec3<f32>(0.0);
+    let camdir = normalize(-dir);
+    let step_size = length(dir);
+    let samples_count = i32(max(uniforms.samples, 8u));
+
+    for (var i = 0; i < samples_count; i = i + 1) {
+        let intensity = sample_volume_scalar(pos);
+        let color_sample = color_lookup(intensity, uniforms.colormap, uniforms.colorrange);
+
+        let opacity = color_sample.a;
+        if (opacity > 0.0) {
+            let N = gennormal(pos);
+            let L = uniforms.light_direction;
+            let opaque = blinnphong(N, camdir, L, color_sample.rgb);
+            color_sum = color_sum + (transmittance * opacity) * opaque;
+            transmittance = transmittance * (1.0 - opacity);
+
+            if (transmittance <= 0.01) {
+                break;
+            }
+        }
+        pos = pos + dir;
+    }
+    if (1.0 - transmittance <= 0.0) {
+        return vec4<f32>(0.0);
+    }
+    return vec4<f32>(color_sum / (1.0 - transmittance), 1.0 - transmittance);
+}
+
+struct ClipResult {
+    clipped: bool,
+    p1: vec3<f32>,
+    p2: vec3<f32>,
+};
+
+fn process_clip_planes(p1_in: vec3<f32>, p2_in: vec3<f32>) -> ClipResult {
+    var p1 = p1_in;
+    var p2 = p2_in;
+    var d1: f32;
+    var d2: f32;
+    let count = min(uniforms.num_clip_planes, 8u);
+
+    for (var i = 0u; i < count; i = i + 1u) {
+        let plane = uniforms.clip_planes[i];
+        d1 = dot(p1, plane.xyz) - plane.w;
+        d2 = dot(p2, plane.xyz) - plane.w;
+
+        if (d1 < 0.0 && d2 < 0.0) {
+            p2 = p1;
+            return ClipResult(true, p1, p2);
+        }
+        else if (d1 < 0.0) {
+            p1 = p1 - d1 * (p2 - p1) / (d2 - d1);
+        } else if (d2 < 0.0) {
+            p2 = p2 - d2 * (p1 - p2) / (d1 - d2);
+        }
+    }
+
+    return ClipResult(false, p1, p2);
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // Reconstruct camera ray in object space
-    let cam_dist = clamp(uniforms.zoom, 1.1, 10.0);
-    let ray_origin = vec3<f32>(0.0, 0.0, cam_dist);
-    let ray_dir = normalize(in.local_pos - ray_origin);
+    var color: vec4<f32>;
 
-    let box_min = vec3<f32>(-1.0, -1.0, -1.0);
-    let box_max = vec3<f32>(1.0, 1.0, 1.0);
+    let cy = cos(-uniforms.rotation_y);
+    let sy = sin(-uniforms.rotation_y);
+    let cx = cos(-uniforms.rotation_x);
+    let sx = sin(-uniforms.rotation_x);
 
-    let intersect = ray_box_intersect(ray_origin, ray_dir, box_min, box_max);
-    let t_near = max(intersect.x, 0.0);
-    let t_far = intersect.y;
+    let eye_cam = vec3<f32>(0.0, 0.0, uniforms.zoom);
+    let eye_x_rot = vec3<f32>(eye_cam.x, cx * eye_cam.y - sx * eye_cam.z, sx * eye_cam.y + cx * eye_cam.z);
+    let eye_rot = vec3<f32>(cy * eye_x_rot.x + sy * eye_x_rot.z, eye_x_rot.y, -sy * eye_x_rot.x + cy * eye_x_rot.z);
 
-    if (t_near >= t_far) {
-        discard;
-    }
+    let scale_vec = vec3<f32>(
+        max(uniforms.aspect_x, 0.001),
+        max(uniforms.aspect_y, 0.001),
+        max(uniforms.aspect_z, 0.001)
+    );
 
-    let steps = max(uniforms.step_count, 16u);
-    let step_size = (t_far - t_near) / f32(steps);
+    let algo = uniforms.algorithm;
 
-    var accum_color = vec3<f32>(0.0);
-    var accum_alpha = 0.0;
+    if (algo == 0u) {
+        // Mode 0: Default HitBox Threshold Volume Raymarching
+        let vOrigin = eye_rot;
+        let vDirection = normalize(in.frag_vert - eye_rot);
+        let rayDir = normalize(vDirection);
+        var bounds = hitBox(vOrigin, rayDir, scale_vec);
+        if (bounds.x > bounds.y) {
+            discard;
+        }
+        bounds.x = max(bounds.x, 0.0);
+        color = volume_hitbox_threshold(vOrigin, rayDir, bounds, scale_vec);
+    } else {
+        // Modes (Isosurface, MIP, Absorption, Additive, Indexed, Contours)
+        let eye_unit = vec3<f32>(0.5) + eye_rot / scale_vec;
+        let back_position = in.frag_vert / scale_vec + vec3<f32>(0.5);
+        let dir = normalize(back_position - eye_unit);
 
-    let total_len = arrayLength(&data_buffer);
-    let grid_w = max(uniforms.width, 1u);
-    let grid_h = max(uniforms.height, 1u);
-    let grid_d = max(uniforms.depth, 1u);
+        let is_outside_box = (
+            eye_unit.x < 0.0 || eye_unit.y < 0.0 || eye_unit.z < 0.0 ||
+            eye_unit.x > 1.0 || eye_unit.y > 1.0 || eye_unit.z > 1.0
+        );
 
-    // March ray through 3D scalar volume with solid non-transparent outer surface
-    for (var i = 0u; i < steps; i = i + 1u) {
-        let t = t_near + (f32(i) + 0.5) * step_size;
-        let pos = ray_origin + t * ray_dir;
+        if ((dir.x == 0.0 && dir.y == 0.0 && dir.z == 0.0) || is_nan(dir.x) || is_nan(dir.y) || is_nan(dir.z)) {
+            discard;
+        }
 
-        // Convert [-1, 1]^3 to 3D grid cell indices (z, y, x)
-        let norm_pos = pos * 0.5 + vec3<f32>(0.5);
-        let gx = min(u32(norm_pos.x * f32(grid_w)), grid_w - 1u);
-        let gy = min(u32((1.0 - norm_pos.y) * f32(grid_h)), grid_h - 1u);
-        let gz = min(u32(norm_pos.z * f32(grid_d)), grid_d - 1u);
+        let solution_1 = (vec3<f32>(1.0) - eye_unit) / dir;
+        let solution_0 = (vec3<f32>(0.0) - eye_unit) / dir;
 
-        let data_idx = min(gz * grid_h * grid_w + gy * grid_w + gx, total_len - 1u);
-        let raw_val = data_buffer[data_idx];
-        let norm_val = clamp(raw_val / 100.0, 0.0, 1.0);
+        var solutions_min = min(solution_0, solution_1);
+        var solutions_max = max(solution_0, solution_1);
 
-        let sample_color = sample_colormap(uniforms.colormap, norm_val);
-        // Solid opacity accumulation: non-zero voxels hit 1.0 opacity rapidly
-        let sample_alpha = clamp(norm_val * 3.0 * uniforms.displacement_strength, 0.0, 1.0);
+        let typemax: f32 = 1e30;
+        if (no_solution(solutions_min.x)) { solutions_min.x = -typemax; }
+        if (no_solution(solutions_min.y)) { solutions_min.y = -typemax; }
+        if (no_solution(solutions_min.z)) { solutions_min.z = -typemax; }
 
-        // Front-to-back emission-absorption accumulation
-        accum_color = accum_color + (1.0 - accum_alpha) * sample_color * sample_alpha;
-        accum_alpha = accum_alpha + (1.0 - accum_alpha) * sample_alpha;
+        if (no_solution(solutions_max.x)) { solutions_max.x = typemax; }
+        if (no_solution(solutions_max.y)) { solutions_max.y = typemax; }
+        if (no_solution(solutions_max.z)) { solutions_max.z = typemax; }
 
-        // Early Ray Termination when surface becomes 100% solid/opaque
-        if (accum_alpha >= 0.98) {
-            accum_alpha = 1.0;
-            break;
+        let start_solution = max(max(solutions_min.x, solutions_min.y), solutions_min.z);
+        let stop_solution = min(min(solutions_max.x, solutions_max.y), solutions_max.z);
+
+        if (stop_solution < max(start_solution, 0.0)) {
+            discard;
+        }
+
+        let start = eye_unit + select(0.0, start_solution, is_outside_box) * dir;
+        let stop = eye_unit + stop_solution * dir;
+
+        let clip_res = process_clip_planes(start, stop);
+        if (clip_res.clipped) {
+            discard;
+        }
+
+        let step_in_dir = (clip_res.p2 - clip_res.p1) / f32(max(uniforms.samples, 1u));
+        let ray_start = clip_res.p1;
+
+        if (algo == 1u) {
+            color = isosurface(ray_start, step_in_dir);
+        } else if (algo == 2u) {
+            color = mip(ray_start, step_in_dir);
+        } else if (algo == 3u) {
+            color = absorptionrgba(ray_start, step_in_dir);
+        } else if (algo == 4u) {
+            color = additivergba(ray_start, step_in_dir);
+        } else if (algo == 5u) {
+            color = volumeindexedrgba(ray_start, step_in_dir);
+        } else {
+            color = contours(ray_start, step_in_dir);
         }
     }
 
-    if (accum_alpha <= 0.001) {
+    if (color.a <= 0.001) {
         discard;
     }
 
-    return vec4<f32>(accum_color, accum_alpha);
+    return color;
 }

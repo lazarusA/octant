@@ -25,6 +25,26 @@ impl VolumeVertex {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct VolumeUniforms {
+    pub clip_planes: [[f32; 4]; 8],
+    pub light_color: [f32; 3],
+    pub num_clip_planes: u32,
+    pub ambient: [f32; 3],
+    pub shininess: f32,
+    pub light_direction: [f32; 3],
+    pub algorithm: u32,
+    pub colorrange: [f32; 2],
+    pub isovalue: f32,
+    pub isorange: f32,
+    pub highclip_color: [f32; 4],
+    pub lowclip_color: [f32; 4],
+    pub nan_color: [f32; 4],
+    pub absorption: f32,
+    pub samples: u32,
+    pub diffuse: f32,
+    pub specular: f32,
+    pub depth_shift: f32,
+    pub picking: u32,
+    pub object_id: u32,
     pub colormap: u32,
     pub rotation_y: f32,
     pub rotation_x: f32,
@@ -32,11 +52,12 @@ pub struct VolumeUniforms {
     pub aspect_y: f32,
     pub aspect_z: f32,
     pub zoom: f32,
-    pub displacement_strength: f32,
-    pub step_count: u32,
     pub width: u32,
     pub height: u32,
     pub depth: u32,
+    pub screen_aspect: f32,
+    pub _pad1: u32,
+    pub _pad2: u32,
 }
 
 pub struct VolumeRenderer {
@@ -103,6 +124,26 @@ impl VolumeRenderer {
         let depth = (initial_data_safe.len() as u32 / (width.max(1) * height.max(1))).max(1);
 
         let uniforms = VolumeUniforms {
+            clip_planes: [[0.0; 4]; 8],
+            light_color: [1.0, 1.0, 1.0],
+            num_clip_planes: 0,
+            ambient: [0.2, 0.2, 0.2],
+            shininess: 32.0,
+            light_direction: [1.0, 1.0, 1.0],
+            algorithm: 0,
+            colorrange: [0.0, 100.0],
+            isovalue: 50.0,
+            isorange: 5.0,
+            highclip_color: [0.0, 0.0, 0.0, 0.0],
+            lowclip_color: [0.0, 0.0, 0.0, 0.0],
+            nan_color: [0.0, 0.0, 0.0, 0.0],
+            absorption: 2.0,
+            samples: 64,
+            diffuse: 0.8,
+            specular: 0.2,
+            depth_shift: 0.0,
+            picking: 0,
+            object_id: 0,
             colormap: 0,
             rotation_y: 0.0,
             rotation_x: 0.0,
@@ -110,11 +151,12 @@ impl VolumeRenderer {
             aspect_y: 1.0,
             aspect_z: 1.0,
             zoom: 2.5,
-            displacement_strength: 2.0,
-            step_count: 64,
             width: width.max(1),
             height: height.max(1),
             depth,
+            screen_aspect: 1.0,
+            _pad1: 0,
+            _pad2: 0,
         };
 
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -232,9 +274,35 @@ impl VolumeRenderer {
         step_count: u32,
         width: u32,
         height: u32,
+        algorithm: u32,
+        isovalue: f32,
+        isorange: f32,
+        cmin: f32,
+        cmax: f32,
+        screen_aspect: f32,
     ) {
         let depth = (self.data_len as u32 / (width.max(1) * height.max(1))).max(1);
         let uniforms = VolumeUniforms {
+            clip_planes: [[0.0; 4]; 8],
+            light_color: [1.0, 1.0, 1.0],
+            num_clip_planes: 0,
+            ambient: [0.2, 0.2, 0.2],
+            shininess: 32.0,
+            light_direction: [1.0, 1.0, 1.0],
+            algorithm,
+            colorrange: [cmin, cmax],
+            isovalue,
+            isorange,
+            highclip_color: [0.0, 0.0, 0.0, 0.0],
+            lowclip_color: [0.0, 0.0, 0.0, 0.0],
+            nan_color: [0.0, 0.0, 0.0, 0.0],
+            absorption: opacity_scale,
+            samples: step_count,
+            diffuse: 0.8,
+            specular: 0.2,
+            depth_shift: 0.0,
+            picking: 0,
+            object_id: 0,
             colormap,
             rotation_y: rot_y,
             rotation_x: rot_x,
@@ -242,11 +310,12 @@ impl VolumeRenderer {
             aspect_y,
             aspect_z,
             zoom,
-            displacement_strength: opacity_scale,
-            step_count,
             width: width.max(1),
             height: height.max(1),
             depth,
+            screen_aspect,
+            _pad1: 0,
+            _pad2: 0,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -265,6 +334,11 @@ pub struct VolumeCallback {
     pub step_count: u32,
     pub width: u32,
     pub height: u32,
+    pub algorithm: u32,
+    pub isovalue: f32,
+    pub isorange: f32,
+    pub cmin: f32,
+    pub cmax: f32,
     pub rect: egui::Rect,
 }
 
@@ -277,6 +351,7 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
+        let screen_aspect = self.rect.width() / self.rect.height().max(1.0);
         self.renderer.update_uniforms(
             queue,
             self.colormap,
@@ -290,6 +365,12 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
             self.step_count,
             self.width,
             self.height,
+            self.algorithm,
+            self.isovalue,
+            self.isorange,
+            self.cmin,
+            self.cmax,
+            screen_aspect,
         );
         Vec::new()
     }

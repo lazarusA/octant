@@ -46,6 +46,11 @@ pub struct OctantApp {
     pub surface_mode: u32,
     pub volume_opacity: f32,
     pub volume_step_count: u32,
+    pub volume_algorithm: u32,
+    pub volume_isovalue: f32,
+    pub volume_isorange: f32,
+    pub volume_cmin: f32,
+    pub volume_cmax: f32,
     pub point_cloud_size: f32,
     pub show_colorbar: bool,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
@@ -110,6 +115,11 @@ impl OctantApp {
             surface_mode: 0,
             volume_opacity: 3.0,
             volume_step_count: 64,
+            volume_algorithm: 1,
+            volume_isovalue: 50.0,
+            volume_isorange: 5.0,
+            volume_cmin: 5.0,
+            volume_cmax: 100.0,
             point_cloud_size: 0.02,
             show_colorbar: true,
             wgpu_render_state,
@@ -537,6 +547,7 @@ impl eframe::App for OctantApp {
 
         // 3. Render Top Navigation Bar & Bottom Playback Toolbar & Right Selection Panel
         crate::ui::top_bar::show_top_bar(self, ctx);
+        crate::ui::bottom_bar::show_plot_controls_bar(self, ctx);
         crate::ui::bottom_bar::show_bottom_bar(self, ctx);
         crate::ui::catalog::show_catalog_window(self, ctx);
         crate::ui::colorbar::show_colorbar_overlay(self, ctx);
@@ -646,6 +657,11 @@ impl eframe::App for OctantApp {
                                 step_count: self.volume_step_count,
                                 width,
                                 height,
+                                algorithm: self.volume_algorithm,
+                                isovalue: self.volume_isovalue,
+                                isorange: self.volume_isorange,
+                                cmin: self.volume_cmin,
+                                cmax: self.volume_cmax,
                                 rect,
                             },
                         );

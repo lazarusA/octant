@@ -2,6 +2,98 @@ use crate::app::OctantApp;
 use crate::plots::PlotType;
 use super::cache;
 
+pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
+    egui::TopBottomPanel::bottom("octant_plot_controls_bar")
+        .exact_height(34.0)
+        .show(ctx, |ui| {
+            ui.add_space(3.0);
+            ui.horizontal(|ui| {
+                match app.active_plot_type {
+                    PlotType::Volume => {
+                        ui.label(egui::RichText::new("☁️ Volume:").strong().small());
+
+                        let algo_label = match app.volume_algorithm {
+                            0 => "☁️ Volume Raymarching",
+                            1 => "🎯 Solid Isosurface (WIP)",
+                            2 => "⚡ Maximum Intensity (MIP)",
+                            3 => "🌫 Absorption RGBA (WIP)",
+                            4 => "✨ Additive RGBA (WIP)",
+                            5 => "🎨 Indexed RGBA (WIP)",
+                            _ => "📐 Shaded Contours (WIP)",
+                        };
+                        ui.menu_button(egui::RichText::new(algo_label).small(), |ui| {
+                            let algos = [
+                                (0, "☁️ Volume Raymarching (Default)"),
+                                (1, "🎯 Solid Isosurface (WIP / Experimental)"),
+                                (2, "⚡ Maximum Intensity (MIP)"),
+                                (3, "🌫 Absorption RGBA (WIP / Experimental)"),
+                                (4, "✨ Additive RGBA (WIP / Experimental)"),
+                                (5, "🎨 Indexed RGBA (WIP / Experimental)"),
+                                (6, "📐 Shaded Contours (WIP / Experimental)"),
+                            ];
+                            for (id, label) in algos {
+                                if ui.selectable_label(app.volume_algorithm == id, label).clicked() {
+                                    app.volume_algorithm = id;
+                                    ui.close_menu();
+                                }
+                            }
+                        });
+
+                        ui.separator();
+                        ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("💧 Density"));
+                        ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("🌫 Steps"));
+
+                        ui.separator();
+                        ui.add(egui::Slider::new(&mut app.volume_cmin, 0.0..=100.0).text("✂️ Min Clip"));
+                        ui.add(egui::Slider::new(&mut app.volume_cmax, 0.0..=100.0).text("📊 Max Range"));
+
+                        if app.volume_algorithm == 0 || app.volume_algorithm == 6 {
+                            ui.separator();
+                            ui.add(egui::Slider::new(&mut app.volume_isovalue, -100.0..=100.0).text("🎯 Isovalue"));
+                            ui.add(egui::Slider::new(&mut app.volume_isorange, 0.1..=20.0).text("📏 Isorange"));
+                        }
+                    }
+                    PlotType::Sphere => {
+                        ui.label(egui::RichText::new("🌍 3D Globe:").strong().small());
+                        let style_label = match app.sphere_mode {
+                            0 => "🌍 Smooth Globe",
+                            1 => "🌋 Smooth Terrain",
+                            2 => "📐 Flat Steps",
+                            _ => "🧱 3D Radial Legos",
+                        };
+                        if ui.button(egui::RichText::new(style_label).small()).clicked() {
+                            app.sphere_mode = (app.sphere_mode + 1) % 4;
+                        }
+                        if app.sphere_mode > 0 {
+                            ui.separator();
+                            ui.add(egui::Slider::new(&mut app.sphere_displacement_strength, 0.0..=5.0).text("🌋 Height"));
+                        }
+                    }
+                    PlotType::Surface => {
+                        ui.label(egui::RichText::new("⛰️ 3D Surface:").strong().small());
+                        let style_label = match app.surface_mode {
+                            0 => "🌊 Smooth Terrain",
+                            1 => "📐 Flat Steps",
+                            _ => "🧱 3D Lego Cubes",
+                        };
+                        if ui.button(egui::RichText::new(style_label).small()).clicked() {
+                            app.surface_mode = (app.surface_mode + 1) % 3;
+                        }
+                        ui.separator();
+                        ui.add(egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0).text("⛰️ Height"));
+                    }
+                    PlotType::PointCloud => {
+                        ui.label(egui::RichText::new("✨ Point Cloud:").strong().small());
+                        ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("✨ Size"));
+                    }
+                    PlotType::Heatmap | PlotType::Block => {
+                        ui.label(egui::RichText::new("🗺️ 2D Plane Heatmap Active").small().weak());
+                    }
+                }
+            });
+        });
+}
+
 pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
     let is_3d_mode = app.active_plot_type == PlotType::Sphere
         || app.active_plot_type == PlotType::Surface
