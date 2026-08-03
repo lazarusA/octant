@@ -2,6 +2,16 @@ use crate::app::OctantApp;
 use crate::plots::PlotType;
 
 pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
+    let is_3d_available = if let Some(meta) = &app.active_dataset_metadata {
+        if let Some(v) = meta.variables.get(app.selected_variable_idx) {
+            v.shape.len() >= 3 || v.dimension_names.len() >= 3
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
     let current_label = match app.active_plot_type {
         PlotType::Heatmap => "🌐 Plot: 2D Plane",
         PlotType::Sphere => "🌐 Plot: 3D Globe",
@@ -11,7 +21,7 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     };
 
     ui.menu_button(current_label, |ui| {
-        ui.set_min_width(190.0);
+        ui.set_min_width(210.0);
 
         ui.label(egui::RichText::new("Select Visualization Projection").small().weak());
         ui.separator();
@@ -20,8 +30,8 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             (PlotType::Heatmap, "🗺️ 2D Plane (Flatmap)", true),
             (PlotType::Sphere, "🌍 3D Globe (Sphere)", true),
             (PlotType::Surface, "⛰️ 3D Surface / Blocks", true),
-            (PlotType::Volume, "☁️ 3D Volume Raycasting", false),
-            (PlotType::PointCloud, "✨ 3D Point Cloud", false),
+            (PlotType::Volume, "☁️ 3D Volume Raycasting", is_3d_available),
+            (PlotType::PointCloud, "✨ 3D Point Cloud", is_3d_available),
         ];
 
         for (plot_type, label, enabled) in options {
@@ -32,12 +42,16 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                     ui.close_menu();
                 }
             } else {
-                ui.add_enabled(false, egui::SelectableLabel::new(false, format!("{} (Soon)", label)));
+                ui.add_enabled(false, egui::SelectableLabel::new(false, format!("{} (Requires 3D Data)", label)));
             }
         }
     });
 
-    if app.active_plot_type == PlotType::Sphere || app.active_plot_type == PlotType::Surface {
+    if app.active_plot_type == PlotType::Sphere
+        || app.active_plot_type == PlotType::Surface
+        || app.active_plot_type == PlotType::Volume
+        || app.active_plot_type == PlotType::PointCloud
+    {
         ui.separator();
 
         let pause_label = if app.sphere_auto_rotate { "⏸ Pause" } else { "▶ Rotate" };
@@ -89,5 +103,16 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0)
                 .text("⛰️ Height"),
         );
+    }
+
+    if app.active_plot_type == PlotType::Volume {
+        ui.separator();
+        ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=5.0).text("💧 Density"));
+        ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=128).text("🌫 Steps"));
+    }
+
+    if app.active_plot_type == PlotType::PointCloud {
+        ui.separator();
+        ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("✨ Size"));
     }
 }

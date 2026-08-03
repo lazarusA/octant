@@ -1,7 +1,8 @@
 use crate::cache::{SliceCacheKey, SliceLruCache, SlicePrefetcher};
 use crate::data::matrix_data::MatrixData;
 use crate::plots::{
-    MatrixCallback, MatrixRenderer, PlotType, SphereCallback, SphereRenderer, SurfaceCallback, SurfaceRenderer,
+    MatrixCallback, MatrixRenderer, PointCloudCallback, PointCloudRenderer, PlotType, SphereCallback,
+    SphereRenderer, SurfaceCallback, SurfaceRenderer, VolumeCallback, VolumeRenderer,
 };
 use crate::stores::{
     icechunk_local::IcechunkLocalStore, icechunk_remote::IcechunkRemoteStore,
@@ -33,6 +34,8 @@ pub struct OctantApp {
     pub renderer: Option<Arc<MatrixRenderer>>,
     pub sphere_renderer: Option<Arc<SphereRenderer>>,
     pub surface_renderer: Option<Arc<SurfaceRenderer>>,
+    pub volume_renderer: Option<Arc<VolumeRenderer>>,
+    pub point_cloud_renderer: Option<Arc<PointCloudRenderer>>,
     pub sphere_rotation_y: f32,
     pub sphere_rotation_x: f32,
     pub sphere_auto_rotate: bool,
@@ -41,6 +44,9 @@ pub struct OctantApp {
     pub sphere_mode: u32,
     pub surface_displacement_strength: f32,
     pub surface_mode: u32,
+    pub volume_opacity: f32,
+    pub volume_step_count: u32,
+    pub point_cloud_size: f32,
     pub show_colorbar: bool,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
@@ -85,6 +91,8 @@ impl OctantApp {
             renderer: None,
             sphere_renderer: None,
             surface_renderer: None,
+            volume_renderer: None,
+            point_cloud_renderer: None,
             sphere_rotation_y: 0.0,
             sphere_rotation_x: 0.25,
             sphere_auto_rotate: true,
@@ -93,6 +101,9 @@ impl OctantApp {
             sphere_mode: 0,
             surface_displacement_strength: 0.3,
             surface_mode: 0,
+            volume_opacity: 3.0,
+            volume_step_count: 64,
+            point_cloud_size: 0.02,
             show_colorbar: true,
             wgpu_render_state,
 
@@ -305,7 +316,7 @@ impl OctantApp {
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
             let same_dimensions = self.matrix_data.as_ref().map_or(false, |m| m.width == data.width && m.height == data.height);
 
-            if same_dimensions && self.renderer.is_some() && self.sphere_renderer.is_some() && self.surface_renderer.is_some() {
+            if same_dimensions && self.renderer.is_some() && self.sphere_renderer.is_some() && self.surface_renderer.is_some() && self.volume_renderer.is_some() && self.point_cloud_renderer.is_some() {
                 if let Some(renderer) = &self.renderer {
                     renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
@@ -314,6 +325,12 @@ impl OctantApp {
                 }
                 if let Some(surface_renderer) = &self.surface_renderer {
                     surface_renderer.update_data(&wgpu_render_state.queue, &data.values);
+                }
+                if let Some(volume_renderer) = &mut self.volume_renderer {
+                    Arc::get_mut(volume_renderer).map(|r| r.update_data(&wgpu_render_state.queue, &data.values));
+                }
+                if let Some(point_cloud_renderer) = &mut self.point_cloud_renderer {
+                    Arc::get_mut(point_cloud_renderer).map(|r| r.update_data(&wgpu_render_state.queue, &data.values));
                 }
             } else {
                 let renderer = MatrixRenderer::new(
@@ -337,12 +354,59 @@ impl OctantApp {
                     data.width,
                     data.height,
                 );
+                let volume_renderer = VolumeRenderer::new(
+                    &wgpu_render_state.device,
+                    wgpu_render_state.target_format,
+                    &data.values,
+                    data.width as u32,
+                    data.height as u32,
+                );
+                let point_cloud_renderer = PointCloudRenderer::new(
+                    &wgpu_render_state.device,
+                    wgpu_render_state.target_format,
+                    &data.values,
+                    data.width as u32,
+                    data.height as u32,
+                );
                 self.renderer = Some(Arc::new(renderer));
                 self.sphere_renderer = Some(Arc::new(sphere_renderer));
                 self.surface_renderer = Some(Arc::new(surface_renderer));
+                self.volume_renderer = Some(Arc::new(volume_renderer));
+                self.point_cloud_renderer = Some(Arc::new(point_cloud_renderer));
             }
         }
         self.matrix_data = Some(data);
+    }
+
+    pub fn get_3d_aspect_ratio(&self) -> (f32, f32, f32) {
+        let (w, h, max_t) = self.matrix_data.as_ref().map_or((64, 64, 64), |m| {
+            (m.width as u32, m.height as u32, m.max_timesteps as u32)
+        });
+
+        let (shape_d, shape_h, shape_w) = if let Some(meta) = &self.active_dataset_metadata {
+            if let Some(v) = meta.variables.get(self.selected_variable_idx) {
+                if v.shape.len() >= 3 {
+                    (v.shape[0] as u32, v.shape[1] as u32, v.shape[2] as u32)
+                } else {
+                    (max_t, h, w)
+                }
+            } else {
+                (max_t, h, w)
+            }
+        } else {
+            (max_t, h, w)
+        };
+
+        let width = shape_w.max(w);
+        let height = shape_h.max(h);
+        let depth = shape_d.max(max_t);
+
+        let max_spatial = (width.max(height)) as f32;
+        let aspect_x = width as f32 / max_spatial;
+        let aspect_y = height as f32 / max_spatial;
+        let aspect_z = ((depth as f32 / max_spatial) * 0.12).clamp(0.4, 1.0);
+
+        (aspect_x, aspect_y, aspect_z)
     }
 }
 
@@ -492,7 +556,7 @@ impl eframe::App for OctantApp {
                 }
             }
 
-            if self.sphere_auto_rotate && (self.active_plot_type == PlotType::Sphere || self.active_plot_type == PlotType::Surface) {
+            if self.sphere_auto_rotate && (self.active_plot_type == PlotType::Sphere || self.active_plot_type == PlotType::Surface || self.active_plot_type == PlotType::Volume || self.active_plot_type == PlotType::PointCloud) {
                 self.sphere_rotation_y += ui.ctx().input(|i| i.stable_dt).min(0.1) * 0.15;
                 ui.ctx().request_repaint();
             }
@@ -530,6 +594,57 @@ impl eframe::App for OctantApp {
                                 zoom: self.sphere_zoom,
                                 displacement_strength: self.surface_displacement_strength,
                                 surface_mode: self.surface_mode,
+                                rect,
+                            },
+                        );
+                        ui.painter().add(callback);
+                    }
+                }
+                PlotType::Volume => {
+                    if let Some(volume_renderer) = &self.volume_renderer {
+                        let (width, height) = self.matrix_data.as_ref().map_or((64, 64), |m| (m.width as u32, m.height as u32));
+                        let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+
+                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                            rect,
+                            VolumeCallback {
+                                renderer: volume_renderer.clone(),
+                                colormap: effective_colormap,
+                                rot_y: self.sphere_rotation_y,
+                                rot_x: self.sphere_rotation_x,
+                                aspect_x,
+                                aspect_y,
+                                aspect_z,
+                                zoom: self.sphere_zoom,
+                                opacity_scale: self.volume_opacity,
+                                step_count: self.volume_step_count,
+                                width,
+                                height,
+                                rect,
+                            },
+                        );
+                        ui.painter().add(callback);
+                    }
+                }
+                PlotType::PointCloud => {
+                    if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
+                        let (width, height) = self.matrix_data.as_ref().map_or((64, 64), |m| (m.width as u32, m.height as u32));
+                        let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+
+                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                            rect,
+                            PointCloudCallback {
+                                renderer: point_cloud_renderer.clone(),
+                                colormap: effective_colormap,
+                                rot_y: self.sphere_rotation_y,
+                                rot_x: self.sphere_rotation_x,
+                                aspect_x,
+                                aspect_y,
+                                aspect_z,
+                                zoom: self.sphere_zoom,
+                                point_size: self.point_cloud_size,
+                                width,
+                                height,
                                 rect,
                             },
                         );

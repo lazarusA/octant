@@ -8,8 +8,9 @@ pub mod point_cloud;
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
 pub use surface::{SurfaceCallback, SurfaceRenderer, SurfacePlot};
 pub use block::BlockPlot;
-pub use volume::VolumePlot; 
+pub use volume::{VolumeCallback, VolumeRenderer}; 
 pub use sphere::{SphereCallback, SphereRenderer, SpherePlot};
+pub use point_cloud::{PointCloudCallback, PointCloudRenderer};
 
 /// Supported visualization plot types in Octant Engine
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]

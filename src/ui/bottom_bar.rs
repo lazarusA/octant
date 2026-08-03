@@ -1,13 +1,19 @@
 use crate::app::OctantApp;
+use crate::plots::PlotType;
 use super::cache;
 
 pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
+    let is_3d_mode = app.active_plot_type == PlotType::Sphere
+        || app.active_plot_type == PlotType::Surface
+        || app.active_plot_type == PlotType::Volume
+        || app.active_plot_type == PlotType::PointCloud;
+
     egui::TopBottomPanel::bottom("octant_bottom_bar")
         .exact_height(38.0)
         .show(ctx, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
-                // 1. Play / Pause Button
+                // 1. Play / Pause Button for Timestep Animation across all plot types
                 let play_text = if app.is_playing { "⏸ Pause" } else { "▶ Play" };
                 if ui.button(egui::RichText::new(play_text).strong()).clicked() {
                     app.is_playing = !app.is_playing;
@@ -37,9 +43,14 @@ pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
                 // 4. Loop Toggle
                 ui.checkbox(&mut app.loop_playback, "🔄 Loop");
 
+                // 5. Auto-Rotate toggle for 3D modes
+                if is_3d_mode {
+                    ui.checkbox(&mut app.sphere_auto_rotate, "🎥 Rotate");
+                }
+
                 ui.separator();
 
-                // 5. Timestep timeline slider & Dimension-Agnostic Axis Reading
+                // 6. Timestep timeline slider & Dimension-Agnostic Axis Reading
                 let active_var_info = app
                     .active_dataset_metadata
                     .as_ref()
@@ -94,13 +105,13 @@ pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
 
                 ui.separator();
 
-                // 6. Playback speed slider
+                // 7. Playback speed slider
                 ui.menu_button(format!("{:.0} FPS", app.playback_fps), |ui| {
                     ui.label(egui::RichText::new("Playback Speed").strong());
                     ui.add(egui::Slider::new(&mut app.playback_fps, 1.0..=60.0).suffix(" FPS"));
                 });
 
-                // 7. Bottom Right: Cache Menu Dropdown
+                // 8. Bottom Right: Cache Menu Dropdown
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     cache::show_cache_menu(app, ui);
                 });
