@@ -187,9 +187,16 @@ fn gennormal(uvw: vec3<f32>) -> vec3<f32> {
     let dy = vec3<f32>(0.0, 1.0 / grid_h, 0.0);
     let dz = vec3<f32>(0.0, 0.0, 1.0 / grid_d);
 
-    let nx = sample_volume_scalar(uvw - dx) - sample_volume_scalar(uvw + dx);
-    let ny = sample_volume_scalar(uvw - dy) - sample_volume_scalar(uvw + dy);
-    let nz = sample_volume_scalar(uvw - dz) - sample_volume_scalar(uvw + dz);
+    let p_x0 = clamp(uvw - dx, vec3<f32>(0.0), vec3<f32>(1.0));
+    let p_x1 = clamp(uvw + dx, vec3<f32>(0.0), vec3<f32>(1.0));
+    let p_y0 = clamp(uvw - dy, vec3<f32>(0.0), vec3<f32>(1.0));
+    let p_y1 = clamp(uvw + dy, vec3<f32>(0.0), vec3<f32>(1.0));
+    let p_z0 = clamp(uvw - dz, vec3<f32>(0.0), vec3<f32>(1.0));
+    let p_z1 = clamp(uvw + dz, vec3<f32>(0.0), vec3<f32>(1.0));
+
+    let nx = sample_volume_scalar(p_x0) - sample_volume_scalar(p_x1);
+    let ny = sample_volume_scalar(p_y0) - sample_volume_scalar(p_y1);
+    let nz = sample_volume_scalar(p_z0) - sample_volume_scalar(p_z1);
 
     let grad = vec3<f32>(nx, ny, nz);
     let len = length(grad);
@@ -216,13 +223,13 @@ fn smooth_zero_max(x: f32) -> f32 {
 }
 
 fn blinnphong(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
-    let diff_coeff = smooth_zero_max(dot(L, -N)) + smooth_zero_max(dot(L, N));
-    let H = normalize(L + V);
-    let spec_coeff = pow(max(dot(H, -N), 0.0) + max(dot(H, N), 0.0), uniforms.shininess);
-    return uniforms.ambient * color + uniforms.light_color * (
-        uniforms.diffuse * diff_coeff * color +
-        uniforms.specular * spec_coeff
-    );
+    let light_dir = normalize(vec3<f32>(0.4, 0.8, 0.6));
+    let diff_coeff = max(dot(light_dir, N), 0.0) + max(dot(light_dir, -N), 0.0) * 0.4;
+    let H = normalize(light_dir + V);
+    let spec_coeff = pow(max(dot(H, N), 0.0), uniforms.shininess);
+
+    let ambient = max(uniforms.ambient, vec3<f32>(0.35));
+    return ambient * color + uniforms.diffuse * diff_coeff * color + uniforms.light_color * uniforms.specular * spec_coeff;
 }
 
 fn hitBox(orig: vec3<f32>, dir: vec3<f32>, scale_vec: vec3<f32>) -> vec2<f32> {
@@ -409,12 +416,12 @@ fn contours(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
 
     for (var i = 0; i < samples_count; i = i + 1) {
         let intensity = sample_volume_scalar(pos);
-        let color_sample = color_lookup(intensity, uniforms.colormap, uniforms.colorrange);
+        if (intensity >= uniforms.colorrange.x && intensity <= uniforms.colorrange.y) {
+            let color_sample = color_lookup(intensity, uniforms.colormap, uniforms.colorrange);
+            let opacity = clamp(step_size * max(color_sample.a, 0.1) * uniforms.absorption, 0.0, 1.0);
 
-        let opacity = color_sample.a;
-        if (opacity > 0.0) {
             let N = gennormal(pos);
-            let L = uniforms.light_direction;
+            let L = normalize(vec3<f32>(0.4, 0.8, 0.6));
             let opaque = blinnphong(N, camdir, L, color_sample.rgb);
             color_sum = color_sum + (transmittance * opacity) * opaque;
             transmittance = transmittance * (1.0 - opacity);
@@ -428,7 +435,7 @@ fn contours(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     if (1.0 - transmittance <= 0.0) {
         return vec4<f32>(0.0);
     }
-    return vec4<f32>(color_sum / (1.0 - transmittance), 1.0 - transmittance);
+    return vec4<f32>(color_sum / max(1.0 - transmittance, 0.001), 1.0 - transmittance);
 }
 
 struct ClipResult {
