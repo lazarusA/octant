@@ -3,12 +3,12 @@ name = "octant"
 version = "0.1.0"
 authors = ["Lazaro Alonso <lazarus.alon@gmail.com>"]
 edition = "2024"
-description = "A multiscale cloud-native tensor visualization engine in Rust."
+description = "A cloud-native visualization engine in Rust for n-dimensional datasets and interactive plotting."
 readme = "README.md"
 repository = "https://github.com/lalonso/octant"
 documentation = "https://docs.rs/octant"
 license = "MIT OR Apache-2.0"
-keywords = ["visualization", "zarr", "tensor", "wgpu", "graphics"]
+keywords = ["visualization", "zarr", "icechunk", "array", "wgpu", "graphics"]
 categories = ["visualization", "graphics", "science"]
 
 [dependencies]
