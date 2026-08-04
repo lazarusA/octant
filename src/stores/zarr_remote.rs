@@ -22,7 +22,7 @@ impl DataStore for ZarrRemoteStore {
     fn inspect(&self) -> Result<DatasetMetadata, Box<dyn Error>> {
         let base_url = self.store_url.trim_end_matches('/');
         let store = zarr_utils::build_sync_store(base_url)?;
-        let variables = zarr_utils::extract_store_variables(store, base_url)?;
+        let variables = zarr_utils::extract_store_variables_consolidated(store, base_url)?;
         let dataset_name = base_url.split('/').last().unwrap_or("remote.zarr").to_string();
 
         Ok(DatasetMetadata {

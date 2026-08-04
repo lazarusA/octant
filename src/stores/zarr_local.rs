@@ -1,6 +1,5 @@
-use super::{DataStore, DatasetMetadata, MatrixSlice, VariableInfo};
+use super::{DataStore, DatasetMetadata, MatrixSlice};
 use std::error::Error;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use zarrs::filesystem::FilesystemStore;
@@ -31,34 +30,18 @@ impl DataStore for ZarrLocalStore {
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| "local.zarr".to_string());
 
-        let mut variables = Vec::new();
-
-        // Recursively inspect directory for zarr array metadata (.zarray or zarr.json)
-        inspect_directory_for_zarr_variables(&self.path, &mut variables, "")?;
-
-        if variables.is_empty() {
-            // Generate fallback variable if root itself is a single Zarr array
-            variables.push(VariableInfo {
-                name: "data".to_string(),
-                data_type: "float32".to_string(),
-                shape: vec![64, 64],
-                dimension_names: vec!["y".to_string(), "x".to_string()],
-                chunk_shape: vec![64, 64],
-                file_size: crate::utils::calculate_variable_size_bytes(&[64, 64], "float32"),
-                ..Default::default()
-            });
-        }
-
         let store_path_str = self.path.to_string_lossy().to_string();
-        let dimension_coordinates = if let Ok(store) = FilesystemStore::new(&self.path) {
+        let (variables, dimension_coordinates) = if let Ok(store) = FilesystemStore::new(&self.path) {
             let store_arc = Arc::new(store);
-            let dim_names: Vec<String> = variables
+            let vars = crate::utils::extract_store_variables_consolidated(store_arc.clone(), &store_path_str)?;
+            let dim_names: Vec<String> = vars
                 .iter()
                 .flat_map(|v| v.dimension_names.clone())
                 .collect();
-            crate::utils::zarr::fetch_all_dimension_coordinates(store_arc, &dim_names, Some(&store_path_str))
+            let coords = crate::utils::zarr::fetch_all_dimension_coordinates(store_arc, &dim_names, Some(&store_path_str));
+            (vars, coords)
         } else {
-            std::collections::HashMap::new()
+            (Vec::new(), std::collections::HashMap::new())
         };
 
         Ok(DatasetMetadata {
@@ -121,67 +104,4 @@ impl DataStore for ZarrLocalStore {
     }
 }
 
-fn inspect_directory_for_zarr_variables(
-    dir_path: &Path,
-    variables: &mut Vec<VariableInfo>,
-    rel_prefix: &str,
-) -> Result<(), Box<dyn Error>> {
-    if !dir_path.is_dir() {
-        return Ok(());
-    }
 
-    let entries = fs::read_dir(dir_path)?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_file() {
-            let file_name = entry.file_name().to_string_lossy().to_string();
-            if file_name == ".zarray" || file_name == "zarr.json" {
-                if let Ok(contents) = fs::read_to_string(&path) {
-                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&contents) {
-                        let var_name = if rel_prefix.is_empty() {
-                            "data".to_string()
-                        } else {
-                            rel_prefix.trim_start_matches('/').to_string()
-                        };
-
-                        let shape = v.get("shape")
-                            .and_then(|s| s.as_array())
-                            .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
-                            .unwrap_or_else(|| vec![64, 64]);
-
-                        let chunk_shape = v.get("chunks")
-                            .and_then(|c| c.as_array())
-                            .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
-                            .unwrap_or_else(|| shape.clone());
-
-                        let data_type = v.get("dtype")
-                            .or_else(|| v.get("data_type"))
-                            .and_then(|d| d.as_str())
-                            .unwrap_or("float32")
-                            .to_string();
-
-                        let file_size = crate::utils::calculate_variable_size_bytes(&shape, &data_type);
-
-                        variables.push(VariableInfo {
-                            name: var_name,
-                            data_type,
-                            shape,
-                            dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
-                            chunk_shape,
-                            file_size,
-                            ..Default::default()
-                        });
-                    }
-                }
-            }
-        } else if path.is_dir() {
-            let folder_name = entry.file_name().to_string_lossy().to_string();
-            if !folder_name.starts_with('.') && folder_name != "node_modules" {
-                let sub_prefix = format!("{}/{}", rel_prefix, folder_name);
-                let _ = inspect_directory_for_zarr_variables(&path, variables, &sub_prefix);
-            }
-        }
-    }
-
-    Ok(())
-}
