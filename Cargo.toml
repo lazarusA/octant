@@ -8,7 +8,7 @@ readme = "README.md"
 repository = "https://github.com/lalonso/octant"
 documentation = "https://docs.rs/octant"
 license = "MIT OR Apache-2.0"
-keywords = ["visualization", "zarr", "icechunk", "array", "wgpu", "graphics"]
+keywords = ["visualization", "zarr", "icechunk", "wgpu", "graphics"]
 categories = ["visualization", "graphics", "science"]
 
 [dependencies]
