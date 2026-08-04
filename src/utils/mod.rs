@@ -10,4 +10,9 @@ pub use units::{
     add_days_to_date, calculate_variable_size_bytes, format_axis_value, parse_loc,
     parse_reference_date, parse_time_unit, unit_to_milliseconds,
 };
-pub use zarr::{build_sync_store, discover_arrays_via_metadata, extract_store_variables, fetch_all_dimension_coordinates, fetch_slice, fetch_slice_range};
+pub use zarr::{
+    build_sync_store, discover_arrays_via_metadata, extract_store_variables,
+    extract_store_variables_consolidated, fetch_all_dimension_coordinates, fetch_slice,
+    fetch_slice_range,
+};
+
