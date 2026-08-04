@@ -211,9 +211,16 @@ pub fn show_hover_tooltip(
         painter.circle_stroke(
             crosshair_pos,
             5.0,
-            Stroke::new(1.0_f32, ctx.style().visuals.strong_text_color()),
+            Stroke::new(
+                1.0_f32,
+                ctx.style_of(ctx.theme()).visuals.strong_text_color(),
+            ),
         );
-        painter.circle_filled(crosshair_pos, 2.0, ctx.style().visuals.strong_text_color());
+        painter.circle_filled(
+            crosshair_pos,
+            2.0,
+            ctx.style_of(ctx.theme()).visuals.strong_text_color(),
+        );
 
         let arm_len = 8.0;
         painter.line_segment(
@@ -242,10 +249,11 @@ pub fn show_hover_tooltip(
     };
 
     // 7. Render Floating Glassmorphic Tooltip Window near Cursor
-    let strong_text = ctx.style().visuals.strong_text_color();
-    let text_color = ctx.style().visuals.text_color();
+    let style = ctx.style_of(ctx.theme());
+    let strong_text = style.visuals.strong_text_color();
+    let text_color = style.visuals.text_color();
 
-    let screen_rect = ctx.screen_rect();
+    let screen_rect = ctx.input(|i| i.viewport_rect());
     let tooltip_w = 230.0;
     let tooltip_h = 72.0;
 
@@ -262,7 +270,7 @@ pub fn show_hover_tooltip(
         .fixed_pos(tooltip_pos)
         .show(ctx, |ui| {
             egui::Frame::window(ui.style())
-                .inner_margin(egui::Margin::symmetric(10.0, 6.0))
+                .inner_margin(egui::Margin::symmetric(10, 6))
                 .show(ui, |ui| {
                     ui.set_width(tooltip_w - 20.0);
                     ui.vertical(|ui| {

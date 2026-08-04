@@ -14,7 +14,7 @@ pub fn show_variables_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     };
 
     ui.menu_button(menu_title, |ui| {
-        let screen_size = ui.ctx().screen_rect().size();
+        let screen_size = ui.ctx().input(|i| i.viewport_rect()).size();
         let target_width = (screen_size.x * 0.28).clamp(280.0, 480.0);
         let max_height = (screen_size.y * 0.65).clamp(250.0, 750.0);
 
@@ -50,7 +50,7 @@ pub fn show_variables_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                                 app.selected_dim_indices = vec![0; var_info.shape.len()];
                                 app.selected_dim_ranges = var_info.shape.iter().map(|&s| (0, (s as usize).saturating_sub(1))).collect();
                                 app.show_right_panel = true;
-                                ui.close_menu();
+                                ui.close();
 
                             }
                         }

@@ -33,7 +33,7 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             if response.clicked() {
                 app.active_colormap = id;
                 app.preview_colormap = None;
-                ui.close_menu();
+                ui.close();
             }
         }
 

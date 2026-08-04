@@ -62,7 +62,7 @@ pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.add_space(4.0);
         if ui.button(egui::RichText::new("📚 Open Dataset Catalog...").strong()).clicked() {
             app.show_catalog_window = true;
-            ui.close_menu();
+            ui.close();
         }
 
         ui.separator();
@@ -86,7 +86,7 @@ pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             ui.add_space(6.0);
             if ui.button("🔄 Refresh Store Metadata").clicked() {
                 app.inspect_active_store();
-                ui.close_menu();
+                ui.close();
             }
         });
     });

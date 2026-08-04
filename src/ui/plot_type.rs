@@ -43,12 +43,12 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             if enabled {
                 if ui.selectable_label(is_selected, label).clicked() {
                     app.active_plot_type = plot_type;
-                    ui.close_menu();
+                    ui.close();
                 }
             } else {
                 ui.add_enabled(
                     false,
-                    egui::SelectableLabel::new(false, format!("{} (Requires 3D Data)", label)),
+                    egui::Label::new(format!("{} (Requires 3D Data)", label)),
                 );
             }
         }
