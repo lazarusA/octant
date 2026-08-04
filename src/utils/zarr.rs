@@ -20,6 +20,21 @@ impl AsyncToSyncBlockOn for TokioBlockOn {
     }
 }
 
+static SHARED_TOKIO_RT: OnceLock<Arc<tokio::runtime::Runtime>> = OnceLock::new();
+
+fn get_shared_tokio_rt() -> Arc<tokio::runtime::Runtime> {
+    SHARED_TOKIO_RT
+        .get_or_init(|| {
+            Arc::new(
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to create shared Tokio runtime"),
+            )
+        })
+        .clone()
+}
+
 /// Helper function to build a synchronous Zarr storage adapter over HTTP object_store.
 pub fn build_sync_store(url: &str) -> Result<ReadableWritableListableStorage, Box<dyn Error>> {
     let clean_url = url.trim_end_matches('/');
@@ -31,7 +46,7 @@ pub fn build_sync_store(url: &str) -> Result<ReadableWritableListableStorage, Bo
         .with_client_options(options)
         .build()?;
     let async_store = Arc::new(AsyncObjectStore::new(http_store));
-    let rt = Arc::new(tokio::runtime::Builder::new_current_thread().enable_all().build()?);
+    let rt = get_shared_tokio_rt();
     let sync_store: ReadableWritableListableStorage = Arc::new(AsyncToSyncStorageAdapter::new(
         async_store,
         TokioBlockOn(rt.clone()),
@@ -344,7 +359,7 @@ pub fn fetch_all_dimension_coordinates(
         if let Ok(array) = Array::open(store.clone(), &array_path)
             .or_else(|_| Array::open(store.clone(), &dim_clean))
         {
-            let len = array.shape().first().copied().unwrap_or(0) as usize;
+            let len = (array.shape().first().copied().unwrap_or(0) as usize).min(5000);
             if len > 0 {
                 let subset = ArraySubset::new_with_ranges(&[0..len as u64]);
                 let mut coords = Vec::with_capacity(len);

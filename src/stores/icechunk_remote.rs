@@ -20,26 +20,8 @@ impl DataStore for IcechunkRemoteStore {
 
     fn inspect(&self) -> Result<DatasetMetadata, Box<dyn Error>> {
         let base_url = self.endpoint_url.trim_end_matches('/');
-        println!("[ICECHUNK STORE DEBUG] Inspecting store URL: {}", base_url);
-        let store = match crate::utils::icechunk::build_sync_icechunk_store(base_url) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("[ICECHUNK STORE ERROR] Failed to build sync icechunk store: {:?}", e);
-                return Err(e);
-            }
-        };
-
-        println!("[ICECHUNK STORE DEBUG] Extracting store variables...");
-        let variables = match crate::utils::extract_store_variables_consolidated(store.clone(), base_url) {
-            Ok(v) => {
-                println!("[ICECHUNK STORE DEBUG] Extracted {} variables!", v.len());
-                v
-            }
-            Err(e) => {
-                eprintln!("[ICECHUNK STORE ERROR] Failed to extract store variables: {:?}", e);
-                return Err(e);
-            }
-        };
+        let store = crate::utils::icechunk::build_sync_icechunk_store(base_url)?;
+        let variables = crate::utils::extract_store_variables_consolidated(store.clone(), base_url)?;
 
         let dim_names: Vec<String> = variables
             .iter()

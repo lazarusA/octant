@@ -13,26 +13,45 @@ impl AsyncToSyncBlockOn for TokioBlockOn {
     }
 }
 
+use std::collections::HashMap;
+use std::sync::{OnceLock, RwLock};
+
+static ICECHUNK_STORE_CACHE: OnceLock<RwLock<HashMap<String, ReadableWritableListableStorage>>> = OnceLock::new();
+static SHARED_TOKIO_RT: OnceLock<Arc<tokio::runtime::Runtime>> = OnceLock::new();
+
+fn get_shared_tokio_rt() -> Arc<tokio::runtime::Runtime> {
+    SHARED_TOKIO_RT
+        .get_or_init(|| {
+            Arc::new(
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to create shared Tokio runtime"),
+            )
+        })
+        .clone()
+}
+
 /// Helper function to build a synchronous Zarr storage adapter over an Icechunk repository.
-/// By default, opens a readonly session for the "main" branch.
+/// By default, opens a readonly session for the "main" branch. Caches stores by URL location.
 pub fn build_sync_icechunk_store(
     location: &str,
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error>> {
-    println!("[ICECHUNK DEBUG] Opening store at location: {}", location);
-    let rt = Arc::new(tokio::runtime::Builder::new_current_thread().enable_all().build()?);
+    let cache_lock = ICECHUNK_STORE_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+    if let Ok(cache) = cache_lock.read() {
+        if let Some(store) = cache.get(location) {
+            return Ok(store.clone());
+        }
+    }
+
+    let rt = get_shared_tokio_rt();
 
     let async_store = rt.block_on(async {
         let path = Path::new(location);
         let storage = if path.exists() {
-            println!("[ICECHUNK DEBUG] Opening local filesystem storage: {:?}", path);
             icechunk::new_local_filesystem_storage(path).await?
         } else {
             let (bucket, prefix, region, endpoint_url) = parse_s3_or_http_url(location)?;
-            println!(
-                "[ICECHUNK DEBUG] Parsed URL -> bucket: '{}', prefix: '{:?}', region: '{:?}', endpoint_url: '{:?}'",
-                bucket, prefix, region, endpoint_url
-            );
-
             let mut config = icechunk::config::S3Options::default();
             config.region = region.or_else(|| Some("us-east-1".to_string()));
             config.endpoint_url = endpoint_url;
@@ -40,7 +59,6 @@ pub fn build_sync_icechunk_store(
             config.allow_http = true;
             config.force_path_style = true;
 
-            println!("[ICECHUNK DEBUG] Creating S3 storage adapter...");
             icechunk::new_s3_object_store_storage(
                 config,
                 bucket,
@@ -51,33 +69,10 @@ pub fn build_sync_icechunk_store(
             ).await?
         };
 
-        println!("[ICECHUNK DEBUG] Opening Icechunk Repository...");
-        let repo = match icechunk::Repository::open(None, storage, Default::default()).await {
-            Ok(r) => {
-                println!("[ICECHUNK DEBUG] Repository opened successfully!");
-                r
-            }
-            Err(e) => {
-                eprintln!("[ICECHUNK DEBUG ERROR] Failed to open Repository: {:?}", e);
-                return Err(Box::new(e) as Box<dyn Error>);
-            }
-        };
-
-        println!("[ICECHUNK DEBUG] Opening readonly session for branch 'main'...");
+        let repo = icechunk::Repository::open(None, storage, Default::default()).await?;
         let version_info = icechunk::repository::VersionInfo::BranchTipRef("main".to_string());
-        let session = match repo.readonly_session(&version_info).await {
-            Ok(s) => {
-                println!("[ICECHUNK DEBUG] Readonly session opened successfully!");
-                s
-            }
-            Err(e) => {
-                eprintln!("[ICECHUNK DEBUG ERROR] Failed to open readonly_session for 'main': {:?}", e);
-                return Err(Box::new(e) as Box<dyn Error>);
-            }
-        };
-
+        let session = repo.readonly_session(&version_info).await?;
         let ice_store = Arc::new(AsyncIcechunkStore::new(session));
-        println!("[ICECHUNK DEBUG] AsyncIcechunkStore created.");
         Ok::<_, Box<dyn Error>>(ice_store)
     })?;
 
@@ -86,7 +81,10 @@ pub fn build_sync_icechunk_store(
         TokioBlockOn(rt.clone()),
     ));
 
-    println!("[ICECHUNK DEBUG] Synchronous storage adapter ready.");
+    if let Ok(mut cache) = cache_lock.write() {
+        cache.insert(location.to_string(), sync_store.clone());
+    }
+
     Ok(sync_store)
 }
 
