@@ -164,8 +164,10 @@ impl HeatmapRenderer {
     }
 
     pub fn update_colormap(&self, queue: &wgpu::Queue, colormap: u32) {
-        let mut color = super::common::PlotColorParams::default();
-        color.colormap = colormap;
+        let color = super::common::PlotColorParams {
+            colormap,
+            ..Default::default()
+        };
         self.update_uniforms(queue, &color);
     }
 

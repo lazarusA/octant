@@ -341,41 +341,41 @@ impl OctantApp {
     }
 
     pub fn trigger_background_prefetch(&mut self) {
-        if let Some(metadata) = &self.active_dataset_metadata {
-            if let Some(var_info) = metadata.variables.get(self.selected_variable_idx) {
-                let max_steps = if var_info.shape.len() <= 2 {
-                    1
-                } else {
-                    var_info.shape.first().copied().unwrap_or(1) as usize
-                };
-                if max_steps <= 1 {
-                    return;
-                }
-                let chunk_time_size = if !var_info.chunk_shape.is_empty() {
-                    var_info.chunk_shape[0] as usize
-                } else {
-                    46
-                };
-                let slice_bytes = if var_info.shape.len() >= 2 {
-                    let w = var_info.shape[var_info.shape.len() - 1] as usize;
-                    let h = var_info.shape[var_info.shape.len() - 2] as usize;
-                    w * h * std::mem::size_of::<f32>()
-                } else {
-                    64 * 64 * std::mem::size_of::<f32>()
-                };
-
-                self.prefetcher.prefetch_chunk_aligned(
-                    self.selected_store_kind,
-                    &self.store_target_input,
-                    &var_info.name,
-                    self.current_timestep,
-                    max_steps,
-                    chunk_time_size,
-                    slice_bytes,
-                    self.prefetch_lookahead,
-                    &self.lru_cache,
-                );
+        if let Some(metadata) = &self.active_dataset_metadata
+            && let Some(var_info) = metadata.variables.get(self.selected_variable_idx)
+        {
+            let max_steps = if var_info.shape.len() <= 2 {
+                1
+            } else {
+                var_info.shape.first().copied().unwrap_or(1) as usize
+            };
+            if max_steps <= 1 {
+                return;
             }
+            let chunk_time_size = if !var_info.chunk_shape.is_empty() {
+                var_info.chunk_shape[0] as usize
+            } else {
+                46
+            };
+            let slice_bytes = if var_info.shape.len() >= 2 {
+                let w = var_info.shape[var_info.shape.len() - 1] as usize;
+                let h = var_info.shape[var_info.shape.len() - 2] as usize;
+                w * h * std::mem::size_of::<f32>()
+            } else {
+                64 * 64 * std::mem::size_of::<f32>()
+            };
+
+            self.prefetcher.prefetch_chunk_aligned(
+                self.selected_store_kind,
+                &self.store_target_input,
+                &var_info.name,
+                self.current_timestep,
+                max_steps,
+                chunk_time_size,
+                slice_bytes,
+                self.prefetch_lookahead,
+                &self.lru_cache,
+            );
         }
     }
 
@@ -384,7 +384,7 @@ impl OctantApp {
             let same_dimensions = self
                 .matrix_data
                 .as_ref()
-                .map_or(false, |m| m.width == data.width && m.height == data.height);
+                .is_some_and(|m| m.width == data.width && m.height == data.height);
 
             if same_dimensions
                 && self.renderer.is_some()
@@ -402,13 +402,15 @@ impl OctantApp {
                 if let Some(surface_renderer) = &self.surface_renderer {
                     surface_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
-                if let Some(volume_renderer) = &mut self.volume_renderer {
-                    Arc::get_mut(volume_renderer)
-                        .map(|r| r.update_data(&wgpu_render_state.queue, &data.values));
+                if let Some(volume_renderer) = &mut self.volume_renderer
+                    && let Some(r) = Arc::get_mut(volume_renderer)
+                {
+                    r.update_data(&wgpu_render_state.queue, &data.values)
                 }
-                if let Some(point_cloud_renderer) = &mut self.point_cloud_renderer {
-                    Arc::get_mut(point_cloud_renderer)
-                        .map(|r| r.update_data(&wgpu_render_state.queue, &data.values));
+                if let Some(point_cloud_renderer) = &mut self.point_cloud_renderer
+                    && let Some(r) = Arc::get_mut(point_cloud_renderer)
+                {
+                    r.update_data(&wgpu_render_state.queue, &data.values)
                 }
             } else {
                 let renderer = MatrixRenderer::new(

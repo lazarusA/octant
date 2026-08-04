@@ -196,6 +196,7 @@ impl PointCloudRenderer {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_uniforms(
         &self,
         queue: &wgpu::Queue,

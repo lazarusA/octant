@@ -20,47 +20,46 @@ pub fn extract_store_variables_consolidated(
     // 1. Try opening the root as a Zarr Group
     if let Ok(group) = Group::open(store.clone(), "/") {
         // Check if group contains consolidated metadata natively
-        let consolidated_arrays = if let Some(ConsolidatedMetadata { metadata, .. }) =
-            group.consolidated_metadata()
-        {
-            let mut found_vars = Vec::new();
-            for (node_path, _node_meta) in metadata {
-                let clean_path = if node_path.starts_with('/') {
-                    node_path.to_string()
-                } else {
-                    format!("/{}", node_path)
-                };
-                if let Ok(array) = Array::open(store.clone(), &clean_path) {
-                    if let Some(var_info) = variable_info_from_array(&array, node_path.as_str()) {
+        let consolidated_arrays =
+            if let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata() {
+                let mut found_vars = Vec::new();
+                for (node_path, _node_meta) in metadata {
+                    let clean_path = if node_path.starts_with('/') {
+                        node_path.to_string()
+                    } else {
+                        format!("/{}", node_path)
+                    };
+                    if let Ok(array) = Array::open(store.clone(), &clean_path)
+                        && let Some(var_info) = variable_info_from_array(&array, node_path.as_str())
+                    {
                         found_vars.push(var_info);
                     }
                 }
-            }
-            found_vars
-        } else {
-            Vec::new()
-        };
+                found_vars
+            } else {
+                Vec::new()
+            };
 
         if !consolidated_arrays.is_empty() {
             return Ok(consolidated_arrays);
         }
 
         // 2. Fallback: discover child nodes natively via zarrs get_child_nodes
-        if let Ok(root_path) = NodePath::new("/") {
-            if let Ok(children) = get_child_nodes(&store, &root_path, true) {
-                for child in children {
-                    let path_str = child.path().as_str();
-                    let var_name = path_str.trim_start_matches('/');
-                    let var_name = if var_name.is_empty() {
-                        "data"
-                    } else {
-                        var_name
-                    };
-                    if let Ok(array) = Array::open(store.clone(), path_str) {
-                        if let Some(var_info) = variable_info_from_array(&array, var_name) {
-                            variables.push(var_info);
-                        }
-                    }
+        if let Ok(root_path) = NodePath::new("/")
+            && let Ok(children) = get_child_nodes(&store, &root_path, true)
+        {
+            for child in children {
+                let path_str = child.path().as_str();
+                let var_name = path_str.trim_start_matches('/');
+                let var_name = if var_name.is_empty() {
+                    "data"
+                } else {
+                    var_name
+                };
+                if let Ok(array) = Array::open(store.clone(), path_str)
+                    && let Some(var_info) = variable_info_from_array(&array, var_name)
+                {
+                    variables.push(var_info);
                 }
             }
         }

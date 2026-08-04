@@ -41,10 +41,10 @@ pub fn build_sync_icechunk_store(
     location: &str,
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error>> {
     let cache_lock = ICECHUNK_STORE_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
-    if let Ok(cache) = cache_lock.read() {
-        if let Some(store) = cache.get(location) {
-            return Ok(store.clone());
-        }
+    if let Ok(cache) = cache_lock.read()
+        && let Some(store) = cache.get(location)
+    {
+        return Ok(store.clone());
     }
 
     let rt = get_shared_tokio_rt();
@@ -92,6 +92,7 @@ pub fn build_sync_icechunk_store(
     Ok(sync_store)
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_s3_or_http_url(
     url: &str,
 ) -> Result<(String, Option<String>, Option<String>, Option<String>), Box<dyn Error>> {

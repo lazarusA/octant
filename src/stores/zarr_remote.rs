@@ -25,7 +25,7 @@ impl DataStore for ZarrRemoteStore {
         let variables = zarr_utils::extract_store_variables_consolidated(store, base_url)?;
         let dataset_name = base_url
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or("remote.zarr")
             .to_string();
 

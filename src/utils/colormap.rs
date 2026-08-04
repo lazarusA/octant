@@ -214,6 +214,7 @@ fn sample_inferno(t: f32) -> (f32, f32, f32) {
 }
 
 // 3: Magma (magma.wgsl)
+#[allow(clippy::approx_constant)]
 fn sample_magma(t: f32) -> (f32, f32, f32) {
     sample_segmented(
         t,

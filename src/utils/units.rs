@@ -90,15 +90,15 @@ pub fn parse_reference_date(
     // 3. Fallback to CF units_str (e.g. "days since 1970-01-01")
     if let Some(u) = units_str {
         let lower = u.to_lowercase();
-        if let Some((_, ref_part)) = lower.split_once(" since ") {
-            if let Some((y, m, d)) = parse_iso_date(ref_part.trim()) {
-                let step = if lower.starts_with("day") || lower.starts_with("d ") {
-                    1
-                } else {
-                    days_step
-                };
-                return (y, m, d, step);
-            }
+        if let Some((_, ref_part)) = lower.split_once(" since ")
+            && let Some((y, m, d)) = parse_iso_date(ref_part.trim())
+        {
+            let step = if lower.starts_with("day") || lower.starts_with("d ") {
+                1
+            } else {
+                days_step
+            };
+            return (y, m, d, step);
         }
     }
 
@@ -155,7 +155,7 @@ pub fn add_days_to_date(
 }
 
 fn is_leap_year(year: usize) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
 fn days_in_month(year: usize, month: usize) -> usize {

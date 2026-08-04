@@ -121,73 +121,73 @@ pub fn show_hover_tooltip(
     let mut units_str = String::new();
     let mut dim_info_str = String::new();
 
-    if let Some(meta) = &app.active_dataset_metadata {
-        if let Some(var) = meta.variables.get(app.selected_variable_idx) {
-            var_name = var.name.clone();
-            if let Some(unit) = var.attributes.get("units") {
-                units_str = format!(" [{}]", unit);
-            }
+    if let Some(meta) = &app.active_dataset_metadata
+        && let Some(var) = meta.variables.get(app.selected_variable_idx)
+    {
+        var_name = var.name.clone();
+        if let Some(unit) = var.attributes.get("units") {
+            units_str = format!(" [{}]", unit);
+        }
 
-            // Real Dimension Names (e.g., latitude, longitude, time, depth)
-            let dim_y_name = var
+        // Real Dimension Names (e.g., latitude, longitude, time, depth)
+        let dim_y_name = var
+            .dimension_names
+            .iter()
+            .rposition(|d| d.contains("lat") || d.contains("y") || d.contains("row"))
+            .and_then(|idx| var.dimension_names.get(idx))
+            .cloned()
+            .unwrap_or_else(|| "lat".to_string());
+
+        let dim_x_name = var
+            .dimension_names
+            .iter()
+            .rposition(|d| d.contains("lon") || d.contains("x") || d.contains("col"))
+            .and_then(|idx| var.dimension_names.get(idx))
+            .cloned()
+            .unwrap_or_else(|| "lon".to_string());
+
+        // Check if actual coordinate vectors exist in metadata
+        let lat_coord_str = meta
+            .dimension_coordinates
+            .get(&dim_y_name)
+            .and_then(|coords| coords.get(py))
+            .cloned();
+
+        let lon_coord_str = meta
+            .dimension_coordinates
+            .get(&dim_x_name)
+            .and_then(|coords| coords.get(px))
+            .cloned();
+
+        let loc_y = if let Some(c) = lat_coord_str {
+            format!("{}: {}", dim_y_name, c)
+        } else if let Some((lat_deg, _)) = geo_coords {
+            format!("{}: {:.2}°", dim_y_name, lat_deg)
+        } else {
+            format!("{}: {}", dim_y_name, py)
+        };
+
+        let loc_x = if let Some(c) = lon_coord_str {
+            format!("{}: {}", dim_x_name, c)
+        } else if let Some((_, lon_deg)) = geo_coords {
+            format!("{}: {:.2}°", dim_x_name, lon_deg)
+        } else {
+            format!("{}: {}", dim_x_name, px)
+        };
+
+        if var.shape.len() >= 3 {
+            let step = app.current_timestep + 1;
+            let step_dim_name = var
                 .dimension_names
-                .iter()
-                .rposition(|d| d.contains("lat") || d.contains("y") || d.contains("row"))
-                .and_then(|idx| var.dimension_names.get(idx))
-                .cloned()
-                .unwrap_or_else(|| "lat".to_string());
-
-            let dim_x_name = var
-                .dimension_names
-                .iter()
-                .rposition(|d| d.contains("lon") || d.contains("x") || d.contains("col"))
-                .and_then(|idx| var.dimension_names.get(idx))
-                .cloned()
-                .unwrap_or_else(|| "lon".to_string());
-
-            // Check if actual coordinate vectors exist in metadata
-            let lat_coord_str = meta
-                .dimension_coordinates
-                .get(&dim_y_name)
-                .and_then(|coords| coords.get(py))
-                .cloned();
-
-            let lon_coord_str = meta
-                .dimension_coordinates
-                .get(&dim_x_name)
-                .and_then(|coords| coords.get(px))
-                .cloned();
-
-            let loc_y = if let Some(c) = lat_coord_str {
-                format!("{}: {}", dim_y_name, c)
-            } else if let Some((lat_deg, _)) = geo_coords {
-                format!("{}: {:.2}°", dim_y_name, lat_deg)
-            } else {
-                format!("{}: {}", dim_y_name, py)
-            };
-
-            let loc_x = if let Some(c) = lon_coord_str {
-                format!("{}: {}", dim_x_name, c)
-            } else if let Some((_, lon_deg)) = geo_coords {
-                format!("{}: {:.2}°", dim_x_name, lon_deg)
-            } else {
-                format!("{}: {}", dim_x_name, px)
-            };
-
-            if var.shape.len() >= 3 {
-                let step = app.current_timestep + 1;
-                let step_dim_name = var
-                    .dimension_names
-                    .first()
-                    .map(|s| s.as_str())
-                    .unwrap_or("time");
-                dim_info_str = format!(
-                    "{}, {} | {}: {}/{}",
-                    loc_y, loc_x, step_dim_name, step, var.shape[0]
-                );
-            } else {
-                dim_info_str = format!("{}, {}", loc_y, loc_x);
-            }
+                .first()
+                .map(|s| s.as_str())
+                .unwrap_or("time");
+            dim_info_str = format!(
+                "{}, {} | {}: {}/{}",
+                loc_y, loc_x, step_dim_name, step, var.shape[0]
+            );
+        } else {
+            dim_info_str = format!("{}, {}", loc_y, loc_x);
         }
     }
 
@@ -261,7 +261,7 @@ pub fn show_hover_tooltip(
         .order(egui::Order::Tooltip)
         .fixed_pos(tooltip_pos)
         .show(ctx, |ui| {
-            egui::Frame::window(&ui.style())
+            egui::Frame::window(ui.style())
                 .inner_margin(egui::Margin::symmetric(10.0, 6.0))
                 .show(ui, |ui| {
                     ui.set_width(tooltip_w - 20.0);

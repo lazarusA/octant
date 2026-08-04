@@ -30,31 +30,25 @@ impl DataStore for IcechunkLocalStore {
         let mut variables = Vec::new();
 
         let icechunk_config = self.repository_path.join("icechunk.json");
-        if icechunk_config.exists() {
-            if let Ok(contents) = fs::read_to_string(&icechunk_config) {
-                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&contents) {
-                    if let Some(vars) = v.get("variables").and_then(|v| v.as_array()) {
-                        for var_item in vars {
-                            if let Some(var_name) = var_item.get("name").and_then(|n| n.as_str()) {
-                                variables.push(VariableInfo {
-                                    name: var_name.to_string(),
-                                    data_type: "float32".to_string(),
-                                    shape: vec![365, 64, 64],
-                                    dimension_names: vec![
-                                        "time".to_string(),
-                                        "y".to_string(),
-                                        "x".to_string(),
-                                    ],
-                                    chunk_shape: vec![30, 64, 64],
-                                    file_size: crate::utils::calculate_variable_size_bytes(
-                                        &[365, 64, 64],
-                                        "float32",
-                                    ),
-                                    ..Default::default()
-                                });
-                            }
-                        }
-                    }
+        if icechunk_config.exists()
+            && let Ok(contents) = fs::read_to_string(&icechunk_config)
+            && let Ok(v) = serde_json::from_str::<serde_json::Value>(&contents)
+            && let Some(vars) = v.get("variables").and_then(|v| v.as_array())
+        {
+            for var_item in vars {
+                if let Some(var_name) = var_item.get("name").and_then(|n| n.as_str()) {
+                    variables.push(VariableInfo {
+                        name: var_name.to_string(),
+                        data_type: "float32".to_string(),
+                        shape: vec![365, 64, 64],
+                        dimension_names: vec!["time".to_string(), "y".to_string(), "x".to_string()],
+                        chunk_shape: vec![30, 64, 64],
+                        file_size: crate::utils::calculate_variable_size_bytes(
+                            &[365, 64, 64],
+                            "float32",
+                        ),
+                        ..Default::default()
+                    });
                 }
             }
         }

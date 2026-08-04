@@ -73,12 +73,12 @@ impl SliceLruCache {
 
     fn evict_if_needed(&mut self) {
         while self.current_bytes > self.max_bytes && !self.access_order.is_empty() {
-            if let Some(oldest_key) = self.access_order.pop_front() {
-                if let Some(evicted_slice) = self.entries.remove(&oldest_key) {
-                    self.current_bytes = self
-                        .current_bytes
-                        .saturating_sub(evicted_slice.bytes_size());
-                }
+            if let Some(oldest_key) = self.access_order.pop_front()
+                && let Some(evicted_slice) = self.entries.remove(&oldest_key)
+            {
+                self.current_bytes = self
+                    .current_bytes
+                    .saturating_sub(evicted_slice.bytes_size());
             }
         }
     }
@@ -139,6 +139,12 @@ pub struct SlicePrefetcher {
     rx: Receiver<BatchResult>,
     pending: HashSet<SliceCacheKey>,
     active_worker_threads: usize,
+}
+
+impl Default for SlicePrefetcher {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SlicePrefetcher {
@@ -236,6 +242,7 @@ impl SlicePrefetcher {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn prefetch_chunk_aligned(
         &mut self,
         store_kind: StoreKind,

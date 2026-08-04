@@ -52,7 +52,7 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
         .order(egui::Order::Foreground)
         .fixed_pos(panel_min)
         .show(ctx, |ui| {
-            egui::Frame::window(&ui.style())
+            egui::Frame::window(ui.style())
                 .inner_margin(egui::Margin::symmetric(12.0, 8.0))
                 .show(ui, |ui| {
                     ui.set_width(panel_w - 24.0);
@@ -97,11 +97,10 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
 
                             // 1. Build Discrete Color Band Mesh
                             let mut mesh = Mesh::default();
-                            for i in 0..num_cats {
+                            for (i, &val) in cat_vals.iter().enumerate() {
                                 let t_start = i as f32 / num_cats as f32;
                                 let t_end = (i + 1) as f32 / num_cats as f32;
 
-                                let val = cat_vals[i];
                                 let norm_scaled = crate::utils::colormap::apply_color_scale_cpu(
                                     val,
                                     min_val,
@@ -499,7 +498,7 @@ fn format_scientific_tick(val: f32) -> String {
     let abs_val = val.abs();
     if abs_val == 0.0 {
         "0".to_string()
-    } else if abs_val >= 10000.0 || abs_val < 0.001 {
+    } else if !(0.001..10000.0).contains(&abs_val) {
         let s = format!("{:.2e}", val);
         if let Some((mantissa, exponent)) = s.split_once('e') {
             let clean_mantissa = mantissa.trim_end_matches('0').trim_end_matches('.');

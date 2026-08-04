@@ -33,7 +33,7 @@ impl DataStore for IcechunkRemoteStore {
 
         let dataset_name = base_url
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or("icechunk_store")
             .to_string();
 

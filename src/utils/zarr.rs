@@ -118,135 +118,119 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
         .and_then(|c| c.get(&zmetadata_url).send().ok())
         .or_else(|| reqwest::blocking::get(&zmetadata_url).ok());
 
-    if let Some(resp) = resp_opt {
-        if resp.status().is_success() {
-            if let Ok(bytes) = resp.bytes() {
-                if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes) {
-                    if let Some(metadata_obj) = v.get("metadata").and_then(|m| m.as_object()) {
-                        for (key, val) in metadata_obj {
-                            if key.ends_with("/.zarray")
-                                || key == ".zarray"
-                                || key.ends_with("/zarr.json")
-                            {
-                                let var_name = key
-                                    .trim_end_matches("/.zarray")
-                                    .trim_end_matches("/zarr.json")
-                                    .to_string();
-                                let var_name = if var_name.is_empty() {
-                                    "data".to_string()
-                                } else {
-                                    var_name
-                                };
+    if let Some(resp) = resp_opt
+        && resp.status().is_success()
+        && let Ok(bytes) = resp.bytes()
+        && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes)
+        && let Some(metadata_obj) = v.get("metadata").and_then(|m| m.as_object())
+    {
+        for (key, val) in metadata_obj {
+            if key.ends_with("/.zarray") || key == ".zarray" || key.ends_with("/zarr.json") {
+                let var_name = key
+                    .trim_end_matches("/.zarray")
+                    .trim_end_matches("/zarr.json")
+                    .to_string();
+                let var_name = if var_name.is_empty() {
+                    "data".to_string()
+                } else {
+                    var_name
+                };
 
-                                let shape: Vec<u64> = val
-                                    .get("shape")
-                                    .and_then(|s| s.as_array())
-                                    .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
-                                    .unwrap_or_else(|| vec![989, 72, 144]);
+                let shape: Vec<u64> = val
+                    .get("shape")
+                    .and_then(|s| s.as_array())
+                    .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
+                    .unwrap_or_else(|| vec![989, 72, 144]);
 
-                                let chunk_shape: Vec<u64> = val
-                                    .get("chunks")
-                                    .and_then(|c| c.as_array())
-                                    .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
-                                    .unwrap_or_else(|| shape.clone());
+                let chunk_shape: Vec<u64> = val
+                    .get("chunks")
+                    .and_then(|c| c.as_array())
+                    .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
+                    .unwrap_or_else(|| shape.clone());
 
-                                let data_type = val
-                                    .get("dtype")
-                                    .or_else(|| val.get("data_type"))
-                                    .and_then(|d| d.as_str())
-                                    .unwrap_or("float32")
-                                    .to_string();
+                let data_type = val
+                    .get("dtype")
+                    .or_else(|| val.get("data_type"))
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("float32")
+                    .to_string();
 
-                                let zattrs_key = if var_name == "data" {
-                                    ".zattrs".to_string()
-                                } else {
-                                    format!("{}/.zattrs", var_name)
-                                };
+                let zattrs_key = if var_name == "data" {
+                    ".zattrs".to_string()
+                } else {
+                    format!("{}/.zattrs", var_name)
+                };
 
-                                let attrs_val = metadata_obj
-                                    .get(&zattrs_key)
-                                    .or_else(|| metadata_obj.get(".zattrs"));
+                let attrs_val = metadata_obj
+                    .get(&zattrs_key)
+                    .or_else(|| metadata_obj.get(".zattrs"));
 
-                                let mut attributes = HashMap::new();
-                                let mut units = None;
-                                let mut long_name = None;
-                                let mut time_coverage_start = None;
-                                let mut time_coverage_end = None;
-                                let mut temporal_resolution = None;
-                                let mut dimension_names = match shape.len() {
-                                    1 => vec!["x".to_string()],
-                                    2 => vec!["lat".to_string(), "lon".to_string()],
-                                    3 => vec![
-                                        "time".to_string(),
-                                        "lat".to_string(),
-                                        "lon".to_string(),
-                                    ],
-                                    4 => vec![
-                                        "time".to_string(),
-                                        "level".to_string(),
-                                        "lat".to_string(),
-                                        "lon".to_string(),
-                                    ],
-                                    _ => (0..shape.len()).map(|i| format!("dim_{}", i)).collect(),
-                                };
+                let mut attributes = HashMap::new();
+                let mut units = None;
+                let mut long_name = None;
+                let mut time_coverage_start = None;
+                let mut time_coverage_end = None;
+                let mut temporal_resolution = None;
+                let mut dimension_names = match shape.len() {
+                    1 => vec!["x".to_string()],
+                    2 => vec!["lat".to_string(), "lon".to_string()],
+                    3 => vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
+                    4 => vec![
+                        "time".to_string(),
+                        "level".to_string(),
+                        "lat".to_string(),
+                        "lon".to_string(),
+                    ],
+                    _ => (0..shape.len()).map(|i| format!("dim_{}", i)).collect(),
+                };
 
-                                if let Some(attrs) = attrs_val.and_then(|a| a.as_object()) {
-                                    for (k, v_json) in attrs {
-                                        let val_str = if let Some(s) = v_json.as_str() {
-                                            s.to_string()
-                                        } else {
-                                            v_json.to_string()
-                                        };
-                                        attributes.insert(k.clone(), val_str.clone());
+                if let Some(attrs) = attrs_val.and_then(|a| a.as_object()) {
+                    for (k, v_json) in attrs {
+                        let val_str = if let Some(s) = v_json.as_str() {
+                            s.to_string()
+                        } else {
+                            v_json.to_string()
+                        };
+                        attributes.insert(k.clone(), val_str.clone());
 
-                                        match k.as_str() {
-                                            "units" => units = Some(val_str),
-                                            "long_name" => long_name = Some(val_str),
-                                            "time_coverage_start" => {
-                                                time_coverage_start = Some(val_str)
-                                            }
-                                            "time_coverage_end" => {
-                                                time_coverage_end = Some(val_str)
-                                            }
-                                            "temporal_resolution" | "time_period" => {
-                                                temporal_resolution = Some(val_str)
-                                            }
-                                            "_ARRAY_DIMENSIONS" => {
-                                                if let Some(arr) = v_json.as_array() {
-                                                    dimension_names = arr
-                                                        .iter()
-                                                        .filter_map(|e| {
-                                                            e.as_str().map(|s| s.to_string())
-                                                        })
-                                                        .collect();
-                                                }
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                }
-
-                                let file_size = calculate_variable_size_bytes(&shape, &data_type);
-
-                                if !variables.iter().any(|v: &VariableInfo| v.name == var_name) {
-                                    variables.push(VariableInfo {
-                                        name: var_name,
-                                        data_type,
-                                        shape,
-                                        dimension_names,
-                                        chunk_shape,
-                                        file_size,
-                                        units,
-                                        long_name,
-                                        time_coverage_start,
-                                        time_coverage_end,
-                                        temporal_resolution,
-                                        attributes,
-                                    });
+                        match k.as_str() {
+                            "units" => units = Some(val_str),
+                            "long_name" => long_name = Some(val_str),
+                            "time_coverage_start" => time_coverage_start = Some(val_str),
+                            "time_coverage_end" => time_coverage_end = Some(val_str),
+                            "temporal_resolution" | "time_period" => {
+                                temporal_resolution = Some(val_str)
+                            }
+                            "_ARRAY_DIMENSIONS" => {
+                                if let Some(arr) = v_json.as_array() {
+                                    dimension_names = arr
+                                        .iter()
+                                        .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                                        .collect();
                                 }
                             }
+                            _ => {}
                         }
                     }
+                }
+
+                let file_size = calculate_variable_size_bytes(&shape, &data_type);
+
+                if !variables.iter().any(|v: &VariableInfo| v.name == var_name) {
+                    variables.push(VariableInfo {
+                        name: var_name,
+                        data_type,
+                        shape,
+                        dimension_names,
+                        chunk_shape,
+                        file_size,
+                        units,
+                        long_name,
+                        time_coverage_start,
+                        time_coverage_end,
+                        temporal_resolution,
+                        attributes,
+                    });
                 }
             }
         }
@@ -261,82 +245,78 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
             .and_then(|c| c.get(&zarr_v3_url).send().ok())
             .or_else(|| reqwest::blocking::get(&zarr_v3_url).ok());
 
-        if let Some(resp) = resp_opt {
-            if resp.status().is_success() {
-                if let Ok(bytes) = resp.bytes() {
-                    if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes) {
-                        if v.get("zarr_format").and_then(|f| f.as_u64()) == Some(3) {
-                            let shape: Vec<u64> = v
-                                .get("shape")
-                                .and_then(|s| s.as_array())
-                                .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
-                                .unwrap_or_else(|| vec![989, 72, 144]);
+        if let Some(resp) = resp_opt
+            && resp.status().is_success()
+            && let Ok(bytes) = resp.bytes()
+            && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes)
+            && v.get("zarr_format").and_then(|f| f.as_u64()) == Some(3)
+        {
+            let shape: Vec<u64> = v
+                .get("shape")
+                .and_then(|s| s.as_array())
+                .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
+                .unwrap_or_else(|| vec![989, 72, 144]);
 
-                            let data_type = v
-                                .get("data_type")
-                                .and_then(|d| d.as_str())
-                                .unwrap_or("float32")
-                                .to_string();
+            let data_type = v
+                .get("data_type")
+                .and_then(|d| d.as_str())
+                .unwrap_or("float32")
+                .to_string();
 
-                            let mut attributes = HashMap::new();
-                            let mut units = None;
-                            let mut long_name = None;
-                            let mut dimension_names = match shape.len() {
-                                1 => vec!["x".to_string()],
-                                2 => vec!["lat".to_string(), "lon".to_string()],
-                                3 => vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
-                                4 => vec![
-                                    "time".to_string(),
-                                    "level".to_string(),
-                                    "lat".to_string(),
-                                    "lon".to_string(),
-                                ],
-                                _ => (0..shape.len()).map(|i| format!("dim_{}", i)).collect(),
-                            };
+            let mut attributes = HashMap::new();
+            let mut units = None;
+            let mut long_name = None;
+            let mut dimension_names = match shape.len() {
+                1 => vec!["x".to_string()],
+                2 => vec!["lat".to_string(), "lon".to_string()],
+                3 => vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
+                4 => vec![
+                    "time".to_string(),
+                    "level".to_string(),
+                    "lat".to_string(),
+                    "lon".to_string(),
+                ],
+                _ => (0..shape.len()).map(|i| format!("dim_{}", i)).collect(),
+            };
 
-                            if let Some(attrs) = v.get("attributes").and_then(|a| a.as_object()) {
-                                for (k, v_json) in attrs {
-                                    let val_str = v_json
-                                        .as_str()
-                                        .map(|s| s.to_string())
-                                        .unwrap_or_else(|| v_json.to_string());
-                                    attributes.insert(k.clone(), val_str.clone());
-                                    match k.as_str() {
-                                        "units" => units = Some(val_str),
-                                        "long_name" => long_name = Some(val_str),
-                                        _ => {}
-                                    }
-                                }
-                            }
-
-                            if let Some(dims) = v.get("dimension_names").and_then(|d| d.as_array())
-                            {
-                                dimension_names = dims
-                                    .iter()
-                                    .filter_map(|e| e.as_str().map(|s| s.to_string()))
-                                    .collect();
-                            }
-
-                            let file_size = calculate_variable_size_bytes(&shape, &data_type);
-
-                            variables.push(VariableInfo {
-                                name: "data".to_string(),
-                                data_type,
-                                shape: shape.clone(),
-                                dimension_names,
-                                chunk_shape: shape,
-                                file_size,
-                                units,
-                                long_name,
-                                time_coverage_start: None,
-                                time_coverage_end: None,
-                                temporal_resolution: None,
-                                attributes,
-                            });
-                        }
+            if let Some(attrs) = v.get("attributes").and_then(|a| a.as_object()) {
+                for (k, v_json) in attrs {
+                    let val_str = v_json
+                        .as_str()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| v_json.to_string());
+                    attributes.insert(k.clone(), val_str.clone());
+                    match k.as_str() {
+                        "units" => units = Some(val_str),
+                        "long_name" => long_name = Some(val_str),
+                        _ => {}
                     }
                 }
             }
+
+            if let Some(dims) = v.get("dimension_names").and_then(|d| d.as_array()) {
+                dimension_names = dims
+                    .iter()
+                    .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                    .collect();
+            }
+
+            let file_size = calculate_variable_size_bytes(&shape, &data_type);
+
+            variables.push(VariableInfo {
+                name: "data".to_string(),
+                data_type,
+                shape: shape.clone(),
+                dimension_names,
+                chunk_shape: shape,
+                file_size,
+                units,
+                long_name,
+                time_coverage_start: None,
+                time_coverage_end: None,
+                temporal_resolution: None,
+                attributes,
+            });
         }
     }
 
@@ -377,6 +357,7 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
 }
 
 /// Fetch 1D coordinate array values for all dimensions present in the store (e.g. /time, /lat, /lon, /depth).
+#[allow(clippy::single_range_in_vec_init)]
 pub fn fetch_all_dimension_coordinates(
     store: ReadableWritableListableStorage,
     dim_names: &[String],
@@ -777,8 +758,10 @@ pub fn fetch_slice_range(
 }
 
 use std::sync::{OnceLock, RwLock};
+#[allow(clippy::type_complexity)]
 static COORD_BOUNDS_CACHE: OnceLock<RwLock<HashMap<String, Option<(f64, f64)>>>> = OnceLock::new();
 
+#[allow(clippy::single_range_in_vec_init)]
 fn get_cached_coord_bounds(
     store: ReadableWritableListableStorage,
     store_url: &str,
@@ -787,10 +770,10 @@ fn get_cached_coord_bounds(
     let cache_lock = COORD_BOUNDS_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
     let key = format!("{}:{}", store_url, dim_name.trim().to_lowercase());
 
-    if let Ok(cache) = cache_lock.read() {
-        if let Some(bounds) = cache.get(&key) {
-            return *bounds;
-        }
+    if let Ok(cache) = cache_lock.read()
+        && let Some(bounds) = cache.get(&key)
+    {
+        return *bounds;
     }
 
     let bounds = read_coord_bounds(store, dim_name);
@@ -800,6 +783,7 @@ fn get_cached_coord_bounds(
     bounds
 }
 
+#[allow(clippy::single_range_in_vec_init)]
 fn read_coord_bounds(store: ReadableWritableListableStorage, dim_name: &str) -> Option<(f64, f64)> {
     let clean = dim_name.trim().to_lowercase();
     let array_path = format!("/{}", clean);

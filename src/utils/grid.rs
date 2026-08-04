@@ -84,10 +84,10 @@ pub fn check_and_orient_axes_with_coords(
         } else if orientation.to_lowercase() == "descending" {
             flip_y = false;
         }
-    } else if let Some(positive_attr) = attributes.get("positive").and_then(|v| v.as_str()) {
-        if positive_attr.to_lowercase() == "up" {
-            flip_y = true;
-        }
+    } else if let Some(positive_attr) = attributes.get("positive").and_then(|v| v.as_str())
+        && positive_attr.to_lowercase() == "up"
+    {
+        flip_y = true;
     }
 
     if flip_y && height > 1 {
@@ -115,10 +115,9 @@ pub fn check_and_orient_axes_with_coords(
     } else if let Some(orientation) = attributes
         .get("longitude_orientation")
         .and_then(|v| v.as_str())
+        && orientation.to_lowercase() == "descending"
     {
-        if orientation.to_lowercase() == "descending" {
-            flip_x = true;
-        }
+        flip_x = true;
     }
 
     if flip_x && width > 1 {

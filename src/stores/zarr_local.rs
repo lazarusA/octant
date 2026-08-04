@@ -66,15 +66,15 @@ impl DataStore for ZarrLocalStore {
 
     fn fetch_slice(&self, variable: &str, timestep: usize) -> Result<MatrixSlice, Box<dyn Error>> {
         let store_path_str = self.path.to_string_lossy().to_string();
-        if let Ok(store) = FilesystemStore::new(&self.path) {
-            if let Ok(slice) = crate::utils::zarr::fetch_slice(
+        if let Ok(store) = FilesystemStore::new(&self.path)
+            && let Ok(slice) = crate::utils::zarr::fetch_slice(
                 Arc::new(store),
                 &store_path_str,
                 variable,
                 timestep,
-            ) {
-                return Ok(slice);
-            }
+            )
+        {
+            return Ok(slice);
         }
 
         // Fallback procedural matrix if array slice read fails

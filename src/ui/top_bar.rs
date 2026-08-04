@@ -103,14 +103,13 @@ fn show_secondary_toolbar(app: &mut OctantApp, ctx: &egui::Context) {
                     app.lock_color_bounds = !app.lock_color_bounds;
                 }
 
-                if ui.button("↺ Reset").on_hover_text("Reset bounds to current slice data min/max").clicked() {
-                    if let Some(mdata) = &app.matrix_data {
+                if ui.button("↺ Reset").on_hover_text("Reset bounds to current slice data min/max").clicked()
+                    && let Some(mdata) = &app.matrix_data {
                         app.color_range_min = mdata.min_val;
                         app.color_range_max = mdata.max_val;
                         app.volume_cmin = mdata.min_val;
                         app.volume_cmax = mdata.max_val;
                     }
-                }
 
                 ui.separator();
 
