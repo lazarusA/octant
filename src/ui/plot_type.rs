@@ -23,7 +23,11 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.menu_button(current_label, |ui| {
         ui.set_min_width(210.0);
 
-        ui.label(egui::RichText::new("Select Visualization Projection").small().weak());
+        ui.label(
+            egui::RichText::new("Select Visualization Projection")
+                .small()
+                .weak(),
+        );
         ui.separator();
 
         let options = [
@@ -42,7 +46,10 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                     ui.close_menu();
                 }
             } else {
-                ui.add_enabled(false, egui::SelectableLabel::new(false, format!("{} (Requires 3D Data)", label)));
+                ui.add_enabled(
+                    false,
+                    egui::SelectableLabel::new(false, format!("{} (Requires 3D Data)", label)),
+                );
             }
         }
     });

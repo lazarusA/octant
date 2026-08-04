@@ -7,9 +7,6 @@ mod stores;
 pub mod ui;
 pub mod utils;
 
-
-
-
 use app::OctantApp;
 
 // NATIVE RUNTIME MAIN WINDOW TRIGGER

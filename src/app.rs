@@ -1,12 +1,13 @@
 use crate::cache::{SliceCacheKey, SliceLruCache, SlicePrefetcher};
 use crate::data::matrix_data::MatrixData;
 use crate::plots::{
-    MatrixCallback, MatrixRenderer, PointCloudCallback, PointCloudRenderer, PlotType, SphereCallback,
-    SphereRenderer, SurfaceCallback, SurfaceRenderer, VolumeCallback, VolumeRenderer,
+    MatrixCallback, MatrixRenderer, PlotType, PointCloudCallback, PointCloudRenderer,
+    SphereCallback, SphereRenderer, SurfaceCallback, SurfaceRenderer, VolumeCallback,
+    VolumeRenderer,
 };
 use crate::stores::{
-    icechunk_local::IcechunkLocalStore, icechunk_remote::IcechunkRemoteStore,
-    zarr_local::ZarrLocalStore, zarr_remote::ZarrRemoteStore, DataStore, DatasetMetadata, VariableInfo,
+    DataStore, DatasetMetadata, VariableInfo, icechunk_local::IcechunkLocalStore,
+    icechunk_remote::IcechunkRemoteStore, zarr_local::ZarrLocalStore, zarr_remote::ZarrRemoteStore,
 };
 use std::sync::Arc;
 
@@ -175,8 +176,6 @@ impl OctantApp {
             scale_param: 1.0,
         };
 
-
-
         // App starts clean without auto-fetching. User clicks "Fetch Store Metadata" when ready.
         app
     }
@@ -207,7 +206,10 @@ impl OctantApp {
                             shape: vec![64, 64],
                             dimension_names: vec!["y".to_string(), "x".to_string()],
                             chunk_shape: vec![64, 64],
-                            file_size: crate::utils::calculate_variable_size_bytes(&[64, 64], "float32"),
+                            file_size: crate::utils::calculate_variable_size_bytes(
+                                &[64, 64],
+                                "float32",
+                            ),
                             ..Default::default()
                         }],
                         dimension_coordinates: std::collections::HashMap::new(),
@@ -254,7 +256,12 @@ impl OctantApp {
                         64 * 64 * std::mem::size_of::<f32>()
                     };
 
-                    (var_info.name.clone(), max_steps, chunk_time_size, slice_bytes)
+                    (
+                        var_info.name.clone(),
+                        max_steps,
+                        chunk_time_size,
+                        slice_bytes,
+                    )
                 } else {
                     return;
                 }
@@ -290,7 +297,11 @@ impl OctantApp {
             );
             self.rebuild_pipeline_with_matrix_data(mdata);
             self.is_fetching_slice = false;
-            self.status_message = format!("🚀 Cache HIT for '{}' (step {})", slice.variable_name, self.current_timestep + 1);
+            self.status_message = format!(
+                "🚀 Cache HIT for '{}' (step {})",
+                slice.variable_name,
+                self.current_timestep + 1
+            );
 
             // Trigger chunk-aligned prefetching ahead
             let total_steps = max_steps.max(slice.max_timesteps);
@@ -319,7 +330,11 @@ impl OctantApp {
 
         // 2. Cache MISS: Dispatch Non-Blocking Async Background Request for active slice ONLY!
         self.is_fetching_slice = true;
-        self.status_message = format!("⏳ Downloading slice for '{}' (step {})...", var_name, self.current_timestep + 1);
+        self.status_message = format!(
+            "⏳ Downloading slice for '{}' (step {})...",
+            var_name,
+            self.current_timestep + 1
+        );
 
         // Fetch active slice first so 2D map renders immediately on screen
         self.prefetcher.request_slice(cache_key, &self.lru_cache);
@@ -366,9 +381,18 @@ impl OctantApp {
 
     pub fn rebuild_pipeline_with_matrix_data(&mut self, data: MatrixData) {
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
-            let same_dimensions = self.matrix_data.as_ref().map_or(false, |m| m.width == data.width && m.height == data.height);
+            let same_dimensions = self
+                .matrix_data
+                .as_ref()
+                .map_or(false, |m| m.width == data.width && m.height == data.height);
 
-            if same_dimensions && self.renderer.is_some() && self.sphere_renderer.is_some() && self.surface_renderer.is_some() && self.volume_renderer.is_some() && self.point_cloud_renderer.is_some() {
+            if same_dimensions
+                && self.renderer.is_some()
+                && self.sphere_renderer.is_some()
+                && self.surface_renderer.is_some()
+                && self.volume_renderer.is_some()
+                && self.point_cloud_renderer.is_some()
+            {
                 if let Some(renderer) = &self.renderer {
                     renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
@@ -379,10 +403,12 @@ impl OctantApp {
                     surface_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
                 if let Some(volume_renderer) = &mut self.volume_renderer {
-                    Arc::get_mut(volume_renderer).map(|r| r.update_data(&wgpu_render_state.queue, &data.values));
+                    Arc::get_mut(volume_renderer)
+                        .map(|r| r.update_data(&wgpu_render_state.queue, &data.values));
                 }
                 if let Some(point_cloud_renderer) = &mut self.point_cloud_renderer {
-                    Arc::get_mut(point_cloud_renderer).map(|r| r.update_data(&wgpu_render_state.queue, &data.values));
+                    Arc::get_mut(point_cloud_renderer)
+                        .map(|r| r.update_data(&wgpu_render_state.queue, &data.values));
                 }
             } else {
                 let renderer = MatrixRenderer::new(
@@ -540,7 +566,6 @@ impl eframe::App for OctantApp {
                         self.selected_variable_idx = 0;
                         self.show_right_panel = true;
                         self.load_selected_variable_slice();
-
                     }
                     Err(err) => {
                         self.status_message = format!("Store inspect error: {}", err);
@@ -574,7 +599,11 @@ impl eframe::App for OctantApp {
                     );
                     self.rebuild_pipeline_with_matrix_data(mdata);
                     self.is_fetching_slice = false;
-                    self.status_message = format!("⚡ Loaded slice for '{}' (step {})", slice.variable_name, slice.current_timestep + 1);
+                    self.status_message = format!(
+                        "⚡ Loaded slice for '{}' (step {})",
+                        slice.variable_name,
+                        slice.current_timestep + 1
+                    );
                 }
             }
         }
@@ -583,8 +612,6 @@ impl eframe::App for OctantApp {
         if !self.is_fetching_slice {
             self.trigger_background_prefetch();
         }
-
-
 
         // 2. Playback Animation Timer Loop
         if self.is_playing {
@@ -629,7 +656,6 @@ impl eframe::App for OctantApp {
         crate::ui::colorbar::show_colorbar_overlay(self, ctx);
         crate::ui::variables_panel::show_right_panel(self, ctx);
 
-
         // 4. Centered Drawing Canvas Area with Aspect Data Ratio
         egui::CentralPanel::default().show(ctx, |ui| {
             let available_rect = ui.available_rect_before_wrap();
@@ -657,8 +683,10 @@ impl eframe::App for OctantApp {
             if response.dragged() {
                 let delta = response.drag_delta();
                 self.sphere_rotation_y += delta.x * 0.008;
-                self.sphere_rotation_x = (self.sphere_rotation_x + delta.y * 0.008)
-                    .clamp(-std::f32::consts::FRAC_PI_2 + 0.05, std::f32::consts::FRAC_PI_2 - 0.05);
+                self.sphere_rotation_x = (self.sphere_rotation_x + delta.y * 0.008).clamp(
+                    -std::f32::consts::FRAC_PI_2 + 0.05,
+                    std::f32::consts::FRAC_PI_2 - 0.05,
+                );
             }
 
             if response.hovered() {
@@ -669,7 +697,12 @@ impl eframe::App for OctantApp {
                 }
             }
 
-            if self.sphere_auto_rotate && (self.active_plot_type == PlotType::Sphere || self.active_plot_type == PlotType::Surface || self.active_plot_type == PlotType::Volume || self.active_plot_type == PlotType::PointCloud) {
+            if self.sphere_auto_rotate
+                && (self.active_plot_type == PlotType::Sphere
+                    || self.active_plot_type == PlotType::Surface
+                    || self.active_plot_type == PlotType::Volume
+                    || self.active_plot_type == PlotType::PointCloud)
+            {
                 self.sphere_rotation_y += ui.ctx().input(|i| i.stable_dt).min(0.1) * 0.15;
                 ui.ctx().request_repaint();
             }
@@ -713,7 +746,10 @@ impl eframe::App for OctantApp {
                 }
                 PlotType::Volume => {
                     if let Some(volume_renderer) = &self.volume_renderer {
-                        let (width, height) = self.matrix_data.as_ref().map_or((64, 64), |m| (m.width as u32, m.height as u32));
+                        let (width, height) = self
+                            .matrix_data
+                            .as_ref()
+                            .map_or((64, 64), |m| (m.width as u32, m.height as u32));
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
 
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
@@ -742,7 +778,10 @@ impl eframe::App for OctantApp {
                 }
                 PlotType::PointCloud => {
                     if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
-                        let (width, height) = self.matrix_data.as_ref().map_or((64, 64), |m| (m.width as u32, m.height as u32));
+                        let (width, height) = self
+                            .matrix_data
+                            .as_ref()
+                            .map_or((64, 64), |m| (m.width as u32, m.height as u32));
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
 
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
@@ -785,5 +824,3 @@ impl eframe::App for OctantApp {
         });
     }
 }
-
-

@@ -112,18 +112,42 @@ impl VolumeRenderer {
             screen_aspect: 1.0,
             _pad0: 0,
             color: super::common::PlotColorParams::default(),
-        };// 3D Bounding Box Vertices [-1, 1]^3
+        }; // 3D Bounding Box Vertices [-1, 1]^3
         let vertices = [
             // Front face
-            VolumeVertex { position: [-1.0, -1.0,  1.0], uv: [0.0, 0.0] },
-            VolumeVertex { position: [ 1.0, -1.0,  1.0], uv: [1.0, 0.0] },
-            VolumeVertex { position: [ 1.0,  1.0,  1.0], uv: [1.0, 1.0] },
-            VolumeVertex { position: [-1.0,  1.0,  1.0], uv: [0.0, 1.0] },
+            VolumeVertex {
+                position: [-1.0, -1.0, 1.0],
+                uv: [0.0, 0.0],
+            },
+            VolumeVertex {
+                position: [1.0, -1.0, 1.0],
+                uv: [1.0, 0.0],
+            },
+            VolumeVertex {
+                position: [1.0, 1.0, 1.0],
+                uv: [1.0, 1.0],
+            },
+            VolumeVertex {
+                position: [-1.0, 1.0, 1.0],
+                uv: [0.0, 1.0],
+            },
             // Back face
-            VolumeVertex { position: [-1.0, -1.0, -1.0], uv: [0.0, 0.0] },
-            VolumeVertex { position: [ 1.0, -1.0, -1.0], uv: [1.0, 0.0] },
-            VolumeVertex { position: [ 1.0,  1.0, -1.0], uv: [1.0, 1.0] },
-            VolumeVertex { position: [-1.0,  1.0, -1.0], uv: [0.0, 1.0] },
+            VolumeVertex {
+                position: [-1.0, -1.0, -1.0],
+                uv: [0.0, 0.0],
+            },
+            VolumeVertex {
+                position: [1.0, -1.0, -1.0],
+                uv: [1.0, 0.0],
+            },
+            VolumeVertex {
+                position: [1.0, 1.0, -1.0],
+                uv: [1.0, 1.0],
+            },
+            VolumeVertex {
+                position: [-1.0, 1.0, -1.0],
+                uv: [0.0, 1.0],
+            },
         ];
 
         let indices: [u16; 36] = [
@@ -147,7 +171,11 @@ impl VolumeRenderer {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        let initial_data_safe = if initial_data.is_empty() { vec![50.0; 64 * 64] } else { initial_data.to_vec() };
+        let initial_data_safe = if initial_data.is_empty() {
+            vec![50.0; 64 * 64]
+        } else {
+            initial_data.to_vec()
+        };
 
         let uniform_buffer = super::common::create_uniform_buffer(
             device,
@@ -344,7 +372,10 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-        rpass.set_index_buffer(self.renderer.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        rpass.set_index_buffer(
+            self.renderer.index_buffer.slice(..),
+            wgpu::IndexFormat::Uint16,
+        );
         rpass.draw_indexed(0..self.renderer.index_count, 0, 0..1);
     }
 }

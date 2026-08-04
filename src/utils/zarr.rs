@@ -2,14 +2,16 @@ use crate::stores::{MatrixSlice, VariableInfo};
 use crate::utils::grid::check_and_orient_axes_with_coords;
 use crate::utils::units;
 use crate::utils::units::calculate_variable_size_bytes;
-use object_store::http::HttpBuilder;
 use object_store::ClientOptions;
+use object_store::http::HttpBuilder;
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 use zarrs::array::{Array, ArraySubset};
-use zarrs::storage::storage_adapter::async_to_sync::{AsyncToSyncBlockOn, AsyncToSyncStorageAdapter};
 use zarrs::storage::ReadableWritableListableStorage;
+use zarrs::storage::storage_adapter::async_to_sync::{
+    AsyncToSyncBlockOn, AsyncToSyncStorageAdapter,
+};
 use zarrs_object_store::AsyncObjectStore;
 
 struct TokioBlockOn(Arc<tokio::runtime::Runtime>);
@@ -74,7 +76,12 @@ pub fn extract_store_variables(
         let dim_names = array
             .dimension_names()
             .as_ref()
-            .map(|names| names.iter().map(|n| n.as_deref().unwrap_or("dim").to_string()).collect())
+            .map(|names| {
+                names
+                    .iter()
+                    .map(|n| n.as_deref().unwrap_or("dim").to_string())
+                    .collect()
+            })
             .unwrap_or_else(|| vec!["time".to_string(), "lat".to_string(), "lon".to_string()]);
 
         let shape = array.shape().to_vec();
@@ -117,7 +124,10 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
                 if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes) {
                     if let Some(metadata_obj) = v.get("metadata").and_then(|m| m.as_object()) {
                         for (key, val) in metadata_obj {
-                            if key.ends_with("/.zarray") || key == ".zarray" || key.ends_with("/zarr.json") {
+                            if key.ends_with("/.zarray")
+                                || key == ".zarray"
+                                || key.ends_with("/zarr.json")
+                            {
                                 let var_name = key
                                     .trim_end_matches("/.zarray")
                                     .trim_end_matches("/zarr.json")
@@ -153,7 +163,9 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
                                     format!("{}/.zattrs", var_name)
                                 };
 
-                                let attrs_val = metadata_obj.get(&zattrs_key).or_else(|| metadata_obj.get(".zattrs"));
+                                let attrs_val = metadata_obj
+                                    .get(&zattrs_key)
+                                    .or_else(|| metadata_obj.get(".zattrs"));
 
                                 let mut attributes = HashMap::new();
                                 let mut units = None;
@@ -164,8 +176,17 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
                                 let mut dimension_names = match shape.len() {
                                     1 => vec!["x".to_string()],
                                     2 => vec!["lat".to_string(), "lon".to_string()],
-                                    3 => vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
-                                    4 => vec!["time".to_string(), "level".to_string(), "lat".to_string(), "lon".to_string()],
+                                    3 => vec![
+                                        "time".to_string(),
+                                        "lat".to_string(),
+                                        "lon".to_string(),
+                                    ],
+                                    4 => vec![
+                                        "time".to_string(),
+                                        "level".to_string(),
+                                        "lat".to_string(),
+                                        "lon".to_string(),
+                                    ],
                                     _ => (0..shape.len()).map(|i| format!("dim_{}", i)).collect(),
                                 };
 
@@ -181,14 +202,22 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
                                         match k.as_str() {
                                             "units" => units = Some(val_str),
                                             "long_name" => long_name = Some(val_str),
-                                            "time_coverage_start" => time_coverage_start = Some(val_str),
-                                            "time_coverage_end" => time_coverage_end = Some(val_str),
-                                            "temporal_resolution" | "time_period" => temporal_resolution = Some(val_str),
+                                            "time_coverage_start" => {
+                                                time_coverage_start = Some(val_str)
+                                            }
+                                            "time_coverage_end" => {
+                                                time_coverage_end = Some(val_str)
+                                            }
+                                            "temporal_resolution" | "time_period" => {
+                                                temporal_resolution = Some(val_str)
+                                            }
                                             "_ARRAY_DIMENSIONS" => {
                                                 if let Some(arr) = v_json.as_array() {
                                                     dimension_names = arr
                                                         .iter()
-                                                        .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                                                        .filter_map(|e| {
+                                                            e.as_str().map(|s| s.to_string())
+                                                        })
                                                         .collect();
                                                 }
                                             }
@@ -237,12 +266,14 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
                 if let Ok(bytes) = resp.bytes() {
                     if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes) {
                         if v.get("zarr_format").and_then(|f| f.as_u64()) == Some(3) {
-                            let shape: Vec<u64> = v.get("shape")
+                            let shape: Vec<u64> = v
+                                .get("shape")
                                 .and_then(|s| s.as_array())
                                 .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
                                 .unwrap_or_else(|| vec![989, 72, 144]);
 
-                            let data_type = v.get("data_type")
+                            let data_type = v
+                                .get("data_type")
                                 .and_then(|d| d.as_str())
                                 .unwrap_or("float32")
                                 .to_string();
@@ -254,13 +285,21 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
                                 1 => vec!["x".to_string()],
                                 2 => vec!["lat".to_string(), "lon".to_string()],
                                 3 => vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
-                                4 => vec!["time".to_string(), "level".to_string(), "lat".to_string(), "lon".to_string()],
+                                4 => vec![
+                                    "time".to_string(),
+                                    "level".to_string(),
+                                    "lat".to_string(),
+                                    "lon".to_string(),
+                                ],
                                 _ => (0..shape.len()).map(|i| format!("dim_{}", i)).collect(),
                             };
 
                             if let Some(attrs) = v.get("attributes").and_then(|a| a.as_object()) {
                                 for (k, v_json) in attrs {
-                                    let val_str = v_json.as_str().map(|s| s.to_string()).unwrap_or_else(|| v_json.to_string());
+                                    let val_str = v_json
+                                        .as_str()
+                                        .map(|s| s.to_string())
+                                        .unwrap_or_else(|| v_json.to_string());
                                     attributes.insert(k.clone(), val_str.clone());
                                     match k.as_str() {
                                         "units" => units = Some(val_str),
@@ -270,8 +309,12 @@ pub fn discover_arrays_via_metadata(base_url: &str) -> Vec<VariableInfo> {
                                 }
                             }
 
-                            if let Some(dims) = v.get("dimension_names").and_then(|d| d.as_array()) {
-                                dimension_names = dims.iter().filter_map(|e| e.as_str().map(|s| s.to_string())).collect();
+                            if let Some(dims) = v.get("dimension_names").and_then(|d| d.as_array())
+                            {
+                                dimension_names = dims
+                                    .iter()
+                                    .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                                    .collect();
                             }
 
                             let file_size = calculate_variable_size_bytes(&shape, &data_type);
@@ -370,15 +413,36 @@ pub fn fetch_all_dimension_coordinates(
 
                 if let Ok(vec_f64) = array.retrieve_array_subset::<Vec<f64>>(&subset) {
                     for (idx, &val) in vec_f64.iter().enumerate() {
-                        coords.push(format_dim_value(&dim_clean, val, idx, time_units, time_start, target_hint));
+                        coords.push(format_dim_value(
+                            &dim_clean,
+                            val,
+                            idx,
+                            time_units,
+                            time_start,
+                            target_hint,
+                        ));
                     }
                 } else if let Ok(vec_f32) = array.retrieve_array_subset::<Vec<f32>>(&subset) {
                     for (idx, &val) in vec_f32.iter().enumerate() {
-                        coords.push(format_dim_value(&dim_clean, val as f64, idx, time_units, time_start, target_hint));
+                        coords.push(format_dim_value(
+                            &dim_clean,
+                            val as f64,
+                            idx,
+                            time_units,
+                            time_start,
+                            target_hint,
+                        ));
                     }
                 } else if let Ok(vec_i64) = array.retrieve_array_subset::<Vec<i64>>(&subset) {
                     for (idx, &val) in vec_i64.iter().enumerate() {
-                        coords.push(format_dim_value(&dim_clean, val as f64, idx, time_units, time_start, target_hint));
+                        coords.push(format_dim_value(
+                            &dim_clean,
+                            val as f64,
+                            idx,
+                            time_units,
+                            time_start,
+                            target_hint,
+                        ));
                     }
                 }
 
@@ -418,7 +482,8 @@ fn format_dim_value(
             format!("{:04}-{:02}-{:02}", y, m, d)
         } else {
             // Step index or days since reference date
-            let (ref_y, ref_m, ref_d, days_step) = units::parse_reference_date(units_str, time_start, None, target_hint);
+            let (ref_y, ref_m, ref_d, days_step) =
+                units::parse_reference_date(units_str, time_start, None, target_hint);
             let total_days = (val * days_step as f64).max(0.0).round() as usize;
             let (y, m, d) = units::add_days_to_date(ref_y, ref_m, ref_d, total_days);
             format!("{:04}-{:02}-{:02}", y, m, d)
@@ -456,7 +521,12 @@ pub fn fetch_slice(
         let dim_names: Vec<String> = array
             .dimension_names()
             .as_ref()
-            .map(|names| names.iter().map(|n| n.as_deref().unwrap_or("dim").to_string()).collect())
+            .map(|names| {
+                names
+                    .iter()
+                    .map(|n| n.as_deref().unwrap_or("dim").to_string())
+                    .collect()
+            })
             .unwrap_or_else(|| vec!["time".to_string(), "lat".to_string(), "lon".to_string()]);
 
         let (max_timesteps, initial_height, initial_width, local_time_idx) = match shape.len() {
@@ -499,11 +569,19 @@ pub fn fetch_slice(
         if let Ok(raw_values) = array.retrieve_array_subset::<Vec<f32>>(&subset) {
             let attributes = array.attributes();
 
-            let lat_dim = dim_names.iter().find(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
-            let lon_dim = dim_names.iter().find(|d| d.to_lowercase().contains("lon") || d.to_lowercase() == "x");
+            let lat_dim = dim_names
+                .iter()
+                .find(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
+            let lon_dim = dim_names
+                .iter()
+                .find(|d| d.to_lowercase().contains("lon") || d.to_lowercase() == "x");
 
-            let lat_coords = lat_dim.and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d)).map(|(f, l)| vec![f, l]);
-            let lon_coords = lon_dim.and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d)).map(|(f, l)| vec![f, l]);
+            let lat_coords = lat_dim
+                .and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d))
+                .map(|(f, l)| vec![f, l]);
+            let lon_coords = lon_dim
+                .and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d))
+                .map(|(f, l)| vec![f, l]);
 
             // Check axes order and orientation directly from axis coordinate values
             let (oriented_values, width, height) = check_and_orient_axes_with_coords(
@@ -516,7 +594,11 @@ pub fn fetch_slice(
                 lon_coords.as_deref(),
             );
 
-            let valid_vals: Vec<f32> = oriented_values.iter().copied().filter(|v| !v.is_nan()).collect();
+            let valid_vals: Vec<f32> = oriented_values
+                .iter()
+                .copied()
+                .filter(|v| !v.is_nan())
+                .collect();
             let (min_v, max_v) = if !valid_vals.is_empty() {
                 let min_val = valid_vals.iter().copied().fold(f32::INFINITY, f32::min);
                 let max_val = valid_vals.iter().copied().fold(f32::NEG_INFINITY, f32::max);
@@ -585,7 +667,12 @@ pub fn fetch_slice_range(
         let dim_names: Vec<String> = array
             .dimension_names()
             .as_ref()
-            .map(|names| names.iter().map(|n| n.as_deref().unwrap_or("dim").to_string()).collect())
+            .map(|names| {
+                names
+                    .iter()
+                    .map(|n| n.as_deref().unwrap_or("dim").to_string())
+                    .collect()
+            })
             .unwrap_or_else(|| vec!["time".to_string(), "lat".to_string(), "lon".to_string()]);
 
         let (max_timesteps, initial_height, initial_width) = match shape.len() {
@@ -618,11 +705,19 @@ pub fn fetch_slice_range(
         if let Ok(raw_values) = array.retrieve_array_subset::<Vec<f32>>(&subset) {
             let attributes = array.attributes();
 
-            let lat_dim = dim_names.iter().find(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
-            let lon_dim = dim_names.iter().find(|d| d.to_lowercase().contains("lon") || d.to_lowercase() == "x");
+            let lat_dim = dim_names
+                .iter()
+                .find(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
+            let lon_dim = dim_names
+                .iter()
+                .find(|d| d.to_lowercase().contains("lon") || d.to_lowercase() == "x");
 
-            let lat_coords = lat_dim.and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d)).map(|(f, l)| vec![f, l]);
-            let lon_coords = lon_dim.and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d)).map(|(f, l)| vec![f, l]);
+            let lat_coords = lat_dim
+                .and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d))
+                .map(|(f, l)| vec![f, l]);
+            let lon_coords = lon_dim
+                .and_then(|d| get_cached_coord_bounds(store.clone(), store_url, d))
+                .map(|(f, l)| vec![f, l]);
 
             let slice_size = initial_width * initial_height;
             let mut slices = Vec::with_capacity(actual_count);
@@ -644,7 +739,11 @@ pub fn fetch_slice_range(
                     lon_coords.as_deref(),
                 );
 
-                let valid_vals: Vec<f32> = oriented_values.iter().copied().filter(|v| !v.is_nan()).collect();
+                let valid_vals: Vec<f32> = oriented_values
+                    .iter()
+                    .copied()
+                    .filter(|v| !v.is_nan())
+                    .collect();
                 let (min_v, max_v) = if !valid_vals.is_empty() {
                     let min_val = valid_vals.iter().copied().fold(f32::INFINITY, f32::min);
                     let max_val = valid_vals.iter().copied().fold(f32::NEG_INFINITY, f32::max);
@@ -680,7 +779,11 @@ pub fn fetch_slice_range(
 use std::sync::{OnceLock, RwLock};
 static COORD_BOUNDS_CACHE: OnceLock<RwLock<HashMap<String, Option<(f64, f64)>>>> = OnceLock::new();
 
-fn get_cached_coord_bounds(store: ReadableWritableListableStorage, store_url: &str, dim_name: &str) -> Option<(f64, f64)> {
+fn get_cached_coord_bounds(
+    store: ReadableWritableListableStorage,
+    store_url: &str,
+    dim_name: &str,
+) -> Option<(f64, f64)> {
     let cache_lock = COORD_BOUNDS_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
     let key = format!("{}:{}", store_url, dim_name.trim().to_lowercase());
 
@@ -712,13 +815,26 @@ fn read_coord_bounds(store: ReadableWritableListableStorage, dim_name: &str) -> 
     let subset_start = ArraySubset::new_with_ranges(&[0..1]);
     let subset_end = ArraySubset::new_with_ranges(&[(len as u64 - 1)..len as u64]);
 
-    let v_start = array.retrieve_array_subset::<Vec<f64>>(&subset_start)
-        .ok().and_then(|v| v.first().copied())
-        .or_else(|| array.retrieve_array_subset::<Vec<f32>>(&subset_start).ok().and_then(|v| v.first().map(|&x| x as f64)))?;
+    let v_start = array
+        .retrieve_array_subset::<Vec<f64>>(&subset_start)
+        .ok()
+        .and_then(|v| v.first().copied())
+        .or_else(|| {
+            array
+                .retrieve_array_subset::<Vec<f32>>(&subset_start)
+                .ok()
+                .and_then(|v| v.first().map(|&x| x as f64))
+        })?;
 
-    let v_end = array.retrieve_array_subset::<Vec<f64>>(&subset_end)
-        .ok().and_then(|v| v.first().copied())
-        .or_else(|| array.retrieve_array_subset::<Vec<f32>>(&subset_end).ok().and_then(|v| v.first().map(|&x| x as f64)))?;    Some((v_start, v_end))
+    let v_end = array
+        .retrieve_array_subset::<Vec<f64>>(&subset_end)
+        .ok()
+        .and_then(|v| v.first().copied())
+        .or_else(|| {
+            array
+                .retrieve_array_subset::<Vec<f32>>(&subset_end)
+                .ok()
+                .and_then(|v| v.first().map(|&x| x as f64))
+        })?;
+    Some((v_start, v_end))
 }
-
-

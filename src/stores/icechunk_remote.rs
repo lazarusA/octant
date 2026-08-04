@@ -21,15 +21,21 @@ impl DataStore for IcechunkRemoteStore {
     fn inspect(&self) -> Result<DatasetMetadata, Box<dyn Error>> {
         let base_url = self.endpoint_url.trim_end_matches('/');
         let store = crate::utils::icechunk::build_sync_icechunk_store(base_url)?;
-        let variables = crate::utils::extract_store_variables_consolidated(store.clone(), base_url)?;
+        let variables =
+            crate::utils::extract_store_variables_consolidated(store.clone(), base_url)?;
 
         let dim_names: Vec<String> = variables
             .iter()
             .flat_map(|v| v.dimension_names.clone())
             .collect();
-        let dimension_coordinates = crate::utils::zarr::fetch_all_dimension_coordinates(store, &dim_names, Some(base_url));
+        let dimension_coordinates =
+            crate::utils::zarr::fetch_all_dimension_coordinates(store, &dim_names, Some(base_url));
 
-        let dataset_name = base_url.split('/').last().unwrap_or("icechunk_store").to_string();
+        let dataset_name = base_url
+            .split('/')
+            .last()
+            .unwrap_or("icechunk_store")
+            .to_string();
 
         Ok(DatasetMetadata {
             name: dataset_name,

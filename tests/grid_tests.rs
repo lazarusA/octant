@@ -8,7 +8,8 @@ fn test_grid_orientation_esdc_example_a() {
     let attrs = serde_json::Map::new();
     let lat_coords = vec![-89.875, 89.875];
 
-    let (oriented, _, _) = check_and_orient_axes_with_coords(raw, 2, 2, &dim_names, &attrs, Some(&lat_coords), None);
+    let (oriented, _, _) =
+        check_and_orient_axes_with_coords(raw, 2, 2, &dim_names, &attrs, Some(&lat_coords), None);
     // Ascending lat axis SHOULD flip Y so North [3.0, 4.0] is at Row 0 (top of map)
     assert_eq!(oriented, vec![3.0, 4.0, 1.0, 2.0]);
 }
@@ -17,11 +18,23 @@ fn test_grid_orientation_esdc_example_a() {
 fn test_grid_orientation_seasfire_example_b() {
     // Example B (SeasFire): Axis data descends [89.875, ..., -89.875] (Row 0 = North [1.0, 2.0], Row 1 = South [3.0, 4.0])
     let raw = vec![1.0, 2.0, 3.0, 4.0];
-    let dim_names = vec!["time".to_string(), "latitude".to_string(), "longitude".to_string()];
+    let dim_names = vec![
+        "time".to_string(),
+        "latitude".to_string(),
+        "longitude".to_string(),
+    ];
     let attrs = serde_json::Map::new();
     let lat_coords = vec![89.875, -89.875];
 
-    let (oriented, _, _) = check_and_orient_axes_with_coords(raw.clone(), 2, 2, &dim_names, &attrs, Some(&lat_coords), None);
+    let (oriented, _, _) = check_and_orient_axes_with_coords(
+        raw.clone(),
+        2,
+        2,
+        &dim_names,
+        &attrs,
+        Some(&lat_coords),
+        None,
+    );
     // Descending lat axis should NOT flip Y, Row 0 stays North [1.0, 2.0]
     assert_eq!(oriented, raw);
 }
@@ -32,7 +45,10 @@ fn test_grid_orientation_positive_up() {
     let raw = vec![1.0, 2.0, 3.0, 4.0];
     let dim_names = vec!["lat".to_string(), "lon".to_string()];
     let mut attrs = serde_json::Map::new();
-    attrs.insert("positive".to_string(), serde_json::Value::String("up".to_string()));
+    attrs.insert(
+        "positive".to_string(),
+        serde_json::Value::String("up".to_string()),
+    );
 
     let (oriented, _, _) = check_and_orient_axes(raw, 2, 2, &dim_names, &attrs);
     assert_eq!(oriented, vec![3.0, 4.0, 1.0, 2.0]);

@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use bytemuck::{Pod, Zeroable};
+use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -199,10 +199,26 @@ impl HeatmapRenderer {
 
                 let base_idx = vertices.len() as u32;
 
-                vertices.push(HeatmapVertex { position: [x0, y0], uv: [u0, v0], cell_index });
-                vertices.push(HeatmapVertex { position: [x1, y0], uv: [u1, v0], cell_index });
-                vertices.push(HeatmapVertex { position: [x0, y1], uv: [u0, v1], cell_index });
-                vertices.push(HeatmapVertex { position: [x1, y1], uv: [u1, v1], cell_index });
+                vertices.push(HeatmapVertex {
+                    position: [x0, y0],
+                    uv: [u0, v0],
+                    cell_index,
+                });
+                vertices.push(HeatmapVertex {
+                    position: [x1, y0],
+                    uv: [u1, v0],
+                    cell_index,
+                });
+                vertices.push(HeatmapVertex {
+                    position: [x0, y1],
+                    uv: [u0, v1],
+                    cell_index,
+                });
+                vertices.push(HeatmapVertex {
+                    position: [x1, y1],
+                    uv: [u1, v1],
+                    cell_index,
+                });
 
                 // Triangle 1: TL, BL, TR
                 indices.push(base_idx);
@@ -250,7 +266,10 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-        rpass.set_index_buffer(self.renderer.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        rpass.set_index_buffer(
+            self.renderer.index_buffer.slice(..),
+            wgpu::IndexFormat::Uint32,
+        );
         rpass.draw_indexed(0..self.renderer.num_indices, 0, 0..1);
     }
 }

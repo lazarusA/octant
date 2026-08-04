@@ -1,6 +1,4 @@
-use octant::utils::units::{
-    parse_loc, parse_reference_date, parse_time_unit,
-};
+use octant::utils::units::{parse_loc, parse_reference_date, parse_time_unit};
 
 #[test]
 fn test_parse_time_unit_hour_aliases_with_since() {
@@ -58,21 +56,36 @@ fn test_parse_loc_bare_duration_coarsest_unit() {
     assert_eq!(parse_loc(Some(7200.0), "s"), Some("2 h".to_string()));
     assert_eq!(parse_loc(Some(10800.0), "sec"), Some("3 h".to_string()));
     assert_eq!(parse_loc(Some(30.0), "seconds"), Some("30 s".to_string()));
-    assert_eq!(parse_loc(Some(1800.0), "seconds"), Some("30 min".to_string()));
+    assert_eq!(
+        parse_loc(Some(1800.0), "seconds"),
+        Some("30 min".to_string())
+    );
     assert_eq!(parse_loc(Some(5.0), "d"), Some("5 d".to_string()));
     assert_eq!(parse_loc(Some(500.0), "ms"), Some("500 ms".to_string()));
 }
 
 #[test]
 fn test_parse_loc_cf_absolute_datetime() {
-    assert_eq!(parse_loc(Some(12.0), "hours since 2024-01-01"), Some("01-01-2024 12:00".to_string()));
-    assert_eq!(parse_loc(Some(12.0), "h since 2024-01-01"), Some("01-01-2024 12:00".to_string()));
-    assert_eq!(parse_loc(Some(12.0), "hrs since 2024-01-01"), Some("01-01-2024 12:00".to_string()));
+    assert_eq!(
+        parse_loc(Some(12.0), "hours since 2024-01-01"),
+        Some("01-01-2024 12:00".to_string())
+    );
+    assert_eq!(
+        parse_loc(Some(12.0), "h since 2024-01-01"),
+        Some("01-01-2024 12:00".to_string())
+    );
+    assert_eq!(
+        parse_loc(Some(12.0), "hrs since 2024-01-01"),
+        Some("01-01-2024 12:00".to_string())
+    );
 }
 
 #[test]
 fn test_parse_loc_degrees() {
-    assert_eq!(parse_loc(Some(-120.5), "degrees_east"), Some("-120.50°".to_string()));
+    assert_eq!(
+        parse_loc(Some(-120.5), "degrees_east"),
+        Some("-120.50°".to_string())
+    );
     assert_eq!(parse_loc(Some(45.0), "deg"), Some("45.00°".to_string()));
 }
 

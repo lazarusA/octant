@@ -12,7 +12,9 @@ pub fn check_and_orient_axes(
     dim_names: &[String],
     attributes: &serde_json::Map<String, serde_json::Value>,
 ) -> (Vec<f32>, usize, usize) {
-    check_and_orient_axes_with_coords(raw_values, in_width, in_height, dim_names, attributes, None, None)
+    check_and_orient_axes_with_coords(
+        raw_values, in_width, in_height, dim_names, attributes, None, None,
+    )
 }
 
 pub fn check_and_orient_axes_with_coords(
@@ -73,7 +75,10 @@ pub fn check_and_orient_axes_with_coords(
                 flip_y = false;
             }
         }
-    } else if let Some(orientation) = attributes.get("latitude_orientation").and_then(|v| v.as_str()) {
+    } else if let Some(orientation) = attributes
+        .get("latitude_orientation")
+        .and_then(|v| v.as_str())
+    {
         if orientation.to_lowercase() == "ascending" {
             flip_y = true;
         } else if orientation.to_lowercase() == "descending" {
@@ -107,7 +112,10 @@ pub fn check_and_orient_axes_with_coords(
                 flip_x = true;
             }
         }
-    } else if let Some(orientation) = attributes.get("longitude_orientation").and_then(|v| v.as_str()) {
+    } else if let Some(orientation) = attributes
+        .get("longitude_orientation")
+        .and_then(|v| v.as_str())
+    {
         if orientation.to_lowercase() == "descending" {
             flip_x = true;
         }
@@ -137,7 +145,8 @@ mod tests {
         let attrs = serde_json::Map::new();
         let lat_axis = vec![-89.875, 89.875];
 
-        let (oriented, w, h) = check_and_orient_axes_with_coords(raw, 2, 2, &dim_names, &attrs, Some(&lat_axis), None);
+        let (oriented, w, h) =
+            check_and_orient_axes_with_coords(raw, 2, 2, &dim_names, &attrs, Some(&lat_axis), None);
         assert_eq!(w, 2);
         assert_eq!(h, 2);
         // Ascending lat axis SHOULD flip Y so North [30.0, 40.0] moves to Row 0 (top of map)
@@ -152,7 +161,15 @@ mod tests {
         let attrs = serde_json::Map::new();
         let lat_axis = vec![89.875, -89.875];
 
-        let (oriented, w, h) = check_and_orient_axes_with_coords(raw.clone(), 2, 2, &dim_names, &attrs, Some(&lat_axis), None);
+        let (oriented, w, h) = check_and_orient_axes_with_coords(
+            raw.clone(),
+            2,
+            2,
+            &dim_names,
+            &attrs,
+            Some(&lat_axis),
+            None,
+        );
         assert_eq!(w, 2);
         assert_eq!(h, 2);
         // Descending lat axis should NOT flip Y, row 0 stays North [10.0, 20.0]

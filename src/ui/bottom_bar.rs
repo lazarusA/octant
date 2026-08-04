@@ -1,6 +1,6 @@
+use super::cache;
 use crate::app::OctantApp;
 use crate::plots::PlotType;
-use super::cache;
 
 pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
     let is_3d_mode = app.active_plot_type == PlotType::Sphere
@@ -37,7 +37,10 @@ pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
                                 (6, "📐 Shaded Contours (WIP / Experimental)"),
                             ];
                             for (id, label) in algos {
-                                if ui.selectable_label(app.volume_algorithm == id, label).clicked() {
+                                if ui
+                                    .selectable_label(app.volume_algorithm == id, label)
+                                    .clicked()
+                                {
                                     app.volume_algorithm = id;
                                     ui.close_menu();
                                 }
@@ -45,27 +48,48 @@ pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
                         });
 
                         ui.separator();
-                        ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("🌫 Steps"));
+                        ui.add(
+                            egui::Slider::new(&mut app.volume_step_count, 16..=256).text("🌫 Steps"),
+                        );
 
                         // Density slider (used in algorithms 0, 3, 4, 5, 6)
                         if app.volume_algorithm != 1 && app.volume_algorithm != 2 {
-                            ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("💧 Density"));
+                            ui.add(
+                                egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0)
+                                    .text("💧 Density"),
+                            );
                         }
 
                         // Min Clip & Max Range sliders (used in algorithms 0, 1, 2, 6)
-                        if app.volume_algorithm == 0 || app.volume_algorithm == 1 || app.volume_algorithm == 2 || app.volume_algorithm == 6 {
+                        if app.volume_algorithm == 0
+                            || app.volume_algorithm == 1
+                            || app.volume_algorithm == 2
+                            || app.volume_algorithm == 6
+                        {
                             ui.separator();
                             if app.volume_algorithm != 2 {
-                                ui.add(egui::Slider::new(&mut app.volume_cmin, 0.0..=100.0).text("✂️ Min Clip"));
+                                ui.add(
+                                    egui::Slider::new(&mut app.volume_cmin, 0.0..=100.0)
+                                        .text("✂️ Min Clip"),
+                                );
                             }
-                            ui.add(egui::Slider::new(&mut app.volume_cmax, 0.0..=100.0).text("📊 Max Range"));
+                            ui.add(
+                                egui::Slider::new(&mut app.volume_cmax, 0.0..=100.0)
+                                    .text("📊 Max Range"),
+                            );
                         }
 
                         // Isovalue & Isorange sliders (used specifically in Solid Isosurface algorithm 1)
                         if app.volume_algorithm == 1 {
                             ui.separator();
-                            ui.add(egui::Slider::new(&mut app.volume_isovalue, -100.0..=100.0).text("🎯 Isovalue"));
-                            ui.add(egui::Slider::new(&mut app.volume_isorange, 0.1..=20.0).text("📏 Isorange"));
+                            ui.add(
+                                egui::Slider::new(&mut app.volume_isovalue, -100.0..=100.0)
+                                    .text("🎯 Isovalue"),
+                            );
+                            ui.add(
+                                egui::Slider::new(&mut app.volume_isorange, 0.1..=20.0)
+                                    .text("📏 Isorange"),
+                            );
                         }
                     }
                     PlotType::Sphere => {
@@ -76,12 +100,18 @@ pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
                             2 => "📐 Flat Steps",
                             _ => "🧱 3D Radial Legos",
                         };
-                        if ui.button(egui::RichText::new(style_label).small()).clicked() {
+                        if ui
+                            .button(egui::RichText::new(style_label).small())
+                            .clicked()
+                        {
                             app.sphere_mode = (app.sphere_mode + 1) % 4;
                         }
                         if app.sphere_mode > 0 {
                             ui.separator();
-                            ui.add(egui::Slider::new(&mut app.sphere_displacement_strength, 0.0..=5.0).text("🌋 Height"));
+                            ui.add(
+                                egui::Slider::new(&mut app.sphere_displacement_strength, 0.0..=5.0)
+                                    .text("🌋 Height"),
+                            );
                         }
                     }
                     PlotType::Surface => {
@@ -91,25 +121,42 @@ pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
                             1 => "📐 Flat Steps",
                             _ => "🧱 3D Lego Cubes",
                         };
-                        if ui.button(egui::RichText::new(style_label).small()).clicked() {
+                        if ui
+                            .button(egui::RichText::new(style_label).small())
+                            .clicked()
+                        {
                             app.surface_mode = (app.surface_mode + 1) % 3;
                         }
                         ui.separator();
-                        ui.add(egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0).text("⛰️ Height"));
+                        ui.add(
+                            egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0)
+                                .text("⛰️ Height"),
+                        );
                     }
                     PlotType::PointCloud => {
                         ui.label(egui::RichText::new("✨ Point Cloud:").strong().small());
-                        ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("✨ Size"));
+                        ui.add(
+                            egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10)
+                                .text("✨ Size"),
+                        );
                     }
                     PlotType::Heatmap | PlotType::Block => {
-                        ui.label(egui::RichText::new("🗺️ 2D Plane Heatmap Active").small().weak());
+                        ui.label(
+                            egui::RichText::new("🗺️ 2D Plane Heatmap Active")
+                                .small()
+                                .weak(),
+                        );
                     }
                 }
 
                 if is_3d_mode {
                     ui.separator();
                     ui.checkbox(&mut app.sphere_auto_rotate, "🎥 Rotate");
-                    if ui.button("🔄 Reset View").on_hover_text("Reset 3D camera orientation").clicked() {
+                    if ui
+                        .button("🔄 Reset View")
+                        .on_hover_text("Reset 3D camera orientation")
+                        .clicked()
+                    {
                         app.sphere_rotation_x = 0.25;
                         app.sphere_rotation_y = 0.0;
                         app.sphere_zoom = 2.5;
@@ -126,13 +173,21 @@ pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 // 1. Play / Pause Button for Timestep Animation across all plot types
-                let play_text = if app.is_playing { "⏸ Pause" } else { "▶ Play" };
+                let play_text = if app.is_playing {
+                    "⏸ Pause"
+                } else {
+                    "▶ Play"
+                };
                 if ui.button(egui::RichText::new(play_text).strong()).clicked() {
                     app.is_playing = !app.is_playing;
                     app.last_step_time = std::time::Instant::now();
                 }
 
-                let max_steps = app.matrix_data.as_ref().map(|h| h.max_timesteps).unwrap_or(1);
+                let max_steps = app
+                    .matrix_data
+                    .as_ref()
+                    .map(|h| h.max_timesteps)
+                    .unwrap_or(1);
 
                 // 2. Prev Step
                 if ui.button("◀").on_hover_text("Previous Step").clicked() {
@@ -176,7 +231,8 @@ pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
                 let formatted_axis = if let Some(coord_str) = direct_coord_label {
                     coord_str
                 } else {
-                    let active_dim_name = active_var_info.and_then(|v| v.dimension_names.first().cloned());
+                    let active_dim_name =
+                        active_var_info.and_then(|v| v.dimension_names.first().cloned());
                     let active_units = active_var_info.and_then(|v| v.units.as_deref());
                     let time_start = active_var_info.and_then(|v| v.time_coverage_start.as_deref());
                     let temp_res = active_var_info.and_then(|v| v.temporal_resolution.as_deref());
@@ -199,7 +255,11 @@ pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
                         .monospace()
                         .strong(),
                 )
-                .on_hover_text(format!("Step {} / {}", app.current_timestep + 1, max_steps));
+                .on_hover_text(format!(
+                    "Step {} / {}",
+                    app.current_timestep + 1,
+                    max_steps
+                ));
 
                 let slider_res = ui.add(
                     egui::Slider::new(&mut app.current_timestep, 0..=slider_max)

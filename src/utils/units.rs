@@ -60,7 +60,11 @@ pub fn parse_reference_date(
         if clean.ends_with('D') {
             clean.trim_end_matches('D').parse::<usize>().unwrap_or(8)
         } else if clean.ends_with("DAY") || clean.ends_with("DAYS") {
-            clean.split_whitespace().next().and_then(|s| s.parse().ok()).unwrap_or(1)
+            clean
+                .split_whitespace()
+                .next()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(1)
         } else {
             8
         }
@@ -88,7 +92,11 @@ pub fn parse_reference_date(
         let lower = u.to_lowercase();
         if let Some((_, ref_part)) = lower.split_once(" since ") {
             if let Some((y, m, d)) = parse_iso_date(ref_part.trim()) {
-                let step = if lower.starts_with("day") || lower.starts_with("d ") { 1 } else { days_step };
+                let step = if lower.starts_with("day") || lower.starts_with("d ") {
+                    1
+                } else {
+                    days_step
+                };
                 return (y, m, d, step);
             }
         }
@@ -120,7 +128,12 @@ fn parse_iso_date(s: &str) -> Option<(usize, usize, usize)> {
 }
 
 /// Dynamically add N days to a starting date (year, month, day), handling month lengths and leap years.
-pub fn add_days_to_date(start_year: usize, start_month: usize, start_day: usize, days_to_add: usize) -> (usize, usize, usize) {
+pub fn add_days_to_date(
+    start_year: usize,
+    start_month: usize,
+    start_day: usize,
+    days_to_add: usize,
+) -> (usize, usize, usize) {
     let mut year = start_year;
     let mut month = start_month;
     let mut day = start_day + days_to_add;
@@ -182,9 +195,11 @@ pub fn format_axis_value(
         || units_lower.contains("day")
         || units_lower.contains("hour")
     {
-        let (start_year, start_month, start_day, days_per_step) = parse_reference_date(units_str, time_start, temp_res, target_hint);
+        let (start_year, start_month, start_day, days_per_step) =
+            parse_reference_date(units_str, time_start, temp_res, target_hint);
         let total_days_offset = timestep * days_per_step;
-        let (year, month, day) = add_days_to_date(start_year, start_month, start_day, total_days_offset);
+        let (year, month, day) =
+            add_days_to_date(start_year, start_month, start_day, total_days_offset);
 
         return format!("{:04}-{:02}-{:02}", year, month, day);
     }
@@ -239,21 +254,35 @@ pub fn parse_loc(val: Option<f64>, units_str: &str) -> Option<String> {
         let hour_of_day = total_hours.rem_euclid(24) as usize;
 
         let (res_y, res_m, res_d) = add_days_to_date(y, m, d, days_added);
-        return Some(format!("{:02}-{:02}-{:04} {:02}:00", res_m, res_d, res_y, hour_of_day));
+        return Some(format!(
+            "{:02}-{:02}-{:04} {:02}:00",
+            res_m, res_d, res_y, hour_of_day
+        ));
     }
 
     // 2. Bare Time Duration (e.g. "hours", "seconds", "d")
     if let Some(scale_ms) = unit_to_milliseconds(&lower_units) {
         let ms = v * scale_ms as f64;
         if ms == 0.0 {
-            if lower_units.contains("sec") || lower_units == "s" || lower_units.contains("hour") || lower_units == "h" || lower_units == "hr" || lower_units == "hrs" {
+            if lower_units.contains("sec")
+                || lower_units == "s"
+                || lower_units.contains("hour")
+                || lower_units == "h"
+                || lower_units == "hr"
+                || lower_units == "hrs"
+            {
                 return Some("0 h".to_string());
             }
             return Some("0 ms".to_string());
         }
 
         // If unit is explicitly hour-based, keep in hours (e.g. 24 h -> "24 h")
-        if lower_units == "h" || lower_units == "hr" || lower_units == "hrs" || lower_units == "hour" || lower_units == "hours" {
+        if lower_units == "h"
+            || lower_units == "hr"
+            || lower_units == "hrs"
+            || lower_units == "hour"
+            || lower_units == "hours"
+        {
             return Some(format_num_with_unit(v, "h"));
         }
         // If unit is day-based, keep in days
@@ -355,21 +384,36 @@ mod tests {
         assert_eq!(parse_loc(Some(7200.0), "s"), Some("2 h".to_string()));
         assert_eq!(parse_loc(Some(10800.0), "sec"), Some("3 h".to_string()));
         assert_eq!(parse_loc(Some(30.0), "seconds"), Some("30 s".to_string()));
-        assert_eq!(parse_loc(Some(1800.0), "seconds"), Some("30 min".to_string()));
+        assert_eq!(
+            parse_loc(Some(1800.0), "seconds"),
+            Some("30 min".to_string())
+        );
         assert_eq!(parse_loc(Some(5.0), "d"), Some("5 d".to_string()));
         assert_eq!(parse_loc(Some(500.0), "ms"), Some("500 ms".to_string()));
     }
 
     #[test]
     fn test_parse_loc_datetime() {
-        assert_eq!(parse_loc(Some(12.0), "hours since 2024-01-01"), Some("01-01-2024 12:00".to_string()));
-        assert_eq!(parse_loc(Some(12.0), "h since 2024-01-01"), Some("01-01-2024 12:00".to_string()));
-        assert_eq!(parse_loc(Some(12.0), "hrs since 2024-01-01"), Some("01-01-2024 12:00".to_string()));
+        assert_eq!(
+            parse_loc(Some(12.0), "hours since 2024-01-01"),
+            Some("01-01-2024 12:00".to_string())
+        );
+        assert_eq!(
+            parse_loc(Some(12.0), "h since 2024-01-01"),
+            Some("01-01-2024 12:00".to_string())
+        );
+        assert_eq!(
+            parse_loc(Some(12.0), "hrs since 2024-01-01"),
+            Some("01-01-2024 12:00".to_string())
+        );
     }
 
     #[test]
     fn test_parse_loc_degrees_and_fallback() {
-        assert_eq!(parse_loc(Some(-120.5), "degrees_east"), Some("-120.50°".to_string()));
+        assert_eq!(
+            parse_loc(Some(-120.5), "degrees_east"),
+            Some("-120.50°".to_string())
+        );
         assert_eq!(parse_loc(Some(45.0), "deg"), Some("45.00°".to_string()));
         assert_eq!(parse_loc(Some(100.0), "hPa"), Some("100.00".to_string()));
         assert_eq!(parse_loc(None, "hours"), None);

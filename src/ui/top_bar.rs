@@ -1,5 +1,5 @@
-use crate::app::OctantApp;
 use super::{colormap, plot_type, status, store, variables};
+use crate::app::OctantApp;
 
 pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
     egui::TopBottomPanel::top("octant_top_bar")
@@ -14,7 +14,10 @@ pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
                 // Dropdown menus: Store, Catalog, Variables, Colormap, Plot Type
                 store::show_store_menu(app, ui);
 
-                if ui.button(egui::RichText::new("📚 Catalog").strong()).clicked() {
+                if ui
+                    .button(egui::RichText::new("📚 Catalog").strong())
+                    .clicked()
+                {
                     app.show_catalog_window = true;
                 }
 
@@ -25,8 +28,16 @@ pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
                 if app.active_dataset_metadata.is_some() {
                     // Right status info and controls toggle on far right
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let panel_label = if app.show_right_panel { "🎛️ Controls ◀" } else { "🎛️ Controls ▶" };
-                        if ui.button(egui::RichText::new(panel_label).strong()).on_hover_text("Toggle Right Variable Controls Panel").clicked() {
+                        let panel_label = if app.show_right_panel {
+                            "🎛️ Controls ◀"
+                        } else {
+                            "🎛️ Controls ▶"
+                        };
+                        if ui
+                            .button(egui::RichText::new(panel_label).strong())
+                            .on_hover_text("Toggle Right Variable Controls Panel")
+                            .clicked()
+                        {
                             app.show_right_panel = !app.show_right_panel;
                         }
                         ui.separator();
@@ -120,7 +131,7 @@ fn show_secondary_toolbar(app: &mut OctantApp, ctx: &egui::Context) {
                     })
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut app.active_scale_type, 0, "Linear");
-                        
+
                         ui.add_enabled_ui(is_valid_log, |ui| {
                             ui.selectable_value(&mut app.active_scale_type, 1, "Logarithmic")
                                 .on_hover_text(if is_valid_log {

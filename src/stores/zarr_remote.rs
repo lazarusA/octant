@@ -1,5 +1,5 @@
-use crate::utils as zarr_utils;
 use super::{DataStore, DatasetMetadata, MatrixSlice};
+use crate::utils as zarr_utils;
 use std::error::Error;
 
 pub struct ZarrRemoteStore {
@@ -23,7 +23,11 @@ impl DataStore for ZarrRemoteStore {
         let base_url = self.store_url.trim_end_matches('/');
         let store = zarr_utils::build_sync_store(base_url)?;
         let variables = zarr_utils::extract_store_variables_consolidated(store, base_url)?;
-        let dataset_name = base_url.split('/').last().unwrap_or("remote.zarr").to_string();
+        let dataset_name = base_url
+            .split('/')
+            .last()
+            .unwrap_or("remote.zarr")
+            .to_string();
 
         Ok(DatasetMetadata {
             name: dataset_name,
@@ -50,4 +54,3 @@ impl DataStore for ZarrRemoteStore {
         zarr_utils::fetch_slice_range(store, base_url, variable, start_step, count)
     }
 }
-

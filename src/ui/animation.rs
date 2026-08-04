@@ -1,11 +1,19 @@
 use crate::app::OctantApp;
 
 pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let max_steps = app.matrix_data.as_ref().map(|h| h.max_timesteps).unwrap_or(1);
+    let max_steps = app
+        .matrix_data
+        .as_ref()
+        .map(|h| h.max_timesteps)
+        .unwrap_or(1);
 
     ui.horizontal(|ui| {
         // Play / Pause Button
-        let play_text = if app.is_playing { "⏸ Pause" } else { "▶ Play" };
+        let play_text = if app.is_playing {
+            "⏸ Pause"
+        } else {
+            "▶ Play"
+        };
         if ui.button(egui::RichText::new(play_text).strong()).clicked() {
             app.is_playing = !app.is_playing;
             app.last_step_time = std::time::Instant::now();

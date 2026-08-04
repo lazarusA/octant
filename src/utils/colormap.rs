@@ -22,7 +22,13 @@ pub fn sample_colormap_rgb(colormap_id: u32, t: f32) -> Color32 {
 }
 
 /// Unscales a normalized colorbar position t in [0.0, 1.0] back to the exact data value v(t) for tick labeling.
-pub fn unscale_norm_to_value(t: f32, cmin: f32, cmax: f32, scale_type: u32, scale_param: f32) -> f32 {
+pub fn unscale_norm_to_value(
+    t: f32,
+    cmin: f32,
+    cmax: f32,
+    scale_type: u32,
+    scale_param: f32,
+) -> f32 {
     let t = t.clamp(0.0, 1.0);
     let range = (cmax - cmin).max(1e-30);
 
@@ -37,7 +43,11 @@ pub fn unscale_norm_to_value(t: f32, cmin: f32, cmax: f32, scale_type: u32, scal
                 cmin
             };
             let safe_max = cmax.max(safe_min * 1.0001);
-            let gamma = if scale_param > 0.0 && scale_param != 1.0 { scale_param } else { 1.0 };
+            let gamma = if scale_param > 0.0 && scale_param != 1.0 {
+                scale_param
+            } else {
+                1.0
+            };
             let t_gamma = t.powf(1.0 / gamma);
 
             let log_min = safe_min.ln();
@@ -60,7 +70,11 @@ pub fn unscale_norm_to_value(t: f32, cmin: f32, cmax: f32, scale_type: u32, scal
         4 => {
             let k = if scale_param > 0.0 { scale_param } else { 3.0 };
             let denom = k.exp() - 1.0;
-            let norm_x = if denom.abs() > 1e-5 { (1.0 + t * denom).ln() / k } else { t };
+            let norm_x = if denom.abs() > 1e-5 {
+                (1.0 + t * denom).ln() / k
+            } else {
+                t
+            };
             cmin + norm_x.clamp(0.0, 1.0) * range
         }
         _ => cmin + t * range,
@@ -68,7 +82,13 @@ pub fn unscale_norm_to_value(t: f32, cmin: f32, cmax: f32, scale_type: u32, scal
 }
 
 /// Computes normalized colormap parameter t for raw value val under current scale.
-pub fn apply_color_scale_cpu(val: f32, cmin: f32, cmax: f32, scale_type: u32, scale_param: f32) -> f32 {
+pub fn apply_color_scale_cpu(
+    val: f32,
+    cmin: f32,
+    cmax: f32,
+    scale_type: u32,
+    scale_param: f32,
+) -> f32 {
     let range = (cmax - cmin).max(1e-30);
 
     match scale_type {
@@ -91,7 +111,11 @@ pub fn apply_color_scale_cpu(val: f32, cmin: f32, cmax: f32, scale_type: u32, sc
             let log_max = safe_max.ln();
             let log_range = (log_max - log_min).max(1e-6);
             let norm_log = ((log_v - log_min) / log_range).clamp(0.0, 1.0);
-            let gamma = if scale_param > 0.0 && scale_param != 1.0 { scale_param } else { 1.0 };
+            let gamma = if scale_param > 0.0 && scale_param != 1.0 {
+                scale_param
+            } else {
+                1.0
+            };
             norm_log.powf(gamma)
         }
         2 => {
@@ -100,7 +124,11 @@ pub fn apply_color_scale_cpu(val: f32, cmin: f32, cmax: f32, scale_type: u32, sc
             let safe_range = range.abs().max(1e-6);
             let num = (c + norm_x * safe_range).ln() - c.ln();
             let denom = (c + safe_range).ln() - c.ln();
-            if denom != 0.0 { (num / denom).clamp(0.0, 1.0) } else { norm_x }
+            if denom != 0.0 {
+                (num / denom).clamp(0.0, 1.0)
+            } else {
+                norm_x
+            }
         }
         3 => {
             let norm_x = ((val - cmin) / range).clamp(0.0, 1.0);
@@ -112,7 +140,11 @@ pub fn apply_color_scale_cpu(val: f32, cmin: f32, cmax: f32, scale_type: u32, sc
             let k = if scale_param > 0.0 { scale_param } else { 3.0 };
             let num = (norm_x * k).exp() - 1.0;
             let denom = k.exp() - 1.0;
-            if denom.abs() > 1e-5 { (num / denom).clamp(0.0, 1.0) } else { norm_x }
+            if denom.abs() > 1e-5 {
+                (num / denom).clamp(0.0, 1.0)
+            } else {
+                norm_x
+            }
         }
         _ => ((val - cmin) / range).clamp(0.0, 1.0),
     }
@@ -126,7 +158,14 @@ fn mix_rgb(c0: [f32; 3], c1: [f32; 3], t: f32) -> (f32, f32, f32) {
     )
 }
 
-fn sample_segmented(x: f32, c0: [f32; 3], c1: [f32; 3], c2: [f32; 3], c3: [f32; 3], c4: [f32; 3]) -> (f32, f32, f32) {
+fn sample_segmented(
+    x: f32,
+    c0: [f32; 3],
+    c1: [f32; 3],
+    c2: [f32; 3],
+    c3: [f32; 3],
+    c4: [f32; 3],
+) -> (f32, f32, f32) {
     if x < 0.25 {
         mix_rgb(c0, c1, x / 0.25)
     } else if x < 0.50 {
@@ -228,7 +267,13 @@ mod tests {
     use super::*;
 
     fn assert_close(a: f32, b: f32, tol: f32) {
-        assert!((a - b).abs() <= tol, "Expected {} to be close to {} within tol {}", a, b, tol);
+        assert!(
+            (a - b).abs() <= tol,
+            "Expected {} to be close to {} within tol {}",
+            a,
+            b,
+            tol
+        );
     }
 
     #[test]
@@ -293,11 +338,31 @@ mod tests {
         let max_val = 1000.0;
         let data_range = max_val - min_val;
 
-        assert_close(apply_color_scale_cpu(0.0, min_val, max_val, 1, 1.0), 0.0, 1e-4);
-        assert_close(apply_color_scale_cpu(0.001 * data_range, min_val, max_val, 1, 1.0), 0.0, 1e-4);
-        assert_close(apply_color_scale_cpu(0.01 * data_range, min_val, max_val, 1, 1.0), 0.3333, 1e-3);
-        assert_close(apply_color_scale_cpu(0.1 * data_range, min_val, max_val, 1, 1.0), 0.6667, 1e-3);
-        assert_close(apply_color_scale_cpu(1.0 * data_range, min_val, max_val, 1, 1.0), 1.0, 1e-4);
+        assert_close(
+            apply_color_scale_cpu(0.0, min_val, max_val, 1, 1.0),
+            0.0,
+            1e-4,
+        );
+        assert_close(
+            apply_color_scale_cpu(0.001 * data_range, min_val, max_val, 1, 1.0),
+            0.0,
+            1e-4,
+        );
+        assert_close(
+            apply_color_scale_cpu(0.01 * data_range, min_val, max_val, 1, 1.0),
+            0.3333,
+            1e-3,
+        );
+        assert_close(
+            apply_color_scale_cpu(0.1 * data_range, min_val, max_val, 1, 1.0),
+            0.6667,
+            1e-3,
+        );
+        assert_close(
+            apply_color_scale_cpu(1.0 * data_range, min_val, max_val, 1, 1.0),
+            1.0,
+            1e-4,
+        );
     }
 
     #[test]
@@ -306,10 +371,26 @@ mod tests {
         let max_val = 1000.0;
         let c = 1.0;
 
-        assert_close(apply_color_scale_cpu(0.0, min_val, max_val, 2, c), 0.0, 1e-4);
-        assert_close(apply_color_scale_cpu(10.0, min_val, max_val, 2, c), 0.3472, 1e-3); // norm_x = 0.01
-        assert_close(apply_color_scale_cpu(100.0, min_val, max_val, 2, c), 0.6680, 1e-3); // norm_x = 0.1
-        assert_close(apply_color_scale_cpu(1000.0, min_val, max_val, 2, c), 1.0, 1e-4);
+        assert_close(
+            apply_color_scale_cpu(0.0, min_val, max_val, 2, c),
+            0.0,
+            1e-4,
+        );
+        assert_close(
+            apply_color_scale_cpu(10.0, min_val, max_val, 2, c),
+            0.3472,
+            1e-3,
+        ); // norm_x = 0.01
+        assert_close(
+            apply_color_scale_cpu(100.0, min_val, max_val, 2, c),
+            0.6680,
+            1e-3,
+        ); // norm_x = 0.1
+        assert_close(
+            apply_color_scale_cpu(1000.0, min_val, max_val, 2, c),
+            1.0,
+            1e-4,
+        );
 
         // Round-trip test
         for &val in &[0.0, 10.0, 100.0, 500.0, 1000.0] {
@@ -324,11 +405,31 @@ mod tests {
         let min_val = 0.0;
         let max_val = 100.0;
 
-        assert_close(apply_color_scale_cpu(0.0, min_val, max_val, 3, 1.0), 0.0, 1e-4);
-        assert_close(apply_color_scale_cpu(25.0, min_val, max_val, 3, 1.0), 0.1464, 1e-3);
-        assert_close(apply_color_scale_cpu(50.0, min_val, max_val, 3, 1.0), 0.5, 1e-4);
-        assert_close(apply_color_scale_cpu(75.0, min_val, max_val, 3, 1.0), 0.8536, 1e-3);
-        assert_close(apply_color_scale_cpu(100.0, min_val, max_val, 3, 1.0), 1.0, 1e-4);
+        assert_close(
+            apply_color_scale_cpu(0.0, min_val, max_val, 3, 1.0),
+            0.0,
+            1e-4,
+        );
+        assert_close(
+            apply_color_scale_cpu(25.0, min_val, max_val, 3, 1.0),
+            0.1464,
+            1e-3,
+        );
+        assert_close(
+            apply_color_scale_cpu(50.0, min_val, max_val, 3, 1.0),
+            0.5,
+            1e-4,
+        );
+        assert_close(
+            apply_color_scale_cpu(75.0, min_val, max_val, 3, 1.0),
+            0.8536,
+            1e-3,
+        );
+        assert_close(
+            apply_color_scale_cpu(100.0, min_val, max_val, 3, 1.0),
+            1.0,
+            1e-4,
+        );
 
         // Round-trip test
         for &val in &[0.0, 10.0, 25.0, 50.0, 75.0, 90.0, 100.0] {
@@ -344,8 +445,16 @@ mod tests {
         let max_val = 100.0;
         let k = 3.0;
 
-        assert_close(apply_color_scale_cpu(0.0, min_val, max_val, 4, k), 0.0, 1e-4);
-        assert_close(apply_color_scale_cpu(100.0, min_val, max_val, 4, k), 1.0, 1e-4);
+        assert_close(
+            apply_color_scale_cpu(0.0, min_val, max_val, 4, k),
+            0.0,
+            1e-4,
+        );
+        assert_close(
+            apply_color_scale_cpu(100.0, min_val, max_val, 4, k),
+            1.0,
+            1e-4,
+        );
 
         // Round-trip test
         for &val in &[0.0, 10.0, 25.0, 50.0, 75.0, 100.0] {

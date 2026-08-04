@@ -5,7 +5,7 @@ use std::error::Error;
 use zarrs::array::Array;
 use zarrs::group::Group;
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata;
-use zarrs::node::{get_child_nodes, NodePath};
+use zarrs::node::{NodePath, get_child_nodes};
 use zarrs::storage::{ReadableStorageTraits, ReadableWritableListableStorage};
 
 /// Extract all available variables natively using `zarrs` Group consolidated metadata API first,

@@ -2,8 +2,8 @@ pub mod matrix_data;
 
 use std::sync::Arc;
 use zarrs::array::{Array, ArrayBuilder, ArraySubset, FillValue};
-use zarrs::storage::store::MemoryStore;
 use zarrs::storage::WritableStorageTraits;
+use zarrs::storage::store::MemoryStore;
 
 pub struct ZarrHeatmapData {
     pub width: usize,
@@ -17,7 +17,10 @@ pub struct ZarrHeatmapData {
 
 impl ZarrHeatmapData {
     /// Generates a random 2D matrix for testing graphics rendering.
-    pub fn create_random_heatmap(width: usize, height: usize) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn create_random_heatmap(
+        width: usize,
+        height: usize,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut raw_data = Vec::with_capacity(width * height);
         for y in 0..height {
             for x in 0..width {
@@ -43,7 +46,10 @@ impl ZarrHeatmapData {
     }
 
     /// Generates a sample 2D Zarr v3 Array stored in an in-memory Zarr store.
-    pub fn create_sample_heatmap(width: usize, height: usize) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn create_sample_heatmap(
+        width: usize,
+        height: usize,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let store = Arc::new(MemoryStore::new());
         let array_path = "/heatmap_matrix";
 
@@ -102,7 +108,10 @@ impl ZarrHeatmapData {
     }
 
     /// Fetches a 2D slice [timestep, lat, lon] of `air_temperature_2m` from a remote HTTP Zarr store.
-    pub fn fetch_remote_esdc_temperature(store_url: &str, timestep: usize) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn fetch_remote_esdc_temperature(
+        store_url: &str,
+        timestep: usize,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let base_url = store_url.trim_end_matches('/');
 
         // 1. Fetch .zarray metadata over HTTP
@@ -120,7 +129,8 @@ impl ZarrHeatmapData {
 
         // 3. Populate a local MemoryStore for zarrs decoding
         let key_zarray = zarrs::storage::StoreKey::new("air_temperature_2m/.zarray")?;
-        let key_chunk = zarrs::storage::StoreKey::new(format!("air_temperature_2m/{}.0.0", chunk_time_idx))?;
+        let key_chunk =
+            zarrs::storage::StoreKey::new(format!("air_temperature_2m/{}.0.0", chunk_time_idx))?;
 
         let store = Arc::new(MemoryStore::new());
         store.set(&key_zarray, zarray_bytes.to_vec().into())?;
@@ -142,11 +152,7 @@ impl ZarrHeatmapData {
         let raw_values = array.retrieve_array_subset::<Vec<f32>>(&subset)?;
 
         // Compute min and max across all valid matrix values
-        let valid_vals: Vec<f32> = raw_values
-            .iter()
-            .copied()
-            .filter(|v| !v.is_nan())
-            .collect();
+        let valid_vals: Vec<f32> = raw_values.iter().copied().filter(|v| !v.is_nan()).collect();
 
         let (min_v, max_v) = if !valid_vals.is_empty() {
             let min_val = valid_vals.iter().copied().fold(f32::INFINITY, f32::min);
@@ -175,7 +181,11 @@ impl ZarrHeatmapData {
             height,
             values,
             shape: shape.to_vec(),
-            dataset_name: format!("ESDC air_temperature_2m [Step {}/{}]", timestep + 1, max_timesteps),
+            dataset_name: format!(
+                "ESDC air_temperature_2m [Step {}/{}]",
+                timestep + 1,
+                max_timesteps
+            ),
             current_timestep: timestep,
             max_timesteps,
         })

@@ -1,10 +1,10 @@
 use crate::app::StoreKind;
 use crate::stores::{
-    icechunk_local::IcechunkLocalStore, icechunk_remote::IcechunkRemoteStore,
-    zarr_local::ZarrLocalStore, zarr_remote::ZarrRemoteStore, DataStore, MatrixSlice,
+    DataStore, MatrixSlice, icechunk_local::IcechunkLocalStore,
+    icechunk_remote::IcechunkRemoteStore, zarr_local::ZarrLocalStore, zarr_remote::ZarrRemoteStore,
 };
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -75,7 +75,9 @@ impl SliceLruCache {
         while self.current_bytes > self.max_bytes && !self.access_order.is_empty() {
             if let Some(oldest_key) = self.access_order.pop_front() {
                 if let Some(evicted_slice) = self.entries.remove(&oldest_key) {
-                    self.current_bytes = self.current_bytes.saturating_sub(evicted_slice.bytes_size());
+                    self.current_bytes = self
+                        .current_bytes
+                        .saturating_sub(evicted_slice.bytes_size());
                 }
             }
         }
@@ -207,8 +209,12 @@ impl SlicePrefetcher {
             let store: Box<dyn DataStore> = match key_clone.store_kind {
                 StoreKind::RemoteZarr => Box::new(ZarrRemoteStore::new(&store_target_for_thread)),
                 StoreKind::LocalZarr => Box::new(ZarrLocalStore::new(&store_target_for_thread)),
-                StoreKind::RemoteIcechunk => Box::new(IcechunkRemoteStore::new(&store_target_for_thread)),
-                StoreKind::LocalIcechunk => Box::new(IcechunkLocalStore::new(&store_target_for_thread)),
+                StoreKind::RemoteIcechunk => {
+                    Box::new(IcechunkRemoteStore::new(&store_target_for_thread))
+                }
+                StoreKind::LocalIcechunk => {
+                    Box::new(IcechunkLocalStore::new(&store_target_for_thread))
+                }
                 StoreKind::ProceduralRandom => {
                     let _ = tx.send(BatchResult {
                         keys: vec![key_clone],
@@ -246,10 +252,18 @@ impl SlicePrefetcher {
             return;
         }
 
-        let slice_bytes = if slice_bytes_hint > 0 { slice_bytes_hint } else { 41_472 };
+        let slice_bytes = if slice_bytes_hint > 0 {
+            slice_bytes_hint
+        } else {
+            41_472
+        };
         let cache_max_bytes = cache.max_bytes();
         let total_cacheable_slices = (cache_max_bytes / slice_bytes).max(1);
-        let chunk_time_steps = if chunk_time_size > 0 { chunk_time_size } else { 1 };
+        let chunk_time_steps = if chunk_time_size > 0 {
+            chunk_time_size
+        } else {
+            1
+        };
         let target_prefetch_bytes = 50 * 1024 * 1024;
         let raw_target_slices = (target_prefetch_bytes / slice_bytes).max(1);
 
@@ -301,7 +315,9 @@ impl SlicePrefetcher {
                 })
                 .collect();
 
-            let needs_fetch = batch_keys.iter().any(|k| !cache.contains(k) && !self.pending.contains(k));
+            let needs_fetch = batch_keys
+                .iter()
+                .any(|k| !cache.contains(k) && !self.pending.contains(k));
 
             if needs_fetch {
                 for k in &batch_keys {
@@ -320,10 +336,18 @@ impl SlicePrefetcher {
 
                 thread::spawn(move || {
                     let store: Box<dyn DataStore> = match store_kind_for_thread {
-                        StoreKind::RemoteZarr => Box::new(ZarrRemoteStore::new(&store_target_for_thread)),
-                        StoreKind::LocalZarr => Box::new(ZarrLocalStore::new(&store_target_for_thread)),
-                        StoreKind::RemoteIcechunk => Box::new(IcechunkRemoteStore::new(&store_target_for_thread)),
-                        StoreKind::LocalIcechunk => Box::new(IcechunkLocalStore::new(&store_target_for_thread)),
+                        StoreKind::RemoteZarr => {
+                            Box::new(ZarrRemoteStore::new(&store_target_for_thread))
+                        }
+                        StoreKind::LocalZarr => {
+                            Box::new(ZarrLocalStore::new(&store_target_for_thread))
+                        }
+                        StoreKind::RemoteIcechunk => {
+                            Box::new(IcechunkRemoteStore::new(&store_target_for_thread))
+                        }
+                        StoreKind::LocalIcechunk => {
+                            Box::new(IcechunkLocalStore::new(&store_target_for_thread))
+                        }
                         StoreKind::ProceduralRandom => {
                             let _ = tx.send(BatchResult {
                                 keys: thread_keys,

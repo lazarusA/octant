@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use bytemuck::{Pod, Zeroable};
+use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -268,10 +268,34 @@ impl SurfaceRenderer {
 
                 let base_idx = vertices.len() as u32;
 
-                vertices.push(SurfaceVertex { position: [x0, y0, 1.0], uv: [u0, v0], cell_index, corner_index: corner_tl, normal: norm_top });
-                vertices.push(SurfaceVertex { position: [x1, y0, 1.0], uv: [u1, v0], cell_index, corner_index: corner_tr, normal: norm_top });
-                vertices.push(SurfaceVertex { position: [x0, y1, 1.0], uv: [u0, v1], cell_index, corner_index: corner_bl, normal: norm_top });
-                vertices.push(SurfaceVertex { position: [x1, y1, 1.0], uv: [u1, v1], cell_index, corner_index: corner_br, normal: norm_top });
+                vertices.push(SurfaceVertex {
+                    position: [x0, y0, 1.0],
+                    uv: [u0, v0],
+                    cell_index,
+                    corner_index: corner_tl,
+                    normal: norm_top,
+                });
+                vertices.push(SurfaceVertex {
+                    position: [x1, y0, 1.0],
+                    uv: [u1, v0],
+                    cell_index,
+                    corner_index: corner_tr,
+                    normal: norm_top,
+                });
+                vertices.push(SurfaceVertex {
+                    position: [x0, y1, 1.0],
+                    uv: [u0, v1],
+                    cell_index,
+                    corner_index: corner_bl,
+                    normal: norm_top,
+                });
+                vertices.push(SurfaceVertex {
+                    position: [x1, y1, 1.0],
+                    uv: [u1, v1],
+                    cell_index,
+                    corner_index: corner_br,
+                    normal: norm_top,
+                });
 
                 indices.push(base_idx);
                 indices.push(base_idx + 2);
@@ -345,12 +369,18 @@ impl eframe::egui_wgpu::CallbackTrait for SurfaceCallback {
         if self.surface_mode == 2 {
             // Mode 2: 3D Lego Cubes (GPU Instanced Unit Cube Draw)
             rpass.set_vertex_buffer(0, self.renderer.cube_vertex_buffer.slice(..));
-            rpass.set_index_buffer(self.renderer.cube_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            rpass.set_index_buffer(
+                self.renderer.cube_index_buffer.slice(..),
+                wgpu::IndexFormat::Uint32,
+            );
             rpass.draw_indexed(0..36, 0, 0..self.renderer.num_instances);
         } else {
             // Mode 0 (Smooth Terrain) & Mode 1 (Flat Steps)
             rpass.set_vertex_buffer(0, self.renderer.grid_vertex_buffer.slice(..));
-            rpass.set_index_buffer(self.renderer.grid_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            rpass.set_index_buffer(
+                self.renderer.grid_index_buffer.slice(..),
+                wgpu::IndexFormat::Uint32,
+            );
             rpass.draw_indexed(0..self.renderer.grid_num_indices, 0, 0..1);
         }
     }

@@ -1,8 +1,10 @@
 use std::error::Error;
 use std::path::Path;
 use std::sync::Arc;
-use zarrs::storage::storage_adapter::async_to_sync::{AsyncToSyncBlockOn, AsyncToSyncStorageAdapter};
 use zarrs::storage::ReadableWritableListableStorage;
+use zarrs::storage::storage_adapter::async_to_sync::{
+    AsyncToSyncBlockOn, AsyncToSyncStorageAdapter,
+};
 use zarrs_icechunk::AsyncIcechunkStore;
 
 struct TokioBlockOn(Arc<tokio::runtime::Runtime>);
@@ -16,7 +18,8 @@ impl AsyncToSyncBlockOn for TokioBlockOn {
 use std::collections::HashMap;
 use std::sync::{OnceLock, RwLock};
 
-static ICECHUNK_STORE_CACHE: OnceLock<RwLock<HashMap<String, ReadableWritableListableStorage>>> = OnceLock::new();
+static ICECHUNK_STORE_CACHE: OnceLock<RwLock<HashMap<String, ReadableWritableListableStorage>>> =
+    OnceLock::new();
 static SHARED_TOKIO_RT: OnceLock<Arc<tokio::runtime::Runtime>> = OnceLock::new();
 
 fn get_shared_tokio_rt() -> Arc<tokio::runtime::Runtime> {
@@ -66,7 +69,8 @@ pub fn build_sync_icechunk_store(
                 None,
                 Vec::new(),
                 Vec::new(),
-            ).await?
+            )
+            .await?
         };
 
         let repo = icechunk::Repository::open(None, storage, Default::default()).await?;
@@ -88,8 +92,12 @@ pub fn build_sync_icechunk_store(
     Ok(sync_store)
 }
 
-fn parse_s3_or_http_url(url: &str) -> Result<(String, Option<String>, Option<String>, Option<String>), Box<dyn Error>> {
-    let clean = url.trim_start_matches("https://").trim_start_matches("http://");
+fn parse_s3_or_http_url(
+    url: &str,
+) -> Result<(String, Option<String>, Option<String>, Option<String>), Box<dyn Error>> {
+    let clean = url
+        .trim_start_matches("https://")
+        .trim_start_matches("http://");
     let parts: Vec<&str> = clean.split('/').filter(|s| !s.is_empty()).collect();
     if parts.is_empty() {
         return Err("Invalid storage URL".into());
@@ -100,7 +108,10 @@ fn parse_s3_or_http_url(url: &str) -> Result<(String, Option<String>, Option<Str
 
     if host.contains(".s3.") && host.ends_with(".amazonaws.com") {
         // E.g. dynamical-noaa-hrrr.s3.us-west-2.amazonaws.com
-        let sub_parts: Vec<&str> = host.trim_end_matches(".amazonaws.com").split(".s3.").collect();
+        let sub_parts: Vec<&str> = host
+            .trim_end_matches(".amazonaws.com")
+            .split(".s3.")
+            .collect();
         let bucket = sub_parts.first().unwrap_or(&host).to_string();
         let region = sub_parts.get(1).map(|r| r.to_string());
         let prefix = if path_parts.is_empty() {
@@ -110,7 +121,10 @@ fn parse_s3_or_http_url(url: &str) -> Result<(String, Option<String>, Option<Str
         };
         Ok((bucket, prefix, region, None))
     } else if host.contains(".s3-") && host.ends_with(".amazonaws.com") {
-        let sub_parts: Vec<&str> = host.trim_end_matches(".amazonaws.com").split(".s3-").collect();
+        let sub_parts: Vec<&str> = host
+            .trim_end_matches(".amazonaws.com")
+            .split(".s3-")
+            .collect();
         let bucket = sub_parts.first().unwrap_or(&host).to_string();
         let region = sub_parts.get(1).map(|r| r.to_string());
         let prefix = if path_parts.is_empty() {
@@ -139,9 +153,12 @@ fn parse_s3_or_http_url(url: &str) -> Result<(String, Option<String>, Option<Str
         } else {
             None
         };
-        let scheme = if url.starts_with("http://") { "http" } else { "https" };
+        let scheme = if url.starts_with("http://") {
+            "http"
+        } else {
+            "https"
+        };
         let endpoint_url = Some(format!("{}://{}", scheme, host));
         Ok((bucket, prefix, None, endpoint_url))
     }
 }
-

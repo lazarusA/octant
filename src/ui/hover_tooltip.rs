@@ -176,8 +176,15 @@ pub fn show_hover_tooltip(
 
             if var.shape.len() >= 3 {
                 let step = app.current_timestep + 1;
-                let step_dim_name = var.dimension_names.first().map(|s| s.as_str()).unwrap_or("time");
-                dim_info_str = format!("{}, {} | {}: {}/{}", loc_y, loc_x, step_dim_name, step, var.shape[0]);
+                let step_dim_name = var
+                    .dimension_names
+                    .first()
+                    .map(|s| s.as_str())
+                    .unwrap_or("time");
+                dim_info_str = format!(
+                    "{}, {} | {}: {}/{}",
+                    loc_y, loc_x, step_dim_name, step, var.shape[0]
+                );
             } else {
                 dim_info_str = format!("{}, {}", loc_y, loc_x);
             }
@@ -206,19 +213,21 @@ pub fn show_hover_tooltip(
             5.0,
             Stroke::new(1.0_f32, ctx.style().visuals.strong_text_color()),
         );
-        painter.circle_filled(
-            crosshair_pos,
-            2.0,
-            ctx.style().visuals.strong_text_color(),
-        );
+        painter.circle_filled(crosshair_pos, 2.0, ctx.style().visuals.strong_text_color());
 
         let arm_len = 8.0;
         painter.line_segment(
-            [Pos2::new(crosshair_pos.x - arm_len, crosshair_pos.y), Pos2::new(crosshair_pos.x + arm_len, crosshair_pos.y)],
+            [
+                Pos2::new(crosshair_pos.x - arm_len, crosshair_pos.y),
+                Pos2::new(crosshair_pos.x + arm_len, crosshair_pos.y),
+            ],
             Stroke::new(1.0_f32, Color32::from_black_alpha(150)),
         );
         painter.line_segment(
-            [Pos2::new(crosshair_pos.x, crosshair_pos.y - arm_len), Pos2::new(crosshair_pos.x, crosshair_pos.y + arm_len)],
+            [
+                Pos2::new(crosshair_pos.x, crosshair_pos.y - arm_len),
+                Pos2::new(crosshair_pos.x, crosshair_pos.y + arm_len),
+            ],
             Stroke::new(1.0_f32, Color32::from_black_alpha(150)),
         );
     }
@@ -269,11 +278,7 @@ pub fn show_hover_tooltip(
 
                         // Value [Units] (Prominent 15.0pt bold font)
                         ui.horizontal(|ui| {
-                            ui.label(
-                                egui::RichText::new("Val:")
-                                    .small()
-                                    .color(text_color),
-                            );
+                            ui.label(egui::RichText::new("Val:").small().color(text_color));
                             ui.label(
                                 egui::RichText::new(format!("{}{}", val_formatted, units_str))
                                     .size(15.0)
@@ -285,11 +290,7 @@ pub fn show_hover_tooltip(
                         ui.add_space(1.0);
 
                         // Real Dimension Names & Coordinates
-                        ui.label(
-                            egui::RichText::new(&dim_info_str)
-                                .small()
-                                .color(text_color),
-                        );
+                        ui.label(egui::RichText::new(&dim_info_str).small().color(text_color));
                     });
                 });
         });

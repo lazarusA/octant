@@ -23,22 +23,34 @@ impl DataStore for ZarrLocalStore {
 
     fn inspect(&self) -> Result<DatasetMetadata, Box<dyn Error>> {
         if !self.path.exists() {
-            return Err(format!("Local Zarr path '{}' does not exist.", self.path.display()).into());
+            return Err(
+                format!("Local Zarr path '{}' does not exist.", self.path.display()).into(),
+            );
         }
 
-        let store_name = self.path.file_name()
+        let store_name = self
+            .path
+            .file_name()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| "local.zarr".to_string());
 
         let store_path_str = self.path.to_string_lossy().to_string();
-        let (variables, dimension_coordinates) = if let Ok(store) = FilesystemStore::new(&self.path) {
+        let (variables, dimension_coordinates) = if let Ok(store) = FilesystemStore::new(&self.path)
+        {
             let store_arc = Arc::new(store);
-            let vars = crate::utils::extract_store_variables_consolidated(store_arc.clone(), &store_path_str)?;
+            let vars = crate::utils::extract_store_variables_consolidated(
+                store_arc.clone(),
+                &store_path_str,
+            )?;
             let dim_names: Vec<String> = vars
                 .iter()
                 .flat_map(|v| v.dimension_names.clone())
                 .collect();
-            let coords = crate::utils::zarr::fetch_all_dimension_coordinates(store_arc, &dim_names, Some(&store_path_str));
+            let coords = crate::utils::zarr::fetch_all_dimension_coordinates(
+                store_arc,
+                &dim_names,
+                Some(&store_path_str),
+            );
             (vars, coords)
         } else {
             (Vec::new(), std::collections::HashMap::new())
@@ -55,7 +67,12 @@ impl DataStore for ZarrLocalStore {
     fn fetch_slice(&self, variable: &str, timestep: usize) -> Result<MatrixSlice, Box<dyn Error>> {
         let store_path_str = self.path.to_string_lossy().to_string();
         if let Ok(store) = FilesystemStore::new(&self.path) {
-            if let Ok(slice) = crate::utils::zarr::fetch_slice(Arc::new(store), &store_path_str, variable, timestep) {
+            if let Ok(slice) = crate::utils::zarr::fetch_slice(
+                Arc::new(store),
+                &store_path_str,
+                variable,
+                timestep,
+            ) {
                 return Ok(slice);
             }
         }
@@ -92,7 +109,13 @@ impl DataStore for ZarrLocalStore {
     ) -> Result<Vec<MatrixSlice>, Box<dyn Error>> {
         if let Ok(store) = FilesystemStore::new(&self.path) {
             let store_path_str = self.path.to_string_lossy().to_string();
-            if let Ok(slices) = crate::utils::zarr::fetch_slice_range(Arc::new(store), &store_path_str, variable, start_step, count) {
+            if let Ok(slices) = crate::utils::zarr::fetch_slice_range(
+                Arc::new(store),
+                &store_path_str,
+                variable,
+                start_step,
+                count,
+            ) {
                 return Ok(slices);
             }
         }
@@ -103,5 +126,3 @@ impl DataStore for ZarrLocalStore {
         Ok(fallback)
     }
 }
-
-

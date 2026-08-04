@@ -12,14 +12,12 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         let fraction = (current_bytes as f32 / max_bytes as f32).clamp(0.0, 1.0);
 
         ui.label(egui::RichText::new("RAM Memory Usage (1GB Default Limit):").small());
-        ui.add(
-            egui::ProgressBar::new(fraction).text(format!(
-                "{:.2} MB / {} MB ({:.1}%)",
-                current_mb,
-                app.max_cache_mb,
-                fraction * 100.0
-            )),
-        );
+        ui.add(egui::ProgressBar::new(fraction).text(format!(
+            "{:.2} MB / {} MB ({:.1}%)",
+            current_mb,
+            app.max_cache_mb,
+            fraction * 100.0
+        )));
 
         let chunk_time_size = app
             .active_dataset_metadata

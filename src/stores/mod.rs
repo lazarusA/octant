@@ -1,7 +1,7 @@
-pub mod zarr_local;
-pub mod zarr_remote;
 pub mod icechunk_local;
 pub mod icechunk_remote;
+pub mod zarr_local;
+pub mod zarr_remote;
 
 use std::collections::HashMap;
 use std::error::Error;

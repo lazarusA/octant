@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use bytemuck::{Pod, Zeroable};
+use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -109,11 +109,8 @@ impl SphereRenderer {
             &initial_uniforms,
         );
 
-        let data_buffer = super::common::create_storage_buffer(
-            device,
-            "Sphere Data Storage Buffer",
-            matrix_data,
-        );
+        let data_buffer =
+            super::common::create_storage_buffer(device, "Sphere Data Storage Buffer", matrix_data);
 
         let bind_group_layout = super::common::create_uniform_storage_bind_group_layout(
             device,
@@ -264,10 +261,34 @@ impl SphereRenderer {
 
                 let base_idx = vertices.len() as u32;
 
-                vertices.push(SphereVertex { position: p0, uv: [u0, v0], cell_index, corner_index: corner_tl, normal: p0 });
-                vertices.push(SphereVertex { position: p1, uv: [u1, v0], cell_index, corner_index: corner_tr, normal: p1 });
-                vertices.push(SphereVertex { position: p2, uv: [u0, v1], cell_index, corner_index: corner_bl, normal: p2 });
-                vertices.push(SphereVertex { position: p3, uv: [u1, v1], cell_index, corner_index: corner_br, normal: p3 });
+                vertices.push(SphereVertex {
+                    position: p0,
+                    uv: [u0, v0],
+                    cell_index,
+                    corner_index: corner_tl,
+                    normal: p0,
+                });
+                vertices.push(SphereVertex {
+                    position: p1,
+                    uv: [u1, v0],
+                    cell_index,
+                    corner_index: corner_tr,
+                    normal: p1,
+                });
+                vertices.push(SphereVertex {
+                    position: p2,
+                    uv: [u0, v1],
+                    cell_index,
+                    corner_index: corner_bl,
+                    normal: p2,
+                });
+                vertices.push(SphereVertex {
+                    position: p3,
+                    uv: [u1, v1],
+                    cell_index,
+                    corner_index: corner_br,
+                    normal: p3,
+                });
 
                 indices.push(base_idx);
                 indices.push(base_idx + 2);
@@ -356,12 +377,18 @@ impl eframe::egui_wgpu::CallbackTrait for SphereCallback {
         if self.sphere_mode == 3 {
             // Mode 3: 3D Radial Lego Cubes (GPU Instanced Draw)
             rpass.set_vertex_buffer(0, self.renderer.cube_vertex_buffer.slice(..));
-            rpass.set_index_buffer(self.renderer.cube_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            rpass.set_index_buffer(
+                self.renderer.cube_index_buffer.slice(..),
+                wgpu::IndexFormat::Uint32,
+            );
             rpass.draw_indexed(0..36, 0, 0..self.renderer.num_instances);
         } else {
             // Mode 0 (Smooth Globe), Mode 1 (Smooth Terrain), & Mode 2 (Flat Steps)
             rpass.set_vertex_buffer(0, self.renderer.grid_vertex_buffer.slice(..));
-            rpass.set_index_buffer(self.renderer.grid_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            rpass.set_index_buffer(
+                self.renderer.grid_index_buffer.slice(..),
+                wgpu::IndexFormat::Uint32,
+            );
             rpass.draw_indexed(0..self.renderer.grid_num_indices, 0, 0..1);
         }
     }

@@ -1,5 +1,5 @@
 use crate::app::OctantApp;
-use egui::{epaint::Vertex, Color32, Mesh, Pos2, Rect, Shape, Vec2};
+use egui::{Color32, Mesh, Pos2, Rect, Shape, Vec2, epaint::Vertex};
 
 struct ColorbarTick {
     t_pos: f32,
@@ -70,15 +70,16 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                         let bar_w = 410.0;
                         let total_h = 36.0;
 
-                        let (widget_rect, response) = ui.allocate_exact_size(
-                            Vec2::new(bar_w, total_h),
-                            egui::Sense::hover(),
-                        );
+                        let (widget_rect, response) =
+                            ui.allocate_exact_size(Vec2::new(bar_w, total_h), egui::Sense::hover());
 
                         let bar_rect = Rect::from_min_size(widget_rect.min, Vec2::new(bar_w, 13.0));
 
                         // Check if categorical mode is active or unique entries exist
-                        let unique_vals = app.matrix_data.as_ref().and_then(|m| m.detect_unique_values());
+                        let unique_vals = app
+                            .matrix_data
+                            .as_ref()
+                            .and_then(|m| m.detect_unique_values());
                         let is_categorical_active = app.is_categorical || unique_vals.is_some();
 
                         if is_categorical_active {
@@ -101,19 +102,51 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                                 let t_end = (i + 1) as f32 / num_cats as f32;
 
                                 let val = cat_vals[i];
-                                let norm_scaled = crate::utils::colormap::apply_color_scale_cpu(val, min_val, max_val, app.active_scale_type, app.scale_param);
-                                let color = crate::utils::colormap::sample_colormap_rgb(effective_colormap, norm_scaled);
+                                let norm_scaled = crate::utils::colormap::apply_color_scale_cpu(
+                                    val,
+                                    min_val,
+                                    max_val,
+                                    app.active_scale_type,
+                                    app.scale_param,
+                                );
+                                let color = crate::utils::colormap::sample_colormap_rgb(
+                                    effective_colormap,
+                                    norm_scaled,
+                                );
 
                                 let x_start = bar_rect.min.x + t_start * bar_rect.width();
                                 let x_end = bar_rect.min.x + t_end * bar_rect.width();
 
                                 let idx = mesh.vertices.len() as u32;
-                                mesh.vertices.push(Vertex { pos: Pos2::new(x_start, bar_rect.min.y), uv: Pos2::ZERO, color });
-                                mesh.vertices.push(Vertex { pos: Pos2::new(x_start, bar_rect.max.y), uv: Pos2::ZERO, color });
-                                mesh.vertices.push(Vertex { pos: Pos2::new(x_end, bar_rect.min.y), uv: Pos2::ZERO, color });
-                                mesh.vertices.push(Vertex { pos: Pos2::new(x_end, bar_rect.max.y), uv: Pos2::ZERO, color });
+                                mesh.vertices.push(Vertex {
+                                    pos: Pos2::new(x_start, bar_rect.min.y),
+                                    uv: Pos2::ZERO,
+                                    color,
+                                });
+                                mesh.vertices.push(Vertex {
+                                    pos: Pos2::new(x_start, bar_rect.max.y),
+                                    uv: Pos2::ZERO,
+                                    color,
+                                });
+                                mesh.vertices.push(Vertex {
+                                    pos: Pos2::new(x_end, bar_rect.min.y),
+                                    uv: Pos2::ZERO,
+                                    color,
+                                });
+                                mesh.vertices.push(Vertex {
+                                    pos: Pos2::new(x_end, bar_rect.max.y),
+                                    uv: Pos2::ZERO,
+                                    color,
+                                });
 
-                                mesh.indices.extend_from_slice(&[idx, idx + 1, idx + 2, idx + 1, idx + 3, idx + 2]);
+                                mesh.indices.extend_from_slice(&[
+                                    idx,
+                                    idx + 1,
+                                    idx + 2,
+                                    idx + 1,
+                                    idx + 3,
+                                    idx + 2,
+                                ]);
                             }
                             ui.painter().add(Shape::mesh(mesh));
 
@@ -129,7 +162,10 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                                 let t_div = i as f32 / num_cats as f32;
                                 let x_div = bar_rect.min.x + t_div * bar_rect.width();
                                 ui.painter().line_segment(
-                                    [Pos2::new(x_div, bar_rect.min.y), Pos2::new(x_div, bar_rect.max.y)],
+                                    [
+                                        Pos2::new(x_div, bar_rect.min.y),
+                                        Pos2::new(x_div, bar_rect.max.y),
+                                    ],
                                     egui::Stroke::new(1.0_f32, Color32::from_black_alpha(120)),
                                 );
                             }
@@ -167,9 +203,24 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
 
                             for i in 0..=num_segments {
                                 let t = i as f32 / num_segments as f32;
-                                let raw_val = crate::utils::colormap::unscale_norm_to_value(t, min_val, max_val, app.active_scale_type, app.scale_param);
-                                let norm_scaled = crate::utils::colormap::apply_color_scale_cpu(raw_val, min_val, max_val, app.active_scale_type, app.scale_param);
-                                let color = crate::utils::colormap::sample_colormap_rgb(effective_colormap, norm_scaled);
+                                let raw_val = crate::utils::colormap::unscale_norm_to_value(
+                                    t,
+                                    min_val,
+                                    max_val,
+                                    app.active_scale_type,
+                                    app.scale_param,
+                                );
+                                let norm_scaled = crate::utils::colormap::apply_color_scale_cpu(
+                                    raw_val,
+                                    min_val,
+                                    max_val,
+                                    app.active_scale_type,
+                                    app.scale_param,
+                                );
+                                let color = crate::utils::colormap::sample_colormap_rgb(
+                                    effective_colormap,
+                                    norm_scaled,
+                                );
 
                                 let x = bar_rect.min.x + t * bar_rect.width();
 
@@ -209,14 +260,22 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                             );
 
                             // Continuous Major & Minor Ticks
-                            let ticks = generate_colorbar_ticks(min_val, max_val, app.active_scale_type, app.scale_param);
+                            let ticks = generate_colorbar_ticks(
+                                min_val,
+                                max_val,
+                                app.active_scale_type,
+                                app.scale_param,
+                            );
 
                             for tick in ticks {
                                 let x = bar_rect.min.x + tick.t_pos * bar_rect.width();
 
                                 if tick.is_major {
                                     ui.painter().line_segment(
-                                        [Pos2::new(x, bar_rect.min.y), Pos2::new(x, bar_rect.max.y)],
+                                        [
+                                            Pos2::new(x, bar_rect.min.y),
+                                            Pos2::new(x, bar_rect.max.y),
+                                        ],
                                         egui::Stroke::new(1.0_f32, Color32::from_black_alpha(80)),
                                     );
 
@@ -267,16 +326,31 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
 
                         // Interactive Hover Tooltip
                         if let Some(hover_pos) = response.hover_pos() {
-                            let norm_x = ((hover_pos.x - bar_rect.min.x) / bar_rect.width()).clamp(0.0, 1.0);
-                            let hover_val = crate::utils::colormap::unscale_norm_to_value(norm_x, min_val, max_val, app.active_scale_type, app.scale_param);
-                            response.on_hover_text(format!("Val: {}", format_scientific_tick(hover_val)));
+                            let norm_x =
+                                ((hover_pos.x - bar_rect.min.x) / bar_rect.width()).clamp(0.0, 1.0);
+                            let hover_val = crate::utils::colormap::unscale_norm_to_value(
+                                norm_x,
+                                min_val,
+                                max_val,
+                                app.active_scale_type,
+                                app.scale_param,
+                            );
+                            response.on_hover_text(format!(
+                                "Val: {}",
+                                format_scientific_tick(hover_val)
+                            ));
                         }
                     });
                 });
         });
 }
 
-fn generate_colorbar_ticks(min_val: f32, max_val: f32, scale_type: u32, scale_param: f32) -> Vec<ColorbarTick> {
+fn generate_colorbar_ticks(
+    min_val: f32,
+    max_val: f32,
+    scale_type: u32,
+    scale_param: f32,
+) -> Vec<ColorbarTick> {
     let mut ticks = Vec::new();
 
     if scale_type == 1 {
@@ -291,7 +365,11 @@ fn generate_colorbar_ticks(min_val: f32, max_val: f32, scale_type: u32, scale_pa
         let log_min = safe_min.log10();
         let log_max = safe_max.log10();
         let log_range = (log_max - log_min).max(1e-6);
-        let gamma = if scale_param > 0.0 && scale_param != 1.0 { scale_param } else { 1.0 };
+        let gamma = if scale_param > 0.0 && scale_param != 1.0 {
+            scale_param
+        } else {
+            1.0
+        };
 
         if log_range >= 0.8 {
             let dec_start = log_min.floor() as i32;
@@ -354,7 +432,13 @@ fn generate_colorbar_ticks(min_val: f32, max_val: f32, scale_type: u32, scale_pa
     // Default Linear & Standard Scale Ticks (5 major ticks, 4 minor subdivisions per interval)
     let major_positions = [0.00, 0.25, 0.50, 0.75, 1.00];
     for &t_maj in &major_positions {
-        let val = crate::utils::colormap::unscale_norm_to_value(t_maj, min_val, max_val, scale_type, scale_param);
+        let val = crate::utils::colormap::unscale_norm_to_value(
+            t_maj,
+            min_val,
+            max_val,
+            scale_type,
+            scale_param,
+        );
         ticks.push(ColorbarTick {
             t_pos: t_maj,
             _val: val,
@@ -369,7 +453,13 @@ fn generate_colorbar_ticks(min_val: f32, max_val: f32, scale_type: u32, scale_pa
         let t_end = major_positions[i + 1];
         for step in 1..5 {
             let t_min = t_start + (t_end - t_start) * (step as f32 / 5.0);
-            let val = crate::utils::colormap::unscale_norm_to_value(t_min, min_val, max_val, scale_type, scale_param);
+            let val = crate::utils::colormap::unscale_norm_to_value(
+                t_min,
+                min_val,
+                max_val,
+                scale_type,
+                scale_param,
+            );
             ticks.push(ColorbarTick {
                 t_pos: t_min,
                 _val: val,
@@ -388,7 +478,9 @@ fn generate_colorbar_ticks(min_val: f32, max_val: f32, scale_type: u32, scale_pa
     for tick in ticks.iter_mut() {
         if tick.is_major && tick.label.is_some() {
             if let Some(last_t) = last_labeled_t {
-                if (tick.t_pos - last_t).abs() < min_label_spacing && (1.0 - tick.t_pos).abs() > 0.01 {
+                if (tick.t_pos - last_t).abs() < min_label_spacing
+                    && (1.0 - tick.t_pos).abs() > 0.01
+                {
                     tick.label = None;
                 } else {
                     last_labeled_t = Some(tick.t_pos);

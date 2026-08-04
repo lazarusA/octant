@@ -33,7 +33,10 @@ impl MatrixData {
     }
 
     /// Generates a random 2D scalar field for visualization
-    pub fn create_random_matrix(width: usize, height: usize) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn create_random_matrix(
+        width: usize,
+        height: usize,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut raw_data = Vec::with_capacity(width * height);
         for y in 0..height {
             for x in 0..width {

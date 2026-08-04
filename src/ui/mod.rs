@@ -11,4 +11,3 @@ pub mod store;
 pub mod top_bar;
 pub mod variables;
 pub mod variables_panel;
-

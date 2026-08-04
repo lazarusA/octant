@@ -80,12 +80,20 @@ impl PointCloudRenderer {
             screen_aspect: 1.0,
             _pad0: 0,
             color: super::common::PlotColorParams::default(),
-        };// Unit quad template for point billboard
+        }; // Unit quad template for point billboard
         let vertices = [
-            PointCloudVertex { position: [-0.5, -0.5] },
-            PointCloudVertex { position: [ 0.5, -0.5] },
-            PointCloudVertex { position: [ 0.5,  0.5] },
-            PointCloudVertex { position: [-0.5,  0.5] },
+            PointCloudVertex {
+                position: [-0.5, -0.5],
+            },
+            PointCloudVertex {
+                position: [0.5, -0.5],
+            },
+            PointCloudVertex {
+                position: [0.5, 0.5],
+            },
+            PointCloudVertex {
+                position: [-0.5, 0.5],
+            },
         ];
 
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
@@ -102,7 +110,11 @@ impl PointCloudRenderer {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        let initial_data_safe = if initial_data.is_empty() { vec![50.0; 64 * 64] } else { initial_data.to_vec() };
+        let initial_data_safe = if initial_data.is_empty() {
+            vec![50.0; 64 * 64]
+        } else {
+            initial_data.to_vec()
+        };
 
         let uniform_buffer = super::common::create_uniform_buffer(
             device,
@@ -272,7 +284,14 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-        rpass.set_index_buffer(self.renderer.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        rpass.draw_indexed(0..self.renderer.index_count, 0, 0..self.renderer.instance_count);
+        rpass.set_index_buffer(
+            self.renderer.index_buffer.slice(..),
+            wgpu::IndexFormat::Uint16,
+        );
+        rpass.draw_indexed(
+            0..self.renderer.index_count,
+            0,
+            0..self.renderer.instance_count,
+        );
     }
 }
