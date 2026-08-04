@@ -60,7 +60,7 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.add_space(4.0);
         if ui.button("🗑 Flush & Clear Cache").clicked() {
             app.lru_cache.clear();
-            ui.close_menu();
+            ui.close();
         }
     });
 }

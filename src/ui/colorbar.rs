@@ -34,12 +34,13 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
     };
 
     // Read current theme visual colors for high-contrast dark/light mode rendering
-    let strong_text_color = ctx.style().visuals.strong_text_color();
-    let text_color = ctx.style().visuals.text_color();
-    let border_color = ctx.style().visuals.widgets.noninteractive.fg_stroke.color;
+    let style = ctx.style_of(ctx.theme());
+    let strong_text_color = style.visuals.strong_text_color();
+    let text_color = style.visuals.text_color();
+    let border_color = style.visuals.widgets.noninteractive.fg_stroke.color;
 
     // Position floating panel centered horizontally fixed right above the bottom toolbar
-    let screen_rect = ctx.screen_rect();
+    let screen_rect = ctx.input(|i| i.viewport_rect());
     let panel_w = 470.0;
     let panel_h = 82.0;
 
@@ -53,7 +54,7 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
         .fixed_pos(panel_min)
         .show(ctx, |ui| {
             egui::Frame::window(ui.style())
-                .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                .inner_margin(egui::Margin::symmetric(12, 8))
                 .show(ui, |ui| {
                     ui.set_width(panel_w - 24.0);
 
@@ -154,6 +155,7 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                                 bar_rect,
                                 0.0,
                                 egui::Stroke::new(1.0_f32, border_color),
+                                egui::StrokeKind::Outside,
                             );
 
                             // 2. Draw Band Boundary Dividers
@@ -256,6 +258,7 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                                 bar_rect,
                                 0.0,
                                 egui::Stroke::new(1.0_f32, border_color),
+                                egui::StrokeKind::Outside,
                             );
 
                             // Continuous Major & Minor Ticks
