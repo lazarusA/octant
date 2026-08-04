@@ -1,12 +1,13 @@
 # octant
 
-A multiscale, cloud-native tensor visualization engine in Rust.
+A cloud-native visualization engine in Rust for n-dimensional datasets and interactive plotting.
 
 ## Features
 
-- **Cloud-Native Data Loading**: Built for [Zarr](https://zarr.dev/) and [Icechunk](https://icechunk.io/) datasets via `zarrs` and `object_store`.
-- **High-Performance Rendering**: Accelerated graphics pipeline powered by `wgpu` and `egui` / `eframe`.
-- **Cross-Platform & Web**: Native desktop application with WebAssembly (WASM) browser support.
+- **Flexible Data Storage**: Seamless access to local filesystems and remote cloud object stores (S3, HTTP, Azure, GCP) via `object_store`, [Zarr](https://zarr.dev/), and [Icechunk](https://icechunk.io/).
+- **Versatile Plotting & Inspection**: Interactive n-dimensional data exploration with diverse plot types, 1D/2D slice renderers, and spatial visualizers.
+- **Hardware-Accelerated Rendering**: Fast graphics pipeline powered by `wgpu` and `egui` / `eframe`.
+- **Cross-Platform & Web**: Native desktop application with full WebAssembly (WASM) browser support [WIP].
 
 ## License
 
