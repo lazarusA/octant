@@ -17,12 +17,15 @@ pub fn extract_store_variables_consolidated(
 ) -> Result<Vec<VariableInfo>, Box<dyn Error>> {
     let mut variables = Vec::new();
 
+    println!("[METADATA DEBUG] Opening root Zarr Group...");
     // 1. Try opening the root as a Zarr Group
     if let Ok(group) = Group::open(store.clone(), "/") {
+        println!("[METADATA DEBUG] Group::open at '/' succeeded!");
         // Check if group contains consolidated metadata natively
         let consolidated_arrays = if let Some(ConsolidatedMetadata { metadata, .. }) =
             group.consolidated_metadata()
         {
+            println!("[METADATA DEBUG] Consolidated metadata block found with {} nodes!", metadata.len());
             let mut found_vars = Vec::new();
             for (node_path, _node_meta) in metadata {
                 let clean_path = if node_path.starts_with('/') {
@@ -38,44 +41,58 @@ pub fn extract_store_variables_consolidated(
             }
             found_vars
         } else {
+            println!("[METADATA DEBUG] No inline consolidated metadata in Group.");
             Vec::new()
         };
 
         if !consolidated_arrays.is_empty() {
+            println!("[METADATA DEBUG] Returning {} variables from consolidated metadata.", consolidated_arrays.len());
             return Ok(consolidated_arrays);
         }
 
         // 2. Fallback: discover child nodes natively via zarrs get_child_nodes
+        println!("[METADATA DEBUG] Attempting native get_child_nodes traversal...");
         if let Ok(root_path) = NodePath::new("/") {
-            if let Ok(children) = get_child_nodes(&store, &root_path, true) {
-                for child in children {
-                    let path_str = child.path().as_str();
-                    let var_name = path_str.trim_start_matches('/');
-                    let var_name = if var_name.is_empty() {
-                        "data"
-                    } else {
-                        var_name
-                    };
-                    if let Ok(array) = Array::open(store.clone(), path_str) {
-                        if let Some(var_info) = variable_info_from_array(&array, var_name) {
-                            variables.push(var_info);
+            match get_child_nodes(&store, &root_path, true) {
+                Ok(children) => {
+                    println!("[METADATA DEBUG] get_child_nodes found {} child nodes.", children.len());
+                    for child in children {
+                        let path_str = child.path().as_str();
+                        let var_name = path_str.trim_start_matches('/');
+                        let var_name = if var_name.is_empty() {
+                            "data"
+                        } else {
+                            var_name
+                        };
+                        if let Ok(array) = Array::open(store.clone(), path_str) {
+                            if let Some(var_info) = variable_info_from_array(&array, var_name) {
+                                variables.push(var_info);
+                            }
                         }
                     }
                 }
+                Err(e) => {
+                    eprintln!("[METADATA DEBUG ERROR] get_child_nodes failed: {:?}", e);
+                }
             }
         }
-    } else if let Ok(array) = Array::open(store.clone(), "/") {
-        // 3. Root itself is a single Zarr Array
-        if let Some(var_info) = variable_info_from_array(&array, "data") {
-            variables.push(var_info);
+    } else {
+        println!("[METADATA DEBUG] Group::open at '/' failed, checking if root is an Array...");
+        if let Ok(array) = Array::open(store.clone(), "/") {
+            println!("[METADATA DEBUG] Root is a single Zarr Array!");
+            if let Some(var_info) = variable_info_from_array(&array, "data") {
+                variables.push(var_info);
+            }
         }
     }
 
     // 4. Fallback to existing extraction logic if native zarrs extraction found nothing
     if variables.is_empty() {
+        println!("[METADATA DEBUG] Native zarrs found 0 variables. Invoking extract_store_variables fallback...");
         return crate::utils::zarr::extract_store_variables(store, base_url);
     }
 
+    println!("[METADATA DEBUG] Final variable count: {}", variables.len());
     Ok(variables)
 }
 

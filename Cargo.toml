@@ -13,6 +13,8 @@ glam = { version = "0.27", features = ["bytemuck"] }
 log = "0.4"
 zarrs = { version = "0.23", features = ["blosc", "async"] }
 zarrs_object_store = { version = "0.7", features = ["http"] }
+zarrs_icechunk = "0.5"
+icechunk = "2.1.2"
 object_store = { version = "0.14", features = ["http", "aws", "azure", "gcp"] }
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 serde = { version = "1.0", features = ["derive"] }
