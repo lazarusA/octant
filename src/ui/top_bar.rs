@@ -1,12 +1,12 @@
 use super::{colormap, plot_type, status, store, variables};
 use crate::app::OctantApp;
 
-pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
-    egui::TopBottomPanel::top("octant_top_bar")
-        .exact_height(34.0)
-        .show(ctx, |ui| {
+pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
+    egui::Panel::top("octant_top_bar")
+        .exact_size(34.0)
+        .show(ui, |ui| {
             ui.add_space(2.0);
-            egui::menu::bar(ui, |ui| {
+            ui.horizontal(|ui| {
                 // Octant Brand Header
                 ui.label(egui::RichText::new("📐 Octant").strong().heading());
                 ui.separator();
@@ -49,13 +49,13 @@ pub fn show_top_bar(app: &mut OctantApp, ctx: &egui::Context) {
             });
         });
 
-    show_secondary_toolbar(app, ctx);
+    show_secondary_toolbar(app, ui);
 }
 
-fn show_secondary_toolbar(app: &mut OctantApp, ctx: &egui::Context) {
-    egui::TopBottomPanel::top("octant_secondary_toolbar")
-        .exact_height(32.0)
-        .show(ctx, |ui| {
+fn show_secondary_toolbar(app: &mut OctantApp, ui: &mut egui::Ui) {
+    egui::Panel::top("octant_secondary_toolbar")
+        .exact_size(32.0)
+        .show(ui, |ui| {
             ui.add_space(2.0);
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new("🎨 Clipping & Bounds:").strong().small());

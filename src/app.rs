@@ -538,7 +538,8 @@ impl OctantApp {
 }
 
 impl eframe::App for OctantApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         // Reset hover preview at start of frame
         self.preview_colormap = None;
 
@@ -651,15 +652,15 @@ impl eframe::App for OctantApp {
         }
 
         // 3. Render Top Navigation Bar & Bottom Playback Toolbar & Right Selection Panel
-        crate::ui::top_bar::show_top_bar(self, ctx);
-        crate::ui::bottom_bar::show_plot_controls_bar(self, ctx);
-        crate::ui::bottom_bar::show_bottom_bar(self, ctx);
-        crate::ui::catalog::show_catalog_window(self, ctx);
-        crate::ui::colorbar::show_colorbar_overlay(self, ctx);
-        crate::ui::variables_panel::show_right_panel(self, ctx);
+        crate::ui::top_bar::show_top_bar(self, ui);
+        crate::ui::bottom_bar::show_plot_controls_bar(self, ui);
+        crate::ui::bottom_bar::show_bottom_bar(self, ui);
+        crate::ui::catalog::show_catalog_window(self, &ctx);
+        crate::ui::colorbar::show_colorbar_overlay(self, &ctx);
+        crate::ui::variables_panel::show_right_panel(self, &ctx);
 
         // 4. Centered Drawing Canvas Area with Aspect Data Ratio
-        egui::CentralPanel::default().show(ctx, |ui| {
+        {
             let available_rect = ui.available_rect_before_wrap();
 
             // Enforce aspect data ratio (matrix.width / matrix.height)
@@ -692,7 +693,7 @@ impl eframe::App for OctantApp {
             }
 
             if response.hovered() {
-                let scroll = ui.input(|i| i.raw_scroll_delta.y);
+                let scroll = ui.input(|i| i.smooth_scroll_delta.y);
                 if scroll != 0.0 {
                     self.sphere_zoom = (self.sphere_zoom - scroll * 0.003).clamp(1.1, 8.0);
                     ui.ctx().request_repaint();
@@ -822,7 +823,7 @@ impl eframe::App for OctantApp {
             }
 
             // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle
-            crate::ui::hover_tooltip::show_hover_tooltip(self, ctx, ui, &response, rect);
-        });
+            crate::ui::hover_tooltip::show_hover_tooltip(self, &ctx, ui, &response, rect);
+        }
     }
 }

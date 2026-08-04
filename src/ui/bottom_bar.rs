@@ -2,15 +2,15 @@ use super::cache;
 use crate::app::OctantApp;
 use crate::plots::PlotType;
 
-pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
+pub fn show_plot_controls_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
     let is_3d_mode = app.active_plot_type == PlotType::Sphere
         || app.active_plot_type == PlotType::Surface
         || app.active_plot_type == PlotType::Volume
         || app.active_plot_type == PlotType::PointCloud;
 
-    egui::TopBottomPanel::top("octant_plot_controls_bar")
-        .default_height(34.0)
-        .show(ctx, |ui| {
+    egui::Panel::top("octant_plot_controls_bar")
+        .default_size(34.0)
+        .show(ui, |ui| {
             ui.add_space(3.0);
             ui.horizontal_wrapped(|ui| {
                 match app.active_plot_type {
@@ -42,7 +42,7 @@ pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
                                     .clicked()
                                 {
                                     app.volume_algorithm = id;
-                                    ui.close_menu();
+                                    ui.close();
                                 }
                             }
                         });
@@ -166,10 +166,10 @@ pub fn show_plot_controls_bar(app: &mut OctantApp, ctx: &egui::Context) {
         });
 }
 
-pub fn show_bottom_bar(app: &mut OctantApp, ctx: &egui::Context) {
-    egui::TopBottomPanel::bottom("octant_bottom_bar")
-        .exact_height(38.0)
-        .show(ctx, |ui| {
+pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
+    egui::Panel::bottom("octant_bottom_bar")
+        .exact_size(38.0)
+        .show(ui, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 // 1. Play / Pause Button for Timestep Animation across all plot types
