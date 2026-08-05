@@ -657,9 +657,9 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
-        // 3. Render Left Store Panel, Top Navigation Bar, Plot Controls, Bottom Playback Toolbar & Right Selection Panel
-        crate::ui::store::show_left_panel(self, ui);
+        // 3. Render Top Navigation Bar, Left Store Panel, Plot Controls, Bottom Playback Toolbar & Right Selection Panel
         crate::ui::top_bar::show_top_bar(self, ui);
+        crate::ui::store::show_left_panel(self, ui);
         crate::ui::bottom_bar::show_plot_controls_bar(self, ui);
         crate::ui::bottom_bar::show_bottom_bar(self, ui);
         crate::ui::catalog::show_catalog_window(self, &ctx);
