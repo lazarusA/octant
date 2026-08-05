@@ -1,11 +1,11 @@
 use crate::app::OctantApp;
 use crate::plots::PlotType;
 
-/// Fractal-Clock-style overlay: no window chrome, no close button.
 /// Anchored to the left edge of the canvas area, just below the top bar.
-/// Stores its own height so Variable Controls can stack below without overlap.
+/// Stores its own width so Variable Controls can position to the right without overlap.
 pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
     if !app.show_settings_panel {
+        app.settings_overlay_width = 0.0;
         return;
     }
 
@@ -30,8 +30,8 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
                 });
         });
 
-    // Store height for next frame so Variable Controls can stack below us.
-    app.settings_overlay_height = area_resp.response.rect.height();
+    // Store width for next frame so Variable Controls can position to the right.
+    app.settings_overlay_width = area_resp.response.rect.width();
 }
 
 fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {

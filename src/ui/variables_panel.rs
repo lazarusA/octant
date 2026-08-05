@@ -1,24 +1,22 @@
 use crate::app::OctantApp;
 
-/// Fractal-Clock-style overlay: no window chrome, no close button.
-/// Stacked below the Settings overlay using the previous frame's height.
+/// Positioned to the right of the Settings overlay using the previous frame's settings width.
 pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
     if !app.show_variable_controls || app.active_dataset_metadata.is_none() {
         return;
     }
 
-    // Position just below Settings (or at top if Settings is hidden).
-    // Use the previous frame's settings height — 1-frame lag is imperceptible.
-    let y_offset = if app.show_settings_panel && app.settings_overlay_height > 0.0 {
-        app.settings_overlay_height + 16.0
+    // Position to the right of Settings (or at left edge of canvas if Settings is hidden).
+    let x_offset = if app.show_settings_panel && app.settings_overlay_width > 0.0 {
+        app.settings_overlay_width + 16.0
     } else {
         8.0
     };
 
     egui::Area::new(egui::Id::new("octant_variables_area"))
         .fixed_pos(egui::pos2(
-            canvas_rect.left() + 8.0,
-            canvas_rect.top() + y_offset,
+            canvas_rect.left() + x_offset,
+            canvas_rect.top() + 8.0,
         ))
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
@@ -38,14 +36,36 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         return;
                     };
 
-                    // — Variable overview header (collapsible) —
-                    egui::CollapsingHeader::new(
-                        egui::RichText::new(format!("📄 {}", var_info.name)).strong(),
+                    // — Variable overview header (collapsible, with Plot Data button to the right of variable name) —
+                    let header_id =
+                        ui.make_persistent_id(format!("var_info_header_{}", var_info.name));
+                    let mut should_plot = false;
+
+                    egui::collapsing_header::CollapsingState::load_with_default_open(
+                        ui.ctx(),
+                        header_id,
+                        false,
                     )
-                    .default_open(false)
-                    .show(ui, |ui| {
+                    .show_header(ui, |ui| {
+                        ui.label(egui::RichText::new(format!("📄 {}", var_info.name)).strong());
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui
+                                .button(egui::RichText::new("📊 Plot Data").strong().small())
+                                .clicked()
+                            {
+                                should_plot = true;
+                            }
+                        });
+                    })
+                    .body(|ui| {
                         show_variable_info(ui, &var_info);
                     });
+
+                    if should_plot {
+                        app.load_selected_variable_slice();
+                    }
+
+                    ui.add_space(4.0);
 
                     // — Dimension sliders (collapsible) —
                     egui::CollapsingHeader::new("🎛️ Dimension Sliders")
@@ -53,24 +73,12 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         .show(ui, |ui| {
                             show_dimension_sliders(app, ui, &var_info, &dim_coords);
                         });
-
-                    ui.add_space(6.0);
-
-                    // — Plot button (always visible at bottom) —
-                    let plot_btn = egui::Button::new(egui::RichText::new("📊 Plot Data").strong());
-                    if ui
-                        .add_sized([ui.available_width(), 32.0], plot_btn)
-                        .clicked()
-                    {
-                        app.load_selected_variable_slice();
-                    }
                 });
         });
 }
 
 fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::stores::VariableInfo) {
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(&var_info.name).strong());
         ui.label(
             egui::RichText::new(format!("[{}]", var_info.data_type))
                 .small()
