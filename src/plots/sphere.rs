@@ -138,7 +138,7 @@ impl SphereRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[SphereVertex::desc()],
+                buffers: &[Some(SphereVertex::desc())],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {

@@ -154,7 +154,7 @@ impl PointCloudRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[PointCloudVertex::desc()],
+                buffers: &[Some(PointCloudVertex::desc())],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
