@@ -167,18 +167,26 @@ pub fn show_plot_controls_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
+    if !app.show_bottom_bar {
+        return;
+    }
+
     egui::Panel::bottom("octant_bottom_bar")
         .exact_size(38.0)
         .show(ui, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 // 1. Play / Pause Button for Timestep Animation across all plot types
-                let play_text = if app.is_playing {
-                    "⏸ Pause"
-                } else {
-                    "▶ Play"
-                };
-                if ui.button(egui::RichText::new(play_text).strong()).clicked() {
+                let play_text = if app.is_playing { "⏸" } else { "▶" };
+                let play_button = egui::Button::new(
+                    egui::RichText::new(format!(
+                        "{} {}",
+                        play_text,
+                        if app.is_playing { "Pause" } else { "Play" }
+                    ))
+                    .strong(),
+                );
+                if ui.add(play_button).clicked() {
                     app.is_playing = !app.is_playing;
                     app.last_step_time = std::time::Instant::now();
                 }
@@ -209,6 +217,20 @@ pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
 
                 // 4. Loop Toggle
                 ui.checkbox(&mut app.loop_playback, "🔄 Loop");
+
+                ui.separator();
+
+                let status_text = if app.is_playing {
+                    "▶ Playing"
+                } else {
+                    "⏸ Paused"
+                };
+                let status_color = if app.is_playing {
+                    egui::Color32::from_rgb(255, 99, 71)
+                } else {
+                    egui::Color32::LIGHT_GRAY
+                };
+                ui.label(egui::RichText::new(status_text).small().color(status_color));
 
                 ui.separator();
 
