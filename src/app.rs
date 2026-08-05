@@ -82,6 +82,7 @@ pub struct OctantApp {
     pub show_settings_panel: bool,
     pub show_variable_controls: bool,
     pub show_bottom_bar: bool,
+    pub settings_overlay_height: f32, // tracks prev-frame height to stack Variable Controls below
     pub theme_preference: egui::ThemePreference,
     pub selected_dim_indices: Vec<usize>,
     pub selected_dim_ranges: Vec<(usize, usize)>,
@@ -165,6 +166,8 @@ impl OctantApp {
             show_settings_panel: false,
             show_variable_controls: false,
             show_bottom_bar: true,
+            settings_overlay_height: 0.0,
+
             theme_preference: egui::ThemePreference::System,
             selected_dim_indices: Vec::new(),
             selected_dim_ranges: Vec::new(),
@@ -658,14 +661,18 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
-        // 3. Render Top Navigation Bar, Left Store Panel, Settings Window, Bottom Playback Toolbar & Variable Controls Window
+        // 3. Render panels (each consumes space from the remaining area)
         crate::ui::top_bar::show_top_bar(self, ui);
         crate::ui::store::show_left_panel(self, ui);
         crate::ui::bottom_bar::show_bottom_bar(self, ui);
         crate::ui::catalog::show_catalog_window(self, &ctx);
         crate::ui::colorbar::show_colorbar_overlay(self, &ctx);
-        crate::ui::settings::show_settings_window(self, &ctx);
-        crate::ui::variables_panel::show_variable_controls(self, &ctx);
+
+        // After panels consume their space, the remaining rect is the canvas.
+        // Pass it to the overlays so they can anchor to the canvas left edge.
+        let canvas_rect = ui.available_rect_before_wrap();
+        crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
+        crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
 
         // 4. Drawing Canvas Area with Aspect Data Ratio
         {
