@@ -32,6 +32,14 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.show_settings_panel = !app.show_settings_panel;
                 }
 
+                if ui
+                    .button(egui::RichText::new("🎛️ Controls").strong())
+                    .on_hover_text("Toggle Variable Controls Panel")
+                    .clicked()
+                {
+                    app.show_variable_controls = !app.show_variable_controls;
+                }
+
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let theme_label = if app.theme_preference == egui::ThemePreference::Dark {
                         "☀ Light"

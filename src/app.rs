@@ -82,7 +82,7 @@ pub struct OctantApp {
     pub show_settings_panel: bool,
     pub show_variable_controls: bool,
     pub show_bottom_bar: bool,
-    pub settings_overlay_height: f32, // tracks prev-frame height to stack Variable Controls below
+    pub settings_overlay_width: f32, // tracks prev-frame width to position Variable Controls to the right
     pub theme_preference: egui::ThemePreference,
     pub selected_dim_indices: Vec<usize>,
     pub selected_dim_ranges: Vec<(usize, usize)>,
@@ -166,7 +166,8 @@ impl OctantApp {
             show_settings_panel: false,
             show_variable_controls: false,
             show_bottom_bar: true,
-            settings_overlay_height: 0.0,
+            settings_overlay_width: 0.0,
+
 
             theme_preference: egui::ThemePreference::System,
             selected_dim_indices: Vec::new(),

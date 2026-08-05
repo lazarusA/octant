@@ -38,18 +38,6 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
 
         ui.separator();
-        ui.checkbox(&mut app.show_colorbar, "📊 Show Colorbar Legend");
+        ui.checkbox(&mut app.show_colorbar, "Show Colorbar");
     });
-
-    let bar_btn_label = if app.show_colorbar {
-        "📊 Bar: On"
-    } else {
-        "📊 Bar: Off"
-    };
-    if ui
-        .button(egui::RichText::new(bar_btn_label).small())
-        .clicked()
-    {
-        app.show_colorbar = !app.show_colorbar;
-    }
 }
