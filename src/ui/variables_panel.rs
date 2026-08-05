@@ -1,11 +1,11 @@
 use crate::app::OctantApp;
 
 pub fn show_right_panel(app: &mut OctantApp, ctx: &egui::Context) {
-    if !app.show_right_panel || app.active_dataset_metadata.is_none() {
+    if !app.show_variable_controls || app.active_dataset_metadata.is_none() {
         return;
     }
 
-    let mut show_panel = app.show_right_panel;
+    let mut show_panel = app.show_variable_controls;
 
     egui::Window::new("📊 Variable Controls")
         .open(&mut show_panel)
@@ -202,5 +202,5 @@ pub fn show_right_panel(app: &mut OctantApp, ctx: &egui::Context) {
             });
         });
 
-    app.show_right_panel = show_panel;
+    app.show_variable_controls = show_panel;
 }

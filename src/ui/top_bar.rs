@@ -46,17 +46,30 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                         app.show_bottom_bar = !app.show_bottom_bar;
                     }
 
-                    let right_label = if app.show_right_panel {
-                        "▸ Hide Right"
+                    let settings_label = if app.show_settings_panel {
+                        "⚙ Hide Settings"
                     } else {
-                        "◂ Show Right"
+                        "⚙ Show Settings"
                     };
                     if ui
-                        .button(egui::RichText::new(right_label).small())
-                        .on_hover_text("Toggle right variable controls panel")
+                        .button(egui::RichText::new(settings_label).small())
+                        .on_hover_text("Toggle settings panel")
                         .clicked()
                     {
-                        app.show_right_panel = !app.show_right_panel;
+                        app.show_settings_panel = !app.show_settings_panel;
+                    }
+
+                    let variables_label = if app.show_variable_controls {
+                        "📊 Hide Variable"
+                    } else {
+                        "📊 Show Variable"
+                    };
+                    if ui
+                        .button(egui::RichText::new(variables_label).small())
+                        .on_hover_text("Toggle variable controls panel")
+                        .clicked()
+                    {
+                        app.show_variable_controls = !app.show_variable_controls;
                     }
 
                     let left_label = if app.show_left_panel {
