@@ -79,10 +79,10 @@ pub struct OctantApp {
 
     // Panel Visibility State
     pub show_left_panel: bool,
-    pub show_right_panel: bool,
     pub show_settings_panel: bool,
     pub show_variable_controls: bool,
     pub show_bottom_bar: bool,
+    pub settings_overlay_width: f32, // tracks prev-frame width to position Variable Controls to the right
     pub theme_preference: egui::ThemePreference,
     pub selected_dim_indices: Vec<usize>,
     pub selected_dim_ranges: Vec<(usize, usize)>,
@@ -163,10 +163,12 @@ impl OctantApp {
             catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
 
             show_left_panel: true,
-            show_right_panel: true,
             show_settings_panel: false,
             show_variable_controls: false,
             show_bottom_bar: true,
+            settings_overlay_width: 0.0,
+
+
             theme_preference: egui::ThemePreference::System,
             selected_dim_indices: Vec::new(),
             selected_dim_ranges: Vec::new(),
@@ -235,6 +237,8 @@ impl OctantApp {
     }
 
     pub fn load_selected_variable_slice(&mut self) {
+        self.show_settings_panel = true;
+
         let (var_name, max_steps, chunk_time_size, slice_bytes_hint) = {
             if let Some(metadata) = &self.active_dataset_metadata {
                 if let Some(var_info) = metadata.variables.get(self.selected_variable_idx) {
@@ -577,7 +581,6 @@ impl eframe::App for OctantApp {
 
                         self.active_dataset_metadata = Some(metadata);
                         self.selected_variable_idx = 0;
-                        self.show_right_panel = true;
                         self.load_selected_variable_slice();
                     }
                     Err(err) => {
@@ -661,14 +664,18 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
-        // 3. Render Top Navigation Bar, Left Store Panel, Settings Panel, Bottom Playback Toolbar & Right Selection Panel
+        // 3. Render panels (each consumes space from the remaining area)
         crate::ui::top_bar::show_top_bar(self, ui);
         crate::ui::store::show_left_panel(self, ui);
         crate::ui::bottom_bar::show_bottom_bar(self, ui);
-        crate::ui::settings::show_settings_panel(self, ui);
         crate::ui::catalog::show_catalog_window(self, &ctx);
         crate::ui::colorbar::show_colorbar_overlay(self, &ctx);
-        crate::ui::variables_panel::show_right_panel(self, &ctx);
+
+        // After panels consume their space, the remaining rect is the canvas.
+        // Pass it to the overlays so they can anchor to the canvas left edge.
+        let canvas_rect = ui.available_rect_before_wrap();
+        crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
+        crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
 
         // 4. Drawing Canvas Area with Aspect Data Ratio
         {

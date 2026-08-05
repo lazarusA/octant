@@ -16,12 +16,12 @@ fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1150.0, 720.0])
-            .with_title("Octant Engine — Multiscale Tensor Visualizer"),
+            .with_title("Octant — Interactive Visualization of n-dimensional datasets"),
         ..Default::default()
     };
 
     eframe::run_native(
-        "Octant Platform Launcher",
+        "Octant",
         native_options,
         Box::new(|cc| Ok(Box::new(OctantApp::new(cc)))),
     )
