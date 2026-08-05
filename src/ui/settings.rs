@@ -1,35 +1,37 @@
 use crate::app::OctantApp;
 use crate::plots::PlotType;
 
-pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context) {
+/// Fractal-Clock-style overlay: no window chrome, no close button.
+/// Anchored to the left edge of the canvas area, just below the top bar.
+/// Stores its own height so Variable Controls can stack below without overlap.
+pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
     if !app.show_settings_panel {
         return;
     }
 
-    let mut open = app.show_settings_panel;
-
-    egui::Window::new("⚙️ Settings")
-        .open(&mut open)
-        .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-15.0, 55.0))
-        .default_width(300.0)
-        .resizable(true)
+    let area_resp = egui::Area::new(egui::Id::new("octant_settings_area"))
+        .fixed_pos(egui::pos2(
+            canvas_rect.left() + 8.0,
+            canvas_rect.top() + 8.0,
+        ))
+        .order(egui::Order::Foreground)
         .show(ctx, |ui| {
             egui::Frame::popup(ui.style())
                 .stroke(egui::Stroke::NONE)
                 .show(ui, |ui| {
-                    ui.set_max_width(300.0);
-
-                    egui::CollapsingHeader::new("🖼 Plot Options")
+                    ui.set_max_width(280.0);
+                    egui::CollapsingHeader::new("⚙️ Settings")
                         .default_open(true)
-                        .show(ui, |ui| show_plot_options(app, ui));
-
-                    egui::CollapsingHeader::new("🎨 Clipping & Bounds")
-                        .default_open(true)
-                        .show(ui, |ui| show_clipping_bounds(app, ui));
+                        .show(ui, |ui| {
+                            show_plot_options(app, ui);
+                            ui.separator();
+                            show_clipping_bounds(app, ui);
+                        });
                 });
         });
 
-    app.show_settings_panel = open;
+    // Store height for next frame so Variable Controls can stack below us.
+    app.settings_overlay_height = area_resp.response.rect.height();
 }
 
 fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -147,11 +149,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("✨ Size"));
         }
         PlotType::Heatmap | PlotType::Block => {
-            ui.label(
-                egui::RichText::new("🗺️ 2D Plane Heatmap Active")
-                    .small()
-                    .weak(),
-            );
+            ui.label(egui::RichText::new("🗺️ 2D Heatmap").small().weak());
         }
     }
 
@@ -171,49 +169,42 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.label("Fine-tune color mapping and clipping for the active dataset.");
-    ui.separator();
-
     ui.checkbox(&mut app.use_nan_color, "Custom NaN Color")
-        .on_hover_text("If unchecked, NaN and Inf values render transparently.");
+        .on_hover_text("If unchecked, NaN/Inf values render transparently.");
     if app.use_nan_color {
         ui.color_edit_button_rgba_unmultiplied(&mut app.nan_color);
     }
 
-    ui.add_space(4.0);
+    ui.add_space(2.0);
     ui.checkbox(&mut app.use_lowclip, "Low Clip")
-        .on_hover_text("If unchecked, values < cmin render using the colormap minimum value.");
+        .on_hover_text("Values < cmin clipped to this color.");
     if app.use_lowclip {
         ui.color_edit_button_rgba_unmultiplied(&mut app.lowclip_color);
     }
 
-    ui.add_space(4.0);
+    ui.add_space(2.0);
     ui.checkbox(&mut app.use_highclip, "High Clip")
-        .on_hover_text("If unchecked, values > cmax render using the colormap maximum value.");
+        .on_hover_text("Values > cmax clipped to this color.");
     if app.use_highclip {
         ui.color_edit_button_rgba_unmultiplied(&mut app.highclip_color);
     }
 
-    ui.add_space(6.0);
+    ui.add_space(4.0);
     ui.horizontal(|ui| {
         ui.label("Min:");
         ui.add(egui::DragValue::new(&mut app.color_range_min).speed(0.1));
-    });
-    ui.horizontal(|ui| {
         ui.label("Max:");
         ui.add(egui::DragValue::new(&mut app.color_range_max).speed(0.1));
     });
 
     let lock_label = if app.lock_color_bounds {
-        "🔒 Bounds Locked"
+        "🔒 Locked"
     } else {
-        "🔓 Bounds Dynamic"
+        "🔓 Dynamic"
     };
     if ui
         .selectable_label(app.lock_color_bounds, lock_label)
-        .on_hover_text(
-            "Lock min/max bounds so color mapping remains fixed across all timesteps and slices.",
-        )
+        .on_hover_text("Lock min/max so color mapping stays fixed across timesteps.")
         .clicked()
     {
         app.lock_color_bounds = !app.lock_color_bounds;
@@ -221,7 +212,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     if ui
         .button("↺ Reset")
-        .on_hover_text("Reset bounds to current slice data min/max")
+        .on_hover_text("Reset bounds to current slice min/max")
         .clicked()
         && let Some(mdata) = &app.matrix_data
     {
@@ -231,35 +222,32 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
         app.volume_cmax = mdata.max_val;
     }
 
-    ui.add_space(6.0);
+    ui.add_space(4.0);
+    ui.label(egui::RichText::new("📈 Scale").strong());
     let is_valid_log = app.color_range_min >= -1e-15 && app.color_range_max > 0.0;
     if !is_valid_log && app.active_scale_type == 1 {
         app.active_scale_type = 0;
     }
-
-    ui.label(egui::RichText::new("📈 Scale").strong());
     egui::ComboBox::from_id_salt("settings_color_scale_dropdown")
         .selected_text(match app.active_scale_type {
             1 => "Logarithmic",
-            2 => "Symlog (Log-Offset)",
-            3 => "Sqrt (Diverging)",
+            2 => "Symlog",
+            3 => "Sqrt",
             4 => "Exponential",
             _ => "Linear",
         })
         .show_ui(ui, |ui| {
             ui.selectable_value(&mut app.active_scale_type, 0, "Linear");
-
             ui.add_enabled_ui(is_valid_log, |ui| {
                 ui.selectable_value(&mut app.active_scale_type, 1, "Logarithmic")
                     .on_hover_text(if is_valid_log {
-                        "Logarithmic scale (for non-negative data)"
+                        "Log scale (non-negative data)"
                     } else {
-                        "Disabled: Logarithmic scale requires non-negative data (min >= 0). Use Symlog for data with negative values."
+                        "Disabled: requires min ≥ 0. Use Symlog for negative data."
                     });
             });
-
-            ui.selectable_value(&mut app.active_scale_type, 2, "Symlog (Log-Offset)");
-            ui.selectable_value(&mut app.active_scale_type, 3, "Sqrt (Diverging)");
+            ui.selectable_value(&mut app.active_scale_type, 2, "Symlog");
+            ui.selectable_value(&mut app.active_scale_type, 3, "Sqrt");
             ui.selectable_value(&mut app.active_scale_type, 4, "Exponential");
         });
 
@@ -274,7 +262,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
         });
     }
 
-    ui.add_space(4.0);
+    ui.add_space(2.0);
     ui.toggle_value(&mut app.is_categorical, "🎨 Categorical")
-        .on_hover_text("Enable Categorical / Discrete colorbar (auto-detects unique values, or defaults to 10 equal bins)");
+        .on_hover_text("Discrete colorbar (auto-detects unique values or 10 equal bins).");
 }

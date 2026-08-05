@@ -1,22 +1,31 @@
 use crate::app::OctantApp;
 
-pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context) {
+/// Fractal-Clock-style overlay: no window chrome, no close button.
+/// Stacked below the Settings overlay using the previous frame's height.
+pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
     if !app.show_variable_controls || app.active_dataset_metadata.is_none() {
         return;
     }
 
-    let mut show_panel = app.show_variable_controls;
+    // Position just below Settings (or at top if Settings is hidden).
+    // Use the previous frame's settings height — 1-frame lag is imperceptible.
+    let y_offset = if app.show_settings_panel && app.settings_overlay_height > 0.0 {
+        app.settings_overlay_height + 16.0
+    } else {
+        8.0
+    };
 
-    egui::Window::new("📊 Variable Controls")
-        .open(&mut show_panel)
-        .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-15.0, 55.0))
-        .default_width(340.0)
-        .resizable(true)
+    egui::Area::new(egui::Id::new("octant_variables_area"))
+        .fixed_pos(egui::pos2(
+            canvas_rect.left() + 8.0,
+            canvas_rect.top() + y_offset,
+        ))
+        .order(egui::Order::Foreground)
         .show(ctx, |ui| {
             egui::Frame::popup(ui.style())
                 .stroke(egui::Stroke::NONE)
                 .show(ui, |ui| {
-                    ui.set_max_width(340.0);
+                    ui.set_max_width(320.0);
 
                     let (var_info, dim_coords) = if let Some(meta) = &app.active_dataset_metadata {
                         if let Some(v) = meta.variables.get(app.selected_variable_idx) {
@@ -29,47 +38,39 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context) {
                         return;
                     };
 
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        // 1. Variable Overview — collapsible
-                        egui::CollapsingHeader::new(
-                            egui::RichText::new(format!("📄 {}", var_info.name)).strong(),
-                        )
+                    // — Variable overview header (collapsible) —
+                    egui::CollapsingHeader::new(
+                        egui::RichText::new(format!("📄 {}", var_info.name)).strong(),
+                    )
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        show_variable_info(ui, &var_info);
+                    });
+
+                    // — Dimension sliders (collapsible) —
+                    egui::CollapsingHeader::new("🎛️ Dimension Sliders")
                         .default_open(true)
                         .show(ui, |ui| {
-                            show_variable_info(ui, &var_info);
+                            show_dimension_sliders(app, ui, &var_info, &dim_coords);
                         });
 
-                        ui.add_space(4.0);
+                    ui.add_space(6.0);
 
-                        // 2. Dimension Sliders — collapsible
-                        egui::CollapsingHeader::new("🎛️ Dimension Sliders")
-                            .default_open(true)
-                            .show(ui, |ui| {
-                                show_dimension_sliders(app, ui, &var_info, &dim_coords);
-                            });
-
-                        ui.add_space(10.0);
-
-                        // 3. Plot Button
-                        let plot_btn = egui::Button::new(
-                            egui::RichText::new("📊 Plot Data").strong().size(15.0),
-                        );
-                        if ui
-                            .add_sized([ui.available_width(), 38.0], plot_btn)
-                            .clicked()
-                        {
-                            app.load_selected_variable_slice();
-                        }
-                    });
+                    // — Plot button (always visible at bottom) —
+                    let plot_btn = egui::Button::new(egui::RichText::new("📊 Plot Data").strong());
+                    if ui
+                        .add_sized([ui.available_width(), 32.0], plot_btn)
+                        .clicked()
+                    {
+                        app.load_selected_variable_slice();
+                    }
                 });
         });
-
-    app.show_variable_controls = show_panel;
 }
 
 fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::stores::VariableInfo) {
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(&var_info.name).strong().size(16.0));
+        ui.label(egui::RichText::new(&var_info.name).strong());
         ui.label(
             egui::RichText::new(format!("[{}]", var_info.data_type))
                 .small()
@@ -85,30 +86,23 @@ fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::stores::VariableInfo)
     }
 
     ui.separator();
-    ui.label(egui::RichText::new("Metadata Specs").strong().small());
-
     ui.small(format!("Shape: {:?}", var_info.shape));
-    ui.small(format!("Chunk Shape: {:?}", var_info.chunk_shape));
     ui.small(format!("Dimensions: {:?}", var_info.dimension_names));
 
     if let (Some(start), Some(end)) = (&var_info.time_coverage_start, &var_info.time_coverage_end) {
         let start_clean = start.split('T').next().unwrap_or(start);
         let end_clean = end.split('T').next().unwrap_or(end);
-        ui.small(format!("Time Coverage: {} to {}", start_clean, end_clean));
+        ui.small(format!("Time: {} → {}", start_clean, end_clean));
     }
     if let Some(res) = &var_info.temporal_resolution {
-        ui.small(format!("Temporal Resolution: {}", res));
+        ui.small(format!("Resolution: {}", res));
     }
 
     let size_mb = var_info.file_size as f64 / (1024.0 * 1024.0);
-    ui.small(format!(
-        "File Size: {:.2} MB ({} bytes)",
-        size_mb, var_info.file_size
-    ));
+    ui.small(format!("Size: {:.2} MB", size_mb));
 
     if !var_info.attributes.is_empty() {
-        ui.add_space(2.0);
-        ui.collapsing("All Attributes (.zattrs)", |ui| {
+        ui.collapsing("Attributes (.zattrs)", |ui| {
             for (k, v) in &var_info.attributes {
                 ui.small(format!("{}: {}", k, v));
             }
@@ -122,9 +116,6 @@ fn show_dimension_sliders(
     var_info: &crate::stores::VariableInfo,
     dim_coords: &std::collections::HashMap<String, Vec<String>>,
 ) {
-    ui.small("Select start and end index thumbs for each dimension. The selected ranges will be used for plotting.");
-    ui.separator();
-
     let dim_count = var_info.shape.len();
     if app.selected_dim_indices.len() != dim_count {
         app.selected_dim_indices = vec![0; dim_count];
@@ -155,10 +146,9 @@ fn show_dimension_sliders(
         start_idx = start_idx.min(max_idx);
         end_idx = end_idx.clamp(start_idx, max_idx);
 
-        // Look up start coordinate label
         let start_coord = dim_coords
             .get(&dim_name.to_lowercase())
-            .and_then(|coords| coords.get(start_idx).cloned())
+            .and_then(|c| c.get(start_idx).cloned())
             .unwrap_or_else(|| {
                 crate::utils::units::format_axis_value(
                     start_idx,
@@ -173,10 +163,9 @@ fn show_dimension_sliders(
                 )
             });
 
-        // Look up end coordinate label
         let end_coord = dim_coords
             .get(&dim_name.to_lowercase())
-            .and_then(|coords| coords.get(end_idx).cloned())
+            .and_then(|c| c.get(end_idx).cloned())
             .unwrap_or_else(|| {
                 crate::utils::units::format_axis_value(
                     end_idx,
@@ -202,41 +191,39 @@ fn show_dimension_sliders(
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(
-                        egui::RichText::new(format!("({} / {} steps)", selected_count, dim_size))
+                        egui::RichText::new(format!("{}/{}", selected_count, dim_size))
                             .small()
                             .weak(),
                     );
                 });
             });
-
-            ui.small(format!("Range: {} ➔ {}", start_coord, end_coord));
+            ui.small(format!("{} → {}", start_coord, end_coord));
             ui.add_space(2.0);
 
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("Start Thumb:").small());
-                let start_slider = ui.add(
+                ui.label(egui::RichText::new("Start:").small());
+                let s = ui.add(
                     egui::Slider::new(&mut start_idx, 0..=max_idx)
                         .show_value(true)
                         .trailing_fill(true),
                 );
-                if start_slider.changed() && start_idx > end_idx {
+                if s.changed() && start_idx > end_idx {
                     end_idx = start_idx;
                 }
             });
 
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("End Thumb:  ").small());
-                let end_slider = ui.add(
+                ui.label(egui::RichText::new("End:  ").small());
+                let e = ui.add(
                     egui::Slider::new(&mut end_idx, 0..=max_idx)
                         .show_value(true)
                         .trailing_fill(true),
                 );
-                if end_slider.changed() && end_idx < start_idx {
+                if e.changed() && end_idx < start_idx {
                     start_idx = end_idx;
                 }
             });
 
-            // Synchronize state
             if let Some(r) = app.selected_dim_ranges.get_mut(i) {
                 *r = (start_idx, end_idx);
             }
