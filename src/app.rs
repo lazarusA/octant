@@ -237,6 +237,8 @@ impl OctantApp {
     }
 
     pub fn load_selected_variable_slice(&mut self) {
+        self.show_settings_panel = true;
+
         let (var_name, max_steps, chunk_time_size, slice_bytes_hint) = {
             if let Some(metadata) = &self.active_dataset_metadata {
                 if let Some(var_info) = metadata.variables.get(self.selected_variable_idx) {
