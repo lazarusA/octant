@@ -178,7 +178,14 @@ pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
             ui.horizontal(|ui| {
                 // 1. Play / Pause Button for Timestep Animation across all plot types
                 let play_text = if app.is_playing { "⏸" } else { "▶" };
-                let play_button = egui::Button::new(egui::RichText::new(format!("{} {}", play_text, if app.is_playing { "Pause" } else { "Play" })).strong());
+                let play_button = egui::Button::new(
+                    egui::RichText::new(format!(
+                        "{} {}",
+                        play_text,
+                        if app.is_playing { "Pause" } else { "Play" }
+                    ))
+                    .strong(),
+                );
                 if ui.add(play_button).clicked() {
                     app.is_playing = !app.is_playing;
                     app.last_step_time = std::time::Instant::now();
@@ -213,7 +220,11 @@ pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
 
                 ui.separator();
 
-                let status_text = if app.is_playing { "▶ Playing" } else { "⏸ Paused" };
+                let status_text = if app.is_playing {
+                    "▶ Playing"
+                } else {
+                    "⏸ Paused"
+                };
                 let status_color = if app.is_playing {
                     egui::Color32::from_rgb(255, 99, 71)
                 } else {
