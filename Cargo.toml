@@ -1,9 +1,9 @@
 [package]
 name = "octant"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Lazaro Alonso <lazarus.alon@gmail.com>"]
 edition = "2024"
-description = "A cloud-native visualization engine in Rust for n-dimensional datasets and interactive plotting."
+description = "An interactive viewer for n-dimensional datasets with native support for local and cloud object storage, Zarr, and Icechunk. Built in Rust with GPU-accelerated rendering."
 readme = "README.md"
 repository = "https://github.com/lazarusA/octant"
 documentation = "https://docs.rs/octant"
