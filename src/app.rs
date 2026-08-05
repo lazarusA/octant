@@ -79,7 +79,6 @@ pub struct OctantApp {
 
     // Panel Visibility State
     pub show_left_panel: bool,
-    pub show_right_panel: bool,
     pub show_settings_panel: bool,
     pub show_variable_controls: bool,
     pub show_bottom_bar: bool,
@@ -163,7 +162,6 @@ impl OctantApp {
             catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
 
             show_left_panel: true,
-            show_right_panel: true,
             show_settings_panel: false,
             show_variable_controls: false,
             show_bottom_bar: true,
@@ -577,7 +575,6 @@ impl eframe::App for OctantApp {
 
                         self.active_dataset_metadata = Some(metadata);
                         self.selected_variable_idx = 0;
-                        self.show_right_panel = true;
                         self.load_selected_variable_slice();
                     }
                     Err(err) => {
@@ -661,14 +658,14 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
-        // 3. Render Top Navigation Bar, Left Store Panel, Settings Panel, Bottom Playback Toolbar & Right Selection Panel
+        // 3. Render Top Navigation Bar, Left Store Panel, Settings Window, Bottom Playback Toolbar & Variable Controls Window
         crate::ui::top_bar::show_top_bar(self, ui);
         crate::ui::store::show_left_panel(self, ui);
         crate::ui::bottom_bar::show_bottom_bar(self, ui);
-        crate::ui::settings::show_settings_panel(self, ui);
         crate::ui::catalog::show_catalog_window(self, &ctx);
         crate::ui::colorbar::show_colorbar_overlay(self, &ctx);
-        crate::ui::variables_panel::show_right_panel(self, &ctx);
+        crate::ui::settings::show_settings_window(self, &ctx);
+        crate::ui::variables_panel::show_variable_controls(self, &ctx);
 
         // 4. Drawing Canvas Area with Aspect Data Ratio
         {
