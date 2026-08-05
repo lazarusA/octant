@@ -11,13 +11,15 @@ pub fn show_settings_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
         .resizable(false)
         .default_size(panel_width)
         .show(ui, |ui| {
+            ui.set_min_width(panel_width);
+            ui.set_max_width(panel_width);
             ui.heading("⚙️ Settings");
             ui.add_space(4.0);
             ui.label("Playback, plot options, and clipping controls live here.");
             ui.separator();
 
             ui.add_space(6.0);
-            ui.group(|ui| {
+            ui.scope(|ui| {
                 ui.label(egui::RichText::new("Plot Options").strong());
                 ui.add_space(4.0);
 
@@ -131,7 +133,7 @@ pub fn show_settings_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
             });
 
             ui.add_space(6.0);
-            ui.group(|ui| {
+            ui.scope(|ui| {
                 ui.label(egui::RichText::new("🎨 Clipping & Bounds").strong());
                 ui.add_space(4.0);
                 ui.label("Fine-tune color mapping and clipping for the active dataset.");
