@@ -77,8 +77,13 @@ pub struct OctantApp {
     pub catalog_search_query: String,
     pub catalog_category_filter: crate::catalog::CatalogCategoryFilter,
 
-    // Selection Panel State
+    // Panel Visibility State
+    pub show_left_panel: bool,
     pub show_right_panel: bool,
+    pub show_settings_panel: bool,
+    pub show_variable_controls: bool,
+    pub show_bottom_bar: bool,
+    pub theme_preference: egui::ThemePreference,
     pub selected_dim_indices: Vec<usize>,
     pub selected_dim_ranges: Vec<(usize, usize)>,
 
@@ -157,7 +162,12 @@ impl OctantApp {
             catalog_search_query: String::new(),
             catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
 
+            show_left_panel: true,
             show_right_panel: true,
+            show_settings_panel: false,
+            show_variable_controls: false,
+            show_bottom_bar: true,
+            theme_preference: egui::ThemePreference::System,
             selected_dim_indices: Vec::new(),
             selected_dim_ranges: Vec::new(),
 
@@ -651,23 +661,28 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
-        // 3. Render Top Navigation Bar & Bottom Playback Toolbar & Right Selection Panel
+        // 3. Render Top Navigation Bar, Left Store Panel, Settings Panel, Bottom Playback Toolbar & Right Selection Panel
         crate::ui::top_bar::show_top_bar(self, ui);
-        crate::ui::bottom_bar::show_plot_controls_bar(self, ui);
+        crate::ui::store::show_left_panel(self, ui);
         crate::ui::bottom_bar::show_bottom_bar(self, ui);
+        crate::ui::settings::show_settings_panel(self, ui);
         crate::ui::catalog::show_catalog_window(self, &ctx);
         crate::ui::colorbar::show_colorbar_overlay(self, &ctx);
         crate::ui::variables_panel::show_right_panel(self, &ctx);
 
-        // 4. Centered Drawing Canvas Area with Aspect Data Ratio
+        // 4. Drawing Canvas Area with Aspect Data Ratio
         {
-            let available_rect = ui.available_rect_before_wrap();
+            let canvas_rect = ui.available_rect_before_wrap();
+            let response = ui.allocate_rect(canvas_rect, egui::Sense::drag());
+
+            let canvas_bg = ui.style().visuals.panel_fill;
+            ui.painter().rect_filled(canvas_rect, 0.0, canvas_bg);
 
             // Enforce aspect data ratio (matrix.width / matrix.height)
-            let rect = if let Some(matrix) = &self.matrix_data {
+            let plot_rect = if let Some(matrix) = &self.matrix_data {
                 let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.01);
-                let avail_w = available_rect.width();
-                let avail_h = available_rect.height();
+                let avail_w = canvas_rect.width();
+                let avail_h = canvas_rect.height();
                 let avail_aspect = avail_w / avail_h.max(1.0);
 
                 let (plot_w, plot_h) = if avail_aspect > data_aspect {
@@ -676,12 +691,10 @@ impl eframe::App for OctantApp {
                     (avail_w, avail_w / data_aspect)
                 };
 
-                egui::Rect::from_center_size(available_rect.center(), egui::vec2(plot_w, plot_h))
+                egui::Rect::from_center_size(canvas_rect.center(), egui::vec2(plot_w, plot_h))
             } else {
-                available_rect
+                canvas_rect
             };
-
-            let (rect, response) = ui.allocate_exact_size(rect.size(), egui::Sense::drag());
 
             if response.dragged() {
                 let delta = response.drag_delta();
@@ -714,7 +727,7 @@ impl eframe::App for OctantApp {
                 PlotType::Sphere => {
                     if let Some(sphere_renderer) = &self.sphere_renderer {
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            rect,
+                            plot_rect,
                             SphereCallback {
                                 renderer: sphere_renderer.clone(),
                                 color_params: self.get_color_params(),
@@ -723,7 +736,7 @@ impl eframe::App for OctantApp {
                                 zoom: self.sphere_zoom,
                                 displacement_strength: self.sphere_displacement_strength,
                                 sphere_mode: self.sphere_mode,
-                                rect,
+                                rect: plot_rect,
                             },
                         );
                         ui.painter().add(callback);
@@ -732,7 +745,7 @@ impl eframe::App for OctantApp {
                 PlotType::Surface => {
                     if let Some(surface_renderer) = &self.surface_renderer {
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            rect,
+                            plot_rect,
                             SurfaceCallback {
                                 renderer: surface_renderer.clone(),
                                 color_params: self.get_color_params(),
@@ -741,7 +754,7 @@ impl eframe::App for OctantApp {
                                 zoom: self.sphere_zoom,
                                 displacement_strength: self.surface_displacement_strength,
                                 surface_mode: self.surface_mode,
-                                rect,
+                                rect: plot_rect,
                             },
                         );
                         ui.painter().add(callback);
@@ -756,7 +769,7 @@ impl eframe::App for OctantApp {
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
 
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            rect,
+                            plot_rect,
                             VolumeCallback {
                                 renderer: volume_renderer.clone(),
                                 color_params: self.get_color_params(),
@@ -773,7 +786,7 @@ impl eframe::App for OctantApp {
                                 algorithm: self.volume_algorithm,
                                 isovalue: self.volume_isovalue,
                                 isorange: self.volume_isorange,
-                                rect,
+                                rect: plot_rect,
                             },
                         );
                         ui.painter().add(callback);
@@ -788,7 +801,7 @@ impl eframe::App for OctantApp {
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
 
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            rect,
+                            plot_rect,
                             PointCloudCallback {
                                 renderer: point_cloud_renderer.clone(),
                                 color_params: self.get_color_params(),
@@ -801,7 +814,7 @@ impl eframe::App for OctantApp {
                                 point_size: self.point_cloud_size,
                                 width,
                                 height,
-                                rect,
+                                rect: plot_rect,
                             },
                         );
                         ui.painter().add(callback);
@@ -810,11 +823,11 @@ impl eframe::App for OctantApp {
                 _ => {
                     if let Some(renderer) = &self.renderer {
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            rect,
+                            plot_rect,
                             MatrixCallback {
                                 renderer: renderer.clone(),
                                 color_params: self.get_color_params(),
-                                rect,
+                                rect: plot_rect,
                             },
                         );
                         ui.painter().add(callback);
@@ -823,7 +836,7 @@ impl eframe::App for OctantApp {
             }
 
             // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle
-            crate::ui::hover_tooltip::show_hover_tooltip(self, &ctx, ui, &response, rect);
+            crate::ui::hover_tooltip::show_hover_tooltip(self, &ctx, ui, &response, plot_rect);
         }
     }
 }
