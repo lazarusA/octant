@@ -25,133 +25,42 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                 colormap::show_colormap_menu(app, ui);
                 plot_type::show_plot_type_menu(app, ui);
 
-                if app.active_dataset_metadata.is_some() {
-                    // Right status info and controls toggle on far right
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let panel_label = if app.show_right_panel {
-                            "🎛️ Controls ◀"
-                        } else {
-                            "🎛️ Controls ▶"
-                        };
-                        if ui
-                            .button(egui::RichText::new(panel_label).strong())
-                            .on_hover_text("Toggle Right Variable Controls Panel")
-                            .clicked()
-                        {
-                            app.show_right_panel = !app.show_right_panel;
-                        }
-                        ui.separator();
-                        status::show_status_bar(app, ui);
-                    });
-                } else {
-                    status::show_status_bar(app, ui);
-                }
-            });
-        });
-
-    show_secondary_toolbar(app, ui);
-}
-
-fn show_secondary_toolbar(app: &mut OctantApp, ui: &mut egui::Ui) {
-    egui::Panel::top("octant_secondary_toolbar")
-        .exact_size(32.0)
-        .show(ui, |ui| {
-            ui.add_space(2.0);
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("🎨 Clipping & Bounds:").strong().small());
-                ui.separator();
-
-                // 1. NaN Color Picker & Transparent Toggle
-                ui.checkbox(&mut app.use_nan_color, "Custom NaN Color")
-                    .on_hover_text("If unchecked, NaN and Inf values render transparently.");
-                if app.use_nan_color {
-                    ui.color_edit_button_rgba_unmultiplied(&mut app.nan_color);
-                }
-
-                ui.separator();
-
-                // 2. Low Clip Color Picker & Toggle
-                ui.checkbox(&mut app.use_lowclip, "Low Clip")
-                    .on_hover_text("If unchecked, values < cmin render using the colormap minimum value.");
-                if app.use_lowclip {
-                    ui.color_edit_button_rgba_unmultiplied(&mut app.lowclip_color);
-                }
-
-                ui.separator();
-
-                // 3. High Clip Color Picker & Toggle
-                ui.checkbox(&mut app.use_highclip, "High Clip")
-                    .on_hover_text("If unchecked, values > cmax render using the colormap maximum value.");
-                if app.use_highclip {
-                    ui.color_edit_button_rgba_unmultiplied(&mut app.highclip_color);
-                }
-
-                ui.separator();
-
-                // 4. Color Range Bounds (cmin, cmax) & Fixed Bounds Lock
-                ui.label("Min:");
-                ui.add(egui::DragValue::new(&mut app.color_range_min).speed(0.1));
-
-                ui.label("Max:");
-                ui.add(egui::DragValue::new(&mut app.color_range_max).speed(0.1));
-
-                let lock_label = if app.lock_color_bounds { "🔒 Bounds Locked" } else { "🔓 Bounds Dynamic" };
-                if ui.selectable_label(app.lock_color_bounds, lock_label)
-                    .on_hover_text("Lock min/max bounds so color mapping remains fixed across all timesteps and slices.")
-                    .clicked()
-                {
-                    app.lock_color_bounds = !app.lock_color_bounds;
-                }
-
-                if ui.button("↺ Reset").on_hover_text("Reset bounds to current slice data min/max").clicked()
-                    && let Some(mdata) = &app.matrix_data {
-                        app.color_range_min = mdata.min_val;
-                        app.color_range_max = mdata.max_val;
-                        app.volume_cmin = mdata.min_val;
-                        app.volume_cmax = mdata.max_val;
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let visibility_label = if app.show_bottom_bar { "⬇ Hide Bottom" } else { "⬆ Show Bottom" };
+                    if ui.button(egui::RichText::new(visibility_label).small()).on_hover_text("Toggle bottom playback bar").clicked() {
+                        app.show_bottom_bar = !app.show_bottom_bar;
                     }
 
-                ui.separator();
+                    let right_label = if app.show_right_panel { "▸ Hide Right" } else { "◂ Show Right" };
+                    if ui.button(egui::RichText::new(right_label).small()).on_hover_text("Toggle right variable controls panel").clicked() {
+                        app.show_right_panel = !app.show_right_panel;
+                    }
 
-                // 5. Color Scale Selection
-                let is_valid_log = app.color_range_min >= -1e-15 && app.color_range_max > 0.0;
-                if !is_valid_log && app.active_scale_type == 1 {
-                    app.active_scale_type = 0;
-                }
+                    let left_label = if app.show_left_panel { "◂ Hide Left" } else { "▸ Show Left" };
+                    if ui.button(egui::RichText::new(left_label).small()).on_hover_text("Toggle left store panel").clicked() {
+                        app.show_left_panel = !app.show_left_panel;
+                    }
 
-                ui.label(egui::RichText::new("📈 Scale:").strong().small());
-                egui::ComboBox::from_id_salt("color_scale_dropdown")
-                    .selected_text(match app.active_scale_type {
-                        1 => "Logarithmic",
-                        2 => "Symlog (Log-Offset)",
-                        3 => "Sqrt (Diverging)",
-                        4 => "Exponential",
-                        _ => "Linear",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut app.active_scale_type, 0, "Linear");
+                    let theme_label = if app.theme_preference == egui::ThemePreference::Dark { "☀ Light" } else { "🌙 Dark" };
+                    if ui.button(egui::RichText::new(theme_label).small()).on_hover_text("Toggle light and dark theme").clicked() {
+                        app.theme_preference = if app.theme_preference == egui::ThemePreference::Dark {
+                            egui::ThemePreference::Light
+                        } else {
+                            egui::ThemePreference::Dark
+                        };
+                        ui.ctx().set_theme(app.theme_preference);
+                    }
 
-                        ui.add_enabled_ui(is_valid_log, |ui| {
-                            ui.selectable_value(&mut app.active_scale_type, 1, "Logarithmic")
-                                .on_hover_text(if is_valid_log {
-                                    "Logarithmic scale (for non-negative data)"
-                                } else {
-                                    "Disabled: Logarithmic scale requires non-negative data (min >= 0). Use Symlog for data with negative values."
-                                });
-                        });
-
-                        ui.selectable_value(&mut app.active_scale_type, 2, "Symlog (Log-Offset)");
-                        ui.selectable_value(&mut app.active_scale_type, 3, "Sqrt (Diverging)");
-                        ui.selectable_value(&mut app.active_scale_type, 4, "Exponential");
-                    });
-
-                if app.active_scale_type == 1 || app.active_scale_type == 2 || app.active_scale_type == 4 {
-                    ui.label("Param:");
-                    ui.add(egui::DragValue::new(&mut app.scale_param).speed(0.01).range(0.0001..=100.0));
-                }
-
-                ui.toggle_value(&mut app.is_categorical, "🎨 Categorical")
-                    .on_hover_text("Enable Categorical / Discrete colorbar (auto-detects unique values, or defaults to 10 equal bins)");
+                    if app.active_dataset_metadata.is_some() {
+                        ui.separator();
+                        status::show_status_bar(app, ui);
+                    } else {
+                        ui.separator();
+                        status::show_status_bar(app, ui);
+                    }
+                });
             });
         });
+
 }
+
