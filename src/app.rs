@@ -80,6 +80,7 @@ pub struct OctantApp {
     // Panel Visibility State
     pub show_left_panel: bool,
     pub show_right_panel: bool,
+    pub show_settings_panel: bool,
     pub show_bottom_bar: bool,
     pub theme_preference: egui::ThemePreference,
     pub selected_dim_indices: Vec<usize>,
@@ -162,6 +163,7 @@ impl OctantApp {
 
             show_left_panel: true,
             show_right_panel: true,
+            show_settings_panel: false,
             show_bottom_bar: true,
             theme_preference: egui::ThemePreference::System,
             selected_dim_indices: Vec::new(),
@@ -657,11 +659,11 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
-        // 3. Render Top Navigation Bar, Left Store Panel, Plot Controls, Bottom Playback Toolbar & Right Selection Panel
+        // 3. Render Top Navigation Bar, Left Store Panel, Settings Panel, Bottom Playback Toolbar & Right Selection Panel
         crate::ui::top_bar::show_top_bar(self, ui);
         crate::ui::store::show_left_panel(self, ui);
-        crate::ui::bottom_bar::show_plot_controls_bar(self, ui);
         crate::ui::bottom_bar::show_bottom_bar(self, ui);
+        crate::ui::settings::show_settings_panel(self, ui);
         crate::ui::catalog::show_catalog_window(self, &ctx);
         crate::ui::colorbar::show_colorbar_overlay(self, &ctx);
         crate::ui::variables_panel::show_right_panel(self, &ctx);

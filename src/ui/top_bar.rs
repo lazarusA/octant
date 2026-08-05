@@ -25,6 +25,10 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                 colormap::show_colormap_menu(app, ui);
                 plot_type::show_plot_type_menu(app, ui);
 
+                if ui.button(egui::RichText::new("⚙ Settings").strong()).clicked() {
+                    app.show_settings_panel = !app.show_settings_panel;
+                }
+
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let visibility_label = if app.show_bottom_bar { "⬇ Hide Bottom" } else { "⬆ Show Bottom" };
                     if ui.button(egui::RichText::new(visibility_label).small()).on_hover_text("Toggle bottom playback bar").clicked() {
