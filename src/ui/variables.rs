@@ -49,7 +49,7 @@ pub fn show_variables_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                                 app.selected_variable_idx = idx;
                                 app.selected_dim_indices = vec![0; var_info.shape.len()];
                                 app.selected_dim_ranges = var_info.shape.iter().map(|&s| (0, (s as usize).saturating_sub(1))).collect();
-                                app.show_right_panel = true;
+                                app.show_variable_controls = true;
                                 ui.close();
 
                             }
