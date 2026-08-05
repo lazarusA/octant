@@ -12,9 +12,9 @@ keywords = ["visualization", "zarr", "icechunk", "wgpu", "graphics"]
 categories = ["visualization", "graphics", "science"]
 
 [dependencies]
-egui = "0.35"
-eframe = { version = "0.35", features = ["wgpu"] }
-wgpu = { version = "29", features = ["webgpu", "webgl"] }
+egui = "0.36"
+eframe = { version = "0.36", features = ["wgpu"] }
+wgpu = { version = "30", features = ["webgpu", "webgl"] }
 bytemuck = { version = "1.25", features = ["derive"] }
 glam = { version = "0.33", features = ["bytemuck"] }
 log = "0.4"
