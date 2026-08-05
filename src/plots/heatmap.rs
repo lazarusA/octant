@@ -109,7 +109,7 @@ impl HeatmapRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[HeatmapVertex::desc()],
+                buffers: &[Some(HeatmapVertex::desc())],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {

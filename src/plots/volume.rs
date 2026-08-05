@@ -215,7 +215,7 @@ impl VolumeRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[VolumeVertex::desc()],
+                buffers: &[Some(VolumeVertex::desc())],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {

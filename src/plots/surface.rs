@@ -141,7 +141,7 @@ impl SurfaceRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[SurfaceVertex::desc()],
+                buffers: &[Some(SurfaceVertex::desc())],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
