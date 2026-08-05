@@ -25,46 +25,75 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                 colormap::show_colormap_menu(app, ui);
                 plot_type::show_plot_type_menu(app, ui);
 
-                if ui.button(egui::RichText::new("⚙ Settings").strong()).clicked() {
+                if ui
+                    .button(egui::RichText::new("⚙ Settings").strong())
+                    .clicked()
+                {
                     app.show_settings_panel = !app.show_settings_panel;
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let visibility_label = if app.show_bottom_bar { "⬇ Hide Bottom" } else { "⬆ Show Bottom" };
-                    if ui.button(egui::RichText::new(visibility_label).small()).on_hover_text("Toggle bottom playback bar").clicked() {
+                    let visibility_label = if app.show_bottom_bar {
+                        "⬇ Hide Bottom"
+                    } else {
+                        "⬆ Show Bottom"
+                    };
+                    if ui
+                        .button(egui::RichText::new(visibility_label).small())
+                        .on_hover_text("Toggle bottom playback bar")
+                        .clicked()
+                    {
                         app.show_bottom_bar = !app.show_bottom_bar;
                     }
 
-                    let right_label = if app.show_right_panel { "▸ Hide Right" } else { "◂ Show Right" };
-                    if ui.button(egui::RichText::new(right_label).small()).on_hover_text("Toggle right variable controls panel").clicked() {
+                    let right_label = if app.show_right_panel {
+                        "▸ Hide Right"
+                    } else {
+                        "◂ Show Right"
+                    };
+                    if ui
+                        .button(egui::RichText::new(right_label).small())
+                        .on_hover_text("Toggle right variable controls panel")
+                        .clicked()
+                    {
                         app.show_right_panel = !app.show_right_panel;
                     }
 
-                    let left_label = if app.show_left_panel { "◂ Hide Left" } else { "▸ Show Left" };
-                    if ui.button(egui::RichText::new(left_label).small()).on_hover_text("Toggle left store panel").clicked() {
+                    let left_label = if app.show_left_panel {
+                        "◂ Hide Left"
+                    } else {
+                        "▸ Show Left"
+                    };
+                    if ui
+                        .button(egui::RichText::new(left_label).small())
+                        .on_hover_text("Toggle left store panel")
+                        .clicked()
+                    {
                         app.show_left_panel = !app.show_left_panel;
                     }
 
-                    let theme_label = if app.theme_preference == egui::ThemePreference::Dark { "☀ Light" } else { "🌙 Dark" };
-                    if ui.button(egui::RichText::new(theme_label).small()).on_hover_text("Toggle light and dark theme").clicked() {
-                        app.theme_preference = if app.theme_preference == egui::ThemePreference::Dark {
-                            egui::ThemePreference::Light
-                        } else {
-                            egui::ThemePreference::Dark
-                        };
+                    let theme_label = if app.theme_preference == egui::ThemePreference::Dark {
+                        "☀ Light"
+                    } else {
+                        "🌙 Dark"
+                    };
+                    if ui
+                        .button(egui::RichText::new(theme_label).small())
+                        .on_hover_text("Toggle light and dark theme")
+                        .clicked()
+                    {
+                        app.theme_preference =
+                            if app.theme_preference == egui::ThemePreference::Dark {
+                                egui::ThemePreference::Light
+                            } else {
+                                egui::ThemePreference::Dark
+                            };
                         ui.ctx().set_theme(app.theme_preference);
                     }
 
-                    if app.active_dataset_metadata.is_some() {
-                        ui.separator();
-                        status::show_status_bar(app, ui);
-                    } else {
-                        ui.separator();
-                        status::show_status_bar(app, ui);
-                    }
+                    ui.separator();
+                    status::show_status_bar(app, ui);
                 });
             });
         });
-
 }
-
