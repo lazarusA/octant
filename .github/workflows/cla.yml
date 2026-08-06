@@ -4,7 +4,7 @@ on:
   issue_comment:
     types: [created]
   pull_request_target:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, synchronize]
 
 permissions:
   actions: write
@@ -18,7 +18,8 @@ jobs:
     steps:
       - name: "CLA Assistant"
         if: (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'
-        uses: contributor-assistant/github-action@v2.6.1
+        uses: iainmcgin/cla-github-action@0d27e5a16278d4adb6b0c4b92f08ad27b0a21dc8 # v3.2.0
+        # pinning to a specific commit because the original repo has been archived and has no active maintainer doing this so that the cla assistant can be updated and until an official fork is created.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
