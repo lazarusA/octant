@@ -50,6 +50,12 @@ pub fn show_variables_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                                 app.selected_dim_indices = vec![0; var_info.shape.len()];
                                 app.selected_dim_ranges = var_info.shape.iter().map(|&s| (0, (s as usize).saturating_sub(1))).collect();
                                 app.show_variable_controls = true;
+                                // If the variable is a line plot, set the line plot all series to false and the line profile dim index and slice index to 0
+                                if var_info.shape.len() <= 1 {
+                                    app.line_plot_all_series = false;
+                                    app.line_profile_dim_idx = 0;
+                                    app.line_profile_slice_idx = 0;
+                                }
                                 ui.close();
 
                             }

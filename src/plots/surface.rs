@@ -322,6 +322,12 @@ impl SurfaceRenderer {
     }
 }
 
+impl super::common::PlotRenderer for SurfaceRenderer {
+    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
+        self.update_data(queue, values);
+    }
+}
+
 pub struct SurfaceCallback {
     pub renderer: Arc<SurfaceRenderer>,
     pub color_params: super::common::PlotColorParams,

@@ -37,25 +37,15 @@ impl MatrixData {
         width: usize,
         height: usize,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut raw_data = Vec::with_capacity(width * height);
-        for y in 0..height {
-            for x in 0..width {
-                let fx = x as f32 / width as f32;
-                let fy = y as f32 / height as f32;
-                let wave1 = (fx * 14.2 + fy * 9.7).sin() * 0.5 + 0.5;
-                let wave2 = ((fx * 28.4 - fy * 19.1).cos() * 0.5 + 0.5) * 0.5;
-                let hash = (((x * 1597 + y * 28491) % 1000) as f32 / 1000.0) * 0.25;
-                let val = ((wave1 * 0.5 + wave2 + hash) * 100.0).clamp(0.0, 100.0);
-                raw_data.push(val);
-            }
-        }
+        let (raw_data, min_v, max_v) =
+            super::procedural::generate_procedural_matrix(width, height, 0);
 
         Ok(Self::new(
             width,
             height,
             raw_data,
-            0.0,
-            100.0,
+            min_v,
+            max_v,
             format!("Random Matrix ({}x{})", width, height),
             1,
         ))
@@ -93,5 +83,71 @@ impl MatrixData {
     /// Returns pre-cached unique values in O(1) constant time per frame.
     pub fn detect_unique_values(&self) -> Option<Vec<f32>> {
         self.unique_values.clone()
+    }
+
+    /// Extracts a 1D line profile along dimension axis (`dim_axis`: 0 = along X/width, 1 = along Y/height).
+    pub fn extract_1d_line_profile(&self, dim_axis: usize, slice_idx: usize) -> Vec<f32> {
+        if self.values.is_empty() || self.width == 0 || self.height == 0 {
+            return Vec::new();
+        }
+
+        if dim_axis == 0 {
+            // Along X (width): extract row at `slice_idx`
+            let row = slice_idx.min(self.height.saturating_sub(1));
+            let start = row * self.width;
+            let end = (start + self.width).min(self.values.len());
+            self.values[start..end].to_vec()
+        } else {
+            // Along Y (height): extract column at `slice_idx`
+            let col = slice_idx.min(self.width.saturating_sub(1));
+            (0..self.height)
+                .map(|y| {
+                    let idx = y * self.width + col;
+                    self.values.get(idx).copied().unwrap_or(f32::NAN)
+                })
+                .collect()
+        }
+    }
+
+    /// Extracts all 1D line profiles along dimension axis (`dim_axis`: 0 = all rows along X, 1 = all columns along Y).
+    pub fn extract_all_1d_line_profiles(&self, dim_axis: usize) -> Vec<Vec<f32>> {
+        if dim_axis == 0 {
+            (0..self.height)
+                .map(|y| self.extract_1d_line_profile(0, y))
+                .collect()
+        } else {
+            (0..self.width)
+                .map(|x| self.extract_1d_line_profile(1, x))
+                .collect()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MatrixData;
+
+    #[test]
+    fn extracts_row_and_column_profiles() {
+        let data = MatrixData::new(
+            3,
+            2,
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            1.0,
+            6.0,
+            "test".to_string(),
+            1,
+        );
+
+        assert_eq!(data.extract_1d_line_profile(0, 0), vec![1.0, 2.0, 3.0]);
+        assert_eq!(data.extract_1d_line_profile(1, 1), vec![2.0, 5.0]);
+        assert_eq!(
+            data.extract_all_1d_line_profiles(0),
+            vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]]
+        );
+        assert_eq!(
+            data.extract_all_1d_line_profiles(1),
+            vec![vec![1.0, 4.0], vec![2.0, 5.0], vec![3.0, 6.0]]
+        );
     }
 }

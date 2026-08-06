@@ -29,7 +29,7 @@ impl DataStore for IcechunkRemoteStore {
             .flat_map(|v| v.dimension_names.clone())
             .collect();
         let dimension_coordinates =
-            crate::utils::zarr::fetch_all_dimension_coordinates(store, &dim_names, Some(base_url));
+            crate::utils::fetch_all_dimension_coordinates(store, &dim_names, Some(base_url));
 
         let dataset_name = base_url
             .split('/')
