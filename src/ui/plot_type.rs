@@ -14,6 +14,7 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     let current_label = match app.active_plot_type {
         PlotType::Heatmap => "🌐 Plot: 2D Plane",
+        PlotType::Line => "📈 Plot: 1D Line Chart",
         PlotType::Sphere => "🌐 Plot: 3D Globe",
         PlotType::Surface | PlotType::Block => "🌐 Plot: 3D Surface / Blocks",
         PlotType::Volume => "🌐 Plot: 3D Volume",
@@ -32,6 +33,7 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         let options = [
             (PlotType::Heatmap, "🗺️ 2D Plane (Flatmap)", true),
+            (PlotType::Line, "📈 1D Line Chart", true),
             (PlotType::Sphere, "🌍 3D Globe (Sphere)", true),
             (PlotType::Surface, "⛰️ 3D Surface / Blocks", true),
             (PlotType::Volume, "☁️ 3D Volume Raycasting", is_3d_available),

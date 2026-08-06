@@ -148,6 +148,20 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             ui.label(egui::RichText::new("✨ Point Cloud").strong().small());
             ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("✨ Size"));
         }
+        PlotType::Line => {
+            ui.label(egui::RichText::new("📈 1D Line Plot").strong().small());
+            let mut use_flat = app.active_colormap == 999;
+            if ui
+                .checkbox(&mut use_flat, "🎨 Solid Flat Line Color")
+                .changed()
+            {
+                if use_flat {
+                    app.active_colormap = 999;
+                } else {
+                    app.active_colormap = 0;
+                }
+            }
+        }
         PlotType::Heatmap | PlotType::Block => {
             ui.label(egui::RichText::new("🗺️ 2D Heatmap").small().weak());
         }
