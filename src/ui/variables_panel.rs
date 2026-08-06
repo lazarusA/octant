@@ -1,4 +1,5 @@
 use crate::app::OctantApp;
+use egui::{DragValue, Sense, Stroke, Ui, Vec2};
 
 /// Positioned to the right of the Settings overlay using the previous frame's settings width.
 pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
@@ -213,29 +214,7 @@ fn show_dimension_sliders(
             ui.small(format!("{} → {}", start_coord, end_coord));
             ui.add_space(2.0);
 
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("Start:").small());
-                let s = ui.add(
-                    egui::Slider::new(&mut start_idx, 0..=max_idx)
-                        .show_value(true)
-                        .trailing_fill(true),
-                );
-                if s.changed() && start_idx > end_idx {
-                    end_idx = start_idx;
-                }
-            });
-
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("End:  ").small());
-                let e = ui.add(
-                    egui::Slider::new(&mut end_idx, 0..=max_idx)
-                        .show_value(true)
-                        .trailing_fill(true),
-                );
-                if e.changed() && end_idx < start_idx {
-                    start_idx = end_idx;
-                }
-            });
+            double_slider_with_inputs(ui, &dim_name, &mut start_idx, &mut end_idx, 0, max_idx);
 
             if let Some(r) = app.selected_dim_ranges.get_mut(i) {
                 *r = (start_idx, end_idx);
@@ -250,4 +229,130 @@ fn show_dimension_sliders(
 
         ui.add_space(4.0);
     }
+}
+
+/// A compact double-slider: [start input] ——●————●—— [end input]
+///
+/// - `start`/`end` are drag-editable via the two DragValue boxes on either side
+///   (click and type, or click-drag like a normal DragValue).
+/// - The two dots on the track between them can also be dragged directly.
+/// - `start` is always clamped to `min..=end`, `end` to `start..=max`.
+///
+/// `id_source` must be unique per call site when this is used in a loop (e.g. the
+/// dimension name or index) so repeated calls don't collide on the same widget IDs.
+///
+/// Returns `true` if either value changed this frame.
+pub fn double_slider_with_inputs(
+    ui: &mut Ui,
+    id_source: impl egui::AsIdSalt,
+    start: &mut usize,
+    end: &mut usize,
+    min: usize,
+    max: usize,
+) -> bool {
+    let mut changed = false;
+    let handle_radius: f32 = 6.0;
+    let base_id = ui.id().with("double_slider").with(id_source);
+
+    ui.horizontal(|ui| {
+        // --- left numeric input ---
+        changed |= ui
+            .push_id(base_id.with("start_input"), |ui| {
+                ui.add(DragValue::new(start).range(min..=*end).speed(1))
+            })
+            .inner
+            .changed();
+
+        // --- track ---
+        let track_width = (ui.available_width() - 70.0).max(40.0);
+        let (rect, _resp) = ui.allocate_exact_size(
+            Vec2::new(track_width, 2.0 * handle_radius + 4.0),
+            Sense::hover(),
+        );
+
+        let span = max.saturating_sub(min).max(1) as f32;
+        let left = rect.left() + handle_radius;
+        let right = rect.right() - handle_radius;
+
+        let to_x = |v: usize| left + ((v - min) as f32 / span) * (right - left);
+        let from_x = |x: f32| {
+            let t = ((x - left) / (right - left)).clamp(0.0, 1.0);
+            min + (t * span).round() as usize
+        };
+
+        let painter = ui.painter_at(rect);
+        let mid_y = rect.center().y;
+
+        // base line
+        painter.line_segment(
+            [egui::pos2(left, mid_y), egui::pos2(right, mid_y)],
+            Stroke::new(2.0, ui.visuals().widgets.inactive.bg_fill),
+        );
+
+        let x0 = to_x(*start);
+        let x1 = to_x(*end);
+
+        // highlighted selected span
+        painter.line_segment(
+            [egui::pos2(x0, mid_y), egui::pos2(x1, mid_y)],
+            Stroke::new(4.0, ui.visuals().selection.bg_fill),
+        );
+
+        // start handle
+        let start_rect =
+            egui::Rect::from_center_size(egui::pos2(x0, mid_y), Vec2::splat(2.0 * handle_radius));
+        let start_resp = ui.interact(start_rect, base_id.with("start_handle"), Sense::drag());
+        if let Some(pos) = start_resp
+            .dragged()
+            .then(|| start_resp.interact_pointer_pos())
+            .flatten()
+        {
+            let v = from_x(pos.x).min(*end);
+            if v != *start {
+                *start = v;
+                changed = true;
+            }
+        }
+        painter.circle(
+            egui::pos2(x0, mid_y),
+            handle_radius,
+            ui.visuals().widgets.inactive.bg_fill,
+            ui.style().interact(&start_resp).fg_stroke,
+        );
+
+        // end handle
+        let end_rect =
+            egui::Rect::from_center_size(egui::pos2(x1, mid_y), Vec2::splat(2.0 * handle_radius));
+        let end_resp = ui.interact(end_rect, base_id.with("end_handle"), Sense::drag());
+        if let Some(pos) = end_resp
+            .dragged()
+            .then(|| end_resp.interact_pointer_pos())
+            .flatten()
+        {
+            let v = from_x(pos.x).max(*start);
+            if v != *end {
+                *end = v;
+                changed = true;
+            }
+        }
+        painter.circle(
+            egui::pos2(x1, mid_y),
+            handle_radius,
+            ui.visuals().widgets.inactive.bg_fill,
+            ui.style().interact(&end_resp).fg_stroke,
+        );
+
+        // --- right numeric input ---
+        changed |= ui
+            .push_id(base_id.with("end_input"), |ui| {
+                ui.add(DragValue::new(end).range(*start..=max).speed(1))
+            })
+            .inner
+            .changed();
+    });
+
+    *start = (*start).clamp(min, max);
+    *end = (*end).clamp(min, max).max(*start);
+
+    changed
 }
