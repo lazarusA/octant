@@ -491,6 +491,12 @@ impl OctantApp {
     }
 
     pub fn rebuild_pipeline_with_matrix_data(&mut self, data: MatrixData) {
+        // If the data is a line plot, set the line plot all series to false and the line profile dim index and slice index to 0
+        if data.height == 1 {
+            self.line_plot_all_series = false;
+            self.line_profile_dim_idx = 0;
+            self.line_profile_slice_idx = 0;
+        }
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
             let same_dimensions = self
                 .matrix_data
