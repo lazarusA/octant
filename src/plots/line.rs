@@ -221,7 +221,7 @@ impl LineRenderer {
             return;
         }
 
-        let needed_bytes = (matrix_data.len() * std::mem::size_of::<f32>()) as u64;
+        let needed_bytes = std::mem::size_of_val(matrix_data) as u64;
         let capacity_bytes = self.data_buffer.size();
 
         if needed_bytes > capacity_bytes {
