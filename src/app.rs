@@ -83,8 +83,11 @@ pub struct OctantApp {
 
     // Panel Visibility State
     pub show_left_panel: bool,
+    pub show_variables_overlay: bool,
     pub show_settings_panel: bool,
     pub show_variable_controls: bool,
+    pub variables_overlay_width: f32,
+    pub variable_search: String,
     pub show_bottom_bar: bool,
     pub settings_overlay_width: f32, // tracks prev-frame width to position Variable Controls to the right
     pub theme_preference: egui::ThemePreference,
@@ -186,10 +189,13 @@ impl OctantApp {
             catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
 
             show_left_panel: true,
+            show_variables_overlay: true,
             show_settings_panel: false,
             show_variable_controls: false,
             show_bottom_bar: true,
             settings_overlay_width: 0.0,
+            variables_overlay_width: 340.0,
+            variable_search: String::new(),
 
             theme_preference: egui::ThemePreference::System,
             selected_dim_indices: Vec::new(),
@@ -687,6 +693,7 @@ impl eframe::App for OctantApp {
                             metadata.name,
                             metadata.variables.len()
                         );
+                        self.show_variables_overlay = !self.show_variables_overlay;
                         if let Some(first_var) = metadata.variables.first() {
                             self.selected_dim_indices = vec![0; first_var.shape.len()];
                             self.selected_dim_ranges = first_var
@@ -790,6 +797,7 @@ impl eframe::App for OctantApp {
         // After panels consume their space, the remaining rect is the canvas.
         // Pass it to the overlays so they can anchor to the canvas left edge.
         let canvas_rect = ui.available_rect_before_wrap();
+        crate::ui::variables::show_variables_overlay(self, &ctx, canvas_rect);
         crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
         crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
 

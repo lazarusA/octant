@@ -1,4 +1,4 @@
-use super::{colormap, plot_type, status, store, variables};
+use super::{colormap, plot_type, status, store};
 use crate::app::OctantApp;
 
 pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -22,7 +22,12 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.show_catalog_window = true;
                 }
 
-                variables::show_variables_menu(app, ui);
+                if ui
+                    .button(egui::RichText::new("📊 Variables").strong())
+                    .clicked()
+                {
+                    app.show_variables_overlay = !app.show_variables_overlay;
+                }
                 colormap::show_colormap_menu(app, ui);
                 plot_type::show_plot_type_menu(app, ui);
 
