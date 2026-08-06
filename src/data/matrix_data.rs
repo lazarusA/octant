@@ -84,4 +84,70 @@ impl MatrixData {
     pub fn detect_unique_values(&self) -> Option<Vec<f32>> {
         self.unique_values.clone()
     }
+
+    /// Extracts a 1D line profile along dimension axis (`dim_axis`: 0 = along X/width, 1 = along Y/height).
+    pub fn extract_1d_line_profile(&self, dim_axis: usize, slice_idx: usize) -> Vec<f32> {
+        if self.values.is_empty() || self.width == 0 || self.height == 0 {
+            return Vec::new();
+        }
+
+        if dim_axis == 0 {
+            // Along X (width): extract row at `slice_idx`
+            let row = slice_idx.min(self.height.saturating_sub(1));
+            let start = row * self.width;
+            let end = (start + self.width).min(self.values.len());
+            self.values[start..end].to_vec()
+        } else {
+            // Along Y (height): extract column at `slice_idx`
+            let col = slice_idx.min(self.width.saturating_sub(1));
+            (0..self.height)
+                .map(|y| {
+                    let idx = y * self.width + col;
+                    self.values.get(idx).copied().unwrap_or(f32::NAN)
+                })
+                .collect()
+        }
+    }
+
+    /// Extracts all 1D line profiles along dimension axis (`dim_axis`: 0 = all rows along X, 1 = all columns along Y).
+    pub fn extract_all_1d_line_profiles(&self, dim_axis: usize) -> Vec<Vec<f32>> {
+        if dim_axis == 0 {
+            (0..self.height)
+                .map(|y| self.extract_1d_line_profile(0, y))
+                .collect()
+        } else {
+            (0..self.width)
+                .map(|x| self.extract_1d_line_profile(1, x))
+                .collect()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MatrixData;
+
+    #[test]
+    fn extracts_row_and_column_profiles() {
+        let data = MatrixData::new(
+            3,
+            2,
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            1.0,
+            6.0,
+            "test".to_string(),
+            1,
+        );
+
+        assert_eq!(data.extract_1d_line_profile(0, 0), vec![1.0, 2.0, 3.0]);
+        assert_eq!(data.extract_1d_line_profile(1, 1), vec![2.0, 5.0]);
+        assert_eq!(
+            data.extract_all_1d_line_profiles(0),
+            vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]]
+        );
+        assert_eq!(
+            data.extract_all_1d_line_profiles(1),
+            vec![vec![1.0, 4.0], vec![2.0, 5.0], vec![3.0, 6.0]]
+        );
+    }
 }

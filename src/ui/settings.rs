@@ -161,6 +161,77 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.active_colormap = 0;
                 }
             }
+
+            let profile_controls = app.matrix_data.as_ref().map_or((false, 0usize), |matrix| {
+                (
+                    matrix.width > 1 || matrix.height > 1,
+                    matrix.width.max(matrix.height),
+                )
+            });
+
+            if profile_controls.0 {
+                ui.separator();
+                ui.label(egui::RichText::new("🧭 Line Profile").small().weak());
+
+                let mut selected_dim_idx = app.line_profile_dim_idx;
+                egui::ComboBox::from_id_salt("line_profile_dim_selector")
+                    .selected_text(if selected_dim_idx == 0 {
+                        "Along X / Longitude"
+                    } else {
+                        "Along Y / Latitude"
+                    })
+                    .show_ui(ui, |ui| {
+                        if ui
+                            .selectable_label(selected_dim_idx == 0, "Along X / Longitude")
+                            .clicked()
+                        {
+                            selected_dim_idx = 0;
+                        }
+                        if ui
+                            .selectable_label(selected_dim_idx == 1, "Along Y / Latitude")
+                            .clicked()
+                        {
+                            selected_dim_idx = 1;
+                        }
+                    });
+                if selected_dim_idx != app.line_profile_dim_idx {
+                    app.line_profile_dim_idx = selected_dim_idx;
+                }
+
+                let mut all_series = app.line_plot_all_series;
+                if ui
+                    .checkbox(&mut all_series, "📈 All Lines Series")
+                    .changed()
+                {
+                    app.line_plot_all_series = all_series;
+                }
+
+                if !app.line_plot_all_series {
+                    let max_idx = if app.line_profile_dim_idx == 0 {
+                        app.matrix_data
+                            .as_ref()
+                            .map_or(0, |matrix| matrix.height.saturating_sub(1))
+                    } else {
+                        app.matrix_data
+                            .as_ref()
+                            .map_or(0, |matrix| matrix.width.saturating_sub(1))
+                    };
+                    if max_idx > 0 {
+                        let mut slice_idx = app.line_profile_slice_idx;
+                        if ui
+                            .add(
+                                egui::Slider::new(&mut slice_idx, 0..=max_idx)
+                                    .text("🧪 Profile Index"),
+                            )
+                            .changed()
+                        {
+                            app.line_profile_slice_idx = slice_idx;
+                        }
+                    } else {
+                        ui.label("Single profile available.");
+                    }
+                }
+            }
         }
         PlotType::Heatmap | PlotType::Block => {
             ui.label(egui::RichText::new("🗺️ 2D Heatmap").small().weak());
