@@ -84,27 +84,16 @@ impl DataStore for IcechunkLocalStore {
 
     fn fetch_slice(&self, variable: &str, timestep: usize) -> Result<MatrixSlice, Box<dyn Error>> {
         let (width, height) = (64, 64);
-        let mut raw_data = Vec::with_capacity(width * height);
-
-        for y in 0..height {
-            for x in 0..width {
-                let fx = x as f32 / width as f32;
-                let fy = y as f32 / height as f32;
-                let t_shift = (timestep % 365) as f32 * 0.05;
-                let val1 = ((fx * 8.0 + t_shift).sin() * (fy * 8.0).cos() * 0.5 + 0.5) * 80.0;
-                let val2 = (((x * 23 + y * 47) % 100) as f32) * 0.2;
-                let val = (val1 + val2).clamp(0.0, 100.0);
-                raw_data.push(val);
-            }
-        }
+        let (raw_data, min_val, max_val) =
+            crate::data::procedural::generate_procedural_matrix(width, height, timestep);
 
         Ok(MatrixSlice {
             variable_name: variable.to_string(),
             width,
             height,
             values: raw_data,
-            min_val: 0.0,
-            max_val: 100.0,
+            min_val,
+            max_val,
             shape: vec![365, height as u64, width as u64],
             current_timestep: timestep,
             max_timesteps: 365,

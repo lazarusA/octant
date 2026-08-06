@@ -37,25 +37,15 @@ impl MatrixData {
         width: usize,
         height: usize,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut raw_data = Vec::with_capacity(width * height);
-        for y in 0..height {
-            for x in 0..width {
-                let fx = x as f32 / width as f32;
-                let fy = y as f32 / height as f32;
-                let wave1 = (fx * 14.2 + fy * 9.7).sin() * 0.5 + 0.5;
-                let wave2 = ((fx * 28.4 - fy * 19.1).cos() * 0.5 + 0.5) * 0.5;
-                let hash = (((x * 1597 + y * 28491) % 1000) as f32 / 1000.0) * 0.25;
-                let val = ((wave1 * 0.5 + wave2 + hash) * 100.0).clamp(0.0, 100.0);
-                raw_data.push(val);
-            }
-        }
+        let (raw_data, min_v, max_v) =
+            super::procedural::generate_procedural_matrix(width, height, 0);
 
         Ok(Self::new(
             width,
             height,
             raw_data,
-            0.0,
-            100.0,
+            min_v,
+            max_v,
             format!("Random Matrix ({}x{})", width, height),
             1,
         ))
