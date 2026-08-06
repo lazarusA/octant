@@ -9,9 +9,15 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
         return;
     }
 
+    let x_offset = if app.show_variables_overlay && app.variables_overlay_width > 0.0 {
+        app.variables_overlay_width + 16.0
+    } else {
+        8.0
+    };
+
     let area_resp = egui::Area::new(egui::Id::new("octant_settings_area"))
         .fixed_pos(egui::pos2(
-            canvas_rect.left() + 8.0,
+            canvas_rect.left() + x_offset,
             canvas_rect.top() + 8.0,
         ))
         .order(egui::Order::Foreground)

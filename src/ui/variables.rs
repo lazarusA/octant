@@ -1,87 +1,142 @@
 use crate::app::OctantApp;
 
-pub fn show_variables_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let menu_title = if app.is_loading {
-        "📊 Variables (⏳ Loading...)".to_string()
-    } else if let Some(metadata) = &app.active_dataset_metadata {
-        if let Some(var) = metadata.variables.get(app.selected_variable_idx) {
-            format!("📊 Variables ({})", var.name)
-        } else {
-            "📊 Variables (Empty)".to_string()
-        }
-    } else {
-        "📊 Variables (Not Loaded)".to_string()
-    };
+pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
+    if !app.show_variables_overlay {
+        return;
+    }
 
-    ui.menu_button(menu_title, |ui| {
-        let screen_size = ui.ctx().input(|i| i.viewport_rect()).size();
-        let target_width = (screen_size.x * 0.28).clamp(280.0, 480.0);
-        let max_height = (screen_size.y * 0.65).clamp(250.0, 750.0);
+    let screen_size = ctx.input(|i| i.viewport_rect().size());
 
-        ui.set_min_width(target_width);
+    let width = (screen_size.x * 0.28).clamp(280.0, 480.0);
+    let max_height = (screen_size.y * 0.65).clamp(250.0, 750.0);
 
-        egui::ScrollArea::vertical()
-            .max_height(max_height)
-            .show(ui, |ui| {
-                ui.label(egui::RichText::new("Dataset Variables").strong());
-                ui.small("Select a variable to open the Right Control Panel with sliders and plot button.");
-                ui.separator();
+    app.variables_overlay_width = width;
 
-                if app.is_loading {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(10.0);
-                        ui.spinner();
-                        ui.label(egui::RichText::new("Inspecting store metadata in background...").italics());
-                        ui.add_space(10.0);
-                    });
-                } else if let Some(metadata) = &app.active_dataset_metadata {
-                    if !metadata.variables.is_empty() {
-                        for (idx, var_info) in metadata.variables.iter().enumerate() {
-                            let is_selected = app.selected_variable_idx == idx;
+    let area_resp = egui::Area::new(egui::Id::new("octant_variables_area"))
+        .fixed_pos(egui::pos2(
+            canvas_rect.left() + 8.0,
+            canvas_rect.top() + 8.0,
+        ))
+        .order(egui::Order::Foreground)
+        .show(ctx, |ui| {
+            egui::Frame::popup(ui.style()).show(ui, |ui| {
+                ui.set_width(width);
 
-                            let label_text = if let Some(units) = &var_info.units {
-                                format!("{}  [{}] ({})", var_info.name, var_info.data_type, units)
-                            } else {
-                                format!("{}  [{}]", var_info.name, var_info.data_type)
-                            };
-
-                            if ui.selectable_label(is_selected, egui::RichText::new(label_text).strong()).clicked() {
-                                app.selected_variable_idx = idx;
-                                app.selected_dim_indices = vec![0; var_info.shape.len()];
-                                app.selected_dim_ranges = var_info.shape.iter().map(|&s| (0, (s as usize).saturating_sub(1))).collect();
-                                app.show_variable_controls = true;
-                                // If the variable is a line plot, set the line plot all series to false and the line profile dim index and slice index to 0
-                                if var_info.shape.len() <= 1 {
-                                    app.line_plot_all_series = false;
-                                    app.line_profile_dim_idx = 0;
-                                    app.line_profile_slice_idx = 0;
-                                }
-                                ui.close();
-
-                            }
-                        }
-                    } else {
-                        ui.vertical_centered(|ui| {
-                            ui.add_space(10.0);
-                            ui.label("No variables found in this dataset store.");
-                            ui.add_space(6.0);
-                            if ui.button("🔍 Refresh Store Metadata").clicked() {
-                                app.inspect_active_store();
-                            }
-                            ui.add_space(10.0);
+                egui::CollapsingHeader::new("📊 Variables")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("🔍");
+                            ui.text_edit_singleline(&mut app.variable_search);
                         });
-                    }
-                } else {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(10.0);
-                        ui.label("No store metadata loaded yet.");
-                        ui.add_space(6.0);
-                        if ui.button("🔍 Fetch / Load Store Metadata").clicked() {
-                            app.inspect_active_store();
-                        }
-                        ui.add_space(10.0);
+                        egui::ScrollArea::vertical()
+                            .max_height(max_height)
+                            .min_scrolled_height(max_height)
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| {
+                                if app.is_loading {
+                                    ui.vertical_centered(|ui| {
+                                        ui.add_space(10.0);
+                                        ui.spinner();
+
+                                        ui.label(
+                                            egui::RichText::new(
+                                                "Inspecting store metadata in background...",
+                                            )
+                                            .italics(),
+                                        );
+
+                                        ui.add_space(10.0);
+                                    });
+
+                                    return;
+                                }
+
+                                let Some(metadata) = &app.active_dataset_metadata else {
+                                    ui.vertical_centered(|ui| {
+                                        ui.add_space(10.0);
+
+                                        ui.label("No store metadata loaded yet.");
+
+                                        ui.add_space(6.0);
+
+                                        if ui.button("🔍 Fetch / Load Store Metadata").clicked() {
+                                            app.inspect_active_store();
+                                        }
+
+                                        ui.add_space(10.0);
+                                    });
+
+                                    return;
+                                };
+
+                                if metadata.variables.is_empty() {
+                                    ui.vertical_centered(|ui| {
+                                        ui.add_space(10.0);
+
+                                        ui.label("No variables found in this dataset store.");
+
+                                        ui.add_space(6.0);
+
+                                        if ui.button("🔍 Refresh Store Metadata").clicked() {
+                                            app.inspect_active_store();
+                                        }
+
+                                        ui.add_space(10.0);
+                                    });
+
+                                    return;
+                                }
+
+                                let search = app.variable_search.to_lowercase();
+
+                                for (idx, var_info) in metadata.variables.iter().enumerate() {
+                                    if !search.is_empty()
+                                        && !var_info.name.to_lowercase().contains(&search)
+                                    {
+                                        continue;
+                                    }
+
+                                    let is_selected = app.selected_variable_idx == idx;
+
+                                    let label_text = if let Some(units) = &var_info.units {
+                                        format!(
+                                            "{}  [{}] ({})",
+                                            var_info.name, var_info.data_type, units
+                                        )
+                                    } else {
+                                        format!("{}  [{}]", var_info.name, var_info.data_type)
+                                    };
+
+                                    if ui
+                                        .selectable_label(
+                                            is_selected,
+                                            egui::RichText::new(label_text).strong(),
+                                        )
+                                        .clicked()
+                                    {
+                                        app.selected_variable_idx = idx;
+
+                                        app.selected_dim_indices = vec![0; var_info.shape.len()];
+
+                                        app.selected_dim_ranges = var_info
+                                            .shape
+                                            .iter()
+                                            .map(|&s| (0, (s as usize).saturating_sub(1)))
+                                            .collect();
+
+                                        app.show_variable_controls = true;
+
+                                        if var_info.shape.len() <= 1 {
+                                            app.line_plot_all_series = false;
+                                            app.line_profile_dim_idx = 0;
+                                            app.line_profile_slice_idx = 0;
+                                        }
+                                    }
+                                }
+                            });
                     });
-                }
             });
-    });
+        });
+    app.variables_overlay_width = area_resp.response.rect.width();
 }
