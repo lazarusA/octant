@@ -46,7 +46,7 @@ impl DataStore for ZarrLocalStore {
                 .iter()
                 .flat_map(|v| v.dimension_names.clone())
                 .collect();
-            let coords = crate::utils::zarr::fetch_all_dimension_coordinates(
+            let coords = crate::utils::fetch_all_dimension_coordinates(
                 store_arc,
                 &dim_names,
                 Some(&store_path_str),
@@ -79,21 +79,16 @@ impl DataStore for ZarrLocalStore {
 
         // Fallback procedural matrix if array slice read fails
         let (width, height) = (64, 64);
-        let mut raw_data = Vec::with_capacity(width * height);
-        for y in 0..height {
-            for x in 0..width {
-                let val = (((x * 17 + y * 31 + timestep * 13) % 100) as f32).clamp(0.0, 100.0);
-                raw_data.push(val);
-            }
-        }
+        let (raw_data, min_val, max_val) =
+            crate::data::procedural::generate_procedural_matrix(width, height, timestep);
 
         Ok(MatrixSlice {
             variable_name: variable.to_string(),
             width,
             height,
             values: raw_data,
-            min_val: 0.0,
-            max_val: 100.0,
+            min_val,
+            max_val,
             shape: vec![height as u64, width as u64],
             current_timestep: timestep,
             max_timesteps: 1,

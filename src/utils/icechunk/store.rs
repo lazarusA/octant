@@ -1,39 +1,14 @@
+use crate::utils::executor::{TokioBlockOn, get_shared_tokio_rt};
+use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock, RwLock};
 use zarrs::storage::ReadableWritableListableStorage;
-use zarrs::storage::storage_adapter::async_to_sync::{
-    AsyncToSyncBlockOn, AsyncToSyncStorageAdapter,
-};
+use zarrs::storage::storage_adapter::async_to_sync::AsyncToSyncStorageAdapter;
 use zarrs_icechunk::AsyncIcechunkStore;
-
-struct TokioBlockOn(Arc<tokio::runtime::Runtime>);
-
-impl AsyncToSyncBlockOn for TokioBlockOn {
-    fn block_on<F: core::future::Future>(&self, future: F) -> F::Output {
-        self.0.block_on(future)
-    }
-}
-
-use std::collections::HashMap;
-use std::sync::{OnceLock, RwLock};
 
 static ICECHUNK_STORE_CACHE: OnceLock<RwLock<HashMap<String, ReadableWritableListableStorage>>> =
     OnceLock::new();
-static SHARED_TOKIO_RT: OnceLock<Arc<tokio::runtime::Runtime>> = OnceLock::new();
-
-fn get_shared_tokio_rt() -> Arc<tokio::runtime::Runtime> {
-    SHARED_TOKIO_RT
-        .get_or_init(|| {
-            Arc::new(
-                tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .expect("Failed to create shared Tokio runtime"),
-            )
-        })
-        .clone()
-}
 
 /// Helper function to build a synchronous Zarr storage adapter over an Icechunk repository.
 /// By default, opens a readonly session for the "main" branch. Caches stores by URL location.
@@ -108,7 +83,6 @@ fn parse_s3_or_http_url(
     let path_parts = &parts[1..];
 
     if host.contains(".s3.") && host.ends_with(".amazonaws.com") {
-        // E.g. dynamical-noaa-hrrr.s3.us-west-2.amazonaws.com
         let sub_parts: Vec<&str> = host
             .trim_end_matches(".amazonaws.com")
             .split(".s3.")
@@ -135,7 +109,6 @@ fn parse_s3_or_http_url(
         };
         Ok((bucket, prefix, region, None))
     } else if host == "data.source.coop" {
-        // E.g. https://data.source.coop/e4drr-project/observations/chirps_daily_icechunk
         if path_parts.is_empty() {
             return Err("Missing bucket in source.coop URL".into());
         }

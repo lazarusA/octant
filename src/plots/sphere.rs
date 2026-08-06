@@ -330,6 +330,12 @@ impl SphereRenderer {
     }
 }
 
+impl super::common::PlotRenderer for SphereRenderer {
+    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
+        self.update_data(queue, values);
+    }
+}
+
 pub struct SphereCallback {
     pub renderer: Arc<SphereRenderer>,
     pub color_params: super::common::PlotColorParams,

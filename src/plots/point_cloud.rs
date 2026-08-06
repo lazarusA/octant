@@ -190,8 +190,8 @@ impl PointCloudRenderer {
         }
     }
 
-    pub fn update_data(&mut self, queue: &wgpu::Queue, data: &[f32]) {
-        if !data.is_empty() && data.len() as u32 == self.instance_count {
+    pub fn update_data(&self, queue: &wgpu::Queue, data: &[f32]) {
+        if !data.is_empty() {
             queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(data));
         }
     }
@@ -229,6 +229,12 @@ impl PointCloudRenderer {
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+    }
+}
+
+impl super::common::PlotRenderer for PointCloudRenderer {
+    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
+        PointCloudRenderer::update_data(self, queue, values);
     }
 }
 

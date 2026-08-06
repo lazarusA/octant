@@ -5,18 +5,6 @@
 /// 2. Coordinate direction:
 ///    - If Y/latitude ascends from South (-90) to North (+90), flips rows vertically (y-flip) so North renders at top of map.
 ///    - If X/longitude descends from East to West, flips columns horizontally (x-flip) so East renders on the right.
-pub fn check_and_orient_axes(
-    raw_values: Vec<f32>,
-    in_width: usize,
-    in_height: usize,
-    dim_names: &[String],
-    attributes: &serde_json::Map<String, serde_json::Value>,
-) -> (Vec<f32>, usize, usize) {
-    check_and_orient_axes_with_coords(
-        raw_values, in_width, in_height, dim_names, attributes, None, None,
-    )
-}
-
 pub fn check_and_orient_axes_with_coords(
     raw_values: Vec<f32>,
     in_width: usize,

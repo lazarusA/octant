@@ -1,4 +1,3 @@
-pub mod block;
 pub mod common;
 pub mod heatmap;
 pub mod point_cloud;
@@ -6,7 +5,7 @@ pub mod sphere;
 pub mod surface;
 pub mod volume;
 
-pub use block::BlockPlot;
+pub use common::PlotRenderer;
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
 pub use point_cloud::{PointCloudCallback, PointCloudRenderer};
 pub use sphere::{SphereCallback, SpherePlot, SphereRenderer};
