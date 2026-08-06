@@ -1,9 +1,9 @@
 use crate::cache::{SliceCacheKey, SliceLruCache, SlicePrefetcher};
 use crate::data::matrix_data::MatrixData;
 use crate::plots::{
-    MatrixCallback, MatrixRenderer, PlotType, PointCloudCallback, PointCloudRenderer,
-    SphereCallback, SphereRenderer, SurfaceCallback, SurfaceRenderer, VolumeCallback,
-    VolumeRenderer,
+    LineCallback, LineRenderer, MatrixCallback, MatrixRenderer, PlotType, PointCloudCallback,
+    PointCloudRenderer, SphereCallback, SphereRenderer, SurfaceCallback, SurfaceRenderer,
+    VolumeCallback, VolumeRenderer,
 };
 use crate::stores::{
     DataStore, DatasetMetadata, VariableInfo, icechunk_local::IcechunkLocalStore,
@@ -33,6 +33,7 @@ pub struct OctantApp {
     pub is_loading: bool,
     pub matrix_data: Option<MatrixData>,
     pub renderer: Option<Arc<MatrixRenderer>>,
+    pub line_renderer: Option<Arc<LineRenderer>>,
     pub sphere_renderer: Option<Arc<SphereRenderer>>,
     pub surface_renderer: Option<Arc<SurfaceRenderer>>,
     pub volume_renderer: Option<Arc<VolumeRenderer>>,
@@ -53,6 +54,9 @@ pub struct OctantApp {
     pub volume_cmin: f32,
     pub volume_cmax: f32,
     pub point_cloud_size: f32,
+    pub line_profile_dim_idx: usize,
+    pub line_profile_slice_idx: usize,
+    pub line_plot_all_series: bool,
     pub show_colorbar: bool,
     pub is_categorical: bool,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
@@ -103,12 +107,27 @@ pub struct OctantApp {
     pub scale_param: f32,
 }
 
+#[derive(Debug, Clone)]
+pub enum AppAction {
+    InspectActiveStore,
+    SelectStore { kind: StoreKind, target: String },
+    SelectVariable(usize),
+    SetTimestep(usize),
+    SetPlotType(PlotType),
+    SetColormap(u32),
+    SetLineProfileDim(usize),
+    SetLineProfileSlice(usize),
+    ToggleLineAllSeries,
+    TogglePlayback,
+    UpdateColorBounds { min: f32, max: f32 },
+}
+
 impl OctantApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let wgpu_render_state = cc.wgpu_render_state.clone();
         let default_cache_mb = 1024; // Default 1GB cache size limit
 
-        let app = Self {
+        Self {
             selected_store_kind: StoreKind::RemoteZarr,
             store_target_input: "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string(),
             active_dataset_metadata: None,
@@ -121,6 +140,7 @@ impl OctantApp {
             is_loading: false,
             matrix_data: None,
             renderer: None,
+            line_renderer: None,
             sphere_renderer: None,
             surface_renderer: None,
             volume_renderer: None,
@@ -141,6 +161,9 @@ impl OctantApp {
             volume_cmin: 5.0,
             volume_cmax: 100.0,
             point_cloud_size: 0.02,
+            line_profile_dim_idx: 0,
+            line_profile_slice_idx: 0,
+            line_plot_all_series: false,
             show_colorbar: true,
             is_categorical: false,
             wgpu_render_state,
@@ -168,7 +191,6 @@ impl OctantApp {
             show_bottom_bar: true,
             settings_overlay_width: 0.0,
 
-
             theme_preference: egui::ThemePreference::System,
             selected_dim_indices: Vec::new(),
             selected_dim_ranges: Vec::new(),
@@ -186,10 +208,85 @@ impl OctantApp {
             global_data_max: f32::NEG_INFINITY,
             active_scale_type: 0,
             scale_param: 1.0,
-        };
+        }
+    }
 
-        // App starts clean without auto-fetching. User clicks "Fetch Store Metadata" when ready.
-        app
+    /// Action dispatch handler for event-driven app state mutations.
+    pub fn dispatch(&mut self, action: AppAction) {
+        match action {
+            AppAction::InspectActiveStore => self.inspect_active_store(),
+            AppAction::SelectStore { kind, target } => {
+                self.selected_store_kind = kind;
+                self.store_target_input = target;
+                self.inspect_active_store();
+            }
+            AppAction::SelectVariable(idx) => {
+                self.selected_variable_idx = idx;
+                self.load_selected_variable_slice();
+            }
+            AppAction::SetTimestep(step) => {
+                self.current_timestep = step;
+                self.load_selected_variable_slice();
+            }
+            AppAction::SetPlotType(plot_type) => {
+                self.active_plot_type = plot_type;
+            }
+            AppAction::SetColormap(cmap) => {
+                self.active_colormap = cmap;
+            }
+            AppAction::SetLineProfileDim(dim_idx) => {
+                self.line_profile_dim_idx = dim_idx;
+            }
+            AppAction::SetLineProfileSlice(slice_idx) => {
+                self.line_profile_slice_idx = slice_idx;
+            }
+            AppAction::ToggleLineAllSeries => {
+                self.line_plot_all_series = !self.line_plot_all_series;
+            }
+            AppAction::TogglePlayback => {
+                self.is_playing = !self.is_playing;
+            }
+            AppAction::UpdateColorBounds { min, max } => {
+                self.color_range_min = min;
+                self.color_range_max = max;
+            }
+        }
+    }
+
+    fn get_line_profile_payload(&self) -> (Vec<f32>, u32, u32) {
+        if let Some(matrix) = &self.matrix_data {
+            let (profile_length, line_count, slice_idx) = if self.line_profile_dim_idx == 0 {
+                (
+                    matrix.width,
+                    matrix.height,
+                    self.line_profile_slice_idx
+                        .min(matrix.height.saturating_sub(1)),
+                )
+            } else {
+                (
+                    matrix.height,
+                    matrix.width,
+                    self.line_profile_slice_idx
+                        .min(matrix.width.saturating_sub(1)),
+                )
+            };
+
+            if self.line_plot_all_series {
+                let mut payload = Vec::with_capacity(profile_length.max(1) * line_count.max(1));
+                for idx in 0..line_count {
+                    payload.extend(matrix.extract_1d_line_profile(self.line_profile_dim_idx, idx));
+                }
+                (payload, profile_length as u32, line_count as u32)
+            } else {
+                (
+                    matrix.extract_1d_line_profile(self.line_profile_dim_idx, slice_idx),
+                    profile_length as u32,
+                    1,
+                )
+            }
+        } else {
+            (Vec::new(), 0, 0)
+        }
     }
 
     pub fn inspect_active_store(&mut self) {
@@ -394,6 +491,12 @@ impl OctantApp {
     }
 
     pub fn rebuild_pipeline_with_matrix_data(&mut self, data: MatrixData) {
+        // If the data is a line plot, set the line plot all series to false and the line profile dim index and slice index to 0
+        if data.height == 1 {
+            self.line_plot_all_series = false;
+            self.line_profile_dim_idx = 0;
+            self.line_profile_slice_idx = 0;
+        }
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
             let same_dimensions = self
                 .matrix_data
@@ -402,6 +505,7 @@ impl OctantApp {
 
             if same_dimensions
                 && self.renderer.is_some()
+                && self.line_renderer.is_some()
                 && self.sphere_renderer.is_some()
                 && self.surface_renderer.is_some()
                 && self.volume_renderer.is_some()
@@ -410,24 +514,30 @@ impl OctantApp {
                 if let Some(renderer) = &self.renderer {
                     renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
+                if let Some(line_renderer) = &self.line_renderer {
+                    line_renderer.update_data(&wgpu_render_state.queue, &data.values);
+                }
                 if let Some(sphere_renderer) = &self.sphere_renderer {
                     sphere_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
                 if let Some(surface_renderer) = &self.surface_renderer {
                     surface_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
-                if let Some(volume_renderer) = &mut self.volume_renderer
-                    && let Some(r) = Arc::get_mut(volume_renderer)
-                {
-                    r.update_data(&wgpu_render_state.queue, &data.values)
+                if let Some(volume_renderer) = &self.volume_renderer {
+                    volume_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
-                if let Some(point_cloud_renderer) = &mut self.point_cloud_renderer
-                    && let Some(r) = Arc::get_mut(point_cloud_renderer)
-                {
-                    r.update_data(&wgpu_render_state.queue, &data.values)
+                if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
+                    point_cloud_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
             } else {
                 let renderer = MatrixRenderer::new(
+                    &wgpu_render_state.device,
+                    wgpu_render_state.target_format,
+                    &data.values,
+                    data.width,
+                    data.height,
+                );
+                let line_renderer = LineRenderer::new(
                     &wgpu_render_state.device,
                     wgpu_render_state.target_format,
                     &data.values,
@@ -463,10 +573,17 @@ impl OctantApp {
                     data.height as u32,
                 );
                 self.renderer = Some(Arc::new(renderer));
+                self.line_renderer = Some(Arc::new(line_renderer));
                 self.sphere_renderer = Some(Arc::new(sphere_renderer));
                 self.surface_renderer = Some(Arc::new(surface_renderer));
                 self.volume_renderer = Some(Arc::new(volume_renderer));
                 self.point_cloud_renderer = Some(Arc::new(point_cloud_renderer));
+
+                if data.height == 1 {
+                    self.active_plot_type = PlotType::Line;
+                } else if self.active_plot_type == PlotType::Line {
+                    self.active_plot_type = PlotType::Heatmap;
+                }
             }
         }
 
@@ -581,7 +698,6 @@ impl eframe::App for OctantApp {
 
                         self.active_dataset_metadata = Some(metadata);
                         self.selected_variable_idx = 0;
-                        self.load_selected_variable_slice();
                     }
                     Err(err) => {
                         self.status_message = format!("Store inspect error: {}", err);
@@ -731,6 +847,26 @@ impl eframe::App for OctantApp {
             }
 
             match self.active_plot_type {
+                PlotType::Line => {
+                    if let Some(line_renderer) = &self.line_renderer {
+                        let color_params = self.get_color_params();
+                        let (profile_values, profile_length, line_count) =
+                            self.get_line_profile_payload();
+                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                            plot_rect,
+                            LineCallback {
+                                renderer: line_renderer.clone(),
+                                color_params,
+                                rect: plot_rect,
+                                profile_values,
+                                profile_length,
+                                line_count,
+                                line_mode: if self.line_plot_all_series { 1 } else { 0 },
+                            },
+                        );
+                        ui.painter().add(callback);
+                    }
+                }
                 PlotType::Sphere => {
                     if let Some(sphere_renderer) = &self.sphere_renderer {
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(

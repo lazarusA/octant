@@ -91,14 +91,26 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.separator();
 
         // 6. Timestep timeline slider & Dimension-Agnostic Axis Reading
-        let active_var_info = app
-            .active_dataset_metadata
-            .as_ref()
-            .and_then(|m| m.variables.get(app.selected_variable_idx));
-
-        let active_anim_dim = active_var_info
-            .and_then(|v| v.dimension_names.first().cloned())
-            .unwrap_or_else(|| "time".to_string());
+        let (active_anim_dim, active_dim_name, active_units, time_start, temp_res) =
+            if let Some(active_var_info) = app
+                .active_dataset_metadata
+                .as_ref()
+                .and_then(|m| m.variables.get(app.selected_variable_idx))
+            {
+                (
+                    active_var_info
+                        .dimension_names
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| "time".to_string()),
+                    active_var_info.dimension_names.first().cloned(),
+                    active_var_info.units.clone(),
+                    active_var_info.time_coverage_start.clone(),
+                    active_var_info.temporal_resolution.clone(),
+                )
+            } else {
+                ("time".to_string(), None, None, None, None)
+            };
 
         let direct_coord_label = app
             .active_dataset_metadata
@@ -109,30 +121,73 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         let formatted_axis = if let Some(coord_str) = direct_coord_label {
             coord_str
         } else {
-            let active_dim_name = active_var_info.and_then(|v| v.dimension_names.first().cloned());
-            let active_units = active_var_info.and_then(|v| v.units.as_deref());
-            let time_start = active_var_info.and_then(|v| v.time_coverage_start.as_deref());
-            let temp_res = active_var_info.and_then(|v| v.temporal_resolution.as_deref());
-
             crate::utils::units::format_axis_value(
                 app.current_timestep,
                 max_steps,
                 active_dim_name.as_deref(),
-                active_units,
-                time_start,
-                temp_res,
+                active_units.as_deref(),
+                time_start.as_deref(),
+                temp_res.as_deref(),
                 Some(&app.store_target_input),
             )
         };
 
-        let slider_max = max_steps.saturating_sub(1);
+        let start_date_str = if let Some(coord_str) = app
+            .active_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
+            .and_then(|coords| coords.first().cloned())
+        {
+            coord_str
+        } else {
+            crate::utils::units::format_axis_value(
+                0,
+                max_steps,
+                active_dim_name.as_deref(),
+                active_units.as_deref(),
+                time_start.as_deref(),
+                temp_res.as_deref(),
+                Some(&app.store_target_input),
+            )
+        };
+
+        let end_date_str = if let Some(coord_str) = app
+            .active_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
+            .and_then(|coords| coords.last().cloned())
+        {
+            coord_str
+        } else {
+            crate::utils::units::format_axis_value(
+                max_steps.saturating_sub(1),
+                max_steps,
+                active_dim_name.as_deref(),
+                active_units.as_deref(),
+                time_start.as_deref(),
+                temp_res.as_deref(),
+                Some(&app.store_target_input),
+            )
+        };
+
+        let step_size_str = temp_res.unwrap_or_else(|| "Step: 1".to_string());
+
         ui.label(
-            egui::RichText::new(format!("📅 {}", formatted_axis))
-                .small()
-                .monospace()
-                .strong(),
+            egui::RichText::new(format!(
+                "📅 {} | Current: {}",
+                start_date_str, formatted_axis
+            ))
+            .small()
+            .monospace()
+            .strong(),
         )
-        .on_hover_text(format!("Step {} / {}", app.current_timestep + 1, max_steps));
+        .on_hover_text(format!(
+            "Start: {} | End: {} | {}",
+            start_date_str, end_date_str, step_size_str
+        ));
+
+        let slider_max = max_steps.saturating_sub(1);
+        ui.small(format!("[{}]", start_date_str));
 
         let slider_res = ui.add(
             egui::Slider::new(&mut app.current_timestep, 0..=slider_max)
@@ -142,6 +197,9 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         if slider_res.drag_stopped() || (slider_res.changed() && !app.is_playing) {
             app.load_selected_variable_slice();
         }
+
+        ui.small(format!("⏱ {}", step_size_str));
+        ui.small(format!("[{}]", end_date_str));
 
         ui.separator();
 

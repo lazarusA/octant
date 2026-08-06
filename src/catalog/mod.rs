@@ -288,3 +288,21 @@ pub fn get_catalog_entries(filter: CatalogCategoryFilter) -> Vec<&'static Catalo
         CatalogCategoryFilter::Icechunk => ICECHUNK_CATALOG.iter().collect(),
     }
 }
+
+/// Standard interface for dataset catalog providers (static lists, STAC APIs, JSON manifests).
+pub trait CatalogProvider: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn fetch_entries(&self, filter: CatalogCategoryFilter) -> Vec<&'static CatalogEntry>;
+}
+
+pub struct StaticCatalogProvider;
+
+impl CatalogProvider for StaticCatalogProvider {
+    fn name(&self) -> &'static str {
+        "Static Built-in Catalog"
+    }
+
+    fn fetch_entries(&self, filter: CatalogCategoryFilter) -> Vec<&'static CatalogEntry> {
+        get_catalog_entries(filter)
+    }
+}

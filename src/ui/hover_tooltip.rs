@@ -195,7 +195,73 @@ pub fn show_hover_tooltip(
         dim_info_str = format!("y: {}, x: {}", py, px);
     }
 
-    // 5. Draw Subtle Reticle Dot & Crosshair on 2D Canvas
+    // 5. Draw Glowing Reticle Marker Dot & Guide Line on 1D Line Plot
+    if app.active_plot_type == PlotType::Line {
+        let n = matrix.values.len();
+        if n > 0 {
+            let sample_idx = (norm_x * (n as f32 - 1.0)).round() as usize;
+            let sample_idx = sample_idx.min(n - 1);
+            let val = matrix.values[sample_idx];
+
+            let min_val = matrix.min_val;
+            let max_val = matrix.max_val;
+            let range = (max_val - min_val).max(1e-6);
+
+            let padding_x = (40.0 / rect.width().max(1.0)).clamp(0.04, 0.15);
+            let padding_y = (35.0 / rect.height().max(1.0)).clamp(0.06, 0.20);
+
+            let inner_w = rect.width() * (1.0 - 2.0 * padding_x);
+            let inner_h = rect.height() * (1.0 - 2.0 * padding_y);
+
+            let start_x = rect.min.x + rect.width() * padding_x;
+            let start_y = rect.min.y + rect.height() * padding_y;
+
+            let norm_x_pos = if n > 1 {
+                sample_idx as f32 / (n - 1) as f32
+            } else {
+                0.5
+            };
+            let norm_y_pos = if val.is_nan() {
+                0.0
+            } else {
+                ((val - min_val) / range).clamp(0.0, 1.0)
+            };
+
+            let dot_x = start_x + norm_x_pos * inner_w;
+            let dot_y = start_y + (1.0 - norm_y_pos) * inner_h;
+            let dot_pos = Pos2::new(dot_x, dot_y);
+
+            let painter = ui.painter();
+
+            // Vertical cyan guideline from bottom to curve point
+            painter.line_segment(
+                [Pos2::new(dot_x, rect.max.y - 8.0), dot_pos],
+                Stroke::new(1.2, Color32::from_rgba_unmultiplied(0, 210, 255, 120)),
+            );
+
+            // Outer soft glowing aura halo
+            painter.circle_filled(
+                dot_pos,
+                11.0,
+                Color32::from_rgba_unmultiplied(0, 200, 255, 45),
+            );
+            painter.circle_filled(
+                dot_pos,
+                7.0,
+                Color32::from_rgba_unmultiplied(0, 220, 255, 90),
+            );
+            // Inner cyan stroke ring
+            painter.circle_stroke(
+                dot_pos,
+                5.0,
+                Stroke::new(2.0, Color32::from_rgb(0, 240, 255)),
+            );
+            // Solid bright white center core
+            painter.circle_filled(dot_pos, 3.0, Color32::WHITE);
+        }
+    }
+
+    // 6. Draw Subtle Reticle Dot & Crosshair on 2D Canvas
     if app.active_plot_type == PlotType::Heatmap {
         let px_center_x = rect.min.x + ((px as f32 + 0.5) / matrix.width as f32) * rect.width();
         let px_center_y = rect.min.y + ((py as f32 + 0.5) / matrix.height as f32) * rect.height();

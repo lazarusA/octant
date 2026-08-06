@@ -45,6 +45,11 @@ impl Default for PlotColorParams {
     }
 }
 
+/// Standard trait implemented by all Octant WGPU plot renderers.
+pub trait PlotRenderer: Send + Sync {
+    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]);
+}
+
 /// Setup viewport and scissor rect on a wgpu RenderPass based on egui Rect and pixels_per_point.
 #[inline]
 pub fn setup_viewport_and_scissor(
