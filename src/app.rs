@@ -54,6 +54,9 @@ pub struct OctantApp {
     pub volume_cmin: f32,
     pub volume_cmax: f32,
     pub point_cloud_size: f32,
+    pub line_profile_dim_idx: usize,
+    pub line_profile_slice_idx: usize,
+    pub line_plot_all_series: bool,
     pub show_colorbar: bool,
     pub is_categorical: bool,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
@@ -112,6 +115,9 @@ pub enum AppAction {
     SetTimestep(usize),
     SetPlotType(PlotType),
     SetColormap(u32),
+    SetLineProfileDim(usize),
+    SetLineProfileSlice(usize),
+    ToggleLineAllSeries,
     TogglePlayback,
     UpdateColorBounds { min: f32, max: f32 },
 }
@@ -155,6 +161,9 @@ impl OctantApp {
             volume_cmin: 5.0,
             volume_cmax: 100.0,
             point_cloud_size: 0.02,
+            line_profile_dim_idx: 0,
+            line_profile_slice_idx: 0,
+            line_plot_all_series: false,
             show_colorbar: true,
             is_categorical: false,
             wgpu_render_state,
@@ -225,6 +234,15 @@ impl OctantApp {
             AppAction::SetColormap(cmap) => {
                 self.active_colormap = cmap;
             }
+            AppAction::SetLineProfileDim(dim_idx) => {
+                self.line_profile_dim_idx = dim_idx;
+            }
+            AppAction::SetLineProfileSlice(slice_idx) => {
+                self.line_profile_slice_idx = slice_idx;
+            }
+            AppAction::ToggleLineAllSeries => {
+                self.line_plot_all_series = !self.line_plot_all_series;
+            }
             AppAction::TogglePlayback => {
                 self.is_playing = !self.is_playing;
             }
@@ -232,6 +250,42 @@ impl OctantApp {
                 self.color_range_min = min;
                 self.color_range_max = max;
             }
+        }
+    }
+
+    fn get_line_profile_payload(&self) -> (Vec<f32>, u32, u32) {
+        if let Some(matrix) = &self.matrix_data {
+            let (profile_length, line_count, slice_idx) = if self.line_profile_dim_idx == 0 {
+                (
+                    matrix.width,
+                    matrix.height,
+                    self.line_profile_slice_idx
+                        .min(matrix.height.saturating_sub(1)),
+                )
+            } else {
+                (
+                    matrix.height,
+                    matrix.width,
+                    self.line_profile_slice_idx
+                        .min(matrix.width.saturating_sub(1)),
+                )
+            };
+
+            if self.line_plot_all_series {
+                let mut payload = Vec::with_capacity(profile_length.max(1) * line_count.max(1));
+                for idx in 0..line_count {
+                    payload.extend(matrix.extract_1d_line_profile(self.line_profile_dim_idx, idx));
+                }
+                (payload, profile_length as u32, line_count as u32)
+            } else {
+                (
+                    matrix.extract_1d_line_profile(self.line_profile_dim_idx, slice_idx),
+                    profile_length as u32,
+                    1,
+                )
+            }
+        } else {
+            (Vec::new(), 0, 0)
         }
     }
 
@@ -790,12 +844,19 @@ impl eframe::App for OctantApp {
             match self.active_plot_type {
                 PlotType::Line => {
                     if let Some(line_renderer) = &self.line_renderer {
+                        let color_params = self.get_color_params();
+                        let (profile_values, profile_length, line_count) =
+                            self.get_line_profile_payload();
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
                             plot_rect,
                             LineCallback {
                                 renderer: line_renderer.clone(),
-                                color_params: self.get_color_params(),
+                                color_params,
                                 rect: plot_rect,
+                                profile_values,
+                                profile_length,
+                                line_count,
+                                line_mode: if self.line_plot_all_series { 1 } else { 0 },
                             },
                         );
                         ui.painter().add(callback);

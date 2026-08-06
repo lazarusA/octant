@@ -1,6 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use eframe::egui;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -8,6 +9,7 @@ use wgpu::util::DeviceExt;
 pub struct LineVertex {
     pub position: [f32; 2],
     pub cell_index: u32,
+    pub line_index: u32,
 }
 
 impl LineVertex {
@@ -26,6 +28,11 @@ impl LineVertex {
                     shader_location: 1,
                     format: wgpu::VertexFormat::Uint32,
                 },
+                wgpu::VertexAttribute {
+                    offset: 12,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Uint32,
+                },
             ],
         }
     }
@@ -36,7 +43,14 @@ impl LineVertex {
 pub struct LineUniforms {
     pub viewport_padding: [f32; 2],
     pub line_thickness: f32,
-    pub _pad0: u32,
+    pub profile_length: u32,
+    pub line_count: u32,
+    pub line_mode: u32,
+    pub _pad1: u32,
+    pub _pad2: u32,
+    pub _pad3: u32,
+    /// WGSL aligns nested `ColorUniforms` to 16 bytes (offset 48).
+    pub _color_align_pad: [u32; 3],
     pub color: super::common::PlotColorParams,
 }
 
@@ -46,7 +60,7 @@ pub struct LineRenderer {
     data_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    num_vertices: u32,
+    num_vertices: AtomicU32,
 }
 
 impl LineRenderer {
@@ -78,15 +92,21 @@ impl LineRenderer {
         let initial_uniforms = LineUniforms {
             viewport_padding: [0.08, 0.12], // 8% horizontal, 12% vertical dynamic padding
             line_thickness: 2.0,
-            _pad0: 0,
+            profile_length: width.max(1) as u32,
+            line_count: height.max(1) as u32,
+            line_mode: 0,
+            _pad1: 0,
+            _pad2: 0,
+            _pad3: 0,
+            _color_align_pad: [0; 3],
             color: super::common::PlotColorParams::default(),
         };
 
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("1D Line Uniform Buffer"),
-            contents: bytemuck::bytes_of(&initial_uniforms),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let uniform_buffer = super::common::create_uniform_buffer(
+            device,
+            "1D Line Uniform Buffer",
+            &initial_uniforms,
+        );
 
         let bind_group_layout = super::common::create_uniform_storage_bind_group_layout(
             device,
@@ -138,11 +158,10 @@ impl LineRenderer {
             cache: None,
         });
 
-        let vertices = Self::build_line_vertices(&safe_data, width, height);
-
+        let initial_vertices = Self::build_line_vertices(width.max(1), height.max(1));
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("1D Line Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
+            contents: bytemuck::cast_slice(&initial_vertices),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -152,8 +171,22 @@ impl LineRenderer {
             data_buffer,
             uniform_buffer,
             bind_group,
-            num_vertices: vertices.len() as u32,
+            num_vertices: AtomicU32::new(initial_vertices.len() as u32),
         }
+    }
+
+    pub fn update_profile_geometry(
+        &self,
+        queue: &wgpu::Queue,
+        profile_length: u32,
+        line_count: u32,
+    ) {
+        let profile_length = profile_length.max(1) as usize;
+        let line_count = line_count.max(1) as usize;
+        let vertices = Self::build_line_vertices(profile_length, line_count);
+        queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
+        self.num_vertices
+            .store(vertices.len() as u32, Ordering::Relaxed);
     }
 
     pub fn update_uniforms(
@@ -162,11 +195,20 @@ impl LineRenderer {
         color: &super::common::PlotColorParams,
         padding_x: f32,
         padding_y: f32,
+        profile_length: u32,
+        line_count: u32,
+        line_mode: u32,
     ) {
         let uniforms = LineUniforms {
             viewport_padding: [padding_x.clamp(0.02, 0.2), padding_y.clamp(0.02, 0.3)],
             line_thickness: 2.5,
-            _pad0: 0,
+            profile_length: profile_length.max(1),
+            line_count: line_count.max(1),
+            line_mode,
+            _pad1: 0,
+            _pad2: 0,
+            _pad3: 0,
+            _color_align_pad: [0; 3],
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -178,26 +220,25 @@ impl LineRenderer {
         }
     }
 
-    fn build_line_vertices(values: &[f32], _width: usize, _height: usize) -> Vec<LineVertex> {
-        let n = values.len();
-        if n == 0 {
-            return Vec::new();
-        }
+    fn build_line_vertices(profile_length: usize, line_count: usize) -> Vec<LineVertex> {
+        let profile_length = profile_length.max(2);
+        let line_count = line_count.max(1);
+        let mut vertices = Vec::with_capacity(profile_length * line_count);
 
-        let count = n.max(2);
-        let mut vertices = Vec::with_capacity(count);
+        for line_idx in 0..line_count {
+            for point_idx in 0..profile_length {
+                let norm_x = if profile_length > 1 {
+                    (point_idx as f32 / (profile_length - 1) as f32) * 2.0 - 1.0
+                } else {
+                    0.0
+                };
 
-        for (i, _) in values.iter().enumerate() {
-            let norm_x = if count > 1 {
-                (i as f32 / (count - 1) as f32) * 2.0 - 1.0
-            } else {
-                0.0
-            };
-
-            vertices.push(LineVertex {
-                position: [norm_x, 0.0],
-                cell_index: i as u32,
-            });
+                vertices.push(LineVertex {
+                    position: [norm_x, 0.0],
+                    cell_index: point_idx as u32,
+                    line_index: line_idx as u32,
+                });
+            }
         }
 
         vertices
@@ -214,6 +255,10 @@ pub struct LineCallback {
     pub renderer: Arc<LineRenderer>,
     pub color_params: super::common::PlotColorParams,
     pub rect: egui::Rect,
+    pub profile_values: Vec<f32>,
+    pub profile_length: u32,
+    pub line_count: u32,
+    pub line_mode: u32,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for LineCallback {
@@ -228,8 +273,21 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         // Dynamic viewport padding computed from canvas dimensions
         let padding_x = (40.0 / self.rect.width().max(1.0)).clamp(0.04, 0.15);
         let padding_y = (35.0 / self.rect.height().max(1.0)).clamp(0.06, 0.20);
+
+        if !self.profile_values.is_empty() {
+            self.renderer.update_data(queue, &self.profile_values);
+        }
         self.renderer
-            .update_uniforms(queue, &self.color_params, padding_x, padding_y);
+            .update_profile_geometry(queue, self.profile_length, self.line_count);
+        self.renderer.update_uniforms(
+            queue,
+            &self.color_params,
+            padding_x,
+            padding_y,
+            self.profile_length,
+            self.line_count,
+            self.line_mode,
+        );
         Vec::new()
     }
 
@@ -244,6 +302,13 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-        rpass.draw(0..self.renderer.num_vertices, 0..1);
+
+        let profile_length = self.profile_length.max(2) as u32;
+        let line_count = self.line_count.max(1);
+        for line_idx in 0..line_count {
+            let start = line_idx * profile_length;
+            let end = start + profile_length;
+            rpass.draw(start..end, 0..1);
+        }
     }
 }
