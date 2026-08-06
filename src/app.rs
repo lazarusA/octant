@@ -1,9 +1,9 @@
 use crate::cache::{SliceCacheKey, SliceLruCache, SlicePrefetcher};
 use crate::data::matrix_data::MatrixData;
 use crate::plots::{
-    MatrixCallback, MatrixRenderer, PlotType, PointCloudCallback, PointCloudRenderer,
-    SphereCallback, SphereRenderer, SurfaceCallback, SurfaceRenderer, VolumeCallback,
-    VolumeRenderer,
+    LineCallback, LineRenderer, MatrixCallback, MatrixRenderer, PlotType, PointCloudCallback,
+    PointCloudRenderer, SphereCallback, SphereRenderer, SurfaceCallback, SurfaceRenderer,
+    VolumeCallback, VolumeRenderer,
 };
 use crate::stores::{
     DataStore, DatasetMetadata, VariableInfo, icechunk_local::IcechunkLocalStore,
@@ -33,6 +33,7 @@ pub struct OctantApp {
     pub is_loading: bool,
     pub matrix_data: Option<MatrixData>,
     pub renderer: Option<Arc<MatrixRenderer>>,
+    pub line_renderer: Option<Arc<LineRenderer>>,
     pub sphere_renderer: Option<Arc<SphereRenderer>>,
     pub surface_renderer: Option<Arc<SurfaceRenderer>>,
     pub volume_renderer: Option<Arc<VolumeRenderer>>,
@@ -133,6 +134,7 @@ impl OctantApp {
             is_loading: false,
             matrix_data: None,
             renderer: None,
+            line_renderer: None,
             sphere_renderer: None,
             surface_renderer: None,
             volume_renderer: None,
@@ -443,6 +445,7 @@ impl OctantApp {
 
             if same_dimensions
                 && self.renderer.is_some()
+                && self.line_renderer.is_some()
                 && self.sphere_renderer.is_some()
                 && self.surface_renderer.is_some()
                 && self.volume_renderer.is_some()
@@ -451,24 +454,30 @@ impl OctantApp {
                 if let Some(renderer) = &self.renderer {
                     renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
+                if let Some(line_renderer) = &self.line_renderer {
+                    line_renderer.update_data(&wgpu_render_state.queue, &data.values);
+                }
                 if let Some(sphere_renderer) = &self.sphere_renderer {
                     sphere_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
                 if let Some(surface_renderer) = &self.surface_renderer {
                     surface_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
-                if let Some(volume_renderer) = &mut self.volume_renderer
-                    && let Some(r) = Arc::get_mut(volume_renderer)
-                {
-                    r.update_data(&wgpu_render_state.queue, &data.values)
+                if let Some(volume_renderer) = &self.volume_renderer {
+                    volume_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
-                if let Some(point_cloud_renderer) = &mut self.point_cloud_renderer
-                    && let Some(r) = Arc::get_mut(point_cloud_renderer)
-                {
-                    r.update_data(&wgpu_render_state.queue, &data.values)
+                if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
+                    point_cloud_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
             } else {
                 let renderer = MatrixRenderer::new(
+                    &wgpu_render_state.device,
+                    wgpu_render_state.target_format,
+                    &data.values,
+                    data.width,
+                    data.height,
+                );
+                let line_renderer = LineRenderer::new(
                     &wgpu_render_state.device,
                     wgpu_render_state.target_format,
                     &data.values,
@@ -504,10 +513,17 @@ impl OctantApp {
                     data.height as u32,
                 );
                 self.renderer = Some(Arc::new(renderer));
+                self.line_renderer = Some(Arc::new(line_renderer));
                 self.sphere_renderer = Some(Arc::new(sphere_renderer));
                 self.surface_renderer = Some(Arc::new(surface_renderer));
                 self.volume_renderer = Some(Arc::new(volume_renderer));
                 self.point_cloud_renderer = Some(Arc::new(point_cloud_renderer));
+
+                if data.height == 1 {
+                    self.active_plot_type = PlotType::Line;
+                } else if self.active_plot_type == PlotType::Line {
+                    self.active_plot_type = PlotType::Heatmap;
+                }
             }
         }
 
@@ -772,6 +788,19 @@ impl eframe::App for OctantApp {
             }
 
             match self.active_plot_type {
+                PlotType::Line => {
+                    if let Some(line_renderer) = &self.line_renderer {
+                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                            plot_rect,
+                            LineCallback {
+                                renderer: line_renderer.clone(),
+                                color_params: self.get_color_params(),
+                                rect: plot_rect,
+                            },
+                        );
+                        ui.painter().add(callback);
+                    }
+                }
                 PlotType::Sphere => {
                     if let Some(sphere_renderer) = &self.sphere_renderer {
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(

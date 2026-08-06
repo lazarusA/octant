@@ -1,5 +1,6 @@
 pub mod common;
 pub mod heatmap;
+pub mod line;
 pub mod point_cloud;
 pub mod sphere;
 pub mod surface;
@@ -7,6 +8,7 @@ pub mod volume;
 
 pub use common::PlotRenderer;
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
+pub use line::{LineCallback, LineRenderer};
 pub use point_cloud::{PointCloudCallback, PointCloudRenderer};
 pub use sphere::{SphereCallback, SpherePlot, SphereRenderer};
 pub use surface::{SurfaceCallback, SurfacePlot, SurfaceRenderer};
@@ -17,6 +19,7 @@ pub use volume::{VolumeCallback, VolumeRenderer};
 pub enum PlotType {
     #[default]
     Heatmap,
+    Line,
     Surface,
     Block,
     Volume,
@@ -28,6 +31,7 @@ impl PlotType {
     pub fn display_name(&self) -> &'static str {
         match self {
             PlotType::Heatmap => "2D Flatmap Heatmap",
+            PlotType::Line => "1D Line Chart",
             PlotType::Surface => "3D Surface / Blocks",
             PlotType::Block => "3D Voxel / Block",
             PlotType::Volume => "3D Volume Raycasting",
