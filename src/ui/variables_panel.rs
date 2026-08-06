@@ -7,13 +7,18 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
     }
 
     // Position to the right of Settings (or at left edge of canvas if Settings is hidden).
-    let x_offset = if app.show_settings_panel && app.settings_overlay_width > 0.0 {
-        app.settings_overlay_width + 16.0
-    } else {
-        8.0
-    };
+    let x_offset =
+        8.0 + if app.show_variables_overlay && app.variables_overlay_width > 0.0 {
+            app.variables_overlay_width + 16.0
+        } else {
+            0.0
+        } + if app.show_settings_panel && app.settings_overlay_width > 0.0 {
+            app.settings_overlay_width + 16.0
+        } else {
+            0.0
+        };
 
-    egui::Area::new(egui::Id::new("octant_variables_area"))
+    egui::Area::new(egui::Id::new("octant_variables_panel"))
         .fixed_pos(egui::pos2(
             canvas_rect.left() + x_offset,
             canvas_rect.top() + 8.0,
