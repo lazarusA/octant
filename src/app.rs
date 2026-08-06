@@ -698,7 +698,6 @@ impl eframe::App for OctantApp {
 
                         self.active_dataset_metadata = Some(metadata);
                         self.selected_variable_idx = 0;
-                        self.load_selected_variable_slice();
                     }
                     Err(err) => {
                         self.status_message = format!("Store inspect error: {}", err);
