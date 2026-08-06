@@ -54,6 +54,14 @@ pub struct LineUniforms {
     pub color: super::common::PlotColorParams,
 }
 
+pub struct LineUniformParams {
+    pub color: super::common::PlotColorParams,
+    pub viewport_padding: [f32; 2],
+    pub profile_length: u32,
+    pub line_count: u32,
+    pub line_mode: u32,
+}
+
 pub struct LineRenderer {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
@@ -189,35 +197,46 @@ impl LineRenderer {
             .store(vertices.len() as u32, Ordering::Relaxed);
     }
 
-    pub fn update_uniforms(
-        &self,
-        queue: &wgpu::Queue,
-        color: &super::common::PlotColorParams,
-        padding_x: f32,
-        padding_y: f32,
-        profile_length: u32,
-        line_count: u32,
-        line_mode: u32,
-    ) {
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &LineUniformParams) {
         let uniforms = LineUniforms {
-            viewport_padding: [padding_x.clamp(0.02, 0.2), padding_y.clamp(0.02, 0.3)],
+            viewport_padding: [
+                params.viewport_padding[0].clamp(0.02, 0.2),
+                params.viewport_padding[1].clamp(0.02, 0.3),
+            ],
             line_thickness: 2.5,
-            profile_length: profile_length.max(1),
-            line_count: line_count.max(1),
-            line_mode,
+            profile_length: params.profile_length.max(1),
+            line_count: params.line_count.max(1),
+            line_mode: params.line_mode,
             _pad1: 0,
             _pad2: 0,
             _pad3: 0,
             _color_align_pad: [0; 3],
-            color: *color,
+            color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
-        if !matrix_data.is_empty() {
-            queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
+        if matrix_data.is_empty() {
+            return;
         }
+
+        let needed_bytes = (matrix_data.len() * std::mem::size_of::<f32>()) as u64;
+        let capacity_bytes = self.data_buffer.size();
+
+        if needed_bytes > capacity_bytes {
+            // Should be unreachable given current state-reset invariants, but this
+            // guards against future state-sync bugs causing a hard wgpu panic.
+            log::error!(
+                "LineRenderer::update_data: payload ({needed_bytes} bytes) exceeds \
+                 buffer capacity ({capacity_bytes} bytes) - dropping update. This \
+                 usually means matrix_data.len() doesn't match the (width, height) \
+                 the renderer was created with."
+            );
+            return;
+        }
+
+        queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
     }
 
     fn build_line_vertices(profile_length: usize, line_count: usize) -> Vec<LineVertex> {
@@ -281,12 +300,13 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
             .update_profile_geometry(queue, self.profile_length, self.line_count);
         self.renderer.update_uniforms(
             queue,
-            &self.color_params,
-            padding_x,
-            padding_y,
-            self.profile_length,
-            self.line_count,
-            self.line_mode,
+            &LineUniformParams {
+                color: self.color_params,
+                viewport_padding: [padding_x, padding_y],
+                profile_length: self.profile_length,
+                line_count: self.line_count,
+                line_mode: self.line_mode,
+            },
         );
         Vec::new()
     }
@@ -303,7 +323,7 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
 
-        let profile_length = self.profile_length.max(2) as u32;
+        let profile_length = self.profile_length.max(2);
         let line_count = self.line_count.max(1);
         for line_idx in 0..line_count {
             let start = line_idx * profile_length;
