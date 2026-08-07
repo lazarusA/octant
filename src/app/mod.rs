@@ -10,6 +10,7 @@
 //! - `ui`: the `eframe::App` per-frame update/paint loop.
 
 mod actions;
+mod block_loading;
 mod data_loading;
 mod pipeline;
 mod state;

@@ -79,8 +79,14 @@ impl eframe::App for OctantApp {
             }
         }
 
-        // Continuously replenish prefetch buffer when active slice is rendered
-        if !self.is_fetching_slice {
+        // 1b. Drain completed block-cache prefetch results (opt-in path).
+        // No-op unless `use_block_cache` is set.
+        self.poll_block_prefetch_results();
+
+        // Continuously replenish prefetch buffer when active slice is rendered.
+        // The block-cache path doesn't do lookahead prefetching yet (that's
+        // the windowed-animation phase), so only run this for the legacy path.
+        if !self.use_block_cache && !self.is_fetching_slice {
             self.trigger_background_prefetch();
         }
 
@@ -89,8 +95,19 @@ impl eframe::App for OctantApp {
             let now = std::time::Instant::now();
             let frame_dur = std::time::Duration::from_secs_f32(1.0 / self.playback_fps.max(1.0));
 
+            // "Busy" means: don't advance the timestep yet, the current
+            // frame hasn't finished loading. Each cache path tracks this
+            // differently (a plain bool vs. a pending-key check).
+            let is_busy = if self.use_block_cache {
+                self.active_block_key
+                    .as_ref()
+                    .is_some_and(|key| self.block_prefetcher.is_pending(key))
+            } else {
+                self.is_fetching_slice
+            };
+
             // Only advance playback when current requested slice is already loaded & rendered
-            if !self.is_fetching_slice {
+            if !is_busy {
                 if now.duration_since(self.last_step_time) >= frame_dur {
                     self.last_step_time = now;
                     let max_steps = self
@@ -107,7 +124,11 @@ impl eframe::App for OctantApp {
                         } else {
                             self.is_playing = false;
                         }
-                        self.load_selected_variable_slice();
+                        if self.use_block_cache {
+                            self.load_selected_variable_block();
+                        } else {
+                            self.load_selected_variable_slice();
+                        }
                     }
                 }
             } else {

@@ -116,6 +116,39 @@ impl OctantBlock {
         self.shape.len()
     }
 
+    /// Approximate resident memory footprint of this block, in bytes.
+    ///
+    /// Used by `BlockLruCache` for byte-budgeted eviction. Only counts the
+    /// dominant cost (`values`) plus the per-dimension bookkeeping and
+    /// coordinate/attribute maps — deliberately approximate rather than a
+    /// byte-exact `size_of_val`, since the cache only needs this to decide
+    /// *roughly* when it's over budget, not to account every allocator byte.
+    pub fn bytes_size(&self) -> usize {
+        let values_bytes = self.values.len() * std::mem::size_of::<f32>();
+
+        let shape_bytes = self.shape.len() * std::mem::size_of::<usize>();
+        let strides_bytes = self.strides.len() * std::mem::size_of::<usize>();
+        let origin_bytes = self.origin.len() * std::mem::size_of::<usize>();
+
+        let dim_names_bytes: usize = self.dimension_names.iter().map(|s| s.len()).sum();
+
+        let coordinates_bytes: usize = self
+            .coordinates
+            .iter()
+            .map(|(k, v)| k.len() + v.len() * std::mem::size_of::<f64>())
+            .sum();
+
+        let attributes_bytes: usize = self.attributes.iter().map(|(k, v)| k.len() + v.len()).sum();
+
+        values_bytes
+            + shape_bytes
+            + strides_bytes
+            + origin_bytes
+            + dim_names_bytes
+            + coordinates_bytes
+            + attributes_bytes
+    }
+
     /// Index of a dimension by name, if present.
     pub fn dim_index(&self, name: &str) -> Option<usize> {
         self.dimension_names.iter().position(|d| d == name)
@@ -300,6 +333,14 @@ mod tests {
         assert_eq!(slice.height, 3);
         // first row (y=0) at time=1 should be values 12..16
         assert_eq!(&slice.values[0..4], &[12.0, 13.0, 14.0, 15.0]);
+    }
+
+    #[test]
+    fn bytes_size_is_dominated_by_values() {
+        let block = test_block();
+        // 24 f32 values = 96 bytes, plus small bookkeeping overhead.
+        assert!(block.bytes_size() >= 24 * std::mem::size_of::<f32>());
+        assert!(block.bytes_size() < 24 * std::mem::size_of::<f32>() + 512);
     }
 
     #[test]
