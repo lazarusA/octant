@@ -7,6 +7,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 
+pub mod block_cache;
+pub mod storage;
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct SliceCacheKey {
     pub store_kind: StoreKind,

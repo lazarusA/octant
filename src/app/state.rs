@@ -79,11 +79,19 @@ pub struct OctantApp {
     pub is_categorical: bool,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
-    // LRU Cache & Prefetcher State
+    // LRU Cache & Prefetcher State (legacy MatrixSlice path)
     pub lru_cache: SliceLruCache,
     pub prefetcher: SlicePrefetcher,
     pub max_cache_mb: usize,
     pub prefetch_lookahead: usize,
+
+    // Block-cache path (OctantBlock redesign). Independent of the fields
+    // above: nothing reads or writes these unless `use_block_cache` is set,
+    // so the legacy path keeps working untouched while this is tested.
+    pub block_cache: crate::cache::block_cache::BlockLruCache,
+    pub block_prefetcher: crate::cache::block_cache::BlockPrefetcher,
+    pub active_block_key: Option<crate::cache::block_cache::BlockCacheKey>,
+    pub use_block_cache: bool,
 
     // Animation & Playback Controls
     pub is_fetching_slice: bool,
@@ -184,6 +192,11 @@ impl OctantApp {
             prefetcher: SlicePrefetcher::new(),
             max_cache_mb: default_cache_mb,
             prefetch_lookahead: 24,
+
+            block_cache: crate::cache::block_cache::BlockLruCache::new(default_cache_mb * 1024 * 1024),
+            block_prefetcher: crate::cache::block_cache::BlockPrefetcher::new(),
+            active_block_key: None,
+            use_block_cache: false,
 
             is_fetching_slice: false,
             active_requested_key: None,
