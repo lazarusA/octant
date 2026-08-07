@@ -9,6 +9,8 @@ use crate::stores::{
     DataStore, DatasetMetadata, VariableInfo, icechunk_local::IcechunkLocalStore,
     icechunk_remote::IcechunkRemoteStore, zarr_local::ZarrLocalStore, zarr_remote::ZarrRemoteStore,
 };
+use crate::ui::variables_panel::build_slice_request;
+use crate::utils::zarr::SliceRequest;
 use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -18,6 +20,26 @@ pub enum StoreKind {
     RemoteIcechunk,
     LocalIcechunk,
     ProceduralRandom,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpatialRole {
+    None,
+    X,
+    Y,
+    Z,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnimationRole {
+    None,
+    Animated,
+}
+
+#[derive(Debug, Clone)]
+pub struct DimConfig {
+    pub spatial: SpatialRole,
+    pub animation: AnimationRole,
+    pub active: bool, // expanded (range) or collapsed (index)
 }
 
 pub struct OctantApp {
@@ -91,8 +113,14 @@ pub struct OctantApp {
     pub show_bottom_bar: bool,
     pub settings_overlay_width: f32, // tracks prev-frame width to position Variable Controls to the right
     pub theme_preference: egui::ThemePreference,
-    pub selected_dim_indices: Vec<usize>,
-    pub selected_dim_ranges: Vec<(usize, usize)>,
+
+    // DimConfig
+    pub dim_config: Vec<DimConfig>,               // one per dimension
+    pub selected_dim_indices: Vec<usize>,         // collapsed index per dimension
+    pub selected_dim_ranges: Vec<(usize, usize)>, // range per dimension
+    pub spatial_dims: Vec<usize>,                 // dims assigned X,Y,Z
+    pub animated_dim: Option<usize>,              // dim assigned Animated
+    pub active_slice_request: Option<SliceRequest>,
 
     // Clipping & Color Range State
     pub nan_color: [f32; 4],
@@ -198,8 +226,12 @@ impl OctantApp {
             variable_search: String::new(),
 
             theme_preference: egui::ThemePreference::System,
+            dim_config: Vec::new(),
             selected_dim_indices: Vec::new(),
             selected_dim_ranges: Vec::new(),
+            spatial_dims: Vec::new(),
+            animated_dim: None,
+            active_slice_request: None,
 
             nan_color: [0.0, 0.0, 0.0, 0.0],
             use_nan_color: false,
@@ -386,6 +418,26 @@ impl OctantApp {
                 return;
             }
         };
+        // We still have metadata in scope, so get var_info again:
+        let var_info = if let Some(metadata) = &self.active_dataset_metadata {
+            if let Some(v) = metadata.variables.get(self.selected_variable_idx) {
+                v
+            } else {
+                self.status_message = "Invalid variable index.".to_string();
+                return;
+            }
+        } else {
+            self.status_message = "No dataset metadata loaded.".to_string();
+            return;
+        };
+
+        // Build the hyperslab request from UI state
+        let slice_request = build_slice_request(self, &var_name, &var_info.shape);
+        self.active_slice_request = Some(slice_request);
+        // Update current_timestep based on animated dimension (if any)
+        if let Some(anim_dim) = self.animated_dim {
+            self.current_timestep = self.selected_dim_indices[anim_dim];
+        }
 
         // Enforce bounds on current_timestep for new variable
         if self.current_timestep >= max_steps {

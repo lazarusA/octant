@@ -1,4 +1,4 @@
-use crate::app::OctantApp;
+use crate::app::{AnimationRole, DimConfig, OctantApp, SpatialRole};
 
 pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
     if !app.show_variables_overlay {
@@ -117,13 +117,25 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                     {
                                         app.selected_variable_idx = idx;
 
-                                        app.selected_dim_indices = vec![0; var_info.shape.len()];
+                                        let rank = var_info.shape.len();
+
+                                        app.dim_config = (0..rank)
+                                            .map(|_| DimConfig {
+                                                spatial: SpatialRole::None,
+                                                animation: AnimationRole::None,
+                                                active: false,
+                                            })
+                                            .collect();
+
+                                        app.selected_dim_indices = vec![0; rank];
 
                                         app.selected_dim_ranges = var_info
                                             .shape
                                             .iter()
                                             .map(|&s| (0, (s as usize).saturating_sub(1)))
                                             .collect();
+                                        app.spatial_dims.clear();
+                                        app.animated_dim = None;
 
                                         app.show_variable_controls = true;
 
