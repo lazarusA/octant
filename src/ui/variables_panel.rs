@@ -131,7 +131,7 @@ fn show_dimension_sliders(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
     var_info: &crate::stores::VariableInfo,
-    dim_coords: &std::collections::HashMap<String, Vec<String>>,
+    _dim_coords: &std::collections::HashMap<String, Vec<String>>,
 ) {
     let rank = var_info.shape.len();
 
