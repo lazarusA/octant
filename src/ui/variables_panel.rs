@@ -70,8 +70,34 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         show_variable_info(ui, &var_info);
                     });
 
+                    // — Block-cache toggle (opt-in OctantBlock redesign path) —
+                    // Only RemoteZarr has a working storage backend right now
+                    // (see cache::storage::build_storage_for); flag that
+                    // inline rather than letting the toggle silently no-op
+                    // for the other store kinds.
+                    ui.add_space(2.0);
+                    ui.horizontal(|ui| {
+                        ui.checkbox(
+                            &mut app.use_block_cache,
+                            "🧊 Use block cache (experimental)",
+                        );
+                        if app.use_block_cache
+                            && app.selected_store_kind != crate::app::StoreKind::RemoteZarr
+                        {
+                            ui.label(
+                                egui::RichText::new("⚠ backend not wired yet for this store kind")
+                                    .small()
+                                    .weak(),
+                            );
+                        }
+                    });
+
                     if should_plot {
-                        app.load_selected_variable_slice();
+                        if app.use_block_cache {
+                            app.load_selected_variable_block();
+                        } else {
+                            app.load_selected_variable_slice();
+                        }
                     }
 
                     ui.add_space(4.0);
