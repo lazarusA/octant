@@ -92,6 +92,10 @@ pub struct OctantApp {
     pub block_prefetcher: crate::cache::block_cache::BlockPrefetcher,
     pub active_block_key: Option<crate::cache::block_cache::BlockCacheKey>,
     pub use_block_cache: bool,
+    /// Number of frames fetched per hyperslab request along the animated
+    /// dimension. Frames within an already-fetched window are pure cache
+    /// hits (no I/O); only crossing a window boundary triggers a new fetch.
+    pub block_window_size: usize,
 
     // Animation & Playback Controls
     pub is_fetching_slice: bool,
@@ -197,6 +201,7 @@ impl OctantApp {
             block_prefetcher: crate::cache::block_cache::BlockPrefetcher::new(),
             active_block_key: None,
             use_block_cache: false,
+            block_window_size: 32,
 
             is_fetching_slice: false,
             active_requested_key: None,
