@@ -5,6 +5,29 @@ use std::error::Error;
 use zarrs::array::{Array, ArraySubset};
 use zarrs::storage::ReadableWritableListableStorage;
 
+use std::ops::Range;
+
+/// A selection for a single dimension of a hyperslab.
+///
+/// Either:
+/// - collapse to a single index
+/// - select a range [start, end] inclusive (UI convention)
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum DimensionSelection {
+    Index(usize),
+    Range(Range<usize>),
+}
+
+/// A hyperslab request for a variable.
+///
+/// One DimensionSelection per dimension.
+/// Length must match the array rank.
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct SliceRequest {
+    pub variable: String,
+    pub selections: Vec<DimensionSelection>,
+}
+
 /// Fetches a 2D scalar matrix slice [timestep, lat, lon] from a Zarr storage backend.
 pub fn fetch_slice(
     store: ReadableWritableListableStorage,
@@ -268,7 +291,9 @@ pub fn fetch_slice_range(
     Ok(vec![single])
 }
 
-fn retrieve_array_subset_as_f32(
+/// `pub(crate)` (was private) so `crate::utils::zarr::block::fetch_block` can
+/// reuse the same dtype-conversion logic instead of duplicating it.
+pub(crate) fn retrieve_array_subset_as_f32(
     array: &Array<dyn zarrs::storage::ReadableWritableListableStorageTraits>,
     subset: &ArraySubset,
 ) -> Result<Vec<f32>, Box<dyn Error>> {

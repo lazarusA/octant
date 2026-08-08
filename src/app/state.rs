@@ -1,0 +1,250 @@
+use crate::cache::{SliceCacheKey, SliceLruCache, SlicePrefetcher};
+use crate::data::matrix_data::MatrixData;
+use crate::plots::{
+    LineRenderer, MatrixRenderer, PlotType, PointCloudRenderer, SphereRenderer, SurfaceRenderer,
+    VolumeRenderer,
+};
+use crate::stores::DatasetMetadata;
+use crate::utils::zarr::SliceRequest;
+use std::sync::Arc;
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub enum StoreKind {
+    RemoteZarr,
+    LocalZarr,
+    RemoteIcechunk,
+    LocalIcechunk,
+    ProceduralRandom,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpatialRole {
+    None,
+    X,
+    Y,
+    Z,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnimationRole {
+    None,
+    Animated,
+}
+
+#[derive(Debug, Clone)]
+pub struct DimConfig {
+    pub spatial: SpatialRole,
+    pub animation: AnimationRole,
+    pub active: bool, // expanded (range) or collapsed (index)
+}
+
+pub struct OctantApp {
+    pub selected_store_kind: StoreKind,
+    pub store_target_input: String,
+    pub active_dataset_metadata: Option<DatasetMetadata>,
+    pub selected_variable_idx: usize,
+    pub current_timestep: usize,
+    pub active_plot_type: PlotType,
+    pub active_colormap: u32,
+    pub preview_colormap: Option<u32>,
+    pub status_message: String,
+    pub is_loading: bool,
+    pub matrix_data: Option<MatrixData>,
+    pub renderer: Option<Arc<MatrixRenderer>>,
+    pub line_renderer: Option<Arc<LineRenderer>>,
+    pub sphere_renderer: Option<Arc<SphereRenderer>>,
+    pub surface_renderer: Option<Arc<SurfaceRenderer>>,
+    pub volume_renderer: Option<Arc<VolumeRenderer>>,
+    pub point_cloud_renderer: Option<Arc<PointCloudRenderer>>,
+    pub sphere_rotation_y: f32,
+    pub sphere_rotation_x: f32,
+    pub sphere_auto_rotate: bool,
+    pub sphere_zoom: f32,
+    pub sphere_displacement_strength: f32,
+    pub sphere_mode: u32,
+    pub surface_displacement_strength: f32,
+    pub surface_mode: u32,
+    pub volume_opacity: f32,
+    pub volume_step_count: u32,
+    pub volume_algorithm: u32,
+    pub volume_isovalue: f32,
+    pub volume_isorange: f32,
+    pub volume_cmin: f32,
+    pub volume_cmax: f32,
+    pub point_cloud_size: f32,
+    pub line_profile_dim_idx: usize,
+    pub line_profile_slice_idx: usize,
+    pub line_plot_all_series: bool,
+    pub show_colorbar: bool,
+    pub is_categorical: bool,
+    pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
+
+    // LRU Cache & Prefetcher State (legacy MatrixSlice path)
+    pub lru_cache: SliceLruCache,
+    pub prefetcher: SlicePrefetcher,
+    pub max_cache_mb: usize,
+    pub prefetch_lookahead: usize,
+
+    // Block-cache path (OctantBlock redesign). Independent of the fields
+    // above: nothing reads or writes these unless `use_block_cache` is set,
+    // so the legacy path keeps working untouched while this is tested.
+    pub block_cache: crate::cache::block_cache::BlockLruCache,
+    pub block_prefetcher: crate::cache::block_cache::BlockPrefetcher,
+    pub active_block_key: Option<crate::cache::block_cache::BlockCacheKey>,
+    pub use_block_cache: bool,
+    /// Number of frames fetched per hyperslab request along the animated
+    /// dimension. Frames within an already-fetched window are pure cache
+    /// hits (no I/O); only crossing a window boundary triggers a new fetch.
+    pub block_window_size: usize,
+
+    // Animation & Playback Controls
+    pub is_fetching_slice: bool,
+    pub active_requested_key: Option<SliceCacheKey>,
+    pub metadata_rx: Option<std::sync::mpsc::Receiver<Result<DatasetMetadata, String>>>,
+    pub is_playing: bool,
+    pub playback_fps: f32,
+    pub loop_playback: bool,
+    pub last_step_time: std::time::Instant,
+
+    // Catalog State
+    pub show_catalog_window: bool,
+    pub catalog_search_query: String,
+    pub catalog_category_filter: crate::catalog::CatalogCategoryFilter,
+
+    // Panel Visibility State
+    pub show_left_panel: bool,
+    pub show_variables_overlay: bool,
+    pub show_settings_panel: bool,
+    pub show_variable_controls: bool,
+    pub variables_overlay_width: f32,
+    pub variable_search: String,
+    pub show_bottom_bar: bool,
+    pub settings_overlay_width: f32, // tracks prev-frame width to position Variable Controls to the right
+    pub theme_preference: egui::ThemePreference,
+
+    // DimConfig
+    pub dim_config: Vec<DimConfig>,               // one per dimension
+    pub selected_dim_indices: Vec<usize>,         // collapsed index per dimension
+    pub selected_dim_ranges: Vec<(usize, usize)>, // range per dimension
+    pub spatial_dims: Vec<usize>,                 // dims assigned X,Y,Z
+    pub animated_dim: Option<usize>,              // dim assigned Animated
+    pub active_slice_request: Option<SliceRequest>,
+
+    // Clipping & Color Range State
+    pub nan_color: [f32; 4],
+    pub use_nan_color: bool,
+    pub lowclip_color: [f32; 4],
+    pub use_lowclip: bool,
+    pub highclip_color: [f32; 4],
+    pub use_highclip: bool,
+    pub lock_color_bounds: bool,
+    pub color_range_min: f32,
+    pub color_range_max: f32,
+    pub global_data_min: f32,
+    pub global_data_max: f32,
+    pub active_scale_type: u32,
+    pub scale_param: f32,
+}
+
+impl OctantApp {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let wgpu_render_state = cc.wgpu_render_state.clone();
+        let default_cache_mb = 1024; // Default 1GB cache size limit
+
+        Self {
+            selected_store_kind: StoreKind::RemoteZarr,
+            store_target_input: "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string(),
+            active_dataset_metadata: None,
+            selected_variable_idx: 0,
+            current_timestep: 0,
+            active_plot_type: PlotType::Heatmap,
+            active_colormap: 0,
+            preview_colormap: None,
+            status_message: "Ready. Select store and click Inspect Store Metadata.".to_string(),
+            is_loading: false,
+            matrix_data: None,
+            renderer: None,
+            line_renderer: None,
+            sphere_renderer: None,
+            surface_renderer: None,
+            volume_renderer: None,
+            point_cloud_renderer: None,
+            sphere_rotation_y: 0.0,
+            sphere_rotation_x: 0.25,
+            sphere_auto_rotate: true,
+            sphere_zoom: 2.5,
+            sphere_displacement_strength: 0.3,
+            sphere_mode: 0,
+            surface_displacement_strength: 0.3,
+            surface_mode: 0,
+            volume_opacity: 3.0,
+            volume_step_count: 64,
+            volume_algorithm: 1,
+            volume_isovalue: 50.0,
+            volume_isorange: 5.0,
+            volume_cmin: 5.0,
+            volume_cmax: 100.0,
+            point_cloud_size: 0.02,
+            line_profile_dim_idx: 0,
+            line_profile_slice_idx: 0,
+            line_plot_all_series: false,
+            show_colorbar: true,
+            is_categorical: false,
+            wgpu_render_state,
+
+            lru_cache: SliceLruCache::new(default_cache_mb * 1024 * 1024),
+            prefetcher: SlicePrefetcher::new(),
+            max_cache_mb: default_cache_mb,
+            prefetch_lookahead: 24,
+
+            block_cache: crate::cache::block_cache::BlockLruCache::new(default_cache_mb * 1024 * 1024),
+            block_prefetcher: crate::cache::block_cache::BlockPrefetcher::new(),
+            active_block_key: None,
+            use_block_cache: false,
+            block_window_size: 32,
+
+            is_fetching_slice: false,
+            active_requested_key: None,
+            metadata_rx: None,
+            is_playing: false,
+            playback_fps: 15.0,
+            loop_playback: true,
+            last_step_time: std::time::Instant::now(),
+
+            show_catalog_window: false,
+            catalog_search_query: String::new(),
+            catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
+
+            show_left_panel: true,
+            show_variables_overlay: true,
+            show_settings_panel: false,
+            show_variable_controls: false,
+            show_bottom_bar: true,
+            settings_overlay_width: 0.0,
+            variables_overlay_width: 340.0,
+            variable_search: String::new(),
+
+            theme_preference: egui::ThemePreference::System,
+            dim_config: Vec::new(),
+            selected_dim_indices: Vec::new(),
+            selected_dim_ranges: Vec::new(),
+            spatial_dims: Vec::new(),
+            animated_dim: None,
+            active_slice_request: None,
+
+            nan_color: [0.0, 0.0, 0.0, 0.0],
+            use_nan_color: false,
+            lowclip_color: [0.0, 0.0, 1.0, 1.0],
+            use_lowclip: false,
+            highclip_color: [1.0, 0.0, 0.0, 1.0],
+            use_highclip: false,
+            lock_color_bounds: false,
+            color_range_min: 0.0,
+            color_range_max: 100.0,
+            global_data_min: f32::INFINITY,
+            global_data_max: f32::NEG_INFINITY,
+            active_scale_type: 0,
+            scale_param: 1.0,
+        }
+    }
+}
