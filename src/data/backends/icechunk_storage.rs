@@ -1,3 +1,5 @@
+//! Storage initializers for Icechunk repositories.
+
 use crate::utils::executor::{TokioBlockOn, get_shared_tokio_rt};
 use std::collections::HashMap;
 use std::error::Error;
@@ -68,7 +70,7 @@ pub fn build_sync_icechunk_store(
 }
 
 #[allow(clippy::type_complexity)]
-fn parse_s3_or_http_url(
+pub fn parse_s3_or_http_url(
     url: &str,
 ) -> Result<(String, Option<String>, Option<String>, Option<String>), Box<dyn Error>> {
     let clean = url

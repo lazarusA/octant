@@ -60,7 +60,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             } else if max_steps > 0 {
                 app.current_timestep = max_steps - 1;
             }
-            app.load_selected_variable_slice();
+            app.load_selected_variable_block();
         }
 
         // 3. Next Step
@@ -68,7 +68,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             if max_steps > 0 {
                 app.current_timestep = (app.current_timestep + 1) % max_steps;
             }
-            app.load_selected_variable_slice();
+            app.load_selected_variable_block();
         }
 
         // 4. Loop Toggle
@@ -92,28 +92,28 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         // 6. Timestep timeline slider & Dimension-Agnostic Axis Reading
         let (active_anim_dim, active_dim_name, active_units, time_start, temp_res) =
-            if let Some(active_var_info) = app
-                .active_dataset_metadata
+            if let Some(plotted_var_info) = app
+                .plotted_dataset_metadata
                 .as_ref()
-                .and_then(|m| m.variables.get(app.selected_variable_idx))
+                .and_then(|m| m.variables.get(app.plotted_variable_idx))
             {
                 (
-                    active_var_info
+                    plotted_var_info
                         .dimension_names
                         .first()
                         .cloned()
                         .unwrap_or_else(|| "time".to_string()),
-                    active_var_info.dimension_names.first().cloned(),
-                    active_var_info.units.clone(),
-                    active_var_info.time_coverage_start.clone(),
-                    active_var_info.temporal_resolution.clone(),
+                    plotted_var_info.dimension_names.first().cloned(),
+                    plotted_var_info.units.clone(),
+                    plotted_var_info.time_coverage_start.clone(),
+                    plotted_var_info.temporal_resolution.clone(),
                 )
             } else {
                 ("time".to_string(), None, None, None, None)
             };
 
         let direct_coord_label = app
-            .active_dataset_metadata
+            .plotted_dataset_metadata
             .as_ref()
             .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
             .and_then(|coords| coords.get(app.current_timestep).cloned());
@@ -128,12 +128,12 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 active_units.as_deref(),
                 time_start.as_deref(),
                 temp_res.as_deref(),
-                Some(&app.store_target_input),
+                Some(&app.plotted_store_target_input),
             )
         };
 
         let start_date_str = if let Some(coord_str) = app
-            .active_dataset_metadata
+            .plotted_dataset_metadata
             .as_ref()
             .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
             .and_then(|coords| coords.first().cloned())
@@ -147,12 +147,12 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 active_units.as_deref(),
                 time_start.as_deref(),
                 temp_res.as_deref(),
-                Some(&app.store_target_input),
+                Some(&app.plotted_store_target_input),
             )
         };
 
         let end_date_str = if let Some(coord_str) = app
-            .active_dataset_metadata
+            .plotted_dataset_metadata
             .as_ref()
             .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
             .and_then(|coords| coords.last().cloned())
@@ -166,7 +166,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 active_units.as_deref(),
                 time_start.as_deref(),
                 temp_res.as_deref(),
-                Some(&app.store_target_input),
+                Some(&app.plotted_store_target_input),
             )
         };
 
@@ -195,7 +195,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .trailing_fill(true),
         );
         if slider_res.drag_stopped() || (slider_res.changed() && !app.is_playing) {
-            app.load_selected_variable_slice();
+            app.load_selected_variable_block();
         }
 
         ui.small(format!("⏱ {}", step_size_str));
