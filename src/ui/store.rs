@@ -90,7 +90,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                         ui.label(format!("Active Datasets: {}", app.dataset_manager.len()));
                         ui.add_space(4.0);
 
-                        let datasets: Vec<(String, String, String, Option<crate::stores::DatasetMetadata>, crate::data::DataSourceKind)> = app
+                        let datasets: Vec<(String, String, String, Option<crate::data::DatasetMetadata>, crate::data::DataSourceKind)> = app
                             .dataset_manager
                             .iter()
                             .map(|d| (
@@ -148,7 +148,7 @@ pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 }
 
-fn self_activate_dataset_metadata(app: &mut OctantApp, metadata: crate::stores::DatasetMetadata) {
+fn self_activate_dataset_metadata(app: &mut OctantApp, metadata: crate::data::DatasetMetadata) {
     app.status_message = format!(
         "Activated dataset '{}' (Found {} variables)",
         metadata.name,

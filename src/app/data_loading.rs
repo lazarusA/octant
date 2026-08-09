@@ -1,7 +1,4 @@
-use crate::stores::{
-    DataStore, DatasetMetadata, VariableInfo, icechunk_local::IcechunkLocalStore,
-    icechunk_remote::IcechunkRemoteStore, zarr_local::ZarrLocalStore, zarr_remote::ZarrRemoteStore,
-};
+use crate::data::{DatasetMetadata, VariableInfo};
 
 use super::OctantApp;
 use super::state::StoreKind;
@@ -54,35 +51,45 @@ impl OctantApp {
         self.metadata_rx = Some(rx);
 
         std::thread::spawn(move || {
-            let store: Box<dyn DataStore> = match store_kind {
-                StoreKind::RemoteZarr => Box::new(ZarrRemoteStore::new(&target_input)),
-                StoreKind::LocalZarr => Box::new(ZarrLocalStore::new(&target_input)),
-                StoreKind::RemoteIcechunk => Box::new(IcechunkRemoteStore::new(&target_input)),
-                StoreKind::LocalIcechunk => Box::new(IcechunkLocalStore::new(&target_input)),
+            if store_kind == StoreKind::ProceduralRandom {
+                let meta = DatasetMetadata {
+                    name: "Procedural Test Store".to_string(),
+                    store_type: "Random Procedural".to_string(),
+                    variables: vec![VariableInfo {
+                        name: "random_matrix".to_string(),
+                        data_type: "float32".to_string(),
+                        shape: vec![64, 64],
+                        dimension_names: vec!["y".to_string(), "x".to_string()],
+                        chunk_shape: vec![64, 64],
+                        file_size: crate::utils::calculate_variable_size_bytes(
+                            &[64, 64],
+                            "float32",
+                        ),
+                        ..Default::default()
+                    }],
+                    dimension_coordinates: std::collections::HashMap::new(),
+                };
+                let _ = tx.send(Ok(meta));
+                return;
+            }
+
+            let kind = match store_kind {
+                StoreKind::RemoteZarr => crate::data::DataSourceKind::RemoteZarr,
+                StoreKind::LocalZarr => crate::data::DataSourceKind::LocalZarr,
+                StoreKind::RemoteIcechunk => crate::data::DataSourceKind::RemoteIcechunk,
+                StoreKind::LocalIcechunk => crate::data::DataSourceKind::LocalIcechunk,
                 StoreKind::ProceduralRandom => {
-                    let meta = DatasetMetadata {
-                        name: "Procedural Test Store".to_string(),
-                        store_type: "Random Procedural".to_string(),
-                        variables: vec![VariableInfo {
-                            name: "random_matrix".to_string(),
-                            data_type: "float32".to_string(),
-                            shape: vec![64, 64],
-                            dimension_names: vec!["y".to_string(), "x".to_string()],
-                            chunk_shape: vec![64, 64],
-                            file_size: crate::utils::calculate_variable_size_bytes(
-                                &[64, 64],
-                                "float32",
-                            ),
-                            ..Default::default()
-                        }],
-                        dimension_coordinates: std::collections::HashMap::new(),
-                    };
-                    let _ = tx.send(Ok(meta));
-                    return;
+                    crate::data::DataSourceKind::Other("ProceduralRandom".into())
                 }
             };
 
-            let res = store.inspect().map_err(|e| e.to_string());
+            let source_id = format!("{:?}:{}", store_kind, target_input);
+            let source = crate::data::DataSource::new(&source_id, kind, &target_input, "Store");
+
+            let res = crate::data::SourceFactory::open(source)
+                .and_then(|store| store.inspect())
+                .map_err(|e| e.to_string());
+
             let _ = tx.send(res);
         });
     }

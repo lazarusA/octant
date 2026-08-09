@@ -42,8 +42,42 @@ impl BlockStore for IcechunkBlockStore {
     }
 
     fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
-        // Variable/catalog discovery placeholder.
-        Ok(Vec::new())
+        let vars = crate::utils::extract_store_variables_consolidated(
+            self.storage.clone(),
+            &self.source_url,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(vars.into_iter().map(|v| v.name).collect())
+    }
+
+    fn inspect(&self) -> Result<crate::data::DatasetMetadata, BlockStoreError> {
+        let base_url = self.source_url.trim_end_matches('/');
+        let variables =
+            crate::utils::extract_store_variables_consolidated(self.storage.clone(), base_url)
+                .map_err(|e| e.to_string())?;
+
+        let dim_names: Vec<String> = variables
+            .iter()
+            .flat_map(|v| v.dimension_names.clone())
+            .collect();
+        let dimension_coordinates = crate::utils::fetch_all_dimension_coordinates(
+            self.storage.clone(),
+            &dim_names,
+            Some(base_url),
+        );
+
+        let dataset_name = base_url
+            .split('/')
+            .next_back()
+            .unwrap_or("icechunk_store")
+            .to_string();
+
+        Ok(crate::data::DatasetMetadata {
+            name: dataset_name,
+            store_type: "Icechunk".to_string(),
+            variables,
+            dimension_coordinates,
+        })
     }
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {

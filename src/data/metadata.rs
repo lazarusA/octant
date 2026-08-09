@@ -1,10 +1,6 @@
-pub mod icechunk_local;
-pub mod icechunk_remote;
-pub mod zarr_local;
-pub mod zarr_remote;
+//! Metadata representations for open dataset sources and variables.
 
 use std::collections::HashMap;
-use std::error::Error;
 
 #[derive(Debug, Clone, Default)]
 pub struct DatasetMetadata {
@@ -28,9 +24,4 @@ pub struct VariableInfo {
     pub time_coverage_end: Option<String>,
     pub temporal_resolution: Option<String>,
     pub attributes: HashMap<String, String>,
-}
-
-pub trait DataStore: Send + Sync {
-    fn store_type(&self) -> &'static str;
-    fn inspect(&self) -> Result<DatasetMetadata, Box<dyn Error>>;
 }

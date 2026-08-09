@@ -47,8 +47,44 @@ impl BlockStore for ZarrBlockStore {
     }
 
     fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
-        // Variable/catalog discovery placeholder.
-        Ok(Vec::new())
+        let vars = crate::utils::extract_store_variables_consolidated(
+            self.storage.clone(),
+            &self.source_url,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(vars.into_iter().map(|v| v.name).collect())
+    }
+
+    fn inspect(&self) -> Result<crate::data::DatasetMetadata, BlockStoreError> {
+        let store_name = self
+            .source_url
+            .split('/')
+            .next_back()
+            .unwrap_or("zarr_store")
+            .to_string();
+
+        let variables = crate::utils::extract_store_variables_consolidated(
+            self.storage.clone(),
+            &self.source_url,
+        )
+        .map_err(|e| e.to_string())?;
+
+        let dim_names: Vec<String> = variables
+            .iter()
+            .flat_map(|v| v.dimension_names.clone())
+            .collect();
+        let dimension_coordinates = crate::utils::fetch_all_dimension_coordinates(
+            self.storage.clone(),
+            &dim_names,
+            Some(&self.source_url),
+        );
+
+        Ok(crate::data::DatasetMetadata {
+            name: store_name,
+            store_type: "Zarr".to_string(),
+            variables,
+            dimension_coordinates,
+        })
     }
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {

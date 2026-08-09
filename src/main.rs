@@ -2,7 +2,6 @@ mod app;
 pub mod catalog;
 pub mod data;
 pub mod plots;
-mod stores;
 pub mod ui;
 pub mod utils;
 
