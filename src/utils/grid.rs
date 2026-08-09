@@ -120,6 +120,73 @@ pub fn check_and_orient_axes_with_coords(
     (current_values, width, height)
 }
 
+/// Orients an N-dimensional block's 2D spatial grid slices and axes using `check_and_orient_axes_with_coords`.
+pub fn check_and_orient_block_grid(
+    mut values: Vec<f32>,
+    block_shape: &mut [usize],
+    dimension_names: &mut [String],
+    origin: &mut [usize],
+    attributes: &serde_json::Map<String, serde_json::Value>,
+    coordinates: &std::collections::HashMap<String, Vec<f64>>,
+) -> Vec<f32> {
+    let rank = block_shape.len();
+    if rank < 2 {
+        return values;
+    }
+
+    let lat_dim = dimension_names
+        .iter()
+        .find(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
+    let lon_dim = dimension_names
+        .iter()
+        .find(|d| d.to_lowercase().contains("lon") || d.to_lowercase() == "x");
+
+    let lat_coords = lat_dim
+        .and_then(|d| coordinates.get(d))
+        .map(|v| v.as_slice());
+    let lon_coords = lon_dim
+        .and_then(|d| coordinates.get(d))
+        .map(|v| v.as_slice());
+
+    let in_height = block_shape[rank - 2];
+    let in_width = block_shape[rank - 1];
+    let slice_size = in_width * in_height;
+
+    if slice_size > 0 && values.len().is_multiple_of(slice_size) {
+        let num_slices = values.len() / slice_size;
+        let mut final_values = Vec::with_capacity(values.len());
+        let mut final_width = in_width;
+        let mut final_height = in_height;
+
+        for i in 0..num_slices {
+            let slice_raw = values[i * slice_size..(i + 1) * slice_size].to_vec();
+            let (slice_oriented, w, h) = check_and_orient_axes_with_coords(
+                slice_raw,
+                in_width,
+                in_height,
+                dimension_names,
+                attributes,
+                lat_coords,
+                lon_coords,
+            );
+            final_width = w;
+            final_height = h;
+            final_values.extend(slice_oriented);
+        }
+
+        if final_width != in_width || final_height != in_height {
+            block_shape[rank - 2] = final_height;
+            block_shape[rank - 1] = final_width;
+            origin.swap(rank - 2, rank - 1);
+            dimension_names.swap(rank - 2, rank - 1);
+        }
+
+        values = final_values;
+    }
+
+    values
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
