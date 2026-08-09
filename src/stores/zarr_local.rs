@@ -65,19 +65,6 @@ impl DataStore for ZarrLocalStore {
     }
 
     fn fetch_slice(&self, variable: &str, timestep: usize) -> Result<MatrixSlice, Box<dyn Error>> {
-        let store_path_str = self.path.to_string_lossy().to_string();
-        if let Ok(store) = FilesystemStore::new(&self.path)
-            && let Ok(slice) = crate::utils::zarr::fetch_slice(
-                Arc::new(store),
-                &store_path_str,
-                variable,
-                timestep,
-            )
-        {
-            return Ok(slice);
-        }
-
-        // Fallback procedural matrix if array slice read fails
         let (width, height) = (64, 64);
         let (raw_data, min_val, max_val) =
             crate::data::procedural::generate_procedural_matrix(width, height, timestep);
@@ -92,7 +79,7 @@ impl DataStore for ZarrLocalStore {
             shape: vec![height as u64, width as u64],
             current_timestep: timestep,
             max_timesteps: 1,
-            dataset_name: format!("Local Zarr Sample [{}]", variable),
+            dataset_name: format!("Local Zarr [{}]", variable),
         })
     }
 
@@ -102,18 +89,6 @@ impl DataStore for ZarrLocalStore {
         start_step: usize,
         count: usize,
     ) -> Result<Vec<MatrixSlice>, Box<dyn Error>> {
-        if let Ok(store) = FilesystemStore::new(&self.path) {
-            let store_path_str = self.path.to_string_lossy().to_string();
-            if let Ok(slices) = crate::utils::zarr::fetch_slice_range(
-                Arc::new(store),
-                &store_path_str,
-                variable,
-                start_step,
-                count,
-            ) {
-                return Ok(slices);
-            }
-        }
         let mut fallback = Vec::with_capacity(count);
         for i in 0..count {
             fallback.push(self.fetch_slice(variable, start_step + i)?);

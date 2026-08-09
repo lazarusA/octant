@@ -1,6 +1,6 @@
 use crate::{
     app::{AnimationRole, OctantApp, SpatialRole},
-    utils::zarr::{DimensionSelection, SliceRequest},
+    data::slice_request::{DimensionSelection, SliceRequest},
 };
 use egui::{DragValue, Sense, Stroke, Ui, Vec2};
 
@@ -294,7 +294,7 @@ pub fn build_slice_request(app: &OctantApp, var_name: &str, shape: &[u64]) -> Sl
             if start == end {
                 DimensionSelection::Index(start)
             } else {
-                DimensionSelection::Range(start..end)
+                DimensionSelection::Range { start, end }
             }
         })
         .collect();

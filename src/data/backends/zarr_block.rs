@@ -1,16 +1,16 @@
-//! Generic, N-dimensional fetch that returns an `OctantBlock`.
+//! Generic, N-dimensional fetch that returns an `OctantBlock` from a Zarr array.
 
 use std::collections::HashMap;
 
 use zarrs::array::{Array, ArraySubset};
 use zarrs::storage::ReadableWritableListableStorage;
 
+use super::zarr_slice::retrieve_array_subset_as_f32;
 use crate::data::block_store::BlockStoreError;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::{DimensionSelection, SliceRequest};
 use crate::utils::coordinates::get_cached_coord_bounds_with_rank;
-
-use super::slice::retrieve_array_subset_as_f32;
+use crate::utils::grid::check_and_orient_block_grid;
 
 /// Fetches an arbitrary-rank hyperslab described by `request` and returns it
 /// as a resident `OctantBlock`.
@@ -88,7 +88,7 @@ pub fn fetch_block(
         }
     }
 
-    let raw_values = crate::utils::grid::check_and_orient_block_grid(
+    let raw_values = check_and_orient_block_grid(
         raw_values,
         &mut block_shape,
         &mut dim_names,

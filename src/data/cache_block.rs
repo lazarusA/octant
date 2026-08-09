@@ -49,8 +49,8 @@ use zarrs::storage::ReadableWritableListableStorage;
 
 use crate::app::StoreKind;
 use crate::data::octant_block::OctantBlock;
-use crate::utils::zarr::block::fetch_block;
-use crate::utils::zarr::{DimensionSelection, SliceRequest};
+use crate::data::backends::zarr_block::fetch_block;
+use crate::data::slice_request::{DimensionSelection, SliceRequest};
 
 
 // ============================================================

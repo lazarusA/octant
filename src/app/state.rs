@@ -1,11 +1,11 @@
 use crate::cache::{SliceCacheKey, SliceLruCache, SlicePrefetcher};
 use crate::data::matrix_data::MatrixData;
+use crate::data::slice_request::SliceRequest;
 use crate::plots::{
     LineRenderer, MatrixRenderer, PlotType, PointCloudRenderer, SphereRenderer, SurfaceRenderer,
     VolumeRenderer,
 };
 use crate::stores::DatasetMetadata;
-use crate::utils::zarr::SliceRequest;
 use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

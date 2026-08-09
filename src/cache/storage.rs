@@ -18,35 +18,22 @@ use std::error::Error;
 use zarrs::storage::ReadableWritableListableStorage;
 
 use crate::app::StoreKind;
-use crate::utils::zarr::build_sync_store;
+use crate::data::backends::icechunk_storage::build_sync_icechunk_store;
+use crate::data::backends::zarr_storage::{build_sync_store, open_local_storage};
 
 /// Builds a synchronous Zarr storage handle for the given store kind/target.
-///
-/// `ProceduralRandom` has no backing store at all — callers should branch on
-/// `StoreKind::ProceduralRandom` before reaching the block-cache path
-/// entirely, the same way `load_selected_variable_slice` already bypasses
-/// the cache for it.
 pub fn build_storage_for(
     store_kind: StoreKind,
     target: &str,
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error>> {
     match store_kind {
-        StoreKind::RemoteZarr => build_sync_store(target),
+        StoreKind::RemoteZarr => build_sync_store(target).map_err(|e| e as Box<dyn Error>),
 
-        StoreKind::LocalZarr => Err(format!(
-            "block cache: StoreKind::LocalZarr storage construction not yet implemented (target: {target})"
-        )
-        .into()),
+        StoreKind::LocalZarr => open_local_storage(target).map_err(|e| e as Box<dyn Error>),
 
-        StoreKind::RemoteIcechunk => Err(format!(
-            "block cache: StoreKind::RemoteIcechunk storage construction not yet implemented (target: {target})"
-        )
-        .into()),
-
-        StoreKind::LocalIcechunk => Err(format!(
-            "block cache: StoreKind::LocalIcechunk storage construction not yet implemented (target: {target})"
-        )
-        .into()),
+        StoreKind::RemoteIcechunk | StoreKind::LocalIcechunk => {
+            build_sync_icechunk_store(target).map_err(|e| e as Box<dyn Error>)
+        }
 
         StoreKind::ProceduralRandom => Err(
             "block cache: ProceduralRandom has no backing store; callers should bypass the block cache for this kind".into(),

@@ -52,7 +52,7 @@ impl BlockStore for ZarrBlockStore {
     }
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
-        crate::utils::zarr::block::fetch_block(self.storage.clone(), &self.source_url, request)
+        super::zarr_block::fetch_block(self.storage.clone(), &self.source_url, request)
     }
 
     fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {
