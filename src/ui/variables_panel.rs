@@ -132,6 +132,132 @@ fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) {
     }
 }
 
+pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::data::VariableInfo) {
+    let rank = var_info.shape.len();
+
+    app.dim_config = vec![
+        crate::app::DimConfig {
+            spatial: SpatialRole::None,
+            animation: AnimationRole::None,
+            active: false,
+        };
+        rank
+    ];
+    app.selected_dim_indices = vec![0; rank];
+    app.selected_dim_ranges.clear();
+    app.spatial_dims.clear();
+    app.animated_dim = None;
+
+    for i in 0..rank {
+        let dim_size = var_info.shape[i] as usize;
+        let dim_name = var_info
+            .dimension_names
+            .get(i)
+            .cloned()
+            .unwrap_or_else(|| format!("dim_{}", i))
+            .to_lowercase();
+
+        // Check if dim_name contains time, lon/x, lat/y
+        let is_chunk_based = dim_name.contains("time")
+            || dim_name == "t"
+            || dim_name.contains("step")
+            || dim_name.contains("lon")
+            || dim_name == "x"
+            || dim_name.contains("lat")
+            || dim_name == "y";
+
+        let (range_start, range_end) = if is_chunk_based {
+            let chunk_size = var_info.chunk_shape.get(i).copied().unwrap_or(0) as usize;
+            if chunk_size > 0 {
+                (0, chunk_size.min(dim_size).saturating_sub(1))
+            } else {
+                (0, dim_size.saturating_sub(1))
+            }
+        } else {
+            (0, dim_size.saturating_sub(1))
+        };
+
+        app.selected_dim_ranges.push((range_start, range_end));
+    }
+
+    let mut x_assigned = false;
+    let mut y_assigned = false;
+    let mut z_assigned = false;
+    let mut anim_assigned = false;
+
+    for i in 0..rank {
+        let dim_name = var_info
+            .dimension_names
+            .get(i)
+            .cloned()
+            .unwrap_or_default()
+            .to_lowercase();
+
+        if !x_assigned && (dim_name.contains("lon") || dim_name == "x") {
+            app.dim_config[i].spatial = SpatialRole::X;
+            x_assigned = true;
+        } else if !y_assigned && (dim_name.contains("lat") || dim_name == "y") {
+            app.dim_config[i].spatial = SpatialRole::Y;
+            y_assigned = true;
+        } else if !anim_assigned
+            && (dim_name.contains("time") || dim_name == "t" || dim_name.contains("step"))
+        {
+            app.dim_config[i].animation = AnimationRole::Animated;
+            app.animated_dim = Some(i);
+            anim_assigned = true;
+
+            // For volume, Z will be time and Animated
+            if app.active_plot_type == crate::plots::PlotType::Volume && !z_assigned {
+                app.dim_config[i].spatial = SpatialRole::Z;
+                z_assigned = true;
+            }
+        } else if !z_assigned
+            && (dim_name.contains("depth")
+                || dim_name.contains("level")
+                || dim_name.contains("height")
+                || dim_name == "z")
+        {
+            app.dim_config[i].spatial = SpatialRole::Z;
+            z_assigned = true;
+        }
+    }
+
+    // Fallback: assign remaining unassigned dimensions for 2D visualization if needed
+    for i in 0..rank {
+        if app.dim_config[i].spatial == SpatialRole::None
+            && app.dim_config[i].animation == AnimationRole::None
+        {
+            if !y_assigned {
+                app.dim_config[i].spatial = SpatialRole::Y;
+                y_assigned = true;
+            } else if !x_assigned {
+                app.dim_config[i].spatial = SpatialRole::X;
+                x_assigned = true;
+            }
+        }
+    }
+
+    // Synchronize active flags and spatial_dims list
+    for i in 0..rank {
+        let spatial = app.dim_config[i].spatial;
+        let anim = app.dim_config[i].animation;
+        if spatial != SpatialRole::None {
+            app.spatial_dims.push(i);
+        }
+        if spatial != SpatialRole::None || anim == AnimationRole::Animated {
+            app.dim_config[i].active = true;
+        }
+    }
+
+    app.spatial_dims
+        .sort_by_key(|&d| match app.dim_config[d].spatial {
+            SpatialRole::X => 0,
+            SpatialRole::Y => 1,
+            SpatialRole::Z => 2,
+            SpatialRole::None => 99,
+        });
+}
+
 fn show_dimension_sliders(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
@@ -141,24 +267,7 @@ fn show_dimension_sliders(
     let rank = var_info.shape.len();
 
     if app.dim_config.len() != rank {
-        app.dim_config = vec![
-            crate::app::DimConfig {
-                spatial: SpatialRole::None,
-                animation: AnimationRole::None,
-                active: false,
-            };
-            rank
-        ];
-    }
-    if app.selected_dim_indices.len() != rank {
-        app.selected_dim_indices = vec![0; rank];
-    }
-    if app.selected_dim_ranges.len() != rank {
-        app.selected_dim_ranges = var_info
-            .shape
-            .iter()
-            .map(|&s| (0, (s as usize).saturating_sub(1)))
-            .collect();
+        init_variable_dimension_defaults(app, var_info);
     }
 
     for i in 0..rank {
@@ -215,7 +324,13 @@ fn show_dimension_sliders(
                 app.selected_dim_ranges[i] = (start, end);
                 app.selected_dim_indices[i] = start;
             } else {
-                ui.add(DragValue::new(&mut app.selected_dim_indices[i]).range(0..=dim_size - 1));
+                ui.horizontal(|ui| {
+                    ui.label("Index:");
+                    ui.add(egui::Slider::new(
+                        &mut app.selected_dim_indices[i],
+                        0..=dim_size.saturating_sub(1),
+                    ));
+                });
                 app.selected_dim_ranges[i] =
                     (app.selected_dim_indices[i], app.selected_dim_indices[i]);
             }
@@ -226,39 +341,60 @@ fn show_dimension_sliders(
 }
 
 fn apply_role_change(dim: usize, spatial: SpatialRole, anim: AnimationRole, app: &mut OctantApp) {
-    // --- Update spatial role ---
-    app.dim_config[dim].spatial = spatial;
+    let old_spatial = app.dim_config[dim].spatial;
+    let old_anim = app.dim_config[dim].animation;
 
-    // Remove dim from spatial list if needed
-    app.spatial_dims.retain(|&d| d != dim);
-
-    if spatial != SpatialRole::None {
-        app.spatial_dims.push(dim);
-
-        // Sort X,Y,Z order
-        app.spatial_dims
-            .sort_by_key(|&d| match app.dim_config[d].spatial {
-                SpatialRole::X => 0,
-                SpatialRole::Y => 1,
-                SpatialRole::Z => 2,
-                SpatialRole::None => 99,
-            });
-    }
-
-    // --- Update animation role ---
-    app.dim_config[dim].animation = anim;
-
-    if anim == AnimationRole::Animated {
-        // Only one animated dimension allowed
-        app.animated_dim = Some(dim);
-
-        // Remove from spatial dims (cannot be both)
-        app.spatial_dims.retain(|&d| d != dim);
-    } else {
-        if app.animated_dim == Some(dim) {
-            app.animated_dim = None;
+    // --- Uniqueness Enforcement for Spatial Roles ---
+    if spatial != old_spatial && spatial != SpatialRole::None {
+        for j in 0..app.dim_config.len() {
+            if j != dim && app.dim_config[j].spatial == spatial {
+                app.dim_config[j].spatial = SpatialRole::None;
+                if app.dim_config[j].animation == AnimationRole::None {
+                    app.dim_config[j].active = false;
+                }
+            }
         }
     }
+
+    // --- Uniqueness Enforcement for Animation Role ---
+    if anim != old_anim && anim == AnimationRole::Animated {
+        for j in 0..app.dim_config.len() {
+            if j != dim && app.dim_config[j].animation == AnimationRole::Animated {
+                app.dim_config[j].animation = AnimationRole::None;
+                if app.dim_config[j].spatial == SpatialRole::None {
+                    app.dim_config[j].active = false;
+                }
+            }
+        }
+    }
+
+    app.dim_config[dim].spatial = spatial;
+    app.dim_config[dim].animation = anim;
+
+    if spatial != SpatialRole::None || anim == AnimationRole::Animated {
+        app.dim_config[dim].active = true;
+    }
+
+    // Re-build spatial_dims list in X, Y, Z order
+    app.spatial_dims.clear();
+    for j in 0..app.dim_config.len() {
+        if app.dim_config[j].spatial != SpatialRole::None {
+            app.spatial_dims.push(j);
+        }
+    }
+    app.spatial_dims
+        .sort_by_key(|&d| match app.dim_config[d].spatial {
+            SpatialRole::X => 0,
+            SpatialRole::Y => 1,
+            SpatialRole::Z => 2,
+            SpatialRole::None => 99,
+        });
+
+    // Synchronize animated_dim
+    app.animated_dim = app
+        .dim_config
+        .iter()
+        .position(|c| c.animation == AnimationRole::Animated);
 }
 
 pub fn build_slice_request(app: &OctantApp, var_name: &str, shape: &[u64]) -> SliceRequest {
