@@ -48,8 +48,21 @@ impl OctantApp {
             }
             if anim_dim < selections.len() {
                 let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
-                let (start, end) = self.animated_window(full_extent);
-                selections[anim_dim] = DimensionSelection::Range { start, end };
+                let (user_start, user_end) = self
+                    .plotted_selected_dim_ranges
+                    .get(anim_dim)
+                    .copied()
+                    .unwrap_or((0, full_extent.saturating_sub(1)));
+
+                if user_end > user_start {
+                    selections[anim_dim] = DimensionSelection::Range {
+                        start: user_start,
+                        end: (user_end + 1).min(full_extent),
+                    };
+                } else {
+                    let (start, end) = self.animated_window(full_extent);
+                    selections[anim_dim] = DimensionSelection::Range { start, end };
+                }
             }
         }
 
@@ -60,6 +73,23 @@ impl OctantApp {
             "{:?}:{}",
             self.plotted_store_kind, self.plotted_store_target_input
         );
+
+        // 1. Cache HIT: Check if any resident block in memory (e.g. full dataset array) covers current_timestep
+        if let Some(block) = self.block_cache.find_covering_block(
+            &source_id,
+            &var_name,
+            self.plotted_animated_dim,
+            self.current_timestep,
+        ) {
+            self.status_message = format!(
+                "🚀 Block cache HIT for '{}' ({} bytes resident)",
+                block.variable_name,
+                block.bytes_size()
+            );
+            self.apply_block_projection(&block);
+            self.maybe_prefetch_next_window(&shape);
+            return;
+        }
 
         let store_handle = if let Some(dataset) = self.dataset_manager.get(&source_id) {
             dataset.store.clone()
@@ -95,7 +125,7 @@ impl OctantApp {
         let key = block_request.cache_key();
         self.active_block_key = Some(key.clone());
 
-        // 1. Cache HIT: project in memory, no I/O.
+        // 2. Exact Key Cache HIT
         if let Some(block) = self.block_cache.get(&key) {
             self.status_message = format!(
                 "🚀 Block cache HIT for '{}' ({} bytes resident)",
@@ -107,13 +137,13 @@ impl OctantApp {
             return;
         }
 
-        // 2. Cache MISS: dispatch async prefetch request.
+        // 3. Cache MISS: dispatch async prefetch request.
         self.status_message = format!("⏳ [block cache] Downloading window for '{}'...", var_name);
         self.block_prefetcher
             .request(block_request, &self.block_cache);
     }
 
-    /// Prefetches next animation window in the background once past midpoint.
+    /// Prefetches upcoming animation windows in the background to ensure buffer is warm ahead of playback.
     fn maybe_prefetch_next_window(&mut self, shape: &[u64]) {
         if !self.is_playing {
             return;
@@ -122,16 +152,10 @@ impl OctantApp {
             return;
         };
         let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
-        let (start, end) = self.animated_window(full_extent);
-        if end >= full_extent {
-            return;
-        }
-        if self.current_timestep < start + (end - start) / 2 {
-            return;
-        }
+        let (_start, end) = self.animated_window(full_extent);
 
-        let next_start = end;
-        let next_end = (next_start + self.block_window_size.max(1)).min(full_extent);
+        let window = self.block_window_size.max(1);
+        let lookahead_windows = 4; // Look ahead up to 4 windows in parallel
 
         let Some(next_legacy_request) = self.active_slice_request.clone() else {
             return;
@@ -140,14 +164,6 @@ impl OctantApp {
             return;
         }
 
-        let mut selections = next_legacy_request.selections.clone();
-
-        selections[anim_dim] = DimensionSelection::Range {
-            start: next_start,
-            end: next_end,
-        };
-
-        let next_slice_request = SliceRequest::new(next_legacy_request.variable, selections);
         let source_id = format!(
             "{:?}:{}",
             self.plotted_store_kind, self.plotted_store_target_input
@@ -157,9 +173,59 @@ impl OctantApp {
             return;
         };
 
-        let next_block_request = dataset.request(next_slice_request);
-        self.block_prefetcher
-            .request(next_block_request, &self.block_cache);
+        for i in 0..lookahead_windows {
+            let ns = end + i * window;
+            if ns >= full_extent {
+                if self.loop_playback && full_extent > 0 {
+                    let wrap_start = (i * window) % full_extent;
+                    let wrap_end = (wrap_start + window).min(full_extent);
+                    if self.block_cache.covers(
+                        &source_id,
+                        &next_legacy_request.variable,
+                        self.plotted_animated_dim,
+                        wrap_start,
+                    ) {
+                        continue;
+                    }
+                    let mut selections = next_legacy_request.selections.clone();
+                    selections[anim_dim] = DimensionSelection::Range {
+                        start: wrap_start,
+                        end: wrap_end,
+                    };
+                    let req = dataset.request(SliceRequest::new(
+                        next_legacy_request.variable.clone(),
+                        selections,
+                    ));
+                    if !self.block_cache.contains(&req.cache_key()) {
+                        self.block_prefetcher.request(req, &self.block_cache);
+                    }
+                }
+                break;
+            }
+
+            if self.block_cache.covers(
+                &source_id,
+                &next_legacy_request.variable,
+                self.plotted_animated_dim,
+                ns,
+            ) {
+                continue; // Already resident in memory! Skip prefetching!
+            }
+
+            let ne = (ns + window).min(full_extent);
+            let mut selections = next_legacy_request.selections.clone();
+            selections[anim_dim] = DimensionSelection::Range { start: ns, end: ne };
+
+            let req = dataset.request(SliceRequest::new(
+                next_legacy_request.variable.clone(),
+                selections,
+            ));
+            if !self.block_cache.contains(&req.cache_key())
+                && !self.block_prefetcher.request(req, &self.block_cache)
+            {
+                break; // Stop if prefetch thread pool is full
+            }
+        }
     }
 
     /// Full size of the currently animated dimension in the dataset.
