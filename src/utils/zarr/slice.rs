@@ -291,9 +291,8 @@ pub fn fetch_slice_range(
     Ok(vec![single])
 }
 
-/// `pub(crate)` (was private) so `crate::utils::zarr::block::fetch_block` can
-/// reuse the same dtype-conversion logic instead of duplicating it.
-pub(crate) fn retrieve_array_subset_as_f32(
+/// Dtype-conversion helper for reading array subsets as f32.
+pub fn retrieve_array_subset_as_f32(
     array: &Array<dyn zarrs::storage::ReadableWritableListableStorageTraits>,
     subset: &ArraySubset,
 ) -> Result<Vec<f32>, Box<dyn Error>> {

@@ -88,9 +88,10 @@ pub struct OctantApp {
     // Block-cache path (OctantBlock redesign). Independent of the fields
     // above: nothing reads or writes these unless `use_block_cache` is set,
     // so the legacy path keeps working untouched while this is tested.
-    pub block_cache: crate::cache::block_cache::BlockLruCache,
-    pub block_prefetcher: crate::cache::block_cache::BlockPrefetcher,
-    pub active_block_key: Option<crate::cache::block_cache::BlockCacheKey>,
+    pub dataset_manager: crate::data::DatasetManager,
+    pub block_cache: crate::data::BlockCache,
+    pub block_prefetcher: crate::data::BlockPrefetcher,
+    pub active_block_key: Option<crate::data::BlockCacheKey>,
     pub use_block_cache: bool,
     /// Number of frames fetched per hyperslab request along the animated
     /// dimension. Frames within an already-fetched window are pure cache
@@ -197,8 +198,9 @@ impl OctantApp {
             max_cache_mb: default_cache_mb,
             prefetch_lookahead: 24,
 
-            block_cache: crate::cache::block_cache::BlockLruCache::new(default_cache_mb * 1024 * 1024),
-            block_prefetcher: crate::cache::block_cache::BlockPrefetcher::new(),
+            dataset_manager: crate::data::DatasetManager::new(),
+            block_cache: crate::data::BlockCache::new(default_cache_mb * 1024 * 1024),
+            block_prefetcher: crate::data::BlockPrefetcher::new(),
             active_block_key: None,
             use_block_cache: false,
             block_window_size: 32,
