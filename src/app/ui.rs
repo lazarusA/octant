@@ -46,6 +46,38 @@ impl eframe::App for OctantApp {
                             self.animated_dim = None;
                         }
 
+                        let source_id =
+                            format!("{:?}:{}", self.selected_store_kind, self.store_target_input);
+                        let kind = match self.selected_store_kind {
+                            crate::app::StoreKind::RemoteZarr => {
+                                crate::data::DataSourceKind::RemoteZarr
+                            }
+                            crate::app::StoreKind::LocalZarr => {
+                                crate::data::DataSourceKind::LocalZarr
+                            }
+                            crate::app::StoreKind::RemoteIcechunk => {
+                                crate::data::DataSourceKind::RemoteIcechunk
+                            }
+                            crate::app::StoreKind::LocalIcechunk => {
+                                crate::data::DataSourceKind::LocalIcechunk
+                            }
+                            crate::app::StoreKind::ProceduralRandom => {
+                                crate::data::DataSourceKind::Other("ProceduralRandom".into())
+                            }
+                        };
+                        let data_source = crate::data::DataSource::new(
+                            &source_id,
+                            kind,
+                            &self.store_target_input,
+                            &metadata.name,
+                        );
+                        if let Ok(store) = crate::data::SourceFactory::open(data_source.clone()) {
+                            let mut dataset =
+                                crate::data::Dataset::new(&source_id, data_source, store);
+                            dataset.metadata = Some(metadata.clone());
+                            self.dataset_manager.add(dataset);
+                        }
+
                         self.active_dataset_metadata = Some(metadata);
                         self.selected_variable_idx = 0;
                     }

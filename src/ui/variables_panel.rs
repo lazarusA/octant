@@ -77,10 +77,10 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     // for the other store kinds.
                     ui.add_space(2.0);
                     ui.horizontal(|ui| {
-                        ui.checkbox(
-                            &mut app.use_block_cache,
-                            "🧊 Use block cache (proposal workflow)",
-                        );
+                        // ui.checkbox(
+                        //     &mut app.use_block_cache,
+                        //     "🧊 Use block cache (proposal workflow)",
+                        // );
                         if app.use_block_cache
                             && app.selected_store_kind != crate::app::StoreKind::RemoteZarr
                             && app.selected_store_kind != crate::app::StoreKind::LocalZarr
