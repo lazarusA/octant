@@ -1,12 +1,13 @@
 //! Icechunk implementation of the generic BlockStore abstraction.
 
+use super::icechunk_storage::build_sync_icechunk_store;
+use super::zarr_block;
 use crate::data::{
     block_request::BlockResult,
     block_store::{BlockStore, BlockStoreError},
     octant_block::OctantBlock,
     slice_request::SliceRequest,
 };
-use crate::utils::icechunk::store::build_sync_icechunk_store;
 
 pub struct IcechunkBlockStore {
     storage: zarrs::storage::ReadableWritableListableStorage,
@@ -46,7 +47,7 @@ impl BlockStore for IcechunkBlockStore {
     }
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
-        crate::utils::zarr::block::fetch_block(self.storage.clone(), &self.source_url, request)
+        zarr_block::fetch_block(self.storage.clone(), &self.source_url, request)
     }
 
     fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {

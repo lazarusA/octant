@@ -133,13 +133,15 @@ pub fn read_coord_bounds_with_rank(
     let subset_start = ArraySubset::new_with_ranges(&[0..1]);
     let subset_end = ArraySubset::new_with_ranges(&[(len as u64 - 1)..len as u64]);
 
-    let v_start = crate::utils::zarr::slice::retrieve_array_subset_as_f32(&array, &subset_start)
-        .ok()
-        .and_then(|v| v.first().map(|&x| x as f64))?;
+    let v_start =
+        crate::data::backends::zarr_slice::retrieve_array_subset_as_f32(&array, &subset_start)
+            .ok()
+            .and_then(|v| v.first().map(|&x| x as f64))?;
 
-    let v_end = crate::utils::zarr::slice::retrieve_array_subset_as_f32(&array, &subset_end)
-        .ok()
-        .and_then(|v| v.first().map(|&x| x as f64))?;
+    let v_end =
+        crate::data::backends::zarr_slice::retrieve_array_subset_as_f32(&array, &subset_end)
+            .ok()
+            .and_then(|v| v.first().map(|&x| x as f64))?;
 
     Some((v_start, v_end))
 }

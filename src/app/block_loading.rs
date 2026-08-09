@@ -46,17 +46,7 @@ impl OctantApp {
         let shape = var_info.shape.clone();
 
         let legacy_request = build_slice_request(self, &var_name, &shape);
-        let mut selections: Vec<DimensionSelection> = legacy_request
-            .selections
-            .iter()
-            .map(|sel| match sel {
-                crate::utils::zarr::DimensionSelection::Index(i) => DimensionSelection::Index(*i),
-                crate::utils::zarr::DimensionSelection::Range(r) => DimensionSelection::Range {
-                    start: r.start,
-                    end: r.end,
-                },
-            })
-            .collect();
+        let mut selections = legacy_request.selections.clone();
 
         if let Some(anim_dim) = self.animated_dim {
             self.selected_dim_indices[anim_dim] = self.current_timestep;
@@ -68,21 +58,7 @@ impl OctantApp {
         }
 
         let slice_request = SliceRequest::new(&var_name, selections);
-        self.active_slice_request = Some(crate::utils::zarr::SliceRequest {
-            variable: var_name.clone(),
-            selections: slice_request
-                .selections
-                .iter()
-                .map(|s| match s {
-                    DimensionSelection::Index(i) => {
-                        crate::utils::zarr::DimensionSelection::Index(*i)
-                    }
-                    DimensionSelection::Range { start, end } => {
-                        crate::utils::zarr::DimensionSelection::Range(*start..*end)
-                    }
-                })
-                .collect(),
-        });
+        self.active_slice_request = Some(slice_request.clone());
 
         let source_id = format!("{:?}:{}", self.selected_store_kind, self.store_target_input);
 
@@ -161,17 +137,7 @@ impl OctantApp {
             return;
         }
 
-        let mut selections: Vec<DimensionSelection> = next_legacy_request
-            .selections
-            .iter()
-            .map(|sel| match sel {
-                crate::utils::zarr::DimensionSelection::Index(i) => DimensionSelection::Index(*i),
-                crate::utils::zarr::DimensionSelection::Range(r) => DimensionSelection::Range {
-                    start: r.start,
-                    end: r.end,
-                },
-            })
-            .collect();
+        let mut selections = next_legacy_request.selections.clone();
 
         selections[anim_dim] = DimensionSelection::Range {
             start: next_start,
