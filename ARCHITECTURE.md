@@ -150,3 +150,13 @@ Modular UI components integrated with `OctantApp`.
 1. Add a new enum variant to `PlotType` in [`plot_type.rs`](https://github.com/lazarusA/octant/blob/main/src/plots/plot_type.rs).
 2. Create `src/plots/your_renderer.rs` implementing a WGPU rendering pipeline.
 3. Instantiate the renderer in `OctantApp::new` and dispatch rendering in [`src/app/ui.rs`](https://github.com/lazarusA/octant/blob/main/src/app/ui.rs).
+
+---
+
+## 🔮 Future Architectural Roadmap: Multi-Variable Plotting
+
+- **Multi-Layer Rendering Pipeline**: The strict separation between transient exploration state (`active_dataset_metadata`, `dim_config`) and active plotted state (`plotted_dataset_metadata`, `plotted_dim_config`, `plotted_selected_dim_ranges`, etc.) is designed to easily expand into a `Vec<PlottedVariableState>` or multi-layer pipeline.
+- **Dimensional Compatibility Verification**: Variables across the same or different datasets with matching spatial ranks, shape dimensions, or spatial grid coordinates can be validated for dimensional compatibility and combined into:
+  - Vector field overlays (e.g., $u$ and $v$ wind/current velocity components).
+  - Multi-channel RGB/false-color composite layers.
+  - Dual-curve line plots and multi-variable volumetric renderings.
