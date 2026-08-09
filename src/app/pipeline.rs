@@ -118,6 +118,12 @@ impl OctantApp {
         self.matrix_data = Some(data);
     }
 
+    pub fn reset_variable_bounds(&mut self) {
+        self.global_data_min = f32::MAX;
+        self.global_data_max = f32::MIN;
+        self.lock_color_bounds = false;
+    }
+
     pub fn get_color_params(&self) -> crate::plots::common::PlotColorParams {
         let effective_colormap = self.preview_colormap.unwrap_or(self.active_colormap);
 

@@ -76,6 +76,11 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     // inline rather than letting the toggle silently no-op
                     // for the other store kinds.
                     if should_plot {
+                        app.plotted_store_kind = app.selected_store_kind;
+                        app.plotted_store_target_input = app.store_target_input.clone();
+                        app.plotted_dataset_metadata = app.active_dataset_metadata.clone();
+                        app.plotted_variable_idx = app.selected_variable_idx;
+                        app.reset_variable_bounds();
                         app.load_selected_variable_block();
                     }
 
@@ -401,8 +406,13 @@ pub fn build_slice_request(app: &OctantApp, var_name: &str, shape: &[u64]) -> Sl
     let selections = shape
         .iter()
         .enumerate()
-        .map(|(i, _)| {
-            let (start, end) = app.selected_dim_ranges[i];
+        .map(|(i, &s)| {
+            let dim_size = s as usize;
+            let (start, end) = app
+                .selected_dim_ranges
+                .get(i)
+                .copied()
+                .unwrap_or((0, dim_size.saturating_sub(1)));
             if start == end {
                 DimensionSelection::Index(start)
             } else {

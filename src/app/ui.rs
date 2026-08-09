@@ -24,12 +24,7 @@ impl eframe::App for OctantApp {
                             metadata.name,
                             metadata.variables.len()
                         );
-                        self.show_variables_overlay = !self.show_variables_overlay;
-                        if let Some(first_var) = metadata.variables.first() {
-                            crate::ui::variables_panel::init_variable_dimension_defaults(
-                                self, first_var,
-                            );
-                        }
+                        self.show_variables_overlay = true;
 
                         let source_id =
                             format!("{:?}:{}", self.selected_store_kind, self.store_target_input);

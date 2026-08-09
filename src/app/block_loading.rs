@@ -27,14 +27,12 @@ impl OctantApp {
 
     /// Block-cache equivalent of `load_selected_variable_slice`.
     pub fn load_selected_variable_block(&mut self) {
-        self.show_settings_panel = true;
-
-        let Some(metadata) = &self.active_dataset_metadata else {
-            self.status_message = "No dataset metadata loaded.".to_string();
+        let Some(metadata) = &self.plotted_dataset_metadata else {
+            self.status_message = "No plotted dataset metadata loaded.".to_string();
             return;
         };
-        let Some(var_info) = metadata.variables.get(self.selected_variable_idx) else {
-            self.status_message = "Invalid variable index.".to_string();
+        let Some(var_info) = metadata.variables.get(self.plotted_variable_idx) else {
+            self.status_message = "Invalid plotted variable index.".to_string();
             return;
         };
 
@@ -56,20 +54,27 @@ impl OctantApp {
         let slice_request = SliceRequest::new(&var_name, selections);
         self.active_slice_request = Some(slice_request.clone());
 
-        let source_id = format!("{:?}:{}", self.selected_store_kind, self.store_target_input);
+        let source_id = format!(
+            "{:?}:{}",
+            self.plotted_store_kind, self.plotted_store_target_input
+        );
 
         let store_handle = if let Some(dataset) = self.dataset_manager.get(&source_id) {
             dataset.store.clone()
         } else {
-            let kind = match self.selected_store_kind {
+            let kind = match self.plotted_store_kind {
                 StoreKind::RemoteZarr => DataSourceKind::RemoteZarr,
                 StoreKind::LocalZarr => DataSourceKind::LocalZarr,
                 StoreKind::RemoteIcechunk => DataSourceKind::RemoteIcechunk,
                 StoreKind::LocalIcechunk => DataSourceKind::LocalIcechunk,
                 StoreKind::ProceduralRandom => DataSourceKind::Other("ProceduralRandom".into()),
             };
-            let data_source =
-                DataSource::new(&source_id, kind, &self.store_target_input, &metadata.name);
+            let data_source = DataSource::new(
+                &source_id,
+                kind,
+                &self.plotted_store_target_input,
+                &metadata.name,
+            );
 
             match SourceFactory::open(data_source.clone()) {
                 Ok(store) => {
@@ -141,7 +146,10 @@ impl OctantApp {
         };
 
         let next_slice_request = SliceRequest::new(next_legacy_request.variable, selections);
-        let source_id = format!("{:?}:{}", self.selected_store_kind, self.store_target_input);
+        let source_id = format!(
+            "{:?}:{}",
+            self.plotted_store_kind, self.plotted_store_target_input
+        );
 
         let Some(dataset) = self.dataset_manager.get(&source_id) else {
             return;
@@ -157,9 +165,9 @@ impl OctantApp {
         let Some(anim_dim) = self.animated_dim else {
             return 1;
         };
-        self.active_dataset_metadata
+        self.plotted_dataset_metadata
             .as_ref()
-            .and_then(|meta| meta.variables.get(self.selected_variable_idx))
+            .and_then(|meta| meta.variables.get(self.plotted_variable_idx))
             .and_then(|v| v.shape.get(anim_dim))
             .map(|&s| s as usize)
             .unwrap_or(1)

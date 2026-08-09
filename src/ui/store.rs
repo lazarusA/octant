@@ -155,9 +155,6 @@ fn self_activate_dataset_metadata(app: &mut OctantApp, metadata: crate::data::Da
         metadata.variables.len()
     );
     app.show_variables_overlay = true;
-    if let Some(first_var) = metadata.variables.first() {
-        crate::ui::variables_panel::init_variable_dimension_defaults(app, first_var);
-    }
     app.active_dataset_metadata = Some(metadata);
     app.selected_variable_idx = 0;
 }
