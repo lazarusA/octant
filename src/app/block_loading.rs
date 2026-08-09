@@ -27,10 +27,6 @@ impl OctantApp {
 
     /// Block-cache equivalent of `load_selected_variable_slice`.
     pub fn load_selected_variable_block(&mut self) {
-        if !self.use_block_cache {
-            return;
-        }
-
         self.show_settings_panel = true;
 
         let Some(metadata) = &self.active_dataset_metadata else {
@@ -214,11 +210,10 @@ impl OctantApp {
             .map(|(i, &idx)| idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0)))
             .collect();
 
-        let Some(matrix_slice) = block.matrix_slice(
+        let Some(mdata) = block.slice_2d(
             x_dim,
             y_dim,
             &fixed_indices,
-            self.current_timestep,
             self.animated_dim_extent(),
             &format!("Block Cache [{}]", block.variable_name),
         ) else {
@@ -227,15 +222,6 @@ impl OctantApp {
             return;
         };
 
-        let mdata = crate::data::matrix_data::MatrixData::new(
-            matrix_slice.width,
-            matrix_slice.height,
-            matrix_slice.values,
-            matrix_slice.min_val,
-            matrix_slice.max_val,
-            matrix_slice.dataset_name,
-            matrix_slice.max_timesteps,
-        );
         self.rebuild_pipeline_with_matrix_data(mdata);
         self.status_message = format!(
             "{}  [x_dim={x_dim} y_dim={y_dim} anim_dim={anim_dim:?} t={}]",
@@ -245,10 +231,6 @@ impl OctantApp {
 
     /// Drains completed block-cache prefetch results.
     pub fn poll_block_prefetch_results(&mut self) {
-        if !self.use_block_cache {
-            return;
-        }
-
         let completed = self.block_prefetcher.poll();
         for res in completed {
             match res.result {

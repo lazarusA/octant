@@ -6,8 +6,6 @@
 
 use std::collections::HashMap;
 
-use crate::stores::MatrixSlice;
-
 #[derive(Debug, Clone)]
 pub struct OctantBlock {
     pub variable_name: String,
@@ -124,15 +122,14 @@ impl OctantBlock {
             .and_then(|i| self.values.get(i).copied())
     }
 
-    pub fn matrix_slice(
+    pub fn slice_2d(
         &self,
         x_dim: usize,
         y_dim: usize,
         fixed_indices: &[usize],
-        timestep: usize,
         max_timesteps: usize,
         dataset_name: &str,
-    ) -> Option<MatrixSlice> {
+    ) -> Option<crate::data::matrix_data::MatrixData> {
         if x_dim == y_dim
             || x_dim >= self.rank()
             || y_dim >= self.rank()
@@ -170,18 +167,15 @@ impl OctantBlock {
             (0.0, 1.0)
         };
 
-        Some(MatrixSlice {
-            variable_name: self.variable_name.clone(),
+        Some(crate::data::matrix_data::MatrixData::new(
             width,
             height,
             values,
             min_val,
             max_val,
-            shape: self.shape.iter().map(|&s| s as u64).collect(),
-            current_timestep: timestep,
+            dataset_name.to_string(),
             max_timesteps,
-            dataset_name: dataset_name.to_string(),
-        })
+        ))
     }
 
     pub fn volume(
