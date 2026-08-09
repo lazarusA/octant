@@ -18,9 +18,9 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
     // Read active min_val and max_val bounds (locked or dynamic)
     let (min_val, max_val) = (app.color_range_min, app.color_range_max);
 
-    let var_name = if let Some(meta) = &app.active_dataset_metadata {
+    let var_name = if let Some(meta) = &app.plotted_dataset_metadata {
         meta.variables
-            .get(app.selected_variable_idx)
+            .get(app.plotted_variable_idx)
             .map(|v| {
                 if let Some(unit) = &v.attributes.get("units") {
                     format!("{} ({})", v.name, unit)
