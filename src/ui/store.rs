@@ -81,7 +81,57 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                     } else {
                         ui.label("No dataset metadata loaded yet.");
                     }
+                });
 
+                ui.collapsing("🧊 Dataset Manager", |ui| {
+                    if app.dataset_manager.is_empty() {
+                        ui.label("No active datasets in DatasetManager.");
+                    } else {
+                        ui.label(format!("Active Datasets: {}", app.dataset_manager.len()));
+                        ui.add_space(4.0);
+
+                        let datasets: Vec<(String, String, String, Option<crate::data::DatasetMetadata>, crate::data::DataSourceKind)> = app
+                            .dataset_manager
+                            .iter()
+                            .map(|d| (
+                                d.id.clone(),
+                                d.source.display_name.clone(),
+                                d.source.uri.clone(),
+                                d.metadata.clone(),
+                                d.source.kind.clone(),
+                            ))
+                            .collect();
+
+                        for (_id, display_name, uri, metadata, kind) in datasets {
+                            let is_active = app.store_target_input == uri;
+                            let label_text = format!("• {} [{}]", display_name, uri);
+
+                            if ui.selectable_label(is_active, egui::RichText::new(label_text).strong()).clicked() {
+                                app.store_target_input = uri;
+                                match kind {
+                                    crate::data::DataSourceKind::RemoteZarr => app.selected_store_kind = StoreKind::RemoteZarr,
+                                    crate::data::DataSourceKind::LocalZarr => app.selected_store_kind = StoreKind::LocalZarr,
+                                    crate::data::DataSourceKind::RemoteIcechunk => app.selected_store_kind = StoreKind::RemoteIcechunk,
+                                    crate::data::DataSourceKind::LocalIcechunk => app.selected_store_kind = StoreKind::LocalIcechunk,
+                                    _ => app.selected_store_kind = StoreKind::ProceduralRandom,
+                                }
+
+                                if let Some(meta) = metadata {
+                                    self_activate_dataset_metadata(app, meta);
+                                } else {
+                                    app.inspect_active_store();
+                                }
+                            }
+                        }
+                    }
+                    ui.separator();
+                    ui.label(format!("BlockCache Entries: {}", app.block_cache.cached_count()));
+                    ui.label(format!(
+                        "BlockCache Size: {:.2} MB / {:.2} MB",
+                        app.block_cache.current_bytes() as f64 / (1024.0 * 1024.0),
+                        app.block_cache.max_bytes() as f64 / (1024.0 * 1024.0)
+                    ));
+                    ui.label(format!("BlockCache Hit Rate: {:.1}%", app.block_cache.hit_rate()));
                 });
             });
         });
@@ -96,4 +146,15 @@ pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     {
         app.show_left_panel = !app.show_left_panel;
     }
+}
+
+fn self_activate_dataset_metadata(app: &mut OctantApp, metadata: crate::data::DatasetMetadata) {
+    app.status_message = format!(
+        "Activated dataset '{}' (Found {} variables)",
+        metadata.name,
+        metadata.variables.len()
+    );
+    app.show_variables_overlay = true;
+    app.active_dataset_metadata = Some(metadata);
+    app.selected_variable_idx = 0;
 }

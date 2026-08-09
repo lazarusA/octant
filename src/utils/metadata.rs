@@ -1,4 +1,4 @@
-use crate::stores::VariableInfo;
+use crate::data::VariableInfo;
 use crate::utils::units::calculate_variable_size_bytes;
 use std::collections::HashMap;
 use std::error::Error;
