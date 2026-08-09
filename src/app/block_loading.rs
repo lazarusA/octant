@@ -248,6 +248,11 @@ impl OctantApp {
             .map(|(i, &idx)| idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0)))
             .collect();
 
+        eprintln!(
+            "[apply_block_projection] block var='{}', shape={:?}, dim_names={:?}, x_dim={x_dim}, y_dim={y_dim}, fixed_indices={:?}",
+            block.variable_name, block.shape, block.dimension_names, fixed_indices
+        );
+
         let Some(matrix_slice) = block.matrix_slice(
             x_dim,
             y_dim,

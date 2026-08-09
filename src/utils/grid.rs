@@ -46,7 +46,18 @@ pub fn check_and_orient_axes_with_coords(
         (raw_values, in_width, in_height)
     };
 
-    // 2. Determine Y (Latitude) orientation directly from axis coordinate values or explicit metadata
+    let lat_dim = dim_names
+        .iter()
+        .find(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
+    let lon_dim = dim_names
+        .iter()
+        .find(|d| d.to_lowercase().contains("lon") || d.to_lowercase() == "x");
+
+    eprintln!(
+        "[check_and_orient_axes_with_coords] in_w={in_width}, in_h={in_height}, dims={:?}, lat_dim={:?}, lon_dim={:?}, lat_coords={:?}, lon_coords={:?}",
+        dim_names, lat_dim, lon_dim, lat_coords, lon_coords
+    );
+
     let mut flip_y = false;
 
     if let Some(coords) = lat_coords {
@@ -76,6 +87,13 @@ pub fn check_and_orient_axes_with_coords(
         && positive_attr.to_lowercase() == "up"
     {
         flip_y = true;
+    } else {
+        let is_lat_dim = dim_names
+            .iter()
+            .any(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
+        if is_lat_dim {
+            flip_y = true;
+        }
     }
 
     if flip_y && height > 1 {
@@ -117,6 +135,10 @@ pub fn check_and_orient_axes_with_coords(
         }
     }
 
+    eprintln!(
+        "[check_and_orient_axes_with_coords] DONE -> needs_transpose={needs_transpose}, flip_y={flip_y}, flip_x={flip_x}, out_w={width}, out_h={height}"
+    );
+
     (current_values, width, height)
 }
 
@@ -134,6 +156,13 @@ pub fn check_and_orient_block_grid(
         return values;
     }
 
+    eprintln!(
+        "[check_and_orient_block_grid] START block_shape={:?}, dim_names={:?}, coords_keys={:?}",
+        block_shape,
+        dimension_names,
+        coordinates.keys().collect::<Vec<_>>()
+    );
+
     let lat_dim = dimension_names
         .iter()
         .find(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
@@ -143,9 +172,24 @@ pub fn check_and_orient_block_grid(
 
     let lat_coords = lat_dim
         .and_then(|d| coordinates.get(d))
+        .or_else(|| dimension_names.get(rank - 2).and_then(|d| coordinates.get(d)))
+        .or_else(|| {
+            coordinates
+                .iter()
+                .find(|(k, _)| k.contains("lat") || *k == "y")
+                .map(|(_, v)| v)
+        })
         .map(|v| v.as_slice());
+
     let lon_coords = lon_dim
         .and_then(|d| coordinates.get(d))
+        .or_else(|| dimension_names.get(rank - 1).and_then(|d| coordinates.get(d)))
+        .or_else(|| {
+            coordinates
+                .iter()
+                .find(|(k, _)| k.contains("lon") || *k == "x")
+                .map(|(_, v)| v)
+        })
         .map(|v| v.as_slice());
 
     let in_height = block_shape[rank - 2];
