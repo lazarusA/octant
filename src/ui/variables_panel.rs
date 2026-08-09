@@ -75,32 +75,8 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     // (see cache::storage::build_storage_for); flag that
                     // inline rather than letting the toggle silently no-op
                     // for the other store kinds.
-                    ui.add_space(2.0);
-                    ui.horizontal(|ui| {
-                        // ui.checkbox(
-                        //     &mut app.use_block_cache,
-                        //     "🧊 Use block cache (proposal workflow)",
-                        // );
-                        if app.use_block_cache
-                            && app.selected_store_kind != crate::app::StoreKind::RemoteZarr
-                            && app.selected_store_kind != crate::app::StoreKind::LocalZarr
-                        {
-                            ui.label(
-                                egui::RichText::new(
-                                    "⚠ backend not implemented for this store kind yet",
-                                )
-                                .small()
-                                .weak(),
-                            );
-                        }
-                    });
-
                     if should_plot {
-                        if app.use_block_cache {
-                            app.load_selected_variable_block();
-                        } else {
-                            app.load_selected_variable_slice();
-                        }
+                        app.load_selected_variable_block();
                     }
 
                     ui.add_space(4.0);

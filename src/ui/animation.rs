@@ -26,7 +26,7 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             } else if max_steps > 0 {
                 app.current_timestep = max_steps - 1;
             }
-            app.load_selected_variable_slice();
+            app.load_selected_variable_block();
         }
 
         // Step Next
@@ -34,7 +34,7 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             if max_steps > 0 {
                 app.current_timestep = (app.current_timestep + 1) % max_steps;
             }
-            app.load_selected_variable_slice();
+            app.load_selected_variable_block();
         }
 
         // Loop Toggle Checkbox
@@ -49,7 +49,7 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .trailing_fill(true),
         );
         if slider_res.drag_stopped() || (slider_res.changed() && !app.is_playing) {
-            app.load_selected_variable_slice();
+            app.load_selected_variable_block();
         }
 
         // FPS Speed Menu Dropdown

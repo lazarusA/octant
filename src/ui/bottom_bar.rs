@@ -60,7 +60,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             } else if max_steps > 0 {
                 app.current_timestep = max_steps - 1;
             }
-            app.load_selected_variable_slice();
+            app.load_selected_variable_block();
         }
 
         // 3. Next Step
@@ -68,7 +68,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             if max_steps > 0 {
                 app.current_timestep = (app.current_timestep + 1) % max_steps;
             }
-            app.load_selected_variable_slice();
+            app.load_selected_variable_block();
         }
 
         // 4. Loop Toggle
@@ -195,7 +195,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .trailing_fill(true),
         );
         if slider_res.drag_stopped() || (slider_res.changed() && !app.is_playing) {
-            app.load_selected_variable_slice();
+            app.load_selected_variable_block();
         }
 
         ui.small(format!("⏱ {}", step_size_str));

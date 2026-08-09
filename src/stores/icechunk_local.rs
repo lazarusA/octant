@@ -1,4 +1,4 @@
-use super::{DataStore, DatasetMetadata, MatrixSlice, VariableInfo};
+use super::{DataStore, DatasetMetadata, VariableInfo};
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -79,25 +79,6 @@ impl DataStore for IcechunkLocalStore {
             store_type: self.store_type().to_string(),
             variables,
             dimension_coordinates: std::collections::HashMap::new(),
-        })
-    }
-
-    fn fetch_slice(&self, variable: &str, timestep: usize) -> Result<MatrixSlice, Box<dyn Error>> {
-        let (width, height) = (64, 64);
-        let (raw_data, min_val, max_val) =
-            crate::data::procedural::generate_procedural_matrix(width, height, timestep);
-
-        Ok(MatrixSlice {
-            variable_name: variable.to_string(),
-            width,
-            height,
-            values: raw_data,
-            min_val,
-            max_val,
-            shape: vec![365, height as u64, width as u64],
-            current_timestep: timestep,
-            max_timesteps: 365,
-            dataset_name: format!("Local Icechunk [{}]", variable),
         })
     }
 }

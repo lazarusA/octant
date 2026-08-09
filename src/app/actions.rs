@@ -30,11 +30,11 @@ impl OctantApp {
             }
             AppAction::SelectVariable(idx) => {
                 self.selected_variable_idx = idx;
-                self.load_selected_variable_slice();
+                self.load_selected_variable_block();
             }
             AppAction::SetTimestep(step) => {
                 self.current_timestep = step;
-                self.load_selected_variable_slice();
+                self.load_selected_variable_block();
             }
             AppAction::SetPlotType(plot_type) => {
                 self.active_plot_type = plot_type;

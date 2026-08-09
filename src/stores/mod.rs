@@ -30,46 +30,7 @@ pub struct VariableInfo {
     pub attributes: HashMap<String, String>,
 }
 
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct MatrixSlice {
-    pub variable_name: String,
-    pub width: usize,
-    pub height: usize,
-    pub values: Vec<f32>,
-    pub min_val: f32,
-    pub max_val: f32,
-    pub shape: Vec<u64>,
-    pub current_timestep: usize,
-    pub max_timesteps: usize,
-    pub dataset_name: String,
-}
-
-impl MatrixSlice {
-    pub fn bytes_size(&self) -> usize {
-        self.values.len() * std::mem::size_of::<f32>()
-            + self.variable_name.len()
-            + self.dataset_name.len()
-            + std::mem::size_of::<Self>()
-    }
-}
-
 pub trait DataStore: Send + Sync {
     fn store_type(&self) -> &'static str;
     fn inspect(&self) -> Result<DatasetMetadata, Box<dyn Error>>;
-    fn fetch_slice(&self, variable: &str, timestep: usize) -> Result<MatrixSlice, Box<dyn Error>>;
-
-    fn fetch_slice_range(
-        &self,
-        variable: &str,
-        start_step: usize,
-        count: usize,
-    ) -> Result<Vec<MatrixSlice>, Box<dyn Error>> {
-        let mut slices = Vec::with_capacity(count);
-        for i in 0..count {
-            let slice = self.fetch_slice(variable, start_step + i)?;
-            slices.push(slice);
-        }
-        Ok(slices)
-    }
 }

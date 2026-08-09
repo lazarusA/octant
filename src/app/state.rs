@@ -1,4 +1,3 @@
-use crate::cache::{SliceCacheKey, SliceLruCache, SlicePrefetcher};
 use crate::data::matrix_data::MatrixData;
 use crate::data::slice_request::SliceRequest;
 use crate::plots::{
@@ -79,28 +78,15 @@ pub struct OctantApp {
     pub is_categorical: bool,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
-    // LRU Cache & Prefetcher State (legacy MatrixSlice path)
-    pub lru_cache: SliceLruCache,
-    pub prefetcher: SlicePrefetcher,
-    pub max_cache_mb: usize,
-    pub prefetch_lookahead: usize,
-
-    // Block-cache path (OctantBlock redesign). Independent of the fields
-    // above: nothing reads or writes these unless `use_block_cache` is set,
-    // so the legacy path keeps working untouched while this is tested.
+    // Block-cache & Prefetcher State
     pub dataset_manager: crate::data::DatasetManager,
     pub block_cache: crate::data::BlockCache,
     pub block_prefetcher: crate::data::BlockPrefetcher,
     pub active_block_key: Option<crate::data::BlockCacheKey>,
-    pub use_block_cache: bool,
-    /// Number of frames fetched per hyperslab request along the animated
-    /// dimension. Frames within an already-fetched window are pure cache
-    /// hits (no I/O); only crossing a window boundary triggers a new fetch.
+    pub max_cache_mb: usize,
     pub block_window_size: usize,
 
     // Animation & Playback Controls
-    pub is_fetching_slice: bool,
-    pub active_requested_key: Option<SliceCacheKey>,
     pub metadata_rx: Option<std::sync::mpsc::Receiver<Result<DatasetMetadata, String>>>,
     pub is_playing: bool,
     pub playback_fps: f32,
@@ -193,20 +179,13 @@ impl OctantApp {
             is_categorical: false,
             wgpu_render_state,
 
-            lru_cache: SliceLruCache::new(default_cache_mb * 1024 * 1024),
-            prefetcher: SlicePrefetcher::new(),
-            max_cache_mb: default_cache_mb,
-            prefetch_lookahead: 24,
-
             dataset_manager: crate::data::DatasetManager::new(),
             block_cache: crate::data::BlockCache::new(default_cache_mb * 1024 * 1024),
             block_prefetcher: crate::data::BlockPrefetcher::new(),
             active_block_key: None,
-            use_block_cache: true,
+            max_cache_mb: default_cache_mb,
             block_window_size: 32,
 
-            is_fetching_slice: false,
-            active_requested_key: None,
             metadata_rx: None,
             is_playing: false,
             playback_fps: 15.0,

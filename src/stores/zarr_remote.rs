@@ -1,4 +1,4 @@
-use super::{DataStore, DatasetMetadata, MatrixSlice};
+use super::{DataStore, DatasetMetadata};
 use crate::utils as zarr_utils;
 use std::error::Error;
 
@@ -35,37 +35,5 @@ impl DataStore for ZarrRemoteStore {
             variables,
             dimension_coordinates: std::collections::HashMap::new(),
         })
-    }
-
-    fn fetch_slice(&self, variable: &str, timestep: usize) -> Result<MatrixSlice, Box<dyn Error>> {
-        let (width, height) = (64, 64);
-        let (raw_data, min_val, max_val) =
-            crate::data::procedural::generate_procedural_matrix(width, height, timestep);
-
-        Ok(MatrixSlice {
-            variable_name: variable.to_string(),
-            width,
-            height,
-            values: raw_data,
-            min_val,
-            max_val,
-            shape: vec![height as u64, width as u64],
-            current_timestep: timestep,
-            max_timesteps: 1,
-            dataset_name: format!("Remote Zarr [{}]", variable),
-        })
-    }
-
-    fn fetch_slice_range(
-        &self,
-        variable: &str,
-        start_step: usize,
-        count: usize,
-    ) -> Result<Vec<MatrixSlice>, Box<dyn Error>> {
-        let mut fallback = Vec::with_capacity(count);
-        for i in 0..count {
-            fallback.push(self.fetch_slice(variable, start_step + i)?);
-        }
-        Ok(fallback)
     }
 }
