@@ -1,4 +1,4 @@
-use crate::app::{AnimationRole, DimConfig, OctantApp, SpatialRole};
+use crate::app::OctantApp;
 
 pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
     if !app.show_variables_overlay {
@@ -52,25 +52,28 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                     return;
                                 }
 
-                                let Some(metadata) = &app.active_dataset_metadata else {
-                                    ui.vertical_centered(|ui| {
-                                        ui.add_space(10.0);
+                                let variables = match &app.active_dataset_metadata {
+                                    Some(meta) => meta.variables.clone(),
+                                    None => {
+                                        ui.vertical_centered(|ui| {
+                                            ui.add_space(10.0);
 
-                                        ui.label("No store metadata loaded yet.");
+                                            ui.label("No store metadata loaded yet.");
 
-                                        ui.add_space(6.0);
+                                            ui.add_space(6.0);
 
-                                        if ui.button("🔍 Fetch / Load Store Metadata").clicked() {
-                                            app.inspect_active_store();
-                                        }
+                                            if ui.button("🔍 Fetch / Load Store Metadata").clicked() {
+                                                app.inspect_active_store();
+                                            }
 
-                                        ui.add_space(10.0);
-                                    });
+                                            ui.add_space(10.0);
+                                        });
 
-                                    return;
+                                        return;
+                                    }
                                 };
 
-                                if metadata.variables.is_empty() {
+                                if variables.is_empty() {
                                     ui.vertical_centered(|ui| {
                                         ui.add_space(10.0);
 
@@ -90,7 +93,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
                                 let search = app.variable_search.to_lowercase();
 
-                                for (idx, var_info) in metadata.variables.iter().enumerate() {
+                                for (idx, var_info) in variables.iter().enumerate() {
                                     if !search.is_empty()
                                         && !var_info.name.to_lowercase().contains(&search)
                                     {
@@ -117,25 +120,9 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                     {
                                         app.selected_variable_idx = idx;
 
-                                        let rank = var_info.shape.len();
-
-                                        app.dim_config = (0..rank)
-                                            .map(|_| DimConfig {
-                                                spatial: SpatialRole::None,
-                                                animation: AnimationRole::None,
-                                                active: false,
-                                            })
-                                            .collect();
-
-                                        app.selected_dim_indices = vec![0; rank];
-
-                                        app.selected_dim_ranges = var_info
-                                            .shape
-                                            .iter()
-                                            .map(|&s| (0, (s as usize).saturating_sub(1)))
-                                            .collect();
-                                        app.spatial_dims.clear();
-                                        app.animated_dim = None;
+                                        crate::ui::variables_panel::init_variable_dimension_defaults(
+                                            app, var_info,
+                                        );
 
                                         app.show_variable_controls = true;
 
