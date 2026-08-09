@@ -8,7 +8,7 @@ use super::{
     store_handle::StoreHandle,
 };
 
-use super::backends::zarr::ZarrBlockStore;
+use super::backends::{icechunk::IcechunkBlockStore, zarr::ZarrBlockStore};
 
 pub struct SourceFactory;
 
@@ -20,11 +20,7 @@ impl SourceFactory {
             DataSourceKind::RemoteZarr => Arc::new(ZarrBlockStore::open_remote(&source.uri)?),
 
             DataSourceKind::LocalIcechunk | DataSourceKind::RemoteIcechunk => {
-                return Err(format!(
-                    "Icechunk backend not yet connected to SourceFactory: {}",
-                    source.uri
-                )
-                .into());
+                Arc::new(IcechunkBlockStore::open(&source.uri)?)
             }
 
             DataSourceKind::NetCdf => {

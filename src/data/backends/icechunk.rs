@@ -1,0 +1,61 @@
+//! Icechunk implementation of the generic BlockStore abstraction.
+
+use crate::data::{
+    block_request::BlockResult,
+    block_store::{BlockStore, BlockStoreError},
+    octant_block::OctantBlock,
+    slice_request::SliceRequest,
+};
+use crate::utils::icechunk::store::build_sync_icechunk_store;
+
+pub struct IcechunkBlockStore {
+    storage: zarrs::storage::ReadableWritableListableStorage,
+    source_url: String,
+}
+
+impl IcechunkBlockStore {
+    pub fn new(
+        storage: zarrs::storage::ReadableWritableListableStorage,
+        source_url: impl Into<String>,
+    ) -> Self {
+        Self {
+            storage,
+            source_url: source_url.into(),
+        }
+    }
+
+    pub fn source_url(&self) -> &str {
+        &self.source_url
+    }
+
+    pub fn open(location: &str) -> Result<Self, BlockStoreError> {
+        let storage = build_sync_icechunk_store(location).map_err(|e| e.to_string())?;
+
+        Ok(Self::new(storage, location))
+    }
+}
+
+impl BlockStore for IcechunkBlockStore {
+    fn backend_name(&self) -> &str {
+        "icechunk"
+    }
+
+    fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
+        // Variable/catalog discovery placeholder.
+        Ok(Vec::new())
+    }
+
+    fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
+        crate::utils::zarr::block::fetch_block(self.storage.clone(), &self.source_url, request)
+    }
+
+    fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {
+        let mut blocks = Vec::with_capacity(requests.len());
+
+        for request in requests {
+            blocks.push(self.fetch_block(request)?);
+        }
+
+        Ok(BlockResult::new(blocks))
+    }
+}
