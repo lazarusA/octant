@@ -83,16 +83,45 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                     }
                 });
 
-                ui.collapsing("🧊 DatasetManager (New Proposal)", |ui| {
+                ui.collapsing("🧊 Dataset Manager", |ui| {
                     if app.dataset_manager.is_empty() {
-                        ui.label("No active Dataset handles in DatasetManager.");
-                        ui.label("Enable 'Use block cache' when plotting to open a StoreHandle.");
+                        ui.label("No active datasets in DatasetManager.");
                     } else {
                         ui.label(format!("Active Datasets: {}", app.dataset_manager.len()));
-                        for dataset in app.dataset_manager.iter() {
-                            ui.label(format!("• ID: {}", dataset.id));
-                            ui.label(format!("  Backend: {}", dataset.store.backend_name()));
-                            ui.label(format!("  URI: {}", dataset.source.uri));
+                        ui.add_space(4.0);
+
+                        let datasets: Vec<(String, String, String, Option<crate::stores::DatasetMetadata>, crate::data::DataSourceKind)> = app
+                            .dataset_manager
+                            .iter()
+                            .map(|d| (
+                                d.id.clone(),
+                                d.source.display_name.clone(),
+                                d.source.uri.clone(),
+                                d.metadata.clone(),
+                                d.source.kind.clone(),
+                            ))
+                            .collect();
+
+                        for (_id, display_name, uri, metadata, kind) in datasets {
+                            let is_active = app.store_target_input == uri;
+                            let label_text = format!("• {} [{}]", display_name, uri);
+
+                            if ui.selectable_label(is_active, egui::RichText::new(label_text).strong()).clicked() {
+                                app.store_target_input = uri;
+                                match kind {
+                                    crate::data::DataSourceKind::RemoteZarr => app.selected_store_kind = StoreKind::RemoteZarr,
+                                    crate::data::DataSourceKind::LocalZarr => app.selected_store_kind = StoreKind::LocalZarr,
+                                    crate::data::DataSourceKind::RemoteIcechunk => app.selected_store_kind = StoreKind::RemoteIcechunk,
+                                    crate::data::DataSourceKind::LocalIcechunk => app.selected_store_kind = StoreKind::LocalIcechunk,
+                                    _ => app.selected_store_kind = StoreKind::ProceduralRandom,
+                                }
+
+                                if let Some(meta) = metadata {
+                                    self_activate_dataset_metadata(app, meta);
+                                } else {
+                                    app.inspect_active_store();
+                                }
+                            }
                         }
                     }
                     ui.separator();
@@ -117,4 +146,34 @@ pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     {
         app.show_left_panel = !app.show_left_panel;
     }
+}
+
+fn self_activate_dataset_metadata(app: &mut OctantApp, metadata: crate::stores::DatasetMetadata) {
+    app.status_message = format!(
+        "Activated dataset '{}' (Found {} variables)",
+        metadata.name,
+        metadata.variables.len()
+    );
+    app.show_variables_overlay = true;
+    if let Some(first_var) = metadata.variables.first() {
+        let rank = first_var.shape.len();
+        app.selected_dim_indices = vec![0; rank];
+        app.selected_dim_ranges = first_var
+            .shape
+            .iter()
+            .map(|&s| (0, (s as usize).saturating_sub(1)))
+            .collect();
+        app.dim_config = vec![
+            crate::app::DimConfig {
+                spatial: crate::app::SpatialRole::None,
+                animation: crate::app::AnimationRole::None,
+                active: false,
+            };
+            rank
+        ];
+        app.spatial_dims.clear();
+        app.animated_dim = None;
+    }
+    app.active_dataset_metadata = Some(metadata);
+    app.selected_variable_idx = 0;
 }

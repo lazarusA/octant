@@ -202,7 +202,7 @@ impl OctantApp {
             block_cache: crate::data::BlockCache::new(default_cache_mb * 1024 * 1024),
             block_prefetcher: crate::data::BlockPrefetcher::new(),
             active_block_key: None,
-            use_block_cache: false,
+            use_block_cache: true,
             block_window_size: 32,
 
             is_fetching_slice: false,

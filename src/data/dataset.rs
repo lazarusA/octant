@@ -15,6 +15,7 @@ pub struct Dataset {
     pub id: String,
     pub source: DataSource,
     pub store: StoreHandle,
+    pub metadata: Option<crate::stores::DatasetMetadata>,
     pub selected_variables: Vec<String>,
 }
 
@@ -24,6 +25,7 @@ impl Dataset {
             id: id.into(),
             source,
             store,
+            metadata: None,
             selected_variables: Vec::new(),
         }
     }
