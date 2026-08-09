@@ -80,6 +80,11 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         app.plotted_store_target_input = app.store_target_input.clone();
                         app.plotted_dataset_metadata = app.active_dataset_metadata.clone();
                         app.plotted_variable_idx = app.selected_variable_idx;
+                        app.plotted_dim_config = app.dim_config.clone();
+                        app.plotted_selected_dim_indices = app.selected_dim_indices.clone();
+                        app.plotted_selected_dim_ranges = app.selected_dim_ranges.clone();
+                        app.plotted_spatial_dims = app.spatial_dims.clone();
+                        app.plotted_animated_dim = app.animated_dim;
                         app.reset_variable_bounds();
                         app.load_selected_variable_block();
                     }
@@ -343,6 +348,8 @@ fn show_dimension_sliders(
 
         ui.add_space(6.0);
     }
+
+    sync_plotted_dim_config_if_active(app);
 }
 
 fn apply_role_change(dim: usize, spatial: SpatialRole, anim: AnimationRole, app: &mut OctantApp) {
@@ -400,6 +407,51 @@ fn apply_role_change(dim: usize, spatial: SpatialRole, anim: AnimationRole, app:
         .dim_config
         .iter()
         .position(|c| c.animation == AnimationRole::Animated);
+
+    sync_plotted_dim_config_if_active(app);
+}
+
+pub fn sync_plotted_dim_config_if_active(app: &mut OctantApp) {
+    let is_same_store = app.store_target_input == app.plotted_store_target_input
+        && app.selected_store_kind == app.plotted_store_kind;
+    let is_same_var = app.selected_variable_idx == app.plotted_variable_idx;
+
+    if is_same_store && is_same_var {
+        app.plotted_dim_config = app.dim_config.clone();
+        app.plotted_selected_dim_indices = app.selected_dim_indices.clone();
+        app.plotted_selected_dim_ranges = app.selected_dim_ranges.clone();
+        app.plotted_spatial_dims = app.spatial_dims.clone();
+        app.plotted_animated_dim = app.animated_dim;
+    }
+}
+
+pub fn build_slice_request_for_plotted(
+    app: &OctantApp,
+    var_name: &str,
+    shape: &[u64],
+) -> SliceRequest {
+    let selections = shape
+        .iter()
+        .enumerate()
+        .map(|(i, &s)| {
+            let dim_size = s as usize;
+            let (start, end) = app
+                .plotted_selected_dim_ranges
+                .get(i)
+                .copied()
+                .unwrap_or((0, dim_size.saturating_sub(1)));
+            if start == end {
+                DimensionSelection::Index(start)
+            } else {
+                DimensionSelection::Range { start, end }
+            }
+        })
+        .collect();
+
+    SliceRequest {
+        variable: var_name.to_string(),
+        selections,
+    }
 }
 
 pub fn build_slice_request(app: &OctantApp, var_name: &str, shape: &[u64]) -> SliceRequest {

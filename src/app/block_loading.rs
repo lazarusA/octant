@@ -9,7 +9,6 @@ use crate::data::{
     BlockRequest, DataSource, DataSourceKind, Dataset, DimensionSelection, SliceRequest,
     SourceFactory,
 };
-use crate::ui::variables_panel::build_slice_request;
 
 use super::OctantApp;
 use super::state::StoreKind;
@@ -39,11 +38,14 @@ impl OctantApp {
         let var_name = var_info.name.clone();
         let shape = var_info.shape.clone();
 
-        let legacy_request = build_slice_request(self, &var_name, &shape);
+        let legacy_request =
+            crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_name, &shape);
         let mut selections = legacy_request.selections.clone();
 
-        if let Some(anim_dim) = self.animated_dim {
-            self.selected_dim_indices[anim_dim] = self.current_timestep;
+        if let Some(anim_dim) = self.plotted_animated_dim {
+            if anim_dim < self.plotted_selected_dim_indices.len() {
+                self.plotted_selected_dim_indices[anim_dim] = self.current_timestep;
+            }
             if anim_dim < selections.len() {
                 let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
                 let (start, end) = self.animated_window(full_extent);
@@ -116,7 +118,7 @@ impl OctantApp {
         if !self.is_playing {
             return;
         }
-        let Some(anim_dim) = self.animated_dim else {
+        let Some(anim_dim) = self.plotted_animated_dim else {
             return;
         };
         let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
@@ -162,7 +164,7 @@ impl OctantApp {
 
     /// Full size of the currently animated dimension in the dataset.
     fn animated_dim_extent(&self) -> usize {
-        let Some(anim_dim) = self.animated_dim else {
+        let Some(anim_dim) = self.plotted_animated_dim else {
             return 1;
         };
         self.plotted_dataset_metadata
@@ -175,9 +177,12 @@ impl OctantApp {
 
     /// Projects a resident block into the current 2D view.
     fn apply_block_projection(&mut self, block: &crate::data::octant_block::OctantBlock) {
-        let anim_dim = self.animated_dim;
+        let anim_dim = self.plotted_animated_dim;
 
-        let explicit_spatial = match (self.spatial_dims.first(), self.spatial_dims.get(1)) {
+        let explicit_spatial = match (
+            self.plotted_spatial_dims.first(),
+            self.plotted_spatial_dims.get(1),
+        ) {
             (Some(&x), Some(&y)) => Some((x, y)),
             _ => None,
         };
@@ -212,7 +217,7 @@ impl OctantApp {
         };
 
         let fixed_indices: Vec<usize> = self
-            .selected_dim_indices
+            .plotted_selected_dim_indices
             .iter()
             .enumerate()
             .map(|(i, &idx)| idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0)))
