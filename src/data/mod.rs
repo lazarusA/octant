@@ -8,11 +8,14 @@ pub mod data_source;
 pub mod dataset;
 pub mod dataset_manager;
 pub mod matrix_data;
+pub mod metadata;
 pub mod octant_block;
 pub mod procedural;
 pub mod slice_request;
 pub mod source_factory;
 pub mod store_handle;
+
+pub use metadata::{DatasetMetadata, VariableInfo};
 
 pub use block_cache::{BlockCache, BlockCacheKey};
 pub use block_loader::{BlockBatchOutcome, BlockLoadOutcome, BlockLoader};

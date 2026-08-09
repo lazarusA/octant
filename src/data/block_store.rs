@@ -21,6 +21,26 @@ pub trait BlockStore: Send + Sync {
     /// List variables available from this source.
     fn variables(&self) -> Result<Vec<String>, BlockStoreError>;
 
+    /// Inspect variables and metadata from this dataset source.
+    fn inspect(&self) -> Result<super::metadata::DatasetMetadata, BlockStoreError> {
+        let vars = self.variables()?;
+        let var_infos = vars
+            .into_iter()
+            .map(|name| super::metadata::VariableInfo {
+                name,
+                data_type: "float32".to_string(),
+                ..Default::default()
+            })
+            .collect();
+
+        Ok(super::metadata::DatasetMetadata {
+            name: self.backend_name().to_string(),
+            store_type: self.backend_name().to_string(),
+            variables: var_infos,
+            dimension_coordinates: std::collections::HashMap::new(),
+        })
+    }
+
     /// Load one arbitrary N-dimensional block.
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError>;
 

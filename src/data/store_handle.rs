@@ -40,6 +40,10 @@ impl StoreHandle {
         self.backend.variables()
     }
 
+    pub fn inspect(&self) -> Result<super::DatasetMetadata, BlockStoreError> {
+        self.backend.inspect()
+    }
+
     pub fn fetch(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
         self.backend.fetch_block(request)
     }

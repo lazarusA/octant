@@ -91,7 +91,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
         });
 }
 
-fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::stores::VariableInfo) {
+fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) {
     ui.horizontal(|ui| {
         ui.label(
             egui::RichText::new(format!("[{}]", var_info.data_type))
@@ -135,7 +135,7 @@ fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::stores::VariableInfo)
 fn show_dimension_sliders(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
-    var_info: &crate::stores::VariableInfo,
+    var_info: &crate::data::VariableInfo,
     _dim_coords: &std::collections::HashMap<String, Vec<String>>,
 ) {
     let rank = var_info.shape.len();

@@ -1,10 +1,10 @@
+use crate::data::DatasetMetadata;
 use crate::data::matrix_data::MatrixData;
 use crate::data::slice_request::SliceRequest;
 use crate::plots::{
     LineRenderer, MatrixRenderer, PlotType, PointCloudRenderer, SphereRenderer, SurfaceRenderer,
     VolumeRenderer,
 };
-use crate::stores::DatasetMetadata;
 use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
