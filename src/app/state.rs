@@ -284,10 +284,9 @@ impl OctantApp {
     /// Placeholder method to add a secondary dimensionally-compatible variable layer
     /// for multi-variable plotting (e.g., vector fields, RGB composites, dual-curves).
     pub fn add_plotted_layer(&mut self, layer: PlottedVariableState) -> Result<(), String> {
-        if let (Some(existing_meta), Some(new_meta)) = (
-            &self.plotted_dataset_metadata,
-            &layer.dataset_metadata,
-        ) {
+        if let (Some(existing_meta), Some(new_meta)) =
+            (&self.plotted_dataset_metadata, &layer.dataset_metadata)
+        {
             let existing_var = existing_meta.variables.get(self.plotted_variable_idx);
             let new_var = new_meta.variables.get(layer.variable_idx);
 

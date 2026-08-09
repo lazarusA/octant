@@ -68,6 +68,60 @@ impl BlockCache {
         self.entries.contains_key(key)
     }
 
+    /// Finds any resident block in cache for `source_id` & `variable_name` whose
+    /// hyperslab bounds along `anim_dim` cover `timestep`.
+    pub fn find_covering_block(
+        &mut self,
+        source_id: &str,
+        variable_name: &str,
+        anim_dim: Option<usize>,
+        timestep: usize,
+    ) -> Option<OctantBlock> {
+        let matching_key = self.entries.iter().find_map(|(key, block)| {
+            if key.source_id == source_id && key.variable_name == variable_name {
+                if let Some(dim) = anim_dim {
+                    let origin = block.origin.get(dim).copied().unwrap_or(0);
+                    let extent = block.shape.get(dim).copied().unwrap_or(0);
+                    if timestep >= origin && timestep < origin + extent {
+                        Some(key.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    Some(key.clone())
+                }
+            } else {
+                None
+            }
+        })?;
+
+        self.get(&matching_key)
+    }
+
+    /// Checks whether any resident block in cache for `source_id` & `variable_name`
+    /// covers `timestep` along `anim_dim`, without mutating hit/miss statistics.
+    pub fn covers(
+        &self,
+        source_id: &str,
+        variable_name: &str,
+        anim_dim: Option<usize>,
+        timestep: usize,
+    ) -> bool {
+        self.entries.iter().any(|(key, block)| {
+            if key.source_id == source_id && key.variable_name == variable_name {
+                if let Some(dim) = anim_dim {
+                    let origin = block.origin.get(dim).copied().unwrap_or(0);
+                    let extent = block.shape.get(dim).copied().unwrap_or(0);
+                    timestep >= origin && timestep < origin + extent
+                } else {
+                    true
+                }
+            } else {
+                false
+            }
+        })
+    }
+
     /// Gets a block and marks it as recently used. Counts as a real cache
     /// access (updates hits/misses).
     pub fn get(&mut self, key: &BlockCacheKey) -> Option<OctantBlock> {
