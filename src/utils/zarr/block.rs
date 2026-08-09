@@ -1,37 +1,24 @@
-//! Phase 2/3 of the OctantBlock redesign: a generic, N-dimensional fetch
-//! that returns an `OctantBlock` instead of assuming a 2D matrix.
-//!
-//! Unlike `fetch_slice` (which hard-codes "first dim is time, last two are
-//! lat/lon"), `fetch_block` takes an explicit `SliceRequest` — one
-//! `DimensionSelection` per array dimension — and pulls exactly that
-//! hyperslab, whatever its rank. This is what lets a single load serve a 2D
-//! map, a 3D volume, or an animated sequence of either, without re-fetching.
+//! Generic, N-dimensional fetch that returns an `OctantBlock`.
 
 use std::collections::HashMap;
-use std::error::Error;
 
 use zarrs::array::{Array, ArraySubset};
 use zarrs::storage::ReadableWritableListableStorage;
 
+use crate::data::block_store::BlockStoreError;
 use crate::data::octant_block::OctantBlock;
+use crate::data::slice_request::{DimensionSelection, SliceRequest};
 use crate::utils::coordinates::get_cached_coord_bounds;
 
 use super::slice::retrieve_array_subset_as_f32;
-use super::{DimensionSelection, SliceRequest};
 
 /// Fetches an arbitrary-rank hyperslab described by `request` and returns it
-/// as a resident `OctantBlock`. No rendering assumptions are made here: it
-/// is up to the caller (via `OctantBlock::matrix_slice` / `OctantBlock::volume`)
-/// to decide later how to project it.
-///
-/// `request.selections` must have exactly one entry per array dimension —
-/// same convention already used by `build_slice_request` in the variable
-/// controls panel.
+/// as a resident `OctantBlock`.
 pub fn fetch_block(
     store: ReadableWritableListableStorage,
     store_url: &str,
     request: &SliceRequest,
-) -> Result<OctantBlock, Box<dyn Error>> {
+) -> Result<OctantBlock, BlockStoreError> {
     let var_path = if request.variable.starts_with('/') {
         request.variable.clone()
     } else {
@@ -52,7 +39,7 @@ pub fn fetch_block(
         .into());
     }
 
-    let dim_names: Vec<String> = array
+    let mut dim_names: Vec<String> = array
         .dimension_names()
         .as_ref()
         .map(|names| {
@@ -64,10 +51,6 @@ pub fn fetch_block(
         })
         .unwrap_or_else(|| (0..rank).map(|i| format!("dim_{i}")).collect());
 
-    // Resolve each DimensionSelection into a concrete [start, end) range,
-    // clamped to the array's actual extent, and remember the block's shape
-    // and origin so it can be reasoned about relative to the full array later
-    // (sliding-window prefetch, Phase 8/9).
     let mut ranges: Vec<std::ops::Range<u64>> = Vec::with_capacity(rank);
     let mut block_shape = Vec::with_capacity(rank);
     let mut origin = Vec::with_capacity(rank);
@@ -75,8 +58,8 @@ pub fn fetch_block(
     for (i, sel) in request.selections.iter().enumerate() {
         let dim_len = shape[i] as usize;
         let (start, end) = match sel {
-            DimensionSelection::Index(idx) => (*idx, idx + 1),
-            DimensionSelection::Range(r) => (r.start, r.end),
+            DimensionSelection::Index(idx) => (*idx, idx.saturating_add(1)),
+            DimensionSelection::Range { start, end } => (*start, *end),
         };
         let start = start.min(dim_len.saturating_sub(1));
         let end = end.max(start + 1).min(dim_len);
@@ -87,7 +70,7 @@ pub fn fetch_block(
     }
 
     let subset = ArraySubset::new_with_ranges(&ranges);
-    let raw_values = retrieve_array_subset_as_f32(&array, &subset)?;
+    let raw_values = retrieve_array_subset_as_f32(&array, &subset).map_err(|e| e.to_string())?;
 
     let attributes: HashMap<String, String> = array
         .attributes()
@@ -101,6 +84,15 @@ pub fn fetch_block(
             coordinates.insert(name.clone(), vec![first, last]);
         }
     }
+
+    let raw_values = crate::utils::grid::check_and_orient_block_grid(
+        raw_values,
+        &mut block_shape,
+        &mut dim_names,
+        &mut origin,
+        array.attributes(),
+        &coordinates,
+    );
 
     Ok(OctantBlock::new(
         request.variable.clone(),

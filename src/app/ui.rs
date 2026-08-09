@@ -27,12 +27,23 @@ impl eframe::App for OctantApp {
                         );
                         self.show_variables_overlay = !self.show_variables_overlay;
                         if let Some(first_var) = metadata.variables.first() {
-                            self.selected_dim_indices = vec![0; first_var.shape.len()];
+                            let rank = first_var.shape.len();
+                            self.selected_dim_indices = vec![0; rank];
                             self.selected_dim_ranges = first_var
                                 .shape
                                 .iter()
                                 .map(|&s| (0, (s as usize).saturating_sub(1)))
                                 .collect();
+                            self.dim_config = vec![
+                                crate::app::DimConfig {
+                                    spatial: crate::app::SpatialRole::None,
+                                    animation: crate::app::AnimationRole::None,
+                                    active: false,
+                                };
+                                rank
+                            ];
+                            self.spatial_dims.clear();
+                            self.animated_dim = None;
                         }
 
                         self.active_dataset_metadata = Some(metadata);

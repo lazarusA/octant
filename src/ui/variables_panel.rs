@@ -164,6 +164,27 @@ fn show_dimension_sliders(
 ) {
     let rank = var_info.shape.len();
 
+    if app.dim_config.len() != rank {
+        app.dim_config = vec![
+            crate::app::DimConfig {
+                spatial: SpatialRole::None,
+                animation: AnimationRole::None,
+                active: false,
+            };
+            rank
+        ];
+    }
+    if app.selected_dim_indices.len() != rank {
+        app.selected_dim_indices = vec![0; rank];
+    }
+    if app.selected_dim_ranges.len() != rank {
+        app.selected_dim_ranges = var_info
+            .shape
+            .iter()
+            .map(|&s| (0, (s as usize).saturating_sub(1)))
+            .collect();
+    }
+
     for i in 0..rank {
         let dim_size = var_info.shape[i] as usize;
         let dim_name = var_info
