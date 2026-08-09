@@ -22,13 +22,9 @@ pub fn fetch_all_dimension_coordinates(
             continue;
         }
 
-        if let Some((first, last)) = get_cached_coord_bounds_with_rank(
-            store.clone(),
-            url_hint,
-            name,
-            i,
-            total_dims,
-        ) {
+        if let Some((first, last)) =
+            get_cached_coord_bounds_with_rank(store.clone(), url_hint, name, i, total_dims)
+        {
             coords_map.insert(clean, vec![first.to_string(), last.to_string()]);
         }
     }
@@ -54,7 +50,12 @@ pub fn get_cached_coord_bounds_with_rank(
     total_dims: usize,
 ) -> Option<(f64, f64)> {
     let cache_lock = COORD_BOUNDS_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
-    let key = format!("{}:{}:{}", store_url, dim_name.trim().to_lowercase(), dim_idx);
+    let key = format!(
+        "{}:{}:{}",
+        store_url,
+        dim_name.trim().to_lowercase(),
+        dim_idx
+    );
 
     if let Ok(cache) = cache_lock.read()
         && let Some(bounds) = cache.get(&key)
@@ -116,25 +117,16 @@ pub fn read_coord_bounds_with_rank(
     }
 
     let mut found_array = None;
-    let mut matched_path = String::new();
     for path in &candidates {
         if let Ok(arr) = Array::open(store.clone(), path) {
-            matched_path = path.clone();
             found_array = Some(arr);
             break;
         }
     }
-    let array = match found_array {
-        Some(arr) => arr,
-        None => {
-            eprintln!("[read_coord_bounds] No array found for '{dim_name}' in candidates {:?}", candidates);
-            return None;
-        }
-    };
+    let array = found_array?;
 
     let len = array.shape().first().copied().unwrap_or(0) as usize;
     if len < 2 {
-        eprintln!("[read_coord_bounds] Array for '{dim_name}' at '{matched_path}' has len {len} < 2");
         return None;
     }
 
@@ -143,20 +135,11 @@ pub fn read_coord_bounds_with_rank(
 
     let v_start = crate::utils::zarr::slice::retrieve_array_subset_as_f32(&array, &subset_start)
         .ok()
-        .and_then(|v| v.first().map(|&x| x as f64));
+        .and_then(|v| v.first().map(|&x| x as f64))?;
 
     let v_end = crate::utils::zarr::slice::retrieve_array_subset_as_f32(&array, &subset_end)
         .ok()
-        .and_then(|v| v.first().map(|&x| x as f64));
+        .and_then(|v| v.first().map(|&x| x as f64))?;
 
-    match (v_start, v_end) {
-        (Some(s), Some(e)) => {
-            eprintln!("[read_coord_bounds] SUCCESS for '{dim_name}' via '{matched_path}': first={s}, last={e}");
-            Some((s, e))
-        }
-        _ => {
-            eprintln!("[read_coord_bounds] FAILED to read subset values for '{dim_name}' at '{matched_path}'");
-            None
-        }
-    }
+    Some((v_start, v_end))
 }

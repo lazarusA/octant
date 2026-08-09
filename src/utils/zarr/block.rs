@@ -8,7 +8,7 @@ use zarrs::storage::ReadableWritableListableStorage;
 use crate::data::block_store::BlockStoreError;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::{DimensionSelection, SliceRequest};
-use crate::utils::coordinates::get_cached_coord_bounds;
+use crate::utils::coordinates::get_cached_coord_bounds_with_rank;
 
 use super::slice::retrieve_array_subset_as_f32;
 
@@ -81,13 +81,9 @@ pub fn fetch_block(
     let mut coordinates = HashMap::new();
     let total_dims = dim_names.len();
     for (i, name) in dim_names.iter().enumerate() {
-        if let Some((first, last)) = crate::utils::coordinates::get_cached_coord_bounds_with_rank(
-            store.clone(),
-            store_url,
-            name,
-            i,
-            total_dims,
-        ) {
+        if let Some((first, last)) =
+            get_cached_coord_bounds_with_rank(store.clone(), store_url, name, i, total_dims)
+        {
             coordinates.insert(name.clone(), vec![first, last]);
         }
     }
