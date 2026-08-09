@@ -79,15 +79,18 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     ui.horizontal(|ui| {
                         ui.checkbox(
                             &mut app.use_block_cache,
-                            "🧊 Use block cache (experimental)",
+                            "🧊 Use block cache (proposal workflow)",
                         );
                         if app.use_block_cache
                             && app.selected_store_kind != crate::app::StoreKind::RemoteZarr
+                            && app.selected_store_kind != crate::app::StoreKind::LocalZarr
                         {
                             ui.label(
-                                egui::RichText::new("⚠ backend not wired yet for this store kind")
-                                    .small()
-                                    .weak(),
+                                egui::RichText::new(
+                                    "⚠ backend not implemented for this store kind yet",
+                                )
+                                .small()
+                                .weak(),
                             );
                         }
                     });

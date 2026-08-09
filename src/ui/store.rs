@@ -81,7 +81,28 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                     } else {
                         ui.label("No dataset metadata loaded yet.");
                     }
+                });
 
+                ui.collapsing("🧊 DatasetManager (New Proposal)", |ui| {
+                    if app.dataset_manager.is_empty() {
+                        ui.label("No active Dataset handles in DatasetManager.");
+                        ui.label("Enable 'Use block cache' when plotting to open a StoreHandle.");
+                    } else {
+                        ui.label(format!("Active Datasets: {}", app.dataset_manager.len()));
+                        for dataset in app.dataset_manager.iter() {
+                            ui.label(format!("• ID: {}", dataset.id));
+                            ui.label(format!("  Backend: {}", dataset.store.backend_name()));
+                            ui.label(format!("  URI: {}", dataset.source.uri));
+                        }
+                    }
+                    ui.separator();
+                    ui.label(format!("BlockCache Entries: {}", app.block_cache.cached_count()));
+                    ui.label(format!(
+                        "BlockCache Size: {:.2} MB / {:.2} MB",
+                        app.block_cache.current_bytes() as f64 / (1024.0 * 1024.0),
+                        app.block_cache.max_bytes() as f64 / (1024.0 * 1024.0)
+                    ));
+                    ui.label(format!("BlockCache Hit Rate: {:.1}%", app.block_cache.hit_rate()));
                 });
             });
         });
