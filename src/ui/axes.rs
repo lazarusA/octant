@@ -8,7 +8,7 @@ pub struct PlotAxisOptions<'a> {
 }
 
 /// Dynamic plot axis renderer with auto-attaching canvas borders, inward/outward ticks,
-/// and theme-aware overlay pills.
+/// and theme-aware overlay pills for Top, Bottom, Right, and Left axes.
 pub fn draw_plot_axes(
     ui: &mut egui::Ui,
     canvas_rect: Rect,
@@ -124,7 +124,7 @@ pub fn draw_plot_axes(
         let tick_x = (visible_left + fract * vis_w).round();
 
         if tick_x >= visible_left - 1.0 && tick_x <= visible_right + 1.0 {
-            // Bottom tick mark
+            // Bottom tick mark & label
             let b_start = Pos2::new(tick_x, bottom_axis_y);
             let b_end = Pos2::new(tick_x, bottom_axis_y + bottom_x_tick_dir * tick_len);
             painter.line_segment([b_start, b_end], stroke);
@@ -135,21 +135,40 @@ pub fn draw_plot_axes(
                 Pos2::new(tick_x, bottom_axis_y - tick_len - 14.0)
             };
 
-            draw_tick_label_aligned(
-                visuals,
-                painter,
-                b_label_pos,
-                &tick.label,
-                font_id.clone(),
-                text_color,
-                egui::Align2::CENTER_TOP,
-                bottom_x_tick_dir < 0.0, // use bg pill when inward
-            );
+            if !is_near_corner(b_label_pos, canvas_rect) {
+                draw_tick_label_aligned(
+                    visuals,
+                    painter,
+                    b_label_pos,
+                    &tick.label,
+                    font_id.clone(),
+                    text_color,
+                    egui::Align2::CENTER_TOP,
+                    bottom_x_tick_dir < 0.0, // use bg pill when inward
+                );
+            }
 
-            // Top tick mark
+            // Top tick mark & label
             let t_start = Pos2::new(tick_x, top_axis_y);
-            let t_end = Pos2::new(tick_x, top_axis_y + top_x_tick_dir * (tick_len * 0.7));
+            let t_end = Pos2::new(tick_x, top_axis_y + top_x_tick_dir * tick_len);
             painter.line_segment([t_start, t_end], secondary_stroke);
+
+            if top_x_tick_dir > 0.0 {
+                // Inward Top X-Axis tick label numbers in pills
+                let t_label_pos = Pos2::new(tick_x, top_axis_y + tick_len + 3.0);
+                if !is_near_corner(t_label_pos, canvas_rect) {
+                    draw_tick_label_aligned(
+                        visuals,
+                        painter,
+                        t_label_pos,
+                        &tick.label,
+                        font_id.clone(),
+                        text_color,
+                        egui::Align2::CENTER_TOP,
+                        true, // use bg pill for inward top ticks
+                    );
+                }
+            }
         }
     }
 
@@ -163,16 +182,19 @@ pub fn draw_plot_axes(
         };
 
         if title_y >= canvas_rect.top() && title_y <= canvas_rect.bottom() {
-            draw_tick_label_aligned(
-                visuals,
-                painter,
-                Pos2::new(title_x, title_y),
-                options.x_title,
-                title_font_id.clone(),
-                text_color,
-                egui::Align2::CENTER_TOP,
-                bottom_x_tick_dir < 0.0,
-            );
+            let title_pos = Pos2::new(title_x, title_y);
+            if !is_near_corner(title_pos, canvas_rect) {
+                draw_tick_label_aligned(
+                    visuals,
+                    painter,
+                    title_pos,
+                    options.x_title,
+                    title_font_id.clone(),
+                    text_color,
+                    egui::Align2::CENTER_TOP,
+                    bottom_x_tick_dir < 0.0,
+                );
+            }
         }
     }
 
@@ -243,50 +265,41 @@ pub fn draw_plot_axes(
                 egui::Align2::RIGHT_CENTER
             };
 
-            draw_tick_label_aligned(
-                visuals,
-                painter,
-                r_label_pos,
-                &tick.label,
-                font_id.clone(),
-                text_color,
-                align,
-                right_y_tick_dir < 0.0, // use bg pill when inward
-            );
+            if !is_near_corner(r_label_pos, canvas_rect) {
+                draw_tick_label_aligned(
+                    visuals,
+                    painter,
+                    r_label_pos,
+                    &tick.label,
+                    font_id.clone(),
+                    text_color,
+                    align,
+                    right_y_tick_dir < 0.0, // use bg pill when inward
+                );
+            }
 
-            // Left Y tick mark
+            // Left Y tick mark & label
             let l_start = Pos2::new(left_axis_x, tick_y);
-            let l_end = Pos2::new(left_axis_x + left_y_tick_dir * (tick_len * 0.7), tick_y);
+            let l_end = Pos2::new(left_axis_x + left_y_tick_dir * tick_len, tick_y);
             painter.line_segment([l_start, l_end], secondary_stroke);
+
+            if left_y_tick_dir > 0.0 {
+                // Inward Left Y-Axis tick label numbers in pills
+                let l_label_pos = Pos2::new(left_axis_x + tick_len + 4.0, tick_y);
+                if !is_near_corner(l_label_pos, canvas_rect) {
+                    draw_tick_label_aligned(
+                        visuals,
+                        painter,
+                        l_label_pos,
+                        &tick.label,
+                        font_id.clone(),
+                        text_color,
+                        egui::Align2::LEFT_CENTER,
+                        true, // use bg pill for inward left ticks
+                    );
+                }
+            }
         }
-    }
-
-    // Draw Top Y-Axis Title in the Top-Right Corner (Deeper on X than the Ticks)
-    if !options.y_title.is_empty() {
-        let title_y = (visible_top + 10.0).round();
-        let title_x = if right_y_tick_dir > 0.0 {
-            (right_axis_x + tick_len + 12.0).round()
-        } else {
-            // Indent deeper on X into the top-right corner than the ticks
-            (right_axis_x - tick_len - 18.0).round()
-        };
-
-        let align = if right_y_tick_dir > 0.0 {
-            egui::Align2::LEFT_TOP
-        } else {
-            egui::Align2::RIGHT_TOP
-        };
-
-        draw_tick_label_aligned(
-            visuals,
-            painter,
-            Pos2::new(title_x, title_y),
-            options.y_title,
-            title_font_id,
-            text_color,
-            align,
-            true, // always use theme-aware bg pill overlay for corner title
-        );
     }
 }
 
@@ -323,6 +336,20 @@ fn format_tick_value(val: f64, step: f64) -> String {
     } else {
         format!("{:.2}", val)
     }
+}
+
+/// Helper function to detect if a tick label position lands near any of the 4 canvas corners.
+fn is_near_corner(pos: Pos2, rect: Rect) -> bool {
+    let margin = 32.0;
+    let near_left = (pos.x - rect.left()).abs() < margin;
+    let near_right = (pos.x - rect.right()).abs() < margin;
+    let near_top = (pos.y - rect.top()).abs() < margin;
+    let near_bottom = (pos.y - rect.bottom()).abs() < margin;
+
+    (near_left && near_top)
+        || (near_right && near_top)
+        || (near_left && near_bottom)
+        || (near_right && near_bottom)
 }
 
 #[allow(clippy::too_many_arguments)]
