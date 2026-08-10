@@ -5,6 +5,7 @@ pub mod catalog;
 pub mod colorbar;
 pub mod colormap;
 pub mod hover_tooltip;
+pub mod loading_bar;
 pub mod plot_type;
 pub mod settings;
 pub mod status;

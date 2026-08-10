@@ -129,6 +129,7 @@ impl eframe::App for OctantApp {
         crate::ui::variables::show_variables_overlay(self, &ctx, canvas_rect);
         crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
         crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
+        crate::ui::loading_bar::show_canvas_loading_bar(self, &ctx, canvas_rect);
 
         // 4. Drawing Canvas Area with Aspect Data Ratio
         {

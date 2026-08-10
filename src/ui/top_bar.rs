@@ -1,4 +1,4 @@
-use super::{colormap, plot_type, status, store};
+use super::{colormap, plot_type, store};
 use crate::app::OctantApp;
 
 pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -65,9 +65,6 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                             };
                         ui.ctx().set_theme(app.theme_preference);
                     }
-
-                    ui.separator();
-                    status::show_status_bar(app, ui);
                 });
             });
         });
