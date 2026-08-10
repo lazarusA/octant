@@ -156,7 +156,8 @@ impl SurfaceRenderer {
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: None,
+                cull_mode: Some(wgpu::Face::Back),
+                front_face: wgpu::FrontFace::Ccw,
                 ..Default::default()
             },
             depth_stencil: None,

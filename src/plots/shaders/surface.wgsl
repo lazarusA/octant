@@ -99,11 +99,12 @@ fn vs_main(
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.8 * uniforms.displacement_strength;
 
-        let scale_x = 2.0 * uniforms.aspect_ratio;
+        let data_aspect = max(f32(uniforms.width) / f32(grid_h), 0.1);
+        let scale_x = 2.0 * data_aspect;
         let scale_y = 2.0;
 
-        let x0 = -uniforms.aspect_ratio + (f32(cell_x) / f32(uniforms.width)) * scale_x;
-        let x1 = -uniforms.aspect_ratio + (f32(cell_x + 1u) / f32(uniforms.width)) * scale_x;
+        let x0 = -data_aspect + (f32(cell_x) / f32(uniforms.width)) * scale_x;
+        let x1 = -data_aspect + (f32(cell_x + 1u) / f32(uniforms.width)) * scale_x;
 
         let y0 = -1.0 + (f32(cell_y) / f32(grid_h)) * scale_y;
         let y1 = -1.0 + (f32(cell_y + 1u) / f32(grid_h)) * scale_y;
@@ -158,14 +159,17 @@ fn vs_main(
     // Perspective projection transformation
     let cam_dist = clamp(uniforms.zoom, 1.1, 10.0);
     let cam_z = pos_rot.z - cam_dist;
+    let dist_positive = max(-cam_z, 0.1);
     let fov_scale = 1.6;
     let proj_x = (pos_rot.x * fov_scale) / uniforms.aspect_ratio;
     let proj_y = pos_rot.y * fov_scale;
 
-    // Depth Z
-    let proj_z = (cam_z + 15.0) / 30.0;
+    // Linear depth projection mapped to [0.0, 1.0] for hardware depth testing
+    let z_near = 0.1;
+    let z_far = 50.0;
+    let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
 
-    out.position = vec4<f32>(proj_x, proj_y, proj_z, -cam_z);
+    out.position = vec4<f32>(proj_x, proj_y, proj_z, dist_positive);
     out.uv = model.uv;
     out.val = raw_val;
 
