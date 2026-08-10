@@ -297,21 +297,23 @@ impl OctantApp {
         let is_3d_plot = self.active_plot_type == crate::plots::PlotType::Volume
             || self.active_plot_type == crate::plots::PlotType::PointCloud;
 
-        if is_3d_plot {
-            if let Some(vdata) = block.volume(
-                x_dim,
-                y_dim,
-                z_dim,
-                &fixed_indices,
-                &format!("Block Cache Volume [{}]", block.variable_name),
-            ) {
-                let depth = vdata.depth;
-                self.rebuild_pipeline_with_volume_data(vdata);
-                self.status_message = format!(
-                    "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
-                    self.status_message, self.current_timestep
-                );
-            }
+        if !is_3d_plot {
+            return;
+        }
+
+        if let Some(vdata) = block.volume(
+            x_dim,
+            y_dim,
+            z_dim,
+            &fixed_indices,
+            &format!("Block Cache Volume [{}]", block.variable_name),
+        ) {
+            let depth = vdata.depth;
+            self.rebuild_pipeline_with_volume_data(vdata);
+            self.status_message = format!(
+                "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
+                self.status_message, self.current_timestep
+            );
         }
     }
 
