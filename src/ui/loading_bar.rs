@@ -1,11 +1,8 @@
-//! Progress component and top-center canvas floating loading bar overlay.
+//! Minimal floating top-center canvas bouncing loading bar.
 
 use crate::app::OctantApp;
 use egui::{Color32, Ui, Vec2};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-
-static RAW_TOTAL_REQUESTS: AtomicUsize = AtomicUsize::new(0);
 
 // =============================================================================
 // ProgressSize / ProgressVariant
@@ -13,8 +10,8 @@ static RAW_TOTAL_REQUESTS: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ProgressSize {
-    Size1,
     #[default]
+    Size1,
     Size2,
     Size3,
 }
@@ -33,7 +30,7 @@ pub enum ProgressVariant {
 
 #[derive(Clone, Debug)]
 pub struct ProgressProps {
-    pub value: Option<f32>, // None = indeterminate
+    pub value: Option<f32>, // None = indeterminate bouncing bar
     pub max: f32,
     pub size: ProgressSize,
     pub variant: ProgressVariant,
@@ -47,7 +44,7 @@ impl ProgressProps {
         Self {
             value,
             max: 100.0,
-            size: ProgressSize::Size2,
+            size: ProgressSize::Size1,
             variant: ProgressVariant::Surface,
             color: None,
             radius: None,
@@ -87,10 +84,9 @@ impl ProgressProps {
 }
 
 // =============================================================================
-// Main Progress Function
+// Bouncing Progress Bar Render Function
 // =============================================================================
 
-/// Render a progress bar.
 pub fn progress(ui: &mut Ui, props: ProgressProps) {
     let primary = ui.visuals().selection.bg_fill;
     let muted = ui.visuals().widgets.noninteractive.bg_fill;
@@ -118,7 +114,7 @@ pub fn progress(ui: &mut Ui, props: ProgressProps) {
     // Background track
     ui.painter().rect_filled(rect, rounding, bg_color);
 
-    // Foreground progress
+    // Foreground / Indeterminate animation
     if let Some(value) = props.value {
         let progress_ratio = (value / props.max).clamp(0.0, 1.0);
         let progress_width = rect.width() * progress_ratio;
@@ -129,7 +125,7 @@ pub fn progress(ui: &mut Ui, props: ProgressProps) {
             ui.painter().rect_filled(progress_rect, rounding, fg_color);
         }
     } else {
-        // Smooth indeterminate animation
+        // Smooth bouncing bar animation
         let time = ui.ctx().input(|i| i.time) as f32;
         let speed = 1000.0 / props.duration_ms.max(1) as f32 * 2.25;
         let anim_progress = ((time * speed).sin() + 1.0) / 2.0;
@@ -146,74 +142,33 @@ pub fn progress(ui: &mut Ui, props: ProgressProps) {
 }
 
 // =============================================================================
-// Top-Center Canvas Floating Loading Overlay Component
+// Top-Center Canvas Floating Bouncing Bar Overlay
 // =============================================================================
 
 pub fn show_canvas_loading_bar(app: &OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
-    let is_metadata_fetching = app.metadata_rx.is_some() || app.is_loading;
-    let pending_raw_count = app.block_prefetcher.pending_count();
-    let is_raw_data_fetching = pending_raw_count > 0;
+    let is_active =
+        app.metadata_rx.is_some() || app.is_loading || app.block_prefetcher.pending_count() > 0;
 
-    if !is_metadata_fetching && !is_raw_data_fetching {
-        RAW_TOTAL_REQUESTS.store(0, Ordering::Relaxed);
+    if !is_active {
         return;
     }
 
-    // Track total requested raw data blocks for progress
-    if pending_raw_count > 0 {
-        let current_total = RAW_TOTAL_REQUESTS.load(Ordering::Relaxed);
-        if pending_raw_count > current_total {
-            RAW_TOTAL_REQUESTS.store(pending_raw_count, Ordering::Relaxed);
-        }
-    }
-
-    let (label_text, progress_props) = if is_metadata_fetching {
-        (
-            "🔍 Inspecting store metadata...".to_string(),
-            ProgressProps::new(None)
-                .size(ProgressSize::Size2)
-                .variant(ProgressVariant::Surface),
-        )
-    } else {
-        let total = RAW_TOTAL_REQUESTS.load(Ordering::Relaxed).max(pending_raw_count);
-        let fetched = total.saturating_sub(pending_raw_count);
-
-        let label = if total > 1 {
-            format!("⏳ Fetching data ({}/{})", fetched, total)
-        } else {
-            "⏳ Fetching data...".to_string()
-        };
-
-        (
-            label,
-            ProgressProps::new(Some(fetched as f32))
-                .max(total.max(1) as f32)
-                .size(ProgressSize::Size2)
-                .variant(ProgressVariant::Surface),
-        )
-    };
-
-    let card_width = 260.0;
+    let width = 220.0;
     let pos = egui::pos2(
-        canvas_rect.center().x - (card_width / 2.0),
-        canvas_rect.top() + 14.0,
+        canvas_rect.center().x - (width / 2.0),
+        canvas_rect.top() + 6.0,
     );
 
     egui::Area::new(egui::Id::new("octant_canvas_loading_bar"))
         .order(egui::Order::Foreground)
         .fixed_pos(pos)
         .show(ctx, |ui| {
-            egui::Frame::popup(ui.style())
-                .inner_margin(egui::Margin::symmetric(12, 8))
-                .show(ui, |ui| {
-                    ui.set_width(card_width - 24.0);
-                    ui.horizontal(|ui| {
-                        ui.spinner();
-                        ui.label(egui::RichText::new(&label_text).strong().small());
-                    });
-
-                    ui.add_space(4.0);
-                    progress(ui, progress_props);
-                });
+            ui.set_width(width);
+            progress(
+                ui,
+                ProgressProps::new(None)
+                    .size(ProgressSize::Size1)
+                    .variant(ProgressVariant::Surface),
+            );
         });
 }
