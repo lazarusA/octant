@@ -241,46 +241,41 @@ impl OctantApp {
             .unwrap_or(1)
     }
 
-    /// Projects a resident block into the current 2D view.
+    /// Projects a resident block into current 2D and 3D views.
     fn apply_block_projection(&mut self, block: &crate::data::octant_block::OctantBlock) {
         let anim_dim = self.plotted_animated_dim;
 
-        let explicit_spatial = match (
-            self.plotted_spatial_dims.first(),
-            self.plotted_spatial_dims.get(1),
-        ) {
-            (Some(&x), Some(&y)) => Some((x, y)),
-            _ => None,
-        };
+        let all_dims: Vec<usize> = (0..block.rank()).collect();
+        let non_anim: Vec<usize> = (0..block.rank()).filter(|&d| Some(d) != anim_dim).collect();
 
-        let (x_dim, y_dim) = if let Some((x, y)) = explicit_spatial {
-            if Some(x) == anim_dim || Some(y) == anim_dim {
-                self.status_message = format!(
-                    "Block cache: X/Y spatial role collides with the animated dimension (dim {}) — pick a different X or Y dim.",
-                    anim_dim.unwrap_or(usize::MAX)
-                );
-                return;
-            }
-            (x, y)
-        } else {
-            let non_anim: Vec<usize> = (0..block.rank()).filter(|&d| Some(d) != anim_dim).collect();
-            match (
-                non_anim.last().copied(),
-                non_anim
-                    .len()
-                    .checked_sub(2)
-                    .and_then(|i| non_anim.get(i))
-                    .copied(),
-            ) {
-                (Some(x), Some(y)) => (x, y),
-                _ => {
-                    self.status_message =
-                        "Block cache: not enough non-animated dimensions to project a 2D view."
-                            .to_string();
-                    return;
-                }
-            }
-        };
+        let explicit_spatial: Vec<usize> = self
+            .plotted_spatial_dims
+            .iter()
+            .copied()
+            .filter(|&d| d < block.rank())
+            .collect();
+
+        let x_dim = explicit_spatial
+            .first()
+            .copied()
+            .unwrap_or_else(|| non_anim.last().copied().unwrap_or(0));
+
+        let y_dim = explicit_spatial.get(1).copied().unwrap_or_else(|| {
+            non_anim
+                .len()
+                .checked_sub(2)
+                .and_then(|i| non_anim.get(i))
+                .copied()
+                .unwrap_or_else(|| all_dims.iter().copied().find(|&d| d != x_dim).unwrap_or(0))
+        });
+
+        let z_dim = explicit_spatial.get(2).copied().unwrap_or_else(|| {
+            all_dims
+                .iter()
+                .copied()
+                .find(|&d| d != x_dim && d != y_dim)
+                .unwrap_or(usize::MAX)
+        });
 
         let fixed_indices: Vec<usize> = self
             .plotted_selected_dim_indices
@@ -289,23 +284,35 @@ impl OctantApp {
             .map(|(i, &idx)| idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0)))
             .collect();
 
-        let Some(mdata) = block.slice_2d(
+        if let Some(mdata) = block.slice_2d(
             x_dim,
             y_dim,
             &fixed_indices,
             self.animated_dim_extent(),
             &format!("Block Cache [{}]", block.variable_name),
-        ) else {
-            self.status_message =
-                "Block cache: projection failed (dimension mismatch).".to_string();
-            return;
-        };
+        ) {
+            self.rebuild_pipeline_with_matrix_data(mdata);
+        }
 
-        self.rebuild_pipeline_with_matrix_data(mdata);
-        self.status_message = format!(
-            "{}  [x_dim={x_dim} y_dim={y_dim} anim_dim={anim_dim:?} t={}]",
-            self.status_message, self.current_timestep
-        );
+        let is_3d_plot = self.active_plot_type == crate::plots::PlotType::Volume
+            || self.active_plot_type == crate::plots::PlotType::PointCloud;
+
+        if is_3d_plot {
+            if let Some(vdata) = block.volume(
+                x_dim,
+                y_dim,
+                z_dim,
+                &fixed_indices,
+                &format!("Block Cache Volume [{}]", block.variable_name),
+            ) {
+                let depth = vdata.depth;
+                self.rebuild_pipeline_with_volume_data(vdata);
+                self.status_message = format!(
+                    "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
+                    self.status_message, self.current_timestep
+                );
+            }
+        }
     }
 
     /// Drains completed block-cache prefetch results.

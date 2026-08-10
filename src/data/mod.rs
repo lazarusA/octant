@@ -14,6 +14,7 @@ pub mod procedural;
 pub mod slice_request;
 pub mod source_factory;
 pub mod store_handle;
+pub mod volume_data;
 
 pub use metadata::{DatasetMetadata, VariableInfo};
 
@@ -31,3 +32,4 @@ pub use procedural::generate_procedural_matrix;
 pub use slice_request::{DimensionSelection, SliceRequest};
 pub use source_factory::SourceFactory;
 pub use store_handle::StoreHandle;
+pub use volume_data::VolumeData;

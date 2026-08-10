@@ -243,9 +243,14 @@ impl eframe::App for OctantApp {
                 PlotType::Volume => {
                     if let Some(volume_renderer) = &self.volume_renderer {
                         let (width, height) = self
-                            .matrix_data
+                            .volume_data
                             .as_ref()
-                            .map_or((64, 64), |m| (m.width as u32, m.height as u32));
+                            .map(|v| (v.width as u32, v.height as u32))
+                            .unwrap_or_else(|| {
+                                self.matrix_data
+                                    .as_ref()
+                                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
+                            });
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
 
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
@@ -275,9 +280,14 @@ impl eframe::App for OctantApp {
                 PlotType::PointCloud => {
                     if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
                         let (width, height) = self
-                            .matrix_data
+                            .volume_data
                             .as_ref()
-                            .map_or((64, 64), |m| (m.width as u32, m.height as u32));
+                            .map(|v| (v.width as u32, v.height as u32))
+                            .unwrap_or_else(|| {
+                                self.matrix_data
+                                    .as_ref()
+                                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
+                            });
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
 
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
