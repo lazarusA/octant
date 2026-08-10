@@ -21,20 +21,26 @@ log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 web-time = "1.1"
+flate2 = { version = "1.0", default-features = false, features = ["miniz_oxide"] }
+aws-lc-rs = { version = "1.17", default-features = false, features = ["non-fips"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 zarrs = { version = "0.23", features = ["blosc", "async"] }
 tokio = { version = "1.53", features = ["full"] }
 env_logger = "0.11"
-reqwest = { version = "0.13", features = ["blocking", "json"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "blocking", "json"] }
 zarrs_object_store = { version = "0.7", features = ["http"] }
 zarrs_icechunk = "0.5"
 icechunk = "2.1.2"
-object_store = { version = "0.14", features = ["http", "aws", "azure", "gcp"] }
+object_store = { version = "0.14", default-features = false, features = ["http", "aws", "azure", "gcp"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 zarrs = { version = "0.23", default-features = false, features = ["async"] }
+object_store = { version = "0.14", default-features = false, features = ["http"] }
+zarrs_object_store = { version = "0.7", default-features = false }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 console_log = "1.1"
+reqwest = { version = "0.13", default-features = false, features = ["json"] }
+getrandom = { version = "0.4", features = ["wasm_js"] }

@@ -36,3 +36,35 @@ pub fn retrieve_array_subset_as_f32(
         Ok(vals)
     }
 }
+
+pub async fn retrieve_array_subset_as_f32_async<TStorage: zarrs::storage::AsyncReadableStorageTraits + ?Sized>(
+    array: &Array<TStorage>,
+    subset: &ArraySubset,
+) -> Result<Vec<f32>, Box<dyn Error>> {
+    let dt_str = array.data_type().to_string().to_lowercase();
+    if dt_str.contains("float64") || dt_str.contains("f64") {
+        let vals = array.retrieve_array_subset_async::<Vec<f64>>(subset).await?;
+        Ok(vals.into_iter().map(|v| v as f32).collect())
+    } else if dt_str.contains("int64") || dt_str.contains("i64") {
+        let vals = array.retrieve_array_subset_async::<Vec<i64>>(subset).await?;
+        Ok(vals.into_iter().map(|v| v as f32).collect())
+    } else if dt_str.contains("int32") || dt_str.contains("i32") {
+        let vals = array.retrieve_array_subset_async::<Vec<i32>>(subset).await?;
+        Ok(vals.into_iter().map(|v| v as f32).collect())
+    } else if dt_str.contains("uint64") || dt_str.contains("u64") {
+        let vals = array.retrieve_array_subset_async::<Vec<u64>>(subset).await?;
+        Ok(vals.into_iter().map(|v| v as f32).collect())
+    } else if dt_str.contains("uint32") || dt_str.contains("u32") {
+        let vals = array.retrieve_array_subset_async::<Vec<u32>>(subset).await?;
+        Ok(vals.into_iter().map(|v| v as f32).collect())
+    } else if dt_str.contains("int16") || dt_str.contains("i16") {
+        let vals = array.retrieve_array_subset_async::<Vec<i16>>(subset).await?;
+        Ok(vals.into_iter().map(|v| v as f32).collect())
+    } else if dt_str.contains("uint16") || dt_str.contains("u16") {
+        let vals = array.retrieve_array_subset_async::<Vec<u16>>(subset).await?;
+        Ok(vals.into_iter().map(|v| v as f32).collect())
+    } else {
+        let vals = array.retrieve_array_subset_async::<Vec<f32>>(subset).await?;
+        Ok(vals)
+    }
+}

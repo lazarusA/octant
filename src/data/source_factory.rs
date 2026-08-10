@@ -1,10 +1,9 @@
 //! Constructs the appropriate backend for a DataSource.
 
-#[cfg(not(target_arch = "wasm32"))]
 use std::sync::Arc;
 
 use super::{
-    block_store::BlockStoreError,
+    block_store::{BlockStore, BlockStoreError},
     data_source::DataSource,
     store_handle::StoreHandle,
 };
@@ -12,9 +11,33 @@ use super::{
 #[cfg(not(target_arch = "wasm32"))]
 use super::{
     backends::{icechunk::IcechunkBlockStore, zarr::ZarrBlockStore},
-    block_store::BlockStore,
     data_source::DataSourceKind,
 };
+
+#[cfg(target_arch = "wasm32")]
+pub struct WasmBlockStore {
+    source_url: String,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl BlockStore for WasmBlockStore {
+    fn backend_name(&self) -> &str {
+        "wasm"
+    }
+
+    fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
+        Ok(Vec::new())
+    }
+
+    fn inspect(&self) -> Result<crate::data::DatasetMetadata, BlockStoreError> {
+        Err("Inspect store using async WASM inspector".into())
+    }
+
+    fn fetch_block(&self, request: &crate::data::slice_request::SliceRequest) -> Result<crate::data::octant_block::OctantBlock, BlockStoreError> {
+        let dummy_store = Arc::new(zarrs::storage::store::MemoryStore::new());
+        crate::data::backends::zarr_block::fetch_block(dummy_store, &self.source_url, request)
+    }
+}
 
 pub struct SourceFactory;
 
@@ -47,7 +70,10 @@ impl SourceFactory {
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub fn open(_source: DataSource) -> Result<StoreHandle, BlockStoreError> {
-        Err("Native Zarr / Icechunk stores are not supported in WebAssembly mode".into())
+    pub fn open(source: DataSource) -> Result<StoreHandle, BlockStoreError> {
+        let backend = Arc::new(WasmBlockStore {
+            source_url: source.uri.clone(),
+        });
+        Ok(StoreHandle::new(source, backend))
     }
 }

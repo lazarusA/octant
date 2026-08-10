@@ -4309,12 +4309,15 @@ dependencies = [
 name = "octant"
 version = "0.1.1"
 dependencies = [
+ "aws-lc-rs",
  "bytemuck",
  "console_error_panic_hook",
  "console_log",
  "eframe",
  "egui",
  "env_logger",
+ "flate2",
+ "getrandom 0.4.3",
  "glam",
  "icechunk",
  "log",

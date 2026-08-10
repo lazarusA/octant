@@ -159,26 +159,11 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits>(
     })
 }
 
-/// Fallback function: Discover variables via consolidated `.zmetadata` or `zarr.json` HTTP inspection.
-#[cfg(not(target_arch = "wasm32"))]
-pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
+/// Parse .zmetadata JSON bytes into VariableInfo list.
+pub fn parse_zmetadata_json_bytes(bytes: &[u8]) -> Vec<VariableInfo> {
     let mut variables = Vec::new();
 
-    let zmetadata_url = format!("{}/.zmetadata", base_url.trim_end_matches('/'));
-    let client = reqwest::blocking::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .build()
-        .ok();
-
-    let resp_opt = client
-        .as_ref()
-        .and_then(|c| c.get(&zmetadata_url).send().ok())
-        .or_else(|| reqwest::blocking::get(&zmetadata_url).ok());
-
-    if let Some(resp) = resp_opt
-        && resp.status().is_success()
-        && let Ok(bytes) = resp.bytes()
-        && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes)
+    if let Ok(v) = serde_json::from_slice::<serde_json::Value>(bytes)
         && let Some(metadata_obj) = v.get("metadata").and_then(|m| m.as_object())
     {
         for (key, val) in metadata_obj {
@@ -295,7 +280,45 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
     variables
 }
 
+/// Fallback function: Discover variables via consolidated `.zmetadata` or `zarr.json` HTTP inspection.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
+    let zmetadata_url = format!("{}/.zmetadata", base_url.trim_end_matches('/'));
+    let client = reqwest::blocking::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .ok();
+
+    let resp_opt = client
+        .as_ref()
+        .and_then(|c| c.get(&zmetadata_url).send().ok())
+        .or_else(|| reqwest::blocking::get(&zmetadata_url).ok());
+
+    if let Some(resp) = resp_opt
+        && resp.status().is_success()
+        && let Ok(bytes) = resp.bytes()
+    {
+        return parse_zmetadata_json_bytes(&bytes);
+    }
+
+    Vec::new()
+}
+
 #[cfg(target_arch = "wasm32")]
 pub fn discover_arrays_via_http_metadata(_base_url: &str) -> Vec<VariableInfo> {
+    Vec::new()
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn discover_arrays_via_http_metadata_async(base_url: &str) -> Vec<VariableInfo> {
+    let clean_url = base_url.trim_end_matches('/');
+    let zmetadata_url = format!("{}/.zmetadata", clean_url);
+    if let Ok(resp) = reqwest::get(&zmetadata_url).await {
+        if resp.status().is_success() {
+            if let Ok(bytes) = resp.bytes().await {
+                return parse_zmetadata_json_bytes(&bytes);
+            }
+        }
+    }
     Vec::new()
 }

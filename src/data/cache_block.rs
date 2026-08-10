@@ -637,6 +637,7 @@ impl BlockPrefetcher {
 
         let tx = self.tx.clone();
 
+        #[cfg(not(target_arch = "wasm32"))]
         crate::utils::TaskExecutor::spawn(move || {
             let result = fetch_block(
                 request.storage,
@@ -652,6 +653,22 @@ impl BlockPrefetcher {
                 },
             );
         });
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            let target = request.store_target.clone();
+            let slice_req = request.request.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                let result = crate::data::backends::zarr_block::fetch_block_wasm_async(&target, &slice_req)
+                    .await
+                    .map_err(|e| e.to_string());
+
+                let _ = tx.send(BlockPrefetchResult {
+                    key,
+                    result,
+                });
+            });
+        }
 
         true
     }

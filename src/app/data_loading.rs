@@ -51,47 +51,97 @@ impl OctantApp {
         let (tx, rx) = std::sync::mpsc::channel();
         self.metadata_rx = Some(rx);
 
-        crate::utils::TaskExecutor::spawn(move || {
-            if store_kind == StoreKind::ProceduralRandom {
-                let meta = DatasetMetadata {
-                    name: "Procedural Test Store".to_string(),
-                    store_type: "Random Procedural".to_string(),
-                    variables: vec![VariableInfo {
-                        name: "random_matrix".to_string(),
-                        data_type: "float32".to_string(),
-                        shape: vec![64, 64],
-                        dimension_names: vec!["y".to_string(), "x".to_string()],
-                        chunk_shape: vec![64, 64],
-                        file_size: crate::utils::calculate_variable_size_bytes(
-                            &[64, 64],
-                            "float32",
-                        ),
-                        ..Default::default()
-                    }],
-                    dimension_coordinates: std::collections::HashMap::new(),
-                };
-                let _ = tx.send(Ok(meta));
-                return;
-            }
-
-            let kind = match store_kind {
-                StoreKind::RemoteZarr => crate::data::DataSourceKind::RemoteZarr,
-                StoreKind::LocalZarr => crate::data::DataSourceKind::LocalZarr,
-                StoreKind::RemoteIcechunk => crate::data::DataSourceKind::RemoteIcechunk,
-                StoreKind::LocalIcechunk => crate::data::DataSourceKind::LocalIcechunk,
-                StoreKind::ProceduralRandom => {
-                    crate::data::DataSourceKind::Other("ProceduralRandom".into())
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            crate::utils::TaskExecutor::spawn(move || {
+                if store_kind == StoreKind::ProceduralRandom {
+                    let meta = DatasetMetadata {
+                        name: "Procedural Test Store".to_string(),
+                        store_type: "Random Procedural".to_string(),
+                        variables: vec![VariableInfo {
+                            name: "random_matrix".to_string(),
+                            data_type: "float32".to_string(),
+                            shape: vec![64, 64],
+                            dimension_names: vec!["y".to_string(), "x".to_string()],
+                            chunk_shape: vec![64, 64],
+                            file_size: crate::utils::calculate_variable_size_bytes(
+                                &[64, 64],
+                                "float32",
+                            ),
+                            ..Default::default()
+                        }],
+                        dimension_coordinates: std::collections::HashMap::new(),
+                    };
+                    let _ = tx.send(Ok(meta));
+                    return;
                 }
-            };
 
-            let source_id = format!("{:?}:{}", store_kind, target_input);
-            let source = crate::data::DataSource::new(&source_id, kind, &target_input, "Store");
+                let kind = match store_kind {
+                    StoreKind::RemoteZarr => crate::data::DataSourceKind::RemoteZarr,
+                    StoreKind::LocalZarr => crate::data::DataSourceKind::LocalZarr,
+                    StoreKind::RemoteIcechunk => crate::data::DataSourceKind::RemoteIcechunk,
+                    StoreKind::LocalIcechunk => crate::data::DataSourceKind::LocalIcechunk,
+                    StoreKind::ProceduralRandom => {
+                        crate::data::DataSourceKind::Other("ProceduralRandom".into())
+                    }
+                };
 
-            let res = crate::data::SourceFactory::open(source)
-                .and_then(|store| store.inspect())
-                .map_err(|e| e.to_string());
+                let source_id = format!("{:?}:{}", store_kind, target_input);
+                let source = crate::data::DataSource::new(&source_id, kind, &target_input, "Store");
 
-            let _ = tx.send(res);
-        });
+                let res = crate::data::SourceFactory::open(source)
+                    .and_then(|store| store.inspect())
+                    .map_err(|e| e.to_string());
+
+                let _ = tx.send(res);
+            });
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            wasm_bindgen_futures::spawn_local(async move {
+                if store_kind == StoreKind::ProceduralRandom {
+                    let meta = DatasetMetadata {
+                        name: "Procedural Test Store".to_string(),
+                        store_type: "Random Procedural".to_string(),
+                        variables: vec![VariableInfo {
+                            name: "random_matrix".to_string(),
+                            data_type: "float32".to_string(),
+                            shape: vec![64, 64],
+                            dimension_names: vec!["y".to_string(), "x".to_string()],
+                            chunk_shape: vec![64, 64],
+                            file_size: crate::utils::calculate_variable_size_bytes(
+                                &[64, 64],
+                                "float32",
+                            ),
+                            ..Default::default()
+                        }],
+                        dimension_coordinates: std::collections::HashMap::new(),
+                    };
+                    let _ = tx.send(Ok(meta));
+                    return;
+                }
+
+                let vars = crate::utils::metadata::discover_arrays_via_http_metadata_async(&target_input).await;
+                if vars.is_empty() {
+                    let _ = tx.send(Err(format!("Could not fetch metadata from {target_input}")));
+                } else {
+                    let store_name = target_input
+                        .trim_end_matches('/')
+                        .split('/')
+                        .next_back()
+                        .unwrap_or("remote_store")
+                        .to_string();
+
+                    let meta = DatasetMetadata {
+                        name: store_name,
+                        store_type: format!("{:?}", store_kind),
+                        variables: vars,
+                        dimension_coordinates: std::collections::HashMap::new(),
+                    };
+                    let _ = tx.send(Ok(meta));
+                }
+            });
+        }
     }
 }
