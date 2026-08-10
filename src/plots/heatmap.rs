@@ -39,6 +39,9 @@ impl HeatmapVertex {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct HeatmapUniforms {
+    pub pan: [f32; 2],
+    pub zoom: f32,
+    pub _pad: u32,
     pub color: super::common::PlotColorParams,
 }
 
@@ -68,6 +71,9 @@ impl HeatmapRenderer {
         });
 
         let initial_uniforms = HeatmapUniforms {
+            pan: [0.0, 0.0],
+            zoom: 1.0,
+            _pad: 0,
             color: super::common::PlotColorParams::default(),
         };
 
@@ -158,8 +164,19 @@ impl HeatmapRenderer {
         }
     }
 
-    pub fn update_uniforms(&self, queue: &wgpu::Queue, color: &super::common::PlotColorParams) {
-        let uniforms = HeatmapUniforms { color: *color };
+    pub fn update_uniforms(
+        &self,
+        queue: &wgpu::Queue,
+        color: &super::common::PlotColorParams,
+        pan: [f32; 2],
+        zoom: f32,
+    ) {
+        let uniforms = HeatmapUniforms {
+            pan,
+            zoom,
+            _pad: 0,
+            color: *color,
+        };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
@@ -168,7 +185,7 @@ impl HeatmapRenderer {
             colormap,
             ..Default::default()
         };
-        self.update_uniforms(queue, &color);
+        self.update_uniforms(queue, &color, [0.0, 0.0], 1.0);
     }
 
     /// Fast GPU Storage Buffer data channel upload
@@ -248,6 +265,8 @@ pub struct HeatmapCallback {
     pub renderer: Arc<HeatmapRenderer>,
     pub color_params: super::common::PlotColorParams,
     pub rect: egui::Rect,
+    pub pan: [f32; 2],
+    pub zoom: f32,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
@@ -259,7 +278,8 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
-        self.renderer.update_uniforms(queue, &self.color_params);
+        self.renderer
+            .update_uniforms(queue, &self.color_params, self.pan, self.zoom);
         Vec::new()
     }
 
@@ -269,7 +289,7 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
         rpass: &mut wgpu::RenderPass<'static>,
         _callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
-        super::common::setup_viewport_and_scissor(rpass, &self.rect, info.pixels_per_point);
+        super::common::setup_viewport_and_scissor(rpass, &self.rect, &info);
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);

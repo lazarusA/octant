@@ -151,6 +151,7 @@ pub struct OctantApp {
     pub show_bottom_bar: bool,
     pub settings_overlay_width: f32, // tracks prev-frame width to position Variable Controls to the right
     pub theme_preference: egui::ThemePreference,
+    pub enforce_data_aspect_ratio: bool,
 
     // DimConfig
     pub dim_config: Vec<DimConfig>,               // one per dimension
@@ -174,6 +175,12 @@ pub struct OctantApp {
     pub global_data_max: f32,
     pub active_scale_type: u32,
     pub scale_param: f32,
+
+    // 2D Flatmap Heatmap & 1D Line Plot Viewport Zoom / Pan State
+    pub heatmap_zoom: f32,
+    pub heatmap_pan: egui::Vec2,
+    pub line_zoom: f32,
+    pub line_pan: egui::Vec2,
 }
 
 impl OctantApp {
@@ -260,6 +267,7 @@ impl OctantApp {
             variable_search: String::new(),
 
             theme_preference: egui::ThemePreference::System,
+            enforce_data_aspect_ratio: true,
             dim_config: Vec::new(),
             selected_dim_indices: Vec::new(),
             selected_dim_ranges: Vec::new(),
@@ -280,7 +288,21 @@ impl OctantApp {
             global_data_max: f32::NEG_INFINITY,
             active_scale_type: 0,
             scale_param: 1.0,
+            heatmap_zoom: 1.0,
+            heatmap_pan: egui::Vec2::ZERO,
+            line_zoom: 1.0,
+            line_pan: egui::Vec2::ZERO,
         }
+    }
+
+    pub fn reset_heatmap_view(&mut self) {
+        self.heatmap_zoom = 1.0;
+        self.heatmap_pan = egui::Vec2::ZERO;
+    }
+
+    pub fn reset_line_view(&mut self) {
+        self.line_zoom = 1.0;
+        self.line_pan = egui::Vec2::ZERO;
     }
 
     /// Placeholder method to add a secondary dimensionally-compatible variable layer

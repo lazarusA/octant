@@ -17,9 +17,9 @@ struct LineUniforms {
     profile_length: u32,
     line_count: u32,
     line_mode: u32,
+    pan: vec2<f32>,
+    zoom: f32,
     _pad1: u32,
-    _pad2: u32,
-    _pad3: u32,
     color: ColorUniforms,
 };
 
@@ -45,7 +45,8 @@ fn vs_main(model: LineVertexInput) -> LineVertexOutput {
 
     // Apply dynamic viewport padding: map NDC [-1.0, 1.0] within padded region
     let padded_pos = pos * (vec2<f32>(1.0, 1.0) - uniforms.viewport_padding);
-    out.clip_position = vec4<f32>(padded_pos, 0.0, 1.0);
+    let transformed_pos = padded_pos * uniforms.zoom + uniforms.pan;
+    out.clip_position = vec4<f32>(transformed_pos, 0.0, 1.0);
 
     return out;
 }
