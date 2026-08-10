@@ -1,5 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -63,7 +64,7 @@ pub struct VolumeRenderer {
     pub uniform_buffer: wgpu::Buffer,
     pub data_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
-    pub data_len: usize,
+    pub data_len: AtomicUsize,
 }
 
 impl VolumeRenderer {
@@ -80,7 +81,13 @@ impl VolumeRenderer {
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
-        let data_len = initial_data.len();
+        let initial_data_safe = if initial_data.is_empty() {
+            vec![50.0; 64 * 64 * 16]
+        } else {
+            initial_data.to_vec()
+        };
+
+        let data_len = initial_data_safe.len();
         let depth = super::common::calculate_3d_depth(data_len, width, height);
 
         let initial_uniforms = VolumeUniforms {
@@ -171,12 +178,6 @@ impl VolumeRenderer {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        let initial_data_safe = if initial_data.is_empty() {
-            vec![50.0; 64 * 64]
-        } else {
-            initial_data.to_vec()
-        };
-
         let uniform_buffer = super::common::create_uniform_buffer(
             device,
             "Volume Uniform Buffer",
@@ -247,13 +248,14 @@ impl VolumeRenderer {
             uniform_buffer,
             data_buffer,
             bind_group,
-            data_len: initial_data_safe.len(),
+            data_len: AtomicUsize::new(data_len),
         }
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, data: &[f32]) {
         if !data.is_empty() {
             queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(data));
+            self.data_len.store(data.len(), Ordering::Relaxed);
         }
     }
 
@@ -277,7 +279,8 @@ impl VolumeRenderer {
         isorange: f32,
         screen_aspect: f32,
     ) {
-        let depth = super::common::calculate_3d_depth(self.data_len, width, height);
+        let data_l = self.data_len.load(Ordering::Relaxed);
+        let depth = super::common::calculate_3d_depth(data_l, width, height);
         let uniforms = VolumeUniforms {
             clip_planes: [[0.0; 4]; 8],
             light_color: [1.0, 1.0, 1.0],
