@@ -46,11 +46,11 @@ pub struct LineUniforms {
     pub profile_length: u32,
     pub line_count: u32,
     pub line_mode: u32,
+    pub pan: [f32; 2],
+    pub zoom: f32,
     pub _pad1: u32,
-    pub _pad2: u32,
-    pub _pad3: u32,
     /// WGSL aligns nested `ColorUniforms` to 16 bytes (offset 48).
-    pub _color_align_pad: [u32; 3],
+    pub _color_align_pad: [u32; 2],
     pub color: super::common::PlotColorParams,
 }
 
@@ -60,6 +60,8 @@ pub struct LineUniformParams {
     pub profile_length: u32,
     pub line_count: u32,
     pub line_mode: u32,
+    pub pan: [f32; 2],
+    pub zoom: f32,
 }
 
 pub struct LineRenderer {
@@ -103,10 +105,10 @@ impl LineRenderer {
             profile_length: width.max(1) as u32,
             line_count: height.max(1) as u32,
             line_mode: 0,
+            pan: [0.0, 0.0],
+            zoom: 1.0,
             _pad1: 0,
-            _pad2: 0,
-            _pad3: 0,
-            _color_align_pad: [0; 3],
+            _color_align_pad: [0; 2],
             color: super::common::PlotColorParams::default(),
         };
 
@@ -207,10 +209,10 @@ impl LineRenderer {
             profile_length: params.profile_length.max(1),
             line_count: params.line_count.max(1),
             line_mode: params.line_mode,
+            pan: params.pan,
+            zoom: params.zoom,
             _pad1: 0,
-            _pad2: 0,
-            _pad3: 0,
-            _color_align_pad: [0; 3],
+            _color_align_pad: [0; 2],
             color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -278,6 +280,8 @@ pub struct LineCallback {
     pub profile_length: u32,
     pub line_count: u32,
     pub line_mode: u32,
+    pub pan: [f32; 2],
+    pub zoom: f32,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for LineCallback {
@@ -306,6 +310,8 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
                 profile_length: self.profile_length,
                 line_count: self.line_count,
                 line_mode: self.line_mode,
+                pan: self.pan,
+                zoom: self.zoom,
             },
         );
         Vec::new()
@@ -317,7 +323,7 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         rpass: &mut wgpu::RenderPass<'static>,
         _callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
-        super::common::setup_viewport_and_scissor(rpass, &self.rect, info.pixels_per_point);
+        super::common::setup_viewport_and_scissor(rpass, &self.rect, &info);
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);

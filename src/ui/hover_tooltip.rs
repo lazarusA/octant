@@ -96,9 +96,10 @@ pub fn show_hover_tooltip(
         }
         _ => {
             // 2D Heatmap & 2D Slice Direct Mapping
-            let nx = ((hover_pos.x - rect.min.x) / rect.width()).clamp(0.0, 1.0);
-            let ny = ((hover_pos.y - rect.min.y) / rect.height()).clamp(0.0, 1.0);
-            (nx, ny, true, None)
+            let is_inside = rect.contains(hover_pos);
+            let nx = ((hover_pos.x - rect.min.x) / rect.width().max(1.0)).clamp(0.0, 1.0);
+            let ny = ((hover_pos.y - rect.min.y) / rect.height().max(1.0)).clamp(0.0, 1.0);
+            (nx, ny, is_inside, None)
         }
     };
 

@@ -174,6 +174,12 @@ pub struct OctantApp {
     pub global_data_max: f32,
     pub active_scale_type: u32,
     pub scale_param: f32,
+
+    // 2D Flatmap Heatmap & 1D Line Plot Viewport Zoom / Pan State
+    pub heatmap_zoom: f32,
+    pub heatmap_pan: egui::Vec2,
+    pub line_zoom: f32,
+    pub line_pan: egui::Vec2,
 }
 
 impl OctantApp {
@@ -280,7 +286,21 @@ impl OctantApp {
             global_data_max: f32::NEG_INFINITY,
             active_scale_type: 0,
             scale_param: 1.0,
+            heatmap_zoom: 1.0,
+            heatmap_pan: egui::Vec2::ZERO,
+            line_zoom: 1.0,
+            line_pan: egui::Vec2::ZERO,
         }
+    }
+
+    pub fn reset_heatmap_view(&mut self) {
+        self.heatmap_zoom = 1.0;
+        self.heatmap_pan = egui::Vec2::ZERO;
+    }
+
+    pub fn reset_line_view(&mut self) {
+        self.line_zoom = 1.0;
+        self.line_pan = egui::Vec2::ZERO;
     }
 
     /// Placeholder method to add a secondary dimensionally-compatible variable layer
