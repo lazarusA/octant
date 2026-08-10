@@ -26,7 +26,7 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
         if play_btn.clicked() {
             app.is_playing = !app.is_playing;
-            app.last_step_time = std::time::Instant::now();
+            app.last_step_time = web_time::Instant::now();
         }
 
         // Step Prev

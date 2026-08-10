@@ -23,6 +23,28 @@ cargo install octant
 
 Running the above command will globally install the **octant** binary.
 
+## WebAssembly Build & Local Preview
+
+To build and preview Octant in your web browser:
+
+1. **Install Trunk** (and WASM target if needed):
+   ```bash
+   rustup target add wasm32-unknown-unknown
+   cargo install trunk
+   ```
+
+2. **Run Local Development Server (Live Reload & Preview)**:
+   ```bash
+   trunk serve
+   ```
+   Open `http://127.0.0.1:8080` in your browser.
+
+3. **Build Production Static Release**:
+   ```bash
+   trunk build --release
+   ```
+   The compiled deployable output will be generated in the `dist/` directory, ready to be hosted on any web server or static host like GitHub Pages.
+
 ## License
 
 Dual-licensed under either of:

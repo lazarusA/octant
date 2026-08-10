@@ -11,7 +11,9 @@ pub use crate::data::backends::icechunk_storage::build_sync_icechunk_store;
 pub use crate::data::backends::zarr_storage::build_sync_store;
 pub use coordinates::fetch_all_dimension_coordinates;
 pub use error::OctantError;
-pub use executor::{TaskExecutor, TokioBlockOn, get_shared_tokio_rt};
+pub use executor::TaskExecutor;
+#[cfg(not(target_arch = "wasm32"))]
+pub use executor::{TokioBlockOn, get_shared_tokio_rt};
 pub use grid::check_and_orient_axes_with_coords;
 pub use metadata::{
     discover_arrays_via_http_metadata, extract_store_variables, variable_info_from_array,

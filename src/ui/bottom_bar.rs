@@ -52,7 +52,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
         if play_btn_res.clicked() {
             app.is_playing = !app.is_playing;
-            app.last_step_time = std::time::Instant::now();
+            app.last_step_time = web_time::Instant::now();
         }
 
         let max_steps = app

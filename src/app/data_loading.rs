@@ -51,7 +51,7 @@ impl OctantApp {
         let (tx, rx) = std::sync::mpsc::channel();
         self.metadata_rx = Some(rx);
 
-        std::thread::spawn(move || {
+        crate::utils::TaskExecutor::spawn(move || {
             if store_kind == StoreKind::ProceduralRandom {
                 let meta = DatasetMetadata {
                     name: "Procedural Test Store".to_string(),

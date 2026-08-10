@@ -4325,6 +4325,7 @@ dependencies = [
  "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "web-time",
  "wgpu",
  "zarrs",
  "zarrs_icechunk",

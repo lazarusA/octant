@@ -84,7 +84,7 @@ impl eframe::App for OctantApp {
 
         // 2. Playback Animation Timer Loop
         if self.is_playing {
-            let now = std::time::Instant::now();
+            let now = web_time::Instant::now();
             let frame_dur = std::time::Duration::from_secs_f32(1.0 / self.playback_fps.max(1.0));
 
             let is_busy = self

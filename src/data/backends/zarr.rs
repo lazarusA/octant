@@ -1,3 +1,5 @@
+#![cfg(not(target_arch = "wasm32"))]
+
 //! Zarr implementation of the generic BlockStore abstraction.
 
 use super::zarr_storage;

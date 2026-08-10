@@ -160,6 +160,7 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits>(
 }
 
 /// Fallback function: Discover variables via consolidated `.zmetadata` or `zarr.json` HTTP inspection.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
     let mut variables = Vec::new();
 
@@ -182,14 +183,15 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
     {
         for (key, val) in metadata_obj {
             if key.ends_with("/.zarray") || key == ".zarray" || key.ends_with("/zarr.json") {
-                let var_name = key
+                let var_name_raw = key
+                    .trim_start_matches('/')
                     .trim_end_matches("/.zarray")
                     .trim_end_matches("/zarr.json")
                     .to_string();
-                let var_name = if var_name.is_empty() {
+                let var_name = if var_name_raw.is_empty() {
                     "data".to_string()
                 } else {
-                    var_name
+                    var_name_raw
                 };
 
                 let shape: Vec<u64> = val
@@ -291,4 +293,9 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
     }
 
     variables
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn discover_arrays_via_http_metadata(_base_url: &str) -> Vec<VariableInfo> {
+    Vec::new()
 }

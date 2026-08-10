@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Octant Engine — Web Portal</title>
+    <link data-trunk rel="rust" data-wasm-opt="z" />
     <style>
         html, body, canvas {
             width: 100%;
@@ -17,9 +18,5 @@
 </head>
 <body>
     <canvas id="octant_canvas_anchor"></canvas>
-    <script type="module">
-        import init from './pkg/octant.js';
-        init().catch(console.error);
-    </script>
 </body>
 </html>

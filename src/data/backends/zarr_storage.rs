@@ -1,19 +1,24 @@
 //! Synchronous Zarr storage construction.
 
 use std::error::Error;
-use std::sync::Arc;
-
-use object_store::ClientOptions;
-use object_store::http::HttpBuilder;
-
 use zarrs::storage::ReadableWritableListableStorage;
-use zarrs::storage::storage_adapter::async_to_sync::AsyncToSyncStorageAdapter;
-use zarrs_object_store::AsyncObjectStore;
 
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::Arc;
+#[cfg(not(target_arch = "wasm32"))]
+use object_store::ClientOptions;
+#[cfg(not(target_arch = "wasm32"))]
+use object_store::http::HttpBuilder;
+#[cfg(not(target_arch = "wasm32"))]
+use zarrs::storage::storage_adapter::async_to_sync::AsyncToSyncStorageAdapter;
+#[cfg(not(target_arch = "wasm32"))]
+use zarrs_object_store::AsyncObjectStore;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::utils::executor::{TokioBlockOn, get_shared_tokio_rt};
 
 /// Builds a synchronous Zarr storage adapter over HTTP object_store, for
 /// remote sources.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn build_sync_store(
     url: &str,
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
@@ -40,11 +45,26 @@ pub fn build_sync_store(
     Ok(sync_store)
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn build_sync_store(
+    _url: &str,
+) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
+    Err("Remote HTTP Zarr storage adapter is not supported in WASM".into())
+}
+
 /// Builds a storage handle for a local Zarr store rooted at `path`.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn open_local_storage(
     path: &str,
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
     let store = zarrs::filesystem::FilesystemStore::new(path)?;
 
     Ok(Arc::new(store))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn open_local_storage(
+    _path: &str,
+) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
+    Err("Local filesystem storage is not supported in WebAssembly environment".into())
 }

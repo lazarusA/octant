@@ -1,19 +1,28 @@
 //! Storage initializers for Icechunk repositories.
 
-use crate::utils::executor::{TokioBlockOn, get_shared_tokio_rt};
-use std::collections::HashMap;
 use std::error::Error;
-use std::path::Path;
-use std::sync::{Arc, OnceLock, RwLock};
 use zarrs::storage::ReadableWritableListableStorage;
+
+#[cfg(not(target_arch = "wasm32"))]
+use crate::utils::executor::{TokioBlockOn, get_shared_tokio_rt};
+#[cfg(not(target_arch = "wasm32"))]
+use std::collections::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::Path;
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::{Arc, OnceLock, RwLock};
+#[cfg(not(target_arch = "wasm32"))]
 use zarrs::storage::storage_adapter::async_to_sync::AsyncToSyncStorageAdapter;
+#[cfg(not(target_arch = "wasm32"))]
 use zarrs_icechunk::AsyncIcechunkStore;
 
+#[cfg(not(target_arch = "wasm32"))]
 static ICECHUNK_STORE_CACHE: OnceLock<RwLock<HashMap<String, ReadableWritableListableStorage>>> =
     OnceLock::new();
 
 /// Helper function to build a synchronous Zarr storage adapter over an Icechunk repository.
 /// By default, opens a readonly session for the "main" branch. Caches stores by URL location.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn build_sync_icechunk_store(
     location: &str,
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error>> {
@@ -67,6 +76,13 @@ pub fn build_sync_icechunk_store(
     }
 
     Ok(sync_store)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn build_sync_icechunk_store(
+    _location: &str,
+) -> Result<ReadableWritableListableStorage, Box<dyn Error>> {
+    Err("Icechunk storage adapter is not supported in WASM".into())
 }
 
 #[allow(clippy::type_complexity)]

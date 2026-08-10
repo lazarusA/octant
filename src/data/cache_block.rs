@@ -637,7 +637,7 @@ impl BlockPrefetcher {
 
         let tx = self.tx.clone();
 
-        thread::spawn(move || {
+        crate::utils::TaskExecutor::spawn(move || {
             let result = fetch_block(
                 request.storage,
                 &request.store_target,

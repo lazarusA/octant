@@ -30,6 +30,9 @@ fn main() -> eframe::Result<()> {
 use wasm_bindgen::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
+fn main() {}
+
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(start)]
 pub fn main_web() {
     console_error_panic_hook::set_once();
@@ -37,9 +40,19 @@ pub fn main_web() {
 
     let web_options = eframe::WebOptions::default();
     wasm_bindgen_futures::spawn_local(async {
+        let document = eframe::web_sys::window()
+            .expect("No window found")
+            .document()
+            .expect("No document found");
+        let canvas = document
+            .get_element_by_id("octant_canvas_anchor")
+            .expect("Failed to find canvas element octant_canvas_anchor")
+            .dyn_into::<eframe::web_sys::HtmlCanvasElement>()
+            .expect("Element octant_canvas_anchor is not an HtmlCanvasElement");
+
         eframe::WebRunner::new()
             .start(
-                "octant_canvas_anchor",
+                canvas,
                 web_options,
                 Box::new(|cc| Ok(Box::new(OctantApp::new(cc)))),
             )

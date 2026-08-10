@@ -6,7 +6,6 @@
 
 use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender, channel};
-use std::thread;
 
 use super::{
     block_cache::{BlockCache, BlockCacheKey},
@@ -72,7 +71,7 @@ impl BlockPrefetcher {
 
         let tx = self.tx.clone();
 
-        thread::spawn(move || {
+        crate::utils::TaskExecutor::spawn(move || {
             let result = BlockLoader::load_one(&request).map_err(|error| error.to_string());
             let _ = tx.send(PrefetchResult { key, result });
         });

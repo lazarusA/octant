@@ -134,7 +134,7 @@ pub struct OctantApp {
     pub is_playing: bool,
     pub playback_fps: f32,
     pub loop_playback: bool,
-    pub last_step_time: std::time::Instant,
+    pub last_step_time: web_time::Instant,
 
     // Catalog State
     pub show_catalog_window: bool,
@@ -251,7 +251,7 @@ impl OctantApp {
             is_playing: false,
             playback_fps: 15.0,
             loop_playback: true,
-            last_step_time: std::time::Instant::now(),
+            last_step_time: web_time::Instant::now(),
 
             show_catalog_window: false,
             catalog_search_query: String::new(),

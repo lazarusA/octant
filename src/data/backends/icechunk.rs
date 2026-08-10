@@ -1,3 +1,5 @@
+#![cfg(not(target_arch = "wasm32"))]
+
 //! Icechunk implementation of the generic BlockStore abstraction.
 
 use super::icechunk_storage::build_sync_icechunk_store;
