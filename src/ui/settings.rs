@@ -241,6 +241,9 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
         PlotType::Heatmap | PlotType::Block => {
             ui.label(egui::RichText::new("🗺️ 2D Heatmap").small().weak());
+            ui.add_space(2.0);
+            ui.checkbox(&mut app.enforce_data_aspect_ratio, "📐 Aspect Ratio")
+                .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
         }
     }
 

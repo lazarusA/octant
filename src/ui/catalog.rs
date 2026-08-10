@@ -1,5 +1,5 @@
 use crate::app::{OctantApp, StoreKind};
-use crate::catalog::{get_catalog_entries, CatalogCategoryFilter, ICECHUNK_CATALOG, ZARR_CATALOG};
+use crate::catalog::{CatalogCategoryFilter, ICECHUNK_CATALOG, ZARR_CATALOG, get_catalog_entries};
 
 pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     if !app.show_catalog_window {
