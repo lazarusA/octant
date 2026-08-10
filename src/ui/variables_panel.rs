@@ -87,6 +87,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         app.plotted_animated_dim = app.animated_dim;
                         app.reset_variable_bounds();
                         app.load_selected_variable_block();
+                        app.open_only_settings_panel();
                     }
 
                     ui.add_space(4.0);
