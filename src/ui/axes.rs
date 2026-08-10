@@ -117,16 +117,16 @@ pub fn draw_plot_axes(
         }
     }
 
-    // --- 2. Left Y-Axis ---
-    let is_left_inside =
-        plot_rect.left() >= canvas_rect.left() && plot_rect.left() <= canvas_rect.right();
+    // --- 2. Right Y-Axis ---
+    let is_right_inside =
+        plot_rect.right() >= canvas_rect.left() && plot_rect.right() <= canvas_rect.right();
 
-    let (y_axis_x, y_tick_dir) = if is_left_inside {
-        (plot_rect.left(), -1.0) // Outward (pointing left)
-    } else if plot_rect.left() < canvas_rect.left() {
-        (canvas_rect.left() + 1.0, 1.0) // Attached to canvas left border, inward (pointing right)
-    } else {
+    let (y_axis_x, y_tick_dir) = if is_right_inside {
+        (plot_rect.right(), 1.0) // Outward (pointing right)
+    } else if plot_rect.right() > canvas_rect.right() {
         (canvas_rect.right() - 1.0, -1.0) // Attached to canvas right border, inward (pointing left)
+    } else {
+        (canvas_rect.left() + 1.0, 1.0) // Attached to canvas left border, inward (pointing right)
     };
 
     // Draw vertical axis line
@@ -152,16 +152,16 @@ pub fn draw_plot_axes(
             let end = Pos2::new(y_axis_x + y_tick_dir * tick_len, tick_y);
             painter.line_segment([start, end], stroke);
 
-            let label_pos = if y_tick_dir < 0.0 {
-                Pos2::new(y_axis_x - tick_len - 4.0, tick_y)
-            } else {
+            let label_pos = if y_tick_dir > 0.0 {
                 Pos2::new(y_axis_x + tick_len + 4.0, tick_y)
+            } else {
+                Pos2::new(y_axis_x - tick_len - 4.0, tick_y)
             };
 
-            let align = if y_tick_dir < 0.0 {
-                egui::Align2::RIGHT_CENTER
-            } else {
+            let align = if y_tick_dir > 0.0 {
                 egui::Align2::LEFT_CENTER
+            } else {
+                egui::Align2::RIGHT_CENTER
             };
 
             draw_tick_label_aligned(
@@ -171,33 +171,35 @@ pub fn draw_plot_axes(
                 font_id.clone(),
                 text_color,
                 align,
-                y_tick_dir > 0.0, // use bg pill when inward
+                y_tick_dir < 0.0, // use bg pill when inward
             );
         }
     }
 
-    // Draw Y-Axis Title
+    // Draw Y-Axis Title at the TOP of the vertical axis
     if !options.y_title.is_empty() {
-        let title_y = (visible_top + visible_bottom) * 0.5;
-        let title_x = if y_tick_dir < 0.0 {
-            y_axis_x - tick_len - 38.0
+        let title_y = visible_top + 10.0;
+        let title_x = if y_tick_dir > 0.0 {
+            y_axis_x + tick_len + 6.0
         } else {
-            y_axis_x + tick_len + 38.0
+            y_axis_x - tick_len - 6.0
         };
 
-        if title_x >= canvas_rect.left() && title_x <= canvas_rect.right() {
-            painter.text(
-                Pos2::new(title_x, title_y),
-                if y_tick_dir < 0.0 {
-                    egui::Align2::RIGHT_CENTER
-                } else {
-                    egui::Align2::LEFT_CENTER
-                },
-                options.y_title,
-                title_font_id,
-                text_color,
-            );
-        }
+        let align = if y_tick_dir > 0.0 {
+            egui::Align2::LEFT_TOP
+        } else {
+            egui::Align2::RIGHT_TOP
+        };
+
+        draw_tick_label_aligned(
+            painter,
+            Pos2::new(title_x, title_y),
+            options.y_title,
+            title_font_id,
+            text_color,
+            align,
+            y_tick_dir < 0.0, // use bg pill overlay when inward
+        );
     }
 }
 
