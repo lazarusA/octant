@@ -387,19 +387,18 @@ fn apply_role_change(dim: usize, spatial: SpatialRole, anim: AnimationRole, app:
         app.dim_config[dim].active = true;
     }
 
-    if spatial != SpatialRole::None {
-        if let Some(dim_size) = app
+    if spatial != SpatialRole::None
+        && let Some(dim_size) = app
             .active_dataset_metadata
             .as_ref()
             .and_then(|meta| meta.variables.get(app.selected_variable_idx))
             .and_then(|v_info| v_info.shape.get(dim).copied())
-        {
-            let dim_sz = dim_size as usize;
-            if dim < app.selected_dim_ranges.len() {
-                let (st, en) = app.selected_dim_ranges[dim];
-                if st == en {
-                    app.selected_dim_ranges[dim] = (0, dim_sz.saturating_sub(1));
-                }
+    {
+        let dim_sz = dim_size as usize;
+        if dim < app.selected_dim_ranges.len() {
+            let (st, en) = app.selected_dim_ranges[dim];
+            if st == en {
+                app.selected_dim_ranges[dim] = (0, dim_sz.saturating_sub(1));
             }
         }
     }
