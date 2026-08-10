@@ -377,7 +377,7 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
         rpass: &mut wgpu::RenderPass<'static>,
         _callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
-        super::common::setup_viewport_and_scissor(rpass, &self.rect, info.pixels_per_point);
+        super::common::setup_viewport_and_scissor(rpass, &self.rect, &info);
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
