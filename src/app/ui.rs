@@ -144,8 +144,15 @@ impl eframe::App for OctantApp {
             let canvas_bg = ui.style().visuals.panel_fill;
             ui.painter().rect_filled(canvas_rect, 0.0, canvas_bg);
 
-            // Enforce aspect data ratio (matrix.width / matrix.height)
-            let plot_rect = if let Some(matrix) = &self.matrix_data {
+            // 3D plots expand to full container width & height, using shader aspect projection to maintain 3D proportions
+            let is_3d_canvas_plot = self.active_plot_type == PlotType::Sphere
+                || self.active_plot_type == PlotType::Surface
+                || self.active_plot_type == PlotType::Volume
+                || self.active_plot_type == PlotType::PointCloud;
+
+            let plot_rect = if is_3d_canvas_plot {
+                canvas_rect
+            } else if let Some(matrix) = &self.matrix_data {
                 let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.01);
                 let avail_w = canvas_rect.width();
                 let avail_h = canvas_rect.height();
