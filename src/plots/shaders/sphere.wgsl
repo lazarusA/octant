@@ -166,14 +166,17 @@ fn vs_main(
     // Perspective projection transformation using dynamic zoom
     let cam_dist = clamp(uniforms.zoom, 1.1, 10.0);
     let cam_z = pos_rot.z - cam_dist;
+    let dist_positive = max(-cam_z, 0.1);
     let fov_scale = 1.6;
     let proj_x = (pos_rot.x * fov_scale) / uniforms.aspect_ratio;
     let proj_y = pos_rot.y * fov_scale;
 
-    // Standard Depth Z mapped to 0.0..1.0
-    let proj_z = (cam_z + 15.0) / 30.0;
+    // Linear depth projection mapped to [0.0, 1.0] for hardware depth testing
+    let z_near = 0.1;
+    let z_far = 50.0;
+    let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
 
-    out.position = vec4<f32>(proj_x, proj_y, proj_z, -cam_z);
+    out.position = vec4<f32>(proj_x, proj_y, proj_z, dist_positive);
     out.uv = model.uv;
     out.val = raw_val;
 
