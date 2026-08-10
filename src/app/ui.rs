@@ -150,7 +150,24 @@ impl eframe::App for OctantApp {
                 || self.active_plot_type == PlotType::Volume
                 || self.active_plot_type == PlotType::PointCloud;
 
-            let base_plot_rect = canvas_rect;
+            let base_plot_rect = if is_3d_canvas_plot || !self.enforce_data_aspect_ratio {
+                canvas_rect
+            } else if let Some(matrix) = &self.matrix_data {
+                let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.01);
+                let avail_w = canvas_rect.width();
+                let avail_h = canvas_rect.height();
+                let avail_aspect = avail_w / avail_h.max(1.0);
+
+                let (plot_w, plot_h) = if avail_aspect > data_aspect {
+                    (avail_h * data_aspect, avail_h)
+                } else {
+                    (avail_w, avail_w / data_aspect)
+                };
+
+                egui::Rect::from_center_size(canvas_rect.center(), egui::vec2(plot_w, plot_h))
+            } else {
+                canvas_rect
+            };
 
             // Handle Zoom & Pan Interactions
             if is_3d_canvas_plot {

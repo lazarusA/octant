@@ -151,6 +151,7 @@ pub struct OctantApp {
     pub show_bottom_bar: bool,
     pub settings_overlay_width: f32, // tracks prev-frame width to position Variable Controls to the right
     pub theme_preference: egui::ThemePreference,
+    pub enforce_data_aspect_ratio: bool,
 
     // DimConfig
     pub dim_config: Vec<DimConfig>,               // one per dimension
@@ -266,6 +267,7 @@ impl OctantApp {
             variable_search: String::new(),
 
             theme_preference: egui::ThemePreference::System,
+            enforce_data_aspect_ratio: true,
             dim_config: Vec::new(),
             selected_dim_indices: Vec::new(),
             selected_dim_ranges: Vec::new(),
