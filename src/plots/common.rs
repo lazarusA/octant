@@ -50,20 +50,49 @@ pub trait PlotRenderer: Send + Sync {
     fn update_data(&self, queue: &wgpu::Queue, values: &[f32]);
 }
 
-/// Setup viewport and scissor rect on a wgpu RenderPass based on egui Rect and pixels_per_point.
+/// Setup viewport and scissor rect on a wgpu RenderPass based on egui Rect and PaintCallbackInfo,
+/// guaranteeing that the scissor rect is strictly clamped within render target bounds.
 #[inline]
 pub fn setup_viewport_and_scissor(
     rpass: &mut wgpu::RenderPass<'static>,
     rect: &egui::Rect,
-    pixels_per_point: f32,
+    info: &eframe::egui::PaintCallbackInfo,
 ) {
-    let px_x = (rect.min.x * pixels_per_point).max(0.0) as u32;
-    let px_y = (rect.min.y * pixels_per_point).max(0.0) as u32;
-    let px_w = (rect.width() * pixels_per_point).max(1.0) as u32;
-    let px_h = (rect.height() * pixels_per_point).max(1.0) as u32;
+    let ppp = info.pixels_per_point;
 
-    rpass.set_viewport(px_x as f32, px_y as f32, px_w as f32, px_h as f32, 0.0, 1.0);
-    rpass.set_scissor_rect(px_x, px_y, px_w, px_h);
+    let max_dim = 8192.0;
+    let vp_x = (rect.min.x * ppp).round();
+    let vp_y = (rect.min.y * ppp).round();
+    let vp_w = (rect.width() * ppp).round().clamp(1.0, max_dim);
+    let vp_h = (rect.height() * ppp).round().clamp(1.0, max_dim);
+
+    rpass.set_viewport(vp_x, vp_y, vp_w, vp_h, 0.0, 1.0);
+
+    // Scissor Rect MUST be strictly contained within target render surface bounds
+    let target_rect = info.viewport_in_pixels();
+    let clip_rect = info.clip_rect_in_pixels();
+
+    let target_max_x = target_rect.left_px + target_rect.width_px;
+    let target_max_y = target_rect.top_px + target_rect.height_px;
+
+    let clip_max_x = clip_rect.left_px + clip_rect.width_px;
+    let clip_max_y = clip_rect.top_px + clip_rect.height_px;
+
+    let sc_min_x = clip_rect
+        .left_px
+        .clamp(target_rect.left_px, target_max_x)
+        .max(0) as u32;
+    let sc_min_y = clip_rect
+        .top_px
+        .clamp(target_rect.top_px, target_max_y)
+        .max(0) as u32;
+    let sc_max_x = clip_max_x.clamp(target_rect.left_px, target_max_x).max(0) as u32;
+    let sc_max_y = clip_max_y.clamp(target_rect.top_px, target_max_y).max(0) as u32;
+
+    let sc_w = sc_max_x.saturating_sub(sc_min_x).max(1);
+    let sc_h = sc_max_y.saturating_sub(sc_min_y).max(1);
+
+    rpass.set_scissor_rect(sc_min_x, sc_min_y, sc_w, sc_h);
 }
 
 /// Computes viewport aspect ratio from an egui Rect with zero division protection.

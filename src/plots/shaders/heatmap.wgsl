@@ -1,4 +1,7 @@
 struct Uniforms {
+    pan: vec2<f32>,
+    zoom: f32,
+    _pad: u32,
     color: ColorUniforms,
 };
 
@@ -23,7 +26,8 @@ struct VertexOutput {
 @vertex
 fn vs_main(model: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    out.position = vec4<f32>(model.position, 0.0, 1.0);
+    let transformed_pos = model.position * uniforms.zoom + uniforms.pan;
+    out.position = vec4<f32>(transformed_pos, 0.0, 1.0);
     out.uv = model.uv;
     out.val = data_buffer[model.cell_index];
     return out;

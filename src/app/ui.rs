@@ -150,7 +150,7 @@ impl eframe::App for OctantApp {
                 || self.active_plot_type == PlotType::Volume
                 || self.active_plot_type == PlotType::PointCloud;
 
-            let plot_rect = if is_3d_canvas_plot {
+            let base_plot_rect = if is_3d_canvas_plot || !self.enforce_data_aspect_ratio {
                 canvas_rect
             } else if let Some(matrix) = &self.matrix_data {
                 let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.01);
@@ -169,32 +169,99 @@ impl eframe::App for OctantApp {
                 canvas_rect
             };
 
-            if response.dragged() {
-                let delta = response.drag_delta();
-                self.sphere_rotation_y += delta.x * 0.008;
-                self.sphere_rotation_x = (self.sphere_rotation_x + delta.y * 0.008).clamp(
-                    -std::f32::consts::FRAC_PI_2 + 0.05,
-                    std::f32::consts::FRAC_PI_2 - 0.05,
-                );
-            }
+            // Handle Zoom & Pan Interactions
+            if is_3d_canvas_plot {
+                if response.dragged() {
+                    let delta = response.drag_delta();
+                    self.sphere_rotation_y += delta.x * 0.008;
+                    self.sphere_rotation_x = (self.sphere_rotation_x + delta.y * 0.008).clamp(
+                        -std::f32::consts::FRAC_PI_2 + 0.05,
+                        std::f32::consts::FRAC_PI_2 - 0.05,
+                    );
+                }
 
-            if response.hovered() {
-                let scroll = ui.input(|i| i.smooth_scroll_delta.y);
-                if scroll != 0.0 {
-                    self.sphere_zoom = (self.sphere_zoom - scroll * 0.003).clamp(1.1, 8.0);
-                    ui.ctx().request_repaint();
+                if response.hovered() {
+                    let scroll = ui.input(|i| i.smooth_scroll_delta.y);
+                    if scroll != 0.0 {
+                        self.sphere_zoom = (self.sphere_zoom - scroll * 0.003).clamp(1.1, 8.0);
+                        ui.ctx().request_repaint();
+                    }
+                }
+            } else {
+                // 2D Flatmap Heatmap & 1D Line Plot zoom & pan interaction
+                if response.double_clicked() {
+                    match self.active_plot_type {
+                        PlotType::Heatmap => self.reset_heatmap_view(),
+                        PlotType::Line => self.reset_line_view(),
+                        _ => {}
+                    }
+                }
+
+                if response.dragged() {
+                    let delta = response.drag_delta();
+                    match self.active_plot_type {
+                        PlotType::Heatmap => self.heatmap_pan += delta,
+                        PlotType::Line => self.line_pan += delta,
+                        _ => {}
+                    }
+                }
+
+                if response.hovered() {
+                    let scroll = ui.input(|i| i.smooth_scroll_delta.y);
+                    if scroll != 0.0 {
+                        let zoom_factor = (1.0 + scroll * 0.002).clamp(0.8, 1.25);
+                        let mouse_pos = response.hover_pos().unwrap_or(canvas_rect.center());
+                        let center = base_plot_rect.center();
+
+                        match self.active_plot_type {
+                            PlotType::Heatmap => {
+                                let old_zoom = self.heatmap_zoom;
+                                let new_zoom = (old_zoom * zoom_factor).clamp(0.1, 50.0);
+                                let old_pan = self.heatmap_pan;
+                                self.heatmap_pan = old_pan * (new_zoom / old_zoom)
+                                    + (mouse_pos - center) * (1.0 - new_zoom / old_zoom);
+                                self.heatmap_zoom = new_zoom;
+                            }
+                            PlotType::Line => {
+                                let old_zoom = self.line_zoom;
+                                let new_zoom = (old_zoom * zoom_factor).clamp(0.1, 50.0);
+                                let old_pan = self.line_pan;
+                                self.line_pan = old_pan * (new_zoom / old_zoom)
+                                    + (mouse_pos - center) * (1.0 - new_zoom / old_zoom);
+                                self.line_zoom = new_zoom;
+                            }
+                            _ => {}
+                        }
+                        ui.ctx().request_repaint();
+                    }
                 }
             }
 
-            if self.sphere_auto_rotate
-                && (self.active_plot_type == PlotType::Sphere
-                    || self.active_plot_type == PlotType::Surface
-                    || self.active_plot_type == PlotType::Volume
-                    || self.active_plot_type == PlotType::PointCloud)
-            {
+            if self.sphere_auto_rotate && is_3d_canvas_plot {
                 self.sphere_rotation_y += ui.ctx().input(|i| i.stable_dt).min(0.1) * 0.15;
                 ui.ctx().request_repaint();
             }
+
+            // Compute screen-space transformed plot rect and GPU pan/zoom uniforms
+            let (transformed_plot_rect, gpu_pan, gpu_zoom) = if is_3d_canvas_plot {
+                (base_plot_rect, [0.0, 0.0], 1.0)
+            } else {
+                let (zoom, pan) = match self.active_plot_type {
+                    PlotType::Heatmap => (self.heatmap_zoom, self.heatmap_pan),
+                    PlotType::Line => (self.line_zoom, self.line_pan),
+                    _ => (1.0, egui::Vec2::ZERO),
+                };
+
+                let scaled_size = base_plot_rect.size() * zoom;
+                let scaled_center = base_plot_rect.center() + pan;
+                let rect = egui::Rect::from_center_size(scaled_center, scaled_size);
+
+                let gpu_pan_x = pan.x / (0.5 * base_plot_rect.width().max(1.0));
+                let gpu_pan_y = -pan.y / (0.5 * base_plot_rect.height().max(1.0));
+                (rect, [gpu_pan_x, gpu_pan_y], zoom)
+            };
+
+            let plot_rect = transformed_plot_rect;
 
             match self.active_plot_type {
                 PlotType::Line => {
@@ -203,15 +270,17 @@ impl eframe::App for OctantApp {
                         let (profile_values, profile_length, line_count) =
                             self.get_line_profile_payload();
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            plot_rect,
+                            base_plot_rect,
                             LineCallback {
                                 renderer: line_renderer.clone(),
                                 color_params,
-                                rect: plot_rect,
+                                rect: base_plot_rect,
                                 profile_values,
                                 profile_length,
                                 line_count,
                                 line_mode: if self.line_plot_all_series { 1 } else { 0 },
+                                pan: gpu_pan,
+                                zoom: gpu_zoom,
                             },
                         );
                         ui.painter().add(callback);
@@ -326,16 +395,87 @@ impl eframe::App for OctantApp {
                 _ => {
                     if let Some(renderer) = &self.renderer {
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            plot_rect,
+                            base_plot_rect,
                             MatrixCallback {
                                 renderer: renderer.clone(),
                                 color_params: self.get_color_params(),
-                                rect: plot_rect,
+                                rect: base_plot_rect,
+                                pan: gpu_pan,
+                                zoom: gpu_zoom,
                             },
                         );
                         ui.painter().add(callback);
                     }
                 }
+            }
+
+            // Draw Dynamic Plot Axis Lines, Ticks, and Axis Titles
+            if !is_3d_canvas_plot && let Some(matrix) = &self.matrix_data {
+                let (x_dom, y_dom, x_label, y_label) = if self.active_plot_type == PlotType::Line {
+                    let y_min = self.color_range_min as f64;
+                    let y_max = self.color_range_max as f64;
+                    let profile_len = matrix.width.max(1) as f64;
+                    (
+                        (0.0, profile_len - 1.0),
+                        (y_min, y_max),
+                        "Sample Index".to_string(),
+                        "Data Value".to_string(),
+                    )
+                } else {
+                    let mut x_name = "X".to_string();
+                    let mut y_name = "Y".to_string();
+                    let mut x_bounds = (0.0, matrix.width as f64);
+                    let mut y_bounds = (0.0, matrix.height as f64);
+
+                    if let Some(meta) = &self.active_dataset_metadata
+                        && let Some(var) = meta.variables.get(self.selected_variable_idx)
+                    {
+                        if let Some(y_n) = var
+                            .dimension_names
+                            .iter()
+                            .rposition(|d| {
+                                d.contains("lat") || d.contains("y") || d.contains("row")
+                            })
+                            .and_then(|idx| var.dimension_names.get(idx))
+                        {
+                            y_name = y_n.clone();
+                            if let Some(coords) = meta.dimension_coordinates.get(y_n)
+                                && let (Some(f), Some(l)) = (coords.first(), coords.last())
+                                && let (Ok(f_v), Ok(l_v)) = (f.parse::<f64>(), l.parse::<f64>())
+                            {
+                                y_bounds = (f_v, l_v);
+                            }
+                        }
+
+                        if let Some(x_n) = var
+                            .dimension_names
+                            .iter()
+                            .rposition(|d| {
+                                d.contains("lon") || d.contains("x") || d.contains("col")
+                            })
+                            .and_then(|idx| var.dimension_names.get(idx))
+                        {
+                            x_name = x_n.clone();
+                            if let Some(coords) = meta.dimension_coordinates.get(x_n)
+                                && let (Some(f), Some(l)) = (coords.first(), coords.last())
+                                && let (Ok(f_v), Ok(l_v)) = (f.parse::<f64>(), l.parse::<f64>())
+                            {
+                                x_bounds = (f_v, l_v);
+                            }
+                        }
+                    }
+
+                    (x_bounds, y_bounds, x_name, y_name)
+                };
+
+                let options = crate::ui::axes::PlotAxisOptions {
+                    x_domain: x_dom,
+                    y_domain: y_dom,
+                    x_title: &x_label,
+                    y_title: &y_label,
+                };
+
+                crate::ui::axes::draw_plot_axes(ui, canvas_rect, plot_rect, &options);
             }
 
             // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle

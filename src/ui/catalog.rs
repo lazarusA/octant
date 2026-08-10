@@ -9,10 +9,13 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     let mut open = app.show_catalog_window;
     let mut should_close = false;
 
+    let max_w = (ctx.viewport_rect().width() * 0.7).clamp(480.0, 950.0);
+
     egui::Window::new("📚 Dataset Catalog")
         .open(&mut open)
-        .default_size([780.0, 560.0])
-        .min_size([500.0, 380.0])
+        .default_size([max_w, 560.0])
+        .max_width(max_w)
+        .min_size([460.0, 380.0])
         .resizable(true)
         .collapsible(false)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -37,8 +40,8 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                 ui.label(egui::RichText::new("🔍 Search:").strong());
                 ui.add(
                     egui::TextEdit::singleline(&mut app.catalog_search_query)
-                        .hint_text("Filter by name, key, description or URL...")
-                        .desired_width(280.0),
+                        .hint_text("Filter by name, description or URL...")
+                        .desired_width(260.0),
                 );
 
                 ui.separator();
@@ -97,19 +100,21 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                         for entry in filtered_entries {
+                            let trimmed_url = entry.store.trim();
                             ui.group(|ui| {
                                 ui.set_width(ui.available_width());
+
                                 ui.horizontal(|ui| {
-                                    // Store type badge
+                                    // Store type badge using system theme colors
                                     let badge_text = match entry.store_kind {
                                         StoreKind::RemoteZarr => "🌐 Zarr",
                                         StoreKind::RemoteIcechunk => "🧊 Icechunk",
                                         _ => "Store",
                                     };
                                     let badge_color = match entry.store_kind {
-                                        StoreKind::RemoteZarr => egui::Color32::from_rgb(40, 130, 220),
-                                        StoreKind::RemoteIcechunk => egui::Color32::from_rgb(140, 70, 230),
-                                        _ => egui::Color32::GRAY,
+                                        StoreKind::RemoteZarr => ui.visuals().selection.bg_fill,
+                                        StoreKind::RemoteIcechunk => ui.visuals().widgets.active.bg_fill,
+                                        _ => ui.visuals().widgets.noninteractive.fg_stroke.color,
                                     };
 
                                     ui.label(
@@ -126,11 +131,10 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                                         );
                                         if ui.add(btn).clicked() {
                                             app.selected_store_kind = entry.store_kind;
-                                            app.store_target_input = entry.store.to_string();
+                                            app.store_target_input = trimmed_url.to_string();
                                             should_close = true;
                                             app.inspect_active_store();
                                         }
-                                        ui.small(egui::RichText::new(format!("key: {}", entry.key)).monospace());
                                     });
                                 });
 
@@ -139,13 +143,16 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                                 }
 
                                 ui.add_space(2.0);
-                                ui.horizontal(|ui| {
+                                ui.horizontal_top(|ui| {
                                     ui.label(egui::RichText::new("URL:").small().strong());
-                                    ui.label(
-                                        egui::RichText::new(entry.store)
-                                            .small()
-                                            .monospace()
-                                            .color(egui::Color32::LIGHT_BLUE),
+                                    ui.add(
+                                        egui::Label::new(
+                                            egui::RichText::new(trimmed_url)
+                                                .small()
+                                                .monospace()
+                                                .color(ui.visuals().hyperlink_color),
+                                        )
+                                        .wrap(),
                                     );
                                 });
                             });
