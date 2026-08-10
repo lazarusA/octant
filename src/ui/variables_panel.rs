@@ -216,24 +216,20 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
             app.dim_config[i].animation = AnimationRole::Animated;
             app.animated_dim = Some(i);
             anim_assigned = true;
-
-            // For volume, Z will be time and Animated
-            if app.active_plot_type == crate::plots::PlotType::Volume && !z_assigned {
-                app.dim_config[i].spatial = SpatialRole::Z;
-                z_assigned = true;
-            }
         } else if !z_assigned
             && (dim_name.contains("depth")
                 || dim_name.contains("level")
                 || dim_name.contains("height")
-                || dim_name == "z")
+                || dim_name == "z"
+                || dim_name.contains("lev")
+                || dim_name.contains("sigma"))
         {
             app.dim_config[i].spatial = SpatialRole::Z;
             z_assigned = true;
         }
     }
 
-    // Fallback: assign remaining unassigned dimensions for 2D visualization if needed
+    // Fallback: assign remaining unassigned dimensions for 2D/3D visualization if needed
     for i in 0..rank {
         if app.dim_config[i].spatial == SpatialRole::None
             && app.dim_config[i].animation == AnimationRole::None
@@ -244,6 +240,9 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
             } else if !x_assigned {
                 app.dim_config[i].spatial = SpatialRole::X;
                 x_assigned = true;
+            } else if !z_assigned {
+                app.dim_config[i].spatial = SpatialRole::Z;
+                z_assigned = true;
             }
         }
     }
@@ -388,6 +387,22 @@ fn apply_role_change(dim: usize, spatial: SpatialRole, anim: AnimationRole, app:
         app.dim_config[dim].active = true;
     }
 
+    if spatial != SpatialRole::None
+        && let Some(dim_size) = app
+            .active_dataset_metadata
+            .as_ref()
+            .and_then(|meta| meta.variables.get(app.selected_variable_idx))
+            .and_then(|v_info| v_info.shape.get(dim).copied())
+    {
+        let dim_sz = dim_size as usize;
+        if dim < app.selected_dim_ranges.len() {
+            let (st, en) = app.selected_dim_ranges[dim];
+            if st == en {
+                app.selected_dim_ranges[dim] = (0, dim_sz.saturating_sub(1));
+            }
+        }
+    }
+
     // Re-build spatial_dims list in X, Y, Z order
     app.spatial_dims.clear();
     for j in 0..app.dim_config.len() {
@@ -444,7 +459,10 @@ pub fn build_slice_request_for_plotted(
             if start == end {
                 DimensionSelection::Index(start)
             } else {
-                DimensionSelection::Range { start, end }
+                DimensionSelection::Range {
+                    start,
+                    end: (end + 1).min(dim_size),
+                }
             }
         })
         .collect();
@@ -469,7 +487,10 @@ pub fn build_slice_request(app: &OctantApp, var_name: &str, shape: &[u64]) -> Sl
             if start == end {
                 DimensionSelection::Index(start)
             } else {
-                DimensionSelection::Range { start, end }
+                DimensionSelection::Range {
+                    start,
+                    end: (end + 1).min(dim_size),
+                }
             }
         })
         .collect();

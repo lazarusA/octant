@@ -37,6 +37,9 @@ impl OctantApp {
                 self.load_selected_variable_block();
             }
             AppAction::SetPlotType(plot_type) => {
+                if plot_type == PlotType::Volume || plot_type == PlotType::PointCloud {
+                    self.is_playing = false;
+                }
                 self.active_plot_type = plot_type;
             }
             AppAction::SetColormap(cmap) => {
@@ -52,7 +55,13 @@ impl OctantApp {
                 self.line_plot_all_series = !self.line_plot_all_series;
             }
             AppAction::TogglePlayback => {
-                self.is_playing = !self.is_playing;
+                let is_3d = self.active_plot_type == PlotType::Volume
+                    || self.active_plot_type == PlotType::PointCloud;
+                if is_3d {
+                    self.is_playing = false;
+                } else {
+                    self.is_playing = !self.is_playing;
+                }
             }
             AppAction::UpdateColorBounds { min, max } => {
                 self.color_range_min = min;

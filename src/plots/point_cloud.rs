@@ -1,5 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -46,7 +47,7 @@ pub struct PointCloudRenderer {
     pub uniform_buffer: wgpu::Buffer,
     pub data_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
-    pub instance_count: u32,
+    pub instance_count: AtomicU32,
 }
 
 impl PointCloudRenderer {
@@ -63,8 +64,14 @@ impl PointCloudRenderer {
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
-        let instance_count = initial_data.len() as u32;
-        let depth = super::common::calculate_3d_depth(initial_data.len(), width, height);
+        let initial_data_safe = if initial_data.is_empty() {
+            vec![50.0; 64 * 64 * 16]
+        } else {
+            initial_data.to_vec()
+        };
+
+        let instance_count = initial_data_safe.len() as u32;
+        let depth = super::common::calculate_3d_depth(initial_data_safe.len(), width, height);
 
         let initial_uniforms = PointCloudUniforms {
             rotation_y: 0.0,
@@ -109,12 +116,6 @@ impl PointCloudRenderer {
             contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
         });
-
-        let initial_data_safe = if initial_data.is_empty() {
-            vec![50.0; 64 * 64]
-        } else {
-            initial_data.to_vec()
-        };
 
         let uniform_buffer = super::common::create_uniform_buffer(
             device,
@@ -186,13 +187,15 @@ impl PointCloudRenderer {
             uniform_buffer,
             data_buffer,
             bind_group,
-            instance_count,
+            instance_count: AtomicU32::new(instance_count),
         }
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, data: &[f32]) {
         if !data.is_empty() {
             queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(data));
+            self.instance_count
+                .store(data.len() as u32, Ordering::Relaxed);
         }
     }
 
@@ -212,7 +215,8 @@ impl PointCloudRenderer {
         height: u32,
         screen_aspect: f32,
     ) {
-        let depth = super::common::calculate_3d_depth(self.instance_count as usize, width, height);
+        let instance_cnt = self.instance_count.load(Ordering::Relaxed);
+        let depth = super::common::calculate_3d_depth(instance_cnt as usize, width, height);
         let uniforms = PointCloudUniforms {
             rotation_y: rot_y,
             rotation_x: rot_x,
@@ -298,7 +302,7 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         rpass.draw_indexed(
             0..self.renderer.index_count,
             0,
-            0..self.renderer.instance_count,
+            0..self.renderer.instance_count.load(Ordering::Relaxed),
         );
     }
 }
