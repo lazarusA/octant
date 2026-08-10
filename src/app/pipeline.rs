@@ -1,4 +1,5 @@
 use crate::data::matrix_data::MatrixData;
+use crate::data::volume_data::VolumeData;
 use crate::plots::{
     LineRenderer, MatrixRenderer, PlotType, PointCloudRenderer, SphereRenderer, SurfaceRenderer,
     VolumeRenderer,
@@ -118,6 +119,53 @@ impl OctantApp {
         self.matrix_data = Some(data);
     }
 
+    pub fn rebuild_pipeline_with_volume_data(&mut self, data: VolumeData) {
+        if let Some(wgpu_render_state) = &self.wgpu_render_state {
+            let same_dimensions = self.volume_data.as_ref().is_some_and(|v| {
+                v.width == data.width && v.height == data.height && v.depth == data.depth
+            });
+
+            if same_dimensions
+                && self.volume_renderer.is_some()
+                && self.point_cloud_renderer.is_some()
+            {
+                if let Some(volume_renderer) = &self.volume_renderer {
+                    volume_renderer.update_data(&wgpu_render_state.queue, &data.values);
+                }
+                if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
+                    point_cloud_renderer.update_data(&wgpu_render_state.queue, &data.values);
+                }
+            } else {
+                let volume_renderer = VolumeRenderer::new(
+                    &wgpu_render_state.device,
+                    wgpu_render_state.target_format,
+                    &data.values,
+                    data.width as u32,
+                    data.height as u32,
+                );
+                let point_cloud_renderer = PointCloudRenderer::new(
+                    &wgpu_render_state.device,
+                    wgpu_render_state.target_format,
+                    &data.values,
+                    data.width as u32,
+                    data.height as u32,
+                );
+                self.volume_renderer = Some(Arc::new(volume_renderer));
+                self.point_cloud_renderer = Some(Arc::new(point_cloud_renderer));
+            }
+        }
+
+        self.global_data_min = self.global_data_min.min(data.min_val);
+        self.global_data_max = self.global_data_max.max(data.max_val);
+
+        if !self.lock_color_bounds {
+            self.volume_cmin = data.min_val;
+            self.volume_cmax = data.max_val;
+        }
+
+        self.volume_data = Some(data);
+    }
+
     pub fn reset_variable_bounds(&mut self) {
         self.global_data_min = f32::MAX;
         self.global_data_max = f32::MIN;
@@ -161,6 +209,14 @@ impl OctantApp {
     }
 
     pub fn get_3d_aspect_ratio(&self) -> (f32, f32, f32) {
+        if let Some(vdata) = &self.volume_data {
+            let w = vdata.width as f32;
+            let h = vdata.height as f32;
+            let d = vdata.depth as f32;
+            let max_dim = w.max(h).max(d).max(1.0);
+            return (w / max_dim, h / max_dim, d / max_dim);
+        }
+
         let (w, h, max_t) = self.matrix_data.as_ref().map_or((64, 64, 64), |m| {
             (m.width as u32, m.height as u32, m.max_timesteps as u32)
         });

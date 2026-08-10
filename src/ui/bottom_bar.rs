@@ -30,6 +30,9 @@ pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
+    let is_3d_plot = app.active_plot_type == crate::plots::PlotType::Volume
+        || app.active_plot_type == crate::plots::PlotType::PointCloud;
+
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         // 1. Play / Pause Button for Timestep Animation across all plot types
@@ -42,7 +45,12 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             ))
             .strong(),
         );
-        if ui.add(play_button).clicked() {
+        let mut play_btn_res = ui.add_enabled(!is_3d_plot, play_button);
+        if is_3d_plot {
+            play_btn_res =
+                play_btn_res.on_hover_text("Playback disabled for 3D Volume/Point Cloud plots");
+        }
+        if play_btn_res.clicked() {
             app.is_playing = !app.is_playing;
             app.last_step_time = std::time::Instant::now();
         }

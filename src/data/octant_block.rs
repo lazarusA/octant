@@ -184,27 +184,31 @@ impl OctantBlock {
         y_dim: usize,
         z_dim: usize,
         fixed_indices: &[usize],
-    ) -> Option<(Vec<f32>, [usize; 3])> {
-        if x_dim >= self.rank()
-            || y_dim >= self.rank()
-            || z_dim >= self.rank()
-            || x_dim == y_dim
-            || x_dim == z_dim
-            || y_dim == z_dim
-            || fixed_indices.len() != self.rank()
-        {
+        dataset_name: &str,
+    ) -> Option<crate::data::VolumeData> {
+        if x_dim >= self.rank() || y_dim >= self.rank() || fixed_indices.len() != self.rank() {
             return None;
         }
 
         let nx = self.shape[x_dim];
         let ny = self.shape[y_dim];
-        let nz = self.shape[z_dim];
+        let (nz, has_z) = if z_dim < self.rank() && z_dim != x_dim && z_dim != y_dim {
+            (self.shape[z_dim], true)
+        } else {
+            (1, false)
+        };
+
+        if x_dim == y_dim {
+            return None;
+        }
 
         let mut values = Vec::with_capacity(nx * ny * nz);
         let mut indices = fixed_indices.to_vec();
 
         for z in 0..nz {
-            indices[z_dim] = z;
+            if has_z {
+                indices[z_dim] = z;
+            }
 
             for y in 0..ny {
                 indices[y_dim] = y;
@@ -216,7 +220,29 @@ impl OctantBlock {
             }
         }
 
-        Some((values, [nx, ny, nz]))
+        let (min_val, max_val) = values
+            .iter()
+            .copied()
+            .filter(|v| !v.is_nan())
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
+                (lo.min(v), hi.max(v))
+            });
+
+        let (min_val, max_val) = if min_val.is_finite() && max_val.is_finite() {
+            (min_val, max_val)
+        } else {
+            (0.0, 1.0)
+        };
+
+        Some(crate::data::VolumeData::new(
+            nx,
+            ny,
+            nz,
+            values,
+            min_val,
+            max_val,
+            dataset_name.to_string(),
+        ))
     }
 
     pub fn bytes_size(&self) -> usize {
