@@ -320,3 +320,14 @@ impl eframe::App for OctantApp {
         }
     }
 }
+
+impl OctantApp {
+    /// Opens the Settings panel and closes Store, Variables, Controls, and Catalog.
+    pub fn open_only_settings_panel(&mut self) {
+        self.show_settings_panel = true;
+        self.show_left_panel = false;
+        self.show_variables_overlay = false;
+        self.show_variable_controls = false;
+        self.show_catalog_window = false;
+    }
+}
