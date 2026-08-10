@@ -78,8 +78,14 @@ pub fn setup_viewport_and_scissor(
     let clip_max_x = clip_rect.left_px + clip_rect.width_px;
     let clip_max_y = clip_rect.top_px + clip_rect.height_px;
 
-    let sc_min_x = clip_rect.left_px.clamp(target_rect.left_px, target_max_x).max(0) as u32;
-    let sc_min_y = clip_rect.top_px.clamp(target_rect.top_px, target_max_y).max(0) as u32;
+    let sc_min_x = clip_rect
+        .left_px
+        .clamp(target_rect.left_px, target_max_x)
+        .max(0) as u32;
+    let sc_min_y = clip_rect
+        .top_px
+        .clamp(target_rect.top_px, target_max_y)
+        .max(0) as u32;
     let sc_max_x = clip_max_x.clamp(target_rect.left_px, target_max_x).max(0) as u32;
     let sc_max_y = clip_max_y.clamp(target_rect.top_px, target_max_y).max(0) as u32;
 
