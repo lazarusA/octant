@@ -45,6 +45,7 @@ impl OctantApp {
         self.status_message = format!("Inspecting {:?} metadata...", self.selected_store_kind);
 
         let store_kind = self.selected_store_kind;
+        self.store_target_input = self.store_target_input.trim().to_string();
         let target_input = self.store_target_input.clone();
 
         let (tx, rx) = std::sync::mpsc::channel();

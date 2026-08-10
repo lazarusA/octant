@@ -19,7 +19,7 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                     .button(egui::RichText::new("📚 Catalog").strong())
                     .clicked()
                 {
-                    app.show_catalog_window = true;
+                    app.show_catalog_window = !app.show_catalog_window;
                 }
 
                 if ui
