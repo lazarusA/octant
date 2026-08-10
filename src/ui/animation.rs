@@ -7,6 +7,9 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         .map(|h| h.max_timesteps)
         .unwrap_or(1);
 
+    let is_3d_plot = app.active_plot_type == crate::plots::PlotType::Volume
+        || app.active_plot_type == crate::plots::PlotType::PointCloud;
+
     ui.horizontal(|ui| {
         // Play / Pause Button
         let play_text = if app.is_playing {
@@ -14,7 +17,14 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         } else {
             "▶ Play"
         };
-        if ui.button(egui::RichText::new(play_text).strong()).clicked() {
+        let mut play_btn = ui.add_enabled(
+            !is_3d_plot,
+            egui::Button::new(egui::RichText::new(play_text).strong()),
+        );
+        if is_3d_plot {
+            play_btn = play_btn.on_hover_text("Playback disabled for 3D Volume/Point Cloud plots");
+        }
+        if play_btn.clicked() {
             app.is_playing = !app.is_playing;
             app.last_step_time = std::time::Instant::now();
         }

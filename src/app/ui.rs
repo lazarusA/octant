@@ -76,6 +76,12 @@ impl eframe::App for OctantApp {
         // 1. Drain completed block-cache prefetch results.
         self.poll_block_prefetch_results();
 
+        let is_3d_plot = self.active_plot_type == crate::plots::PlotType::Volume
+            || self.active_plot_type == crate::plots::PlotType::PointCloud;
+        if is_3d_plot {
+            self.is_playing = false;
+        }
+
         // 2. Playback Animation Timer Loop
         if self.is_playing {
             let now = std::time::Instant::now();
