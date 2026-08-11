@@ -88,14 +88,14 @@ impl eframe::App for OctantApp {
             let frame_dur = std::time::Duration::from_secs_f32(1.0 / self.playback_fps.max(1.0));
 
             if now.duration_since(self.last_step_time) >= frame_dur {
-                let max_steps = self
-                    .matrix_data
-                    .as_ref()
-                    .map(|h| h.max_timesteps)
-                    .unwrap_or(1);
+                let total_steps = self.animated_dim_extent();
 
-                if max_steps > 1 {
-                    let next_ts = if self.current_timestep + 1 < max_steps {
+                if total_steps > 0 && self.current_timestep >= total_steps {
+                    self.current_timestep = total_steps - 1;
+                }
+
+                if total_steps > 1 {
+                    let next_ts = if self.current_timestep + 1 < total_steps {
                         Some(self.current_timestep + 1)
                     } else if self.loop_playback {
                         Some(0)
@@ -132,19 +132,13 @@ impl eframe::App for OctantApp {
                             self.load_selected_variable_block();
                         } else {
                             // Target block for next timestep is not yet cached.
-                            // Trigger prefetching for next_ts while pausing playback cleanly until resident.
-                            let save_ts = self.current_timestep;
-                            self.current_timestep = next_ts;
-                            self.load_selected_variable_block();
-                            self.current_timestep = save_ts;
-                            if let Some(anim_dim) = self.plotted_animated_dim {
-                                if anim_dim < self.plotted_selected_dim_indices.len() {
-                                    self.plotted_selected_dim_indices[anim_dim] = save_ts;
-                                }
-                            }
+                            // Trigger background prefetch for next_ts while safely keeping playback on current valid frame.
+                            self.prefetch_block_for_timestep(next_ts);
                             self.last_step_time = now;
                         }
                     }
+                } else {
+                    self.is_playing = false;
                 }
             }
             ctx.request_repaint_after(frame_dur);

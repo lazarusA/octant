@@ -32,6 +32,46 @@ impl OctantApp {
         (start, end)
     }
 
+    /// Returns the open `StoreHandle` for the currently plotted dataset,
+    /// looking up in `dataset_manager` first and opening/registering it only if missing.
+    pub fn get_or_open_plotted_store(&mut self) -> Option<crate::data::StoreHandle> {
+        let metadata = self.plotted_dataset_metadata.as_ref()?;
+        let source_id = format!(
+            "{:?}:{}",
+            self.plotted_store_kind, self.plotted_store_target_input
+        );
+
+        if let Some(dataset) = self.dataset_manager.get(&source_id) {
+            return Some(dataset.store.clone());
+        }
+
+        let kind = match self.plotted_store_kind {
+            StoreKind::RemoteZarr => DataSourceKind::RemoteZarr,
+            StoreKind::LocalZarr => DataSourceKind::LocalZarr,
+            StoreKind::RemoteIcechunk => DataSourceKind::RemoteIcechunk,
+            StoreKind::LocalIcechunk => DataSourceKind::LocalIcechunk,
+            StoreKind::ProceduralRandom => DataSourceKind::Other("ProceduralRandom".into()),
+        };
+        let data_source = DataSource::new(
+            &source_id,
+            kind,
+            &self.plotted_store_target_input,
+            &metadata.name,
+        );
+
+        match SourceFactory::open(data_source.clone()) {
+            Ok(store) => {
+                let dataset = Dataset::new(&source_id, data_source, store.clone());
+                self.dataset_manager.add(dataset);
+                Some(store)
+            }
+            Err(e) => {
+                self.status_message = format!("Block cache open error: {e}");
+                None
+            }
+        }
+    }
+
     /// Block-cache equivalent of `load_selected_variable_slice`.
     pub fn load_selected_variable_block(&mut self) {
         let Some(metadata) = &self.plotted_dataset_metadata else {
@@ -57,11 +97,14 @@ impl OctantApp {
             .unwrap_or(1) as usize;
 
         if let Some(anim_dim) = self.plotted_animated_dim {
+            let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
+            if full_extent > 0 && self.current_timestep >= full_extent {
+                self.current_timestep = full_extent - 1;
+            }
             if anim_dim < self.plotted_selected_dim_indices.len() {
                 self.plotted_selected_dim_indices[anim_dim] = self.current_timestep;
             }
             if anim_dim < selections.len() {
-                let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
                 let (user_start, user_end) = self
                     .plotted_selected_dim_ranges
                     .get(anim_dim)
@@ -105,34 +148,8 @@ impl OctantApp {
             return;
         }
 
-        let store_handle = if let Some(dataset) = self.dataset_manager.get(&source_id) {
-            dataset.store.clone()
-        } else {
-            let kind = match self.plotted_store_kind {
-                StoreKind::RemoteZarr => DataSourceKind::RemoteZarr,
-                StoreKind::LocalZarr => DataSourceKind::LocalZarr,
-                StoreKind::RemoteIcechunk => DataSourceKind::RemoteIcechunk,
-                StoreKind::LocalIcechunk => DataSourceKind::LocalIcechunk,
-                StoreKind::ProceduralRandom => DataSourceKind::Other("ProceduralRandom".into()),
-            };
-            let data_source = DataSource::new(
-                &source_id,
-                kind,
-                &self.plotted_store_target_input,
-                &metadata.name,
-            );
-
-            match SourceFactory::open(data_source.clone()) {
-                Ok(store) => {
-                    let dataset = Dataset::new(&source_id, data_source, store.clone());
-                    self.dataset_manager.add(dataset);
-                    store
-                }
-                Err(e) => {
-                    self.status_message = format!("Block cache open error: {e}");
-                    return;
-                }
-            }
+        let Some(store_handle) = self.get_or_open_plotted_store() else {
+            return;
         };
 
         let block_request = BlockRequest::new(store_handle, slice_request);
@@ -157,6 +174,69 @@ impl OctantApp {
             .request(block_request, &self.block_cache);
     }
 
+    /// Prefetches a block covering `timestep` asynchronously without modifying current UI / matrix_data state.
+    pub fn prefetch_block_for_timestep(&mut self, timestep: usize) {
+        let Some(metadata) = &self.plotted_dataset_metadata else {
+            return;
+        };
+        let Some(var_info) = metadata.variables.get(self.plotted_variable_idx) else {
+            return;
+        };
+
+        let var_name = var_info.name.clone();
+        let shape = var_info.shape.clone();
+
+        let source_id = format!(
+            "{:?}:{}",
+            self.plotted_store_kind, self.plotted_store_target_input
+        );
+
+        let Some(anim_dim) = self.plotted_animated_dim else {
+            return;
+        };
+        let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
+        if timestep >= full_extent {
+            return;
+        }
+
+        if self
+            .block_cache
+            .covers(&source_id, &var_name, Some(anim_dim), timestep)
+        {
+            return;
+        }
+
+        let anim_chunk_size = var_info.chunk_shape.get(anim_dim).copied().unwrap_or(1) as usize;
+        let cs = if anim_chunk_size == 0 {
+            1
+        } else {
+            anim_chunk_size
+        };
+        let multiplier = (self.block_window_size / cs).max(1);
+        let window = cs * multiplier;
+
+        let start = (timestep / window) * window;
+        let end = (start + window).min(full_extent).max(start + 1);
+
+        let legacy_request =
+            crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_name, &shape);
+        let mut selections = legacy_request.selections;
+        if anim_dim < selections.len() {
+            selections[anim_dim] = DimensionSelection::Range { start, end };
+        }
+
+        let slice_request = SliceRequest::new(&var_name, selections);
+
+        let Some(store_handle) = self.get_or_open_plotted_store() else {
+            return;
+        };
+
+        let block_request = BlockRequest::new(store_handle, slice_request);
+        self.active_block_key = Some(block_request.cache_key());
+        self.block_prefetcher
+            .request(block_request, &self.block_cache);
+    }
+
     /// Prefetches upcoming animation windows in the background to ensure buffer is warm ahead of playback.
     fn maybe_prefetch_next_window(&mut self, shape: &[u64]) {
         if !self.is_playing {
@@ -175,7 +255,11 @@ impl OctantApp {
             .unwrap_or(1) as usize;
         let (_start, end) = self.animated_window(full_extent, anim_chunk_size);
 
-        let cs = if anim_chunk_size == 0 { 1 } else { anim_chunk_size };
+        let cs = if anim_chunk_size == 0 {
+            1
+        } else {
+            anim_chunk_size
+        };
         let window = cs * (self.block_window_size / cs).max(1);
         let lookahead_windows = 4; // Look ahead up to 4 windows in parallel
 
@@ -191,7 +275,7 @@ impl OctantApp {
             self.plotted_store_kind, self.plotted_store_target_input
         );
 
-        let Some(dataset) = self.dataset_manager.get(&source_id) else {
+        let Some(store_handle) = self.get_or_open_plotted_store() else {
             return;
         };
 
@@ -214,10 +298,10 @@ impl OctantApp {
                         start: wrap_start,
                         end: wrap_end,
                     };
-                    let req = dataset.request(SliceRequest::new(
-                        next_legacy_request.variable.clone(),
-                        selections,
-                    ));
+                    let req = BlockRequest::new(
+                        store_handle.clone(),
+                        SliceRequest::new(next_legacy_request.variable.clone(), selections),
+                    );
                     if !self.block_cache.contains(&req.cache_key()) {
                         self.block_prefetcher.request(req, &self.block_cache);
                     }
@@ -238,10 +322,10 @@ impl OctantApp {
             let mut selections = next_legacy_request.selections.clone();
             selections[anim_dim] = DimensionSelection::Range { start: ns, end: ne };
 
-            let req = dataset.request(SliceRequest::new(
-                next_legacy_request.variable.clone(),
-                selections,
-            ));
+            let req = BlockRequest::new(
+                store_handle.clone(),
+                SliceRequest::new(next_legacy_request.variable.clone(), selections),
+            );
             if !self.block_cache.contains(&req.cache_key())
                 && !self.block_prefetcher.request(req, &self.block_cache)
             {
@@ -251,7 +335,7 @@ impl OctantApp {
     }
 
     /// Full size of the currently animated dimension in the dataset.
-    fn animated_dim_extent(&self) -> usize {
+    pub fn animated_dim_extent(&self) -> usize {
         let Some(anim_dim) = self.plotted_animated_dim else {
             return 1;
         };
@@ -346,7 +430,7 @@ impl OctantApp {
             match res.result {
                 Ok(block) => {
                     let is_active = self.active_block_key.as_ref() == Some(&res.key);
-                    let covers_current = self.plotted_animated_dim.map_or(false, |dim| {
+                    let covers_current = self.plotted_animated_dim.is_some_and(|dim| {
                         let origin = block.origin.get(dim).copied().unwrap_or(0);
                         let extent = block.shape.get(dim).copied().unwrap_or(0);
                         self.current_timestep >= origin && self.current_timestep < origin + extent
