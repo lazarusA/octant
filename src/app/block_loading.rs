@@ -32,44 +32,15 @@ impl OctantApp {
         (start, end)
     }
 
-    /// Returns the open `StoreHandle` for the currently plotted dataset,
-    /// looking up in `dataset_manager` first and opening/registering it only if missing.
-    pub fn get_or_open_plotted_store(&mut self) -> Option<crate::data::StoreHandle> {
-        let metadata = self.plotted_dataset_metadata.as_ref()?;
+    /// Returns the open `StoreHandle` for the currently plotted dataset from `dataset_manager`.
+    pub fn plotted_store_handle(&self) -> Option<crate::data::StoreHandle> {
         let source_id = format!(
             "{:?}:{}",
             self.plotted_store_kind, self.plotted_store_target_input
         );
-
-        if let Some(dataset) = self.dataset_manager.get(&source_id) {
-            return Some(dataset.store.clone());
-        }
-
-        let kind = match self.plotted_store_kind {
-            StoreKind::RemoteZarr => DataSourceKind::RemoteZarr,
-            StoreKind::LocalZarr => DataSourceKind::LocalZarr,
-            StoreKind::RemoteIcechunk => DataSourceKind::RemoteIcechunk,
-            StoreKind::LocalIcechunk => DataSourceKind::LocalIcechunk,
-            StoreKind::ProceduralRandom => DataSourceKind::Other("ProceduralRandom".into()),
-        };
-        let data_source = DataSource::new(
-            &source_id,
-            kind,
-            &self.plotted_store_target_input,
-            &metadata.name,
-        );
-
-        match SourceFactory::open(data_source.clone()) {
-            Ok(store) => {
-                let dataset = Dataset::new(&source_id, data_source, store.clone());
-                self.dataset_manager.add(dataset);
-                Some(store)
-            }
-            Err(e) => {
-                self.status_message = format!("Block cache open error: {e}");
-                None
-            }
-        }
+        self.dataset_manager
+            .get(&source_id)
+            .map(|d| d.store.clone())
     }
 
     /// Block-cache equivalent of `load_selected_variable_slice`.
@@ -148,7 +119,9 @@ impl OctantApp {
             return;
         }
 
-        let Some(store_handle) = self.get_or_open_plotted_store() else {
+        let Some(store_handle) = self.plotted_store_handle() else {
+            self.status_message =
+                format!("Dataset store not open in DatasetManager for '{source_id}'");
             return;
         };
 
@@ -174,12 +147,16 @@ impl OctantApp {
             .request(block_request, &self.block_cache);
     }
 
-    /// Prefetches a block covering `timestep` asynchronously without modifying current UI / matrix_data state.
-    pub fn prefetch_block_for_timestep(&mut self, timestep: usize) {
+    /// Prefetches the block window containing `timestep` asynchronously using `plotted_store_handle()`,
+    /// without modifying current UI, `matrix_data`, or `current_timestep` state.
+    pub fn prefetch_block_window_for_timestep(&mut self, timestep: usize) {
         let Some(metadata) = &self.plotted_dataset_metadata else {
             return;
         };
         let Some(var_info) = metadata.variables.get(self.plotted_variable_idx) else {
+            return;
+        };
+        let Some(store_handle) = self.plotted_store_handle() else {
             return;
         };
 
@@ -226,10 +203,6 @@ impl OctantApp {
         }
 
         let slice_request = SliceRequest::new(&var_name, selections);
-
-        let Some(store_handle) = self.get_or_open_plotted_store() else {
-            return;
-        };
 
         let block_request = BlockRequest::new(store_handle, slice_request);
         self.active_block_key = Some(block_request.cache_key());
