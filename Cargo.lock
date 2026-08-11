@@ -4307,7 +4307,7 @@ dependencies = [
 
 [[package]]
 name = "octant"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "bytemuck",
  "console_error_panic_hook",
