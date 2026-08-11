@@ -17,8 +17,16 @@ impl OctantApp {
     /// Aligned `[start, end)` window along the animated dimension that
     /// contains `self.current_timestep`, clamped to the dataset's actual
     /// extent.
-    fn animated_window(&self, full_extent: usize) -> (usize, usize) {
-        let window = self.block_window_size.max(1);
+    /// Aligned `[start, end)` window along the animated dimension that
+    /// contains `self.current_timestep`, clamped to the dataset's actual
+    /// extent.
+    ///
+    /// By default, prefetches in multiples of the variable's chunk size
+    /// along the animated dimension.
+    fn animated_window(&self, full_extent: usize, chunk_size: usize) -> (usize, usize) {
+        let cs = if chunk_size == 0 { 1 } else { chunk_size };
+        let multiplier = (self.block_window_size / cs).max(1);
+        let window = cs * multiplier;
         let start = (self.current_timestep / window) * window;
         let end = (start + window).min(full_extent).max(start + 1);
         (start, end)
@@ -42,6 +50,12 @@ impl OctantApp {
             crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_name, &shape);
         let mut selections = legacy_request.selections.clone();
 
+        let anim_chunk_size = self
+            .plotted_animated_dim
+            .and_then(|dim| var_info.chunk_shape.get(dim))
+            .copied()
+            .unwrap_or(1) as usize;
+
         if let Some(anim_dim) = self.plotted_animated_dim {
             if anim_dim < self.plotted_selected_dim_indices.len() {
                 self.plotted_selected_dim_indices[anim_dim] = self.current_timestep;
@@ -60,7 +74,7 @@ impl OctantApp {
                         end: (user_end + 1).min(full_extent),
                     };
                 } else {
-                    let (start, end) = self.animated_window(full_extent);
+                    let (start, end) = self.animated_window(full_extent, anim_chunk_size);
                     selections[anim_dim] = DimensionSelection::Range { start, end };
                 }
             }
@@ -152,9 +166,17 @@ impl OctantApp {
             return;
         };
         let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
-        let (_start, end) = self.animated_window(full_extent);
+        let anim_chunk_size = self
+            .plotted_dataset_metadata
+            .as_ref()
+            .and_then(|meta| meta.variables.get(self.plotted_variable_idx))
+            .and_then(|var| var.chunk_shape.get(anim_dim))
+            .copied()
+            .unwrap_or(1) as usize;
+        let (_start, end) = self.animated_window(full_extent, anim_chunk_size);
 
-        let window = self.block_window_size.max(1);
+        let cs = if anim_chunk_size == 0 { 1 } else { anim_chunk_size };
+        let window = cs * (self.block_window_size / cs).max(1);
         let lookahead_windows = 4; // Look ahead up to 4 windows in parallel
 
         let Some(next_legacy_request) = self.active_slice_request.clone() else {
@@ -324,8 +346,13 @@ impl OctantApp {
             match res.result {
                 Ok(block) => {
                     let is_active = self.active_block_key.as_ref() == Some(&res.key);
+                    let covers_current = self.plotted_animated_dim.map_or(false, |dim| {
+                        let origin = block.origin.get(dim).copied().unwrap_or(0);
+                        let extent = block.shape.get(dim).copied().unwrap_or(0);
+                        self.current_timestep >= origin && self.current_timestep < origin + extent
+                    });
                     self.block_cache.put(res.key, block.clone());
-                    if is_active {
+                    if is_active || covers_current {
                         self.status_message =
                             format!("⚡ [block cache] Loaded '{}'", block.variable_name);
                         self.apply_block_projection(&block);
