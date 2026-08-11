@@ -8,7 +8,7 @@
 
 An interactive viewer for n-dimensional datasets with native support for local and cloud object storage, Zarr, and Icechunk. Built in Rust with GPU-accelerated rendering.
 
-![Octant Screenshot](assets/octant_tas.png)
+![Octant Screenshot](https://raw.githubusercontent.com/lazarusA/octant/1f9797486adcc7d2ea43409d2d248771d90a4d33/assets/octant_tas.png)
 
 ## Install
 In order to use `octant` you need to [install rust first](https://rust-lang.org/tools/install/). Then do, 
