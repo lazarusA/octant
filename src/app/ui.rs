@@ -87,35 +87,59 @@ impl eframe::App for OctantApp {
             let now = std::time::Instant::now();
             let frame_dur = std::time::Duration::from_secs_f32(1.0 / self.playback_fps.max(1.0));
 
-            let is_busy = self
-                .active_block_key
-                .as_ref()
-                .is_some_and(|key| self.block_prefetcher.is_pending(key));
+            if now.duration_since(self.last_step_time) >= frame_dur {
+                let total_steps = self.animated_dim_extent();
 
-            // Only advance playback when current requested slice is already loaded & rendered
-            if !is_busy {
-                if now.duration_since(self.last_step_time) >= frame_dur {
-                    self.last_step_time = now;
-                    let max_steps = self
-                        .matrix_data
-                        .as_ref()
-                        .map(|h| h.max_timesteps)
-                        .unwrap_or(1);
-
-                    if max_steps > 1 {
-                        if self.current_timestep + 1 < max_steps {
-                            self.current_timestep += 1;
-                        } else if self.loop_playback {
-                            self.current_timestep = 0;
-                        } else {
-                            self.is_playing = false;
-                        }
-                        self.load_selected_variable_block();
-                    }
+                if total_steps > 0 && self.current_timestep >= total_steps {
+                    self.current_timestep = total_steps - 1;
                 }
-            } else {
-                // Keep timer fresh while waiting for slice download
-                self.last_step_time = now;
+
+                if total_steps > 1 {
+                    let next_ts = if self.current_timestep + 1 < total_steps {
+                        Some(self.current_timestep + 1)
+                    } else if self.loop_playback {
+                        Some(0)
+                    } else {
+                        self.is_playing = false;
+                        None
+                    };
+
+                    if let Some(next_ts) = next_ts {
+                        let source_id = format!(
+                            "{:?}:{}",
+                            self.plotted_store_kind, self.plotted_store_target_input
+                        );
+                        let var_name = self
+                            .plotted_dataset_metadata
+                            .as_ref()
+                            .and_then(|m| m.variables.get(self.plotted_variable_idx))
+                            .map(|v| v.name.clone());
+
+                        let has_next_block = if let Some(ref name) = var_name {
+                            self.block_cache.covers(
+                                &source_id,
+                                name,
+                                self.plotted_animated_dim,
+                                next_ts,
+                            )
+                        } else {
+                            false
+                        };
+
+                        if has_next_block {
+                            self.current_timestep = next_ts;
+                            self.last_step_time = now;
+                            self.load_selected_variable_block();
+                        } else {
+                            // Target block window for next_ts is not yet in cache.
+                            // Trigger background prefetch for next_ts block window while safely keeping playback on current valid frame.
+                            self.prefetch_block_window_for_next_steps(next_ts);
+                            self.last_step_time = now;
+                        }
+                    }
+                } else {
+                    self.is_playing = false;
+                }
             }
             ctx.request_repaint_after(frame_dur);
         } else {
