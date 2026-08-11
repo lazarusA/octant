@@ -8,20 +8,29 @@
 
 An interactive viewer for n-dimensional datasets with native support for local and cloud object storage, Zarr, and Icechunk. Built in Rust with GPU-accelerated rendering.
 
-## Features
-
-- **Flexible Data Storage**: Seamless access to local filesystems and remote cloud object stores (S3, HTTP, Azure, GCP) via `object_store`, [Zarr](https://zarr.dev/), and [Icechunk](https://icechunk.io/).
-- **Interactive Plotting**: Explore n-dimensional data with diverse plot types, 1D/2D slice renderers, and 3D spatial visualizers.
-- **Hardware-Accelerated Rendering**: Fast rendering powered by `wgpu` and `octant` / `eframe`.
-- **Cross-Platform**: Native desktop application with full WebAssembly (WASM) browser support [WIP].
+![Octant Screenshot](assets/octant_tas.png)
 
 ## Install
+In order to use `octant` you need to [install rust first](https://rust-lang.org/tools/install/). Then do, 
 
 ```bash
 cargo install octant
 ```
 
 Running the above command will globally install the **octant** binary.
+
+## run
+
+```bash
+octant
+```
+
+## Features
+
+- **Flexible Data Storage**: Seamless access to local filesystems and remote cloud object stores (S3, HTTP, Azure, GCP) via `object_store`, [Zarr](https://zarr.dev/), and [Icechunk](https://icechunk.io/).
+- **Interactive Plotting**: Explore n-dimensional data with diverse plot types, 1D/2D slice renderers, and 3D spatial visualizers.
+- **Hardware-Accelerated Rendering**: Fast rendering powered by `wgpu` and `octant` / `eframe`.
+- **Cross-Platform**: Native desktop application with full WebAssembly (WASM) browser support [WIP].
 
 ## License
 
