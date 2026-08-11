@@ -133,7 +133,7 @@ impl eframe::App for OctantApp {
                         } else {
                             // Target block window for next_ts is not yet in cache.
                             // Trigger background prefetch for next_ts block window while safely keeping playback on current valid frame.
-                            self.prefetch_block_window_for_timestep(next_ts);
+                            self.prefetch_block_window_for_next_steps(next_ts);
                             self.last_step_time = now;
                         }
                     }

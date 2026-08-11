@@ -1,22 +1,10 @@
-//! Opt-in loading path through `DatasetManager`/`BlockCache`/`BlockPrefetcher`.
-//!
-//! This exists side-by-side with `data_loading.rs`'s
-//! `load_selected_variable_slice`, which is unchanged and remains the
-//! default. Nothing here runs unless `OctantApp::use_block_cache` is `true`
-//! and something calls `load_selected_variable_block`.
+//! Loading path through `DatasetManager`/`BlockCache`/`BlockPrefetcher`.
 
-use crate::data::{
-    BlockRequest, DataSource, DataSourceKind, Dataset, DimensionSelection, SliceRequest,
-    SourceFactory,
-};
+use crate::data::{BlockRequest, DimensionSelection, SliceRequest};
 
 use super::OctantApp;
-use super::state::StoreKind;
 
 impl OctantApp {
-    /// Aligned `[start, end)` window along the animated dimension that
-    /// contains `self.current_timestep`, clamped to the dataset's actual
-    /// extent.
     /// Aligned `[start, end)` window along the animated dimension that
     /// contains `self.current_timestep`, clamped to the dataset's actual
     /// extent.
@@ -43,7 +31,7 @@ impl OctantApp {
             .map(|d| d.store.clone())
     }
 
-    /// Block-cache equivalent of `load_selected_variable_slice`.
+    /// Loads the block corresponding to the current animated step and selections.
     pub fn load_selected_variable_block(&mut self) {
         let Some(metadata) = &self.plotted_dataset_metadata else {
             self.status_message = "No plotted dataset metadata loaded.".to_string();
@@ -147,9 +135,9 @@ impl OctantApp {
             .request(block_request, &self.block_cache);
     }
 
-    /// Prefetches the block window containing `timestep` asynchronously using `plotted_store_handle()`,
+    /// Prefetches the block window containing `step` asynchronously using `plotted_store_handle()`,
     /// without modifying current UI, `matrix_data`, or `current_timestep` state.
-    pub fn prefetch_block_window_for_timestep(&mut self, timestep: usize) {
+    pub fn prefetch_block_window_for_next_steps(&mut self, step: usize) {
         let Some(metadata) = &self.plotted_dataset_metadata else {
             return;
         };
@@ -172,13 +160,13 @@ impl OctantApp {
             return;
         };
         let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
-        if timestep >= full_extent {
+        if step >= full_extent {
             return;
         }
 
         if self
             .block_cache
-            .covers(&source_id, &var_name, Some(anim_dim), timestep)
+            .covers(&source_id, &var_name, Some(anim_dim), step)
         {
             return;
         }
@@ -192,7 +180,7 @@ impl OctantApp {
         let multiplier = (self.block_window_size / cs).max(1);
         let window = cs * multiplier;
 
-        let start = (timestep / window) * window;
+        let start = (step / window) * window;
         let end = (start + window).min(full_extent).max(start + 1);
 
         let legacy_request =
@@ -212,12 +200,17 @@ impl OctantApp {
 
     /// Prefetches upcoming animation windows in the background to ensure buffer is warm ahead of playback.
     fn maybe_prefetch_next_window(&mut self, shape: &[u64]) {
+        // 1. Only prefetch lookahead windows if playback is actively playing.
         if !self.is_playing {
             return;
         }
+
+        // 2. Ensure an animated dimension is active.
         let Some(anim_dim) = self.plotted_animated_dim else {
             return;
         };
+
+        // 3. Extract dimension extent and chunk size to calculate window bounds.
         let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
         let anim_chunk_size = self
             .plotted_dataset_metadata
@@ -236,6 +229,7 @@ impl OctantApp {
         let window = cs * (self.block_window_size / cs).max(1);
         let lookahead_windows = 4; // Look ahead up to 4 windows in parallel
 
+        // 4. Retrieve current active slice request to copy non-animated dimension selections.
         let Some(next_legacy_request) = self.active_slice_request.clone() else {
             return;
         };
@@ -243,17 +237,21 @@ impl OctantApp {
             return;
         }
 
+        // 5. Get current dataset source ID and open store handle.
         let source_id = format!(
             "{:?}:{}",
             self.plotted_store_kind, self.plotted_store_target_input
         );
 
-        let Some(store_handle) = self.get_or_open_plotted_store() else {
+        let Some(store_handle) = self.plotted_store_handle() else {
             return;
         };
 
+        // 6. Loop over upcoming lookahead windows and schedule background requests.
         for i in 0..lookahead_windows {
             let ns = end + i * window;
+
+            // Handle wrap-around prefetching when loop playback is enabled.
             if ns >= full_extent {
                 if self.loop_playback && full_extent > 0 {
                     let wrap_start = (i * window) % full_extent;
@@ -282,15 +280,17 @@ impl OctantApp {
                 break;
             }
 
+            // Skip lookahead window if already resident in memory.
             if self.block_cache.covers(
                 &source_id,
                 &next_legacy_request.variable,
                 self.plotted_animated_dim,
                 ns,
             ) {
-                continue; // Already resident in memory! Skip prefetching!
+                continue;
             }
 
+            // Schedule prefetch request for window [ns, ne).
             let ne = (ns + window).min(full_extent);
             let mut selections = next_legacy_request.selections.clone();
             selections[anim_dim] = DimensionSelection::Range { start: ns, end: ne };
@@ -302,7 +302,7 @@ impl OctantApp {
             if !self.block_cache.contains(&req.cache_key())
                 && !self.block_prefetcher.request(req, &self.block_cache)
             {
-                break; // Stop if prefetch thread pool is full
+                break; // Stop if prefetch thread pool is full.
             }
         }
     }
