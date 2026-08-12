@@ -194,6 +194,7 @@ impl OctantApp {
 
         let block_request = BlockRequest::new(store_handle, slice_request);
         self.active_block_key = Some(block_request.cache_key());
+        self.pending_target_step = Some(step);
         self.block_prefetcher
             .request(block_request, &self.block_cache);
     }
@@ -410,6 +411,19 @@ impl OctantApp {
                     });
                     self.block_cache.put(res.key, block.clone());
                     if is_active || covers_current {
+                        if is_active
+                            && let Some(target) = self.pending_target_step.take()
+                            && let Some(dim) = self.plotted_animated_dim
+                        {
+                            let origin = block.origin.get(dim).copied().unwrap_or(0);
+                            let extent = block.shape.get(dim).copied().unwrap_or(0);
+                            if target >= origin && target < origin + extent {
+                                self.current_timestep = target;
+                                if dim < self.plotted_selected_dim_indices.len() {
+                                    self.plotted_selected_dim_indices[dim] = target;
+                                }
+                            }
+                        }
                         self.status_message =
                             format!("⚡ [block cache] Loaded '{}'", block.variable_name);
                         self.apply_block_projection(&block);
