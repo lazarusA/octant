@@ -55,28 +55,16 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             app.last_step_time = std::time::Instant::now();
         }
 
-        let max_steps = app
-            .matrix_data
-            .as_ref()
-            .map(|h| h.max_timesteps)
-            .unwrap_or(1);
+        let max_steps = app.animated_dim_extent();
 
         // 2. Prev Step
         if ui.button("◀").on_hover_text("Previous Step").clicked() {
-            if app.current_timestep > 0 {
-                app.current_timestep -= 1;
-            } else if max_steps > 0 {
-                app.current_timestep = max_steps - 1;
-            }
-            app.load_selected_variable_block();
+            app.step_prev();
         }
 
         // 3. Next Step
         if ui.button("▶").on_hover_text("Next Step").clicked() {
-            if max_steps > 0 {
-                app.current_timestep = (app.current_timestep + 1) % max_steps;
-            }
-            app.load_selected_variable_block();
+            app.step_next();
         }
 
         // 4. Loop Toggle
@@ -98,39 +86,55 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         ui.separator();
 
-        // 6. Timestep timeline slider & Dimension-Agnostic Axis Reading
+        // 6. Step timeline slider & Dimension-Agnostic Axis Reading
+        let anim_dim_idx = app.plotted_animated_dim.unwrap_or(0);
         let (active_anim_dim, active_dim_name, active_units, time_start, temp_res) =
             if let Some(plotted_var_info) = app
                 .plotted_dataset_metadata
                 .as_ref()
                 .and_then(|m| m.variables.get(app.plotted_variable_idx))
             {
+                let name = plotted_var_info
+                    .dimension_names
+                    .get(anim_dim_idx)
+                    .cloned()
+                    .unwrap_or_else(|| "step".to_string());
                 (
-                    plotted_var_info
-                        .dimension_names
-                        .first()
-                        .cloned()
-                        .unwrap_or_else(|| "time".to_string()),
-                    plotted_var_info.dimension_names.first().cloned(),
+                    name.clone(),
+                    Some(name),
                     plotted_var_info.units.clone(),
                     plotted_var_info.time_coverage_start.clone(),
                     plotted_var_info.temporal_resolution.clone(),
                 )
             } else {
-                ("time".to_string(), None, None, None, None)
+                ("step".to_string(), None, None, None, None)
             };
 
-        let direct_coord_label = app
+        let dim_coords = app
             .plotted_dataset_metadata
             .as_ref()
-            .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
-            .and_then(|coords| coords.get(app.current_timestep).cloned());
+            .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()));
 
-        let formatted_axis = if let Some(coord_str) = direct_coord_label {
-            coord_str
-        } else {
+        let direct_coord_label =
+            dim_coords.and_then(|coords| coords.get(app.current_timestep).cloned());
+        let first_coord = dim_coords.and_then(|coords| coords.first().cloned());
+        let last_coord = dim_coords.and_then(|coords| coords.last().cloned());
+
+        let format_dim_step = |step: usize, default_coord: Option<String>| -> String {
+            if let Some(ref coord) = default_coord {
+                let is_raw_numeric = coord.parse::<f64>().is_ok()
+                    && !coord.contains('-')
+                    && !coord.contains(':')
+                    && !coord.contains('/')
+                    && !coord.contains('T');
+
+                if !is_raw_numeric && !coord.trim().is_empty() {
+                    return coord.clone();
+                }
+            }
+
             crate::utils::units::format_axis_value(
-                app.current_timestep,
+                step,
                 max_steps,
                 active_dim_name.as_deref(),
                 active_units.as_deref(),
@@ -140,43 +144,9 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             )
         };
 
-        let start_date_str = if let Some(coord_str) = app
-            .plotted_dataset_metadata
-            .as_ref()
-            .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
-            .and_then(|coords| coords.first().cloned())
-        {
-            coord_str
-        } else {
-            crate::utils::units::format_axis_value(
-                0,
-                max_steps,
-                active_dim_name.as_deref(),
-                active_units.as_deref(),
-                time_start.as_deref(),
-                temp_res.as_deref(),
-                Some(&app.plotted_store_target_input),
-            )
-        };
-
-        let end_date_str = if let Some(coord_str) = app
-            .plotted_dataset_metadata
-            .as_ref()
-            .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
-            .and_then(|coords| coords.last().cloned())
-        {
-            coord_str
-        } else {
-            crate::utils::units::format_axis_value(
-                max_steps.saturating_sub(1),
-                max_steps,
-                active_dim_name.as_deref(),
-                active_units.as_deref(),
-                time_start.as_deref(),
-                temp_res.as_deref(),
-                Some(&app.plotted_store_target_input),
-            )
-        };
+        let formatted_axis = format_dim_step(app.current_timestep, direct_coord_label);
+        let start_date_str = format_dim_step(0, first_coord);
+        let end_date_str = format_dim_step(max_steps.saturating_sub(1), last_coord);
 
         let step_size_str = temp_res.unwrap_or_else(|| "Step: 1".to_string());
 
@@ -197,13 +167,15 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         let slider_max = max_steps.saturating_sub(1);
         ui.small(format!("[{}]", start_date_str));
 
+        let mut displayed_step = app.current_timestep;
         let slider_res = ui.add(
-            egui::Slider::new(&mut app.current_timestep, 0..=slider_max)
+            egui::Slider::new(&mut displayed_step, 0..=slider_max)
                 .show_value(false)
                 .trailing_fill(true),
         );
-        if slider_res.drag_stopped() || (slider_res.changed() && !app.is_playing) {
-            app.load_selected_variable_block();
+
+        if slider_res.changed() {
+            app.request_step_or_load(displayed_step);
         }
 
         ui.small(format!("⏱ {}", step_size_str));
