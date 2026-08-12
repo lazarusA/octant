@@ -30,7 +30,7 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
 
         // Step Prev
-        if ui.button("◀").on_hover_text("Previous Timestep").clicked() {
+        if ui.button("◀").on_hover_text("Previous Step").clicked() {
             if app.current_timestep > 0 {
                 app.current_timestep -= 1;
             } else if max_steps > 0 {
@@ -40,7 +40,7 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
 
         // Step Next
-        if ui.button("▶").on_hover_text("Next Timestep").clicked() {
+        if ui.button("▶").on_hover_text("Next Step").clicked() {
             if max_steps > 0 {
                 app.current_timestep = (app.current_timestep + 1) % max_steps;
             }
@@ -50,16 +50,41 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         // Loop Toggle Checkbox
         ui.checkbox(&mut app.loop_playback, "🔄");
 
-        // Timestep Timeline Slider
+        // Step Timeline Slider
         let slider_max = max_steps.saturating_sub(1);
         ui.add_space(4.0);
+
+        let source_id = format!(
+            "{:?}:{}",
+            app.plotted_store_kind, app.plotted_store_target_input
+        );
+        let var_name = app
+            .plotted_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.variables.get(app.plotted_variable_idx))
+            .map(|v| v.name.clone());
+
+        let mut displayed_step = app.current_timestep;
         let slider_res = ui.add(
-            egui::Slider::new(&mut app.current_timestep, 0..=slider_max)
+            egui::Slider::new(&mut displayed_step, 0..=slider_max)
                 .show_value(false)
                 .trailing_fill(true),
         );
-        if slider_res.drag_stopped() || (slider_res.changed() && !app.is_playing) {
-            app.load_selected_variable_block();
+
+        if slider_res.changed() {
+            let is_cached = if let Some(ref name) = var_name {
+                app.block_cache
+                    .covers(&source_id, name, app.plotted_animated_dim, displayed_step)
+            } else {
+                false
+            };
+
+            if is_cached {
+                app.current_timestep = displayed_step;
+                app.load_selected_variable_block();
+            } else if slider_res.drag_stopped() || !app.is_playing {
+                app.prefetch_block_window_for_next_steps(displayed_step);
+            }
         }
 
         // FPS Speed Menu Dropdown

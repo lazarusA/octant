@@ -98,7 +98,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         ui.separator();
 
-        // 6. Timestep timeline slider & Dimension-Agnostic Axis Reading
+        // 6. Step timeline slider & Dimension-Agnostic Axis Reading
         let (active_anim_dim, active_dim_name, active_units, time_start, temp_res) =
             if let Some(plotted_var_info) = app
                 .plotted_dataset_metadata
@@ -197,13 +197,37 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         let slider_max = max_steps.saturating_sub(1);
         ui.small(format!("[{}]", start_date_str));
 
+        let source_id = format!(
+            "{:?}:{}",
+            app.plotted_store_kind, app.plotted_store_target_input
+        );
+        let var_name = app
+            .plotted_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.variables.get(app.plotted_variable_idx))
+            .map(|v| v.name.clone());
+
+        let mut displayed_step = app.current_timestep;
         let slider_res = ui.add(
-            egui::Slider::new(&mut app.current_timestep, 0..=slider_max)
+            egui::Slider::new(&mut displayed_step, 0..=slider_max)
                 .show_value(false)
                 .trailing_fill(true),
         );
-        if slider_res.drag_stopped() || (slider_res.changed() && !app.is_playing) {
-            app.load_selected_variable_block();
+
+        if slider_res.changed() {
+            let is_cached = if let Some(ref name) = var_name {
+                app.block_cache
+                    .covers(&source_id, name, app.plotted_animated_dim, displayed_step)
+            } else {
+                false
+            };
+
+            if is_cached {
+                app.current_timestep = displayed_step;
+                app.load_selected_variable_block();
+            } else if slider_res.drag_stopped() || !app.is_playing {
+                app.prefetch_block_window_for_next_steps(displayed_step);
+            }
         }
 
         ui.small(format!("⏱ {}", step_size_str));
