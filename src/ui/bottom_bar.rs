@@ -118,17 +118,31 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ("step".to_string(), None, None, None, None)
             };
 
-        let direct_coord_label = app
+        let dim_coords = app
             .plotted_dataset_metadata
             .as_ref()
-            .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
-            .and_then(|coords| coords.get(app.current_timestep).cloned());
+            .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()));
 
-        let formatted_axis = if let Some(coord_str) = direct_coord_label {
-            coord_str
-        } else {
+        let direct_coord_label =
+            dim_coords.and_then(|coords| coords.get(app.current_timestep).cloned());
+        let first_coord = dim_coords.and_then(|coords| coords.first().cloned());
+        let last_coord = dim_coords.and_then(|coords| coords.last().cloned());
+
+        let format_dim_step = |step: usize, default_coord: Option<String>| -> String {
+            if let Some(ref coord) = default_coord {
+                let is_raw_numeric = coord.parse::<f64>().is_ok()
+                    && !coord.contains('-')
+                    && !coord.contains(':')
+                    && !coord.contains('/')
+                    && !coord.contains('T');
+
+                if !is_raw_numeric && !coord.trim().is_empty() {
+                    return coord.clone();
+                }
+            }
+
             crate::utils::units::format_axis_value(
-                app.current_timestep,
+                step,
                 max_steps,
                 active_dim_name.as_deref(),
                 active_units.as_deref(),
@@ -138,43 +152,9 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             )
         };
 
-        let start_date_str = if let Some(coord_str) = app
-            .plotted_dataset_metadata
-            .as_ref()
-            .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
-            .and_then(|coords| coords.first().cloned())
-        {
-            coord_str
-        } else {
-            crate::utils::units::format_axis_value(
-                0,
-                max_steps,
-                active_dim_name.as_deref(),
-                active_units.as_deref(),
-                time_start.as_deref(),
-                temp_res.as_deref(),
-                Some(&app.plotted_store_target_input),
-            )
-        };
-
-        let end_date_str = if let Some(coord_str) = app
-            .plotted_dataset_metadata
-            .as_ref()
-            .and_then(|m| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
-            .and_then(|coords| coords.last().cloned())
-        {
-            coord_str
-        } else {
-            crate::utils::units::format_axis_value(
-                max_steps.saturating_sub(1),
-                max_steps,
-                active_dim_name.as_deref(),
-                active_units.as_deref(),
-                time_start.as_deref(),
-                temp_res.as_deref(),
-                Some(&app.plotted_store_target_input),
-            )
-        };
+        let formatted_axis = format_dim_step(app.current_timestep, direct_coord_label);
+        let start_date_str = format_dim_step(0, first_coord);
+        let end_date_str = format_dim_step(max_steps.saturating_sub(1), last_coord);
 
         let step_size_str = temp_res.unwrap_or_else(|| "Step: 1".to_string());
 
