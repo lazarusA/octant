@@ -1,11 +1,7 @@
 use crate::app::OctantApp;
 
 pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let max_steps = app
-        .matrix_data
-        .as_ref()
-        .map(|h| h.max_timesteps)
-        .unwrap_or(1);
+    let max_steps = app.animated_dim_extent();
 
     let is_3d_plot = app.active_plot_type == crate::plots::PlotType::Volume
         || app.active_plot_type == crate::plots::PlotType::PointCloud;

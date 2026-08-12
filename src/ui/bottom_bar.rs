@@ -55,11 +55,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             app.last_step_time = std::time::Instant::now();
         }
 
-        let max_steps = app
-            .matrix_data
-            .as_ref()
-            .map(|h| h.max_timesteps)
-            .unwrap_or(1);
+        let max_steps = app.animated_dim_extent();
 
         // 2. Prev Step
         if ui.button("◀").on_hover_text("Previous Step").clicked() {
@@ -99,25 +95,27 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.separator();
 
         // 6. Step timeline slider & Dimension-Agnostic Axis Reading
+        let anim_dim_idx = app.plotted_animated_dim.unwrap_or(0);
         let (active_anim_dim, active_dim_name, active_units, time_start, temp_res) =
             if let Some(plotted_var_info) = app
                 .plotted_dataset_metadata
                 .as_ref()
                 .and_then(|m| m.variables.get(app.plotted_variable_idx))
             {
+                let name = plotted_var_info
+                    .dimension_names
+                    .get(anim_dim_idx)
+                    .cloned()
+                    .unwrap_or_else(|| "step".to_string());
                 (
-                    plotted_var_info
-                        .dimension_names
-                        .first()
-                        .cloned()
-                        .unwrap_or_else(|| "time".to_string()),
-                    plotted_var_info.dimension_names.first().cloned(),
+                    name.clone(),
+                    Some(name),
                     plotted_var_info.units.clone(),
                     plotted_var_info.time_coverage_start.clone(),
                     plotted_var_info.temporal_resolution.clone(),
                 )
             } else {
-                ("time".to_string(), None, None, None, None)
+                ("step".to_string(), None, None, None, None)
             };
 
         let direct_coord_label = app
