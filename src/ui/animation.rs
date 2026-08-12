@@ -1,11 +1,7 @@
 use crate::app::OctantApp;
 
 pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let max_steps = app
-        .matrix_data
-        .as_ref()
-        .map(|h| h.max_timesteps)
-        .unwrap_or(1);
+    let max_steps = app.animated_dim_extent();
 
     let is_3d_plot = app.active_plot_type == crate::plots::PlotType::Volume
         || app.active_plot_type == crate::plots::PlotType::PointCloud;
@@ -30,36 +26,31 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
 
         // Step Prev
-        if ui.button("◀").on_hover_text("Previous Timestep").clicked() {
-            if app.current_timestep > 0 {
-                app.current_timestep -= 1;
-            } else if max_steps > 0 {
-                app.current_timestep = max_steps - 1;
-            }
-            app.load_selected_variable_block();
+        if ui.button("◀").on_hover_text("Previous Step").clicked() {
+            app.step_prev();
         }
 
         // Step Next
-        if ui.button("▶").on_hover_text("Next Timestep").clicked() {
-            if max_steps > 0 {
-                app.current_timestep = (app.current_timestep + 1) % max_steps;
-            }
-            app.load_selected_variable_block();
+        if ui.button("▶").on_hover_text("Next Step").clicked() {
+            app.step_next();
         }
 
         // Loop Toggle Checkbox
         ui.checkbox(&mut app.loop_playback, "🔄");
 
-        // Timestep Timeline Slider
+        // Step Timeline Slider
         let slider_max = max_steps.saturating_sub(1);
         ui.add_space(4.0);
+
+        let mut displayed_step = app.current_timestep;
         let slider_res = ui.add(
-            egui::Slider::new(&mut app.current_timestep, 0..=slider_max)
+            egui::Slider::new(&mut displayed_step, 0..=slider_max)
                 .show_value(false)
                 .trailing_fill(true),
         );
-        if slider_res.drag_stopped() || (slider_res.changed() && !app.is_playing) {
-            app.load_selected_variable_block();
+
+        if slider_res.changed() {
+            app.request_step_or_load(displayed_step);
         }
 
         // FPS Speed Menu Dropdown

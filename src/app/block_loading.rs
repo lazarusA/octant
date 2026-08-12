@@ -194,8 +194,62 @@ impl OctantApp {
 
         let block_request = BlockRequest::new(store_handle, slice_request);
         self.active_block_key = Some(block_request.cache_key());
+        self.pending_target_step = Some(step);
         self.block_prefetcher
             .request(block_request, &self.block_cache);
+    }
+
+    /// Checks if `target_step` is resident in the block cache.
+    /// - If resident: updates `current_timestep` to `target_step` and projects data immediately.
+    /// - If not resident: keeps `current_timestep` on the current valid step and prefetches the block window containing `target_step`.
+    pub fn request_step_or_load(&mut self, target_step: usize) {
+        let source_id = format!(
+            "{:?}:{}",
+            self.plotted_store_kind, self.plotted_store_target_input
+        );
+        let var_name = self
+            .plotted_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.variables.get(self.plotted_variable_idx))
+            .map(|v| v.name.clone());
+
+        let is_cached = if let Some(ref name) = var_name {
+            self.block_cache
+                .covers(&source_id, name, self.plotted_animated_dim, target_step)
+        } else {
+            false
+        };
+
+        if is_cached {
+            self.current_timestep = target_step;
+            self.load_selected_variable_block();
+        } else {
+            self.prefetch_block_window_for_next_steps(target_step);
+        }
+    }
+
+    /// Requests the previous step along the animated dimension.
+    pub fn step_prev(&mut self) {
+        let max_steps = self.animated_dim_extent();
+        let target_step = if self.current_timestep > 0 {
+            self.current_timestep - 1
+        } else if max_steps > 0 {
+            max_steps - 1
+        } else {
+            0
+        };
+        self.request_step_or_load(target_step);
+    }
+
+    /// Requests the next step along the animated dimension.
+    pub fn step_next(&mut self) {
+        let max_steps = self.animated_dim_extent();
+        let target_step = if max_steps > 0 {
+            (self.current_timestep + 1) % max_steps
+        } else {
+            0
+        };
+        self.request_step_or_load(target_step);
     }
 
     /// Prefetches upcoming animation windows in the background to ensure buffer is warm ahead of playback.
@@ -410,6 +464,19 @@ impl OctantApp {
                     });
                     self.block_cache.put(res.key, block.clone());
                     if is_active || covers_current {
+                        if is_active
+                            && let Some(target) = self.pending_target_step.take()
+                            && let Some(dim) = self.plotted_animated_dim
+                        {
+                            let origin = block.origin.get(dim).copied().unwrap_or(0);
+                            let extent = block.shape.get(dim).copied().unwrap_or(0);
+                            if target >= origin && target < origin + extent {
+                                self.current_timestep = target;
+                                if dim < self.plotted_selected_dim_indices.len() {
+                                    self.plotted_selected_dim_indices[dim] = target;
+                                }
+                            }
+                        }
                         self.status_message =
                             format!("⚡ [block cache] Loaded '{}'", block.variable_name);
                         self.apply_block_projection(&block);
