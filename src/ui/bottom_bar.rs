@@ -57,22 +57,62 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         let max_steps = app.animated_dim_extent();
 
+        let source_id = format!(
+            "{:?}:{}",
+            app.plotted_store_kind, app.plotted_store_target_input
+        );
+        let var_name = app
+            .plotted_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.variables.get(app.plotted_variable_idx))
+            .map(|v| v.name.clone());
+
         // 2. Prev Step
         if ui.button("◀").on_hover_text("Previous Step").clicked() {
-            if app.current_timestep > 0 {
-                app.current_timestep -= 1;
+            let target_step = if app.current_timestep > 0 {
+                app.current_timestep - 1
             } else if max_steps > 0 {
-                app.current_timestep = max_steps - 1;
+                max_steps - 1
+            } else {
+                0
+            };
+
+            let is_cached = if let Some(ref name) = var_name {
+                app.block_cache
+                    .covers(&source_id, name, app.plotted_animated_dim, target_step)
+            } else {
+                false
+            };
+
+            if is_cached {
+                app.current_timestep = target_step;
+                app.load_selected_variable_block();
+            } else {
+                app.prefetch_block_window_for_next_steps(target_step);
             }
-            app.load_selected_variable_block();
         }
 
         // 3. Next Step
         if ui.button("▶").on_hover_text("Next Step").clicked() {
-            if max_steps > 0 {
-                app.current_timestep = (app.current_timestep + 1) % max_steps;
+            let target_step = if max_steps > 0 {
+                (app.current_timestep + 1) % max_steps
+            } else {
+                0
+            };
+
+            let is_cached = if let Some(ref name) = var_name {
+                app.block_cache
+                    .covers(&source_id, name, app.plotted_animated_dim, target_step)
+            } else {
+                false
+            };
+
+            if is_cached {
+                app.current_timestep = target_step;
+                app.load_selected_variable_block();
+            } else {
+                app.prefetch_block_window_for_next_steps(target_step);
             }
-            app.load_selected_variable_block();
         }
 
         // 4. Loop Toggle

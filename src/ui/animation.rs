@@ -25,31 +25,6 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             app.last_step_time = std::time::Instant::now();
         }
 
-        // Step Prev
-        if ui.button("◀").on_hover_text("Previous Step").clicked() {
-            if app.current_timestep > 0 {
-                app.current_timestep -= 1;
-            } else if max_steps > 0 {
-                app.current_timestep = max_steps - 1;
-            }
-            app.load_selected_variable_block();
-        }
-
-        // Step Next
-        if ui.button("▶").on_hover_text("Next Step").clicked() {
-            if max_steps > 0 {
-                app.current_timestep = (app.current_timestep + 1) % max_steps;
-            }
-            app.load_selected_variable_block();
-        }
-
-        // Loop Toggle Checkbox
-        ui.checkbox(&mut app.loop_playback, "🔄");
-
-        // Step Timeline Slider
-        let slider_max = max_steps.saturating_sub(1);
-        ui.add_space(4.0);
-
         let source_id = format!(
             "{:?}:{}",
             app.plotted_store_kind, app.plotted_store_target_input
@@ -59,6 +34,61 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             .as_ref()
             .and_then(|m| m.variables.get(app.plotted_variable_idx))
             .map(|v| v.name.clone());
+
+        // Step Prev
+        if ui.button("◀").on_hover_text("Previous Step").clicked() {
+            let target_step = if app.current_timestep > 0 {
+                app.current_timestep - 1
+            } else if max_steps > 0 {
+                max_steps - 1
+            } else {
+                0
+            };
+
+            let is_cached = if let Some(ref name) = var_name {
+                app.block_cache
+                    .covers(&source_id, name, app.plotted_animated_dim, target_step)
+            } else {
+                false
+            };
+
+            if is_cached {
+                app.current_timestep = target_step;
+                app.load_selected_variable_block();
+            } else {
+                app.prefetch_block_window_for_next_steps(target_step);
+            }
+        }
+
+        // Step Next
+        if ui.button("▶").on_hover_text("Next Step").clicked() {
+            let target_step = if max_steps > 0 {
+                (app.current_timestep + 1) % max_steps
+            } else {
+                0
+            };
+
+            let is_cached = if let Some(ref name) = var_name {
+                app.block_cache
+                    .covers(&source_id, name, app.plotted_animated_dim, target_step)
+            } else {
+                false
+            };
+
+            if is_cached {
+                app.current_timestep = target_step;
+                app.load_selected_variable_block();
+            } else {
+                app.prefetch_block_window_for_next_steps(target_step);
+            }
+        }
+
+        // Loop Toggle Checkbox
+        ui.checkbox(&mut app.loop_playback, "🔄");
+
+        // Step Timeline Slider
+        let slider_max = max_steps.saturating_sub(1);
+        ui.add_space(4.0);
 
         let mut displayed_step = app.current_timestep;
         let slider_res = ui.add(
