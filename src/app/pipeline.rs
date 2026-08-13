@@ -76,8 +76,6 @@ impl OctantApp {
 
                 if data.height == 1 {
                     self.active_plot_type = PlotType::Line;
-                } else if self.active_plot_type == PlotType::Line {
-                    self.active_plot_type = PlotType::Heatmap;
                 }
             }
         }
