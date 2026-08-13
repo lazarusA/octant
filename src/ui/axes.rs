@@ -52,17 +52,25 @@ pub fn draw_plot_axes(
     }
 
     // Calculate visible domain span for constant tick count updating on zoom
-    let full_x_span = (options.x_domain.1 - options.x_domain.0).max(1e-9);
+    let (x_min_domain, x_max_domain) = (
+        options.x_domain.0.min(options.x_domain.1),
+        options.x_domain.0.max(options.x_domain.1),
+    );
+    let full_x_span = (x_max_domain - x_min_domain).max(1e-9);
     let t_x_min = ((visible_left - plot_rect.left()) / plot_rect.width().max(1.0)) as f64;
     let t_x_max = ((visible_right - plot_rect.left()) / plot_rect.width().max(1.0)) as f64;
-    let vis_x_min = options.x_domain.0 + t_x_min * full_x_span;
-    let vis_x_max = options.x_domain.0 + t_x_max * full_x_span;
+    let vis_x_min = x_min_domain + t_x_min * full_x_span;
+    let vis_x_max = x_min_domain + t_x_max * full_x_span;
 
-    let full_y_span = (options.y_domain.1 - options.y_domain.0).max(1e-9);
+    let (y_min_domain, y_max_domain) = (
+        options.y_domain.0.min(options.y_domain.1),
+        options.y_domain.0.max(options.y_domain.1),
+    );
+    let full_y_span = (y_max_domain - y_min_domain).max(1e-9);
     let t_y_min = ((plot_rect.bottom() - visible_bottom) / plot_rect.height().max(1.0)) as f64;
     let t_y_max = ((plot_rect.bottom() - visible_top) / plot_rect.height().max(1.0)) as f64;
-    let vis_y_min = options.y_domain.0 + t_y_min * full_y_span;
-    let vis_y_max = options.y_domain.0 + t_y_max * full_y_span;
+    let vis_y_min = y_min_domain + t_y_min * full_y_span;
+    let vis_y_max = y_min_domain + t_y_max * full_y_span;
 
     // Generate constant count of ticks (7 ticks) for visible viewport
     let num_x_ticks = 7;

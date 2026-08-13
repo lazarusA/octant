@@ -51,10 +51,9 @@ pub fn get_cached_coord_bounds_with_rank(
 ) -> Option<(f64, f64)> {
     let cache_lock = COORD_BOUNDS_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
     let key = format!(
-        "{}:{}:{}",
-        store_url,
-        dim_name.trim().to_lowercase(),
-        dim_idx
+        "{}:{}",
+        store_url.trim().to_lowercase(),
+        dim_name.trim().to_lowercase()
     );
 
     if let Ok(cache) = cache_lock.read()
@@ -82,19 +81,14 @@ pub fn read_coord_bounds(
 pub fn read_coord_bounds_with_rank(
     store: ReadableWritableListableStorage,
     dim_name: &str,
-    dim_idx: usize,
-    total_dims: usize,
+    _dim_idx: usize,
+    _total_dims: usize,
 ) -> Option<(f64, f64)> {
     let clean = dim_name.trim().to_lowercase();
     let mut candidates = vec![format!("/{}", clean), clean.clone()];
 
-    let is_lat = clean.contains("lat")
-        || clean == "y"
-        || (total_dims >= 2 && dim_idx == total_dims.saturating_sub(2));
-
-    let is_lon = clean.contains("lon")
-        || clean == "x"
-        || (total_dims >= 2 && dim_idx == total_dims.saturating_sub(1));
+    let is_lat = clean.contains("lat") || clean == "y";
+    let is_lon = clean.contains("lon") || clean == "x";
 
     if is_lat {
         candidates.push("/lat".to_string());
@@ -144,4 +138,30 @@ pub fn read_coord_bounds_with_rank(
             .and_then(|v| v.first().map(|&x| x as f64))?;
 
     Some((v_start, v_end))
+}
+
+/// Checks if a dimension name matches Spatial X heuristics (longitude / X / column).
+pub fn is_spatial_x_name(dim_name: &str) -> bool {
+    let clean = dim_name.trim().to_lowercase();
+    clean.contains("lon") || clean == "x" || clean.contains("col")
+}
+
+/// Checks if a dimension name matches Spatial Y heuristics (latitude / Y / row).
+pub fn is_spatial_y_name(dim_name: &str) -> bool {
+    let clean = dim_name.trim().to_lowercase();
+    clean.contains("lat") || clean == "y" || clean.contains("row")
+}
+
+/// Checks if a dimension name matches Spatial Z heuristics (depth / level / height / alt / sigma / time / Z / T).
+pub fn is_spatial_z_name(dim_name: &str) -> bool {
+    let clean = dim_name.trim().to_lowercase();
+    clean.contains("depth")
+        || clean.contains("level")
+        || clean.contains("lev")
+        || clean.contains("height")
+        || clean.contains("alt")
+        || clean.contains("sigma")
+        || clean.contains("time")
+        || clean == "z"
+        || clean == "t"
 }

@@ -150,14 +150,12 @@ pub fn check_and_orient_block_grid(
     let lat_coords = lat_dim
         .and_then(|d| coordinates.get(d))
         .or_else(|| {
-            dimension_names
-                .get(rank - 2)
-                .and_then(|d| coordinates.get(d))
-        })
-        .or_else(|| {
             coordinates
                 .iter()
-                .find(|(k, _)| k.contains("lat") || *k == "y")
+                .find(|(k, _)| {
+                    let clean = k.to_lowercase();
+                    clean.contains("lat") || clean == "y"
+                })
                 .map(|(_, v)| v)
         })
         .map(|v| v.as_slice());
@@ -165,14 +163,12 @@ pub fn check_and_orient_block_grid(
     let lon_coords = lon_dim
         .and_then(|d| coordinates.get(d))
         .or_else(|| {
-            dimension_names
-                .get(rank - 1)
-                .and_then(|d| coordinates.get(d))
-        })
-        .or_else(|| {
             coordinates
                 .iter()
-                .find(|(k, _)| k.contains("lon") || *k == "x")
+                .find(|(k, _)| {
+                    let clean = k.to_lowercase();
+                    clean.contains("lon") || clean == "x"
+                })
                 .map(|(_, v)| v)
         })
         .map(|v| v.as_slice());
