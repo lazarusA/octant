@@ -454,56 +454,24 @@ impl eframe::App for OctantApp {
                     if let Some(meta) = &self.plotted_dataset_metadata
                         && let Some(var) = meta.variables.get(self.plotted_variable_idx)
                     {
-                        let explicit_x = (0..var.dimension_names.len()).find(|&d| {
-                            self.plotted_dim_config
-                                .get(d)
-                                .is_some_and(|c| c.spatial == crate::app::SpatialRole::X)
-                        });
-                        let explicit_y = (0..var.dimension_names.len()).find(|&d| {
-                            self.plotted_dim_config
-                                .get(d)
-                                .is_some_and(|c| c.spatial == crate::app::SpatialRole::Y)
-                        });
+                        let (explicit_x, explicit_y) =
+                            var.resolve_spatial_dim_indices(&self.plotted_dim_config);
 
                         if let Some(x_idx) = explicit_x
-                            .or_else(|| {
-                                var.dimension_names
-                                    .iter()
-                                    .rposition(|d| d.contains("lon") || d.contains("x") || d.contains("col"))
-                            })
                             && let Some(x_n) = var.dimension_names.get(x_idx)
                         {
                             x_name = x_n.clone();
-                            let clean_name = x_n.trim().to_lowercase();
-                            if let Some(coords) = meta
-                                .dimension_coordinates
-                                .get(&clean_name)
-                                .or_else(|| meta.dimension_coordinates.get(x_n))
-                                && let (Some(f), Some(l)) = (coords.first(), coords.last())
-                                && let (Ok(f_v), Ok(l_v)) = (f.parse::<f64>(), l.parse::<f64>())
-                            {
-                                x_bounds = (f_v.min(l_v), f_v.max(l_v));
+                            if let Some(bounds) = meta.get_coord_bounds(x_n) {
+                                x_bounds = bounds;
                             }
                         }
 
                         if let Some(y_idx) = explicit_y
-                            .or_else(|| {
-                                var.dimension_names
-                                    .iter()
-                                    .rposition(|d| d.contains("lat") || d.contains("y") || d.contains("row"))
-                            })
                             && let Some(y_n) = var.dimension_names.get(y_idx)
                         {
                             y_name = y_n.clone();
-                            let clean_name = y_n.trim().to_lowercase();
-                            if let Some(coords) = meta
-                                .dimension_coordinates
-                                .get(&clean_name)
-                                .or_else(|| meta.dimension_coordinates.get(y_n))
-                                && let (Some(f), Some(l)) = (coords.first(), coords.last())
-                                && let (Ok(f_v), Ok(l_v)) = (f.parse::<f64>(), l.parse::<f64>())
-                            {
-                                y_bounds = (f_v.min(l_v), f_v.max(l_v));
+                            if let Some(bounds) = meta.get_coord_bounds(y_n) {
+                                y_bounds = bounds;
                             }
                         }
                     }

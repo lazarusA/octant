@@ -132,39 +132,17 @@ pub fn show_hover_tooltip(
             units_str = format!(" [{}]", unit);
         }
 
-        let explicit_x = (0..var.dimension_names.len()).find(|&d| {
-            app.plotted_dim_config
-                .get(d)
-                .is_some_and(|c| c.spatial == crate::app::SpatialRole::X)
-        });
-        let explicit_y = (0..var.dimension_names.len()).find(|&d| {
-            app.plotted_dim_config
-                .get(d)
-                .is_some_and(|c| c.spatial == crate::app::SpatialRole::Y)
-        });
+        let (explicit_x, explicit_y) =
+            var.resolve_spatial_dim_indices(&app.plotted_dim_config);
 
         let dim_y_name = explicit_y
             .and_then(|idx| var.dimension_names.get(idx))
             .cloned()
-            .or_else(|| {
-                var.dimension_names
-                    .iter()
-                    .rposition(|d| d.contains("lat") || d.contains("y") || d.contains("row"))
-                    .and_then(|idx| var.dimension_names.get(idx))
-                    .cloned()
-            })
             .unwrap_or_else(|| "y".to_string());
 
         let dim_x_name = explicit_x
             .and_then(|idx| var.dimension_names.get(idx))
             .cloned()
-            .or_else(|| {
-                var.dimension_names
-                    .iter()
-                    .rposition(|d| d.contains("lon") || d.contains("x") || d.contains("col"))
-                    .and_then(|idx| var.dimension_names.get(idx))
-                    .cloned()
-            })
             .unwrap_or_else(|| "x".to_string());
 
         // Check if actual coordinate vectors exist in metadata
