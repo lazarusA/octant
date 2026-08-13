@@ -355,7 +355,7 @@ impl eframe::App for OctantApp {
                         let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
 
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                             plot_rect,
+                            plot_rect,
                             VolumeCallback {
                                 renderer: volume_renderer.clone(),
                                 color_params: self.get_color_params(),

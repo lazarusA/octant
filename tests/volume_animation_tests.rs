@@ -150,11 +150,13 @@ fn test_octant_block_volume_extraction() {
     );
 
     let fixed_indices = vec![0, 0, 0];
-    let vdata = block.volume(2, 1, 0, &fixed_indices, "test_volume").unwrap();
+    let vdata = block
+        .volume(2, 1, 0, &fixed_indices, "test_volume")
+        .unwrap();
 
-    assert_eq!(vdata.width, 4);  // X
+    assert_eq!(vdata.width, 4); // X
     assert_eq!(vdata.height, 3); // Y
-    assert_eq!(vdata.depth, 2);  // Z
+    assert_eq!(vdata.depth, 2); // Z
     assert_eq!(vdata.values.len(), 24);
     assert_eq!(vdata.min_val, 0.0);
     assert_eq!(vdata.max_val, 23.0);
