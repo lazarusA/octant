@@ -41,6 +41,8 @@ fn vs_main(
     let raw_val = data_buffer[safe_idx];
     out.raw_val = raw_val;
 
+    let is_valid = raw_val == raw_val && abs(raw_val) < 1e30;
+
     let cmin = uniforms.color.cmin;
     let cmax = uniforms.color.cmax;
     let range = max(cmax - cmin, 1e-6);
@@ -51,13 +53,16 @@ fn vs_main(
         uniforms.profile_length > 1u
     );
 
-    let norm_y = select(-1.0, clamp(((raw_val - cmin) / range) * 2.0 - 1.0, -1.0, 1.0), raw_val == raw_val && abs(raw_val) < 1e30);
+    let norm_y = select(-1.0, clamp(((raw_val - cmin) / range) * 2.0 - 1.0, -1.0, 1.0), is_valid);
     let pos = vec2<f32>(norm_x, norm_y);
 
     // Apply dynamic viewport padding: map NDC [-1.0, 1.0] within padded region
     let padded_pos = pos * (vec2<f32>(1.0, 1.0) - uniforms.viewport_padding);
     let transformed_pos = padded_pos * uniforms.zoom + uniforms.pan;
-    out.clip_position = vec4<f32>(transformed_pos, 0.0, 1.0);
+
+    // Hardware clipping: if vertex value is NaN or infinite, place clip_z outside [0, 1] NDC range to cull
+    let clip_z = select(2.0, 0.0, is_valid);
+    out.clip_position = vec4<f32>(transformed_pos, clip_z, 1.0);
 
     return out;
 }
