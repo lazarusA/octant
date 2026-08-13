@@ -487,22 +487,23 @@ impl OctantApp {
             true
         };
 
-        if (block.rank() >= 3 || is_3d_plot) && needs_volume_update {
-            if let Some(vdata) = block.volume(
+        if (block.rank() >= 3 || is_3d_plot)
+            && needs_volume_update
+            && let Some(vdata) = block.volume(
                 x_dim,
                 y_dim,
                 z_dim,
                 &fixed_indices,
                 &format!("Block Cache Volume [{}]", block.variable_name),
-            ) {
-                let depth = vdata.depth;
-                self.rebuild_pipeline_with_volume_data(vdata);
-                if is_3d_plot {
-                    self.status_message = format!(
-                        "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
-                        self.status_message, self.current_timestep
-                    );
-                }
+            )
+        {
+            let depth = vdata.depth;
+            self.rebuild_pipeline_with_volume_data(vdata);
+            if is_3d_plot {
+                self.status_message = format!(
+                    "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
+                    self.status_message, self.current_timestep
+                );
             }
         }
     }
