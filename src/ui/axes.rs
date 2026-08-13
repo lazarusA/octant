@@ -137,10 +137,18 @@ pub fn draw_plot_axes(
             let b_end = Pos2::new(tick_x, bottom_axis_y + bottom_x_tick_dir * tick_len);
             painter.line_segment([b_start, b_end], stroke);
 
-            let b_label_pos = if bottom_x_tick_dir > 0.0 {
-                Pos2::new(tick_x, bottom_axis_y + tick_len + 3.0)
+            let (b_label_pos, b_align, b_use_pill) = if bottom_x_tick_dir > 0.0 {
+                (
+                    Pos2::new(tick_x, bottom_axis_y + tick_len + 4.0),
+                    egui::Align2::CENTER_TOP,
+                    false,
+                )
             } else {
-                Pos2::new(tick_x, bottom_axis_y - tick_len - 14.0)
+                (
+                    Pos2::new(tick_x, bottom_axis_y - tick_len - 4.0),
+                    egui::Align2::CENTER_BOTTOM,
+                    true, // Inward overlay pill
+                )
             };
 
             if !is_near_corner(b_label_pos, canvas_rect) {
@@ -151,8 +159,8 @@ pub fn draw_plot_axes(
                     &tick.label,
                     font_id.clone(),
                     text_color,
-                    egui::Align2::CENTER_TOP,
-                    bottom_x_tick_dir < 0.0, // use bg pill when inward
+                    b_align,
+                    b_use_pill,
                 );
             }
 
@@ -162,8 +170,8 @@ pub fn draw_plot_axes(
             painter.line_segment([t_start, t_end], secondary_stroke);
 
             if top_x_tick_dir > 0.0 {
-                // Inward Top X-Axis tick label numbers in pills
-                let t_label_pos = Pos2::new(tick_x, top_axis_y + tick_len + 3.0);
+                // Inward Top X-Axis tick label numbers in overlay pills
+                let t_label_pos = Pos2::new(tick_x, top_axis_y + tick_len + 4.0);
                 if !is_near_corner(t_label_pos, canvas_rect) {
                     draw_tick_label_aligned(
                         visuals,
@@ -173,7 +181,7 @@ pub fn draw_plot_axes(
                         font_id.clone(),
                         text_color,
                         egui::Align2::CENTER_TOP,
-                        true, // use bg pill for inward top ticks
+                        true, // Inward overlay pill
                     );
                 }
             }
@@ -183,10 +191,18 @@ pub fn draw_plot_axes(
     // Draw X-Axis Title
     if !options.x_title.is_empty() {
         let title_x = ((visible_left + visible_right) * 0.5).round();
-        let title_y = if bottom_x_tick_dir > 0.0 {
-            bottom_axis_y + tick_len + 20.0
+        let (title_y, title_align, title_use_pill) = if bottom_x_tick_dir > 0.0 {
+            (
+                bottom_axis_y + tick_len + 20.0,
+                egui::Align2::CENTER_TOP,
+                false,
+            )
         } else {
-            bottom_axis_y - tick_len - 30.0
+            (
+                bottom_axis_y - tick_len - 28.0,
+                egui::Align2::CENTER_BOTTOM,
+                true, // Inward overlay pill
+            )
         };
 
         if title_y >= canvas_rect.top() && title_y <= canvas_rect.bottom() {
@@ -199,8 +215,8 @@ pub fn draw_plot_axes(
                     options.x_title,
                     title_font_id.clone(),
                     text_color,
-                    egui::Align2::CENTER_TOP,
-                    bottom_x_tick_dir < 0.0,
+                    title_align,
+                    title_use_pill,
                 );
             }
         }
