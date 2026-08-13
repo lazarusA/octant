@@ -448,19 +448,48 @@ impl eframe::App for OctantApp {
                         1 => matrix.height as f64,
                         _ => matrix.width as f64,
                     };
-                    let axis_name = self
-                        .get_spatial_dim_name(self.line_profile_dim_idx)
-                        .unwrap_or_else(|| match self.line_profile_dim_idx {
-                            2 => "Z".to_string(),
-                            1 => "Y".to_string(),
-                            _ => "X".to_string(),
-                        });
-                    (
-                        (0.0, (profile_len - 1.0).max(1.0)),
-                        (y_min, y_max),
-                        format!("{} Index", axis_name),
-                        "Data Value".to_string(),
-                    )
+
+                    let mut x_bounds = (0.0, (profile_len - 1.0).max(1.0));
+                    let mut x_name = match self.line_profile_dim_idx {
+                        2 => "z".to_string(),
+                        1 => "y".to_string(),
+                        _ => "x".to_string(),
+                    };
+                    let mut y_name = "Data Value".to_string();
+
+                    if let Some(meta) = &self.plotted_dataset_metadata
+                        && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                    {
+                        if let Some(u) = &var.units {
+                            y_name = format!("{} [{u}]", var.name);
+                        } else if let Some(u) = var.attributes.get("units") {
+                            y_name = format!("{} [{u}]", var.name);
+                        } else {
+                            y_name = var.name.clone();
+                        }
+
+                        let (explicit_x, explicit_y, explicit_z) =
+                            var.resolve_spatial_dim_indices(&self.plotted_dim_config);
+
+                        let target_dim_idx = match self.line_profile_dim_idx {
+                            2 => explicit_z,
+                            1 => explicit_y,
+                            _ => explicit_x,
+                        };
+
+                        if let Some(dim_idx) = target_dim_idx
+                            && let Some(name) = var.dimension_names.get(dim_idx)
+                        {
+                            x_name = name.clone();
+                            if let Some(bounds) = meta.get_coord_bounds(name) {
+                                x_bounds = bounds;
+                            }
+                        }
+                    }
+
+                    let x_title = crate::utils::coordinates::format_dimension_axis_title(&x_name);
+
+                    (x_bounds, (y_min, y_max), x_title, y_name)
                 } else {
                     let mut x_name = "X".to_string();
                     let mut y_name = "Y".to_string();
@@ -492,7 +521,10 @@ impl eframe::App for OctantApp {
                         }
                     }
 
-                    (x_bounds, y_bounds, x_name, y_name)
+                    let x_title = crate::utils::coordinates::format_dimension_axis_title(&x_name);
+                    let y_title = crate::utils::coordinates::format_dimension_axis_title(&y_name);
+
+                    (x_bounds, y_bounds, x_title, y_title)
                 };
 
                 let options = crate::ui::axes::PlotAxisOptions {
