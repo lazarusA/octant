@@ -163,3 +163,28 @@ pub fn is_spatial_z_name(dim_name: &str) -> bool {
         || clean.contains("sigma")
         || clean == "z"
 }
+
+/// Formats a dimension name into a human-friendly axis title with standard units.
+pub fn format_dimension_axis_title(dim_name: &str) -> String {
+    let clean = dim_name.trim().to_lowercase();
+    if clean.is_empty() {
+        return "Index".to_string();
+    }
+    if clean.contains('[') || clean.contains('(') {
+        return dim_name.to_string();
+    }
+
+    if clean.contains("lon") {
+        format!("{dim_name} [°E]")
+    } else if clean.contains("lat") {
+        format!("{dim_name} [°N]")
+    } else if clean.contains("depth") || clean.contains("height") || clean.contains("alt") {
+        format!("{dim_name} [m]")
+    } else if clean.contains("time") {
+        dim_name.to_string()
+    } else if clean == "x" || clean == "y" || clean == "z" {
+        format!("{dim_name} Index")
+    } else {
+        dim_name.to_string()
+    }
+}
