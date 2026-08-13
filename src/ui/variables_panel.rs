@@ -219,10 +219,13 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
         } else if !z_assigned
             && (dim_name.contains("depth")
                 || dim_name.contains("level")
-                || dim_name.contains("height")
-                || dim_name == "z"
                 || dim_name.contains("lev")
-                || dim_name.contains("sigma"))
+                || dim_name.contains("height")
+                || dim_name.contains("alt")
+                || dim_name.contains("sigma")
+                || dim_name.contains("time")
+                || dim_name == "z"
+                || dim_name == "t")
         {
             app.dim_config[i].spatial = SpatialRole::Z;
             z_assigned = true;
