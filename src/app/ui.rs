@@ -451,33 +451,27 @@ impl eframe::App for OctantApp {
                     let mut x_bounds = (0.0, matrix.width as f64);
                     let mut y_bounds = (0.0, matrix.height as f64);
 
-                    if let Some(meta) = &self.active_dataset_metadata
-                        && let Some(var) = meta.variables.get(self.selected_variable_idx)
+                    if let Some(meta) = &self.plotted_dataset_metadata
+                        && let Some(var) = meta.variables.get(self.plotted_variable_idx)
                     {
-                        if let Some(y_n) = var
-                            .dimension_names
-                            .iter()
-                            .rposition(|d| {
-                                d.contains("lat") || d.contains("y") || d.contains("row")
-                            })
-                            .and_then(|idx| var.dimension_names.get(idx))
-                        {
-                            y_name = y_n.clone();
-                            if let Some(coords) = meta.dimension_coordinates.get(y_n)
-                                && let (Some(f), Some(l)) = (coords.first(), coords.last())
-                                && let (Ok(f_v), Ok(l_v)) = (f.parse::<f64>(), l.parse::<f64>())
-                            {
-                                y_bounds = (f_v, l_v);
-                            }
-                        }
+                        let explicit_x = (0..var.dimension_names.len()).find(|&d| {
+                            self.plotted_dim_config
+                                .get(d)
+                                .is_some_and(|c| c.spatial == crate::app::SpatialRole::X)
+                        });
+                        let explicit_y = (0..var.dimension_names.len()).find(|&d| {
+                            self.plotted_dim_config
+                                .get(d)
+                                .is_some_and(|c| c.spatial == crate::app::SpatialRole::Y)
+                        });
 
-                        if let Some(x_n) = var
-                            .dimension_names
-                            .iter()
-                            .rposition(|d| {
-                                d.contains("lon") || d.contains("x") || d.contains("col")
+                        if let Some(x_idx) = explicit_x
+                            .or_else(|| {
+                                var.dimension_names
+                                    .iter()
+                                    .rposition(|d| d.contains("lon") || d.contains("x") || d.contains("col"))
                             })
-                            .and_then(|idx| var.dimension_names.get(idx))
+                            && let Some(x_n) = var.dimension_names.get(x_idx)
                         {
                             x_name = x_n.clone();
                             if let Some(coords) = meta.dimension_coordinates.get(x_n)
@@ -485,6 +479,23 @@ impl eframe::App for OctantApp {
                                 && let (Ok(f_v), Ok(l_v)) = (f.parse::<f64>(), l.parse::<f64>())
                             {
                                 x_bounds = (f_v, l_v);
+                            }
+                        }
+
+                        if let Some(y_idx) = explicit_y
+                            .or_else(|| {
+                                var.dimension_names
+                                    .iter()
+                                    .rposition(|d| d.contains("lat") || d.contains("y") || d.contains("row"))
+                            })
+                            && let Some(y_n) = var.dimension_names.get(y_idx)
+                        {
+                            y_name = y_n.clone();
+                            if let Some(coords) = meta.dimension_coordinates.get(y_n)
+                                && let (Some(f), Some(l)) = (coords.first(), coords.last())
+                                && let (Ok(f_v), Ok(l_v)) = (f.parse::<f64>(), l.parse::<f64>())
+                            {
+                                y_bounds = (f_v, l_v);
                             }
                         }
                     }
