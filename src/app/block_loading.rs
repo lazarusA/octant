@@ -458,24 +458,6 @@ impl OctantApp {
             })
             .collect();
 
-        println!(
-            "📦 [apply_block_projection] block.variable_name='{}', block.shape={:?}, block.dim_names={:?}",
-            block.variable_name, block.shape, block.dimension_names
-        );
-        println!("   orig_dim_names: {:?}", orig_dim_names);
-        println!(
-            "   plotted_dim_config roles: {:?}",
-            self.plotted_dim_config.iter().map(|c| c.spatial).collect::<Vec<_>>()
-        );
-        println!(
-            "   resolved -> x_dim={} ('{}'), y_dim={} ('{}'), z_dim={}",
-            x_dim,
-            block.dimension_names.get(x_dim).cloned().unwrap_or_default(),
-            y_dim,
-            block.dimension_names.get(y_dim).cloned().unwrap_or_default(),
-            z_dim
-        );
-
         if let Some(mdata) = block.slice_2d(
             x_dim,
             y_dim,
@@ -483,12 +465,6 @@ impl OctantApp {
             self.animated_dim_extent(),
             &format!("Block Cache [{}]", block.variable_name),
         ) {
-            println!(
-                "   [slice_2d output] mdata width={}, height={}, values len={}",
-                mdata.width,
-                mdata.height,
-                mdata.values.len()
-            );
             self.rebuild_pipeline_with_matrix_data(mdata);
         }
 

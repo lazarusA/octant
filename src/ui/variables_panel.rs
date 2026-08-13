@@ -266,20 +266,6 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
             SpatialRole::Z => 2,
             SpatialRole::None => 99,
         });
-
-    println!(
-        "🎛️ [init_variable_dimension_defaults] var='{}', dim_names={:?}, spatial_dims={:?}",
-        var_info.name, var_info.dimension_names, app.spatial_dims
-    );
-    for (i, cfg) in app.dim_config.iter().enumerate() {
-        println!(
-            "   dim {} ('{}'): spatial={:?}, anim={:?}",
-            i,
-            var_info.dimension_names.get(i).cloned().unwrap_or_default(),
-            cfg.spatial,
-            cfg.animation
-        );
-    }
 }
 
 fn show_dimension_sliders(
