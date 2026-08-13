@@ -61,6 +61,23 @@ fn vs_main(
     out.val = raw_val;
     out.local_uv = model.position;
 
+    // Fast-cull invisible points (NaNs or clipped values) in vertex shader
+    let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
+    if (is_nan_val && uniforms.color.use_nan_color == 0u) {
+        out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        return out;
+    }
+    if (!is_nan_val) {
+        if (uniforms.color.use_lowclip == 0u && raw_val < uniforms.color.cmin) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+        if (uniforms.color.use_highclip == 0u && raw_val > uniforms.color.cmax) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+    }
+
     // Map cell (z, y, x) to 3D world coordinates with North (+Y) at top and South (-Y) at bottom
     let norm_x = (-1.0 + (f32(cell_x) + 0.5) / f32(grid_w) * 2.0) * uniforms.aspect_x;
     let norm_y = (1.0 - (f32(cell_y) + 0.5) / f32(grid_h) * 2.0) * uniforms.aspect_y; // Inverted Y so Row 0 = North (+Y)

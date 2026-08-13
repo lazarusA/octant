@@ -471,7 +471,23 @@ impl OctantApp {
         let is_3d_plot = self.active_plot_type == crate::plots::PlotType::Volume
             || self.active_plot_type == crate::plots::PlotType::PointCloud;
 
-        if block.rank() >= 3 || is_3d_plot {
+        let needs_volume_update = if let Some(existing) = &self.volume_data {
+            let nz = if z_dim < block.rank() && z_dim != x_dim && z_dim != y_dim {
+                block.shape[z_dim]
+            } else {
+                1
+            };
+            let nx = block.shape.get(x_dim).copied().unwrap_or(0);
+            let ny = block.shape.get(y_dim).copied().unwrap_or(0);
+            existing.width != nx
+                || existing.height != ny
+                || existing.depth != nz
+                || self.volume_renderer.is_none()
+        } else {
+            true
+        };
+
+        if (block.rank() >= 3 || is_3d_plot) && needs_volume_update {
             if let Some(vdata) = block.volume(
                 x_dim,
                 y_dim,

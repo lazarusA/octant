@@ -10,10 +10,7 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         } else {
             "▶ Play"
         };
-        if ui
-            .button(egui::RichText::new(play_text).strong())
-            .clicked()
-        {
+        if ui.button(egui::RichText::new(play_text).strong()).clicked() {
             app.is_playing = !app.is_playing;
             app.last_step_time = std::time::Instant::now();
         }
