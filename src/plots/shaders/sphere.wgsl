@@ -75,6 +75,13 @@ fn vs_main(
     if (uniforms.sphere_mode == 0u) {
         // Mode 0: Smooth Sphere Projection
         raw_val = data_buffer[model.cell_index];
+
+        let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
+        if (is_nan_val && uniforms.color.use_nan_color == 0u) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+
         pos_3d = model.position;
         normal_3d = normalize(model.position);
     } else if (uniforms.sphere_mode == 1u) {
@@ -85,13 +92,19 @@ fn vs_main(
         let data_idx = min(gy * uniforms.width + gx, max_data_idx);
         raw_val = data_buffer[data_idx];
 
+        let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
+        if (is_nan_val && uniforms.color.use_nan_color == 0u) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+
         let dr = get_normalized_radial_dr(raw_val);
         pos_3d = spherical_to_cartesian(1.0 + dr, model.uv.x, model.uv.y);
 
         // Compute local gradient surface normal for 3D peak and in-ward valley lighting
         let val_left = data_buffer[gy * uniforms.width + max(gx, 1u) - 1u];
         let val_right = data_buffer[gy * uniforms.width + min(gx + 1u, uniforms.width - 1u)];
-        let val_up = data_buffer[max(gy, 1u) - 1u * uniforms.width + gx];
+        let val_up = data_buffer[(max(gy, 1u) - 1u) * uniforms.width + gx];
         let val_down = data_buffer[min(gy + 1u, max_data_idx / uniforms.width) * uniforms.width + gx];
 
         let dh_du = get_normalized_radial_dr(val_right) - get_normalized_radial_dr(val_left);
@@ -102,6 +115,23 @@ fn vs_main(
     } else if (uniforms.sphere_mode == 2u) {
         // Mode 2: Flat Steps
         raw_val = data_buffer[model.cell_index];
+
+        let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
+        if (is_nan_val && uniforms.color.use_nan_color == 0u) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+        if (!is_nan_val) {
+            if (uniforms.color.use_lowclip == 0u && raw_val < uniforms.color.cmin) {
+                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                return out;
+            }
+            if (uniforms.color.use_highclip == 0u && raw_val > uniforms.color.cmax) {
+                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                return out;
+            }
+        }
+
         let dr = get_normalized_radial_dr(raw_val);
         pos_3d = spherical_to_cartesian(1.0 + dr, model.uv.x, model.uv.y);
         normal_3d = normalize(model.position);
@@ -114,6 +144,22 @@ fn vs_main(
         let max_idx = arrayLength(&data_buffer) - 1u;
         let safe_idx = min(instance_idx, max_idx);
         raw_val = data_buffer[safe_idx];
+
+        let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
+        if (is_nan_val && uniforms.color.use_nan_color == 0u) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+        if (!is_nan_val) {
+            if (uniforms.color.use_lowclip == 0u && raw_val < uniforms.color.cmin) {
+                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                return out;
+            }
+            if (uniforms.color.use_highclip == 0u && raw_val > uniforms.color.cmax) {
+                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                return out;
+            }
+        }
 
         let dr = get_normalized_radial_dr(raw_val);
 
