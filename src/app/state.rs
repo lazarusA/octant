@@ -184,9 +184,8 @@ pub struct OctantApp {
     pub line_pan: egui::Vec2,
 }
 
-impl OctantApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let wgpu_render_state = cc.wgpu_render_state.clone();
+impl Default for OctantApp {
+    fn default() -> Self {
         let default_cache_mb = 1024; // Default 1GB cache size limit
 
         Self {
@@ -239,7 +238,7 @@ impl OctantApp {
             line_plot_all_series: false,
             show_colorbar: true,
             is_categorical: false,
-            wgpu_render_state,
+            wgpu_render_state: None,
 
             dataset_manager: crate::data::DatasetManager::new(),
             block_cache: crate::data::BlockCache::new(default_cache_mb * 1024 * 1024),
@@ -295,6 +294,14 @@ impl OctantApp {
             line_zoom: 1.0,
             line_pan: egui::Vec2::ZERO,
         }
+    }
+}
+
+impl OctantApp {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let mut app = Self::default();
+        app.wgpu_render_state = cc.wgpu_render_state.clone();
+        app
     }
 
     pub fn reset_heatmap_view(&mut self) {

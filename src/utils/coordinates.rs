@@ -152,7 +152,7 @@ pub fn is_spatial_y_name(dim_name: &str) -> bool {
     clean.contains("lat") || clean == "y" || clean.contains("row")
 }
 
-/// Checks if a dimension name matches Spatial Z heuristics (depth / level / height / alt / sigma / time / Z / T).
+/// Checks if a dimension name matches Spatial Z heuristics (depth / level / height / alt / sigma / Z).
 pub fn is_spatial_z_name(dim_name: &str) -> bool {
     let clean = dim_name.trim().to_lowercase();
     clean.contains("depth")
@@ -161,7 +161,5 @@ pub fn is_spatial_z_name(dim_name: &str) -> bool {
         || clean.contains("height")
         || clean.contains("alt")
         || clean.contains("sigma")
-        || clean.contains("time")
         || clean == "z"
-        || clean == "t"
 }
