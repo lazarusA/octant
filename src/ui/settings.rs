@@ -168,9 +168,10 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
             }
 
+            let has_z_dim = app.volume_data.as_ref().is_some_and(|v| v.depth > 1);
             let profile_controls = app.matrix_data.as_ref().map_or((false, 0usize), |matrix| {
                 (
-                    matrix.width > 1 || matrix.height > 1,
+                    matrix.width > 1 || matrix.height > 1 || has_z_dim,
                     matrix.width.max(matrix.height),
                 )
             });
@@ -179,29 +180,43 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.separator();
                 ui.label(egui::RichText::new("🧭 Line Profile").small().weak());
 
+                let label_x = app.get_spatial_dim_label(0);
+                let label_y = app.get_spatial_dim_label(1);
+                let label_z = app.get_spatial_dim_label(2);
+
+                let selected_text = match app.line_profile_dim_idx {
+                    2 if has_z_dim => &label_z,
+                    1 => &label_y,
+                    _ => &label_x,
+                };
+
                 let mut selected_dim_idx = app.line_profile_dim_idx;
                 egui::ComboBox::from_id_salt("line_profile_dim_selector")
-                    .selected_text(if selected_dim_idx == 0 {
-                        "Along X / Longitude"
-                    } else {
-                        "Along Y / Latitude"
-                    })
+                    .selected_text(selected_text)
                     .show_ui(ui, |ui| {
                         if ui
-                            .selectable_label(selected_dim_idx == 0, "Along X / Longitude")
+                            .selectable_label(selected_dim_idx == 0, &label_x)
                             .clicked()
                         {
                             selected_dim_idx = 0;
                         }
                         if ui
-                            .selectable_label(selected_dim_idx == 1, "Along Y / Latitude")
+                            .selectable_label(selected_dim_idx == 1, &label_y)
                             .clicked()
                         {
                             selected_dim_idx = 1;
                         }
+                        if has_z_dim
+                            && ui
+                                .selectable_label(selected_dim_idx == 2, &label_z)
+                                .clicked()
+                        {
+                            selected_dim_idx = 2;
+                        }
                     });
                 if selected_dim_idx != app.line_profile_dim_idx {
                     app.line_profile_dim_idx = selected_dim_idx;
+                    app.line_profile_slice_idx = 0;
                 }
 
                 let mut all_series = app.line_plot_all_series;
@@ -213,14 +228,19 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
 
                 if !app.line_plot_all_series {
-                    let max_idx = if app.line_profile_dim_idx == 0 {
-                        app.matrix_data
+                    let max_idx = match app.line_profile_dim_idx {
+                        2 if has_z_dim => app
+                            .volume_data
                             .as_ref()
-                            .map_or(0, |matrix| matrix.height.saturating_sub(1))
-                    } else {
-                        app.matrix_data
+                            .map_or(0, |v| (v.width * v.height).saturating_sub(1)),
+                        1 => app
+                            .matrix_data
                             .as_ref()
-                            .map_or(0, |matrix| matrix.width.saturating_sub(1))
+                            .map_or(0, |matrix| matrix.width.saturating_sub(1)),
+                        _ => app
+                            .matrix_data
+                            .as_ref()
+                            .map_or(0, |matrix| matrix.height.saturating_sub(1)),
                     };
                     if max_idx > 0 {
                         let mut slice_idx = app.line_profile_slice_idx;

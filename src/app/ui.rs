@@ -440,11 +440,25 @@ impl eframe::App for OctantApp {
                 let (x_dom, y_dom, x_label, y_label) = if self.active_plot_type == PlotType::Line {
                     let y_min = self.color_range_min as f64;
                     let y_max = self.color_range_max as f64;
-                    let profile_len = matrix.width.max(1) as f64;
+                    let profile_len = match self.line_profile_dim_idx {
+                        2 => self
+                            .volume_data
+                            .as_ref()
+                            .map_or(matrix.width, |v| v.depth) as f64,
+                        1 => matrix.height as f64,
+                        _ => matrix.width as f64,
+                    };
+                    let axis_name = self
+                        .get_spatial_dim_name(self.line_profile_dim_idx)
+                        .unwrap_or_else(|| match self.line_profile_dim_idx {
+                            2 => "Z".to_string(),
+                            1 => "Y".to_string(),
+                            _ => "X".to_string(),
+                        });
                     (
-                        (0.0, profile_len - 1.0),
+                        (0.0, (profile_len - 1.0).max(1.0)),
                         (y_min, y_max),
-                        "Sample Index".to_string(),
+                        format!("{} Index", axis_name),
                         "Data Value".to_string(),
                     )
                 } else {
