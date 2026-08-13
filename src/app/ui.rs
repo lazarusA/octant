@@ -76,12 +76,6 @@ impl eframe::App for OctantApp {
         // 1. Drain completed block-cache prefetch results.
         self.poll_block_prefetch_results();
 
-        let is_3d_plot = self.active_plot_type == crate::plots::PlotType::Volume
-            || self.active_plot_type == crate::plots::PlotType::PointCloud;
-        if is_3d_plot {
-            self.is_playing = false;
-        }
-
         // 2. Playback Animation Timer Loop
         if self.is_playing {
             let now = std::time::Instant::now();
@@ -358,9 +352,10 @@ impl eframe::App for OctantApp {
                                     .map_or((64, 64), |m| (m.width as u32, m.height as u32))
                             });
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+                        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
 
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            plot_rect,
+                             plot_rect,
                             VolumeCallback {
                                 renderer: volume_renderer.clone(),
                                 color_params: self.get_color_params(),
@@ -377,6 +372,9 @@ impl eframe::App for OctantApp {
                                 algorithm: self.volume_algorithm,
                                 isovalue: self.volume_isovalue,
                                 isorange: self.volume_isorange,
+                                shift_x,
+                                shift_y,
+                                shift_z,
                                 rect: plot_rect,
                             },
                         );
@@ -395,6 +393,7 @@ impl eframe::App for OctantApp {
                                     .map_or((64, 64), |m| (m.width as u32, m.height as u32))
                             });
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+                        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
 
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
                             plot_rect,
@@ -410,6 +409,9 @@ impl eframe::App for OctantApp {
                                 point_size: self.point_cloud_size,
                                 width,
                                 height,
+                                shift_x,
+                                shift_y,
+                                shift_z,
                                 rect: plot_rect,
                             },
                         );

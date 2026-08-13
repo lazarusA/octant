@@ -27,8 +27,6 @@ impl OctantApp {
                 && self.line_renderer.is_some()
                 && self.sphere_renderer.is_some()
                 && self.surface_renderer.is_some()
-                && self.volume_renderer.is_some()
-                && self.point_cloud_renderer.is_some()
             {
                 if let Some(renderer) = &self.renderer {
                     renderer.update_data(&wgpu_render_state.queue, &data.values);
@@ -41,12 +39,6 @@ impl OctantApp {
                 }
                 if let Some(surface_renderer) = &self.surface_renderer {
                     surface_renderer.update_data(&wgpu_render_state.queue, &data.values);
-                }
-                if let Some(volume_renderer) = &self.volume_renderer {
-                    volume_renderer.update_data(&wgpu_render_state.queue, &data.values);
-                }
-                if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
-                    point_cloud_renderer.update_data(&wgpu_render_state.queue, &data.values);
                 }
             } else {
                 let renderer = MatrixRenderer::new(
@@ -77,26 +69,10 @@ impl OctantApp {
                     data.width,
                     data.height,
                 );
-                let volume_renderer = VolumeRenderer::new(
-                    &wgpu_render_state.device,
-                    wgpu_render_state.target_format,
-                    &data.values,
-                    data.width as u32,
-                    data.height as u32,
-                );
-                let point_cloud_renderer = PointCloudRenderer::new(
-                    &wgpu_render_state.device,
-                    wgpu_render_state.target_format,
-                    &data.values,
-                    data.width as u32,
-                    data.height as u32,
-                );
                 self.renderer = Some(Arc::new(renderer));
                 self.line_renderer = Some(Arc::new(line_renderer));
                 self.sphere_renderer = Some(Arc::new(sphere_renderer));
                 self.surface_renderer = Some(Arc::new(surface_renderer));
-                self.volume_renderer = Some(Arc::new(volume_renderer));
-                self.point_cloud_renderer = Some(Arc::new(point_cloud_renderer));
 
                 if data.height == 1 {
                     self.active_plot_type = PlotType::Line;
@@ -245,5 +221,47 @@ impl OctantApp {
         let aspect_z = ((depth as f32 / max_spatial) * 0.12).clamp(0.4, 1.0);
 
         (aspect_x, aspect_y, aspect_z)
+    }
+
+    /// Computes circular shift offsets (shift_x, shift_y, shift_z) along the animated spatial dimension.
+    pub fn get_volume_shifts(&self) -> (u32, u32, u32) {
+        let Some(anim_dim) = self.plotted_animated_dim else {
+            return (0, 0, 0);
+        };
+
+        let spatial_role = self
+            .plotted_dim_config
+            .get(anim_dim)
+            .map(|c| c.spatial)
+            .unwrap_or(crate::app::SpatialRole::None);
+
+        let (width, height, depth) = if let Some(vdata) = &self.volume_data {
+            (
+                vdata.width.max(1) as u32,
+                vdata.height.max(1) as u32,
+                vdata.depth.max(1) as u32,
+            )
+        } else {
+            (64, 64, 64)
+        };
+
+        let origin = self
+            .active_slice_request
+            .as_ref()
+            .and_then(|req| req.selections.get(anim_dim))
+            .map(|sel| match sel {
+                crate::data::DimensionSelection::Range { start, .. } => *start,
+                crate::data::DimensionSelection::Index(idx) => *idx,
+            })
+            .unwrap_or(0);
+
+        let local_step = (self.current_timestep.saturating_sub(origin)) as u32;
+
+        match spatial_role {
+            crate::app::SpatialRole::X => (local_step % width, 0, 0),
+            crate::app::SpatialRole::Y => (0, local_step % height, 0),
+            crate::app::SpatialRole::Z => (0, 0, local_step % depth),
+            crate::app::SpatialRole::None => (0, 0, 0),
+        }
     }
 }
