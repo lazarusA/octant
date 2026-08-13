@@ -381,6 +381,31 @@ impl OctantApp {
         let all_dims: Vec<usize> = (0..block.rank()).collect();
         let non_anim: Vec<usize> = (0..block.rank()).filter(|&d| Some(d) != anim_dim).collect();
 
+        let orig_dim_names: Vec<String> = self
+            .plotted_dataset_metadata
+            .as_ref()
+            .and_then(|meta| meta.variables.get(self.plotted_variable_idx))
+            .map(|v| v.dimension_names.clone())
+            .unwrap_or_else(|| block.dimension_names.clone());
+
+        let find_explicit_spatial = |role: crate::app::SpatialRole| -> Option<usize> {
+            (0..block.rank()).find(|&d| {
+                let Some(name) = block.dimension_names.get(d) else {
+                    return false;
+                };
+                let Some(orig_idx) = orig_dim_names.iter().position(|n| n == name) else {
+                    return false;
+                };
+                self.plotted_dim_config
+                    .get(orig_idx)
+                    .is_some_and(|c| c.spatial == role)
+            })
+        };
+
+        let explicit_x = find_explicit_spatial(crate::app::SpatialRole::X);
+        let explicit_y = find_explicit_spatial(crate::app::SpatialRole::Y);
+        let explicit_z = find_explicit_spatial(crate::app::SpatialRole::Z);
+
         let explicit_spatial: Vec<usize> = self
             .plotted_spatial_dims
             .iter()
@@ -388,33 +413,49 @@ impl OctantApp {
             .filter(|&d| d < block.rank())
             .collect();
 
-        let x_dim = explicit_spatial
-            .first()
-            .copied()
+        let x_dim = explicit_x
+            .or_else(|| explicit_spatial.first().copied())
             .unwrap_or_else(|| non_anim.last().copied().unwrap_or(0));
 
-        let y_dim = explicit_spatial.get(1).copied().unwrap_or_else(|| {
-            non_anim
-                .len()
-                .checked_sub(2)
-                .and_then(|i| non_anim.get(i))
-                .copied()
-                .unwrap_or_else(|| all_dims.iter().copied().find(|&d| d != x_dim).unwrap_or(0))
-        });
+        let y_dim = explicit_y
+            .or_else(|| explicit_spatial.iter().copied().find(|&d| d != x_dim))
+            .unwrap_or_else(|| {
+                non_anim
+                    .len()
+                    .checked_sub(2)
+                    .and_then(|i| non_anim.get(i))
+                    .copied()
+                    .unwrap_or_else(|| all_dims.iter().copied().find(|&d| d != x_dim).unwrap_or(0))
+            });
 
-        let z_dim = explicit_spatial.get(2).copied().unwrap_or_else(|| {
-            all_dims
-                .iter()
-                .copied()
-                .find(|&d| d != x_dim && d != y_dim)
-                .unwrap_or(usize::MAX)
-        });
+        let z_dim = explicit_z
+            .or_else(|| {
+                explicit_spatial
+                    .iter()
+                    .copied()
+                    .find(|&d| d != x_dim && d != y_dim)
+            })
+            .unwrap_or_else(|| {
+                all_dims
+                    .iter()
+                    .copied()
+                    .find(|&d| d != x_dim && d != y_dim)
+                    .unwrap_or(usize::MAX)
+            });
 
-        let fixed_indices: Vec<usize> = self
-            .plotted_selected_dim_indices
-            .iter()
-            .enumerate()
-            .map(|(i, &idx)| idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0)))
+        let fixed_indices: Vec<usize> = (0..block.rank())
+            .map(|i| {
+                let name = block.dimension_names.get(i);
+                let orig_idx = name
+                    .and_then(|n| orig_dim_names.iter().position(|o| o == n))
+                    .unwrap_or(i);
+                let idx = self
+                    .plotted_selected_dim_indices
+                    .get(orig_idx)
+                    .copied()
+                    .unwrap_or(0);
+                idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0))
+            })
             .collect();
 
         if let Some(mdata) = block.slice_2d(
