@@ -264,4 +264,40 @@ impl OctantApp {
             crate::app::SpatialRole::None => (0, 0, 0),
         }
     }
+
+    /// Resolves the metadata dimension name for spatial axis (0 = X, 1 = Y, 2 = Z).
+    pub fn get_spatial_dim_name(&self, axis: usize) -> Option<String> {
+        if let Some(meta) = &self.plotted_dataset_metadata
+            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+        {
+            let (x, y, z) = var.resolve_spatial_dim_indices(&self.plotted_dim_config);
+            let idx = match axis {
+                0 => x,
+                1 => y,
+                _ => z,
+            }?;
+            return var.dimension_names.get(idx).cloned();
+        }
+        None
+    }
+
+    /// Returns a human-friendly label for the spatial axis (e.g., "Along X (lon)", "Along Z (depth)").
+    pub fn get_spatial_dim_label(&self, axis: usize) -> String {
+        let (name_opt, fallback) = match axis {
+            0 => (self.get_spatial_dim_name(0), "X / Longitude"),
+            1 => (self.get_spatial_dim_name(1), "Y / Latitude"),
+            _ => (self.get_spatial_dim_name(2), "Z / Depth"),
+        };
+
+        if let Some(name) = name_opt {
+            let axis_letter = match axis {
+                0 => "X",
+                1 => "Y",
+                _ => "Z",
+            };
+            format!("Along {} ({})", axis_letter, name)
+        } else {
+            format!("Along {}", fallback)
+        }
+    }
 }

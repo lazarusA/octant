@@ -30,12 +30,19 @@ pub struct LineUniformParams {
     pub zoom: f32,
 }
 
+use std::sync::RwLock;
+
 pub struct LineRenderer {
     render_pipeline: wgpu::RenderPipeline,
-    data_buffer: wgpu::Buffer,
+    bind_group_layout: wgpu::BindGroupLayout,
     uniform_buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    gpu_resources: RwLock<LineGpuResources>,
     data_len: AtomicU32,
+}
+
+struct LineGpuResources {
+    data_buffer: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
 }
 
 impl LineRenderer {
@@ -138,9 +145,12 @@ impl LineRenderer {
 
         Self {
             render_pipeline,
-            data_buffer,
+            bind_group_layout,
             uniform_buffer,
-            bind_group,
+            gpu_resources: RwLock::new(LineGpuResources {
+                data_buffer,
+                bind_group,
+            }),
             data_len: AtomicU32::new(safe_data.len() as u32),
         }
     }
@@ -164,25 +174,63 @@ impl LineRenderer {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
+    pub fn update_data_with_device(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        matrix_data: &[f32],
+    ) {
+        if matrix_data.is_empty() {
+            return;
+        }
+
+        let needed_bytes = (matrix_data.len() * std::mem::size_of::<f32>()) as u64;
+        let current_capacity = self.gpu_resources.read().unwrap().data_buffer.size();
+
+        if needed_bytes > current_capacity {
+            let new_capacity = needed_bytes.next_power_of_two();
+            let new_data_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("1D Line Storage Buffer (Resized)"),
+                size: new_capacity,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+
+            let new_bind_group = super::common::create_uniform_storage_bind_group(
+                device,
+                "1D Line Bind Group (Resized)",
+                &self.bind_group_layout,
+                &self.uniform_buffer,
+                &new_data_buffer,
+            );
+
+            queue.write_buffer(&new_data_buffer, 0, bytemuck::cast_slice(matrix_data));
+
+            let mut guard = self.gpu_resources.write().unwrap();
+            guard.data_buffer = new_data_buffer;
+            guard.bind_group = new_bind_group;
+        } else {
+            let guard = self.gpu_resources.read().unwrap();
+            queue.write_buffer(&guard.data_buffer, 0, bytemuck::cast_slice(matrix_data));
+        }
+
+        self.data_len
+            .store(matrix_data.len() as u32, Ordering::Relaxed);
+    }
+
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
         if matrix_data.is_empty() {
             return;
         }
 
-        let needed_bytes = std::mem::size_of_val(matrix_data) as u64;
-        let capacity_bytes = self.data_buffer.size();
+        let needed_bytes = (matrix_data.len() * std::mem::size_of::<f32>()) as u64;
+        let guard = self.gpu_resources.read().unwrap();
 
-        if needed_bytes > capacity_bytes {
-            log::error!(
-                "LineRenderer::update_data: payload ({needed_bytes} bytes) exceeds \
-                 buffer capacity ({capacity_bytes} bytes) - dropping update."
-            );
-            return;
+        if needed_bytes <= guard.data_buffer.size() {
+            queue.write_buffer(&guard.data_buffer, 0, bytemuck::cast_slice(matrix_data));
+            self.data_len
+                .store(matrix_data.len() as u32, Ordering::Relaxed);
         }
-
-        queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
-        self.data_len
-            .store(matrix_data.len() as u32, Ordering::Relaxed);
     }
 }
 
@@ -207,7 +255,7 @@ pub struct LineCallback {
 impl eframe::egui_wgpu::CallbackTrait for LineCallback {
     fn prepare(
         &self,
-        _device: &wgpu::Device,
+        device: &wgpu::Device,
         queue: &wgpu::Queue,
         _screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
         _encoder: &mut wgpu::CommandEncoder,
@@ -217,7 +265,8 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         let padding_y = (35.0 / self.rect.height().max(1.0)).clamp(0.06, 0.20);
 
         if !self.profile_values.is_empty() {
-            self.renderer.update_data(queue, &self.profile_values);
+            self.renderer
+                .update_data_with_device(device, queue, &self.profile_values);
         }
         self.renderer.update_uniforms(
             queue,
@@ -243,7 +292,8 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         super::common::setup_viewport_and_scissor(rpass, &self.rect, &info);
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
-        rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
+        let guard = self.renderer.gpu_resources.read().unwrap();
+        rpass.set_bind_group(0, &guard.bind_group, &[]);
 
         let profile_length = self.profile_length.max(2);
         let line_count = self.line_count.max(1);

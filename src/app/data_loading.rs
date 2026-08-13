@@ -4,8 +4,75 @@ use super::OctantApp;
 use super::state::StoreKind;
 
 impl OctantApp {
-    pub(super) fn get_line_profile_payload(&self) -> (Vec<f32>, u32, u32) {
-        if let Some(matrix) = &self.matrix_data {
+    pub fn get_line_profile_payload(&self) -> (Vec<f32>, u32, u32) {
+        if let Some(vdata) = &self.volume_data
+            && vdata.depth > 1
+        {
+            let (nx, ny, nz) = (vdata.width, vdata.height, vdata.depth);
+            match self.line_profile_dim_idx {
+                2 => {
+                    // Along Z: profile length = nz
+                    let num_pixels = nx * ny;
+                    if self.line_plot_all_series {
+                        let mut payload = Vec::with_capacity(nx * ny * nz);
+                        for y in 0..ny {
+                            for x in 0..nx {
+                                for z in 0..nz {
+                                    let idx = z * (nx * ny) + y * nx + x;
+                                    payload.push(vdata.values.get(idx).copied().unwrap_or(f32::NAN));
+                                }
+                            }
+                        }
+                        (payload, nz as u32, num_pixels as u32)
+                    } else {
+                        let target_pixel = self
+                            .line_profile_slice_idx
+                            .min(num_pixels.saturating_sub(1));
+                        let target_y = target_pixel / nx.max(1);
+                        let target_x = target_pixel % nx.max(1);
+
+                        let mut profile = Vec::with_capacity(nz);
+                        for z in 0..nz {
+                            let idx = z * (nx * ny) + target_y * nx + target_x;
+                            profile.push(vdata.values.get(idx).copied().unwrap_or(f32::NAN));
+                        }
+                        (profile, nz as u32, 1)
+                    }
+                }
+                1 => {
+                    // Along Y: profile length = ny
+                    if self.line_plot_all_series {
+                        let mut payload = Vec::with_capacity(nx * ny);
+                        for col in 0..nx {
+                            for row in 0..ny {
+                                let idx = row * nx + col;
+                                payload.push(vdata.values.get(idx).copied().unwrap_or(f32::NAN));
+                            }
+                        }
+                        (payload, ny as u32, nx as u32)
+                    } else {
+                        let target_col = self.line_profile_slice_idx.min(nx.saturating_sub(1));
+                        let mut profile = Vec::with_capacity(ny);
+                        for row in 0..ny {
+                            let idx = row * nx + target_col;
+                            profile.push(vdata.values.get(idx).copied().unwrap_or(f32::NAN));
+                        }
+                        (profile, ny as u32, 1)
+                    }
+                }
+                _ => {
+                    // Along X: profile length = nx
+                    if self.line_plot_all_series {
+                        (vdata.values[0..nx * ny].to_vec(), nx as u32, ny as u32)
+                    } else {
+                        let target_row = self.line_profile_slice_idx.min(ny.saturating_sub(1));
+                        let start = target_row * nx;
+                        let end = (start + nx).min(vdata.values.len());
+                        (vdata.values[start..end].to_vec(), nx as u32, 1)
+                    }
+                }
+            }
+        } else if let Some(matrix) = &self.matrix_data {
             let (profile_length, line_count, slice_idx) = if self.line_profile_dim_idx == 0 {
                 (
                     matrix.width,
