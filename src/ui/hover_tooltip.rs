@@ -122,30 +122,50 @@ pub fn show_hover_tooltip(
     let mut units_str = String::new();
     let mut dim_info_str = String::new();
 
-    if let Some(meta) = &app.active_dataset_metadata
-        && let Some(var) = meta.variables.get(app.selected_variable_idx)
+    if let Some(meta) = &app.plotted_dataset_metadata
+        && let Some(var) = meta.variables.get(app.plotted_variable_idx)
     {
         var_name = var.name.clone();
-        if let Some(unit) = var.attributes.get("units") {
+        if let Some(unit) = &var.units {
+            units_str = format!(" [{}]", unit);
+        } else if let Some(unit) = var.attributes.get("units") {
             units_str = format!(" [{}]", unit);
         }
 
-        // Real Dimension Names (e.g., latitude, longitude, time, depth)
-        let dim_y_name = var
-            .dimension_names
-            .iter()
-            .rposition(|d| d.contains("lat") || d.contains("y") || d.contains("row"))
-            .and_then(|idx| var.dimension_names.get(idx))
-            .cloned()
-            .unwrap_or_else(|| "lat".to_string());
+        let explicit_x = (0..var.dimension_names.len()).find(|&d| {
+            app.plotted_dim_config
+                .get(d)
+                .is_some_and(|c| c.spatial == crate::app::SpatialRole::X)
+        });
+        let explicit_y = (0..var.dimension_names.len()).find(|&d| {
+            app.plotted_dim_config
+                .get(d)
+                .is_some_and(|c| c.spatial == crate::app::SpatialRole::Y)
+        });
 
-        let dim_x_name = var
-            .dimension_names
-            .iter()
-            .rposition(|d| d.contains("lon") || d.contains("x") || d.contains("col"))
+        let dim_y_name = explicit_y
             .and_then(|idx| var.dimension_names.get(idx))
             .cloned()
-            .unwrap_or_else(|| "lon".to_string());
+            .or_else(|| {
+                var.dimension_names
+                    .iter()
+                    .rposition(|d| d.contains("lat") || d.contains("y") || d.contains("row"))
+                    .and_then(|idx| var.dimension_names.get(idx))
+                    .cloned()
+            })
+            .unwrap_or_else(|| "y".to_string());
+
+        let dim_x_name = explicit_x
+            .and_then(|idx| var.dimension_names.get(idx))
+            .cloned()
+            .or_else(|| {
+                var.dimension_names
+                    .iter()
+                    .rposition(|d| d.contains("lon") || d.contains("x") || d.contains("col"))
+                    .and_then(|idx| var.dimension_names.get(idx))
+                    .cloned()
+            })
+            .unwrap_or_else(|| "x".to_string());
 
         // Check if actual coordinate vectors exist in metadata
         let lat_coord_str = meta

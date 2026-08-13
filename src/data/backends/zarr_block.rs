@@ -49,6 +49,20 @@ pub fn fetch_block(
                 .map(|(i, n)| n.clone().unwrap_or_else(|| format!("dim_{i}")))
                 .collect()
         })
+        .or_else(|| {
+            array.attributes().get("_ARRAY_DIMENSIONS").and_then(|v| {
+                v.as_array().map(|arr| {
+                    arr.iter()
+                        .enumerate()
+                        .map(|(i, s)| {
+                            s.as_str()
+                                .map(|str_v| str_v.to_string())
+                                .unwrap_or_else(|| format!("dim_{i}"))
+                        })
+                        .collect()
+                })
+            })
+        })
         .unwrap_or_else(|| (0..rank).map(|i| format!("dim_{i}")).collect());
 
     let mut ranges: Vec<std::ops::Range<u64>> = Vec::with_capacity(rank);
@@ -85,6 +99,17 @@ pub fn fetch_block(
             get_cached_coord_bounds_with_rank(store.clone(), store_url, name, i, total_dims)
         {
             coordinates.insert(name.clone(), vec![first, last]);
+        }
+    }
+
+    // Fallback: If dim_names contain generic "dim_i" names, query spatial coordinate bounds for lat and lon
+    if coordinates.is_empty() || dim_names.iter().any(|d| d.starts_with("dim_")) {
+        for candidate in &["lat", "latitude", "y", "lon", "longitude", "x"] {
+            if let Some((first, last)) =
+                get_cached_coord_bounds_with_rank(store.clone(), store_url, candidate, usize::MAX, total_dims)
+            {
+                coordinates.insert((*candidate).to_string(), vec![first, last]);
+            }
         }
     }
 

@@ -51,20 +51,20 @@ pub fn get_cached_coord_bounds_with_rank(
 ) -> Option<(f64, f64)> {
     let cache_lock = COORD_BOUNDS_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
     let key = format!(
-        "{}:{}:{}:{}",
-        store_url,
-        dim_name.trim().to_lowercase(),
-        dim_idx,
-        total_dims
+        "{}:{}",
+        store_url.trim().to_lowercase(),
+        dim_name.trim().to_lowercase()
     );
 
     if let Ok(cache) = cache_lock.read()
         && let Some(bounds) = cache.get(&key)
     {
+        println!("🌐 [coord_cache HIT] key='{}' -> bounds={:?}", key, bounds);
         return *bounds;
     }
 
     let bounds = read_coord_bounds_with_rank(store, dim_name, dim_idx, total_dims);
+    println!("🌐 [coord_cache MISS] key='{}' -> read bounds={:?}", key, bounds);
     if let Ok(mut cache) = cache_lock.write() {
         cache.insert(key, bounds);
     }
@@ -83,19 +83,14 @@ pub fn read_coord_bounds(
 pub fn read_coord_bounds_with_rank(
     store: ReadableWritableListableStorage,
     dim_name: &str,
-    dim_idx: usize,
-    total_dims: usize,
+    _dim_idx: usize,
+    _total_dims: usize,
 ) -> Option<(f64, f64)> {
     let clean = dim_name.trim().to_lowercase();
     let mut candidates = vec![format!("/{}", clean), clean.clone()];
 
-    let is_lat = clean.contains("lat")
-        || clean == "y"
-        || (total_dims >= 2 && dim_idx == total_dims.saturating_sub(2));
-
-    let is_lon = clean.contains("lon")
-        || clean == "x"
-        || (total_dims >= 2 && dim_idx == total_dims.saturating_sub(1));
+    let is_lat = clean.contains("lat") || clean == "y";
+    let is_lon = clean.contains("lon") || clean == "x";
 
     if is_lat {
         candidates.push("/lat".to_string());

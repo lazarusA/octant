@@ -381,21 +381,30 @@ impl OctantApp {
         let all_dims: Vec<usize> = (0..block.rank()).collect();
         let non_anim: Vec<usize> = (0..block.rank()).filter(|&d| Some(d) != anim_dim).collect();
 
-        let explicit_x = (0..block.rank()).find(|&d| {
-            self.plotted_dim_config
-                .get(d)
-                .is_some_and(|c| c.spatial == crate::app::SpatialRole::X)
-        });
-        let explicit_y = (0..block.rank()).find(|&d| {
-            self.plotted_dim_config
-                .get(d)
-                .is_some_and(|c| c.spatial == crate::app::SpatialRole::Y)
-        });
-        let explicit_z = (0..block.rank()).find(|&d| {
-            self.plotted_dim_config
-                .get(d)
-                .is_some_and(|c| c.spatial == crate::app::SpatialRole::Z)
-        });
+        let orig_dim_names: Vec<String> = self
+            .plotted_dataset_metadata
+            .as_ref()
+            .and_then(|meta| meta.variables.get(self.plotted_variable_idx))
+            .map(|v| v.dimension_names.clone())
+            .unwrap_or_else(|| block.dimension_names.clone());
+
+        let find_explicit_spatial = |role: crate::app::SpatialRole| -> Option<usize> {
+            (0..block.rank()).find(|&d| {
+                let Some(name) = block.dimension_names.get(d) else {
+                    return false;
+                };
+                let Some(orig_idx) = orig_dim_names.iter().position(|n| n == name) else {
+                    return false;
+                };
+                self.plotted_dim_config
+                    .get(orig_idx)
+                    .is_some_and(|c| c.spatial == role)
+            })
+        };
+
+        let explicit_x = find_explicit_spatial(crate::app::SpatialRole::X);
+        let explicit_y = find_explicit_spatial(crate::app::SpatialRole::Y);
+        let explicit_z = find_explicit_spatial(crate::app::SpatialRole::Z);
 
         let explicit_spatial: Vec<usize> = self
             .plotted_spatial_dims
@@ -436,14 +445,36 @@ impl OctantApp {
 
         let fixed_indices: Vec<usize> = (0..block.rank())
             .map(|i| {
+                let name = block.dimension_names.get(i);
+                let orig_idx = name
+                    .and_then(|n| orig_dim_names.iter().position(|o| o == n))
+                    .unwrap_or(i);
                 let idx = self
                     .plotted_selected_dim_indices
-                    .get(i)
+                    .get(orig_idx)
                     .copied()
                     .unwrap_or(0);
                 idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0))
             })
             .collect();
+
+        println!(
+            "📦 [apply_block_projection] block.variable_name='{}', block.shape={:?}, block.dim_names={:?}",
+            block.variable_name, block.shape, block.dimension_names
+        );
+        println!("   orig_dim_names: {:?}", orig_dim_names);
+        println!(
+            "   plotted_dim_config roles: {:?}",
+            self.plotted_dim_config.iter().map(|c| c.spatial).collect::<Vec<_>>()
+        );
+        println!(
+            "   resolved -> x_dim={} ('{}'), y_dim={} ('{}'), z_dim={}",
+            x_dim,
+            block.dimension_names.get(x_dim).cloned().unwrap_or_default(),
+            y_dim,
+            block.dimension_names.get(y_dim).cloned().unwrap_or_default(),
+            z_dim
+        );
 
         if let Some(mdata) = block.slice_2d(
             x_dim,
@@ -452,6 +483,12 @@ impl OctantApp {
             self.animated_dim_extent(),
             &format!("Block Cache [{}]", block.variable_name),
         ) {
+            println!(
+                "   [slice_2d output] mdata width={}, height={}, values len={}",
+                mdata.width,
+                mdata.height,
+                mdata.values.len()
+            );
             self.rebuild_pipeline_with_matrix_data(mdata);
         }
 
