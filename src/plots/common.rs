@@ -190,6 +190,20 @@ pub fn calculate_3d_depth(total_len: usize, width: u32, height: u32) -> u32 {
     (total_len as u32 / (width.max(1) * height.max(1))).max(1)
 }
 
+/// Helper to create a standard DepthStencilState with Depth32Float format.
+pub fn default_depth_stencil_state(
+    depth_write_enabled: bool,
+    depth_compare: wgpu::CompareFunction,
+) -> wgpu::DepthStencilState {
+    wgpu::DepthStencilState {
+        format: wgpu::TextureFormat::Depth32Float,
+        depth_write_enabled: Some(depth_write_enabled),
+        depth_compare: Some(depth_compare),
+        stencil: wgpu::StencilState::default(),
+        bias: wgpu::DepthBiasState::default(),
+    }
+}
+
 /// Reusable unit cube mesh generator (24 vertices, 36 indices) for instanced 3D rendering.
 pub fn build_unit_cube_mesh<V, F>(mut make_vertex: F) -> (Vec<V>, Vec<u32>)
 where
@@ -256,16 +270,16 @@ where
     // 5. Left Wall (x=0.0)
     push_face(
         [0.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
         [0.0, 0.0, 1.0],
+        [0.0, 1.0, 0.0],
         [0.0, 1.0, 1.0],
         norm_left,
     );
     // 6. Right Wall (x=1.0)
     push_face(
         [1.0, 0.0, 1.0],
-        [1.0, 1.0, 1.0],
         [1.0, 0.0, 0.0],
+        [1.0, 1.0, 1.0],
         [1.0, 1.0, 0.0],
         norm_right,
     );
