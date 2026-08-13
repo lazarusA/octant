@@ -139,3 +139,29 @@ pub fn read_coord_bounds_with_rank(
 
     Some((v_start, v_end))
 }
+
+/// Checks if a dimension name matches Spatial X heuristics (longitude / X / column).
+pub fn is_spatial_x_name(dim_name: &str) -> bool {
+    let clean = dim_name.trim().to_lowercase();
+    clean.contains("lon") || clean == "x" || clean.contains("col")
+}
+
+/// Checks if a dimension name matches Spatial Y heuristics (latitude / Y / row).
+pub fn is_spatial_y_name(dim_name: &str) -> bool {
+    let clean = dim_name.trim().to_lowercase();
+    clean.contains("lat") || clean == "y" || clean.contains("row")
+}
+
+/// Checks if a dimension name matches Spatial Z heuristics (depth / level / height / alt / sigma / time / Z / T).
+pub fn is_spatial_z_name(dim_name: &str) -> bool {
+    let clean = dim_name.trim().to_lowercase();
+    clean.contains("depth")
+        || clean.contains("level")
+        || clean.contains("lev")
+        || clean.contains("height")
+        || clean.contains("alt")
+        || clean.contains("sigma")
+        || clean.contains("time")
+        || clean == "z"
+        || clean == "t"
+}

@@ -204,10 +204,10 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
             .unwrap_or_default()
             .to_lowercase();
 
-        if !x_assigned && (dim_name.contains("lon") || dim_name == "x") {
+        if !x_assigned && crate::utils::coordinates::is_spatial_x_name(&dim_name) {
             app.dim_config[i].spatial = SpatialRole::X;
             x_assigned = true;
-        } else if !y_assigned && (dim_name.contains("lat") || dim_name == "y") {
+        } else if !y_assigned && crate::utils::coordinates::is_spatial_y_name(&dim_name) {
             app.dim_config[i].spatial = SpatialRole::Y;
             y_assigned = true;
         } else if !anim_assigned
@@ -216,17 +216,7 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
             app.dim_config[i].animation = AnimationRole::Animated;
             app.animated_dim = Some(i);
             anim_assigned = true;
-        } else if !z_assigned
-            && (dim_name.contains("depth")
-                || dim_name.contains("level")
-                || dim_name.contains("lev")
-                || dim_name.contains("height")
-                || dim_name.contains("alt")
-                || dim_name.contains("sigma")
-                || dim_name.contains("time")
-                || dim_name == "z"
-                || dim_name == "t")
-        {
+        } else if !z_assigned && crate::utils::coordinates::is_spatial_z_name(&dim_name) {
             app.dim_config[i].spatial = SpatialRole::Z;
             z_assigned = true;
         }

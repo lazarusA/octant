@@ -55,10 +55,9 @@ impl VariableInfo {
                     .is_some_and(|c| c.spatial == crate::app::SpatialRole::X)
             })
             .or_else(|| {
-                self.dimension_names.iter().rposition(|d| {
-                    let clean = d.to_lowercase();
-                    clean.contains("lon") || clean == "x" || clean.contains("col")
-                })
+                self.dimension_names
+                    .iter()
+                    .rposition(|d| crate::utils::coordinates::is_spatial_x_name(d))
             });
 
         let explicit_y = (0..self.dimension_names.len())
@@ -68,10 +67,9 @@ impl VariableInfo {
                     .is_some_and(|c| c.spatial == crate::app::SpatialRole::Y)
             })
             .or_else(|| {
-                self.dimension_names.iter().rposition(|d| {
-                    let clean = d.to_lowercase();
-                    clean.contains("lat") || clean == "y" || clean.contains("row")
-                })
+                self.dimension_names
+                    .iter()
+                    .rposition(|d| crate::utils::coordinates::is_spatial_y_name(d))
             });
 
         let explicit_z = (0..self.dimension_names.len())
@@ -81,16 +79,9 @@ impl VariableInfo {
                     .is_some_and(|c| c.spatial == crate::app::SpatialRole::Z)
             })
             .or_else(|| {
-                self.dimension_names.iter().rposition(|d| {
-                    let clean = d.to_lowercase();
-                    clean.contains("depth")
-                        || clean.contains("lev")
-                        || clean.contains("alt")
-                        || clean.contains("height")
-                        || clean.contains("time")
-                        || clean == "z"
-                        || clean == "t"
-                })
+                self.dimension_names
+                    .iter()
+                    .rposition(|d| crate::utils::coordinates::is_spatial_z_name(d))
             });
 
         (explicit_x, explicit_y, explicit_z)
