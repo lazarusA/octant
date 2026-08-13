@@ -6,40 +6,6 @@ use wgpu::util::DeviceExt;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub struct LineVertex {
-    pub position: [f32; 2],
-    pub cell_index: u32,
-    pub line_index: u32,
-}
-
-impl LineVertex {
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<LineVertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-                wgpu::VertexAttribute {
-                    offset: 8,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Uint32,
-                },
-                wgpu::VertexAttribute {
-                    offset: 12,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Uint32,
-                },
-            ],
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct LineUniforms {
     pub viewport_padding: [f32; 2],
     pub line_thickness: f32,
@@ -66,11 +32,10 @@ pub struct LineUniformParams {
 
 pub struct LineRenderer {
     render_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
     data_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    num_vertices: AtomicU32,
+    data_len: AtomicU32,
 }
 
 impl LineRenderer {
@@ -144,7 +109,7 @@ impl LineRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[Some(LineVertex::desc())],
+                buffers: &[],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -171,35 +136,13 @@ impl LineRenderer {
             cache: None,
         });
 
-        let initial_vertices = Self::build_line_vertices(width.max(1), height.max(1));
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("1D Line Vertex Buffer"),
-            contents: bytemuck::cast_slice(&initial_vertices),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        });
-
         Self {
             render_pipeline,
-            vertex_buffer,
             data_buffer,
             uniform_buffer,
             bind_group,
-            num_vertices: AtomicU32::new(initial_vertices.len() as u32),
+            data_len: AtomicU32::new(safe_data.len() as u32),
         }
-    }
-
-    pub fn update_profile_geometry(
-        &self,
-        queue: &wgpu::Queue,
-        profile_length: u32,
-        line_count: u32,
-    ) {
-        let profile_length = profile_length.max(1) as usize;
-        let line_count = line_count.max(1) as usize;
-        let vertices = Self::build_line_vertices(profile_length, line_count);
-        queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
-        self.num_vertices
-            .store(vertices.len() as u32, Ordering::Relaxed);
     }
 
     pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &LineUniformParams) {
@@ -230,42 +173,16 @@ impl LineRenderer {
         let capacity_bytes = self.data_buffer.size();
 
         if needed_bytes > capacity_bytes {
-            // Should be unreachable given current state-reset invariants, but this
-            // guards against future state-sync bugs causing a hard wgpu panic.
             log::error!(
                 "LineRenderer::update_data: payload ({needed_bytes} bytes) exceeds \
-                 buffer capacity ({capacity_bytes} bytes) - dropping update. This \
-                 usually means matrix_data.len() doesn't match the (width, height) \
-                 the renderer was created with."
+                 buffer capacity ({capacity_bytes} bytes) - dropping update."
             );
             return;
         }
 
         queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
-    }
-
-    fn build_line_vertices(profile_length: usize, line_count: usize) -> Vec<LineVertex> {
-        let profile_length = profile_length.max(2);
-        let line_count = line_count.max(1);
-        let mut vertices = Vec::with_capacity(profile_length * line_count);
-
-        for line_idx in 0..line_count {
-            for point_idx in 0..profile_length {
-                let norm_x = if profile_length > 1 {
-                    (point_idx as f32 / (profile_length - 1) as f32) * 2.0 - 1.0
-                } else {
-                    0.0
-                };
-
-                vertices.push(LineVertex {
-                    position: [norm_x, 0.0],
-                    cell_index: point_idx as u32,
-                    line_index: line_idx as u32,
-                });
-            }
-        }
-
-        vertices
+        self.data_len
+            .store(matrix_data.len() as u32, Ordering::Relaxed);
     }
 }
 
@@ -296,15 +213,12 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
-        // Dynamic viewport padding computed from canvas dimensions
         let padding_x = (40.0 / self.rect.width().max(1.0)).clamp(0.04, 0.15);
         let padding_y = (35.0 / self.rect.height().max(1.0)).clamp(0.06, 0.20);
 
         if !self.profile_values.is_empty() {
             self.renderer.update_data(queue, &self.profile_values);
         }
-        self.renderer
-            .update_profile_geometry(queue, self.profile_length, self.line_count);
         self.renderer.update_uniforms(
             queue,
             &LineUniformParams {
@@ -330,14 +244,11 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
-        rpass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
 
         let profile_length = self.profile_length.max(2);
         let line_count = self.line_count.max(1);
         for line_idx in 0..line_count {
-            let start = line_idx * profile_length;
-            let end = start + profile_length;
-            rpass.draw(start..end, 0..1);
+            rpass.draw(0..profile_length, line_idx..(line_idx + 1));
         }
     }
 }

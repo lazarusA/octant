@@ -23,11 +23,22 @@ impl OctantApp {
             };
 
             if self.line_plot_all_series {
-                let mut payload = Vec::with_capacity(profile_length.max(1) * line_count.max(1));
-                for idx in 0..line_count {
-                    payload.extend(matrix.extract_1d_line_profile(self.line_profile_dim_idx, idx));
+                if self.line_profile_dim_idx == 0 {
+                    (
+                        matrix.values.clone(),
+                        profile_length as u32,
+                        line_count as u32,
+                    )
+                } else {
+                    let mut payload = Vec::with_capacity(profile_length * line_count);
+                    for col in 0..line_count {
+                        for row in 0..profile_length {
+                            let idx = row * matrix.width + col;
+                            payload.push(matrix.values.get(idx).copied().unwrap_or(f32::NAN));
+                        }
+                    }
+                    (payload, profile_length as u32, line_count as u32)
                 }
-                (payload, profile_length as u32, line_count as u32)
             } else {
                 (
                     matrix.extract_1d_line_profile(self.line_profile_dim_idx, slice_idx),

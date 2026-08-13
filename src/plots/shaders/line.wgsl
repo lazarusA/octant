@@ -27,21 +27,32 @@ struct LineUniforms {
 @group(0) @binding(1) var<storage, read> data_buffer: array<f32>;
 
 @vertex
-fn vs_main(model: LineVertexInput) -> LineVertexOutput {
+fn vs_main(
+    @builtin(vertex_index) vertex_idx: u32,
+    @builtin(instance_index) instance_idx: u32,
+) -> LineVertexOutput {
     var out: LineVertexOutput;
-    out.cell_index = model.cell_index;
-    out.line_index = model.line_index;
+    out.cell_index = vertex_idx;
+    out.line_index = instance_idx;
 
-    let line_offset = model.line_index * uniforms.profile_length;
-    let raw_val = data_buffer[line_offset + model.cell_index];
+    let line_offset = instance_idx * uniforms.profile_length;
+    let max_data_idx = arrayLength(&data_buffer) - 1u;
+    let safe_idx = min(line_offset + vertex_idx, max_data_idx);
+    let raw_val = data_buffer[safe_idx];
     out.raw_val = raw_val;
 
     let cmin = uniforms.color.cmin;
     let cmax = uniforms.color.cmax;
     let range = max(cmax - cmin, 1e-6);
 
+    let norm_x = select(
+        0.0,
+        (f32(vertex_idx) / max(f32(uniforms.profile_length) - 1.0, 1.0)) * 2.0 - 1.0,
+        uniforms.profile_length > 1u
+    );
+
     let norm_y = select(-1.0, clamp(((raw_val - cmin) / range) * 2.0 - 1.0, -1.0, 1.0), raw_val == raw_val && abs(raw_val) < 1e30);
-    let pos = vec2<f32>(model.position.x, norm_y);
+    let pos = vec2<f32>(norm_x, norm_y);
 
     // Apply dynamic viewport padding: map NDC [-1.0, 1.0] within padded region
     let padded_pos = pos * (vec2<f32>(1.0, 1.0) - uniforms.viewport_padding);
