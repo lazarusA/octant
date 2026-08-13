@@ -145,9 +145,9 @@ impl OctantBlock {
         let stride_y = self.strides[y_dim];
 
         let mut base_offset = 0usize;
-        for i in 0..self.rank() {
+        for (i, &fixed_idx) in fixed_indices.iter().enumerate().take(self.rank()) {
             if i != x_dim && i != y_dim {
-                let idx = fixed_indices[i].min(self.shape[i].saturating_sub(1));
+                let idx = fixed_idx.min(self.shape[i].saturating_sub(1));
                 base_offset += idx * self.strides[i];
             }
         }
@@ -262,9 +262,9 @@ impl OctantBlock {
         let stride_z = if has_z { self.strides[z_dim] } else { 0 };
 
         let mut base_offset = 0usize;
-        for i in 0..self.rank() {
+        for (i, &fixed_idx) in fixed_indices.iter().enumerate().take(self.rank()) {
             if i != x_dim && i != y_dim && (!has_z || i != z_dim) {
-                let idx = fixed_indices[i].min(self.shape[i].saturating_sub(1));
+                let idx = fixed_idx.min(self.shape[i].saturating_sub(1));
                 base_offset += idx * self.strides[i];
             }
         }

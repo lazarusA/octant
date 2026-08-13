@@ -299,9 +299,10 @@ impl Default for OctantApp {
 
 impl OctantApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let mut app = Self::default();
-        app.wgpu_render_state = cc.wgpu_render_state.clone();
-        app
+        Self {
+            wgpu_render_state: cc.wgpu_render_state.clone(),
+            ..Default::default()
+        }
     }
 
     pub fn reset_heatmap_view(&mut self) {
