@@ -2,6 +2,8 @@ struct Uniforms {
     pan: vec2<f32>,
     zoom: f32,
     _pad: u32,
+    aspect_scale: vec2<f32>,
+    _pad2: vec2<u32>,
     color: ColorUniforms,
 };
 
@@ -26,7 +28,8 @@ struct VertexOutput {
 @vertex
 fn vs_main(model: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    let transformed_pos = model.position * uniforms.zoom + uniforms.pan;
+    let scaled_model_pos = model.position * uniforms.aspect_scale;
+    let transformed_pos = scaled_model_pos * uniforms.zoom + uniforms.pan;
     out.position = vec4<f32>(transformed_pos, 0.0, 1.0);
     out.uv = model.uv;
     out.val = data_buffer[model.cell_index];
