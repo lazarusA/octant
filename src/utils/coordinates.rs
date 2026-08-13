@@ -51,10 +51,11 @@ pub fn get_cached_coord_bounds_with_rank(
 ) -> Option<(f64, f64)> {
     let cache_lock = COORD_BOUNDS_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
     let key = format!(
-        "{}:{}:{}",
+        "{}:{}:{}:{}",
         store_url,
         dim_name.trim().to_lowercase(),
-        dim_idx
+        dim_idx,
+        total_dims
     );
 
     if let Ok(cache) = cache_lock.read()
