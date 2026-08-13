@@ -15,15 +15,29 @@ impl OctantApp {
                     let num_pixels = nx * ny;
                     if self.line_plot_all_series {
                         let mut payload = Vec::with_capacity(nx * ny * nz);
+                        let mut valid_lines = 0u32;
                         for y in 0..ny {
                             for x in 0..nx {
+                                let mut has_valid = false;
                                 for z in 0..nz {
                                     let idx = z * (nx * ny) + y * nx + x;
-                                    payload.push(vdata.values.get(idx).copied().unwrap_or(f32::NAN));
+                                    if let Some(&v) = vdata.values.get(idx)
+                                        && !v.is_nan() && v.is_finite()
+                                    {
+                                        has_valid = true;
+                                        break;
+                                    }
+                                }
+                                if has_valid {
+                                    valid_lines += 1;
+                                    for z in 0..nz {
+                                        let idx = z * (nx * ny) + y * nx + x;
+                                        payload.push(vdata.values.get(idx).copied().unwrap_or(f32::NAN));
+                                    }
                                 }
                             }
                         }
-                        (payload, nz as u32, num_pixels as u32)
+                        (payload, nz as u32, valid_lines)
                     } else {
                         let target_pixel = self
                             .line_profile_slice_idx
@@ -43,13 +57,27 @@ impl OctantApp {
                     // Along Y: profile length = ny
                     if self.line_plot_all_series {
                         let mut payload = Vec::with_capacity(nx * ny);
+                        let mut valid_lines = 0u32;
                         for col in 0..nx {
+                            let mut has_valid = false;
                             for row in 0..ny {
                                 let idx = row * nx + col;
-                                payload.push(vdata.values.get(idx).copied().unwrap_or(f32::NAN));
+                                if let Some(&v) = vdata.values.get(idx)
+                                    && !v.is_nan() && v.is_finite()
+                                {
+                                    has_valid = true;
+                                    break;
+                                }
+                            }
+                            if has_valid {
+                                valid_lines += 1;
+                                for row in 0..ny {
+                                    let idx = row * nx + col;
+                                    payload.push(vdata.values.get(idx).copied().unwrap_or(f32::NAN));
+                                }
                             }
                         }
-                        (payload, ny as u32, nx as u32)
+                        (payload, ny as u32, valid_lines)
                     } else {
                         let target_col = self.line_profile_slice_idx.min(nx.saturating_sub(1));
                         let mut profile = Vec::with_capacity(ny);
@@ -63,7 +91,18 @@ impl OctantApp {
                 _ => {
                     // Along X: profile length = nx
                     if self.line_plot_all_series {
-                        (vdata.values[0..nx * ny].to_vec(), nx as u32, ny as u32)
+                        let mut payload = Vec::with_capacity(nx * ny);
+                        let mut valid_lines = 0u32;
+                        for row in 0..ny {
+                            let start = row * nx;
+                            let end = (start + nx).min(vdata.values.len());
+                            let row_slice = &vdata.values[start..end];
+                            if row_slice.iter().any(|v| !v.is_nan() && v.is_finite()) {
+                                valid_lines += 1;
+                                payload.extend_from_slice(row_slice);
+                            }
+                        }
+                        (payload, nx as u32, valid_lines)
                     } else {
                         let target_row = self.line_profile_slice_idx.min(ny.saturating_sub(1));
                         let start = target_row * nx;
@@ -91,20 +130,41 @@ impl OctantApp {
 
             if self.line_plot_all_series {
                 if self.line_profile_dim_idx == 0 {
-                    (
-                        matrix.values.clone(),
-                        profile_length as u32,
-                        line_count as u32,
-                    )
-                } else {
                     let mut payload = Vec::with_capacity(profile_length * line_count);
-                    for col in 0..line_count {
-                        for row in 0..profile_length {
-                            let idx = row * matrix.width + col;
-                            payload.push(matrix.values.get(idx).copied().unwrap_or(f32::NAN));
+                    let mut valid_lines = 0u32;
+                    for row in 0..line_count {
+                        let start = row * profile_length;
+                        let end = (start + profile_length).min(matrix.values.len());
+                        let row_slice = &matrix.values[start..end];
+                        if row_slice.iter().any(|v| !v.is_nan() && v.is_finite()) {
+                            valid_lines += 1;
+                            payload.extend_from_slice(row_slice);
                         }
                     }
-                    (payload, profile_length as u32, line_count as u32)
+                    (payload, profile_length as u32, valid_lines)
+                } else {
+                    let mut payload = Vec::with_capacity(profile_length * line_count);
+                    let mut valid_lines = 0u32;
+                    for col in 0..line_count {
+                        let mut has_valid = false;
+                        for row in 0..profile_length {
+                            let idx = row * matrix.width + col;
+                            if let Some(&v) = matrix.values.get(idx)
+                                && !v.is_nan() && v.is_finite()
+                            {
+                                has_valid = true;
+                                break;
+                            }
+                        }
+                        if has_valid {
+                            valid_lines += 1;
+                            for row in 0..profile_length {
+                                let idx = row * matrix.width + col;
+                                payload.push(matrix.values.get(idx).copied().unwrap_or(f32::NAN));
+                            }
+                        }
+                    }
+                    (payload, profile_length as u32, valid_lines)
                 }
             } else {
                 (

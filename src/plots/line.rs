@@ -296,9 +296,9 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         rpass.set_bind_group(0, &guard.bind_group, &[]);
 
         let profile_length = self.profile_length.max(2);
-        let line_count = self.line_count.max(1);
-        for line_idx in 0..line_count {
-            rpass.draw(0..profile_length, line_idx..(line_idx + 1));
+        let line_count = self.line_count;
+        if line_count > 0 && !self.profile_values.is_empty() {
+            rpass.draw(0..profile_length, 0..line_count);
         }
     }
 }
