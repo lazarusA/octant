@@ -173,7 +173,10 @@ impl PointCloudRenderer {
                 cull_mode: None,
                 ..Default::default()
             },
-            depth_stencil: None,
+            depth_stencil: Some(super::common::default_depth_stencil_state(
+                true,
+                wgpu::CompareFunction::LessEqual,
+            )),
             multisample: wgpu::MultisampleState::default(),
             multiview_mask: None,
             cache: None,

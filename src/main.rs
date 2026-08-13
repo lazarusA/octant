@@ -15,6 +15,7 @@ fn main() -> eframe::Result<()> {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1150.0, 720.0])
             .with_title("Octant — Interactive Visualization of n-dimensional datasets"),
+        depth_buffer: 32,
         ..Default::default()
     };
 
@@ -35,7 +36,10 @@ pub fn main_web() {
     console_error_panic_hook::set_once();
     console_log::init_with_level(log::Level::Debug).unwrap();
 
-    let web_options = eframe::WebOptions::default();
+    let web_options = eframe::WebOptions {
+        depth_buffer: 32,
+        ..Default::default()
+    };
     wasm_bindgen_futures::spawn_local(async {
         eframe::WebRunner::new()
             .start(
