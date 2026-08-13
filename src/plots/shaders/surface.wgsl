@@ -112,13 +112,10 @@ fn vs_main(
         let world_x = mix(x0, x1, model.position.x);
         let world_z = mix(y0, y1, model.position.y);
 
-        // Positive values extrude upward from 0.0; negative values extrude downward/in-ward from 0.0
-        var world_y: f32;
-        if (height >= 0.0) {
-            world_y = mix(0.0, height, model.position.z);
-        } else {
-            world_y = mix(height, 0.0, model.position.z);
-        }
+        // Positive values extrude upward from 0.0; negative values extrude downward from 0.0
+        let y_base = min(0.0, height);
+        let y_top = max(0.0, height);
+        let world_y = mix(y_base, y_top, model.position.z);
 
         pos_3d = vec3<f32>(world_x, world_y, world_z);
         normal_3d = model.raw_normal;
