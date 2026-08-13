@@ -196,11 +196,36 @@ fn test_line_profile_along_z_and_xyz() {
     assert_eq!(count_p1, 1);
     assert_eq!(payload_p1, vec![1.0, 7.0, 13.0, 19.0]);
 
-    // 3. Along X (dim 0)
+    // 3. Along X (dim 0) - extracted from matrix_data (timestep slice)
     app.line_profile_dim_idx = 0;
     app.line_profile_slice_idx = 0;
+    app.matrix_data = Some(octant::data::MatrixData::new(
+        2,
+        3,
+        vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
+        10.0,
+        60.0,
+        "slice_t0".to_string(),
+        1,
+    ));
+
     let (payload_x, len_x, count_x) = app.get_line_profile_payload();
     assert_eq!(len_x, 2);
     assert_eq!(count_x, 1);
-    assert_eq!(payload_x, vec![0.0, 1.0]);
+    assert_eq!(payload_x, vec![10.0, 20.0]);
+
+    // Timestep advances -> new matrix_data slice
+    app.matrix_data = Some(octant::data::MatrixData::new(
+        2,
+        3,
+        vec![100.0, 200.0, 300.0, 400.0, 500.0, 600.0],
+        100.0,
+        600.0,
+        "slice_t1".to_string(),
+        1,
+    ));
+    let (payload_x1, len_x1, count_x1) = app.get_line_profile_payload();
+    assert_eq!(len_x1, 2);
+    assert_eq!(count_x1, 1);
+    assert_eq!(payload_x1, vec![100.0, 200.0]);
 }
