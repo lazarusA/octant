@@ -474,11 +474,15 @@ impl eframe::App for OctantApp {
                             && let Some(x_n) = var.dimension_names.get(x_idx)
                         {
                             x_name = x_n.clone();
-                            if let Some(coords) = meta.dimension_coordinates.get(x_n)
+                            let clean_name = x_n.trim().to_lowercase();
+                            if let Some(coords) = meta
+                                .dimension_coordinates
+                                .get(&clean_name)
+                                .or_else(|| meta.dimension_coordinates.get(x_n))
                                 && let (Some(f), Some(l)) = (coords.first(), coords.last())
                                 && let (Ok(f_v), Ok(l_v)) = (f.parse::<f64>(), l.parse::<f64>())
                             {
-                                x_bounds = (f_v, l_v);
+                                x_bounds = (f_v.min(l_v), f_v.max(l_v));
                             }
                         }
 
@@ -491,11 +495,15 @@ impl eframe::App for OctantApp {
                             && let Some(y_n) = var.dimension_names.get(y_idx)
                         {
                             y_name = y_n.clone();
-                            if let Some(coords) = meta.dimension_coordinates.get(y_n)
+                            let clean_name = y_n.trim().to_lowercase();
+                            if let Some(coords) = meta
+                                .dimension_coordinates
+                                .get(&clean_name)
+                                .or_else(|| meta.dimension_coordinates.get(y_n))
                                 && let (Some(f), Some(l)) = (coords.first(), coords.last())
                                 && let (Ok(f_v), Ok(l_v)) = (f.parse::<f64>(), l.parse::<f64>())
                             {
-                                y_bounds = (f_v, l_v);
+                                y_bounds = (f_v.min(l_v), f_v.max(l_v));
                             }
                         }
                     }
