@@ -59,12 +59,10 @@ pub fn get_cached_coord_bounds_with_rank(
     if let Ok(cache) = cache_lock.read()
         && let Some(bounds) = cache.get(&key)
     {
-        println!("🌐 [coord_cache HIT] key='{}' -> bounds={:?}", key, bounds);
         return *bounds;
     }
 
     let bounds = read_coord_bounds_with_rank(store, dim_name, dim_idx, total_dims);
-    println!("🌐 [coord_cache MISS] key='{}' -> read bounds={:?}", key, bounds);
     if let Ok(mut cache) = cache_lock.write() {
         cache.insert(key, bounds);
     }

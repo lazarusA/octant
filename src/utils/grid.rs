@@ -123,11 +123,6 @@ pub fn check_and_orient_axes_with_coords(
         }
     }
 
-    println!(
-        "   [check_and_orient_axes_with_coords] dim_names={:?}, needs_transpose={}, flip_y={}, flip_x={} -> result_w={}, result_h={}",
-        dim_names, needs_transpose, flip_y, flip_x, width, height
-    );
-
     (current_values, width, height)
 }
 
@@ -178,11 +173,6 @@ pub fn check_and_orient_block_grid(
         })
         .map(|v| v.as_slice());
 
-    println!(
-        "🗺️ [check_and_orient_block_grid] START: shape={:?}, dim_names={:?}, lat_coords={:?}, lon_coords={:?}",
-        block_shape, dimension_names, lat_coords, lon_coords
-    );
-
     let in_height = block_shape[rank - 2];
     let in_width = block_shape[rank - 1];
     let slice_size = in_width * in_height;
@@ -214,7 +204,6 @@ pub fn check_and_orient_block_grid(
             block_shape[rank - 1] = final_width;
             origin.swap(rank - 2, rank - 1);
             dimension_names.swap(rank - 2, rank - 1);
-            println!("   [check_and_orient_block_grid] SWAPPED rank-2 and rank-1! new shape={:?}, new dim_names={:?}", block_shape, dimension_names);
         }
 
         values = final_values;
