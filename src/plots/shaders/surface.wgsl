@@ -220,9 +220,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    // 3D Directional Lighting for surface terrain & block faces
+    // 3D Directional Lighting for surface terrain & block faces (two-sided)
     let light_dir = normalize(vec3<f32>(0.4, 0.8, 0.6));
-    let diffuse = max(dot(in.normal, light_dir), 0.25);
+    let diffuse = max(abs(dot(in.normal, light_dir)), 0.25);
     let ambient = 0.35;
     let lighting = clamp(ambient + diffuse * 0.65, 0.3, 1.0);
 
