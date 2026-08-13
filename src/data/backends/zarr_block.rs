@@ -105,9 +105,13 @@ pub fn fetch_block(
     // Fallback: If dim_names contain generic "dim_i" names, query spatial coordinate bounds for lat and lon
     if coordinates.is_empty() || dim_names.iter().any(|d| d.starts_with("dim_")) {
         for candidate in &["lat", "latitude", "y", "lon", "longitude", "x"] {
-            if let Some((first, last)) =
-                get_cached_coord_bounds_with_rank(store.clone(), store_url, candidate, usize::MAX, total_dims)
-            {
+            if let Some((first, last)) = get_cached_coord_bounds_with_rank(
+                store.clone(),
+                store_url,
+                candidate,
+                usize::MAX,
+                total_dims,
+            ) {
                 coordinates.insert((*candidate).to_string(), vec![first, last]);
             }
         }

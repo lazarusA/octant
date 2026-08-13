@@ -454,7 +454,7 @@ impl eframe::App for OctantApp {
                     if let Some(meta) = &self.plotted_dataset_metadata
                         && let Some(var) = meta.variables.get(self.plotted_variable_idx)
                     {
-                        let (explicit_x, explicit_y) =
+                        let (explicit_x, explicit_y, _) =
                             var.resolve_spatial_dim_indices(&self.plotted_dim_config);
 
                         if let Some(x_idx) = explicit_x

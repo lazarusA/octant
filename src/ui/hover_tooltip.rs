@@ -132,8 +132,7 @@ pub fn show_hover_tooltip(
             units_str = format!(" [{}]", unit);
         }
 
-        let (explicit_x, explicit_y) =
-            var.resolve_spatial_dim_indices(&app.plotted_dim_config);
+        let (explicit_x, explicit_y, _) = var.resolve_spatial_dim_indices(&app.plotted_dim_config);
 
         let dim_y_name = explicit_y
             .and_then(|idx| var.dimension_names.get(idx))

@@ -42,34 +42,57 @@ pub struct VariableInfo {
 }
 
 impl VariableInfo {
-    /// Resolves spatial X and Y dimension indices for this variable using explicit spatial role configs
+    /// Resolves spatial X, Y, and Z dimension indices for this variable using explicit spatial role configs
     /// or fallback dimension name heuristics.
     pub fn resolve_spatial_dim_indices(
         &self,
-        dim_configs: &[crate::app::DimensionConfig],
-    ) -> (Option<usize>, Option<usize>) {
-        let explicit_x = (0..self.dimension_names.len()).find(|&d| {
-            dim_configs
-                .get(d)
-                .is_some_and(|c| c.spatial == crate::app::SpatialRole::X)
-        }).or_else(|| {
-            self.dimension_names.iter().rposition(|d| {
-                let clean = d.to_lowercase();
-                clean.contains("lon") || clean == "x" || clean.contains("col")
+        dim_configs: &[crate::app::DimConfig],
+    ) -> (Option<usize>, Option<usize>, Option<usize>) {
+        let explicit_x = (0..self.dimension_names.len())
+            .find(|&d| {
+                dim_configs
+                    .get(d)
+                    .is_some_and(|c| c.spatial == crate::app::SpatialRole::X)
             })
-        });
+            .or_else(|| {
+                self.dimension_names.iter().rposition(|d| {
+                    let clean = d.to_lowercase();
+                    clean.contains("lon") || clean == "x" || clean.contains("col")
+                })
+            });
 
-        let explicit_y = (0..self.dimension_names.len()).find(|&d| {
-            dim_configs
-                .get(d)
-                .is_some_and(|c| c.spatial == crate::app::SpatialRole::Y)
-        }).or_else(|| {
-            self.dimension_names.iter().rposition(|d| {
-                let clean = d.to_lowercase();
-                clean.contains("lat") || clean == "y" || clean.contains("row")
+        let explicit_y = (0..self.dimension_names.len())
+            .find(|&d| {
+                dim_configs
+                    .get(d)
+                    .is_some_and(|c| c.spatial == crate::app::SpatialRole::Y)
             })
-        });
+            .or_else(|| {
+                self.dimension_names.iter().rposition(|d| {
+                    let clean = d.to_lowercase();
+                    clean.contains("lat") || clean == "y" || clean.contains("row")
+                })
+            });
 
-        (explicit_x, explicit_y)
+        let explicit_z = (0..self.dimension_names.len())
+            .find(|&d| {
+                dim_configs
+                    .get(d)
+                    .is_some_and(|c| c.spatial == crate::app::SpatialRole::Z)
+            })
+            .or_else(|| {
+                self.dimension_names.iter().rposition(|d| {
+                    let clean = d.to_lowercase();
+                    clean.contains("depth")
+                        || clean.contains("lev")
+                        || clean.contains("alt")
+                        || clean.contains("height")
+                        || clean.contains("time")
+                        || clean == "z"
+                        || clean == "t"
+                })
+            });
+
+        (explicit_x, explicit_y, explicit_z)
     }
 }
