@@ -143,9 +143,10 @@ fn sample_volume_scalar(texCoord: vec3<f32>) -> f32 {
     let total_len = arrayLength(&data_buffer);
 
     let norm_y = 1.0 - texCoord.y;
+    let norm_z = 1.0 - texCoord.z;
     let base_x = u32(texCoord.x * f32(grid_w - 1u));
     let base_y = u32(norm_y * f32(grid_h - 1u));
-    let base_z = u32(texCoord.z * f32(grid_d - 1u));
+    let base_z = u32(norm_z * f32(grid_d - 1u));
 
     let gx = (base_x + uniforms.shift_x) % grid_w;
     let gy = (base_y + uniforms.shift_y) % grid_h;

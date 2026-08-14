@@ -72,13 +72,9 @@ impl OctantApp {
 
                 let user_range_len = user_end.saturating_sub(user_start) + 1;
                 if user_range_len < full_extent && user_range_len > 0 {
-                    // When animating with a shorter range / subset of slabs, slide the window with current_timestep
-                    let half = user_range_len / 2;
-                    let start = self
-                        .current_timestep
-                        .saturating_sub(half)
-                        .min(full_extent.saturating_sub(user_range_len));
-                    let end = (start + user_range_len).min(full_extent);
+                    let window = user_range_len.max(1);
+                    let start = (self.current_timestep / window) * window;
+                    let end = (start + window).min(full_extent);
                     selections[anim_dim] = DimensionSelection::Range { start, end };
                 } else {
                     let (start, end) = self.animated_window(full_extent, anim_chunk_size);
