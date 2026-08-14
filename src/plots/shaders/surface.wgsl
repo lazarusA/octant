@@ -65,6 +65,12 @@ fn vs_main(
         let data_idx = min(gy * uniforms.width + gx, max_data_idx);
         raw_val = data_buffer[data_idx];
 
+        let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
+        if (is_nan_val && uniforms.color.use_nan_color == 0u) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.8 * uniforms.displacement_strength;
         pos_3d = vec3<f32>(model.position.x, height, model.position.y);
@@ -72,7 +78,7 @@ fn vs_main(
         // Compute local gradient surface normal for 3D peak and in-ward valley lighting
         let val_left = data_buffer[gy * uniforms.width + max(gx, 1u) - 1u];
         let val_right = data_buffer[gy * uniforms.width + min(gx + 1u, uniforms.width - 1u)];
-        let val_up = data_buffer[max(gy, 1u) - 1u * uniforms.width + gx];
+        let val_up = data_buffer[(max(gy, 1u) - 1u) * uniforms.width + gx];
         let val_down = data_buffer[min(gy + 1u, max_data_idx / uniforms.width) * uniforms.width + gx];
 
         let dh_dx = (get_normalized_height(val_right) - get_normalized_height(val_left)) * 0.8 * uniforms.displacement_strength;
@@ -82,6 +88,23 @@ fn vs_main(
     } else if (uniforms.surface_mode == 1u) {
         // Mode 1: Flat Steps
         raw_val = data_buffer[model.cell_index];
+
+        let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
+        if (is_nan_val && uniforms.color.use_nan_color == 0u) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+        if (!is_nan_val) {
+            if (uniforms.color.use_lowclip == 0u && raw_val < uniforms.color.cmin) {
+                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                return out;
+            }
+            if (uniforms.color.use_highclip == 0u && raw_val > uniforms.color.cmax) {
+                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                return out;
+            }
+        }
+
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.6 * uniforms.displacement_strength;
         pos_3d = vec3<f32>(model.position.x, height, model.position.y);
@@ -95,6 +118,22 @@ fn vs_main(
         let max_idx = arrayLength(&data_buffer) - 1u;
         let safe_idx = min(instance_idx, max_idx);
         raw_val = data_buffer[safe_idx];
+
+        let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
+        if (is_nan_val && uniforms.color.use_nan_color == 0u) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+        if (!is_nan_val) {
+            if (uniforms.color.use_lowclip == 0u && raw_val < uniforms.color.cmin) {
+                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                return out;
+            }
+            if (uniforms.color.use_highclip == 0u && raw_val > uniforms.color.cmax) {
+                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+                return out;
+            }
+        }
 
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.8 * uniforms.displacement_strength;
@@ -181,9 +220,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    // 3D Directional Lighting for surface terrain & block faces
+    // 3D Directional Lighting for surface terrain & block faces (two-sided)
     let light_dir = normalize(vec3<f32>(0.4, 0.8, 0.6));
-    let diffuse = max(dot(in.normal, light_dir), 0.25);
+    let diffuse = max(abs(dot(in.normal, light_dir)), 0.25);
     let ambient = 0.35;
     let lighting = clamp(ambient + diffuse * 0.65, 0.3, 1.0);
 

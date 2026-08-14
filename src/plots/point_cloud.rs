@@ -35,7 +35,11 @@ pub struct PointCloudUniforms {
     pub height: u32,
     pub depth: u32,
     pub screen_aspect: f32,
+    pub shift_x: u32,
+    pub shift_y: u32,
+    pub shift_z: u32,
     pub _pad0: u32,
+    pub _pad1: u32,
     pub color: super::common::PlotColorParams,
 }
 
@@ -85,7 +89,11 @@ impl PointCloudRenderer {
             height: height.max(1),
             depth,
             screen_aspect: 1.0,
+            shift_x: 0,
+            shift_y: 0,
+            shift_z: 0,
             _pad0: 0,
+            _pad1: 0,
             color: super::common::PlotColorParams::default(),
         }; // Unit quad template for point billboard
         let vertices = [
@@ -217,6 +225,9 @@ impl PointCloudRenderer {
         width: u32,
         height: u32,
         screen_aspect: f32,
+        shift_x: u32,
+        shift_y: u32,
+        shift_z: u32,
     ) {
         let instance_cnt = self.instance_count.load(Ordering::Relaxed);
         let depth = super::common::calculate_3d_depth(instance_cnt as usize, width, height);
@@ -232,7 +243,11 @@ impl PointCloudRenderer {
             height: height.max(1),
             depth,
             screen_aspect,
+            shift_x,
+            shift_y,
+            shift_z,
             _pad0: 0,
+            _pad1: 0,
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -257,6 +272,9 @@ pub struct PointCloudCallback {
     pub point_size: f32,
     pub width: u32,
     pub height: u32,
+    pub shift_x: u32,
+    pub shift_y: u32,
+    pub shift_z: u32,
     pub rect: egui::Rect,
 }
 
@@ -283,6 +301,9 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
             self.width,
             self.height,
             screen_aspect,
+            self.shift_x,
+            self.shift_y,
+            self.shift_z,
         );
         Vec::new()
     }

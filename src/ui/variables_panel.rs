@@ -196,6 +196,7 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
     let mut z_assigned = false;
     let mut anim_assigned = false;
 
+    // 1. First pass: Match explicit named coordinate patterns
     for i in 0..rank {
         let dim_name = var_info
             .dimension_names
@@ -210,19 +211,21 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
         } else if !y_assigned && crate::utils::coordinates::is_spatial_y_name(&dim_name) {
             app.dim_config[i].spatial = SpatialRole::Y;
             y_assigned = true;
-        } else if !anim_assigned
+        } else if !z_assigned && crate::utils::coordinates::is_spatial_z_name(&dim_name) {
+            app.dim_config[i].spatial = SpatialRole::Z;
+            z_assigned = true;
+        }
+
+        if !anim_assigned
             && (dim_name.contains("time") || dim_name == "t" || dim_name.contains("step"))
         {
             app.dim_config[i].animation = AnimationRole::Animated;
             app.animated_dim = Some(i);
             anim_assigned = true;
-        } else if !z_assigned && crate::utils::coordinates::is_spatial_z_name(&dim_name) {
-            app.dim_config[i].spatial = SpatialRole::Z;
-            z_assigned = true;
         }
     }
 
-    // Fallback: assign remaining unassigned dimensions for 2D/3D visualization if needed
+    // 2. Second pass: Fallback spatial assignment for unassigned dimensions
     for i in 0..rank {
         if app.dim_config[i].spatial == SpatialRole::None
             && app.dim_config[i].animation == AnimationRole::None
@@ -233,11 +236,30 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
             } else if !x_assigned {
                 app.dim_config[i].spatial = SpatialRole::X;
                 x_assigned = true;
-            } else if !z_assigned {
+            } else if !z_assigned && rank >= 3 {
                 app.dim_config[i].spatial = SpatialRole::Z;
                 z_assigned = true;
             }
         }
+    }
+
+    // 3. Third pass: For 3D datasets, if Z is still unassigned (e.g. dim 0 was marked Animated), assign Z
+    if rank >= 3 && !z_assigned {
+        for i in 0..rank {
+            if app.dim_config[i].spatial == SpatialRole::None {
+                app.dim_config[i].spatial = SpatialRole::Z;
+                break;
+            }
+        }
+    }
+
+    // 4. Fourth pass: If no animation dimension is assigned yet, default to Z (or dim 0)
+    if !anim_assigned && rank > 0 {
+        let default_anim = (0..rank)
+            .find(|&i| app.dim_config[i].spatial == SpatialRole::Z)
+            .unwrap_or(0);
+        app.dim_config[default_anim].animation = AnimationRole::Animated;
+        app.animated_dim = Some(default_anim);
     }
 
     // Synchronize active flags and spatial_dims list

@@ -76,12 +76,6 @@ impl eframe::App for OctantApp {
         // 1. Drain completed block-cache prefetch results.
         self.poll_block_prefetch_results();
 
-        let is_3d_plot = self.active_plot_type == crate::plots::PlotType::Volume
-            || self.active_plot_type == crate::plots::PlotType::PointCloud;
-        if is_3d_plot {
-            self.is_playing = false;
-        }
-
         // 2. Playback Animation Timer Loop
         if self.is_playing {
             let now = std::time::Instant::now();
@@ -174,25 +168,6 @@ impl eframe::App for OctantApp {
                 || self.active_plot_type == PlotType::Volume
                 || self.active_plot_type == PlotType::PointCloud;
 
-            let base_plot_rect = if is_3d_canvas_plot || !self.enforce_data_aspect_ratio {
-                canvas_rect
-            } else if let Some(matrix) = &self.matrix_data {
-                let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.01);
-                let avail_w = canvas_rect.width();
-                let avail_h = canvas_rect.height();
-                let avail_aspect = avail_w / avail_h.max(1.0);
-
-                let (plot_w, plot_h) = if avail_aspect > data_aspect {
-                    (avail_h * data_aspect, avail_h)
-                } else {
-                    (avail_w, avail_w / data_aspect)
-                };
-
-                egui::Rect::from_center_size(canvas_rect.center(), egui::vec2(plot_w, plot_h))
-            } else {
-                canvas_rect
-            };
-
             // Handle Zoom & Pan Interactions
             if is_3d_canvas_plot {
                 if response.dragged() {
@@ -235,7 +210,7 @@ impl eframe::App for OctantApp {
                     if scroll != 0.0 {
                         let zoom_factor = (1.0 + scroll * 0.002).clamp(0.8, 1.25);
                         let mouse_pos = response.hover_pos().unwrap_or(canvas_rect.center());
-                        let center = base_plot_rect.center();
+                        let center = canvas_rect.center();
 
                         match self.active_plot_type {
                             PlotType::Heatmap => {
@@ -267,22 +242,48 @@ impl eframe::App for OctantApp {
             }
 
             // Compute screen-space transformed plot rect and GPU pan/zoom uniforms
-            let (transformed_plot_rect, gpu_pan, gpu_zoom) = if is_3d_canvas_plot {
-                (base_plot_rect, [0.0, 0.0], 1.0)
+            let (transformed_plot_rect, gpu_pan, gpu_zoom, gpu_aspect_scale) = if is_3d_canvas_plot
+            {
+                (canvas_rect, [0.0, 0.0], 1.0, [1.0, 1.0])
+            } else if self.active_plot_type == PlotType::Line {
+                let zoom = self.line_zoom;
+                let pan = self.line_pan;
+                let scaled_size = canvas_rect.size() * zoom;
+                let scaled_center = canvas_rect.center() + pan;
+                let rect = egui::Rect::from_center_size(scaled_center, scaled_size);
+                let gpu_pan_x = pan.x / (0.5 * canvas_rect.width().max(1.0));
+                let gpu_pan_y = -pan.y / (0.5 * canvas_rect.height().max(1.0));
+                (rect, [gpu_pan_x, gpu_pan_y], zoom, [1.0, 1.0])
             } else {
-                let (zoom, pan) = match self.active_plot_type {
-                    PlotType::Heatmap => (self.heatmap_zoom, self.heatmap_pan),
-                    PlotType::Line => (self.line_zoom, self.line_pan),
-                    _ => (1.0, egui::Vec2::ZERO),
+                let (aspect_scale_x, aspect_scale_y) = if self.enforce_data_aspect_ratio
+                    && let Some(matrix) = &self.matrix_data
+                {
+                    let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.001);
+                    let canvas_aspect = canvas_rect.width() / canvas_rect.height().max(1.0);
+                    if canvas_aspect > data_aspect {
+                        (data_aspect / canvas_aspect, 1.0)
+                    } else {
+                        (1.0, canvas_aspect / data_aspect)
+                    }
+                } else {
+                    (1.0, 1.0)
                 };
 
-                let scaled_size = base_plot_rect.size() * zoom;
-                let scaled_center = base_plot_rect.center() + pan;
-                let rect = egui::Rect::from_center_size(scaled_center, scaled_size);
+                let zoom = self.heatmap_zoom;
+                let pan = self.heatmap_pan;
+                let plot_w = canvas_rect.width() * aspect_scale_x * zoom;
+                let plot_h = canvas_rect.height() * aspect_scale_y * zoom;
+                let scaled_center = canvas_rect.center() + pan;
+                let rect = egui::Rect::from_center_size(scaled_center, egui::vec2(plot_w, plot_h));
 
-                let gpu_pan_x = pan.x / (0.5 * base_plot_rect.width().max(1.0));
-                let gpu_pan_y = -pan.y / (0.5 * base_plot_rect.height().max(1.0));
-                (rect, [gpu_pan_x, gpu_pan_y], zoom)
+                let gpu_pan_x = pan.x / (0.5 * canvas_rect.width().max(1.0));
+                let gpu_pan_y = -pan.y / (0.5 * canvas_rect.height().max(1.0));
+                (
+                    rect,
+                    [gpu_pan_x, gpu_pan_y],
+                    zoom,
+                    [aspect_scale_x, aspect_scale_y],
+                )
             };
 
             let plot_rect = transformed_plot_rect;
@@ -294,11 +295,11 @@ impl eframe::App for OctantApp {
                         let (profile_values, profile_length, line_count) =
                             self.get_line_profile_payload();
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            base_plot_rect,
+                            canvas_rect,
                             LineCallback {
                                 renderer: line_renderer.clone(),
                                 color_params,
-                                rect: base_plot_rect,
+                                rect: canvas_rect,
                                 profile_values,
                                 profile_length,
                                 line_count,
@@ -358,6 +359,7 @@ impl eframe::App for OctantApp {
                                     .map_or((64, 64), |m| (m.width as u32, m.height as u32))
                             });
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+                        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
 
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
                             plot_rect,
@@ -377,6 +379,9 @@ impl eframe::App for OctantApp {
                                 algorithm: self.volume_algorithm,
                                 isovalue: self.volume_isovalue,
                                 isorange: self.volume_isorange,
+                                shift_x,
+                                shift_y,
+                                shift_z,
                                 rect: plot_rect,
                             },
                         );
@@ -395,6 +400,7 @@ impl eframe::App for OctantApp {
                                     .map_or((64, 64), |m| (m.width as u32, m.height as u32))
                             });
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+                        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
 
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
                             plot_rect,
@@ -410,6 +416,9 @@ impl eframe::App for OctantApp {
                                 point_size: self.point_cloud_size,
                                 width,
                                 height,
+                                shift_x,
+                                shift_y,
+                                shift_z,
                                 rect: plot_rect,
                             },
                         );
@@ -419,13 +428,14 @@ impl eframe::App for OctantApp {
                 _ => {
                     if let Some(renderer) = &self.renderer {
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            base_plot_rect,
+                            canvas_rect,
                             MatrixCallback {
                                 renderer: renderer.clone(),
                                 color_params: self.get_color_params(),
-                                rect: base_plot_rect,
+                                rect: canvas_rect,
                                 pan: gpu_pan,
                                 zoom: gpu_zoom,
+                                aspect_scale: gpu_aspect_scale,
                             },
                         );
                         ui.painter().add(callback);
@@ -438,13 +448,53 @@ impl eframe::App for OctantApp {
                 let (x_dom, y_dom, x_label, y_label) = if self.active_plot_type == PlotType::Line {
                     let y_min = self.color_range_min as f64;
                     let y_max = self.color_range_max as f64;
-                    let profile_len = matrix.width.max(1) as f64;
-                    (
-                        (0.0, profile_len - 1.0),
-                        (y_min, y_max),
-                        "Sample Index".to_string(),
-                        "Data Value".to_string(),
-                    )
+                    let profile_len = match self.line_profile_dim_idx {
+                        2 => self.volume_data.as_ref().map_or(matrix.width, |v| v.depth) as f64,
+                        1 => matrix.height as f64,
+                        _ => matrix.width as f64,
+                    };
+
+                    let mut x_bounds = (0.0, (profile_len - 1.0).max(1.0));
+                    let mut x_name = match self.line_profile_dim_idx {
+                        2 => "z".to_string(),
+                        1 => "y".to_string(),
+                        _ => "x".to_string(),
+                    };
+                    let mut y_name = "Data Value".to_string();
+
+                    if let Some(meta) = &self.plotted_dataset_metadata
+                        && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                    {
+                        if let Some(u) = &var.units {
+                            y_name = format!("{} [{u}]", var.name);
+                        } else if let Some(u) = var.attributes.get("units") {
+                            y_name = format!("{} [{u}]", var.name);
+                        } else {
+                            y_name = var.name.clone();
+                        }
+
+                        let (explicit_x, explicit_y, explicit_z) =
+                            var.resolve_spatial_dim_indices(&self.plotted_dim_config);
+
+                        let target_dim_idx = match self.line_profile_dim_idx {
+                            2 => explicit_z,
+                            1 => explicit_y,
+                            _ => explicit_x,
+                        };
+
+                        if let Some(dim_idx) = target_dim_idx
+                            && let Some(name) = var.dimension_names.get(dim_idx)
+                        {
+                            x_name = name.clone();
+                            if let Some(bounds) = meta.get_coord_bounds(name) {
+                                x_bounds = bounds;
+                            }
+                        }
+                    }
+
+                    let x_title = crate::utils::coordinates::format_dimension_axis_title(&x_name);
+
+                    (x_bounds, (y_min, y_max), x_title, y_name)
                 } else {
                     let mut x_name = "X".to_string();
                     let mut y_name = "Y".to_string();
@@ -476,7 +526,10 @@ impl eframe::App for OctantApp {
                         }
                     }
 
-                    (x_bounds, y_bounds, x_name, y_name)
+                    let x_title = crate::utils::coordinates::format_dimension_axis_title(&x_name);
+                    let y_title = crate::utils::coordinates::format_dimension_axis_title(&y_name);
+
+                    (x_bounds, y_bounds, x_title, y_title)
                 };
 
                 let options = crate::ui::axes::PlotAxisOptions {
@@ -490,7 +543,7 @@ impl eframe::App for OctantApp {
             }
 
             // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle
-            crate::ui::hover_tooltip::show_hover_tooltip(self, &ctx, ui, &response, plot_rect);
+            crate::ui::hover_tooltip::show_hover_tooltip(self, &ctx, ui, &response, canvas_rect);
         }
     }
 }

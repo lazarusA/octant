@@ -1,6 +1,443 @@
 use crate::app::OctantApp;
+use crate::data::MatrixData;
 use crate::plots::PlotType;
-use egui::{Color32, Pos2, Rect, Stroke};
+use egui::{Pos2, Rect, Stroke};
+use std::collections::HashSet;
+
+/// A 3D ray with origin and normalized direction
+#[derive(Clone, Copy, Debug)]
+pub struct Ray3D {
+    pub origin: [f32; 3],
+    pub dir: [f32; 3],
+}
+
+/// Perspective 3D Camera encapsulating view parameters, ray casting, and forward projection
+#[derive(Clone, Copy, Debug)]
+pub struct Camera3D {
+    pub rect: Rect,
+    pub screen_aspect: f32,
+    pub cam_dist: f32,
+    pub fov_scale: f32,
+    pub cx: f32,
+    pub sx: f32,
+    pub cy: f32,
+    pub sy: f32,
+}
+
+impl Camera3D {
+    pub fn from_app(app: &OctantApp, rect: Rect) -> Self {
+        let screen_aspect = (rect.width() / rect.height().max(1.0)).max(0.01);
+        let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
+        let fov_scale = 1.6_f32;
+        let cx = app.sphere_rotation_x.cos();
+        let sx = app.sphere_rotation_x.sin();
+        let cy = app.sphere_rotation_y.cos();
+        let sy = app.sphere_rotation_y.sin();
+
+        Self {
+            rect,
+            screen_aspect,
+            cam_dist,
+            fov_scale,
+            cx,
+            sx,
+            cy,
+            sy,
+        }
+    }
+
+    /// Casts a ray from screen coordinates returning `(view_space_ray, world_space_ray)`
+    pub fn cast_ray(&self, screen_pos: Pos2) -> (Ray3D, Ray3D) {
+        let clip_x = (screen_pos.x - self.rect.center().x) / (0.5 * self.rect.width().max(1.0));
+        let clip_y = -(screen_pos.y - self.rect.center().y) / (0.5 * self.rect.height().max(1.0));
+
+        let dir_x = clip_x * self.screen_aspect / self.fov_scale;
+        let dir_y = clip_y / self.fov_scale;
+        let dir_z = -1.0_f32;
+
+        let inv_len = 1.0 / (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
+        let dx = dir_x * inv_len;
+        let dy = dir_y * inv_len;
+        let dz = dir_z * inv_len;
+
+        let view_ray = Ray3D {
+            origin: [0.0, 0.0, self.cam_dist],
+            dir: [dx, dy, dz],
+        };
+
+        // Transform ray into Model World Space
+        let o1_y = self.sx * self.cam_dist;
+        let o1_z = self.cx * self.cam_dist;
+
+        let d1_x = dx;
+        let d1_y = self.cx * dy + self.sx * dz;
+        let d1_z = -self.sx * dy + self.cx * dz;
+
+        let o_world_x = -self.sy * o1_z;
+        let o_world_y = o1_y;
+        let o_world_z = self.cy * o1_z;
+
+        let d_world_x = self.cy * d1_x - self.sy * d1_z;
+        let d_world_y = d1_y;
+        let d_world_z = self.sy * d1_x + self.cy * d1_z;
+
+        let world_ray = Ray3D {
+            origin: [o_world_x, o_world_y, o_world_z],
+            dir: [d_world_x, d_world_y, d_world_z],
+        };
+
+        (view_ray, world_ray)
+    }
+
+    /// Forward projects a 3D model point to screen coordinates
+    pub fn project_point(&self, pt: [f32; 3]) -> Option<Pos2> {
+        // Rotate around Y
+        let p_y_rot_x = self.cy * pt[0] + self.sy * pt[2];
+        let p_y_rot_y = pt[1];
+        let p_y_rot_z = -self.sy * pt[0] + self.cy * pt[2];
+
+        // Rotate around X
+        let p_rot_x = p_y_rot_x;
+        let p_rot_y = self.cx * p_y_rot_y - self.sx * p_y_rot_z;
+        let p_rot_z = self.sx * p_y_rot_y + self.cx * p_y_rot_z;
+
+        let dist_c = self.cam_dist - p_rot_z;
+        if dist_c > 0.1 && p_rot_z < self.cam_dist {
+            let pr_x = (p_rot_x * self.fov_scale) / (self.screen_aspect * dist_c);
+            let pr_y = (p_rot_y * self.fov_scale) / dist_c;
+            let target_x = self.rect.center().x + pr_x * (0.5 * self.rect.width());
+            let target_y = self.rect.center().y - pr_y * (0.5 * self.rect.height());
+            Some(Pos2::new(target_x, target_y))
+        } else {
+            None
+        }
+    }
+}
+
+/// Standard AABB Ray-Box intersection using the slab method
+pub fn intersect_aabb(ray: &Ray3D, min_b: [f32; 3], max_b: [f32; 3]) -> Option<(f32, f32)> {
+    let inv_dx = if ray.dir[0].abs() > 1e-6 {
+        1.0 / ray.dir[0]
+    } else {
+        1e6
+    };
+    let inv_dy = if ray.dir[1].abs() > 1e-6 {
+        1.0 / ray.dir[1]
+    } else {
+        1e6
+    };
+    let inv_dz = if ray.dir[2].abs() > 1e-6 {
+        1.0 / ray.dir[2]
+    } else {
+        1e6
+    };
+
+    let t1_x = (min_b[0] - ray.origin[0]) * inv_dx;
+    let t2_x = (max_b[0] - ray.origin[0]) * inv_dx;
+    let t_min_x = t1_x.min(t2_x);
+    let t_max_x = t1_x.max(t2_x);
+
+    let t1_y = (min_b[1] - ray.origin[1]) * inv_dy;
+    let t2_y = (max_b[1] - ray.origin[1]) * inv_dy;
+    let t_min_y = t1_y.min(t2_y);
+    let t_max_y = t1_y.max(t2_y);
+
+    let t1_z = (min_b[2] - ray.origin[2]) * inv_dz;
+    let t2_z = (max_b[2] - ray.origin[2]) * inv_dz;
+    let t_min_z = t1_z.min(t2_z);
+    let t_max_z = t1_z.max(t2_z);
+
+    let t_enter = t_min_x.max(t_min_y).max(t_min_z);
+    let t_exit = t_max_x.min(t_max_y).min(t_max_z);
+
+    if t_enter > t_exit || t_exit <= 0.0 {
+        None
+    } else {
+        Some((t_enter, t_exit))
+    }
+}
+
+/// Helper for volumetric sampling, circular dataset shifts, and 3D ray marching with hole penetration
+pub struct VolumeSampler<'a> {
+    pub width: usize,
+    pub height: usize,
+    pub depth: usize,
+    pub values: &'a [f32],
+    pub shift_x: usize,
+    pub shift_y: usize,
+    pub shift_z: usize,
+}
+
+impl<'a> VolumeSampler<'a> {
+    pub fn from_app(app: &'a OctantApp, matrix: &'a MatrixData) -> Self {
+        let (shift_x, shift_y, shift_z) = app.get_volume_shifts();
+        if let Some(v) = &app.volume_data {
+            Self {
+                width: v.width.max(1),
+                height: v.height.max(1),
+                depth: v.depth.max(1),
+                values: &v.values,
+                shift_x: shift_x as usize,
+                shift_y: shift_y as usize,
+                shift_z: shift_z as usize,
+            }
+        } else {
+            Self {
+                width: matrix.width.max(1),
+                height: matrix.height.max(1),
+                depth: 1,
+                values: &matrix.values,
+                shift_x: shift_x as usize,
+                shift_y: shift_y as usize,
+                shift_z: shift_z as usize,
+            }
+        }
+    }
+
+    pub fn sample_cell(&self, cx: usize, cy: usize, cz: usize) -> f32 {
+        let shifted_x = (cx + self.shift_x) % self.width;
+        let shifted_y = (cy + self.shift_y) % self.height;
+        let shifted_z = (cz + self.shift_z) % self.depth;
+        let idx = shifted_z * (self.width * self.height) + shifted_y * self.width + shifted_x;
+        self.values.get(idx).copied().unwrap_or(f32::NAN)
+    }
+
+    pub fn is_visible(&self, app: &OctantApp, val: f32) -> bool {
+        let is_nan = val.is_nan() || val.abs() > 1e30;
+        if is_nan {
+            app.use_nan_color
+        } else {
+            let in_low = app.use_lowclip || val >= app.color_range_min;
+            let in_high = app.use_highclip || val <= app.color_range_max;
+            in_low && in_high
+        }
+    }
+
+    /// Marches a ray through the 3D dataset.
+    /// `is_half_scale` is true for Volume bounds $[-0.5\times aspect, +0.5\times aspect]$
+    /// and false for PointCloud bounds $[-aspect, +aspect]$.
+    pub fn march_ray(
+        &self,
+        app: &OctantApp,
+        ray: &Ray3D,
+        aspects: (f32, f32, f32),
+        is_half_scale: bool,
+    ) -> Option<(usize, usize, usize, f32)> {
+        let (aspect_x, aspect_y, aspect_z) = aspects;
+        let scale = if is_half_scale { 0.5 } else { 1.0 };
+        let min_b = [-scale * aspect_x, -scale * aspect_y, -scale * aspect_z];
+        let max_b = [scale * aspect_x, scale * aspect_y, scale * aspect_z];
+
+        let (t_enter, t_exit) = intersect_aabb(ray, min_b, max_b)?;
+        let t_start = t_enter.max(0.0);
+        let t_end = t_exit;
+        let total_len = t_end - t_start;
+        if total_len <= 0.0 {
+            return None;
+        }
+
+        let max_dim = self.width.max(self.height).max(self.depth);
+        let num_steps = (max_dim * 3).clamp(64, 512);
+        let dt = total_len / num_steps as f32;
+
+        let mut hit_point = None;
+        let mut last_cell = None;
+        let mut max_intensity_hit = None;
+        let mut max_val = -1e30_f32;
+
+        for i in 0..num_steps {
+            let t = t_start + (i as f32 + 0.5) * dt;
+            let px_world = ray.origin[0] + t * ray.dir[0];
+            let py_world = ray.origin[1] + t * ray.dir[1];
+            let pz_world = ray.origin[2] + t * ray.dir[2];
+
+            let (u, v, w) = if is_half_scale {
+                let u = ((px_world / aspect_x.max(1e-4)) + 0.5).clamp(0.0, 1.0);
+                let v = ((py_world / aspect_y.max(1e-4)) + 0.5).clamp(0.0, 1.0);
+                let w = ((pz_world / aspect_z.max(1e-4)) + 0.5).clamp(0.0, 1.0);
+                (u, 1.0 - v, 1.0 - w)
+            } else {
+                let u = ((px_world / aspect_x.max(1e-4)) + 1.0) * 0.5;
+                let v = (1.0 - (py_world / aspect_y.max(1e-4))) * 0.5;
+                let w = (1.0 - (pz_world / aspect_z.max(1e-4))) * 0.5;
+                (u, v, w)
+            };
+
+            if (0.0..1.0).contains(&u) && (0.0..1.0).contains(&v) && (0.0..1.0).contains(&w) {
+                let cx = if is_half_scale {
+                    ((u * (self.width - 1) as f32).round() as usize).min(self.width - 1)
+                } else {
+                    ((u * self.width as f32).floor() as usize).min(self.width - 1)
+                };
+                let cy = if is_half_scale {
+                    ((v * (self.height - 1) as f32).round() as usize).min(self.height - 1)
+                } else {
+                    ((v * self.height as f32).floor() as usize).min(self.height - 1)
+                };
+                let cz = if is_half_scale {
+                    ((w * (self.depth - 1) as f32).round() as usize).min(self.depth - 1)
+                } else {
+                    ((w * self.depth as f32).floor() as usize).min(self.depth - 1)
+                };
+
+                if last_cell == Some((cx, cy, cz)) {
+                    continue;
+                }
+                last_cell = Some((cx, cy, cz));
+
+                let raw_val = self.sample_cell(cx, cy, cz);
+                let is_nan = raw_val.is_nan() || raw_val.abs() > 1e30;
+
+                if is_half_scale
+                    && app.active_plot_type == PlotType::Volume
+                    && app.volume_algorithm == 1
+                {
+                    // Isosurface mode
+                    if !is_nan && (raw_val - app.volume_isovalue).abs() <= app.volume_isorange {
+                        hit_point = Some((cx, cy, cz, raw_val));
+                        break;
+                    }
+                } else if is_half_scale
+                    && app.active_plot_type == PlotType::Volume
+                    && app.volume_algorithm == 2
+                {
+                    // MIP mode
+                    if !is_nan && raw_val > max_val {
+                        let is_visible = app.use_highclip || raw_val <= app.color_range_max;
+                        if is_visible {
+                            max_val = raw_val;
+                            max_intensity_hit = Some((cx, cy, cz, raw_val));
+                        }
+                    }
+                } else if self.is_visible(app, raw_val) {
+                    hit_point = Some((cx, cy, cz, raw_val));
+                    break;
+                }
+            }
+        }
+
+        if is_half_scale && app.active_plot_type == PlotType::Volume && app.volume_algorithm == 2 {
+            max_intensity_hit.or(hit_point)
+        } else {
+            hit_point
+        }
+    }
+}
+
+/// 2D Viewport Transformation Helper (Aspect-scaling, Zoom, Pan)
+#[derive(Clone, Copy, Debug)]
+pub struct Transform2D {
+    pub rect: Rect,
+    pub aspect_scale_x: f32,
+    pub aspect_scale_y: f32,
+    pub zoom: f32,
+    pub gpu_pan_x: f32,
+    pub gpu_pan_y: f32,
+}
+
+impl Transform2D {
+    pub fn from_app(app: &OctantApp, rect: Rect, matrix: &MatrixData) -> Self {
+        let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio {
+            let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.001);
+            let canvas_aspect = rect.width() / rect.height().max(1.0);
+            if canvas_aspect > data_aspect {
+                (data_aspect / canvas_aspect, 1.0)
+            } else {
+                (1.0, canvas_aspect / data_aspect)
+            }
+        } else {
+            (1.0, 1.0)
+        };
+
+        let zoom = app.heatmap_zoom;
+        let pan = app.heatmap_pan;
+        let gpu_pan_x = pan.x / (0.5 * rect.width().max(1.0));
+        let gpu_pan_y = -pan.y / (0.5 * rect.height().max(1.0));
+
+        Self {
+            rect,
+            aspect_scale_x,
+            aspect_scale_y,
+            zoom,
+            gpu_pan_x,
+            gpu_pan_y,
+        }
+    }
+
+    pub fn screen_to_norm(&self, screen_pos: Pos2) -> (f32, f32) {
+        let ndc_x = ((screen_pos.x - self.rect.min.x) / self.rect.width().max(1.0)) * 2.0 - 1.0;
+        let unpanned_x = (ndc_x - self.gpu_pan_x) / self.zoom.max(0.01);
+        let unscaled_x = unpanned_x / self.aspect_scale_x.max(0.001);
+        let nx = ((unscaled_x + 1.0) / 2.0).clamp(0.0, 1.0);
+
+        let ndc_y = 1.0 - ((screen_pos.y - self.rect.min.y) / self.rect.height().max(1.0)) * 2.0;
+        let unpanned_y = (ndc_y - self.gpu_pan_y) / self.zoom.max(0.01);
+        let unscaled_y = unpanned_y / self.aspect_scale_y.max(0.001);
+        let ny = ((1.0 - unscaled_y) / 2.0).clamp(0.0, 1.0);
+
+        (nx, ny)
+    }
+
+    pub fn norm_to_screen(&self, u: f32, v: f32) -> Pos2 {
+        let unscaled_x = u * 2.0 - 1.0;
+        let unpanned_x = unscaled_x * self.aspect_scale_x.max(0.001);
+        let ndc_x = unpanned_x * self.zoom.max(0.01) + self.gpu_pan_x;
+        let target_x = self.rect.min.x + ((ndc_x + 1.0) * 0.5) * self.rect.width();
+
+        let unscaled_y = 1.0 - v * 2.0;
+        let unpanned_y = unscaled_y * self.aspect_scale_y.max(0.001);
+        let ndc_y = unpanned_y * self.zoom.max(0.01) + self.gpu_pan_y;
+        let target_y = self.rect.min.y + ((1.0 - ndc_y) * 0.5) * self.rect.height();
+
+        Pos2::new(target_x, target_y)
+    }
+}
+
+/// Renders the reticle marker dot, calculates tooltip anchor, and draws the leader elbow line
+pub fn draw_leader_callout(
+    painter: &egui::Painter,
+    ctx: &egui::Context,
+    target_pos: Pos2,
+    tooltip_rect: Rect,
+) {
+    let visuals = &ctx.style_of(ctx.theme()).visuals;
+    let strong_color = visuals.strong_text_color();
+    let text_color = visuals.text_color();
+    let line_color = visuals.widgets.noninteractive.fg_stroke.color;
+
+    // 1. Target reticle marker dot
+    painter.circle_filled(target_pos, 7.0, text_color.linear_multiply(0.12));
+    painter.circle_filled(target_pos, 4.5, text_color.linear_multiply(0.25));
+    painter.circle_stroke(target_pos, 3.5, Stroke::new(1.2, strong_color));
+    painter.circle_filled(target_pos, 1.8, strong_color);
+
+    // 2. Compute anchor on tooltip box
+    let box_anchor = if tooltip_rect.min.x >= target_pos.x {
+        Pos2::new(
+            tooltip_rect.min.x,
+            (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0),
+        )
+    } else if tooltip_rect.max.x <= target_pos.x {
+        Pos2::new(
+            tooltip_rect.max.x,
+            (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0),
+        )
+    } else if tooltip_rect.min.y >= target_pos.y {
+        Pos2::new(target_pos.x, tooltip_rect.min.y)
+    } else {
+        Pos2::new(target_pos.x, tooltip_rect.max.y)
+    };
+
+    // 3. Elbow connector line
+    let elbow = Pos2::new(target_pos.x, box_anchor.y);
+    let leader_stroke = Stroke::new(1.2, line_color.linear_multiply(0.85));
+
+    painter.line_segment([target_pos, elbow], leader_stroke);
+    painter.line_segment([elbow, box_anchor], leader_stroke);
+
+    // 4. Subtle junction dot at the elbow vertex
+    painter.circle_filled(elbow, 1.5, strong_color.linear_multiply(0.8));
+}
 
 pub fn show_hover_tooltip(
     app: &OctantApp,
@@ -19,87 +456,214 @@ pub fn show_hover_tooltip(
         _ => return,
     };
 
+    let camera = Camera3D::from_app(app, rect);
+    let sampler = VolumeSampler::from_app(app, matrix);
+    let transform_2d = Transform2D::from_app(app, rect, matrix);
+
     // 1. Calculate Normalized Coordinates (norm_x, norm_y) considering 2D vs 3D Plot Mode
-    let (norm_x, norm_y, is_valid_hit, geo_coords) = match app.active_plot_type {
+    let (norm_x, norm_y, is_valid_hit, geo_coords, point_3d_hit) = match app.active_plot_type {
         PlotType::Sphere => {
-            // 3D Globe Projection Inverse Raycast
-            let center = rect.center();
-            let half_size = (rect.height() / 2.0).max(1.0);
-            let zoom = app.sphere_zoom.max(0.1);
+            // 3D Globe Projection Perspective Raycast supporting all Sphere Modes (Smooth, Steps, Lego)
+            let (view_ray, _) = camera.cast_ray(hover_pos);
+            let dx = view_ray.dir[0];
+            let dy = view_ray.dir[1];
+            let dz = view_ray.dir[2];
 
-            let ndc_x = (hover_pos.x - center.x) / (half_size * 0.7 * zoom);
-            let ndc_y = (hover_pos.y - center.y) / (half_size * 0.7 * zoom);
+            let max_r = if app.sphere_mode > 0 {
+                1.0 + 0.4 * app.sphere_displacement_strength
+            } else {
+                1.0
+            };
 
-            let r_sq = ndc_x * ndc_x + ndc_y * ndc_y;
-            if r_sq > 1.0 {
-                // Hover position is outside the 3D sphere globe
+            let b = camera.cam_dist * dz;
+            let c_max = camera.cam_dist * camera.cam_dist - max_r * max_r;
+            let discr_max = b * b - c_max;
+
+            if discr_max < 0.0 {
                 return;
             }
 
-            let view_x = ndc_x;
-            let view_y = -ndc_y;
-            let view_z = (1.0 - r_sq).sqrt();
+            let mut r = 1.0_f32;
+            let c = camera.cam_dist * camera.cam_dist - r * r;
+            let discr = b * b - c;
+            let t = if discr >= 0.0 {
+                -b - discr.sqrt()
+            } else {
+                -b - discr_max.sqrt()
+            };
 
-            // Un-rotate around X (rot_x) and Y (rot_y)
-            let rx = app.sphere_rotation_x;
-            let ry = app.sphere_rotation_y;
+            let pos_rot_x = t * dx;
+            let pos_rot_y = t * dy;
+            let pos_rot_z = camera.cam_dist + t * dz;
 
-            let y1 = view_y * rx.cos() + view_z * rx.sin();
-            let z1 = -view_y * rx.sin() + view_z * rx.cos();
-            let x1 = view_x;
+            // Inverse rotate around X by -rx
+            let pos_y_rot_x = pos_rot_x;
+            let pos_y_rot_y = camera.cx * pos_rot_y + camera.sx * pos_rot_z;
+            let pos_y_rot_z = -camera.sx * pos_rot_y + camera.cx * pos_rot_z;
 
-            let x_model = x1 * ry.cos() - z1 * ry.sin();
-            let y_model = y1;
-            let z_model = x1 * ry.sin() + z1 * ry.cos();
+            // Inverse rotate around Y by -ry
+            let pos_3d_x = camera.cy * pos_y_rot_x - camera.sy * pos_y_rot_z;
+            let pos_3d_y = pos_y_rot_y;
+            let pos_3d_z = camera.sy * pos_y_rot_x + camera.cy * pos_y_rot_z;
 
-            let lat_rad = y_model.clamp(-1.0, 1.0).asin();
-            let lon_rad = x_model.atan2(z_model);
-
-            let lat_deg = lat_rad.to_degrees();
-            let lon_deg = lon_rad.to_degrees();
+            let lat_rad = (pos_3d_y / r).clamp(-1.0, 1.0).asin();
+            let lon_rad = pos_3d_x.atan2(pos_3d_z);
 
             let u = (lon_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
-            let v = (lat_rad + std::f32::consts::FRAC_PI_2) / std::f32::consts::PI;
+            let v = 0.5 - (lat_rad / std::f32::consts::PI);
+
+            let mut nx = u.clamp(0.0, 1.0);
+            let mut ny = v.clamp(0.0, 1.0);
+
+            if app.sphere_mode > 0 {
+                let px = ((nx * matrix.width as f32).floor() as usize)
+                    .min(matrix.width.saturating_sub(1));
+                let py = ((ny * matrix.height as f32).floor() as usize)
+                    .min(matrix.height.saturating_sub(1));
+                let cell_val = matrix
+                    .values
+                    .get(py * matrix.width + px)
+                    .copied()
+                    .unwrap_or(f32::NAN);
+                let dr = get_normalized_radial_dr(app, cell_val);
+                r = 1.0 + dr;
+
+                let c_ref = camera.cam_dist * camera.cam_dist - r * r;
+                let discr_ref = b * b - c_ref;
+                if discr_ref >= 0.0 {
+                    let t_ref = -b - discr_ref.sqrt();
+                    let pr_x = t_ref * dx;
+                    let pr_y = t_ref * dy;
+                    let pr_z = camera.cam_dist + t_ref * dz;
+
+                    let py_x = pr_x;
+                    let py_y = camera.cx * pr_y + camera.sx * pr_z;
+                    let py_z = -camera.sx * pr_y + camera.cx * pr_z;
+
+                    let p3_x = camera.cy * py_x - camera.sy * py_z;
+                    let p3_y = py_y;
+                    let p3_z = camera.sy * py_x + camera.cy * py_z;
+
+                    let l_rad = (p3_y / r).clamp(-1.0, 1.0).asin();
+                    let o_rad = p3_x.atan2(p3_z);
+                    nx = ((o_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI))
+                        .clamp(0.0, 1.0);
+                    ny = (0.5 - (l_rad / std::f32::consts::PI)).clamp(0.0, 1.0);
+                }
+            }
+
+            let lat_deg = (0.5 - ny) * 180.0;
+            let lon_deg = (nx - 0.5) * 360.0;
+
+            (nx, ny, true, Some((lat_deg, lon_deg)), None)
+        }
+        PlotType::Surface => {
+            // 3D Surface Projection Perspective Raycast supporting all Surface Modes (Terrain, Steps, Lego)
+            let (_, world_ray) = camera.cast_ray(hover_pos);
+            let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.1);
+
+            if world_ray.dir[1].abs() < 1e-5 {
+                return;
+            }
+
+            let t0 = -world_ray.origin[1] / world_ray.dir[1];
+            if t0 <= 0.0 {
+                return;
+            }
+
+            let hit_x = world_ray.origin[0] + t0 * world_ray.dir[0];
+            let hit_z = world_ray.origin[2] + t0 * world_ray.dir[2];
+
+            let mut u = ((hit_x / data_aspect) + 1.0) * 0.5;
+            let mut v = (hit_z + 1.0) * 0.5;
+
+            if !(-0.1..=1.1).contains(&u) || !(-0.1..=1.1).contains(&v) {
+                return;
+            }
+
+            let px = ((u.clamp(0.0, 1.0) * matrix.width as f32).floor() as usize)
+                .min(matrix.width.saturating_sub(1));
+            let py = ((v.clamp(0.0, 1.0) * matrix.height as f32).floor() as usize)
+                .min(matrix.height.saturating_sub(1));
+            let cell_val = matrix
+                .values
+                .get(py * matrix.width + px)
+                .copied()
+                .unwrap_or(f32::NAN);
+            let h = get_normalized_surface_height(app, cell_val);
+            let target_h = if app.surface_mode == 2 { h.max(0.0) } else { h };
+
+            let t_ref = (target_h - world_ray.origin[1]) / world_ray.dir[1];
+            if t_ref > 0.0 {
+                let ref_x = world_ray.origin[0] + t_ref * world_ray.dir[0];
+                let ref_z = world_ray.origin[2] + t_ref * world_ray.dir[2];
+                let u_ref = ((ref_x / data_aspect) + 1.0) * 0.5;
+                let v_ref = (ref_z + 1.0) * 0.5;
+                if (-0.05..=1.05).contains(&u_ref) && (-0.05..=1.05).contains(&v_ref) {
+                    u = u_ref;
+                    v = v_ref;
+                }
+            }
 
             let nx = u.clamp(0.0, 1.0);
-            let ny = (1.0 - v).clamp(0.0, 1.0);
+            let ny = v.clamp(0.0, 1.0);
 
-            (nx, ny, true, Some((lat_deg, lon_deg)))
+            (nx, ny, true, None, None)
         }
-        PlotType::Surface | PlotType::Volume | PlotType::PointCloud => {
-            // 3D Surface / Box Projection Inverse Raycast
-            let center = rect.center();
-            let half_size = (rect.height() / 2.0).max(1.0);
-            let zoom = app.sphere_zoom.max(0.1);
+        PlotType::PointCloud => {
+            // 3D Point Cloud Volumetric Ray Marching
+            let (_, world_ray) = camera.cast_ray(hover_pos);
+            let aspects = app.get_3d_aspect_ratio();
 
-            let ndc_x = (hover_pos.x - center.x) / (half_size * 0.8 * zoom);
-            let ndc_y = (hover_pos.y - center.y) / (half_size * 0.8 * zoom);
+            let (hit_x, hit_y, hit_z, hit_val) =
+                match sampler.march_ray(app, &world_ray, aspects, false) {
+                    Some(hit) => hit,
+                    None => return,
+                };
 
-            let rx = app.sphere_rotation_x;
-            let ry = app.sphere_rotation_y;
+            let nx = (hit_x as f32 + 0.5) / sampler.width as f32;
+            let ny = (hit_y as f32 + 0.5) / sampler.height as f32;
 
-            let view_x = ndc_x;
-            let view_y = -ndc_y;
-            let view_z = 0.0;
+            (nx, ny, true, None, Some((hit_x, hit_y, hit_z, hit_val)))
+        }
+        PlotType::Volume => {
+            // 3D Volume Volumetric Ray Marching
+            let (_, world_ray) = camera.cast_ray(hover_pos);
+            let aspects = app.get_3d_aspect_ratio();
 
-            let _y1 = view_y * rx.cos() + view_z * rx.sin();
-            let z1 = -view_y * rx.sin() + view_z * rx.cos();
-            let x1 = view_x;
+            let (hit_x, hit_y, hit_z, hit_val) =
+                match sampler.march_ray(app, &world_ray, aspects, true) {
+                    Some(hit) => hit,
+                    None => return,
+                };
 
-            let x_model = x1 * ry.cos() - z1 * ry.sin();
-            let z_model = x1 * ry.sin() + z1 * ry.cos();
+            let nx = (hit_x as f32 + 0.5) / sampler.width as f32;
+            let ny = (hit_y as f32 + 0.5) / sampler.height as f32;
 
-            let nx = (x_model + 0.5).clamp(0.0, 1.0);
-            let ny = (z_model + 0.5).clamp(0.0, 1.0);
+            (nx, ny, true, None, Some((hit_x, hit_y, hit_z, hit_val)))
+        }
+        PlotType::Line => {
+            // 1D Line Plot Direct Inverse Mapping matching shader vertex transformation (zero gap)
+            let is_inside = rect.contains(hover_pos);
+            let zoom = app.line_zoom;
+            let gpu_pan_x = app.line_pan.x / (0.5 * rect.width().max(1.0));
+            let gpu_pan_y = -app.line_pan.y / (0.5 * rect.height().max(1.0));
 
-            (nx, ny, true, None)
+            let ndc_x = ((hover_pos.x - rect.min.x) / rect.width().max(1.0)) * 2.0 - 1.0;
+            let unpanned_x = (ndc_x - gpu_pan_x) / zoom.max(0.01);
+            let nx = ((unpanned_x + 1.0) / 2.0).clamp(0.0, 1.0);
+
+            let ndc_y = 1.0 - ((hover_pos.y - rect.min.y) / rect.height().max(1.0)) * 2.0;
+            let unpanned_y = (ndc_y - gpu_pan_y) / zoom.max(0.01);
+            let ny = ((unpanned_y + 1.0) / 2.0).clamp(0.0, 1.0);
+
+            (nx, ny, is_inside, None, None)
         }
         _ => {
-            // 2D Heatmap & 2D Slice Direct Mapping
+            // 2D Heatmap Direct Mapping within canvas_rect
+            let (nx, ny) = transform_2d.screen_to_norm(hover_pos);
             let is_inside = rect.contains(hover_pos);
-            let nx = ((hover_pos.x - rect.min.x) / rect.width().max(1.0)).clamp(0.0, 1.0);
-            let ny = ((hover_pos.y - rect.min.y) / rect.height().max(1.0)).clamp(0.0, 1.0);
-            (nx, ny, is_inside, None)
+            (nx, ny, is_inside, None, None)
         }
     };
 
@@ -107,201 +671,589 @@ pub fn show_hover_tooltip(
         return;
     }
 
-    // 2. Map normalized position to integer matrix pixel coordinates
-    let px = ((norm_x * (matrix.width as f32 - 1.0)) + 0.5) as usize;
-    let py = ((norm_y * (matrix.height as f32 - 1.0)) + 0.5) as usize;
-    let px = px.min(matrix.width - 1);
-    let py = py.min(matrix.height - 1);
+    // 2. Metadata lookup (variable, units, dimension names)
+    let meta = app
+        .plotted_dataset_metadata
+        .as_ref()
+        .or(app.active_dataset_metadata.as_ref());
 
-    // 3. Fast O(1) data value lookup
-    let idx = py * matrix.width + px;
-    let raw_val = matrix.values.get(idx).copied().unwrap_or(f32::NAN);
+    let var = meta.and_then(|m| {
+        m.variables
+            .get(app.plotted_variable_idx)
+            .or_else(|| m.variables.get(app.selected_variable_idx))
+            .or_else(|| m.variables.first())
+    });
 
-    // 4. Extract units & real dimension metadata
-    let mut var_name = "Scalar Field".to_string();
-    let mut units_str = String::new();
-    let mut dim_info_str = String::new();
+    let var_name = var
+        .map(|v| v.name.clone())
+        .unwrap_or_else(|| "variable".to_string());
 
-    if let Some(meta) = &app.plotted_dataset_metadata
-        && let Some(var) = meta.variables.get(app.plotted_variable_idx)
-    {
-        var_name = var.name.clone();
-        if let Some(unit) = &var.units {
-            units_str = format!(" [{}]", unit);
-        } else if let Some(unit) = var.attributes.get("units") {
-            units_str = format!(" [{}]", unit);
+    let units_str = var
+        .and_then(|v| {
+            v.units
+                .as_deref()
+                .or(v.attributes.get("units").map(|s| s.as_str()))
+        })
+        .map(|u| {
+            let clean = u.trim();
+            if clean.is_empty() || clean == "1" || clean == "none" || clean == "dimensionless" {
+                String::new()
+            } else {
+                format!("\u{00A0}{}", clean)
+            }
+        })
+        .unwrap_or_default();
+
+    // 3. Coordinate String Formatting & Series Detection
+    let (raw_val, dim_entries, px, py) = if app.active_plot_type == PlotType::Line {
+        let (profile_values, profile_length, line_count) = app.get_line_profile_payload();
+        let prof_len = profile_length as usize;
+        let l_count = line_count as usize;
+
+        let sample_idx = if prof_len > 1 {
+            ((norm_x * (prof_len - 1) as f32) + 0.5) as usize
+        } else {
+            0
+        }
+        .min(prof_len.saturating_sub(1));
+
+        let cmin = app.color_range_min;
+        let cmax = app.color_range_max;
+        let range = (cmax - cmin).max(1e-6);
+
+        // Find the closest line series to the cursor's Y position
+        let mut best_line_idx = 0usize;
+        let mut best_dist = f32::INFINITY;
+        let mut best_val = f32::NAN;
+
+        if l_count > 0 {
+            for line_idx in 0..l_count {
+                let idx = line_idx * prof_len + sample_idx;
+                if let Some(&v) = profile_values.get(idx)
+                    && !v.is_nan()
+                    && v.is_finite()
+                {
+                    let norm_y_val = (((v - cmin) / range) * 2.0 - 1.0).clamp(-1.0, 1.0);
+                    let dist = (norm_y_val - (norm_y * 2.0 - 1.0)).abs();
+                    if dist < best_dist {
+                        best_dist = dist;
+                        best_line_idx = line_idx;
+                        best_val = v;
+                    }
+                }
+            }
         }
 
-        let (explicit_x, explicit_y, _) = var.resolve_spatial_dim_indices(&app.plotted_dim_config);
-
-        let dim_y_name = explicit_y
-            .and_then(|idx| var.dimension_names.get(idx))
-            .cloned()
-            .unwrap_or_else(|| "y".to_string());
-
-        let dim_x_name = explicit_x
-            .and_then(|idx| var.dimension_names.get(idx))
-            .cloned()
-            .unwrap_or_else(|| "x".to_string());
-
-        // Check if actual coordinate vectors exist in metadata
-        let lat_coord_str = meta
-            .dimension_coordinates
-            .get(&dim_y_name)
-            .and_then(|coords| coords.get(py))
-            .cloned();
-
-        let lon_coord_str = meta
-            .dimension_coordinates
-            .get(&dim_x_name)
-            .and_then(|coords| coords.get(px))
-            .cloned();
-
-        let loc_y = if let Some(c) = lat_coord_str {
-            format!("{}: {}", dim_y_name, c)
-        } else if let Some((lat_deg, _)) = geo_coords {
-            format!("{}: {:.2}°", dim_y_name, lat_deg)
+        let val = if !best_val.is_nan() {
+            best_val
         } else {
-            format!("{}: {}", dim_y_name, py)
+            profile_values.get(sample_idx).copied().unwrap_or(f32::NAN)
         };
 
-        let loc_x = if let Some(c) = lon_coord_str {
-            format!("{}: {}", dim_x_name, c)
-        } else if let Some((_, lon_deg)) = geo_coords {
-            format!("{}: {:.2}°", dim_x_name, lon_deg)
+        let mut used_dims = HashSet::new();
+
+        let (dim_name, prof_dim_idx) = if let Some(v) = var {
+            let (explicit_x, explicit_y, explicit_z) =
+                v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
+                    &app.plotted_dim_config
+                } else {
+                    &app.dim_config
+                });
+
+            let p_idx = match app.line_profile_dim_idx {
+                0 => explicit_x.or_else(|| v.dimension_names.len().checked_sub(1)),
+                1 => explicit_y.or_else(|| v.dimension_names.len().checked_sub(2)),
+                _ => explicit_z.or_else(|| {
+                    (0..v.dimension_names.len())
+                        .find(|&i| Some(i) != explicit_x && Some(i) != explicit_y)
+                }),
+            };
+
+            let name = p_idx
+                .and_then(|i| v.dimension_names.get(i).cloned())
+                .or_else(|| app.get_spatial_dim_name(app.line_profile_dim_idx))
+                .unwrap_or_else(|| match app.line_profile_dim_idx {
+                    2 => "z".to_string(),
+                    1 => "y".to_string(),
+                    _ => "x".to_string(),
+                });
+
+            (name, p_idx)
         } else {
-            format!("{}: {}", dim_x_name, px)
+            let name = app
+                .get_spatial_dim_name(app.line_profile_dim_idx)
+                .unwrap_or_else(|| match app.line_profile_dim_idx {
+                    2 => "z".to_string(),
+                    1 => "y".to_string(),
+                    _ => "x".to_string(),
+                });
+            (name, None)
         };
 
-        if var.shape.len() >= 3 {
-            let step = app.current_timestep + 1;
-            let step_dim_name = var
-                .dimension_names
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("time");
-            dim_info_str = format!(
-                "{}, {} | {}: {}/{}",
-                loc_y, loc_x, step_dim_name, step, var.shape[0]
+        let (origin_prof, full_prof_len) = if let Some(idx) = prof_dim_idx {
+            used_dims.insert(idx);
+            get_dimension_origin_and_full_len(app, var, idx)
+        } else {
+            (0, prof_len)
+        };
+        let global_sample = (origin_prof + sample_idx).min(full_prof_len.saturating_sub(1));
+
+        let loc_str = format_dimension_coord(
+            meta,
+            var,
+            Some(&app.plotted_store_target_input),
+            &dim_name,
+            global_sample,
+            full_prof_len,
+            None,
+        );
+        let mut entries = vec![loc_str];
+
+        if l_count > 1 {
+            // Include orthogonal dimension / series coordinate
+            if let Some(v) = var {
+                let (explicit_x, explicit_y, _) =
+                    v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
+                        &app.plotted_dim_config
+                    } else {
+                        &app.dim_config
+                    });
+
+                let ortho_dim_idx = match app.line_profile_dim_idx {
+                    0 => explicit_y,
+                    1 => explicit_x,
+                    _ => None,
+                };
+
+                if let Some(o_idx) = ortho_dim_idx
+                    && let Some(ortho_name) = v.dimension_names.get(o_idx)
+                {
+                    let (origin_ortho, full_ortho_len) =
+                        get_dimension_origin_and_full_len(app, Some(v), o_idx);
+                    let global_ortho =
+                        (origin_ortho + best_line_idx).min(full_ortho_len.saturating_sub(1));
+                    let ortho_str = format_dimension_coord(
+                        meta,
+                        Some(v),
+                        Some(&app.plotted_store_target_input),
+                        ortho_name,
+                        global_ortho,
+                        full_ortho_len,
+                        None,
+                    );
+                    entries.insert(0, ortho_str);
+                    used_dims.insert(o_idx);
+                } else {
+                    entries.insert(
+                        0,
+                        format!("series:\u{00A0}{}/{}", best_line_idx + 1, l_count),
+                    );
+                }
+            } else {
+                entries.insert(
+                    0,
+                    format!("series:\u{00A0}{}/{}", best_line_idx + 1, l_count),
+                );
+            }
+        }
+
+        enrich_entries_with_animated_and_collapsed_dims(
+            app,
+            meta,
+            var,
+            &mut entries,
+            &mut used_dims,
+        );
+
+        (val, entries, sample_idx, best_line_idx)
+    } else if let Some((hit_x, hit_y, hit_z, hit_val)) = point_3d_hit {
+        let px = hit_x;
+        let py = hit_y;
+        let pz = hit_z;
+        let val = hit_val;
+
+        let data_x = (px + sampler.shift_x) % sampler.width;
+        let data_y = (py + sampler.shift_y) % sampler.height;
+        let data_z = (pz + sampler.shift_z) % sampler.depth;
+
+        let mut used_dims = HashSet::new();
+
+        let entries = if let Some(v) = var {
+            let (explicit_x, explicit_y, explicit_z) =
+                v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
+                    &app.plotted_dim_config
+                } else {
+                    &app.dim_config
+                });
+
+            let x_idx = explicit_x.unwrap_or(v.dimension_names.len().saturating_sub(1));
+            let y_idx = explicit_y.unwrap_or(v.dimension_names.len().saturating_sub(2));
+            let z_idx = explicit_z
+                .or_else(|| (0..v.dimension_names.len()).find(|&i| i != x_idx && i != y_idx));
+
+            used_dims.insert(x_idx);
+            used_dims.insert(y_idx);
+
+            let dim_y_name = explicit_y
+                .and_then(|i| v.dimension_names.get(i).cloned())
+                .or_else(|| app.get_spatial_dim_name(1))
+                .unwrap_or_else(|| "y".to_string());
+
+            let dim_x_name = explicit_x
+                .and_then(|i| v.dimension_names.get(i).cloned())
+                .or_else(|| app.get_spatial_dim_name(0))
+                .unwrap_or_else(|| "x".to_string());
+
+            let dim_z_name = z_idx
+                .and_then(|i| v.dimension_names.get(i).cloned())
+                .or_else(|| app.get_spatial_dim_name(2))
+                .unwrap_or_else(|| "z".to_string());
+
+            let (origin_x, full_x_len) = get_dimension_origin_and_full_len(app, Some(v), x_idx);
+            let (origin_y, full_y_len) = get_dimension_origin_and_full_len(app, Some(v), y_idx);
+
+            let global_x = (origin_x + data_x).min(full_x_len.saturating_sub(1));
+            let global_y = (origin_y + data_y).min(full_y_len.saturating_sub(1));
+
+            let loc_y = format_dimension_coord(
+                meta,
+                Some(v),
+                Some(&app.plotted_store_target_input),
+                &dim_y_name,
+                global_y,
+                full_y_len,
+                None,
             );
+            let loc_x = format_dimension_coord(
+                meta,
+                Some(v),
+                Some(&app.plotted_store_target_input),
+                &dim_x_name,
+                global_x,
+                full_x_len,
+                None,
+            );
+
+            let mut list = vec![loc_y, loc_x];
+
+            if sampler.depth > 1 {
+                let z_dim = z_idx.unwrap_or(0);
+                if let Some(zi) = z_idx {
+                    used_dims.insert(zi);
+                }
+                let (origin_z, full_z_len) = get_dimension_origin_and_full_len(app, Some(v), z_dim);
+                let global_z = (origin_z + data_z).min(full_z_len.saturating_sub(1));
+
+                let loc_z = format_dimension_coord(
+                    meta,
+                    Some(v),
+                    Some(&app.plotted_store_target_input),
+                    &dim_z_name,
+                    global_z,
+                    full_z_len,
+                    None,
+                );
+                list.insert(0, loc_z);
+            }
+
+            enrich_entries_with_animated_and_collapsed_dims(
+                app,
+                meta,
+                Some(v),
+                &mut list,
+                &mut used_dims,
+            );
+
+            list
+        } else if sampler.depth > 1 {
+            let dim_z_name = app
+                .get_spatial_dim_name(2)
+                .unwrap_or_else(|| "z".to_string());
+            let dim_y_name = app
+                .get_spatial_dim_name(1)
+                .unwrap_or_else(|| "y".to_string());
+            let dim_x_name = app
+                .get_spatial_dim_name(0)
+                .unwrap_or_else(|| "x".to_string());
+            vec![
+                format!("{}:\u{00A0}{}/{}", dim_z_name, data_z + 1, sampler.depth),
+                format!("{}:\u{00A0}{}/{}", dim_y_name, data_y + 1, sampler.height),
+                format!("{}:\u{00A0}{}/{}", dim_x_name, data_x + 1, sampler.width),
+            ]
         } else {
-            dim_info_str = format!("{}, {}", loc_y, loc_x);
-        }
-    }
+            let dim_y_name = app
+                .get_spatial_dim_name(1)
+                .unwrap_or_else(|| "y".to_string());
+            let dim_x_name = app
+                .get_spatial_dim_name(0)
+                .unwrap_or_else(|| "x".to_string());
+            vec![
+                format!("{}:\u{00A0}{}/{}", dim_y_name, data_y + 1, sampler.height),
+                format!("{}:\u{00A0}{}/{}", dim_x_name, data_x + 1, sampler.width),
+            ]
+        };
 
-    if dim_info_str.is_empty() {
-        dim_info_str = format!("y: {}, x: {}", py, px);
-    }
+        (val, entries, px, py)
+    } else {
+        let px = if app.active_plot_type == PlotType::Sphere
+            || app.active_plot_type == PlotType::Surface
+            || app.active_plot_type == PlotType::PointCloud
+            || app.active_plot_type == PlotType::Volume
+        {
+            ((norm_x * matrix.width as f32).floor() as usize).min(matrix.width.saturating_sub(1))
+        } else {
+            (((norm_x * (matrix.width as f32 - 1.0)) + 0.5) as usize)
+                .min(matrix.width.saturating_sub(1))
+        };
+        let py = if app.active_plot_type == PlotType::Sphere
+            || app.active_plot_type == PlotType::Surface
+            || app.active_plot_type == PlotType::PointCloud
+            || app.active_plot_type == PlotType::Volume
+        {
+            ((norm_y * matrix.height as f32).floor() as usize).min(matrix.height.saturating_sub(1))
+        } else {
+            (((norm_y * (matrix.height as f32 - 1.0)) + 0.5) as usize)
+                .min(matrix.height.saturating_sub(1))
+        };
 
-    // 5. Draw Glowing Reticle Marker Dot & Guide Line on 1D Line Plot
+        let idx = py * matrix.width + px;
+        let val = matrix.values.get(idx).copied().unwrap_or(f32::NAN);
+
+        let mut used_dims = HashSet::new();
+
+        let entries = if let Some(v) = var {
+            let (explicit_x, explicit_y, _) =
+                v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
+                    &app.plotted_dim_config
+                } else {
+                    &app.dim_config
+                });
+
+            let x_idx = explicit_x.unwrap_or(v.dimension_names.len().saturating_sub(1));
+            let y_idx = explicit_y.unwrap_or(v.dimension_names.len().saturating_sub(2));
+
+            used_dims.insert(x_idx);
+            used_dims.insert(y_idx);
+
+            let dim_y_name = explicit_y
+                .and_then(|i| v.dimension_names.get(i))
+                .cloned()
+                .unwrap_or_else(|| "y".to_string());
+
+            let dim_x_name = explicit_x
+                .and_then(|i| v.dimension_names.get(i))
+                .cloned()
+                .unwrap_or_else(|| "x".to_string());
+
+            let geo_y = geo_coords.map(|(lat, _)| lat);
+            let geo_x = geo_coords.map(|(_, lon)| lon);
+
+            let (origin_x, full_x_len) = get_dimension_origin_and_full_len(app, Some(v), x_idx);
+            let (origin_y, full_y_len) = get_dimension_origin_and_full_len(app, Some(v), y_idx);
+
+            let global_x = (origin_x + px).min(full_x_len.saturating_sub(1));
+            let global_y = (origin_y + py).min(full_y_len.saturating_sub(1));
+
+            let loc_y = format_dimension_coord(
+                meta,
+                Some(v),
+                Some(&app.plotted_store_target_input),
+                &dim_y_name,
+                global_y,
+                full_y_len,
+                geo_y,
+            );
+            let loc_x = format_dimension_coord(
+                meta,
+                Some(v),
+                Some(&app.plotted_store_target_input),
+                &dim_x_name,
+                global_x,
+                full_x_len,
+                geo_x,
+            );
+
+            let mut list = vec![loc_y, loc_x];
+
+            enrich_entries_with_animated_and_collapsed_dims(
+                app,
+                meta,
+                Some(v),
+                &mut list,
+                &mut used_dims,
+            );
+
+            list
+        } else {
+            vec![
+                format!("y:\u{00A0}{}/{}", py + 1, matrix.height),
+                format!("x:\u{00A0}{}/{}", px + 1, matrix.width),
+            ]
+        };
+
+        (val, entries, px, py)
+    };
+
+    // 4. Draw Glowing Reticle Marker Dot & Guide Lines on 1D Line Plot
     if app.active_plot_type == PlotType::Line {
-        let n = matrix.values.len();
-        if n > 0 {
-            let sample_idx = (norm_x * (n as f32 - 1.0)).round() as usize;
-            let sample_idx = sample_idx.min(n - 1);
-            let val = matrix.values[sample_idx];
+        let (_, profile_length, _) = app.get_line_profile_payload();
+        let prof_len = profile_length as usize;
+        let norm_x_step = if prof_len > 1 {
+            px as f32 / (prof_len - 1) as f32
+        } else {
+            0.5
+        };
 
-            let min_val = matrix.min_val;
-            let max_val = matrix.max_val;
-            let range = (max_val - min_val).max(1e-6);
+        let zoom = app.line_zoom;
+        let gpu_pan_x = app.line_pan.x / (0.5 * rect.width().max(1.0));
+        let gpu_pan_y = -app.line_pan.y / (0.5 * rect.height().max(1.0));
 
-            let padding_x = (40.0 / rect.width().max(1.0)).clamp(0.04, 0.15);
-            let padding_y = (35.0 / rect.height().max(1.0)).clamp(0.06, 0.20);
+        let ndc_x = (norm_x_step * 2.0 - 1.0) * zoom + gpu_pan_x;
+        let screen_dot_x = rect.min.x + (ndc_x + 1.0) * 0.5 * rect.width();
 
-            let inner_w = rect.width() * (1.0 - 2.0 * padding_x);
-            let inner_h = rect.height() * (1.0 - 2.0 * padding_y);
+        let cmin = app.color_range_min;
+        let cmax = app.color_range_max;
+        let range = (cmax - cmin).max(1e-6);
 
-            let start_x = rect.min.x + rect.width() * padding_x;
-            let start_y = rect.min.y + rect.height() * padding_y;
+        let norm_y_val = if !raw_val.is_nan() && raw_val.is_finite() {
+            ((raw_val - cmin) / range).clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
 
-            let norm_x_pos = if n > 1 {
-                sample_idx as f32 / (n - 1) as f32
-            } else {
-                0.5
-            };
-            let norm_y_pos = if val.is_nan() {
-                0.0
-            } else {
-                ((val - min_val) / range).clamp(0.0, 1.0)
-            };
+        let ndc_y = (norm_y_val * 2.0 - 1.0) * zoom + gpu_pan_y;
+        let screen_dot_y = rect.min.y + (1.0 - ndc_y) * 0.5 * rect.height();
 
-            let dot_x = start_x + norm_x_pos * inner_w;
-            let dot_y = start_y + (1.0 - norm_y_pos) * inner_h;
-            let dot_pos = Pos2::new(dot_x, dot_y);
+        let marker_pos = Pos2::new(screen_dot_x, screen_dot_y);
 
-            let painter = ui.painter();
+        // Compute data/axis bounds on screen for guidelines (spanning full axis range from start to end)
+        let x_start_ndc = -zoom + gpu_pan_x;
+        let x_end_ndc = 1.0 * zoom + gpu_pan_x;
+        let y_top_ndc = 1.0 * zoom + gpu_pan_y;
+        let y_bottom_ndc = -zoom + gpu_pan_y;
 
-            // Vertical cyan guideline from bottom to curve point
-            painter.line_segment(
-                [Pos2::new(dot_x, rect.max.y - 8.0), dot_pos],
-                Stroke::new(1.2, Color32::from_rgba_unmultiplied(0, 210, 255, 120)),
-            );
+        let x_line_start = rect.min.x + ((x_start_ndc + 1.0) / 2.0) * rect.width();
+        let x_line_end = rect.min.x + ((x_end_ndc + 1.0) / 2.0) * rect.width();
+        let y_line_top = rect.min.y + ((1.0 - y_top_ndc) / 2.0) * rect.height();
+        let y_line_bottom = rect.min.y + ((1.0 - y_bottom_ndc) / 2.0) * rect.height();
 
-            // Outer soft glowing aura halo
-            painter.circle_filled(
-                dot_pos,
-                11.0,
-                Color32::from_rgba_unmultiplied(0, 200, 255, 45),
-            );
-            painter.circle_filled(
-                dot_pos,
-                7.0,
-                Color32::from_rgba_unmultiplied(0, 220, 255, 90),
-            );
-            // Inner cyan stroke ring
-            painter.circle_stroke(
-                dot_pos,
-                5.0,
-                Stroke::new(2.0, Color32::from_rgb(0, 240, 255)),
-            );
-            // Solid bright white center core
-            painter.circle_filled(dot_pos, 3.0, Color32::WHITE);
-        }
-    }
+        let x_axis_min = x_line_start.min(x_line_end).clamp(rect.min.x, rect.max.x);
+        let x_axis_max = x_line_start.max(x_line_end).clamp(rect.min.x, rect.max.x);
+        let y_axis_min = y_line_top.min(y_line_bottom).clamp(rect.min.y, rect.max.y);
+        let y_axis_max = y_line_top.max(y_line_bottom).clamp(rect.min.y, rect.max.y);
 
-    // 6. Draw Subtle Reticle Dot & Crosshair on 2D Canvas
-    if app.active_plot_type == PlotType::Heatmap {
-        let px_center_x = rect.min.x + ((px as f32 + 0.5) / matrix.width as f32) * rect.width();
-        let px_center_y = rect.min.y + ((py as f32 + 0.5) / matrix.height as f32) * rect.height();
-        let crosshair_pos = Pos2::new(px_center_x, px_center_y);
+        let visuals = &ctx.style_of(ctx.theme()).visuals;
+        let strong_color = visuals.strong_text_color();
+        let text_color = visuals.text_color();
+        let line_color = visuals.widgets.noninteractive.fg_stroke.color;
 
         let painter = ui.painter();
 
-        painter.circle_stroke(
-            crosshair_pos,
-            5.0,
-            Stroke::new(1.8_f32, Color32::from_black_alpha(180)),
-        );
-        painter.circle_stroke(
-            crosshair_pos,
-            5.0,
-            Stroke::new(
-                1.0_f32,
-                ctx.style_of(ctx.theme()).visuals.strong_text_color(),
-            ),
-        );
-        painter.circle_filled(
-            crosshair_pos,
-            2.0,
-            ctx.style_of(ctx.theme()).visuals.strong_text_color(),
-        );
+        // Full-span Vertical guideline bounded to axis limits
+        if marker_pos.x >= rect.min.x && marker_pos.x <= rect.max.x {
+            painter.line_segment(
+                [
+                    Pos2::new(marker_pos.x, y_axis_min),
+                    Pos2::new(marker_pos.x, y_axis_max),
+                ],
+                Stroke::new(1.0, line_color.linear_multiply(0.7)),
+            );
+        }
 
-        let arm_len = 8.0;
-        painter.line_segment(
-            [
-                Pos2::new(crosshair_pos.x - arm_len, crosshair_pos.y),
-                Pos2::new(crosshair_pos.x + arm_len, crosshair_pos.y),
-            ],
-            Stroke::new(1.0_f32, Color32::from_black_alpha(150)),
-        );
-        painter.line_segment(
-            [
-                Pos2::new(crosshair_pos.x, crosshair_pos.y - arm_len),
-                Pos2::new(crosshair_pos.x, crosshair_pos.y + arm_len),
-            ],
-            Stroke::new(1.0_f32, Color32::from_black_alpha(150)),
-        );
+        // Full-span Horizontal guideline bounded to axis limits
+        if marker_pos.y >= rect.min.y && marker_pos.y <= rect.max.y {
+            painter.line_segment(
+                [
+                    Pos2::new(x_axis_min, marker_pos.y),
+                    Pos2::new(x_axis_max, marker_pos.y),
+                ],
+                Stroke::new(1.0, line_color.linear_multiply(0.7)),
+            );
+        }
+
+        // Only draw reticle dot if inside visible canvas
+        if rect.contains(marker_pos) {
+            painter.circle_filled(marker_pos, 8.0, text_color.linear_multiply(0.12));
+            painter.circle_filled(marker_pos, 5.0, text_color.linear_multiply(0.25));
+            painter.circle_stroke(marker_pos, 4.0, Stroke::new(1.5, strong_color));
+            painter.circle_filled(marker_pos, 2.0, strong_color);
+        }
     }
+
+    // 5. Forward-Project Exact Center of Hovered Point / Face / Particle to Screen Space
+    let target_pos = match app.active_plot_type {
+        PlotType::Sphere => {
+            let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
+            let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
+
+            let dr = get_normalized_radial_dr(app, raw_val);
+            let r = 1.0 + dr;
+
+            let lon_c = (u_c * 2.0 - 1.0) * std::f32::consts::PI;
+            let lat_c = (0.5 - v_c) * std::f32::consts::PI;
+
+            let world_x = r * lat_c.cos() * lon_c.sin();
+            let world_y = r * lat_c.sin();
+            let world_z = r * lat_c.cos() * lon_c.cos();
+
+            camera.project_point([world_x, world_y, world_z])
+        }
+        PlotType::Surface => {
+            let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.1);
+            let height = get_normalized_surface_height(app, raw_val);
+            let world_y = if app.surface_mode == 2 {
+                height.max(0.0) // Lego cube top face
+            } else {
+                height
+            };
+
+            let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
+            let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
+
+            let world_x = (2.0 * u_c - 1.0) * data_aspect;
+            let world_z = 2.0 * v_c - 1.0;
+
+            camera.project_point([world_x, world_y, world_z])
+        }
+        PlotType::PointCloud => {
+            if let Some((hit_x, hit_y, hit_z, _)) = point_3d_hit {
+                let (aspect_x, aspect_y, aspect_z) = app.get_3d_aspect_ratio();
+                let u_c = (hit_x as f32 + 0.5) / sampler.width as f32;
+                let v_c = (hit_y as f32 + 0.5) / sampler.height as f32;
+                let w_c = (hit_z as f32 + 0.5) / sampler.depth as f32;
+
+                let norm_x = (-1.0 + u_c * 2.0) * aspect_x;
+                let norm_y = (1.0 - v_c * 2.0) * aspect_y;
+                let norm_z = (1.0 - w_c * 2.0) * aspect_z;
+
+                camera.project_point([norm_x, norm_y, norm_z])
+            } else {
+                None
+            }
+        }
+        PlotType::Volume => {
+            if let Some((hit_x, hit_y, hit_z, _)) = point_3d_hit {
+                let (aspect_x, aspect_y, aspect_z) = app.get_3d_aspect_ratio();
+                let u_c = (hit_x as f32 + 0.5) / sampler.width as f32;
+                let v_c = (hit_y as f32 + 0.5) / sampler.height as f32;
+                let w_c = (hit_z as f32 + 0.5) / sampler.depth as f32;
+
+                let pos_3d_x = (u_c - 0.5) * aspect_x;
+                let pos_3d_y = (0.5 - v_c) * aspect_y;
+                let pos_3d_z = (0.5 - w_c) * aspect_z;
+
+                camera.project_point([pos_3d_x, pos_3d_y, pos_3d_z])
+            } else {
+                None
+            }
+        }
+        PlotType::Heatmap | PlotType::Block => {
+            let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
+            let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
+            Some(transform_2d.norm_to_screen(u_c, v_c))
+        }
+        _ => None,
+    };
 
     // 6. Format Value String
     let val_formatted = if raw_val.is_nan() {
@@ -318,15 +1270,45 @@ pub fn show_hover_tooltip(
     let text_color = style.visuals.text_color();
 
     let screen_rect = ctx.input(|i| i.viewport_rect());
-    let tooltip_w = 230.0;
-    let tooltip_h = 72.0;
+    let tooltip_w = 210.0;
+    let tooltip_est_h = if dim_entries.len() > 2 { 84.0 } else { 68.0 };
 
-    let mut tooltip_pos = Pos2::new(hover_pos.x + 16.0, hover_pos.y + 16.0);
+    let is_connected_mode = app.active_plot_type != PlotType::Line;
+    let mut tooltip_pos = if is_connected_mode {
+        // Offset outward to create a clear leader line
+        let offset_x = if hover_pos.x >= rect.center().x {
+            36.0
+        } else {
+            -tooltip_w - 36.0
+        };
+        let offset_y = if hover_pos.y >= rect.center().y {
+            -tooltip_est_h - 18.0
+        } else {
+            18.0
+        };
+        Pos2::new(hover_pos.x + offset_x, hover_pos.y + offset_y)
+    } else {
+        Pos2::new(hover_pos.x + 14.0, hover_pos.y + 14.0)
+    };
+
     if tooltip_pos.x + tooltip_w > screen_rect.max.x - 10.0 {
-        tooltip_pos.x = hover_pos.x - tooltip_w - 10.0;
+        tooltip_pos.x = screen_rect.max.x - tooltip_w - 10.0;
     }
-    if tooltip_pos.y + tooltip_h > screen_rect.max.y - 10.0 {
-        tooltip_pos.y = hover_pos.y - tooltip_h - 10.0;
+    if tooltip_pos.x < screen_rect.min.x + 10.0 {
+        tooltip_pos.x = screen_rect.min.x + 10.0;
+    }
+    if tooltip_pos.y + tooltip_est_h > screen_rect.max.y - 10.0 {
+        tooltip_pos.y = screen_rect.max.y - tooltip_est_h - 10.0;
+    }
+    if tooltip_pos.y < screen_rect.min.y + 10.0 {
+        tooltip_pos.y = screen_rect.min.y + 10.0;
+    }
+
+    let tooltip_rect = Rect::from_min_size(tooltip_pos, egui::vec2(tooltip_w, tooltip_est_h));
+
+    // 8. Draw Leader Elbow Connector from Pixel to Tooltip Box
+    if let Some(target) = target_pos {
+        draw_leader_callout(ui.painter(), ctx, target, tooltip_rect);
     }
 
     egui::Area::new(egui::Id::new("octant_hover_pixel_tooltip"))
@@ -334,9 +1316,9 @@ pub fn show_hover_tooltip(
         .fixed_pos(tooltip_pos)
         .show(ctx, |ui| {
             egui::Frame::window(ui.style())
-                .inner_margin(egui::Margin::symmetric(10, 6))
+                .inner_margin(egui::Margin::symmetric(8, 5))
                 .show(ui, |ui| {
-                    ui.set_width(tooltip_w - 20.0);
+                    ui.set_max_width(tooltip_w - 16.0);
                     ui.vertical(|ui| {
                         // Title / Variable Name
                         ui.label(
@@ -361,9 +1343,415 @@ pub fn show_hover_tooltip(
 
                         ui.add_space(1.0);
 
-                        // Real Dimension Names & Coordinates
-                        ui.label(egui::RichText::new(&dim_info_str).small().color(text_color));
+                        // Real Dimension Names & Coordinates with atomic break-wrap
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing.x = 4.0;
+                            ui.spacing_mut().item_spacing.y = 1.0;
+                            for (idx, entry) in dim_entries.iter().enumerate() {
+                                if idx > 0 {
+                                    ui.label(
+                                        egui::RichText::new("•")
+                                            .size(8.0)
+                                            .color(text_color.linear_multiply(0.4)),
+                                    );
+                                }
+                                ui.label(egui::RichText::new(entry).small().color(text_color));
+                            }
+                        });
                     });
                 });
         });
+}
+
+/// Helper to resolve the global dataset origin and full length for a dimension index `dim_idx`.
+/// For windowed/slab-sliced dimensions, this maps the local voxel/sample index to the exact global dataset coordinate.
+fn get_dimension_origin_and_full_len(
+    app: &OctantApp,
+    var: Option<&crate::data::VariableInfo>,
+    dim_idx: usize,
+) -> (usize, usize) {
+    let full_len = var.and_then(|v| v.shape.get(dim_idx)).copied().unwrap_or(1) as usize;
+
+    let origin = if let Some(req) = &app.active_slice_request
+        && let Some(sel) = req.selections.get(dim_idx)
+    {
+        match sel {
+            crate::data::DimensionSelection::Range { start, .. } => *start,
+            crate::data::DimensionSelection::Index(idx) => *idx,
+        }
+    } else {
+        app.plotted_selected_dim_ranges
+            .get(dim_idx)
+            .or_else(|| app.selected_dim_ranges.get(dim_idx))
+            .map(|(start, _)| *start)
+            .unwrap_or(0)
+    };
+
+    (origin, full_len)
+}
+
+/// Appends/prepends the Animated dimension value (at `app.current_timestep`) and all Collapsed dimension values
+/// (at `app.plotted_selected_dim_indices`) to the tooltip's dimension entries list.
+fn enrich_entries_with_animated_and_collapsed_dims(
+    app: &OctantApp,
+    meta: Option<&crate::data::DatasetMetadata>,
+    var: Option<&crate::data::VariableInfo>,
+    entries: &mut Vec<String>,
+    used_dims: &mut HashSet<usize>,
+) {
+    let Some(v) = var else { return };
+    if v.dimension_names.is_empty() {
+        return;
+    }
+
+    // 1. Identify Animated Dimension (if any)
+    let anim_dim = app
+        .plotted_animated_dim
+        .or(app.animated_dim)
+        .or_else(|| {
+            let configs = if !app.plotted_dim_config.is_empty() {
+                &app.plotted_dim_config
+            } else {
+                &app.dim_config
+            };
+            configs
+                .iter()
+                .position(|c| c.animation == crate::app::AnimationRole::Animated)
+        })
+        .or_else(|| {
+            // Default 0-th dimension if 3D+ and 0-th is not already used
+            if v.shape.len() >= 3 && !used_dims.contains(&0) {
+                Some(0)
+            } else {
+                None
+            }
+        });
+
+    let mut has_animated_inserted = false;
+    if let Some(a_idx) = anim_dim
+        && a_idx < v.dimension_names.len()
+        && !used_dims.contains(&a_idx)
+    {
+        let total_steps = app
+            .animated_dim_extent()
+            .max(v.shape.get(a_idx).copied().unwrap_or(1) as usize);
+        let dim_name = &v.dimension_names[a_idx];
+        let loc_anim = format_dimension_coord(
+            meta,
+            Some(v),
+            Some(&app.plotted_store_target_input),
+            dim_name,
+            app.current_timestep.min(total_steps.saturating_sub(1)),
+            total_steps,
+            None,
+        );
+        entries.insert(0, loc_anim);
+        used_dims.insert(a_idx);
+        has_animated_inserted = true;
+    }
+
+    // 2. Insert all remaining Collapsed Dimensions
+    for d in 0..v.dimension_names.len() {
+        if !used_dims.contains(&d) {
+            let sel_idx = app
+                .plotted_selected_dim_indices
+                .get(d)
+                .or_else(|| app.selected_dim_indices.get(d))
+                .copied()
+                .unwrap_or(0);
+            let total_len = v.shape.get(d).copied().unwrap_or(1) as usize;
+            let dim_name = &v.dimension_names[d];
+            let loc_collapsed = format_dimension_coord(
+                meta,
+                Some(v),
+                Some(&app.plotted_store_target_input),
+                dim_name,
+                sel_idx.min(total_len.saturating_sub(1)),
+                total_len,
+                None,
+            );
+            let insert_pos = if has_animated_inserted { 1 } else { 0 };
+            entries.insert(insert_pos.min(entries.len()), loc_collapsed);
+            used_dims.insert(d);
+        }
+    }
+}
+
+/// Helper to format dimension coordinate values with physical units, proper cardinal degrees, pressure levels, or date/time.
+fn format_dimension_coord(
+    meta: Option<&crate::data::DatasetMetadata>,
+    var: Option<&crate::data::VariableInfo>,
+    store_target: Option<&str>,
+    dim_name: &str,
+    idx: usize,
+    total_len: usize,
+    geo_fallback: Option<f32>,
+) -> String {
+    let clean = dim_name.trim().to_lowercase();
+
+    // 1. Geographic fallback if latitude / longitude degrees provided directly
+    if let Some(geo) = geo_fallback {
+        return if clean.contains("lon") {
+            let cardinal = if geo >= 0.0 { "°E" } else { "°W" };
+            format!("{}:\u{00A0}{:.2}{}", dim_name, geo.abs(), cardinal)
+        } else if clean.contains("lat") {
+            let cardinal = if geo >= 0.0 { "°N" } else { "°S" };
+            format!("{}:\u{00A0}{:.2}{}", dim_name, geo.abs(), cardinal)
+        } else {
+            format!("{}:\u{00A0}{:.2}°", dim_name, geo)
+        };
+    }
+
+    let is_time_dim =
+        clean.contains("time") || clean == "t" || clean.contains("date") || clean.contains("step");
+
+    let units_str = var.and_then(|v| {
+        v.units
+            .as_deref()
+            .or(v.attributes.get("units").map(|s| s.as_str()))
+    });
+    let time_start = var.and_then(|v| {
+        v.time_coverage_start
+            .as_deref()
+            .or(v.attributes.get("time_coverage_start").map(|s| s.as_str()))
+    });
+    let temp_res = var.and_then(|v| {
+        v.temporal_resolution
+            .as_deref()
+            .or(v.attributes.get("temporal_resolution").map(|s| s.as_str()))
+    });
+
+    if let Some(m) = meta {
+        if let Some(coords) = m
+            .dimension_coordinates
+            .get(&clean)
+            .or_else(|| m.dimension_coordinates.get(dim_name))
+        {
+            // Case A: Exact matching coordinate array length
+            if coords.len() == total_len
+                && let Some(c) = coords.get(idx)
+                && !c.trim().is_empty()
+            {
+                let is_raw_numeric = c.parse::<f64>().is_ok()
+                    && !c.contains('-')
+                    && !c.contains(':')
+                    && !c.contains('/')
+                    && !c.contains('T');
+
+                if !is_raw_numeric && !c.trim().is_empty() {
+                    return format!("{}:\u{00A0}{}", dim_name, c.replace(' ', "\u{00A0}"));
+                }
+
+                if is_time_dim {
+                    let time_val = crate::utils::units::format_axis_value(
+                        idx,
+                        total_len,
+                        Some(dim_name),
+                        units_str,
+                        time_start.or(Some(c.as_str())),
+                        temp_res,
+                        store_target,
+                    );
+                    return format!("{}:\u{00A0}{}", dim_name, time_val);
+                }
+
+                if let Ok(val) = c.parse::<f64>() {
+                    return if clean.contains("lon") {
+                        let cardinal = if val >= 0.0 { "°E" } else { "°W" };
+                        format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
+                    } else if clean.contains("lat") {
+                        let cardinal = if val >= 0.0 { "°N" } else { "°S" };
+                        format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
+                    } else if clean.contains("depth")
+                        || clean.contains("height")
+                        || clean.contains("alt")
+                    {
+                        format!("{}:\u{00A0}{:.2}\u{00A0}m", dim_name, val)
+                    } else if clean.contains("level")
+                        || clean.contains("lev")
+                        || clean.contains("plev")
+                        || clean.contains("pressure")
+                    {
+                        format!("{}:\u{00A0}{:.2}\u{00A0}hPa", dim_name, val)
+                    } else {
+                        format!("{}:\u{00A0}{:.2}", dim_name, val)
+                    };
+                }
+            }
+
+            // Case B: Dimension bounds (first & last)
+            if coords.len() >= 2
+                && let (Some(first), Some(last)) = (coords.first(), coords.last())
+            {
+                if is_time_dim {
+                    let first_is_date =
+                        first.contains('-') || first.contains(':') || first.contains('T');
+                    let time_start_override = if first_is_date {
+                        Some(first.as_str())
+                    } else {
+                        time_start
+                    };
+                    let time_val = crate::utils::units::format_axis_value(
+                        idx,
+                        total_len,
+                        Some(dim_name),
+                        units_str,
+                        time_start_override,
+                        temp_res,
+                        store_target,
+                    );
+                    return format!("{}:\u{00A0}{}", dim_name, time_val);
+                }
+
+                if let (Ok(f_v), Ok(l_v)) = (first.parse::<f64>(), last.parse::<f64>()) {
+                    let t = if total_len > 1 {
+                        idx as f64 / (total_len - 1) as f64
+                    } else {
+                        0.0
+                    };
+                    let val = f_v + t * (l_v - f_v);
+                    return if clean.contains("lon") {
+                        let cardinal = if val >= 0.0 { "°E" } else { "°W" };
+                        format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
+                    } else if clean.contains("lat") {
+                        let cardinal = if val >= 0.0 { "°N" } else { "°S" };
+                        format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
+                    } else if clean.contains("depth")
+                        || clean.contains("height")
+                        || clean.contains("alt")
+                    {
+                        format!("{}:\u{00A0}{:.2}\u{00A0}m", dim_name, val)
+                    } else if clean.contains("level")
+                        || clean.contains("lev")
+                        || clean.contains("plev")
+                        || clean.contains("pressure")
+                    {
+                        format!("{}:\u{00A0}{:.2}\u{00A0}hPa", dim_name, val)
+                    } else {
+                        format!("{}:\u{00A0}{:.2}", dim_name, val)
+                    };
+                }
+            }
+
+            if is_time_dim {
+                let time_val = crate::utils::units::format_axis_value(
+                    idx,
+                    total_len,
+                    Some(dim_name),
+                    units_str,
+                    time_start,
+                    temp_res,
+                    store_target,
+                );
+                return format!("{}:\u{00A0}{}", dim_name, time_val);
+            }
+
+            if let Some(first) = coords.first()
+                && !first.trim().is_empty()
+            {
+                return format!("{}:\u{00A0}{}", dim_name, first.replace(' ', "\u{00A0}"));
+            }
+        }
+
+        if let Some((min_b, max_b)) = m.get_coord_bounds(dim_name) {
+            if is_time_dim {
+                let time_val = crate::utils::units::format_axis_value(
+                    idx,
+                    total_len,
+                    Some(dim_name),
+                    units_str,
+                    time_start,
+                    temp_res,
+                    store_target,
+                );
+                return format!("{}:\u{00A0}{}", dim_name, time_val);
+            }
+
+            let t = if total_len > 1 {
+                idx as f64 / (total_len - 1) as f64
+            } else {
+                0.0
+            };
+            let val = min_b + t * (max_b - min_b);
+            return if clean.contains("lon") {
+                let cardinal = if val >= 0.0 { "°E" } else { "°W" };
+                format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
+            } else if clean.contains("lat") {
+                let cardinal = if val >= 0.0 { "°N" } else { "°S" };
+                format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
+            } else if clean.contains("depth") || clean.contains("height") || clean.contains("alt") {
+                format!("{}:\u{00A0}{:.2}\u{00A0}m", dim_name, val)
+            } else if clean.contains("level")
+                || clean.contains("lev")
+                || clean.contains("plev")
+                || clean.contains("pressure")
+            {
+                format!("{}:\u{00A0}{:.2}\u{00A0}hPa", dim_name, val)
+            } else {
+                format!("{}:\u{00A0}{:.2}", dim_name, val)
+            };
+        }
+    }
+
+    if is_time_dim {
+        let time_val = crate::utils::units::format_axis_value(
+            idx,
+            total_len,
+            Some(dim_name),
+            units_str,
+            time_start,
+            temp_res,
+            store_target,
+        );
+        return format!("{}:\u{00A0}{}", dim_name, time_val);
+    }
+
+    if total_len > 1 {
+        format!("{}:\u{00A0}{}/{}", dim_name, idx + 1, total_len)
+    } else {
+        format!("{}:\u{00A0}{}", dim_name, idx)
+    }
+}
+
+/// Computes normalized radial displacement on the 3D sphere matching sphere.wgsl
+fn get_normalized_radial_dr(app: &OctantApp, val: f32) -> f32 {
+    if val.is_nan() || !val.is_finite() || app.sphere_mode == 0 {
+        return 0.0;
+    }
+    let cmin = app.color_range_min;
+    let cmax = app.color_range_max;
+    let range = (cmax - cmin).max(1e-6);
+    let disp = app.sphere_displacement_strength;
+
+    if cmin < 0.0 && cmax > 0.0 {
+        let max_abs = cmin.abs().max(cmax.abs());
+        (val / max_abs).clamp(-1.0, 1.0) * 0.4 * disp
+    } else {
+        let norm_val = ((val - cmin) / range).clamp(0.0, 1.0);
+        norm_val * 0.4 * disp
+    }
+}
+
+/// Computes normalized surface height on the 3D surface mesh matching surface.wgsl
+fn get_normalized_surface_height(app: &OctantApp, val: f32) -> f32 {
+    if val.is_nan() || !val.is_finite() {
+        return 0.0;
+    }
+    let cmin = app.color_range_min;
+    let cmax = app.color_range_max;
+    let range = (cmax - cmin).max(1e-6);
+    let disp = app.surface_displacement_strength;
+
+    let mult = match app.surface_mode {
+        1 => 0.6, // Flat Steps
+        _ => 0.8, // Smooth Terrain (0) and 3D Lego Cubes (2)
+    };
+
+    if cmin < 0.0 && cmax > 0.0 {
+        let max_abs = cmin.abs().max(cmax.abs());
+        (val / max_abs).clamp(-1.0, 1.0) * mult * disp
+    } else {
+        let norm_val = ((val - cmin) / range).clamp(0.0, 1.0);
+        norm_val * mult * disp
+    }
 }

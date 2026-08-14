@@ -70,11 +70,12 @@ impl OctantApp {
                     .copied()
                     .unwrap_or((0, full_extent.saturating_sub(1)));
 
-                if user_end > user_start {
-                    selections[anim_dim] = DimensionSelection::Range {
-                        start: user_start,
-                        end: (user_end + 1).min(full_extent),
-                    };
+                let user_range_len = user_end.saturating_sub(user_start) + 1;
+                if user_range_len < full_extent && user_range_len > 0 {
+                    let window = user_range_len.max(1);
+                    let start = (self.current_timestep / window) * window;
+                    let end = (start + window).min(full_extent);
+                    selections[anim_dim] = DimensionSelection::Range { start, end };
                 } else {
                     let (start, end) = self.animated_window(full_extent, anim_chunk_size);
                     selections[anim_dim] = DimensionSelection::Range { start, end };
@@ -471,23 +472,50 @@ impl OctantApp {
         let is_3d_plot = self.active_plot_type == crate::plots::PlotType::Volume
             || self.active_plot_type == crate::plots::PlotType::PointCloud;
 
-        if !is_3d_plot {
-            return;
-        }
+        let is_3d_spatial_anim = anim_dim.is_some_and(|a| a == x_dim || a == y_dim || a == z_dim);
 
-        if let Some(vdata) = block.volume(
-            x_dim,
-            y_dim,
-            z_dim,
-            &fixed_indices,
-            &format!("Block Cache Volume [{}]", block.variable_name),
-        ) {
+        let current_volume_desc = format!(
+            "Block Cache Volume [{}] origin={:?} shape={:?} fixed={:?}",
+            block.variable_name,
+            block.origin,
+            block.shape,
+            if is_3d_spatial_anim {
+                vec![]
+            } else {
+                fixed_indices.clone()
+            }
+        );
+
+        let needs_volume_update = if let Some(existing) = &self.volume_data {
+            let nz = if z_dim < block.rank() && z_dim != x_dim && z_dim != y_dim {
+                block.shape[z_dim]
+            } else {
+                1
+            };
+            let nx = block.shape.get(x_dim).copied().unwrap_or(0);
+            let ny = block.shape.get(y_dim).copied().unwrap_or(0);
+            existing.width != nx
+                || existing.height != ny
+                || existing.depth != nz
+                || self.volume_renderer.is_none()
+                || existing.dataset_name != current_volume_desc
+        } else {
+            true
+        };
+
+        if (block.rank() >= 3 || is_3d_plot)
+            && needs_volume_update
+            && let Some(vdata) =
+                block.volume(x_dim, y_dim, z_dim, &fixed_indices, &current_volume_desc)
+        {
             let depth = vdata.depth;
             self.rebuild_pipeline_with_volume_data(vdata);
-            self.status_message = format!(
-                "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
-                self.status_message, self.current_timestep
-            );
+            if is_3d_plot {
+                self.status_message = format!(
+                    "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
+                    self.status_message, self.current_timestep
+                );
+            }
         }
     }
 
