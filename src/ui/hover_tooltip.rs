@@ -1281,10 +1281,49 @@ pub fn show_hover_tooltip(
         None
     };
 
-    let plot_3d_target_pos = sphere_target_pos
+    let matrix_target_pos = if app.active_plot_type == PlotType::Heatmap
+        || app.active_plot_type == PlotType::Block
+    {
+        let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio {
+            let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.001);
+            let canvas_aspect = rect.width() / rect.height().max(1.0);
+            if canvas_aspect > data_aspect {
+                (data_aspect / canvas_aspect, 1.0)
+            } else {
+                (1.0, canvas_aspect / data_aspect)
+            }
+        } else {
+            (1.0, 1.0)
+        };
+
+        let zoom = app.heatmap_zoom;
+        let pan = app.heatmap_pan;
+        let gpu_pan_x = pan.x / (0.5 * rect.width().max(1.0));
+        let gpu_pan_y = -pan.y / (0.5 * rect.height().max(1.0));
+
+        let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
+        let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
+
+        let unscaled_x = u_c * 2.0 - 1.0;
+        let unpanned_x = unscaled_x * aspect_scale_x.max(0.001);
+        let ndc_x = unpanned_x * zoom.max(0.01) + gpu_pan_x;
+        let target_x = rect.min.x + ((ndc_x + 1.0) * 0.5) * rect.width();
+
+        let unscaled_y = 1.0 - v_c * 2.0;
+        let unpanned_y = unscaled_y * aspect_scale_y.max(0.001);
+        let ndc_y = unpanned_y * zoom.max(0.01) + gpu_pan_y;
+        let target_y = rect.min.y + ((1.0 - ndc_y) * 0.5) * rect.height();
+
+        Some(Pos2::new(target_x, target_y))
+    } else {
+        None
+    };
+
+    let plot_target_pos = sphere_target_pos
         .or(surface_target_pos)
         .or(point_cloud_target_pos)
-        .or(volume_target_pos);
+        .or(volume_target_pos)
+        .or(matrix_target_pos);
 
     // 6. Format Value String
     let val_formatted = if raw_val.is_nan() {
@@ -1304,12 +1343,9 @@ pub fn show_hover_tooltip(
     let tooltip_w = 210.0;
     let tooltip_est_h = if dim_entries.len() > 2 { 84.0 } else { 68.0 };
 
-    let is_3d_mode = app.active_plot_type == PlotType::Sphere
-        || app.active_plot_type == PlotType::Surface
-        || app.active_plot_type == PlotType::PointCloud
-        || app.active_plot_type == PlotType::Volume;
-    let mut tooltip_pos = if is_3d_mode {
-        // In 3D mode, offset outward to create a clear leader line
+    let is_connected_mode = app.active_plot_type != PlotType::Line;
+    let mut tooltip_pos = if is_connected_mode {
+        // Offset outward to create a clear leader line
         let offset_x = if hover_pos.x >= rect.center().x { 36.0 } else { -tooltip_w - 36.0 };
         let offset_y = if hover_pos.y >= rect.center().y { -tooltip_est_h - 18.0 } else { 18.0 };
         Pos2::new(hover_pos.x + offset_x, hover_pos.y + offset_y)
@@ -1332,8 +1368,8 @@ pub fn show_hover_tooltip(
 
     let tooltip_rect = Rect::from_min_size(tooltip_pos, egui::vec2(tooltip_w, tooltip_est_h));
 
-    // 8. Draw Leader Elbow Connector from 3D Pixel to Tooltip Box
-    if let Some(target_pos) = plot_3d_target_pos {
+    // 8. Draw Leader Elbow Connector from Pixel to Tooltip Box
+    if let Some(target_pos) = plot_target_pos {
         let visuals = &ctx.style_of(ctx.theme()).visuals;
         let strong_color = visuals.strong_text_color();
         let line_color = visuals.widgets.noninteractive.fg_stroke.color;
