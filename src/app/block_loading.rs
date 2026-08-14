@@ -70,11 +70,16 @@ impl OctantApp {
                     .copied()
                     .unwrap_or((0, full_extent.saturating_sub(1)));
 
-                if user_end > user_start {
-                    selections[anim_dim] = DimensionSelection::Range {
-                        start: user_start,
-                        end: (user_end + 1).min(full_extent),
-                    };
+                let user_range_len = user_end.saturating_sub(user_start) + 1;
+                if user_range_len < full_extent && user_range_len > 0 {
+                    // When animating with a shorter range / subset of slabs, slide the window with current_timestep
+                    let half = user_range_len / 2;
+                    let start = self
+                        .current_timestep
+                        .saturating_sub(half)
+                        .min(full_extent.saturating_sub(user_range_len));
+                    let end = (start + user_range_len).min(full_extent);
+                    selections[anim_dim] = DimensionSelection::Range { start, end };
                 } else {
                     let (start, end) = self.animated_window(full_extent, anim_chunk_size);
                     selections[anim_dim] = DimensionSelection::Range { start, end };
@@ -473,6 +478,14 @@ impl OctantApp {
 
         let is_3d_spatial_anim = anim_dim.is_some_and(|a| a == x_dim || a == y_dim || a == z_dim);
 
+        let current_volume_desc = format!(
+            "Block Cache Volume [{}] origin={:?} shape={:?} fixed={:?}",
+            block.variable_name,
+            block.origin,
+            block.shape,
+            if is_3d_spatial_anim { vec![] } else { fixed_indices.clone() }
+        );
+
         let needs_volume_update = if let Some(existing) = &self.volume_data {
             let nz = if z_dim < block.rank() && z_dim != x_dim && z_dim != y_dim {
                 block.shape[z_dim]
@@ -485,7 +498,7 @@ impl OctantApp {
                 || existing.height != ny
                 || existing.depth != nz
                 || self.volume_renderer.is_none()
-                || !is_3d_spatial_anim
+                || existing.dataset_name != current_volume_desc
         } else {
             true
         };
@@ -497,7 +510,7 @@ impl OctantApp {
                 y_dim,
                 z_dim,
                 &fixed_indices,
-                &format!("Block Cache Volume [{}]", block.variable_name),
+                &current_volume_desc,
             )
         {
             let depth = vdata.depth;
