@@ -2,6 +2,7 @@ use crate::app::OctantApp;
 use crate::data::MatrixData;
 use crate::plots::PlotType;
 use egui::{Pos2, Rect, Stroke};
+use std::collections::HashSet;
 
 /// A 3D ray with origin and normalized direction
 #[derive(Clone, Copy, Debug)]
@@ -707,13 +708,49 @@ pub fn show_hover_tooltip(
             profile_values.get(sample_idx).copied().unwrap_or(f32::NAN)
         };
 
-        let dim_name = app
-            .get_spatial_dim_name(app.line_profile_dim_idx)
-            .unwrap_or_else(|| match app.line_profile_dim_idx {
-                2 => "z".to_string(),
-                1 => "y".to_string(),
-                _ => "x".to_string(),
-            });
+        let mut used_dims = HashSet::new();
+
+        let (dim_name, prof_dim_idx) = if let Some(v) = var {
+            let (explicit_x, explicit_y, explicit_z) =
+                v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
+                    &app.plotted_dim_config
+                } else {
+                    &app.dim_config
+                });
+
+            let p_idx = match app.line_profile_dim_idx {
+                0 => explicit_x.or_else(|| v.dimension_names.len().checked_sub(1)),
+                1 => explicit_y.or_else(|| v.dimension_names.len().checked_sub(2)),
+                _ => explicit_z.or_else(|| {
+                    (0..v.dimension_names.len())
+                        .find(|&i| Some(i) != explicit_x && Some(i) != explicit_y)
+                }),
+            };
+
+            let name = p_idx
+                .and_then(|i| v.dimension_names.get(i).cloned())
+                .or_else(|| app.get_spatial_dim_name(app.line_profile_dim_idx))
+                .unwrap_or_else(|| match app.line_profile_dim_idx {
+                    2 => "z".to_string(),
+                    1 => "y".to_string(),
+                    _ => "x".to_string(),
+                });
+
+            (name, p_idx)
+        } else {
+            let name = app
+                .get_spatial_dim_name(app.line_profile_dim_idx)
+                .unwrap_or_else(|| match app.line_profile_dim_idx {
+                    2 => "z".to_string(),
+                    1 => "y".to_string(),
+                    _ => "x".to_string(),
+                });
+            (name, None)
+        };
+
+        if let Some(idx) = prof_dim_idx {
+            used_dims.insert(idx);
+        }
 
         let loc_str = format_dimension_coord(
             meta,
@@ -736,16 +773,18 @@ pub fn show_hover_tooltip(
                         &app.dim_config
                     });
 
-                let ortho_dim_name = match app.line_profile_dim_idx {
-                    0 => explicit_y.and_then(|i| v.dimension_names.get(i)),
-                    1 => explicit_x.and_then(|i| v.dimension_names.get(i)),
+                let ortho_dim_idx = match app.line_profile_dim_idx {
+                    0 => explicit_y,
+                    1 => explicit_x,
                     _ => None,
                 };
 
-                if let Some(ortho_name) = ortho_dim_name {
+                if let Some(o_idx) = ortho_dim_idx
+                    && let Some(ortho_name) = v.dimension_names.get(o_idx)
+                {
                     let ortho_str = format_dimension_coord(
                         meta,
-                        var,
+                        Some(v),
                         Some(&app.plotted_store_target_input),
                         ortho_name,
                         best_line_idx,
@@ -753,6 +792,7 @@ pub fn show_hover_tooltip(
                         None,
                     );
                     entries.insert(0, ortho_str);
+                    used_dims.insert(o_idx);
                 } else {
                     entries.insert(
                         0,
@@ -767,12 +807,22 @@ pub fn show_hover_tooltip(
             }
         }
 
+        enrich_entries_with_animated_and_collapsed_dims(
+            app,
+            meta,
+            var,
+            &mut entries,
+            &mut used_dims,
+        );
+
         (val, entries, sample_idx, best_line_idx)
     } else if let Some((hit_x, hit_y, hit_z, hit_val)) = point_3d_hit {
         let px = hit_x;
         let py = hit_y;
         let pz = hit_z;
         let val = hit_val;
+
+        let mut used_dims = HashSet::new();
 
         let entries = if let Some(v) = var {
             let (explicit_x, explicit_y, explicit_z) =
@@ -781,6 +831,15 @@ pub fn show_hover_tooltip(
                 } else {
                     &app.dim_config
                 });
+
+            let x_idx = explicit_x.unwrap_or(v.dimension_names.len().saturating_sub(1));
+            let y_idx = explicit_y.unwrap_or(v.dimension_names.len().saturating_sub(2));
+            let z_idx = explicit_z.or_else(|| {
+                (0..v.dimension_names.len()).find(|&i| i != x_idx && i != y_idx)
+            });
+
+            used_dims.insert(x_idx);
+            used_dims.insert(y_idx);
 
             let dim_y_name = explicit_y
                 .and_then(|i| v.dimension_names.get(i).cloned())
@@ -792,21 +851,14 @@ pub fn show_hover_tooltip(
                 .or_else(|| app.get_spatial_dim_name(0))
                 .unwrap_or_else(|| "x".to_string());
 
-            let dim_z_name = explicit_z
+            let dim_z_name = z_idx
                 .and_then(|i| v.dimension_names.get(i).cloned())
                 .or_else(|| app.get_spatial_dim_name(2))
-                .or_else(|| {
-                    v.dimension_names
-                        .iter()
-                        .enumerate()
-                        .find(|(i, _)| Some(*i) != explicit_x && Some(*i) != explicit_y)
-                        .map(|(_, name)| name.clone())
-                })
                 .unwrap_or_else(|| "z".to_string());
 
             let loc_y = format_dimension_coord(
                 meta,
-                var,
+                Some(v),
                 Some(&app.plotted_store_target_input),
                 &dim_y_name,
                 py,
@@ -815,7 +867,7 @@ pub fn show_hover_tooltip(
             );
             let loc_x = format_dimension_coord(
                 meta,
-                var,
+                Some(v),
                 Some(&app.plotted_store_target_input),
                 &dim_x_name,
                 px,
@@ -826,9 +878,12 @@ pub fn show_hover_tooltip(
             let mut list = vec![loc_y, loc_x];
 
             if sampler.depth > 1 {
+                if let Some(zi) = z_idx {
+                    used_dims.insert(zi);
+                }
                 let loc_z = format_dimension_coord(
                     meta,
-                    var,
+                    Some(v),
                     Some(&app.plotted_store_target_input),
                     &dim_z_name,
                     pz,
@@ -837,6 +892,14 @@ pub fn show_hover_tooltip(
                 );
                 list.insert(0, loc_z);
             }
+
+            enrich_entries_with_animated_and_collapsed_dims(
+                app,
+                meta,
+                Some(v),
+                &mut list,
+                &mut used_dims,
+            );
 
             list
         } else if sampler.depth > 1 {
@@ -881,6 +944,8 @@ pub fn show_hover_tooltip(
         let idx = py * matrix.width + px;
         let val = matrix.values.get(idx).copied().unwrap_or(f32::NAN);
 
+        let mut used_dims = HashSet::new();
+
         let entries = if let Some(v) = var {
             let (explicit_x, explicit_y, _) =
                 v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
@@ -888,6 +953,12 @@ pub fn show_hover_tooltip(
                 } else {
                     &app.dim_config
                 });
+
+            let x_idx = explicit_x.unwrap_or(v.dimension_names.len().saturating_sub(1));
+            let y_idx = explicit_y.unwrap_or(v.dimension_names.len().saturating_sub(2));
+
+            used_dims.insert(x_idx);
+            used_dims.insert(y_idx);
 
             let dim_y_name = explicit_y
                 .and_then(|i| v.dimension_names.get(i))
@@ -904,7 +975,7 @@ pub fn show_hover_tooltip(
 
             let loc_y = format_dimension_coord(
                 meta,
-                var,
+                Some(v),
                 Some(&app.plotted_store_target_input),
                 &dim_y_name,
                 py,
@@ -913,7 +984,7 @@ pub fn show_hover_tooltip(
             );
             let loc_x = format_dimension_coord(
                 meta,
-                var,
+                Some(v),
                 Some(&app.plotted_store_target_input),
                 &dim_x_name,
                 px,
@@ -923,29 +994,13 @@ pub fn show_hover_tooltip(
 
             let mut list = vec![loc_y, loc_x];
 
-            if v.shape.len() >= 3 {
-                let total_steps = app
-                    .animated_dim_extent()
-                    .max(v.shape.first().copied().unwrap_or(1) as usize);
-
-                let step_dim_name = app
-                    .animated_dim
-                    .and_then(|i| v.dimension_names.get(i))
-                    .cloned()
-                    .or_else(|| v.dimension_names.first().cloned())
-                    .unwrap_or_else(|| "time".to_string());
-
-                let loc_t = format_dimension_coord(
-                    meta,
-                    var,
-                    Some(&app.plotted_store_target_input),
-                    &step_dim_name,
-                    app.current_timestep,
-                    total_steps,
-                    None,
-                );
-                list.insert(0, loc_t);
-            }
+            enrich_entries_with_animated_and_collapsed_dims(
+                app,
+                meta,
+                Some(v),
+                &mut list,
+                &mut used_dims,
+            );
 
             list
         } else {
@@ -1211,6 +1266,92 @@ pub fn show_hover_tooltip(
                     });
                 });
         });
+}
+
+/// Appends/prepends the Animated dimension value (at `app.current_timestep`) and all Collapsed dimension values
+/// (at `app.plotted_selected_dim_indices`) to the tooltip's dimension entries list.
+fn enrich_entries_with_animated_and_collapsed_dims(
+    app: &OctantApp,
+    meta: Option<&crate::data::DatasetMetadata>,
+    var: Option<&crate::data::VariableInfo>,
+    entries: &mut Vec<String>,
+    used_dims: &mut HashSet<usize>,
+) {
+    let Some(v) = var else { return };
+    if v.dimension_names.is_empty() {
+        return;
+    }
+
+    // 1. Identify Animated Dimension (if any)
+    let anim_dim = app
+        .plotted_animated_dim
+        .or(app.animated_dim)
+        .or_else(|| {
+            let configs = if !app.plotted_dim_config.is_empty() {
+                &app.plotted_dim_config
+            } else {
+                &app.dim_config
+            };
+            configs
+                .iter()
+                .position(|c| c.animation == crate::app::AnimationRole::Animated)
+        })
+        .or_else(|| {
+            // Default 0-th dimension if 3D+ and 0-th is not already used
+            if v.shape.len() >= 3 && !used_dims.contains(&0) {
+                Some(0)
+            } else {
+                None
+            }
+        });
+
+    let mut has_animated_inserted = false;
+    if let Some(a_idx) = anim_dim {
+        if a_idx < v.dimension_names.len() && !used_dims.contains(&a_idx) {
+            let total_steps = app
+                .animated_dim_extent()
+                .max(v.shape.get(a_idx).copied().unwrap_or(1) as usize);
+            let dim_name = &v.dimension_names[a_idx];
+            let loc_anim = format_dimension_coord(
+                meta,
+                Some(v),
+                Some(&app.plotted_store_target_input),
+                dim_name,
+                app.current_timestep.min(total_steps.saturating_sub(1)),
+                total_steps,
+                None,
+            );
+            entries.insert(0, loc_anim);
+            used_dims.insert(a_idx);
+            has_animated_inserted = true;
+        }
+    }
+
+    // 2. Insert all remaining Collapsed Dimensions
+    for d in 0..v.dimension_names.len() {
+        if !used_dims.contains(&d) {
+            let sel_idx = app
+                .plotted_selected_dim_indices
+                .get(d)
+                .or_else(|| app.selected_dim_indices.get(d))
+                .copied()
+                .unwrap_or(0);
+            let total_len = v.shape.get(d).copied().unwrap_or(1) as usize;
+            let dim_name = &v.dimension_names[d];
+            let loc_collapsed = format_dimension_coord(
+                meta,
+                Some(v),
+                Some(&app.plotted_store_target_input),
+                dim_name,
+                sel_idx.min(total_len.saturating_sub(1)),
+                total_len,
+                None,
+            );
+            let insert_pos = if has_animated_inserted { 1 } else { 0 };
+            entries.insert(insert_pos.min(entries.len()), loc_collapsed);
+            used_dims.insert(d);
+        }
+    }
 }
 
 /// Helper to format dimension coordinate values with physical units, proper cardinal degrees, pressure levels, or date/time.
