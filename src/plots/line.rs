@@ -181,7 +181,7 @@ impl LineRenderer {
             return;
         }
 
-        let needed_bytes = (matrix_data.len() * std::mem::size_of::<f32>()) as u64;
+        let needed_bytes = std::mem::size_of_val(matrix_data) as u64;
         let current_capacity = self.gpu_resources.read().unwrap().data_buffer.size();
 
         if needed_bytes > current_capacity {
@@ -221,7 +221,7 @@ impl LineRenderer {
         }
 
         let guard = self.gpu_resources.read().unwrap();
-        if (matrix_data.len() * std::mem::size_of::<f32>()) as u64 <= guard.data_buffer.size() {
+        if std::mem::size_of_val(matrix_data) as u64 <= guard.data_buffer.size() {
             queue.write_buffer(&guard.data_buffer, 0, bytemuck::cast_slice(matrix_data));
             self.data_len
                 .store(matrix_data.len() as u32, Ordering::Relaxed);

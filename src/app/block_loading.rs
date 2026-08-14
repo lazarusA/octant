@@ -479,7 +479,11 @@ impl OctantApp {
             block.variable_name,
             block.origin,
             block.shape,
-            if is_3d_spatial_anim { vec![] } else { fixed_indices.clone() }
+            if is_3d_spatial_anim {
+                vec![]
+            } else {
+                fixed_indices.clone()
+            }
         );
 
         let needs_volume_update = if let Some(existing) = &self.volume_data {
@@ -501,13 +505,8 @@ impl OctantApp {
 
         if (block.rank() >= 3 || is_3d_plot)
             && needs_volume_update
-            && let Some(vdata) = block.volume(
-                x_dim,
-                y_dim,
-                z_dim,
-                &fixed_indices,
-                &current_volume_desc,
-            )
+            && let Some(vdata) =
+                block.volume(x_dim, y_dim, z_dim, &fixed_indices, &current_volume_desc)
         {
             let depth = vdata.depth;
             self.rebuild_pipeline_with_volume_data(vdata);
