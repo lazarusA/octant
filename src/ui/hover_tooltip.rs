@@ -243,11 +243,11 @@ impl<'a> VolumeSampler<'a> {
                 let u = ((px_world / aspect_x.max(1e-4)) + 0.5).clamp(0.0, 1.0);
                 let v = ((py_world / aspect_y.max(1e-4)) + 0.5).clamp(0.0, 1.0);
                 let w = ((pz_world / aspect_z.max(1e-4)) + 0.5).clamp(0.0, 1.0);
-                (u, 1.0 - v, w)
+                (u, 1.0 - v, 1.0 - w)
             } else {
                 let u = ((px_world / aspect_x.max(1e-4)) + 1.0) * 0.5;
                 let v = (1.0 - (py_world / aspect_y.max(1e-4))) * 0.5;
-                let w = ((pz_world / aspect_z.max(1e-4)) + 1.0) * 0.5;
+                let w = (1.0 - (pz_world / aspect_z.max(1e-4))) * 0.5;
                 (u, v, w)
             };
 
@@ -1170,7 +1170,7 @@ pub fn show_hover_tooltip(
 
                 let norm_x = (-1.0 + u_c * 2.0) * aspect_x;
                 let norm_y = (1.0 - v_c * 2.0) * aspect_y;
-                let norm_z = (-1.0 + w_c * 2.0) * aspect_z;
+                let norm_z = (1.0 - w_c * 2.0) * aspect_z;
 
                 camera.project_point([norm_x, norm_y, norm_z])
             } else {
@@ -1186,7 +1186,7 @@ pub fn show_hover_tooltip(
 
                 let pos_3d_x = (u_c - 0.5) * aspect_x;
                 let pos_3d_y = (0.5 - v_c) * aspect_y;
-                let pos_3d_z = (w_c - 0.5) * aspect_z;
+                let pos_3d_z = (0.5 - w_c) * aspect_z;
 
                 camera.project_point([pos_3d_x, pos_3d_y, pos_3d_z])
             } else {

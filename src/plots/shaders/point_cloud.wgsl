@@ -78,10 +78,10 @@ fn vs_main(
         }
     }
 
-    // Map cell (z, y, x) to 3D world coordinates with North (+Y) at top and South (-Y) at bottom
+    // Map cell (z, y, x) to 3D world coordinates with North (+Y) at top and South (-Y) at bottom, and latest/newest slice at front (-Z)
     let norm_x = (-1.0 + (f32(cell_x) + 0.5) / f32(grid_w) * 2.0) * uniforms.aspect_x;
     let norm_y = (1.0 - (f32(cell_y) + 0.5) / f32(grid_h) * 2.0) * uniforms.aspect_y; // Inverted Y so Row 0 = North (+Y)
-    let norm_z = (-1.0 + (f32(cell_z) + 0.5) / f32(grid_d) * 2.0) * uniforms.aspect_z;
+    let norm_z = (1.0 - (f32(cell_z) + 0.5) / f32(grid_d) * 2.0) * uniforms.aspect_z; // Inverted Z so newest slice is at Front (-Z)
 
     let center_3d = vec3<f32>(norm_x, norm_y, norm_z);
 
