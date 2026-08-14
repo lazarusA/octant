@@ -748,17 +748,21 @@ pub fn show_hover_tooltip(
             (name, None)
         };
 
-        if let Some(idx) = prof_dim_idx {
+        let (origin_prof, full_prof_len) = if let Some(idx) = prof_dim_idx {
             used_dims.insert(idx);
-        }
+            get_dimension_origin_and_full_len(app, var, idx)
+        } else {
+            (0, prof_len)
+        };
+        let global_sample = (origin_prof + sample_idx).min(full_prof_len.saturating_sub(1));
 
         let loc_str = format_dimension_coord(
             meta,
             var,
             Some(&app.plotted_store_target_input),
             &dim_name,
-            sample_idx,
-            prof_len,
+            global_sample,
+            full_prof_len,
             None,
         );
         let mut entries = vec![loc_str];
@@ -782,13 +786,17 @@ pub fn show_hover_tooltip(
                 if let Some(o_idx) = ortho_dim_idx
                     && let Some(ortho_name) = v.dimension_names.get(o_idx)
                 {
+                    let (origin_ortho, full_ortho_len) =
+                        get_dimension_origin_and_full_len(app, Some(v), o_idx);
+                    let global_ortho =
+                        (origin_ortho + best_line_idx).min(full_ortho_len.saturating_sub(1));
                     let ortho_str = format_dimension_coord(
                         meta,
                         Some(v),
                         Some(&app.plotted_store_target_input),
                         ortho_name,
-                        best_line_idx,
-                        l_count,
+                        global_ortho,
+                        full_ortho_len,
                         None,
                     );
                     entries.insert(0, ortho_str);
@@ -860,13 +868,21 @@ pub fn show_hover_tooltip(
                 .or_else(|| app.get_spatial_dim_name(2))
                 .unwrap_or_else(|| "z".to_string());
 
+            let (origin_x, full_x_len) =
+                get_dimension_origin_and_full_len(app, Some(v), x_idx);
+            let (origin_y, full_y_len) =
+                get_dimension_origin_and_full_len(app, Some(v), y_idx);
+
+            let global_x = (origin_x + data_x).min(full_x_len.saturating_sub(1));
+            let global_y = (origin_y + data_y).min(full_y_len.saturating_sub(1));
+
             let loc_y = format_dimension_coord(
                 meta,
                 Some(v),
                 Some(&app.plotted_store_target_input),
                 &dim_y_name,
-                data_y,
-                sampler.height,
+                global_y,
+                full_y_len,
                 None,
             );
             let loc_x = format_dimension_coord(
@@ -874,24 +890,29 @@ pub fn show_hover_tooltip(
                 Some(v),
                 Some(&app.plotted_store_target_input),
                 &dim_x_name,
-                data_x,
-                sampler.width,
+                global_x,
+                full_x_len,
                 None,
             );
 
             let mut list = vec![loc_y, loc_x];
 
             if sampler.depth > 1 {
+                let z_dim = z_idx.unwrap_or(0);
                 if let Some(zi) = z_idx {
                     used_dims.insert(zi);
                 }
+                let (origin_z, full_z_len) =
+                    get_dimension_origin_and_full_len(app, Some(v), z_dim);
+                let global_z = (origin_z + data_z).min(full_z_len.saturating_sub(1));
+
                 let loc_z = format_dimension_coord(
                     meta,
                     Some(v),
                     Some(&app.plotted_store_target_input),
                     &dim_z_name,
-                    data_z,
-                    sampler.depth,
+                    global_z,
+                    full_z_len,
                     None,
                 );
                 list.insert(0, loc_z);
@@ -977,13 +998,21 @@ pub fn show_hover_tooltip(
             let geo_y = geo_coords.map(|(lat, _)| lat);
             let geo_x = geo_coords.map(|(_, lon)| lon);
 
+            let (origin_x, full_x_len) =
+                get_dimension_origin_and_full_len(app, Some(v), x_idx);
+            let (origin_y, full_y_len) =
+                get_dimension_origin_and_full_len(app, Some(v), y_idx);
+
+            let global_x = (origin_x + px).min(full_x_len.saturating_sub(1));
+            let global_y = (origin_y + py).min(full_y_len.saturating_sub(1));
+
             let loc_y = format_dimension_coord(
                 meta,
                 Some(v),
                 Some(&app.plotted_store_target_input),
                 &dim_y_name,
-                py,
-                matrix.height,
+                global_y,
+                full_y_len,
                 geo_y,
             );
             let loc_x = format_dimension_coord(
@@ -991,8 +1020,8 @@ pub fn show_hover_tooltip(
                 Some(v),
                 Some(&app.plotted_store_target_input),
                 &dim_x_name,
-                px,
-                matrix.width,
+                global_x,
+                full_x_len,
                 geo_x,
             );
 
@@ -1270,6 +1299,36 @@ pub fn show_hover_tooltip(
                     });
                 });
         });
+}
+
+/// Helper to resolve the global dataset origin and full length for a dimension index `dim_idx`.
+/// For windowed/slab-sliced dimensions, this maps the local voxel/sample index to the exact global dataset coordinate.
+fn get_dimension_origin_and_full_len(
+    app: &OctantApp,
+    var: Option<&crate::data::VariableInfo>,
+    dim_idx: usize,
+) -> (usize, usize) {
+    let full_len = var
+        .and_then(|v| v.shape.get(dim_idx))
+        .copied()
+        .unwrap_or(1) as usize;
+
+    let origin = if let Some(req) = &app.active_slice_request
+        && let Some(sel) = req.selections.get(dim_idx)
+    {
+        match sel {
+            crate::data::DimensionSelection::Range { start, .. } => *start,
+            crate::data::DimensionSelection::Index(idx) => *idx,
+        }
+    } else {
+        app.plotted_selected_dim_ranges
+            .get(dim_idx)
+            .or_else(|| app.selected_dim_ranges.get(dim_idx))
+            .map(|(start, _)| *start)
+            .unwrap_or(0)
+    };
+
+    (origin, full_len)
 }
 
 /// Appends/prepends the Animated dimension value (at `app.current_timestep`) and all Collapsed dimension values
