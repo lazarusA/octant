@@ -1,6 +1,418 @@
 use crate::app::OctantApp;
+use crate::data::MatrixData;
 use crate::plots::PlotType;
 use egui::{Pos2, Rect, Stroke};
+
+/// A 3D ray with origin and normalized direction
+#[derive(Clone, Copy, Debug)]
+pub struct Ray3D {
+    pub origin: [f32; 3],
+    pub dir: [f32; 3],
+}
+
+/// Perspective 3D Camera encapsulating view parameters, ray casting, and forward projection
+#[derive(Clone, Copy, Debug)]
+pub struct Camera3D {
+    pub rect: Rect,
+    pub screen_aspect: f32,
+    pub cam_dist: f32,
+    pub fov_scale: f32,
+    pub cx: f32,
+    pub sx: f32,
+    pub cy: f32,
+    pub sy: f32,
+}
+
+impl Camera3D {
+    pub fn from_app(app: &OctantApp, rect: Rect) -> Self {
+        let screen_aspect = (rect.width() / rect.height().max(1.0)).max(0.01);
+        let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
+        let fov_scale = 1.6_f32;
+        let cx = app.sphere_rotation_x.cos();
+        let sx = app.sphere_rotation_x.sin();
+        let cy = app.sphere_rotation_y.cos();
+        let sy = app.sphere_rotation_y.sin();
+
+        Self {
+            rect,
+            screen_aspect,
+            cam_dist,
+            fov_scale,
+            cx,
+            sx,
+            cy,
+            sy,
+        }
+    }
+
+    /// Casts a ray from screen coordinates returning `(view_space_ray, world_space_ray)`
+    pub fn cast_ray(&self, screen_pos: Pos2) -> (Ray3D, Ray3D) {
+        let clip_x = (screen_pos.x - self.rect.center().x) / (0.5 * self.rect.width().max(1.0));
+        let clip_y = -(screen_pos.y - self.rect.center().y) / (0.5 * self.rect.height().max(1.0));
+
+        let dir_x = clip_x * self.screen_aspect / self.fov_scale;
+        let dir_y = clip_y / self.fov_scale;
+        let dir_z = -1.0_f32;
+
+        let inv_len = 1.0 / (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
+        let dx = dir_x * inv_len;
+        let dy = dir_y * inv_len;
+        let dz = dir_z * inv_len;
+
+        let view_ray = Ray3D {
+            origin: [0.0, 0.0, self.cam_dist],
+            dir: [dx, dy, dz],
+        };
+
+        // Transform ray into Model World Space
+        let o1_y = self.sx * self.cam_dist;
+        let o1_z = self.cx * self.cam_dist;
+
+        let d1_x = dx;
+        let d1_y = self.cx * dy + self.sx * dz;
+        let d1_z = -self.sx * dy + self.cx * dz;
+
+        let o_world_x = -self.sy * o1_z;
+        let o_world_y = o1_y;
+        let o_world_z = self.cy * o1_z;
+
+        let d_world_x = self.cy * d1_x - self.sy * d1_z;
+        let d_world_y = d1_y;
+        let d_world_z = self.sy * d1_x + self.cy * d1_z;
+
+        let world_ray = Ray3D {
+            origin: [o_world_x, o_world_y, o_world_z],
+            dir: [d_world_x, d_world_y, d_world_z],
+        };
+
+        (view_ray, world_ray)
+    }
+
+    /// Forward projects a 3D model point to screen coordinates
+    pub fn project_point(&self, pt: [f32; 3]) -> Option<Pos2> {
+        // Rotate around Y
+        let p_y_rot_x = self.cy * pt[0] + self.sy * pt[2];
+        let p_y_rot_y = pt[1];
+        let p_y_rot_z = -self.sy * pt[0] + self.cy * pt[2];
+
+        // Rotate around X
+        let p_rot_x = p_y_rot_x;
+        let p_rot_y = self.cx * p_y_rot_y - self.sx * p_y_rot_z;
+        let p_rot_z = self.sx * p_y_rot_y + self.cx * p_y_rot_z;
+
+        let dist_c = self.cam_dist - p_rot_z;
+        if dist_c > 0.1 && p_rot_z < self.cam_dist {
+            let pr_x = (p_rot_x * self.fov_scale) / (self.screen_aspect * dist_c);
+            let pr_y = (p_rot_y * self.fov_scale) / dist_c;
+            let target_x = self.rect.center().x + pr_x * (0.5 * self.rect.width());
+            let target_y = self.rect.center().y - pr_y * (0.5 * self.rect.height());
+            Some(Pos2::new(target_x, target_y))
+        } else {
+            None
+        }
+    }
+}
+
+/// Standard AABB Ray-Box intersection using the slab method
+pub fn intersect_aabb(ray: &Ray3D, min_b: [f32; 3], max_b: [f32; 3]) -> Option<(f32, f32)> {
+    let inv_dx = if ray.dir[0].abs() > 1e-6 { 1.0 / ray.dir[0] } else { 1e6 };
+    let inv_dy = if ray.dir[1].abs() > 1e-6 { 1.0 / ray.dir[1] } else { 1e6 };
+    let inv_dz = if ray.dir[2].abs() > 1e-6 { 1.0 / ray.dir[2] } else { 1e6 };
+
+    let t1_x = (min_b[0] - ray.origin[0]) * inv_dx;
+    let t2_x = (max_b[0] - ray.origin[0]) * inv_dx;
+    let t_min_x = t1_x.min(t2_x);
+    let t_max_x = t1_x.max(t2_x);
+
+    let t1_y = (min_b[1] - ray.origin[1]) * inv_dy;
+    let t2_y = (max_b[1] - ray.origin[1]) * inv_dy;
+    let t_min_y = t1_y.min(t2_y);
+    let t_max_y = t1_y.max(t2_y);
+
+    let t1_z = (min_b[2] - ray.origin[2]) * inv_dz;
+    let t2_z = (max_b[2] - ray.origin[2]) * inv_dz;
+    let t_min_z = t1_z.min(t2_z);
+    let t_max_z = t1_z.max(t2_z);
+
+    let t_enter = t_min_x.max(t_min_y).max(t_min_z);
+    let t_exit = t_max_x.min(t_max_y).min(t_max_z);
+
+    if t_enter > t_exit || t_exit <= 0.0 {
+        None
+    } else {
+        Some((t_enter, t_exit))
+    }
+}
+
+/// Helper for volumetric sampling, circular dataset shifts, and 3D ray marching with hole penetration
+pub struct VolumeSampler<'a> {
+    pub width: usize,
+    pub height: usize,
+    pub depth: usize,
+    pub values: &'a [f32],
+    pub shift_x: usize,
+    pub shift_y: usize,
+    pub shift_z: usize,
+}
+
+impl<'a> VolumeSampler<'a> {
+    pub fn from_app(app: &'a OctantApp, matrix: &'a MatrixData) -> Self {
+        let (shift_x, shift_y, shift_z) = app.get_volume_shifts();
+        if let Some(v) = &app.volume_data {
+            Self {
+                width: v.width.max(1),
+                height: v.height.max(1),
+                depth: v.depth.max(1),
+                values: &v.values,
+                shift_x: shift_x as usize,
+                shift_y: shift_y as usize,
+                shift_z: shift_z as usize,
+            }
+        } else {
+            Self {
+                width: matrix.width.max(1),
+                height: matrix.height.max(1),
+                depth: 1,
+                values: &matrix.values,
+                shift_x: shift_x as usize,
+                shift_y: shift_y as usize,
+                shift_z: shift_z as usize,
+            }
+        }
+    }
+
+    pub fn sample_cell(&self, cx: usize, cy: usize, cz: usize) -> f32 {
+        let shifted_x = (cx + self.shift_x) % self.width;
+        let shifted_y = (cy + self.shift_y) % self.height;
+        let shifted_z = (cz + self.shift_z) % self.depth;
+        let idx = shifted_z * (self.width * self.height) + shifted_y * self.width + shifted_x;
+        self.values.get(idx).copied().unwrap_or(f32::NAN)
+    }
+
+    pub fn is_visible(&self, app: &OctantApp, val: f32) -> bool {
+        let is_nan = val.is_nan() || val.abs() > 1e30;
+        if is_nan {
+            app.use_nan_color
+        } else {
+            let in_low = app.use_lowclip || val >= app.color_range_min;
+            let in_high = app.use_highclip || val <= app.color_range_max;
+            in_low && in_high
+        }
+    }
+
+    /// Marches a ray through the 3D dataset.
+    /// `is_half_scale` is true for Volume bounds $[-0.5\times aspect, +0.5\times aspect]$
+    /// and false for PointCloud bounds $[-aspect, +aspect]$.
+    pub fn march_ray(
+        &self,
+        app: &OctantApp,
+        ray: &Ray3D,
+        aspects: (f32, f32, f32),
+        is_half_scale: bool,
+    ) -> Option<(usize, usize, usize, f32)> {
+        let (aspect_x, aspect_y, aspect_z) = aspects;
+        let scale = if is_half_scale { 0.5 } else { 1.0 };
+        let min_b = [-scale * aspect_x, -scale * aspect_y, -scale * aspect_z];
+        let max_b = [scale * aspect_x, scale * aspect_y, scale * aspect_z];
+
+        let (t_enter, t_exit) = intersect_aabb(ray, min_b, max_b)?;
+        let t_start = t_enter.max(0.0);
+        let t_end = t_exit;
+        let total_len = t_end - t_start;
+        if total_len <= 0.0 {
+            return None;
+        }
+
+        let max_dim = self.width.max(self.height).max(self.depth);
+        let num_steps = (max_dim * 3).clamp(64, 512);
+        let dt = total_len / num_steps as f32;
+
+        let mut hit_point = None;
+        let mut last_cell = None;
+        let mut max_intensity_hit = None;
+        let mut max_val = -1e30_f32;
+
+        for i in 0..num_steps {
+            let t = t_start + (i as f32 + 0.5) * dt;
+            let px_world = ray.origin[0] + t * ray.dir[0];
+            let py_world = ray.origin[1] + t * ray.dir[1];
+            let pz_world = ray.origin[2] + t * ray.dir[2];
+
+            let (u, v, w) = if is_half_scale {
+                let u = ((px_world / aspect_x.max(1e-4)) + 0.5).clamp(0.0, 1.0);
+                let v = ((py_world / aspect_y.max(1e-4)) + 0.5).clamp(0.0, 1.0);
+                let w = ((pz_world / aspect_z.max(1e-4)) + 0.5).clamp(0.0, 1.0);
+                (u, 1.0 - v, w)
+            } else {
+                let u = ((px_world / aspect_x.max(1e-4)) + 1.0) * 0.5;
+                let v = (1.0 - (py_world / aspect_y.max(1e-4))) * 0.5;
+                let w = ((pz_world / aspect_z.max(1e-4)) + 1.0) * 0.5;
+                (u, v, w)
+            };
+
+            if u >= 0.0 && u < 1.0 && v >= 0.0 && v < 1.0 && w >= 0.0 && w < 1.0 {
+                let cx = if is_half_scale {
+                    ((u * (self.width - 1) as f32).round() as usize).min(self.width - 1)
+                } else {
+                    ((u * self.width as f32).floor() as usize).min(self.width - 1)
+                };
+                let cy = if is_half_scale {
+                    ((v * (self.height - 1) as f32).round() as usize).min(self.height - 1)
+                } else {
+                    ((v * self.height as f32).floor() as usize).min(self.height - 1)
+                };
+                let cz = if is_half_scale {
+                    ((w * (self.depth - 1) as f32).round() as usize).min(self.depth - 1)
+                } else {
+                    ((w * self.depth as f32).floor() as usize).min(self.depth - 1)
+                };
+
+                if last_cell == Some((cx, cy, cz)) {
+                    continue;
+                }
+                last_cell = Some((cx, cy, cz));
+
+                let raw_val = self.sample_cell(cx, cy, cz);
+                let is_nan = raw_val.is_nan() || raw_val.abs() > 1e30;
+
+                if is_half_scale && app.active_plot_type == PlotType::Volume && app.volume_algorithm == 1 {
+                    // Isosurface mode
+                    if !is_nan && (raw_val - app.volume_isovalue).abs() <= app.volume_isorange {
+                        hit_point = Some((cx, cy, cz, raw_val));
+                        break;
+                    }
+                } else if is_half_scale && app.active_plot_type == PlotType::Volume && app.volume_algorithm == 2 {
+                    // MIP mode
+                    if !is_nan && raw_val > max_val {
+                        let is_visible = app.use_highclip || raw_val <= app.color_range_max;
+                        if is_visible {
+                            max_val = raw_val;
+                            max_intensity_hit = Some((cx, cy, cz, raw_val));
+                        }
+                    }
+                } else if self.is_visible(app, raw_val) {
+                    hit_point = Some((cx, cy, cz, raw_val));
+                    break;
+                }
+            }
+        }
+
+        if is_half_scale && app.active_plot_type == PlotType::Volume && app.volume_algorithm == 2 {
+            max_intensity_hit.or(hit_point)
+        } else {
+            hit_point
+        }
+    }
+}
+
+/// 2D Viewport Transformation Helper (Aspect-scaling, Zoom, Pan)
+#[derive(Clone, Copy, Debug)]
+pub struct Transform2D {
+    pub rect: Rect,
+    pub aspect_scale_x: f32,
+    pub aspect_scale_y: f32,
+    pub zoom: f32,
+    pub gpu_pan_x: f32,
+    pub gpu_pan_y: f32,
+}
+
+impl Transform2D {
+    pub fn from_app(app: &OctantApp, rect: Rect, matrix: &MatrixData) -> Self {
+        let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio {
+            let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.001);
+            let canvas_aspect = rect.width() / rect.height().max(1.0);
+            if canvas_aspect > data_aspect {
+                (data_aspect / canvas_aspect, 1.0)
+            } else {
+                (1.0, canvas_aspect / data_aspect)
+            }
+        } else {
+            (1.0, 1.0)
+        };
+
+        let zoom = app.heatmap_zoom;
+        let pan = app.heatmap_pan;
+        let gpu_pan_x = pan.x / (0.5 * rect.width().max(1.0));
+        let gpu_pan_y = -pan.y / (0.5 * rect.height().max(1.0));
+
+        Self {
+            rect,
+            aspect_scale_x,
+            aspect_scale_y,
+            zoom,
+            gpu_pan_x,
+            gpu_pan_y,
+        }
+    }
+
+    pub fn screen_to_norm(&self, screen_pos: Pos2) -> (f32, f32) {
+        let ndc_x = ((screen_pos.x - self.rect.min.x) / self.rect.width().max(1.0)) * 2.0 - 1.0;
+        let unpanned_x = (ndc_x - self.gpu_pan_x) / self.zoom.max(0.01);
+        let unscaled_x = unpanned_x / self.aspect_scale_x.max(0.001);
+        let nx = ((unscaled_x + 1.0) / 2.0).clamp(0.0, 1.0);
+
+        let ndc_y = 1.0 - ((screen_pos.y - self.rect.min.y) / self.rect.height().max(1.0)) * 2.0;
+        let unpanned_y = (ndc_y - self.gpu_pan_y) / self.zoom.max(0.01);
+        let unscaled_y = unpanned_y / self.aspect_scale_y.max(0.001);
+        let ny = ((1.0 - unscaled_y) / 2.0).clamp(0.0, 1.0);
+
+        (nx, ny)
+    }
+
+    pub fn norm_to_screen(&self, u: f32, v: f32) -> Pos2 {
+        let unscaled_x = u * 2.0 - 1.0;
+        let unpanned_x = unscaled_x * self.aspect_scale_x.max(0.001);
+        let ndc_x = unpanned_x * self.zoom.max(0.01) + self.gpu_pan_x;
+        let target_x = self.rect.min.x + ((ndc_x + 1.0) * 0.5) * self.rect.width();
+
+        let unscaled_y = 1.0 - v * 2.0;
+        let unpanned_y = unscaled_y * self.aspect_scale_y.max(0.001);
+        let ndc_y = unpanned_y * self.zoom.max(0.01) + self.gpu_pan_y;
+        let target_y = self.rect.min.y + ((1.0 - ndc_y) * 0.5) * self.rect.height();
+
+        Pos2::new(target_x, target_y)
+    }
+}
+
+/// Renders the reticle marker dot, calculates tooltip anchor, and draws the leader elbow line
+pub fn draw_leader_callout(
+    painter: &egui::Painter,
+    ctx: &egui::Context,
+    target_pos: Pos2,
+    tooltip_rect: Rect,
+) {
+    let visuals = &ctx.style_of(ctx.theme()).visuals;
+    let strong_color = visuals.strong_text_color();
+    let text_color = visuals.text_color();
+    let line_color = visuals.widgets.noninteractive.fg_stroke.color;
+
+    // 1. Target reticle marker dot
+    painter.circle_filled(target_pos, 7.0, text_color.linear_multiply(0.12));
+    painter.circle_filled(target_pos, 4.5, text_color.linear_multiply(0.25));
+    painter.circle_stroke(target_pos, 3.5, Stroke::new(1.2, strong_color));
+    painter.circle_filled(target_pos, 1.8, strong_color);
+
+    // 2. Compute anchor on tooltip box
+    let box_anchor = if tooltip_rect.min.x >= target_pos.x {
+        Pos2::new(tooltip_rect.min.x, (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0))
+    } else if tooltip_rect.max.x <= target_pos.x {
+        Pos2::new(tooltip_rect.max.x, (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0))
+    } else if tooltip_rect.min.y >= target_pos.y {
+        Pos2::new(target_pos.x, tooltip_rect.min.y)
+    } else {
+        Pos2::new(target_pos.x, tooltip_rect.max.y)
+    };
+
+    // 3. Elbow connector line
+    let elbow = Pos2::new(target_pos.x, box_anchor.y);
+    let leader_stroke = Stroke::new(1.2, line_color.linear_multiply(0.85));
+
+    painter.line_segment([target_pos, elbow], leader_stroke);
+    painter.line_segment([elbow, box_anchor], leader_stroke);
+
+    // 4. Subtle junction dot at the elbow vertex
+    painter.circle_filled(elbow, 1.5, strong_color.linear_multiply(0.8));
+}
 
 pub fn show_hover_tooltip(
     app: &OctantApp,
@@ -19,27 +431,18 @@ pub fn show_hover_tooltip(
         _ => return,
     };
 
+    let camera = Camera3D::from_app(app, rect);
+    let sampler = VolumeSampler::from_app(app, matrix);
+    let transform_2d = Transform2D::from_app(app, rect, matrix);
+
     // 1. Calculate Normalized Coordinates (norm_x, norm_y) considering 2D vs 3D Plot Mode
     let (norm_x, norm_y, is_valid_hit, geo_coords, point_3d_hit) = match app.active_plot_type {
         PlotType::Sphere => {
             // 3D Globe Projection Perspective Raycast supporting all Sphere Modes (Smooth, Steps, Lego)
-            let aspect_ratio = (rect.width() / rect.height().max(1.0)).max(0.01);
-            let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
-            let fov_scale = 1.6_f32;
-
-            // Map hover_pos to NDC in [-1, 1]
-            let clip_x = (hover_pos.x - rect.center().x) / (0.5 * rect.width().max(1.0));
-            let clip_y = -(hover_pos.y - rect.center().y) / (0.5 * rect.height().max(1.0));
-
-            // Camera ray in rotated view space
-            let dir_x = clip_x * aspect_ratio / fov_scale;
-            let dir_y = clip_y / fov_scale;
-            let dir_z = -1.0_f32;
-
-            let inv_len = 1.0 / (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
-            let dx = dir_x * inv_len;
-            let dy = dir_y * inv_len;
-            let dz = dir_z * inv_len;
+            let (view_ray, _) = camera.cast_ray(hover_pos);
+            let dx = view_ray.dir[0];
+            let dy = view_ray.dir[1];
+            let dz = view_ray.dir[2];
 
             let max_r = if app.sphere_mode > 0 {
                 1.0 + 0.4 * app.sphere_displacement_strength
@@ -47,8 +450,8 @@ pub fn show_hover_tooltip(
                 1.0
             };
 
-            let b = cam_dist * dz;
-            let c_max = cam_dist * cam_dist - max_r * max_r;
+            let b = camera.cam_dist * dz;
+            let c_max = camera.cam_dist * camera.cam_dist - max_r * max_r;
             let discr_max = b * b - c_max;
 
             if discr_max < 0.0 {
@@ -56,7 +459,7 @@ pub fn show_hover_tooltip(
             }
 
             let mut r = 1.0_f32;
-            let c = cam_dist * cam_dist - r * r;
+            let c = camera.cam_dist * camera.cam_dist - r * r;
             let discr = b * b - c;
             let t = if discr >= 0.0 {
                 -b - discr.sqrt()
@@ -66,23 +469,18 @@ pub fn show_hover_tooltip(
 
             let pos_rot_x = t * dx;
             let pos_rot_y = t * dy;
-            let pos_rot_z = cam_dist + t * dz;
+            let pos_rot_z = camera.cam_dist + t * dz;
 
             // Inverse rotate around X by -rx
-            let cx = app.sphere_rotation_x.cos();
-            let sx = app.sphere_rotation_x.sin();
             let pos_y_rot_x = pos_rot_x;
-            let pos_y_rot_y = cx * pos_rot_y + sx * pos_rot_z;
-            let pos_y_rot_z = -sx * pos_rot_y + cx * pos_rot_z;
+            let pos_y_rot_y = camera.cx * pos_rot_y + camera.sx * pos_rot_z;
+            let pos_y_rot_z = -camera.sx * pos_rot_y + camera.cx * pos_rot_z;
 
             // Inverse rotate around Y by -ry
-            let cy = app.sphere_rotation_y.cos();
-            let sy = app.sphere_rotation_y.sin();
-            let pos_3d_x = cy * pos_y_rot_x - sy * pos_y_rot_z;
+            let pos_3d_x = camera.cy * pos_y_rot_x - camera.sy * pos_y_rot_z;
             let pos_3d_y = pos_y_rot_y;
-            let pos_3d_z = sy * pos_y_rot_x + cy * pos_y_rot_z;
+            let pos_3d_z = camera.sy * pos_y_rot_x + camera.cy * pos_y_rot_z;
 
-            // Spherical coordinates (u, v) matching sphere.wgsl & sphere.rs
             let lat_rad = (pos_3d_y / r).clamp(-1.0, 1.0).asin();
             let lon_rad = pos_3d_x.atan2(pos_3d_z);
 
@@ -99,21 +497,21 @@ pub fn show_hover_tooltip(
                 let dr = get_normalized_radial_dr(app, cell_val);
                 r = 1.0 + dr;
 
-                let c_ref = cam_dist * cam_dist - r * r;
+                let c_ref = camera.cam_dist * camera.cam_dist - r * r;
                 let discr_ref = b * b - c_ref;
                 if discr_ref >= 0.0 {
                     let t_ref = -b - discr_ref.sqrt();
                     let pr_x = t_ref * dx;
                     let pr_y = t_ref * dy;
-                    let pr_z = cam_dist + t_ref * dz;
+                    let pr_z = camera.cam_dist + t_ref * dz;
 
                     let py_x = pr_x;
-                    let py_y = cx * pr_y + sx * pr_z;
-                    let py_z = -sx * pr_y + cx * pr_z;
+                    let py_y = camera.cx * pr_y + camera.sx * pr_z;
+                    let py_z = -camera.sx * pr_y + camera.cx * pr_z;
 
-                    let p3_x = cy * py_x - sy * py_z;
+                    let p3_x = camera.cy * py_x - camera.sy * py_z;
                     let p3_y = py_y;
-                    let p3_z = sy * py_x + cy * py_z;
+                    let p3_z = camera.sy * py_x + camera.cy * py_z;
 
                     let l_rad = (p3_y / r).clamp(-1.0, 1.0).asin();
                     let o_rad = p3_x.atan2(p3_z);
@@ -129,58 +527,20 @@ pub fn show_hover_tooltip(
         }
         PlotType::Surface => {
             // 3D Surface Projection Perspective Raycast supporting all Surface Modes (Terrain, Steps, Lego)
-            let aspect_ratio = (rect.width() / rect.height().max(1.0)).max(0.01);
-            let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
-            let fov_scale = 1.6_f32;
+            let (_, world_ray) = camera.cast_ray(hover_pos);
             let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.1);
 
-            // Map hover_pos to NDC in [-1, 1]
-            let clip_x = (hover_pos.x - rect.center().x) / (0.5 * rect.width().max(1.0));
-            let clip_y = -(hover_pos.y - rect.center().y) / (0.5 * rect.height().max(1.0));
-
-            // Camera ray in view space
-            let dir_x = clip_x * aspect_ratio / fov_scale;
-            let dir_y = clip_y / fov_scale;
-            let dir_z = -1.0_f32;
-
-            let inv_len = 1.0 / (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
-            let dx = dir_x * inv_len;
-            let dy = dir_y * inv_len;
-            let dz = dir_z * inv_len;
-
-            // Transform ray origin and direction into Model World space
-            let cx = app.sphere_rotation_x.cos();
-            let sx = app.sphere_rotation_x.sin();
-            let cy = app.sphere_rotation_y.cos();
-            let sy = app.sphere_rotation_y.sin();
-
-            let o1_y = sx * cam_dist;
-            let o1_z = cx * cam_dist;
-
-            let d1_x = dx;
-            let d1_y = cx * dy + sx * dz;
-            let d1_z = -sx * dy + cx * dz;
-
-            let o_world_x = -sy * o1_z;
-            let o_world_y = o1_y;
-            let o_world_z = cy * o1_z;
-
-            let d_world_x = cy * d1_x - sy * d1_z;
-            let d_world_y = d1_y;
-            let d_world_z = sy * d1_x + cy * d1_z;
-
-            if d_world_y.abs() < 1e-5 {
+            if world_ray.dir[1].abs() < 1e-5 {
                 return;
             }
 
-            // Ray-plane intersection with base plane Y = 0.0
-            let t0 = -o_world_y / d_world_y;
+            let t0 = -world_ray.origin[1] / world_ray.dir[1];
             if t0 <= 0.0 {
                 return;
             }
 
-            let hit_x = o_world_x + t0 * d_world_x;
-            let hit_z = o_world_z + t0 * d_world_z;
+            let hit_x = world_ray.origin[0] + t0 * world_ray.dir[0];
+            let hit_z = world_ray.origin[2] + t0 * world_ray.dir[2];
 
             let mut u = ((hit_x / data_aspect) + 1.0) * 0.5;
             let mut v = (hit_z + 1.0) * 0.5;
@@ -189,17 +549,16 @@ pub fn show_hover_tooltip(
                 return;
             }
 
-            // Refine with cell's actual displaced height
             let px = ((u.clamp(0.0, 1.0) * matrix.width as f32).floor() as usize).min(matrix.width.saturating_sub(1));
             let py = ((v.clamp(0.0, 1.0) * matrix.height as f32).floor() as usize).min(matrix.height.saturating_sub(1));
             let cell_val = matrix.values.get(py * matrix.width + px).copied().unwrap_or(f32::NAN);
             let h = get_normalized_surface_height(app, cell_val);
             let target_h = if app.surface_mode == 2 { h.max(0.0) } else { h };
 
-            let t_ref = (target_h - o_world_y) / d_world_y;
+            let t_ref = (target_h - world_ray.origin[1]) / world_ray.dir[1];
             if t_ref > 0.0 {
-                let ref_x = o_world_x + t_ref * d_world_x;
-                let ref_z = o_world_z + t_ref * d_world_z;
+                let ref_x = world_ray.origin[0] + t_ref * world_ray.dir[0];
+                let ref_z = world_ray.origin[2] + t_ref * world_ray.dir[2];
                 let u_ref = ((ref_x / data_aspect) + 1.0) * 0.5;
                 let v_ref = (ref_z + 1.0) * 0.5;
                 if u_ref >= -0.05 && u_ref <= 1.05 && v_ref >= -0.05 && v_ref <= 1.05 {
@@ -214,323 +573,32 @@ pub fn show_hover_tooltip(
             (nx, ny, true, None, None)
         }
         PlotType::PointCloud => {
-            // 3D Point Cloud Exact Volumetric Ray Marching (Top, Bottom, Sides, Front, Back & Hole Penetration)
-            let screen_aspect = (rect.width() / rect.height().max(1.0)).max(0.01);
-            let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
-            let fov_scale = 1.6_f32;
-            let (aspect_x, aspect_y, aspect_z) = app.get_3d_aspect_ratio();
+            // 3D Point Cloud Volumetric Ray Marching
+            let (_, world_ray) = camera.cast_ray(hover_pos);
+            let aspects = app.get_3d_aspect_ratio();
 
-            let (grid_w, grid_h, grid_d, values): (usize, usize, usize, &[f32]) =
-                if let Some(v) = &app.volume_data {
-                    (v.width.max(1), v.height.max(1), v.depth.max(1), &v.values)
-                } else {
-                    (matrix.width.max(1), matrix.height.max(1), 1, &matrix.values)
-                };
-
-            let (shift_x, shift_y, shift_z) = app.get_volume_shifts();
-
-            // Map hover_pos to NDC in [-1, 1]
-            let clip_x = (hover_pos.x - rect.center().x) / (0.5 * rect.width().max(1.0));
-            let clip_y = -(hover_pos.y - rect.center().y) / (0.5 * rect.height().max(1.0));
-
-            // Camera ray in view space
-            let dir_x = clip_x * screen_aspect / fov_scale;
-            let dir_y = clip_y / fov_scale;
-            let dir_z = -1.0_f32;
-
-            let inv_len = 1.0 / (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
-            let dx = dir_x * inv_len;
-            let dy = dir_y * inv_len;
-            let dz = dir_z * inv_len;
-
-            // Transform ray into Model World Space
-            let cx = app.sphere_rotation_x.cos();
-            let sx = app.sphere_rotation_x.sin();
-            let cy = app.sphere_rotation_y.cos();
-            let sy = app.sphere_rotation_y.sin();
-
-            let o1_y = sx * cam_dist;
-            let o1_z = cx * cam_dist;
-
-            let d1_x = dx;
-            let d1_y = cx * dy + sx * dz;
-            let d1_z = -sx * dy + cx * dz;
-
-            let o_world_x = -sy * o1_z;
-            let o_world_y = o1_y;
-            let o_world_z = cy * o1_z;
-
-            let d_world_x = cy * d1_x - sy * d1_z;
-            let d_world_y = d1_y;
-            let d_world_z = sy * d1_x + cy * d1_z;
-
-            // Intersect ray with oriented 3D point cloud bounding box
-            let inv_dx = if d_world_x.abs() > 1e-6 { 1.0 / d_world_x } else { 1e6 };
-            let inv_dy = if d_world_y.abs() > 1e-6 { 1.0 / d_world_y } else { 1e6 };
-            let inv_dz = if d_world_z.abs() > 1e-6 { 1.0 / d_world_z } else { 1e6 };
-
-            let t1_x = (-aspect_x - o_world_x) * inv_dx;
-            let t2_x = (aspect_x - o_world_x) * inv_dx;
-            let t_min_x = t1_x.min(t2_x);
-            let t_max_x = t1_x.max(t2_x);
-
-            let t1_y = (-aspect_y - o_world_y) * inv_dy;
-            let t2_y = (aspect_y - o_world_y) * inv_dy;
-            let t_min_y = t1_y.min(t2_y);
-            let t_max_y = t1_y.max(t2_y);
-
-            let t1_z = (-aspect_z - o_world_z) * inv_dz;
-            let t2_z = (aspect_z - o_world_z) * inv_dz;
-            let t_min_z = t1_z.min(t2_z);
-            let t_max_z = t1_z.max(t2_z);
-
-            let t_enter = t_min_x.max(t_min_y).max(t_min_z);
-            let t_exit = t_max_x.min(t_max_y).min(t_max_z);
-
-            if t_enter > t_exit || t_exit <= 0.0 {
-                return;
-            }
-
-            let t_start = t_enter.max(0.0);
-            let t_end = t_exit;
-            let total_len = t_end - t_start;
-            if total_len <= 0.0 {
-                return;
-            }
-
-            let max_dim = grid_w.max(grid_h).max(grid_d);
-            let num_steps = (max_dim * 3).clamp(64, 512);
-            let dt = total_len / num_steps as f32;
-
-            let mut hit_point = None;
-            let mut last_cell = None;
-
-            for i in 0..num_steps {
-                let t = t_start + (i as f32 + 0.5) * dt;
-                let px_world = o_world_x + t * d_world_x;
-                let py_world = o_world_y + t * d_world_y;
-                let pz_world = o_world_z + t * d_world_z;
-
-                let u = ((px_world / aspect_x.max(1e-4)) + 1.0) * 0.5;
-                let v = (1.0 - (py_world / aspect_y.max(1e-4))) * 0.5;
-                let w = ((pz_world / aspect_z.max(1e-4)) + 1.0) * 0.5;
-
-                if u >= 0.0 && u < 1.0 && v >= 0.0 && v < 1.0 && w >= 0.0 && w < 1.0 {
-                    let cx = ((u * grid_w as f32).floor() as usize).min(grid_w - 1);
-                    let cy = ((v * grid_h as f32).floor() as usize).min(grid_h - 1);
-                    let cz = ((w * grid_d as f32).floor() as usize).min(grid_d - 1);
-
-                    if last_cell == Some((cx, cy, cz)) {
-                        continue;
-                    }
-                    last_cell = Some((cx, cy, cz));
-
-                    let shifted_x = (cx + shift_x as usize) % grid_w;
-                    let shifted_y = (cy + shift_y as usize) % grid_h;
-                    let shifted_z = (cz + shift_z as usize) % grid_d;
-                    let idx = shifted_z * (grid_w * grid_h) + shifted_y * grid_w + shifted_x;
-
-                    if let Some(&raw_val) = values.get(idx) {
-                        let is_nan = raw_val.is_nan() || raw_val.abs() > 1e30;
-                        let is_visible = if is_nan {
-                            app.use_nan_color
-                        } else {
-                            let in_low = app.use_lowclip || raw_val >= app.color_range_min;
-                            let in_high = app.use_highclip || raw_val <= app.color_range_max;
-                            in_low && in_high
-                        };
-
-                        if is_visible {
-                            hit_point = Some((cx, cy, cz, raw_val));
-                            break;
-                        }
-                    }
-                }
-            }
-
-            let (hit_x, hit_y, hit_z, hit_val) = match hit_point {
+            let (hit_x, hit_y, hit_z, hit_val) = match sampler.march_ray(app, &world_ray, aspects, false) {
                 Some(hit) => hit,
                 None => return,
             };
 
-            let nx = (hit_x as f32 + 0.5) / grid_w as f32;
-            let ny = (hit_y as f32 + 0.5) / grid_h as f32;
+            let nx = (hit_x as f32 + 0.5) / sampler.width as f32;
+            let ny = (hit_y as f32 + 0.5) / sampler.height as f32;
 
             (nx, ny, true, None, Some((hit_x, hit_y, hit_z, hit_val)))
         }
         PlotType::Volume => {
-            // 3D Volume Volumetric Ray Marching supporting all Algorithms (Isosurface, MIP, Threshold, Absorption, etc.)
-            let screen_aspect = (rect.width() / rect.height().max(1.0)).max(0.01);
-            let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
-            let fov_scale = 1.6_f32;
-            let (aspect_x, aspect_y, aspect_z) = app.get_3d_aspect_ratio();
+            // 3D Volume Volumetric Ray Marching
+            let (_, world_ray) = camera.cast_ray(hover_pos);
+            let aspects = app.get_3d_aspect_ratio();
 
-            let (grid_w, grid_h, grid_d, values): (usize, usize, usize, &[f32]) =
-                if let Some(v) = &app.volume_data {
-                    (v.width.max(1), v.height.max(1), v.depth.max(1), &v.values)
-                } else {
-                    (matrix.width.max(1), matrix.height.max(1), 1, &matrix.values)
-                };
-
-            let (shift_x, shift_y, shift_z) = app.get_volume_shifts();
-
-            // Map hover_pos to NDC in [-1, 1]
-            let clip_x = (hover_pos.x - rect.center().x) / (0.5 * rect.width().max(1.0));
-            let clip_y = -(hover_pos.y - rect.center().y) / (0.5 * rect.height().max(1.0));
-
-            // Camera ray in view space
-            let dir_x = clip_x * screen_aspect / fov_scale;
-            let dir_y = clip_y / fov_scale;
-            let dir_z = -1.0_f32;
-
-            let inv_len = 1.0 / (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
-            let dx = dir_x * inv_len;
-            let dy = dir_y * inv_len;
-            let dz = dir_z * inv_len;
-
-            // Transform ray into Model World Space
-            let cx = app.sphere_rotation_x.cos();
-            let sx = app.sphere_rotation_x.sin();
-            let cy = app.sphere_rotation_y.cos();
-            let sy = app.sphere_rotation_y.sin();
-
-            let o1_y = sx * cam_dist;
-            let o1_z = cx * cam_dist;
-
-            let d1_x = dx;
-            let d1_y = cx * dy + sx * dz;
-            let d1_z = -sx * dy + cx * dz;
-
-            let o_world_x = -sy * o1_z;
-            let o_world_y = o1_y;
-            let o_world_z = cy * o1_z;
-
-            let d_world_x = cy * d1_x - sy * d1_z;
-            let d_world_y = d1_y;
-            let d_world_z = sy * d1_x + cy * d1_z;
-
-            // Intersect ray with Volume oriented bounding box [-0.5*aspect, +0.5*aspect]
-            let half_x = 0.5 * aspect_x;
-            let half_y = 0.5 * aspect_y;
-            let half_z = 0.5 * aspect_z;
-
-            let inv_dx = if d_world_x.abs() > 1e-6 { 1.0 / d_world_x } else { 1e6 };
-            let inv_dy = if d_world_y.abs() > 1e-6 { 1.0 / d_world_y } else { 1e6 };
-            let inv_dz = if d_world_z.abs() > 1e-6 { 1.0 / d_world_z } else { 1e6 };
-
-            let t1_x = (-half_x - o_world_x) * inv_dx;
-            let t2_x = (half_x - o_world_x) * inv_dx;
-            let t_min_x = t1_x.min(t2_x);
-            let t_max_x = t1_x.max(t2_x);
-
-            let t1_y = (-half_y - o_world_y) * inv_dy;
-            let t2_y = (half_y - o_world_y) * inv_dy;
-            let t_min_y = t1_y.min(t2_y);
-            let t_max_y = t1_y.max(t2_y);
-
-            let t1_z = (-half_z - o_world_z) * inv_dz;
-            let t2_z = (half_z - o_world_z) * inv_dz;
-            let t_min_z = t1_z.min(t2_z);
-            let t_max_z = t1_z.max(t2_z);
-
-            let t_enter = t_min_x.max(t_min_y).max(t_min_z);
-            let t_exit = t_max_x.min(t_max_y).min(t_max_z);
-
-            if t_enter > t_exit || t_exit <= 0.0 {
-                return;
-            }
-
-            let t_start = t_enter.max(0.0);
-            let t_end = t_exit;
-            let total_len = t_end - t_start;
-            if total_len <= 0.0 {
-                return;
-            }
-
-            let max_dim = grid_w.max(grid_h).max(grid_d);
-            let num_steps = (max_dim * 3).clamp(64, 512);
-            let dt = total_len / num_steps as f32;
-
-            let mut hit_point = None;
-            let mut last_cell = None;
-            let mut max_intensity_hit = None;
-            let mut max_val = -1e30_f32;
-
-            for i in 0..num_steps {
-                let t = t_start + (i as f32 + 0.5) * dt;
-                let px_world = o_world_x + t * d_world_x;
-                let py_world = o_world_y + t * d_world_y;
-                let pz_world = o_world_z + t * d_world_z;
-
-                // Map to normalized texCoord [0, 1]
-                let u = ((px_world / aspect_x.max(1e-4)) + 0.5).clamp(0.0, 1.0);
-                let v = ((py_world / aspect_y.max(1e-4)) + 0.5).clamp(0.0, 1.0);
-                let w = ((pz_world / aspect_z.max(1e-4)) + 0.5).clamp(0.0, 1.0);
-
-                let norm_y = 1.0 - v;
-                let cx = ((u * (grid_w - 1) as f32).round() as usize).min(grid_w - 1);
-                let cy = ((norm_y * (grid_h - 1) as f32).round() as usize).min(grid_h - 1);
-                let cz = ((w * (grid_d - 1) as f32).round() as usize).min(grid_d - 1);
-
-                if last_cell == Some((cx, cy, cz)) {
-                    continue;
-                }
-                last_cell = Some((cx, cy, cz));
-
-                let shifted_x = (cx + shift_x as usize) % grid_w;
-                let shifted_y = (cy + shift_y as usize) % grid_h;
-                let shifted_z = (cz + shift_z as usize) % grid_d;
-                let idx = shifted_z * (grid_w * grid_h) + shifted_y * grid_w + shifted_x;
-
-                if let Some(&raw_val) = values.get(idx) {
-                    let is_nan = raw_val.is_nan() || raw_val.abs() > 1e30;
-
-                    if app.volume_algorithm == 1 {
-                        // Isosurface mode
-                        if !is_nan && (raw_val - app.volume_isovalue).abs() <= app.volume_isorange {
-                            hit_point = Some((cx, cy, cz, raw_val));
-                            break;
-                        }
-                    } else if app.volume_algorithm == 2 {
-                        // MIP mode
-                        if !is_nan && raw_val > max_val {
-                            let is_visible = app.use_highclip || raw_val <= app.color_range_max;
-                            if is_visible {
-                                max_val = raw_val;
-                                max_intensity_hit = Some((cx, cy, cz, raw_val));
-                            }
-                        }
-                    } else {
-                        // Standard volume raymarching (Threshold, Absorption, Additive, Indexed, Contours)
-                        let is_visible = if is_nan {
-                            app.use_nan_color
-                        } else {
-                            let in_low = app.use_lowclip || raw_val >= app.color_range_min;
-                            let in_high = app.use_highclip || raw_val <= app.color_range_max;
-                            in_low && in_high
-                        };
-
-                        if is_visible {
-                            hit_point = Some((cx, cy, cz, raw_val));
-                            break;
-                        }
-                    }
-                }
-            }
-
-            let hit = if app.volume_algorithm == 2 {
-                max_intensity_hit.or(hit_point)
-            } else {
-                hit_point
-            };
-
-            let (hit_x, hit_y, hit_z, hit_val) = match hit {
-                Some(h) => h,
+            let (hit_x, hit_y, hit_z, hit_val) = match sampler.march_ray(app, &world_ray, aspects, true) {
+                Some(hit) => hit,
                 None => return,
             };
 
-            let nx = (hit_x as f32 + 0.5) / grid_w as f32;
-            let ny = (hit_y as f32 + 0.5) / grid_h as f32;
+            let nx = (hit_x as f32 + 0.5) / sampler.width as f32;
+            let ny = (hit_y as f32 + 0.5) / sampler.height as f32;
 
             (nx, ny, true, None, Some((hit_x, hit_y, hit_z, hit_val)))
         }
@@ -547,41 +615,13 @@ pub fn show_hover_tooltip(
 
             let ndc_y = 1.0 - ((hover_pos.y - rect.min.y) / rect.height().max(1.0)) * 2.0;
             let unpanned_y = (ndc_y - gpu_pan_y) / zoom.max(0.01);
-            let ny = ((unpanned_y + 1.0) / 2.0).clamp(0.0, 1.0);
+            let ny = ((1.0 - unpanned_y) / 2.0).clamp(0.0, 1.0);
 
             (nx, ny, is_inside, None, None)
         }
         _ => {
             // 2D Heatmap Direct Mapping within canvas_rect
-            let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio
-                && let Some(matrix) = &app.matrix_data
-            {
-                let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.001);
-                let canvas_aspect = rect.width() / rect.height().max(1.0);
-                if canvas_aspect > data_aspect {
-                    (data_aspect / canvas_aspect, 1.0)
-                } else {
-                    (1.0, canvas_aspect / data_aspect)
-                }
-            } else {
-                (1.0, 1.0)
-            };
-
-            let zoom = app.heatmap_zoom;
-            let pan = app.heatmap_pan;
-            let gpu_pan_x = pan.x / (0.5 * rect.width().max(1.0));
-            let gpu_pan_y = -pan.y / (0.5 * rect.height().max(1.0));
-
-            let ndc_x = ((hover_pos.x - rect.min.x) / rect.width().max(1.0)) * 2.0 - 1.0;
-            let unpanned_x = (ndc_x - gpu_pan_x) / zoom.max(0.01);
-            let unscaled_x = unpanned_x / aspect_scale_x.max(0.001);
-            let nx = ((unscaled_x + 1.0) / 2.0).clamp(0.0, 1.0);
-
-            let ndc_y = 1.0 - ((hover_pos.y - rect.min.y) / rect.height().max(1.0)) * 2.0;
-            let unpanned_y = (ndc_y - gpu_pan_y) / zoom.max(0.01);
-            let unscaled_y = unpanned_y / aspect_scale_y.max(0.001);
-            let ny = ((1.0 - unscaled_y) / 2.0).clamp(0.0, 1.0);
-
+            let (nx, ny) = transform_2d.screen_to_norm(hover_pos);
             let is_inside = rect.contains(hover_pos);
             (nx, ny, is_inside, None, None)
         }
@@ -606,20 +646,25 @@ pub fn show_hover_tooltip(
 
     let var_name = var
         .map(|v| v.name.clone())
-        .unwrap_or_else(|| "Scalar Field".to_string());
+        .unwrap_or_else(|| "variable".to_string());
 
     let units_str = var
         .and_then(|v| {
             v.units
-                .as_ref()
-                .or_else(|| v.attributes.get("units"))
-                .or_else(|| v.attributes.get("unit"))
-                .or_else(|| v.attributes.get("UNITS"))
+                .as_deref()
+                .or(v.attributes.get("units").map(|s| s.as_str()))
         })
-        .map(|u| format!(" [{u}]"))
+        .map(|u| {
+            let clean = u.trim();
+            if clean.is_empty() || clean == "1" || clean == "none" || clean == "dimensionless" {
+                String::new()
+            } else {
+                format!("\u{00A0}{}", clean)
+            }
+        })
         .unwrap_or_default();
 
-    // 3. Extract Pixel Value & Location Info based on Active Plot Type
+    // 3. Coordinate String Formatting & Series Detection
     let (raw_val, dim_entries, px, py) = if app.active_plot_type == PlotType::Line {
         let (profile_values, profile_length, line_count) = app.get_line_profile_payload();
         let prof_len = profile_length as usize;
@@ -714,12 +759,6 @@ pub fn show_hover_tooltip(
         let pz = hit_z;
         let val = hit_val;
 
-        let (grid_w, grid_h, grid_d) = if let Some(v) = &app.volume_data {
-            (v.width.max(1), v.height.max(1), v.depth.max(1))
-        } else {
-            (matrix.width.max(1), matrix.height.max(1), 1)
-        };
-
         let entries = if let Some(v) = var {
             let (explicit_x, explicit_y, explicit_z) =
                 v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
@@ -738,34 +777,32 @@ pub fn show_hover_tooltip(
                 .cloned()
                 .unwrap_or_else(|| "x".to_string());
 
-            let loc_y = format_dimension_coord(meta, &dim_y_name, py, grid_h, None);
-            let loc_x = format_dimension_coord(meta, &dim_x_name, px, grid_w, None);
+            let loc_y = format_dimension_coord(meta, &dim_y_name, py, sampler.height, None);
+            let loc_x = format_dimension_coord(meta, &dim_x_name, px, sampler.width, None);
 
             let mut list = vec![loc_y, loc_x];
 
-            if grid_d > 1 {
+            if sampler.depth > 1 {
                 let dim_z_name = explicit_z
                     .and_then(|i| v.dimension_names.get(i))
                     .cloned()
                     .unwrap_or_else(|| "z".to_string());
-                let loc_z = format_dimension_coord(meta, &dim_z_name, pz, grid_d, None);
+                let loc_z = format_dimension_coord(meta, &dim_z_name, pz, sampler.depth, None);
                 list.insert(0, loc_z);
             }
 
             list
+        } else if sampler.depth > 1 {
+            vec![
+                format!("z:\u{00A0}{}/{}", pz + 1, sampler.depth),
+                format!("y:\u{00A0}{}/{}", py + 1, sampler.height),
+                format!("x:\u{00A0}{}/{}", px + 1, sampler.width),
+            ]
         } else {
-            if grid_d > 1 {
-                vec![
-                    format!("z:\u{00A0}{}/{}", pz + 1, grid_d),
-                    format!("y:\u{00A0}{}/{}", py + 1, grid_h),
-                    format!("x:\u{00A0}{}/{}", px + 1, grid_w),
-                ]
-            } else {
-                vec![
-                    format!("y:\u{00A0}{}/{}", py + 1, grid_h),
-                    format!("x:\u{00A0}{}/{}", px + 1, grid_w),
-                ]
-            }
+            vec![
+                format!("y:\u{00A0}{}/{}", py + 1, sampler.height),
+                format!("x:\u{00A0}{}/{}", px + 1, sampler.width),
+            ]
         };
 
         (val, entries, px, py)
@@ -773,6 +810,7 @@ pub fn show_hover_tooltip(
         let px = if app.active_plot_type == PlotType::Sphere
             || app.active_plot_type == PlotType::Surface
             || app.active_plot_type == PlotType::PointCloud
+            || app.active_plot_type == PlotType::Volume
         {
             ((norm_x * matrix.width as f32).floor() as usize).min(matrix.width.saturating_sub(1))
         } else {
@@ -781,6 +819,7 @@ pub fn show_hover_tooltip(
         let py = if app.active_plot_type == PlotType::Sphere
             || app.active_plot_type == PlotType::Surface
             || app.active_plot_type == PlotType::PointCloud
+            || app.active_plot_type == PlotType::Volume
         {
             ((norm_y * matrix.height as f32).floor() as usize).min(matrix.height.saturating_sub(1))
         } else {
@@ -897,433 +936,150 @@ pub fn show_hover_tooltip(
                     )
                 };
 
-                let time_display = format!(
-                    "{}:\u{00A0}{}",
-                    step_dim_name,
-                    formatted_val.replace(' ', "\u{00A0}")
-                );
-                list.push(time_display);
+                let loc_t = format!("{}:\u{00A0}{}", step_dim_name, formatted_val);
+                list.insert(0, loc_t);
             }
 
             list
         } else {
-            vec![format!("y:\u{00A0}{}", py), format!("x:\u{00A0}{}", px)]
+            vec![
+                format!("y:\u{00A0}{}/{}", py + 1, matrix.height),
+                format!("x:\u{00A0}{}/{}", px + 1, matrix.width),
+            ]
         };
 
         (val, entries, px, py)
     };
 
-    // 4. Draw Glowing Reticle Marker Dot & Guide Line on 1D Line Plot
+    // 4. Draw Glowing Reticle Marker Dot & Guide Lines on 1D Line Plot
     if app.active_plot_type == PlotType::Line {
-        let (profile_values, profile_length, line_count) = app.get_line_profile_payload();
+        let (_, profile_length, _) = app.get_line_profile_payload();
         let prof_len = profile_length as usize;
-        let l_count = line_count as usize;
-        if prof_len > 0 && !profile_values.is_empty() {
-            let sample_idx = px.min(prof_len - 1);
-            let line_idx = py.min(l_count.saturating_sub(1));
-            let data_idx = line_idx * prof_len + sample_idx;
-            let val = profile_values.get(data_idx).copied().unwrap_or(raw_val);
+        let norm_x_step = if prof_len > 1 {
+            px as f32 / (prof_len - 1) as f32
+        } else {
+            0.5
+        };
 
-            let min_val = app.color_range_min;
-            let max_val = app.color_range_max;
-            let range = (max_val - min_val).max(1e-6);
+        let zoom = app.line_zoom;
+        let gpu_pan_x = app.line_pan.x / (0.5 * rect.width().max(1.0));
+        let gpu_pan_y = -app.line_pan.y / (0.5 * rect.height().max(1.0));
 
-            let vertex_norm_x = if prof_len > 1 {
-                (sample_idx as f32 / (prof_len - 1) as f32) * 2.0 - 1.0
-            } else {
-                0.0
-            };
-            let vertex_norm_y = if val.is_nan() {
-                -1.0
-            } else {
-                (((val - min_val) / range) * 2.0 - 1.0).clamp(-1.0, 1.0)
-            };
+        let ndc_x = (norm_x_step * 2.0 - 1.0) * zoom + gpu_pan_x;
+        let screen_dot_x = rect.min.x + (ndc_x + 1.0) * 0.5 * rect.width();
 
-            let zoom = app.line_zoom;
-            let gpu_pan_x = app.line_pan.x / (0.5 * rect.width().max(1.0));
-            let gpu_pan_y = -app.line_pan.y / (0.5 * rect.height().max(1.0));
+        let cmin = app.color_range_min;
+        let cmax = app.color_range_max;
+        let range = (cmax - cmin).max(1e-6);
 
-            let transformed_pos_x = vertex_norm_x * zoom + gpu_pan_x;
-            let transformed_pos_y = vertex_norm_y * zoom + gpu_pan_y;
+        let norm_y_val = if !raw_val.is_nan() && raw_val.is_finite() {
+            ((raw_val - cmin) / range).clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
 
-            let dot_x = rect.min.x + ((transformed_pos_x + 1.0) / 2.0) * rect.width();
-            let dot_y = rect.min.y + ((1.0 - transformed_pos_y) / 2.0) * rect.height();
-            let dot_pos = Pos2::new(dot_x, dot_y);
+        let ndc_y = (norm_y_val * 2.0 - 1.0) * zoom + gpu_pan_y;
+        let screen_dot_y = rect.min.y + (1.0 - ndc_y) * 0.5 * rect.height();
 
-            // Compute data/axis bounds on screen for guidelines (spanning full axis range from start to end)
-            let x_start_ndc = -1.0 * zoom + gpu_pan_x;
-            let x_end_ndc = 1.0 * zoom + gpu_pan_x;
-            let y_top_ndc = 1.0 * zoom + gpu_pan_y;
-            let y_bottom_ndc = -1.0 * zoom + gpu_pan_y;
+        let marker_pos = Pos2::new(screen_dot_x, screen_dot_y);
 
-            let x_line_start = rect.min.x + ((x_start_ndc + 1.0) / 2.0) * rect.width();
-            let x_line_end = rect.min.x + ((x_end_ndc + 1.0) / 2.0) * rect.width();
-            let y_line_top = rect.min.y + ((1.0 - y_top_ndc) / 2.0) * rect.height();
-            let y_line_bottom = rect.min.y + ((1.0 - y_bottom_ndc) / 2.0) * rect.height();
+        let visuals = &ctx.style_of(ctx.theme()).visuals;
+        let strong_color = visuals.strong_text_color();
+        let guideline_color = visuals.widgets.noninteractive.bg_stroke.color;
 
-            let x_axis_min = x_line_start.min(x_line_end).clamp(rect.min.x, rect.max.x);
-            let x_axis_max = x_line_start.max(x_line_end).clamp(rect.min.x, rect.max.x);
-            let y_axis_min = y_line_top.min(y_line_bottom).clamp(rect.min.y, rect.max.y);
-            let y_axis_max = y_line_top.max(y_line_bottom).clamp(rect.min.y, rect.max.y);
+        let painter = ui.painter();
 
-            let visuals = &ctx.style_of(ctx.theme()).visuals;
-            let strong_color = visuals.strong_text_color();
-            let text_color = visuals.text_color();
-            let line_color = visuals.widgets.noninteractive.fg_stroke.color;
+        // Crosshair guidelines from axis to axis
+        painter.line_segment(
+            [Pos2::new(rect.min.x, marker_pos.y), Pos2::new(rect.max.x, marker_pos.y)],
+            Stroke::new(1.0, guideline_color),
+        );
+        painter.line_segment(
+            [Pos2::new(marker_pos.x, rect.min.y), Pos2::new(marker_pos.x, rect.max.y)],
+            Stroke::new(1.0, guideline_color),
+        );
 
-            let painter = ui.painter();
-
-            // Full-span Vertical guideline from top axis limit to bottom axis limit
-            if dot_x >= rect.min.x && dot_x <= rect.max.x {
-                painter.line_segment(
-                    [Pos2::new(dot_x, y_axis_min), Pos2::new(dot_x, y_axis_max)],
-                    Stroke::new(1.0, line_color.linear_multiply(0.7)),
-                );
-            }
-
-            // Full-span Horizontal guideline from left axis limit to right axis limit
-            if dot_y >= rect.min.y && dot_y <= rect.max.y {
-                painter.line_segment(
-                    [Pos2::new(x_axis_min, dot_y), Pos2::new(x_axis_max, dot_y)],
-                    Stroke::new(1.0, line_color.linear_multiply(0.7)),
-                );
-            }
-
-            // Only draw reticle dot if inside visible canvas
-            if rect.contains(dot_pos) {
-                // Subtle system theme aura halo
-                painter.circle_filled(dot_pos, 8.0, text_color.linear_multiply(0.12));
-                painter.circle_filled(dot_pos, 5.0, text_color.linear_multiply(0.25));
-
-                // Inner high-contrast system ring
-                painter.circle_stroke(dot_pos, 4.0, Stroke::new(1.5, strong_color));
-
-                // Solid system center core
-                painter.circle_filled(dot_pos, 2.0, strong_color);
-            }
-        }
+        // Reticle dot
+        painter.circle_filled(marker_pos, 6.0, strong_color.linear_multiply(0.15));
+        painter.circle_filled(marker_pos, 4.0, strong_color.linear_multiply(0.35));
+        painter.circle_stroke(marker_pos, 3.0, Stroke::new(1.2, strong_color));
+        painter.circle_filled(marker_pos, 1.5, strong_color);
     }
 
-    // 5. Draw Subtle Reticle Dot & Crosshair on 2D Canvas
-    if app.active_plot_type == PlotType::Heatmap {
-        let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio
-            && let Some(matrix) = &app.matrix_data
-        {
-            let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.001);
-            let canvas_aspect = rect.width() / rect.height().max(1.0);
-            if canvas_aspect > data_aspect {
-                (data_aspect / canvas_aspect, 1.0)
+    // 5. Forward-Project Exact Center of Hovered Point / Face / Particle to Screen Space
+    let target_pos = match app.active_plot_type {
+        PlotType::Sphere => {
+            let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
+            let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
+
+            let dr = get_normalized_radial_dr(app, raw_val);
+            let r = 1.0 + dr;
+
+            let lon_c = (u_c * 2.0 - 1.0) * std::f32::consts::PI;
+            let lat_c = (0.5 - v_c) * std::f32::consts::PI;
+
+            let world_x = r * lat_c.cos() * lon_c.sin();
+            let world_y = r * lat_c.sin();
+            let world_z = r * lat_c.cos() * lon_c.cos();
+
+            camera.project_point([world_x, world_y, world_z])
+        }
+        PlotType::Surface => {
+            let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.1);
+            let height = get_normalized_surface_height(app, raw_val);
+            let world_y = if app.surface_mode == 2 {
+                height.max(0.0) // Lego cube top face
             } else {
-                (1.0, canvas_aspect / data_aspect)
-            }
-        } else {
-            (1.0, 1.0)
-        };
-
-        let zoom = app.heatmap_zoom;
-        let pan = app.heatmap_pan;
-        let gpu_pan_x = pan.x / (0.5 * rect.width().max(1.0));
-        let gpu_pan_y = -pan.y / (0.5 * rect.height().max(1.0));
-
-        let norm_pixel_x = ((px as f32 + 0.5) / matrix.width as f32) * 2.0 - 1.0;
-        let norm_pixel_y = 1.0 - ((py as f32 + 0.5) / matrix.height as f32) * 2.0;
-
-        let ndc_x = norm_pixel_x * aspect_scale_x * zoom + gpu_pan_x;
-        let ndc_y = norm_pixel_y * aspect_scale_y * zoom + gpu_pan_y;
-
-        let px_center_x = rect.min.x + ((ndc_x + 1.0) / 2.0) * rect.width();
-        let px_center_y = rect.min.y + ((1.0 - ndc_y) / 2.0) * rect.height();
-        let crosshair_pos = Pos2::new(px_center_x, px_center_y);
-
-        if rect.contains(crosshair_pos) {
-            let visuals = &ctx.style_of(ctx.theme()).visuals;
-            let strong_color = visuals.strong_text_color();
-            let text_color = visuals.text_color();
-
-            let painter = ui.painter();
-
-            painter.circle_stroke(
-                crosshair_pos,
-                5.0,
-                Stroke::new(1.8_f32, text_color.linear_multiply(0.2)),
-            );
-            painter.circle_stroke(
-                crosshair_pos,
-                5.0,
-                Stroke::new(1.0_f32, strong_color),
-            );
-            painter.circle_filled(
-                crosshair_pos,
-                2.0,
-                strong_color,
-            );
-
-            let arm_len = 8.0;
-            painter.line_segment(
-                [
-                    Pos2::new(crosshair_pos.x - arm_len, crosshair_pos.y),
-                    Pos2::new(crosshair_pos.x + arm_len, crosshair_pos.y),
-                ],
-                Stroke::new(1.0_f32, strong_color.linear_multiply(0.7)),
-            );
-            painter.line_segment(
-                [
-                    Pos2::new(crosshair_pos.x, crosshair_pos.y - arm_len),
-                    Pos2::new(crosshair_pos.x, crosshair_pos.y + arm_len),
-                ],
-                Stroke::new(1.0_f32, strong_color.linear_multiply(0.7)),
-            );
-        }
-    }
-
-    // 5b. Compute Target Pixel Center Position on 3D Globe / Surface (Sphere and Surface Modes)
-    let sphere_target_pos = if app.active_plot_type == PlotType::Sphere {
-        let aspect_ratio = (rect.width() / rect.height().max(1.0)).max(0.01);
-        let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
-        let fov_scale = 1.6_f32;
-
-        let dr = get_normalized_radial_dr(app, raw_val);
-        let radius = 1.0 + dr;
-
-        let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
-        let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
-
-        let lat_c = (0.5 - v_c) * std::f32::consts::PI;
-        let lon_c = (u_c - 0.5) * 2.0 * std::f32::consts::PI;
-
-        let cos_lat = lat_c.cos();
-        let p3d_x = radius * cos_lat * lon_c.sin();
-        let p3d_y = radius * lat_c.sin();
-        let p3d_z = radius * cos_lat * lon_c.cos();
-
-        let cx = app.sphere_rotation_x.cos();
-        let sx = app.sphere_rotation_x.sin();
-        let cy = app.sphere_rotation_y.cos();
-        let sy = app.sphere_rotation_y.sin();
-
-        // Rotate around Y
-        let p_y_rot_x = cy * p3d_x + sy * p3d_z;
-        let p_y_rot_y = p3d_y;
-        let p_y_rot_z = -sy * p3d_x + cy * p3d_z;
-
-        // Rotate around X
-        let p_rot_x = p_y_rot_x;
-        let p_rot_y = cx * p_y_rot_y - sx * p_y_rot_z;
-        let p_rot_z = sx * p_y_rot_y + cx * p_y_rot_z;
-
-        let dist_c = cam_dist - p_rot_z;
-        if dist_c > 0.1 && p_rot_z < cam_dist {
-            let pr_x = (p_rot_x * fov_scale) / (aspect_ratio * dist_c);
-            let pr_y = (p_rot_y * fov_scale) / dist_c;
-            let target_x = rect.center().x + pr_x * (0.5 * rect.width());
-            let target_y = rect.center().y - pr_y * (0.5 * rect.height());
-            Some(Pos2::new(target_x, target_y))
-        } else {
-            Some(hover_pos)
-        }
-    } else {
-        None
-    };
-
-    let surface_target_pos = if app.active_plot_type == PlotType::Surface {
-        let aspect_ratio = (rect.width() / rect.height().max(1.0)).max(0.01);
-        let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
-        let fov_scale = 1.6_f32;
-        let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.1);
-
-        let height = get_normalized_surface_height(app, raw_val);
-        let world_y = if app.surface_mode == 2 {
-            height.max(0.0) // Lego cube top face
-        } else {
-            height
-        };
-
-        let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
-        let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
-
-        let world_x = (2.0 * u_c - 1.0) * data_aspect;
-        let world_z = 2.0 * v_c - 1.0;
-
-        let cx = app.sphere_rotation_x.cos();
-        let sx = app.sphere_rotation_x.sin();
-        let cy = app.sphere_rotation_y.cos();
-        let sy = app.sphere_rotation_y.sin();
-
-        // Rotate around Y
-        let p_y_rot_x = cy * world_x + sy * world_z;
-        let p_y_rot_y = world_y;
-        let p_y_rot_z = -sy * world_x + cy * world_z;
-
-        // Rotate around X
-        let p_rot_x = p_y_rot_x;
-        let p_rot_y = cx * p_y_rot_y - sx * p_y_rot_z;
-        let p_rot_z = sx * p_y_rot_y + cx * p_y_rot_z;
-
-        let dist_c = cam_dist - p_rot_z;
-        if dist_c > 0.1 && p_rot_z < cam_dist {
-            let pr_x = (p_rot_x * fov_scale) / (aspect_ratio * dist_c);
-            let pr_y = (p_rot_y * fov_scale) / dist_c;
-            let target_x = rect.center().x + pr_x * (0.5 * rect.width());
-            let target_y = rect.center().y - pr_y * (0.5 * rect.height());
-            Some(Pos2::new(target_x, target_y))
-        } else {
-            Some(hover_pos)
-        }
-    } else {
-        None
-    };
-
-    let point_cloud_target_pos = if app.active_plot_type == PlotType::PointCloud {
-        if let Some((hit_x, hit_y, hit_z, _)) = point_3d_hit {
-            let screen_aspect = (rect.width() / rect.height().max(1.0)).max(0.01);
-            let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
-            let fov_scale = 1.6_f32;
-            let (aspect_x, aspect_y, aspect_z) = app.get_3d_aspect_ratio();
-
-            let (grid_w, grid_h, grid_d) = if let Some(v) = &app.volume_data {
-                (v.width.max(1), v.height.max(1), v.depth.max(1))
-            } else {
-                (matrix.width.max(1), matrix.height.max(1), 1)
+                height
             };
 
-            let u_c = (hit_x as f32 + 0.5) / grid_w as f32;
-            let v_c = (hit_y as f32 + 0.5) / grid_h as f32;
-            let w_c = (hit_z as f32 + 0.5) / grid_d as f32;
+            let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
+            let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
 
-            let norm_x = (-1.0 + u_c * 2.0) * aspect_x;
-            let norm_y = (1.0 - v_c * 2.0) * aspect_y;
-            let norm_z = (-1.0 + w_c * 2.0) * aspect_z;
+            let world_x = (2.0 * u_c - 1.0) * data_aspect;
+            let world_z = 2.0 * v_c - 1.0;
 
-            let cx = app.sphere_rotation_x.cos();
-            let sx = app.sphere_rotation_x.sin();
-            let cy = app.sphere_rotation_y.cos();
-            let sy = app.sphere_rotation_y.sin();
-
-            // Rotate around Y
-            let p_y_rot_x = cy * norm_x + sy * norm_z;
-            let p_y_rot_y = norm_y;
-            let p_y_rot_z = -sy * norm_x + cy * norm_z;
-
-            // Rotate around X
-            let p_rot_x = p_y_rot_x;
-            let p_rot_y = cx * p_y_rot_y - sx * p_y_rot_z;
-            let p_rot_z = sx * p_y_rot_y + cx * p_y_rot_z;
-
-            let dist_c = cam_dist - p_rot_z;
-            if dist_c > 0.1 && p_rot_z < cam_dist {
-                let pr_x = (p_rot_x * fov_scale) / (screen_aspect * dist_c);
-                let pr_y = (p_rot_y * fov_scale) / dist_c;
-                let target_x = rect.center().x + pr_x * (0.5 * rect.width());
-                let target_y = rect.center().y - pr_y * (0.5 * rect.height());
-                Some(Pos2::new(target_x, target_y))
-            } else {
-                Some(hover_pos)
-            }
-        } else {
-            None
+            camera.project_point([world_x, world_y, world_z])
         }
-    } else {
-        None
-    };
+        PlotType::PointCloud => {
+            if let Some((hit_x, hit_y, hit_z, _)) = point_3d_hit {
+                let (aspect_x, aspect_y, aspect_z) = app.get_3d_aspect_ratio();
+                let u_c = (hit_x as f32 + 0.5) / sampler.width as f32;
+                let v_c = (hit_y as f32 + 0.5) / sampler.height as f32;
+                let w_c = (hit_z as f32 + 0.5) / sampler.depth as f32;
 
-    let volume_target_pos = if app.active_plot_type == PlotType::Volume {
-        if let Some((hit_x, hit_y, hit_z, _)) = point_3d_hit {
-            let screen_aspect = (rect.width() / rect.height().max(1.0)).max(0.01);
-            let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
-            let fov_scale = 1.6_f32;
-            let (aspect_x, aspect_y, aspect_z) = app.get_3d_aspect_ratio();
+                let norm_x = (-1.0 + u_c * 2.0) * aspect_x;
+                let norm_y = (1.0 - v_c * 2.0) * aspect_y;
+                let norm_z = (-1.0 + w_c * 2.0) * aspect_z;
 
-            let (grid_w, grid_h, grid_d) = if let Some(v) = &app.volume_data {
-                (v.width.max(1), v.height.max(1), v.depth.max(1))
+                camera.project_point([norm_x, norm_y, norm_z])
             } else {
-                (matrix.width.max(1), matrix.height.max(1), 1)
-            };
-
-            let u_c = (hit_x as f32 + 0.5) / grid_w as f32;
-            let v_c = (hit_y as f32 + 0.5) / grid_h as f32;
-            let w_c = (hit_z as f32 + 0.5) / grid_d as f32;
-
-            // In volume shader: unit_pos is in [-0.5, 0.5], pos_3d = unit_pos * aspect
-            // u is in [0, 1], v is in [0, 1] with Y inverted (Row 0 = +Y top = pos_y +0.5*aspect_y)
-            let pos_3d_x = (u_c - 0.5) * aspect_x;
-            let pos_3d_y = (0.5 - v_c) * aspect_y;
-            let pos_3d_z = (w_c - 0.5) * aspect_z;
-
-            let cx = app.sphere_rotation_x.cos();
-            let sx = app.sphere_rotation_x.sin();
-            let cy = app.sphere_rotation_y.cos();
-            let sy = app.sphere_rotation_y.sin();
-
-            // Rotate around Y
-            let p_y_rot_x = cy * pos_3d_x + sy * pos_3d_z;
-            let p_y_rot_y = pos_3d_y;
-            let p_y_rot_z = -sy * pos_3d_x + cy * pos_3d_z;
-
-            // Rotate around X
-            let p_rot_x = p_y_rot_x;
-            let p_rot_y = cx * p_y_rot_y - sx * p_y_rot_z;
-            let p_rot_z = sx * p_y_rot_y + cx * p_y_rot_z;
-
-            let dist_c = cam_dist - p_rot_z;
-            if dist_c > 0.1 && p_rot_z < cam_dist {
-                let pr_x = (p_rot_x * fov_scale) / (screen_aspect * dist_c);
-                let pr_y = (p_rot_y * fov_scale) / dist_c;
-                let target_x = rect.center().x + pr_x * (0.5 * rect.width());
-                let target_y = rect.center().y - pr_y * (0.5 * rect.height());
-                Some(Pos2::new(target_x, target_y))
-            } else {
-                Some(hover_pos)
+                None
             }
-        } else {
-            None
         }
-    } else {
-        None
-    };
+        PlotType::Volume => {
+            if let Some((hit_x, hit_y, hit_z, _)) = point_3d_hit {
+                let (aspect_x, aspect_y, aspect_z) = app.get_3d_aspect_ratio();
+                let u_c = (hit_x as f32 + 0.5) / sampler.width as f32;
+                let v_c = (hit_y as f32 + 0.5) / sampler.height as f32;
+                let w_c = (hit_z as f32 + 0.5) / sampler.depth as f32;
 
-    let matrix_target_pos = if app.active_plot_type == PlotType::Heatmap
-        || app.active_plot_type == PlotType::Block
-    {
-        let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio {
-            let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.001);
-            let canvas_aspect = rect.width() / rect.height().max(1.0);
-            if canvas_aspect > data_aspect {
-                (data_aspect / canvas_aspect, 1.0)
+                let pos_3d_x = (u_c - 0.5) * aspect_x;
+                let pos_3d_y = (0.5 - v_c) * aspect_y;
+                let pos_3d_z = (w_c - 0.5) * aspect_z;
+
+                camera.project_point([pos_3d_x, pos_3d_y, pos_3d_z])
             } else {
-                (1.0, canvas_aspect / data_aspect)
+                None
             }
-        } else {
-            (1.0, 1.0)
-        };
-
-        let zoom = app.heatmap_zoom;
-        let pan = app.heatmap_pan;
-        let gpu_pan_x = pan.x / (0.5 * rect.width().max(1.0));
-        let gpu_pan_y = -pan.y / (0.5 * rect.height().max(1.0));
-
-        let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
-        let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
-
-        let unscaled_x = u_c * 2.0 - 1.0;
-        let unpanned_x = unscaled_x * aspect_scale_x.max(0.001);
-        let ndc_x = unpanned_x * zoom.max(0.01) + gpu_pan_x;
-        let target_x = rect.min.x + ((ndc_x + 1.0) * 0.5) * rect.width();
-
-        let unscaled_y = 1.0 - v_c * 2.0;
-        let unpanned_y = unscaled_y * aspect_scale_y.max(0.001);
-        let ndc_y = unpanned_y * zoom.max(0.01) + gpu_pan_y;
-        let target_y = rect.min.y + ((1.0 - ndc_y) * 0.5) * rect.height();
-
-        Some(Pos2::new(target_x, target_y))
-    } else {
-        None
+        }
+        PlotType::Heatmap | PlotType::Block => {
+            let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
+            let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
+            Some(transform_2d.norm_to_screen(u_c, v_c))
+        }
+        _ => None,
     };
-
-    let plot_target_pos = sphere_target_pos
-        .or(surface_target_pos)
-        .or(point_cloud_target_pos)
-        .or(volume_target_pos)
-        .or(matrix_target_pos);
 
     // 6. Format Value String
     let val_formatted = if raw_val.is_nan() {
@@ -1369,43 +1125,8 @@ pub fn show_hover_tooltip(
     let tooltip_rect = Rect::from_min_size(tooltip_pos, egui::vec2(tooltip_w, tooltip_est_h));
 
     // 8. Draw Leader Elbow Connector from Pixel to Tooltip Box
-    if let Some(target_pos) = plot_target_pos {
-        let visuals = &ctx.style_of(ctx.theme()).visuals;
-        let strong_color = visuals.strong_text_color();
-        let line_color = visuals.widgets.noninteractive.fg_stroke.color;
-
-        let painter = ui.painter();
-
-        // 1. Target reticle dot on the 3D surface / globe
-        painter.circle_filled(target_pos, 7.0, text_color.linear_multiply(0.12));
-        painter.circle_filled(target_pos, 4.5, text_color.linear_multiply(0.25));
-        painter.circle_stroke(target_pos, 3.5, Stroke::new(1.2, strong_color));
-        painter.circle_filled(target_pos, 1.8, strong_color);
-
-        // 2. Compute anchor on tooltip box
-        let box_anchor = if tooltip_rect.min.x >= target_pos.x {
-            // Tooltip is to the right of the target
-            Pos2::new(tooltip_rect.min.x, (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0))
-        } else if tooltip_rect.max.x <= target_pos.x {
-            // Tooltip is to the left of the target
-            Pos2::new(tooltip_rect.max.x, (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0))
-        } else if tooltip_rect.min.y >= target_pos.y {
-            // Tooltip is below the target
-            Pos2::new(target_pos.x, tooltip_rect.min.y)
-        } else {
-            // Tooltip is above the target
-            Pos2::new(target_pos.x, tooltip_rect.max.y)
-        };
-
-        // 3. Elbow connector line (vertical from target to anchor level, then horizontal to box)
-        let elbow = Pos2::new(target_pos.x, box_anchor.y);
-        let leader_stroke = Stroke::new(1.2, line_color.linear_multiply(0.85));
-
-        painter.line_segment([target_pos, elbow], leader_stroke);
-        painter.line_segment([elbow, box_anchor], leader_stroke);
-
-        // 4. Subtle junction dot at the elbow vertex
-        painter.circle_filled(elbow, 1.5, strong_color.linear_multiply(0.8));
+    if let Some(target) = target_pos {
+        draw_leader_callout(ui.painter(), ctx, target, tooltip_rect);
     }
 
     egui::Area::new(egui::Id::new("octant_hover_pixel_tooltip"))
