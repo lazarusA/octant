@@ -822,6 +822,10 @@ pub fn show_hover_tooltip(
         let pz = hit_z;
         let val = hit_val;
 
+        let data_x = (px + sampler.shift_x) % sampler.width;
+        let data_y = (py + sampler.shift_y) % sampler.height;
+        let data_z = (pz + sampler.shift_z) % sampler.depth;
+
         let mut used_dims = HashSet::new();
 
         let entries = if let Some(v) = var {
@@ -861,7 +865,7 @@ pub fn show_hover_tooltip(
                 Some(v),
                 Some(&app.plotted_store_target_input),
                 &dim_y_name,
-                py,
+                data_y,
                 sampler.height,
                 None,
             );
@@ -870,7 +874,7 @@ pub fn show_hover_tooltip(
                 Some(v),
                 Some(&app.plotted_store_target_input),
                 &dim_x_name,
-                px,
+                data_x,
                 sampler.width,
                 None,
             );
@@ -886,7 +890,7 @@ pub fn show_hover_tooltip(
                     Some(v),
                     Some(&app.plotted_store_target_input),
                     &dim_z_name,
-                    pz,
+                    data_z,
                     sampler.depth,
                     None,
                 );
@@ -907,16 +911,16 @@ pub fn show_hover_tooltip(
             let dim_y_name = app.get_spatial_dim_name(1).unwrap_or_else(|| "y".to_string());
             let dim_x_name = app.get_spatial_dim_name(0).unwrap_or_else(|| "x".to_string());
             vec![
-                format!("{}:\u{00A0}{}/{}", dim_z_name, pz + 1, sampler.depth),
-                format!("{}:\u{00A0}{}/{}", dim_y_name, py + 1, sampler.height),
-                format!("{}:\u{00A0}{}/{}", dim_x_name, px + 1, sampler.width),
+                format!("{}:\u{00A0}{}/{}", dim_z_name, data_z + 1, sampler.depth),
+                format!("{}:\u{00A0}{}/{}", dim_y_name, data_y + 1, sampler.height),
+                format!("{}:\u{00A0}{}/{}", dim_x_name, data_x + 1, sampler.width),
             ]
         } else {
             let dim_y_name = app.get_spatial_dim_name(1).unwrap_or_else(|| "y".to_string());
             let dim_x_name = app.get_spatial_dim_name(0).unwrap_or_else(|| "x".to_string());
             vec![
-                format!("{}:\u{00A0}{}/{}", dim_y_name, py + 1, sampler.height),
-                format!("{}:\u{00A0}{}/{}", dim_x_name, px + 1, sampler.width),
+                format!("{}:\u{00A0}{}/{}", dim_y_name, data_y + 1, sampler.height),
+                format!("{}:\u{00A0}{}/{}", dim_x_name, data_x + 1, sampler.width),
             ]
         };
 
