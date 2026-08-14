@@ -12,15 +12,8 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.label(egui::RichText::new("Octant").strong().heading());
                 ui.separator();
 
-                // Dropdown menus: Store, Catalog, Variables, Colormap, Plot Type, Settings
+                // Dropdown menus: Store, Variables, Dimensions, Plot, Settings
                 store::show_store_menu(app, ui);
-
-                if ui
-                    .button(egui::RichText::new("📚 Catalog").strong())
-                    .clicked()
-                {
-                    app.show_catalog_window = !app.show_catalog_window;
-                }
 
                 if ui
                     .button(egui::RichText::new("📊 Variables").strong())
@@ -28,22 +21,23 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                 {
                     app.show_variables_overlay = !app.show_variables_overlay;
                 }
-                colormap::show_colormap_menu(app, ui);
+
+                if ui
+                    .button(egui::RichText::new("🎛️ Dimensions").strong())
+                    .on_hover_text("Toggle Variable Controls Panel")
+                    .clicked()
+                {
+                    app.show_variable_controls = !app.show_variable_controls;
+                }
+
                 plot_type::show_plot_type_menu(app, ui);
+                colormap::show_colormap_menu(app, ui);
 
                 if ui
                     .button(egui::RichText::new("⚙️ Settings").strong())
                     .clicked()
                 {
                     app.show_settings_panel = !app.show_settings_panel;
-                }
-
-                if ui
-                    .button(egui::RichText::new("🎛️ Controls").strong())
-                    .on_hover_text("Toggle Variable Controls Panel")
-                    .clicked()
-                {
-                    app.show_variable_controls = !app.show_variable_controls;
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
