@@ -615,7 +615,7 @@ pub fn show_hover_tooltip(
 
             let ndc_y = 1.0 - ((hover_pos.y - rect.min.y) / rect.height().max(1.0)) * 2.0;
             let unpanned_y = (ndc_y - gpu_pan_y) / zoom.max(0.01);
-            let ny = ((1.0 - unpanned_y) / 2.0).clamp(0.0, 1.0);
+            let ny = ((unpanned_y + 1.0) / 2.0).clamp(0.0, 1.0);
 
             (nx, ny, is_inside, None, None)
         }
@@ -983,27 +983,52 @@ pub fn show_hover_tooltip(
 
         let marker_pos = Pos2::new(screen_dot_x, screen_dot_y);
 
+        // Compute data/axis bounds on screen for guidelines (spanning full axis range from start to end)
+        let x_start_ndc = -1.0 * zoom + gpu_pan_x;
+        let x_end_ndc = 1.0 * zoom + gpu_pan_x;
+        let y_top_ndc = 1.0 * zoom + gpu_pan_y;
+        let y_bottom_ndc = -1.0 * zoom + gpu_pan_y;
+
+        let x_line_start = rect.min.x + ((x_start_ndc + 1.0) / 2.0) * rect.width();
+        let x_line_end = rect.min.x + ((x_end_ndc + 1.0) / 2.0) * rect.width();
+        let y_line_top = rect.min.y + ((1.0 - y_top_ndc) / 2.0) * rect.height();
+        let y_line_bottom = rect.min.y + ((1.0 - y_bottom_ndc) / 2.0) * rect.height();
+
+        let x_axis_min = x_line_start.min(x_line_end).clamp(rect.min.x, rect.max.x);
+        let x_axis_max = x_line_start.max(x_line_end).clamp(rect.min.x, rect.max.x);
+        let y_axis_min = y_line_top.min(y_line_bottom).clamp(rect.min.y, rect.max.y);
+        let y_axis_max = y_line_top.max(y_line_bottom).clamp(rect.min.y, rect.max.y);
+
         let visuals = &ctx.style_of(ctx.theme()).visuals;
         let strong_color = visuals.strong_text_color();
-        let guideline_color = visuals.widgets.noninteractive.bg_stroke.color;
+        let text_color = visuals.text_color();
+        let line_color = visuals.widgets.noninteractive.fg_stroke.color;
 
         let painter = ui.painter();
 
-        // Crosshair guidelines from axis to axis
-        painter.line_segment(
-            [Pos2::new(rect.min.x, marker_pos.y), Pos2::new(rect.max.x, marker_pos.y)],
-            Stroke::new(1.0, guideline_color),
-        );
-        painter.line_segment(
-            [Pos2::new(marker_pos.x, rect.min.y), Pos2::new(marker_pos.x, rect.max.y)],
-            Stroke::new(1.0, guideline_color),
-        );
+        // Full-span Vertical guideline bounded to axis limits
+        if marker_pos.x >= rect.min.x && marker_pos.x <= rect.max.x {
+            painter.line_segment(
+                [Pos2::new(marker_pos.x, y_axis_min), Pos2::new(marker_pos.x, y_axis_max)],
+                Stroke::new(1.0, line_color.linear_multiply(0.7)),
+            );
+        }
 
-        // Reticle dot
-        painter.circle_filled(marker_pos, 6.0, strong_color.linear_multiply(0.15));
-        painter.circle_filled(marker_pos, 4.0, strong_color.linear_multiply(0.35));
-        painter.circle_stroke(marker_pos, 3.0, Stroke::new(1.2, strong_color));
-        painter.circle_filled(marker_pos, 1.5, strong_color);
+        // Full-span Horizontal guideline bounded to axis limits
+        if marker_pos.y >= rect.min.y && marker_pos.y <= rect.max.y {
+            painter.line_segment(
+                [Pos2::new(x_axis_min, marker_pos.y), Pos2::new(x_axis_max, marker_pos.y)],
+                Stroke::new(1.0, line_color.linear_multiply(0.7)),
+            );
+        }
+
+        // Only draw reticle dot if inside visible canvas
+        if rect.contains(marker_pos) {
+            painter.circle_filled(marker_pos, 8.0, text_color.linear_multiply(0.12));
+            painter.circle_filled(marker_pos, 5.0, text_color.linear_multiply(0.25));
+            painter.circle_stroke(marker_pos, 4.0, Stroke::new(1.5, strong_color));
+            painter.circle_filled(marker_pos, 2.0, strong_color);
+        }
     }
 
     // 5. Forward-Project Exact Center of Hovered Point / Face / Particle to Screen Space
