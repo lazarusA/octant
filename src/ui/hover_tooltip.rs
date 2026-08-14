@@ -127,8 +127,94 @@ pub fn show_hover_tooltip(
 
             (nx, ny, true, Some((lat_deg, lon_deg)))
         }
-        PlotType::Surface | PlotType::Volume | PlotType::PointCloud => {
-            // 3D Surface / Box Projection Inverse Raycast
+        PlotType::Surface => {
+            // 3D Surface Projection Perspective Raycast supporting all Surface Modes (Terrain, Steps, Lego)
+            let aspect_ratio = (rect.width() / rect.height().max(1.0)).max(0.01);
+            let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
+            let fov_scale = 1.6_f32;
+            let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.1);
+
+            // Map hover_pos to NDC in [-1, 1]
+            let clip_x = (hover_pos.x - rect.center().x) / (0.5 * rect.width().max(1.0));
+            let clip_y = -(hover_pos.y - rect.center().y) / (0.5 * rect.height().max(1.0));
+
+            // Camera ray in view space
+            let dir_x = clip_x * aspect_ratio / fov_scale;
+            let dir_y = clip_y / fov_scale;
+            let dir_z = -1.0_f32;
+
+            let inv_len = 1.0 / (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
+            let dx = dir_x * inv_len;
+            let dy = dir_y * inv_len;
+            let dz = dir_z * inv_len;
+
+            // Transform ray origin and direction into Model World space
+            let cx = app.sphere_rotation_x.cos();
+            let sx = app.sphere_rotation_x.sin();
+            let cy = app.sphere_rotation_y.cos();
+            let sy = app.sphere_rotation_y.sin();
+
+            let o1_y = sx * cam_dist;
+            let o1_z = cx * cam_dist;
+
+            let d1_x = dx;
+            let d1_y = cx * dy + sx * dz;
+            let d1_z = -sx * dy + cx * dz;
+
+            let o_world_x = -sy * o1_z;
+            let o_world_y = o1_y;
+            let o_world_z = cy * o1_z;
+
+            let d_world_x = cy * d1_x - sy * d1_z;
+            let d_world_y = d1_y;
+            let d_world_z = sy * d1_x + cy * d1_z;
+
+            if d_world_y.abs() < 1e-5 {
+                return;
+            }
+
+            // Ray-plane intersection with base plane Y = 0.0
+            let t0 = -o_world_y / d_world_y;
+            if t0 <= 0.0 {
+                return;
+            }
+
+            let hit_x = o_world_x + t0 * d_world_x;
+            let hit_z = o_world_z + t0 * d_world_z;
+
+            let mut u = ((hit_x / data_aspect) + 1.0) * 0.5;
+            let mut v = (hit_z + 1.0) * 0.5;
+
+            if u < -0.1 || u > 1.1 || v < -0.1 || v > 1.1 {
+                return;
+            }
+
+            // Refine with cell's actual displaced height
+            let px = ((u.clamp(0.0, 1.0) * matrix.width as f32).floor() as usize).min(matrix.width.saturating_sub(1));
+            let py = ((v.clamp(0.0, 1.0) * matrix.height as f32).floor() as usize).min(matrix.height.saturating_sub(1));
+            let cell_val = matrix.values.get(py * matrix.width + px).copied().unwrap_or(f32::NAN);
+            let h = get_normalized_surface_height(app, cell_val);
+            let target_h = if app.surface_mode == 2 { h.max(0.0) } else { h };
+
+            let t_ref = (target_h - o_world_y) / d_world_y;
+            if t_ref > 0.0 {
+                let ref_x = o_world_x + t_ref * d_world_x;
+                let ref_z = o_world_z + t_ref * d_world_z;
+                let u_ref = ((ref_x / data_aspect) + 1.0) * 0.5;
+                let v_ref = (ref_z + 1.0) * 0.5;
+                if u_ref >= -0.05 && u_ref <= 1.05 && v_ref >= -0.05 && v_ref <= 1.05 {
+                    u = u_ref;
+                    v = v_ref;
+                }
+            }
+
+            let nx = u.clamp(0.0, 1.0);
+            let ny = v.clamp(0.0, 1.0);
+
+            (nx, ny, true, None)
+        }
+        PlotType::Volume | PlotType::PointCloud => {
+            // 3D Volume / Point Cloud Box Projection Inverse Raycast
             let center = rect.center();
             let half_size = (rect.height() / 2.0).max(1.0);
             let zoom = app.sphere_zoom.max(0.1);
@@ -330,12 +416,12 @@ pub fn show_hover_tooltip(
 
         (val, entries, sample_idx, best_line_idx)
     } else {
-        let px = if app.active_plot_type == PlotType::Sphere {
+        let px = if app.active_plot_type == PlotType::Sphere || app.active_plot_type == PlotType::Surface {
             ((norm_x * matrix.width as f32).floor() as usize).min(matrix.width.saturating_sub(1))
         } else {
             (((norm_x * (matrix.width as f32 - 1.0)) + 0.5) as usize).min(matrix.width.saturating_sub(1))
         };
-        let py = if app.active_plot_type == PlotType::Sphere {
+        let py = if app.active_plot_type == PlotType::Sphere || app.active_plot_type == PlotType::Surface {
             ((norm_y * matrix.height as f32).floor() as usize).min(matrix.height.saturating_sub(1))
         } else {
             (((norm_y * (matrix.height as f32 - 1.0)) + 0.5) as usize).min(matrix.height.saturating_sub(1))
@@ -630,7 +716,7 @@ pub fn show_hover_tooltip(
         }
     }
 
-    // 5b. Compute Target Pixel Center Position on 3D Globe Surface (Sphere Mode)
+    // 5b. Compute Target Pixel Center Position on 3D Globe / Surface (Sphere and Surface Modes)
     let sphere_target_pos = if app.active_plot_type == PlotType::Sphere {
         let aspect_ratio = (rect.width() / rect.height().max(1.0)).max(0.01);
         let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
@@ -679,6 +765,56 @@ pub fn show_hover_tooltip(
         None
     };
 
+    let surface_target_pos = if app.active_plot_type == PlotType::Surface {
+        let aspect_ratio = (rect.width() / rect.height().max(1.0)).max(0.01);
+        let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
+        let fov_scale = 1.6_f32;
+        let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.1);
+
+        let height = get_normalized_surface_height(app, raw_val);
+        let world_y = if app.surface_mode == 2 {
+            height.max(0.0) // Lego cube top face
+        } else {
+            height
+        };
+
+        let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
+        let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
+
+        let world_x = (2.0 * u_c - 1.0) * data_aspect;
+        let world_z = 2.0 * v_c - 1.0;
+
+        let cx = app.sphere_rotation_x.cos();
+        let sx = app.sphere_rotation_x.sin();
+        let cy = app.sphere_rotation_y.cos();
+        let sy = app.sphere_rotation_y.sin();
+
+        // Rotate around Y
+        let p_y_rot_x = cy * world_x + sy * world_z;
+        let p_y_rot_y = world_y;
+        let p_y_rot_z = -sy * world_x + cy * world_z;
+
+        // Rotate around X
+        let p_rot_x = p_y_rot_x;
+        let p_rot_y = cx * p_y_rot_y - sx * p_y_rot_z;
+        let p_rot_z = sx * p_y_rot_y + cx * p_y_rot_z;
+
+        let dist_c = cam_dist - p_rot_z;
+        if dist_c > 0.1 && p_rot_z < cam_dist {
+            let pr_x = (p_rot_x * fov_scale) / (aspect_ratio * dist_c);
+            let pr_y = (p_rot_y * fov_scale) / dist_c;
+            let target_x = rect.center().x + pr_x * (0.5 * rect.width());
+            let target_y = rect.center().y - pr_y * (0.5 * rect.height());
+            Some(Pos2::new(target_x, target_y))
+        } else {
+            Some(hover_pos)
+        }
+    } else {
+        None
+    };
+
+    let plot_3d_target_pos = sphere_target_pos.or(surface_target_pos);
+
     // 6. Format Value String
     let val_formatted = if raw_val.is_nan() {
         "NaN".to_string()
@@ -697,8 +833,9 @@ pub fn show_hover_tooltip(
     let tooltip_w = 210.0;
     let tooltip_est_h = if dim_entries.len() > 2 { 84.0 } else { 68.0 };
 
-    let mut tooltip_pos = if app.active_plot_type == PlotType::Sphere {
-        // In Sphere mode, offset outward to create a clear leader line
+    let is_3d_mode = app.active_plot_type == PlotType::Sphere || app.active_plot_type == PlotType::Surface;
+    let mut tooltip_pos = if is_3d_mode {
+        // In 3D mode, offset outward to create a clear leader line
         let offset_x = if hover_pos.x >= rect.center().x { 36.0 } else { -tooltip_w - 36.0 };
         let offset_y = if hover_pos.y >= rect.center().y { -tooltip_est_h - 18.0 } else { 18.0 };
         Pos2::new(hover_pos.x + offset_x, hover_pos.y + offset_y)
@@ -721,15 +858,15 @@ pub fn show_hover_tooltip(
 
     let tooltip_rect = Rect::from_min_size(tooltip_pos, egui::vec2(tooltip_w, tooltip_est_h));
 
-    // 8. Draw Leader Elbow Connector from Sphere Pixel to Tooltip Box
-    if let Some(target_pos) = sphere_target_pos {
+    // 8. Draw Leader Elbow Connector from 3D Pixel to Tooltip Box
+    if let Some(target_pos) = plot_3d_target_pos {
         let visuals = &ctx.style_of(ctx.theme()).visuals;
         let strong_color = visuals.strong_text_color();
         let line_color = visuals.widgets.noninteractive.fg_stroke.color;
 
         let painter = ui.painter();
 
-        // 1. Target reticle dot on the 3D globe surface
+        // 1. Target reticle dot on the 3D surface / globe
         painter.circle_filled(target_pos, 7.0, text_color.linear_multiply(0.12));
         painter.circle_filled(target_pos, 4.5, text_color.linear_multiply(0.25));
         painter.circle_stroke(target_pos, 3.5, Stroke::new(1.2, strong_color));
@@ -919,5 +1056,29 @@ fn get_normalized_radial_dr(app: &OctantApp, val: f32) -> f32 {
     } else {
         let norm_val = ((val - cmin) / range).clamp(0.0, 1.0);
         norm_val * 0.4 * disp
+    }
+}
+
+/// Computes normalized surface height on the 3D surface mesh matching surface.wgsl
+fn get_normalized_surface_height(app: &OctantApp, val: f32) -> f32 {
+    if val.is_nan() || !val.is_finite() {
+        return 0.0;
+    }
+    let cmin = app.color_range_min;
+    let cmax = app.color_range_max;
+    let range = (cmax - cmin).max(1e-6);
+    let disp = app.surface_displacement_strength;
+
+    let mult = match app.surface_mode {
+        1 => 0.6, // Flat Steps
+        _ => 0.8, // Smooth Terrain (0) and 3D Lego Cubes (2)
+    };
+
+    if cmin < 0.0 && cmax > 0.0 {
+        let max_abs = cmin.abs().max(cmax.abs());
+        (val / max_abs).clamp(-1.0, 1.0) * mult * disp
+    } else {
+        let norm_val = ((val - cmin) / range).clamp(0.0, 1.0);
+        norm_val * mult * disp
     }
 }
