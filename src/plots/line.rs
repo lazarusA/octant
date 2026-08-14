@@ -157,10 +157,7 @@ impl LineRenderer {
 
     pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &LineUniformParams) {
         let uniforms = LineUniforms {
-            viewport_padding: [
-                params.viewport_padding[0].clamp(0.02, 0.2),
-                params.viewport_padding[1].clamp(0.02, 0.3),
-            ],
+            viewport_padding: params.viewport_padding,
             line_thickness: 2.5,
             profile_length: params.profile_length.max(1),
             line_count: params.line_count.max(1),
@@ -223,10 +220,8 @@ impl LineRenderer {
             return;
         }
 
-        let needed_bytes = (matrix_data.len() * std::mem::size_of::<f32>()) as u64;
         let guard = self.gpu_resources.read().unwrap();
-
-        if needed_bytes <= guard.data_buffer.size() {
+        if (matrix_data.len() * std::mem::size_of::<f32>()) as u64 <= guard.data_buffer.size() {
             queue.write_buffer(&guard.data_buffer, 0, bytemuck::cast_slice(matrix_data));
             self.data_len
                 .store(matrix_data.len() as u32, Ordering::Relaxed);
@@ -261,9 +256,6 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
-        let padding_x = (40.0 / self.rect.width().max(1.0)).clamp(0.04, 0.15);
-        let padding_y = (35.0 / self.rect.height().max(1.0)).clamp(0.06, 0.20);
-
         if !self.profile_values.is_empty() {
             self.renderer
                 .update_data_with_device(device, queue, &self.profile_values);
@@ -272,7 +264,7 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
             queue,
             &LineUniformParams {
                 color: self.color_params,
-                viewport_padding: [padding_x, padding_y],
+                viewport_padding: [0.0, 0.0],
                 profile_length: self.profile_length,
                 line_count: self.line_count,
                 line_mode: self.line_mode,
