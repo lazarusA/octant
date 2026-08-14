@@ -22,45 +22,65 @@ pub fn show_hover_tooltip(
     // 1. Calculate Normalized Coordinates (norm_x, norm_y) considering 2D vs 3D Plot Mode
     let (norm_x, norm_y, is_valid_hit, geo_coords) = match app.active_plot_type {
         PlotType::Sphere => {
-            // 3D Globe Projection Inverse Raycast
-            let center = rect.center();
-            let half_size = (rect.height() / 2.0).max(1.0);
-            let zoom = app.sphere_zoom.max(0.1);
+            // 3D Globe Projection Exact Perspective Raycast matching sphere.wgsl
+            let aspect_ratio = (rect.width() / rect.height().max(1.0)).max(0.01);
+            let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
+            let fov_scale = 1.6_f32;
 
-            let ndc_x = (hover_pos.x - center.x) / (half_size * 0.7 * zoom);
-            let ndc_y = (hover_pos.y - center.y) / (half_size * 0.7 * zoom);
+            // Map hover_pos to NDC in [-1, 1]
+            let clip_x = (hover_pos.x - rect.center().x) / (0.5 * rect.width().max(1.0));
+            let clip_y = -(hover_pos.y - rect.center().y) / (0.5 * rect.height().max(1.0));
 
-            let r_sq = ndc_x * ndc_x + ndc_y * ndc_y;
-            if r_sq > 1.0 {
+            // Camera ray in rotated view space
+            let dir_x = clip_x * aspect_ratio / fov_scale;
+            let dir_y = clip_y / fov_scale;
+            let dir_z = -1.0_f32;
+
+            let inv_len = 1.0 / (dir_x * dir_x + dir_y * dir_y + dir_z * dir_z).sqrt();
+            let dx = dir_x * inv_len;
+            let dy = dir_y * inv_len;
+            let dz = dir_z * inv_len;
+
+            // Intersect ray with unit sphere at origin (R = 1.0)
+            let b = cam_dist * dz;
+            let c = cam_dist * cam_dist - 1.0;
+            let discr = b * b - c;
+
+            if discr < 0.0 {
                 return;
             }
 
-            let view_x = ndc_x;
-            let view_y = -ndc_y;
-            let view_z = (1.0 - r_sq).sqrt();
+            let t = -b - discr.sqrt();
+            let pos_rot_x = t * dx;
+            let pos_rot_y = t * dy;
+            let pos_rot_z = cam_dist + t * dz;
 
-            let rx = app.sphere_rotation_x;
-            let ry = app.sphere_rotation_y;
+            // Inverse rotate around X by -rx
+            let cx = app.sphere_rotation_x.cos();
+            let sx = app.sphere_rotation_x.sin();
+            let pos_y_rot_x = pos_rot_x;
+            let pos_y_rot_y = cx * pos_rot_y + sx * pos_rot_z;
+            let pos_y_rot_z = -sx * pos_rot_y + cx * pos_rot_z;
 
-            let y1 = view_y * rx.cos() + view_z * rx.sin();
-            let z1 = -view_y * rx.sin() + view_z * rx.cos();
-            let x1 = view_x;
+            // Inverse rotate around Y by -ry
+            let cy = app.sphere_rotation_y.cos();
+            let sy = app.sphere_rotation_y.sin();
+            let pos_3d_x = cy * pos_y_rot_x - sy * pos_y_rot_z;
+            let pos_3d_y = pos_y_rot_y;
+            let pos_3d_z = sy * pos_y_rot_x + cy * pos_y_rot_z;
 
-            let x_model = x1 * ry.cos() - z1 * ry.sin();
-            let y_model = y1;
-            let z_model = x1 * ry.sin() + z1 * ry.cos();
-
-            let lat_rad = y_model.clamp(-1.0, 1.0).asin();
-            let lon_rad = x_model.atan2(z_model);
+            // Spherical coordinates (u, v) matching sphere.wgsl & sphere.rs
+            let lat_rad = pos_3d_y.clamp(-1.0, 1.0).asin();
+            let lon_rad = pos_3d_x.atan2(pos_3d_z);
 
             let lat_deg = lat_rad.to_degrees();
             let lon_deg = lon_rad.to_degrees();
 
             let u = (lon_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
-            let v = (lat_rad + std::f32::consts::FRAC_PI_2) / std::f32::consts::PI;
+            let v = 0.5 - (lat_rad / std::f32::consts::PI);
 
             let nx = u.clamp(0.0, 1.0);
-            let ny = (1.0 - v).clamp(0.0, 1.0);
+            let ny = v.clamp(0.0, 1.0);
 
             (nx, ny, true, Some((lat_deg, lon_deg)))
         }
@@ -267,10 +287,16 @@ pub fn show_hover_tooltip(
 
         (val, entries, sample_idx, best_line_idx)
     } else {
-        let px = ((norm_x * (matrix.width as f32 - 1.0)) + 0.5) as usize;
-        let py = ((norm_y * (matrix.height as f32 - 1.0)) + 0.5) as usize;
-        let px = px.min(matrix.width - 1);
-        let py = py.min(matrix.height - 1);
+        let px = if app.active_plot_type == PlotType::Sphere {
+            ((norm_x * matrix.width as f32).floor() as usize).min(matrix.width.saturating_sub(1))
+        } else {
+            (((norm_x * (matrix.width as f32 - 1.0)) + 0.5) as usize).min(matrix.width.saturating_sub(1))
+        };
+        let py = if app.active_plot_type == PlotType::Sphere {
+            ((norm_y * matrix.height as f32).floor() as usize).min(matrix.height.saturating_sub(1))
+        } else {
+            (((norm_y * (matrix.height as f32 - 1.0)) + 0.5) as usize).min(matrix.height.saturating_sub(1))
+        };
 
         let idx = py * matrix.width + px;
         let val = matrix.values.get(idx).copied().unwrap_or(f32::NAN);
@@ -561,6 +587,52 @@ pub fn show_hover_tooltip(
         }
     }
 
+    // 5b. Compute Target Pixel Center Position on 3D Globe Surface (Sphere Mode)
+    let sphere_target_pos = if app.active_plot_type == PlotType::Sphere {
+        let aspect_ratio = (rect.width() / rect.height().max(1.0)).max(0.01);
+        let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
+        let fov_scale = 1.6_f32;
+
+        let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
+        let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
+
+        let lat_c = (0.5 - v_c) * std::f32::consts::PI;
+        let lon_c = (u_c - 0.5) * 2.0 * std::f32::consts::PI;
+
+        let cos_lat = lat_c.cos();
+        let p3d_x = cos_lat * lon_c.sin();
+        let p3d_y = lat_c.sin();
+        let p3d_z = cos_lat * lon_c.cos();
+
+        let cx = app.sphere_rotation_x.cos();
+        let sx = app.sphere_rotation_x.sin();
+        let cy = app.sphere_rotation_y.cos();
+        let sy = app.sphere_rotation_y.sin();
+
+        // Rotate around Y
+        let p_y_rot_x = cy * p3d_x + sy * p3d_z;
+        let p_y_rot_y = p3d_y;
+        let p_y_rot_z = -sy * p3d_x + cy * p3d_z;
+
+        // Rotate around X
+        let p_rot_x = p_y_rot_x;
+        let p_rot_y = cx * p_y_rot_y - sx * p_y_rot_z;
+        let p_rot_z = sx * p_y_rot_y + cx * p_y_rot_z;
+
+        let dist_c = cam_dist - p_rot_z;
+        if dist_c > 0.1 && p_rot_z < cam_dist {
+            let pr_x = (p_rot_x * fov_scale) / (aspect_ratio * dist_c);
+            let pr_y = (p_rot_y * fov_scale) / dist_c;
+            let target_x = rect.center().x + pr_x * (0.5 * rect.width());
+            let target_y = rect.center().y - pr_y * (0.5 * rect.height());
+            Some(Pos2::new(target_x, target_y))
+        } else {
+            Some(hover_pos)
+        }
+    } else {
+        None
+    };
+
     // 6. Format Value String
     let val_formatted = if raw_val.is_nan() {
         "NaN".to_string()
@@ -579,12 +651,68 @@ pub fn show_hover_tooltip(
     let tooltip_w = 210.0;
     let tooltip_est_h = if dim_entries.len() > 2 { 84.0 } else { 68.0 };
 
-    let mut tooltip_pos = Pos2::new(hover_pos.x + 14.0, hover_pos.y + 14.0);
+    let mut tooltip_pos = if app.active_plot_type == PlotType::Sphere {
+        // In Sphere mode, offset outward to create a clear leader line
+        let offset_x = if hover_pos.x >= rect.center().x { 36.0 } else { -tooltip_w - 36.0 };
+        let offset_y = if hover_pos.y >= rect.center().y { -tooltip_est_h - 18.0 } else { 18.0 };
+        Pos2::new(hover_pos.x + offset_x, hover_pos.y + offset_y)
+    } else {
+        Pos2::new(hover_pos.x + 14.0, hover_pos.y + 14.0)
+    };
+
     if tooltip_pos.x + tooltip_w > screen_rect.max.x - 10.0 {
-        tooltip_pos.x = hover_pos.x - tooltip_w - 10.0;
+        tooltip_pos.x = screen_rect.max.x - tooltip_w - 10.0;
+    }
+    if tooltip_pos.x < screen_rect.min.x + 10.0 {
+        tooltip_pos.x = screen_rect.min.x + 10.0;
     }
     if tooltip_pos.y + tooltip_est_h > screen_rect.max.y - 10.0 {
-        tooltip_pos.y = hover_pos.y - tooltip_est_h - 10.0;
+        tooltip_pos.y = screen_rect.max.y - tooltip_est_h - 10.0;
+    }
+    if tooltip_pos.y < screen_rect.min.y + 10.0 {
+        tooltip_pos.y = screen_rect.min.y + 10.0;
+    }
+
+    let tooltip_rect = Rect::from_min_size(tooltip_pos, egui::vec2(tooltip_w, tooltip_est_h));
+
+    // 8. Draw Leader Elbow Connector from Sphere Pixel to Tooltip Box
+    if let Some(target_pos) = sphere_target_pos {
+        let visuals = &ctx.style_of(ctx.theme()).visuals;
+        let strong_color = visuals.strong_text_color();
+        let line_color = visuals.widgets.noninteractive.fg_stroke.color;
+
+        let painter = ui.painter();
+
+        // 1. Target reticle dot on the 3D globe surface
+        painter.circle_filled(target_pos, 7.0, text_color.linear_multiply(0.12));
+        painter.circle_filled(target_pos, 4.5, text_color.linear_multiply(0.25));
+        painter.circle_stroke(target_pos, 3.5, Stroke::new(1.2, strong_color));
+        painter.circle_filled(target_pos, 1.8, strong_color);
+
+        // 2. Compute anchor on tooltip box
+        let box_anchor = if tooltip_rect.min.x >= target_pos.x {
+            // Tooltip is to the right of the target
+            Pos2::new(tooltip_rect.min.x, (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0))
+        } else if tooltip_rect.max.x <= target_pos.x {
+            // Tooltip is to the left of the target
+            Pos2::new(tooltip_rect.max.x, (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0))
+        } else if tooltip_rect.min.y >= target_pos.y {
+            // Tooltip is below the target
+            Pos2::new(target_pos.x, tooltip_rect.min.y)
+        } else {
+            // Tooltip is above the target
+            Pos2::new(target_pos.x, tooltip_rect.max.y)
+        };
+
+        // 3. Elbow connector line (vertical from target to anchor level, then horizontal to box)
+        let elbow = Pos2::new(target_pos.x, box_anchor.y);
+        let leader_stroke = Stroke::new(1.2, line_color.linear_multiply(0.85));
+
+        painter.line_segment([target_pos, elbow], leader_stroke);
+        painter.line_segment([elbow, box_anchor], leader_stroke);
+
+        // 4. Subtle junction dot at the elbow vertex
+        painter.circle_filled(elbow, 1.5, strong_color.linear_multiply(0.8));
     }
 
     egui::Area::new(egui::Id::new("octant_hover_pixel_tooltip"))
