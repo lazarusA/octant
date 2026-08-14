@@ -11,13 +11,14 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
 
     let max_w = (ctx.viewport_rect().width() * 0.7).clamp(480.0, 950.0);
 
-    egui::Window::new("📚 Dataset Catalog")
+    let response = egui::Window::new("📚 Dataset Catalog")
         .open(&mut open)
         .default_size([max_w, 560.0])
         .max_width(max_w)
         .min_size([460.0, 380.0])
         .resizable(true)
         .collapsible(false)
+        .order(egui::Order::Foreground)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
             ui.add_space(4.0);
@@ -165,5 +166,18 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     if should_close {
         open = false;
     }
+
+    // Close when the user presses outside the catalog window.
+    // We use primary_pressed() instead of any_click() to avoid a same-frame race:
+    // button.clicked() fires on *release*, so on the frame the window first appears,
+    // primary_pressed() is already false — preventing an immediate close.
+    if let Some(r) = response
+        && let Some(pos) = ctx.input(|i| i.pointer.interact_pos())
+        && ctx.input(|i| i.pointer.primary_pressed())
+        && !r.response.rect.contains(pos)
+    {
+        open = false;
+    }
+
     app.show_catalog_window = open;
 }
