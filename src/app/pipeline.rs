@@ -223,12 +223,17 @@ impl OctantApp {
 
     /// Computes circular shift offsets (shift_x, shift_y, shift_z) along the animated spatial dimension.
     pub fn get_volume_shifts(&self) -> (u32, u32, u32) {
-        let Some(anim_dim) = self.plotted_animated_dim else {
+        let Some(anim_dim) = self.plotted_animated_dim.or(self.animated_dim) else {
             return (0, 0, 0);
         };
 
-        let spatial_role = self
-            .plotted_dim_config
+        let dim_configs = if !self.plotted_dim_config.is_empty() {
+            &self.plotted_dim_config
+        } else {
+            &self.dim_config
+        };
+
+        let spatial_role = dim_configs
             .get(anim_dim)
             .map(|c| c.spatial)
             .unwrap_or(crate::app::SpatialRole::None);
