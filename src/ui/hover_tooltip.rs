@@ -116,9 +116,21 @@ impl Camera3D {
 
 /// Standard AABB Ray-Box intersection using the slab method
 pub fn intersect_aabb(ray: &Ray3D, min_b: [f32; 3], max_b: [f32; 3]) -> Option<(f32, f32)> {
-    let inv_dx = if ray.dir[0].abs() > 1e-6 { 1.0 / ray.dir[0] } else { 1e6 };
-    let inv_dy = if ray.dir[1].abs() > 1e-6 { 1.0 / ray.dir[1] } else { 1e6 };
-    let inv_dz = if ray.dir[2].abs() > 1e-6 { 1.0 / ray.dir[2] } else { 1e6 };
+    let inv_dx = if ray.dir[0].abs() > 1e-6 {
+        1.0 / ray.dir[0]
+    } else {
+        1e6
+    };
+    let inv_dy = if ray.dir[1].abs() > 1e-6 {
+        1.0 / ray.dir[1]
+    } else {
+        1e6
+    };
+    let inv_dz = if ray.dir[2].abs() > 1e-6 {
+        1.0 / ray.dir[2]
+    } else {
+        1e6
+    };
 
     let t1_x = (min_b[0] - ray.origin[0]) * inv_dx;
     let t2_x = (max_b[0] - ray.origin[0]) * inv_dx;
@@ -251,7 +263,7 @@ impl<'a> VolumeSampler<'a> {
                 (u, v, w)
             };
 
-            if u >= 0.0 && u < 1.0 && v >= 0.0 && v < 1.0 && w >= 0.0 && w < 1.0 {
+            if (0.0..1.0).contains(&u) && (0.0..1.0).contains(&v) && (0.0..1.0).contains(&w) {
                 let cx = if is_half_scale {
                     ((u * (self.width - 1) as f32).round() as usize).min(self.width - 1)
                 } else {
@@ -276,13 +288,19 @@ impl<'a> VolumeSampler<'a> {
                 let raw_val = self.sample_cell(cx, cy, cz);
                 let is_nan = raw_val.is_nan() || raw_val.abs() > 1e30;
 
-                if is_half_scale && app.active_plot_type == PlotType::Volume && app.volume_algorithm == 1 {
+                if is_half_scale
+                    && app.active_plot_type == PlotType::Volume
+                    && app.volume_algorithm == 1
+                {
                     // Isosurface mode
                     if !is_nan && (raw_val - app.volume_isovalue).abs() <= app.volume_isorange {
                         hit_point = Some((cx, cy, cz, raw_val));
                         break;
                     }
-                } else if is_half_scale && app.active_plot_type == PlotType::Volume && app.volume_algorithm == 2 {
+                } else if is_half_scale
+                    && app.active_plot_type == PlotType::Volume
+                    && app.volume_algorithm == 2
+                {
                     // MIP mode
                     if !is_nan && raw_val > max_val {
                         let is_visible = app.use_highclip || raw_val <= app.color_range_max;
@@ -395,9 +413,15 @@ pub fn draw_leader_callout(
 
     // 2. Compute anchor on tooltip box
     let box_anchor = if tooltip_rect.min.x >= target_pos.x {
-        Pos2::new(tooltip_rect.min.x, (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0))
+        Pos2::new(
+            tooltip_rect.min.x,
+            (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0),
+        )
     } else if tooltip_rect.max.x <= target_pos.x {
-        Pos2::new(tooltip_rect.max.x, (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0))
+        Pos2::new(
+            tooltip_rect.max.x,
+            (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0),
+        )
     } else if tooltip_rect.min.y >= target_pos.y {
         Pos2::new(target_pos.x, tooltip_rect.min.y)
     } else {
@@ -492,9 +516,15 @@ pub fn show_hover_tooltip(
             let mut ny = v.clamp(0.0, 1.0);
 
             if app.sphere_mode > 0 {
-                let px = ((nx * matrix.width as f32).floor() as usize).min(matrix.width.saturating_sub(1));
-                let py = ((ny * matrix.height as f32).floor() as usize).min(matrix.height.saturating_sub(1));
-                let cell_val = matrix.values.get(py * matrix.width + px).copied().unwrap_or(f32::NAN);
+                let px = ((nx * matrix.width as f32).floor() as usize)
+                    .min(matrix.width.saturating_sub(1));
+                let py = ((ny * matrix.height as f32).floor() as usize)
+                    .min(matrix.height.saturating_sub(1));
+                let cell_val = matrix
+                    .values
+                    .get(py * matrix.width + px)
+                    .copied()
+                    .unwrap_or(f32::NAN);
                 let dr = get_normalized_radial_dr(app, cell_val);
                 r = 1.0 + dr;
 
@@ -516,7 +546,8 @@ pub fn show_hover_tooltip(
 
                     let l_rad = (p3_y / r).clamp(-1.0, 1.0).asin();
                     let o_rad = p3_x.atan2(p3_z);
-                    nx = ((o_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI)).clamp(0.0, 1.0);
+                    nx = ((o_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI))
+                        .clamp(0.0, 1.0);
                     ny = (0.5 - (l_rad / std::f32::consts::PI)).clamp(0.0, 1.0);
                 }
             }
@@ -546,13 +577,19 @@ pub fn show_hover_tooltip(
             let mut u = ((hit_x / data_aspect) + 1.0) * 0.5;
             let mut v = (hit_z + 1.0) * 0.5;
 
-            if u < -0.1 || u > 1.1 || v < -0.1 || v > 1.1 {
+            if !(-0.1..=1.1).contains(&u) || !(-0.1..=1.1).contains(&v) {
                 return;
             }
 
-            let px = ((u.clamp(0.0, 1.0) * matrix.width as f32).floor() as usize).min(matrix.width.saturating_sub(1));
-            let py = ((v.clamp(0.0, 1.0) * matrix.height as f32).floor() as usize).min(matrix.height.saturating_sub(1));
-            let cell_val = matrix.values.get(py * matrix.width + px).copied().unwrap_or(f32::NAN);
+            let px = ((u.clamp(0.0, 1.0) * matrix.width as f32).floor() as usize)
+                .min(matrix.width.saturating_sub(1));
+            let py = ((v.clamp(0.0, 1.0) * matrix.height as f32).floor() as usize)
+                .min(matrix.height.saturating_sub(1));
+            let cell_val = matrix
+                .values
+                .get(py * matrix.width + px)
+                .copied()
+                .unwrap_or(f32::NAN);
             let h = get_normalized_surface_height(app, cell_val);
             let target_h = if app.surface_mode == 2 { h.max(0.0) } else { h };
 
@@ -562,7 +599,7 @@ pub fn show_hover_tooltip(
                 let ref_z = world_ray.origin[2] + t_ref * world_ray.dir[2];
                 let u_ref = ((ref_x / data_aspect) + 1.0) * 0.5;
                 let v_ref = (ref_z + 1.0) * 0.5;
-                if u_ref >= -0.05 && u_ref <= 1.05 && v_ref >= -0.05 && v_ref <= 1.05 {
+                if (-0.05..=1.05).contains(&u_ref) && (-0.05..=1.05).contains(&v_ref) {
                     u = u_ref;
                     v = v_ref;
                 }
@@ -578,10 +615,11 @@ pub fn show_hover_tooltip(
             let (_, world_ray) = camera.cast_ray(hover_pos);
             let aspects = app.get_3d_aspect_ratio();
 
-            let (hit_x, hit_y, hit_z, hit_val) = match sampler.march_ray(app, &world_ray, aspects, false) {
-                Some(hit) => hit,
-                None => return,
-            };
+            let (hit_x, hit_y, hit_z, hit_val) =
+                match sampler.march_ray(app, &world_ray, aspects, false) {
+                    Some(hit) => hit,
+                    None => return,
+                };
 
             let nx = (hit_x as f32 + 0.5) / sampler.width as f32;
             let ny = (hit_y as f32 + 0.5) / sampler.height as f32;
@@ -593,10 +631,11 @@ pub fn show_hover_tooltip(
             let (_, world_ray) = camera.cast_ray(hover_pos);
             let aspects = app.get_3d_aspect_ratio();
 
-            let (hit_x, hit_y, hit_z, hit_val) = match sampler.march_ray(app, &world_ray, aspects, true) {
-                Some(hit) => hit,
-                None => return,
-            };
+            let (hit_x, hit_y, hit_z, hit_val) =
+                match sampler.march_ray(app, &world_ray, aspects, true) {
+                    Some(hit) => hit,
+                    None => return,
+                };
 
             let nx = (hit_x as f32 + 0.5) / sampler.width as f32;
             let ny = (hit_y as f32 + 0.5) / sampler.height as f32;
@@ -690,7 +729,10 @@ pub fn show_hover_tooltip(
         if l_count > 0 {
             for line_idx in 0..l_count {
                 let idx = line_idx * prof_len + sample_idx;
-                if let Some(&v) = profile_values.get(idx) && !v.is_nan() && v.is_finite() {
+                if let Some(&v) = profile_values.get(idx)
+                    && !v.is_nan()
+                    && v.is_finite()
+                {
                     let norm_y_val = (((v - cmin) / range) * 2.0 - 1.0).clamp(-1.0, 1.0);
                     let dist = (norm_y_val - (norm_y * 2.0 - 1.0)).abs();
                     if dist < best_dist {
@@ -846,9 +888,8 @@ pub fn show_hover_tooltip(
 
             let x_idx = explicit_x.unwrap_or(v.dimension_names.len().saturating_sub(1));
             let y_idx = explicit_y.unwrap_or(v.dimension_names.len().saturating_sub(2));
-            let z_idx = explicit_z.or_else(|| {
-                (0..v.dimension_names.len()).find(|&i| i != x_idx && i != y_idx)
-            });
+            let z_idx = explicit_z
+                .or_else(|| (0..v.dimension_names.len()).find(|&i| i != x_idx && i != y_idx));
 
             used_dims.insert(x_idx);
             used_dims.insert(y_idx);
@@ -868,10 +909,8 @@ pub fn show_hover_tooltip(
                 .or_else(|| app.get_spatial_dim_name(2))
                 .unwrap_or_else(|| "z".to_string());
 
-            let (origin_x, full_x_len) =
-                get_dimension_origin_and_full_len(app, Some(v), x_idx);
-            let (origin_y, full_y_len) =
-                get_dimension_origin_and_full_len(app, Some(v), y_idx);
+            let (origin_x, full_x_len) = get_dimension_origin_and_full_len(app, Some(v), x_idx);
+            let (origin_y, full_y_len) = get_dimension_origin_and_full_len(app, Some(v), y_idx);
 
             let global_x = (origin_x + data_x).min(full_x_len.saturating_sub(1));
             let global_y = (origin_y + data_y).min(full_y_len.saturating_sub(1));
@@ -902,8 +941,7 @@ pub fn show_hover_tooltip(
                 if let Some(zi) = z_idx {
                     used_dims.insert(zi);
                 }
-                let (origin_z, full_z_len) =
-                    get_dimension_origin_and_full_len(app, Some(v), z_dim);
+                let (origin_z, full_z_len) = get_dimension_origin_and_full_len(app, Some(v), z_dim);
                 let global_z = (origin_z + data_z).min(full_z_len.saturating_sub(1));
 
                 let loc_z = format_dimension_coord(
@@ -928,17 +966,27 @@ pub fn show_hover_tooltip(
 
             list
         } else if sampler.depth > 1 {
-            let dim_z_name = app.get_spatial_dim_name(2).unwrap_or_else(|| "z".to_string());
-            let dim_y_name = app.get_spatial_dim_name(1).unwrap_or_else(|| "y".to_string());
-            let dim_x_name = app.get_spatial_dim_name(0).unwrap_or_else(|| "x".to_string());
+            let dim_z_name = app
+                .get_spatial_dim_name(2)
+                .unwrap_or_else(|| "z".to_string());
+            let dim_y_name = app
+                .get_spatial_dim_name(1)
+                .unwrap_or_else(|| "y".to_string());
+            let dim_x_name = app
+                .get_spatial_dim_name(0)
+                .unwrap_or_else(|| "x".to_string());
             vec![
                 format!("{}:\u{00A0}{}/{}", dim_z_name, data_z + 1, sampler.depth),
                 format!("{}:\u{00A0}{}/{}", dim_y_name, data_y + 1, sampler.height),
                 format!("{}:\u{00A0}{}/{}", dim_x_name, data_x + 1, sampler.width),
             ]
         } else {
-            let dim_y_name = app.get_spatial_dim_name(1).unwrap_or_else(|| "y".to_string());
-            let dim_x_name = app.get_spatial_dim_name(0).unwrap_or_else(|| "x".to_string());
+            let dim_y_name = app
+                .get_spatial_dim_name(1)
+                .unwrap_or_else(|| "y".to_string());
+            let dim_x_name = app
+                .get_spatial_dim_name(0)
+                .unwrap_or_else(|| "x".to_string());
             vec![
                 format!("{}:\u{00A0}{}/{}", dim_y_name, data_y + 1, sampler.height),
                 format!("{}:\u{00A0}{}/{}", dim_x_name, data_x + 1, sampler.width),
@@ -954,7 +1002,8 @@ pub fn show_hover_tooltip(
         {
             ((norm_x * matrix.width as f32).floor() as usize).min(matrix.width.saturating_sub(1))
         } else {
-            (((norm_x * (matrix.width as f32 - 1.0)) + 0.5) as usize).min(matrix.width.saturating_sub(1))
+            (((norm_x * (matrix.width as f32 - 1.0)) + 0.5) as usize)
+                .min(matrix.width.saturating_sub(1))
         };
         let py = if app.active_plot_type == PlotType::Sphere
             || app.active_plot_type == PlotType::Surface
@@ -963,7 +1012,8 @@ pub fn show_hover_tooltip(
         {
             ((norm_y * matrix.height as f32).floor() as usize).min(matrix.height.saturating_sub(1))
         } else {
-            (((norm_y * (matrix.height as f32 - 1.0)) + 0.5) as usize).min(matrix.height.saturating_sub(1))
+            (((norm_y * (matrix.height as f32 - 1.0)) + 0.5) as usize)
+                .min(matrix.height.saturating_sub(1))
         };
 
         let idx = py * matrix.width + px;
@@ -998,10 +1048,8 @@ pub fn show_hover_tooltip(
             let geo_y = geo_coords.map(|(lat, _)| lat);
             let geo_x = geo_coords.map(|(_, lon)| lon);
 
-            let (origin_x, full_x_len) =
-                get_dimension_origin_and_full_len(app, Some(v), x_idx);
-            let (origin_y, full_y_len) =
-                get_dimension_origin_and_full_len(app, Some(v), y_idx);
+            let (origin_x, full_x_len) = get_dimension_origin_and_full_len(app, Some(v), x_idx);
+            let (origin_y, full_y_len) = get_dimension_origin_and_full_len(app, Some(v), y_idx);
 
             let global_x = (origin_x + px).min(full_x_len.saturating_sub(1));
             let global_y = (origin_y + py).min(full_y_len.saturating_sub(1));
@@ -1079,10 +1127,10 @@ pub fn show_hover_tooltip(
         let marker_pos = Pos2::new(screen_dot_x, screen_dot_y);
 
         // Compute data/axis bounds on screen for guidelines (spanning full axis range from start to end)
-        let x_start_ndc = -1.0 * zoom + gpu_pan_x;
+        let x_start_ndc = -zoom + gpu_pan_x;
         let x_end_ndc = 1.0 * zoom + gpu_pan_x;
         let y_top_ndc = 1.0 * zoom + gpu_pan_y;
-        let y_bottom_ndc = -1.0 * zoom + gpu_pan_y;
+        let y_bottom_ndc = -zoom + gpu_pan_y;
 
         let x_line_start = rect.min.x + ((x_start_ndc + 1.0) / 2.0) * rect.width();
         let x_line_end = rect.min.x + ((x_end_ndc + 1.0) / 2.0) * rect.width();
@@ -1104,7 +1152,10 @@ pub fn show_hover_tooltip(
         // Full-span Vertical guideline bounded to axis limits
         if marker_pos.x >= rect.min.x && marker_pos.x <= rect.max.x {
             painter.line_segment(
-                [Pos2::new(marker_pos.x, y_axis_min), Pos2::new(marker_pos.x, y_axis_max)],
+                [
+                    Pos2::new(marker_pos.x, y_axis_min),
+                    Pos2::new(marker_pos.x, y_axis_max),
+                ],
                 Stroke::new(1.0, line_color.linear_multiply(0.7)),
             );
         }
@@ -1112,7 +1163,10 @@ pub fn show_hover_tooltip(
         // Full-span Horizontal guideline bounded to axis limits
         if marker_pos.y >= rect.min.y && marker_pos.y <= rect.max.y {
             painter.line_segment(
-                [Pos2::new(x_axis_min, marker_pos.y), Pos2::new(x_axis_max, marker_pos.y)],
+                [
+                    Pos2::new(x_axis_min, marker_pos.y),
+                    Pos2::new(x_axis_max, marker_pos.y),
+                ],
                 Stroke::new(1.0, line_color.linear_multiply(0.7)),
             );
         }
@@ -1222,8 +1276,16 @@ pub fn show_hover_tooltip(
     let is_connected_mode = app.active_plot_type != PlotType::Line;
     let mut tooltip_pos = if is_connected_mode {
         // Offset outward to create a clear leader line
-        let offset_x = if hover_pos.x >= rect.center().x { 36.0 } else { -tooltip_w - 36.0 };
-        let offset_y = if hover_pos.y >= rect.center().y { -tooltip_est_h - 18.0 } else { 18.0 };
+        let offset_x = if hover_pos.x >= rect.center().x {
+            36.0
+        } else {
+            -tooltip_w - 36.0
+        };
+        let offset_y = if hover_pos.y >= rect.center().y {
+            -tooltip_est_h - 18.0
+        } else {
+            18.0
+        };
         Pos2::new(hover_pos.x + offset_x, hover_pos.y + offset_y)
     } else {
         Pos2::new(hover_pos.x + 14.0, hover_pos.y + 14.0)
@@ -1308,10 +1370,7 @@ fn get_dimension_origin_and_full_len(
     var: Option<&crate::data::VariableInfo>,
     dim_idx: usize,
 ) -> (usize, usize) {
-    let full_len = var
-        .and_then(|v| v.shape.get(dim_idx))
-        .copied()
-        .unwrap_or(1) as usize;
+    let full_len = var.and_then(|v| v.shape.get(dim_idx)).copied().unwrap_or(1) as usize;
 
     let origin = if let Some(req) = &app.active_slice_request
         && let Some(sel) = req.selections.get(dim_idx)
@@ -1369,25 +1428,26 @@ fn enrich_entries_with_animated_and_collapsed_dims(
         });
 
     let mut has_animated_inserted = false;
-    if let Some(a_idx) = anim_dim {
-        if a_idx < v.dimension_names.len() && !used_dims.contains(&a_idx) {
-            let total_steps = app
-                .animated_dim_extent()
-                .max(v.shape.get(a_idx).copied().unwrap_or(1) as usize);
-            let dim_name = &v.dimension_names[a_idx];
-            let loc_anim = format_dimension_coord(
-                meta,
-                Some(v),
-                Some(&app.plotted_store_target_input),
-                dim_name,
-                app.current_timestep.min(total_steps.saturating_sub(1)),
-                total_steps,
-                None,
-            );
-            entries.insert(0, loc_anim);
-            used_dims.insert(a_idx);
-            has_animated_inserted = true;
-        }
+    if let Some(a_idx) = anim_dim
+        && a_idx < v.dimension_names.len()
+        && !used_dims.contains(&a_idx)
+    {
+        let total_steps = app
+            .animated_dim_extent()
+            .max(v.shape.get(a_idx).copied().unwrap_or(1) as usize);
+        let dim_name = &v.dimension_names[a_idx];
+        let loc_anim = format_dimension_coord(
+            meta,
+            Some(v),
+            Some(&app.plotted_store_target_input),
+            dim_name,
+            app.current_timestep.min(total_steps.saturating_sub(1)),
+            total_steps,
+            None,
+        );
+        entries.insert(0, loc_anim);
+        used_dims.insert(a_idx);
+        has_animated_inserted = true;
     }
 
     // 2. Insert all remaining Collapsed Dimensions
@@ -1442,17 +1502,24 @@ fn format_dimension_coord(
         };
     }
 
-    let is_time_dim = clean.contains("time")
-        || clean == "t"
-        || clean.contains("date")
-        || clean.contains("step");
+    let is_time_dim =
+        clean.contains("time") || clean == "t" || clean.contains("date") || clean.contains("step");
 
-    let units_str = var
-        .and_then(|v| v.units.as_deref().or(v.attributes.get("units").map(|s| s.as_str())));
-    let time_start = var
-        .and_then(|v| v.time_coverage_start.as_deref().or(v.attributes.get("time_coverage_start").map(|s| s.as_str())));
-    let temp_res = var
-        .and_then(|v| v.temporal_resolution.as_deref().or(v.attributes.get("temporal_resolution").map(|s| s.as_str())));
+    let units_str = var.and_then(|v| {
+        v.units
+            .as_deref()
+            .or(v.attributes.get("units").map(|s| s.as_str()))
+    });
+    let time_start = var.and_then(|v| {
+        v.time_coverage_start
+            .as_deref()
+            .or(v.attributes.get("time_coverage_start").map(|s| s.as_str()))
+    });
+    let temp_res = var.and_then(|v| {
+        v.temporal_resolution
+            .as_deref()
+            .or(v.attributes.get("temporal_resolution").map(|s| s.as_str()))
+    });
 
     if let Some(m) = meta {
         if let Some(coords) = m
@@ -1461,7 +1528,10 @@ fn format_dimension_coord(
             .or_else(|| m.dimension_coordinates.get(dim_name))
         {
             // Case A: Exact matching coordinate array length
-            if coords.len() == total_len && let Some(c) = coords.get(idx) && !c.trim().is_empty() {
+            if coords.len() == total_len
+                && let Some(c) = coords.get(idx)
+                && !c.trim().is_empty()
+            {
                 let is_raw_numeric = c.parse::<f64>().is_ok()
                     && !c.contains('-')
                     && !c.contains(':')
@@ -1514,8 +1584,13 @@ fn format_dimension_coord(
                 && let (Some(first), Some(last)) = (coords.first(), coords.last())
             {
                 if is_time_dim {
-                    let first_is_date = first.contains('-') || first.contains(':') || first.contains('T');
-                    let time_start_override = if first_is_date { Some(first.as_str()) } else { time_start };
+                    let first_is_date =
+                        first.contains('-') || first.contains(':') || first.contains('T');
+                    let time_start_override = if first_is_date {
+                        Some(first.as_str())
+                    } else {
+                        time_start
+                    };
                     let time_val = crate::utils::units::format_axis_value(
                         idx,
                         total_len,
