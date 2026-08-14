@@ -715,7 +715,15 @@ pub fn show_hover_tooltip(
                 _ => "x".to_string(),
             });
 
-        let loc_str = format_dimension_coord(meta, &dim_name, sample_idx, prof_len, None);
+        let loc_str = format_dimension_coord(
+            meta,
+            var,
+            Some(&app.plotted_store_target_input),
+            &dim_name,
+            sample_idx,
+            prof_len,
+            None,
+        );
         let mut entries = vec![loc_str];
 
         if l_count > 1 {
@@ -735,8 +743,15 @@ pub fn show_hover_tooltip(
                 };
 
                 if let Some(ortho_name) = ortho_dim_name {
-                    let ortho_str =
-                        format_dimension_coord(meta, ortho_name, best_line_idx, l_count, None);
+                    let ortho_str = format_dimension_coord(
+                        meta,
+                        var,
+                        Some(&app.plotted_store_target_input),
+                        ortho_name,
+                        best_line_idx,
+                        l_count,
+                        None,
+                    );
                     entries.insert(0, ortho_str);
                 } else {
                     entries.insert(
@@ -768,40 +783,77 @@ pub fn show_hover_tooltip(
                 });
 
             let dim_y_name = explicit_y
-                .and_then(|i| v.dimension_names.get(i))
-                .cloned()
+                .and_then(|i| v.dimension_names.get(i).cloned())
+                .or_else(|| app.get_spatial_dim_name(1))
                 .unwrap_or_else(|| "y".to_string());
 
             let dim_x_name = explicit_x
-                .and_then(|i| v.dimension_names.get(i))
-                .cloned()
+                .and_then(|i| v.dimension_names.get(i).cloned())
+                .or_else(|| app.get_spatial_dim_name(0))
                 .unwrap_or_else(|| "x".to_string());
 
-            let loc_y = format_dimension_coord(meta, &dim_y_name, py, sampler.height, None);
-            let loc_x = format_dimension_coord(meta, &dim_x_name, px, sampler.width, None);
+            let dim_z_name = explicit_z
+                .and_then(|i| v.dimension_names.get(i).cloned())
+                .or_else(|| app.get_spatial_dim_name(2))
+                .or_else(|| {
+                    v.dimension_names
+                        .iter()
+                        .enumerate()
+                        .find(|(i, _)| Some(*i) != explicit_x && Some(*i) != explicit_y)
+                        .map(|(_, name)| name.clone())
+                })
+                .unwrap_or_else(|| "z".to_string());
+
+            let loc_y = format_dimension_coord(
+                meta,
+                var,
+                Some(&app.plotted_store_target_input),
+                &dim_y_name,
+                py,
+                sampler.height,
+                None,
+            );
+            let loc_x = format_dimension_coord(
+                meta,
+                var,
+                Some(&app.plotted_store_target_input),
+                &dim_x_name,
+                px,
+                sampler.width,
+                None,
+            );
 
             let mut list = vec![loc_y, loc_x];
 
             if sampler.depth > 1 {
-                let dim_z_name = explicit_z
-                    .and_then(|i| v.dimension_names.get(i))
-                    .cloned()
-                    .unwrap_or_else(|| "z".to_string());
-                let loc_z = format_dimension_coord(meta, &dim_z_name, pz, sampler.depth, None);
+                let loc_z = format_dimension_coord(
+                    meta,
+                    var,
+                    Some(&app.plotted_store_target_input),
+                    &dim_z_name,
+                    pz,
+                    sampler.depth,
+                    None,
+                );
                 list.insert(0, loc_z);
             }
 
             list
         } else if sampler.depth > 1 {
+            let dim_z_name = app.get_spatial_dim_name(2).unwrap_or_else(|| "z".to_string());
+            let dim_y_name = app.get_spatial_dim_name(1).unwrap_or_else(|| "y".to_string());
+            let dim_x_name = app.get_spatial_dim_name(0).unwrap_or_else(|| "x".to_string());
             vec![
-                format!("z:\u{00A0}{}/{}", pz + 1, sampler.depth),
-                format!("y:\u{00A0}{}/{}", py + 1, sampler.height),
-                format!("x:\u{00A0}{}/{}", px + 1, sampler.width),
+                format!("{}:\u{00A0}{}/{}", dim_z_name, pz + 1, sampler.depth),
+                format!("{}:\u{00A0}{}/{}", dim_y_name, py + 1, sampler.height),
+                format!("{}:\u{00A0}{}/{}", dim_x_name, px + 1, sampler.width),
             ]
         } else {
+            let dim_y_name = app.get_spatial_dim_name(1).unwrap_or_else(|| "y".to_string());
+            let dim_x_name = app.get_spatial_dim_name(0).unwrap_or_else(|| "x".to_string());
             vec![
-                format!("y:\u{00A0}{}/{}", py + 1, sampler.height),
-                format!("x:\u{00A0}{}/{}", px + 1, sampler.width),
+                format!("{}:\u{00A0}{}/{}", dim_y_name, py + 1, sampler.height),
+                format!("{}:\u{00A0}{}/{}", dim_x_name, px + 1, sampler.width),
             ]
         };
 
@@ -850,8 +902,24 @@ pub fn show_hover_tooltip(
             let geo_y = geo_coords.map(|(lat, _)| lat);
             let geo_x = geo_coords.map(|(_, lon)| lon);
 
-            let loc_y = format_dimension_coord(meta, &dim_y_name, py, matrix.height, geo_y);
-            let loc_x = format_dimension_coord(meta, &dim_x_name, px, matrix.width, geo_x);
+            let loc_y = format_dimension_coord(
+                meta,
+                var,
+                Some(&app.plotted_store_target_input),
+                &dim_y_name,
+                py,
+                matrix.height,
+                geo_y,
+            );
+            let loc_x = format_dimension_coord(
+                meta,
+                var,
+                Some(&app.plotted_store_target_input),
+                &dim_x_name,
+                px,
+                matrix.width,
+                geo_x,
+            );
 
             let mut list = vec![loc_y, loc_x];
 
@@ -867,76 +935,15 @@ pub fn show_hover_tooltip(
                     .or_else(|| v.dimension_names.first().cloned())
                     .unwrap_or_else(|| "time".to_string());
 
-                let time_coord = meta.and_then(|m| {
-                    m.dimension_coordinates
-                        .get(&step_dim_name.to_lowercase())
-                        .or_else(|| m.dimension_coordinates.get(&step_dim_name))
-                        .and_then(|coords| {
-                            if coords.len() == total_steps {
-                                coords.get(app.current_timestep).cloned()
-                            } else if coords.len() >= 2
-                                && let (Some(first), Some(last)) = (coords.first(), coords.last())
-                                && let (Ok(f_v), Ok(l_v)) =
-                                    (first.parse::<f64>(), last.parse::<f64>())
-                            {
-                                let t = if total_steps > 1 {
-                                    app.current_timestep as f64 / (total_steps - 1) as f64
-                                } else {
-                                    0.0
-                                };
-                                let val = f_v + t * (l_v - f_v);
-                                Some(format!("{:.2}", val))
-                            } else {
-                                coords.get(app.current_timestep).cloned()
-                            }
-                        })
-                });
-
-                let formatted_val = if let Some(tc) = time_coord {
-                    let is_raw_numeric = tc.parse::<f64>().is_ok()
-                        && !tc.contains('-')
-                        && !tc.contains(':')
-                        && !tc.contains('/')
-                        && !tc.contains('T');
-
-                    if !is_raw_numeric && !tc.trim().is_empty() {
-                        tc
-                    } else {
-                        crate::utils::units::format_axis_value(
-                            app.current_timestep,
-                            total_steps,
-                            Some(&step_dim_name),
-                            v.units
-                                .as_deref()
-                                .or(v.attributes.get("units").map(|s| s.as_str())),
-                            v.time_coverage_start
-                                .as_deref()
-                                .or(v.attributes.get("time_coverage_start").map(|s| s.as_str())),
-                            v.temporal_resolution
-                                .as_deref()
-                                .or(v.attributes.get("temporal_resolution").map(|s| s.as_str())),
-                            Some(&app.plotted_store_target_input),
-                        )
-                    }
-                } else {
-                    crate::utils::units::format_axis_value(
-                        app.current_timestep,
-                        total_steps,
-                        Some(&step_dim_name),
-                        v.units
-                            .as_deref()
-                            .or(v.attributes.get("units").map(|s| s.as_str())),
-                        v.time_coverage_start
-                            .as_deref()
-                            .or(v.attributes.get("time_coverage_start").map(|s| s.as_str())),
-                        v.temporal_resolution
-                            .as_deref()
-                            .or(v.attributes.get("temporal_resolution").map(|s| s.as_str())),
-                        Some(&app.plotted_store_target_input),
-                    )
-                };
-
-                let loc_t = format!("{}:\u{00A0}{}", step_dim_name, formatted_val);
+                let loc_t = format_dimension_coord(
+                    meta,
+                    var,
+                    Some(&app.plotted_store_target_input),
+                    &step_dim_name,
+                    app.current_timestep,
+                    total_steps,
+                    None,
+                );
                 list.insert(0, loc_t);
             }
 
@@ -1206,9 +1213,11 @@ pub fn show_hover_tooltip(
         });
 }
 
-/// Helper to format dimension coordinate values with physical units and proper cardinal degrees.
+/// Helper to format dimension coordinate values with physical units, proper cardinal degrees, pressure levels, or date/time.
 fn format_dimension_coord(
     meta: Option<&crate::data::DatasetMetadata>,
+    var: Option<&crate::data::VariableInfo>,
+    store_target: Option<&str>,
     dim_name: &str,
     idx: usize,
     total_len: usize,
@@ -1216,6 +1225,7 @@ fn format_dimension_coord(
 ) -> String {
     let clean = dim_name.trim().to_lowercase();
 
+    // 1. Geographic fallback if latitude / longitude degrees provided directly
     if let Some(geo) = geo_fallback {
         return if clean.contains("lon") {
             let cardinal = if geo >= 0.0 { "°E" } else { "°W" };
@@ -1228,43 +1238,135 @@ fn format_dimension_coord(
         };
     }
 
+    let is_time_dim = clean.contains("time")
+        || clean == "t"
+        || clean.contains("date")
+        || clean.contains("step");
+
+    let units_str = var
+        .and_then(|v| v.units.as_deref().or(v.attributes.get("units").map(|s| s.as_str())));
+    let time_start = var
+        .and_then(|v| v.time_coverage_start.as_deref().or(v.attributes.get("time_coverage_start").map(|s| s.as_str())));
+    let temp_res = var
+        .and_then(|v| v.temporal_resolution.as_deref().or(v.attributes.get("temporal_resolution").map(|s| s.as_str())));
+
     if let Some(m) = meta {
         if let Some(coords) = m
             .dimension_coordinates
             .get(&clean)
             .or_else(|| m.dimension_coordinates.get(dim_name))
         {
-            if coords.len() == total_len
-                && let Some(c) = coords.get(idx)
-                && !c.trim().is_empty()
-            {
-                return format!("{}:\u{00A0}{}", dim_name, c.replace(' ', "\u{00A0}"));
+            // Case A: Exact matching coordinate array length
+            if coords.len() == total_len && let Some(c) = coords.get(idx) && !c.trim().is_empty() {
+                let is_raw_numeric = c.parse::<f64>().is_ok()
+                    && !c.contains('-')
+                    && !c.contains(':')
+                    && !c.contains('/')
+                    && !c.contains('T');
+
+                if !is_raw_numeric && !c.trim().is_empty() {
+                    return format!("{}:\u{00A0}{}", dim_name, c.replace(' ', "\u{00A0}"));
+                }
+
+                if is_time_dim {
+                    let time_val = crate::utils::units::format_axis_value(
+                        idx,
+                        total_len,
+                        Some(dim_name),
+                        units_str,
+                        time_start.or(Some(c.as_str())),
+                        temp_res,
+                        store_target,
+                    );
+                    return format!("{}:\u{00A0}{}", dim_name, time_val);
+                }
+
+                if let Ok(val) = c.parse::<f64>() {
+                    return if clean.contains("lon") {
+                        let cardinal = if val >= 0.0 { "°E" } else { "°W" };
+                        format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
+                    } else if clean.contains("lat") {
+                        let cardinal = if val >= 0.0 { "°N" } else { "°S" };
+                        format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
+                    } else if clean.contains("depth")
+                        || clean.contains("height")
+                        || clean.contains("alt")
+                    {
+                        format!("{}:\u{00A0}{:.2}\u{00A0}m", dim_name, val)
+                    } else if clean.contains("level")
+                        || clean.contains("lev")
+                        || clean.contains("plev")
+                        || clean.contains("pressure")
+                    {
+                        format!("{}:\u{00A0}{:.2}\u{00A0}hPa", dim_name, val)
+                    } else {
+                        format!("{}:\u{00A0}{:.2}", dim_name, val)
+                    };
+                }
             }
+
+            // Case B: Dimension bounds (first & last)
             if coords.len() >= 2
                 && let (Some(first), Some(last)) = (coords.first(), coords.last())
-                && let (Ok(f_v), Ok(l_v)) = (first.parse::<f64>(), last.parse::<f64>())
             {
-                let t = if total_len > 1 {
-                    idx as f64 / (total_len - 1) as f64
-                } else {
-                    0.0
-                };
-                let val = f_v + t * (l_v - f_v);
-                return if clean.contains("lon") {
-                    let cardinal = if val >= 0.0 { "°E" } else { "°W" };
-                    format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
-                } else if clean.contains("lat") {
-                    let cardinal = if val >= 0.0 { "°N" } else { "°S" };
-                    format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
-                } else if clean.contains("depth")
-                    || clean.contains("height")
-                    || clean.contains("alt")
-                {
-                    format!("{}:\u{00A0}{:.2}\u{00A0}m", dim_name, val)
-                } else {
-                    format!("{}:\u{00A0}{:.2}", dim_name, val)
-                };
+                if is_time_dim {
+                    let first_is_date = first.contains('-') || first.contains(':') || first.contains('T');
+                    let time_start_override = if first_is_date { Some(first.as_str()) } else { time_start };
+                    let time_val = crate::utils::units::format_axis_value(
+                        idx,
+                        total_len,
+                        Some(dim_name),
+                        units_str,
+                        time_start_override,
+                        temp_res,
+                        store_target,
+                    );
+                    return format!("{}:\u{00A0}{}", dim_name, time_val);
+                }
+
+                if let (Ok(f_v), Ok(l_v)) = (first.parse::<f64>(), last.parse::<f64>()) {
+                    let t = if total_len > 1 {
+                        idx as f64 / (total_len - 1) as f64
+                    } else {
+                        0.0
+                    };
+                    let val = f_v + t * (l_v - f_v);
+                    return if clean.contains("lon") {
+                        let cardinal = if val >= 0.0 { "°E" } else { "°W" };
+                        format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
+                    } else if clean.contains("lat") {
+                        let cardinal = if val >= 0.0 { "°N" } else { "°S" };
+                        format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
+                    } else if clean.contains("depth")
+                        || clean.contains("height")
+                        || clean.contains("alt")
+                    {
+                        format!("{}:\u{00A0}{:.2}\u{00A0}m", dim_name, val)
+                    } else if clean.contains("level")
+                        || clean.contains("lev")
+                        || clean.contains("plev")
+                        || clean.contains("pressure")
+                    {
+                        format!("{}:\u{00A0}{:.2}\u{00A0}hPa", dim_name, val)
+                    } else {
+                        format!("{}:\u{00A0}{:.2}", dim_name, val)
+                    };
+                }
             }
+
+            if is_time_dim {
+                let time_val = crate::utils::units::format_axis_value(
+                    idx,
+                    total_len,
+                    Some(dim_name),
+                    units_str,
+                    time_start,
+                    temp_res,
+                    store_target,
+                );
+                return format!("{}:\u{00A0}{}", dim_name, time_val);
+            }
+
             if let Some(first) = coords.first()
                 && !first.trim().is_empty()
             {
@@ -1273,6 +1375,19 @@ fn format_dimension_coord(
         }
 
         if let Some((min_b, max_b)) = m.get_coord_bounds(dim_name) {
+            if is_time_dim {
+                let time_val = crate::utils::units::format_axis_value(
+                    idx,
+                    total_len,
+                    Some(dim_name),
+                    units_str,
+                    time_start,
+                    temp_res,
+                    store_target,
+                );
+                return format!("{}:\u{00A0}{}", dim_name, time_val);
+            }
+
             let t = if total_len > 1 {
                 idx as f64 / (total_len - 1) as f64
             } else {
@@ -1287,13 +1402,36 @@ fn format_dimension_coord(
                 format!("{}:\u{00A0}{:.2}{}", dim_name, val.abs(), cardinal)
             } else if clean.contains("depth") || clean.contains("height") || clean.contains("alt") {
                 format!("{}:\u{00A0}{:.2}\u{00A0}m", dim_name, val)
+            } else if clean.contains("level")
+                || clean.contains("lev")
+                || clean.contains("plev")
+                || clean.contains("pressure")
+            {
+                format!("{}:\u{00A0}{:.2}\u{00A0}hPa", dim_name, val)
             } else {
                 format!("{}:\u{00A0}{:.2}", dim_name, val)
             };
         }
     }
 
-    format!("{}:\u{00A0}{}", dim_name, idx)
+    if is_time_dim {
+        let time_val = crate::utils::units::format_axis_value(
+            idx,
+            total_len,
+            Some(dim_name),
+            units_str,
+            time_start,
+            temp_res,
+            store_target,
+        );
+        return format!("{}:\u{00A0}{}", dim_name, time_val);
+    }
+
+    if total_len > 1 {
+        format!("{}:\u{00A0}{}/{}", dim_name, idx + 1, total_len)
+    } else {
+        format!("{}:\u{00A0}{}", dim_name, idx)
+    }
 }
 
 /// Computes normalized radial displacement on the 3D sphere matching sphere.wgsl
