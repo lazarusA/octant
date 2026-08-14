@@ -11,9 +11,11 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
         .size_range(180.0..=420.0)
         .show_collapsible(ui, &mut show, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.heading("🗂️ Stores");
                 ui.add_space(4.0);
-                ui.label("Choose a data source and load metadata into the current session.");
+                if ui.button(egui::RichText::new("📚 Open Catalog").strong()).clicked() {
+                    app.show_catalog_window = true;
+                }
+                ui.add_space(4.0);
                 ui.separator();
 
                 let mut selected = app.selected_store_kind;
@@ -62,16 +64,12 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
 
                 ui.add_space(6.0);
-                let btn_label = if app.is_loading { "⏳ Fetching..." } else { "🔍 Load Metadata" };
+                let btn_label = if app.is_loading { "⏳ Loading..." } else { "⬇️ Load" };
                 if ui.add_enabled(!app.is_loading, egui::Button::new(egui::RichText::new(btn_label).strong())).clicked() {
                     app.inspect_active_store();
                 }
 
                 ui.add_space(6.0);
-                if ui.button(egui::RichText::new("📚 Open Catalog").strong()).clicked() {
-                    app.show_catalog_window = true;
-                }
-
                 ui.separator();
                 ui.collapsing("About this store", |ui| {
                     if let Some(metadata) = &app.active_dataset_metadata {
