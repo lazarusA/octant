@@ -10,7 +10,11 @@ struct Uniforms {
     height: u32,
     depth: u32,
     screen_aspect: f32,
+    shift_x: u32,
+    shift_y: u32,
+    shift_z: u32,
     _pad0: u32,
+    _pad1: u32,
     color: ColorUniforms,
 };
 
@@ -37,12 +41,6 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
 
-    let max_idx = arrayLength(&data_buffer) - 1u;
-    let safe_idx = min(instance_idx, max_idx);
-    let raw_val = data_buffer[safe_idx];
-    out.val = raw_val;
-    out.local_uv = model.position;
-
     let grid_w = max(uniforms.width, 1u);
     let grid_h = max(uniforms.height, 1u);
     let grid_d = max(arrayLength(&data_buffer) / (grid_w * grid_h), 1u);
@@ -52,10 +50,38 @@ fn vs_main(
     let cell_y = (instance_idx / grid_w) % grid_h;
     let cell_z = instance_idx / (grid_w * grid_h);
 
-    // Map cell (z, y, x) to 3D world coordinates with North (+Y) at top and South (-Y) at bottom
+    // Apply circular shift offsets along X, Y, Z
+    let shifted_x = (cell_x + uniforms.shift_x) % grid_w;
+    let shifted_y = (cell_y + uniforms.shift_y) % grid_h;
+    let shifted_z = (cell_z + uniforms.shift_z) % grid_d;
+    let max_idx = arrayLength(&data_buffer) - 1u;
+    let data_idx = min(shifted_z * (grid_w * grid_h) + shifted_y * grid_w + shifted_x, max_idx);
+
+    let raw_val = data_buffer[data_idx];
+    out.val = raw_val;
+    out.local_uv = model.position;
+
+    // Fast-cull invisible points (NaNs or clipped values) in vertex shader
+    let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
+    if (is_nan_val && uniforms.color.use_nan_color == 0u) {
+        out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        return out;
+    }
+    if (!is_nan_val) {
+        if (uniforms.color.use_lowclip == 0u && raw_val < uniforms.color.cmin) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+        if (uniforms.color.use_highclip == 0u && raw_val > uniforms.color.cmax) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+    }
+
+    // Map cell (z, y, x) to 3D world coordinates with North (+Y) at top and South (-Y) at bottom, and latest/newest slice at front (-Z)
     let norm_x = (-1.0 + (f32(cell_x) + 0.5) / f32(grid_w) * 2.0) * uniforms.aspect_x;
     let norm_y = (1.0 - (f32(cell_y) + 0.5) / f32(grid_h) * 2.0) * uniforms.aspect_y; // Inverted Y so Row 0 = North (+Y)
-    let norm_z = (-1.0 + (f32(cell_z) + 0.5) / f32(grid_d) * 2.0) * uniforms.aspect_z;
+    let norm_z = (1.0 - (f32(cell_z) + 0.5) / f32(grid_d) * 2.0) * uniforms.aspect_z; // Inverted Z so newest slice is at Front (-Z)
 
     let center_3d = vec3<f32>(norm_x, norm_y, norm_z);
 

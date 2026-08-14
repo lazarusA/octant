@@ -141,15 +141,37 @@ impl OctantBlock {
         let width = self.shape[x_dim];
         let height = self.shape[y_dim];
 
+        let stride_x = self.strides[x_dim];
+        let stride_y = self.strides[y_dim];
+
+        let mut base_offset = 0usize;
+        for (i, &fixed_idx) in fixed_indices.iter().enumerate().take(self.rank()) {
+            if i != x_dim && i != y_dim {
+                let idx = fixed_idx.min(self.shape[i].saturating_sub(1));
+                base_offset += idx * self.strides[i];
+            }
+        }
+
         let mut values = Vec::with_capacity(width * height);
-        let mut indices = fixed_indices.to_vec();
-
-        for y in 0..height {
-            indices[y_dim] = y;
-
-            for x in 0..width {
-                indices[x_dim] = x;
-                values.push(self.get(&indices).unwrap_or(f32::NAN));
+        if stride_x == 1 {
+            for y in 0..height {
+                let row_start = base_offset + y * stride_y;
+                let row_end = row_start + width;
+                if row_end <= self.values.len() {
+                    values.extend_from_slice(&self.values[row_start..row_end]);
+                } else {
+                    for x in 0..width {
+                        values.push(self.values.get(row_start + x).copied().unwrap_or(f32::NAN));
+                    }
+                }
+            }
+        } else {
+            for y in 0..height {
+                let row_start = base_offset + y * stride_y;
+                for x in 0..width {
+                    let idx = row_start + x * stride_x;
+                    values.push(self.values.get(idx).copied().unwrap_or(f32::NAN));
+                }
             }
         }
 
@@ -202,20 +224,77 @@ impl OctantBlock {
             return None;
         }
 
-        let mut values = Vec::with_capacity(nx * ny * nz);
-        let mut indices = fixed_indices.to_vec();
+        // Fast path: if 3D array matching shape [nz, ny, nx] exactly
+        if self.rank() == 3
+            && z_dim == 0
+            && y_dim == 1
+            && x_dim == 2
+            && self.values.len() == nx * ny * nz
+        {
+            let (min_val, max_val) = self
+                .values
+                .iter()
+                .copied()
+                .filter(|v| !v.is_nan())
+                .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
+                    (lo.min(v), hi.max(v))
+                });
 
-        for z in 0..nz {
-            if has_z {
-                indices[z_dim] = z;
+            let (min_val, max_val) = if min_val.is_finite() && max_val.is_finite() {
+                (min_val, max_val)
+            } else {
+                (0.0, 1.0)
+            };
+
+            return Some(crate::data::VolumeData::new(
+                nx,
+                ny,
+                nz,
+                self.values.clone(),
+                min_val,
+                max_val,
+                dataset_name.to_string(),
+            ));
+        }
+
+        let stride_x = self.strides[x_dim];
+        let stride_y = self.strides[y_dim];
+        let stride_z = if has_z { self.strides[z_dim] } else { 0 };
+
+        let mut base_offset = 0usize;
+        for (i, &fixed_idx) in fixed_indices.iter().enumerate().take(self.rank()) {
+            if i != x_dim && i != y_dim && (!has_z || i != z_dim) {
+                let idx = fixed_idx.min(self.shape[i].saturating_sub(1));
+                base_offset += idx * self.strides[i];
             }
+        }
 
-            for y in 0..ny {
-                indices[y_dim] = y;
-
-                for x in 0..nx {
-                    indices[x_dim] = x;
-                    values.push(self.get(&indices).unwrap_or(f32::NAN));
+        let mut values = Vec::with_capacity(nx * ny * nz);
+        if stride_x == 1 {
+            for z in 0..nz {
+                let z_offset = base_offset + z * stride_z;
+                for y in 0..ny {
+                    let row_start = z_offset + y * stride_y;
+                    let row_end = row_start + nx;
+                    if row_end <= self.values.len() {
+                        values.extend_from_slice(&self.values[row_start..row_end]);
+                    } else {
+                        for x in 0..nx {
+                            values
+                                .push(self.values.get(row_start + x).copied().unwrap_or(f32::NAN));
+                        }
+                    }
+                }
+            }
+        } else {
+            for z in 0..nz {
+                let z_offset = base_offset + z * stride_z;
+                for y in 0..ny {
+                    let row_start = z_offset + y * stride_y;
+                    for x in 0..nx {
+                        let idx = row_start + x * stride_x;
+                        values.push(self.values.get(idx).copied().unwrap_or(f32::NAN));
+                    }
                 }
             }
         }

@@ -52,7 +52,11 @@ pub struct VolumeUniforms {
     pub height: u32,
     pub depth: u32,
     pub screen_aspect: f32,
+    pub shift_x: u32,
+    pub shift_y: u32,
+    pub shift_z: u32,
     pub _pad0: u32,
+    pub _pad1: u32,
     pub color: super::common::PlotColorParams,
 }
 
@@ -117,7 +121,11 @@ impl VolumeRenderer {
             height: height.max(1),
             depth,
             screen_aspect: 1.0,
+            shift_x: 0,
+            shift_y: 0,
+            shift_z: 0,
             _pad0: 0,
+            _pad1: 0,
             color: super::common::PlotColorParams::default(),
         }; // 3D Bounding Box Vertices [-1, 1]^3
         let vertices = [
@@ -281,6 +289,9 @@ impl VolumeRenderer {
         isovalue: f32,
         isorange: f32,
         screen_aspect: f32,
+        shift_x: u32,
+        shift_y: u32,
+        shift_z: u32,
     ) {
         let data_l = self.data_len.load(Ordering::Relaxed);
         let depth = super::common::calculate_3d_depth(data_l, width, height);
@@ -311,7 +322,11 @@ impl VolumeRenderer {
             height: height.max(1),
             depth,
             screen_aspect,
+            shift_x,
+            shift_y,
+            shift_z,
             _pad0: 0,
+            _pad1: 0,
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -340,6 +355,9 @@ pub struct VolumeCallback {
     pub algorithm: u32,
     pub isovalue: f32,
     pub isorange: f32,
+    pub shift_x: u32,
+    pub shift_y: u32,
+    pub shift_z: u32,
     pub rect: egui::Rect,
 }
 
@@ -370,6 +388,9 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
             self.isovalue,
             self.isorange,
             screen_aspect,
+            self.shift_x,
+            self.shift_y,
+            self.shift_z,
         );
         Vec::new()
     }

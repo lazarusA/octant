@@ -30,7 +30,11 @@ struct Uniforms {
     height: u32,
     depth: u32,
     screen_aspect: f32,
+    shift_x: u32,
+    shift_y: u32,
+    shift_z: u32,
     _pad0: u32,
+    _pad1: u32,
     color: ColorUniforms,
 };
 
@@ -139,9 +143,14 @@ fn sample_volume_scalar(texCoord: vec3<f32>) -> f32 {
     let total_len = arrayLength(&data_buffer);
 
     let norm_y = 1.0 - texCoord.y;
-    let gx = u32(texCoord.x * f32(grid_w - 1u));
-    let gy = u32(norm_y * f32(grid_h - 1u));
-    let gz = u32(texCoord.z * f32(grid_d - 1u));
+    let norm_z = 1.0 - texCoord.z;
+    let base_x = u32(texCoord.x * f32(grid_w - 1u));
+    let base_y = u32(norm_y * f32(grid_h - 1u));
+    let base_z = u32(norm_z * f32(grid_d - 1u));
+
+    let gx = (base_x + uniforms.shift_x) % grid_w;
+    let gy = (base_y + uniforms.shift_y) % grid_h;
+    let gz = (base_z + uniforms.shift_z) % grid_d;
 
     let idx = min(gz * grid_h * grid_w + gy * grid_w + gx, total_len - 1u);
     return data_buffer[idx];
