@@ -1,6 +1,6 @@
 use crate::app::OctantApp;
 use crate::plots::PlotType;
-use egui::{Color32, Pos2, Rect, Stroke};
+use egui::{Pos2, Rect, Stroke};
 
 pub fn show_hover_tooltip(
     app: &OctantApp,
@@ -92,11 +92,55 @@ pub fn show_hover_tooltip(
 
             (nx, ny, true, None)
         }
-        _ => {
-            // 2D Heatmap & 1D Line Plot Direct Mapping within plot_rect
+        PlotType::Line => {
+            // 1D Line Plot Direct Inverse Mapping matching shader vertex transformation (zero gap)
             let is_inside = rect.contains(hover_pos);
-            let nx = ((hover_pos.x - rect.min.x) / rect.width().max(1.0)).clamp(0.0, 1.0);
-            let ny = ((hover_pos.y - rect.min.y) / rect.height().max(1.0)).clamp(0.0, 1.0);
+            let zoom = app.line_zoom;
+            let gpu_pan_x = app.line_pan.x / (0.5 * rect.width().max(1.0));
+            let gpu_pan_y = -app.line_pan.y / (0.5 * rect.height().max(1.0));
+
+            let ndc_x = ((hover_pos.x - rect.min.x) / rect.width().max(1.0)) * 2.0 - 1.0;
+            let unpanned_x = (ndc_x - gpu_pan_x) / zoom.max(0.01);
+            let nx = ((unpanned_x + 1.0) / 2.0).clamp(0.0, 1.0);
+
+            let ndc_y = 1.0 - ((hover_pos.y - rect.min.y) / rect.height().max(1.0)) * 2.0;
+            let unpanned_y = (ndc_y - gpu_pan_y) / zoom.max(0.01);
+            let ny = ((unpanned_y + 1.0) / 2.0).clamp(0.0, 1.0);
+
+            (nx, ny, is_inside, None)
+        }
+        _ => {
+            // 2D Heatmap Direct Mapping within canvas_rect
+            let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio
+                && let Some(matrix) = &app.matrix_data
+            {
+                let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.001);
+                let canvas_aspect = rect.width() / rect.height().max(1.0);
+                if canvas_aspect > data_aspect {
+                    (data_aspect / canvas_aspect, 1.0)
+                } else {
+                    (1.0, canvas_aspect / data_aspect)
+                }
+            } else {
+                (1.0, 1.0)
+            };
+
+            let zoom = app.heatmap_zoom;
+            let pan = app.heatmap_pan;
+            let gpu_pan_x = pan.x / (0.5 * rect.width().max(1.0));
+            let gpu_pan_y = -pan.y / (0.5 * rect.height().max(1.0));
+
+            let ndc_x = ((hover_pos.x - rect.min.x) / rect.width().max(1.0)) * 2.0 - 1.0;
+            let unpanned_x = (ndc_x - gpu_pan_x) / zoom.max(0.01);
+            let unscaled_x = unpanned_x / aspect_scale_x.max(0.001);
+            let nx = ((unscaled_x + 1.0) / 2.0).clamp(0.0, 1.0);
+
+            let ndc_y = 1.0 - ((hover_pos.y - rect.min.y) / rect.height().max(1.0)) * 2.0;
+            let unpanned_y = (ndc_y - gpu_pan_y) / zoom.max(0.01);
+            let unscaled_y = unpanned_y / aspect_scale_y.max(0.001);
+            let ny = ((1.0 - unscaled_y) / 2.0).clamp(0.0, 1.0);
+
+            let is_inside = rect.contains(hover_pos);
             (nx, ny, is_inside, None)
         }
     };
@@ -135,8 +179,10 @@ pub fn show_hover_tooltip(
 
     // 3. Extract Pixel Value & Location Info based on Active Plot Type
     let (raw_val, dim_entries, px, py) = if app.active_plot_type == PlotType::Line {
-        let (profile_values, profile_length, _) = app.get_line_profile_payload();
+        let (profile_values, profile_length, line_count) = app.get_line_profile_payload();
         let prof_len = profile_length as usize;
+        let l_count = line_count as usize;
+
         let sample_idx = if prof_len > 1 {
             ((norm_x * (prof_len - 1) as f32) + 0.5) as usize
         } else {
@@ -144,7 +190,35 @@ pub fn show_hover_tooltip(
         }
         .min(prof_len.saturating_sub(1));
 
-        let val = profile_values.get(sample_idx).copied().unwrap_or(f32::NAN);
+        let cmin = app.color_range_min;
+        let cmax = app.color_range_max;
+        let range = (cmax - cmin).max(1e-6);
+
+        // Find the closest line series to the cursor's Y position
+        let mut best_line_idx = 0usize;
+        let mut best_dist = f32::INFINITY;
+        let mut best_val = f32::NAN;
+
+        if l_count > 0 {
+            for line_idx in 0..l_count {
+                let idx = line_idx * prof_len + sample_idx;
+                if let Some(&v) = profile_values.get(idx) && !v.is_nan() && v.is_finite() {
+                    let norm_y_val = (((v - cmin) / range) * 2.0 - 1.0).clamp(-1.0, 1.0);
+                    let dist = (norm_y_val - (norm_y * 2.0 - 1.0)).abs();
+                    if dist < best_dist {
+                        best_dist = dist;
+                        best_line_idx = line_idx;
+                        best_val = v;
+                    }
+                }
+            }
+        }
+
+        let val = if !best_val.is_nan() {
+            best_val
+        } else {
+            profile_values.get(sample_idx).copied().unwrap_or(f32::NAN)
+        };
 
         let dim_name = app
             .get_spatial_dim_name(app.line_profile_dim_idx)
@@ -155,7 +229,43 @@ pub fn show_hover_tooltip(
             });
 
         let loc_str = format_dimension_coord(meta, &dim_name, sample_idx, prof_len, None);
-        (val, vec![loc_str], sample_idx, 0)
+        let mut entries = vec![loc_str];
+
+        if l_count > 1 {
+            // Include orthogonal dimension / series coordinate
+            if let Some(v) = var {
+                let (explicit_x, explicit_y, _) =
+                    v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
+                        &app.plotted_dim_config
+                    } else {
+                        &app.dim_config
+                    });
+
+                let ortho_dim_name = match app.line_profile_dim_idx {
+                    0 => explicit_y.and_then(|i| v.dimension_names.get(i)),
+                    1 => explicit_x.and_then(|i| v.dimension_names.get(i)),
+                    _ => None,
+                };
+
+                if let Some(ortho_name) = ortho_dim_name {
+                    let ortho_str =
+                        format_dimension_coord(meta, ortho_name, best_line_idx, l_count, None);
+                    entries.insert(0, ortho_str);
+                } else {
+                    entries.insert(
+                        0,
+                        format!("series:\u{00A0}{}/{}", best_line_idx + 1, l_count),
+                    );
+                }
+            } else {
+                entries.insert(
+                    0,
+                    format!("series:\u{00A0}{}/{}", best_line_idx + 1, l_count),
+                );
+            }
+        }
+
+        (val, entries, sample_idx, best_line_idx)
     } else {
         let px = ((norm_x * (matrix.width as f32 - 1.0)) + 0.5) as usize;
         let py = ((norm_y * (matrix.height as f32 - 1.0)) + 0.5) as usize;
@@ -290,103 +400,165 @@ pub fn show_hover_tooltip(
 
     // 4. Draw Glowing Reticle Marker Dot & Guide Line on 1D Line Plot
     if app.active_plot_type == PlotType::Line {
-        let (profile_values, profile_length, _) = app.get_line_profile_payload();
-        let n = profile_length as usize;
-        if n > 0 && !profile_values.is_empty() {
-            let sample_idx = px.min(n - 1);
-            let val = profile_values.get(sample_idx).copied().unwrap_or(f32::NAN);
+        let (profile_values, profile_length, line_count) = app.get_line_profile_payload();
+        let prof_len = profile_length as usize;
+        let l_count = line_count as usize;
+        if prof_len > 0 && !profile_values.is_empty() {
+            let sample_idx = px.min(prof_len - 1);
+            let line_idx = py.min(l_count.saturating_sub(1));
+            let data_idx = line_idx * prof_len + sample_idx;
+            let val = profile_values.get(data_idx).copied().unwrap_or(raw_val);
 
             let min_val = app.color_range_min;
             let max_val = app.color_range_max;
             let range = (max_val - min_val).max(1e-6);
 
-            let norm_x_pos = if n > 1 {
-                sample_idx as f32 / (n - 1) as f32
+            let vertex_norm_x = if prof_len > 1 {
+                (sample_idx as f32 / (prof_len - 1) as f32) * 2.0 - 1.0
             } else {
-                0.5
-            };
-            let norm_y_pos = if val.is_nan() {
                 0.0
+            };
+            let vertex_norm_y = if val.is_nan() {
+                -1.0
             } else {
-                ((val - min_val) / range).clamp(0.0, 1.0)
+                (((val - min_val) / range) * 2.0 - 1.0).clamp(-1.0, 1.0)
             };
 
-            let dot_x = rect.min.x + norm_x_pos * rect.width();
-            let dot_y = rect.min.y + (1.0 - norm_y_pos) * rect.height();
+            let zoom = app.line_zoom;
+            let gpu_pan_x = app.line_pan.x / (0.5 * rect.width().max(1.0));
+            let gpu_pan_y = -app.line_pan.y / (0.5 * rect.height().max(1.0));
+
+            let transformed_pos_x = vertex_norm_x * zoom + gpu_pan_x;
+            let transformed_pos_y = vertex_norm_y * zoom + gpu_pan_y;
+
+            let dot_x = rect.min.x + ((transformed_pos_x + 1.0) / 2.0) * rect.width();
+            let dot_y = rect.min.y + ((1.0 - transformed_pos_y) / 2.0) * rect.height();
             let dot_pos = Pos2::new(dot_x, dot_y);
+
+            // Compute data/axis bounds on screen for guidelines (spanning full axis range from start to end)
+            let x_start_ndc = -1.0 * zoom + gpu_pan_x;
+            let x_end_ndc = 1.0 * zoom + gpu_pan_x;
+            let y_top_ndc = 1.0 * zoom + gpu_pan_y;
+            let y_bottom_ndc = -1.0 * zoom + gpu_pan_y;
+
+            let x_line_start = rect.min.x + ((x_start_ndc + 1.0) / 2.0) * rect.width();
+            let x_line_end = rect.min.x + ((x_end_ndc + 1.0) / 2.0) * rect.width();
+            let y_line_top = rect.min.y + ((1.0 - y_top_ndc) / 2.0) * rect.height();
+            let y_line_bottom = rect.min.y + ((1.0 - y_bottom_ndc) / 2.0) * rect.height();
+
+            let x_axis_min = x_line_start.min(x_line_end).clamp(rect.min.x, rect.max.x);
+            let x_axis_max = x_line_start.max(x_line_end).clamp(rect.min.x, rect.max.x);
+            let y_axis_min = y_line_top.min(y_line_bottom).clamp(rect.min.y, rect.max.y);
+            let y_axis_max = y_line_top.max(y_line_bottom).clamp(rect.min.y, rect.max.y);
+
+            let visuals = &ctx.style_of(ctx.theme()).visuals;
+            let strong_color = visuals.strong_text_color();
+            let text_color = visuals.text_color();
+            let line_color = visuals.widgets.noninteractive.fg_stroke.color;
 
             let painter = ui.painter();
 
-            // Vertical cyan guideline from bottom to curve point
-            painter.line_segment(
-                [Pos2::new(dot_x, rect.max.y - 4.0), dot_pos],
-                Stroke::new(1.2, Color32::from_rgba_unmultiplied(0, 210, 255, 120)),
-            );
+            // Full-span Vertical guideline from top axis limit to bottom axis limit
+            if dot_x >= rect.min.x && dot_x <= rect.max.x {
+                painter.line_segment(
+                    [Pos2::new(dot_x, y_axis_min), Pos2::new(dot_x, y_axis_max)],
+                    Stroke::new(1.0, line_color.linear_multiply(0.7)),
+                );
+            }
 
-            // Outer soft glowing aura halo
-            painter.circle_filled(
-                dot_pos,
-                11.0,
-                Color32::from_rgba_unmultiplied(0, 200, 255, 45),
-            );
-            painter.circle_filled(
-                dot_pos,
-                7.0,
-                Color32::from_rgba_unmultiplied(0, 220, 255, 90),
-            );
-            // Inner cyan stroke ring
-            painter.circle_stroke(
-                dot_pos,
-                5.0,
-                Stroke::new(2.0, Color32::from_rgb(0, 240, 255)),
-            );
-            // Solid bright white center core
-            painter.circle_filled(dot_pos, 3.0, Color32::WHITE);
+            // Full-span Horizontal guideline from left axis limit to right axis limit
+            if dot_y >= rect.min.y && dot_y <= rect.max.y {
+                painter.line_segment(
+                    [Pos2::new(x_axis_min, dot_y), Pos2::new(x_axis_max, dot_y)],
+                    Stroke::new(1.0, line_color.linear_multiply(0.7)),
+                );
+            }
+
+            // Only draw reticle dot if inside visible canvas
+            if rect.contains(dot_pos) {
+                // Subtle system theme aura halo
+                painter.circle_filled(dot_pos, 8.0, text_color.linear_multiply(0.12));
+                painter.circle_filled(dot_pos, 5.0, text_color.linear_multiply(0.25));
+
+                // Inner high-contrast system ring
+                painter.circle_stroke(dot_pos, 4.0, Stroke::new(1.5, strong_color));
+
+                // Solid system center core
+                painter.circle_filled(dot_pos, 2.0, strong_color);
+            }
         }
     }
 
     // 5. Draw Subtle Reticle Dot & Crosshair on 2D Canvas
     if app.active_plot_type == PlotType::Heatmap {
-        let px_center_x = rect.min.x + ((px as f32 + 0.5) / matrix.width as f32) * rect.width();
-        let px_center_y = rect.min.y + ((py as f32 + 0.5) / matrix.height as f32) * rect.height();
+        let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio
+            && let Some(matrix) = &app.matrix_data
+        {
+            let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.001);
+            let canvas_aspect = rect.width() / rect.height().max(1.0);
+            if canvas_aspect > data_aspect {
+                (data_aspect / canvas_aspect, 1.0)
+            } else {
+                (1.0, canvas_aspect / data_aspect)
+            }
+        } else {
+            (1.0, 1.0)
+        };
+
+        let zoom = app.heatmap_zoom;
+        let pan = app.heatmap_pan;
+        let gpu_pan_x = pan.x / (0.5 * rect.width().max(1.0));
+        let gpu_pan_y = -pan.y / (0.5 * rect.height().max(1.0));
+
+        let norm_pixel_x = ((px as f32 + 0.5) / matrix.width as f32) * 2.0 - 1.0;
+        let norm_pixel_y = 1.0 - ((py as f32 + 0.5) / matrix.height as f32) * 2.0;
+
+        let ndc_x = norm_pixel_x * aspect_scale_x * zoom + gpu_pan_x;
+        let ndc_y = norm_pixel_y * aspect_scale_y * zoom + gpu_pan_y;
+
+        let px_center_x = rect.min.x + ((ndc_x + 1.0) / 2.0) * rect.width();
+        let px_center_y = rect.min.y + ((1.0 - ndc_y) / 2.0) * rect.height();
         let crosshair_pos = Pos2::new(px_center_x, px_center_y);
 
-        let painter = ui.painter();
+        if rect.contains(crosshair_pos) {
+            let visuals = &ctx.style_of(ctx.theme()).visuals;
+            let strong_color = visuals.strong_text_color();
+            let text_color = visuals.text_color();
 
-        painter.circle_stroke(
-            crosshair_pos,
-            5.0,
-            Stroke::new(1.8_f32, Color32::from_black_alpha(180)),
-        );
-        painter.circle_stroke(
-            crosshair_pos,
-            5.0,
-            Stroke::new(
-                1.0_f32,
-                ctx.style_of(ctx.theme()).visuals.strong_text_color(),
-            ),
-        );
-        painter.circle_filled(
-            crosshair_pos,
-            2.0,
-            ctx.style_of(ctx.theme()).visuals.strong_text_color(),
-        );
+            let painter = ui.painter();
 
-        let arm_len = 8.0;
-        painter.line_segment(
-            [
-                Pos2::new(crosshair_pos.x - arm_len, crosshair_pos.y),
-                Pos2::new(crosshair_pos.x + arm_len, crosshair_pos.y),
-            ],
-            Stroke::new(1.0_f32, Color32::from_black_alpha(150)),
-        );
-        painter.line_segment(
-            [
-                Pos2::new(crosshair_pos.x, crosshair_pos.y - arm_len),
-                Pos2::new(crosshair_pos.x, crosshair_pos.y + arm_len),
-            ],
-            Stroke::new(1.0_f32, Color32::from_black_alpha(150)),
-        );
+            painter.circle_stroke(
+                crosshair_pos,
+                5.0,
+                Stroke::new(1.8_f32, text_color.linear_multiply(0.2)),
+            );
+            painter.circle_stroke(
+                crosshair_pos,
+                5.0,
+                Stroke::new(1.0_f32, strong_color),
+            );
+            painter.circle_filled(
+                crosshair_pos,
+                2.0,
+                strong_color,
+            );
+
+            let arm_len = 8.0;
+            painter.line_segment(
+                [
+                    Pos2::new(crosshair_pos.x - arm_len, crosshair_pos.y),
+                    Pos2::new(crosshair_pos.x + arm_len, crosshair_pos.y),
+                ],
+                Stroke::new(1.0_f32, strong_color.linear_multiply(0.7)),
+            );
+            painter.line_segment(
+                [
+                    Pos2::new(crosshair_pos.x, crosshair_pos.y - arm_len),
+                    Pos2::new(crosshair_pos.x, crosshair_pos.y + arm_len),
+                ],
+                Stroke::new(1.0_f32, strong_color.linear_multiply(0.7)),
+            );
+        }
     }
 
     // 6. Format Value String
