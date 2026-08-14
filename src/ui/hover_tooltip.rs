@@ -22,7 +22,7 @@ pub fn show_hover_tooltip(
     // 1. Calculate Normalized Coordinates (norm_x, norm_y) considering 2D vs 3D Plot Mode
     let (norm_x, norm_y, is_valid_hit, geo_coords) = match app.active_plot_type {
         PlotType::Sphere => {
-            // 3D Globe Projection Exact Perspective Raycast matching sphere.wgsl
+            // 3D Globe Projection Perspective Raycast supporting all Sphere Modes (Smooth, Steps, Lego)
             let aspect_ratio = (rect.width() / rect.height().max(1.0)).max(0.01);
             let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
             let fov_scale = 1.6_f32;
@@ -41,16 +41,29 @@ pub fn show_hover_tooltip(
             let dy = dir_y * inv_len;
             let dz = dir_z * inv_len;
 
-            // Intersect ray with unit sphere at origin (R = 1.0)
-            let b = cam_dist * dz;
-            let c = cam_dist * cam_dist - 1.0;
-            let discr = b * b - c;
+            let max_r = if app.sphere_mode > 0 {
+                1.0 + 0.4 * app.sphere_displacement_strength
+            } else {
+                1.0
+            };
 
-            if discr < 0.0 {
+            let b = cam_dist * dz;
+            let c_max = cam_dist * cam_dist - max_r * max_r;
+            let discr_max = b * b - c_max;
+
+            if discr_max < 0.0 {
                 return;
             }
 
-            let t = -b - discr.sqrt();
+            let mut r = 1.0_f32;
+            let c = cam_dist * cam_dist - r * r;
+            let discr = b * b - c;
+            let t = if discr >= 0.0 {
+                -b - discr.sqrt()
+            } else {
+                -b - discr_max.sqrt()
+            };
+
             let pos_rot_x = t * dx;
             let pos_rot_y = t * dy;
             let pos_rot_z = cam_dist + t * dz;
@@ -70,17 +83,47 @@ pub fn show_hover_tooltip(
             let pos_3d_z = sy * pos_y_rot_x + cy * pos_y_rot_z;
 
             // Spherical coordinates (u, v) matching sphere.wgsl & sphere.rs
-            let lat_rad = pos_3d_y.clamp(-1.0, 1.0).asin();
+            let lat_rad = (pos_3d_y / r).clamp(-1.0, 1.0).asin();
             let lon_rad = pos_3d_x.atan2(pos_3d_z);
-
-            let lat_deg = lat_rad.to_degrees();
-            let lon_deg = lon_rad.to_degrees();
 
             let u = (lon_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
             let v = 0.5 - (lat_rad / std::f32::consts::PI);
 
-            let nx = u.clamp(0.0, 1.0);
-            let ny = v.clamp(0.0, 1.0);
+            let mut nx = u.clamp(0.0, 1.0);
+            let mut ny = v.clamp(0.0, 1.0);
+
+            if app.sphere_mode > 0 {
+                let px = ((nx * matrix.width as f32).floor() as usize).min(matrix.width.saturating_sub(1));
+                let py = ((ny * matrix.height as f32).floor() as usize).min(matrix.height.saturating_sub(1));
+                let cell_val = matrix.values.get(py * matrix.width + px).copied().unwrap_or(f32::NAN);
+                let dr = get_normalized_radial_dr(app, cell_val);
+                r = 1.0 + dr;
+
+                let c_ref = cam_dist * cam_dist - r * r;
+                let discr_ref = b * b - c_ref;
+                if discr_ref >= 0.0 {
+                    let t_ref = -b - discr_ref.sqrt();
+                    let pr_x = t_ref * dx;
+                    let pr_y = t_ref * dy;
+                    let pr_z = cam_dist + t_ref * dz;
+
+                    let py_x = pr_x;
+                    let py_y = cx * pr_y + sx * pr_z;
+                    let py_z = -sx * pr_y + cx * pr_z;
+
+                    let p3_x = cy * py_x - sy * py_z;
+                    let p3_y = py_y;
+                    let p3_z = sy * py_x + cy * py_z;
+
+                    let l_rad = (p3_y / r).clamp(-1.0, 1.0).asin();
+                    let o_rad = p3_x.atan2(p3_z);
+                    nx = ((o_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI)).clamp(0.0, 1.0);
+                    ny = (0.5 - (l_rad / std::f32::consts::PI)).clamp(0.0, 1.0);
+                }
+            }
+
+            let lat_deg = (0.5 - ny) * 180.0;
+            let lon_deg = (nx - 0.5) * 360.0;
 
             (nx, ny, true, Some((lat_deg, lon_deg)))
         }
@@ -593,6 +636,9 @@ pub fn show_hover_tooltip(
         let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
         let fov_scale = 1.6_f32;
 
+        let dr = get_normalized_radial_dr(app, raw_val);
+        let radius = 1.0 + dr;
+
         let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
         let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
 
@@ -600,9 +646,9 @@ pub fn show_hover_tooltip(
         let lon_c = (u_c - 0.5) * 2.0 * std::f32::consts::PI;
 
         let cos_lat = lat_c.cos();
-        let p3d_x = cos_lat * lon_c.sin();
-        let p3d_y = lat_c.sin();
-        let p3d_z = cos_lat * lon_c.cos();
+        let p3d_x = radius * cos_lat * lon_c.sin();
+        let p3d_y = radius * lat_c.sin();
+        let p3d_z = radius * cos_lat * lon_c.cos();
 
         let cx = app.sphere_rotation_x.cos();
         let sx = app.sphere_rotation_x.sin();
@@ -855,4 +901,23 @@ fn format_dimension_coord(
     }
 
     format!("{}:\u{00A0}{}", dim_name, idx)
+}
+
+/// Computes normalized radial displacement on the 3D sphere matching sphere.wgsl
+fn get_normalized_radial_dr(app: &OctantApp, val: f32) -> f32 {
+    if val.is_nan() || !val.is_finite() || app.sphere_mode == 0 {
+        return 0.0;
+    }
+    let cmin = app.color_range_min;
+    let cmax = app.color_range_max;
+    let range = (cmax - cmin).max(1e-6);
+    let disp = app.sphere_displacement_strength;
+
+    if cmin < 0.0 && cmax > 0.0 {
+        let max_abs = cmin.abs().max(cmax.abs());
+        (val / max_abs).clamp(-1.0, 1.0) * 0.4 * disp
+    } else {
+        let norm_val = ((val - cmin) / range).clamp(0.0, 1.0);
+        norm_val * 0.4 * disp
+    }
 }
