@@ -242,7 +242,8 @@ impl eframe::App for OctantApp {
             }
 
             // Compute screen-space transformed plot rect and GPU pan/zoom uniforms
-            let (transformed_plot_rect, gpu_pan, gpu_zoom, gpu_aspect_scale) = if is_3d_canvas_plot {
+            let (transformed_plot_rect, gpu_pan, gpu_zoom, gpu_aspect_scale) = if is_3d_canvas_plot
+            {
                 (canvas_rect, [0.0, 0.0], 1.0, [1.0, 1.0])
             } else if self.active_plot_type == PlotType::Line {
                 let zoom = self.line_zoom;
@@ -254,7 +255,9 @@ impl eframe::App for OctantApp {
                 let gpu_pan_y = -pan.y / (0.5 * canvas_rect.height().max(1.0));
                 (rect, [gpu_pan_x, gpu_pan_y], zoom, [1.0, 1.0])
             } else {
-                let (aspect_scale_x, aspect_scale_y) = if self.enforce_data_aspect_ratio && let Some(matrix) = &self.matrix_data {
+                let (aspect_scale_x, aspect_scale_y) = if self.enforce_data_aspect_ratio
+                    && let Some(matrix) = &self.matrix_data
+                {
                     let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.001);
                     let canvas_aspect = canvas_rect.width() / canvas_rect.height().max(1.0);
                     if canvas_aspect > data_aspect {
@@ -275,7 +278,12 @@ impl eframe::App for OctantApp {
 
                 let gpu_pan_x = pan.x / (0.5 * canvas_rect.width().max(1.0));
                 let gpu_pan_y = -pan.y / (0.5 * canvas_rect.height().max(1.0));
-                (rect, [gpu_pan_x, gpu_pan_y], zoom, [aspect_scale_x, aspect_scale_y])
+                (
+                    rect,
+                    [gpu_pan_x, gpu_pan_y],
+                    zoom,
+                    [aspect_scale_x, aspect_scale_y],
+                )
             };
 
             let plot_rect = transformed_plot_rect;
@@ -441,10 +449,7 @@ impl eframe::App for OctantApp {
                     let y_min = self.color_range_min as f64;
                     let y_max = self.color_range_max as f64;
                     let profile_len = match self.line_profile_dim_idx {
-                        2 => self
-                            .volume_data
-                            .as_ref()
-                            .map_or(matrix.width, |v| v.depth) as f64,
+                        2 => self.volume_data.as_ref().map_or(matrix.width, |v| v.depth) as f64,
                         1 => matrix.height as f64,
                         _ => matrix.width as f64,
                     };

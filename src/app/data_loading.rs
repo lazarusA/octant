@@ -21,7 +21,8 @@ impl OctantApp {
                         for z in 0..nz {
                             let idx = z * (nx * ny) + y * nx + x;
                             if let Some(&v) = vdata.values.get(idx)
-                                && !v.is_nan() && v.is_finite()
+                                && !v.is_nan()
+                                && v.is_finite()
                             {
                                 has_valid = true;
                                 break;
@@ -92,7 +93,8 @@ impl OctantApp {
                         for row in 0..profile_length {
                             let idx = row * matrix.width + col;
                             if let Some(&v) = matrix.values.get(idx)
-                                && !v.is_nan() && v.is_finite()
+                                && !v.is_nan()
+                                && v.is_finite()
                             {
                                 has_valid = true;
                                 break;
