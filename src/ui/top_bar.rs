@@ -47,7 +47,7 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                         "🌙 Dark"
                     };
                     if ui
-                        .button(egui::RichText::new(theme_label).small())
+                        .button(egui::RichText::new(theme_label))
                         .on_hover_text("Toggle light and dark theme")
                         .clicked()
                     {
