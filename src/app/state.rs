@@ -176,6 +176,7 @@ pub struct OctantApp {
     pub global_data_max: f32,
     pub active_scale_type: u32,
     pub scale_param: f32,
+    pub custom_colorbar_label: Option<String>,
 
     // 2D Flatmap Heatmap & 1D Line Plot Viewport Zoom / Pan State
     pub heatmap_zoom: f32,
@@ -289,6 +290,7 @@ impl Default for OctantApp {
             global_data_max: f32::NEG_INFINITY,
             active_scale_type: 0,
             scale_param: 1.0,
+            custom_colorbar_label: None,
             heatmap_zoom: 1.0,
             heatmap_pan: egui::Vec2::ZERO,
             line_zoom: 1.0,
@@ -313,6 +315,59 @@ impl OctantApp {
     pub fn reset_line_view(&mut self) {
         self.line_zoom = 1.0;
         self.line_pan = egui::Vec2::ZERO;
+    }
+
+    /// Returns the default automatic label for the active plotted variable (including unit if available).
+    pub fn default_colorbar_label(&self) -> String {
+        if let Some(meta) = &self.plotted_dataset_metadata {
+            meta.variables
+                .get(self.plotted_variable_idx)
+                .map(|v| {
+                    if let Some(unit) = v.attributes.get("units").or(v.units.as_ref()) {
+                        format!("{} ({})", v.name, unit)
+                    } else {
+                        v.name.clone()
+                    }
+                })
+                .unwrap_or_else(|| "Scalar Field".to_string())
+        } else {
+            "Scalar Field".to_string()
+        }
+    }
+
+    /// Returns the effective colorbar label (custom overridden label if set, otherwise default).
+    pub fn colorbar_label(&self) -> String {
+        if let Some(ref custom) = self.custom_colorbar_label {
+            custom.clone()
+        } else {
+            self.default_colorbar_label()
+        }
+    }
+
+    /// Resets custom colorbar label back to default.
+    pub fn reset_colorbar_label(&mut self) {
+        self.custom_colorbar_label = None;
+    }
+
+    /// Resets color range min and max to the current dataset/matrix slice bounds and unlocks bounds.
+    pub fn reset_color_range(&mut self) {
+        if let Some(mdata) = &self.matrix_data {
+            self.color_range_min = mdata.min_val;
+            self.color_range_max = mdata.max_val;
+            self.volume_cmin = mdata.min_val;
+            self.volume_cmax = mdata.max_val;
+        } else if let Some(vdata) = &self.volume_data {
+            self.color_range_min = vdata.min_val;
+            self.color_range_max = vdata.max_val;
+            self.volume_cmin = vdata.min_val;
+            self.volume_cmax = vdata.max_val;
+        } else {
+            self.color_range_min = 0.0;
+            self.color_range_max = 100.0;
+            self.volume_cmin = 0.0;
+            self.volume_cmax = 100.0;
+        }
+        self.lock_color_bounds = false;
     }
 
     /// Placeholder method to add a secondary dimensionally-compatible variable layer
