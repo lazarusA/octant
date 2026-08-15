@@ -48,8 +48,6 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     match app.active_plot_type {
         PlotType::Volume => {
-            ui.label(egui::RichText::new("☁️ Volume").strong().small());
-
             let algo_label = match app.volume_algorithm {
                 0 => "☁️ Volume Raymarching",
                 1 => "🎯 Solid Isosurface (WIP)",
@@ -81,7 +79,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             });
 
             ui.separator();
-            ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("🌫 Steps"));
+            ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("Steps"));
 
             if app.volume_algorithm != 1 && app.volume_algorithm != 2 {
                 ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("💧 Density"));
@@ -110,63 +108,78 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
         PlotType::Sphere => {
-            ui.label(egui::RichText::new("🌍 3D Globe").strong().small());
-            let style_label = match app.sphere_mode {
-                0 => "🌍 Smooth Globe",
-                1 => "🌋 Smooth Terrain",
-                2 => "📐 Flat Steps",
-                _ => "🧱 3D Radial Legos",
-            };
-            if ui
-                .button(egui::RichText::new(style_label).small())
-                .clicked()
-            {
-                app.sphere_mode = (app.sphere_mode + 1) % 4;
-            }
+            let modes: [(u32, &str); 4] = [
+                (0, "🔵 Smooth"),
+                (1, "🌊 Bumpy"),
+                (2, "Steps"),
+                (3, "📦 Voxel"),
+            ];
+
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 2.0;
+                for (id, label) in modes {
+                    if ui
+                        .selectable_label(app.sphere_mode == id, egui::RichText::new(label))
+                        .clicked()
+                    {
+                        app.sphere_mode = id;
+                    }
+                }
+            });
+
             if app.sphere_mode > 0 {
                 ui.separator();
                 ui.add(
                     egui::Slider::new(&mut app.sphere_displacement_strength, 0.0..=5.0)
-                        .text("🌋 Height"),
+                        .text("Height"),
                 );
             }
         }
         PlotType::Surface => {
-            ui.label(egui::RichText::new("⛰️ 3D Surface").strong().small());
-            let style_label = match app.surface_mode {
-                0 => "🌊 Smooth Terrain",
-                1 => "📐 Flat Steps",
-                _ => "🧱 3D Lego Cubes",
-            };
-            if ui
-                .button(egui::RichText::new(style_label).small())
-                .clicked()
-            {
-                app.surface_mode = (app.surface_mode + 1) % 3;
-            }
+            let modes: [(u32, &str); 3] = [(0, "🌊 Bumpy"), (1, "Steps"), (2, "📦 Voxel")];
+
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 2.0;
+                for (id, label) in modes {
+                    if ui
+                        .selectable_label(app.surface_mode == id, egui::RichText::new(label))
+                        .clicked()
+                    {
+                        app.surface_mode = id;
+                    }
+                }
+            });
+
             ui.separator();
             ui.add(
-                egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0)
-                    .text("⛰️ Height"),
+                egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0).text("Height"),
             );
         }
         PlotType::PointCloud => {
-            ui.label(egui::RichText::new("✨ Point Cloud").strong().small());
             ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("✨ Size"));
         }
         PlotType::Line => {
-            ui.label(egui::RichText::new("📈 1D Line Plot").strong().small());
-            let mut use_flat = app.active_colormap == 999;
-            if ui
-                .checkbox(&mut use_flat, "🎨 Solid Flat Line Color")
-                .changed()
-            {
-                if use_flat {
-                    app.active_colormap = 999;
-                } else {
-                    app.active_colormap = 0;
+            ui.horizontal(|ui| {
+                let mut use_flat = app.active_colormap == 999;
+                if ui
+                    .checkbox(&mut use_flat, "🎨 Solid Flat Line Color")
+                    .changed()
+                {
+                    if use_flat {
+                        app.active_colormap = 999;
+                    } else {
+                        app.active_colormap = 0;
+                    }
                 }
-            }
+                ui.selectable_label(app.show_hover_card, "💬")
+                    .on_hover_text(if app.show_hover_card {
+                        "Hide hover card"
+                    } else {
+                        "Show hover card"
+                    })
+                    .clicked()
+                    .then(|| app.show_hover_card = !app.show_hover_card);
+            });
 
             let has_z_dim = app.volume_data.as_ref().is_some_and(|v| v.depth > 1);
             let profile_controls = app.matrix_data.as_ref().map_or((false, 0usize), |matrix| {
@@ -260,31 +273,45 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
         PlotType::Heatmap | PlotType::Block => {
-            ui.label(egui::RichText::new("🗺️ 2D Heatmap").small().weak());
             ui.add_space(2.0);
-            ui.checkbox(&mut app.enforce_data_aspect_ratio, "📐 Aspect Ratio")
-                .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut app.enforce_data_aspect_ratio, "📐 Aspect Ratio")
+                    .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
+                ui.selectable_label(app.show_hover_card, "💬")
+                    .on_hover_text(if app.show_hover_card { "Hide hover card" } else { "Show hover card" })
+                    .clicked().then(|| app.show_hover_card = !app.show_hover_card);
+            });
         }
     }
 
     if is_3d_mode {
         ui.separator();
-        ui.checkbox(&mut app.sphere_auto_rotate, "🎥 Rotate");
-        if ui
-            .button("🔄 Reset View")
-            .on_hover_text("Reset 3D camera orientation")
-            .clicked()
-        {
-            app.sphere_rotation_x = 0.25;
-            app.sphere_rotation_y = 0.0;
-            app.sphere_zoom = 2.5;
-        }
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut app.sphere_auto_rotate, "🔁 Rotate");
+            if ui
+                .button("🔄 Reset View")
+                .on_hover_text("Reset 3D camera orientation")
+                .clicked()
+            {
+                app.sphere_rotation_x = 0.25;
+                app.sphere_rotation_y = 0.0;
+                app.sphere_zoom = 2.5;
+            }
+            ui.selectable_label(app.show_hover_card, "💬")
+                .on_hover_text(if app.show_hover_card {
+                    "Hide hover card"
+                } else {
+                    "Show hover card"
+                })
+                .clicked()
+                .then(|| app.show_hover_card = !app.show_hover_card);
+        });
     }
 }
 
 fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     // 1. Colorbar Title / Label Controls & Reset
-    ui.label(egui::RichText::new("🏷️ Colorbar Label").strong().small());
+    ui.label(egui::RichText::new("🏷️ Colorbar Label").strong());
     let default_label = app.default_colorbar_label();
     let mut label_buf = app.colorbar_label();
     let has_custom_label = app.custom_colorbar_label.is_some();
@@ -315,8 +342,17 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
 
     // 2. Color Range & Bounds Controls & Reset
-    ui.label(egui::RichText::new("📊 Color Range").strong().small());
     let range_speed = ((app.color_range_max - app.color_range_min).abs() / 100.0).max(1e-4);
+
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Color Range").strong());
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.toggle_value(&mut app.is_categorical, "🎨 Categorical")
+                .on_hover_text("Discrete colorbar (auto-detects unique values or 10 equal bins).");
+        });
+    });
+
+    ui.add_space(2.0);
 
     ui.horizontal(|ui| {
         ui.label("Min:");
@@ -350,13 +386,11 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
             app.volume_cmax = app.color_range_max;
             app.lock_color_bounds = true;
         }
-    });
 
-    ui.horizontal(|ui| {
         let lock_label = if app.lock_color_bounds {
-            "🔒 Locked"
+            "🔒"
         } else {
-            "🔓 Dynamic"
+            "🔓"
         };
         if ui
             .selectable_label(app.lock_color_bounds, lock_label)
@@ -367,7 +401,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
 
         if ui
-            .button("↺ Reset Range")
+            .button("↺")
             .on_hover_text("Reset bounds to current slice/dataset min and max defaults")
             .clicked()
         {
@@ -386,11 +420,13 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
         app.reset_color_range();
     }
 
+    ui.add_space(4.0);
     ui.separator();
+    ui.add_space(4.0);
 
     // 3. Clipping Colors
     ui.horizontal(|ui| {
-        ui.checkbox(&mut app.use_nan_color, "Custom NaN Color")
+        ui.checkbox(&mut app.use_nan_color, "NaN Color")
             .on_hover_text("If unchecked, NaN/Inf values render transparently.");
         if app.use_nan_color {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -407,7 +443,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
     });
 
-    ui.add_space(2.0);
+    ui.add_space(4.0);
     ui.horizontal(|ui| {
         ui.checkbox(&mut app.use_lowclip, "Low Clip")
             .on_hover_text("Values < cmin clipped to this color.");
@@ -426,7 +462,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
     });
 
-    ui.add_space(2.0);
+    ui.add_space(4.0);
     ui.horizontal(|ui| {
         ui.checkbox(&mut app.use_highclip, "High Clip")
             .on_hover_text("Values > cmax clipped to this color.");
@@ -446,35 +482,43 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     });
 
     ui.add_space(4.0);
-    ui.label(egui::RichText::new("📈 Scale").strong());
+    ui.separator();
+    ui.add_space(4.0);
+
+    // 4. Scale
     let is_valid_log = app.color_range_min >= -1e-15 && app.color_range_max > 0.0;
     if !is_valid_log && app.active_scale_type == 1 {
         app.active_scale_type = 0;
     }
-    egui::ComboBox::from_id_salt("settings_color_scale_dropdown")
-        .selected_text(match app.active_scale_type {
-            1 => "Logarithmic",
-            2 => "Symlog",
-            3 => "Sqrt",
-            4 => "Exponential",
-            _ => "Linear",
-        })
-        .show_ui(ui, |ui| {
-            ui.selectable_value(&mut app.active_scale_type, 0, "Linear");
-            ui.add_enabled_ui(is_valid_log, |ui| {
-                ui.selectable_value(&mut app.active_scale_type, 1, "Logarithmic")
-                    .on_hover_text(if is_valid_log {
-                        "Log scale (non-negative data)"
-                    } else {
-                        "Disabled: requires min ≥ 0. Use Symlog for negative data."
-                    });
+
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("📈 Scale").strong());
+        egui::ComboBox::from_id_salt("settings_color_scale_dropdown")
+            .selected_text(match app.active_scale_type {
+                1 => "Logarithmic",
+                2 => "Symlog",
+                3 => "Sqrt",
+                4 => "Exponential",
+                _ => "Linear",
+            })
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut app.active_scale_type, 0, "Linear");
+                ui.add_enabled_ui(is_valid_log, |ui| {
+                    ui.selectable_value(&mut app.active_scale_type, 1, "Logarithmic")
+                        .on_hover_text(if is_valid_log {
+                            "Log scale (non-negative data)"
+                        } else {
+                            "Disabled: requires min ≥ 0. Use Symlog for negative data."
+                        });
+                });
+                ui.selectable_value(&mut app.active_scale_type, 2, "Symlog");
+                ui.selectable_value(&mut app.active_scale_type, 3, "Sqrt");
+                ui.selectable_value(&mut app.active_scale_type, 4, "Exponential");
             });
-            ui.selectable_value(&mut app.active_scale_type, 2, "Symlog");
-            ui.selectable_value(&mut app.active_scale_type, 3, "Sqrt");
-            ui.selectable_value(&mut app.active_scale_type, 4, "Exponential");
-        });
+    });
 
     if app.active_scale_type == 1 || app.active_scale_type == 2 || app.active_scale_type == 4 {
+        ui.add_space(2.0);
         ui.horizontal(|ui| {
             ui.label("Param:");
             ui.add(
@@ -484,8 +528,4 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
             );
         });
     }
-
-    ui.add_space(2.0);
-    ui.toggle_value(&mut app.is_categorical, "🎨 Categorical")
-        .on_hover_text("Discrete colorbar (auto-detects unique values or 10 equal bins).");
 }
