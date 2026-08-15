@@ -8,7 +8,7 @@ struct ColorbarTick {
     label: Option<String>,
 }
 
-pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
+pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
     if !app.show_colorbar {
         return;
     }
@@ -18,20 +18,8 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
     // Read active min_val and max_val bounds (locked or dynamic)
     let (min_val, max_val) = (app.color_range_min, app.color_range_max);
 
-    let var_name = if let Some(meta) = &app.plotted_dataset_metadata {
-        meta.variables
-            .get(app.plotted_variable_idx)
-            .map(|v| {
-                if let Some(unit) = &v.attributes.get("units") {
-                    format!("{} ({})", v.name, unit)
-                } else {
-                    v.name.clone()
-                }
-            })
-            .unwrap_or_else(|| "Scalar Field".to_string())
-    } else {
-        "Scalar Field".to_string()
-    };
+    let default_label = app.default_colorbar_label();
+    let mut current_label = app.colorbar_label();
 
     // Read current theme visual colors for high-contrast dark/light mode rendering
     let style = ctx.style_of(ctx.theme());
@@ -41,8 +29,8 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
 
     // Position floating panel centered horizontally fixed right above the bottom toolbar
     let screen_rect = ctx.input(|i| i.viewport_rect());
-    let panel_w = 470.0;
-    let panel_h = 82.0;
+    let panel_w = 490.0;
+    let panel_h = 88.0;
 
     let center_x = screen_rect.center().x;
     let bottom_bar_top = screen_rect.max.y - 42.0; // Bottom bar height + margin
@@ -59,17 +47,38 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                     ui.set_width(panel_w - 24.0);
 
                     ui.vertical_centered(|ui| {
-                        ui.label(
-                            egui::RichText::new(&var_name)
-                                .strong()
-                                .color(strong_text_color),
-                        );
+                        // Editable Colorbar Title
+                        ui.horizontal(|ui| {
+                            let avail = ui.available_width();
+                            let text_w = (avail - 40.0).clamp(100.0, 320.0);
+                            let pad = ((avail - text_w) / 2.0).max(0.0);
+                            ui.add_space(pad);
 
-                        ui.add_space(4.0);
+                            let text_edit = egui::TextEdit::singleline(&mut current_label)
+                                .hint_text(&default_label)
+                                .font(egui::TextStyle::Body)
+                                .horizontal_align(egui::Align::Center)
+                                .desired_width(text_w)
+                                .frame(egui::Frame::NONE);
 
-                        // Reserve exact 410x36 rect for horizontal gradient bar + inward/outward ticks + labels
-                        let bar_w = 410.0;
-                        let total_h = 36.0;
+                            let resp = ui
+                                .add(text_edit)
+                                .on_hover_text("Colorbar title. Click to edit.");
+                            if resp.changed() {
+                                if current_label.trim().is_empty() || current_label == default_label
+                                {
+                                    app.custom_colorbar_label = None;
+                                } else {
+                                    app.custom_colorbar_label = Some(current_label.clone());
+                                }
+                            }
+                        });
+
+                        ui.add_space(3.0);
+
+                        // Reserve exact 400x38 rect for horizontal gradient bar + inward/outward ticks + input fields
+                        let bar_w = 400.0;
+                        let total_h = 38.0;
 
                         let (widget_rect, response) =
                             ui.allocate_exact_size(Vec2::new(bar_w, total_h), egui::Sense::hover());
@@ -188,14 +197,17 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                                     egui::Stroke::new(1.2_f32, strong_text_color),
                                 );
 
-                                let label_text = format_scientific_tick(val);
-                                ui.painter().text(
-                                    Pos2::new(x, y_out + 2.0),
-                                    egui::Align2::CENTER_TOP,
-                                    label_text,
-                                    egui::FontId::proportional(11.0),
-                                    strong_text_color,
-                                );
+                                // Avoid painting label if it overlaps the min/max input fields at ends
+                                if t_center > 0.12 && t_center < 0.88 {
+                                    let label_text = format_scientific_tick(val);
+                                    ui.painter().text(
+                                        Pos2::new(x, y_out + 2.0),
+                                        egui::Align2::CENTER_TOP,
+                                        label_text,
+                                        egui::FontId::proportional(11.0),
+                                        strong_text_color,
+                                    );
+                                }
                             }
                         } else {
                             // Standard Continuous Gradient Mesh
@@ -293,18 +305,14 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                                         egui::Stroke::new(1.2_f32, strong_text_color),
                                     );
 
-                                    if let Some(label_text) = &tick.label {
-                                        let align = if tick.t_pos <= 0.01 {
-                                            egui::Align2::LEFT_TOP
-                                        } else if tick.t_pos >= 0.99 {
-                                            egui::Align2::RIGHT_TOP
-                                        } else {
-                                            egui::Align2::CENTER_TOP
-                                        };
-
+                                    // Render intermediate major tick labels between the lower/upper input fields
+                                    if let Some(label_text) = &tick.label
+                                        && tick.t_pos > 0.12
+                                        && tick.t_pos < 0.88
+                                    {
                                         ui.painter().text(
                                             Pos2::new(x, y_out + 2.0),
-                                            align,
+                                            egui::Align2::CENTER_TOP,
                                             label_text,
                                             egui::FontId::proportional(11.0),
                                             strong_text_color,
@@ -324,6 +332,58 @@ pub fn show_colorbar_overlay(app: &OctantApp, ctx: &egui::Context) {
                                     );
                                 }
                             }
+                        }
+
+                        // Lower and Upper End Ticks Input Fields centered directly on end ticks
+                        let input_w = 60.0;
+                        let input_h = 18.0;
+                        let drag_speed = ((max_val - min_val).abs() / 100.0).max(1e-4);
+
+                        let mut new_min = app.color_range_min;
+                        let mut new_max = app.color_range_max;
+
+                        let min_rect = Rect::from_center_size(
+                            Pos2::new(bar_rect.min.x, bar_rect.max.y + 6.0 + input_h / 2.0),
+                            Vec2::new(input_w, input_h),
+                        );
+                        let max_rect = Rect::from_center_size(
+                            Pos2::new(bar_rect.max.x, bar_rect.max.y + 6.0 + input_h / 2.0),
+                            Vec2::new(input_w, input_h),
+                        );
+
+                        let min_resp = ui
+                            .put(
+                                min_rect,
+                                egui::DragValue::new(&mut new_min)
+                                    .speed(drag_speed)
+                                    .custom_formatter(|val, _| format_scientific_tick(val as f32))
+                                    .custom_parser(|s| s.trim().parse::<f64>().ok()),
+                            )
+                            .on_hover_text(
+                                "Lower end range (Min). Drag to adjust or click to type.",
+                            );
+
+                        let max_resp = ui
+                            .put(
+                                max_rect,
+                                egui::DragValue::new(&mut new_max)
+                                    .speed(drag_speed)
+                                    .custom_formatter(|val, _| format_scientific_tick(val as f32))
+                                    .custom_parser(|s| s.trim().parse::<f64>().ok()),
+                            )
+                            .on_hover_text(
+                                "Upper end range (Max). Drag to adjust or click to type.",
+                            );
+
+                        if min_resp.changed() || new_min != app.color_range_min {
+                            app.color_range_min = new_min;
+                            app.volume_cmin = new_min;
+                            app.lock_color_bounds = true;
+                        }
+                        if max_resp.changed() || new_max != app.color_range_max {
+                            app.color_range_max = new_max;
+                            app.volume_cmax = new_max;
+                            app.lock_color_bounds = true;
                         }
 
                         // Interactive Hover Tooltip
@@ -497,7 +557,7 @@ fn generate_colorbar_ticks(
 }
 
 /// Formats tick values cleanly using integer/decimal or concise scientific notation.
-fn format_scientific_tick(val: f32) -> String {
+pub fn format_scientific_tick(val: f32) -> String {
     let abs_val = val.abs();
     if abs_val == 0.0 {
         "0".to_string()
@@ -515,5 +575,124 @@ fn format_scientific_tick(val: f32) -> String {
         format!("{:.1}", val)
     } else {
         format!("{:.2}", val)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data::{DatasetMetadata, VariableInfo, matrix_data::MatrixData};
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_format_scientific_tick() {
+        assert_eq!(format_scientific_tick(0.0), "0");
+        assert_eq!(format_scientific_tick(42.0), "42");
+        assert_eq!(format_scientific_tick(15.5), "15.5");
+        assert_eq!(format_scientific_tick(100.25), "100.25");
+        assert_eq!(format_scientific_tick(0.0000123), "1.23e-5");
+        assert_eq!(format_scientific_tick(100000.0), "1e5");
+        assert_eq!(format_scientific_tick(-50.0), "-50");
+    }
+
+    #[test]
+    fn test_colorbar_default_and_custom_label() {
+        let mut app = OctantApp::default();
+        assert_eq!(app.colorbar_label(), "Scalar Field");
+        assert_eq!(app.default_colorbar_label(), "Scalar Field");
+
+        // Custom label override
+        app.custom_colorbar_label = Some("Surface Temp (Celsius)".to_string());
+        assert_eq!(app.colorbar_label(), "Surface Temp (Celsius)");
+        assert_eq!(app.default_colorbar_label(), "Scalar Field");
+
+        // Reset label
+        app.reset_colorbar_label();
+        assert_eq!(app.colorbar_label(), "Scalar Field");
+        assert!(app.custom_colorbar_label.is_none());
+
+        // With metadata and units
+        let mut attrs = HashMap::new();
+        attrs.insert("units".to_string(), "degK".to_string());
+        let var = VariableInfo {
+            name: "air_temp".to_string(),
+            data_type: "float32".to_string(),
+            shape: vec![10, 10],
+            dimension_names: vec!["y".to_string(), "x".to_string()],
+            chunk_shape: vec![10, 10],
+            file_size: 400,
+            units: Some("degK".to_string()),
+            long_name: None,
+            time_coverage_start: None,
+            time_coverage_end: None,
+            temporal_resolution: None,
+            attributes: attrs,
+        };
+        let meta = DatasetMetadata {
+            name: "test_dataset".to_string(),
+            store_type: "zarr".to_string(),
+            variables: vec![var],
+            dimension_coordinates: HashMap::new(),
+        };
+        app.plotted_dataset_metadata = Some(meta);
+        app.plotted_variable_idx = 0;
+
+        assert_eq!(app.default_colorbar_label(), "air_temp (degK)");
+        assert_eq!(app.colorbar_label(), "air_temp (degK)");
+
+        // Set custom override over metadata default
+        app.custom_colorbar_label = Some("Custom Temp".to_string());
+        assert_eq!(app.colorbar_label(), "Custom Temp");
+        assert_eq!(app.default_colorbar_label(), "air_temp (degK)");
+
+        // Reset
+        app.reset_colorbar_label();
+        assert_eq!(app.colorbar_label(), "air_temp (degK)");
+    }
+
+    #[test]
+    fn test_colorbar_range_reset() {
+        let mut app = OctantApp::default();
+
+        // Simulate matrix data with min 12.0 and max 88.0
+        let mdata = MatrixData::new(
+            10,
+            10,
+            vec![12.0; 100],
+            12.0,
+            88.0,
+            "test_ds".to_string(),
+            1,
+        );
+        app.matrix_data = Some(mdata);
+
+        // User manually customized range
+        app.color_range_min = 20.0;
+        app.color_range_max = 50.0;
+        app.lock_color_bounds = true;
+
+        // Reset color range
+        app.reset_color_range();
+
+        assert_eq!(app.color_range_min, 12.0);
+        assert_eq!(app.color_range_max, 88.0);
+        assert_eq!(app.volume_cmin, 12.0);
+        assert_eq!(app.volume_cmax, 88.0);
+        assert!(!app.lock_color_bounds);
+    }
+
+    #[test]
+    fn test_colorbar_ticks_generation_custom_bounds() {
+        let ticks = generate_colorbar_ticks(10.0, 50.0, 0, 1.0);
+        assert!(!ticks.is_empty());
+        let major_ticks: Vec<_> = ticks.iter().filter(|t| t.is_major).collect();
+        assert_eq!(major_ticks.len(), 5);
+
+        // First major tick at 0.0 -> value 10.0
+        assert!((major_ticks[0]._val - 10.0).abs() < 1e-4);
+        // Last major tick at 1.0 -> value 50.0
+        assert!((major_ticks[4]._val - 50.0).abs() < 1e-4);
+        // Mid major tick at 0.5 -> value 30.0
+        assert!((major_ticks[2]._val - 30.0).abs() < 1e-4);
     }
 }

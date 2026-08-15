@@ -283,6 +283,112 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
+    // 1. Colorbar Title / Label Controls & Reset
+    ui.label(egui::RichText::new("🏷️ Colorbar Label").strong().small());
+    let default_label = app.default_colorbar_label();
+    let mut label_buf = app.colorbar_label();
+    let has_custom_label = app.custom_colorbar_label.is_some();
+
+    ui.horizontal(|ui| {
+        let resp = ui.add(
+            egui::TextEdit::singleline(&mut label_buf)
+                .hint_text(&default_label)
+                .desired_width(170.0),
+        );
+        if resp.changed() {
+            if label_buf.trim().is_empty() || label_buf == default_label {
+                app.custom_colorbar_label = None;
+            } else {
+                app.custom_colorbar_label = Some(label_buf);
+            }
+        }
+
+        if ui
+            .add_enabled(has_custom_label, egui::Button::new("↺"))
+            .on_hover_text("Reset colorbar label to default")
+            .clicked()
+        {
+            app.reset_colorbar_label();
+        }
+    });
+
+    ui.add_space(4.0);
+
+    // 2. Color Range & Bounds Controls & Reset
+    ui.label(egui::RichText::new("📊 Color Range").strong().small());
+    let range_speed = ((app.color_range_max - app.color_range_min).abs() / 100.0).max(1e-4);
+
+    ui.horizontal(|ui| {
+        ui.label("Min:");
+        if ui
+            .add(
+                egui::DragValue::new(&mut app.color_range_min)
+                    .speed(range_speed)
+                    .custom_formatter(|val, _| {
+                        crate::ui::colorbar::format_scientific_tick(val as f32)
+                    })
+                    .custom_parser(|s| s.trim().parse::<f64>().ok()),
+            )
+            .changed()
+        {
+            app.volume_cmin = app.color_range_min;
+            app.lock_color_bounds = true;
+        }
+
+        ui.label("Max:");
+        if ui
+            .add(
+                egui::DragValue::new(&mut app.color_range_max)
+                    .speed(range_speed)
+                    .custom_formatter(|val, _| {
+                        crate::ui::colorbar::format_scientific_tick(val as f32)
+                    })
+                    .custom_parser(|s| s.trim().parse::<f64>().ok()),
+            )
+            .changed()
+        {
+            app.volume_cmax = app.color_range_max;
+            app.lock_color_bounds = true;
+        }
+    });
+
+    ui.horizontal(|ui| {
+        let lock_label = if app.lock_color_bounds {
+            "🔒 Locked"
+        } else {
+            "🔓 Dynamic"
+        };
+        if ui
+            .selectable_label(app.lock_color_bounds, lock_label)
+            .on_hover_text("Lock min/max so color mapping stays fixed across timesteps.")
+            .clicked()
+        {
+            app.lock_color_bounds = !app.lock_color_bounds;
+        }
+
+        if ui
+            .button("↺ Reset Range")
+            .on_hover_text("Reset bounds to current slice/dataset min and max defaults")
+            .clicked()
+        {
+            app.reset_color_range();
+        }
+    });
+
+    // Quick Reset All Colorbar Defaults if either label or bounds are customized
+    if (has_custom_label || app.lock_color_bounds)
+        && ui
+            .button("↺ Reset All Colorbar Defaults")
+            .on_hover_text("Reset both colorbar label and range to default values")
+            .clicked()
+    {
+        app.reset_colorbar_label();
+        app.reset_color_range();
+    }
+
+    ui.separator();
+
+    // 3. Clipping Colors
     ui.checkbox(&mut app.use_nan_color, "Custom NaN Color")
         .on_hover_text("If unchecked, NaN/Inf values render transparently.");
     if app.use_nan_color {
@@ -301,39 +407,6 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
         .on_hover_text("Values > cmax clipped to this color.");
     if app.use_highclip {
         ui.color_edit_button_rgba_unmultiplied(&mut app.highclip_color);
-    }
-
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        ui.label("Min:");
-        ui.add(egui::DragValue::new(&mut app.color_range_min).speed(0.1));
-        ui.label("Max:");
-        ui.add(egui::DragValue::new(&mut app.color_range_max).speed(0.1));
-    });
-
-    let lock_label = if app.lock_color_bounds {
-        "🔒 Locked"
-    } else {
-        "🔓 Dynamic"
-    };
-    if ui
-        .selectable_label(app.lock_color_bounds, lock_label)
-        .on_hover_text("Lock min/max so color mapping stays fixed across timesteps.")
-        .clicked()
-    {
-        app.lock_color_bounds = !app.lock_color_bounds;
-    }
-
-    if ui
-        .button("↺ Reset")
-        .on_hover_text("Reset bounds to current slice min/max")
-        .clicked()
-        && let Some(mdata) = &app.matrix_data
-    {
-        app.color_range_min = mdata.min_val;
-        app.color_range_max = mdata.max_val;
-        app.volume_cmin = mdata.min_val;
-        app.volume_cmax = mdata.max_val;
     }
 
     ui.add_space(4.0);
