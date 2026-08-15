@@ -1,6 +1,6 @@
 [package]
 name = "octant"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Lazaro Alonso <lazarus.alon@gmail.com>"]
 edition = "2024"
 description = "An interactive viewer for n-dimensional datasets with native support for local and cloud object storage, Zarr, and Icechunk. Built in Rust with GPU-accelerated rendering."
