@@ -61,9 +61,12 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                                 .desired_width(text_w)
                                 .frame(egui::Frame::NONE);
 
-                            let resp = ui.add(text_edit).on_hover_text("Colorbar title. Click to edit.");
+                            let resp = ui
+                                .add(text_edit)
+                                .on_hover_text("Colorbar title. Click to edit.");
                             if resp.changed() {
-                                if current_label.trim().is_empty() || current_label == default_label {
+                                if current_label.trim().is_empty() || current_label == default_label
+                                {
                                     app.custom_colorbar_label = None;
                                 } else {
                                     app.custom_colorbar_label = Some(current_label.clone());
@@ -303,16 +306,17 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                                     );
 
                                     // Render intermediate major tick labels between the lower/upper input fields
-                                    if let Some(label_text) = &tick.label {
-                                        if tick.t_pos > 0.12 && tick.t_pos < 0.88 {
-                                            ui.painter().text(
-                                                Pos2::new(x, y_out + 2.0),
-                                                egui::Align2::CENTER_TOP,
-                                                label_text,
-                                                egui::FontId::proportional(11.0),
-                                                strong_text_color,
-                                            );
-                                        }
+                                    if let Some(label_text) = &tick.label
+                                        && tick.t_pos > 0.12
+                                        && tick.t_pos < 0.88
+                                    {
+                                        ui.painter().text(
+                                            Pos2::new(x, y_out + 2.0),
+                                            egui::Align2::CENTER_TOP,
+                                            label_text,
+                                            egui::FontId::proportional(11.0),
+                                            strong_text_color,
+                                        );
                                     }
                                 } else {
                                     let y_in = bar_rect.max.y - 3.0;
@@ -355,7 +359,9 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                                     .custom_formatter(|val, _| format_scientific_tick(val as f32))
                                     .custom_parser(|s| s.trim().parse::<f64>().ok()),
                             )
-                            .on_hover_text("Lower end range (Min). Drag to adjust or click to type.");
+                            .on_hover_text(
+                                "Lower end range (Min). Drag to adjust or click to type.",
+                            );
 
                         let max_resp = ui
                             .put(
@@ -365,7 +371,9 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                                     .custom_formatter(|val, _| format_scientific_tick(val as f32))
                                     .custom_parser(|s| s.trim().parse::<f64>().ok()),
                             )
-                            .on_hover_text("Upper end range (Max). Drag to adjust or click to type.");
+                            .on_hover_text(
+                                "Upper end range (Max). Drag to adjust or click to type.",
+                            );
 
                         if min_resp.changed() || new_min != app.color_range_min {
                             app.color_range_min = new_min;
