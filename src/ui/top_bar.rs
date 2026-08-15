@@ -41,22 +41,23 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let theme_label = if app.theme_preference == egui::ThemePreference::Dark {
-                        "☀ Light"
+                    let is_dark = app.theme_preference == egui::ThemePreference::Dark;
+                    let theme_label = if is_dark { "☀ Light" } else { "🌙 Dark" };
+                    let theme_hover = if is_dark {
+                        "Switch to Light mode"
                     } else {
-                        "🌙 Dark"
+                        "Switch to Dark mode"
                     };
                     if ui
-                        .button(egui::RichText::new(theme_label).small())
-                        .on_hover_text("Toggle light and dark theme")
+                        .button(egui::RichText::new(theme_label))
+                        .on_hover_text(theme_hover)
                         .clicked()
                     {
-                        app.theme_preference =
-                            if app.theme_preference == egui::ThemePreference::Dark {
-                                egui::ThemePreference::Light
-                            } else {
-                                egui::ThemePreference::Dark
-                            };
+                        app.theme_preference = if is_dark {
+                            egui::ThemePreference::Light
+                        } else {
+                            egui::ThemePreference::Dark
+                        };
                         ui.ctx().set_theme(app.theme_preference);
                     }
 

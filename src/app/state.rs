@@ -150,6 +150,7 @@ pub struct OctantApp {
     pub variables_overlay_width: f32,
     pub variable_search: String,
     pub show_bottom_bar: bool,
+    pub show_hover_card: bool,
     pub settings_overlay_width: f32, // tracks prev-frame width to position Variable Controls to the right
     pub theme_preference: egui::ThemePreference,
     pub enforce_data_aspect_ratio: bool,
@@ -264,6 +265,7 @@ impl Default for OctantApp {
             show_settings_panel: false,
             show_variable_controls: false,
             show_bottom_bar: true,
+            show_hover_card: true,
             settings_overlay_width: 0.0,
             variables_overlay_width: 340.0,
             variable_search: String::new(),
