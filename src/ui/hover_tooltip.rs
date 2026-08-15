@@ -413,15 +413,11 @@ pub fn draw_leader_callout(
 
     // 2. Compute anchor on tooltip box
     let box_anchor = if tooltip_rect.min.x >= target_pos.x {
-        Pos2::new(
-            tooltip_rect.min.x,
-            (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0),
-        )
+        // card is to the right — connect at left edge, vertically centred
+        Pos2::new(tooltip_rect.min.x, tooltip_rect.center().y)
     } else if tooltip_rect.max.x <= target_pos.x {
-        Pos2::new(
-            tooltip_rect.max.x,
-            (tooltip_rect.min.y + 16.0).min(tooltip_rect.max.y - 6.0),
-        )
+        // card is to the left — connect at right edge, vertically centred
+        Pos2::new(tooltip_rect.max.x, tooltip_rect.center().y)
     } else if tooltip_rect.min.y >= target_pos.y {
         Pos2::new(target_pos.x, tooltip_rect.min.y)
     } else {
