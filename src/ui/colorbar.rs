@@ -20,7 +20,6 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
 
     let default_label = app.default_colorbar_label();
     let mut current_label = app.colorbar_label();
-    let is_custom_label = app.custom_colorbar_label.is_some();
 
     // Read current theme visual colors for high-contrast dark/light mode rendering
     let style = ctx.style_of(ctx.theme());
@@ -30,7 +29,7 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
 
     // Position floating panel centered horizontally fixed right above the bottom toolbar
     let screen_rect = ctx.input(|i| i.viewport_rect());
-    let panel_w = 480.0;
+    let panel_w = 490.0;
     let panel_h = 88.0;
 
     let center_x = screen_rect.center().x;
@@ -70,22 +69,12 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                                     app.custom_colorbar_label = Some(current_label.clone());
                                 }
                             }
-
-                            if is_custom_label {
-                                if ui
-                                    .small_button("↺")
-                                    .on_hover_text("Reset colorbar label to default")
-                                    .clicked()
-                                {
-                                    app.custom_colorbar_label = None;
-                                }
-                            }
                         });
 
                         ui.add_space(3.0);
 
-                        // Reserve exact 420x38 rect for horizontal gradient bar + inward/outward ticks + input fields
-                        let bar_w = 420.0;
+                        // Reserve exact 400x38 rect for horizontal gradient bar + inward/outward ticks + input fields
+                        let bar_w = 400.0;
                         let total_h = 38.0;
 
                         let (widget_rect, response) =
@@ -206,7 +195,7 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                                 );
 
                                 // Avoid painting label if it overlaps the min/max input fields at ends
-                                if t_center > 0.17 && t_center < 0.83 {
+                                if t_center > 0.12 && t_center < 0.88 {
                                     let label_text = format_scientific_tick(val);
                                     ui.painter().text(
                                         Pos2::new(x, y_out + 2.0),
@@ -315,7 +304,7 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
 
                                     // Render intermediate major tick labels between the lower/upper input fields
                                     if let Some(label_text) = &tick.label {
-                                        if tick.t_pos > 0.17 && tick.t_pos < 0.83 {
+                                        if tick.t_pos > 0.12 && tick.t_pos < 0.88 {
                                             ui.painter().text(
                                                 Pos2::new(x, y_out + 2.0),
                                                 egui::Align2::CENTER_TOP,
@@ -341,20 +330,20 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                             }
                         }
 
-                        // Lower and Upper End Ticks Input Fields
-                        let input_w = 70.0;
+                        // Lower and Upper End Ticks Input Fields centered directly on end ticks
+                        let input_w = 60.0;
                         let input_h = 18.0;
                         let drag_speed = ((max_val - min_val).abs() / 100.0).max(1e-4);
 
                         let mut new_min = app.color_range_min;
                         let mut new_max = app.color_range_max;
 
-                        let min_rect = Rect::from_min_size(
-                            Pos2::new(bar_rect.min.x - 2.0, bar_rect.max.y + 6.0),
+                        let min_rect = Rect::from_center_size(
+                            Pos2::new(bar_rect.min.x, bar_rect.max.y + 6.0 + input_h / 2.0),
                             Vec2::new(input_w, input_h),
                         );
-                        let max_rect = Rect::from_min_size(
-                            Pos2::new(bar_rect.max.x - input_w + 2.0, bar_rect.max.y + 6.0),
+                        let max_rect = Rect::from_center_size(
+                            Pos2::new(bar_rect.max.x, bar_rect.max.y + 6.0 + input_h / 2.0),
                             Vec2::new(input_w, input_h),
                         );
 
