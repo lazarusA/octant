@@ -324,7 +324,9 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
             .add(
                 egui::DragValue::new(&mut app.color_range_min)
                     .speed(range_speed)
-                    .custom_formatter(|val, _| crate::ui::colorbar::format_scientific_tick(val as f32))
+                    .custom_formatter(|val, _| {
+                        crate::ui::colorbar::format_scientific_tick(val as f32)
+                    })
                     .custom_parser(|s| s.trim().parse::<f64>().ok()),
             )
             .changed()
@@ -338,7 +340,9 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
             .add(
                 egui::DragValue::new(&mut app.color_range_max)
                     .speed(range_speed)
-                    .custom_formatter(|val, _| crate::ui::colorbar::format_scientific_tick(val as f32))
+                    .custom_formatter(|val, _| {
+                        crate::ui::colorbar::format_scientific_tick(val as f32)
+                    })
                     .custom_parser(|s| s.trim().parse::<f64>().ok()),
             )
             .changed()
@@ -372,15 +376,14 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     });
 
     // Quick Reset All Colorbar Defaults if either label or bounds are customized
-    if has_custom_label || app.lock_color_bounds {
-        if ui
+    if (has_custom_label || app.lock_color_bounds)
+        && ui
             .button("↺ Reset All Colorbar Defaults")
             .on_hover_text("Reset both colorbar label and range to default values")
             .clicked()
-        {
-            app.reset_colorbar_label();
-            app.reset_color_range();
-        }
+    {
+        app.reset_colorbar_label();
+        app.reset_color_range();
     }
 
     ui.separator();
