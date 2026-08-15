@@ -389,25 +389,61 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.separator();
 
     // 3. Clipping Colors
-    ui.checkbox(&mut app.use_nan_color, "Custom NaN Color")
-        .on_hover_text("If unchecked, NaN/Inf values render transparently.");
-    if app.use_nan_color {
-        ui.color_edit_button_rgba_unmultiplied(&mut app.nan_color);
-    }
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut app.use_nan_color, "Custom NaN Color")
+            .on_hover_text("If unchecked, NaN/Inf values render transparently.");
+        if app.use_nan_color {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                crate::ui::color_picker::ShapeColorPicker::new(
+                    "settings_nan_color_picker",
+                    &mut app.nan_color,
+                    crate::ui::color_picker::ColorShape::Rect(3.0),
+                )
+                .size(egui::vec2(18.0, 16.0))
+                .tooltip("NaN color. Click to select color.")
+                .anchor_offset(egui::vec2(-240.0, -100.0))
+                .show(ui);
+            });
+        }
+    });
 
     ui.add_space(2.0);
-    ui.checkbox(&mut app.use_lowclip, "Low Clip")
-        .on_hover_text("Values < cmin clipped to this color.");
-    if app.use_lowclip {
-        ui.color_edit_button_rgba_unmultiplied(&mut app.lowclip_color);
-    }
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut app.use_lowclip, "Low Clip")
+            .on_hover_text("Values < cmin clipped to this color.");
+        if app.use_lowclip {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                crate::ui::color_picker::ShapeColorPicker::new(
+                    "settings_lowclip_color_picker",
+                    &mut app.lowclip_color,
+                    crate::ui::color_picker::ColorShape::LeftTriangle,
+                )
+                .size(egui::vec2(18.0, 16.0))
+                .tooltip("Low Clip color (< Min). Click to select color.")
+                .anchor_offset(egui::vec2(-240.0, -100.0))
+                .show(ui);
+            });
+        }
+    });
 
     ui.add_space(2.0);
-    ui.checkbox(&mut app.use_highclip, "High Clip")
-        .on_hover_text("Values > cmax clipped to this color.");
-    if app.use_highclip {
-        ui.color_edit_button_rgba_unmultiplied(&mut app.highclip_color);
-    }
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut app.use_highclip, "High Clip")
+            .on_hover_text("Values > cmax clipped to this color.");
+        if app.use_highclip {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                crate::ui::color_picker::ShapeColorPicker::new(
+                    "settings_highclip_color_picker",
+                    &mut app.highclip_color,
+                    crate::ui::color_picker::ColorShape::RightTriangle,
+                )
+                .size(egui::vec2(18.0, 16.0))
+                .tooltip("High Clip color (> Max). Click to select color.")
+                .anchor_offset(egui::vec2(-240.0, -100.0))
+                .show(ui);
+            });
+        }
+    });
 
     ui.add_space(4.0);
     ui.label(egui::RichText::new("📈 Scale").strong());
