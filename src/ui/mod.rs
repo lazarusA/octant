@@ -3,6 +3,7 @@ pub mod axes;
 pub mod bottom_bar;
 pub mod cache;
 pub mod catalog;
+pub mod color_picker;
 pub mod colorbar;
 pub mod colormap;
 pub mod hover_tooltip;
