@@ -264,8 +264,13 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
         PlotType::Heatmap | PlotType::Block => {
             ui.add_space(2.0);
-            ui.checkbox(&mut app.enforce_data_aspect_ratio, "📐 Aspect Ratio")
-                .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut app.enforce_data_aspect_ratio, "📐 Aspect Ratio")
+                    .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
+                ui.selectable_label(app.show_hover_card, "💬")
+                    .on_hover_text(if app.show_hover_card { "Hide hover card" } else { "Show hover card" })
+                    .clicked().then(|| app.show_hover_card = !app.show_hover_card);
+            });
         }
     }
 
@@ -282,6 +287,14 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                 app.sphere_rotation_y = 0.0;
                 app.sphere_zoom = 2.5;
             }
+            ui.selectable_label(app.show_hover_card, "💬")
+                .on_hover_text(if app.show_hover_card {
+                    "Hide hover card"
+                } else {
+                    "Show hover card"
+                })
+                .clicked()
+                .then(|| app.show_hover_card = !app.show_hover_card);
         });
     }
 }
@@ -403,7 +416,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     // 3. Clipping Colors
     ui.horizontal(|ui| {
-        ui.checkbox(&mut app.use_nan_color, "Custom NaN Color")
+        ui.checkbox(&mut app.use_nan_color, "NaN Color")
             .on_hover_text("If unchecked, NaN/Inf values render transparently.");
         if app.use_nan_color {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

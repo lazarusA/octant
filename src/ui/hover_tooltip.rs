@@ -451,6 +451,10 @@ pub fn show_hover_tooltip(
         None => return,
     };
 
+    if !app.show_hover_card {
+        return;
+    }
+
     let matrix = match &app.matrix_data {
         Some(m) if m.width > 0 && m.height > 0 && !m.values.is_empty() => m,
         _ => return,
