@@ -48,8 +48,6 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     match app.active_plot_type {
         PlotType::Volume => {
-            ui.label(egui::RichText::new("☁️ Volume").strong().small());
-
             let algo_label = match app.volume_algorithm {
                 0 => "☁️ Volume Raymarching",
                 1 => "🎯 Solid Isosurface (WIP)",
@@ -110,7 +108,6 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
         PlotType::Sphere => {
-
             let modes: [(u32, &str); 4] = [
                 (0, "🔵 Smooth"),
                 (1, "🌊 Bumpy"),
@@ -121,10 +118,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             ui.horizontal(|ui| {
                 for (id, label) in modes {
                     if ui
-                        .selectable_label(
-                            app.sphere_mode == id,
-                            egui::RichText::new(label),
-                        )
+                        .selectable_label(app.sphere_mode == id, egui::RichText::new(label))
                         .clicked()
                     {
                         app.sphere_mode = id;
@@ -141,30 +135,28 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
         PlotType::Surface => {
-            ui.label(egui::RichText::new("⛰️ 3D Surface").strong().small());
-            let style_label = match app.surface_mode {
-                0 => "🌊 Smooth Terrain",
-                1 => "📐 Flat Steps",
-                _ => "🧱 3D Lego Cubes",
-            };
-            if ui
-                .button(egui::RichText::new(style_label).small())
-                .clicked()
-            {
-                app.surface_mode = (app.surface_mode + 1) % 3;
-            }
+            let modes: [(u32, &str); 3] = [(0, "🌊 Bumpy"), (1, "📶 Steps"), (2, "📦 Voxel")];
+
+            ui.horizontal(|ui| {
+                for (id, label) in modes {
+                    if ui
+                        .selectable_label(app.surface_mode == id, egui::RichText::new(label))
+                        .clicked()
+                    {
+                        app.surface_mode = id;
+                    }
+                }
+            });
+
             ui.separator();
             ui.add(
-                egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0)
-                    .text("Height"),
+                egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0).text("Height"),
             );
         }
         PlotType::PointCloud => {
-            ui.label(egui::RichText::new("✨ Point Cloud").strong().small());
             ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("✨ Size"));
         }
         PlotType::Line => {
-            ui.label(egui::RichText::new("📈 1D Line Plot").strong().small());
             let mut use_flat = app.active_colormap == 999;
             if ui
                 .checkbox(&mut use_flat, "🎨 Solid Flat Line Color")
@@ -269,7 +261,6 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
         PlotType::Heatmap | PlotType::Block => {
-            ui.label(egui::RichText::new("🗺️ 2D Heatmap").small().weak());
             ui.add_space(2.0);
             ui.checkbox(&mut app.enforce_data_aspect_ratio, "📐 Aspect Ratio")
                 .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
