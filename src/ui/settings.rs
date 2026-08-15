@@ -269,16 +269,18 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     if is_3d_mode {
         ui.separator();
-        ui.checkbox(&mut app.sphere_auto_rotate, "🎥 Rotate");
-        if ui
-            .button("🔄 Reset View")
-            .on_hover_text("Reset 3D camera orientation")
-            .clicked()
-        {
-            app.sphere_rotation_x = 0.25;
-            app.sphere_rotation_y = 0.0;
-            app.sphere_zoom = 2.5;
-        }
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut app.sphere_auto_rotate, "🔁 Rotate");
+            if ui
+                .button("🔄 Reset View")
+                .on_hover_text("Reset 3D camera orientation")
+                .clicked()
+            {
+                app.sphere_rotation_x = 0.25;
+                app.sphere_rotation_y = 0.0;
+                app.sphere_zoom = 2.5;
+            }
+        });
     }
 }
 
