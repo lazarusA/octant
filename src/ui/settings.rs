@@ -110,24 +110,33 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
         PlotType::Sphere => {
-            ui.label(egui::RichText::new("🌍 3D Globe").strong().small());
-            let style_label = match app.sphere_mode {
-                0 => "🌍 Smooth Globe",
-                1 => "🌋 Smooth Terrain",
-                2 => "📐 Flat Steps",
-                _ => "🧱 3D Radial Legos",
-            };
-            if ui
-                .button(egui::RichText::new(style_label).small())
-                .clicked()
-            {
-                app.sphere_mode = (app.sphere_mode + 1) % 4;
-            }
+
+            let modes: [(u32, &str); 4] = [
+                (0, "🔵 Smooth"),
+                (1, "🌊 Bumpy"),
+                (2, "📶 Steps"),
+                (3, "📦 Voxel"),
+            ];
+
+            ui.horizontal(|ui| {
+                for (id, label) in modes {
+                    if ui
+                        .selectable_label(
+                            app.sphere_mode == id,
+                            egui::RichText::new(label),
+                        )
+                        .clicked()
+                    {
+                        app.sphere_mode = id;
+                    }
+                }
+            });
+
             if app.sphere_mode > 0 {
                 ui.separator();
                 ui.add(
                     egui::Slider::new(&mut app.sphere_displacement_strength, 0.0..=5.0)
-                        .text("🌋 Height"),
+                        .text("Height"),
                 );
             }
         }
@@ -147,7 +156,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             ui.separator();
             ui.add(
                 egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0)
-                    .text("⛰️ Height"),
+                    .text("Height"),
             );
         }
         PlotType::PointCloud => {
