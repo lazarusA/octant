@@ -282,7 +282,19 @@ fn show_clean_color_picker_popup(
         return;
     }
 
-    let popup_pos = Pos2::new(anchor_pos.x.max(10.0), anchor_pos.y.max(10.0));
+    let screen_rect = ui
+        .input(|i| i.raw.screen_rect)
+        .unwrap_or(Rect::from_min_size(Pos2::ZERO, Vec2::new(1920.0, 1080.0)));
+    let popup_w = 230.0;
+    let popup_h = 320.0;
+    let popup_pos = Pos2::new(
+        anchor_pos
+            .x
+            .clamp(10.0, (screen_rect.max.x - popup_w - 10.0).max(10.0)),
+        anchor_pos
+            .y
+            .clamp(10.0, (screen_rect.max.y - popup_h - 10.0).max(10.0)),
+    );
     let hsva_id = id_salt.with("hsva_state");
     let gamma_space_id = id_salt.with("gamma_space_mode");
 
@@ -300,7 +312,7 @@ fn show_clean_color_picker_popup(
         .fixed_pos(popup_pos)
         .show(ui.ctx(), |ui| {
             let frame_resp = egui::Frame::popup(ui.style()).show(ui, |ui| {
-                ui.set_width(220.0);
+                ui.set_width(popup_w);
                 let mut changed = false;
 
                 // =========================================================================
@@ -492,7 +504,7 @@ fn show_clean_color_picker_popup(
                 // MIDDLE SECTION: 2D Saturation / Value Color Area (Expands full container)
                 // =========================================================================
                 let available_w = ui.available_width();
-                let sv_size = Vec2::new(available_w, 140.0);
+                let sv_size = Vec2::new(available_w, 165.0);
                 let (sv_rect, sv_resp) = ui.allocate_exact_size(sv_size, egui::Sense::drag());
 
                 if (sv_resp.dragged() || sv_resp.clicked())
@@ -550,7 +562,7 @@ fn show_clean_color_picker_popup(
                 // BOTTOM SECTION: Hue Spectrum Bar followed by Transparency (Alpha) Bar
                 // =========================================================================
                 // 1. Hue Bar
-                let hue_size = Vec2::new(available_w, 14.0);
+                let hue_size = Vec2::new(available_w, 15.0);
                 let (hue_rect, hue_resp) = ui.allocate_exact_size(hue_size, egui::Sense::drag());
 
                 if (hue_resp.dragged() || hue_resp.clicked())
@@ -610,7 +622,7 @@ fn show_clean_color_picker_popup(
                 ui.add_space(4.0);
 
                 // 2. Transparency (Alpha) Bar
-                let alpha_size = Vec2::new(available_w, 14.0);
+                let alpha_size = Vec2::new(available_w, 15.0);
                 let (alpha_rect, alpha_resp) =
                     ui.allocate_exact_size(alpha_size, egui::Sense::drag());
 
