@@ -79,7 +79,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             });
 
             ui.separator();
-            ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("🌫 Steps"));
+            ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("Steps"));
 
             if app.volume_algorithm != 1 && app.volume_algorithm != 2 {
                 ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("💧 Density"));
@@ -111,11 +111,12 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             let modes: [(u32, &str); 4] = [
                 (0, "🔵 Smooth"),
                 (1, "🌊 Bumpy"),
-                (2, "📶 Steps"),
+                (2, "Steps"),
                 (3, "📦 Voxel"),
             ];
 
             ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 2.0;
                 for (id, label) in modes {
                     if ui
                         .selectable_label(app.sphere_mode == id, egui::RichText::new(label))
@@ -135,9 +136,10 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
         PlotType::Surface => {
-            let modes: [(u32, &str); 3] = [(0, "🌊 Bumpy"), (1, "📶 Steps"), (2, "📦 Voxel")];
+            let modes: [(u32, &str); 3] = [(0, "🌊 Bumpy"), (1, "Steps"), (2, "📦 Voxel")];
 
             ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 2.0;
                 for (id, label) in modes {
                     if ui
                         .selectable_label(app.surface_mode == id, egui::RichText::new(label))
