@@ -159,17 +159,27 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("✨ Size"));
         }
         PlotType::Line => {
-            let mut use_flat = app.active_colormap == 999;
-            if ui
-                .checkbox(&mut use_flat, "🎨 Solid Flat Line Color")
-                .changed()
-            {
-                if use_flat {
-                    app.active_colormap = 999;
-                } else {
-                    app.active_colormap = 0;
+            ui.horizontal(|ui| {
+                let mut use_flat = app.active_colormap == 999;
+                if ui
+                    .checkbox(&mut use_flat, "🎨 Solid Flat Line Color")
+                    .changed()
+                {
+                    if use_flat {
+                        app.active_colormap = 999;
+                    } else {
+                        app.active_colormap = 0;
+                    }
                 }
-            }
+                ui.selectable_label(app.show_hover_card, "💬")
+                    .on_hover_text(if app.show_hover_card {
+                        "Hide hover card"
+                    } else {
+                        "Show hover card"
+                    })
+                    .clicked()
+                    .then(|| app.show_hover_card = !app.show_hover_card);
+            });
 
             let has_z_dim = app.volume_data.as_ref().is_some_and(|v| v.depth > 1);
             let profile_controls = app.matrix_data.as_ref().map_or((false, 0usize), |matrix| {
