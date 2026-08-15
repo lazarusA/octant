@@ -164,7 +164,7 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                                 bar_rect,
                                 0.0,
                                 egui::Stroke::new(1.0_f32, border_color),
-                                egui::StrokeKind::Outside,
+                                egui::StrokeKind::Middle,
                             );
 
                             // 2. Draw Band Boundary Dividers
@@ -270,7 +270,7 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                                 bar_rect,
                                 0.0,
                                 egui::Stroke::new(1.0_f32, border_color),
-                                egui::StrokeKind::Outside,
+                                egui::StrokeKind::Middle,
                             );
 
                             // Continuous Major & Minor Ticks
@@ -332,6 +332,42 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                                     );
                                 }
                             }
+                        }
+
+                        // Low & High Clip Triangles on Colorbar Ends (when enabled in settings)
+                        let tri_w = 12.0_f32;
+
+                        if app.use_lowclip {
+                            let low_tri_rect = Rect::from_min_max(
+                                Pos2::new(bar_rect.min.x - tri_w, bar_rect.min.y),
+                                Pos2::new(bar_rect.min.x, bar_rect.max.y),
+                            );
+
+                            crate::ui::color_picker::ShapeColorPicker::new(
+                                "colorbar_lowclip_picker",
+                                &mut app.lowclip_color,
+                                crate::ui::color_picker::ColorShape::LeftTriangle,
+                            )
+                            .title("Low Clip Color (< Min)")
+                            .tooltip("Low Clip color (< Min). Click to select color.")
+                            .show_at(ui, low_tri_rect);
+                        }
+
+                        if app.use_highclip {
+                            let high_tri_rect = Rect::from_min_max(
+                                Pos2::new(bar_rect.max.x, bar_rect.min.y),
+                                Pos2::new(bar_rect.max.x + tri_w, bar_rect.max.y),
+                            );
+
+                            crate::ui::color_picker::ShapeColorPicker::new(
+                                "colorbar_highclip_picker",
+                                &mut app.highclip_color,
+                                crate::ui::color_picker::ColorShape::RightTriangle,
+                            )
+                            .title("High Clip Color (> Max)")
+                            .tooltip("High Clip color (> Max). Click to select color.")
+                            .anchor_offset(egui::Vec2::new(-170.0, -250.0))
+                            .show_at(ui, high_tri_rect);
                         }
 
                         // Lower and Upper End Ticks Input Fields centered directly on end ticks
