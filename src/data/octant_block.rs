@@ -175,18 +175,21 @@ impl OctantBlock {
             }
         }
 
-        let (min_val, max_val) = values
-            .iter()
-            .copied()
-            .filter(|v| !v.is_nan())
-            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-                (lo.min(v), hi.max(v))
-            });
-
-        let (min_val, max_val) = if min_val.is_finite() && max_val.is_finite() {
-            (min_val, max_val)
+        let (min_val, max_val) = if self.min_value.is_finite() && self.max_value.is_finite() {
+            (self.min_value, self.max_value)
         } else {
-            (0.0, 1.0)
+            let (lo, hi) = values
+                .iter()
+                .copied()
+                .filter(|v| !v.is_nan())
+                .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
+                    (lo.min(v), hi.max(v))
+                });
+            if lo.is_finite() && hi.is_finite() {
+                (lo, hi)
+            } else {
+                (0.0, 1.0)
+            }
         };
 
         Some(crate::data::matrix_data::MatrixData::new(
@@ -224,12 +227,19 @@ impl OctantBlock {
             return None;
         }
 
-        // Fast path: if 3D array matching shape [nz, ny, nx] exactly
+        // Limit nz so that nx * ny * eff_nz <= MAX_GPU_STORAGE_BUFFER_ELEMENTS
+        let slice_elements = nx.saturating_mul(ny).max(1);
+        let max_z = (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS / slice_elements)
+            .clamp(1, nz);
+        let eff_nz = nz.min(max_z);
+
+        // Fast path: if 3D array matching shape [nz, ny, nx] exactly and fits within GPU buffer limit
         if self.rank() == 3
             && z_dim == 0
             && y_dim == 1
             && x_dim == 2
             && self.values.len() == nx * ny * nz
+            && nz == eff_nz
         {
             let (min_val, max_val) = self
                 .values
@@ -269,9 +279,9 @@ impl OctantBlock {
             }
         }
 
-        let mut values = Vec::with_capacity(nx * ny * nz);
+        let mut values = Vec::with_capacity(nx * ny * eff_nz);
         if stride_x == 1 {
-            for z in 0..nz {
+            for z in 0..eff_nz {
                 let z_offset = base_offset + z * stride_z;
                 for y in 0..ny {
                     let row_start = z_offset + y * stride_y;
@@ -287,7 +297,7 @@ impl OctantBlock {
                 }
             }
         } else {
-            for z in 0..nz {
+            for z in 0..eff_nz {
                 let z_offset = base_offset + z * stride_z;
                 for y in 0..ny {
                     let row_start = z_offset + y * stride_y;
@@ -316,7 +326,7 @@ impl OctantBlock {
         Some(crate::data::VolumeData::new(
             nx,
             ny,
-            nz,
+            eff_nz,
             values,
             min_val,
             max_val,

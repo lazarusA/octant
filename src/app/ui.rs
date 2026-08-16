@@ -135,7 +135,14 @@ impl eframe::App for OctantApp {
                     self.is_playing = false;
                 }
             }
-            ctx.request_repaint_after(frame_dur);
+
+            let elapsed = now.duration_since(self.last_step_time);
+            let next_wake = if elapsed < frame_dur {
+                frame_dur - elapsed
+            } else {
+                std::time::Duration::from_millis(1)
+            };
+            ctx.request_repaint_after(next_wake);
         } else {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }

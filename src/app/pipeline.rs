@@ -10,6 +10,16 @@ use super::OctantApp;
 
 impl OctantApp {
     pub fn rebuild_pipeline_with_matrix_data(&mut self, data: MatrixData) {
+        if data.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+            log::error!(
+                "Matrix data buffer size ({} elements / {} bytes) exceeds maximum GPU storage buffer limit ({})",
+                data.values.len(),
+                data.values.len() * 4,
+                crate::plots::common::MAX_GPU_STORAGE_BUFFER_BYTES
+            );
+            return;
+        }
+
         // If the data is a line plot, set the line plot all series to false and the line profile dim index and slice index to 0
         if data.height == 1 {
             self.line_plot_all_series = false;
@@ -28,17 +38,28 @@ impl OctantApp {
                 && self.sphere_renderer.is_some()
                 && self.surface_renderer.is_some()
             {
-                if let Some(renderer) = &self.renderer {
-                    renderer.update_data(&wgpu_render_state.queue, &data.values);
-                }
-                if let Some(line_renderer) = &self.line_renderer {
-                    line_renderer.update_data(&wgpu_render_state.queue, &data.values);
-                }
-                if let Some(sphere_renderer) = &self.sphere_renderer {
-                    sphere_renderer.update_data(&wgpu_render_state.queue, &data.values);
-                }
-                if let Some(surface_renderer) = &self.surface_renderer {
-                    surface_renderer.update_data(&wgpu_render_state.queue, &data.values);
+                match self.active_plot_type {
+                    PlotType::Heatmap => {
+                        if let Some(renderer) = &self.renderer {
+                            renderer.update_data(&wgpu_render_state.queue, &data.values);
+                        }
+                    }
+                    PlotType::Sphere => {
+                        if let Some(sphere_renderer) = &self.sphere_renderer {
+                            sphere_renderer.update_data(&wgpu_render_state.queue, &data.values);
+                        }
+                    }
+                    PlotType::Surface | PlotType::Block => {
+                        if let Some(surface_renderer) = &self.surface_renderer {
+                            surface_renderer.update_data(&wgpu_render_state.queue, &data.values);
+                        }
+                    }
+                    PlotType::Line => {
+                        if let Some(line_renderer) = &self.line_renderer {
+                            line_renderer.update_data(&wgpu_render_state.queue, &data.values);
+                        }
+                    }
+                    PlotType::Volume | PlotType::PointCloud => {}
                 }
             } else {
                 let renderer = MatrixRenderer::new(
@@ -94,6 +115,16 @@ impl OctantApp {
     }
 
     pub fn rebuild_pipeline_with_volume_data(&mut self, data: VolumeData) {
+        if data.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+            log::error!(
+                "Volume data buffer size ({} elements / {} bytes) exceeds maximum GPU storage buffer limit ({})",
+                data.values.len(),
+                data.values.len() * 4,
+                crate::plots::common::MAX_GPU_STORAGE_BUFFER_BYTES
+            );
+            return;
+        }
+
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
             let same_dimensions = self.volume_data.as_ref().is_some_and(|v| {
                 v.width == data.width && v.height == data.height && v.depth == data.depth

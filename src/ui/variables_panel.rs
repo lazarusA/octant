@@ -283,6 +283,53 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
         });
 }
 
+/// Computes the maximum steps along the animated dimension that fit within the GPU buffer limit,
+/// the current requested step count, and the number of spatial elements per step.
+pub fn calculate_max_animated_steps(
+    var_info: &crate::data::VariableInfo,
+    dim_config: &[crate::app::DimConfig],
+    selected_ranges: &[(usize, usize)],
+    anim_dim: usize,
+) -> (usize, usize, usize) {
+    let rank = var_info.shape.len();
+    if anim_dim >= rank {
+        return (1, 1, 1);
+    }
+
+    let mut spatial_elements_per_step: usize = 1;
+    for d in 0..rank {
+        if d == anim_dim {
+            continue;
+        }
+        if let Some(cfg) = dim_config.get(d) {
+            if cfg.active {
+                let span = if let Some(&(start, end)) = selected_ranges.get(d) {
+                    end.saturating_sub(start) + 1
+                } else {
+                    var_info.shape[d] as usize
+                };
+                spatial_elements_per_step = spatial_elements_per_step.saturating_mul(span.max(1));
+            }
+        }
+    }
+    if spatial_elements_per_step == 0 {
+        spatial_elements_per_step = 1;
+    }
+
+    let full_anim_size = var_info.shape[anim_dim] as usize;
+    let max_allowed = (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
+        / spatial_elements_per_step)
+        .clamp(1, full_anim_size.max(1));
+
+    let requested = if let Some(&(start, end)) = selected_ranges.get(anim_dim) {
+        end.saturating_sub(start) + 1
+    } else {
+        full_anim_size
+    };
+
+    (max_allowed, requested, spatial_elements_per_step)
+}
+
 fn show_dimension_sliders(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
@@ -302,6 +349,9 @@ fn show_dimension_sliders(
             .get(i)
             .cloned()
             .unwrap_or_else(|| format!("dim_{}", i));
+
+        let is_animated = app.dim_config[i].animation == AnimationRole::Animated;
+        let mut anim_clamped_info = None;
 
         ui.group(|ui| {
             ui.horizontal(|ui| {
@@ -345,9 +395,40 @@ fn show_dimension_sliders(
             // --- SLIDER OR INDEX ---
             if app.dim_config[i].active {
                 let (mut start, mut end) = app.selected_dim_ranges[i];
+                if is_animated {
+                    let (max_allowed, requested, spatial_elems) = calculate_max_animated_steps(
+                        var_info,
+                        &app.dim_config,
+                        &app.selected_dim_ranges,
+                        i,
+                    );
+                    if requested > max_allowed {
+                        anim_clamped_info = Some((max_allowed, requested, spatial_elems));
+                        end = (start + max_allowed - 1).min(dim_size.saturating_sub(1));
+                    }
+                }
+
                 double_slider_with_inputs(ui, &dim_name, &mut start, &mut end, 0, dim_size - 1);
+
+                if is_animated {
+                    let (max_allowed, requested, spatial_elems) = calculate_max_animated_steps(
+                        var_info,
+                        &app.dim_config,
+                        &app.selected_dim_ranges,
+                        i,
+                    );
+                    if requested > max_allowed {
+                        anim_clamped_info = Some((max_allowed, requested, spatial_elems));
+                        end = (start + max_allowed - 1).min(dim_size.saturating_sub(1));
+                    }
+                }
+
                 app.selected_dim_ranges[i] = (start, end);
-                app.selected_dim_indices[i] = start;
+                if is_animated {
+                    app.selected_dim_indices[i] = app.current_timestep.clamp(start, end);
+                } else {
+                    app.selected_dim_indices[i] = start;
+                }
             } else {
                 ui.horizontal(|ui| {
                     ui.label("Index:");
@@ -358,6 +439,38 @@ fn show_dimension_sliders(
                 });
                 app.selected_dim_ranges[i] =
                     (app.selected_dim_indices[i], app.selected_dim_indices[i]);
+            }
+
+            if let Some((max_allowed, requested, spatial_elems)) = anim_clamped_info {
+                ui.add_space(4.0);
+                egui::Frame::group(ui.style())
+                    .fill(ui.visuals().warn_fg_color.linear_multiply(0.12))
+                    .stroke(egui::Stroke::new(1.0, ui.visuals().warn_fg_color))
+                    .corner_radius(4.0)
+                    .inner_margin(6.0)
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("⚠️").size(14.0));
+                            ui.vertical(|ui| {
+                                ui.label(
+                                    egui::RichText::new("Display Clamped to GPU Buffer Limit")
+                                        .strong()
+                                        .small()
+                                        .color(ui.visuals().warn_fg_color),
+                                );
+                                let slice_mb = (spatial_elems * 4) as f64 / (1024.0 * 1024.0);
+                                let req_mb =
+                                    (requested * spatial_elems * 4) as f64 / (1024.0 * 1024.0);
+                                ui.label(
+                                    egui::RichText::new(format!(
+                                        "Clamped to {} steps (out of {} requested, {:.1} MB) to stay within the 256 MB GPU limit ({:.2} MB/slice).",
+                                        max_allowed, requested, req_mb, slice_mb
+                                    ))
+                                    .small(),
+                                );
+                            });
+                        });
+                    });
             }
         });
 

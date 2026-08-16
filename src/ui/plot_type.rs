@@ -45,6 +45,34 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             if enabled {
                 if ui.selectable_label(is_selected, label).clicked() {
                     app.active_plot_type = plot_type;
+                    if let Some(wgpu_render_state) = &app.wgpu_render_state {
+                        if let Some(mdata) = &app.matrix_data {
+                            match plot_type {
+                                PlotType::Heatmap => {
+                                    if let Some(r) = &app.renderer {
+                                        r.update_data(&wgpu_render_state.queue, &mdata.values);
+                                    }
+                                }
+                                PlotType::Sphere => {
+                                    if let Some(r) = &app.sphere_renderer {
+                                        r.update_data(&wgpu_render_state.queue, &mdata.values);
+                                    }
+                                }
+                                PlotType::Surface | PlotType::Block => {
+                                    if let Some(r) = &app.surface_renderer {
+                                        r.update_data(&wgpu_render_state.queue, &mdata.values);
+                                    }
+                                }
+                                PlotType::Line => {
+                                    if let Some(r) = &app.line_renderer {
+                                        r.update_data(&wgpu_render_state.queue, &mdata.values);
+                                    }
+                                }
+                                PlotType::Volume | PlotType::PointCloud => {}
+                            }
+                        }
+                    }
+                    app.load_selected_variable_block();
                     ui.close();
                 }
             } else {

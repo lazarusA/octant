@@ -229,3 +229,82 @@ fn test_line_profile_along_z_and_xyz() {
     assert_eq!(count_x1, 1);
     assert_eq!(payload_x1, vec![100.0, 200.0]);
 }
+
+#[test]
+fn test_calculate_max_animated_steps_small_and_large_datasets() {
+    // 1. Small dataset: 100 timesteps, 50x50 spatial -> 2500 f32s per step (10 KB/slice).
+    // Total fits comfortably in 256 MB (67,108,864 elements).
+    let var_small = VariableInfo {
+        name: "small_var".to_string(),
+        data_type: "f32".to_string(),
+        shape: vec![100, 50, 50],
+        chunk_shape: vec![10, 50, 50],
+        dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
+        units: None,
+        long_name: None,
+        temporal_resolution: None,
+        time_coverage_start: None,
+        time_coverage_end: None,
+        file_size: 100 * 50 * 50 * 4,
+        attributes: HashMap::new(),
+    };
+
+    let dim_config = vec![
+        octant::app::DimConfig {
+            spatial: SpatialRole::None,
+            animation: AnimationRole::Animated,
+            active: true,
+        },
+        octant::app::DimConfig {
+            spatial: SpatialRole::Y,
+            animation: AnimationRole::None,
+            active: true,
+        },
+        octant::app::DimConfig {
+            spatial: SpatialRole::X,
+            animation: AnimationRole::None,
+            active: true,
+        },
+    ];
+    let selected_ranges = vec![(0, 99), (0, 49), (0, 49)];
+
+    let (max_allowed, requested, spatial_per_step) =
+        octant::ui::variables_panel::calculate_max_animated_steps(
+            &var_small,
+            &dim_config,
+            &selected_ranges,
+            0,
+        );
+    assert_eq!(spatial_per_step, 2500);
+    assert_eq!(requested, 100);
+    assert_eq!(max_allowed, 100); // not clamped because 100 <= 67_108_864 / 2500 = 26843
+
+    // 2. Large dataset: 500 timesteps, 2048x2048 spatial -> 4,194,304 f32s per step (16 MB/slice).
+    // 67,108,864 / 4,194,304 = 16 steps maximum fit in 256 MB!
+    let var_large = VariableInfo {
+        name: "large_var".to_string(),
+        data_type: "f32".to_string(),
+        shape: vec![500, 2048, 2048],
+        chunk_shape: vec![1, 1024, 1024],
+        dimension_names: vec!["time".to_string(), "y".to_string(), "x".to_string()],
+        units: None,
+        long_name: None,
+        temporal_resolution: None,
+        time_coverage_start: None,
+        time_coverage_end: None,
+        file_size: 500 * 2048 * 2048 * 4,
+        attributes: HashMap::new(),
+    };
+    let large_ranges = vec![(0, 499), (0, 2047), (0, 2047)];
+
+    let (max_allowed_large, requested_large, spatial_large) =
+        octant::ui::variables_panel::calculate_max_animated_steps(
+            &var_large,
+            &dim_config,
+            &large_ranges,
+            0,
+        );
+    assert_eq!(spatial_large, 2048 * 2048);
+    assert_eq!(requested_large, 500);
+    assert_eq!(max_allowed_large, 16); // strictly clamped to 16 steps!
+}
