@@ -395,7 +395,7 @@ pub fn calculate_selected_volume_elements(app: &OctantApp) -> usize {
 /// Checks if 3D Volume / Point Cloud rendering is permitted under the 128 MB GPU storage buffer limit.
 pub fn is_volume_allowed_for_selection(app: &OctantApp) -> bool {
     let elements = calculate_selected_volume_elements(app);
-    if elements == 0 {
+    if elements == 0 && app.active_dataset_metadata.is_some() {
         return false;
     }
     if elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {

@@ -79,9 +79,9 @@ fn vs_main(
     }
 
     // Map cell (z, y, x) to 3D world coordinates with North (+Y) at top and South (-Y) at bottom, and latest/newest slice at front (-Z)
-    let norm_x = (-1.0 + (f32(cell_x) + 0.5) / f32(grid_w) * 2.0) * uniforms.aspect_x;
-    let norm_y = (1.0 - (f32(cell_y) + 0.5) / f32(grid_h) * 2.0) * uniforms.aspect_y; // Inverted Y so Row 0 = North (+Y)
-    let norm_z = (1.0 - (f32(cell_z) + 0.5) / f32(grid_d) * 2.0) * uniforms.aspect_z; // Inverted Z so newest slice is at Front (-Z)
+    let norm_x = (-0.5 + (f32(cell_x) + 0.5) / f32(grid_w)) * uniforms.aspect_x;
+    let norm_y = (0.5 - (f32(cell_y) + 0.5) / f32(grid_h)) * uniforms.aspect_y; // Inverted Y so Row 0 = North (+Y)
+    let norm_z = (0.5 - (f32(cell_z) + 0.5) / f32(grid_d)) * uniforms.aspect_z; // Inverted Z so newest slice is at Front (-Z)
 
     let center_3d = vec3<f32>(norm_x, norm_y, norm_z);
 
@@ -108,16 +108,16 @@ fn vs_main(
     let corner_pos = center_rot + vec3<f32>(model.position.x * p_size, model.position.y * p_size, 0.0);
 
     // Perspective projection transformation using dynamic zoom & screen aspect ratio
-    let cam_dist = clamp(uniforms.zoom, 1.1, 10.0);
+    let cam_dist = clamp(uniforms.zoom, 0.1, 10.0);
     let cam_z = corner_pos.z - cam_dist;
-    let dist_positive = max(-cam_z, 0.1);
+    let dist_positive = max(-cam_z, 0.001);
     let fov_scale = 1.6;
     let screen_asp = max(uniforms.screen_aspect, 0.1);
     let proj_x = (corner_pos.x * fov_scale) / screen_asp;
     let proj_y = corner_pos.y * fov_scale;
 
     // Linear depth projection mapped to [0.0, 1.0] for hardware depth testing
-    let z_near = 0.1;
+    let z_near = 0.01;
     let z_far = 50.0;
     let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
 
