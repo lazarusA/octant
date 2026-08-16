@@ -80,6 +80,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
             ui.separator();
             ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("Steps"));
+            ui.checkbox(&mut app.volume_transparency, "✨ Transparency");
 
             if app.volume_algorithm != 1 && app.volume_algorithm != 2 {
                 ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("💧 Density"));

@@ -365,6 +365,7 @@ impl eframe::App for OctantApp {
                                 shift_x,
                                 shift_y,
                                 shift_z,
+                                transparency: self.volume_transparency,
                                 rect: plot_rect,
                             },
                         );
