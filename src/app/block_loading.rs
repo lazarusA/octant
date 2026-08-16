@@ -15,11 +15,10 @@ impl OctantApp {
         &self,
         full_extent: usize,
         chunk_size: usize,
-        max_steps: usize,
     ) -> (usize, usize) {
         let cs = if chunk_size == 0 { 1 } else { chunk_size };
         let start = (self.current_timestep / cs) * cs;
-        let end = (start + cs).min(full_extent).min(max_steps).max(start + 1);
+        let end = (start + cs).min(full_extent).max(start + 1);
         (start, end)
     }
 
@@ -59,14 +58,6 @@ impl OctantApp {
             .unwrap_or(1) as usize;
 
         if let Some(anim_dim) = self.plotted_animated_dim {
-            let (max_allowed_steps, _, _) =
-                crate::ui::variables_panel::calculate_max_animated_steps(
-                    var_info,
-                    &self.plotted_dim_config,
-                    &self.plotted_selected_dim_ranges,
-                    anim_dim,
-                );
-
             let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
             if full_extent > 0 && self.current_timestep >= full_extent {
                 self.current_timestep = full_extent - 1;
@@ -75,8 +66,7 @@ impl OctantApp {
                 self.plotted_selected_dim_indices[anim_dim] = self.current_timestep;
             }
             if anim_dim < selections.len() {
-                let (start, end) =
-                    self.animated_window(full_extent, anim_chunk_size, max_allowed_steps);
+                let (start, end) = self.animated_window(full_extent, anim_chunk_size);
                 selections[anim_dim] = DimensionSelection::Range { start, end };
             }
         }
@@ -479,8 +469,18 @@ impl OctantApp {
             self.rebuild_pipeline_with_matrix_data(mdata);
         }
 
-        let is_3d_plot = self.active_plot_type == crate::plots::PlotType::Volume
-            || self.active_plot_type == crate::plots::PlotType::PointCloud;
+        let is_volume_allowed =
+            crate::ui::variables_panel::is_volume_allowed_for_selection(self);
+        if !is_volume_allowed
+            && (self.active_plot_type == crate::plots::PlotType::Volume
+                || self.active_plot_type == crate::plots::PlotType::PointCloud)
+        {
+            self.active_plot_type = crate::plots::PlotType::Heatmap;
+        }
+
+        let is_3d_plot = (self.active_plot_type == crate::plots::PlotType::Volume
+            || self.active_plot_type == crate::plots::PlotType::PointCloud)
+            && is_volume_allowed;
 
         let is_3d_spatial_anim = anim_dim.is_some_and(|a| a == x_dim || a == y_dim || a == z_dim);
 

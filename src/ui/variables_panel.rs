@@ -412,6 +412,56 @@ pub fn calculate_download_sizes(
     (requested_bytes, total_bytes)
 }
 
+/// Calculates the total 3D volume elements from the currently selected dimension ranges and spatial configuration.
+pub fn calculate_selected_volume_elements(app: &OctantApp) -> usize {
+    let Some(metadata) = &app.active_dataset_metadata else {
+        return 0;
+    };
+    let Some(var_info) = metadata.variables.get(app.selected_variable_idx) else {
+        return 0;
+    };
+
+    let mut total_elements = 1usize;
+    let mut counted = 0;
+    for (i, &size) in var_info.shape.iter().enumerate() {
+        let is_active = app.dim_config.get(i).map(|c| c.active).unwrap_or(false)
+            || app.spatial_dims.contains(&i)
+            || app.animated_dim == Some(i);
+        if is_active {
+            let (start, end) = app
+                .selected_dim_ranges
+                .get(i)
+                .copied()
+                .unwrap_or((0, (size as usize).saturating_sub(1)));
+            let span = (end.saturating_sub(start) + 1).min(size as usize);
+            total_elements = total_elements.saturating_mul(span.max(1));
+            counted += 1;
+        }
+    }
+    if counted == 0 {
+        var_info.shape.iter().copied().product::<u64>() as usize
+    } else {
+        total_elements
+    }
+}
+
+/// Checks if 3D Volume / Point Cloud rendering is permitted under the 128 MB GPU storage buffer limit.
+pub fn is_volume_allowed_for_selection(app: &OctantApp) -> bool {
+    let elements = calculate_selected_volume_elements(app);
+    if elements == 0 {
+        return false;
+    }
+    if elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+        return false;
+    }
+    if let Some(vdata) = &app.volume_data {
+        if vdata.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+            return false;
+        }
+    }
+    true
+}
+
 fn show_dimension_sliders(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
@@ -435,6 +485,25 @@ fn show_dimension_sliders(
     });
     ui.add_space(4.0);
 
+    // Warning banner when selected volume exceeds GPU limit for 3D Volume/Point Cloud
+    let total_vol_elements = calculate_selected_volume_elements(app);
+    if total_vol_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+        let vol_mb = (total_vol_elements * 4) as f64 / (1024.0 * 1024.0);
+        ui.group(|ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(
+                    egui::RichText::new(format!(
+                        "⚠️ 3D Volume & Point Cloud are disabled for this selection: volume size ({:.0} MB) exceeds the 128 MB GPU storage buffer limit. 2D Plane, 1D Line, and 3D Globe remain active.",
+                        vol_mb
+                    ))
+                    .small()
+                    .color(egui::Color32::from_rgb(255, 180, 80)),
+                );
+            });
+        });
+        ui.add_space(2.0);
+    }
+
     for i in 0..rank {
         let dim_size = var_info.shape[i] as usize;
         let dim_name = var_info
@@ -444,7 +513,6 @@ fn show_dimension_sliders(
             .unwrap_or_else(|| format!("dim_{}", i));
 
         let is_animated = app.dim_config[i].animation == AnimationRole::Animated;
-        let mut anim_clamped_info = None;
 
         ui.group(|ui| {
             ui.horizontal(|ui| {
@@ -488,33 +556,7 @@ fn show_dimension_sliders(
             // --- SLIDER OR INDEX ---
             if app.dim_config[i].active {
                 let (mut start, mut end) = app.selected_dim_ranges[i];
-                if is_animated {
-                    let (max_allowed, requested, spatial_elems) = calculate_max_animated_steps(
-                        var_info,
-                        &app.dim_config,
-                        &app.selected_dim_ranges,
-                        i,
-                    );
-                    if requested > max_allowed {
-                        anim_clamped_info = Some((max_allowed, requested, spatial_elems));
-                        end = (start + max_allowed - 1).min(dim_size.saturating_sub(1));
-                    }
-                }
-
                 double_slider_with_inputs(ui, &dim_name, &mut start, &mut end, 0, dim_size - 1);
-
-                if is_animated {
-                    let (max_allowed, requested, spatial_elems) = calculate_max_animated_steps(
-                        var_info,
-                        &app.dim_config,
-                        &app.selected_dim_ranges,
-                        i,
-                    );
-                    if requested > max_allowed {
-                        anim_clamped_info = Some((max_allowed, requested, spatial_elems));
-                        end = (start + max_allowed - 1).min(dim_size.saturating_sub(1));
-                    }
-                }
 
                 app.selected_dim_ranges[i] = (start, end);
                 if is_animated {
@@ -532,38 +574,6 @@ fn show_dimension_sliders(
                 });
                 app.selected_dim_ranges[i] =
                     (app.selected_dim_indices[i], app.selected_dim_indices[i]);
-            }
-
-            if let Some((max_allowed, requested, spatial_elems)) = anim_clamped_info {
-                ui.add_space(4.0);
-                egui::Frame::group(ui.style())
-                    .fill(ui.visuals().warn_fg_color.linear_multiply(0.12))
-                    .stroke(egui::Stroke::new(1.0, ui.visuals().warn_fg_color))
-                    .corner_radius(4.0)
-                    .inner_margin(6.0)
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("⚠️").size(14.0));
-                            ui.vertical(|ui| {
-                                ui.label(
-                                    egui::RichText::new("Display Clamped to GPU Buffer Limit")
-                                        .strong()
-                                        .small()
-                                        .color(ui.visuals().warn_fg_color),
-                                );
-                                let slice_mb = (spatial_elems * 4) as f64 / (1024.0 * 1024.0);
-                                let req_mb =
-                                    (requested * spatial_elems * 4) as f64 / (1024.0 * 1024.0);
-                                ui.label(
-                                    egui::RichText::new(format!(
-                                        "Clamped to {} steps (out of {} requested, {:.1} MB) to stay within the 256 MB GPU limit ({:.2} MB/slice).",
-                                        max_allowed, requested, req_mb, slice_mb
-                                    ))
-                                    .small(),
-                                );
-                            });
-                        });
-                    });
             }
         });
 
