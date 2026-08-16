@@ -51,7 +51,9 @@ impl BlockLoader {
         request: &BlockRequest,
         on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
     ) -> Result<OctantBlock, BlockStoreError> {
-        request.store.fetch_with_progress(&request.slice, on_progress)
+        request
+            .store
+            .fetch_with_progress(&request.slice, on_progress)
     }
 
     /// Loads every request in a batch.
