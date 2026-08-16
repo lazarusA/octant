@@ -301,15 +301,15 @@ pub fn calculate_max_animated_steps(
         if d == anim_dim {
             continue;
         }
-        if let Some(cfg) = dim_config.get(d) {
-            if cfg.active {
-                let span = if let Some(&(start, end)) = selected_ranges.get(d) {
-                    end.saturating_sub(start) + 1
-                } else {
-                    var_info.shape[d] as usize
-                };
-                spatial_elements_per_step = spatial_elements_per_step.saturating_mul(span.max(1));
-            }
+        if let Some(cfg) = dim_config.get(d)
+            && cfg.active
+        {
+            let span = if let Some(&(start, end)) = selected_ranges.get(d) {
+                end.saturating_sub(start) + 1
+            } else {
+                var_info.shape[d] as usize
+            };
+            spatial_elements_per_step = spatial_elements_per_step.saturating_mul(span.max(1));
         }
     }
     if spatial_elements_per_step == 0 {
@@ -395,7 +395,7 @@ pub fn calculate_download_sizes(
     let mut requested_elements: u64 = 1;
     for i in 0..rank {
         let dim_size = var_info.shape[i] as usize;
-        if dim_config.get(i).map_or(false, |c| c.active) {
+        if dim_config.get(i).is_some_and(|c| c.active) {
             let span = if let Some(&(start, end)) = selected_ranges.get(i) {
                 (end.saturating_sub(start) + 1).min(dim_size)
             } else {
@@ -454,10 +454,10 @@ pub fn is_volume_allowed_for_selection(app: &OctantApp) -> bool {
     if elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
         return false;
     }
-    if let Some(vdata) = &app.volume_data {
-        if vdata.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
-            return false;
-        }
+    if let Some(vdata) = &app.volume_data
+        && vdata.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
+    {
+        return false;
     }
     true
 }

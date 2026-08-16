@@ -11,11 +11,7 @@ impl OctantApp {
     ///
     /// By default, prefetches in multiples of the variable's chunk size
     /// along the animated dimension.
-    fn animated_window(
-        &self,
-        full_extent: usize,
-        chunk_size: usize,
-    ) -> (usize, usize) {
+    fn animated_window(&self, full_extent: usize, chunk_size: usize) -> (usize, usize) {
         let cs = if chunk_size == 0 { 1 } else { chunk_size };
         let start = (self.current_timestep / cs) * cs;
         let end = (start + cs).min(full_extent).max(start + 1);
@@ -92,7 +88,7 @@ impl OctantApp {
                 block.bytes_size()
             );
             self.apply_block_projection(&block);
-            self.maybe_prefetch_next_window(&shape);
+            self.prefetch_selected_animated_range(&shape);
             return;
         }
 
@@ -114,14 +110,17 @@ impl OctantApp {
                 block.bytes_size()
             );
             self.apply_block_projection(&block);
-            self.maybe_prefetch_next_window(&shape);
+            self.prefetch_selected_animated_range(&shape);
             return;
         }
 
-        // 3. Cache MISS: dispatch async prefetch request.
+        // 3. Cache MISS: dispatch async prefetch request for current chunk.
         self.status_message = format!("⏳ [block cache] Downloading window for '{}'...", var_name);
         self.block_prefetcher
             .request(block_request, &self.block_cache);
+
+        // Also queue up background prefetch for the rest of the selected slider range
+        self.prefetch_selected_animated_range(&shape);
     }
 
     /// Prefetches the block window containing `step` asynchronously using `plotted_store_handle()`,
@@ -238,19 +237,12 @@ impl OctantApp {
         self.request_step_or_load(target_step);
     }
 
-    /// Prefetches upcoming animation windows in the background to ensure buffer is warm ahead of playback.
-    fn maybe_prefetch_next_window(&mut self, shape: &[u64]) {
-        // 1. Only prefetch lookahead windows if playback is actively playing.
-        if !self.is_playing {
-            return;
-        }
-
-        // 2. Ensure an animated dimension is active.
+    /// Prefetches all chunks within the user's selected slider range along the animated dimension in the background.
+    pub fn prefetch_selected_animated_range(&mut self, shape: &[u64]) {
         let Some(anim_dim) = self.plotted_animated_dim else {
             return;
         };
 
-        // 3. Extract dimension extent and chunk size to calculate window bounds.
         let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
         let anim_chunk_size = self
             .plotted_dataset_metadata
@@ -265,10 +257,21 @@ impl OctantApp {
         } else {
             anim_chunk_size
         };
-        let current_chunk_idx = self.current_timestep / cs;
-        let lookahead_chunks = (self.block_window_size / cs).clamp(2, 6);
 
-        // 4. Retrieve current active slice request to copy non-animated dimension selections.
+        // Determine user's selected slider range for the animated dimension
+        let (range_start, range_end) = self
+            .plotted_selected_dim_ranges
+            .get(anim_dim)
+            .copied()
+            .unwrap_or((0, full_extent.saturating_sub(1)));
+        let range_start = range_start.min(full_extent.saturating_sub(1));
+        let range_end = range_end
+            .min(full_extent.saturating_sub(1))
+            .max(range_start);
+
+        let first_chunk = range_start / cs;
+        let last_chunk = range_end / cs;
+
         let Some(next_legacy_request) = self.active_slice_request.clone() else {
             return;
         };
@@ -276,7 +279,6 @@ impl OctantApp {
             return;
         }
 
-        // 5. Get current dataset source ID and open store handle.
         let source_id = format!(
             "{:?}:{}",
             self.plotted_store_kind, self.plotted_store_target_input
@@ -286,48 +288,22 @@ impl OctantApp {
             return;
         };
 
-        // 6. Loop over upcoming lookahead chunks and schedule background requests.
-        for i in 1..=lookahead_chunks {
-            let chunk_idx = current_chunk_idx + i;
+        let current_chunk = self.current_timestep / cs;
+
+        // Schedule chunks ordered by proximity to current_timestep:
+        // First forward (current_chunk + 1 ..= last_chunk), then from start up to current_chunk
+        let mut chunk_indices = Vec::new();
+        for c in (current_chunk + 1)..=last_chunk {
+            chunk_indices.push(c);
+        }
+        for c in first_chunk..=current_chunk {
+            chunk_indices.push(c);
+        }
+
+        for chunk_idx in chunk_indices {
             let chunk_start = chunk_idx * cs;
-
-            // Handle wrap-around prefetching when loop playback is enabled.
-            if chunk_start >= full_extent {
-                if self.loop_playback && full_extent > 0 {
-                    let total_chunks = full_extent.div_ceil(cs);
-                    let wrap_chunk_idx = (current_chunk_idx + i) % total_chunks;
-                    let wrap_start = wrap_chunk_idx * cs;
-                    let wrap_end = (wrap_start + cs).min(full_extent);
-                    if self.block_cache.covers(
-                        &source_id,
-                        &next_legacy_request.variable,
-                        self.plotted_animated_dim,
-                        wrap_start,
-                    ) || self.block_prefetcher.is_pending_timestep(
-                        &source_id,
-                        &next_legacy_request.variable,
-                        self.plotted_animated_dim,
-                        wrap_start,
-                    ) {
-                        continue;
-                    }
-                    let mut selections = next_legacy_request.selections.clone();
-                    selections[anim_dim] = DimensionSelection::Range {
-                        start: wrap_start,
-                        end: wrap_end,
-                    };
-                    let req = BlockRequest::new(
-                        store_handle.clone(),
-                        SliceRequest::new(next_legacy_request.variable.clone(), selections),
-                    );
-                    if !self.block_cache.contains(&req.cache_key()) {
-                        self.block_prefetcher.request(req, &self.block_cache);
-                    }
-                }
-                break;
-            }
-
             let chunk_end = (chunk_start + cs).min(full_extent);
+
             if self.block_cache.covers(
                 &source_id,
                 &next_legacy_request.variable,
@@ -351,10 +327,11 @@ impl OctantApp {
                 store_handle.clone(),
                 SliceRequest::new(next_legacy_request.variable.clone(), selections),
             );
+
             if !self.block_cache.contains(&req.cache_key())
                 && !self.block_prefetcher.request(req, &self.block_cache)
             {
-                break; // Stop if prefetch thread pool is full.
+                break; // Stop when thread pool is saturated; will continue as worker threads finish
             }
         }
     }
@@ -469,8 +446,7 @@ impl OctantApp {
             self.rebuild_pipeline_with_matrix_data(mdata);
         }
 
-        let is_volume_allowed =
-            crate::ui::variables_panel::is_volume_allowed_for_selection(self);
+        let is_volume_allowed = crate::ui::variables_panel::is_volume_allowed_for_selection(self);
         if !is_volume_allowed
             && (self.active_plot_type == crate::plots::PlotType::Volume
                 || self.active_plot_type == crate::plots::PlotType::PointCloud)
@@ -541,6 +517,8 @@ impl OctantApp {
     /// Drains completed block-cache prefetch results.
     pub fn poll_block_prefetch_results(&mut self) {
         let completed = self.block_prefetcher.poll();
+        let has_completed = !completed.is_empty();
+
         for res in completed {
             match res.result {
                 Ok(block) => {
@@ -574,6 +552,14 @@ impl OctantApp {
                     self.status_message = format!("Block cache fetch error: {e}");
                 }
             }
+        }
+
+        if has_completed
+            && let Some(meta) = &self.plotted_dataset_metadata
+            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+        {
+            let shape = var.shape.clone();
+            self.prefetch_selected_animated_range(&shape);
         }
     }
 
