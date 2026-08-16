@@ -53,6 +53,7 @@ pub fn get_known_truth_4d_center(
 }
 
 /// Evaluates the analytical ground-truth 4D scalar field at continuous/discrete indices (t, z, y, x).
+#[allow(clippy::too_many_arguments)]
 pub fn eval_known_truth_4d(
     t: usize,
     num_timesteps: usize,
@@ -67,9 +68,21 @@ pub fn eval_known_truth_4d(
     let default_params = KnownTruth4DParams::default();
     let p = params.unwrap_or(&default_params);
 
-    let fx = if nx <= 1 { 0.5 } else { x as f32 / (nx - 1) as f32 };
-    let fy = if ny <= 1 { 0.5 } else { y as f32 / (ny - 1) as f32 };
-    let fz = if nz <= 1 { 0.5 } else { z as f32 / (nz - 1) as f32 };
+    let fx = if nx <= 1 {
+        0.5
+    } else {
+        x as f32 / (nx - 1) as f32
+    };
+    let fy = if ny <= 1 {
+        0.5
+    } else {
+        y as f32 / (ny - 1) as f32
+    };
+    let fz = if nz <= 1 {
+        0.5
+    } else {
+        z as f32 / (nz - 1) as f32
+    };
     let ft = if num_timesteps <= 1 {
         0.0
     } else {
@@ -271,12 +284,28 @@ mod tests {
         let center_y = (y0 * (ny - 1) as f32).round() as usize;
         let center_z = (z0 * (nz - 1) as f32).round() as usize;
 
-        let peak_val = eval_known_truth_4d(0, 10, center_z, nz, center_y, ny, center_x, nx, Some(&params));
-        assert!(peak_val > 40.0, "Expected peak near center to be high, got {peak_val}");
+        let peak_val = eval_known_truth_4d(
+            0,
+            10,
+            center_z,
+            nz,
+            center_y,
+            ny,
+            center_x,
+            nx,
+            Some(&params),
+        );
+        assert!(
+            peak_val > 40.0,
+            "Expected peak near center to be high, got {peak_val}"
+        );
 
         // Far away from peak (at corner 0,0,0 if peak is around 0.8,0.5,0.2)
         let far_val = eval_known_truth_4d(0, 10, 0, nz, 0, ny, 0, nx, Some(&params));
-        assert!(far_val < peak_val, "Far value {far_val} should be less than peak {peak_val}");
+        assert!(
+            far_val < peak_val,
+            "Far value {far_val} should be less than peak {peak_val}"
+        );
     }
 
     #[test]

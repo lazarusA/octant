@@ -439,7 +439,7 @@ fn test_prefetcher_abort_and_pending_bytes() {
 
 #[test]
 fn test_known_truth_4d_analytical_voxel_evaluation() {
-    use octant::data::{eval_known_truth_4d, generate_procedural_volume_4d, KnownTruth4DParams};
+    use octant::data::{KnownTruth4DParams, eval_known_truth_4d, generate_procedural_volume_4d};
 
     let params = KnownTruth4DParams::default();
     let (nt, nz, ny, nx) = (5, 8, 12, 16);
@@ -470,7 +470,7 @@ fn test_known_truth_4d_analytical_voxel_evaluation() {
 #[test]
 fn test_known_truth_4d_peak_trajectory_tracking() {
     use octant::data::{
-        generate_procedural_volume_4d, get_known_truth_4d_center, KnownTruth4DParams,
+        KnownTruth4DParams, generate_procedural_volume_4d, get_known_truth_4d_center,
     };
 
     let (nt, nz, ny, nx) = (8, 32, 32, 32);
@@ -520,9 +520,7 @@ fn test_known_truth_4d_peak_trajectory_tracking() {
 
 #[test]
 fn test_4d_octant_block_volume_extraction_at_timesteps() {
-    use octant::data::{
-        generate_known_truth_4d_block, generate_procedural_volume_3d, VolumeData,
-    };
+    use octant::data::{VolumeData, generate_known_truth_4d_block, generate_procedural_volume_3d};
 
     let (nt, nz, ny, nx) = (4, 6, 8, 10);
     let block = generate_known_truth_4d_block("test_4d_var", nt, nz, ny, nx);
@@ -631,7 +629,7 @@ fn test_volume_animation_timeline_progression() {
 #[test]
 fn test_procedural_block_store_inspect_and_fetch() {
     use octant::data::{
-        backends::ProceduralBlockStore, block_store::BlockStore, DimensionSelection, SliceRequest,
+        DimensionSelection, SliceRequest, backends::ProceduralBlockStore, block_store::BlockStore,
     };
 
     let store = ProceduralBlockStore::open("procedural://volume4d").unwrap();
@@ -747,5 +745,3 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
     assert_eq!(app.color_range_min, vdata.min_val);
     assert_eq!(app.color_range_max, vdata.max_val);
 }
-
-

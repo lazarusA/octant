@@ -220,15 +220,7 @@ impl BlockStore for ProceduralBlockStore {
                 for y in y_start..y_end {
                     for x in x_start..x_end {
                         let val = eval_known_truth_4d(
-                            t,
-                            nt_full,
-                            z,
-                            nz_full,
-                            y,
-                            ny_full,
-                            x,
-                            nx_full,
-                            None,
+                            t, nt_full, z, nz_full, y, ny_full, x, nx_full, None,
                         );
                         values.push(val);
                     }
@@ -242,7 +234,12 @@ impl BlockStore for ProceduralBlockStore {
 
         Ok(OctantBlock::new(
             request.variable.clone(),
-            vec![t_end - t_start, z_end - z_start, y_end - y_start, x_end - x_start],
+            vec![
+                t_end - t_start,
+                z_end - z_start,
+                y_end - y_start,
+                x_end - x_start,
+            ],
             vec![
                 "time".to_string(),
                 "depth".to_string(),
