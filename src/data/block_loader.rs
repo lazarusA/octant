@@ -46,6 +46,14 @@ impl BlockLoader {
         request.store.fetch(&request.slice)
     }
 
+    /// Loads a single block through its own store, reporting progressive bytes downloaded.
+    pub fn load_one_with_progress(
+        request: &BlockRequest,
+        on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+    ) -> Result<OctantBlock, BlockStoreError> {
+        request.store.fetch_with_progress(&request.slice, on_progress)
+    }
+
     /// Loads every request in a batch.
     pub fn load_batch(batch: &BlockRequestBatch) -> BlockBatchOutcome {
         let mut grouped: HashMap<String, Vec<&BlockRequest>> = HashMap::new();

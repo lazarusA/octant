@@ -19,6 +19,16 @@ pub fn fetch_block(
     store_url: &str,
     request: &SliceRequest,
 ) -> Result<OctantBlock, BlockStoreError> {
+    fetch_block_with_progress(store, store_url, request, None)
+}
+
+/// Fetches an arbitrary-rank hyperslab described by `request` with progress reporting.
+pub fn fetch_block_with_progress(
+    store: ReadableWritableListableStorage,
+    store_url: &str,
+    request: &SliceRequest,
+    mut on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+) -> Result<OctantBlock, BlockStoreError> {
     let var_path = if request.variable.starts_with('/') {
         request.variable.clone()
     } else {
@@ -83,8 +93,34 @@ pub fn fetch_block(
         origin.push(start);
     }
 
-    let subset = ArraySubset::new_with_ranges(&ranges);
-    let raw_values = retrieve_array_subset_as_f32(&array, &subset).map_err(|e| e.to_string())?;
+    let raw_values = if rank > 0 && ranges[0].end > ranges[0].start + 1 {
+        let step_start = ranges[0].start;
+        let step_end = ranges[0].end;
+        let total_capacity: usize = block_shape.iter().product();
+        let mut values = Vec::with_capacity(total_capacity);
+
+        for step in step_start..step_end {
+            let mut step_ranges = ranges.clone();
+            step_ranges[0] = step..step + 1;
+            let step_subset = ArraySubset::new_with_ranges(&step_ranges);
+            let step_vals = retrieve_array_subset_as_f32(&array, &step_subset)
+                .map_err(|e| e.to_string())?;
+            let bytes_read = (step_vals.len() * std::mem::size_of::<f32>()) as u64;
+            if let Some(ref mut cb) = on_progress {
+                cb(bytes_read);
+            }
+            values.extend(step_vals);
+        }
+        values
+    } else {
+        let subset = ArraySubset::new_with_ranges(&ranges);
+        let vals = retrieve_array_subset_as_f32(&array, &subset).map_err(|e| e.to_string())?;
+        let bytes_read = (vals.len() * std::mem::size_of::<f32>()) as u64;
+        if let Some(ref mut cb) = on_progress {
+            cb(bytes_read);
+        }
+        vals
+    };
 
     let attributes: HashMap<String, String> = array
         .attributes()

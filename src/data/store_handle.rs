@@ -48,6 +48,14 @@ impl StoreHandle {
         self.backend.fetch_block(request)
     }
 
+    pub fn fetch_with_progress(
+        &self,
+        request: &SliceRequest,
+        on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+    ) -> Result<OctantBlock, BlockStoreError> {
+        self.backend.fetch_block_with_progress(request, on_progress)
+    }
+
     /// Fetches several variables/selections from this same store in one
     /// call, letting the backend optimize a coordinated read if it wants
     /// to.

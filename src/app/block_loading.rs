@@ -584,4 +584,12 @@ impl OctantApp {
             }
         }
     }
+
+    /// Aborts all ongoing data transfers and prefetch worker threads.
+    pub fn abort_current_fetch(&mut self) {
+        self.block_prefetcher.abort();
+        self.is_playing = false;
+        self.pending_target_step = None;
+        self.status_message = "⏹ Data fetch aborted by user.".to_string();
+    }
 }
