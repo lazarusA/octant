@@ -7,14 +7,19 @@ use super::OctantApp;
 impl OctantApp {
     /// Aligned `[start, end)` window along the animated dimension that
     /// contains `self.current_timestep`, clamped to the dataset's actual
-    /// extent.
+    /// extent and `max_steps` limit.
     ///
     /// By default, prefetches in multiples of the variable's chunk size
     /// along the animated dimension.
-    fn animated_window(&self, full_extent: usize, chunk_size: usize) -> (usize, usize) {
+    fn animated_window(
+        &self,
+        full_extent: usize,
+        chunk_size: usize,
+        max_steps: usize,
+    ) -> (usize, usize) {
         let cs = if chunk_size == 0 { 1 } else { chunk_size };
         let multiplier = (self.block_window_size / cs).max(1);
-        let window = cs * multiplier;
+        let window = (cs * multiplier).min(max_steps).max(1);
         let start = (self.current_timestep / window) * window;
         let end = (start + window).min(full_extent).max(start + 1);
         (start, end)
@@ -56,6 +61,14 @@ impl OctantApp {
             .unwrap_or(1) as usize;
 
         if let Some(anim_dim) = self.plotted_animated_dim {
+            let (max_allowed_steps, _, _) =
+                crate::ui::variables_panel::calculate_max_animated_steps(
+                    var_info,
+                    &self.plotted_dim_config,
+                    &self.plotted_selected_dim_ranges,
+                    anim_dim,
+                );
+
             let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
             if full_extent > 0 && self.current_timestep >= full_extent {
                 self.current_timestep = full_extent - 1;
@@ -64,22 +77,9 @@ impl OctantApp {
                 self.plotted_selected_dim_indices[anim_dim] = self.current_timestep;
             }
             if anim_dim < selections.len() {
-                let (user_start, user_end) = self
-                    .plotted_selected_dim_ranges
-                    .get(anim_dim)
-                    .copied()
-                    .unwrap_or((0, full_extent.saturating_sub(1)));
-
-                let user_range_len = user_end.saturating_sub(user_start) + 1;
-                if user_range_len < full_extent && user_range_len > 0 {
-                    let window = user_range_len.max(1);
-                    let start = (self.current_timestep / window) * window;
-                    let end = (start + window).min(full_extent);
-                    selections[anim_dim] = DimensionSelection::Range { start, end };
-                } else {
-                    let (start, end) = self.animated_window(full_extent, anim_chunk_size);
-                    selections[anim_dim] = DimensionSelection::Range { start, end };
-                }
+                let (start, end) =
+                    self.animated_window(full_extent, anim_chunk_size, max_allowed_steps);
+                selections[anim_dim] = DimensionSelection::Range { start, end };
             }
         }
 
@@ -274,14 +274,29 @@ impl OctantApp {
             .and_then(|var| var.chunk_shape.get(anim_dim))
             .copied()
             .unwrap_or(1) as usize;
-        let (_start, end) = self.animated_window(full_extent, anim_chunk_size);
+        let max_allowed_steps = self
+            .plotted_dataset_metadata
+            .as_ref()
+            .and_then(|meta| meta.variables.get(self.plotted_variable_idx))
+            .map(|var_info| {
+                crate::ui::variables_panel::calculate_max_animated_steps(
+                    var_info,
+                    &self.plotted_dim_config,
+                    &self.plotted_selected_dim_ranges,
+                    anim_dim,
+                )
+                .0
+            })
+            .unwrap_or(full_extent);
+
+        let (_start, end) = self.animated_window(full_extent, anim_chunk_size, max_allowed_steps);
 
         let cs = if anim_chunk_size == 0 {
             1
         } else {
             anim_chunk_size
         };
-        let window = cs * (self.block_window_size / cs).max(1);
+        let window = (cs * (self.block_window_size / cs).max(1)).min(max_allowed_steps);
         let lookahead_windows = 4; // Look ahead up to 4 windows in parallel
 
         // 4. Retrieve current active slice request to copy non-animated dimension selections.
@@ -494,28 +509,31 @@ impl OctantApp {
             };
             let nx = block.shape.get(x_dim).copied().unwrap_or(0);
             let ny = block.shape.get(y_dim).copied().unwrap_or(0);
+            let slice_elements = nx.saturating_mul(ny).max(1);
+            let max_z = (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS / slice_elements)
+                .clamp(1, nz);
+            let eff_nz = nz.min(max_z);
+
             existing.width != nx
                 || existing.height != ny
-                || existing.depth != nz
+                || existing.depth != eff_nz
                 || self.volume_renderer.is_none()
                 || existing.dataset_name != current_volume_desc
         } else {
             true
         };
 
-        if (block.rank() >= 3 || is_3d_plot)
+        if is_3d_plot
             && needs_volume_update
             && let Some(vdata) =
                 block.volume(x_dim, y_dim, z_dim, &fixed_indices, &current_volume_desc)
         {
             let depth = vdata.depth;
             self.rebuild_pipeline_with_volume_data(vdata);
-            if is_3d_plot {
-                self.status_message = format!(
-                    "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
-                    self.status_message, self.current_timestep
-                );
-            }
+            self.status_message = format!(
+                "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
+                self.status_message, self.current_timestep
+            );
         }
     }
 

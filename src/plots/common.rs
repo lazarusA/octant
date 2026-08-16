@@ -2,6 +2,12 @@ use bytemuck::{Pod, Zeroable};
 use eframe::egui;
 use wgpu::util::DeviceExt;
 
+/// Maximum buffer size for GPU storage buffers in bytes (256 MiB default WebGPU limit).
+pub const MAX_GPU_STORAGE_BUFFER_BYTES: usize = 256 * 1024 * 1024;
+/// Maximum number of f32 elements that fit in a single GPU storage buffer.
+pub const MAX_GPU_STORAGE_BUFFER_ELEMENTS: usize =
+    MAX_GPU_STORAGE_BUFFER_BYTES / std::mem::size_of::<f32>();
+
 /// Standard GPU color, clipping, and range uniforms struct shared across all plots.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
