@@ -153,6 +153,13 @@ impl eframe::App for OctantApp {
 
             // Handle Zoom & Pan Interactions
             if is_3d_canvas_plot {
+                if response.double_clicked() {
+                    self.sphere_rotation_x = 0.25;
+                    self.sphere_rotation_y = 0.0;
+                    self.sphere_zoom = 2.5;
+                    ui.ctx().request_repaint();
+                }
+
                 if response.dragged() {
                     let delta = response.drag_delta();
                     self.sphere_rotation_y += delta.x * 0.008;
@@ -165,7 +172,12 @@ impl eframe::App for OctantApp {
                 if response.hovered() {
                     let scroll = ui.input(|i| i.smooth_scroll_delta.y);
                     if scroll != 0.0 {
-                        self.sphere_zoom = (self.sphere_zoom - scroll * 0.003).clamp(1.1, 8.0);
+                        let min_zoom = if self.active_plot_type == PlotType::Sphere {
+                            1.1
+                        } else {
+                            0.2
+                        };
+                        self.sphere_zoom = (self.sphere_zoom - scroll * 0.003).clamp(min_zoom, 8.0);
                         ui.ctx().request_repaint();
                     }
                 }

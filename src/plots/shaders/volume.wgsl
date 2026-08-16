@@ -86,17 +86,17 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 
     out.frag_vert = pos_3d;
 
-    let cam_dist = clamp(uniforms.zoom, 1.1, 10.0);
+    let cam_dist = clamp(uniforms.zoom, 0.1, 10.0);
     let cam_z = pos_rot.z - cam_dist;
-    let dist_positive = max(-cam_z, 0.1);
+    let dist_positive = max(-cam_z, 0.001);
 
     let fov_scale = 1.6;
     let screen_asp = max(uniforms.screen_aspect, 0.1);
     let proj_x = (pos_rot.x * fov_scale) / screen_asp;
     let proj_y = pos_rot.y * fov_scale;
 
-    let z_near = 0.5;
-    let z_far = 30.0;
+    let z_near = 0.01;
+    let z_far = 50.0;
     let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
 
     out.position = vec4<f32>(proj_x, proj_y, proj_z, dist_positive);

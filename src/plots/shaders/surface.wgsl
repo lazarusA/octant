@@ -193,15 +193,15 @@ fn vs_main(
     ));
 
     // Perspective projection transformation
-    let cam_dist = clamp(uniforms.zoom, 1.1, 10.0);
+    let cam_dist = clamp(uniforms.zoom, 0.1, 10.0);
     let cam_z = pos_rot.z - cam_dist;
-    let dist_positive = max(-cam_z, 0.1);
+    let dist_positive = max(-cam_z, 0.001);
     let fov_scale = 1.6;
     let proj_x = (pos_rot.x * fov_scale) / uniforms.aspect_ratio;
     let proj_y = pos_rot.y * fov_scale;
 
     // Linear depth projection mapped to [0.0, 1.0] for hardware depth testing
-    let z_near = 0.1;
+    let z_near = 0.01;
     let z_far = 50.0;
     let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
 
