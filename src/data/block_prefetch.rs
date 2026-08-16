@@ -5,9 +5,9 @@
 //! different `StoreHandle`s within the same batch.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
-use std::sync::Arc;
 use std::thread;
 
 use super::{
@@ -77,7 +77,8 @@ impl BlockPrefetcher {
 
         let estimated_bytes = (request.slice.estimated_elements() as u64) * 4;
         self.pending.insert(key.clone(), estimated_bytes);
-        self.total_bytes.fetch_add(estimated_bytes, Ordering::Relaxed);
+        self.total_bytes
+            .fetch_add(estimated_bytes, Ordering::Relaxed);
         self.active_worker_threads += 1;
 
         let tx = self.tx.clone();
@@ -163,6 +164,32 @@ impl BlockPrefetcher {
 
     pub fn is_pending(&self, key: &BlockCacheKey) -> bool {
         self.pending.contains_key(key)
+    }
+
+    /// Checks if any pending in-flight request already covers the given timestep.
+    pub fn is_pending_timestep(
+        &self,
+        source_id: &str,
+        variable_name: &str,
+        anim_dim: Option<usize>,
+        timestep: usize,
+    ) -> bool {
+        self.pending.keys().any(|key| {
+            if key.source_id == source_id && key.variable_name == variable_name {
+                if let Some(dim) = anim_dim {
+                    if let Some(sel) = key.selections.get(dim) {
+                        let (start, end) = sel.bounds();
+                        timestep >= start && timestep < end
+                    } else {
+                        true
+                    }
+                } else {
+                    true
+                }
+            } else {
+                false
+            }
+        })
     }
 
     pub fn forget_pending(&mut self, key: &BlockCacheKey) -> bool {

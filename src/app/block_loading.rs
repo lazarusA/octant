@@ -18,10 +18,8 @@ impl OctantApp {
         max_steps: usize,
     ) -> (usize, usize) {
         let cs = if chunk_size == 0 { 1 } else { chunk_size };
-        let multiplier = (self.block_window_size / cs).max(1);
-        let window = (cs * multiplier).min(max_steps).max(1);
-        let start = (self.current_timestep / window) * window;
-        let end = (start + window).min(full_extent).max(start + 1);
+        let start = (self.current_timestep / cs) * cs;
+        let end = (start + cs).min(full_extent).min(max_steps).max(start + 1);
         (start, end)
     }
 
@@ -178,11 +176,8 @@ impl OctantApp {
         } else {
             anim_chunk_size
         };
-        let multiplier = (self.block_window_size / cs).max(1);
-        let window = cs * multiplier;
-
-        let start = (step / window) * window;
-        let end = (start + window).min(full_extent).max(start + 1);
+        let start = (step / cs) * cs;
+        let end = (start + cs).min(full_extent).max(start + 1);
 
         let legacy_request =
             crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_name, &shape);
@@ -274,30 +269,14 @@ impl OctantApp {
             .and_then(|var| var.chunk_shape.get(anim_dim))
             .copied()
             .unwrap_or(1) as usize;
-        let max_allowed_steps = self
-            .plotted_dataset_metadata
-            .as_ref()
-            .and_then(|meta| meta.variables.get(self.plotted_variable_idx))
-            .map(|var_info| {
-                crate::ui::variables_panel::calculate_max_animated_steps(
-                    var_info,
-                    &self.plotted_dim_config,
-                    &self.plotted_selected_dim_ranges,
-                    anim_dim,
-                )
-                .0
-            })
-            .unwrap_or(full_extent);
-
-        let (_start, end) = self.animated_window(full_extent, anim_chunk_size, max_allowed_steps);
 
         let cs = if anim_chunk_size == 0 {
             1
         } else {
             anim_chunk_size
         };
-        let window = (cs * (self.block_window_size / cs).max(1)).min(max_allowed_steps);
-        let lookahead_windows = 4; // Look ahead up to 4 windows in parallel
+        let current_chunk_idx = self.current_timestep / cs;
+        let lookahead_chunks = (self.block_window_size / cs).clamp(2, 6);
 
         // 4. Retrieve current active slice request to copy non-animated dimension selections.
         let Some(next_legacy_request) = self.active_slice_request.clone() else {
@@ -317,16 +296,24 @@ impl OctantApp {
             return;
         };
 
-        // 6. Loop over upcoming lookahead windows and schedule background requests.
-        for i in 0..lookahead_windows {
-            let ns = end + i * window;
+        // 6. Loop over upcoming lookahead chunks and schedule background requests.
+        for i in 1..=lookahead_chunks {
+            let chunk_idx = current_chunk_idx + i;
+            let chunk_start = chunk_idx * cs;
 
             // Handle wrap-around prefetching when loop playback is enabled.
-            if ns >= full_extent {
+            if chunk_start >= full_extent {
                 if self.loop_playback && full_extent > 0 {
-                    let wrap_start = (i * window) % full_extent;
-                    let wrap_end = (wrap_start + window).min(full_extent);
+                    let total_chunks = full_extent.div_ceil(cs);
+                    let wrap_chunk_idx = (current_chunk_idx + i) % total_chunks;
+                    let wrap_start = wrap_chunk_idx * cs;
+                    let wrap_end = (wrap_start + cs).min(full_extent);
                     if self.block_cache.covers(
+                        &source_id,
+                        &next_legacy_request.variable,
+                        self.plotted_animated_dim,
+                        wrap_start,
+                    ) || self.block_prefetcher.is_pending_timestep(
                         &source_id,
                         &next_legacy_request.variable,
                         self.plotted_animated_dim,
@@ -350,21 +337,26 @@ impl OctantApp {
                 break;
             }
 
-            // Skip lookahead window if already resident in memory.
+            let chunk_end = (chunk_start + cs).min(full_extent);
             if self.block_cache.covers(
                 &source_id,
                 &next_legacy_request.variable,
                 self.plotted_animated_dim,
-                ns,
+                chunk_start,
+            ) || self.block_prefetcher.is_pending_timestep(
+                &source_id,
+                &next_legacy_request.variable,
+                self.plotted_animated_dim,
+                chunk_start,
             ) {
                 continue;
             }
 
-            // Schedule prefetch request for window [ns, ne).
-            let ne = (ns + window).min(full_extent);
             let mut selections = next_legacy_request.selections.clone();
-            selections[anim_dim] = DimensionSelection::Range { start: ns, end: ne };
-
+            selections[anim_dim] = DimensionSelection::Range {
+                start: chunk_start,
+                end: chunk_end,
+            };
             let req = BlockRequest::new(
                 store_handle.clone(),
                 SliceRequest::new(next_legacy_request.variable.clone(), selections),
