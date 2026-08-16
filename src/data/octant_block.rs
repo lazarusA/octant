@@ -5,6 +5,7 @@
 //! Once resident, rendering code does not need to know where it came from.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct OctantBlock {
@@ -19,8 +20,8 @@ pub struct OctantBlock {
     /// Global origin of this block inside the source array.
     pub origin: Vec<usize>,
 
-    /// Row-major values.
-    pub values: Vec<f32>,
+    /// Row-major values wrapped in Arc for O(1) cloning and zero-copy sharing.
+    pub values: Arc<[f32]>,
 
     /// Row-major strides.
     pub strides: Vec<usize>,
@@ -41,10 +42,11 @@ impl OctantBlock {
         shape: Vec<usize>,
         dimension_names: Vec<String>,
         origin: Vec<usize>,
-        values: Vec<f32>,
+        values: impl Into<Arc<[f32]>>,
         coordinates: HashMap<String, Vec<f64>>,
         attributes: HashMap<String, String>,
     ) -> Self {
+        let values: Arc<[f32]> = values.into();
         debug_assert_eq!(
             values.len(),
             shape.iter().copied().product::<usize>(),
@@ -52,20 +54,7 @@ impl OctantBlock {
         );
 
         let strides = Self::row_major_strides(&shape);
-
-        let (min_value, max_value) = values
-            .iter()
-            .copied()
-            .filter(|v| !v.is_nan())
-            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-                (lo.min(v), hi.max(v))
-            });
-
-        let (min_value, max_value) = if min_value.is_finite() && max_value.is_finite() {
-            (min_value, max_value)
-        } else {
-            (0.0, 1.0)
-        };
+        let (min_value, max_value) = crate::utils::compute_finite_min_max(&values);
 
         Self {
             variable_name,
@@ -129,6 +118,7 @@ impl OctantBlock {
         fixed_indices: &[usize],
         max_timesteps: usize,
         dataset_name: &str,
+        compute_bounds: bool,
     ) -> Option<crate::data::matrix_data::MatrixData> {
         if x_dim == y_dim
             || x_dim >= self.rank()
@@ -152,8 +142,27 @@ impl OctantBlock {
             }
         }
 
-        let mut values = Vec::with_capacity(width * height);
-        if stride_x == 1 {
+        let slice_len = width * height;
+        let mut values = Vec::with_capacity(slice_len);
+        if stride_x == 1 && stride_y == width {
+            let slice_end = base_offset + slice_len;
+            if slice_end <= self.values.len() {
+                values.extend_from_slice(&self.values[base_offset..slice_end]);
+            } else {
+                for y in 0..height {
+                    let row_start = base_offset + y * stride_y;
+                    let row_end = row_start + width;
+                    if row_end <= self.values.len() {
+                        values.extend_from_slice(&self.values[row_start..row_end]);
+                    } else {
+                        for x in 0..width {
+                            values
+                                .push(self.values.get(row_start + x).copied().unwrap_or(f32::NAN));
+                        }
+                    }
+                }
+            }
+        } else if stride_x == 1 {
             for y in 0..height {
                 let row_start = base_offset + y * stride_y;
                 let row_end = row_start + width;
@@ -175,16 +184,10 @@ impl OctantBlock {
             }
         }
 
-        let (min_val, max_val) = values
-            .iter()
-            .copied()
-            .filter(|v| !v.is_nan())
-            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-                (lo.min(v), hi.max(v))
-            });
-
-        let (min_val, max_val) = if min_val.is_finite() && max_val.is_finite() {
-            (min_val, max_val)
+        let (min_val, max_val) = if compute_bounds {
+            crate::utils::compute_finite_min_max(&values)
+        } else if self.min_value.is_finite() && self.max_value.is_finite() {
+            (self.min_value, self.max_value)
         } else {
             (0.0, 1.0)
         };
@@ -207,41 +210,43 @@ impl OctantBlock {
         z_dim: usize,
         fixed_indices: &[usize],
         dataset_name: &str,
+        compute_bounds: bool,
     ) -> Option<crate::data::VolumeData> {
-        if x_dim >= self.rank() || y_dim >= self.rank() || fixed_indices.len() != self.rank() {
+        let has_z = z_dim < self.rank();
+
+        if x_dim == y_dim
+            || x_dim >= self.rank()
+            || y_dim >= self.rank()
+            || (has_z && (z_dim == x_dim || z_dim == y_dim))
+            || fixed_indices.len() != self.rank()
+        {
             return None;
         }
 
         let nx = self.shape[x_dim];
         let ny = self.shape[y_dim];
-        let (nz, has_z) = if z_dim < self.rank() && z_dim != x_dim && z_dim != y_dim {
-            (self.shape[z_dim], true)
-        } else {
-            (1, false)
-        };
+        let nz = if has_z { self.shape[z_dim] } else { 1 };
 
-        if x_dim == y_dim {
-            return None;
-        }
+        // Limit nz so that nx * ny * eff_nz <= MAX_GPU_STORAGE_BUFFER_ELEMENTS
+        let slice_elements = nx.saturating_mul(ny).max(1);
+        let max_z =
+            (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS / slice_elements).clamp(1, nz);
+        let eff_nz = nz.min(max_z);
 
-        // Fast path: if 3D array matching shape [nz, ny, nx] exactly
-        if self.rank() == 3
-            && z_dim == 0
+        let is_full_3d = self.rank() == 3
+            && x_dim == 0
             && y_dim == 1
-            && x_dim == 2
-            && self.values.len() == nx * ny * nz
-        {
-            let (min_val, max_val) = self
-                .values
-                .iter()
-                .copied()
-                .filter(|v| !v.is_nan())
-                .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-                    (lo.min(v), hi.max(v))
-                });
+            && z_dim == 2
+            && self.strides[0] == self.shape[1] * self.shape[2]
+            && self.strides[1] == self.shape[2]
+            && self.strides[2] == 1
+            && nz == eff_nz;
 
-            let (min_val, max_val) = if min_val.is_finite() && max_val.is_finite() {
-                (min_val, max_val)
+        if is_full_3d {
+            let (min_val, max_val) = if compute_bounds {
+                crate::utils::compute_finite_min_max(&self.values)
+            } else if self.min_value.is_finite() && self.max_value.is_finite() {
+                (self.min_value, self.max_value)
             } else {
                 (0.0, 1.0)
             };
@@ -250,7 +255,7 @@ impl OctantBlock {
                 nx,
                 ny,
                 nz,
-                self.values.clone(),
+                self.values.to_vec(),
                 min_val,
                 max_val,
                 dataset_name.to_string(),
@@ -269,9 +274,9 @@ impl OctantBlock {
             }
         }
 
-        let mut values = Vec::with_capacity(nx * ny * nz);
+        let mut values = Vec::with_capacity(nx * ny * eff_nz);
         if stride_x == 1 {
-            for z in 0..nz {
+            for z in 0..eff_nz {
                 let z_offset = base_offset + z * stride_z;
                 for y in 0..ny {
                     let row_start = z_offset + y * stride_y;
@@ -287,7 +292,7 @@ impl OctantBlock {
                 }
             }
         } else {
-            for z in 0..nz {
+            for z in 0..eff_nz {
                 let z_offset = base_offset + z * stride_z;
                 for y in 0..ny {
                     let row_start = z_offset + y * stride_y;
@@ -299,16 +304,10 @@ impl OctantBlock {
             }
         }
 
-        let (min_val, max_val) = values
-            .iter()
-            .copied()
-            .filter(|v| !v.is_nan())
-            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-                (lo.min(v), hi.max(v))
-            });
-
-        let (min_val, max_val) = if min_val.is_finite() && max_val.is_finite() {
-            (min_val, max_val)
+        let (min_val, max_val) = if compute_bounds {
+            crate::utils::compute_finite_min_max(&values)
+        } else if self.min_value.is_finite() && self.max_value.is_finite() {
+            (self.min_value, self.max_value)
         } else {
             (0.0, 1.0)
         };
@@ -316,7 +315,7 @@ impl OctantBlock {
         Some(crate::data::VolumeData::new(
             nx,
             ny,
-            nz,
+            eff_nz,
             values,
             min_val,
             max_val,

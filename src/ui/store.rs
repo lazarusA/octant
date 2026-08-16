@@ -106,13 +106,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
 
                             if ui.selectable_label(is_active, egui::RichText::new(label_text).strong()).clicked() {
                                 app.store_target_input = uri;
-                                match kind {
-                                    crate::data::DataSourceKind::RemoteZarr => app.selected_store_kind = StoreKind::RemoteZarr,
-                                    crate::data::DataSourceKind::LocalZarr => app.selected_store_kind = StoreKind::LocalZarr,
-                                    crate::data::DataSourceKind::RemoteIcechunk => app.selected_store_kind = StoreKind::RemoteIcechunk,
-                                    crate::data::DataSourceKind::LocalIcechunk => app.selected_store_kind = StoreKind::LocalIcechunk,
-                                    _ => app.selected_store_kind = StoreKind::ProceduralRandom,
-                                }
+                                app.selected_store_kind = StoreKind::from_data_source_kind(&kind);
 
                                 if let Some(meta) = metadata {
                                     self_activate_dataset_metadata(app, meta);
