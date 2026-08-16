@@ -126,8 +126,8 @@ pub fn read_coord_bounds_with_rank(
     {
         for path in &candidates {
             let key = path.trim_start_matches('/');
-            if let Some(node_meta) = metadata.get(key).or_else(|| metadata.get(path)) {
-                if let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
+            if let Some(node_meta) = metadata.get(key).or_else(|| metadata.get(path))
+                && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
                     store.clone(),
                     path,
                     node_meta,
@@ -135,7 +135,6 @@ pub fn read_coord_bounds_with_rank(
                     found_array = Some(arr);
                     break;
                 }
-            }
         }
     }
     let array = found_array?;

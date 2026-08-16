@@ -27,8 +27,8 @@ pub fn normalize_v3_array_metadata(mut meta: serde_json::Value) -> serde_json::V
 
     if let Some(codecs) = meta.get_mut("codecs").and_then(|c| c.as_array_mut()) {
         for codec in codecs {
-            if let Some(obj) = codec.as_object_mut() {
-                if let Some(name) = obj.get("name").and_then(|n| n.as_str()) {
+            if let Some(obj) = codec.as_object_mut()
+                && let Some(name) = obj.get("name").and_then(|n| n.as_str()) {
                     if name == "numcodecs.blosc" || name.ends_with(".blosc") {
                         obj.insert("name".to_string(), serde_json::json!("blosc"));
                         if let Some(config) =
@@ -40,8 +40,8 @@ pub fn normalize_v3_array_metadata(mut meta: serde_json::Value) -> serde_json::V
                             if !config.contains_key("blocksize") {
                                 config.insert("blocksize".to_string(), serde_json::json!(0));
                             }
-                            if let Some(shuffle) = config.get("shuffle") {
-                                if let Some(s_int) = shuffle.as_i64() {
+                            if let Some(shuffle) = config.get("shuffle")
+                                && let Some(s_int) = shuffle.as_i64() {
                                     let s_str = match s_int {
                                         1 => "shuffle",
                                         2 => "bitshuffle",
@@ -50,7 +50,6 @@ pub fn normalize_v3_array_metadata(mut meta: serde_json::Value) -> serde_json::V
                                     };
                                     config.insert("shuffle".to_string(), serde_json::json!(s_str));
                                 }
-                            }
                         }
                     } else if name == "numcodecs.zstd" || name.ends_with(".zstd") {
                         obj.insert("name".to_string(), serde_json::json!("zstd"));
@@ -60,7 +59,6 @@ pub fn normalize_v3_array_metadata(mut meta: serde_json::Value) -> serde_json::V
                         obj.insert("name".to_string(), serde_json::json!("crc32c"));
                     }
                 }
-            }
         }
     }
     meta
