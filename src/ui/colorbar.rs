@@ -85,12 +85,18 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
 
                         let bar_rect = Rect::from_min_size(widget_rect.min, Vec2::new(bar_w, 13.0));
 
-                        // Check if categorical mode is active or unique entries exist
-                        let unique_vals = app
-                            .matrix_data
-                            .as_ref()
-                            .and_then(|m| m.detect_unique_values());
-                        let is_categorical_active = app.is_categorical || unique_vals.is_some();
+                        // Check if categorical mode is explicitly active (disabled in 3D volume plots)
+                        let is_3d = app.active_plot_type == crate::plots::PlotType::Volume
+                            || app.active_plot_type == crate::plots::PlotType::PointCloud;
+                        let is_categorical_active = !is_3d && app.is_categorical;
+
+                        let unique_vals = if is_categorical_active {
+                            app.matrix_data
+                                .as_ref()
+                                .and_then(|m| m.detect_unique_values())
+                        } else {
+                            None
+                        };
 
                         if is_categorical_active {
                             let cat_vals: Vec<f32> = if let Some(unique) = unique_vals {

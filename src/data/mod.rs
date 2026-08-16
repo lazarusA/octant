@@ -29,9 +29,9 @@ pub use dataset_manager::DatasetManager;
 pub use matrix_data::MatrixData;
 pub use octant_block::OctantBlock;
 pub use procedural::{
-    eval_known_truth_4d, generate_known_truth_4d_block, generate_procedural_matrix,
-    generate_procedural_volume_3d, generate_procedural_volume_4d, get_known_truth_4d_center,
-    KnownTruth4DParams,
+    KnownTruth4DParams, eval_known_truth_4d, generate_known_truth_4d_block,
+    generate_procedural_matrix, generate_procedural_volume_3d, generate_procedural_volume_4d,
+    get_known_truth_4d_center,
 };
 pub use slice_request::{DimensionSelection, SliceRequest};
 pub use source_factory::SourceFactory;
