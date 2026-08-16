@@ -474,12 +474,15 @@ impl OctantApp {
             })
             .collect();
 
+        let compute_bounds = !self.lock_color_bounds;
+
         if let Some(mdata) = block.slice_2d(
             x_dim,
             y_dim,
             &fixed_indices,
             self.animated_dim_extent(),
             &format!("Block Cache [{}]", block.variable_name),
+            compute_bounds,
         ) {
             self.rebuild_pipeline_with_matrix_data(mdata);
         }
@@ -525,8 +528,14 @@ impl OctantApp {
 
         if is_3d_plot
             && needs_volume_update
-            && let Some(vdata) =
-                block.volume(x_dim, y_dim, z_dim, &fixed_indices, &current_volume_desc)
+            && let Some(vdata) = block.volume(
+                x_dim,
+                y_dim,
+                z_dim,
+                &fixed_indices,
+                &current_volume_desc,
+                compute_bounds,
+            )
         {
             let depth = vdata.depth;
             self.rebuild_pipeline_with_volume_data(vdata);

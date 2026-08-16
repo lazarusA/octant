@@ -330,6 +330,88 @@ pub fn calculate_max_animated_steps(
     (max_allowed, requested, spatial_elements_per_step)
 }
 
+/// Formats a byte count into a human-readable string (e.g. "500 B", "50 KB", "50 MB", "100 GB", "1.5 TB").
+pub fn format_byte_size(bytes: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    const TB: f64 = GB * 1024.0;
+
+    let b = bytes as f64;
+    if b >= TB {
+        let tb = b / TB;
+        if (tb.fract() * 10.0).round() == 0.0 {
+            format!("{:.0} TB", tb)
+        } else {
+            format!("{:.1} TB", tb)
+        }
+    } else if b >= GB {
+        let gb = b / GB;
+        if (gb.fract() * 10.0).round() == 0.0 {
+            format!("{:.0} GB", gb)
+        } else {
+            format!("{:.1} GB", gb)
+        }
+    } else if b >= MB {
+        let mb = b / MB;
+        if (mb.fract() * 10.0).round() == 0.0 {
+            format!("{:.0} MB", mb)
+        } else {
+            format!("{:.1} MB", mb)
+        }
+    } else if b >= KB {
+        let kb = b / KB;
+        if (kb.fract() * 10.0).round() == 0.0 {
+            format!("{:.0} KB", kb)
+        } else {
+            format!("{:.1} KB", kb)
+        }
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+/// Calculates the requested payload size in bytes and the total dataset size in bytes for a variable.
+pub fn calculate_download_sizes(
+    var_info: &crate::data::VariableInfo,
+    dim_config: &[crate::app::DimConfig],
+    selected_ranges: &[(usize, usize)],
+) -> (u64, u64) {
+    let dtype_bytes = match var_info.data_type.to_lowercase().as_str() {
+        "f64" | "float64" | "i64" | "int64" | "u64" | "uint64" => 8,
+        "f16" | "float16" | "i16" | "int16" | "u16" | "uint16" => 2,
+        "i8" | "int8" | "u8" | "uint8" | "bool" => 1,
+        _ => 4,
+    };
+
+    let total_elements: u64 = var_info.shape.iter().copied().product::<u64>().max(1);
+    let total_bytes = if var_info.file_size > 0 {
+        var_info.file_size
+    } else {
+        total_elements.saturating_mul(dtype_bytes as u64)
+    };
+
+    let rank = var_info.shape.len();
+    let mut requested_elements: u64 = 1;
+    for i in 0..rank {
+        let dim_size = var_info.shape[i] as usize;
+        if dim_config.get(i).map_or(false, |c| c.active) {
+            let span = if let Some(&(start, end)) = selected_ranges.get(i) {
+                (end.saturating_sub(start) + 1).min(dim_size)
+            } else {
+                dim_size
+            };
+            requested_elements = requested_elements.saturating_mul(span.max(1) as u64);
+        } else {
+            // inactive dimension selects a single fixed slice
+            requested_elements = requested_elements.saturating_mul(1);
+        }
+    }
+    let requested_bytes = requested_elements.saturating_mul(dtype_bytes as u64);
+
+    (requested_bytes, total_bytes)
+}
+
 fn show_dimension_sliders(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
@@ -341,6 +423,17 @@ fn show_dimension_sliders(
     if app.dim_config.len() != rank {
         init_variable_dimension_defaults(app, var_info);
     }
+
+    // Top Download Summary indicator
+    let (requested_bytes, total_bytes) =
+        calculate_download_sizes(var_info, &app.dim_config, &app.selected_dim_ranges);
+
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Download").strong());
+        ui.label(egui::RichText::new(format_byte_size(requested_bytes)).strong());
+        ui.label(egui::RichText::new(format!("/ {}", format_byte_size(total_bytes))).weak());
+    });
+    ui.add_space(4.0);
 
     for i in 0..rank {
         let dim_size = var_info.shape[i] as usize;

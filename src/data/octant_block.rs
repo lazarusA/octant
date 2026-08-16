@@ -129,6 +129,7 @@ impl OctantBlock {
         fixed_indices: &[usize],
         max_timesteps: usize,
         dataset_name: &str,
+        compute_bounds: bool,
     ) -> Option<crate::data::matrix_data::MatrixData> {
         if x_dim == y_dim
             || x_dim >= self.rank()
@@ -175,9 +176,7 @@ impl OctantBlock {
             }
         }
 
-        let (min_val, max_val) = if self.min_value.is_finite() && self.max_value.is_finite() {
-            (self.min_value, self.max_value)
-        } else {
+        let (min_val, max_val) = if compute_bounds {
             let (lo, hi) = values
                 .iter()
                 .copied()
@@ -190,6 +189,10 @@ impl OctantBlock {
             } else {
                 (0.0, 1.0)
             }
+        } else if self.min_value.is_finite() && self.max_value.is_finite() {
+            (self.min_value, self.max_value)
+        } else {
+            (0.0, 1.0)
         };
 
         Some(crate::data::matrix_data::MatrixData::new(
@@ -210,6 +213,7 @@ impl OctantBlock {
         z_dim: usize,
         fixed_indices: &[usize],
         dataset_name: &str,
+        compute_bounds: bool,
     ) -> Option<crate::data::VolumeData> {
         if x_dim >= self.rank() || y_dim >= self.rank() || fixed_indices.len() != self.rank() {
             return None;
@@ -229,8 +233,8 @@ impl OctantBlock {
 
         // Limit nz so that nx * ny * eff_nz <= MAX_GPU_STORAGE_BUFFER_ELEMENTS
         let slice_elements = nx.saturating_mul(ny).max(1);
-        let max_z = (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS / slice_elements)
-            .clamp(1, nz);
+        let max_z =
+            (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS / slice_elements).clamp(1, nz);
         let eff_nz = nz.min(max_z);
 
         // Fast path: if 3D array matching shape [nz, ny, nx] exactly and fits within GPU buffer limit
@@ -241,17 +245,23 @@ impl OctantBlock {
             && self.values.len() == nx * ny * nz
             && nz == eff_nz
         {
-            let (min_val, max_val) = self
-                .values
-                .iter()
-                .copied()
-                .filter(|v| !v.is_nan())
-                .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-                    (lo.min(v), hi.max(v))
-                });
+            let (min_val, max_val) = if compute_bounds {
+                let (lo, hi) = self
+                    .values
+                    .iter()
+                    .copied()
+                    .filter(|v| !v.is_nan())
+                    .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
+                        (lo.min(v), hi.max(v))
+                    });
 
-            let (min_val, max_val) = if min_val.is_finite() && max_val.is_finite() {
-                (min_val, max_val)
+                if lo.is_finite() && hi.is_finite() {
+                    (lo, hi)
+                } else {
+                    (0.0, 1.0)
+                }
+            } else if self.min_value.is_finite() && self.max_value.is_finite() {
+                (self.min_value, self.max_value)
             } else {
                 (0.0, 1.0)
             };
@@ -309,16 +319,22 @@ impl OctantBlock {
             }
         }
 
-        let (min_val, max_val) = values
-            .iter()
-            .copied()
-            .filter(|v| !v.is_nan())
-            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-                (lo.min(v), hi.max(v))
-            });
+        let (min_val, max_val) = if compute_bounds {
+            let (lo, hi) = values
+                .iter()
+                .copied()
+                .filter(|v| !v.is_nan())
+                .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
+                    (lo.min(v), hi.max(v))
+                });
 
-        let (min_val, max_val) = if min_val.is_finite() && max_val.is_finite() {
-            (min_val, max_val)
+            if lo.is_finite() && hi.is_finite() {
+                (lo, hi)
+            } else {
+                (0.0, 1.0)
+            }
+        } else if self.min_value.is_finite() && self.max_value.is_finite() {
+            (self.min_value, self.max_value)
         } else {
             (0.0, 1.0)
         };

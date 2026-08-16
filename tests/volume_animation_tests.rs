@@ -151,7 +151,7 @@ fn test_octant_block_volume_extraction() {
 
     let fixed_indices = vec![0, 0, 0];
     let vdata = block
-        .volume(2, 1, 0, &fixed_indices, "test_volume")
+        .volume(2, 1, 0, &fixed_indices, "test_volume", true)
         .unwrap();
 
     assert_eq!(vdata.width, 4); // X
@@ -307,4 +307,59 @@ fn test_calculate_max_animated_steps_small_and_large_datasets() {
     assert_eq!(spatial_large, 2048 * 2048);
     assert_eq!(requested_large, 500);
     assert_eq!(max_allowed_large, 16); // strictly clamped to 16 steps!
+}
+
+#[test]
+fn test_format_byte_size_and_calculate_download_sizes() {
+    use octant::app::{AnimationRole, DimConfig, SpatialRole};
+    use octant::ui::variables_panel::{calculate_download_sizes, format_byte_size};
+
+    assert_eq!(format_byte_size(500), "500 B");
+    assert_eq!(format_byte_size(1024), "1 KB");
+    assert_eq!(format_byte_size(50 * 1024 * 1024), "50 MB");
+    assert_eq!(format_byte_size(100 * 1024 * 1024 * 1024), "100 GB");
+    assert_eq!(
+        format_byte_size((1.5 * 1024.0 * 1024.0 * 1024.0 * 1024.0) as u64),
+        "1.5 TB"
+    );
+
+    let var_info = VariableInfo {
+        name: "test_var".to_string(),
+        data_type: "f32".to_string(),
+        shape: vec![100, 1000, 1000],
+        chunk_shape: vec![1, 500, 500],
+        dimension_names: vec!["time".to_string(), "y".to_string(), "x".to_string()],
+        units: None,
+        long_name: None,
+        temporal_resolution: None,
+        time_coverage_start: None,
+        time_coverage_end: None,
+        file_size: 100 * 1000 * 1000 * 4,
+        attributes: HashMap::new(),
+    };
+
+    let dim_config = vec![
+        DimConfig {
+            active: true,
+            spatial: SpatialRole::None,
+            animation: AnimationRole::Animated,
+        },
+        DimConfig {
+            active: true,
+            spatial: SpatialRole::Y,
+            animation: AnimationRole::None,
+        },
+        DimConfig {
+            active: true,
+            spatial: SpatialRole::X,
+            animation: AnimationRole::None,
+        },
+    ];
+
+    // Requesting 10 time steps out of 100 (full spatial)
+    let selected_ranges = vec![(0, 9), (0, 999), (0, 999)];
+    let (requested, total) = calculate_download_sizes(&var_info, &dim_config, &selected_ranges);
+
+    assert_eq!(requested, 10 * 1000 * 1000 * 4); // 40 MB
+    assert_eq!(total, 100 * 1000 * 1000 * 4); // 400 MB
 }
