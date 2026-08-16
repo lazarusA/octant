@@ -7,25 +7,20 @@ use super::OctantApp;
 impl OctantApp {
     /// Aligned `[start, end)` window along the animated dimension that
     /// contains `self.current_timestep`, clamped to the dataset's actual
-    /// extent.
+    /// extent and `max_steps` limit.
     ///
     /// By default, prefetches in multiples of the variable's chunk size
     /// along the animated dimension.
     fn animated_window(&self, full_extent: usize, chunk_size: usize) -> (usize, usize) {
         let cs = if chunk_size == 0 { 1 } else { chunk_size };
-        let multiplier = (self.block_window_size / cs).max(1);
-        let window = cs * multiplier;
-        let start = (self.current_timestep / window) * window;
-        let end = (start + window).min(full_extent).max(start + 1);
+        let start = (self.current_timestep / cs) * cs;
+        let end = (start + cs).min(full_extent).max(start + 1);
         (start, end)
     }
 
     /// Returns the open `StoreHandle` for the currently plotted dataset from `dataset_manager`.
     pub fn plotted_store_handle(&self) -> Option<crate::data::StoreHandle> {
-        let source_id = format!(
-            "{:?}:{}",
-            self.plotted_store_kind, self.plotted_store_target_input
-        );
+        let source_id = self.plotted_source_id();
         self.dataset_manager
             .get(&source_id)
             .map(|d| d.store.clone())
@@ -64,32 +59,15 @@ impl OctantApp {
                 self.plotted_selected_dim_indices[anim_dim] = self.current_timestep;
             }
             if anim_dim < selections.len() {
-                let (user_start, user_end) = self
-                    .plotted_selected_dim_ranges
-                    .get(anim_dim)
-                    .copied()
-                    .unwrap_or((0, full_extent.saturating_sub(1)));
-
-                let user_range_len = user_end.saturating_sub(user_start) + 1;
-                if user_range_len < full_extent && user_range_len > 0 {
-                    let window = user_range_len.max(1);
-                    let start = (self.current_timestep / window) * window;
-                    let end = (start + window).min(full_extent);
-                    selections[anim_dim] = DimensionSelection::Range { start, end };
-                } else {
-                    let (start, end) = self.animated_window(full_extent, anim_chunk_size);
-                    selections[anim_dim] = DimensionSelection::Range { start, end };
-                }
+                let (start, end) = self.animated_window(full_extent, anim_chunk_size);
+                selections[anim_dim] = DimensionSelection::Range { start, end };
             }
         }
 
         let slice_request = SliceRequest::new(&var_name, selections);
         self.active_slice_request = Some(slice_request.clone());
 
-        let source_id = format!(
-            "{:?}:{}",
-            self.plotted_store_kind, self.plotted_store_target_input
-        );
+        let source_id = self.plotted_source_id();
 
         // 1. Cache HIT: Check if any resident block in memory (e.g. full dataset array) covers current_timestep
         if let Some(block) = self.block_cache.find_covering_block(
@@ -104,7 +82,6 @@ impl OctantApp {
                 block.bytes_size()
             );
             self.apply_block_projection(&block);
-            self.maybe_prefetch_next_window(&shape);
             return;
         }
 
@@ -126,14 +103,16 @@ impl OctantApp {
                 block.bytes_size()
             );
             self.apply_block_projection(&block);
-            self.maybe_prefetch_next_window(&shape);
             return;
         }
 
-        // 3. Cache MISS: dispatch async prefetch request.
+        // 3. Cache MISS: dispatch async prefetch request for current chunk.
         self.status_message = format!("⏳ [block cache] Downloading window for '{}'...", var_name);
         self.block_prefetcher
             .request(block_request, &self.block_cache);
+
+        // Also queue up background prefetch for the rest of the selected slider range
+        self.prefetch_selected_animated_range(&shape);
     }
 
     /// Prefetches the block window containing `step` asynchronously using `plotted_store_handle()`,
@@ -152,10 +131,7 @@ impl OctantApp {
         let var_name = var_info.name.clone();
         let shape = var_info.shape.clone();
 
-        let source_id = format!(
-            "{:?}:{}",
-            self.plotted_store_kind, self.plotted_store_target_input
-        );
+        let source_id = self.plotted_source_id();
 
         let Some(anim_dim) = self.plotted_animated_dim else {
             return;
@@ -178,11 +154,8 @@ impl OctantApp {
         } else {
             anim_chunk_size
         };
-        let multiplier = (self.block_window_size / cs).max(1);
-        let window = cs * multiplier;
-
-        let start = (step / window) * window;
-        let end = (start + window).min(full_extent).max(start + 1);
+        let start = (step / cs) * cs;
+        let end = (start + cs).min(full_extent).max(start + 1);
 
         let legacy_request =
             crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_name, &shape);
@@ -204,15 +177,8 @@ impl OctantApp {
     /// - If resident: updates `current_timestep` to `target_step` and projects data immediately.
     /// - If not resident: keeps `current_timestep` on the current valid step and prefetches the block window containing `target_step`.
     pub fn request_step_or_load(&mut self, target_step: usize) {
-        let source_id = format!(
-            "{:?}:{}",
-            self.plotted_store_kind, self.plotted_store_target_input
-        );
-        let var_name = self
-            .plotted_dataset_metadata
-            .as_ref()
-            .and_then(|m| m.variables.get(self.plotted_variable_idx))
-            .map(|v| v.name.clone());
+        let source_id = self.plotted_source_id();
+        let var_name = self.plotted_variable_info().map(|v| v.name.clone());
 
         let is_cached = if let Some(ref name) = var_name {
             self.block_cache
@@ -232,59 +198,56 @@ impl OctantApp {
     /// Requests the previous step along the animated dimension.
     pub fn step_prev(&mut self) {
         let max_steps = self.animated_dim_extent();
-        let target_step = if self.current_timestep > 0 {
-            self.current_timestep - 1
-        } else if max_steps > 0 {
-            max_steps - 1
-        } else {
-            0
-        };
-        self.request_step_or_load(target_step);
+        if max_steps > 0 {
+            let prev_step = if self.current_timestep > 0 {
+                self.current_timestep - 1
+            } else {
+                max_steps - 1
+            };
+            self.request_step_or_load(prev_step);
+        }
     }
 
     /// Requests the next step along the animated dimension.
     pub fn step_next(&mut self) {
         let max_steps = self.animated_dim_extent();
-        let target_step = if max_steps > 0 {
-            (self.current_timestep + 1) % max_steps
-        } else {
-            0
-        };
-        self.request_step_or_load(target_step);
+        if max_steps > 0 {
+            let next_step = (self.current_timestep + 1) % max_steps;
+            self.request_step_or_load(next_step);
+        }
     }
 
-    /// Prefetches upcoming animation windows in the background to ensure buffer is warm ahead of playback.
-    fn maybe_prefetch_next_window(&mut self, shape: &[u64]) {
-        // 1. Only prefetch lookahead windows if playback is actively playing.
-        if !self.is_playing {
-            return;
-        }
-
-        // 2. Ensure an animated dimension is active.
+    /// Progressively prefetches all remaining block windows across the selected animated dimension range in the background.
+    pub fn prefetch_selected_animated_range(&mut self, shape: &[u64]) {
         let Some(anim_dim) = self.plotted_animated_dim else {
             return;
         };
-
-        // 3. Extract dimension extent and chunk size to calculate window bounds.
         let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
-        let anim_chunk_size = self
-            .plotted_dataset_metadata
-            .as_ref()
-            .and_then(|meta| meta.variables.get(self.plotted_variable_idx))
-            .and_then(|var| var.chunk_shape.get(anim_dim))
-            .copied()
-            .unwrap_or(1) as usize;
-        let (_start, end) = self.animated_window(full_extent, anim_chunk_size);
+        if full_extent <= 1 {
+            return;
+        }
 
+        let anim_chunk_size = self.plotted_chunk_size(anim_dim);
         let cs = if anim_chunk_size == 0 {
             1
         } else {
             anim_chunk_size
         };
-        let window = cs * (self.block_window_size / cs).max(1);
-        let lookahead_windows = 4; // Look ahead up to 4 windows in parallel
 
-        // 4. Retrieve current active slice request to copy non-animated dimension selections.
+        // Determine user's selected slider range for the animated dimension
+        let (range_start, range_end) = self
+            .plotted_selected_dim_ranges
+            .get(anim_dim)
+            .copied()
+            .unwrap_or((0, full_extent.saturating_sub(1)));
+        let range_start = range_start.min(full_extent.saturating_sub(1));
+        let range_end = range_end
+            .min(full_extent.saturating_sub(1))
+            .max(range_start);
+
+        let first_chunk = range_start / cs;
+        let last_chunk = range_end / cs;
+
         let Some(next_legacy_request) = self.active_slice_request.clone() else {
             return;
         };
@@ -292,72 +255,56 @@ impl OctantApp {
             return;
         }
 
-        // 5. Get current dataset source ID and open store handle.
-        let source_id = format!(
-            "{:?}:{}",
-            self.plotted_store_kind, self.plotted_store_target_input
-        );
+        let source_id = self.plotted_source_id();
 
         let Some(store_handle) = self.plotted_store_handle() else {
             return;
         };
 
-        // 6. Loop over upcoming lookahead windows and schedule background requests.
-        for i in 0..lookahead_windows {
-            let ns = end + i * window;
+        let current_chunk = self.current_timestep / cs;
 
-            // Handle wrap-around prefetching when loop playback is enabled.
-            if ns >= full_extent {
-                if self.loop_playback && full_extent > 0 {
-                    let wrap_start = (i * window) % full_extent;
-                    let wrap_end = (wrap_start + window).min(full_extent);
-                    if self.block_cache.covers(
-                        &source_id,
-                        &next_legacy_request.variable,
-                        self.plotted_animated_dim,
-                        wrap_start,
-                    ) {
-                        continue;
-                    }
-                    let mut selections = next_legacy_request.selections.clone();
-                    selections[anim_dim] = DimensionSelection::Range {
-                        start: wrap_start,
-                        end: wrap_end,
-                    };
-                    let req = BlockRequest::new(
-                        store_handle.clone(),
-                        SliceRequest::new(next_legacy_request.variable.clone(), selections),
-                    );
-                    if !self.block_cache.contains(&req.cache_key()) {
-                        self.block_prefetcher.request(req, &self.block_cache);
-                    }
-                }
-                break;
-            }
+        // Schedule chunks ordered by proximity to current_timestep:
+        // First forward (current_chunk + 1 ..= last_chunk), then from start up to current_chunk
+        let mut chunk_indices = Vec::new();
+        for c in (current_chunk + 1)..=last_chunk {
+            chunk_indices.push(c);
+        }
+        for c in first_chunk..=current_chunk {
+            chunk_indices.push(c);
+        }
 
-            // Skip lookahead window if already resident in memory.
+        for chunk_idx in chunk_indices {
+            let chunk_start = chunk_idx * cs;
+            let chunk_end = (chunk_start + cs).min(full_extent);
+
             if self.block_cache.covers(
                 &source_id,
                 &next_legacy_request.variable,
                 self.plotted_animated_dim,
-                ns,
+                chunk_start,
+            ) || self.block_prefetcher.is_pending_timestep(
+                &source_id,
+                &next_legacy_request.variable,
+                self.plotted_animated_dim,
+                chunk_start,
             ) {
                 continue;
             }
 
-            // Schedule prefetch request for window [ns, ne).
-            let ne = (ns + window).min(full_extent);
             let mut selections = next_legacy_request.selections.clone();
-            selections[anim_dim] = DimensionSelection::Range { start: ns, end: ne };
-
+            selections[anim_dim] = DimensionSelection::Range {
+                start: chunk_start,
+                end: chunk_end,
+            };
             let req = BlockRequest::new(
                 store_handle.clone(),
                 SliceRequest::new(next_legacy_request.variable.clone(), selections),
             );
+
             if !self.block_cache.contains(&req.cache_key())
                 && !self.block_prefetcher.request(req, &self.block_cache)
             {
-                break; // Stop if prefetch thread pool is full.
+                break; // Stop when thread pool is saturated; will continue as worker threads finish
             }
         }
     }
@@ -375,31 +322,28 @@ impl OctantApp {
             .unwrap_or(1)
     }
 
-    /// Projects a resident block into current 2D and 3D views.
-    fn apply_block_projection(&mut self, block: &crate::data::octant_block::OctantBlock) {
-        let anim_dim = self.plotted_animated_dim;
-
-        let all_dims: Vec<usize> = (0..block.rank()).collect();
-        let non_anim: Vec<usize> = (0..block.rank()).filter(|&d| Some(d) != anim_dim).collect();
-
-        let orig_dim_names: Vec<String> = self
-            .plotted_dataset_metadata
-            .as_ref()
-            .and_then(|meta| meta.variables.get(self.plotted_variable_idx))
-            .map(|v| v.dimension_names.clone())
-            .unwrap_or_else(|| block.dimension_names.clone());
+    /// Resolves the 3D spatial axis indices `(x_dim, y_dim, z_dim)` for block projections,
+    /// honoring explicit user SpatialRoles (X/Y/Z) or falling back to non-animated dimensions.
+    pub fn resolve_spatial_axes(
+        rank: usize,
+        anim_dim: Option<usize>,
+        block_dim_names: &[String],
+        orig_dim_names: &[String],
+        dim_config: &[crate::app::DimConfig],
+        spatial_dims: &[usize],
+    ) -> (usize, usize, usize) {
+        let all_dims: Vec<usize> = (0..rank).collect();
+        let non_anim: Vec<usize> = (0..rank).filter(|&d| Some(d) != anim_dim).collect();
 
         let find_explicit_spatial = |role: crate::app::SpatialRole| -> Option<usize> {
-            (0..block.rank()).find(|&d| {
-                let Some(name) = block.dimension_names.get(d) else {
+            (0..rank).find(|&d| {
+                let Some(name) = block_dim_names.get(d) else {
                     return false;
                 };
                 let Some(orig_idx) = orig_dim_names.iter().position(|n| n == name) else {
                     return false;
                 };
-                self.plotted_dim_config
-                    .get(orig_idx)
-                    .is_some_and(|c| c.spatial == role)
+                dim_config.get(orig_idx).is_some_and(|c| c.spatial == role)
             })
         };
 
@@ -407,12 +351,8 @@ impl OctantApp {
         let explicit_y = find_explicit_spatial(crate::app::SpatialRole::Y);
         let explicit_z = find_explicit_spatial(crate::app::SpatialRole::Z);
 
-        let explicit_spatial: Vec<usize> = self
-            .plotted_spatial_dims
-            .iter()
-            .copied()
-            .filter(|&d| d < block.rank())
-            .collect();
+        let explicit_spatial: Vec<usize> =
+            spatial_dims.iter().copied().filter(|&d| d < rank).collect();
 
         let x_dim = explicit_x
             .or_else(|| explicit_spatial.first().copied())
@@ -444,6 +384,29 @@ impl OctantApp {
                     .unwrap_or(usize::MAX)
             });
 
+        (x_dim, y_dim, z_dim)
+    }
+
+    /// Projects a resident block into current 2D and 3D views.
+    fn apply_block_projection(&mut self, block: &crate::data::octant_block::OctantBlock) {
+        let anim_dim = self.plotted_animated_dim;
+
+        let orig_dim_names: Vec<String> = self
+            .plotted_dataset_metadata
+            .as_ref()
+            .and_then(|meta| meta.variables.get(self.plotted_variable_idx))
+            .map(|v| v.dimension_names.clone())
+            .unwrap_or_else(|| block.dimension_names.clone());
+
+        let (x_dim, y_dim, z_dim) = Self::resolve_spatial_axes(
+            block.rank(),
+            anim_dim,
+            &block.dimension_names,
+            &orig_dim_names,
+            &self.plotted_dim_config,
+            &self.plotted_spatial_dims,
+        );
+
         let fixed_indices: Vec<usize> = (0..block.rank())
             .map(|i| {
                 let name = block.dimension_names.get(i);
@@ -459,18 +422,30 @@ impl OctantApp {
             })
             .collect();
 
+        let compute_bounds = !self.lock_color_bounds;
+
         if let Some(mdata) = block.slice_2d(
             x_dim,
             y_dim,
             &fixed_indices,
             self.animated_dim_extent(),
             &format!("Block Cache [{}]", block.variable_name),
+            compute_bounds,
         ) {
             self.rebuild_pipeline_with_matrix_data(mdata);
         }
 
-        let is_3d_plot = self.active_plot_type == crate::plots::PlotType::Volume
-            || self.active_plot_type == crate::plots::PlotType::PointCloud;
+        let is_volume_allowed = crate::ui::variables_panel::is_volume_allowed_for_selection(self);
+        if !is_volume_allowed
+            && (self.active_plot_type == crate::plots::PlotType::Volume
+                || self.active_plot_type == crate::plots::PlotType::PointCloud)
+        {
+            self.active_plot_type = crate::plots::PlotType::Heatmap;
+        }
+
+        let is_3d_plot = (self.active_plot_type == crate::plots::PlotType::Volume
+            || self.active_plot_type == crate::plots::PlotType::PointCloud)
+            && is_volume_allowed;
 
         let is_3d_spatial_anim = anim_dim.is_some_and(|a| a == x_dim || a == y_dim || a == z_dim);
 
@@ -494,34 +469,45 @@ impl OctantApp {
             };
             let nx = block.shape.get(x_dim).copied().unwrap_or(0);
             let ny = block.shape.get(y_dim).copied().unwrap_or(0);
+            let slice_elements = nx.saturating_mul(ny).max(1);
+            let max_z = (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS / slice_elements)
+                .clamp(1, nz);
+            let eff_nz = nz.min(max_z);
+
             existing.width != nx
                 || existing.height != ny
-                || existing.depth != nz
+                || existing.depth != eff_nz
                 || self.volume_renderer.is_none()
                 || existing.dataset_name != current_volume_desc
         } else {
             true
         };
 
-        if (block.rank() >= 3 || is_3d_plot)
+        if is_3d_plot
             && needs_volume_update
-            && let Some(vdata) =
-                block.volume(x_dim, y_dim, z_dim, &fixed_indices, &current_volume_desc)
+            && let Some(vdata) = block.volume(
+                x_dim,
+                y_dim,
+                z_dim,
+                &fixed_indices,
+                &current_volume_desc,
+                compute_bounds,
+            )
         {
             let depth = vdata.depth;
             self.rebuild_pipeline_with_volume_data(vdata);
-            if is_3d_plot {
-                self.status_message = format!(
-                    "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
-                    self.status_message, self.current_timestep
-                );
-            }
+            self.status_message = format!(
+                "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
+                self.status_message, self.current_timestep
+            );
         }
     }
 
     /// Drains completed block-cache prefetch results.
     pub fn poll_block_prefetch_results(&mut self) {
         let completed = self.block_prefetcher.poll();
+        let has_completed = !completed.is_empty();
+
         for res in completed {
             match res.result {
                 Ok(block) => {
@@ -556,5 +542,21 @@ impl OctantApp {
                 }
             }
         }
+
+        if has_completed
+            && let Some(meta) = &self.plotted_dataset_metadata
+            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+        {
+            let shape = var.shape.clone();
+            self.prefetch_selected_animated_range(&shape);
+        }
+    }
+
+    /// Aborts all ongoing data transfers and prefetch worker threads.
+    pub fn abort_current_fetch(&mut self) {
+        self.block_prefetcher.abort();
+        self.is_playing = false;
+        self.pending_target_step = None;
+        self.status_message = "⏹ Data fetch aborted by user.".to_string();
     }
 }

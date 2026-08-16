@@ -26,25 +26,8 @@ impl eframe::App for OctantApp {
                         );
                         self.show_variables_overlay = true;
 
-                        let source_id =
-                            format!("{:?}:{}", self.selected_store_kind, self.store_target_input);
-                        let kind = match self.selected_store_kind {
-                            crate::app::StoreKind::RemoteZarr => {
-                                crate::data::DataSourceKind::RemoteZarr
-                            }
-                            crate::app::StoreKind::LocalZarr => {
-                                crate::data::DataSourceKind::LocalZarr
-                            }
-                            crate::app::StoreKind::RemoteIcechunk => {
-                                crate::data::DataSourceKind::RemoteIcechunk
-                            }
-                            crate::app::StoreKind::LocalIcechunk => {
-                                crate::data::DataSourceKind::LocalIcechunk
-                            }
-                            crate::app::StoreKind::ProceduralRandom => {
-                                crate::data::DataSourceKind::Other("ProceduralRandom".into())
-                            }
-                        };
+                        let source_id = self.selected_source_id();
+                        let kind = self.selected_store_kind.to_data_source_kind();
                         let data_source = crate::data::DataSource::new(
                             &source_id,
                             kind,
@@ -99,15 +82,8 @@ impl eframe::App for OctantApp {
                     };
 
                     if let Some(next_ts) = next_ts {
-                        let source_id = format!(
-                            "{:?}:{}",
-                            self.plotted_store_kind, self.plotted_store_target_input
-                        );
-                        let var_name = self
-                            .plotted_dataset_metadata
-                            .as_ref()
-                            .and_then(|m| m.variables.get(self.plotted_variable_idx))
-                            .map(|v| v.name.clone());
+                        let source_id = self.plotted_source_id();
+                        let var_name = self.plotted_variable_info().map(|v| v.name.clone());
 
                         let has_next_block = if let Some(ref name) = var_name {
                             self.block_cache.covers(
@@ -135,7 +111,14 @@ impl eframe::App for OctantApp {
                     self.is_playing = false;
                 }
             }
-            ctx.request_repaint_after(frame_dur);
+
+            let elapsed = now.duration_since(self.last_step_time);
+            let next_wake = if elapsed < frame_dur {
+                frame_dur - elapsed
+            } else {
+                std::time::Duration::from_millis(1)
+            };
+            ctx.request_repaint_after(next_wake);
         } else {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }

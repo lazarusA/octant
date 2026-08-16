@@ -79,6 +79,22 @@ pub fn extract_store_variables(
     Ok(variables)
 }
 
+/// Returns standard fallback dimension names for a given tensor rank.
+pub fn default_dimension_names_for_rank(rank: usize) -> Vec<String> {
+    match rank {
+        1 => vec!["x".to_string()],
+        2 => vec!["lat".to_string(), "lon".to_string()],
+        3 => vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
+        4 => vec![
+            "time".to_string(),
+            "level".to_string(),
+            "lat".to_string(),
+            "lon".to_string(),
+        ],
+        _ => (0..rank).map(|i| format!("dim_{}", i)).collect(),
+    }
+}
+
 /// Constructs a VariableInfo struct from any ReadableStorageTraits zarrs Array.
 pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits>(
     array: &Array<TStorage>,
@@ -101,20 +117,14 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits>(
                 .map(|(i, n)| n.as_deref().unwrap_or(&format!("dim_{}", i)).to_string())
                 .collect()
         })
-        .unwrap_or_else(|| match shape.len() {
-            1 => vec!["x".to_string()],
-            2 => vec!["lat".to_string(), "lon".to_string()],
-            3 => vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
-            4 => vec![
-                "time".to_string(),
-                "level".to_string(),
-                "lat".to_string(),
-                "lon".to_string(),
-            ],
-            _ => (0..shape.len()).map(|i| format!("dim_{}", i)).collect(),
-        });
+        .unwrap_or_else(|| default_dimension_names_for_rank(shape.len()));
 
-    let chunk_shape = shape.clone();
+    let zero_idx = vec![0u64; shape.len()];
+    let chunk_shape = array
+        .chunk_shape(&zero_idx)
+        .ok()
+        .map(|cs| cs.iter().map(|v| v.get()).collect::<Vec<u64>>())
+        .unwrap_or_else(|| shape.clone());
     let file_size = calculate_variable_size_bytes(&shape, &data_type);
 
     let attrs_map = array.attributes();

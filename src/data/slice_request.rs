@@ -63,4 +63,12 @@ impl SliceRequest {
                 .collect(),
         }
     }
+
+    /// Computes the total number of elements requested across all dimensions.
+    pub fn estimated_elements(&self) -> usize {
+        self.selections.iter().fold(1usize, |acc, sel| {
+            let (start, end) = sel.bounds();
+            acc.saturating_mul(end.saturating_sub(start).max(1))
+        })
+    }
 }

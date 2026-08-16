@@ -59,7 +59,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         ui.label(egui::RichText::new(format!("📄 {}", var_info.name)).strong());
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui
-                                .button(egui::RichText::new("📊 Plot Data").strong().small())
+                                .button(egui::RichText::new("📊 Plot Data").strong())
                                 .clicked()
                             {
                                 should_plot = true;
@@ -76,16 +76,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     // inline rather than letting the toggle silently no-op
                     // for the other store kinds.
                     if should_plot {
-                        app.plotted_store_kind = app.selected_store_kind;
-                        app.plotted_store_target_input = app.store_target_input.clone();
-                        app.plotted_dataset_metadata = app.active_dataset_metadata.clone();
-                        app.plotted_variable_idx = app.selected_variable_idx;
-                        app.plotted_dim_config = app.dim_config.clone();
-                        app.plotted_selected_dim_indices = app.selected_dim_indices.clone();
-                        app.plotted_selected_dim_ranges = app.selected_dim_ranges.clone();
-                        app.plotted_spatial_dims = app.spatial_dims.clone();
-                        app.plotted_animated_dim = app.animated_dim;
-                        app.reset_variable_bounds();
+                        app.sync_plotted_state_from_selected();
                         app.load_selected_variable_block();
                         app.open_only_settings_panel();
                     }
@@ -283,6 +274,141 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
         });
 }
 
+/// Computes the maximum steps along the animated dimension that fit within the GPU buffer limit,
+/// the current requested step count, and the number of spatial elements per step.
+pub fn calculate_max_animated_steps(
+    var_info: &crate::data::VariableInfo,
+    dim_config: &[crate::app::DimConfig],
+    selected_ranges: &[(usize, usize)],
+    anim_dim: usize,
+) -> (usize, usize, usize) {
+    let rank = var_info.shape.len();
+    if anim_dim >= rank {
+        return (1, 1, 1);
+    }
+
+    let mut spatial_elements_per_step: usize = 1;
+    for d in 0..rank {
+        if d == anim_dim {
+            continue;
+        }
+        if let Some(cfg) = dim_config.get(d)
+            && cfg.active
+        {
+            let span = if let Some(&(start, end)) = selected_ranges.get(d) {
+                end.saturating_sub(start) + 1
+            } else {
+                var_info.shape[d] as usize
+            };
+            spatial_elements_per_step = spatial_elements_per_step.saturating_mul(span.max(1));
+        }
+    }
+    if spatial_elements_per_step == 0 {
+        spatial_elements_per_step = 1;
+    }
+
+    let full_anim_size = var_info.shape[anim_dim] as usize;
+    let max_allowed = (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
+        / spatial_elements_per_step)
+        .clamp(1, full_anim_size.max(1));
+
+    let requested = if let Some(&(start, end)) = selected_ranges.get(anim_dim) {
+        end.saturating_sub(start) + 1
+    } else {
+        full_anim_size
+    };
+
+    (max_allowed, requested, spatial_elements_per_step)
+}
+
+pub use crate::utils::format_byte_size;
+
+/// Calculates the requested payload size in bytes and the total dataset size in bytes for a variable.
+pub fn calculate_download_sizes(
+    var_info: &crate::data::VariableInfo,
+    dim_config: &[crate::app::DimConfig],
+    selected_ranges: &[(usize, usize)],
+) -> (u64, u64) {
+    let dtype_bytes = crate::utils::data_type_bytes(&var_info.data_type);
+
+    let total_elements: u64 = var_info.shape.iter().copied().product::<u64>().max(1);
+    let total_bytes = if var_info.file_size > 0 {
+        var_info.file_size
+    } else {
+        total_elements.saturating_mul(dtype_bytes)
+    };
+
+    let rank = var_info.shape.len();
+    let mut requested_elements: u64 = 1;
+    for i in 0..rank {
+        let dim_size = var_info.shape[i] as usize;
+        if dim_config.get(i).is_some_and(|c| c.active) {
+            let span = if let Some(&(start, end)) = selected_ranges.get(i) {
+                (end.saturating_sub(start) + 1).min(dim_size)
+            } else {
+                dim_size
+            };
+            requested_elements = requested_elements.saturating_mul(span.max(1) as u64);
+        } else {
+            // inactive dimension selects a single fixed slice
+            requested_elements = requested_elements.saturating_mul(1);
+        }
+    }
+    let requested_bytes = requested_elements.saturating_mul(dtype_bytes);
+
+    (requested_bytes, total_bytes)
+}
+
+/// Calculates the total 3D volume elements from the currently selected dimension ranges and spatial configuration.
+pub fn calculate_selected_volume_elements(app: &OctantApp) -> usize {
+    let Some(metadata) = &app.active_dataset_metadata else {
+        return 0;
+    };
+    let Some(var_info) = metadata.variables.get(app.selected_variable_idx) else {
+        return 0;
+    };
+
+    let mut total_elements = 1usize;
+    let mut counted = 0;
+    for (i, &size) in var_info.shape.iter().enumerate() {
+        let is_active = app.dim_config.get(i).map(|c| c.active).unwrap_or(false)
+            || app.spatial_dims.contains(&i)
+            || app.animated_dim == Some(i);
+        if is_active {
+            let (start, end) = app
+                .selected_dim_ranges
+                .get(i)
+                .copied()
+                .unwrap_or((0, (size as usize).saturating_sub(1)));
+            let span = (end.saturating_sub(start) + 1).min(size as usize);
+            total_elements = total_elements.saturating_mul(span.max(1));
+            counted += 1;
+        }
+    }
+    if counted == 0 {
+        var_info.shape.iter().copied().product::<u64>() as usize
+    } else {
+        total_elements
+    }
+}
+
+/// Checks if 3D Volume / Point Cloud rendering is permitted under the 128 MB GPU storage buffer limit.
+pub fn is_volume_allowed_for_selection(app: &OctantApp) -> bool {
+    let elements = calculate_selected_volume_elements(app);
+    if elements == 0 {
+        return false;
+    }
+    if elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+        return false;
+    }
+    if let Some(vdata) = &app.volume_data
+        && vdata.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
+    {
+        return false;
+    }
+    true
+}
+
 fn show_dimension_sliders(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
@@ -295,6 +421,36 @@ fn show_dimension_sliders(
         init_variable_dimension_defaults(app, var_info);
     }
 
+    // Top Download Summary indicator
+    let (requested_bytes, total_bytes) =
+        calculate_download_sizes(var_info, &app.dim_config, &app.selected_dim_ranges);
+
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Download").strong());
+        ui.label(egui::RichText::new(format_byte_size(requested_bytes)).strong());
+        ui.label(egui::RichText::new(format!("/ {}", format_byte_size(total_bytes))).weak());
+    });
+    ui.add_space(4.0);
+
+    // Warning banner when selected volume exceeds GPU limit for 3D Volume/Point Cloud
+    let total_vol_elements = calculate_selected_volume_elements(app);
+    if total_vol_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+        let vol_mb = (total_vol_elements * 4) as f64 / (1024.0 * 1024.0);
+        ui.group(|ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(
+                    egui::RichText::new(format!(
+                        "⚠️ 3D Volume & Point Cloud are disabled for this selection: volume size ({:.0} MB) exceeds the 128 MB GPU storage buffer limit. 2D Plane, 1D Line, and 3D Globe remain active.",
+                        vol_mb
+                    ))
+                    .small()
+                    .color(egui::Color32::from_rgb(255, 180, 80)),
+                );
+            });
+        });
+        ui.add_space(2.0);
+    }
+
     for i in 0..rank {
         let dim_size = var_info.shape[i] as usize;
         let dim_name = var_info
@@ -302,6 +458,8 @@ fn show_dimension_sliders(
             .get(i)
             .cloned()
             .unwrap_or_else(|| format!("dim_{}", i));
+
+        let is_animated = app.dim_config[i].animation == AnimationRole::Animated;
 
         ui.group(|ui| {
             ui.horizontal(|ui| {
@@ -346,8 +504,13 @@ fn show_dimension_sliders(
             if app.dim_config[i].active {
                 let (mut start, mut end) = app.selected_dim_ranges[i];
                 double_slider_with_inputs(ui, &dim_name, &mut start, &mut end, 0, dim_size - 1);
+
                 app.selected_dim_ranges[i] = (start, end);
-                app.selected_dim_indices[i] = start;
+                if is_animated {
+                    app.selected_dim_indices[i] = app.current_timestep.clamp(start, end);
+                } else {
+                    app.selected_dim_indices[i] = start;
+                }
             } else {
                 ui.horizontal(|ui| {
                     ui.label("Index:");

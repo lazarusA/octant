@@ -19,6 +19,16 @@ pub fn fetch_block(
     store_url: &str,
     request: &SliceRequest,
 ) -> Result<OctantBlock, BlockStoreError> {
+    fetch_block_with_progress(store, store_url, request, None)
+}
+
+/// Fetches an arbitrary-rank hyperslab described by `request` with progress reporting.
+pub fn fetch_block_with_progress(
+    store: ReadableWritableListableStorage,
+    store_url: &str,
+    request: &SliceRequest,
+    mut on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+) -> Result<OctantBlock, BlockStoreError> {
     let var_path = if request.variable.starts_with('/') {
         request.variable.clone()
     } else {
@@ -63,7 +73,7 @@ pub fn fetch_block(
                 })
             })
         })
-        .unwrap_or_else(|| (0..rank).map(|i| format!("dim_{i}")).collect());
+        .unwrap_or_else(|| crate::utils::default_dimension_names_for_rank(rank));
 
     let mut ranges: Vec<std::ops::Range<u64>> = Vec::with_capacity(rank);
     let mut block_shape = Vec::with_capacity(rank);
@@ -85,6 +95,10 @@ pub fn fetch_block(
 
     let subset = ArraySubset::new_with_ranges(&ranges);
     let raw_values = retrieve_array_subset_as_f32(&array, &subset).map_err(|e| e.to_string())?;
+    let bytes_read = (raw_values.len() * std::mem::size_of::<f32>()) as u64;
+    if let Some(ref mut cb) = on_progress {
+        cb(bytes_read);
+    }
 
     let attributes: HashMap<String, String> = array
         .attributes()
