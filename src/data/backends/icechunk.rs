@@ -32,7 +32,7 @@ impl IcechunkBlockStore {
     pub fn open(location: &str) -> Result<Self, BlockStoreError> {
         let storage = build_sync_icechunk_store(location).map_err(|e| e.to_string())?;
 
-        Ok(Self::new(storage, location))
+        Ok(Self::new(storage, location.trim_end_matches('/')))
     }
 }
 

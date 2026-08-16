@@ -114,7 +114,12 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits>(
             _ => (0..shape.len()).map(|i| format!("dim_{}", i)).collect(),
         });
 
-    let chunk_shape = shape.clone();
+    let zero_idx = vec![0u64; shape.len()];
+    let chunk_shape = array
+        .chunk_shape(&zero_idx)
+        .ok()
+        .map(|cs| cs.iter().map(|v| v.get()).collect::<Vec<u64>>())
+        .unwrap_or_else(|| shape.clone());
     let file_size = calculate_variable_size_bytes(&shape, &data_type);
 
     let attrs_map = array.attributes();
