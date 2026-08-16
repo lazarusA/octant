@@ -16,6 +16,34 @@ pub enum StoreKind {
     ProceduralRandom,
 }
 
+impl StoreKind {
+    pub fn to_data_source_kind(self) -> crate::data::DataSourceKind {
+        match self {
+            StoreKind::RemoteZarr => crate::data::DataSourceKind::RemoteZarr,
+            StoreKind::LocalZarr => crate::data::DataSourceKind::LocalZarr,
+            StoreKind::RemoteIcechunk => crate::data::DataSourceKind::RemoteIcechunk,
+            StoreKind::LocalIcechunk => crate::data::DataSourceKind::LocalIcechunk,
+            StoreKind::ProceduralRandom => {
+                crate::data::DataSourceKind::Other("ProceduralRandom".into())
+            }
+        }
+    }
+
+    pub fn from_data_source_kind(kind: &crate::data::DataSourceKind) -> Self {
+        match kind {
+            crate::data::DataSourceKind::RemoteZarr => StoreKind::RemoteZarr,
+            crate::data::DataSourceKind::LocalZarr => StoreKind::LocalZarr,
+            crate::data::DataSourceKind::RemoteIcechunk => StoreKind::RemoteIcechunk,
+            crate::data::DataSourceKind::LocalIcechunk => StoreKind::LocalIcechunk,
+            _ => StoreKind::ProceduralRandom,
+        }
+    }
+
+    pub fn make_source_id(kind: StoreKind, target: &str) -> String {
+        format!("{:?}:{}", kind, target)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpatialRole {
     None,
@@ -417,4 +445,60 @@ pub fn check_dimensional_compatibility(
         ));
     }
     Ok(())
+}
+
+impl OctantApp {
+    /// Returns the source_id string for the currently plotted store.
+    pub fn plotted_source_id(&self) -> String {
+        StoreKind::make_source_id(self.plotted_store_kind, &self.plotted_store_target_input)
+    }
+
+    /// Returns the source_id string for the currently selected (UI active) store.
+    pub fn selected_source_id(&self) -> String {
+        StoreKind::make_source_id(self.selected_store_kind, &self.store_target_input)
+    }
+
+    /// Synchronizes all plotted configuration fields from the current UI selection.
+    pub fn sync_plotted_state_from_selected(&mut self) {
+        self.plotted_store_kind = self.selected_store_kind;
+        self.plotted_store_target_input = self.store_target_input.clone();
+        self.plotted_dataset_metadata = self.active_dataset_metadata.clone();
+        self.plotted_variable_idx = self.selected_variable_idx;
+        self.plotted_dim_config = self.dim_config.clone();
+        self.plotted_selected_dim_indices = self.selected_dim_indices.clone();
+        self.plotted_selected_dim_ranges = self.selected_dim_ranges.clone();
+        self.plotted_spatial_dims = self.spatial_dims.clone();
+        self.plotted_animated_dim = self.animated_dim;
+        self.reset_variable_bounds();
+    }
+
+    /// Returns VariableInfo for the currently plotted variable, if available.
+    pub fn plotted_variable_info(&self) -> Option<&crate::data::VariableInfo> {
+        self.plotted_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.variables.get(self.plotted_variable_idx))
+    }
+
+    /// Returns VariableInfo for the currently selected variable, if available.
+    pub fn selected_variable_info(&self) -> Option<&crate::data::VariableInfo> {
+        self.active_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.variables.get(self.selected_variable_idx))
+    }
+
+    /// Returns the chunk size along `dim` for the currently plotted variable (defaults to 1).
+    pub fn plotted_chunk_size(&self, dim: usize) -> usize {
+        self.plotted_variable_info()
+            .and_then(|v| v.chunk_shape.get(dim))
+            .copied()
+            .unwrap_or(1) as usize
+    }
+
+    /// Returns the total extent along `dim` for the currently plotted variable (defaults to 1).
+    pub fn plotted_dim_size(&self, dim: usize) -> usize {
+        self.plotted_variable_info()
+            .and_then(|v| v.shape.get(dim))
+            .copied()
+            .unwrap_or(1) as usize
+    }
 }

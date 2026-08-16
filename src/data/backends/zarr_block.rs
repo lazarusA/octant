@@ -73,7 +73,7 @@ pub fn fetch_block_with_progress(
                 })
             })
         })
-        .unwrap_or_else(|| (0..rank).map(|i| format!("dim_{i}")).collect());
+        .unwrap_or_else(|| crate::utils::default_dimension_names_for_rank(rank));
 
     let mut ranges: Vec<std::ops::Range<u64>> = Vec::with_capacity(rank);
     let mut block_shape = Vec::with_capacity(rank);

@@ -34,16 +34,7 @@ impl OctantApp {
                     && let Some(var_info) = meta.variables.get(idx).cloned()
                 {
                     crate::ui::variables_panel::init_variable_dimension_defaults(self, &var_info);
-                    self.plotted_store_kind = self.selected_store_kind;
-                    self.plotted_store_target_input = self.store_target_input.clone();
-                    self.plotted_dataset_metadata = Some(meta);
-                    self.plotted_variable_idx = idx;
-                    self.plotted_dim_config = self.dim_config.clone();
-                    self.plotted_selected_dim_indices = self.selected_dim_indices.clone();
-                    self.plotted_selected_dim_ranges = self.selected_dim_ranges.clone();
-                    self.plotted_spatial_dims = self.spatial_dims.clone();
-                    self.plotted_animated_dim = self.animated_dim;
-                    self.reset_variable_bounds();
+                    self.sync_plotted_state_from_selected();
                 }
                 self.load_selected_variable_block();
             }
