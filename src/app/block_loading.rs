@@ -88,7 +88,6 @@ impl OctantApp {
                 block.bytes_size()
             );
             self.apply_block_projection(&block);
-            self.prefetch_selected_animated_range(&shape);
             return;
         }
 
@@ -110,7 +109,6 @@ impl OctantApp {
                 block.bytes_size()
             );
             self.apply_block_projection(&block);
-            self.prefetch_selected_animated_range(&shape);
             return;
         }
 
