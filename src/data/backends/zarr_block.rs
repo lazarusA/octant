@@ -3,6 +3,8 @@
 use std::collections::HashMap;
 
 use zarrs::array::{Array, ArraySubset};
+use zarrs::group::Group;
+use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata;
 use zarrs::storage::ReadableWritableListableStorage;
 
 use super::zarr_slice::retrieve_array_subset_as_f32;
@@ -35,7 +37,25 @@ pub fn fetch_block_with_progress(
         format!("/{}", request.variable)
     };
 
-    let array = Array::open(store.clone(), &var_path)?;
+    let array = if let Ok(arr) = Array::open(store.clone(), &var_path) {
+        arr
+    } else if let Ok(group) = Group::open(store.clone(), "/")
+        && let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata()
+        && let Some(node_meta) = metadata
+            .get(request.variable.trim_start_matches('/'))
+            .or_else(|| metadata.get(&var_path))
+        && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
+            store.clone(),
+            &var_path,
+            node_meta,
+        )
+    {
+        arr
+    } else if request.variable == "data" || request.variable.is_empty() {
+        Array::open(store.clone(), "/")?
+    } else {
+        Array::open(store.clone(), &var_path)?
+    };
     let shape = array.shape();
     let rank = shape.len();
 
@@ -106,7 +126,7 @@ pub fn fetch_block_with_progress(
         .map(|(k, v)| (k.clone(), v.to_string()))
         .collect();
 
-    let mut coordinates = HashMap::new();
+    let mut coordinates: HashMap<String, Vec<f64>> = HashMap::new();
     let total_dims = dim_names.len();
     for (i, name) in dim_names.iter().enumerate() {
         if let Some((first, last)) =

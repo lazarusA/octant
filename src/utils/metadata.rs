@@ -2,11 +2,94 @@ use crate::data::VariableInfo;
 use crate::utils::units::calculate_variable_size_bytes;
 use std::collections::HashMap;
 use std::error::Error;
-use zarrs::array::Array;
+use zarrs::array::{Array, ArrayMetadata};
 use zarrs::group::Group;
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata;
-use zarrs::node::{NodePath, get_child_nodes};
-use zarrs::storage::{ReadableStorageTraits, ReadableWritableListableStorage};
+use zarrs::node::{NodeMetadata, NodePath, get_child_nodes};
+use zarrs::storage::{
+    ReadableStorageTraits, ReadableWritableListableStorage, ReadableWritableListableStorageTraits,
+};
+
+/// Normalizes Zarr v3 array metadata to handle non-standard / Python numcodecs codec representations.
+pub fn normalize_v3_array_metadata(mut meta: serde_json::Value) -> serde_json::Value {
+    let dt_str = meta
+        .get("data_type")
+        .and_then(|d| d.as_str())
+        .unwrap_or("float32")
+        .to_string();
+    let typesize = match dt_str.as_str() {
+        "float64" | "int64" | "uint64" | "r64" => 8,
+        "float32" | "int32" | "uint32" | "r32" => 4,
+        "int16" | "uint16" | "float16" | "bfloat16" | "r16" => 2,
+        "int8" | "uint8" | "bool" | "r8" => 1,
+        _ => 4,
+    };
+
+    if let Some(codecs) = meta.get_mut("codecs").and_then(|c| c.as_array_mut()) {
+        for codec in codecs {
+            if let Some(obj) = codec.as_object_mut() {
+                if let Some(name) = obj.get("name").and_then(|n| n.as_str()) {
+                    if name == "numcodecs.blosc" || name.ends_with(".blosc") {
+                        obj.insert("name".to_string(), serde_json::json!("blosc"));
+                        if let Some(config) =
+                            obj.get_mut("configuration").and_then(|c| c.as_object_mut())
+                        {
+                            if !config.contains_key("typesize") {
+                                config.insert("typesize".to_string(), serde_json::json!(typesize));
+                            }
+                            if !config.contains_key("blocksize") {
+                                config.insert("blocksize".to_string(), serde_json::json!(0));
+                            }
+                            if let Some(shuffle) = config.get("shuffle") {
+                                if let Some(s_int) = shuffle.as_i64() {
+                                    let s_str = match s_int {
+                                        1 => "shuffle",
+                                        2 => "bitshuffle",
+                                        -1 => "autoshuffle",
+                                        _ => "noshuffle",
+                                    };
+                                    config.insert("shuffle".to_string(), serde_json::json!(s_str));
+                                }
+                            }
+                        }
+                    } else if name == "numcodecs.zstd" || name.ends_with(".zstd") {
+                        obj.insert("name".to_string(), serde_json::json!("zstd"));
+                    } else if name == "numcodecs.gzip" || name.ends_with(".gzip") {
+                        obj.insert("name".to_string(), serde_json::json!("gzip"));
+                    } else if name == "numcodecs.crc32c" || name.ends_with(".crc32c") {
+                        obj.insert("name".to_string(), serde_json::json!("crc32c"));
+                    }
+                }
+            }
+        }
+    }
+    meta
+}
+
+/// Helper to instantiate an Array from NodeMetadata, applying codec normalization if needed.
+pub fn instantiate_array_from_node_metadata(
+    store: ReadableWritableListableStorage,
+    path: &str,
+    node_meta: &NodeMetadata,
+) -> Option<Array<dyn ReadableWritableListableStorageTraits>> {
+    match node_meta {
+        NodeMetadata::Array(array_meta) => {
+            if let Ok(arr) = Array::new_with_metadata(store.clone(), path, array_meta.clone()) {
+                Some(arr)
+            } else if let Ok(meta_val) = serde_json::to_value(array_meta) {
+                let norm_val = normalize_v3_array_metadata(meta_val);
+                if let Ok(norm_meta) = serde_json::from_value::<ArrayMetadata>(norm_val) {
+                    Array::new_with_metadata(store, path, norm_meta).ok()
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+        _ => Array::open(store, path).ok(),
+    }
+}
 
 /// Format-agnostic store variable metadata extractor.
 /// Operates on any zarrs storage adapter (`ReadableWritableListableStorage`),
@@ -20,49 +103,39 @@ pub fn extract_store_variables(
 
     // 1. Try opening root as a Zarr Group
     if let Ok(group) = Group::open(store.clone(), "/") {
-        // Check if group contains consolidated metadata
-        let consolidated_arrays =
-            if let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata() {
-                let mut found_vars = Vec::new();
-                for (node_path, _node_meta) in metadata {
-                    let clean_path = if node_path.starts_with('/') {
-                        node_path.to_string()
-                    } else {
-                        format!("/{}", node_path)
-                    };
-                    if let Ok(array) = Array::open(store.clone(), &clean_path)
-                        && let Some(var_info) = variable_info_from_array(&array, node_path.as_str())
-                    {
-                        found_vars.push(var_info);
-                    }
+        // Check if group contains consolidated metadata (Zarr v2 or v3 inline)
+        let consolidated_arrays = if let Some(ConsolidatedMetadata { metadata, .. }) =
+            group.consolidated_metadata()
+        {
+            let mut found_vars = Vec::new();
+            for (node_path, node_meta) in metadata {
+                let clean_path = if node_path.starts_with('/') {
+                    node_path.to_string()
+                } else {
+                    format!("/{}", node_path)
+                };
+
+                let array_opt =
+                    instantiate_array_from_node_metadata(store.clone(), &clean_path, &node_meta);
+
+                if let Some(array) = array_opt
+                    && let Some(var_info) = variable_info_from_array(&array, node_path.as_str())
+                {
+                    found_vars.push(var_info);
                 }
-                found_vars
-            } else {
-                Vec::new()
-            };
+            }
+            found_vars
+        } else {
+            Vec::new()
+        };
 
         if !consolidated_arrays.is_empty() {
             return Ok(consolidated_arrays);
         }
 
-        // 2. Discover child nodes natively via zarrs get_child_nodes
-        if let Ok(root_path) = NodePath::new("/")
-            && let Ok(children) = get_child_nodes(&store, &root_path, true)
-        {
-            for child in children {
-                let path_str = child.path().as_str();
-                let var_name = path_str.trim_start_matches('/');
-                let var_name = if var_name.is_empty() {
-                    "data"
-                } else {
-                    var_name
-                };
-                if let Ok(array) = Array::open(store.clone(), path_str)
-                    && let Some(var_info) = variable_info_from_array(&array, var_name)
-                {
-                    variables.push(var_info);
-                }
-            }
+        // 2. Discover child nodes recursively via zarrs get_child_nodes
+        if let Ok(root_path) = NodePath::new("/") {
+            discover_child_nodes_recursive(&store, &root_path, &mut variables);
         }
     } else if let Ok(array) = Array::open(store.clone(), "/") {
         // 3. Root itself is a single Array
@@ -77,6 +150,31 @@ pub fn extract_store_variables(
     }
 
     Ok(variables)
+}
+
+fn discover_child_nodes_recursive(
+    store: &ReadableWritableListableStorage,
+    parent_path: &NodePath,
+    variables: &mut Vec<VariableInfo>,
+) {
+    if let Ok(children) = get_child_nodes(store, parent_path, false) {
+        for child in children {
+            let path_str = child.path().as_str();
+            let var_name = path_str.trim_start_matches('/');
+            let var_name = if var_name.is_empty() {
+                "data"
+            } else {
+                var_name
+            };
+            if let Ok(array) = Array::open(store.clone(), path_str) {
+                if let Some(var_info) = variable_info_from_array(&array, var_name) {
+                    variables.push(var_info);
+                }
+            } else if let Ok(child_path) = NodePath::new(path_str) {
+                discover_child_nodes_recursive(store, &child_path, variables);
+            }
+        }
+    }
 }
 
 /// Returns standard fallback dimension names for a given tensor rank.
@@ -116,6 +214,20 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits>(
                 .enumerate()
                 .map(|(i, n)| n.as_deref().unwrap_or(&format!("dim_{}", i)).to_string())
                 .collect()
+        })
+        .or_else(|| {
+            array.attributes().get("_ARRAY_DIMENSIONS").and_then(|v| {
+                v.as_array().map(|arr| {
+                    arr.iter()
+                        .enumerate()
+                        .map(|(i, s)| {
+                            s.as_str()
+                                .map(|str_v| str_v.to_string())
+                                .unwrap_or_else(|| format!("dim_{i}"))
+                        })
+                        .collect()
+                })
+            })
         })
         .unwrap_or_else(|| default_dimension_names_for_rank(shape.len()));
 
