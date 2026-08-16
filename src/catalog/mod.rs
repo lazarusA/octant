@@ -14,6 +14,7 @@ pub enum CatalogCategoryFilter {
     All,
     Zarr,
     Icechunk,
+    Procedural,
 }
 
 pub static ZARR_CATALOG: &[CatalogEntry] = &[
@@ -281,11 +282,33 @@ pub static ICECHUNK_CATALOG: &[CatalogEntry] = &[
     },
 ];
 
+pub static PROCEDURAL_CATALOG: &[CatalogEntry] = &[
+    CatalogEntry {
+        key: "procedural-4d-volume",
+        label: "4D Known-Truth Gaussian Volume",
+        subtitle: "Synthetic 4D Traveling Wave Packet with Exact Ground Truth & Orbiting Center",
+        store: "procedural://volume4d",
+        store_kind: StoreKind::ProceduralVolume4D,
+    },
+    CatalogEntry {
+        key: "procedural-2d-matrix",
+        label: "2D Procedural Matrix",
+        subtitle: "Synthetic 2D Sine Wave Scalar Field for Quick Tests",
+        store: "procedural://matrix2d",
+        store_kind: StoreKind::ProceduralRandom,
+    },
+];
+
 pub fn get_catalog_entries(filter: CatalogCategoryFilter) -> Vec<&'static CatalogEntry> {
     match filter {
-        CatalogCategoryFilter::All => ZARR_CATALOG.iter().chain(ICECHUNK_CATALOG.iter()).collect(),
+        CatalogCategoryFilter::All => ZARR_CATALOG
+            .iter()
+            .chain(ICECHUNK_CATALOG.iter())
+            .chain(PROCEDURAL_CATALOG.iter())
+            .collect(),
         CatalogCategoryFilter::Zarr => ZARR_CATALOG.iter().collect(),
         CatalogCategoryFilter::Icechunk => ICECHUNK_CATALOG.iter().collect(),
+        CatalogCategoryFilter::Procedural => PROCEDURAL_CATALOG.iter().collect(),
     }
 }
 
