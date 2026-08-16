@@ -16,7 +16,7 @@ pub fn get_shared_tokio_rt() -> Arc<tokio::runtime::Runtime> {
     SHARED_TOKIO_RT
         .get_or_init(|| {
             Arc::new(
-                tokio::runtime::Builder::new_current_thread()
+                tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
                     .expect("Failed to create shared Tokio runtime"),
