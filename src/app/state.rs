@@ -13,6 +13,7 @@ pub enum StoreKind {
     LocalZarr,
     RemoteIcechunk,
     LocalIcechunk,
+    ProceduralVolume4D,
     ProceduralRandom,
 }
 
@@ -23,8 +24,8 @@ impl StoreKind {
             StoreKind::LocalZarr => crate::data::DataSourceKind::LocalZarr,
             StoreKind::RemoteIcechunk => crate::data::DataSourceKind::RemoteIcechunk,
             StoreKind::LocalIcechunk => crate::data::DataSourceKind::LocalIcechunk,
-            StoreKind::ProceduralRandom => {
-                crate::data::DataSourceKind::Other("ProceduralRandom".into())
+            StoreKind::ProceduralVolume4D | StoreKind::ProceduralRandom => {
+                crate::data::DataSourceKind::Procedural
             }
         }
     }
@@ -35,6 +36,7 @@ impl StoreKind {
             crate::data::DataSourceKind::LocalZarr => StoreKind::LocalZarr,
             crate::data::DataSourceKind::RemoteIcechunk => StoreKind::RemoteIcechunk,
             crate::data::DataSourceKind::LocalIcechunk => StoreKind::LocalIcechunk,
+            crate::data::DataSourceKind::Procedural => StoreKind::ProceduralVolume4D,
             _ => StoreKind::ProceduralRandom,
         }
     }
@@ -381,7 +383,15 @@ impl OctantApp {
 
     /// Resets color range min and max to the current dataset/matrix slice bounds and unlocks bounds.
     pub fn reset_color_range(&mut self) {
-        if let Some(mdata) = &self.matrix_data {
+        let is_3d = self.active_plot_type == crate::plots::PlotType::Volume
+            || self.active_plot_type == crate::plots::PlotType::PointCloud;
+
+        if is_3d && let Some(vdata) = &self.volume_data {
+            self.color_range_min = vdata.min_val;
+            self.color_range_max = vdata.max_val;
+            self.volume_cmin = vdata.min_val;
+            self.volume_cmax = vdata.max_val;
+        } else if let Some(mdata) = &self.matrix_data {
             self.color_range_min = mdata.min_val;
             self.color_range_max = mdata.max_val;
             self.volume_cmin = mdata.min_val;

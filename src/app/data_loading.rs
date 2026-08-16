@@ -1,5 +1,3 @@
-use crate::data::{DatasetMetadata, VariableInfo};
-
 use super::OctantApp;
 use super::state::StoreKind;
 
@@ -134,28 +132,6 @@ impl OctantApp {
         self.metadata_rx = Some(rx);
 
         std::thread::spawn(move || {
-            if store_kind == StoreKind::ProceduralRandom {
-                let meta = DatasetMetadata {
-                    name: "Procedural Test Store".to_string(),
-                    store_type: "Random Procedural".to_string(),
-                    variables: vec![VariableInfo {
-                        name: "random_matrix".to_string(),
-                        data_type: "float32".to_string(),
-                        shape: vec![64, 64],
-                        dimension_names: vec!["y".to_string(), "x".to_string()],
-                        chunk_shape: vec![64, 64],
-                        file_size: crate::utils::calculate_variable_size_bytes(
-                            &[64, 64],
-                            "float32",
-                        ),
-                        ..Default::default()
-                    }],
-                    dimension_coordinates: std::collections::HashMap::new(),
-                };
-                let _ = tx.send(Ok(meta));
-                return;
-            }
-
             let kind = store_kind.to_data_source_kind();
             let source_id = StoreKind::make_source_id(store_kind, &target_input);
             let source = crate::data::DataSource::new(&source_id, kind, &target_input, "Store");

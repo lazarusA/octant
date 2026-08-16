@@ -144,6 +144,8 @@ impl OctantApp {
         if !self.lock_color_bounds {
             self.volume_cmin = data.min_val;
             self.volume_cmax = data.max_val;
+            self.color_range_min = data.min_val;
+            self.color_range_max = data.max_val;
         }
 
         self.volume_data = Some(data);

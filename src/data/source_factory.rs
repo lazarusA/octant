@@ -8,7 +8,9 @@ use super::{
     store_handle::StoreHandle,
 };
 
-use super::backends::{icechunk::IcechunkBlockStore, zarr::ZarrBlockStore};
+use super::backends::{
+    icechunk::IcechunkBlockStore, procedural::ProceduralBlockStore, zarr::ZarrBlockStore,
+};
 
 pub struct SourceFactory;
 
@@ -23,6 +25,8 @@ impl SourceFactory {
                 Arc::new(IcechunkBlockStore::open(&source.uri)?)
             }
 
+            DataSourceKind::Procedural => Arc::new(ProceduralBlockStore::open(&source.uri)?),
+
             DataSourceKind::NetCdf => {
                 return Err("NetCDF backend not yet implemented".into());
             }
@@ -32,7 +36,11 @@ impl SourceFactory {
             }
 
             DataSourceKind::Other(kind) => {
-                return Err(format!("Unsupported data source kind: {kind}").into());
+                if kind.to_lowercase().contains("procedural") {
+                    Arc::new(ProceduralBlockStore::open(&source.uri)?)
+                } else {
+                    return Err(format!("Unsupported data source kind: {kind}").into());
+                }
             }
         };
 
