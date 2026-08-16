@@ -757,3 +757,19 @@ fn test_volume_transparency_setting_default_and_toggle() {
     app.volume_transparency = true;
     assert!(app.volume_transparency);
 }
+
+#[test]
+fn test_volume_attenuation_and_advanced_algorithms() {
+    let mut app = OctantApp::default();
+    assert_eq!(app.volume_algorithm, 0);
+    assert_eq!(app.volume_attenuation, 0.0);
+
+    app.volume_attenuation = 1.5;
+    assert_eq!(app.volume_attenuation, 1.5);
+
+    // Test algorithm IDs: 0..=9
+    for algo_id in 0..=9 {
+        app.volume_algorithm = algo_id;
+        assert_eq!(app.volume_algorithm, algo_id);
+    }
+}

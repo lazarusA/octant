@@ -374,6 +374,7 @@ impl eframe::App for OctantApp {
                                 algorithm: self.volume_algorithm,
                                 isovalue: self.volume_isovalue,
                                 isorange: self.volume_isorange,
+                                attenuation: self.volume_attenuation,
                                 shift_x,
                                 shift_y,
                                 shift_z,
