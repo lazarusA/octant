@@ -59,7 +59,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         ui.label(egui::RichText::new(format!("📄 {}", var_info.name)).strong());
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui
-                                .button(egui::RichText::new("📊 Plot Data").strong().small())
+                                .button(egui::RichText::new("📊 Plot Data").strong())
                                 .clicked()
                             {
                                 should_plot = true;
@@ -76,16 +76,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     // inline rather than letting the toggle silently no-op
                     // for the other store kinds.
                     if should_plot {
-                        app.plotted_store_kind = app.selected_store_kind;
-                        app.plotted_store_target_input = app.store_target_input.clone();
-                        app.plotted_dataset_metadata = app.active_dataset_metadata.clone();
-                        app.plotted_variable_idx = app.selected_variable_idx;
-                        app.plotted_dim_config = app.dim_config.clone();
-                        app.plotted_selected_dim_indices = app.selected_dim_indices.clone();
-                        app.plotted_selected_dim_ranges = app.selected_dim_ranges.clone();
-                        app.plotted_spatial_dims = app.spatial_dims.clone();
-                        app.plotted_animated_dim = app.animated_dim;
-                        app.reset_variable_bounds();
+                        app.sync_plotted_state_from_selected();
                         app.load_selected_variable_block();
                         app.open_only_settings_panel();
                     }
@@ -330,46 +321,7 @@ pub fn calculate_max_animated_steps(
     (max_allowed, requested, spatial_elements_per_step)
 }
 
-/// Formats a byte count into a human-readable string (e.g. "500 B", "50 KB", "50 MB", "100 GB", "1.5 TB").
-pub fn format_byte_size(bytes: u64) -> String {
-    const KB: f64 = 1024.0;
-    const MB: f64 = KB * 1024.0;
-    const GB: f64 = MB * 1024.0;
-    const TB: f64 = GB * 1024.0;
-
-    let b = bytes as f64;
-    if b >= TB {
-        let tb = b / TB;
-        if (tb.fract() * 10.0).round() == 0.0 {
-            format!("{:.0} TB", tb)
-        } else {
-            format!("{:.1} TB", tb)
-        }
-    } else if b >= GB {
-        let gb = b / GB;
-        if (gb.fract() * 10.0).round() == 0.0 {
-            format!("{:.0} GB", gb)
-        } else {
-            format!("{:.1} GB", gb)
-        }
-    } else if b >= MB {
-        let mb = b / MB;
-        if (mb.fract() * 10.0).round() == 0.0 {
-            format!("{:.0} MB", mb)
-        } else {
-            format!("{:.1} MB", mb)
-        }
-    } else if b >= KB {
-        let kb = b / KB;
-        if (kb.fract() * 10.0).round() == 0.0 {
-            format!("{:.0} KB", kb)
-        } else {
-            format!("{:.1} KB", kb)
-        }
-    } else {
-        format!("{} B", bytes)
-    }
-}
+pub use crate::utils::format_byte_size;
 
 /// Calculates the requested payload size in bytes and the total dataset size in bytes for a variable.
 pub fn calculate_download_sizes(
@@ -377,18 +329,13 @@ pub fn calculate_download_sizes(
     dim_config: &[crate::app::DimConfig],
     selected_ranges: &[(usize, usize)],
 ) -> (u64, u64) {
-    let dtype_bytes = match var_info.data_type.to_lowercase().as_str() {
-        "f64" | "float64" | "i64" | "int64" | "u64" | "uint64" => 8,
-        "f16" | "float16" | "i16" | "int16" | "u16" | "uint16" => 2,
-        "i8" | "int8" | "u8" | "uint8" | "bool" => 1,
-        _ => 4,
-    };
+    let dtype_bytes = crate::utils::data_type_bytes(&var_info.data_type);
 
     let total_elements: u64 = var_info.shape.iter().copied().product::<u64>().max(1);
     let total_bytes = if var_info.file_size > 0 {
         var_info.file_size
     } else {
-        total_elements.saturating_mul(dtype_bytes as u64)
+        total_elements.saturating_mul(dtype_bytes)
     };
 
     let rank = var_info.shape.len();
@@ -407,7 +354,7 @@ pub fn calculate_download_sizes(
             requested_elements = requested_elements.saturating_mul(1);
         }
     }
-    let requested_bytes = requested_elements.saturating_mul(dtype_bytes as u64);
+    let requested_bytes = requested_elements.saturating_mul(dtype_bytes);
 
     (requested_bytes, total_bytes)
 }

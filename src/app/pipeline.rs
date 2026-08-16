@@ -38,29 +38,7 @@ impl OctantApp {
                 && self.sphere_renderer.is_some()
                 && self.surface_renderer.is_some()
             {
-                match self.active_plot_type {
-                    PlotType::Heatmap => {
-                        if let Some(renderer) = &self.renderer {
-                            renderer.update_data(&wgpu_render_state.queue, &data.values);
-                        }
-                    }
-                    PlotType::Sphere => {
-                        if let Some(sphere_renderer) = &self.sphere_renderer {
-                            sphere_renderer.update_data(&wgpu_render_state.queue, &data.values);
-                        }
-                    }
-                    PlotType::Surface | PlotType::Block => {
-                        if let Some(surface_renderer) = &self.surface_renderer {
-                            surface_renderer.update_data(&wgpu_render_state.queue, &data.values);
-                        }
-                    }
-                    PlotType::Line => {
-                        if let Some(line_renderer) = &self.line_renderer {
-                            line_renderer.update_data(&wgpu_render_state.queue, &data.values);
-                        }
-                    }
-                    PlotType::Volume | PlotType::PointCloud => {}
-                }
+                self.update_active_2d_renderer_data(&wgpu_render_state.queue, &data.values);
             } else {
                 let renderer = MatrixRenderer::new(
                     &wgpu_render_state.device,
@@ -332,6 +310,33 @@ impl OctantApp {
             format!("Along {} ({})", axis_letter, name)
         } else {
             format!("Along {}", fallback)
+        }
+    }
+
+    /// Updates GPU vertex/storage buffer data for the currently active 2D renderer.
+    pub fn update_active_2d_renderer_data(&self, queue: &wgpu::Queue, values: &[f32]) {
+        match self.active_plot_type {
+            PlotType::Heatmap => {
+                if let Some(renderer) = &self.renderer {
+                    renderer.update_data(queue, values);
+                }
+            }
+            PlotType::Sphere => {
+                if let Some(sphere_renderer) = &self.sphere_renderer {
+                    sphere_renderer.update_data(queue, values);
+                }
+            }
+            PlotType::Surface | PlotType::Block => {
+                if let Some(surface_renderer) = &self.surface_renderer {
+                    surface_renderer.update_data(queue, values);
+                }
+            }
+            PlotType::Line => {
+                if let Some(line_renderer) = &self.line_renderer {
+                    line_renderer.update_data(queue, values);
+                }
+            }
+            PlotType::Volume | PlotType::PointCloud => {}
         }
     }
 }

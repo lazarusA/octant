@@ -54,20 +54,7 @@ impl OctantBlock {
         );
 
         let strides = Self::row_major_strides(&shape);
-
-        let (min_value, max_value) = values
-            .iter()
-            .copied()
-            .filter(|v| !v.is_nan())
-            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-                (lo.min(v), hi.max(v))
-            });
-
-        let (min_value, max_value) = if min_value.is_finite() && max_value.is_finite() {
-            (min_value, max_value)
-        } else {
-            (0.0, 1.0)
-        };
+        let (min_value, max_value) = crate::utils::compute_finite_min_max(&values);
 
         Self {
             variable_name,
@@ -198,18 +185,7 @@ impl OctantBlock {
         }
 
         let (min_val, max_val) = if compute_bounds {
-            let (lo, hi) = values
-                .iter()
-                .copied()
-                .filter(|v| !v.is_nan())
-                .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-                    (lo.min(v), hi.max(v))
-                });
-            if lo.is_finite() && hi.is_finite() {
-                (lo, hi)
-            } else {
-                (0.0, 1.0)
-            }
+            crate::utils::compute_finite_min_max(&values)
         } else if self.min_value.is_finite() && self.max_value.is_finite() {
             (self.min_value, self.max_value)
         } else {
@@ -236,21 +212,20 @@ impl OctantBlock {
         dataset_name: &str,
         compute_bounds: bool,
     ) -> Option<crate::data::VolumeData> {
-        if x_dim >= self.rank() || y_dim >= self.rank() || fixed_indices.len() != self.rank() {
+        let has_z = z_dim < self.rank();
+
+        if x_dim == y_dim
+            || x_dim >= self.rank()
+            || y_dim >= self.rank()
+            || (has_z && (z_dim == x_dim || z_dim == y_dim))
+            || fixed_indices.len() != self.rank()
+        {
             return None;
         }
 
         let nx = self.shape[x_dim];
         let ny = self.shape[y_dim];
-        let (nz, has_z) = if z_dim < self.rank() && z_dim != x_dim && z_dim != y_dim {
-            (self.shape[z_dim], true)
-        } else {
-            (1, false)
-        };
-
-        if x_dim == y_dim {
-            return None;
-        }
+        let nz = if has_z { self.shape[z_dim] } else { 1 };
 
         // Limit nz so that nx * ny * eff_nz <= MAX_GPU_STORAGE_BUFFER_ELEMENTS
         let slice_elements = nx.saturating_mul(ny).max(1);
@@ -258,29 +233,18 @@ impl OctantBlock {
             (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS / slice_elements).clamp(1, nz);
         let eff_nz = nz.min(max_z);
 
-        // Fast path: if 3D array matching shape [nz, ny, nx] exactly and fits within GPU buffer limit
-        if self.rank() == 3
-            && z_dim == 0
+        let is_full_3d = self.rank() == 3
+            && x_dim == 0
             && y_dim == 1
-            && x_dim == 2
-            && self.values.len() == nx * ny * nz
-            && nz == eff_nz
-        {
-            let (min_val, max_val) = if compute_bounds {
-                let (lo, hi) = self
-                    .values
-                    .iter()
-                    .copied()
-                    .filter(|v| !v.is_nan())
-                    .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-                        (lo.min(v), hi.max(v))
-                    });
+            && z_dim == 2
+            && self.strides[0] == self.shape[1] * self.shape[2]
+            && self.strides[1] == self.shape[2]
+            && self.strides[2] == 1
+            && nz == eff_nz;
 
-                if lo.is_finite() && hi.is_finite() {
-                    (lo, hi)
-                } else {
-                    (0.0, 1.0)
-                }
+        if is_full_3d {
+            let (min_val, max_val) = if compute_bounds {
+                crate::utils::compute_finite_min_max(&self.values)
             } else if self.min_value.is_finite() && self.max_value.is_finite() {
                 (self.min_value, self.max_value)
             } else {
@@ -341,19 +305,7 @@ impl OctantBlock {
         }
 
         let (min_val, max_val) = if compute_bounds {
-            let (lo, hi) = values
-                .iter()
-                .copied()
-                .filter(|v| !v.is_nan())
-                .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), v| {
-                    (lo.min(v), hi.max(v))
-                });
-
-            if lo.is_finite() && hi.is_finite() {
-                (lo, hi)
-            } else {
-                (0.0, 1.0)
-            }
+            crate::utils::compute_finite_min_max(&values)
         } else if self.min_value.is_finite() && self.max_value.is_finite() {
             (self.min_value, self.max_value)
         } else {

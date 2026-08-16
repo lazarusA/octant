@@ -1,14 +1,59 @@
-/// Calculate uncompressed file/variable size in bytes based on shape and data type string.
-pub fn calculate_variable_size_bytes(shape: &[u64], data_type: &str) -> u64 {
-    let element_count: u64 = shape.iter().product();
-    let bytes_per_elem: u64 = match data_type.to_lowercase().as_str() {
+/// Returns the byte width of a data type string (e.g. "f64" -> 8, "f32" -> 4, "f16" -> 2, "i8" -> 1).
+pub fn data_type_bytes(data_type: &str) -> u64 {
+    match data_type.to_lowercase().as_str() {
         "float64" | "double" | "f64" | "i64" | "u64" | "int64" | "uint64" => 8,
         "float32" | "float" | "f32" | "i32" | "u32" | "int32" | "uint32" => 4,
         "float16" | "f16" | "i16" | "u16" | "int16" | "uint16" => 2,
         "i8" | "u8" | "int8" | "uint8" | "bool" => 1,
         _ => 4,
-    };
-    element_count.saturating_mul(bytes_per_elem)
+    }
+}
+
+/// Formats a byte count into a human-readable string (e.g. "500 B", "50 KB", "50 MB", "100 GB", "1.5 TB").
+pub fn format_byte_size(bytes: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    const TB: f64 = GB * 1024.0;
+
+    let b = bytes as f64;
+    if b >= TB {
+        let tb = b / TB;
+        if (tb.fract() * 10.0).round() == 0.0 {
+            format!("{:.0} TB", tb)
+        } else {
+            format!("{:.1} TB", tb)
+        }
+    } else if b >= GB {
+        let gb = b / GB;
+        if (gb.fract() * 10.0).round() == 0.0 {
+            format!("{:.0} GB", gb)
+        } else {
+            format!("{:.1} GB", gb)
+        }
+    } else if b >= MB {
+        let mb = b / MB;
+        if (mb.fract() * 10.0).round() == 0.0 {
+            format!("{:.0} MB", mb)
+        } else {
+            format!("{:.1} MB", mb)
+        }
+    } else if b >= KB {
+        let kb = b / KB;
+        if (kb.fract() * 10.0).round() == 0.0 {
+            format!("{:.0} KB", kb)
+        } else {
+            format!("{:.1} KB", kb)
+        }
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+/// Calculate uncompressed file/variable size in bytes based on shape and data type string.
+pub fn calculate_variable_size_bytes(shape: &[u64], data_type: &str) -> u64 {
+    let element_count: u64 = shape.iter().product();
+    element_count.saturating_mul(data_type_bytes(data_type))
 }
 
 /// Map of CF time unit names and short aliases to milliseconds per unit.

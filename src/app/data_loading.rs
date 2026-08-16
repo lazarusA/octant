@@ -156,17 +156,8 @@ impl OctantApp {
                 return;
             }
 
-            let kind = match store_kind {
-                StoreKind::RemoteZarr => crate::data::DataSourceKind::RemoteZarr,
-                StoreKind::LocalZarr => crate::data::DataSourceKind::LocalZarr,
-                StoreKind::RemoteIcechunk => crate::data::DataSourceKind::RemoteIcechunk,
-                StoreKind::LocalIcechunk => crate::data::DataSourceKind::LocalIcechunk,
-                StoreKind::ProceduralRandom => {
-                    crate::data::DataSourceKind::Other("ProceduralRandom".into())
-                }
-            };
-
-            let source_id = format!("{:?}:{}", store_kind, target_input);
+            let kind = store_kind.to_data_source_kind();
+            let source_id = StoreKind::make_source_id(store_kind, &target_input);
             let source = crate::data::DataSource::new(&source_id, kind, &target_input, "Store");
 
             let res = crate::data::SourceFactory::open(source)
