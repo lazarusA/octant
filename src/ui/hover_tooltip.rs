@@ -27,7 +27,12 @@ pub struct Camera3D {
 impl Camera3D {
     pub fn from_app(app: &OctantApp, rect: Rect) -> Self {
         let screen_aspect = (rect.width() / rect.height().max(1.0)).max(0.01);
-        let cam_dist = app.sphere_zoom.clamp(1.1, 10.0);
+        let min_zoom = if app.active_plot_type == PlotType::Sphere {
+            1.1
+        } else {
+            0.1
+        };
+        let cam_dist = app.sphere_zoom.clamp(min_zoom, 10.0);
         let fov_scale = 1.6_f32;
         let cx = app.sphere_rotation_x.cos();
         let sx = app.sphere_rotation_x.sin();
@@ -616,7 +621,7 @@ pub fn show_hover_tooltip(
             let aspects = app.get_3d_aspect_ratio();
 
             let (hit_x, hit_y, hit_z, hit_val) =
-                match sampler.march_ray(app, &world_ray, aspects, false) {
+                match sampler.march_ray(app, &world_ray, aspects, true) {
                     Some(hit) => hit,
                     None => return,
                 };
@@ -1222,9 +1227,9 @@ pub fn show_hover_tooltip(
                 let v_c = (hit_y as f32 + 0.5) / sampler.height as f32;
                 let w_c = (hit_z as f32 + 0.5) / sampler.depth as f32;
 
-                let norm_x = (-1.0 + u_c * 2.0) * aspect_x;
-                let norm_y = (1.0 - v_c * 2.0) * aspect_y;
-                let norm_z = (1.0 - w_c * 2.0) * aspect_z;
+                let norm_x = (u_c - 0.5) * aspect_x;
+                let norm_y = (0.5 - v_c) * aspect_y;
+                let norm_z = (0.5 - w_c) * aspect_z;
 
                 camera.project_point([norm_x, norm_y, norm_z])
             } else {
