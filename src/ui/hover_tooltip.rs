@@ -248,7 +248,9 @@ impl<'a> VolumeSampler<'a> {
         let mut hit_point = None;
         let mut last_cell = None;
         let mut max_intensity_hit = None;
+        let mut min_intensity_hit = None;
         let mut max_val = -1e30_f32;
+        let mut min_val = 1e30_f32;
 
         for i in 0..num_steps {
             let t = t_start + (i as f32 + 0.5) * dt;
@@ -314,6 +316,27 @@ impl<'a> VolumeSampler<'a> {
                             max_intensity_hit = Some((cx, cy, cz, raw_val));
                         }
                     }
+                } else if is_half_scale
+                    && app.active_plot_type == PlotType::Volume
+                    && app.volume_algorithm == 3
+                {
+                    // MinIP mode
+                    if !is_nan && raw_val < min_val {
+                        let is_visible = app.use_lowclip || raw_val >= app.color_range_min;
+                        if is_visible {
+                            min_val = raw_val;
+                            min_intensity_hit = Some((cx, cy, cz, raw_val));
+                        }
+                    }
+                } else if is_half_scale
+                    && app.active_plot_type == PlotType::Volume
+                    && app.volume_algorithm == 5
+                {
+                    // Categorical Label Isosurface mode
+                    if !is_nan && raw_val >= 0.5 {
+                        hit_point = Some((cx, cy, cz, raw_val));
+                        break;
+                    }
                 } else if self.is_visible(app, raw_val) {
                     hit_point = Some((cx, cy, cz, raw_val));
                     break;
@@ -323,6 +346,11 @@ impl<'a> VolumeSampler<'a> {
 
         if is_half_scale && app.active_plot_type == PlotType::Volume && app.volume_algorithm == 2 {
             max_intensity_hit.or(hit_point)
+        } else if is_half_scale
+            && app.active_plot_type == PlotType::Volume
+            && app.volume_algorithm == 3
+        {
+            min_intensity_hit.or(hit_point)
         } else {
             hit_point
         }

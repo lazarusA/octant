@@ -48,48 +48,75 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     match app.active_plot_type {
         PlotType::Volume => {
-            let algo_label = match app.volume_algorithm {
-                0 => "☁️ Volume Raymarching",
-                1 => "🎯 Solid Isosurface (WIP)",
-                2 => "⚡ Maximum Intensity (MIP)",
-                3 => "🌫 Absorption RGBA (WIP)",
-                4 => "✨ Additive RGBA (WIP)",
-                5 => "🎨 Indexed RGBA (WIP)",
-                _ => "📐 Shaded Contours (WIP)",
-            };
-            ui.menu_button(egui::RichText::new(algo_label).small(), |ui| {
-                let algos = [
-                    (0, "☁️ Volume Raymarching (Default)"),
-                    (1, "🎯 Solid Isosurface (WIP / Experimental)"),
-                    (2, "⚡ Maximum Intensity (MIP)"),
-                    (3, "🌫 Absorption RGBA (WIP / Experimental)"),
-                    (4, "✨ Additive RGBA (WIP / Experimental)"),
-                    (5, "🎨 Indexed RGBA (WIP / Experimental)"),
-                    (6, "📐 Shaded Contours (WIP / Experimental)"),
-                ];
-                for (id, label) in algos {
-                    if ui
-                        .selectable_label(app.volume_algorithm == id, label)
-                        .clicked()
-                    {
-                        app.volume_algorithm = id;
-                        ui.close();
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("🧪 Experimental")
+                        .small()
+                        .color(ui.visuals().weak_text_color()),
+                );
+                let algo_label = match app.volume_algorithm {
+                    0 => "☁️ Volume Raymarching",
+                    1 => "🎯 Isosurface (Sobel)",
+                    2 => "⚡ Maximum Intensity (MIP)",
+                    3 => "🌑 Minimum Intensity (MinIP)",
+                    4 => "🔬 Average Projection (X-ray)",
+                    5 => "🏷️ Categorical Label Surface",
+                    6 => "🌫 Absorption RGBA",
+                    7 => "✨ Additive RGBA",
+                    8 => "🎨 Indexed RGBA",
+                    _ => "📐 Shaded Contours",
+                };
+                ui.menu_button(egui::RichText::new(algo_label).small(), |ui| {
+                    let algos = [
+                        (0, "☁️ Volume Raymarching (DVR)"),
+                        (1, "🎯 Isosurface (Sub-Voxel + Sobel)"),
+                        (2, "⚡ Maximum Intensity (MIP)"),
+                        (3, "🌑 Minimum Intensity (MinIP)"),
+                        (4, "🔬 Average Projection (X-ray)"),
+                        (5, "🏷️ Categorical Label Surface"),
+                        (6, "🌫 Absorption RGBA"),
+                        (7, "✨ Additive RGBA"),
+                        (8, "🎨 Indexed RGBA"),
+                        (9, "📐 Shaded Contours"),
+                    ];
+                    for (id, label) in algos {
+                        if ui
+                            .selectable_label(app.volume_algorithm == id, label)
+                            .clicked()
+                        {
+                            app.volume_algorithm = id;
+                            ui.close();
+                        }
                     }
-                }
+                });
             });
 
             ui.separator();
             ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("Steps"));
             ui.checkbox(&mut app.volume_transparency, "✨ Transparency");
 
-            if app.volume_algorithm != 1 && app.volume_algorithm != 2 {
+            if app.volume_algorithm != 1
+                && app.volume_algorithm != 2
+                && app.volume_algorithm != 3
+                && app.volume_algorithm != 4
+                && app.volume_algorithm != 5
+            {
                 ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("💧 Density"));
+            }
+
+            if app.volume_algorithm == 2 {
+                ui.add(
+                    egui::Slider::new(&mut app.volume_attenuation, 0.0..=5.0)
+                        .text("📉 Attenuation"),
+                );
             }
 
             if app.volume_algorithm == 0
                 || app.volume_algorithm == 1
                 || app.volume_algorithm == 2
-                || app.volume_algorithm == 6
+                || app.volume_algorithm == 3
+                || app.volume_algorithm == 4
+                || app.volume_algorithm == 9
             {
                 ui.separator();
                 if app.volume_algorithm != 2 {
