@@ -306,7 +306,7 @@ fn test_calculate_max_animated_steps_small_and_large_datasets() {
         );
     assert_eq!(spatial_large, 2048 * 2048);
     assert_eq!(requested_large, 500);
-    assert_eq!(max_allowed_large, 16); // strictly clamped to 16 steps!
+    assert_eq!(max_allowed_large, 8); // strictly clamped to 8 steps on 128 MB limit!
 }
 
 #[test]
@@ -362,6 +362,66 @@ fn test_format_byte_size_and_calculate_download_sizes() {
 
     assert_eq!(requested, 10 * 1000 * 1000 * 4); // 40 MB
     assert_eq!(total, 100 * 1000 * 1000 * 4); // 400 MB
+}
+
+#[test]
+fn test_selected_volume_elements_and_limit() {
+    use octant::data::DatasetMetadata;
+    use octant::ui::variables_panel::{
+        calculate_selected_volume_elements, is_volume_allowed_for_selection,
+    };
+
+    let mut app = OctantApp::default();
+    let var_info = VariableInfo {
+        name: "huge_var".to_string(),
+        data_type: "f32".to_string(),
+        shape: vec![50, 1000, 1000],
+        chunk_shape: vec![1, 500, 500],
+        dimension_names: vec!["z".to_string(), "y".to_string(), "x".to_string()],
+        units: None,
+        long_name: None,
+        temporal_resolution: None,
+        time_coverage_start: None,
+        time_coverage_end: None,
+        file_size: 50 * 1000 * 1000 * 4,
+        attributes: HashMap::new(),
+    };
+    app.active_dataset_metadata = Some(DatasetMetadata {
+        name: "test_ds".to_string(),
+        store_type: "zarr".to_string(),
+        variables: vec![var_info.clone()],
+        dimension_coordinates: HashMap::new(),
+    });
+    app.selected_variable_idx = 0;
+    app.selected_dim_ranges = vec![(0, 49), (0, 999), (0, 999)];
+    app.dim_config = vec![
+        octant::app::DimConfig {
+            active: true,
+            spatial: SpatialRole::Z,
+            animation: AnimationRole::None,
+        },
+        octant::app::DimConfig {
+            active: true,
+            spatial: SpatialRole::Y,
+            animation: AnimationRole::None,
+        },
+        octant::app::DimConfig {
+            active: true,
+            spatial: SpatialRole::X,
+            animation: AnimationRole::None,
+        },
+    ];
+
+    // 50 * 1000 * 1000 = 50,000,000 floats (200 MB) > 33,554,432 (128 MB)
+    let elements = calculate_selected_volume_elements(&app);
+    assert_eq!(elements, 50_000_000);
+    assert!(!is_volume_allowed_for_selection(&app));
+
+    // Reducing Z range to 10 slices: 10 * 1000 * 1000 = 10,000,000 floats (40 MB) <= 128 MB
+    app.selected_dim_ranges[0] = (0, 9);
+    let elements_small = calculate_selected_volume_elements(&app);
+    assert_eq!(elements_small, 10_000_000);
+    assert!(is_volume_allowed_for_selection(&app));
 }
 
 #[test]
