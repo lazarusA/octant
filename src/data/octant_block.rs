@@ -5,6 +5,7 @@
 //! Once resident, rendering code does not need to know where it came from.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct OctantBlock {
@@ -19,8 +20,8 @@ pub struct OctantBlock {
     /// Global origin of this block inside the source array.
     pub origin: Vec<usize>,
 
-    /// Row-major values.
-    pub values: Vec<f32>,
+    /// Row-major values wrapped in Arc for O(1) cloning and zero-copy sharing.
+    pub values: Arc<[f32]>,
 
     /// Row-major strides.
     pub strides: Vec<usize>,
@@ -41,10 +42,11 @@ impl OctantBlock {
         shape: Vec<usize>,
         dimension_names: Vec<String>,
         origin: Vec<usize>,
-        values: Vec<f32>,
+        values: impl Into<Arc<[f32]>>,
         coordinates: HashMap<String, Vec<f64>>,
         attributes: HashMap<String, String>,
     ) -> Self {
+        let values: Arc<[f32]> = values.into();
         debug_assert_eq!(
             values.len(),
             shape.iter().copied().product::<usize>(),
@@ -153,8 +155,27 @@ impl OctantBlock {
             }
         }
 
-        let mut values = Vec::with_capacity(width * height);
-        if stride_x == 1 {
+        let slice_len = width * height;
+        let mut values = Vec::with_capacity(slice_len);
+        if stride_x == 1 && stride_y == width {
+            let slice_end = base_offset + slice_len;
+            if slice_end <= self.values.len() {
+                values.extend_from_slice(&self.values[base_offset..slice_end]);
+            } else {
+                for y in 0..height {
+                    let row_start = base_offset + y * stride_y;
+                    let row_end = row_start + width;
+                    if row_end <= self.values.len() {
+                        values.extend_from_slice(&self.values[row_start..row_end]);
+                    } else {
+                        for x in 0..width {
+                            values
+                                .push(self.values.get(row_start + x).copied().unwrap_or(f32::NAN));
+                        }
+                    }
+                }
+            }
+        } else if stride_x == 1 {
             for y in 0..height {
                 let row_start = base_offset + y * stride_y;
                 let row_end = row_start + width;
@@ -270,7 +291,7 @@ impl OctantBlock {
                 nx,
                 ny,
                 nz,
-                self.values.clone(),
+                self.values.to_vec(),
                 min_val,
                 max_val,
                 dataset_name.to_string(),
