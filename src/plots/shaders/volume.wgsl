@@ -33,7 +33,7 @@ struct Uniforms {
     shift_x: u32,
     shift_y: u32,
     shift_z: u32,
-    _pad0: u32,
+    transparency: u32,
     _pad1: u32,
     color: ColorUniforms,
 };
@@ -276,8 +276,16 @@ fn volume_hitbox_threshold(vOrigin: vec3<f32>, rayDir: vec3<f32>, bounds: vec2<f
             let range = max(threshold_max - threshold_min, 0.0001);
             let sampLoc = clamp((d - threshold_min) / range, 0.0, 1.0);
             col = sample_colormap(uniforms.color.colormap, sampLoc);
-            let alpha_exponent = max(uniforms.absorption, 0.1);
-            alpha = clamp(pow(max(sampLoc, 0.001), 1.0 / alpha_exponent), 0.01, 1.0);
+
+            if (uniforms.transparency == 1u) {
+                let alpha_exponent = max(uniforms.absorption, 0.1);
+                alpha = clamp(pow(max(sampLoc, 0.001), 1.0 / alpha_exponent), 0.01, 1.0);
+            } else {
+                // In opaque mode, the first hit boundary is solid with lighting
+                let N = gennormal(texCoord);
+                let shaded = blinnphong(N, -rayDir, uniforms.light_direction, col);
+                return vec4<f32>(shaded, 1.0);
+            }
         }
 
         if (alpha > 0.0) {
@@ -297,26 +305,35 @@ fn volume_hitbox_threshold(vOrigin: vec3<f32>, rayDir: vec3<f32>, bounds: vec2<f
 // Modes (Isosurface, MIP, Absorption, Additive, Indexed, Contours)
 fn isosurface(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var pos = front;
-    var c = vec4<f32>(0.0);
     let diffuse_color = color_lookup(uniforms.isovalue);
     let camdir = normalize(-dir);
-    let step_size = length(dir);
     let samples_count = i32(max(uniforms.samples, 8u));
+
+    var accum_color = vec3<f32>(0.0);
+    var accum_alpha: f32 = 0.0;
 
     for (var i = 0; i < samples_count; i = i + 1) {
         let density = sample_volume_scalar(pos);
         if (abs(density - uniforms.isovalue) < uniforms.isorange) {
             let N = gennormal(pos);
             let L = uniforms.light_direction;
-            c = vec4<f32>(
-                blinnphong(N, camdir, L, diffuse_color.rgb),
-                diffuse_color.a
-            );
-            break;
+            let shaded = blinnphong(N, camdir, L, diffuse_color.rgb);
+
+            if (uniforms.transparency == 0u) {
+                return vec4<f32>(shaded, 1.0);
+            }
+
+            let iso_alpha = clamp(0.4 * uniforms.absorption, 0.05, 0.95);
+            accum_color = accum_color + (1.0 - accum_alpha) * iso_alpha * shaded;
+            accum_alpha = accum_alpha + (1.0 - accum_alpha) * iso_alpha;
+
+            if (accum_alpha >= 0.95) {
+                break;
+            }
         }
         pos = pos + dir;
     }
-    return c;
+    return vec4<f32>(accum_color, accum_alpha);
 }
 
 fn mip(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
@@ -336,7 +353,11 @@ fn mip(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     if (maximum == -1e30) {
         maximum = 1e30;
     }
-    return color_lookup(maximum);
+    let col = color_lookup(maximum);
+    if (uniforms.transparency == 0u) {
+        return vec4<f32>(col.rgb, 1.0);
+    }
+    return col;
 }
 
 fn absorptionrgba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
@@ -349,15 +370,26 @@ fn absorptionrgba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     for (var i = 0; i < samples_count; i = i + 1) {
         let color_sample = sample_volume_rgba(pos);
 
-        let opacity = clamp(step_size * color_sample.a * uniforms.absorption, 0.0, 1.0);
-        color_sum = color_sum + (transmittance * opacity) * color_sample.rgb;
-        transmittance = transmittance * (1.0 - opacity);
+        if (uniforms.transparency == 0u) {
+            if (color_sample.a > 0.05) {
+                let N = gennormal(pos);
+                let shaded = blinnphong(N, normalize(-dir), uniforms.light_direction, color_sample.rgb);
+                return vec4<f32>(shaded, 1.0);
+            }
+        } else {
+            let opacity = clamp(step_size * color_sample.a * uniforms.absorption, 0.0, 1.0);
+            color_sum = color_sum + (transmittance * opacity) * color_sample.rgb;
+            transmittance = transmittance * (1.0 - opacity);
 
-        if (transmittance <= 0.01) {
-            break;
+            if (transmittance <= 0.01) {
+                break;
+            }
         }
 
         pos = pos + dir;
+    }
+    if (uniforms.transparency == 0u) {
+        return vec4<f32>(0.0);
     }
     if (1.0 - transmittance <= 0.0) {
         return vec4<f32>(0.0);
@@ -417,11 +449,15 @@ fn contours(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
         let intensity = sample_volume_scalar(pos);
         if (intensity >= uniforms.color.cmin && intensity <= uniforms.color.cmax) {
             let color_sample = color_lookup(intensity);
-            let opacity = clamp(step_size * max(color_sample.a, 0.1) * uniforms.absorption, 0.0, 1.0);
-
             let N = gennormal(pos);
             let L = normalize(vec3<f32>(0.4, 0.8, 0.6));
             let opaque = blinnphong(N, camdir, L, color_sample.rgb);
+
+            if (uniforms.transparency == 0u) {
+                return vec4<f32>(opaque, 1.0);
+            }
+
+            let opacity = clamp(step_size * max(color_sample.a, 0.1) * uniforms.absorption, 0.0, 1.0);
             color_sum = color_sum + (transmittance * opacity) * opaque;
             transmittance = transmittance * (1.0 - opacity);
 
@@ -430,6 +466,9 @@ fn contours(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
             }
         }
         pos = pos + dir;
+    }
+    if (uniforms.transparency == 0u) {
+        return vec4<f32>(0.0);
     }
     if (1.0 - transmittance <= 0.0) {
         return vec4<f32>(0.0);

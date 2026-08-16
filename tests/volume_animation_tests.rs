@@ -745,3 +745,15 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
     assert_eq!(app.color_range_min, vdata.min_val);
     assert_eq!(app.color_range_max, vdata.max_val);
 }
+
+#[test]
+fn test_volume_transparency_setting_default_and_toggle() {
+    let mut app = OctantApp::default();
+    assert!(app.volume_transparency);
+
+    app.volume_transparency = false;
+    assert!(!app.volume_transparency);
+
+    app.volume_transparency = true;
+    assert!(app.volume_transparency);
+}
