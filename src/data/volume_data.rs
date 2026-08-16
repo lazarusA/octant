@@ -29,4 +29,29 @@ impl VolumeData {
             dataset_name,
         }
     }
+
+    pub fn new_procedural(
+        width: usize,
+        height: usize,
+        depth: usize,
+        timestep: usize,
+        max_timesteps: usize,
+    ) -> Self {
+        let (values, min_val, max_val) = super::procedural::generate_procedural_volume_3d(
+            width,
+            height,
+            depth,
+            timestep,
+            max_timesteps,
+        );
+        Self::new(
+            width,
+            height,
+            depth,
+            values,
+            min_val,
+            max_val,
+            format!("Procedural Volume [t={timestep}]"),
+        )
+    }
 }

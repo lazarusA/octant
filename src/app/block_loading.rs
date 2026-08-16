@@ -388,7 +388,7 @@ impl OctantApp {
     }
 
     /// Projects a resident block into current 2D and 3D views.
-    fn apply_block_projection(&mut self, block: &crate::data::octant_block::OctantBlock) {
+    pub fn apply_block_projection(&mut self, block: &crate::data::octant_block::OctantBlock) {
         let anim_dim = self.plotted_animated_dim;
 
         let orig_dim_names: Vec<String> = self

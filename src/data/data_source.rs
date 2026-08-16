@@ -11,6 +11,8 @@ pub enum DataSourceKind {
     LocalIcechunk,
     RemoteIcechunk,
 
+    Procedural,
+
     NetCdf,
     GeoTiff,
 

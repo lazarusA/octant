@@ -1,5 +1,7 @@
 use crate::app::{OctantApp, StoreKind};
-use crate::catalog::{CatalogCategoryFilter, ICECHUNK_CATALOG, ZARR_CATALOG, get_catalog_entries};
+use crate::catalog::{
+    CatalogCategoryFilter, ICECHUNK_CATALOG, PROCEDURAL_CATALOG, ZARR_CATALOG, get_catalog_entries,
+};
 
 pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     if !app.show_catalog_window {
@@ -23,14 +25,15 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
-                ui.heading("🌐 Zarr & 🧊 Icechunk Dataset Catalog");
+                ui.heading("🌐 Zarr, 🧊 Icechunk & 🎲 Procedural Dataset Catalog");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let total_count = ZARR_CATALOG.len() + ICECHUNK_CATALOG.len();
+                    let total_count =
+                        ZARR_CATALOG.len() + ICECHUNK_CATALOG.len() + PROCEDURAL_CATALOG.len();
                     ui.small(format!("{} total stores", total_count));
                 });
             });
             ui.label(
-                egui::RichText::new("Browse curated cloud Zarr and Icechunk datasets. Select any entry to load it into Octant.")
+                egui::RichText::new("Browse curated cloud Zarr, Icechunk, and procedural ground-truth datasets. Select any entry to load it into Octant.")
                     .small()
                     .italics(),
             );
@@ -50,7 +53,8 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
 
                 let zarr_count = ZARR_CATALOG.len();
                 let icechunk_count = ICECHUNK_CATALOG.len();
-                let total_count = zarr_count + icechunk_count;
+                let procedural_count = PROCEDURAL_CATALOG.len();
+                let total_count = zarr_count + icechunk_count + procedural_count;
 
                 ui.selectable_value(
                     &mut app.catalog_category_filter,
@@ -66,6 +70,11 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                     &mut app.catalog_category_filter,
                     CatalogCategoryFilter::Icechunk,
                     format!("🧊 Icechunk ({})", icechunk_count),
+                );
+                ui.selectable_value(
+                    &mut app.catalog_category_filter,
+                    CatalogCategoryFilter::Procedural,
+                    format!("🎲 Procedural ({})", procedural_count),
                 );
             });
 
@@ -110,11 +119,19 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                                     let badge_text = match entry.store_kind {
                                         StoreKind::RemoteZarr => "🌐 Zarr",
                                         StoreKind::RemoteIcechunk => "🧊 Icechunk",
+                                        StoreKind::ProceduralVolume4D => "🌐 4D Volume",
+                                        StoreKind::ProceduralRandom => "🎲 2D Matrix",
                                         _ => "Store",
                                     };
                                     let badge_color = match entry.store_kind {
                                         StoreKind::RemoteZarr => ui.visuals().selection.bg_fill,
-                                        StoreKind::RemoteIcechunk => ui.visuals().widgets.active.bg_fill,
+                                        StoreKind::RemoteIcechunk => {
+                                            ui.visuals().widgets.active.bg_fill
+                                        }
+                                        StoreKind::ProceduralVolume4D
+                                        | StoreKind::ProceduralRandom => {
+                                            ui.visuals().widgets.hovered.bg_fill
+                                        }
                                         _ => ui.visuals().widgets.noninteractive.fg_stroke.color,
                                     };
 

@@ -436,3 +436,340 @@ fn test_prefetcher_abort_and_pending_bytes() {
     assert_eq!(prefetcher.pending_count(), 0);
     assert_eq!(prefetcher.pending_bytes(), 0);
 }
+
+#[test]
+fn test_known_truth_4d_analytical_voxel_evaluation() {
+    use octant::data::{KnownTruth4DParams, eval_known_truth_4d, generate_procedural_volume_4d};
+
+    let params = KnownTruth4DParams::default();
+    let (nt, nz, ny, nx) = (5, 8, 12, 16);
+    let (data, min_v, max_v) = generate_procedural_volume_4d(nt, nz, ny, nx);
+
+    assert_eq!(data.len(), nt * nz * ny * nx);
+    assert!(min_v >= params.background);
+    assert!(max_v <= params.background + params.base_amplitude + params.amplitude_modulation);
+
+    // Verify all voxels match analytical formula
+    for t in 0..nt {
+        for z in 0..nz {
+            for y in 0..ny {
+                for x in 0..nx {
+                    let idx = t * (nz * ny * nx) + z * (ny * nx) + y * nx + x;
+                    let actual = data[idx];
+                    let expected = eval_known_truth_4d(t, nt, z, nz, y, ny, x, nx, Some(&params));
+                    assert!(
+                        (actual - expected).abs() < 1e-5,
+                        "Voxel mismatch at t={t}, z={z}, y={y}, x={x}: actual={actual}, expected={expected}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_known_truth_4d_peak_trajectory_tracking() {
+    use octant::data::{
+        KnownTruth4DParams, generate_procedural_volume_4d, get_known_truth_4d_center,
+    };
+
+    let (nt, nz, ny, nx) = (8, 32, 32, 32);
+    let (data, _, _) = generate_procedural_volume_4d(nt, nz, ny, nx);
+    let params = KnownTruth4DParams::default();
+
+    for t in 0..nt {
+        let (x0, y0, z0) = get_known_truth_4d_center(t, nt, Some(&params));
+
+        // Find the voxel with the maximum value at timestep t
+        let mut max_val = f32::NEG_INFINITY;
+        let mut max_coords = (0, 0, 0);
+
+        for z in 0..nz {
+            for y in 0..ny {
+                for x in 0..nx {
+                    let idx = t * (nz * ny * nx) + z * (ny * nx) + y * nx + x;
+                    let val = data[idx];
+                    if val > max_val {
+                        max_val = val;
+                        max_coords = (x, y, z);
+                    }
+                }
+            }
+        }
+
+        // Convert discrete coords to normalized [0, 1]
+        let norm_x = max_coords.0 as f32 / (nx - 1) as f32;
+        let norm_y = max_coords.1 as f32 / (ny - 1) as f32;
+        let norm_z = max_coords.2 as f32 / (nz - 1) as f32;
+
+        let max_err = 1.0 / 31.0; // 1 voxel grid resolution
+        assert!(
+            (norm_x - x0).abs() <= max_err + 1e-4,
+            "Peak X mismatch at t={t}: found={norm_x}, expected={x0}"
+        );
+        assert!(
+            (norm_y - y0).abs() <= max_err + 1e-4,
+            "Peak Y mismatch at t={t}: found={norm_y}, expected={y0}"
+        );
+        assert!(
+            (norm_z - z0).abs() <= max_err + 1e-4,
+            "Peak Z mismatch at t={t}: found={norm_z}, expected={z0}"
+        );
+    }
+}
+
+#[test]
+fn test_4d_octant_block_volume_extraction_at_timesteps() {
+    use octant::data::{VolumeData, generate_known_truth_4d_block, generate_procedural_volume_3d};
+
+    let (nt, nz, ny, nx) = (4, 6, 8, 10);
+    let block = generate_known_truth_4d_block("test_4d_var", nt, nz, ny, nx);
+
+    // Dim order: 0=time (T), 1=depth (Z), 2=lat (Y), 3=lon (X)
+    // x_dim=3, y_dim=2, z_dim=1
+    for t in 0..nt {
+        let fixed_indices = vec![t, 0, 0, 0];
+        let vdata = block
+            .volume(3, 2, 1, &fixed_indices, "vol_4d_slice", true)
+            .expect("Failed to extract volume from 4D block");
+
+        assert_eq!(vdata.width, nx);
+        assert_eq!(vdata.height, ny);
+        assert_eq!(vdata.depth, nz);
+        assert_eq!(vdata.values.len(), nx * ny * nz);
+
+        // Compare against directly generated procedural 3D volume at timestep t
+        let (expected_3d, exp_min, exp_max) = generate_procedural_volume_3d(nx, ny, nz, t, nt);
+        assert_eq!(vdata.values, expected_3d);
+        assert!((vdata.min_val - exp_min).abs() < 1e-5);
+        assert!((vdata.max_val - exp_max).abs() < 1e-5);
+    }
+
+    // Also test VolumeData::new_procedural convenience constructor
+    let proc_vol = VolumeData::new_procedural(nx, ny, nz, 1, nt);
+    let (exp_vals_t1, _, _) = generate_procedural_volume_3d(nx, ny, nz, 1, nt);
+    assert_eq!(proc_vol.values, exp_vals_t1);
+}
+
+#[test]
+fn test_volume_animation_timeline_progression() {
+    use octant::app::{AnimationRole, OctantApp, SpatialRole};
+    use octant::data::generate_known_truth_4d_block;
+
+    let mut app = OctantApp::default();
+    let (nt, nz, ny, nx) = (6, 5, 8, 10);
+    let block = generate_known_truth_4d_block("animated_salinity", nt, nz, ny, nx);
+
+    // Setup dimension configs: dim 0 = Animated, dim 1 = Z, dim 2 = Y, dim 3 = X
+    app.dim_config = vec![
+        octant::app::DimConfig {
+            spatial: SpatialRole::None,
+            animation: AnimationRole::Animated,
+            active: true,
+        },
+        octant::app::DimConfig {
+            spatial: SpatialRole::Z,
+            animation: AnimationRole::None,
+            active: true,
+        },
+        octant::app::DimConfig {
+            spatial: SpatialRole::Y,
+            animation: AnimationRole::None,
+            active: true,
+        },
+        octant::app::DimConfig {
+            spatial: SpatialRole::X,
+            animation: AnimationRole::None,
+            active: true,
+        },
+    ];
+    app.animated_dim = Some(0);
+    app.spatial_dims = vec![3, 2, 1]; // X, Y, Z
+    app.selected_dim_indices = vec![0, 0, 0, 0];
+    app.active_plot_type = octant::plots::PlotType::Volume;
+    app.sync_plotted_state_from_selected();
+
+    // Simulate stepping through all timesteps in OctantApp
+    for step in 0..nt {
+        app.current_timestep = step;
+        app.selected_dim_indices[0] = step;
+        app.sync_plotted_state_from_selected();
+        app.apply_block_projection(&block);
+
+        let vdata = app
+            .volume_data
+            .as_ref()
+            .expect("VolumeData should be populated");
+        assert_eq!(vdata.width, nx);
+        assert_eq!(vdata.height, ny);
+        assert_eq!(vdata.depth, nz);
+
+        // Peak voxel at this step should match ground-truth trajectory
+        let (x0, y0, z0) = octant::data::get_known_truth_4d_center(step, nt, None);
+        let exp_x = (x0 * (nx - 1) as f32).round() as usize;
+        let exp_y = (y0 * (ny - 1) as f32).round() as usize;
+        let exp_z = (z0 * (nz - 1) as f32).round() as usize;
+
+        let center_idx = exp_z * (nx * ny) + exp_y * nx + exp_x;
+        let center_val = vdata.values[center_idx];
+        assert!(
+            center_val > 15.0,
+            "Center voxel should have high amplitude, got {center_val} at step {step}"
+        );
+
+        // Entire volume slice should match the ground-truth 3D slice at timestep `step`
+        let (expected_3d, exp_min, exp_max) =
+            octant::data::generate_procedural_volume_3d(nx, ny, nz, step, nt);
+        assert_eq!(vdata.values, expected_3d);
+        assert!((vdata.min_val - exp_min).abs() < 1e-5);
+        assert!((vdata.max_val - exp_max).abs() < 1e-5);
+    }
+}
+
+#[test]
+fn test_procedural_block_store_inspect_and_fetch() {
+    use octant::data::{
+        DimensionSelection, SliceRequest, backends::ProceduralBlockStore, block_store::BlockStore,
+    };
+
+    let store = ProceduralBlockStore::open("procedural://volume4d").unwrap();
+    let meta = store.inspect().unwrap();
+    assert_eq!(meta.variables.len(), 2);
+    assert_eq!(meta.variables[0].name, "gaussian_wave_packet_4d");
+    assert_eq!(meta.variables[0].shape, vec![20, 32, 32, 32]);
+    assert_eq!(
+        meta.variables[0].dimension_names,
+        vec!["time", "depth", "lat", "lon"]
+    );
+
+    // Request timestep 3, full spatial
+    let req = SliceRequest::new(
+        "gaussian_wave_packet_4d",
+        vec![
+            DimensionSelection::Range { start: 3, end: 4 },
+            DimensionSelection::Range { start: 0, end: 32 },
+            DimensionSelection::Range { start: 0, end: 32 },
+            DimensionSelection::Range { start: 0, end: 32 },
+        ],
+    );
+    let block = store.fetch_block(&req).unwrap();
+    assert_eq!(block.shape, vec![1, 32, 32, 32]);
+    assert_eq!(block.origin, vec![3, 0, 0, 0]);
+    assert_eq!(block.values.len(), 32 * 32 * 32);
+
+    let vdata = block
+        .volume(3, 2, 1, &[0, 0, 0, 0], "proc_test", true)
+        .unwrap();
+    assert_eq!(vdata.width, 32);
+    assert_eq!(vdata.height, 32);
+    assert_eq!(vdata.depth, 32);
+
+    let (exp_3d, _, _) = octant::data::generate_procedural_volume_3d(32, 32, 32, 3, 20);
+    assert_eq!(vdata.values, exp_3d);
+}
+
+#[test]
+fn test_volume_dynamic_vs_locked_color_bounds() {
+    use octant::app::{AnimationRole, OctantApp, SpatialRole};
+    use octant::data::generate_known_truth_4d_block;
+
+    let mut app = OctantApp::default();
+    let (nt, nz, ny, nx) = (5, 6, 8, 10);
+    let block = generate_known_truth_4d_block("pulse_4d", nt, nz, ny, nx);
+
+    app.dim_config = vec![
+        octant::app::DimConfig {
+            spatial: SpatialRole::None,
+            animation: AnimationRole::Animated,
+            active: true,
+        },
+        octant::app::DimConfig {
+            spatial: SpatialRole::Z,
+            animation: AnimationRole::None,
+            active: true,
+        },
+        octant::app::DimConfig {
+            spatial: SpatialRole::Y,
+            animation: AnimationRole::None,
+            active: true,
+        },
+        octant::app::DimConfig {
+            spatial: SpatialRole::X,
+            animation: AnimationRole::None,
+            active: true,
+        },
+    ];
+    app.animated_dim = Some(0);
+    app.spatial_dims = vec![3, 2, 1];
+    app.selected_dim_indices = vec![0, 0, 0, 0];
+    app.active_plot_type = octant::plots::PlotType::Volume;
+    app.sync_plotted_state_from_selected();
+
+    // 1. Dynamic Mode (!lock_color_bounds): color_range_min and max dynamically adapt to each 3D step
+    app.lock_color_bounds = false;
+
+    for step in 0..nt {
+        app.current_timestep = step;
+        app.plotted_selected_dim_indices[0] = step;
+        app.apply_block_projection(&block);
+
+        let vdata = app.volume_data.as_ref().unwrap();
+        assert_eq!(app.color_range_min, vdata.min_val);
+        assert_eq!(app.color_range_max, vdata.max_val);
+        assert_eq!(app.volume_cmin, vdata.min_val);
+        assert_eq!(app.volume_cmax, vdata.max_val);
+    }
+
+    // 2. Locked Mode (lock_color_bounds = true): bounds remain fixed
+    app.color_range_min = 10.0;
+    app.color_range_max = 80.0;
+    app.volume_cmin = 10.0;
+    app.volume_cmax = 80.0;
+    app.lock_color_bounds = true;
+
+    for step in 0..nt {
+        app.current_timestep = step;
+        app.plotted_selected_dim_indices[0] = step;
+        app.apply_block_projection(&block);
+
+        assert_eq!(app.color_range_min, 10.0);
+        assert_eq!(app.color_range_max, 80.0);
+        assert_eq!(app.volume_cmin, 10.0);
+        assert_eq!(app.volume_cmax, 80.0);
+    }
+
+    // 3. Reset Bounds: unlocks and resets to active 3D volume min/max
+    app.reset_color_range();
+    assert!(!app.lock_color_bounds);
+    let vdata = app.volume_data.as_ref().unwrap();
+    assert_eq!(app.color_range_min, vdata.min_val);
+    assert_eq!(app.color_range_max, vdata.max_val);
+}
+
+#[test]
+fn test_volume_transparency_setting_default_and_toggle() {
+    let mut app = OctantApp::default();
+    assert!(app.volume_transparency);
+
+    app.volume_transparency = false;
+    assert!(!app.volume_transparency);
+
+    app.volume_transparency = true;
+    assert!(app.volume_transparency);
+}
+
+#[test]
+fn test_volume_attenuation_and_advanced_algorithms() {
+    let mut app = OctantApp::default();
+    assert_eq!(app.volume_algorithm, 0);
+    assert_eq!(app.volume_attenuation, 0.0);
+
+    app.volume_attenuation = 1.5;
+    assert_eq!(app.volume_attenuation, 1.5);
+
+    // Test algorithm IDs: 0..=9
+    for algo_id in 0..=9 {
+        app.volume_algorithm = algo_id;
+        assert_eq!(app.volume_algorithm, algo_id);
+    }
+}
