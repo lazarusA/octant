@@ -4,8 +4,10 @@
 //! this is backend-agnostic and works across requests that target
 //! different `StoreHandle`s within the same batch.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::Arc;
 use std::thread;
 
 use super::{
@@ -23,9 +25,12 @@ pub struct PrefetchResult {
 pub struct BlockPrefetcher {
     tx: Sender<PrefetchResult>,
     rx: Receiver<PrefetchResult>,
-    pending: HashSet<BlockCacheKey>,
+    pending: HashMap<BlockCacheKey, u64>,
     active_worker_threads: usize,
     max_concurrent_threads: usize,
+    completed_bytes: Arc<AtomicU64>,
+    total_bytes: Arc<AtomicU64>,
+    aborted: Arc<AtomicBool>,
 }
 
 impl Default for BlockPrefetcher {
@@ -45,9 +50,12 @@ impl BlockPrefetcher {
         Self {
             tx,
             rx,
-            pending: HashSet::new(),
+            pending: HashMap::new(),
             active_worker_threads: 0,
             max_concurrent_threads: max_concurrent_threads.max(1),
+            completed_bytes: Arc::new(AtomicU64::new(0)),
+            total_bytes: Arc::new(AtomicU64::new(0)),
+            aborted: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -59,7 +67,7 @@ impl BlockPrefetcher {
             return false;
         }
 
-        if self.pending.contains(&key) {
+        if self.pending.contains_key(&key) {
             return false;
         }
 
@@ -67,13 +75,23 @@ impl BlockPrefetcher {
             return false;
         }
 
-        self.pending.insert(key.clone());
+        let estimated_bytes = (request.slice.estimated_elements() as u64) * 4;
+        self.pending.insert(key.clone(), estimated_bytes);
+        self.total_bytes.fetch_add(estimated_bytes, Ordering::Relaxed);
         self.active_worker_threads += 1;
 
         let tx = self.tx.clone();
+        let completed_atomic = self.completed_bytes.clone();
+        let aborted_atomic = self.aborted.clone();
 
         thread::spawn(move || {
-            let result = BlockLoader::load_one(&request).map_err(|error| error.to_string());
+            let mut on_progress = |chunk_bytes: u64| {
+                if !aborted_atomic.load(Ordering::Relaxed) {
+                    completed_atomic.fetch_add(chunk_bytes, Ordering::Relaxed);
+                }
+            };
+            let result = BlockLoader::load_one_with_progress(&request, Some(&mut on_progress))
+                .map_err(|error| error.to_string());
             let _ = tx.send(PrefetchResult { key, result });
         });
 
@@ -106,11 +124,33 @@ impl BlockPrefetcher {
             results.push(result);
         }
 
+        if self.pending.is_empty() {
+            self.completed_bytes.store(0, Ordering::Relaxed);
+            self.total_bytes.store(0, Ordering::Relaxed);
+        }
+
         results
     }
 
     pub fn pending_count(&self) -> usize {
         self.pending.len()
+    }
+
+    pub fn pending_bytes(&self) -> u64 {
+        self.pending.values().copied().sum()
+    }
+
+    pub fn completed_bytes(&self) -> u64 {
+        self.completed_bytes.load(Ordering::Relaxed)
+    }
+
+    pub fn total_bytes(&self) -> u64 {
+        let total = self.total_bytes.load(Ordering::Relaxed);
+        if total > 0 {
+            total
+        } else {
+            self.pending_bytes()
+        }
     }
 
     pub fn active_worker_threads(&self) -> usize {
@@ -122,10 +162,23 @@ impl BlockPrefetcher {
     }
 
     pub fn is_pending(&self, key: &BlockCacheKey) -> bool {
-        self.pending.contains(key)
+        self.pending.contains_key(key)
     }
 
     pub fn forget_pending(&mut self, key: &BlockCacheKey) -> bool {
-        self.pending.remove(key)
+        self.pending.remove(key).is_some()
+    }
+
+    /// Cancels all currently queued/in-flight prefetch requests.
+    pub fn abort(&mut self) {
+        self.aborted.store(true, Ordering::Relaxed);
+        self.aborted = Arc::new(AtomicBool::new(false));
+        let (tx, rx) = channel();
+        self.tx = tx;
+        self.rx = rx;
+        self.pending.clear();
+        self.completed_bytes.store(0, Ordering::Relaxed);
+        self.total_bytes.store(0, Ordering::Relaxed);
+        self.active_worker_threads = 0;
     }
 }

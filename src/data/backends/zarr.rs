@@ -91,6 +91,19 @@ impl BlockStore for ZarrBlockStore {
         super::zarr_block::fetch_block(self.storage.clone(), &self.source_url, request)
     }
 
+    fn fetch_block_with_progress(
+        &self,
+        request: &SliceRequest,
+        on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+    ) -> Result<OctantBlock, BlockStoreError> {
+        super::zarr_block::fetch_block_with_progress(
+            self.storage.clone(),
+            &self.source_url,
+            request,
+            on_progress,
+        )
+    }
+
     fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {
         let mut blocks = Vec::with_capacity(requests.len());
 

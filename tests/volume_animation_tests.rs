@@ -363,3 +363,16 @@ fn test_format_byte_size_and_calculate_download_sizes() {
     assert_eq!(requested, 10 * 1000 * 1000 * 4); // 40 MB
     assert_eq!(total, 100 * 1000 * 1000 * 4); // 400 MB
 }
+
+#[test]
+fn test_prefetcher_abort_and_pending_bytes() {
+    use octant::data::block_prefetch::BlockPrefetcher;
+
+    let mut prefetcher = BlockPrefetcher::new();
+    assert_eq!(prefetcher.pending_count(), 0);
+    assert_eq!(prefetcher.pending_bytes(), 0);
+
+    prefetcher.abort();
+    assert_eq!(prefetcher.pending_count(), 0);
+    assert_eq!(prefetcher.pending_bytes(), 0);
+}
