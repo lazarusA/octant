@@ -117,6 +117,27 @@ pub fn read_coord_bounds_with_rank(
             break;
         }
     }
+    if found_array.is_none()
+        && let Ok(group) = zarrs::group::Group::open(store.clone(), "/")
+        && let Some(zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata {
+            metadata,
+            ..
+        }) = group.consolidated_metadata()
+    {
+        for path in &candidates {
+            let key = path.trim_start_matches('/');
+            if let Some(node_meta) = metadata.get(key).or_else(|| metadata.get(path))
+                && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
+                    store.clone(),
+                    path,
+                    node_meta,
+                )
+            {
+                found_array = Some(arr);
+                break;
+            }
+        }
+    }
     let array = found_array?;
 
     let len = array.shape().first().copied().unwrap_or(0) as usize;

@@ -44,7 +44,14 @@ pub fn build_sync_store(
 pub fn open_local_storage(
     path: &str,
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
-    let store = zarrs::filesystem::FilesystemStore::new(path)?;
+    let clean_path = path.strip_prefix("file://").unwrap_or(path);
+    let p = std::path::Path::new(clean_path);
+    let dir_path = if p.is_file() {
+        p.parent().unwrap_or(p)
+    } else {
+        p
+    };
+    let store = zarrs::filesystem::FilesystemStore::new(dir_path)?;
 
     Ok(Arc::new(store))
 }
