@@ -207,7 +207,8 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
             z_assigned = true;
         }
 
-        if !anim_assigned
+        if rank >= 3
+            && !anim_assigned
             && (dim_name.contains("time") || dim_name == "t" || dim_name.contains("step"))
         {
             app.dim_config[i].animation = AnimationRole::Animated;
@@ -244,8 +245,8 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
         }
     }
 
-    // 4. Fourth pass: If no animation dimension is assigned yet, default to Z (or dim 0)
-    if !anim_assigned && rank > 0 {
+    // 4. Fourth pass: For 3D+ datasets, if no animation dimension is assigned yet, default to Z (or dim 0)
+    if rank >= 3 && !anim_assigned {
         let default_anim = (0..rank)
             .find(|&i| app.dim_config[i].spatial == SpatialRole::Z)
             .unwrap_or(0);
@@ -526,8 +527,6 @@ fn show_dimension_sliders(
 
         ui.add_space(6.0);
     }
-
-    sync_plotted_dim_config_if_active(app);
 }
 
 fn apply_role_change(dim: usize, spatial: SpatialRole, anim: AnimationRole, app: &mut OctantApp) {
@@ -601,22 +600,6 @@ fn apply_role_change(dim: usize, spatial: SpatialRole, anim: AnimationRole, app:
         .dim_config
         .iter()
         .position(|c| c.animation == AnimationRole::Animated);
-
-    sync_plotted_dim_config_if_active(app);
-}
-
-pub fn sync_plotted_dim_config_if_active(app: &mut OctantApp) {
-    let is_same_store = app.store_target_input == app.plotted_store_target_input
-        && app.selected_store_kind == app.plotted_store_kind;
-    let is_same_var = app.selected_variable_idx == app.plotted_variable_idx;
-
-    if is_same_store && is_same_var {
-        app.plotted_dim_config = app.dim_config.clone();
-        app.plotted_selected_dim_indices = app.selected_dim_indices.clone();
-        app.plotted_selected_dim_ranges = app.selected_dim_ranges.clone();
-        app.plotted_spatial_dims = app.spatial_dims.clone();
-        app.plotted_animated_dim = app.animated_dim;
-    }
 }
 
 pub fn build_slice_request_for_plotted(

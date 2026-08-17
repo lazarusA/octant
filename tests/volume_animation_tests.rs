@@ -3,6 +3,39 @@ use octant::data::{OctantBlock, VariableInfo, VolumeData};
 use std::collections::HashMap;
 
 #[test]
+fn test_init_dimension_defaults_2d_dataset() {
+    let mut app = OctantApp::default();
+    let var_info = VariableInfo {
+        name: "elevation".to_string(),
+        data_type: "f32".to_string(),
+        shape: vec![100, 200],
+        chunk_shape: vec![50, 50],
+        dimension_names: vec!["lat".to_string(), "lon".to_string()],
+        units: Some("m".to_string()),
+        long_name: Some("Surface Elevation".to_string()),
+        temporal_resolution: None,
+        time_coverage_start: None,
+        time_coverage_end: None,
+        file_size: 100 * 200 * 4,
+        attributes: HashMap::new(),
+    };
+
+    octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
+
+    // Lon should be X (dim 1)
+    assert_eq!(app.dim_config[1].spatial, SpatialRole::X);
+    // Lat should be Y (dim 0)
+    assert_eq!(app.dim_config[0].spatial, SpatialRole::Y);
+    // Neither dimension should be Animated
+    assert_eq!(app.dim_config[0].animation, AnimationRole::None);
+    assert_eq!(app.dim_config[1].animation, AnimationRole::None);
+    assert_eq!(app.animated_dim, None);
+
+    // spatial_dims should contain 2 dimensions in X, Y order: [1, 0]
+    assert_eq!(app.spatial_dims, vec![1, 0]);
+}
+
+#[test]
 fn test_init_dimension_defaults_3d_dataset() {
     let mut app = OctantApp::default();
     let var_info = VariableInfo {
