@@ -131,10 +131,11 @@ pub fn read_coord_bounds_with_rank(
                     store.clone(),
                     path,
                     node_meta,
-                ) {
-                    found_array = Some(arr);
-                    break;
-                }
+                )
+            {
+                found_array = Some(arr);
+                break;
+            }
         }
     }
     let array = found_array?;

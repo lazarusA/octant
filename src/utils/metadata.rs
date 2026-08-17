@@ -2,63 +2,49 @@ use crate::data::VariableInfo;
 use crate::utils::units::calculate_variable_size_bytes;
 use std::collections::HashMap;
 use std::error::Error;
-use zarrs::array::{Array, ArrayMetadata};
+use zarrs::array::{Array, ArrayMetadata, DataType};
 use zarrs::group::Group;
+use zarrs::metadata::v3::MetadataV3;
+use zarrs::metadata_ext::codec::blosc::{
+    BloscCodecConfigurationNumcodecs, codec_blosc_v2_numcodecs_to_v3,
+};
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata;
 use zarrs::node::{NodeMetadata, NodePath, get_child_nodes};
 use zarrs::storage::{
     ReadableStorageTraits, ReadableWritableListableStorage, ReadableWritableListableStorageTraits,
 };
 
-/// Normalizes Zarr v3 array metadata to handle non-standard / Python numcodecs codec representations.
+/// Normalizes Zarr v3 array metadata to handle non-standard / Python numcodecs codec representations
+/// using `zarrs_metadata` and `zarrs_metadata_ext`.
 pub fn normalize_v3_array_metadata(mut meta: serde_json::Value) -> serde_json::Value {
-    let dt_str = meta
+    let typesize = meta
         .get("data_type")
-        .and_then(|d| d.as_str())
-        .unwrap_or("float32")
-        .to_string();
-    let typesize = match dt_str.as_str() {
-        "float64" | "int64" | "uint64" | "r64" => 8,
-        "float32" | "int32" | "uint32" | "r32" => 4,
-        "int16" | "uint16" | "float16" | "bfloat16" | "r16" => 2,
-        "int8" | "uint8" | "bool" | "r8" => 1,
-        _ => 4,
-    };
+        .and_then(|d| serde_json::from_value::<MetadataV3>(d.clone()).ok())
+        .and_then(|m| DataType::from_metadata(&m).ok())
+        .map(|dt| dt.size());
 
     if let Some(codecs) = meta.get_mut("codecs").and_then(|c| c.as_array_mut()) {
         for codec in codecs {
             if let Some(obj) = codec.as_object_mut()
-                && let Some(name) = obj.get("name").and_then(|n| n.as_str()) {
-                    if name == "numcodecs.blosc" || name.ends_with(".blosc") {
+                && let Some(name) = obj.get("name").and_then(|n| n.as_str())
+            {
+                if name == "numcodecs.blosc" || name.ends_with(".blosc") {
+                    if let Some(config) = obj.get("configuration").cloned()
+                        && let Ok(blosc_numcodecs) =
+                            serde_json::from_value::<BloscCodecConfigurationNumcodecs>(config)
+                    {
+                        let blosc_v3 = codec_blosc_v2_numcodecs_to_v3(&blosc_numcodecs, typesize);
                         obj.insert("name".to_string(), serde_json::json!("blosc"));
-                        if let Some(config) =
-                            obj.get_mut("configuration").and_then(|c| c.as_object_mut())
-                        {
-                            if !config.contains_key("typesize") {
-                                config.insert("typesize".to_string(), serde_json::json!(typesize));
-                            }
-                            if !config.contains_key("blocksize") {
-                                config.insert("blocksize".to_string(), serde_json::json!(0));
-                            }
-                            if let Some(shuffle) = config.get("shuffle")
-                                && let Some(s_int) = shuffle.as_i64() {
-                                    let s_str = match s_int {
-                                        1 => "shuffle",
-                                        2 => "bitshuffle",
-                                        -1 => "autoshuffle",
-                                        _ => "noshuffle",
-                                    };
-                                    config.insert("shuffle".to_string(), serde_json::json!(s_str));
-                                }
+                        if let Ok(v3_config) = serde_json::to_value(&blosc_v3) {
+                            obj.insert("configuration".to_string(), v3_config);
                         }
-                    } else if name == "numcodecs.zstd" || name.ends_with(".zstd") {
-                        obj.insert("name".to_string(), serde_json::json!("zstd"));
-                    } else if name == "numcodecs.gzip" || name.ends_with(".gzip") {
-                        obj.insert("name".to_string(), serde_json::json!("gzip"));
-                    } else if name == "numcodecs.crc32c" || name.ends_with(".crc32c") {
-                        obj.insert("name".to_string(), serde_json::json!("crc32c"));
+                    } else {
+                        obj.insert("name".to_string(), serde_json::json!("blosc"));
                     }
+                } else if let Some(suffix) = name.strip_prefix("numcodecs.") {
+                    obj.insert("name".to_string(), serde_json::json!(suffix));
                 }
+            }
         }
     }
     meta
