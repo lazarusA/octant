@@ -31,6 +31,18 @@ pub fn retrieve_array_subset_as_f32(
     } else if dt_str.contains("uint16") || dt_str.contains("u16") {
         let vals = array.retrieve_array_subset::<Vec<u16>>(subset)?;
         Ok(vals.into_iter().map(|v| v as f32).collect())
+    } else if dt_str.contains("uint8") || dt_str.contains("u8") || dt_str.contains("|u1") {
+        let vals = array.retrieve_array_subset::<Vec<u8>>(subset)?;
+        Ok(vals.into_iter().map(|v| v as f32).collect())
+    } else if dt_str.contains("int8") || dt_str.contains("i8") || dt_str.contains("|i1") {
+        let vals = array.retrieve_array_subset::<Vec<i8>>(subset)?;
+        Ok(vals.into_iter().map(|v| v as f32).collect())
+    } else if dt_str.contains("bool") || dt_str.contains("|b1") {
+        let vals = array.retrieve_array_subset::<Vec<u8>>(subset)?;
+        Ok(vals
+            .into_iter()
+            .map(|v| if v != 0 { 1.0 } else { 0.0 })
+            .collect())
     } else {
         let vals = array.retrieve_array_subset::<Vec<f32>>(subset)?;
         Ok(vals)

@@ -18,7 +18,7 @@ wgpu = { version = "30", features = ["webgpu", "webgl"] }
 bytemuck = { version = "1.25", features = ["derive"] }
 glam = { version = "0.33", features = ["bytemuck"] }
 log = "0.4"
-zarrs = { version = "0.23", features = ["blosc", "async"] }
+zarrs = { version = "0.23", features = ["blosc", "zstd", "sharding", "gzip", "crc32c", "async"] }
 zarrs_object_store = { version = "0.7", features = ["http"] }
 zarrs_icechunk = "0.5"
 icechunk = "2.1.2"
