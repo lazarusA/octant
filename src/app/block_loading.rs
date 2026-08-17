@@ -344,12 +344,11 @@ impl OctantApp {
     /// honoring explicit user SpatialRoles (X/Y/Z) or falling back to non-animated dimensions.
     pub fn resolve_spatial_axes(
         rank: usize,
-        anim_dim: Option<usize>,
         block_dim_names: &[String],
         orig_dim_names: &[String],
         dim_config: &[crate::app::DimConfig],
-        spatial_dims: &[usize],
     ) -> (usize, usize, usize) {
+        let anim_dim = crate::app::DimConfig::animated_dim(dim_config);
         let all_dims: Vec<usize> = (0..rank).collect();
         let non_anim: Vec<usize> = (0..rank).filter(|&d| Some(d) != anim_dim).collect();
 
@@ -369,8 +368,10 @@ impl OctantApp {
         let explicit_y = find_explicit_spatial(crate::app::SpatialRole::Y);
         let explicit_z = find_explicit_spatial(crate::app::SpatialRole::Z);
 
-        let explicit_spatial: Vec<usize> =
-            spatial_dims.iter().copied().filter(|&d| d < rank).collect();
+        let explicit_spatial: Vec<usize> = crate::app::DimConfig::spatial_dims(dim_config)
+            .into_iter()
+            .filter(|&d| d < rank)
+            .collect();
 
         let x_dim = explicit_x
             .or_else(|| explicit_spatial.first().copied())
@@ -407,8 +408,7 @@ impl OctantApp {
 
     /// Projects a resident block into current 2D and 3D views.
     pub fn apply_block_projection(&mut self, block: &crate::data::octant_block::OctantBlock) {
-        let anim_dim = self.plotted_animated_dim;
-
+        let anim_dim = crate::app::DimConfig::animated_dim(&self.plotted_dim_config);
         let orig_dim_names: Vec<String> = self
             .plotted_dataset_metadata
             .as_ref()
@@ -418,11 +418,9 @@ impl OctantApp {
 
         let (x_dim, y_dim, z_dim) = Self::resolve_spatial_axes(
             block.rank(),
-            anim_dim,
             &block.dimension_names,
             &orig_dim_names,
             &self.plotted_dim_config,
-            &self.plotted_spatial_dims,
         );
 
         let fixed_indices: Vec<usize> = (0..block.rank())

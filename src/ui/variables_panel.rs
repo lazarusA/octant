@@ -137,14 +137,7 @@ fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) {
 pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::data::VariableInfo) {
     let rank = var_info.shape.len();
 
-    app.dim_config = vec![
-        crate::app::DimConfig {
-            spatial: SpatialRole::None,
-            animation: AnimationRole::None,
-            active: false,
-        };
-        rank
-    ];
+    app.dim_config = vec![crate::app::DimConfig::default(); rank];
     app.selected_dim_indices = vec![0; rank];
     app.selected_dim_ranges.clear();
     app.spatial_dims.clear();
@@ -263,6 +256,10 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
         }
         if spatial != SpatialRole::None || anim == AnimationRole::Animated {
             app.dim_config[i].active = true;
+        }
+        app.dim_config[i].index = app.selected_dim_indices.get(i).copied().unwrap_or(0);
+        if let Some(&r) = app.selected_dim_ranges.get(i) {
+            app.dim_config[i].range = r;
         }
     }
 
@@ -512,6 +509,8 @@ fn show_dimension_sliders(
                 } else {
                     app.selected_dim_indices[i] = start;
                 }
+                app.dim_config[i].range = (start, end);
+                app.dim_config[i].index = app.selected_dim_indices[i];
             } else {
                 ui.horizontal(|ui| {
                     ui.label("Index:");
@@ -522,6 +521,8 @@ fn show_dimension_sliders(
                 });
                 app.selected_dim_ranges[i] =
                     (app.selected_dim_indices[i], app.selected_dim_indices[i]);
+                app.dim_config[i].range = app.selected_dim_ranges[i];
+                app.dim_config[i].index = app.selected_dim_indices[i];
             }
         });
 

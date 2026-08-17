@@ -123,16 +123,19 @@ fn test_get_volume_shifts_for_spatial_dimensions() {
             spatial: SpatialRole::Z,
             animation: AnimationRole::Animated,
             active: true,
+            ..Default::default()
         },
         octant::app::DimConfig {
             spatial: SpatialRole::Y,
             animation: AnimationRole::None,
             active: true,
+            ..Default::default()
         },
         octant::app::DimConfig {
             spatial: SpatialRole::X,
             animation: AnimationRole::None,
             active: true,
+            ..Default::default()
         },
     ];
     app.plotted_animated_dim = Some(0);
@@ -287,16 +290,19 @@ fn test_calculate_max_animated_steps_small_and_large_datasets() {
             spatial: SpatialRole::None,
             animation: AnimationRole::Animated,
             active: true,
+            ..Default::default()
         },
         octant::app::DimConfig {
             spatial: SpatialRole::Y,
             animation: AnimationRole::None,
             active: true,
+            ..Default::default()
         },
         octant::app::DimConfig {
             spatial: SpatialRole::X,
             animation: AnimationRole::None,
             active: true,
+            ..Default::default()
         },
     ];
     let selected_ranges = vec![(0, 99), (0, 49), (0, 49)];
@@ -376,16 +382,19 @@ fn test_format_byte_size_and_calculate_download_sizes() {
             active: true,
             spatial: SpatialRole::None,
             animation: AnimationRole::Animated,
+            ..Default::default()
         },
         DimConfig {
             active: true,
             spatial: SpatialRole::Y,
             animation: AnimationRole::None,
+            ..Default::default()
         },
         DimConfig {
             active: true,
             spatial: SpatialRole::X,
             animation: AnimationRole::None,
+            ..Default::default()
         },
     ];
 
@@ -432,16 +441,19 @@ fn test_selected_volume_elements_and_limit() {
             active: true,
             spatial: SpatialRole::Z,
             animation: AnimationRole::None,
+            ..Default::default()
         },
         octant::app::DimConfig {
             active: true,
             spatial: SpatialRole::Y,
             animation: AnimationRole::None,
+            ..Default::default()
         },
         octant::app::DimConfig {
             active: true,
             spatial: SpatialRole::X,
             animation: AnimationRole::None,
+            ..Default::default()
         },
     ];
 
@@ -599,21 +611,25 @@ fn test_volume_animation_timeline_progression() {
             spatial: SpatialRole::None,
             animation: AnimationRole::Animated,
             active: true,
+            ..Default::default()
         },
         octant::app::DimConfig {
             spatial: SpatialRole::Z,
             animation: AnimationRole::None,
             active: true,
+            ..Default::default()
         },
         octant::app::DimConfig {
             spatial: SpatialRole::Y,
             animation: AnimationRole::None,
             active: true,
+            ..Default::default()
         },
         octant::app::DimConfig {
             spatial: SpatialRole::X,
             animation: AnimationRole::None,
             active: true,
+            ..Default::default()
         },
     ];
     app.animated_dim = Some(0);
@@ -715,21 +731,25 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
             spatial: SpatialRole::None,
             animation: AnimationRole::Animated,
             active: true,
+            ..Default::default()
         },
         octant::app::DimConfig {
             spatial: SpatialRole::Z,
             animation: AnimationRole::None,
             active: true,
+            ..Default::default()
         },
         octant::app::DimConfig {
             spatial: SpatialRole::Y,
             animation: AnimationRole::None,
             active: true,
+            ..Default::default()
         },
         octant::app::DimConfig {
             spatial: SpatialRole::X,
             animation: AnimationRole::None,
             active: true,
+            ..Default::default()
         },
     ];
     app.animated_dim = Some(0);

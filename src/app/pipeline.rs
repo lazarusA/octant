@@ -286,11 +286,9 @@ impl OctantApp {
         {
             let (x, y, z) = Self::resolve_spatial_axes(
                 var.shape.len(),
-                self.plotted_animated_dim,
                 &var.dimension_names,
                 &var.dimension_names,
                 &self.plotted_dim_config,
-                &self.plotted_spatial_dims,
             );
             let idx = match axis {
                 0 => x,

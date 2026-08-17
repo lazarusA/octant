@@ -491,11 +491,9 @@ impl eframe::App for OctantApp {
 
                         let (x_dim, y_dim, z_dim) = Self::resolve_spatial_axes(
                             var.shape.len(),
-                            self.plotted_animated_dim,
                             &var.dimension_names,
                             &var.dimension_names,
                             &self.plotted_dim_config,
-                            &self.plotted_spatial_dims,
                         );
 
                         let target_dim_idx = match self.line_profile_dim_idx {
@@ -545,11 +543,9 @@ impl eframe::App for OctantApp {
                     {
                         let (x_dim, y_dim, _) = Self::resolve_spatial_axes(
                             var.shape.len(),
-                            self.plotted_animated_dim,
                             &var.dimension_names,
                             &var.dimension_names,
                             &self.plotted_dim_config,
-                            &self.plotted_spatial_dims,
                         );
 
                         if x_dim < var.shape.len() {
