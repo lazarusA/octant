@@ -21,7 +21,8 @@ pub use metadata::{
 };
 pub use units::{
     add_days_to_date, calculate_variable_size_bytes, data_type_bytes, format_axis_value,
-    format_byte_size, parse_loc, parse_reference_date, parse_time_unit, unit_to_milliseconds,
+    format_byte_size, format_count_metric, parse_loc, parse_reference_date, parse_time_unit,
+    unit_to_milliseconds,
 };
 
 /// Convenience alias for format-agnostic metadata extraction

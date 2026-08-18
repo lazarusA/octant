@@ -438,11 +438,44 @@ impl OctantApp {
             })
             .collect();
 
+        let get_local_range = |dim_idx: usize| -> (usize, usize) {
+            let Some(dim_name) = block.dimension_names.get(dim_idx) else {
+                return (0, block.shape.get(dim_idx).copied().unwrap_or(1));
+            };
+            let orig_idx = orig_dim_names
+                .iter()
+                .position(|o| o == dim_name)
+                .unwrap_or(dim_idx);
+            let dim_len = block.shape.get(dim_idx).copied().unwrap_or(1);
+            let block_orig = block.origin.get(dim_idx).copied().unwrap_or(0);
+            let (req_start, req_end) = self
+                .plotted_selected_dim_ranges
+                .get(orig_idx)
+                .copied()
+                .unwrap_or((0, dim_len.saturating_sub(1)));
+
+            let local_start = req_start.saturating_sub(block_orig).min(dim_len.saturating_sub(1));
+            let local_end = (req_end + 1)
+                .saturating_sub(block_orig)
+                .clamp(local_start + 1, dim_len);
+            (local_start, local_end)
+        };
+
+        let x_range = get_local_range(x_dim);
+        let y_range = get_local_range(y_dim);
+        let z_range = if z_dim < block.rank() {
+            get_local_range(z_dim)
+        } else {
+            (0, 1)
+        };
+
         let compute_bounds = !self.lock_color_bounds;
 
-        if let Some(mdata) = block.slice_2d(
+        if let Some(mdata) = block.slice_2d_with_ranges(
             x_dim,
             y_dim,
+            x_range,
+            y_range,
             &fixed_indices,
             self.animated_dim_extent(),
             &format!("Block Cache [{}]", block.variable_name),
@@ -466,7 +499,7 @@ impl OctantApp {
         let is_3d_spatial_anim = anim_dim.is_some_and(|a| a == x_dim || a == y_dim || a == z_dim);
 
         let current_volume_desc = format!(
-            "Block Cache Volume [{}] origin={:?} shape={:?} fixed={:?}",
+            "Block Cache Volume [{}] origin={:?} shape={:?} fixed={:?} xr={:?} yr={:?} zr={:?}",
             block.variable_name,
             block.origin,
             block.shape,
@@ -474,24 +507,24 @@ impl OctantApp {
                 vec![]
             } else {
                 fixed_indices.clone()
-            }
+            },
+            x_range,
+            y_range,
+            z_range,
         );
 
-        let needs_volume_update = if let Some(existing) = &self.volume_data {
-            let nz = if z_dim < block.rank() && z_dim != x_dim && z_dim != y_dim {
-                block.shape[z_dim]
-            } else {
-                1
-            };
-            let nx = block.shape.get(x_dim).copied().unwrap_or(0);
-            let ny = block.shape.get(y_dim).copied().unwrap_or(0);
-            let slice_elements = nx.saturating_mul(ny).max(1);
-            let max_z = (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS / slice_elements)
-                .clamp(1, nz);
-            let eff_nz = nz.min(max_z);
+        let req_nx = x_range.1.saturating_sub(x_range.0);
+        let req_ny = y_range.1.saturating_sub(y_range.0);
+        let req_nz = z_range.1.saturating_sub(z_range.0);
 
-            existing.width != nx
-                || existing.height != ny
+        let needs_volume_update = if let Some(existing) = &self.volume_data {
+            let slice_elements = req_nx.saturating_mul(req_ny).max(1);
+            let max_z = (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS / slice_elements)
+                .clamp(1, req_nz);
+            let eff_nz = req_nz.min(max_z);
+
+            existing.width != req_nx
+                || existing.height != req_ny
                 || existing.depth != eff_nz
                 || self.volume_renderer.is_none()
                 || existing.dataset_name != current_volume_desc
@@ -501,10 +534,13 @@ impl OctantApp {
 
         if is_3d_plot
             && needs_volume_update
-            && let Some(vdata) = block.volume(
+            && let Some(vdata) = block.volume_with_ranges(
                 x_dim,
                 y_dim,
                 z_dim,
+                x_range,
+                y_range,
+                z_range,
                 &fixed_indices,
                 &current_volume_desc,
                 compute_bounds,

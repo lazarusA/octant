@@ -10,12 +10,12 @@ use super::OctantApp;
 
 impl OctantApp {
     pub fn rebuild_pipeline_with_matrix_data(&mut self, data: MatrixData) {
-        if data.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+        let total_elements = data.width * data.height;
+        if total_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
             log::error!(
-                "Matrix data buffer size ({} elements / {} bytes) exceeds maximum GPU storage buffer limit ({})",
-                data.values.len(),
-                data.values.len() * 4,
-                crate::plots::common::MAX_GPU_STORAGE_BUFFER_BYTES
+                "Matrix data elements ({} cells) exceeds maximum GPU storage buffer limit ({})",
+                total_elements,
+                crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
             );
             return;
         }
@@ -35,8 +35,6 @@ impl OctantApp {
             if same_dimensions
                 && self.renderer.is_some()
                 && self.line_renderer.is_some()
-                && self.sphere_renderer.is_some()
-                && self.surface_renderer.is_some()
             {
                 self.update_active_2d_renderer_data(&wgpu_render_state.queue, &data.values);
             } else {
@@ -54,24 +52,31 @@ impl OctantApp {
                     data.width,
                     data.height,
                 );
-                let sphere_renderer = SphereRenderer::new(
-                    &wgpu_render_state.device,
-                    wgpu_render_state.target_format,
-                    &data.values,
-                    data.width,
-                    data.height,
-                );
-                let surface_renderer = SurfaceRenderer::new(
-                    &wgpu_render_state.device,
-                    wgpu_render_state.target_format,
-                    &data.values,
-                    data.width,
-                    data.height,
-                );
                 self.renderer = Some(Arc::new(renderer));
                 self.line_renderer = Some(Arc::new(line_renderer));
-                self.sphere_renderer = Some(Arc::new(sphere_renderer));
-                self.surface_renderer = Some(Arc::new(surface_renderer));
+
+                // Instantiate 3D sphere and surface meshes only when within vertex buffer limits
+                if total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
+                    let sphere_renderer = SphereRenderer::new(
+                        &wgpu_render_state.device,
+                        wgpu_render_state.target_format,
+                        &data.values,
+                        data.width,
+                        data.height,
+                    );
+                    let surface_renderer = SurfaceRenderer::new(
+                        &wgpu_render_state.device,
+                        wgpu_render_state.target_format,
+                        &data.values,
+                        data.width,
+                        data.height,
+                    );
+                    self.sphere_renderer = Some(Arc::new(sphere_renderer));
+                    self.surface_renderer = Some(Arc::new(surface_renderer));
+                } else {
+                    self.sphere_renderer = None;
+                    self.surface_renderer = None;
+                }
 
                 if data.height == 1 {
                     self.active_plot_type = PlotType::Line;

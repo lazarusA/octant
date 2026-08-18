@@ -8,6 +8,13 @@ pub const MAX_GPU_STORAGE_BUFFER_BYTES: usize = 128 * 1024 * 1024;
 pub const MAX_GPU_STORAGE_BUFFER_ELEMENTS: usize =
     MAX_GPU_STORAGE_BUFFER_BYTES / std::mem::size_of::<f32>();
 
+/// Maximum buffer size for GPU vertex / index buffers in bytes (256 MiB default wgpu limit).
+pub const MAX_GPU_BUFFER_BYTES: usize = 256 * 1024 * 1024;
+/// Maximum number of 2D cells that fit in a single 256 MiB GPU vertex buffer for Heatmap (80 bytes/cell).
+pub const MAX_2D_HEATMAP_ELEMENTS: usize = MAX_GPU_BUFFER_BYTES / 80;
+/// Maximum number of 2D cells that fit in a single 256 MiB GPU vertex buffer for 3D Surface/Sphere (160 bytes/cell).
+pub const MAX_2D_SURFACE_ELEMENTS: usize = MAX_GPU_BUFFER_BYTES / 160;
+
 /// Standard GPU color, clipping, and range uniforms struct shared across all plots.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]

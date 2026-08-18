@@ -7,7 +7,6 @@ use wgpu::util::DeviceExt;
 pub struct HeatmapVertex {
     pub position: [f32; 2],
     pub uv: [f32; 2],
-    pub cell_index: u32,
 }
 
 impl HeatmapVertex {
@@ -26,11 +25,6 @@ impl HeatmapVertex {
                     shader_location: 1,
                     format: wgpu::VertexFormat::Float32x2,
                 },
-                wgpu::VertexAttribute {
-                    offset: 16,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Uint32,
-                },
             ],
         }
     }
@@ -43,7 +37,8 @@ pub struct HeatmapUniforms {
     pub zoom: f32,
     pub _pad: u32,
     pub aspect_scale: [f32; 2],
-    pub _pad2: [u32; 2],
+    pub width: u32,
+    pub height: u32,
     pub color: super::common::PlotColorParams,
 }
 
@@ -55,6 +50,8 @@ pub struct HeatmapRenderer {
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     num_indices: u32,
+    width: usize,
+    height: usize,
 }
 
 impl HeatmapRenderer {
@@ -77,7 +74,8 @@ impl HeatmapRenderer {
             zoom: 1.0,
             _pad: 0,
             aspect_scale: [1.0, 1.0],
-            _pad2: [0; 2],
+            width: width.max(1) as u32,
+            height: height.max(1) as u32,
             color: super::common::PlotColorParams::default(),
         };
 
@@ -146,7 +144,7 @@ impl HeatmapRenderer {
             cache: None,
         });
 
-        let (vertices, indices) = Self::build_mesh(width, height);
+        let (vertices, indices) = Self::build_quad();
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Heatmap Vertex Buffer"),
@@ -168,6 +166,8 @@ impl HeatmapRenderer {
             uniform_buffer,
             bind_group,
             num_indices: indices.len() as u32,
+            width,
+            height,
         }
     }
 
@@ -184,7 +184,8 @@ impl HeatmapRenderer {
             zoom,
             _pad: 0,
             aspect_scale,
-            _pad2: [0; 2],
+            width: self.width as u32,
+            height: self.height as u32,
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -203,63 +204,27 @@ impl HeatmapRenderer {
         queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
     }
 
-    fn build_mesh(width: usize, height: usize) -> (Vec<HeatmapVertex>, Vec<u32>) {
-        let num_quads = width * height;
-        let mut vertices = Vec::with_capacity(num_quads * 4);
-        let mut indices = Vec::with_capacity(num_quads * 6);
+    fn build_quad() -> (Vec<HeatmapVertex>, Vec<u32>) {
+        let vertices = vec![
+            HeatmapVertex {
+                position: [-1.0, 1.0],
+                uv: [0.0, 0.0],
+            },
+            HeatmapVertex {
+                position: [1.0, 1.0],
+                uv: [1.0, 0.0],
+            },
+            HeatmapVertex {
+                position: [-1.0, -1.0],
+                uv: [0.0, 1.0],
+            },
+            HeatmapVertex {
+                position: [1.0, -1.0],
+                uv: [1.0, 1.0],
+            },
+        ];
 
-        let scale_x = 2.0;
-        let scale_y = 2.0;
-
-        for y in 0..height {
-            for x in 0..width {
-                let cell_index = (y * width + x) as u32;
-
-                let x0 = -1.0 + (x as f32 / width as f32) * scale_x;
-                let x1 = -1.0 + ((x + 1) as f32 / width as f32) * scale_x;
-
-                let y0 = 1.0 - (y as f32 / height as f32) * scale_y;
-                let y1 = 1.0 - ((y + 1) as f32 / height as f32) * scale_y;
-
-                let u0 = x as f32 / width as f32;
-                let u1 = (x + 1) as f32 / width as f32;
-                let v0 = y as f32 / height as f32;
-                let v1 = (y + 1) as f32 / height as f32;
-
-                let base_idx = vertices.len() as u32;
-
-                vertices.push(HeatmapVertex {
-                    position: [x0, y0],
-                    uv: [u0, v0],
-                    cell_index,
-                });
-                vertices.push(HeatmapVertex {
-                    position: [x1, y0],
-                    uv: [u1, v0],
-                    cell_index,
-                });
-                vertices.push(HeatmapVertex {
-                    position: [x0, y1],
-                    uv: [u0, v1],
-                    cell_index,
-                });
-                vertices.push(HeatmapVertex {
-                    position: [x1, y1],
-                    uv: [u1, v1],
-                    cell_index,
-                });
-
-                // Triangle 1: TL, BL, TR
-                indices.push(base_idx);
-                indices.push(base_idx + 2);
-                indices.push(base_idx + 1);
-
-                // Triangle 2: TR, BL, BR
-                indices.push(base_idx + 1);
-                indices.push(base_idx + 2);
-                indices.push(base_idx + 3);
-            }
-        }
+        let indices = vec![0, 2, 1, 1, 2, 3];
 
         (vertices, indices)
     }
