@@ -284,12 +284,17 @@ impl OctantApp {
         if let Some(meta) = &self.plotted_dataset_metadata
             && let Some(var) = meta.variables.get(self.plotted_variable_idx)
         {
-            let (x, y, z) = var.resolve_spatial_dim_indices(&self.plotted_dim_config);
+            let (x, y, z) = Self::resolve_spatial_axes(
+                var.shape.len(),
+                &var.dimension_names,
+                &var.dimension_names,
+                &self.plotted_dim_config,
+            );
             let idx = match axis {
                 0 => x,
                 1 => y,
                 _ => z,
-            }?;
+            };
             return var.dimension_names.get(idx).cloned();
         }
         None

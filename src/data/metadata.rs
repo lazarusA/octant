@@ -23,6 +23,45 @@ impl DatasetMetadata {
         let l_v: f64 = last.parse().ok()?;
         Some((f_v.min(l_v), f_v.max(l_v)))
     }
+
+    /// Returns numerical coordinate bounds for a subrange `(start_idx, end_idx)` within `dim_size` for `dim_name`.
+    pub fn get_coord_bounds_for_range(
+        &self,
+        dim_name: &str,
+        dim_size: usize,
+        range: (usize, usize),
+    ) -> Option<(f64, f64)> {
+        let clean = dim_name.trim().to_lowercase();
+        let coords = self
+            .dimension_coordinates
+            .get(&clean)
+            .or_else(|| self.dimension_coordinates.get(dim_name))?;
+
+        let (start, end) = (range.0.min(range.1), range.0.max(range.1));
+        let total_len = dim_size.max(coords.len()).max(1);
+
+        // If the full coordinate vector is available with individual coordinate values
+        if coords.len() >= total_len && coords.len() > end {
+            let start_val: f64 = coords.get(start)?.parse().ok()?;
+            let end_val: f64 = coords.get(end)?.parse().ok()?;
+            return Some((start_val.min(end_val), start_val.max(end_val)));
+        }
+
+        // If only boundary coordinates (first, last) are available
+        let first: f64 = coords.first()?.parse().ok()?;
+        let last: f64 = coords.last()?.parse().ok()?;
+        if total_len <= 1 {
+            return Some((first.min(last), first.max(last)));
+        }
+
+        let t_start = start as f64 / (total_len - 1) as f64;
+        let t_end = end as f64 / (total_len - 1) as f64;
+
+        let val_start = first + t_start * (last - first);
+        let val_end = first + t_end * (last - first);
+
+        Some((val_start.min(val_end), val_start.max(val_end)))
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -85,5 +124,64 @@ impl VariableInfo {
             });
 
         (explicit_x, explicit_y, explicit_z)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_coord_bounds_for_range_with_boundary_coords() {
+        let mut meta = DatasetMetadata::default();
+        meta.dimension_coordinates.insert(
+            "lat".to_string(),
+            vec!["-90.0".to_string(), "90.0".to_string()],
+        );
+
+        // 101 points from index 0 (-90) to index 100 (+90)
+        let bounds_full = meta.get_coord_bounds_for_range("lat", 101, (0, 100));
+        assert_eq!(bounds_full, Some((-90.0, 90.0)));
+
+        let bounds_sub = meta.get_coord_bounds_for_range("lat", 101, (25, 75));
+        assert_eq!(bounds_sub, Some((-45.0, 45.0)));
+
+        let bounds_single = meta.get_coord_bounds_for_range("lat", 101, (50, 50));
+        assert_eq!(bounds_single, Some((0.0, 0.0)));
+    }
+
+    #[test]
+    fn test_coord_bounds_for_range_with_descending_boundary_coords() {
+        let mut meta = DatasetMetadata::default();
+        meta.dimension_coordinates.insert(
+            "lat".to_string(),
+            vec!["90.0".to_string(), "-90.0".to_string()],
+        );
+
+        // 101 points: index 0 is +90 (North), index 100 is -90 (South)
+        // Range (0, 50) is Northern hemisphere [0..90]
+        let bounds_north = meta.get_coord_bounds_for_range("lat", 101, (0, 50));
+        assert_eq!(bounds_north, Some((0.0, 90.0)));
+
+        // Range (50, 100) is Southern hemisphere [-90..0]
+        let bounds_south = meta.get_coord_bounds_for_range("lat", 101, (50, 100));
+        assert_eq!(bounds_south, Some((-90.0, 0.0)));
+    }
+
+    #[test]
+    fn test_coord_bounds_for_range_with_full_coords() {
+        let mut meta = DatasetMetadata::default();
+        meta.dimension_coordinates.insert(
+            "lon".to_string(),
+            vec![
+                "0.0".to_string(),
+                "10.0".to_string(),
+                "25.0".to_string(),
+                "50.0".to_string(),
+            ],
+        );
+
+        let bounds_sub = meta.get_coord_bounds_for_range("lon", 4, (1, 3));
+        assert_eq!(bounds_sub, Some((10.0, 50.0)));
     }
 }

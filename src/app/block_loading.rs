@@ -73,6 +73,7 @@ impl OctantApp {
         if let Some(block) = self.block_cache.find_covering_block(
             &source_id,
             &var_name,
+            &slice_request.selections,
             self.plotted_animated_dim,
             self.current_timestep,
         ) {
@@ -82,6 +83,7 @@ impl OctantApp {
                 block.bytes_size()
             );
             self.apply_block_projection(&block);
+            self.prefetch_selected_animated_range(&shape);
             return;
         }
 
@@ -103,6 +105,7 @@ impl OctantApp {
                 block.bytes_size()
             );
             self.apply_block_projection(&block);
+            self.prefetch_selected_animated_range(&shape);
             return;
         }
 
@@ -110,9 +113,6 @@ impl OctantApp {
         self.status_message = format!("⏳ [block cache] Downloading window for '{}'...", var_name);
         self.block_prefetcher
             .request(block_request, &self.block_cache);
-
-        // Also queue up background prefetch for the rest of the selected slider range
-        self.prefetch_selected_animated_range(&shape);
     }
 
     /// Prefetches the block window containing `step` asynchronously using `plotted_store_handle()`,
@@ -141,10 +141,16 @@ impl OctantApp {
             return;
         }
 
-        if self
-            .block_cache
-            .covers(&source_id, &var_name, Some(anim_dim), step)
-        {
+        let legacy_request =
+            crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_name, &shape);
+
+        if self.block_cache.covers(
+            &source_id,
+            &var_name,
+            &legacy_request.selections,
+            Some(anim_dim),
+            step,
+        ) {
             return;
         }
 
@@ -157,8 +163,6 @@ impl OctantApp {
         let start = (step / cs) * cs;
         let end = (start + cs).min(full_extent).max(start + 1);
 
-        let legacy_request =
-            crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_name, &shape);
         let mut selections = legacy_request.selections;
         if anim_dim < selections.len() {
             selections[anim_dim] = DimensionSelection::Range { start, end };
@@ -179,10 +183,22 @@ impl OctantApp {
     pub fn request_step_or_load(&mut self, target_step: usize) {
         let source_id = self.plotted_source_id();
         let var_name = self.plotted_variable_info().map(|v| v.name.clone());
+        let legacy_request = self.plotted_variable_info().map(|v| {
+            crate::ui::variables_panel::build_slice_request_for_plotted(self, &v.name, &v.shape)
+        });
+        let selections = legacy_request
+            .as_ref()
+            .map(|r| r.selections.as_slice())
+            .unwrap_or(&[]);
 
         let is_cached = if let Some(ref name) = var_name {
-            self.block_cache
-                .covers(&source_id, name, self.plotted_animated_dim, target_step)
+            self.block_cache.covers(
+                &source_id,
+                name,
+                selections,
+                self.plotted_animated_dim,
+                target_step,
+            )
         } else {
             false
         };
@@ -263,14 +279,15 @@ impl OctantApp {
 
         let current_chunk = self.current_timestep / cs;
 
-        // Schedule chunks ordered by proximity to current_timestep:
-        // First forward (current_chunk + 1 ..= last_chunk), then from start up to current_chunk
+        // Schedule chunks ordered by proximity to current_timestep within the selected range [first_chunk..=last_chunk]:
         let mut chunk_indices = Vec::new();
         for c in (current_chunk + 1)..=last_chunk {
             chunk_indices.push(c);
         }
-        for c in first_chunk..=current_chunk {
-            chunk_indices.push(c);
+        for c in (first_chunk..=current_chunk).rev() {
+            if !chunk_indices.contains(&c) {
+                chunk_indices.push(c);
+            }
         }
 
         for chunk_idx in chunk_indices {
@@ -280,6 +297,7 @@ impl OctantApp {
             if self.block_cache.covers(
                 &source_id,
                 &next_legacy_request.variable,
+                &next_legacy_request.selections,
                 self.plotted_animated_dim,
                 chunk_start,
             ) || self.block_prefetcher.is_pending_timestep(
@@ -326,12 +344,11 @@ impl OctantApp {
     /// honoring explicit user SpatialRoles (X/Y/Z) or falling back to non-animated dimensions.
     pub fn resolve_spatial_axes(
         rank: usize,
-        anim_dim: Option<usize>,
         block_dim_names: &[String],
         orig_dim_names: &[String],
         dim_config: &[crate::app::DimConfig],
-        spatial_dims: &[usize],
     ) -> (usize, usize, usize) {
+        let anim_dim = crate::app::DimConfig::animated_dim(dim_config);
         let all_dims: Vec<usize> = (0..rank).collect();
         let non_anim: Vec<usize> = (0..rank).filter(|&d| Some(d) != anim_dim).collect();
 
@@ -351,8 +368,10 @@ impl OctantApp {
         let explicit_y = find_explicit_spatial(crate::app::SpatialRole::Y);
         let explicit_z = find_explicit_spatial(crate::app::SpatialRole::Z);
 
-        let explicit_spatial: Vec<usize> =
-            spatial_dims.iter().copied().filter(|&d| d < rank).collect();
+        let explicit_spatial: Vec<usize> = crate::app::DimConfig::spatial_dims(dim_config)
+            .into_iter()
+            .filter(|&d| d < rank)
+            .collect();
 
         let x_dim = explicit_x
             .or_else(|| explicit_spatial.first().copied())
@@ -389,8 +408,7 @@ impl OctantApp {
 
     /// Projects a resident block into current 2D and 3D views.
     pub fn apply_block_projection(&mut self, block: &crate::data::octant_block::OctantBlock) {
-        let anim_dim = self.plotted_animated_dim;
-
+        let anim_dim = crate::app::DimConfig::animated_dim(&self.plotted_dim_config);
         let orig_dim_names: Vec<String> = self
             .plotted_dataset_metadata
             .as_ref()
@@ -400,11 +418,9 @@ impl OctantApp {
 
         let (x_dim, y_dim, z_dim) = Self::resolve_spatial_axes(
             block.rank(),
-            anim_dim,
             &block.dimension_names,
             &orig_dim_names,
             &self.plotted_dim_config,
-            &self.plotted_spatial_dims,
         );
 
         let fixed_indices: Vec<usize> = (0..block.rank())
@@ -506,7 +522,6 @@ impl OctantApp {
     /// Drains completed block-cache prefetch results.
     pub fn poll_block_prefetch_results(&mut self) {
         let completed = self.block_prefetcher.poll();
-        let has_completed = !completed.is_empty();
 
         for res in completed {
             match res.result {
@@ -535,20 +550,19 @@ impl OctantApp {
                         self.status_message =
                             format!("⚡ [block cache] Loaded '{}'", block.variable_name);
                         self.apply_block_projection(&block);
+
+                        if let Some(meta) = &self.plotted_dataset_metadata
+                            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                        {
+                            let shape = var.shape.clone();
+                            self.prefetch_selected_animated_range(&shape);
+                        }
                     }
                 }
                 Err(e) => {
                     self.status_message = format!("Block cache fetch error: {e}");
                 }
             }
-        }
-
-        if has_completed
-            && let Some(meta) = &self.plotted_dataset_metadata
-            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
-        {
-            let shape = var.shape.clone();
-            self.prefetch_selected_animated_range(&shape);
         }
     }
 
