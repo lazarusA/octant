@@ -6,7 +6,14 @@ fn test_pyramid_levels_and_dimensions() {
     let height = 1024;
     let values: Vec<f32> = (0..width * height).map(|i| (i % 100) as f32).collect();
 
-    let pyramid = MatrixPyramid::new(&values, width, height, "test_data", AggregationOp::Mean, 512);
+    let pyramid = MatrixPyramid::new(
+        &values,
+        width,
+        height,
+        "test_data",
+        AggregationOp::Mean,
+        512,
+    );
 
     assert!(pyramid.levels.len() >= 3);
     assert_eq!(pyramid.levels[0].width, 2048);
@@ -64,7 +71,14 @@ fn test_pyramid_level_selection() {
     let width = 4096;
     let height = 4096;
     let values = vec![1.0; width * height];
-    let pyramid = MatrixPyramid::new(&values, width, height, "selection", AggregationOp::Mean, 512);
+    let pyramid = MatrixPyramid::new(
+        &values,
+        width,
+        height,
+        "selection",
+        AggregationOp::Mean,
+        512,
+    );
 
     // Zoomed all the way out (span 1.0) into a 1024px canvas -> selects coarser level
     let level_zoomed_out = pyramid.select_level(1.0, 1024);
@@ -105,16 +119,66 @@ fn test_sample_viewport() {
 #[test]
 fn test_viewport_resampler_visible_bounds() {
     // Identity view: pan [0, 0], zoom 1.0, aspect [1, 1]
-    let ((u0, u1), (v0, v1)) = ViewportResampler::compute_visible_data_bounds([0.0, 0.0], 1.0, [1.0, 1.0]);
+    let ((u0, u1), (v0, v1)) =
+        ViewportResampler::compute_visible_data_bounds([0.0, 0.0], 1.0, [1.0, 1.0]);
     assert!((u0 - 0.0).abs() < 1e-4);
     assert!((u1 - 1.0).abs() < 1e-4);
     assert!((v0 - 0.0).abs() < 1e-4);
     assert!((v1 - 1.0).abs() < 1e-4);
 
     // Zoomed 2x: visible region should be centered and span [0.25, 0.75]
-    let ((u0_z, u1_z), (v0_z, v1_z)) = ViewportResampler::compute_visible_data_bounds([0.0, 0.0], 2.0, [1.0, 1.0]);
+    let ((u0_z, u1_z), (v0_z, v1_z)) =
+        ViewportResampler::compute_visible_data_bounds([0.0, 0.0], 2.0, [1.0, 1.0]);
     assert!((u0_z - 0.25).abs() < 1e-4);
     assert!((u1_z - 0.75).abs() < 1e-4);
     assert!((v0_z - 0.25).abs() < 1e-4);
     assert!((v1_z - 0.75).abs() < 1e-4);
+}
+
+#[test]
+fn test_compute_target_resolution_preserves_aspect_ratio() {
+    // 50,000 x 20,000 matrix (2.5 aspect ratio)
+    let (tw, th) = ViewportResampler::compute_target_resolution(50000, 20000, 2048);
+    assert_eq!(tw, 2048);
+    assert_eq!(th, 819);
+    let ratio = tw as f64 / th as f64;
+    assert!((ratio - 2.5).abs() < 0.01);
+
+    // 1,000 x 4,000 matrix (0.25 aspect ratio)
+    let (tw2, th2) = ViewportResampler::compute_target_resolution(1000, 4000, 2048);
+    assert_eq!(tw2, 512);
+    assert_eq!(th2, 2048);
+    let ratio2 = tw2 as f64 / th2 as f64;
+    assert!((ratio2 - 0.25).abs() < 0.01);
+}
+
+#[test]
+fn test_resample_if_needed_aspect_ratio_and_lod() {
+    let width = 2000;
+    let height = 1000;
+    let values = vec![5.0f32; width * height];
+    let pyramid = std::sync::Arc::new(MatrixPyramid::new(
+        &values,
+        width,
+        height,
+        "aspect_test",
+        AggregationOp::Mean,
+        256,
+    ));
+
+    let mut resampler = ViewportResampler::new(Some(pyramid));
+    let (tw, th) = ViewportResampler::compute_target_resolution(width, height, 2048);
+    assert_eq!(tw, 2000);
+    assert_eq!(th, 1000);
+
+    // Initial resample
+    let sample1 = resampler.resample_if_needed(1.0, tw, th);
+    assert!(sample1.is_some());
+    let s1 = sample1.unwrap();
+    assert_eq!(s1.width, 2000);
+    assert_eq!(s1.height, 1000);
+
+    // Identical visible span should skip
+    let sample2 = resampler.resample_if_needed(1.0, tw, th);
+    assert!(sample2.is_none());
 }

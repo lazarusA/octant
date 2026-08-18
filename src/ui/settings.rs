@@ -564,10 +564,9 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     let prev_resampling = app.enable_pyramid_resampling;
     let prev_op = app.pyramid_aggregation_op;
 
-    let is_oversized = app
-        .matrix_data
-        .as_ref()
-        .map_or(false, |m| m.width * m.height > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS);
+    let is_oversized = app.matrix_data.as_ref().map_or(false, |m| {
+        m.width * m.height > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
+    });
 
     if is_oversized {
         app.enable_pyramid_resampling = true;
@@ -596,14 +595,30 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
                     crate::data::AggregationOp::Nearest => "Nearest Neighbor",
                 })
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut app.pyramid_aggregation_op, crate::data::AggregationOp::Mean, "Mean (Box Filter)")
-                        .on_hover_text("Averages sub-pixels in 2x2 cells, ignoring NaNs.");
-                    ui.selectable_value(&mut app.pyramid_aggregation_op, crate::data::AggregationOp::Max, "Max (Peak Preserve)")
-                        .on_hover_text("Preserves extreme high values.");
-                    ui.selectable_value(&mut app.pyramid_aggregation_op, crate::data::AggregationOp::Min, "Min (Trough Preserve)")
-                        .on_hover_text("Preserves extreme low values.");
-                    ui.selectable_value(&mut app.pyramid_aggregation_op, crate::data::AggregationOp::Nearest, "Nearest Neighbor")
-                        .on_hover_text("Fast nearest point selection without interpolation.");
+                    ui.selectable_value(
+                        &mut app.pyramid_aggregation_op,
+                        crate::data::AggregationOp::Mean,
+                        "Mean (Box Filter)",
+                    )
+                    .on_hover_text("Averages sub-pixels in 2x2 cells, ignoring NaNs.");
+                    ui.selectable_value(
+                        &mut app.pyramid_aggregation_op,
+                        crate::data::AggregationOp::Max,
+                        "Max (Peak Preserve)",
+                    )
+                    .on_hover_text("Preserves extreme high values.");
+                    ui.selectable_value(
+                        &mut app.pyramid_aggregation_op,
+                        crate::data::AggregationOp::Min,
+                        "Min (Trough Preserve)",
+                    )
+                    .on_hover_text("Preserves extreme low values.");
+                    ui.selectable_value(
+                        &mut app.pyramid_aggregation_op,
+                        crate::data::AggregationOp::Nearest,
+                        "Nearest Neighbor",
+                    )
+                    .on_hover_text("Fast nearest point selection without interpolation.");
                 });
         });
     }

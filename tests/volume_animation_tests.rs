@@ -930,4 +930,3 @@ fn test_2d_and_3d_selected_elements_and_limits() {
     let elements_2d = octant::ui::variables_panel::calculate_selected_2d_elements(&app);
     assert_eq!(elements_2d, 100 * 100);
 }
-

@@ -12,7 +12,10 @@ impl OctantApp {
     pub fn rebuild_pipeline_with_matrix_data(&mut self, data: MatrixData) {
         let total_elements = data.width * data.height;
 
-        let var_key = format!("{}:{}", self.plotted_store_target_input, self.plotted_variable_idx);
+        let var_key = format!(
+            "{}:{}",
+            self.plotted_store_target_input, self.plotted_variable_idx
+        );
         let is_new_variable = self.current_plotted_var_key.as_ref() != Some(&var_key);
 
         if is_new_variable {
@@ -49,7 +52,8 @@ impl OctantApp {
         }
 
         // Build in-memory MatrixPyramid when explicitly enabled or when data elements exceed single GPU storage buffer capacity
-        let effective_data = if data.height > 1 && (self.enable_pyramid_resampling || is_oversized) {
+        let effective_data = if data.height > 1 && (self.enable_pyramid_resampling || is_oversized)
+        {
             let pyramid = Arc::new(crate::data::MatrixPyramid::new(
                 &data.values,
                 data.width,
@@ -69,9 +73,11 @@ impl OctantApp {
                     aspect_scale,
                 );
 
-            let max_res = 2048;
-            let target_w = data.width.min(max_res);
-            let target_h = data.height.min(max_res);
+            let (target_w, target_h) = crate::data::ViewportResampler::compute_target_resolution(
+                data.width,
+                data.height,
+                2048,
+            );
             pyramid.sample_viewport((u_min, u_max), (v_min, v_max), (target_w, target_h))
         } else {
             self.active_pyramid = None;
@@ -80,16 +86,15 @@ impl OctantApp {
         };
 
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
-            let same_dimensions = self
-                .matrix_data
-                .as_ref()
-                .is_some_and(|m| m.width == effective_data.width && m.height == effective_data.height);
+            let same_dimensions = self.matrix_data.as_ref().is_some_and(|m| {
+                m.width == effective_data.width && m.height == effective_data.height
+            });
 
-            if same_dimensions
-                && self.renderer.is_some()
-                && self.line_renderer.is_some()
-            {
-                self.update_active_2d_renderer_data(&wgpu_render_state.queue, &effective_data.values);
+            if same_dimensions && self.renderer.is_some() && self.line_renderer.is_some() {
+                self.update_active_2d_renderer_data(
+                    &wgpu_render_state.queue,
+                    &effective_data.values,
+                );
             } else {
                 let renderer = MatrixRenderer::new(
                     &wgpu_render_state.device,
@@ -186,7 +191,10 @@ impl OctantApp {
             }
         }
 
-        let var_key = format!("{}:{}", self.plotted_store_target_input, self.plotted_variable_idx);
+        let var_key = format!(
+            "{}:{}",
+            self.plotted_store_target_input, self.plotted_variable_idx
+        );
         let is_new_variable = self.current_plotted_var_key.as_ref() != Some(&var_key);
 
         if is_new_variable {

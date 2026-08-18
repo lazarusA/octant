@@ -272,7 +272,12 @@ impl eframe::App for OctantApp {
                 let (aspect_scale_x, aspect_scale_y) = if self.enforce_data_aspect_ratio
                     && let Some(matrix) = &self.matrix_data
                 {
-                    let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.001);
+                    let (orig_w, orig_h) = if let Some(pyr) = &self.active_pyramid {
+                        (pyr.original_width, pyr.original_height)
+                    } else {
+                        (matrix.width, matrix.height)
+                    };
+                    let data_aspect = (orig_w as f32 / orig_h as f32).max(0.001);
                     let canvas_aspect = canvas_rect.width() / canvas_rect.height().max(1.0);
                     if canvas_aspect > data_aspect {
                         (data_aspect / canvas_aspect, 1.0)
@@ -443,23 +448,34 @@ impl eframe::App for OctantApp {
                 }
                 _ => {
                     if let Some(renderer) = &self.renderer {
-                        if self.active_pyramid.is_some() && self.active_plot_type == PlotType::Heatmap {
-                            let ((u_min, u_max), (v_min, v_max)) =
+                        if self.active_pyramid.is_some()
+                            && self.active_plot_type == PlotType::Heatmap
+                        {
+                            let ((u_min, u_max), _v_bounds) =
                                 crate::data::ViewportResampler::compute_visible_data_bounds(
                                     gpu_pan,
                                     gpu_zoom,
                                     gpu_aspect_scale,
                                 );
-                            let max_res = 2048;
-                            let target_w = self.matrix_data.as_ref().map_or(1024, |m| m.width.min(max_res));
-                            let target_h = self.matrix_data.as_ref().map_or(1024, |m| m.height.min(max_res));
+                            let (orig_w, orig_h) = self.active_pyramid.as_ref().map_or(
+                                (
+                                    self.matrix_data.as_ref().map_or(1024, |m| m.width),
+                                    self.matrix_data.as_ref().map_or(1024, |m| m.height),
+                                ),
+                                |p| (p.original_width, p.original_height),
+                            );
+                            let (target_w, target_h) =
+                                crate::data::ViewportResampler::compute_target_resolution(
+                                    orig_w, orig_h, 2048,
+                                );
+                            let visible_span_x = (u_max - u_min).abs().max(1e-6);
 
                             if let Some(sampled) = self.resampler.resample_if_needed(
-                                (u_min, u_max),
-                                (v_min, v_max),
+                                visible_span_x,
                                 target_w,
                                 target_h,
-                            ) && let Some(wgpu_render_state) = &self.wgpu_render_state {
+                            ) && let Some(wgpu_render_state) = &self.wgpu_render_state
+                            {
                                 renderer.update_data_and_dimensions(
                                     &wgpu_render_state.queue,
                                     &sampled.values,

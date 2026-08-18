@@ -454,7 +454,9 @@ impl OctantApp {
                 .copied()
                 .unwrap_or((0, dim_len.saturating_sub(1)));
 
-            let local_start = req_start.saturating_sub(block_orig).min(dim_len.saturating_sub(1));
+            let local_start = req_start
+                .saturating_sub(block_orig)
+                .min(dim_len.saturating_sub(1));
             let local_end = (req_end + 1)
                 .saturating_sub(block_orig)
                 .clamp(local_start + 1, dim_len);

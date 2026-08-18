@@ -1,8 +1,8 @@
 //! Viewport-aware resampler that coordinates interactive pan/zoom with MatrixPyramid.
 
-use std::sync::Arc;
 use crate::data::matrix_data::MatrixData;
 use crate::data::pyramid::MatrixPyramid;
+use std::sync::Arc;
 
 /// Request for a viewport sample.
 #[derive(Debug, Clone, PartialEq)]
@@ -46,6 +46,31 @@ impl ViewportResampler {
         self.last_request = None;
     }
 
+    /// Computes target output resolution preserving original aspect ratio up to `max_dimension`.
+    pub fn compute_target_resolution(
+        orig_w: usize,
+        orig_h: usize,
+        max_dimension: usize,
+    ) -> (usize, usize) {
+        let max_dim = max_dimension.max(16);
+        if orig_w == 0 || orig_h == 0 {
+            return (max_dim, max_dim);
+        }
+        if orig_w >= orig_h {
+            let w = orig_w.min(max_dim);
+            let h = ((w as f64 * orig_h as f64) / orig_w as f64)
+                .round()
+                .max(2.0) as usize;
+            (w, h)
+        } else {
+            let h = orig_h.min(max_dim);
+            let w = ((h as f64 * orig_w as f64) / orig_h as f64)
+                .round()
+                .max(2.0) as usize;
+            (w, h)
+        }
+    }
+
     /// Computes normalized `[0.0, 1.0]` visible data bounds from pan, zoom, and aspect scale.
     pub fn compute_visible_data_bounds(
         pan: [f32; 2],
@@ -77,11 +102,10 @@ impl ViewportResampler {
         ((u_min, u_max), (v_min, v_max))
     }
 
-    /// Resamples the visible viewport if the request has changed meaningfully.
+    /// Resamples the full-domain texture at the optimal pyramid LOD level for the visible span.
     pub fn resample_if_needed(
         &mut self,
-        x_range: (f64, f64),
-        y_range: (f64, f64),
+        visible_span_x: f64,
         target_width: usize,
         target_height: usize,
     ) -> Option<MatrixData> {
@@ -90,39 +114,27 @@ impl ViewportResampler {
         let target_w = target_width.clamp(16, self.max_resolution);
         let target_h = target_height.clamp(16, self.max_resolution);
 
-        let span_x = (x_range.1 - x_range.0).abs().max(1e-6);
+        let span_x = visible_span_x.abs().max(1e-6);
         let level_idx = pyramid.select_level(span_x, target_w);
 
         let req = ViewportRequest {
-            x_range,
-            y_range,
+            x_range: (0.0, 1.0),
+            y_range: (0.0, 1.0),
             target_width: target_w,
             target_height: target_h,
             level_idx,
         };
 
         if let Some(last) = &self.last_request {
-            let last_span_x = (last.x_range.1 - last.x_range.0).abs().max(1e-6);
-            let zoom_ratio = span_x / last_span_x;
-
-            let x_diff = (req.x_range.0 - last.x_range.0).abs() + (req.x_range.1 - last.x_range.1).abs();
-            let y_diff = (req.y_range.0 - last.y_range.0).abs() + (req.y_range.1 - last.y_range.1).abs();
-            let w_diff = req.target_width.abs_diff(last.target_width);
-            let h_diff = req.target_height.abs_diff(last.target_height);
-
-            // If same pyramid LOD level, and zoom changed by < 30%, and pan moved by < 8% of span, skip re-upload
             if req.level_idx == last.level_idx
-                && (0.75..=1.33).contains(&zoom_ratio)
-                && x_diff < span_x * 0.08
-                && y_diff < (y_range.1 - y_range.0).abs().max(1e-6) * 0.08
-                && w_diff < 128
-                && h_diff < 128
+                && req.target_width == last.target_width
+                && req.target_height == last.target_height
             {
                 return None;
             }
         }
 
-        let sampled = pyramid.sample_viewport(x_range, y_range, (target_w, target_h));
+        let sampled = pyramid.sample_viewport((0.0, 1.0), (0.0, 1.0), (target_w, target_h));
         self.last_request = Some(req);
 
         Some(sampled)

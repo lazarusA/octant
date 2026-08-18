@@ -265,22 +265,39 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
 
     // If initial spatial 2D selection exceeds GPU limits, scale initial default ranges to fit within MAX_GPU_STORAGE_BUFFER_ELEMENTS
     if let (Some(x_idx), Some(y_idx)) = (
-        app.dim_config.iter().position(|c| c.spatial == SpatialRole::X),
-        app.dim_config.iter().position(|c| c.spatial == SpatialRole::Y),
+        app.dim_config
+            .iter()
+            .position(|c| c.spatial == SpatialRole::X),
+        app.dim_config
+            .iter()
+            .position(|c| c.spatial == SpatialRole::Y),
     ) {
-        let x_span = (app.selected_dim_ranges[x_idx].1.saturating_sub(app.selected_dim_ranges[x_idx].0) + 1).max(1);
-        let y_span = (app.selected_dim_ranges[y_idx].1.saturating_sub(app.selected_dim_ranges[y_idx].0) + 1).max(1);
+        let x_span = (app.selected_dim_ranges[x_idx]
+            .1
+            .saturating_sub(app.selected_dim_ranges[x_idx].0)
+            + 1)
+        .max(1);
+        let y_span = (app.selected_dim_ranges[y_idx]
+            .1
+            .saturating_sub(app.selected_dim_ranges[y_idx].0)
+            + 1)
+        .max(1);
         let total_2d = x_span.saturating_mul(y_span);
         if total_2d > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
-            let scale = ((crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS as f64) / (total_2d as f64)).sqrt() * 0.95;
+            let scale = ((crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS as f64)
+                / (total_2d as f64))
+                .sqrt()
+                * 0.95;
             let new_x = ((x_span as f64) * scale).max(1.0) as usize;
             let new_y = ((y_span as f64) * scale).max(1.0) as usize;
             let x_start = app.selected_dim_ranges[x_idx].0;
             let y_start = app.selected_dim_ranges[y_idx].0;
             let max_x = var_info.shape[x_idx].saturating_sub(1) as usize;
             let max_y = var_info.shape[y_idx].saturating_sub(1) as usize;
-            app.selected_dim_ranges[x_idx] = (x_start, (x_start + new_x.saturating_sub(1)).min(max_x));
-            app.selected_dim_ranges[y_idx] = (y_start, (y_start + new_y.saturating_sub(1)).min(max_y));
+            app.selected_dim_ranges[x_idx] =
+                (x_start, (x_start + new_x.saturating_sub(1)).min(max_x));
+            app.selected_dim_ranges[y_idx] =
+                (y_start, (y_start + new_y.saturating_sub(1)).min(max_y));
             app.dim_config[x_idx].range = app.selected_dim_ranges[x_idx];
             app.dim_config[y_idx].range = app.selected_dim_ranges[y_idx];
         }
