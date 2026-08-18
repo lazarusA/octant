@@ -46,6 +46,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let gy = clamp(u32(in.uv.y * f32(h)), 0u, h - 1u);
     let cell_index = min(gy * w + gx, max_idx);
     let val = data_buffer[cell_index];
-    return evaluate_plot_color(val, uniforms.color);
+
+    let eval_color = evaluate_plot_color(val, uniforms.color);
+    if (eval_color.a <= 0.0) {
+        discard;
+    }
+    return eval_color;
 }
 
