@@ -69,16 +69,22 @@ impl BlockCache {
     }
 
     /// Finds any resident block in cache for `source_id` & `variable_name` whose
-    /// hyperslab bounds along `anim_dim` cover `timestep`.
+    /// hyperslab bounds along `anim_dim` cover `timestep`, and whose selections on
+    /// all other dimensions match `requested_selections`.
     pub fn find_covering_block(
         &mut self,
         source_id: &str,
         variable_name: &str,
+        requested_selections: &[DimensionSelection],
         anim_dim: Option<usize>,
         timestep: usize,
     ) -> Option<OctantBlock> {
         let matching_key = self.entries.iter().find_map(|(key, block)| {
             if key.source_id == source_id && key.variable_name == variable_name {
+                if !selections_match_except_anim(&key.selections, requested_selections, anim_dim) {
+                    return None;
+                }
+
                 if let Some(dim) = anim_dim {
                     let origin = block.origin.get(dim).copied().unwrap_or(0);
                     let extent = block.shape.get(dim).copied().unwrap_or(0);
@@ -99,16 +105,22 @@ impl BlockCache {
     }
 
     /// Checks whether any resident block in cache for `source_id` & `variable_name`
-    /// covers `timestep` along `anim_dim`, without mutating hit/miss statistics.
+    /// covers `timestep` along `anim_dim` and matches `requested_selections` on other dimensions,
+    /// without mutating hit/miss statistics.
     pub fn covers(
         &self,
         source_id: &str,
         variable_name: &str,
+        requested_selections: &[DimensionSelection],
         anim_dim: Option<usize>,
         timestep: usize,
     ) -> bool {
         self.entries.iter().any(|(key, block)| {
             if key.source_id == source_id && key.variable_name == variable_name {
+                if !selections_match_except_anim(&key.selections, requested_selections, anim_dim) {
+                    return false;
+                }
+
                 if let Some(dim) = anim_dim {
                     let origin = block.origin.get(dim).copied().unwrap_or(0);
                     let extent = block.shape.get(dim).copied().unwrap_or(0);
@@ -211,6 +223,25 @@ impl BlockCache {
     }
 }
 
+fn selections_match_except_anim(
+    cached: &[DimensionSelection],
+    requested: &[DimensionSelection],
+    anim_dim: Option<usize>,
+) -> bool {
+    if cached.len() != requested.len() {
+        return false;
+    }
+    for (i, (c, r)) in cached.iter().zip(requested.iter()).enumerate() {
+        if anim_dim == Some(i) {
+            continue;
+        }
+        if c != r {
+            return false;
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261,5 +292,42 @@ mod tests {
 
         assert_eq!(cache.hits(), 0);
         assert_eq!(cache.misses(), 0);
+    }
+
+    #[test]
+    fn test_covering_block_respects_spatial_ranges() {
+        let mut cache = BlockCache::new(1024 * 1024);
+        let key = test_key("dataset-a", "temperature", 0);
+        cache.put(key.clone(), test_block(0));
+
+        // Matching selections covering timestep 1 along animated dim 0 -> HIT
+        let requested_same = vec![
+            DimensionSelection::range(0, 2),
+            DimensionSelection::range(0, 3),
+            DimensionSelection::range(0, 4),
+        ];
+        assert!(
+            cache
+                .find_covering_block("dataset-a", "temperature", &requested_same, Some(0), 1)
+                .is_some()
+        );
+
+        // Different spatial range on dim 1 -> MISS (must not match cached block with old range)
+        let requested_different_spatial = vec![
+            DimensionSelection::range(0, 2),
+            DimensionSelection::range(1, 3),
+            DimensionSelection::range(0, 4),
+        ];
+        assert!(
+            cache
+                .find_covering_block(
+                    "dataset-a",
+                    "temperature",
+                    &requested_different_spatial,
+                    Some(0),
+                    1
+                )
+                .is_none()
+        );
     }
 }

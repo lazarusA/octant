@@ -1,8 +1,6 @@
 use crate::app::OctantApp;
 
 pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let max_steps = app.animated_dim_extent();
-
     ui.horizontal(|ui| {
         // Play / Pause Button
         let play_text = if app.is_playing {
@@ -29,6 +27,7 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.checkbox(&mut app.loop_playback, "🔄");
 
         // Step Timeline Slider
+        let max_steps = app.animated_dim_extent();
         let slider_max = max_steps.saturating_sub(1);
         ui.add_space(4.0);
 

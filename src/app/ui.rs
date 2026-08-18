@@ -84,11 +84,21 @@ impl eframe::App for OctantApp {
                     if let Some(next_ts) = next_ts {
                         let source_id = self.plotted_source_id();
                         let var_name = self.plotted_variable_info().map(|v| v.name.clone());
+                        let legacy_request = self.plotted_variable_info().map(|v| {
+                            crate::ui::variables_panel::build_slice_request_for_plotted(
+                                self, &v.name, &v.shape,
+                            )
+                        });
+                        let selections = legacy_request
+                            .as_ref()
+                            .map(|r| r.selections.as_slice())
+                            .unwrap_or(&[]);
 
                         let has_next_block = if let Some(ref name) = var_name {
                             self.block_cache.covers(
                                 &source_id,
                                 name,
+                                selections,
                                 self.plotted_animated_dim,
                                 next_ts,
                             )
@@ -100,6 +110,15 @@ impl eframe::App for OctantApp {
                             self.current_timestep = next_ts;
                             self.last_step_time = now;
                             self.load_selected_variable_block();
+
+                            // Lookahead prefetch: stream upcoming chunks in the background while playing
+                            if let Some(anim_dim) = self.plotted_animated_dim {
+                                let anim_chunk_size = self.plotted_chunk_size(anim_dim).max(1);
+                                let ahead_ts = next_ts + anim_chunk_size;
+                                if ahead_ts < total_steps {
+                                    self.prefetch_block_window_for_next_steps(ahead_ts);
+                                }
+                            }
                         } else {
                             // Target block window for next_ts is not yet in cache.
                             // Trigger background prefetch for next_ts block window while safely keeping playback on current valid frame.
@@ -470,21 +489,42 @@ impl eframe::App for OctantApp {
                             y_name = var.name.clone();
                         }
 
-                        let (explicit_x, explicit_y, explicit_z) =
-                            var.resolve_spatial_dim_indices(&self.plotted_dim_config);
+                        let (x_dim, y_dim, z_dim) = Self::resolve_spatial_axes(
+                            var.shape.len(),
+                            &var.dimension_names,
+                            &var.dimension_names,
+                            &self.plotted_dim_config,
+                        );
 
                         let target_dim_idx = match self.line_profile_dim_idx {
-                            2 => explicit_z,
-                            1 => explicit_y,
-                            _ => explicit_x,
+                            2 => z_dim,
+                            1 => y_dim,
+                            _ => x_dim,
                         };
 
-                        if let Some(dim_idx) = target_dim_idx
-                            && let Some(name) = var.dimension_names.get(dim_idx)
-                        {
-                            x_name = name.clone();
-                            if let Some(bounds) = meta.get_coord_bounds(name) {
-                                x_bounds = bounds;
+                        if target_dim_idx < var.shape.len() {
+                            let dim_size = var
+                                .shape
+                                .get(target_dim_idx)
+                                .copied()
+                                .unwrap_or(profile_len as u64)
+                                as usize;
+                            let (start_p, end_p) = self
+                                .plotted_selected_dim_ranges
+                                .get(target_dim_idx)
+                                .copied()
+                                .unwrap_or((0, dim_size.saturating_sub(1)));
+                            x_bounds = (start_p as f64, end_p as f64);
+
+                            if let Some(name) = var.dimension_names.get(target_dim_idx) {
+                                x_name = name.clone();
+                                if let Some(bounds) = meta.get_coord_bounds_for_range(
+                                    name,
+                                    dim_size,
+                                    (start_p, end_p),
+                                ) {
+                                    x_bounds = bounds;
+                                }
                             }
                         }
                     }
@@ -495,31 +535,69 @@ impl eframe::App for OctantApp {
                 } else {
                     let mut x_name = "X".to_string();
                     let mut y_name = "Y".to_string();
-                    let mut x_bounds = (0.0, matrix.width as f64);
-                    let mut y_bounds = (0.0, matrix.height as f64);
+                    let mut x_bounds = (0.0, matrix.width.saturating_sub(1) as f64);
+                    let mut y_bounds = (0.0, matrix.height.saturating_sub(1) as f64);
 
                     if let Some(meta) = &self.plotted_dataset_metadata
                         && let Some(var) = meta.variables.get(self.plotted_variable_idx)
                     {
-                        let (explicit_x, explicit_y, _) =
-                            var.resolve_spatial_dim_indices(&self.plotted_dim_config);
+                        let (x_dim, y_dim, _) = Self::resolve_spatial_axes(
+                            var.shape.len(),
+                            &var.dimension_names,
+                            &var.dimension_names,
+                            &self.plotted_dim_config,
+                        );
 
-                        if let Some(x_idx) = explicit_x
-                            && let Some(x_n) = var.dimension_names.get(x_idx)
-                        {
-                            x_name = x_n.clone();
-                            if let Some(bounds) = meta.get_coord_bounds(x_n) {
-                                x_bounds = bounds;
+                        if x_dim < var.shape.len() {
+                            let dim_size =
+                                var.shape.get(x_dim).copied().unwrap_or(matrix.width as u64)
+                                    as usize;
+                            let (start_x, end_x) = self
+                                .plotted_selected_dim_ranges
+                                .get(x_dim)
+                                .copied()
+                                .unwrap_or((0, dim_size.saturating_sub(1)));
+                            x_bounds = (start_x as f64, end_x as f64);
+
+                            if let Some(x_n) = var.dimension_names.get(x_dim) {
+                                x_name = x_n.clone();
+                                if let Some(bounds) =
+                                    meta.get_coord_bounds_for_range(x_n, dim_size, (start_x, end_x))
+                                {
+                                    x_bounds = bounds;
+                                }
                             }
                         }
 
-                        if let Some(y_idx) = explicit_y
-                            && let Some(y_n) = var.dimension_names.get(y_idx)
-                        {
-                            y_name = y_n.clone();
-                            if let Some(bounds) = meta.get_coord_bounds(y_n) {
-                                y_bounds = bounds;
+                        if y_dim < var.shape.len() {
+                            let dim_size = var
+                                .shape
+                                .get(y_dim)
+                                .copied()
+                                .unwrap_or(matrix.height as u64)
+                                as usize;
+                            let (start_y, end_y) = self
+                                .plotted_selected_dim_ranges
+                                .get(y_dim)
+                                .copied()
+                                .unwrap_or((0, dim_size.saturating_sub(1)));
+                            y_bounds = (start_y as f64, end_y as f64);
+
+                            if let Some(y_n) = var.dimension_names.get(y_dim) {
+                                y_name = y_n.clone();
+                                if let Some(bounds) =
+                                    meta.get_coord_bounds_for_range(y_n, dim_size, (start_y, end_y))
+                                {
+                                    y_bounds = bounds;
+                                }
                             }
+                        }
+                    } else {
+                        if let Some(&(start_x, end_x)) = self.plotted_selected_dim_ranges.first() {
+                            x_bounds = (start_x as f64, end_x as f64);
+                        }
+                        if let Some(&(start_y, end_y)) = self.plotted_selected_dim_ranges.get(1) {
+                            y_bounds = (start_y as f64, end_y as f64);
                         }
                     }
 
