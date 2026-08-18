@@ -11,6 +11,7 @@ pub struct ViewportRequest {
     pub y_range: (f64, f64),
     pub target_width: usize,
     pub target_height: usize,
+    pub level_idx: usize,
 }
 
 /// Viewport resampler managing level-of-detail extraction.
@@ -89,20 +90,34 @@ impl ViewportResampler {
         let target_w = target_width.clamp(16, self.max_resolution);
         let target_h = target_height.clamp(16, self.max_resolution);
 
+        let span_x = (x_range.1 - x_range.0).abs().max(1e-6);
+        let level_idx = pyramid.select_level(span_x, target_w);
+
         let req = ViewportRequest {
             x_range,
             y_range,
             target_width: target_w,
             target_height: target_h,
+            level_idx,
         };
 
         if let Some(last) = &self.last_request {
+            let last_span_x = (last.x_range.1 - last.x_range.0).abs().max(1e-6);
+            let zoom_ratio = span_x / last_span_x;
+
             let x_diff = (req.x_range.0 - last.x_range.0).abs() + (req.x_range.1 - last.x_range.1).abs();
             let y_diff = (req.y_range.0 - last.y_range.0).abs() + (req.y_range.1 - last.y_range.1).abs();
             let w_diff = req.target_width.abs_diff(last.target_width);
             let h_diff = req.target_height.abs_diff(last.target_height);
 
-            if x_diff < 0.002 && y_diff < 0.002 && w_diff < 32 && h_diff < 32 {
+            // If same pyramid LOD level, and zoom changed by < 30%, and pan moved by < 8% of span, skip re-upload
+            if req.level_idx == last.level_idx
+                && (0.75..=1.33).contains(&zoom_ratio)
+                && x_diff < span_x * 0.08
+                && y_diff < (y_range.1 - y_range.0).abs().max(1e-6) * 0.08
+                && w_diff < 128
+                && h_diff < 128
+            {
                 return None;
             }
         }

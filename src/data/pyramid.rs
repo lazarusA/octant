@@ -1,6 +1,7 @@
 //! In-memory 2D matrix pyramid for multi-resolution level-of-detail rendering.
 
 use crate::data::matrix_data::MatrixData;
+use rayon::prelude::*;
 
 /// Aggregation operation for downsampling pyramid levels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -117,7 +118,7 @@ impl MatrixPyramid {
     ) -> Vec<f32> {
         let mut dst = vec![f32::NAN; dst_w * dst_h];
 
-        dst.chunks_mut(dst_w)
+        dst.par_chunks_mut(dst_w)
             .enumerate()
             .for_each(|(dy, row_out)| {
                 let sy0 = dy * 2;
@@ -231,7 +232,7 @@ impl MatrixPyramid {
         let mut out_values = vec![f32::NAN; out_w * out_h];
 
         out_values
-            .chunks_mut(out_w)
+            .par_chunks_mut(out_w)
             .enumerate()
             .for_each(|(out_y, row)| {
                 let norm_y = y_min + (out_y as f64 / out_h as f64) * span_y;

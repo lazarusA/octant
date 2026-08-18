@@ -4319,6 +4319,7 @@ dependencies = [
  "icechunk",
  "log",
  "object_store",
+ "rayon",
  "reqwest",
  "serde",
  "serde_json",
