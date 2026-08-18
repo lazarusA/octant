@@ -87,9 +87,10 @@ impl HeatmapRenderer {
             &initial_uniforms,
         );
 
-        let capacity_elements = (width * height)
-            .max(2048 * 2048)
-            .min(crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS);
+        let capacity_elements = (width * height).clamp(
+            2048 * 2048,
+            crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS,
+        );
         let mut padded_initial = matrix_data.to_vec();
         if padded_initial.len() < capacity_elements {
             padded_initial.resize(capacity_elements, 0.0);

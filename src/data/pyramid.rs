@@ -65,8 +65,8 @@ impl MatrixPyramid {
         let min_dim = min_resolution.max(1);
 
         while current_w > min_dim || current_h > min_dim {
-            let next_w = (current_w + 1) / 2;
-            let next_h = (current_h + 1) / 2;
+            let next_w = current_w.div_ceil(2);
+            let next_h = current_h.div_ceil(2);
             if next_w == current_w && next_h == current_h {
                 break;
             }

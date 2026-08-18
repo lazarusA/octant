@@ -125,13 +125,12 @@ impl ViewportResampler {
             level_idx,
         };
 
-        if let Some(last) = &self.last_request {
-            if req.level_idx == last.level_idx
-                && req.target_width == last.target_width
-                && req.target_height == last.target_height
-            {
-                return None;
-            }
+        if let Some(last) = &self.last_request
+            && req.level_idx == last.level_idx
+            && req.target_width == last.target_width
+            && req.target_height == last.target_height
+        {
+            return None;
         }
 
         let sampled = pyramid.sample_viewport((0.0, 1.0), (0.0, 1.0), (target_w, target_h));
