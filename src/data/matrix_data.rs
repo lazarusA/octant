@@ -1,3 +1,4 @@
+#[derive(Clone, Debug)]
 pub struct MatrixData {
     pub width: usize,
     pub height: usize,

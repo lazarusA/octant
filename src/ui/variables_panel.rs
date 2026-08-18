@@ -515,7 +515,7 @@ fn show_dimension_sliders(
     });
     ui.add_space(4.0);
 
-    // Warning banner when selected 2D plane exceeds GPU storage buffer limit
+    // Info banner when selected 2D plane triggers pyramid aggregation or exceeds 3D mesh limit
     let total_2d_elements = calculate_selected_2d_elements(app);
     if total_2d_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
         let data_mb = (total_2d_elements * 4) as f64 / (1024.0 * 1024.0);
@@ -523,12 +523,12 @@ fn show_dimension_sliders(
             ui.horizontal_wrapped(|ui| {
                 ui.label(
                     egui::RichText::new(format!(
-                        "⚠️ 2D selection ({} cells, {:.0} MB data) exceeds the 128 MB GPU storage buffer limit. Please narrow down the X/Y range sliders.",
+                        "⚡ Large 2D selection ({} cells, {:.0} MB): Automatic multi-resolution pyramid aggregation is enabled.",
                         crate::utils::format_count_metric(total_2d_elements),
                         data_mb,
                     ))
                     .small()
-                    .color(egui::Color32::from_rgb(255, 100, 100)),
+                    .color(egui::Color32::from_rgb(100, 200, 255)),
                 );
             });
         });

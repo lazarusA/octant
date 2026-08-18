@@ -42,6 +42,8 @@ pub struct HeatmapUniforms {
     pub color: super::common::PlotColorParams,
 }
 
+use std::sync::atomic::{AtomicU32, Ordering};
+
 pub struct HeatmapRenderer {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
@@ -50,8 +52,8 @@ pub struct HeatmapRenderer {
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     num_indices: u32,
-    width: usize,
-    height: usize,
+    width: AtomicU32,
+    height: AtomicU32,
 }
 
 impl HeatmapRenderer {
@@ -85,10 +87,18 @@ impl HeatmapRenderer {
             &initial_uniforms,
         );
 
+        let capacity_elements = (width * height)
+            .max(2048 * 2048)
+            .min(crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS);
+        let mut padded_initial = matrix_data.to_vec();
+        if padded_initial.len() < capacity_elements {
+            padded_initial.resize(capacity_elements, 0.0);
+        }
+
         let data_buffer = super::common::create_storage_buffer(
             device,
             "Heatmap Data Storage Buffer",
-            matrix_data,
+            &padded_initial,
         );
 
         let bind_group_layout = super::common::create_uniform_storage_bind_group_layout(
@@ -118,7 +128,7 @@ impl HeatmapRenderer {
                 module: &shader,
                 entry_point: Some("vs_main"),
                 buffers: &[Some(HeatmapVertex::desc())],
-                compilation_options: Default::default(),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -128,12 +138,16 @@ impl HeatmapRenderer {
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
-                compilation_options: Default::default(),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
                 cull_mode: None,
-                ..Default::default()
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
             },
             depth_stencil: Some(super::common::default_depth_stencil_state(
                 false,
@@ -166,8 +180,8 @@ impl HeatmapRenderer {
             uniform_buffer,
             bind_group,
             num_indices: indices.len() as u32,
-            width,
-            height,
+            width: AtomicU32::new(width as u32),
+            height: AtomicU32::new(height as u32),
         }
     }
 
@@ -184,8 +198,8 @@ impl HeatmapRenderer {
             zoom,
             _pad: 0,
             aspect_scale,
-            width: self.width as u32,
-            height: self.height as u32,
+            width: self.width.load(Ordering::Relaxed),
+            height: self.height.load(Ordering::Relaxed),
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -201,6 +215,19 @@ impl HeatmapRenderer {
 
     /// Fast GPU Storage Buffer data channel upload
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
+        queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
+    }
+
+    /// Updates data and dimensions for dynamic viewport LOD resampling
+    pub fn update_data_and_dimensions(
+        &self,
+        queue: &wgpu::Queue,
+        matrix_data: &[f32],
+        width: usize,
+        height: usize,
+    ) {
+        self.width.store(width as u32, Ordering::Relaxed);
+        self.height.store(height as u32, Ordering::Relaxed);
         queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
     }
 

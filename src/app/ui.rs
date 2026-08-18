@@ -443,6 +443,32 @@ impl eframe::App for OctantApp {
                 }
                 _ => {
                     if let Some(renderer) = &self.renderer {
+                        if self.active_pyramid.is_some() && self.active_plot_type == PlotType::Heatmap {
+                            let ((u_min, u_max), (v_min, v_max)) =
+                                crate::data::ViewportResampler::compute_visible_data_bounds(
+                                    gpu_pan,
+                                    gpu_zoom,
+                                    gpu_aspect_scale,
+                                );
+                            let max_res = 2048;
+                            let target_w = self.matrix_data.as_ref().map_or(1024, |m| m.width.min(max_res));
+                            let target_h = self.matrix_data.as_ref().map_or(1024, |m| m.height.min(max_res));
+
+                            if let Some(sampled) = self.resampler.resample_if_needed(
+                                (u_min, u_max),
+                                (v_min, v_max),
+                                target_w,
+                                target_h,
+                            ) && let Some(wgpu_render_state) = &self.wgpu_render_state {
+                                renderer.update_data_and_dimensions(
+                                    &wgpu_render_state.queue,
+                                    &sampled.values,
+                                    sampled.width,
+                                    sampled.height,
+                                );
+                            }
+                        }
+
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
                             canvas_rect,
                             MatrixCallback {
