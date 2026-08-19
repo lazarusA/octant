@@ -412,20 +412,7 @@ impl Default for OctantApp {
 impl OctantApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         if let Some(wgpu_state) = &cc.wgpu_render_state {
-            let info = wgpu_state.adapter.get_info();
-            log::info!(
-                "🎮 GPU initialized: '{}' ({:?}, backend: {:?}, driver: '{}')",
-                info.name,
-                info.device_type,
-                info.backend,
-                info.driver_info
-            );
-            let limits = wgpu_state.device.limits();
-            log::info!(
-                "📊 WGPU device limits: max_buffer_size = {} MB, max_storage_buffer = {} MB",
-                limits.max_buffer_size / (1024 * 1024),
-                limits.max_storage_buffer_binding_size / (1024 * 1024)
-            );
+            crate::utils::diagnostics::log_gpu_diagnostics(wgpu_state);
         }
 
         Self {

@@ -1,5 +1,6 @@
 pub mod colormap;
 pub mod coordinates;
+pub mod diagnostics;
 pub mod error;
 pub mod executor;
 pub mod grid;
