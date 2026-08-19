@@ -1,3 +1,12 @@
+// This ports the logic from
+// https://github.com/MakieOrg/Makie.jl/blob/master/Makie/src/basic_recipes/datashader.jl
+// As of version 0.24.13 (latest on Jul 2026), under the MIT license:
+// https://github.com/MakieOrg/Makie.jl/blob/master/LICENSE
+//
+// Octant's version enhances this by doing downsampling multithreaded using
+// rayon, as well as GPU quad mapping. But in other respects the logic is the
+// same. So you can find the original implementation in the Makie.jl repository.
+
 //! Viewport-aware resampler that coordinates interactive pan/zoom with MatrixPyramid.
 
 use crate::data::matrix_data::MatrixData;
