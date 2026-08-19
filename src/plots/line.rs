@@ -281,7 +281,9 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         rpass: &mut wgpu::RenderPass<'static>,
         _callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
-        super::common::setup_viewport_and_scissor(rpass, &self.rect, &info);
+        if !super::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
+            return;
+        }
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
         let guard = self.renderer.gpu_resources.read().unwrap();
