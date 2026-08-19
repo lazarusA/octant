@@ -83,12 +83,13 @@ pub fn setup_viewport_and_scissor(
     }
 
     let ppp = info.pixels_per_point;
-    let max_dim = 8192.0;
+    let max_target_w = target_rect.width_px as f32;
+    let max_target_h = target_rect.height_px as f32;
 
-    let vp_x = (rect.min.x * ppp).round();
-    let vp_y = (rect.min.y * ppp).round();
-    let vp_w = (rect.width() * ppp).round().clamp(1.0, max_dim);
-    let vp_h = (rect.height() * ppp).round().clamp(1.0, max_dim);
+    let vp_x = (rect.min.x * ppp).round().max(0.0);
+    let vp_y = (rect.min.y * ppp).round().max(0.0);
+    let vp_w = (rect.width() * ppp).round().clamp(1.0, max_target_w);
+    let vp_h = (rect.height() * ppp).round().clamp(1.0, max_target_h);
 
     rpass.set_viewport(vp_x, vp_y, vp_w, vp_h, 0.0, 1.0);
 
