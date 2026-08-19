@@ -371,7 +371,12 @@ pub struct Transform2D {
 impl Transform2D {
     pub fn from_app(app: &OctantApp, rect: Rect, matrix: &MatrixData) -> Self {
         let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio {
-            let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.001);
+            let (orig_w, orig_h) = if let Some(pyr) = &app.active_pyramid {
+                (pyr.original_width, pyr.original_height)
+            } else {
+                (matrix.width, matrix.height)
+            };
+            let data_aspect = (orig_w as f32 / orig_h.max(1) as f32).max(0.001);
             let canvas_aspect = rect.width() / rect.height().max(1.0);
             if canvas_aspect > data_aspect {
                 (data_aspect / canvas_aspect, 1.0)
@@ -1028,29 +1033,23 @@ pub fn show_hover_tooltip(
 
         (val, entries, px, py)
     } else {
-        let px = if app.active_plot_type == PlotType::Sphere
-            || app.active_plot_type == PlotType::Surface
-            || app.active_plot_type == PlotType::PointCloud
-            || app.active_plot_type == PlotType::Volume
-        {
-            ((norm_x * matrix.width as f32).floor() as usize).min(matrix.width.saturating_sub(1))
+        let (orig_w, orig_h) = if let Some(pyr) = &app.active_pyramid {
+            (pyr.original_width, pyr.original_height)
         } else {
-            (((norm_x * (matrix.width as f32 - 1.0)) + 0.5) as usize)
-                .min(matrix.width.saturating_sub(1))
+            (matrix.width, matrix.height)
         };
-        let py = if app.active_plot_type == PlotType::Sphere
-            || app.active_plot_type == PlotType::Surface
-            || app.active_plot_type == PlotType::PointCloud
-            || app.active_plot_type == PlotType::Volume
-        {
-            ((norm_y * matrix.height as f32).floor() as usize).min(matrix.height.saturating_sub(1))
-        } else {
-            (((norm_y * (matrix.height as f32 - 1.0)) + 0.5) as usize)
-                .min(matrix.height.saturating_sub(1))
-        };
+        let px = ((norm_x * orig_w as f32).floor() as usize).min(orig_w.saturating_sub(1));
+        let py = ((norm_y * orig_h as f32).floor() as usize).min(orig_h.saturating_sub(1));
 
-        let idx = py * matrix.width + px;
-        let val = matrix.values.get(idx).copied().unwrap_or(f32::NAN);
+        let val = if let Some(pyr) = &app.active_pyramid
+            && let Some(base_lvl) = pyr.levels.first()
+        {
+            let idx = py * orig_w + px;
+            base_lvl.values.get(idx).copied().unwrap_or(f32::NAN)
+        } else {
+            let idx = py * matrix.width + px;
+            matrix.values.get(idx).copied().unwrap_or(f32::NAN)
+        };
 
         let mut used_dims = HashSet::new();
 
@@ -1119,8 +1118,8 @@ pub fn show_hover_tooltip(
             list
         } else {
             vec![
-                format!("y:\u{00A0}{}/{}", py + 1, matrix.height),
-                format!("x:\u{00A0}{}/{}", px + 1, matrix.width),
+                format!("y:\u{00A0}{}/{}", py + 1, orig_h),
+                format!("x:\u{00A0}{}/{}", px + 1, orig_w),
             ]
         };
 
@@ -1281,8 +1280,13 @@ pub fn show_hover_tooltip(
             }
         }
         PlotType::Heatmap | PlotType::Block => {
-            let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
-            let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
+            let (orig_w, orig_h) = if let Some(pyr) = &app.active_pyramid {
+                (pyr.original_width, pyr.original_height)
+            } else {
+                (matrix.width, matrix.height)
+            };
+            let u_c = (px as f32 + 0.5) / orig_w.max(1) as f32;
+            let v_c = (py as f32 + 0.5) / orig_h.max(1) as f32;
             Some(transform_2d.norm_to_screen(u_c, v_c))
         }
         _ => None,

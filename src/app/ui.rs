@@ -578,8 +578,13 @@ impl eframe::App for OctantApp {
                 } else {
                     let mut x_name = "X".to_string();
                     let mut y_name = "Y".to_string();
-                    let mut x_bounds = (0.0, matrix.width.saturating_sub(1) as f64);
-                    let mut y_bounds = (0.0, matrix.height.saturating_sub(1) as f64);
+                    let (orig_w, orig_h) = if let Some(pyr) = &self.active_pyramid {
+                        (pyr.original_width, pyr.original_height)
+                    } else {
+                        (matrix.width, matrix.height)
+                    };
+                    let mut x_bounds = (0.0, orig_w as f64);
+                    let mut y_bounds = (0.0, orig_h as f64);
 
                     if let Some(meta) = &self.plotted_dataset_metadata
                         && let Some(var) = meta.variables.get(self.plotted_variable_idx)
