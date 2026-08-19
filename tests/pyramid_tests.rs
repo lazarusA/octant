@@ -172,13 +172,20 @@ fn test_resample_if_needed_aspect_ratio_and_lod() {
     assert_eq!(th, 1000);
 
     // Initial resample
-    let sample1 = resampler.resample_if_needed(1.0, tw, th);
+    let sample1 = resampler.resample_if_needed((0.0, 1.0), (0.0, 1.0), tw, th);
     assert!(sample1.is_some());
     let s1 = sample1.unwrap();
-    assert_eq!(s1.width, 2000);
-    assert_eq!(s1.height, 1000);
+    assert_eq!(s1.data.width, 2000);
+    assert_eq!(s1.data.height, 1000);
+    assert_eq!(s1.tile_bounds, [0.0, 0.0, 1.0, 1.0]);
 
     // Identical visible span should skip
-    let sample2 = resampler.resample_if_needed(1.0, tw, th);
+    let sample2 = resampler.resample_if_needed((0.0, 1.0), (0.0, 1.0), tw, th);
     assert!(sample2.is_none());
+
+    // Zoom in 10x (visible 0.45..0.55) -> extracts high-res sub-tile with bounds
+    let sample3 = resampler.resample_if_needed((0.45, 0.55), (0.45, 0.55), tw, th);
+    assert!(sample3.is_some());
+    let s3 = sample3.unwrap();
+    assert!(s3.tile_bounds[0] <= 0.45 && s3.tile_bounds[2] >= 0.55);
 }

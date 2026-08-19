@@ -451,7 +451,7 @@ impl eframe::App for OctantApp {
                         if self.active_pyramid.is_some()
                             && self.active_plot_type == PlotType::Heatmap
                         {
-                            let ((u_min, u_max), _v_bounds) =
+                            let ((u_min, u_max), (v_min, v_max)) =
                                 crate::data::ViewportResampler::compute_visible_data_bounds(
                                     gpu_pan,
                                     gpu_zoom,
@@ -468,19 +468,20 @@ impl eframe::App for OctantApp {
                                 crate::data::ViewportResampler::compute_target_resolution(
                                     orig_w, orig_h, 2048,
                                 );
-                            let visible_span_x = (u_max - u_min).abs().max(1e-6);
 
-                            if let Some(sampled) = self.resampler.resample_if_needed(
-                                visible_span_x,
+                            if let Some(tile) = self.resampler.resample_if_needed(
+                                (u_min, u_max),
+                                (v_min, v_max),
                                 target_w,
                                 target_h,
                             ) && let Some(wgpu_render_state) = &self.wgpu_render_state
                             {
                                 renderer.update_data_and_dimensions(
                                     &wgpu_render_state.queue,
-                                    &sampled.values,
-                                    sampled.width,
-                                    sampled.height,
+                                    &tile.data.values,
+                                    tile.data.width,
+                                    tile.data.height,
+                                    tile.tile_bounds,
                                 );
                             }
                         }

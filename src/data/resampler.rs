@@ -4,6 +4,13 @@ use crate::data::matrix_data::MatrixData;
 use crate::data::pyramid::MatrixPyramid;
 use std::sync::Arc;
 
+/// A sampled viewport tile along with its normalized bounds in the source dataset.
+#[derive(Debug, Clone)]
+pub struct ResampledTile {
+    pub data: MatrixData,
+    pub tile_bounds: [f32; 4], // [u_min, v_min, u_max, v_max]
+}
+
 /// Request for a viewport sample.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewportRequest {
@@ -102,40 +109,78 @@ impl ViewportResampler {
         ((u_min, u_max), (v_min, v_max))
     }
 
-    /// Resamples the full-domain texture at the optimal pyramid LOD level for the visible span.
+    /// Resamples the visible viewport with a buffer margin at the optimal pyramid LOD level.
     pub fn resample_if_needed(
         &mut self,
-        visible_span_x: f64,
+        visible_u: (f64, f64),
+        visible_v: (f64, f64),
         target_width: usize,
         target_height: usize,
-    ) -> Option<MatrixData> {
+    ) -> Option<ResampledTile> {
         let pyramid = self.pyramid.as_ref()?;
 
         let target_w = target_width.clamp(16, self.max_resolution);
         let target_h = target_height.clamp(16, self.max_resolution);
 
-        let span_x = visible_span_x.abs().max(1e-6);
-        let level_idx = pyramid.select_level(span_x, target_w);
+        let u_min_vis = visible_u.0.min(visible_u.1).clamp(0.0, 1.0);
+        let u_max_vis = visible_u.0.max(visible_u.1).clamp(0.0, 1.0);
+        let v_min_vis = visible_v.0.min(visible_v.1).clamp(0.0, 1.0);
+        let v_max_vis = visible_v.0.max(visible_v.1).clamp(0.0, 1.0);
+
+        let span_u = (u_max_vis - u_min_vis).max(1e-6);
+        let span_v = (v_max_vis - v_min_vis).max(1e-6);
+
+        // Pre-buffer a 20% margin around visible viewport
+        let margin_u = span_u * 0.20;
+        let margin_v = span_v * 0.20;
+        let tile_u_min = (u_min_vis - margin_u).clamp(0.0, 1.0);
+        let tile_u_max = (u_max_vis + margin_u).clamp(0.0, 1.0);
+        let tile_v_min = (v_min_vis - margin_v).clamp(0.0, 1.0);
+        let tile_v_max = (v_max_vis + margin_v).clamp(0.0, 1.0);
+
+        let level_idx = pyramid.select_level(span_u, target_w);
 
         let req = ViewportRequest {
-            x_range: (0.0, 1.0),
-            y_range: (0.0, 1.0),
+            x_range: (tile_u_min, tile_u_max),
+            y_range: (tile_v_min, tile_v_max),
             target_width: target_w,
             target_height: target_h,
             level_idx,
         };
 
-        if let Some(last) = &self.last_request
-            && req.level_idx == last.level_idx
-            && req.target_width == last.target_width
-            && req.target_height == last.target_height
-        {
-            return None;
+        if let Some(last) = &self.last_request {
+            let last_span_u = (last.x_range.1 - last.x_range.0).abs().max(1e-6);
+            let zoom_ratio = (tile_u_max - tile_u_min) / last_span_u;
+
+            let is_contained = u_min_vis >= last.x_range.0
+                && u_max_vis <= last.x_range.1
+                && v_min_vis >= last.y_range.0
+                && v_max_vis <= last.y_range.1;
+
+            if is_contained
+                && req.level_idx == last.level_idx
+                && (0.75..=1.33).contains(&zoom_ratio)
+            {
+                return None;
+            }
         }
 
-        let sampled = pyramid.sample_viewport((0.0, 1.0), (0.0, 1.0), (target_w, target_h));
+        let sampled = pyramid.sample_viewport(
+            (tile_u_min, tile_u_max),
+            (tile_v_min, tile_v_max),
+            (target_w, target_h),
+        );
+        let tile_bounds = [
+            tile_u_min as f32,
+            tile_v_min as f32,
+            tile_u_max as f32,
+            tile_v_max as f32,
+        ];
         self.last_request = Some(req);
 
-        Some(sampled)
+        Some(ResampledTile {
+            data: sampled,
+            tile_bounds,
+        })
     }
 }

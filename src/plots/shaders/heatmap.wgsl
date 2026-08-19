@@ -5,6 +5,7 @@ struct Uniforms {
     aspect_scale: vec2<f32>,
     width: u32,
     height: u32,
+    tile_bounds: vec4<f32>,
     color: ColorUniforms,
 };
 
@@ -27,7 +28,16 @@ struct VertexOutput {
 @vertex
 fn vs_main(model: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    let scaled_model_pos = model.position * uniforms.aspect_scale;
+
+    // Map quad vertices [-1..1] to tile sub-region [tile_bounds.x..tile_bounds.z] in data space
+    let tile_u = mix(uniforms.tile_bounds.x, uniforms.tile_bounds.z, (model.position.x + 1.0) * 0.5);
+    let tile_v = mix(uniforms.tile_bounds.y, uniforms.tile_bounds.w, (1.0 - model.position.y) * 0.5);
+
+    let model_x = tile_u * 2.0 - 1.0;
+    let model_y = 1.0 - tile_v * 2.0;
+    let model_pos = vec2<f32>(model_x, model_y);
+
+    let scaled_model_pos = model_pos * uniforms.aspect_scale;
     let transformed_pos = scaled_model_pos * uniforms.zoom + uniforms.pan;
     out.position = vec4<f32>(transformed_pos, 0.0, 1.0);
     out.uv = model.uv;

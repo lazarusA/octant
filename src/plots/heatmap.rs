@@ -39,9 +39,11 @@ pub struct HeatmapUniforms {
     pub aspect_scale: [f32; 2],
     pub width: u32,
     pub height: u32,
+    pub tile_bounds: [f32; 4],
     pub color: super::common::PlotColorParams,
 }
 
+use std::sync::RwLock;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 pub struct HeatmapRenderer {
@@ -54,6 +56,7 @@ pub struct HeatmapRenderer {
     num_indices: u32,
     width: AtomicU32,
     height: AtomicU32,
+    tile_bounds: RwLock<[f32; 4]>,
 }
 
 impl HeatmapRenderer {
@@ -78,6 +81,7 @@ impl HeatmapRenderer {
             aspect_scale: [1.0, 1.0],
             width: width.max(1) as u32,
             height: height.max(1) as u32,
+            tile_bounds: [0.0, 0.0, 1.0, 1.0],
             color: super::common::PlotColorParams::default(),
         };
 
@@ -183,6 +187,7 @@ impl HeatmapRenderer {
             num_indices: indices.len() as u32,
             width: AtomicU32::new(width as u32),
             height: AtomicU32::new(height as u32),
+            tile_bounds: RwLock::new([0.0, 0.0, 1.0, 1.0]),
         }
     }
 
@@ -194,6 +199,11 @@ impl HeatmapRenderer {
         zoom: f32,
         aspect_scale: [f32; 2],
     ) {
+        let tile_bounds = self
+            .tile_bounds
+            .read()
+            .map(|b| *b)
+            .unwrap_or([0.0, 0.0, 1.0, 1.0]);
         let uniforms = HeatmapUniforms {
             pan,
             zoom,
@@ -201,6 +211,7 @@ impl HeatmapRenderer {
             aspect_scale,
             width: self.width.load(Ordering::Relaxed),
             height: self.height.load(Ordering::Relaxed),
+            tile_bounds,
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -219,16 +230,20 @@ impl HeatmapRenderer {
         queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
     }
 
-    /// Updates data and dimensions for dynamic viewport LOD resampling
+    /// Updates data, dimensions, and tile bounds for dynamic viewport LOD resampling
     pub fn update_data_and_dimensions(
         &self,
         queue: &wgpu::Queue,
         matrix_data: &[f32],
         width: usize,
         height: usize,
+        tile_bounds: [f32; 4],
     ) {
         self.width.store(width as u32, Ordering::Relaxed);
         self.height.store(height as u32, Ordering::Relaxed);
+        if let Ok(mut b) = self.tile_bounds.write() {
+            *b = tile_bounds;
+        }
         queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
     }
 
