@@ -239,6 +239,17 @@ impl HeatmapRenderer {
         height: usize,
         tile_bounds: [f32; 4],
     ) {
+        log::debug!(
+            "🖼️ [Heatmap] Uploading LOD tile: {}x{} ({} cells, {:.2} MB), tile_bounds: [{:.3}, {:.3}, {:.3}, {:.3}]",
+            width,
+            height,
+            matrix_data.len(),
+            (matrix_data.len() * 4) as f64 / (1024.0 * 1024.0),
+            tile_bounds[0],
+            tile_bounds[1],
+            tile_bounds[2],
+            tile_bounds[3]
+        );
         self.width.store(width as u32, Ordering::Relaxed);
         self.height.store(height as u32, Ordering::Relaxed);
         if let Ok(mut b) = self.tile_bounds.write() {
