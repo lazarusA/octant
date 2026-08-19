@@ -49,7 +49,7 @@ impl eframe::App for OctantApp {
                     }
                 }
             } else {
-                ctx.request_repaint();
+                ctx.request_repaint_after(std::time::Duration::from_millis(50));
             }
         }
         if metadata_done {
@@ -138,7 +138,7 @@ impl eframe::App for OctantApp {
                 std::time::Duration::from_millis(1)
             };
             ctx.request_repaint_after(next_wake);
-        } else {
+        } else if self.block_prefetcher.pending_count() > 0 || self.metadata_rx.is_some() {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
