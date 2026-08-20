@@ -626,17 +626,22 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     if (app.enable_pyramid_resampling != prev_resampling || app.pyramid_aggregation_op != prev_op)
         && let Some(mdata) = &app.matrix_data
     {
-        if app.enable_pyramid_resampling && mdata.height > 1 {
-            let pyramid = std::sync::Arc::new(crate::data::MatrixPyramid::new(
-                &mdata.values,
-                mdata.width,
-                mdata.height,
-                &mdata.dataset_name,
-                app.pyramid_aggregation_op,
-                512,
-            ));
-            app.resampler.set_pyramid(Some(pyramid.clone()));
-            app.active_pyramid = Some(pyramid);
+        if app.enable_pyramid_resampling {
+            if app.active_plot_type != PlotType::Heatmap {
+                app.active_plot_type = PlotType::Heatmap;
+            }
+            if mdata.height > 1 {
+                let pyramid = std::sync::Arc::new(crate::data::MatrixPyramid::new(
+                    &mdata.values,
+                    mdata.width,
+                    mdata.height,
+                    &mdata.dataset_name,
+                    app.pyramid_aggregation_op,
+                    512,
+                ));
+                app.resampler.set_pyramid(Some(pyramid.clone()));
+                app.active_pyramid = Some(pyramid);
+            }
         } else {
             app.active_pyramid = None;
             app.resampler.set_pyramid(None);
