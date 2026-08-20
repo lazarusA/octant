@@ -11,6 +11,8 @@ pub mod matrix_data;
 pub mod metadata;
 pub mod octant_block;
 pub mod procedural;
+pub mod pyramid;
+pub mod resampler;
 pub mod slice_request;
 pub mod source_factory;
 pub mod store_handle;
@@ -33,6 +35,8 @@ pub use procedural::{
     generate_procedural_matrix, generate_procedural_volume_3d, generate_procedural_volume_4d,
     get_known_truth_4d_center,
 };
+pub use pyramid::{AggregationOp, MatrixPyramid, PyramidLevel};
+pub use resampler::{ViewportRequest, ViewportResampler};
 pub use slice_request::{DimensionSelection, SliceRequest};
 pub use source_factory::SourceFactory;
 pub use store_handle::StoreHandle;

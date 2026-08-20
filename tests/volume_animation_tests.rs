@@ -826,3 +826,107 @@ fn test_volume_attenuation_and_advanced_algorithms() {
         assert_eq!(app.volume_algorithm, algo_id);
     }
 }
+
+#[test]
+fn test_exact_2d_slice_range_extraction() {
+    let block = octant::data::procedural::generate_known_truth_4d_block(
+        "test_wave",
+        5,  // T
+        10, // Z
+        20, // Y
+        30, // X
+    );
+
+    // Full 2D slice along X (dim 3) and Y (dim 2), with T=0, Z=0 fixed
+    let full_slice = block
+        .slice_2d(3, 2, &[0, 0, 0, 0], 5, "full", true)
+        .unwrap();
+    assert_eq!(full_slice.width, 30);
+    assert_eq!(full_slice.height, 20);
+    assert_eq!(full_slice.values.len(), 30 * 20);
+
+    // Exact sub-slice requested: X in [5, 15) -> width 10, Y in [4, 12) -> height 8
+    let sub_slice = block
+        .slice_2d_with_ranges(3, 2, (5, 15), (4, 12), &[0, 0, 0, 0], 5, "sub", true)
+        .unwrap();
+    assert_eq!(sub_slice.width, 10);
+    assert_eq!(sub_slice.height, 8);
+    assert_eq!(sub_slice.values.len(), 80);
+
+    // Verify voxel values match exact indexed elements
+    for y in 0..8 {
+        for x in 0..10 {
+            let sub_val = sub_slice.values[y * 10 + x];
+            let full_val = full_slice.values[(4 + y) * 30 + (5 + x)];
+            assert_eq!(sub_val, full_val);
+        }
+    }
+}
+
+#[test]
+fn test_exact_3d_volume_range_extraction() {
+    let block = octant::data::procedural::generate_known_truth_4d_block(
+        "test_wave",
+        4,  // T
+        10, // Z
+        16, // Y
+        16, // X
+    );
+
+    // Sub-range for X in [2, 10), Y in [4, 12), Z in [1, 6)
+    let sub_vol = block
+        .volume_with_ranges(
+            3,
+            2,
+            1,
+            (2, 10),
+            (4, 12),
+            (1, 6),
+            &[0, 0, 0, 0],
+            "sub_vol",
+            true,
+        )
+        .unwrap();
+
+    assert_eq!(sub_vol.width, 8);
+    assert_eq!(sub_vol.height, 8);
+    assert_eq!(sub_vol.depth, 5);
+    assert_eq!(sub_vol.values.len(), 8 * 8 * 5);
+}
+
+#[test]
+fn test_2d_and_3d_selected_elements_and_limits() {
+    let mut app = OctantApp::default();
+    let var_info = VariableInfo {
+        name: "high_res_data".to_string(),
+        data_type: "f32".to_string(),
+        shape: vec![100, 2000, 3000],
+        chunk_shape: vec![1, 500, 500],
+        dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
+        units: Some("K".to_string()),
+        long_name: Some("High Res Data".to_string()),
+        temporal_resolution: None,
+        time_coverage_start: None,
+        time_coverage_end: None,
+        file_size: 100 * 2000 * 3000 * 4,
+        attributes: HashMap::new(),
+    };
+
+    let metadata = octant::data::DatasetMetadata {
+        name: "high_res_store".to_string(),
+        store_type: "zarr".to_string(),
+        variables: vec![var_info.clone()],
+        dimension_coordinates: HashMap::new(),
+    };
+    app.active_dataset_metadata = Some(metadata);
+    app.selected_variable_idx = 0;
+
+    octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
+
+    // Sub-range selection for X and Y in sliders: 100x100
+    app.selected_dim_ranges[2] = (10, 109); // span 100
+    app.selected_dim_ranges[1] = (20, 119); // span 100
+
+    let elements_2d = octant::ui::variables_panel::calculate_selected_2d_elements(&app);
+    assert_eq!(elements_2d, 100 * 100);
+}

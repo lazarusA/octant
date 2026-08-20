@@ -50,6 +50,27 @@ pub fn format_byte_size(bytes: u64) -> String {
     }
 }
 
+/// Formats a large element count with SI metric prefixes (e.g., "6.48M", "500K").
+pub fn format_count_metric(count: usize) -> String {
+    if count >= 1_000_000 {
+        let m = count as f64 / 1_000_000.0;
+        if (m.fract() * 100.0).round() == 0.0 {
+            format!("{:.0}M", m)
+        } else {
+            format!("{:.2}M", m)
+        }
+    } else if count >= 1_000 {
+        let k = count as f64 / 1_000.0;
+        if (k.fract() * 10.0).round() == 0.0 {
+            format!("{:.0}K", k)
+        } else {
+            format!("{:.1}K", k)
+        }
+    } else {
+        count.to_string()
+    }
+}
+
 /// Calculate uncompressed file/variable size in bytes based on shape and data type string.
 pub fn calculate_variable_size_bytes(shape: &[u64], data_type: &str) -> u64 {
     let element_count: u64 = shape.iter().product();

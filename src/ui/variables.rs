@@ -119,6 +119,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                         .clicked()
                                     {
                                         app.selected_variable_idx = idx;
+                                        app.reset_colorbar_label();
 
                                         crate::ui::variables_panel::init_variable_dimension_defaults(
                                             app, var_info,

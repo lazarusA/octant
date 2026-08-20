@@ -10,14 +10,38 @@ use super::OctantApp;
 
 impl OctantApp {
     pub fn rebuild_pipeline_with_matrix_data(&mut self, data: MatrixData) {
-        if data.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
-            log::error!(
-                "Matrix data buffer size ({} elements / {} bytes) exceeds maximum GPU storage buffer limit ({})",
-                data.values.len(),
-                data.values.len() * 4,
-                crate::plots::common::MAX_GPU_STORAGE_BUFFER_BYTES
-            );
-            return;
+        let total_elements = data.width * data.height;
+
+        let var_key = format!(
+            "{}:{}",
+            self.plotted_store_target_input, self.plotted_variable_idx
+        );
+        let is_new_variable = self.current_plotted_var_key.as_ref() != Some(&var_key);
+
+        if is_new_variable {
+            self.current_plotted_var_key = Some(var_key);
+            self.global_data_min = data.min_val;
+            self.global_data_max = data.max_val;
+            self.color_range_min = data.min_val;
+            self.color_range_max = data.max_val;
+            self.volume_cmin = data.min_val;
+            self.volume_cmax = data.max_val;
+            self.lock_color_bounds = false;
+        } else {
+            self.global_data_min = self.global_data_min.min(data.min_val);
+            self.global_data_max = self.global_data_max.max(data.max_val);
+
+            if !self.lock_color_bounds {
+                self.color_range_min = data.min_val;
+                self.color_range_max = data.max_val;
+                self.volume_cmin = data.min_val;
+                self.volume_cmax = data.max_val;
+            }
+        }
+
+        let is_oversized = total_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
+        if is_oversized {
+            self.enable_pyramid_resampling = true;
         }
 
         // If the data is a line plot, set the line plot all series to false and the line profile dim index and slice index to 0
@@ -26,67 +50,96 @@ impl OctantApp {
             self.line_profile_dim_idx = 0;
             self.line_profile_slice_idx = 0;
         }
-        if let Some(wgpu_render_state) = &self.wgpu_render_state {
-            let same_dimensions = self
-                .matrix_data
-                .as_ref()
-                .is_some_and(|m| m.width == data.width && m.height == data.height);
 
-            if same_dimensions
-                && self.renderer.is_some()
-                && self.line_renderer.is_some()
-                && self.sphere_renderer.is_some()
-                && self.surface_renderer.is_some()
-            {
-                self.update_active_2d_renderer_data(&wgpu_render_state.queue, &data.values);
+        // Build in-memory MatrixPyramid when explicitly enabled or when data elements exceed single GPU storage buffer capacity
+        let effective_data = if data.height > 1 && (self.enable_pyramid_resampling || is_oversized)
+        {
+            let pyramid = Arc::new(crate::data::MatrixPyramid::new(
+                &data.values,
+                data.width,
+                data.height,
+                &data.dataset_name,
+                self.pyramid_aggregation_op,
+                512,
+            ));
+            self.resampler.set_pyramid(Some(pyramid.clone()));
+            self.active_pyramid = Some(pyramid.clone());
+
+            let aspect_scale = [1.0f32, 1.0f32];
+            let ((u_min, u_max), (v_min, v_max)) =
+                crate::data::ViewportResampler::compute_visible_data_bounds(
+                    [self.heatmap_pan.x, self.heatmap_pan.y],
+                    self.heatmap_zoom,
+                    aspect_scale,
+                );
+
+            let (target_w, target_h) = crate::data::ViewportResampler::compute_target_resolution(
+                data.width,
+                data.height,
+                2048,
+            );
+            pyramid.sample_viewport((u_min, u_max), (v_min, v_max), (target_w, target_h))
+        } else {
+            self.active_pyramid = None;
+            self.resampler.set_pyramid(None);
+            data.clone()
+        };
+
+        if let Some(wgpu_render_state) = &self.wgpu_render_state {
+            let same_dimensions = self.matrix_data.as_ref().is_some_and(|m| {
+                m.width == effective_data.width && m.height == effective_data.height
+            });
+
+            if same_dimensions && self.renderer.is_some() && self.line_renderer.is_some() {
+                self.update_active_2d_renderer_data(
+                    &wgpu_render_state.queue,
+                    &effective_data.values,
+                );
             } else {
                 let renderer = MatrixRenderer::new(
                     &wgpu_render_state.device,
                     wgpu_render_state.target_format,
-                    &data.values,
-                    data.width,
-                    data.height,
+                    &effective_data.values,
+                    effective_data.width,
+                    effective_data.height,
                 );
                 let line_renderer = LineRenderer::new(
                     &wgpu_render_state.device,
                     wgpu_render_state.target_format,
-                    &data.values,
-                    data.width,
-                    data.height,
-                );
-                let sphere_renderer = SphereRenderer::new(
-                    &wgpu_render_state.device,
-                    wgpu_render_state.target_format,
-                    &data.values,
-                    data.width,
-                    data.height,
-                );
-                let surface_renderer = SurfaceRenderer::new(
-                    &wgpu_render_state.device,
-                    wgpu_render_state.target_format,
-                    &data.values,
-                    data.width,
-                    data.height,
+                    &effective_data.values,
+                    effective_data.width,
+                    effective_data.height,
                 );
                 self.renderer = Some(Arc::new(renderer));
                 self.line_renderer = Some(Arc::new(line_renderer));
-                self.sphere_renderer = Some(Arc::new(sphere_renderer));
-                self.surface_renderer = Some(Arc::new(surface_renderer));
+
+                // Instantiate 3D sphere and surface meshes only when within vertex buffer limits
+                if total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
+                    let sphere_renderer = SphereRenderer::new(
+                        &wgpu_render_state.device,
+                        wgpu_render_state.target_format,
+                        &effective_data.values,
+                        effective_data.width,
+                        effective_data.height,
+                    );
+                    let surface_renderer = SurfaceRenderer::new(
+                        &wgpu_render_state.device,
+                        wgpu_render_state.target_format,
+                        &effective_data.values,
+                        effective_data.width,
+                        effective_data.height,
+                    );
+                    self.sphere_renderer = Some(Arc::new(sphere_renderer));
+                    self.surface_renderer = Some(Arc::new(surface_renderer));
+                } else {
+                    self.sphere_renderer = None;
+                    self.surface_renderer = None;
+                }
 
                 if data.height == 1 {
                     self.active_plot_type = PlotType::Line;
                 }
             }
-        }
-
-        self.global_data_min = self.global_data_min.min(data.min_val);
-        self.global_data_max = self.global_data_max.max(data.max_val);
-
-        if !self.lock_color_bounds {
-            self.color_range_min = data.min_val;
-            self.color_range_max = data.max_val;
-            self.volume_cmin = data.min_val;
-            self.volume_cmax = data.max_val;
         }
 
         self.matrix_data = Some(data);
@@ -138,14 +191,31 @@ impl OctantApp {
             }
         }
 
-        self.global_data_min = self.global_data_min.min(data.min_val);
-        self.global_data_max = self.global_data_max.max(data.max_val);
+        let var_key = format!(
+            "{}:{}",
+            self.plotted_store_target_input, self.plotted_variable_idx
+        );
+        let is_new_variable = self.current_plotted_var_key.as_ref() != Some(&var_key);
 
-        if !self.lock_color_bounds {
+        if is_new_variable {
+            self.current_plotted_var_key = Some(var_key);
+            self.global_data_min = data.min_val;
+            self.global_data_max = data.max_val;
             self.volume_cmin = data.min_val;
             self.volume_cmax = data.max_val;
             self.color_range_min = data.min_val;
             self.color_range_max = data.max_val;
+            self.lock_color_bounds = false;
+        } else {
+            self.global_data_min = self.global_data_min.min(data.min_val);
+            self.global_data_max = self.global_data_max.max(data.max_val);
+
+            if !self.lock_color_bounds {
+                self.volume_cmin = data.min_val;
+                self.volume_cmax = data.max_val;
+                self.color_range_min = data.min_val;
+                self.color_range_max = data.max_val;
+            }
         }
 
         self.volume_data = Some(data);
