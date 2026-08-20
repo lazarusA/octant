@@ -411,9 +411,9 @@ impl Default for OctantApp {
 
 impl OctantApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        if let Some(wgpu_state) = &cc.wgpu_render_state {
-            crate::utils::diagnostics::log_gpu_diagnostics(wgpu_state);
-        }
+        // if let Some(wgpu_state) = &cc.wgpu_render_state {
+        //     crate::utils::diagnostics::log_gpu_diagnostics(wgpu_state);
+        // }
 
         Self {
             wgpu_render_state: cc.wgpu_render_state.clone(),
