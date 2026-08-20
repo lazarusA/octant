@@ -7,8 +7,6 @@ use wgpu::util::DeviceExt;
 pub struct SphereVertex {
     pub position: [f32; 3],
     pub uv: [f32; 2],
-    pub cell_index: u32,
-    pub corner_index: u32,
     pub normal: [f32; 3],
 }
 
@@ -31,16 +29,6 @@ impl SphereVertex {
                 wgpu::VertexAttribute {
                     offset: 20,
                     shader_location: 2,
-                    format: wgpu::VertexFormat::Uint32,
-                },
-                wgpu::VertexAttribute {
-                    offset: 24,
-                    shader_location: 3,
-                    format: wgpu::VertexFormat::Uint32,
-                },
-                wgpu::VertexAttribute {
-                    offset: 28,
-                    shader_location: 4,
                     format: wgpu::VertexFormat::Float32x3,
                 },
             ],
@@ -64,9 +52,8 @@ pub struct SphereUniforms {
 
 pub struct SphereRenderer {
     render_pipeline: wgpu::RenderPipeline,
-    grid_vertex_buffer: wgpu::Buffer,
-    grid_index_buffer: wgpu::Buffer,
-    grid_num_indices: u32,
+    quad_vertex_buffer: wgpu::Buffer,
+    quad_index_buffer: wgpu::Buffer,
     cube_vertex_buffer: wgpu::Buffer,
     cube_index_buffer: wgpu::Buffer,
     data_buffer: wgpu::Buffer,
@@ -166,28 +153,26 @@ impl SphereRenderer {
             cache: None,
         });
 
-        let (grid_vertices, grid_indices) = Self::build_sphere_mesh(width, height);
-
-        let grid_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Sphere Grid Vertex Buffer"),
-            contents: bytemuck::cast_slice(&grid_vertices),
+        // 1. Instanced Unit Quad Template for Smooth Globe, Smooth Terrain, and Flat Steps
+        let (quad_vertices, quad_indices) = Self::build_unit_quad();
+        let quad_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Sphere Unit Quad Vertex Buffer"),
+            contents: bytemuck::cast_slice(&quad_vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
-
-        let grid_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Sphere Grid Index Buffer"),
-            contents: bytemuck::cast_slice(&grid_indices),
+        let quad_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Sphere Unit Quad Index Buffer"),
+            contents: bytemuck::cast_slice(&quad_indices),
             usage: wgpu::BufferUsages::INDEX,
         });
 
+        // 2. Unit Cube Template for GPU Instanced 3D Radial Lego Cubes
         let (cube_vertices, cube_indices) = Self::build_unit_cube();
-
         let cube_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Sphere Unit Cube Vertex Buffer"),
             contents: bytemuck::cast_slice(&cube_vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
-
         let cube_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Sphere Unit Cube Index Buffer"),
             contents: bytemuck::cast_slice(&cube_indices),
@@ -196,9 +181,8 @@ impl SphereRenderer {
 
         Self {
             render_pipeline,
-            grid_vertex_buffer,
-            grid_index_buffer,
-            grid_num_indices: grid_indices.len() as u32,
+            quad_vertex_buffer,
+            quad_index_buffer,
             cube_vertex_buffer,
             cube_index_buffer,
             data_buffer,
@@ -244,95 +228,18 @@ impl SphereRenderer {
         );
     }
 
-    fn build_sphere_mesh(width: usize, height: usize) -> (Vec<SphereVertex>, Vec<u32>) {
-        let num_quads = width * height;
-        let mut vertices = Vec::with_capacity(num_quads * 4);
-        let mut indices = Vec::with_capacity(num_quads * 6);
-
-        for y in 0..height {
-            for x in 0..width {
-                let cell_index = (y * width + x) as u32;
-
-                let u0 = x as f32 / width as f32;
-                let u1 = (x + 1) as f32 / width as f32;
-                let v0 = y as f32 / height as f32;
-                let v1 = (y + 1) as f32 / height as f32;
-
-                let p0 = Self::spherical_to_cartesian(1.0, u0, v0);
-                let p1 = Self::spherical_to_cartesian(1.0, u1, v0);
-                let p2 = Self::spherical_to_cartesian(1.0, u0, v1);
-                let p3 = Self::spherical_to_cartesian(1.0, u1, v1);
-
-                let corner_tl = (y * (width + 1) + x) as u32;
-                let corner_tr = (y * (width + 1) + (x + 1)) as u32;
-                let corner_bl = ((y + 1) * (width + 1) + x) as u32;
-                let corner_br = ((y + 1) * (width + 1) + (x + 1)) as u32;
-
-                let base_idx = vertices.len() as u32;
-
-                vertices.push(SphereVertex {
-                    position: p0,
-                    uv: [u0, v0],
-                    cell_index,
-                    corner_index: corner_tl,
-                    normal: p0,
-                });
-                vertices.push(SphereVertex {
-                    position: p1,
-                    uv: [u1, v0],
-                    cell_index,
-                    corner_index: corner_tr,
-                    normal: p1,
-                });
-                vertices.push(SphereVertex {
-                    position: p2,
-                    uv: [u0, v1],
-                    cell_index,
-                    corner_index: corner_bl,
-                    normal: p2,
-                });
-                vertices.push(SphereVertex {
-                    position: p3,
-                    uv: [u1, v1],
-                    cell_index,
-                    corner_index: corner_br,
-                    normal: p3,
-                });
-
-                indices.push(base_idx);
-                indices.push(base_idx + 2);
-                indices.push(base_idx + 1);
-
-                indices.push(base_idx + 1);
-                indices.push(base_idx + 2);
-                indices.push(base_idx + 3);
-            }
-        }
-
-        (vertices, indices)
-    }
-
-    /// Map UV coordinates (u in [0..1], v in [0..1]) to 3D Cartesian coordinates [X, Y, Z] on unit sphere
-    fn spherical_to_cartesian(radius: f32, u: f32, v: f32) -> [f32; 3] {
-        let lon = (u - 0.5) * 2.0 * std::f32::consts::PI;
-        let lat = (0.5 - v) * std::f32::consts::PI;
-
-        let cos_lat = lat.cos();
-        let sin_lat = lat.sin();
-
-        let x = radius * cos_lat * lon.sin();
-        let y = radius * sin_lat;
-        let z = radius * cos_lat * lon.cos();
-
-        [x, y, z]
+    fn build_unit_quad() -> (Vec<SphereVertex>, Vec<u32>) {
+        super::common::build_unit_quad_mesh(|position, uv, normal| SphereVertex {
+            position,
+            uv,
+            normal,
+        })
     }
 
     fn build_unit_cube() -> (Vec<SphereVertex>, Vec<u32>) {
         super::common::build_unit_cube_mesh(|position, uv, normal| SphereVertex {
             position,
             uv,
-            cell_index: 0,
-            corner_index: 0,
             normal,
         })
     }
@@ -392,7 +299,7 @@ impl eframe::egui_wgpu::CallbackTrait for SphereCallback {
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
 
         if self.sphere_mode == 3 {
-            // Mode 3: 3D Radial Lego Cubes (GPU Instanced Draw)
+            // Mode 3: 3D Radial Lego Cubes (GPU Instanced Unit Cube Draw)
             rpass.set_vertex_buffer(0, self.renderer.cube_vertex_buffer.slice(..));
             rpass.set_index_buffer(
                 self.renderer.cube_index_buffer.slice(..),
@@ -400,13 +307,13 @@ impl eframe::egui_wgpu::CallbackTrait for SphereCallback {
             );
             rpass.draw_indexed(0..36, 0, 0..self.renderer.num_instances);
         } else {
-            // Mode 0 (Smooth Globe), Mode 1 (Smooth Terrain), & Mode 2 (Flat Steps)
-            rpass.set_vertex_buffer(0, self.renderer.grid_vertex_buffer.slice(..));
+            // Mode 0 (Smooth Globe), Mode 1 (Smooth Terrain), & Mode 2 (Flat Steps) - GPU Instanced Unit Quad Draw
+            rpass.set_vertex_buffer(0, self.renderer.quad_vertex_buffer.slice(..));
             rpass.set_index_buffer(
-                self.renderer.grid_index_buffer.slice(..),
+                self.renderer.quad_index_buffer.slice(..),
                 wgpu::IndexFormat::Uint32,
             );
-            rpass.draw_indexed(0..self.renderer.grid_num_indices, 0, 0..1);
+            rpass.draw_indexed(0..6, 0, 0..self.renderer.num_instances);
         }
     }
 }

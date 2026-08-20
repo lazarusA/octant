@@ -17,11 +17,9 @@ var<uniform> uniforms: Uniforms;
 var<storage, read> data_buffer: array<f32>;
 
 struct VertexInput {
-    @location(0) position: vec3<f32>, // x, y, z (unit cube 0..1 coordinates for instancing)
+    @location(0) position: vec3<f32>, // x, y, z (unit quad or unit cube coordinates)
     @location(1) uv: vec2<f32>,
-    @location(2) cell_index: u32,
-    @location(3) corner_index: u32,
-    @location(4) raw_normal: vec3<f32>,
+    @location(2) raw_normal: vec3<f32>,
 };
 
 struct VertexOutput {
@@ -53,17 +51,38 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
 
+    let grid_h = max(arrayLength(&data_buffer) / max(uniforms.width, 1u), 1u);
+    let cell_x = instance_idx % uniforms.width;
+    let cell_y = instance_idx / uniforms.width;
+    let max_idx = arrayLength(&data_buffer) - 1u;
+    let safe_idx = min(instance_idx, max_idx);
+
+    let data_aspect = max(f32(uniforms.width) / f32(grid_h), 0.1);
+    let scale_x = 2.0 * data_aspect;
+    let scale_y = 2.0;
+
+    let u_base = (f32(cell_x) + model.position.x) / f32(uniforms.width);
+    let v_base = (f32(cell_y) + model.position.y) / f32(grid_h);
+
+    let x0 = -data_aspect + (f32(cell_x) / f32(uniforms.width)) * scale_x;
+    let x1 = -data_aspect + (f32(cell_x + 1u) / f32(uniforms.width)) * scale_x;
+
+    let y0 = -1.0 + (f32(cell_y) / f32(grid_h)) * scale_y;
+    let y1 = -1.0 + (f32(cell_y + 1u) / f32(grid_h)) * scale_y;
+
+    let world_x = mix(x0, x1, model.position.x);
+    let world_z = mix(y0, y1, model.position.y);
+
     var raw_val: f32;
     var pos_3d: vec3<f32>;
     var normal_3d: vec3<f32>;
 
     if (uniforms.surface_mode == 0u) {
         // Mode 0: Smooth Terrain
-        let max_data_idx = arrayLength(&data_buffer) - 1u;
-        let gx = min(model.corner_index % (uniforms.width + 1u), uniforms.width - 1u);
-        let gy = min(model.corner_index / (uniforms.width + 1u), max_data_idx / uniforms.width);
-        let data_idx = min(gy * uniforms.width + gx, max_data_idx);
-        raw_val = data_buffer[data_idx];
+        let corner_x = min(cell_x + u32(round(model.position.x)), uniforms.width - 1u);
+        let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);
+        let corner_idx = min(corner_y * uniforms.width + corner_x, max_idx);
+        raw_val = data_buffer[corner_idx];
 
         let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
         if (is_nan_val && uniforms.color.use_nan_color == 0u) {
@@ -73,13 +92,13 @@ fn vs_main(
 
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.8 * uniforms.displacement_strength;
-        pos_3d = vec3<f32>(model.position.x, height, model.position.y);
+        pos_3d = vec3<f32>(world_x, height, world_z);
 
         // Compute local gradient surface normal for 3D peak and in-ward valley lighting
-        let val_left = data_buffer[gy * uniforms.width + max(gx, 1u) - 1u];
-        let val_right = data_buffer[gy * uniforms.width + min(gx + 1u, uniforms.width - 1u)];
-        let val_up = data_buffer[(max(gy, 1u) - 1u) * uniforms.width + gx];
-        let val_down = data_buffer[min(gy + 1u, max_data_idx / uniforms.width) * uniforms.width + gx];
+        let val_left = data_buffer[corner_y * uniforms.width + max(corner_x, 1u) - 1u];
+        let val_right = data_buffer[corner_y * uniforms.width + min(corner_x + 1u, uniforms.width - 1u)];
+        let val_up = data_buffer[(max(corner_y, 1u) - 1u) * uniforms.width + corner_x];
+        let val_down = data_buffer[min(corner_y + 1u, grid_h - 1u) * uniforms.width + corner_x];
 
         let dh_dx = (get_normalized_height(val_right) - get_normalized_height(val_left)) * 0.8 * uniforms.displacement_strength;
         let dh_dy = (get_normalized_height(val_down) - get_normalized_height(val_up)) * 0.8 * uniforms.displacement_strength;
@@ -87,7 +106,7 @@ fn vs_main(
         normal_3d = normalize(vec3<f32>(-dh_dx, 1.0, -dh_dy));
     } else if (uniforms.surface_mode == 1u) {
         // Mode 1: Flat Steps
-        raw_val = data_buffer[model.cell_index];
+        raw_val = data_buffer[safe_idx];
 
         let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
         if (is_nan_val && uniforms.color.use_nan_color == 0u) {
@@ -107,16 +126,10 @@ fn vs_main(
 
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.6 * uniforms.displacement_strength;
-        pos_3d = vec3<f32>(model.position.x, height, model.position.y);
+        pos_3d = vec3<f32>(world_x, height, world_z);
         normal_3d = vec3<f32>(0.0, 1.0, 0.0);
     } else {
         // Mode 2: 3D Lego Cubes (Signed: Positive -> Upward, Negative -> In-ward/Downward)
-        let grid_h = max(arrayLength(&data_buffer) / uniforms.width, 1u);
-        let cell_x = instance_idx % uniforms.width;
-        let cell_y = instance_idx / uniforms.width;
-
-        let max_idx = arrayLength(&data_buffer) - 1u;
-        let safe_idx = min(instance_idx, max_idx);
         raw_val = data_buffer[safe_idx];
 
         let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
@@ -137,19 +150,6 @@ fn vs_main(
 
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.8 * uniforms.displacement_strength;
-
-        let data_aspect = max(f32(uniforms.width) / f32(grid_h), 0.1);
-        let scale_x = 2.0 * data_aspect;
-        let scale_y = 2.0;
-
-        let x0 = -data_aspect + (f32(cell_x) / f32(uniforms.width)) * scale_x;
-        let x1 = -data_aspect + (f32(cell_x + 1u) / f32(uniforms.width)) * scale_x;
-
-        let y0 = -1.0 + (f32(cell_y) / f32(grid_h)) * scale_y;
-        let y1 = -1.0 + (f32(cell_y + 1u) / f32(grid_h)) * scale_y;
-
-        let world_x = mix(x0, x1, model.position.x);
-        let world_z = mix(y0, y1, model.position.y);
 
         // Positive values extrude upward from 0.0; negative values extrude downward from 0.0
         let y_base = min(0.0, height);

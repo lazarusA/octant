@@ -19,9 +19,7 @@ var<storage, read> data_buffer: array<f32>;
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) uv: vec2<f32>,
-    @location(2) cell_index: u32,
-    @location(3) corner_index: u32,
-    @location(4) raw_normal: vec3<f32>,
+    @location(2) raw_normal: vec3<f32>,
 };
 
 struct VertexOutput {
@@ -68,13 +66,22 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
 
+    let grid_h = max(arrayLength(&data_buffer) / max(uniforms.width, 1u), 1u);
+    let cell_x = instance_idx % uniforms.width;
+    let cell_y = instance_idx / uniforms.width;
+    let max_idx = arrayLength(&data_buffer) - 1u;
+    let safe_idx = min(instance_idx, max_idx);
+
+    let u_base = (f32(cell_x) + model.position.x) / f32(uniforms.width);
+    let v_base = (f32(cell_y) + model.position.y) / f32(grid_h);
+
     var raw_val: f32;
     var pos_3d: vec3<f32>;
     var normal_3d: vec3<f32>;
 
     if (uniforms.sphere_mode == 0u) {
         // Mode 0: Smooth Sphere Projection
-        raw_val = data_buffer[model.cell_index];
+        raw_val = data_buffer[safe_idx];
 
         let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
         if (is_nan_val && uniforms.color.use_nan_color == 0u) {
@@ -82,15 +89,14 @@ fn vs_main(
             return out;
         }
 
-        pos_3d = model.position;
-        normal_3d = normalize(model.position);
+        pos_3d = spherical_to_cartesian(1.0, u_base, v_base);
+        normal_3d = normalize(pos_3d);
     } else if (uniforms.sphere_mode == 1u) {
         // Mode 1: Smooth Terrain (Continuous deformed sphere landscape with smooth corner height interpolation & gradient normals!)
-        let max_data_idx = arrayLength(&data_buffer) - 1u;
-        let gx = min(model.corner_index % (uniforms.width + 1u), uniforms.width - 1u);
-        let gy = min(model.corner_index / (uniforms.width + 1u), max_data_idx / uniforms.width);
-        let data_idx = min(gy * uniforms.width + gx, max_data_idx);
-        raw_val = data_buffer[data_idx];
+        let corner_x = min(cell_x + u32(round(model.position.x)), uniforms.width - 1u);
+        let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);
+        let corner_idx = min(corner_y * uniforms.width + corner_x, max_idx);
+        raw_val = data_buffer[corner_idx];
 
         let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
         if (is_nan_val && uniforms.color.use_nan_color == 0u) {
@@ -99,22 +105,22 @@ fn vs_main(
         }
 
         let dr = get_normalized_radial_dr(raw_val);
-        pos_3d = spherical_to_cartesian(1.0 + dr, model.uv.x, model.uv.y);
+        pos_3d = spherical_to_cartesian(1.0 + dr, u_base, v_base);
 
         // Compute local gradient surface normal for 3D peak and in-ward valley lighting
-        let val_left = data_buffer[gy * uniforms.width + max(gx, 1u) - 1u];
-        let val_right = data_buffer[gy * uniforms.width + min(gx + 1u, uniforms.width - 1u)];
-        let val_up = data_buffer[(max(gy, 1u) - 1u) * uniforms.width + gx];
-        let val_down = data_buffer[min(gy + 1u, max_data_idx / uniforms.width) * uniforms.width + gx];
+        let val_left = data_buffer[corner_y * uniforms.width + max(corner_x, 1u) - 1u];
+        let val_right = data_buffer[corner_y * uniforms.width + min(corner_x + 1u, uniforms.width - 1u)];
+        let val_up = data_buffer[(max(corner_y, 1u) - 1u) * uniforms.width + corner_x];
+        let val_down = data_buffer[min(corner_y + 1u, grid_h - 1u) * uniforms.width + corner_x];
 
         let dh_du = get_normalized_radial_dr(val_right) - get_normalized_radial_dr(val_left);
         let dh_dv = get_normalized_radial_dr(val_down) - get_normalized_radial_dr(val_up);
 
-        let base_norm = normalize(model.position);
+        let base_norm = normalize(pos_3d);
         normal_3d = normalize(base_norm + vec3<f32>(-dh_du, 0.0, -dh_dv));
     } else if (uniforms.sphere_mode == 2u) {
         // Mode 2: Flat Steps
-        raw_val = data_buffer[model.cell_index];
+        raw_val = data_buffer[safe_idx];
 
         let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
         if (is_nan_val && uniforms.color.use_nan_color == 0u) {
@@ -133,16 +139,10 @@ fn vs_main(
         }
 
         let dr = get_normalized_radial_dr(raw_val);
-        pos_3d = spherical_to_cartesian(1.0 + dr, model.uv.x, model.uv.y);
-        normal_3d = normalize(model.position);
+        pos_3d = spherical_to_cartesian(1.0 + dr, u_base, v_base);
+        normal_3d = normalize(spherical_to_cartesian(1.0, u_base, v_base));
     } else {
         // Mode 3: 3D Radial Lego Cubes (WebGPU Instanced Unit Cube draw!)
-        let grid_h = max(arrayLength(&data_buffer) / uniforms.width, 1u);
-        let cell_x = instance_idx % uniforms.width;
-        let cell_y = instance_idx / uniforms.width;
-
-        let max_idx = arrayLength(&data_buffer) - 1u;
-        let safe_idx = min(instance_idx, max_idx);
         raw_val = data_buffer[safe_idx];
 
         let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;

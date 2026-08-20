@@ -82,7 +82,7 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                 if pyramid_disabled {
                     Some(pyramid_reason.into())
                 } else if !is_surface_allowed {
-                    Some(format!("Disabled: {:.0} MB > 3D mesh limit", surface_mb).into())
+                    Some(format!("Disabled: {:.0} MB > 128 MB GPU limit", surface_mb).into())
                 } else {
                     None
                 },
@@ -94,7 +94,7 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                 if pyramid_disabled {
                     Some(pyramid_reason.into())
                 } else if !is_surface_allowed {
-                    Some(format!("Disabled: {:.0} MB > 3D mesh limit", surface_mb).into())
+                    Some(format!("Disabled: {:.0} MB > 128 MB GPU limit", surface_mb).into())
                 } else {
                     None
                 },

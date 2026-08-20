@@ -10,10 +10,8 @@ pub const MAX_GPU_STORAGE_BUFFER_ELEMENTS: usize =
 
 /// Maximum buffer size for GPU vertex / index buffers in bytes (256 MiB default wgpu limit).
 pub const MAX_GPU_BUFFER_BYTES: usize = 256 * 1024 * 1024;
-/// Maximum number of 2D cells that fit in a single 256 MiB GPU vertex buffer for Heatmap (80 bytes/cell).
-pub const MAX_2D_HEATMAP_ELEMENTS: usize = MAX_GPU_BUFFER_BYTES / 80;
-/// Maximum number of 2D cells that fit in a single 256 MiB GPU vertex buffer for 3D Surface/Sphere (160 bytes/cell).
-pub const MAX_2D_SURFACE_ELEMENTS: usize = MAX_GPU_BUFFER_BYTES / 160;
+/// Maximum number of 2D cells that fit in 3D Surface / Sphere GPU storage buffer (33.5M cells / 128 MiB).
+pub const MAX_2D_SURFACE_ELEMENTS: usize = MAX_GPU_STORAGE_BUFFER_ELEMENTS;
 
 /// Standard GPU color, clipping, and range uniforms struct shared across all plots.
 #[repr(C)]
@@ -334,5 +332,21 @@ where
         norm_right,
     );
 
+    (vertices, indices)
+}
+
+/// Reusable unit quad mesh generator (4 vertices, 6 indices) for instanced 2D/3D quad grid rendering.
+pub fn build_unit_quad_mesh<V, F>(mut make_vertex: F) -> (Vec<V>, Vec<u32>)
+where
+    F: FnMut([f32; 3], [f32; 2], [f32; 3]) -> V,
+{
+    let norm = [0.0, 1.0, 0.0];
+    let vertices = vec![
+        make_vertex([0.0, 0.0, 0.0], [0.0, 0.0], norm),
+        make_vertex([1.0, 0.0, 0.0], [1.0, 0.0], norm),
+        make_vertex([0.0, 1.0, 0.0], [0.0, 1.0], norm),
+        make_vertex([1.0, 1.0, 0.0], [1.0, 1.0], norm),
+    ];
+    let indices = vec![0, 2, 1, 1, 2, 3];
     (vertices, indices)
 }
