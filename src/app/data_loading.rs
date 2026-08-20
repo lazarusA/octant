@@ -128,10 +128,10 @@ impl OctantApp {
         self.store_target_input = self.store_target_input.trim().to_string();
         let target_input = self.store_target_input.clone();
 
-        let (tx, rx) = std::sync::mpsc::channel();
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
         self.metadata_rx = Some(rx);
 
-        std::thread::spawn(move || {
+        rayon::spawn(move || {
             let kind = store_kind.to_data_source_kind();
             let source_id = StoreKind::make_source_id(store_kind, &target_input);
             let source = crate::data::DataSource::new(&source_id, kind, &target_input, "Store");

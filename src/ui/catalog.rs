@@ -81,7 +81,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
             ui.separator();
             ui.add_space(4.0);
 
-            let query = app.catalog_search_query.trim().to_lowercase();
+            let query = app.catalog_search_query.trim();
             let entries = get_catalog_entries(app.catalog_category_filter);
 
             let filtered_entries: Vec<_> = entries
@@ -90,10 +90,10 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                     if query.is_empty() {
                         return true;
                     }
-                    e.key.to_lowercase().contains(&query)
-                        || e.label.to_lowercase().contains(&query)
-                        || e.subtitle.to_lowercase().contains(&query)
-                        || e.store.to_lowercase().contains(&query)
+                    contains_ignore_ascii_case(e.key, query)
+                        || contains_ignore_ascii_case(e.label, query)
+                        || contains_ignore_ascii_case(e.subtitle, query)
+                        || contains_ignore_ascii_case(e.store, query)
                 })
                 .collect();
 
@@ -116,12 +116,12 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
 
                                 ui.horizontal(|ui| {
                                     // Store type badge using system theme colors
-                                    let badge_text = match entry.store_kind {
-                                        StoreKind::RemoteZarr => "🌐 Zarr",
-                                        StoreKind::RemoteIcechunk => "🧊 Icechunk",
-                                        StoreKind::ProceduralVolume4D => "🌐 4D Volume",
-                                        StoreKind::ProceduralRandom => "🎲 2D Matrix",
-                                        _ => "Store",
+                                    let badge_label = match entry.store_kind {
+                                        StoreKind::RemoteZarr => "[🌐 Zarr]",
+                                        StoreKind::RemoteIcechunk => "[🧊 Icechunk]",
+                                        StoreKind::ProceduralVolume4D => "[🌐 4D Volume]",
+                                        StoreKind::ProceduralRandom => "[🎲 2D Matrix]",
+                                        _ => "[Store]",
                                     };
                                     let badge_color = match entry.store_kind {
                                         StoreKind::RemoteZarr => ui.visuals().selection.bg_fill,
@@ -136,7 +136,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                                     };
 
                                     ui.label(
-                                        egui::RichText::new(format!("[{}]", badge_text))
+                                        egui::RichText::new(badge_label)
                                             .strong()
                                             .color(badge_color),
                                     );
@@ -197,4 +197,18 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     }
 
     app.show_catalog_window = open;
+}
+
+#[inline]
+fn contains_ignore_ascii_case(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    if needle.len() > haystack.len() {
+        return false;
+    }
+    haystack
+        .as_bytes()
+        .windows(needle.len())
+        .any(|w| w.eq_ignore_ascii_case(needle.as_bytes()))
 }

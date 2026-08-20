@@ -90,14 +90,12 @@ fn octant_icon(ui: &mut egui::Ui, size: f32) -> egui::Response {
 
         // Wireframe unit cube whose lower corner is at (ix, iy, iz), each -1 or 0.
         let draw_wire_cube = |ix: f32, iy: f32, iz: f32| {
-            let corners: Vec<egui::Pos2> = (0..8)
-                .map(|i| {
-                    let dx = (i & 1) as f32;
-                    let dy = ((i >> 1) & 1) as f32;
-                    let dz = ((i >> 2) & 1) as f32;
-                    project(ix + dx, iy + dy, iz + dz)
-                })
-                .collect();
+            let corners: [egui::Pos2; 8] = std::array::from_fn(|i| {
+                let dx = (i & 1) as f32;
+                let dy = ((i >> 1) & 1) as f32;
+                let dz = ((i >> 2) & 1) as f32;
+                project(ix + dx, iy + dy, iz + dz)
+            });
             let edges = [
                 (0, 1),
                 (0, 2),

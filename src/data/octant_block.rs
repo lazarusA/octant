@@ -49,7 +49,11 @@ impl OctantBlock {
         let values: Arc<[f32]> = values.into();
         debug_assert_eq!(
             values.len(),
-            shape.iter().copied().product::<usize>(),
+            shape
+                .iter()
+                .copied()
+                .try_fold(1usize, |acc, d| acc.checked_mul(d))
+                .unwrap_or(usize::MAX),
             "OctantBlock: values length does not match shape"
         );
 
