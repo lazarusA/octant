@@ -73,7 +73,10 @@ pub fn format_count_metric(count: usize) -> String {
 
 /// Calculate uncompressed file/variable size in bytes based on shape and data type string.
 pub fn calculate_variable_size_bytes(shape: &[u64], data_type: &str) -> u64 {
-    let element_count: u64 = shape.iter().product();
+    let element_count: u64 = shape
+        .iter()
+        .try_fold(1u64, |acc, &d| acc.checked_mul(d))
+        .unwrap_or(u64::MAX);
     element_count.saturating_mul(data_type_bytes(data_type))
 }
 

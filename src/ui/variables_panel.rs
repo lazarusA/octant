@@ -46,8 +46,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     };
 
                     // — Variable overview header (collapsible, with Plot Data button to the right of variable name) —
-                    let header_id =
-                        ui.make_persistent_id(format!("var_info_header_{}", var_info.name));
+                    let header_id = ui.make_persistent_id(("var_info_header", &var_info.name));
                     let mut should_plot = false;
 
                     egui::collapsing_header::CollapsingState::load_with_default_open(
@@ -610,7 +609,7 @@ fn show_dimension_sliders(
 
                 // --- SPATIAL ROLE SELECTOR ---
                 let mut spatial = app.dim_config[i].spatial;
-                egui::ComboBox::from_id_salt(format!("spatial_role_{}", i))
+                egui::ComboBox::from_id_salt(("spatial_role", i))
                     .selected_text(format!("{:?}", spatial))
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut spatial, SpatialRole::None, "None");
@@ -621,10 +620,10 @@ fn show_dimension_sliders(
 
                 // --- ANIMATION ROLE SELECTOR ---
                 let mut anim = app.dim_config[i].animation;
-                egui::ComboBox::from_id_salt(format!("anim_role_{}", i))
+                egui::ComboBox::from_id_salt(("anim_role", i))
                     .selected_text(match anim {
-                        AnimationRole::None => "None".to_string(),
-                        AnimationRole::Animated => "Animated".to_string(),
+                        AnimationRole::None => "None",
+                        AnimationRole::Animated => "Animated",
                     })
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut anim, AnimationRole::None, "None");

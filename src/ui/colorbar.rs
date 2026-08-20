@@ -528,7 +528,7 @@ fn generate_colorbar_ticks(
                 });
             }
 
-            ticks.sort_by(|a, b| a.t_pos.partial_cmp(&b.t_pos).unwrap());
+            ticks.sort_by(|a, b| a.t_pos.total_cmp(&b.t_pos));
             return ticks;
         }
     }
@@ -573,7 +573,7 @@ fn generate_colorbar_ticks(
         }
     }
 
-    ticks.sort_by(|a, b| a.t_pos.partial_cmp(&b.t_pos).unwrap());
+    ticks.sort_by(|a, b| a.t_pos.total_cmp(&b.t_pos));
 
     // De-cluttering collision pass: suppress labels if adjacent labeled ticks are closer than 0.08 (~33px)
     let min_label_spacing = 0.08;

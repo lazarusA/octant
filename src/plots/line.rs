@@ -182,7 +182,11 @@ impl LineRenderer {
         }
 
         let needed_bytes = std::mem::size_of_val(matrix_data) as u64;
-        let current_capacity = self.gpu_resources.read().unwrap().data_buffer.size();
+        let current_capacity = self
+            .gpu_resources
+            .read()
+            .map(|g| g.data_buffer.size())
+            .unwrap_or(0);
 
         if needed_bytes > current_capacity {
             let new_capacity = needed_bytes.next_power_of_two();
@@ -203,11 +207,11 @@ impl LineRenderer {
 
             queue.write_buffer(&new_data_buffer, 0, bytemuck::cast_slice(matrix_data));
 
-            let mut guard = self.gpu_resources.write().unwrap();
-            guard.data_buffer = new_data_buffer;
-            guard.bind_group = new_bind_group;
-        } else {
-            let guard = self.gpu_resources.read().unwrap();
+            if let Ok(mut guard) = self.gpu_resources.write() {
+                guard.data_buffer = new_data_buffer;
+                guard.bind_group = new_bind_group;
+            }
+        } else if let Ok(guard) = self.gpu_resources.read() {
             queue.write_buffer(&guard.data_buffer, 0, bytemuck::cast_slice(matrix_data));
         }
 
@@ -220,8 +224,9 @@ impl LineRenderer {
             return;
         }
 
-        let guard = self.gpu_resources.read().unwrap();
-        if std::mem::size_of_val(matrix_data) as u64 <= guard.data_buffer.size() {
+        if let Ok(guard) = self.gpu_resources.read()
+            && std::mem::size_of_val(matrix_data) as u64 <= guard.data_buffer.size()
+        {
             queue.write_buffer(&guard.data_buffer, 0, bytemuck::cast_slice(matrix_data));
             self.data_len
                 .store(matrix_data.len() as u32, Ordering::Relaxed);
@@ -286,7 +291,9 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         }
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
-        let guard = self.renderer.gpu_resources.read().unwrap();
+        let Ok(guard) = self.renderer.gpu_resources.read() else {
+            return;
+        };
         rpass.set_bind_group(0, &guard.bind_group, &[]);
 
         let profile_length = self.profile_length.max(2);

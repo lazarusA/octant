@@ -80,7 +80,9 @@ impl MatrixPyramid {
                 break;
             }
 
-            let prev_level = levels.last().unwrap();
+            let Some(prev_level) = levels.last() else {
+                break;
+            };
             let next_values = Self::downsample_2x2(
                 &prev_level.values,
                 prev_level.width,
