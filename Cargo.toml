@@ -10,6 +10,12 @@ documentation = "https://docs.rs/octant"
 license = "MIT OR Apache-2.0"
 keywords = ["visualization", "zarr", "icechunk", "wgpu", "graphics"]
 categories = ["visualization", "graphics", "science"]
+exclude = [
+    ".agents/",
+    ".github/",
+    "signatures/",
+    "assets/",
+]
 
 [dependencies]
 egui = "0.36"

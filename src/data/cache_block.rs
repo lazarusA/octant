@@ -43,7 +43,6 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::thread;
 
 use zarrs::storage::ReadableWritableListableStorage;
 
@@ -637,7 +636,7 @@ impl BlockPrefetcher {
 
         let tx = self.tx.clone();
 
-        thread::spawn(move || {
+        rayon::spawn(move || {
             let result = fetch_block(
                 request.storage,
                 &request.store_target,

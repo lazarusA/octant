@@ -96,31 +96,29 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                         ui.label(format!("Active Datasets: {}", app.dataset_manager.len()));
                         ui.add_space(4.0);
 
-                        let datasets: Vec<(String, String, String, Option<crate::data::DatasetMetadata>, crate::data::DataSourceKind)> = app
-                            .dataset_manager
-                            .iter()
-                            .map(|d| (
-                                d.id.clone(),
-                                d.source.display_name.clone(),
-                                d.source.uri.clone(),
-                                d.metadata.clone(),
-                                d.source.kind.clone(),
-                            ))
-                            .collect();
+                        let mut to_activate: Option<(String, StoreKind, Option<crate::data::DatasetMetadata>)> = None;
 
-                        for (_id, display_name, uri, metadata, kind) in datasets {
-                            let is_active = app.store_target_input == uri;
-                            let label_text = format!("• {} [{}]", display_name, uri);
+                        for d in app.dataset_manager.iter() {
+                            let is_active = app.store_target_input == d.source.uri;
+                            let label_text = format!("• {} [{}]", d.source.display_name, d.source.uri);
 
                             if ui.selectable_label(is_active, egui::RichText::new(label_text).strong()).clicked() {
-                                app.store_target_input = uri;
-                                app.selected_store_kind = StoreKind::from_data_source_kind(&kind);
+                                to_activate = Some((
+                                    d.source.uri.clone(),
+                                    StoreKind::from_data_source_kind(&d.source.kind),
+                                    d.metadata.clone(),
+                                ));
+                            }
+                        }
 
-                                if let Some(meta) = metadata {
-                                    self_activate_dataset_metadata(app, meta);
-                                } else {
-                                    app.inspect_active_store();
-                                }
+                        if let Some((uri, kind, metadata)) = to_activate {
+                            app.store_target_input = uri;
+                            app.selected_store_kind = kind;
+
+                            if let Some(meta) = metadata {
+                                self_activate_dataset_metadata(app, meta);
+                            } else {
+                                app.inspect_active_store();
                             }
                         }
                     }

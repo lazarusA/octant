@@ -38,7 +38,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen(start)]
 pub fn main_web() {
     console_error_panic_hook::set_once();
-    console_log::init_with_level(log::Level::Debug).unwrap();
+    let _ = console_log::init_with_level(log::Level::Debug);
 
     let web_options = eframe::WebOptions {
         depth_buffer: 32,

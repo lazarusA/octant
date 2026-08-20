@@ -722,9 +722,7 @@ pub fn show_hover_tooltip(
             .or_else(|| m.variables.first())
     });
 
-    let var_name = var
-        .map(|v| v.name.clone())
-        .unwrap_or_else(|| "variable".to_string());
+    let var_name = var.map(|v| v.name.as_str()).unwrap_or("variable");
 
     let units_str = var
         .and_then(|v| {
@@ -1359,7 +1357,7 @@ pub fn show_hover_tooltip(
                     ui.vertical(|ui| {
                         // Title / Variable Name
                         ui.label(
-                            egui::RichText::new(&var_name)
+                            egui::RichText::new(var_name)
                                 .small()
                                 .strong()
                                 .color(strong_text),

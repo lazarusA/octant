@@ -21,7 +21,9 @@ pub fn build_sync_store(
 
     let options = ClientOptions::new()
         .with_allow_http(true)
-        .with_allow_invalid_certificates(true);
+        .with_allow_invalid_certificates(true)
+        .with_timeout(std::time::Duration::from_secs(30))
+        .with_connect_timeout(std::time::Duration::from_secs(10));
 
     let http_store = HttpBuilder::new()
         .with_url(clean_url)

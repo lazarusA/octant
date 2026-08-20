@@ -33,15 +33,12 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         // 1. Play / Pause Button for Timestep Animation across all plot types
-        let play_text = if app.is_playing { "⏸" } else { "▶" };
-        let play_button = egui::Button::new(
-            egui::RichText::new(format!(
-                "{} {}",
-                play_text,
-                if app.is_playing { "Pause" } else { "Play" }
-            ))
-            .strong(),
-        );
+        let play_text = if app.is_playing {
+            "⏸ Pause"
+        } else {
+            "▶ Play"
+        };
+        let play_button = egui::Button::new(egui::RichText::new(play_text).strong());
         if ui.add(play_button).clicked() {
             app.is_playing = !app.is_playing;
             app.last_step_time = std::time::Instant::now();
@@ -176,10 +173,35 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.separator();
 
         // 7. Playback speed slider
-        ui.menu_button(format!("{:.0} FPS", app.playback_fps), |ui| {
+        let fps_int = app.playback_fps.round() as u32;
+        let fps_label = match fps_int {
+            1 => "1 FPS",
+            2 => "2 FPS",
+            3 => "3 FPS",
+            4 => "4 FPS",
+            5 => "5 FPS",
+            6 => "6 FPS",
+            8 => "8 FPS",
+            10 => "10 FPS",
+            12 => "12 FPS",
+            15 => "15 FPS",
+            20 => "20 FPS",
+            24 => "24 FPS",
+            30 => "30 FPS",
+            60 => "60 FPS",
+            _ => "",
+        };
+
+        let menu_body = |ui: &mut egui::Ui| {
             ui.label(egui::RichText::new("Playback Speed").strong());
             ui.add(egui::Slider::new(&mut app.playback_fps, 1.0..=60.0).suffix(" FPS"));
-        });
+        };
+
+        if !fps_label.is_empty() {
+            ui.menu_button(fps_label, menu_body);
+        } else {
+            ui.menu_button(format!("{} FPS", fps_int), menu_body);
+        }
 
         // 8. Bottom Right: Cache Menu Dropdown
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

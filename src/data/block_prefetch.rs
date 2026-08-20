@@ -7,8 +7,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::{Receiver, Sender, channel};
-use std::thread;
+use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 
 use super::{
     block_cache::{BlockCache, BlockCacheKey},
@@ -23,7 +22,7 @@ pub struct PrefetchResult {
 }
 
 pub struct BlockPrefetcher {
-    tx: Sender<PrefetchResult>,
+    tx: SyncSender<PrefetchResult>,
     rx: Receiver<PrefetchResult>,
     pending: HashMap<BlockCacheKey, u64>,
     active_worker_threads: usize,
@@ -45,14 +44,15 @@ impl BlockPrefetcher {
     }
 
     pub fn with_max_concurrent_threads(max_concurrent_threads: usize) -> Self {
-        let (tx, rx) = channel();
+        let max_threads = max_concurrent_threads.max(1);
+        let (tx, rx) = sync_channel(max_threads * 2);
 
         Self {
             tx,
             rx,
             pending: HashMap::new(),
             active_worker_threads: 0,
-            max_concurrent_threads: max_concurrent_threads.max(1),
+            max_concurrent_threads: max_threads,
             completed_bytes: Arc::new(AtomicU64::new(0)),
             total_bytes: Arc::new(AtomicU64::new(0)),
             aborted: Arc::new(AtomicBool::new(false)),
@@ -85,7 +85,7 @@ impl BlockPrefetcher {
         let completed_atomic = self.completed_bytes.clone();
         let aborted_atomic = self.aborted.clone();
 
-        thread::spawn(move || {
+        rayon::spawn(move || {
             let mut on_progress = |chunk_bytes: u64| {
                 if !aborted_atomic.load(Ordering::Relaxed) {
                     completed_atomic.fetch_add(chunk_bytes, Ordering::Relaxed);
@@ -200,7 +200,7 @@ impl BlockPrefetcher {
     pub fn abort(&mut self) {
         self.aborted.store(true, Ordering::Relaxed);
         self.aborted = Arc::new(AtomicBool::new(false));
-        let (tx, rx) = channel();
+        let (tx, rx) = sync_channel(self.max_concurrent_threads * 2);
         self.tx = tx;
         self.rx = rx;
         self.pending.clear();

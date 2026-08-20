@@ -48,71 +48,67 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         );
         ui.separator();
 
-        let pyramid_disabled_reason = "Disabled: 2D Pyramid Resampling active".to_string();
+        let pyramid_disabled = app.enable_pyramid_resampling;
+        let pyramid_reason = "Disabled: 2D Pyramid Resampling active";
 
-        let options = [
-            (
-                PlotType::Heatmap,
-                "🗺️ 2D Plane (Flatmap)",
-                true,
-                String::new(),
-            ),
+        let options: [(PlotType, &str, bool, Option<std::borrow::Cow<'static, str>>); 6] = [
+            (PlotType::Heatmap, "🗺️ 2D Plane (Flatmap)", true, None),
             (
                 PlotType::Line,
                 "📈 1D Line Chart",
-                !app.enable_pyramid_resampling,
-                if app.enable_pyramid_resampling {
-                    pyramid_disabled_reason.clone()
+                !pyramid_disabled,
+                if pyramid_disabled {
+                    Some(pyramid_reason.into())
                 } else {
-                    String::new()
+                    None
                 },
             ),
             (
                 PlotType::Sphere,
                 "🌍 3D Globe (Sphere)",
-                !app.enable_pyramid_resampling,
-                if app.enable_pyramid_resampling {
-                    pyramid_disabled_reason.clone()
+                !pyramid_disabled,
+                if pyramid_disabled {
+                    Some(pyramid_reason.into())
                 } else {
-                    String::new()
+                    None
                 },
             ),
             (
                 PlotType::Surface,
                 "⛰️ 3D Surface / Blocks",
-                !app.enable_pyramid_resampling,
-                if app.enable_pyramid_resampling {
-                    pyramid_disabled_reason.clone()
+                !pyramid_disabled,
+                if pyramid_disabled {
+                    Some(pyramid_reason.into())
                 } else {
-                    String::new()
+                    None
                 },
             ),
             (
                 PlotType::Volume,
                 "☁️ 3D Volume Raycasting",
                 is_volume_allowed,
-                if app.enable_pyramid_resampling {
-                    pyramid_disabled_reason.clone()
+                if pyramid_disabled {
+                    Some(pyramid_reason.into())
                 } else if !is_3d_available {
-                    "Requires 3D Data".to_string()
+                    Some("Requires 3D Data".into())
                 } else if !is_size_allowed {
-                    format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb)
+                    Some(format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb).into())
                 } else {
-                    String::new()
+                    None
                 },
             ),
             (
                 PlotType::PointCloud,
                 "✨ 3D Point Cloud",
                 is_volume_allowed,
-                if app.enable_pyramid_resampling {
-                    pyramid_disabled_reason
+                if pyramid_disabled {
+                    Some(pyramid_reason.into())
                 } else if !is_3d_available {
-                    "Requires 3D Data".to_string()
+                    Some("Requires 3D Data".into())
                 } else if !is_size_allowed {
-                    format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb)
+                    Some(format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb).into())
                 } else {
-                    String::new()
+                    None
                 },
             ),
         ];
@@ -130,11 +126,8 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.load_selected_variable_block();
                     ui.close();
                 }
-            } else {
-                ui.add_enabled(
-                    false,
-                    egui::Label::new(format!("{} ({})", label, disabled_reason)),
-                );
+            } else if let Some(reason) = disabled_reason {
+                ui.add_enabled(false, egui::Label::new(format!("{} ({})", label, reason)));
             }
         }
     });
