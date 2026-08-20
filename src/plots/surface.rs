@@ -237,7 +237,12 @@ impl SurfaceRenderer {
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
-        queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
+        super::common::safe_write_buffer(
+            queue,
+            &self.data_buffer,
+            matrix_data,
+            "SurfaceRenderer::update_data",
+        );
     }
 
     fn build_grid_mesh(width: usize, height: usize) -> (Vec<SurfaceVertex>, Vec<u32>) {

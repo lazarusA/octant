@@ -17,14 +17,26 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     } else {
         (false, false, 0.0)
     };
-
     let is_volume_allowed = is_3d_available && is_size_allowed && !app.enable_pyramid_resampling;
 
-    // Safety fallback: if any other plot was active while 2D pyramid resampling is enabled (or volume exceeds limit), revert to 2D Plane
+    let total_2d_elements = if let Some(mdata) = &app.matrix_data {
+        mdata.width * mdata.height
+    } else {
+        crate::ui::variables_panel::calculate_selected_2d_elements(app)
+    };
+    let is_surface_allowed = total_2d_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS
+        && !app.enable_pyramid_resampling;
+    let surface_mb = (total_2d_elements * 4) as f64 / (1024.0 * 1024.0);
+
+    // Safety fallback: if any plot is active with invalid data constraints, revert to 2D Plane
     if (app.enable_pyramid_resampling && app.active_plot_type != PlotType::Heatmap)
         || ((app.active_plot_type == PlotType::Volume
             || app.active_plot_type == PlotType::PointCloud)
             && !is_volume_allowed)
+        || ((app.active_plot_type == PlotType::Sphere
+            || app.active_plot_type == PlotType::Surface
+            || app.active_plot_type == PlotType::Block)
+            && !is_surface_allowed)
     {
         app.active_plot_type = PlotType::Heatmap;
     }
@@ -66,9 +78,11 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             (
                 PlotType::Sphere,
                 "🌍 3D Globe (Sphere)",
-                !pyramid_disabled,
+                is_surface_allowed,
                 if pyramid_disabled {
                     Some(pyramid_reason.into())
+                } else if !is_surface_allowed {
+                    Some(format!("Disabled: {:.0} MB > 3D mesh limit", surface_mb).into())
                 } else {
                     None
                 },
@@ -76,9 +90,11 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             (
                 PlotType::Surface,
                 "⛰️ 3D Surface / Blocks",
-                !pyramid_disabled,
+                is_surface_allowed,
                 if pyramid_disabled {
                     Some(pyramid_reason.into())
+                } else if !is_surface_allowed {
+                    Some(format!("Disabled: {:.0} MB > 3D mesh limit", surface_mb).into())
                 } else {
                     None
                 },
@@ -118,11 +134,6 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             if enabled {
                 if ui.selectable_label(is_selected, label).clicked() {
                     app.active_plot_type = plot_type;
-                    if let Some(wgpu_render_state) = &app.wgpu_render_state
-                        && let Some(mdata) = &app.matrix_data
-                    {
-                        app.update_active_2d_renderer_data(&wgpu_render_state.queue, &mdata.values);
-                    }
                     app.load_selected_variable_block();
                     ui.close();
                 }

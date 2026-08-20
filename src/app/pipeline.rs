@@ -89,8 +89,16 @@ impl OctantApp {
             let same_dimensions = self.matrix_data.as_ref().is_some_and(|m| {
                 m.width == effective_data.width && m.height == effective_data.height
             });
+            let can_have_3d_surface =
+                total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS;
+            let surface_renderers_ready = !can_have_3d_surface
+                || (self.sphere_renderer.is_some() && self.surface_renderer.is_some());
 
-            if same_dimensions && self.renderer.is_some() && self.line_renderer.is_some() {
+            if same_dimensions
+                && self.renderer.is_some()
+                && self.line_renderer.is_some()
+                && surface_renderers_ready
+            {
                 self.update_active_2d_renderer_data(
                     &wgpu_render_state.queue,
                     &effective_data.values,

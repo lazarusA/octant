@@ -156,6 +156,27 @@ pub fn create_storage_buffer<T: bytemuck::Pod>(
     })
 }
 
+/// Safely writes slice data to a GPU buffer, checking that the byte size fits within the destination buffer capacity.
+/// Returns `true` if the write succeeded, or `false` (with a warning log) if it would overrun.
+pub fn safe_write_buffer<T: bytemuck::Pod>(
+    queue: &wgpu::Queue,
+    buffer: &wgpu::Buffer,
+    data: &[T],
+    label: &str,
+) -> bool {
+    let copy_bytes = std::mem::size_of_val(data) as u64;
+    if copy_bytes <= buffer.size() {
+        queue.write_buffer(buffer, 0, bytemuck::cast_slice(data));
+        true
+    } else {
+        log::warn!(
+            "{label}: data size ({copy_bytes} bytes) exceeds GPU buffer capacity ({} bytes), skipping write",
+            buffer.size()
+        );
+        false
+    }
+}
+
 /// Creates a standard plot bind group layout with binding 0 (Uniform) and binding 1 (Storage).
 pub fn create_uniform_storage_bind_group_layout(
     device: &wgpu::Device,
