@@ -144,21 +144,24 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
 
     for i in 0..rank {
         let dim_size = var_info.shape[i] as usize;
-        let dim_name = var_info
+        let raw_name = var_info
             .dimension_names
             .get(i)
-            .cloned()
-            .unwrap_or_else(|| format!("dim_{}", i))
-            .to_lowercase();
+            .map(|s| s.as_str())
+            .unwrap_or("dim");
+        let name_lower = raw_name.to_ascii_lowercase();
 
         // Check if dim_name contains time, lon/x, lat/y
-        let is_chunk_based = dim_name.contains("time")
-            || dim_name == "t"
-            || dim_name.contains("step")
-            || dim_name.contains("lon")
-            || dim_name == "x"
-            || dim_name.contains("lat")
-            || dim_name == "y";
+        let is_chunk_based = name_lower.contains("time")
+            || name_lower == "t"
+            || name_lower.contains("step")
+            || name_lower.contains("lon")
+            || name_lower == "x"
+            || name_lower.contains("lat")
+            || name_lower == "y"
+            || name_lower.contains("depth")
+            || name_lower.contains("lev")
+            || name_lower.contains("z");
 
         let (range_start, range_end) = if is_chunk_based {
             let chunk_size = var_info.chunk_shape.get(i).copied().unwrap_or(0) as usize;
@@ -591,8 +594,8 @@ fn show_dimension_sliders(
         let dim_name = var_info
             .dimension_names
             .get(i)
-            .cloned()
-            .unwrap_or_else(|| format!("dim_{}", i));
+            .map(|s| s.as_str())
+            .unwrap_or("dim");
 
         let is_animated = app.dim_config[i].animation == AnimationRole::Animated;
 
@@ -610,7 +613,12 @@ fn show_dimension_sliders(
                 // --- SPATIAL ROLE SELECTOR ---
                 let mut spatial = app.dim_config[i].spatial;
                 egui::ComboBox::from_id_salt(("spatial_role", i))
-                    .selected_text(format!("{:?}", spatial))
+                    .selected_text(match spatial {
+                        SpatialRole::None => "None",
+                        SpatialRole::X => "X",
+                        SpatialRole::Y => "Y",
+                        SpatialRole::Z => "Z",
+                    })
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut spatial, SpatialRole::None, "None");
                         ui.selectable_value(&mut spatial, SpatialRole::X, "X");
@@ -638,7 +646,7 @@ fn show_dimension_sliders(
             // --- SLIDER OR INDEX ---
             if app.dim_config[i].active {
                 let (mut start, mut end) = app.selected_dim_ranges[i];
-                double_slider_with_inputs(ui, &dim_name, &mut start, &mut end, 0, dim_size - 1);
+                double_slider_with_inputs(ui, dim_name, &mut start, &mut end, 0, dim_size - 1);
 
                 app.selected_dim_ranges[i] = (start, end);
                 if is_animated {

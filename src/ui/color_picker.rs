@@ -324,31 +324,30 @@ fn show_clean_color_picker_popup(
                     ui.selectable_value(&mut gamma_space, ColorGammaSpace::Float, "0-1");
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let copy_text = match gamma_space {
-                            ColorGammaSpace::Byte => {
-                                let r = (color_rgba[0] * 255.0).round() as u8;
-                                let g = (color_rgba[1] * 255.0).round() as u8;
-                                let b = (color_rgba[2] * 255.0).round() as u8;
-                                let a = (color_rgba[3] * 255.0).round() as u8;
-                                if a == 255 {
-                                    format!("rgb({}, {}, {})", r, g, b)
-                                } else {
-                                    format!("rgba({}, {}, {}, {})", r, g, b, a)
-                                }
-                            }
-                            ColorGammaSpace::Float => {
-                                format!(
-                                    "[{:.3}, {:.3}, {:.3}, {:.3}]",
-                                    color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3]
-                                )
-                            }
-                        };
-
                         if ui
                             .small_button("📋 Copy")
                             .on_hover_text("Copy color values to clipboard")
                             .clicked()
                         {
+                            let copy_text = match gamma_space {
+                                ColorGammaSpace::Byte => {
+                                    let r = (color_rgba[0] * 255.0).round() as u8;
+                                    let g = (color_rgba[1] * 255.0).round() as u8;
+                                    let b = (color_rgba[2] * 255.0).round() as u8;
+                                    let a = (color_rgba[3] * 255.0).round() as u8;
+                                    if a == 255 {
+                                        format!("rgb({}, {}, {})", r, g, b)
+                                    } else {
+                                        format!("rgba({}, {}, {}, {})", r, g, b, a)
+                                    }
+                                }
+                                ColorGammaSpace::Float => {
+                                    format!(
+                                        "[{:.3}, {:.3}, {:.3}, {:.3}]",
+                                        color_rgba[0], color_rgba[1], color_rgba[2], color_rgba[3]
+                                    )
+                                }
+                            };
                             ui.ctx().copy_text(copy_text);
                         }
                     });

@@ -53,7 +53,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                 }
 
                                 let variables = match &app.active_dataset_metadata {
-                                    Some(meta) => meta.variables.clone(),
+                                    Some(meta) => &meta.variables,
                                     None => {
                                         ui.vertical_centered(|ui| {
                                             ui.add_space(10.0);
@@ -93,6 +93,8 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
                                 let search = app.variable_search.to_lowercase();
 
+                                let mut newly_selected_idx: Option<usize> = None;
+
                                 for (idx, var_info) in variables.iter().enumerate() {
                                     if !search.is_empty()
                                         && !var_info.name.to_lowercase().contains(&search)
@@ -118,11 +120,19 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                         )
                                         .clicked()
                                     {
-                                        app.selected_variable_idx = idx;
-                                        app.reset_colorbar_label();
+                                        newly_selected_idx = Some(idx);
+                                    }
+                                }
 
+                                if let Some(idx) = newly_selected_idx {
+                                    app.selected_variable_idx = idx;
+                                    app.reset_colorbar_label();
+
+                                    if let Some(meta) = &app.active_dataset_metadata
+                                        && let Some(var_info) = meta.variables.get(idx).cloned()
+                                    {
                                         crate::ui::variables_panel::init_variable_dimension_defaults(
-                                            app, var_info,
+                                            app, &var_info,
                                         );
 
                                         app.show_variable_controls = true;

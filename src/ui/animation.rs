@@ -43,9 +43,34 @@ pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
 
         // FPS Speed Menu Dropdown
-        ui.menu_button(format!("{:.0} FPS", app.playback_fps), |ui| {
+        let fps_int = app.playback_fps.round() as u32;
+        let fps_label = match fps_int {
+            1 => "1 FPS",
+            2 => "2 FPS",
+            3 => "3 FPS",
+            4 => "4 FPS",
+            5 => "5 FPS",
+            6 => "6 FPS",
+            8 => "8 FPS",
+            10 => "10 FPS",
+            12 => "12 FPS",
+            15 => "15 FPS",
+            20 => "20 FPS",
+            24 => "24 FPS",
+            30 => "30 FPS",
+            60 => "60 FPS",
+            _ => "",
+        };
+
+        let menu_body = |ui: &mut egui::Ui| {
             ui.label(egui::RichText::new("Playback Speed").strong());
             ui.add(egui::Slider::new(&mut app.playback_fps, 1.0..=60.0).suffix(" FPS"));
-        });
+        };
+
+        if !fps_label.is_empty() {
+            ui.menu_button(fps_label, menu_body);
+        } else {
+            ui.menu_button(format!("{} FPS", fps_int), menu_body);
+        }
     });
 }
