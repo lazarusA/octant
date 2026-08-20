@@ -25,7 +25,7 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             let is_active = app.active_colormap == id;
             let response = ui.selectable_label(is_active, name);
 
-            if response.hovered() {
+            if response.hovered() && app.preview_colormap != Some(id) {
                 app.preview_colormap = Some(id);
                 ui.ctx().request_repaint();
             }

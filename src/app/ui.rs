@@ -49,7 +49,7 @@ impl eframe::App for OctantApp {
                     }
                 }
             } else {
-                ctx.request_repaint();
+                ctx.request_repaint_after(std::time::Duration::from_millis(50));
             }
         }
         if metadata_done {
@@ -138,7 +138,7 @@ impl eframe::App for OctantApp {
                 std::time::Duration::from_millis(1)
             };
             ctx.request_repaint_after(next_wake);
-        } else {
+        } else if self.block_prefetcher.pending_count() > 0 || self.metadata_rx.is_some() {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
@@ -272,7 +272,12 @@ impl eframe::App for OctantApp {
                 let (aspect_scale_x, aspect_scale_y) = if self.enforce_data_aspect_ratio
                     && let Some(matrix) = &self.matrix_data
                 {
-                    let data_aspect = (matrix.width as f32 / matrix.height as f32).max(0.001);
+                    let (orig_w, orig_h) = if let Some(pyr) = &self.active_pyramid {
+                        (pyr.original_width, pyr.original_height)
+                    } else {
+                        (matrix.width, matrix.height)
+                    };
+                    let data_aspect = (orig_w as f32 / orig_h as f32).max(0.001);
                     let canvas_aspect = canvas_rect.width() / canvas_rect.height().max(1.0);
                     if canvas_aspect > data_aspect {
                         (data_aspect / canvas_aspect, 1.0)
@@ -443,6 +448,44 @@ impl eframe::App for OctantApp {
                 }
                 _ => {
                     if let Some(renderer) = &self.renderer {
+                        if self.active_pyramid.is_some()
+                            && self.active_plot_type == PlotType::Heatmap
+                        {
+                            let ((u_min, u_max), (v_min, v_max)) =
+                                crate::data::ViewportResampler::compute_visible_data_bounds(
+                                    gpu_pan,
+                                    gpu_zoom,
+                                    gpu_aspect_scale,
+                                );
+                            let (orig_w, orig_h) = self.active_pyramid.as_ref().map_or(
+                                (
+                                    self.matrix_data.as_ref().map_or(1024, |m| m.width),
+                                    self.matrix_data.as_ref().map_or(1024, |m| m.height),
+                                ),
+                                |p| (p.original_width, p.original_height),
+                            );
+                            let (target_w, target_h) =
+                                crate::data::ViewportResampler::compute_target_resolution(
+                                    orig_w, orig_h, 2048,
+                                );
+
+                            if let Some(tile) = self.resampler.resample_if_needed(
+                                (u_min, u_max),
+                                (v_min, v_max),
+                                target_w,
+                                target_h,
+                            ) && let Some(wgpu_render_state) = &self.wgpu_render_state
+                            {
+                                renderer.update_data_and_dimensions(
+                                    &wgpu_render_state.queue,
+                                    &tile.data.values,
+                                    tile.data.width,
+                                    tile.data.height,
+                                    tile.tile_bounds,
+                                );
+                            }
+                        }
+
                         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
                             canvas_rect,
                             MatrixCallback {
@@ -535,8 +578,13 @@ impl eframe::App for OctantApp {
                 } else {
                     let mut x_name = "X".to_string();
                     let mut y_name = "Y".to_string();
-                    let mut x_bounds = (0.0, matrix.width.saturating_sub(1) as f64);
-                    let mut y_bounds = (0.0, matrix.height.saturating_sub(1) as f64);
+                    let (orig_w, orig_h) = if let Some(pyr) = &self.active_pyramid {
+                        (pyr.original_width, pyr.original_height)
+                    } else {
+                        (matrix.width, matrix.height)
+                    };
+                    let mut x_bounds = (0.0, orig_w as f64);
+                    let mut y_bounds = (0.0, orig_h as f64);
 
                     if let Some(meta) = &self.plotted_dataset_metadata
                         && let Some(var) = meta.variables.get(self.plotted_variable_idx)

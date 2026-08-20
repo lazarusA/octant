@@ -120,6 +120,32 @@ impl OctantBlock {
         dataset_name: &str,
         compute_bounds: bool,
     ) -> Option<crate::data::matrix_data::MatrixData> {
+        let x_len = self.shape.get(x_dim).copied().unwrap_or(0);
+        let y_len = self.shape.get(y_dim).copied().unwrap_or(0);
+        self.slice_2d_with_ranges(
+            x_dim,
+            y_dim,
+            (0, x_len),
+            (0, y_len),
+            fixed_indices,
+            max_timesteps,
+            dataset_name,
+            compute_bounds,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn slice_2d_with_ranges(
+        &self,
+        x_dim: usize,
+        y_dim: usize,
+        x_range: (usize, usize),
+        y_range: (usize, usize),
+        fixed_indices: &[usize],
+        max_timesteps: usize,
+        dataset_name: &str,
+        compute_bounds: bool,
+    ) -> Option<crate::data::matrix_data::MatrixData> {
         if x_dim == y_dim
             || x_dim >= self.rank()
             || y_dim >= self.rank()
@@ -128,8 +154,20 @@ impl OctantBlock {
             return None;
         }
 
-        let width = self.shape[x_dim];
-        let height = self.shape[y_dim];
+        let full_x = self.shape[x_dim];
+        let full_y = self.shape[y_dim];
+
+        let x_start = x_range.0.min(full_x);
+        let x_end = x_range.1.clamp(x_start, full_x);
+        let y_start = y_range.0.min(full_y);
+        let y_end = y_range.1.clamp(y_start, full_y);
+
+        let width = x_end.saturating_sub(x_start);
+        let height = y_end.saturating_sub(y_start);
+
+        if width == 0 || height == 0 {
+            return None;
+        }
 
         let stride_x = self.strides[x_dim];
         let stride_y = self.strides[y_dim];
@@ -144,12 +182,14 @@ impl OctantBlock {
 
         let slice_len = width * height;
         let mut values = Vec::with_capacity(slice_len);
-        if stride_x == 1 && stride_y == width {
-            let slice_end = base_offset + slice_len;
+
+        if stride_x == 1 && x_start == 0 && width == full_x && stride_y == width {
+            let slice_start = base_offset + y_start * stride_y;
+            let slice_end = slice_start + slice_len;
             if slice_end <= self.values.len() {
-                values.extend_from_slice(&self.values[base_offset..slice_end]);
+                values.extend_from_slice(&self.values[slice_start..slice_end]);
             } else {
-                for y in 0..height {
+                for y in y_start..y_end {
                     let row_start = base_offset + y * stride_y;
                     let row_end = row_start + width;
                     if row_end <= self.values.len() {
@@ -163,8 +203,8 @@ impl OctantBlock {
                 }
             }
         } else if stride_x == 1 {
-            for y in 0..height {
-                let row_start = base_offset + y * stride_y;
+            for y in y_start..y_end {
+                let row_start = base_offset + y * stride_y + x_start;
                 let row_end = row_start + width;
                 if row_end <= self.values.len() {
                     values.extend_from_slice(&self.values[row_start..row_end]);
@@ -175,9 +215,9 @@ impl OctantBlock {
                 }
             }
         } else {
-            for y in 0..height {
+            for y in y_start..y_end {
                 let row_start = base_offset + y * stride_y;
-                for x in 0..width {
+                for x in x_start..x_end {
                     let idx = row_start + x * stride_x;
                     values.push(self.values.get(idx).copied().unwrap_or(f32::NAN));
                 }
@@ -213,6 +253,41 @@ impl OctantBlock {
         compute_bounds: bool,
     ) -> Option<crate::data::VolumeData> {
         let has_z = z_dim < self.rank();
+        let x_len = self.shape.get(x_dim).copied().unwrap_or(0);
+        let y_len = self.shape.get(y_dim).copied().unwrap_or(0);
+        let z_len = if has_z {
+            self.shape.get(z_dim).copied().unwrap_or(1)
+        } else {
+            1
+        };
+
+        self.volume_with_ranges(
+            x_dim,
+            y_dim,
+            z_dim,
+            (0, x_len),
+            (0, y_len),
+            (0, z_len),
+            fixed_indices,
+            dataset_name,
+            compute_bounds,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn volume_with_ranges(
+        &self,
+        x_dim: usize,
+        y_dim: usize,
+        z_dim: usize,
+        x_range: (usize, usize),
+        y_range: (usize, usize),
+        z_range: (usize, usize),
+        fixed_indices: &[usize],
+        dataset_name: &str,
+        compute_bounds: bool,
+    ) -> Option<crate::data::VolumeData> {
+        let has_z = z_dim < self.rank();
 
         if x_dim == y_dim
             || x_dim >= self.rank()
@@ -223,9 +298,28 @@ impl OctantBlock {
             return None;
         }
 
-        let nx = self.shape[x_dim];
-        let ny = self.shape[y_dim];
-        let nz = if has_z { self.shape[z_dim] } else { 1 };
+        let full_x = self.shape[x_dim];
+        let full_y = self.shape[y_dim];
+        let full_z = if has_z { self.shape[z_dim] } else { 1 };
+
+        let x_start = x_range.0.min(full_x);
+        let x_end = x_range.1.clamp(x_start, full_x);
+        let y_start = y_range.0.min(full_y);
+        let y_end = y_range.1.clamp(y_start, full_y);
+        let z_start = if has_z { z_range.0.min(full_z) } else { 0 };
+        let z_end = if has_z {
+            z_range.1.clamp(z_start, full_z)
+        } else {
+            1
+        };
+
+        let nx = x_end.saturating_sub(x_start);
+        let ny = y_end.saturating_sub(y_start);
+        let nz = z_end.saturating_sub(z_start);
+
+        if nx == 0 || ny == 0 || nz == 0 {
+            return None;
+        }
 
         // Limit nz so that nx * ny * eff_nz <= MAX_GPU_STORAGE_BUFFER_ELEMENTS
         let slice_elements = nx.saturating_mul(ny).max(1);
@@ -237,6 +331,12 @@ impl OctantBlock {
             && x_dim == 0
             && y_dim == 1
             && z_dim == 2
+            && x_start == 0
+            && nx == self.shape[0]
+            && y_start == 0
+            && ny == self.shape[1]
+            && z_start == 0
+            && nz == self.shape[2]
             && self.strides[0] == self.shape[1] * self.shape[2]
             && self.strides[1] == self.shape[2]
             && self.strides[2] == 1
@@ -276,10 +376,10 @@ impl OctantBlock {
 
         let mut values = Vec::with_capacity(nx * ny * eff_nz);
         if stride_x == 1 {
-            for z in 0..eff_nz {
+            for z in z_start..(z_start + eff_nz) {
                 let z_offset = base_offset + z * stride_z;
-                for y in 0..ny {
-                    let row_start = z_offset + y * stride_y;
+                for y in y_start..y_end {
+                    let row_start = z_offset + y * stride_y + x_start;
                     let row_end = row_start + nx;
                     if row_end <= self.values.len() {
                         values.extend_from_slice(&self.values[row_start..row_end]);
@@ -292,11 +392,11 @@ impl OctantBlock {
                 }
             }
         } else {
-            for z in 0..eff_nz {
+            for z in z_start..(z_start + eff_nz) {
                 let z_offset = base_offset + z * stride_z;
-                for y in 0..ny {
+                for y in y_start..y_end {
                     let row_start = z_offset + y * stride_y;
-                    for x in 0..nx {
+                    for x in x_start..x_end {
                         let idx = row_start + x * stride_x;
                         values.push(self.values.get(idx).copied().unwrap_or(f32::NAN));
                     }

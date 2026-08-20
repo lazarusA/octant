@@ -98,8 +98,10 @@ fn evaluate_scaled_norm(val: f32, cmin: f32, cmax: f32, scale_type: u32, scale_p
 }
 
 fn evaluate_plot_color(val: f32, color: ColorUniforms) -> vec4<f32> {
-    // 1. Detect NaN / Inf inputs or corrupt float samples
-    if (val != val || abs(val) > 1e30) {
+    // 1. Detect NaN / Inf inputs using IEEE-754 exponent bits (0x7F800000) or val != val
+    let bits = bitcast<u32>(val);
+    let is_ieee_nan_inf = (bits & 0x7F800000u) == 0x7F800000u;
+    if (is_ieee_nan_inf || val != val || abs(val) > 1e30) {
         return select(vec4<f32>(0.0, 0.0, 0.0, 0.0), color.nan_color, color.use_nan_color == 1u);
     }
 

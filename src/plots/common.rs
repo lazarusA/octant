@@ -8,6 +8,13 @@ pub const MAX_GPU_STORAGE_BUFFER_BYTES: usize = 128 * 1024 * 1024;
 pub const MAX_GPU_STORAGE_BUFFER_ELEMENTS: usize =
     MAX_GPU_STORAGE_BUFFER_BYTES / std::mem::size_of::<f32>();
 
+/// Maximum buffer size for GPU vertex / index buffers in bytes (256 MiB default wgpu limit).
+pub const MAX_GPU_BUFFER_BYTES: usize = 256 * 1024 * 1024;
+/// Maximum number of 2D cells that fit in a single 256 MiB GPU vertex buffer for Heatmap (80 bytes/cell).
+pub const MAX_2D_HEATMAP_ELEMENTS: usize = MAX_GPU_BUFFER_BYTES / 80;
+/// Maximum number of 2D cells that fit in a single 256 MiB GPU vertex buffer for 3D Surface/Sphere (160 bytes/cell).
+pub const MAX_2D_SURFACE_ELEMENTS: usize = MAX_GPU_BUFFER_BYTES / 160;
+
 /// Standard GPU color, clipping, and range uniforms struct shared across all plots.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
@@ -58,24 +65,35 @@ pub trait PlotRenderer: Send + Sync {
 
 /// Setup viewport and scissor rect on a wgpu RenderPass based on egui Rect and PaintCallbackInfo,
 /// guaranteeing that the scissor rect is strictly clamped within render target bounds.
+/// Returns false if the render target is empty (e.g. window minimized or asleep), in which case
+/// the caller should skip drawing to avoid GPU validation errors.
 #[inline]
 pub fn setup_viewport_and_scissor(
     rpass: &mut wgpu::RenderPass<'static>,
     rect: &egui::Rect,
     info: &eframe::egui::PaintCallbackInfo,
-) {
-    let ppp = info.pixels_per_point;
+) -> bool {
+    let target_rect = info.viewport_in_pixels();
+    if target_rect.width_px == 0
+        || target_rect.height_px == 0
+        || rect.width() <= 0.0
+        || rect.height() <= 0.0
+    {
+        return false;
+    }
 
-    let max_dim = 8192.0;
-    let vp_x = (rect.min.x * ppp).round();
-    let vp_y = (rect.min.y * ppp).round();
-    let vp_w = (rect.width() * ppp).round().clamp(1.0, max_dim);
-    let vp_h = (rect.height() * ppp).round().clamp(1.0, max_dim);
+    let ppp = info.pixels_per_point;
+    let max_target_w = target_rect.width_px as f32;
+    let max_target_h = target_rect.height_px as f32;
+
+    let vp_x = (rect.min.x * ppp).round().max(0.0);
+    let vp_y = (rect.min.y * ppp).round().max(0.0);
+    let vp_w = (rect.width() * ppp).round().clamp(1.0, max_target_w);
+    let vp_h = (rect.height() * ppp).round().clamp(1.0, max_target_h);
 
     rpass.set_viewport(vp_x, vp_y, vp_w, vp_h, 0.0, 1.0);
 
     // Scissor Rect MUST be strictly contained within target render surface bounds
-    let target_rect = info.viewport_in_pixels();
     let clip_rect = info.clip_rect_in_pixels();
 
     let target_max_x = target_rect.left_px + target_rect.width_px;
@@ -95,10 +113,15 @@ pub fn setup_viewport_and_scissor(
     let sc_max_x = clip_max_x.clamp(target_rect.left_px, target_max_x).max(0) as u32;
     let sc_max_y = clip_max_y.clamp(target_rect.top_px, target_max_y).max(0) as u32;
 
-    let sc_w = sc_max_x.saturating_sub(sc_min_x).max(1);
-    let sc_h = sc_max_y.saturating_sub(sc_min_y).max(1);
+    let sc_w = sc_max_x
+        .saturating_sub(sc_min_x)
+        .clamp(1, target_rect.width_px.max(1) as u32);
+    let sc_h = sc_max_y
+        .saturating_sub(sc_min_y)
+        .clamp(1, target_rect.height_px.max(1) as u32);
 
     rpass.set_scissor_rect(sc_min_x, sc_min_y, sc_w, sc_h);
+    true
 }
 
 /// Computes viewport aspect ratio from an egui Rect with zero division protection.

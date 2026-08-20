@@ -7,7 +7,6 @@ use wgpu::util::DeviceExt;
 pub struct HeatmapVertex {
     pub position: [f32; 2],
     pub uv: [f32; 2],
-    pub cell_index: u32,
 }
 
 impl HeatmapVertex {
@@ -26,11 +25,6 @@ impl HeatmapVertex {
                     shader_location: 1,
                     format: wgpu::VertexFormat::Float32x2,
                 },
-                wgpu::VertexAttribute {
-                    offset: 16,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Uint32,
-                },
             ],
         }
     }
@@ -43,9 +37,14 @@ pub struct HeatmapUniforms {
     pub zoom: f32,
     pub _pad: u32,
     pub aspect_scale: [f32; 2],
-    pub _pad2: [u32; 2],
+    pub width: u32,
+    pub height: u32,
+    pub tile_bounds: [f32; 4],
     pub color: super::common::PlotColorParams,
 }
+
+use std::sync::RwLock;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 pub struct HeatmapRenderer {
     render_pipeline: wgpu::RenderPipeline,
@@ -55,6 +54,9 @@ pub struct HeatmapRenderer {
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     num_indices: u32,
+    width: AtomicU32,
+    height: AtomicU32,
+    tile_bounds: RwLock<[f32; 4]>,
 }
 
 impl HeatmapRenderer {
@@ -77,7 +79,9 @@ impl HeatmapRenderer {
             zoom: 1.0,
             _pad: 0,
             aspect_scale: [1.0, 1.0],
-            _pad2: [0; 2],
+            width: width.max(1) as u32,
+            height: height.max(1) as u32,
+            tile_bounds: [0.0, 0.0, 1.0, 1.0],
             color: super::common::PlotColorParams::default(),
         };
 
@@ -87,10 +91,19 @@ impl HeatmapRenderer {
             &initial_uniforms,
         );
 
+        let capacity_elements = (width * height).clamp(
+            2048 * 2048,
+            crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS,
+        );
+        let mut padded_initial = matrix_data.to_vec();
+        if padded_initial.len() < capacity_elements {
+            padded_initial.resize(capacity_elements, 0.0);
+        }
+
         let data_buffer = super::common::create_storage_buffer(
             device,
             "Heatmap Data Storage Buffer",
-            matrix_data,
+            &padded_initial,
         );
 
         let bind_group_layout = super::common::create_uniform_storage_bind_group_layout(
@@ -120,7 +133,7 @@ impl HeatmapRenderer {
                 module: &shader,
                 entry_point: Some("vs_main"),
                 buffers: &[Some(HeatmapVertex::desc())],
-                compilation_options: Default::default(),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -130,12 +143,16 @@ impl HeatmapRenderer {
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
-                compilation_options: Default::default(),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
                 cull_mode: None,
-                ..Default::default()
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
             },
             depth_stencil: Some(super::common::default_depth_stencil_state(
                 false,
@@ -146,7 +163,7 @@ impl HeatmapRenderer {
             cache: None,
         });
 
-        let (vertices, indices) = Self::build_mesh(width, height);
+        let (vertices, indices) = Self::build_quad();
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Heatmap Vertex Buffer"),
@@ -168,6 +185,9 @@ impl HeatmapRenderer {
             uniform_buffer,
             bind_group,
             num_indices: indices.len() as u32,
+            width: AtomicU32::new(width as u32),
+            height: AtomicU32::new(height as u32),
+            tile_bounds: RwLock::new([0.0, 0.0, 1.0, 1.0]),
         }
     }
 
@@ -179,12 +199,19 @@ impl HeatmapRenderer {
         zoom: f32,
         aspect_scale: [f32; 2],
     ) {
+        let tile_bounds = self
+            .tile_bounds
+            .read()
+            .map(|b| *b)
+            .unwrap_or([0.0, 0.0, 1.0, 1.0]);
         let uniforms = HeatmapUniforms {
             pan,
             zoom,
             _pad: 0,
             aspect_scale,
-            _pad2: [0; 2],
+            width: self.width.load(Ordering::Relaxed),
+            height: self.height.load(Ordering::Relaxed),
+            tile_bounds,
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -203,63 +230,51 @@ impl HeatmapRenderer {
         queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
     }
 
-    fn build_mesh(width: usize, height: usize) -> (Vec<HeatmapVertex>, Vec<u32>) {
-        let num_quads = width * height;
-        let mut vertices = Vec::with_capacity(num_quads * 4);
-        let mut indices = Vec::with_capacity(num_quads * 6);
-
-        let scale_x = 2.0;
-        let scale_y = 2.0;
-
-        for y in 0..height {
-            for x in 0..width {
-                let cell_index = (y * width + x) as u32;
-
-                let x0 = -1.0 + (x as f32 / width as f32) * scale_x;
-                let x1 = -1.0 + ((x + 1) as f32 / width as f32) * scale_x;
-
-                let y0 = 1.0 - (y as f32 / height as f32) * scale_y;
-                let y1 = 1.0 - ((y + 1) as f32 / height as f32) * scale_y;
-
-                let u0 = x as f32 / width as f32;
-                let u1 = (x + 1) as f32 / width as f32;
-                let v0 = y as f32 / height as f32;
-                let v1 = (y + 1) as f32 / height as f32;
-
-                let base_idx = vertices.len() as u32;
-
-                vertices.push(HeatmapVertex {
-                    position: [x0, y0],
-                    uv: [u0, v0],
-                    cell_index,
-                });
-                vertices.push(HeatmapVertex {
-                    position: [x1, y0],
-                    uv: [u1, v0],
-                    cell_index,
-                });
-                vertices.push(HeatmapVertex {
-                    position: [x0, y1],
-                    uv: [u0, v1],
-                    cell_index,
-                });
-                vertices.push(HeatmapVertex {
-                    position: [x1, y1],
-                    uv: [u1, v1],
-                    cell_index,
-                });
-
-                // Triangle 1: TL, BL, TR
-                indices.push(base_idx);
-                indices.push(base_idx + 2);
-                indices.push(base_idx + 1);
-
-                // Triangle 2: TR, BL, BR
-                indices.push(base_idx + 1);
-                indices.push(base_idx + 2);
-                indices.push(base_idx + 3);
-            }
+    /// Updates data, dimensions, and tile bounds for dynamic viewport LOD resampling
+    pub fn update_data_and_dimensions(
+        &self,
+        queue: &wgpu::Queue,
+        matrix_data: &[f32],
+        width: usize,
+        height: usize,
+        tile_bounds: [f32; 4],
+    ) {
+        // crate::utils::diagnostics::log_lod_tile_upload(
+        //     width,
+        //     height,
+        //     matrix_data.len(),
+        //     (matrix_data.len() * 4) as f64 / (1024.0 * 1024.0),
+        //     tile_bounds,
+        // );
+        self.width.store(width as u32, Ordering::Relaxed);
+        self.height.store(height as u32, Ordering::Relaxed);
+        if let Ok(mut b) = self.tile_bounds.write() {
+            *b = tile_bounds;
         }
+        queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
+    }
+
+    fn build_quad() -> (Vec<HeatmapVertex>, Vec<u32>) {
+        let vertices = vec![
+            HeatmapVertex {
+                position: [-1.0, 1.0],
+                uv: [0.0, 0.0],
+            },
+            HeatmapVertex {
+                position: [1.0, 1.0],
+                uv: [1.0, 0.0],
+            },
+            HeatmapVertex {
+                position: [-1.0, -1.0],
+                uv: [0.0, 1.0],
+            },
+            HeatmapVertex {
+                position: [1.0, -1.0],
+                uv: [1.0, 1.0],
+            },
+        ];
+
+        let indices = vec![0, 2, 1, 1, 2, 3];
 
         (vertices, indices)
     }
@@ -305,7 +320,9 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
         rpass: &mut wgpu::RenderPass<'static>,
         _callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
-        super::common::setup_viewport_and_scissor(rpass, &self.rect, &info);
+        if !super::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
+            return;
+        }
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &self.renderer.bind_group, &[]);

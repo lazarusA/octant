@@ -263,6 +263,46 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
         }
     }
 
+    // If initial spatial 2D selection exceeds GPU limits, scale initial default ranges to fit within MAX_GPU_STORAGE_BUFFER_ELEMENTS
+    if let (Some(x_idx), Some(y_idx)) = (
+        app.dim_config
+            .iter()
+            .position(|c| c.spatial == SpatialRole::X),
+        app.dim_config
+            .iter()
+            .position(|c| c.spatial == SpatialRole::Y),
+    ) {
+        let x_span = (app.selected_dim_ranges[x_idx]
+            .1
+            .saturating_sub(app.selected_dim_ranges[x_idx].0)
+            + 1)
+        .max(1);
+        let y_span = (app.selected_dim_ranges[y_idx]
+            .1
+            .saturating_sub(app.selected_dim_ranges[y_idx].0)
+            + 1)
+        .max(1);
+        let total_2d = x_span.saturating_mul(y_span);
+        if total_2d > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+            let scale = ((crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS as f64)
+                / (total_2d as f64))
+                .sqrt()
+                * 0.95;
+            let new_x = ((x_span as f64) * scale).max(1.0) as usize;
+            let new_y = ((y_span as f64) * scale).max(1.0) as usize;
+            let x_start = app.selected_dim_ranges[x_idx].0;
+            let y_start = app.selected_dim_ranges[y_idx].0;
+            let max_x = var_info.shape[x_idx].saturating_sub(1) as usize;
+            let max_y = var_info.shape[y_idx].saturating_sub(1) as usize;
+            app.selected_dim_ranges[x_idx] =
+                (x_start, (x_start + new_x.saturating_sub(1)).min(max_x));
+            app.selected_dim_ranges[y_idx] =
+                (y_start, (y_start + new_y.saturating_sub(1)).min(max_y));
+            app.dim_config[x_idx].range = app.selected_dim_ranges[x_idx];
+            app.dim_config[y_idx].range = app.selected_dim_ranges[y_idx];
+        }
+    }
+
     app.spatial_dims
         .sort_by_key(|&d| match app.dim_config[d].spatial {
             SpatialRole::X => 0,
@@ -390,6 +430,40 @@ pub fn calculate_selected_volume_elements(app: &OctantApp) -> usize {
     }
 }
 
+/// Calculates the total 2D plane elements from the currently selected dimension ranges for spatial X and Y dimensions.
+pub fn calculate_selected_2d_elements(app: &OctantApp) -> usize {
+    let Some(metadata) = &app.active_dataset_metadata else {
+        return 0;
+    };
+    let Some(var_info) = metadata.variables.get(app.selected_variable_idx) else {
+        return 0;
+    };
+
+    let rank = var_info.shape.len();
+    let (x_dim, y_dim, _) = OctantApp::resolve_spatial_axes(
+        rank,
+        &var_info.dimension_names,
+        &var_info.dimension_names,
+        &app.dim_config,
+    );
+
+    let get_span = |d: usize| -> usize {
+        if d >= rank {
+            return 1;
+        }
+        let size = var_info.shape[d] as usize;
+        if let Some(&(start, end)) = app.selected_dim_ranges.get(d) {
+            (end.saturating_sub(start) + 1).min(size)
+        } else {
+            size
+        }
+    };
+
+    let nx = get_span(x_dim);
+    let ny = get_span(y_dim);
+    nx.saturating_mul(ny)
+}
+
 /// Checks if 3D Volume / Point Cloud rendering is permitted under the 128 MB GPU storage buffer limit.
 pub fn is_volume_allowed_for_selection(app: &OctantApp) -> bool {
     let elements = calculate_selected_volume_elements(app);
@@ -423,12 +497,76 @@ fn show_dimension_sliders(
     let (requested_bytes, total_bytes) =
         calculate_download_sizes(var_info, &app.dim_config, &app.selected_dim_ranges);
 
+    let requested_cells: u64 = if rank > 0 {
+        var_info
+            .shape
+            .iter()
+            .enumerate()
+            .map(|(i, &s)| {
+                if app.dim_config.get(i).is_some_and(|c| c.active) {
+                    if let Some(&(start, end)) = app.selected_dim_ranges.get(i) {
+                        (end.saturating_sub(start) + 1).min(s as usize) as u64
+                    } else {
+                        s
+                    }
+                } else {
+                    1
+                }
+            })
+            .product()
+    } else {
+        1
+    };
+
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Download").strong());
-        ui.label(egui::RichText::new(format_byte_size(requested_bytes)).strong());
+        ui.label(
+            egui::RichText::new(format!(
+                "{} ({} cells)",
+                format_byte_size(requested_bytes),
+                crate::utils::format_count_metric(requested_cells as usize)
+            ))
+            .strong(),
+        );
         ui.label(egui::RichText::new(format!("/ {}", format_byte_size(total_bytes))).weak());
     });
     ui.add_space(4.0);
+
+    // Info banner when selected 2D plane triggers pyramid aggregation or exceeds 3D mesh limit
+    let total_2d_elements = calculate_selected_2d_elements(app);
+    if total_2d_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+        let data_mb = (total_2d_elements * 4) as f64 / (1024.0 * 1024.0);
+        ui.group(|ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(
+                    egui::RichText::new(format!(
+                        "⚡ Large 2D selection ({} cells, {:.0} MB): Automatic multi-resolution pyramid aggregation is enabled.",
+                        crate::utils::format_count_metric(total_2d_elements),
+                        data_mb,
+                    ))
+                    .small()
+                    .color(egui::Color32::from_rgb(100, 200, 255)),
+                );
+            });
+        });
+        ui.add_space(2.0);
+    } else if total_2d_elements > crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
+        let data_mb = (total_2d_elements * 4) as f64 / (1024.0 * 1024.0);
+        ui.group(|ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(
+                    egui::RichText::new(format!(
+                        "ℹ️ 3D Globe & 3D Surface meshes are disabled for this large selection ({} cells, {:.0} MB). 2D Plane and 1D Line plots remain fully active.",
+                        crate::utils::format_count_metric(total_2d_elements),
+                        data_mb,
+                    ))
+                    .small()
+                    .color(egui::Color32::from_rgb(255, 180, 80)),
+                );
+            });
+        });
+        ui.add_space(2.0);
+    }
 
     // Warning banner when selected volume exceeds GPU limit for 3D Volume/Point Cloud
     let total_vol_elements = calculate_selected_volume_elements(app);

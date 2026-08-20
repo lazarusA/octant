@@ -176,6 +176,7 @@ pub struct OctantApp {
     pub plotted_selected_dim_ranges: Vec<(usize, usize)>,
     pub plotted_spatial_dims: Vec<usize>,
     pub plotted_animated_dim: Option<usize>,
+    pub current_plotted_var_key: Option<String>,
     /// Placeholder list for future multi-variable layer overlays (e.g. vector fields, RGB composites)
     pub multi_plotted_layers: Vec<PlottedVariableState>,
     pub current_timestep: usize,
@@ -185,6 +186,8 @@ pub struct OctantApp {
     pub status_message: String,
     pub is_loading: bool,
     pub matrix_data: Option<MatrixData>,
+    pub active_pyramid: Option<Arc<crate::data::MatrixPyramid>>,
+    pub resampler: crate::data::ViewportResampler,
     pub volume_data: Option<crate::data::VolumeData>,
     pub renderer: Option<Arc<MatrixRenderer>>,
     pub line_renderer: Option<Arc<LineRenderer>>,
@@ -280,6 +283,8 @@ pub struct OctantApp {
     pub heatmap_pan: egui::Vec2,
     pub line_zoom: f32,
     pub line_pan: egui::Vec2,
+    pub enable_pyramid_resampling: bool,
+    pub pyramid_aggregation_op: crate::data::AggregationOp,
 }
 
 impl Default for OctantApp {
@@ -300,6 +305,7 @@ impl Default for OctantApp {
             plotted_selected_dim_ranges: Vec::new(),
             plotted_spatial_dims: Vec::new(),
             plotted_animated_dim: None,
+            current_plotted_var_key: None,
             multi_plotted_layers: Vec::new(),
             current_timestep: 0,
             active_plot_type: PlotType::Heatmap,
@@ -308,6 +314,8 @@ impl Default for OctantApp {
             status_message: "Ready. Select store and click Inspect Store Metadata.".to_string(),
             is_loading: false,
             matrix_data: None,
+            active_pyramid: None,
+            resampler: crate::data::ViewportResampler::default(),
             volume_data: None,
             renderer: None,
             line_renderer: None,
@@ -395,16 +403,45 @@ impl Default for OctantApp {
             heatmap_pan: egui::Vec2::ZERO,
             line_zoom: 1.0,
             line_pan: egui::Vec2::ZERO,
+            enable_pyramid_resampling: false,
+            pyramid_aggregation_op: crate::data::AggregationOp::default(),
         }
     }
 }
 
 impl OctantApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        Self {
+        // if let Some(wgpu_state) = &cc.wgpu_render_state {
+        //     crate::utils::diagnostics::log_gpu_diagnostics(wgpu_state);
+        // }
+
+        let mut app = Self {
             wgpu_render_state: cc.wgpu_render_state.clone(),
             ..Default::default()
+        };
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(target) = std::env::args().nth(1) {
+            let kind = if target.starts_with("http://")
+                || target.starts_with("https://")
+                || target.starts_with("s3://")
+            {
+                if target.to_lowercase().contains("icechunk") {
+                    StoreKind::RemoteIcechunk
+                } else {
+                    StoreKind::RemoteZarr
+                }
+            } else if target.to_lowercase().contains("icechunk") {
+                StoreKind::LocalIcechunk
+            } else {
+                StoreKind::LocalZarr
+            };
+            app.selected_store_kind = kind;
+            app.store_target_input = target;
+            app.inspect_active_store();
         }
+
+        app
     }
 
     pub fn reset_heatmap_view(&mut self) {

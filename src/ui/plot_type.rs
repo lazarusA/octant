@@ -18,11 +18,13 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         (false, false, 0.0)
     };
 
-    let is_volume_allowed = is_3d_available && is_size_allowed;
+    let is_volume_allowed = is_3d_available && is_size_allowed && !app.enable_pyramid_resampling;
 
-    // Safety fallback: if Volume/PointCloud was active but current selection exceeds GPU limit, revert to 2D Plane
-    if (app.active_plot_type == PlotType::Volume || app.active_plot_type == PlotType::PointCloud)
-        && !is_volume_allowed
+    // Safety fallback: if any other plot was active while 2D pyramid resampling is enabled (or volume exceeds limit), revert to 2D Plane
+    if (app.enable_pyramid_resampling && app.active_plot_type != PlotType::Heatmap)
+        || ((app.active_plot_type == PlotType::Volume
+            || app.active_plot_type == PlotType::PointCloud)
+            && !is_volume_allowed)
     {
         app.active_plot_type = PlotType::Heatmap;
     }
@@ -46,6 +48,8 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         );
         ui.separator();
 
+        let pyramid_disabled_reason = "Disabled: 2D Pyramid Resampling active".to_string();
+
         let options = [
             (
                 PlotType::Heatmap,
@@ -53,24 +57,43 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                 true,
                 String::new(),
             ),
-            (PlotType::Line, "📈 1D Line Chart", true, String::new()),
+            (
+                PlotType::Line,
+                "📈 1D Line Chart",
+                !app.enable_pyramid_resampling,
+                if app.enable_pyramid_resampling {
+                    pyramid_disabled_reason.clone()
+                } else {
+                    String::new()
+                },
+            ),
             (
                 PlotType::Sphere,
                 "🌍 3D Globe (Sphere)",
-                true,
-                String::new(),
+                !app.enable_pyramid_resampling,
+                if app.enable_pyramid_resampling {
+                    pyramid_disabled_reason.clone()
+                } else {
+                    String::new()
+                },
             ),
             (
                 PlotType::Surface,
                 "⛰️ 3D Surface / Blocks",
-                true,
-                String::new(),
+                !app.enable_pyramid_resampling,
+                if app.enable_pyramid_resampling {
+                    pyramid_disabled_reason.clone()
+                } else {
+                    String::new()
+                },
             ),
             (
                 PlotType::Volume,
                 "☁️ 3D Volume Raycasting",
                 is_volume_allowed,
-                if !is_3d_available {
+                if app.enable_pyramid_resampling {
+                    pyramid_disabled_reason.clone()
+                } else if !is_3d_available {
                     "Requires 3D Data".to_string()
                 } else if !is_size_allowed {
                     format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb)
@@ -82,7 +105,9 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                 PlotType::PointCloud,
                 "✨ 3D Point Cloud",
                 is_volume_allowed,
-                if !is_3d_available {
+                if app.enable_pyramid_resampling {
+                    pyramid_disabled_reason
+                } else if !is_3d_available {
                     "Requires 3D Data".to_string()
                 } else if !is_size_allowed {
                     format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb)
