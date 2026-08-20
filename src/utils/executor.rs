@@ -36,4 +36,12 @@ impl TaskExecutor {
     {
         std::thread::spawn(f)
     }
+
+    /// Spawns a task onto the shared Rayon thread pool.
+    pub fn spawn_background<F>(f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        rayon::spawn(f);
+    }
 }

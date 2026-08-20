@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
-use std::thread;
 
 use super::{
     block_cache::{BlockCache, BlockCacheKey},
@@ -86,7 +85,7 @@ impl BlockPrefetcher {
         let completed_atomic = self.completed_bytes.clone();
         let aborted_atomic = self.aborted.clone();
 
-        thread::spawn(move || {
+        rayon::spawn(move || {
             let mut on_progress = |chunk_bytes: u64| {
                 if !aborted_atomic.load(Ordering::Relaxed) {
                     completed_atomic.fetch_add(chunk_bytes, Ordering::Relaxed);
