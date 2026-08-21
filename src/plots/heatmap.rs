@@ -227,7 +227,12 @@ impl HeatmapRenderer {
 
     /// Fast GPU Storage Buffer data channel upload
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
-        queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
+        super::common::safe_write_buffer(
+            queue,
+            &self.data_buffer,
+            matrix_data,
+            "HeatmapRenderer::update_data",
+        );
     }
 
     /// Updates data, dimensions, and tile bounds for dynamic viewport LOD resampling
@@ -251,7 +256,12 @@ impl HeatmapRenderer {
         if let Ok(mut b) = self.tile_bounds.write() {
             *b = tile_bounds;
         }
-        queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(matrix_data));
+        super::common::safe_write_buffer(
+            queue,
+            &self.data_buffer,
+            matrix_data,
+            "HeatmapRenderer::update_data_and_dimensions",
+        );
     }
 
     fn build_quad() -> (Vec<HeatmapVertex>, Vec<u32>) {
