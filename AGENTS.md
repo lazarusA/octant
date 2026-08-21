@@ -15,6 +15,7 @@ When developing and reviewing code in this repository:
    - Remote I/O must specify client timeouts (`with_timeout(30s)`, `with_connect_timeout(10s)`).
    - Background prefetchers and loaders must use bounded channels (`sync_channel`) for backpressure.
    - WGPU renderers and WGSL shaders live in `src/plots/` and `src/plots/shaders/` (embedded via `assemble_plot_shader!`).
+   - For all structured, discrete global (HEALPix, ICON, Cubed-Sphere), and unstructured grid formats (UGRID, MPAS), use zero-allocation GPU instancing or GPU vertex pulling. Reserve CPU mesh generation strictly for non-grid geometry (GIS vector polygons, streamlines, Marching Cubes CAD export, UI labels and annotations).
    - UI widgets and layout live in `src/ui/` and `src/app/`, with state actions routed via `AppAction`.
    - In immediate-mode UI loops, prefer zero-allocation tuple salts `("salt", id)` over heap-allocating `format!(...)`.
 
