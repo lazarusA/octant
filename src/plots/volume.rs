@@ -264,8 +264,14 @@ impl VolumeRenderer {
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, data: &[f32]) {
-        if !data.is_empty() {
-            queue.write_buffer(&self.data_buffer, 0, bytemuck::cast_slice(data));
+        if !data.is_empty()
+            && super::common::safe_write_buffer(
+                queue,
+                &self.data_buffer,
+                data,
+                "VolumeRenderer::update_data",
+            )
+        {
             self.data_len.store(data.len(), Ordering::Relaxed);
         }
     }

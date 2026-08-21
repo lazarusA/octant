@@ -10,10 +10,8 @@ pub const MAX_GPU_STORAGE_BUFFER_ELEMENTS: usize =
 
 /// Maximum buffer size for GPU vertex / index buffers in bytes (256 MiB default wgpu limit).
 pub const MAX_GPU_BUFFER_BYTES: usize = 256 * 1024 * 1024;
-/// Maximum number of 2D cells that fit in a single 256 MiB GPU vertex buffer for Heatmap (80 bytes/cell).
-pub const MAX_2D_HEATMAP_ELEMENTS: usize = MAX_GPU_BUFFER_BYTES / 80;
-/// Maximum number of 2D cells that fit in a single 256 MiB GPU vertex buffer for 3D Surface/Sphere (160 bytes/cell).
-pub const MAX_2D_SURFACE_ELEMENTS: usize = MAX_GPU_BUFFER_BYTES / 160;
+/// Maximum number of 2D cells that fit in 3D Surface / Sphere GPU storage buffer (33.5M cells / 128 MiB).
+pub const MAX_2D_SURFACE_ELEMENTS: usize = MAX_GPU_STORAGE_BUFFER_ELEMENTS;
 
 /// Standard GPU color, clipping, and range uniforms struct shared across all plots.
 #[repr(C)]
@@ -156,6 +154,27 @@ pub fn create_storage_buffer<T: bytemuck::Pod>(
     })
 }
 
+/// Safely writes slice data to a GPU buffer, checking that the byte size fits within the destination buffer capacity.
+/// Returns `true` if the write succeeded, or `false` (with a warning log) if it would overrun.
+pub fn safe_write_buffer<T: bytemuck::Pod>(
+    queue: &wgpu::Queue,
+    buffer: &wgpu::Buffer,
+    data: &[T],
+    label: &str,
+) -> bool {
+    let copy_bytes = std::mem::size_of_val(data) as u64;
+    if copy_bytes <= buffer.size() {
+        queue.write_buffer(buffer, 0, bytemuck::cast_slice(data));
+        true
+    } else {
+        log::warn!(
+            "{label}: data size ({copy_bytes} bytes) exceeds GPU buffer capacity ({} bytes), skipping write",
+            buffer.size()
+        );
+        false
+    }
+}
+
 /// Creates a standard plot bind group layout with binding 0 (Uniform) and binding 1 (Storage).
 pub fn create_uniform_storage_bind_group_layout(
     device: &wgpu::Device,
@@ -248,12 +267,13 @@ where
         vertices.push(make_vertex(p2, [0.0, 1.0], norm));
         vertices.push(make_vertex(p3, [1.0, 1.0], norm));
 
+        // Counter-Clockwise (CCW) face triangles
         indices.push(base_idx);
-        indices.push(base_idx + 2);
         indices.push(base_idx + 1);
+        indices.push(base_idx + 2);
 
-        indices.push(base_idx + 1);
         indices.push(base_idx + 2);
+        indices.push(base_idx + 1);
         indices.push(base_idx + 3);
     };
 
@@ -264,54 +284,70 @@ where
     let norm_left = [-1.0, 0.0, 0.0];
     let norm_right = [1.0, 0.0, 0.0];
 
-    // 1. Top Face (z=1.0)
+    // 1. Top Face (+Y normal in world space: z=1.0)
     push_face(
         [0.0, 0.0, 1.0],
-        [1.0, 0.0, 1.0],
         [0.0, 1.0, 1.0],
+        [1.0, 0.0, 1.0],
         [1.0, 1.0, 1.0],
         norm_top,
     );
-    // 2. Bottom Base (z=0.0)
+    // 2. Bottom Base (-Y normal in world space: z=0.0)
     push_face(
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
         [0.0, 1.0, 0.0],
         [1.0, 1.0, 0.0],
-        [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
         norm_bottom,
     );
-    // 3. Front Wall (y=0.0)
+    // 3. Front Wall (-Z normal in world space: y=0.0)
     push_face(
         [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
         [0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0],
         [1.0, 0.0, 1.0],
         norm_front,
     );
-    // 4. Back Wall (y=1.0)
+    // 4. Back Wall (+Z normal in world space: y=1.0)
     push_face(
-        [0.0, 1.0, 1.0],
-        [1.0, 1.0, 1.0],
         [0.0, 1.0, 0.0],
         [1.0, 1.0, 0.0],
+        [0.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
         norm_back,
     );
-    // 5. Left Wall (x=0.0)
+    // 5. Left Wall (-X normal in world space: x=0.0)
     push_face(
         [0.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0],
         [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
         [0.0, 1.0, 1.0],
         norm_left,
     );
-    // 6. Right Wall (x=1.0)
+    // 6. Right Wall (+X normal in world space: x=1.0)
     push_face(
-        [1.0, 0.0, 1.0],
         [1.0, 0.0, 0.0],
-        [1.0, 1.0, 1.0],
+        [1.0, 0.0, 1.0],
         [1.0, 1.0, 0.0],
+        [1.0, 1.0, 1.0],
         norm_right,
     );
 
+    (vertices, indices)
+}
+
+/// Reusable unit quad mesh generator (4 vertices, 6 indices) for instanced 2D/3D quad grid rendering.
+pub fn build_unit_quad_mesh<V, F>(mut make_vertex: F) -> (Vec<V>, Vec<u32>)
+where
+    F: FnMut([f32; 3], [f32; 2], [f32; 3]) -> V,
+{
+    let norm = [0.0, 1.0, 0.0];
+    let vertices = vec![
+        make_vertex([0.0, 0.0, 0.0], [0.0, 0.0], norm),
+        make_vertex([1.0, 0.0, 0.0], [1.0, 0.0], norm),
+        make_vertex([0.0, 1.0, 0.0], [0.0, 1.0], norm),
+        make_vertex([1.0, 1.0, 0.0], [1.0, 1.0], norm),
+    ];
+    let indices = vec![0, 2, 1, 1, 2, 3];
     (vertices, indices)
 }

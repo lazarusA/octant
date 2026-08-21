@@ -225,9 +225,13 @@ impl LineRenderer {
         }
 
         if let Ok(guard) = self.gpu_resources.read()
-            && std::mem::size_of_val(matrix_data) as u64 <= guard.data_buffer.size()
+            && super::common::safe_write_buffer(
+                queue,
+                &guard.data_buffer,
+                matrix_data,
+                "LineRenderer::update_data",
+            )
         {
-            queue.write_buffer(&guard.data_buffer, 0, bytemuck::cast_slice(matrix_data));
             self.data_len
                 .store(matrix_data.len() as u32, Ordering::Relaxed);
         }
