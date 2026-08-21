@@ -66,3 +66,48 @@ macro_rules! assemble_plot_shader {
         )
     };
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_all_plot_shaders_parse_cleanly() {
+        let shaders = [
+            (
+                "sphere",
+                crate::assemble_plot_shader!(include_str!("shaders/sphere.wgsl")),
+            ),
+            (
+                "surface",
+                crate::assemble_plot_shader!(include_str!("shaders/surface.wgsl")),
+            ),
+            (
+                "heatmap",
+                crate::assemble_plot_shader!(include_str!("shaders/heatmap.wgsl")),
+            ),
+            (
+                "volume",
+                crate::assemble_plot_shader!(include_str!("shaders/volume.wgsl")),
+            ),
+            (
+                "line",
+                crate::assemble_plot_shader!(include_str!("shaders/line.wgsl")),
+            ),
+            (
+                "point_cloud",
+                crate::assemble_plot_shader!(include_str!("shaders/point_cloud.wgsl")),
+            ),
+        ];
+
+        for (name, source) in shaders {
+            let mut validator = wgpu::naga::valid::Validator::new(
+                wgpu::naga::valid::ValidationFlags::all(),
+                wgpu::naga::valid::Capabilities::all(),
+            );
+            let module = wgpu::naga::front::wgsl::parse_str(source)
+                .unwrap_or_else(|e| panic!("Failed to parse WGSL shader '{name}': {e}"));
+            validator
+                .validate(&module)
+                .unwrap_or_else(|e| panic!("Failed to validate WGSL shader '{name}': {e}"));
+        }
+    }
+}

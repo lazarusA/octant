@@ -6,7 +6,7 @@ struct Uniforms {
     displacement_strength: f32,
     surface_mode: u32,
     width: u32,
-    _pad0: u32,
+    height: u32,
     color: ColorUniforms,
 };
 
@@ -27,6 +27,7 @@ struct VertexOutput {
     @location(0) uv: vec2<f32>,
     @location(1) val: f32,
     @location(2) normal: vec3<f32>,
+    @location(3) world_pos: vec3<f32>,
 };
 
 fn get_normalized_height(val: f32) -> f32 {
@@ -51,21 +52,23 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
 
-    let grid_h = max(arrayLength(&data_buffer) / max(uniforms.width, 1u), 1u);
-    let cell_x = instance_idx % uniforms.width;
-    let cell_y = instance_idx / uniforms.width;
+    let grid_w = max(uniforms.width, 1u);
+    let grid_h = max(uniforms.height, 1u);
+
+    let cell_x = instance_idx % grid_w;
+    let cell_y = instance_idx / grid_w;
     let max_idx = arrayLength(&data_buffer) - 1u;
     let safe_idx = min(instance_idx, max_idx);
 
-    let data_aspect = max(f32(uniforms.width) / f32(grid_h), 0.1);
+    // 1-to-1 exact raw pixel value (0 NaN contamination)
+    var raw_val = data_buffer[safe_idx];
+
+    let data_aspect = max(f32(grid_w) / f32(grid_h), 0.1);
     let scale_x = 2.0 * data_aspect;
     let scale_y = 2.0;
 
-    let u_base = (f32(cell_x) + model.position.x) / f32(uniforms.width);
-    let v_base = (f32(cell_y) + model.position.y) / f32(grid_h);
-
-    let x0 = -data_aspect + (f32(cell_x) / f32(uniforms.width)) * scale_x;
-    let x1 = -data_aspect + (f32(cell_x + 1u) / f32(uniforms.width)) * scale_x;
+    let x0 = -data_aspect + (f32(cell_x) / f32(grid_w)) * scale_x;
+    let x1 = -data_aspect + (f32(cell_x + 1u) / f32(grid_w)) * scale_x;
 
     let y0 = -1.0 + (f32(cell_y) / f32(grid_h)) * scale_y;
     let y1 = -1.0 + (f32(cell_y + 1u) / f32(grid_h)) * scale_y;
@@ -73,85 +76,31 @@ fn vs_main(
     let world_x = mix(x0, x1, model.position.x);
     let world_z = mix(y0, y1, model.position.y);
 
-    var raw_val: f32;
     var pos_3d: vec3<f32>;
     var normal_3d: vec3<f32>;
 
     if (uniforms.surface_mode == 0u) {
-        // Mode 0: Smooth Terrain
-        let corner_x = min(cell_x + u32(round(model.position.x)), uniforms.width - 1u);
+        // Mode 0: Smooth Bumpy Terrain (Continuous surface mesh connecting corner vertices!)
+        let corner_x = min(cell_x + u32(round(model.position.x)), grid_w - 1u);
         let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);
-        let corner_idx = min(corner_y * uniforms.width + corner_x, max_idx);
+        let corner_idx = min(corner_y * grid_w + corner_x, max_idx);
         raw_val = data_buffer[corner_idx];
-
-        let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
-        if (is_nan_val && uniforms.color.use_nan_color == 0u) {
-            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-            return out;
-        }
 
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.8 * uniforms.displacement_strength;
         pos_3d = vec3<f32>(world_x, height, world_z);
-
-        // Compute local gradient surface normal for 3D peak and in-ward valley lighting
-        let val_left = data_buffer[corner_y * uniforms.width + max(corner_x, 1u) - 1u];
-        let val_right = data_buffer[corner_y * uniforms.width + min(corner_x + 1u, uniforms.width - 1u)];
-        let val_up = data_buffer[(max(corner_y, 1u) - 1u) * uniforms.width + corner_x];
-        let val_down = data_buffer[min(corner_y + 1u, grid_h - 1u) * uniforms.width + corner_x];
-
-        let dh_dx = (get_normalized_height(val_right) - get_normalized_height(val_left)) * 0.8 * uniforms.displacement_strength;
-        let dh_dy = (get_normalized_height(val_down) - get_normalized_height(val_up)) * 0.8 * uniforms.displacement_strength;
-
-        normal_3d = normalize(vec3<f32>(-dh_dx, 1.0, -dh_dy));
+        normal_3d = vec3<f32>(0.0, 1.0, 0.0);
     } else if (uniforms.surface_mode == 1u) {
         // Mode 1: Flat Steps
-        raw_val = data_buffer[safe_idx];
-
-        let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
-        if (is_nan_val && uniforms.color.use_nan_color == 0u) {
-            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-            return out;
-        }
-        if (!is_nan_val) {
-            if (uniforms.color.use_lowclip == 0u && raw_val < uniforms.color.cmin) {
-                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-                return out;
-            }
-            if (uniforms.color.use_highclip == 0u && raw_val > uniforms.color.cmax) {
-                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-                return out;
-            }
-        }
-
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.6 * uniforms.displacement_strength;
         pos_3d = vec3<f32>(world_x, height, world_z);
         normal_3d = vec3<f32>(0.0, 1.0, 0.0);
     } else {
-        // Mode 2: 3D Lego Cubes (Signed: Positive -> Upward, Negative -> In-ward/Downward)
-        raw_val = data_buffer[safe_idx];
-
-        let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
-        if (is_nan_val && uniforms.color.use_nan_color == 0u) {
-            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-            return out;
-        }
-        if (!is_nan_val) {
-            if (uniforms.color.use_lowclip == 0u && raw_val < uniforms.color.cmin) {
-                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-                return out;
-            }
-            if (uniforms.color.use_highclip == 0u && raw_val > uniforms.color.cmax) {
-                out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-                return out;
-            }
-        }
-
+        // Mode 2: 3D Lego Cubes
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.8 * uniforms.displacement_strength;
 
-        // Positive values extrude upward from 0.0; negative values extrude downward from 0.0
         let y_base = min(0.0, height);
         let y_top = max(0.0, height);
         let world_y = mix(y_base, y_top, model.position.z);
@@ -186,7 +135,7 @@ fn vs_main(
         normal_3d.y,
         -sy * normal_3d.x + cy * normal_3d.z
     );
-    out.normal = normalize(vec3<f32>(
+    let norm_rot = normalize(vec3<f32>(
         norm_y_rot.x,
         cx * norm_y_rot.y - sx * norm_y_rot.z,
         sx * norm_y_rot.y + cx * norm_y_rot.z
@@ -208,6 +157,8 @@ fn vs_main(
     out.position = vec4<f32>(proj_x, proj_y, proj_z, dist_positive);
     out.uv = model.uv;
     out.val = raw_val;
+    out.normal = norm_rot;
+    out.world_pos = pos_rot;
 
     return out;
 }
@@ -216,13 +167,25 @@ fn vs_main(
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let eval_color = evaluate_plot_color(in.val, uniforms.color);
 
-    if (eval_color.a <= 0.0) {
+    if (eval_color.a < 0.01) {
         discard;
+    }
+
+    // Compute pixel-perfect surface normal from screen-space derivatives or vertex normal
+    var geom_normal = in.normal;
+    if (uniforms.surface_mode == 0u) {
+        // Mode 0: Smooth Terrain - use screen-space partial derivatives for realistic terrain lighting (0 memory reads!)
+        let dpx = dpdx(in.world_pos);
+        let dpy = dpdy(in.world_pos);
+        let cross_norm = cross(dpx, dpy);
+        if (dot(cross_norm, cross_norm) > 1e-6) {
+            geom_normal = normalize(-cross_norm);
+        }
     }
 
     // 3D Directional Lighting for surface terrain & block faces (two-sided)
     let light_dir = normalize(vec3<f32>(0.4, 0.8, 0.6));
-    let diffuse = max(abs(dot(in.normal, light_dir)), 0.25);
+    let diffuse = max(abs(dot(geom_normal, light_dir)), 0.25);
     let ambient = 0.35;
     let lighting = clamp(ambient + diffuse * 0.65, 0.3, 1.0);
 

@@ -46,7 +46,7 @@ pub struct SurfaceUniforms {
     pub displacement_strength: f32,
     pub surface_mode: u32,
     pub width: u32,
-    pub _pad0: u32,
+    pub height: u32,
     pub color: super::common::PlotColorParams,
 }
 
@@ -61,6 +61,7 @@ pub struct SurfaceRenderer {
     bind_group: wgpu::BindGroup,
     num_instances: u32,
     width: usize,
+    height: usize,
 }
 
 impl SurfaceRenderer {
@@ -78,6 +79,8 @@ impl SurfaceRenderer {
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
+        let num_instances = (width * height) as u32;
+
         let initial_uniforms = SurfaceUniforms {
             rotation_y: 0.0,
             rotation_x: 0.0,
@@ -86,7 +89,7 @@ impl SurfaceRenderer {
             displacement_strength: 0.5,
             surface_mode: 0,
             width: width as u32,
-            _pad0: 0,
+            height: height as u32,
             color: super::common::PlotColorParams::default(),
         };
 
@@ -156,7 +159,7 @@ impl SurfaceRenderer {
             cache: None,
         });
 
-        // 1. Instanced Unit Quad Template for Smooth Terrain & Flat Steps
+        // 1. Instanced Unit Quad Template for Smooth Terrain and Flat Steps
         let (quad_vertices, quad_indices) = Self::build_unit_quad();
         let quad_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Surface Unit Quad Vertex Buffer"),
@@ -191,8 +194,9 @@ impl SurfaceRenderer {
             data_buffer,
             uniform_buffer,
             bind_group,
-            num_instances: (width * height) as u32,
+            num_instances,
             width,
+            height,
         }
     }
 
@@ -216,7 +220,7 @@ impl SurfaceRenderer {
             displacement_strength,
             surface_mode,
             width: self.width as u32,
-            _pad0: 0,
+            height: self.height as u32,
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));

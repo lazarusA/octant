@@ -46,7 +46,7 @@ pub struct SphereUniforms {
     pub displacement_strength: f32,
     pub sphere_mode: u32,
     pub width: u32,
-    pub _pad0: u32,
+    pub height: u32,
     pub color: super::common::PlotColorParams,
 }
 
@@ -61,6 +61,7 @@ pub struct SphereRenderer {
     bind_group: wgpu::BindGroup,
     num_instances: u32,
     width: usize,
+    height: usize,
 }
 
 impl SphereRenderer {
@@ -78,6 +79,8 @@ impl SphereRenderer {
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
+        let num_instances = (width * height) as u32;
+
         let initial_uniforms = SphereUniforms {
             rotation_y: 0.0,
             rotation_x: 0.0,
@@ -86,7 +89,7 @@ impl SphereRenderer {
             displacement_strength: 0.5,
             sphere_mode: 0,
             width: width as u32,
-            _pad0: 0,
+            height: height as u32,
             color: super::common::PlotColorParams::default(),
         };
 
@@ -188,8 +191,9 @@ impl SphereRenderer {
             data_buffer,
             uniform_buffer,
             bind_group,
-            num_instances: (width * height) as u32,
+            num_instances,
             width,
+            height,
         }
     }
 
@@ -213,7 +217,7 @@ impl SphereRenderer {
             displacement_strength,
             sphere_mode,
             width: self.width as u32,
-            _pad0: 0,
+            height: self.height as u32,
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
