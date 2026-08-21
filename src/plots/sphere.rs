@@ -52,6 +52,7 @@ pub struct SphereUniforms {
 
 pub struct SphereRenderer {
     render_pipeline: wgpu::RenderPipeline,
+    voxel_pipeline: wgpu::RenderPipeline,
     quad_vertex_buffer: wgpu::Buffer,
     quad_index_buffer: wgpu::Buffer,
     cube_vertex_buffer: wgpu::Buffer,
@@ -156,6 +157,43 @@ impl SphereRenderer {
             cache: None,
         });
 
+        // Dedicated pipeline for Mode 3 Radial Lego Cubes with hardware backface culling
+        // (same cull_mode as the default pipeline — globe modes already benefit from Back culling;
+        //  this separate binding lets us keep cube draw calls clearly separated in paint())
+        let voxel_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Sphere Voxel Render Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[Some(SphereVertex::desc())],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: target_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                cull_mode: Some(wgpu::Face::Back),
+                front_face: wgpu::FrontFace::Ccw,
+                ..Default::default()
+            },
+            depth_stencil: Some(super::common::default_depth_stencil_state(
+                true,
+                wgpu::CompareFunction::LessEqual,
+            )),
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+
         // 1. Instanced Unit Quad Template for Smooth Globe, Smooth Terrain, and Flat Steps
         let (quad_vertices, quad_indices) = Self::build_unit_quad();
         let quad_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -184,6 +222,7 @@ impl SphereRenderer {
 
         Self {
             render_pipeline,
+            voxel_pipeline,
             quad_vertex_buffer,
             quad_index_buffer,
             cube_vertex_buffer,
@@ -299,11 +338,10 @@ impl eframe::egui_wgpu::CallbackTrait for SphereCallback {
             return;
         }
 
-        rpass.set_pipeline(&self.renderer.render_pipeline);
-        rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
-
         if self.sphere_mode == 3 {
-            // Mode 3: 3D Radial Lego Cubes (GPU Instanced Unit Cube Draw)
+            // Mode 3: 3D Radial Lego Cubes (Dedicated pipeline with hardware backface culling)
+            rpass.set_pipeline(&self.renderer.voxel_pipeline);
+            rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
             rpass.set_vertex_buffer(0, self.renderer.cube_vertex_buffer.slice(..));
             rpass.set_index_buffer(
                 self.renderer.cube_index_buffer.slice(..),
@@ -312,6 +350,8 @@ impl eframe::egui_wgpu::CallbackTrait for SphereCallback {
             rpass.draw_indexed(0..36, 0, 0..self.renderer.num_instances);
         } else {
             // Mode 0 (Smooth Globe), Mode 1 (Smooth Terrain), & Mode 2 (Flat Steps) - GPU Instanced Unit Quad Draw
+            rpass.set_pipeline(&self.renderer.render_pipeline);
+            rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
             rpass.set_vertex_buffer(0, self.renderer.quad_vertex_buffer.slice(..));
             rpass.set_index_buffer(
                 self.renderer.quad_index_buffer.slice(..),

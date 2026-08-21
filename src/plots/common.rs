@@ -267,12 +267,13 @@ where
         vertices.push(make_vertex(p2, [0.0, 1.0], norm));
         vertices.push(make_vertex(p3, [1.0, 1.0], norm));
 
+        // Counter-Clockwise (CCW) face triangles
         indices.push(base_idx);
-        indices.push(base_idx + 2);
         indices.push(base_idx + 1);
+        indices.push(base_idx + 2);
 
-        indices.push(base_idx + 1);
         indices.push(base_idx + 2);
+        indices.push(base_idx + 1);
         indices.push(base_idx + 3);
     };
 
@@ -283,52 +284,52 @@ where
     let norm_left = [-1.0, 0.0, 0.0];
     let norm_right = [1.0, 0.0, 0.0];
 
-    // 1. Top Face (z=1.0)
+    // 1. Top Face (+Y normal in world space: z=1.0)
     push_face(
         [0.0, 0.0, 1.0],
-        [1.0, 0.0, 1.0],
         [0.0, 1.0, 1.0],
+        [1.0, 0.0, 1.0],
         [1.0, 1.0, 1.0],
         norm_top,
     );
-    // 2. Bottom Base (z=0.0)
+    // 2. Bottom Base (-Y normal in world space: z=0.0)
     push_face(
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
         [0.0, 1.0, 0.0],
         [1.0, 1.0, 0.0],
-        [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
         norm_bottom,
     );
-    // 3. Front Wall (y=0.0)
+    // 3. Front Wall (-Z normal in world space: y=0.0)
     push_face(
         [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
         [0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0],
         [1.0, 0.0, 1.0],
         norm_front,
     );
-    // 4. Back Wall (y=1.0)
+    // 4. Back Wall (+Z normal in world space: y=1.0)
     push_face(
-        [0.0, 1.0, 1.0],
-        [1.0, 1.0, 1.0],
         [0.0, 1.0, 0.0],
         [1.0, 1.0, 0.0],
+        [0.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
         norm_back,
     );
-    // 5. Left Wall (x=0.0)
+    // 5. Left Wall (-X normal in world space: x=0.0)
     push_face(
         [0.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0],
         [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
         [0.0, 1.0, 1.0],
         norm_left,
     );
-    // 6. Right Wall (x=1.0)
+    // 6. Right Wall (+X normal in world space: x=1.0)
     push_face(
-        [1.0, 0.0, 1.0],
         [1.0, 0.0, 0.0],
-        [1.0, 1.0, 1.0],
+        [1.0, 0.0, 1.0],
         [1.0, 1.0, 0.0],
+        [1.0, 1.0, 1.0],
         norm_right,
     );
 

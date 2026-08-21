@@ -52,6 +52,7 @@ pub struct SurfaceUniforms {
 
 pub struct SurfaceRenderer {
     render_pipeline: wgpu::RenderPipeline,
+    voxel_pipeline: wgpu::RenderPipeline,
     quad_vertex_buffer: wgpu::Buffer,
     quad_index_buffer: wgpu::Buffer,
     cube_vertex_buffer: wgpu::Buffer,
@@ -159,6 +160,41 @@ impl SurfaceRenderer {
             cache: None,
         });
 
+        // Dedicated pipeline for 3D Lego Cubes with hardware backface culling
+        let voxel_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Surface Voxel Render Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[Some(SurfaceVertex::desc())],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: target_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                cull_mode: Some(wgpu::Face::Back),
+                front_face: wgpu::FrontFace::Ccw,
+                ..Default::default()
+            },
+            depth_stencil: Some(super::common::default_depth_stencil_state(
+                true,
+                wgpu::CompareFunction::LessEqual,
+            )),
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+
         // 1. Instanced Unit Quad Template for Smooth Terrain and Flat Steps
         let (quad_vertices, quad_indices) = Self::build_unit_quad();
         let quad_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -187,6 +223,7 @@ impl SurfaceRenderer {
 
         Self {
             render_pipeline,
+            voxel_pipeline,
             quad_vertex_buffer,
             quad_index_buffer,
             cube_vertex_buffer,
@@ -302,11 +339,10 @@ impl eframe::egui_wgpu::CallbackTrait for SurfaceCallback {
             return;
         }
 
-        rpass.set_pipeline(&self.renderer.render_pipeline);
-        rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
-
         if self.surface_mode == 2 {
-            // Mode 2: 3D Lego Cubes (GPU Instanced Unit Cube Draw)
+            // Mode 2: 3D Lego Cubes (Dedicated pipeline with hardware backface culling)
+            rpass.set_pipeline(&self.renderer.voxel_pipeline);
+            rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
             rpass.set_vertex_buffer(0, self.renderer.cube_vertex_buffer.slice(..));
             rpass.set_index_buffer(
                 self.renderer.cube_index_buffer.slice(..),
@@ -314,7 +350,9 @@ impl eframe::egui_wgpu::CallbackTrait for SurfaceCallback {
             );
             rpass.draw_indexed(0..36, 0, 0..self.renderer.num_instances);
         } else {
-            // Mode 0 (Smooth Terrain) & Mode 1 (Flat Steps) - GPU Instanced Unit Quad Draw
+            // Mode 0 (Smooth Terrain) & Mode 1 (Flat Steps) - Two-Sided GPU Instanced Unit Quad Draw
+            rpass.set_pipeline(&self.renderer.render_pipeline);
+            rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
             rpass.set_vertex_buffer(0, self.renderer.quad_vertex_buffer.slice(..));
             rpass.set_index_buffer(
                 self.renderer.quad_index_buffer.slice(..),
