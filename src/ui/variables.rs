@@ -106,11 +106,11 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
                                     let label_text = if let Some(units) = &var_info.units {
                                         format!(
-                                            "{}  [{}] ({})",
-                                            var_info.name, var_info.data_type, units
+                                            "{}  ({})",
+                                            var_info.name, units
                                         )
                                     } else {
-                                        format!("{}  [{}]", var_info.name, var_info.data_type)
+                                        format!("{}", var_info.name)
                                     };
 
                                     if ui
