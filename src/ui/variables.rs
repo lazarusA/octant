@@ -110,7 +110,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                             var_info.name, units
                                         )
                                     } else {
-                                        format!("{}", var_info.name)
+                                        var_info.name.to_string()
                                     };
 
                                     if ui
