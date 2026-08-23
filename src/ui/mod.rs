@@ -1,3 +1,4 @@
+pub mod about;
 pub mod animation;
 pub mod axes;
 pub mod bottom_bar;
