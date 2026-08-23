@@ -620,4 +620,40 @@ impl OctantApp {
             .copied()
             .unwrap_or(1) as usize
     }
+
+    /// Checks if a dataset matching `target` (by URI, ID, or display name) is already in `dataset_manager`.
+    /// If found and it has metadata, activates it and opens the variables overlay.
+    pub fn try_activate_dataset(&mut self, target: &str) -> bool {
+        let input_target = target.trim();
+        if input_target.is_empty() {
+            return false;
+        }
+
+        let existing = self
+            .dataset_manager
+            .iter()
+            .find(|d| {
+                d.source.uri == input_target
+                    || d.id == input_target
+                    || d.source.display_name == input_target
+            })
+            .cloned();
+
+        if let Some(dataset) = existing {
+            self.store_target_input = dataset.source.uri.clone();
+            self.selected_store_kind = StoreKind::from_data_source_kind(&dataset.source.kind);
+            if let Some(meta) = dataset.metadata {
+                self.status_message = format!(
+                    "Activated dataset '{}' (Found {} variables)",
+                    meta.name,
+                    meta.variables.len()
+                );
+                self.show_variables_overlay = true;
+                self.active_dataset_metadata = Some(meta);
+                self.selected_variable_idx = 0;
+                return true;
+            }
+        }
+        false
+    }
 }
