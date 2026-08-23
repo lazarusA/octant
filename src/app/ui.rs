@@ -24,6 +24,9 @@ impl eframe::App for OctantApp {
                             metadata.name,
                             metadata.variables.len()
                         );
+                        self.hero_state.loading = false;
+                        self.hero_state.loaded = true;
+                        self.hero_state.source_label = metadata.name.clone();
                         self.show_variables_overlay = true;
 
                         let source_id = self.selected_source_id();
@@ -43,8 +46,10 @@ impl eframe::App for OctantApp {
 
                         self.active_dataset_metadata = Some(metadata);
                         self.selected_variable_idx = 0;
+                        self.show_variables_overlay = true;
                     }
                     Err(err) => {
+                        self.hero_state.loading = false;
                         self.status_message = format!("Store inspect error: {}", err);
                     }
                 }
@@ -142,23 +147,51 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
+        let is_hero_active =
+            (self.matrix_data.is_none() && self.volume_data.is_none()) || self.show_hero;
+
         // 3. Render panels (each consumes space from the remaining area)
         crate::ui::top_bar::show_top_bar(self, ui);
-        crate::ui::store::show_left_panel(self, ui);
-        crate::ui::bottom_bar::show_bottom_bar(self, ui);
-        crate::ui::catalog::show_catalog_window(self, &ctx);
-        crate::ui::colorbar::show_colorbar_overlay(self, &ctx);
 
-        // After panels consume their space, the remaining rect is the canvas.
-        // Pass it to the overlays so they can anchor to the canvas left edge.
-        let canvas_rect = ui.available_rect_before_wrap();
-        crate::ui::variables::show_variables_overlay(self, &ctx, canvas_rect);
-        crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
-        crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
+        if self.show_left_panel {
+            crate::ui::store::show_left_panel(self, ui);
+        }
+
+        if !is_hero_active {
+            if self.show_bottom_bar {
+                crate::ui::bottom_bar::show_bottom_bar(self, ui);
+            }
+            crate::ui::catalog::show_catalog_window(self, &ctx);
+            if self.show_colorbar {
+                crate::ui::colorbar::show_colorbar_overlay(self, &ctx);
+            }
+
+            // After panels consume their space, the remaining rect is the canvas.
+            // Pass it to the overlays so they can anchor to the canvas left edge.
+            let canvas_rect = ui.available_rect_before_wrap();
+            crate::ui::variables::show_variables_overlay(self, &ctx, canvas_rect);
+            crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
+            crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
+        } else {
+            crate::ui::catalog::show_catalog_window(self, &ctx);
+            let canvas_rect = ui.available_rect_before_wrap();
+            crate::ui::variables::show_variables_overlay(self, &ctx, canvas_rect);
+            crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
+            crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
+        }
 
         // 4. Drawing Canvas Area with Aspect Data Ratio
         {
             let canvas_rect = ui.available_rect_before_wrap();
+
+            // When no dataset is plotted or hero landing view is active, render the clean hero page
+            if is_hero_active {
+                let canvas_bg = ui.visuals().panel_fill;
+                ui.painter().rect_filled(canvas_rect, 0.0, canvas_bg);
+                crate::ui::hero::show_hero_landing(self, ui);
+                return;
+            }
+
             let response = ui.allocate_rect(canvas_rect, egui::Sense::drag());
 
             let canvas_bg = ui.style().visuals.panel_fill;

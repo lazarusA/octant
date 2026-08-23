@@ -7,9 +7,19 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
         .show(ui, |ui| {
             ui.add_space(2.0);
             ui.horizontal(|ui| {
-                // Octant Brand Header
-                octant_icon(ui, 24.0);
-                ui.label(egui::RichText::new("Octant").strong().heading());
+                // Octant Brand Header (clickable to toggle Hero / Landing view)
+                let brand_resp = ui
+                    .horizontal(|ui| {
+                        octant_icon(ui, 24.0);
+                        ui.label(egui::RichText::new("Octant").strong().heading());
+                    })
+                    .response
+                    .interact(egui::Sense::click())
+                    .on_hover_text("Toggle Hero / Landing View");
+
+                if brand_resp.clicked() {
+                    app.show_hero = !app.show_hero;
+                }
                 ui.separator();
 
                 // Dropdown menus: Store, Variables, Dimensions, Plot, Settings

@@ -29,6 +29,7 @@ impl OctantApp {
                 self.inspect_active_store();
             }
             AppAction::SelectVariable(idx) => {
+                self.show_hero = false;
                 self.selected_variable_idx = idx;
                 if let Some(meta) = self.active_dataset_metadata.clone()
                     && let Some(var_info) = meta.variables.get(idx).cloned()
