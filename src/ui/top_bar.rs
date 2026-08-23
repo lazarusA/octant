@@ -7,22 +7,24 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
         .show(ui, |ui| {
             ui.add_space(2.0);
             ui.horizontal(|ui| {
-                // Octant Brand Header (clickable to toggle Hero / Landing view)
-                let brand_resp = ui
-                    .horizontal(|ui| {
-                        let icon_resp = octant_icon(ui, 24.0);
-                        let label_resp = ui.add(
-                            egui::Label::new(egui::RichText::new("Octant").strong().heading())
-                                .sense(egui::Sense::click()),
-                        );
-                        icon_resp | label_resp
-                    })
-                    .inner
+                // Octant Brand Header (Icon toggles Hero / Landing view, Label triggers About window)
+                let icon_resp = octant_icon(ui, 24.0)
                     .on_hover_cursor(egui::CursorIcon::PointingHand)
                     .on_hover_text("Toggle Hero / Landing View");
-
-                if brand_resp.clicked() {
+                if icon_resp.clicked() {
                     app.show_hero = !app.show_hero;
+                }
+
+                let label_resp = ui
+                    .add(
+                        egui::Label::new(egui::RichText::new("Octant").strong().heading())
+                            .sense(egui::Sense::click()),
+                    )
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .on_hover_text("About Octant");
+
+                if label_resp.clicked() {
+                    app.show_about_window = !app.show_about_window;
                 }
                 ui.separator();
 
