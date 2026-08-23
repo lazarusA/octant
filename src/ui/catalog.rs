@@ -148,10 +148,8 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                                             egui::RichText::new("⚡ Select & Load").strong(),
                                         );
                                         if ui.add(btn).clicked() {
-                                            app.selected_store_kind = entry.store_kind;
-                                            app.store_target_input = trimmed_url.to_string();
+                                            app.submit_or_activate_source(trimmed_url, Some(entry.store_kind));
                                             should_close = true;
-                                            app.inspect_active_store();
                                         }
                                     });
                                 });

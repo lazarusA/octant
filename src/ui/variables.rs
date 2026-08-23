@@ -63,7 +63,8 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                             ui.add_space(6.0);
 
                                             if ui.button("🔍 Fetch / Load Store Metadata").clicked() {
-                                                app.inspect_active_store();
+                                                let target = app.store_target_input.clone();
+                                                app.submit_or_activate_source(&target, Some(app.selected_store_kind));
                                             }
 
                                             ui.add_space(10.0);

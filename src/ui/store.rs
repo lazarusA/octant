@@ -54,12 +54,10 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                             app.store_target_input = "./data/icechunk_repo".to_string();
                         }
                         StoreKind::ProceduralVolume4D => {
-                            app.store_target_input = "procedural://volume4d".to_string();
-                            app.inspect_active_store();
+                            app.submit_or_activate_source("procedural://volume4d", Some(StoreKind::ProceduralVolume4D));
                         }
                         StoreKind::ProceduralRandom => {
-                            app.store_target_input = "procedural://matrix2d".to_string();
-                            app.inspect_active_store();
+                            app.submit_or_activate_source("procedural://matrix2d", Some(StoreKind::ProceduralRandom));
                         }
                     }
                 }
@@ -68,13 +66,15 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.label(egui::RichText::new("Target URL / Path").strong());
                 let res = ui.text_edit_singleline(&mut app.store_target_input);
                 if res.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                    app.inspect_active_store();
+                    let target = app.store_target_input.clone();
+                    app.submit_or_activate_source(&target, Some(app.selected_store_kind));
                 }
 
                 ui.add_space(6.0);
                 let btn_label = if app.is_loading { "⏳ Loading..." } else { "⬇️ Load" };
                 if ui.add_enabled(!app.is_loading, egui::Button::new(egui::RichText::new(btn_label).strong())).clicked() {
-                    app.inspect_active_store();
+                    let target = app.store_target_input.clone();
+                    app.submit_or_activate_source(&target, Some(app.selected_store_kind));
                 }
 
                 ui.add_space(6.0);
@@ -96,7 +96,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                         ui.label(format!("Active Datasets: {}", app.dataset_manager.len()));
                         ui.add_space(4.0);
 
-                        let mut to_activate: Option<(String, StoreKind, Option<crate::data::DatasetMetadata>)> = None;
+                        let mut to_activate: Option<(String, StoreKind)> = None;
 
                         for d in app.dataset_manager.iter() {
                             let is_active = app.store_target_input == d.source.uri;
@@ -106,20 +106,12 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                                 to_activate = Some((
                                     d.source.uri.clone(),
                                     StoreKind::from_data_source_kind(&d.source.kind),
-                                    d.metadata.clone(),
                                 ));
                             }
                         }
 
-                        if let Some((uri, kind, metadata)) = to_activate {
-                            app.store_target_input = uri;
-                            app.selected_store_kind = kind;
-
-                            if let Some(meta) = metadata {
-                                self_activate_dataset_metadata(app, meta);
-                            } else {
-                                app.inspect_active_store();
-                            }
+                        if let Some((uri, kind)) = to_activate {
+                            app.submit_or_activate_source(&uri, Some(kind));
                         }
                     }
                     ui.separator();
@@ -144,15 +136,4 @@ pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     {
         app.show_left_panel = !app.show_left_panel;
     }
-}
-
-fn self_activate_dataset_metadata(app: &mut OctantApp, metadata: crate::data::DatasetMetadata) {
-    app.status_message = format!(
-        "Activated dataset '{}' (Found {} variables)",
-        metadata.name,
-        metadata.variables.len()
-    );
-    app.show_variables_overlay = true;
-    app.active_dataset_metadata = Some(metadata);
-    app.selected_variable_idx = 0;
 }
