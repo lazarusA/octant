@@ -176,9 +176,7 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         if !source_path.is_empty() {
             app.hero_state.input = source_path.clone();
-            app.hero_state.begin_submit(&source_path);
-            app.store_target_input = source_path;
-            app.inspect_active_store();
+            submit_or_activate_source(app, &source_path);
         }
     }
 
@@ -332,12 +330,29 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                         app.store_target_input.clone()
                     };
 
-                    app.hero_state.begin_submit(&input_target);
-                    app.store_target_input = input_target;
-                    app.inspect_active_store();
+                    submit_or_activate_source(app, &input_target);
                 }
             });
         });
+}
+
+fn submit_or_activate_source(app: &mut OctantApp, target: &str) {
+    let input_target = target.trim().to_string();
+    if input_target.is_empty() {
+        return;
+    }
+
+    if app.try_activate_dataset(&input_target) {
+        if let Some(meta) = &app.active_dataset_metadata {
+            app.hero_state.source_label = meta.name.clone();
+        }
+        app.hero_state.loaded = true;
+        app.hero_state.loading = false;
+    } else {
+        app.hero_state.begin_submit(&input_target);
+        app.store_target_input = input_target;
+        app.inspect_active_store();
+    }
 }
 
 // ---------------------------------------------------------------------
@@ -359,6 +374,7 @@ pub fn draw_octant_widget(
 
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
+        let is_dark = ui.visuals().dark_mode;
         let wire_color = ui.visuals().weak_text_color().gamma_multiply(0.40);
         let wire_stroke = egui::Stroke::new(0.8, wire_color);
 
@@ -452,7 +468,13 @@ pub fn draw_octant_widget(
             )
         };
 
-        let fill_stroke = egui::Stroke::new(1.0, base);
+        // Solid octant is black in light mode, off-white in dark mode.
+        // Only the edges of the octant have a muted stroke in light mode so facets remain distinct.
+        let fill_stroke = if is_dark {
+            egui::Stroke::new(1.0, base)
+        } else {
+            egui::Stroke::new(1.2, egui::Color32::from_rgb(170, 178, 190))
+        };
 
         painter.add(egui::Shape::convex_polygon(
             face_top,
