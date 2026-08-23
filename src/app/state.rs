@@ -238,6 +238,7 @@ pub struct OctantApp {
 
     // Catalog State
     pub show_catalog_window: bool,
+    pub show_about_window: bool,
     pub catalog_search_query: String,
     pub catalog_category_filter: crate::catalog::CatalogCategoryFilter,
 
@@ -367,6 +368,7 @@ impl Default for OctantApp {
             last_step_time: std::time::Instant::now(),
 
             show_catalog_window: false,
+            show_about_window: false,
             catalog_search_query: String::new(),
             catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
 
