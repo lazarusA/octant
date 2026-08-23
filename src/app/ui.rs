@@ -162,6 +162,7 @@ impl eframe::App for OctantApp {
                 crate::ui::bottom_bar::show_bottom_bar(self, ui);
             }
             crate::ui::catalog::show_catalog_window(self, &ctx);
+            crate::ui::about::show_about_window(self, &ctx);
             if self.show_colorbar {
                 crate::ui::colorbar::show_colorbar_overlay(self, &ctx);
             }
@@ -174,6 +175,7 @@ impl eframe::App for OctantApp {
             crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
         } else {
             crate::ui::catalog::show_catalog_window(self, &ctx);
+            crate::ui::about::show_about_window(self, &ctx);
             let canvas_rect = ui.available_rect_before_wrap();
             crate::ui::variables::show_variables_overlay(self, &ctx, canvas_rect);
             crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
@@ -712,5 +714,6 @@ impl OctantApp {
         self.show_variables_overlay = false;
         self.show_variable_controls = false;
         self.show_catalog_window = false;
+        self.show_about_window = false;
     }
 }
