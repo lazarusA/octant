@@ -197,13 +197,14 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.add_space(28.0);
         intake_row(ui, app);
 
-        ui.add_space(14.0);
-        ui.label(
-            egui::RichText::new("Drop a file anywhere")
-                .monospace()
-                .size(11.5)
-                .color(ui.visuals().weak_text_color()),
-        );
+        // File drag-and-drop hint commented out until feature is supported
+        // ui.add_space(14.0);
+        // ui.label(
+        //     egui::RichText::new("Drop a file anywhere")
+        //         .monospace()
+        //         .size(11.5)
+        //         .color(ui.visuals().weak_text_color()),
+        // );
 
         if app.is_loading || app.hero_state.loading {
             ui.add_space(20.0);
@@ -264,7 +265,7 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 let enter_pressed =
                     response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
-                // Procedural downward chevron button (clean on all platforms without glyph missing issues)
+                // Procedural download / load icon button
                 let btn_size = egui::vec2(28.0, 24.0);
                 let (btn_rect, btn_response) =
                     ui.allocate_exact_size(btn_size, egui::Sense::click());
@@ -279,28 +280,49 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                         egui::StrokeKind::Inside,
                     );
 
-                    let center = btn_rect.center();
-                    let stroke = btn_visuals.fg_stroke;
-                    let w = 4.0;
-                    let h = 2.5;
+                    let c = btn_rect.center();
+                    let stroke = egui::Stroke::new(1.3, btn_visuals.fg_stroke.color);
+
+                    // Downward arrow stem
+                    ui.painter().line_segment(
+                        [egui::pos2(c.x, c.y - 4.5), egui::pos2(c.x, c.y + 1.5)],
+                        stroke,
+                    );
+                    // Arrowhead wings
+                    ui.painter().line_segment(
+                        [egui::pos2(c.x - 3.2, c.y - 1.2), egui::pos2(c.x, c.y + 2.0)],
+                        stroke,
+                    );
+                    ui.painter().line_segment(
+                        [egui::pos2(c.x + 3.2, c.y - 1.2), egui::pos2(c.x, c.y + 2.0)],
+                        stroke,
+                    );
+                    // Load / tray bracket bottom
                     ui.painter().line_segment(
                         [
-                            egui::pos2(center.x - w, center.y - h),
-                            egui::pos2(center.x, center.y + h),
+                            egui::pos2(c.x - 4.8, c.y + 3.5),
+                            egui::pos2(c.x - 4.8, c.y + 5.2),
                         ],
                         stroke,
                     );
                     ui.painter().line_segment(
                         [
-                            egui::pos2(center.x, center.y + h),
-                            egui::pos2(center.x + w, center.y - h),
+                            egui::pos2(c.x - 4.8, c.y + 5.2),
+                            egui::pos2(c.x + 4.8, c.y + 5.2),
+                        ],
+                        stroke,
+                    );
+                    ui.painter().line_segment(
+                        [
+                            egui::pos2(c.x + 4.8, c.y + 5.2),
+                            egui::pos2(c.x + 4.8, c.y + 3.5),
                         ],
                         stroke,
                     );
                 }
 
                 let go_clicked = btn_response
-                    .on_hover_text("Inspect Store & Open Variables")
+                    .on_hover_text("Load Dataset & Open Variables")
                     .clicked();
 
                 if enter_pressed || go_clicked {
