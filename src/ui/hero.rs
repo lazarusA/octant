@@ -186,8 +186,11 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.vertical_centered(|ui| {
         ui.add_space((available_h * 0.14).max(16.0));
 
-        // Centered 3D Octant procedural widget
-        draw_octant_widget(ui, 140.0, filled, extra_rot, extra_scale);
+        // Centered 3D Octant procedural widget (interactive click to hop)
+        let octant_resp = draw_octant_widget(ui, 140.0, filled, extra_rot, extra_scale);
+        if octant_resp.on_hover_text("Click to hop octant").clicked() {
+            app.hero_state.start_hop(Duration::from_millis(350));
+        }
 
         ui.add_space(22.0);
         header_title(ui);
@@ -195,14 +198,8 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.add_space(28.0);
         intake_row(ui, app);
 
-        // File drag-and-drop hint commented out until feature is supported
-        // ui.add_space(14.0);
-        // ui.label(
-        //     egui::RichText::new("Drop a file anywhere")
-        //         .monospace()
-        //         .size(11.5)
-        //         .color(ui.visuals().weak_text_color()),
-        // );
+        ui.add_space(14.0);
+        sample_pills_row(ui, app);
 
         if app.is_loading || app.hero_state.loading {
             ui.add_space(20.0);
@@ -271,15 +268,48 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
         .show(ui, |ui| {
             ui.set_width(420.0);
             ui.horizontal(|ui| {
+                let has_input = !app.hero_state.input.trim().is_empty();
+                let right_reserve = if has_input { 58.0 } else { 36.0 };
+
                 let edit = egui::TextEdit::singleline(&mut app.hero_state.input)
                     .hint_text("URL, path, file, or dataset…")
                     .font(egui::TextStyle::Monospace)
                     .frame(egui::Frame::NONE)
-                    .desired_width(ui.available_width() - 36.0);
+                    .desired_width(ui.available_width() - right_reserve);
                 let response = ui.add(edit);
 
                 let enter_pressed =
                     response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+
+                if has_input {
+                    let clear_size = egui::vec2(18.0, 18.0);
+                    let (clear_rect, clear_resp) =
+                        ui.allocate_exact_size(clear_size, egui::Sense::click());
+
+                    if ui.is_rect_visible(clear_rect) {
+                        let is_hovered = clear_resp.hovered();
+                        let color = if is_hovered {
+                            ui.visuals().strong_text_color()
+                        } else {
+                            ui.visuals().weak_text_color().gamma_multiply(0.65)
+                        };
+                        let stroke = egui::Stroke::new(1.2, color);
+                        let c = clear_rect.center();
+                        let r = 3.5_f32;
+                        ui.painter().line_segment(
+                            [egui::pos2(c.x - r, c.y - r), egui::pos2(c.x + r, c.y + r)],
+                            stroke,
+                        );
+                        ui.painter().line_segment(
+                            [egui::pos2(c.x - r, c.y + r), egui::pos2(c.x + r, c.y - r)],
+                            stroke,
+                        );
+                    }
+
+                    if clear_resp.on_hover_text("Clear input").clicked() {
+                        app.hero_state.input.clear();
+                    }
+                }
 
                 // Procedural download / load icon button
                 let btn_size = egui::vec2(28.0, 24.0);
@@ -354,6 +384,111 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
         });
 }
 
+fn sample_pills_row(ui: &mut egui::Ui, app: &mut OctantApp) {
+    let is_dark = ui.visuals().dark_mode;
+
+    let samples: [(&str, &str, egui::Color32, egui::Color32); 2] = [
+        (
+            "🔥 SeasFire",
+            "https://s3.bgc-jena.mpg.de:9000/misc/seasfire_rechunked.zarr",
+            egui::Color32::from_rgb(255, 140, 70), // amber
+            egui::Color32::from_rgba_unmultiplied(255, 140, 70, 24),
+        ),
+        (
+            "🎲 Procedural 4D",
+            "procedural://volume4d",
+            if is_dark {
+                egui::Color32::from_rgb(222, 228, 238)
+            } else {
+                egui::Color32::from_rgb(70, 76, 88)
+            }, // white-ish / neutral
+            if is_dark {
+                egui::Color32::from_rgba_unmultiplied(222, 228, 238, 22)
+            } else {
+                egui::Color32::from_rgba_unmultiplied(70, 76, 88, 16)
+            },
+        ),
+        // (
+        //     "🧊 Icechunk AIFS",
+        //     "https://dynamical-ecmwf-aifs-single.s3.us-west-2.amazonaws.com/ecmwf-aifs-single-forecast/v0.1.0.icechunk/",
+        //     egui::Color32::from_rgb(85, 172, 248),
+        //     egui::Color32::from_rgba_unmultiplied(85, 172, 248, 24),
+        // ),
+    ];
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 8.0;
+
+        let total_w: f32 = samples
+            .iter()
+            .map(|(label, _, _, _)| {
+                let galley = ui.painter().layout_no_wrap(
+                    label.to_string(),
+                    egui::FontId::monospace(11.5),
+                    egui::Color32::WHITE,
+                );
+                galley.size().x + 20.0
+            })
+            .sum::<f32>()
+            + ((samples.len() - 1) as f32 * 8.0);
+
+        let pad = ((ui.available_width() - total_w) * 0.5).max(0.0);
+        if pad > 0.0 {
+            ui.add_space(pad);
+        }
+
+        for (label, uri, text_color, bg_color) in samples {
+            let resp = render_pill_button(ui, label, text_color, bg_color);
+            if resp.clicked() {
+                app.hero_state.input = uri.to_string();
+                submit_or_activate_source(app, uri);
+            }
+        }
+    });
+}
+
+fn render_pill_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    text_color: egui::Color32,
+    bg_color: egui::Color32,
+) -> egui::Response {
+    let font_id = egui::FontId::monospace(11.5);
+    let galley = ui
+        .painter()
+        .layout_no_wrap(label.to_string(), font_id, text_color);
+    let padding = egui::vec2(16.0, 7.0);
+    let desired_size = galley.size() + padding;
+
+    let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+    if ui.is_rect_visible(rect) {
+        let is_hovered = response.hovered();
+        let current_bg = if is_hovered {
+            bg_color.gamma_multiply(1.8)
+        } else {
+            bg_color
+        };
+        let border_stroke = if is_hovered {
+            egui::Stroke::new(1.0, text_color.gamma_multiply(0.85))
+        } else {
+            egui::Stroke::new(0.8, text_color.gamma_multiply(0.35))
+        };
+
+        ui.painter().rect(
+            rect,
+            12.0,
+            current_bg,
+            border_stroke,
+            egui::StrokeKind::Inside,
+        );
+
+        let text_pos = rect.center() - galley.size() * 0.5;
+        ui.painter().galley(text_pos, galley, text_color);
+    }
+
+    response.on_hover_text(format!("Load sample: {}", label))
+}
+
 fn submit_or_activate_source(app: &mut OctantApp, target: &str) {
     let input_target = target.trim().to_string();
     if input_target.is_empty() {
@@ -368,7 +503,21 @@ fn submit_or_activate_source(app: &mut OctantApp, target: &str) {
         app.hero_state.loading = false;
     } else {
         app.hero_state.begin_submit(&input_target);
-        app.store_target_input = input_target;
+        app.store_target_input = input_target.clone();
+        if input_target == "procedural://volume4d" {
+            app.selected_store_kind = crate::app::StoreKind::ProceduralVolume4D;
+        } else if input_target == "procedural://matrix" || input_target == "procedural://random" {
+            app.selected_store_kind = crate::app::StoreKind::ProceduralRandom;
+        } else if input_target.starts_with("http://")
+            || input_target.starts_with("https://")
+            || input_target.starts_with("s3://")
+        {
+            if input_target.to_lowercase().contains("icechunk") {
+                app.selected_store_kind = crate::app::StoreKind::RemoteIcechunk;
+            } else {
+                app.selected_store_kind = crate::app::StoreKind::RemoteZarr;
+            }
+        }
         app.inspect_active_store();
     }
 }
@@ -388,7 +537,7 @@ pub fn draw_octant_widget(
     extra_rot: f32,
     extra_scale: f32,
 ) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
 
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
