@@ -18,6 +18,40 @@ pub fn compute_finite_min_max(values: &[f32]) -> (f32, f32) {
     }
 }
 
+/// Linearly interpolates between two 3D points `a` and `b` by factor `t`.
+#[inline]
+pub fn lerp3(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
+    [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t,
+    ]
+}
+
+/// Standard cubic ease-in-out curve for smooth procedural transitions.
+#[inline]
+pub fn ease_in_out_cubic(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    if t < 0.5 {
+        4.0 * t * t * t
+    } else {
+        1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
+    }
+}
+
+/// Fast non-cryptographic PRNG (xorshift64) returning a pseudo-random `f32` in `[0.0, 1.0)`.
+pub fn xorshift64_f32(seed: &mut u64) -> f32 {
+    let mut x = *seed;
+    if x == 0 {
+        x = 0x853c49e6748fea9b;
+    }
+    x ^= x << 13;
+    x ^= x >> 7;
+    x ^= x << 17;
+    *seed = x;
+    ((x & 0x00ff_ffff) as f32) / (0x0100_0000 as f32)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -32,5 +66,39 @@ mod tests {
 
         let nans = vec![f32::NAN, f32::INFINITY];
         assert_eq!(compute_finite_min_max(&nans), (0.0, 1.0));
+    }
+
+    #[test]
+    fn test_lerp3() {
+        let a = [0.0, 10.0, -5.0];
+        let b = [10.0, 20.0, 5.0];
+        assert_eq!(lerp3(a, b, 0.0), a);
+        assert_eq!(lerp3(a, b, 1.0), b);
+        assert_eq!(lerp3(a, b, 0.5), [5.0, 15.0, 0.0]);
+    }
+
+    #[test]
+    fn test_ease_in_out_cubic() {
+        assert_eq!(ease_in_out_cubic(0.0), 0.0);
+        assert_eq!(ease_in_out_cubic(1.0), 1.0);
+        assert_eq!(ease_in_out_cubic(0.5), 0.5);
+        assert!(ease_in_out_cubic(0.25) < 0.25); // slow start
+        assert!(ease_in_out_cubic(0.75) > 0.75); // fast middle, decelerating end
+    }
+
+    #[test]
+    fn test_xorshift64_f32() {
+        let mut seed = 0x123456789abcdef0;
+        let v1 = xorshift64_f32(&mut seed);
+        let v2 = xorshift64_f32(&mut seed);
+        assert!((0.0..1.0).contains(&v1));
+        assert!((0.0..1.0).contains(&v2));
+        assert_ne!(v1, v2);
+
+        // Seed 0 fallback
+        let mut zero_seed = 0;
+        let vz = xorshift64_f32(&mut zero_seed);
+        assert!((0.0..1.0).contains(&vz));
+        assert_ne!(zero_seed, 0);
     }
 }

@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use crate::app::OctantApp;
+use crate::utils::{ease_in_out_cubic, lerp3, xorshift64_f32};
 
 // ---------------------------------------------------------------------
 // The 8 octants, visited in Gray-code order so every hop moves to a
@@ -17,38 +18,6 @@ pub const SEQUENCE: [[f32; 3]; 8] = [
     [0.0, -1.0, 0.0],
     [-1.0, -1.0, 0.0],
 ];
-
-#[inline]
-pub fn lerp3(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
-    [
-        a[0] + (b[0] - a[0]) * t,
-        a[1] + (b[1] - a[1]) * t,
-        a[2] + (b[2] - a[2]) * t,
-    ]
-}
-
-#[inline]
-pub fn ease_in_out_cubic(t: f32) -> f32 {
-    if t < 0.5 {
-        4.0 * t * t * t
-    } else {
-        1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
-    }
-}
-
-/// Fast non-cryptographic PRNG (xorshift64) to generate idle wander pauses
-/// without pulling external dependencies.
-fn pseudo_random_f32(seed: &mut u64) -> f32 {
-    let mut x = *seed;
-    if x == 0 {
-        x = 0x853c49e6748fea9b;
-    }
-    x ^= x << 13;
-    x ^= x >> 7;
-    x ^= x << 17;
-    *seed = x;
-    ((x & 0x00ff_ffff) as f32) / (0x0100_0000 as f32)
-}
 
 // ---------------------------------------------------------------------
 // Hero State
@@ -111,7 +80,7 @@ impl HeroState {
     }
 
     pub fn schedule_next_wander(&mut self) {
-        let r = pseudo_random_f32(&mut self.rng_seed);
+        let r = xorshift64_f32(&mut self.rng_seed);
         let delay = 8.0 + r * 7.0; // 8.0 to 15.0 seconds
         self.next_hop_at = Instant::now() + Duration::from_secs_f32(delay);
     }
@@ -272,7 +241,7 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 let right_reserve = if has_input { 58.0 } else { 36.0 };
 
                 let edit = egui::TextEdit::singleline(&mut app.hero_state.input)
-                    .hint_text("URL, path, file, or dataset…")
+                    .hint_text("https://… (.zarr / .icechunk), or local path…")
                     .font(egui::TextStyle::Monospace)
                     .frame(egui::Frame::NONE)
                     .desired_width(ui.available_width() - right_reserve);
@@ -517,6 +486,10 @@ fn submit_or_activate_source(app: &mut OctantApp, target: &str) {
             } else {
                 app.selected_store_kind = crate::app::StoreKind::RemoteZarr;
             }
+        } else if input_target.to_lowercase().contains("icechunk") {
+            app.selected_store_kind = crate::app::StoreKind::LocalIcechunk;
+        } else {
+            app.selected_store_kind = crate::app::StoreKind::LocalZarr;
         }
         app.inspect_active_store();
     }
