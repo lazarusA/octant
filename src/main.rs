@@ -18,7 +18,7 @@ fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1150.0, 720.0])
-            .with_title("Octant — Interactive Visualization of n-dimensional datasets"),
+            .with_title("Octant: N-dimensional Data Explorer"),
         depth_buffer: 32,
         ..Default::default()
     };
