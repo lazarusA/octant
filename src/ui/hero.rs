@@ -3,50 +3,6 @@ use std::time::{Duration, Instant};
 use crate::app::OctantApp;
 
 // ---------------------------------------------------------------------
-// Color Tokens
-// ---------------------------------------------------------------------
-
-#[inline]
-pub fn accent_color() -> egui::Color32 {
-    egui::Color32::from_rgb(255, 139, 71) // warm amber
-}
-
-#[inline]
-pub fn panel_fill_color() -> egui::Color32 {
-    egui::Color32::from_rgb(10, 13, 18)
-}
-
-#[inline]
-pub fn card_fill_color() -> egui::Color32 {
-    egui::Color32::from_rgb(16, 20, 28)
-}
-
-#[inline]
-pub fn card_hover_color() -> egui::Color32 {
-    egui::Color32::from_rgb(20, 25, 34)
-}
-
-#[inline]
-pub fn text_primary_color() -> egui::Color32 {
-    egui::Color32::from_rgb(233, 236, 241)
-}
-
-#[inline]
-pub fn text_secondary_color() -> egui::Color32 {
-    egui::Color32::from_gray(124)
-}
-
-#[inline]
-pub fn text_dim_color() -> egui::Color32 {
-    egui::Color32::from_gray(74)
-}
-
-#[inline]
-pub fn border_subtle_color() -> egui::Color32 {
-    egui::Color32::from_gray(40)
-}
-
-// ---------------------------------------------------------------------
 // The 8 octants, visited in Gray-code order so every hop moves to a
 // face-adjacent neighbor (exactly one axis flips per step).
 // ---------------------------------------------------------------------
@@ -134,19 +90,12 @@ impl Default for HeroState {
 }
 
 impl HeroState {
-    pub fn begin_submit(&mut self, source_override: Option<&str>) {
+    pub fn begin_submit(&mut self, source_name: &str) {
         if self.loading {
             return;
         }
 
-        self.source_label = if let Some(src) = source_override {
-            src.to_owned()
-        } else if self.input.trim().is_empty() {
-            "demo_dataset.nc".to_owned()
-        } else {
-            self.input.trim().to_owned()
-        };
-
+        self.source_label = source_name.trim().to_owned();
         self.loading = true;
         self.loaded = false;
         self.hops_left = 5;
@@ -167,8 +116,8 @@ impl HeroState {
         self.next_hop_at = Instant::now() + Duration::from_secs_f32(delay);
     }
 
-    /// Advance animation physics and return (filled_corner, extra_rot, extra_scale, skip_from, skip_to).
-    pub fn update_animation(&mut self, now: Instant) -> ([f32; 3], f32, f32, [f32; 3], [f32; 3]) {
+    /// Advance animation physics and return (filled_corner, extra_rot, extra_scale).
+    pub fn update_animation(&mut self, now: Instant) -> ([f32; 3], f32, f32) {
         if let Some(start) = self.anim_start {
             let dur_secs = self.anim_duration.as_secs_f32().max(0.001);
             let t = now.duration_since(start).as_secs_f32() / dur_secs;
@@ -190,37 +139,19 @@ impl HeroState {
                     self.schedule_next_wander();
                 }
 
-                (
-                    SEQUENCE[self.current],
-                    0.0,
-                    1.0,
-                    self.anim_from,
-                    self.anim_to,
-                )
+                (SEQUENCE[self.current], 0.0, 1.0)
             } else {
                 let eased = ease_in_out_cubic(t.clamp(0.0, 1.0));
                 let f = lerp3(self.anim_from, self.anim_to, eased);
                 // gentle scale-down/up + slight rotation while it's in transit
                 let wobble = (std::f32::consts::PI * t).sin();
-                (
-                    f,
-                    wobble * 0.16,
-                    1.0 - wobble * 0.09,
-                    self.anim_from,
-                    self.anim_to,
-                )
+                (f, wobble * 0.16, 1.0 - wobble * 0.09)
             }
         } else {
             if !self.loading && now >= self.next_hop_at {
                 self.start_hop(Duration::from_millis(1700));
             }
-            (
-                SEQUENCE[self.current],
-                0.0,
-                1.0,
-                self.anim_from,
-                self.anim_to,
-            )
+            (SEQUENCE[self.current], 0.0, 1.0)
         }
     }
 }
@@ -229,10 +160,10 @@ impl HeroState {
 // Hero Landing UI Rendering
 // ---------------------------------------------------------------------
 
-/// Render the complete Hero Landing page inside the allocated UI region.
+/// Render the clean, centered Hero Landing page.
 pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
     let now = Instant::now();
-    let (filled, extra_rot, extra_scale, anim_from, anim_to) = app.hero_state.update_animation(now);
+    let (filled, extra_rot, extra_scale) = app.hero_state.update_animation(now);
 
     // Keep animating smoothly at 60 FPS while wandering or loading.
     ui.ctx().request_repaint_after(Duration::from_millis(16));
@@ -245,21 +176,28 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         if !source_path.is_empty() {
             app.hero_state.input = source_path.clone();
-            app.hero_state.begin_submit(Some(&source_path));
+            app.hero_state.begin_submit(&source_path);
             app.store_target_input = source_path;
             app.inspect_active_store();
         }
     }
 
-    // Main centered composition (upper-middle positioning)
+    // Main centered composition with procedural cube, title, and intake
     let available_h = ui.available_height();
-    ui.add_space(available_h * 0.22);
 
     ui.vertical_centered(|ui| {
+        ui.add_space((available_h * 0.14).max(16.0));
+
+        // Centered 3D Octant procedural widget
+        draw_octant_widget(ui, 140.0, filled, extra_rot, extra_scale);
+
+        ui.add_space(22.0);
         header_title(ui);
-        ui.add_space(36.0);
+
+        ui.add_space(28.0);
         intake_row(ui, app);
-        ui.add_space(18.0);
+
+        ui.add_space(14.0);
         ui.label(
             egui::RichText::new("Drop a file anywhere")
                 .monospace()
@@ -267,66 +205,38 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .color(ui.visuals().weak_text_color()),
         );
 
-        if app.hero_state.loaded {
-            ui.add_space(28.0);
+        if app.is_loading || app.hero_state.loading {
+            ui.add_space(20.0);
+            let label = if !app.hero_state.source_label.is_empty() {
+                format!("● loading — {}", app.hero_state.source_label)
+            } else {
+                "● loading...".to_string()
+            };
+            ui.label(
+                egui::RichText::new(label)
+                    .monospace()
+                    .size(12.0)
+                    .color(ui.visuals().weak_text_color()),
+            );
+        } else if app.hero_state.loaded && !app.hero_state.source_label.is_empty() {
+            ui.add_space(20.0);
             ui.label(
                 egui::RichText::new(format!("● loaded — {}", app.hero_state.source_label))
                     .monospace()
                     .size(12.0)
-                    .color(accent_color()),
-            );
-        } else if app.is_loading {
-            ui.add_space(28.0);
-            ui.label(
-                egui::RichText::new(format!(
-                    "● inspecting store — {}",
-                    app.hero_state.source_label
-                ))
-                .monospace()
-                .size(12.0)
-                .color(accent_color()),
+                    .color(ui.visuals().text_color()),
             );
         }
     });
-
-    // Anchored animated octant logo in the bottom-right corner
-    egui::Area::new(egui::Id::new("octant_hero_logo_widget"))
-        .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-32.0, -32.0))
-        .show(ui.ctx(), |ui| {
-            let skip = [anim_from, anim_to];
-            draw_octant_widget(
-                ui,
-                220.0,
-                filled,
-                &skip,
-                accent_color(),
-                extra_rot,
-                extra_scale,
-            );
-        });
 }
 
 fn header_title(ui: &mut egui::Ui) {
-    let is_dark = ui.visuals().dark_mode;
     let mut job = egui::text::LayoutJob::default();
     job.append(
-        "OCTANT",
+        "N-DIMENSIONAL DATA EXPLORER",
         0.0,
         egui::TextFormat {
-            font_id: egui::FontId::proportional(16.0),
-            color: if is_dark {
-                egui::Color32::from_rgb(233, 236, 241)
-            } else {
-                egui::Color32::from_rgb(20, 24, 33)
-            },
-            ..Default::default()
-        },
-    );
-    job.append(
-        ": N-Dimensional Data Explorer",
-        0.0,
-        egui::TextFormat {
-            font_id: egui::FontId::monospace(16.0),
+            font_id: egui::FontId::monospace(14.0),
             color: ui.visuals().weak_text_color(),
             ..Default::default()
         },
@@ -336,21 +246,9 @@ fn header_title(ui: &mut egui::Ui) {
 }
 
 fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
-    let is_dark = ui.visuals().dark_mode;
-    let card_bg = if is_dark {
-        egui::Color32::from_rgb(16, 20, 28)
-    } else {
-        egui::Color32::from_rgb(244, 246, 250)
-    };
-    let border_color = if is_dark {
-        egui::Color32::from_gray(40)
-    } else {
-        egui::Color32::from_gray(210)
-    };
-
     egui::Frame::default()
-        .fill(card_bg)
-        .stroke(egui::Stroke::new(1.0, border_color))
+        .fill(ui.visuals().extreme_bg_color)
+        .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
         .corner_radius(8.0)
         .inner_margin(egui::Margin::symmetric(14, 6))
         .show(ui, |ui| {
@@ -360,30 +258,60 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                     .hint_text("URL, path, file, or dataset…")
                     .font(egui::TextStyle::Monospace)
                     .frame(egui::Frame::NONE)
-                    .desired_width(ui.available_width() - 40.0);
+                    .desired_width(ui.available_width() - 36.0);
                 let response = ui.add(edit);
 
                 let enter_pressed =
                     response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
-                let go_clicked = ui
-                    .add(
-                        egui::Button::new(
-                            egui::RichText::new("↓")
-                                .strong()
-                                .color(egui::Color32::BLACK),
-                        )
-                        .fill(accent_color()),
-                    )
+                // Procedural downward chevron button (clean on all platforms without glyph missing issues)
+                let btn_size = egui::vec2(28.0, 24.0);
+                let (btn_rect, btn_response) =
+                    ui.allocate_exact_size(btn_size, egui::Sense::click());
+
+                if ui.is_rect_visible(btn_rect) {
+                    let btn_visuals = ui.style().interact(&btn_response);
+                    ui.painter().rect(
+                        btn_rect,
+                        6.0,
+                        btn_visuals.bg_fill,
+                        btn_visuals.bg_stroke,
+                        egui::StrokeKind::Inside,
+                    );
+
+                    let center = btn_rect.center();
+                    let stroke = btn_visuals.fg_stroke;
+                    let w = 4.0;
+                    let h = 2.5;
+                    ui.painter().line_segment(
+                        [
+                            egui::pos2(center.x - w, center.y - h),
+                            egui::pos2(center.x, center.y + h),
+                        ],
+                        stroke,
+                    );
+                    ui.painter().line_segment(
+                        [
+                            egui::pos2(center.x, center.y + h),
+                            egui::pos2(center.x + w, center.y - h),
+                        ],
+                        stroke,
+                    );
+                }
+
+                let go_clicked = btn_response
                     .on_hover_text("Inspect Store & Open Variables")
                     .clicked();
 
                 if enter_pressed || go_clicked {
-                    let input_target = app.hero_state.input.trim().to_string();
-                    app.hero_state.begin_submit(None);
-                    if !input_target.is_empty() {
-                        app.store_target_input = input_target;
-                    }
+                    let input_target = if !app.hero_state.input.trim().is_empty() {
+                        app.hero_state.input.trim().to_string()
+                    } else {
+                        app.store_target_input.clone()
+                    };
+
+                    app.hero_state.begin_submit(&input_target);
+                    app.store_target_input = input_target;
                     app.inspect_active_store();
                 }
             });
@@ -393,21 +321,15 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
 // ---------------------------------------------------------------------
 // The Octant Widget (Core Procedural Isometric Renderer)
 //
-// Draws a big wireframe cube made of its 8 unit sub-cubes, with one
-// sub-cube ("the octant") filled solid. `filled` is its current corner
-// — usually one of the 8 grid corners, but can be a fractional point
-// in between while it's sliding from one to the next. `skip` hides the
-// wireframe outline at the corners currently in transit (its origin
-// and destination) so the moving solid piece doesn't overlap a wire
-// outline sitting in the same spot.
+// Draws a big wireframe cube made of all 8 unit sub-cubes, with one
+// full solid mini-cube ("the octant") touring all 8 positions.
+// All wireframe lines remain fully intact during transitions.
 // ---------------------------------------------------------------------
 
 pub fn draw_octant_widget(
     ui: &mut egui::Ui,
     size: f32,
     filled: [f32; 3],
-    skip: &[[f32; 3]],
-    accent: egui::Color32,
     extra_rot: f32,
     extra_scale: f32,
 ) -> egui::Response {
@@ -415,13 +337,8 @@ pub fn draw_octant_widget(
 
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
-        let is_dark = ui.visuals().dark_mode;
-        let wire_color = if is_dark {
-            egui::Color32::from_gray(90).gamma_multiply(0.55)
-        } else {
-            egui::Color32::from_gray(160).gamma_multiply(0.70)
-        };
-        let wire_stroke = egui::Stroke::new(0.9, wire_color);
+        let wire_color = ui.visuals().weak_text_color().gamma_multiply(0.40);
+        let wire_stroke = egui::Stroke::new(0.8, wire_color);
 
         let cos30 = 0.8660254_f32;
         let sin30 = 0.5_f32;
@@ -430,10 +347,11 @@ pub fn draw_octant_widget(
             egui::vec2((x - z) * cos30, (x + z) * sin30 - y)
         };
 
-        let scale = size / 4.4;
+        let scale = size / 4.2;
         let project =
             |x: f32, y: f32, z: f32| -> egui::Pos2 { rect.center() + iso(x, y, z) * scale };
 
+        // Draw all 8 wireframe cubes without skipping any lines
         let draw_wire_cube = |ix: f32, iy: f32, iz: f32| {
             let corners: [egui::Pos2; 8] = std::array::from_fn(|i| {
                 let dx = (i & 1) as f32;
@@ -463,19 +381,12 @@ pub fn draw_octant_widget(
         for ix in [-1.0_f32, 0.0] {
             for iy in [-1.0_f32, 0.0] {
                 for iz in [-1.0_f32, 0.0] {
-                    let hidden = skip.iter().any(|s| {
-                        (s[0] - ix).abs() < 0.01
-                            && (s[1] - iy).abs() < 0.01
-                            && (s[2] - iz).abs() < 0.01
-                    });
-                    if !hidden {
-                        draw_wire_cube(ix, iy, iz);
-                    }
+                    draw_wire_cube(ix, iy, iz);
                 }
             }
         }
 
-        // the moving, filled octant — wobble (rotate/scale) around its own center only
+        // Full solid moving mini-cube (the octant)
         let [fx, fy, fz] = filled;
         let anchor = project(fx + 0.5, fy + 0.5, fz + 0.5);
         let (s, c) = extra_rot.sin_cos();
@@ -486,50 +397,54 @@ pub fn draw_octant_widget(
         };
         let p = |dx: f32, dy: f32, dz: f32| wobble(project(fx + dx, fy + dy, fz + dz));
 
-        let outer = |v: f32| if v < -0.5 { 0.0 } else { 1.0 };
-        let (dxo, dyo, dzo) = (outer(fx), outer(fy), outer(fz));
+        // The 3 visible isometric faces of a unit cube:
+        // Top face (Y = 1 plane)
+        let face_top = vec![
+            p(0.0, 1.0, 0.0),
+            p(1.0, 1.0, 0.0),
+            p(1.0, 1.0, 1.0),
+            p(0.0, 1.0, 1.0),
+        ];
+        // Right face (X = 1 plane)
+        let face_right = vec![
+            p(1.0, 0.0, 0.0),
+            p(1.0, 1.0, 0.0),
+            p(1.0, 1.0, 1.0),
+            p(1.0, 0.0, 1.0),
+        ];
+        // Front-left face (Z = 1 plane)
+        let face_left = vec![
+            p(0.0, 0.0, 1.0),
+            p(1.0, 0.0, 1.0),
+            p(1.0, 1.0, 1.0),
+            p(0.0, 1.0, 1.0),
+        ];
 
-        let face_y = vec![
-            p(0.0, dyo, 0.0),
-            p(1.0, dyo, 0.0),
-            p(1.0, dyo, 1.0),
-            p(0.0, dyo, 1.0),
-        ];
-        let face_x = vec![
-            p(dxo, 0.0, 0.0),
-            p(dxo, 0.0, 1.0),
-            p(dxo, 1.0, 1.0),
-            p(dxo, 1.0, 0.0),
-        ];
-        let face_z = vec![
-            p(0.0, 0.0, dzo),
-            p(1.0, 0.0, dzo),
-            p(1.0, 1.0, dzo),
-            p(0.0, 1.0, dzo),
-        ];
-
+        let base = ui.visuals().strong_text_color();
         let shade = |c: egui::Color32, f: f32| {
-            egui::Color32::from_rgb(
-                (c.r() as f32 * f) as u8,
-                (c.g() as f32 * f) as u8,
-                (c.b() as f32 * f) as u8,
+            egui::Color32::from_rgba_unmultiplied(
+                ((c.r() as f32) * f).round() as u8,
+                ((c.g() as f32) * f).round() as u8,
+                ((c.b() as f32) * f).round() as u8,
+                c.a(),
             )
         };
-        let fill_stroke = egui::Stroke::new(0.9, accent);
+
+        let fill_stroke = egui::Stroke::new(1.0, base);
 
         painter.add(egui::Shape::convex_polygon(
-            face_y,
-            shade(accent, 1.0),
+            face_top,
+            shade(base, 1.0),
             fill_stroke,
         ));
         painter.add(egui::Shape::convex_polygon(
-            face_x,
-            shade(accent, 0.72),
+            face_right,
+            shade(base, 0.72),
             fill_stroke,
         ));
         painter.add(egui::Shape::convex_polygon(
-            face_z,
-            shade(accent, 0.5),
+            face_left,
+            shade(base, 0.52),
             fill_stroke,
         ));
     }
