@@ -232,7 +232,25 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
 fn header_title(ui: &mut egui::Ui) {
     let mut job = egui::text::LayoutJob::default();
     job.append(
-        "N-DIMENSIONAL DATA EXPLORER",
+        "Bring data into ",
+        0.0,
+        egui::TextFormat {
+            font_id: egui::FontId::monospace(14.0),
+            color: ui.visuals().weak_text_color(),
+            ..Default::default()
+        },
+    );
+    job.append(
+        "Octant",
+        0.0,
+        egui::TextFormat {
+            font_id: egui::FontId::monospace(14.0),
+            color: ui.visuals().strong_text_color(),
+            ..Default::default()
+        },
+    );
+    job.append(
+        ". Start exploring.",
         0.0,
         egui::TextFormat {
             font_id: egui::FontId::monospace(14.0),
