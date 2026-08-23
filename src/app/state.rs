@@ -243,6 +243,8 @@ pub struct OctantApp {
 
     // Panel Visibility State
     pub show_left_panel: bool,
+    pub show_hero: bool,
+    pub hero_state: crate::ui::hero::HeroState,
     pub show_variables_overlay: bool,
     pub show_settings_panel: bool,
     pub show_variable_controls: bool,
@@ -347,6 +349,8 @@ impl Default for OctantApp {
             show_colorbar: true,
             is_categorical: false,
             wgpu_render_state: None,
+            show_hero: true,
+            hero_state: crate::ui::hero::HeroState::default(),
 
             dataset_manager: crate::data::DatasetManager::new(),
             block_cache: crate::data::BlockCache::new(default_cache_mb * 1024 * 1024),
@@ -366,8 +370,8 @@ impl Default for OctantApp {
             catalog_search_query: String::new(),
             catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
 
-            show_left_panel: true,
-            show_variables_overlay: true,
+            show_left_panel: false,
+            show_variables_overlay: false,
             show_settings_panel: false,
             show_variable_controls: false,
             show_bottom_bar: true,
