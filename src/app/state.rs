@@ -426,23 +426,7 @@ impl OctantApp {
 
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(target) = std::env::args().nth(1) {
-            let kind = if target.starts_with("http://")
-                || target.starts_with("https://")
-                || target.starts_with("s3://")
-            {
-                if target.to_lowercase().contains("icechunk") {
-                    StoreKind::RemoteIcechunk
-                } else {
-                    StoreKind::RemoteZarr
-                }
-            } else if target.to_lowercase().contains("icechunk") {
-                StoreKind::LocalIcechunk
-            } else {
-                StoreKind::LocalZarr
-            };
-            app.selected_store_kind = kind;
-            app.store_target_input = target;
-            app.inspect_active_store();
+            app.submit_or_activate_source(&target, None);
         }
 
         app

@@ -145,7 +145,7 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         if !source_path.is_empty() {
             app.hero_state.input = source_path.clone();
-            submit_or_activate_source(app, &source_path);
+            app.submit_or_activate_source(&source_path, None);
         }
     }
 
@@ -347,7 +347,7 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                         app.store_target_input.clone()
                     };
 
-                    submit_or_activate_source(app, &input_target);
+                    app.submit_or_activate_source(&input_target, None);
                 }
             });
         });
@@ -377,12 +377,6 @@ fn sample_pills_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 egui::Color32::from_rgba_unmultiplied(70, 76, 88, 16)
             },
         ),
-        // (
-        //     "🧊 Icechunk AIFS",
-        //     "https://dynamical-ecmwf-aifs-single.s3.us-west-2.amazonaws.com/ecmwf-aifs-single-forecast/v0.1.0.icechunk/",
-        //     egui::Color32::from_rgb(85, 172, 248),
-        //     egui::Color32::from_rgba_unmultiplied(85, 172, 248, 24),
-        // ),
     ];
 
     ui.horizontal(|ui| {
@@ -410,7 +404,7 @@ fn sample_pills_row(ui: &mut egui::Ui, app: &mut OctantApp) {
             let resp = render_pill_button(ui, label, text_color, bg_color);
             if resp.clicked() {
                 app.hero_state.input = uri.to_string();
-                submit_or_activate_source(app, uri);
+                app.submit_or_activate_source(uri, None);
             }
         }
     });
@@ -456,43 +450,6 @@ fn render_pill_button(
     }
 
     response.on_hover_text(format!("Load sample: {}", label))
-}
-
-fn submit_or_activate_source(app: &mut OctantApp, target: &str) {
-    let input_target = target.trim().to_string();
-    if input_target.is_empty() {
-        return;
-    }
-
-    if app.try_activate_dataset(&input_target) {
-        if let Some(meta) = &app.active_dataset_metadata {
-            app.hero_state.source_label = meta.name.clone();
-        }
-        app.hero_state.loaded = true;
-        app.hero_state.loading = false;
-    } else {
-        app.hero_state.begin_submit(&input_target);
-        app.store_target_input = input_target.clone();
-        if input_target == "procedural://volume4d" {
-            app.selected_store_kind = crate::app::StoreKind::ProceduralVolume4D;
-        } else if input_target == "procedural://matrix" || input_target == "procedural://random" {
-            app.selected_store_kind = crate::app::StoreKind::ProceduralRandom;
-        } else if input_target.starts_with("http://")
-            || input_target.starts_with("https://")
-            || input_target.starts_with("s3://")
-        {
-            if input_target.to_lowercase().contains("icechunk") {
-                app.selected_store_kind = crate::app::StoreKind::RemoteIcechunk;
-            } else {
-                app.selected_store_kind = crate::app::StoreKind::RemoteZarr;
-            }
-        } else if input_target.to_lowercase().contains("icechunk") {
-            app.selected_store_kind = crate::app::StoreKind::LocalIcechunk;
-        } else {
-            app.selected_store_kind = crate::app::StoreKind::LocalZarr;
-        }
-        app.inspect_active_store();
-    }
 }
 
 // ---------------------------------------------------------------------
