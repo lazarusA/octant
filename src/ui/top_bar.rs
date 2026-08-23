@@ -83,22 +83,21 @@ fn octant_icon(ui: &mut egui::Ui, size: f32) -> egui::Response {
 
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
-        let stroke = egui::Stroke::new(0.6, ui.visuals().text_color().gamma_multiply(0.6));
+        let is_dark = ui.visuals().dark_mode;
+        let wire_color = ui.visuals().weak_text_color().gamma_multiply(0.40);
+        let wire_stroke = egui::Stroke::new(0.7, wire_color);
 
         let cos30 = 0.8660254_f32;
         let sin30 = 0.5_f32;
 
-        // Project a 3D point (x, y, z), each in [-1, 1], to a 2D offset.
-        // Origin (0,0,0) is the center of the whole 2x2x2 cube.
         let iso = |x: f32, y: f32, z: f32| -> egui::Vec2 {
             egui::vec2((x - z) * cos30, (x + z) * sin30 - y)
         };
 
-        let scale = size / 4.4;
+        let scale = size / 4.2;
         let project =
             |x: f32, y: f32, z: f32| -> egui::Pos2 { rect.center() + iso(x, y, z) * scale };
 
-        // Wireframe unit cube whose lower corner is at (ix, iy, iz), each -1 or 0.
         let draw_wire_cube = |ix: f32, iy: f32, iz: f32| {
             let corners: [egui::Pos2; 8] = std::array::from_fn(|i| {
                 let dx = (i & 1) as f32;
@@ -121,77 +120,74 @@ fn octant_icon(ui: &mut egui::Ui, size: f32) -> egui::Response {
                 (6, 7),
             ];
             for (a, b) in edges {
-                painter.line_segment([corners[a], corners[b]], stroke);
+                painter.line_segment([corners[a], corners[b]], wire_stroke);
             }
         };
 
-        // Filled unit cube: shade the 3 faces on its *outer* corner (away from the big cube's center),
-        // so the shape correctly reads regardless of which octant is filled.
-        let draw_filled_cube = |ix: f32, iy: f32, iz: f32| {
-            let p = |dx: f32, dy: f32, dz: f32| project(ix + dx, iy + dy, iz + dz);
-
-            let dx_outer = if ix < 0.0 { 0.0 } else { 1.0 };
-            let dy_outer = if iy < 0.0 { 0.0 } else { 1.0 };
-            let dz_outer = if iz < 0.0 { 0.0 } else { 1.0 };
-
-            let face_x = vec![
-                p(dx_outer, 0.0, 0.0),
-                p(dx_outer, 0.0, 1.0),
-                p(dx_outer, 1.0, 1.0),
-                p(dx_outer, 1.0, 0.0),
-            ];
-            let face_y = vec![
-                p(0.0, dy_outer, 0.0),
-                p(1.0, dy_outer, 0.0),
-                p(1.0, dy_outer, 1.0),
-                p(0.0, dy_outer, 1.0),
-            ];
-            let face_z = vec![
-                p(0.0, 0.0, dz_outer),
-                p(1.0, 0.0, dz_outer),
-                p(1.0, 1.0, dz_outer),
-                p(0.0, 1.0, dz_outer),
-            ];
-
-            let base = ui.visuals().strong_text_color();
-            let fill_stroke = egui::Stroke::new(0.6, base);
-            let shade = |c: egui::Color32, f: f32| {
-                egui::Color32::from_rgb(
-                    (c.r() as f32 * f) as u8,
-                    (c.g() as f32 * f) as u8,
-                    (c.b() as f32 * f) as u8,
-                )
-            };
-
-            painter.add(egui::Shape::convex_polygon(
-                face_y,
-                shade(base, 1.0),
-                fill_stroke,
-            ));
-            painter.add(egui::Shape::convex_polygon(
-                face_x,
-                shade(base, 0.7),
-                fill_stroke,
-            ));
-            painter.add(egui::Shape::convex_polygon(
-                face_z,
-                shade(base, 0.55),
-                fill_stroke,
-            ));
-        };
-
-        // Octant from (-1,-1,-1) to (0,0,0) is filled.
-        for ix in [-1.0, 0.0] {
-            for iy in [-1.0, 0.0] {
-                for iz in [-1.0, 0.0] {
-                    let is_filled = ix == -1.0 && iy == -1.0 && iz == -1.0;
-                    if !is_filled {
-                        draw_wire_cube(ix, iy, iz);
-                    }
+        // Draw all 8 wireframe cubes without skipping any lines
+        for ix in [-1.0_f32, 0.0] {
+            for iy in [-1.0_f32, 0.0] {
+                for iz in [-1.0_f32, 0.0] {
+                    draw_wire_cube(ix, iy, iz);
                 }
             }
         }
-        draw_filled_cube(-1.0, -1.0, -1.0); // drawn last so its edges stay crisp
+
+        // The filled octant at [-1.0, -1.0, -1.0]
+        let p = |dx: f32, dy: f32, dz: f32| project(-1.0 + dx, -1.0 + dy, -1.0 + dz);
+
+        let face_top = vec![
+            p(0.0, 1.0, 0.0),
+            p(1.0, 1.0, 0.0),
+            p(1.0, 1.0, 1.0),
+            p(0.0, 1.0, 1.0),
+        ];
+        let face_right = vec![
+            p(1.0, 0.0, 0.0),
+            p(1.0, 1.0, 0.0),
+            p(1.0, 1.0, 1.0),
+            p(1.0, 0.0, 1.0),
+        ];
+        let face_left = vec![
+            p(0.0, 0.0, 1.0),
+            p(1.0, 0.0, 1.0),
+            p(1.0, 1.0, 1.0),
+            p(0.0, 1.0, 1.0),
+        ];
+
+        let base = ui.visuals().strong_text_color();
+        let shade = |c: egui::Color32, f: f32| {
+            egui::Color32::from_rgba_unmultiplied(
+                ((c.r() as f32) * f).round() as u8,
+                ((c.g() as f32) * f).round() as u8,
+                ((c.b() as f32) * f).round() as u8,
+                c.a(),
+            )
+        };
+
+        // Solid octant is black in light mode, off-white in dark mode.
+        // In light mode, crisp panel-fill white seams separate the black facets cleanly.
+        let fill_stroke = if is_dark {
+            egui::Stroke::new(0.8, base)
+        } else {
+            egui::Stroke::new(1.0, ui.visuals().panel_fill)
+        };
+
+        painter.add(egui::Shape::convex_polygon(
+            face_top,
+            shade(base, 1.0),
+            fill_stroke,
+        ));
+        painter.add(egui::Shape::convex_polygon(
+            face_right,
+            shade(base, 0.72),
+            fill_stroke,
+        ));
+        painter.add(egui::Shape::convex_polygon(
+            face_left,
+            shade(base, 0.52),
+            fill_stroke,
+        ));
     }
 
     response
