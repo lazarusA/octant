@@ -24,11 +24,10 @@ impl OctantApp {
         match action {
             AppAction::InspectActiveStore => self.inspect_active_store(),
             AppAction::SelectStore { kind, target } => {
-                self.selected_store_kind = kind;
-                self.store_target_input = target;
-                self.inspect_active_store();
+                self.submit_or_activate_source(&target, Some(kind));
             }
             AppAction::SelectVariable(idx) => {
+                self.show_hero = false;
                 self.selected_variable_idx = idx;
                 if let Some(meta) = self.active_dataset_metadata.clone()
                     && let Some(var_info) = meta.variables.get(idx).cloned()
