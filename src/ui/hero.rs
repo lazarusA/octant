@@ -469,11 +469,11 @@ pub fn draw_octant_widget(
         };
 
         // Solid octant is black in light mode, off-white in dark mode.
-        // Only the edges of the octant have a muted stroke in light mode so facets remain distinct.
+        // In light mode, crisp panel-fill white seams separate the black facets cleanly.
         let fill_stroke = if is_dark {
             egui::Stroke::new(1.0, base)
         } else {
-            egui::Stroke::new(1.2, egui::Color32::from_rgb(170, 178, 190))
+            egui::Stroke::new(1.3, ui.visuals().panel_fill)
         };
 
         painter.add(egui::Shape::convex_polygon(
