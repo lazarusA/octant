@@ -64,6 +64,29 @@ impl eframe::App for OctantApp {
         // 1. Drain completed block-cache prefetch results.
         self.poll_block_prefetch_results();
 
+        // 1.5 Handle Screenshot events for Plot Saving & Video Recording
+        let active_canvas_rect = if self.capture_config.last_canvas_rect.is_positive() {
+            self.capture_config.last_canvas_rect
+        } else {
+            ui.available_rect_before_wrap()
+        };
+        self.handle_screenshot_events(&ctx, active_canvas_rect);
+
+        if self.capture_config.pending_save {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+            ctx.request_repaint();
+        } else if self.capture_config.is_recording {
+            let now = std::time::Instant::now();
+            let frame_dur = std::time::Duration::from_secs_f32(
+                1.0 / self.capture_config.recording_fps.max(1.0),
+            );
+            if now.duration_since(self.capture_config.last_recording_time) >= frame_dur {
+                self.capture_config.last_recording_time = now;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+            }
+            ctx.request_repaint();
+        }
+
         // 2. Playback Animation Timer Loop
         if self.is_playing {
             let now = std::time::Instant::now();
@@ -158,9 +181,7 @@ impl eframe::App for OctantApp {
         }
 
         if !is_hero_active {
-            if self.show_bottom_bar {
-                crate::ui::bottom_bar::show_bottom_bar(self, ui);
-            }
+            crate::ui::bottom_bar::show_bottom_bar(self, ui);
             crate::ui::catalog::show_catalog_window(self, &ctx);
             crate::ui::about::show_about_window(self, &ctx);
             if self.show_colorbar {
@@ -185,6 +206,7 @@ impl eframe::App for OctantApp {
         // 4. Drawing Canvas Area with Aspect Data Ratio
         {
             let canvas_rect = ui.available_rect_before_wrap();
+            self.capture_config.last_canvas_rect = canvas_rect;
 
             // When no dataset is plotted or hero landing view is active, render the clean hero page
             if is_hero_active {
@@ -700,13 +722,119 @@ impl eframe::App for OctantApp {
                 crate::ui::axes::draw_plot_axes(ui, canvas_rect, plot_rect, &options);
             }
 
-            // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle
-            crate::ui::hover_tooltip::show_hover_tooltip(self, &ctx, ui, &response, canvas_rect);
+            // Render interactive Framing Guides & Letterbox Scrim and Hover Tooltip (suppressed during screenshot capture frame)
+            if !self.capture_config.pending_save {
+                crate::ui::framing::draw_canvas_framing_guides(self, ui, canvas_rect);
+                crate::ui::hover_tooltip::show_hover_tooltip(
+                    self,
+                    &ctx,
+                    ui,
+                    &response,
+                    canvas_rect,
+                );
+            }
         }
     }
 }
 
 impl OctantApp {
+    /// Dispatches screenshot events to save PNG or buffer frames for MP4 recording.
+    fn handle_screenshot_events(&mut self, ctx: &egui::Context, canvas_rect: egui::Rect) {
+        let screenshot = ctx.input(|i| {
+            i.events.iter().find_map(|e| {
+                if let egui::Event::Screenshot { image, .. } = e {
+                    Some(image.clone())
+                } else {
+                    None
+                }
+            })
+        });
+
+        if let Some(image) = screenshot {
+            let data_aspect = self.matrix_data.as_ref().and_then(|m| {
+                if m.height > 0 {
+                    Some(m.width as f32 / m.height as f32)
+                } else {
+                    None
+                }
+            });
+
+            let capture_rect = self
+                .capture_config
+                .compute_capture_rect(canvas_rect, data_aspect);
+            let ppp = ctx.pixels_per_point();
+
+            let x_min = ((capture_rect.min.x * ppp).round() as usize).clamp(0, image.width());
+            let x_max = ((capture_rect.max.x * ppp).round() as usize).clamp(x_min, image.width());
+            let y_min = ((capture_rect.min.y * ppp).round() as usize).clamp(0, image.height());
+            let y_max = ((capture_rect.max.y * ppp).round() as usize).clamp(y_min, image.height());
+
+            let mut crop_w = x_max.saturating_sub(x_min);
+            let mut crop_h = y_max.saturating_sub(y_min);
+
+            // H.264 requires even dimensions
+            crop_w &= !1;
+            crop_h &= !1;
+
+            if crop_w > 0 && crop_h > 0 {
+                let mut rgba = Vec::with_capacity(crop_w * crop_h * 4);
+                for y in y_min..(y_min + crop_h) {
+                    for x in x_min..(x_min + crop_w) {
+                        let idx = y * image.width() + x;
+                        if let Some(c) = image.pixels.get(idx) {
+                            rgba.extend_from_slice(&[c.r(), c.g(), c.b(), c.a()]);
+                        } else {
+                            rgba.extend_from_slice(&[0, 0, 0, 255]);
+                        }
+                    }
+                }
+
+                let rgba_arc: std::sync::Arc<[u8]> = std::sync::Arc::from(rgba.into_boxed_slice());
+
+                if self.capture_config.pending_save {
+                    self.capture_config.pending_save = false;
+                    let output_path = self.capture_config.generate_filepath(false);
+                    let w = crop_w as u32;
+                    let h = crop_h as u32;
+                    let filename = output_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("octant_plot.png")
+                        .to_string();
+                    self.status_message = format!("💾 Saved plot: {} ({}×{})", filename, w, h);
+                    self.capture_config.save_notification = Some((
+                        format!("💾 Saved plot: {} ({}×{})", filename, w, h),
+                        output_path.clone(),
+                        std::time::Instant::now(),
+                    ));
+                    self.capture_config.shutter_flash_time = Some(std::time::Instant::now());
+
+                    let png_bytes = rgba_arc.to_vec();
+                    rayon::spawn(move || {
+                        if let Some(parent) = output_path.parent() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
+                        if let Some(img) = image::RgbaImage::from_raw(w, h, png_bytes)
+                            && let Err(e) = img.save(&output_path)
+                        {
+                            log::error!("Failed to save PNG: {}", e);
+                        }
+                    });
+                }
+
+                if self.capture_config.is_recording {
+                    self.capture_config.recorded_frame_size = (crop_w as u32, crop_h as u32);
+                    self.capture_config.recorded_frames.push(rgba_arc.clone());
+                    if self.capture_config.recorded_frames.len()
+                        >= self.capture_config.max_record_frames
+                    {
+                        self.stop_recording();
+                    }
+                }
+            }
+        }
+    }
+
     /// Opens the Settings panel and closes Store, Variables, Controls, and Catalog.
     pub fn open_only_settings_panel(&mut self) {
         self.show_settings_panel = true;

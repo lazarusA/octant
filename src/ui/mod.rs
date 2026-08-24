@@ -7,6 +7,7 @@ pub mod catalog;
 pub mod color_picker;
 pub mod colorbar;
 pub mod colormap;
+pub mod framing;
 pub mod hero;
 pub mod hover_tooltip;
 pub mod plot_type;

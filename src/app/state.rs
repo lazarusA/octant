@@ -289,6 +289,9 @@ pub struct OctantApp {
     pub line_pan: egui::Vec2,
     pub enable_pyramid_resampling: bool,
     pub pyramid_aggregation_op: crate::data::AggregationOp,
+
+    // Canvas Save & Video Recording State
+    pub capture_config: crate::app::capture::CaptureConfig,
 }
 
 impl Default for OctantApp {
@@ -413,6 +416,7 @@ impl Default for OctantApp {
             line_pan: egui::Vec2::ZERO,
             enable_pyramid_resampling: false,
             pyramid_aggregation_op: crate::data::AggregationOp::default(),
+            capture_config: crate::app::capture::CaptureConfig::default(),
         }
     }
 }
@@ -643,5 +647,78 @@ impl OctantApp {
             }
         }
         false
+    }
+
+    /// Triggers immediate lossless screenshot capture of the canvas framing region.
+    pub fn trigger_save_screenshot(&mut self) {
+        self.capture_config.pending_save = true;
+    }
+
+    /// Starts recording canvas interactions into an MP4 video.
+    pub fn start_recording(&mut self) {
+        self.capture_config.is_recording = true;
+        self.capture_config.recording_start_time = Some(std::time::Instant::now());
+        self.capture_config.recorded_frames.clear();
+        self.capture_config.last_recording_time = std::time::Instant::now();
+        self.status_message =
+            "⏺ Recording canvas interaction... Click Stop Recording to export MP4.".to_string();
+    }
+
+    /// Stops video recording and initiates background MP4 encoding and muxing.
+    pub fn stop_recording(&mut self) {
+        if !self.capture_config.is_recording {
+            return;
+        }
+        self.capture_config.is_recording = false;
+        let frames = std::mem::take(&mut self.capture_config.recorded_frames);
+        let (width, height) = self.capture_config.recorded_frame_size;
+        let fps = self.capture_config.recording_fps;
+        let output_path = self.capture_config.generate_filepath(true);
+
+        if frames.is_empty() || width == 0 || height == 0 {
+            self.status_message = "Recording stopped (No frames captured)".to_string();
+            return;
+        }
+
+        let filename = output_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("octant_recording.mp4")
+            .to_string();
+
+        self.capture_config.save_notification = Some((
+            format!(
+                "🎬 Saved video: {} ({} frames @ {:.0} fps)",
+                filename,
+                frames.len(),
+                fps
+            ),
+            output_path.clone(),
+            std::time::Instant::now(),
+        ));
+
+        self.status_message = format!(
+            "🎬 Encoding MP4 video ({} frames @ {:.0} fps) to {}...",
+            frames.len(),
+            fps,
+            filename
+        );
+
+        rayon::spawn(move || {
+            match crate::utils::video::encode_rgba_frames_to_mp4(
+                &frames,
+                width,
+                height,
+                fps,
+                &output_path,
+            ) {
+                Ok(()) => {
+                    log::info!("Successfully saved recording to {}", output_path.display());
+                }
+                Err(err) => {
+                    log::error!("Failed to encode MP4 recording: {}", err);
+                }
+            }
+        });
     }
 }

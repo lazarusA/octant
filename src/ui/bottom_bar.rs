@@ -1,4 +1,5 @@
 use crate::app::OctantApp;
+use crate::app::capture::AspectRatioPreset;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum BottomBarItem {
@@ -11,6 +12,9 @@ enum BottomBarItem {
     StepSize,
     EndDate,
     Fps,
+    SaveBtn,
+    RecordBtn,
+    CaptureSettingsBtn,
     OverflowBtn,
 }
 
@@ -26,6 +30,9 @@ impl BottomBarItem {
             BottomBarItem::StepSize => 75.0,
             BottomBarItem::EndDate => 85.0,
             BottomBarItem::Fps => 75.0,
+            BottomBarItem::SaveBtn => 65.0,
+            BottomBarItem::RecordBtn => 80.0,
+            BottomBarItem::CaptureSettingsBtn => 32.0,
             BottomBarItem::OverflowBtn => 36.0,
         }
     }
@@ -35,6 +42,7 @@ pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
     // Extract to a local bool to avoid split-borrow: we can't hold &mut app.field
     // AND also borrow all of app inside the closure at the same time.
     let mut expanded = app.show_bottom_bar;
+    let mut click_expand = false;
 
     egui::Panel::show_switched(
         ui,
@@ -49,14 +57,17 @@ pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
             if is_expanded {
                 show_bottom_bar_content(app, ui);
             } else {
-                ui.vertical_centered(|ui| {
-                    ui.small("▲ Playback (drag to expand)");
+                let strip_resp = ui.vertical_centered(|ui| {
+                    ui.small("▲ Playback & Capture (click to expand)");
                 });
+                if strip_resp.response.interact(egui::Sense::click()).clicked() {
+                    click_expand = true;
+                }
             }
         },
     );
 
-    app.show_bottom_bar = expanded;
+    app.show_bottom_bar = if click_expand { true } else { expanded };
 }
 
 fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -84,11 +95,14 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         let step_size_w = get_w(BottomBarItem::StepSize, &widths);
         let end_date_w = get_w(BottomBarItem::EndDate, &widths);
         let fps_w = get_w(BottomBarItem::Fps, &widths);
+        let save_w = get_w(BottomBarItem::SaveBtn, &widths);
+        let record_w = get_w(BottomBarItem::RecordBtn, &widths);
+        let capture_settings_w = get_w(BottomBarItem::CaptureSettingsBtn, &widths);
         let overflow_btn_w = get_w(BottomBarItem::OverflowBtn, &widths);
         let spacing = ui.spacing().item_spacing.x;
         let total_width = ui.available_width();
 
-        let min_slider_w = 80.0;
+        let min_slider_w = 70.0;
 
         // Full width needed for all features without overflow
         let full_needed = play_pause_w
@@ -101,7 +115,10 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             + step_size_w
             + end_date_w
             + fps_w
-            + spacing * 14.0;
+            + save_w
+            + record_w
+            + capture_settings_w
+            + spacing * 18.0;
 
         let (
             show_date_info,
@@ -109,14 +126,18 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             show_status,
             show_loop,
             show_fps,
+            show_save,
+            show_record,
+            show_capture_settings,
             show_prev_next,
             show_overflow,
         ) = if total_width >= full_needed {
-            (true, true, true, true, true, true, false)
+            (true, true, true, true, true, true, true, true, true, false)
         } else {
             let base_fixed = play_pause_w + overflow_btn_w + min_slider_w + spacing * 4.0;
             let mut remaining = (total_width - base_fixed).max(0.0);
 
+            // Core playback controls take priority
             let show_prev_next = if remaining >= prev_next_w + spacing {
                 remaining -= prev_next_w + spacing;
                 true
@@ -124,8 +145,8 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 false
             };
 
-            let show_fps = if remaining >= fps_w + spacing {
-                remaining -= fps_w + spacing;
+            let show_status = if remaining >= status_w + spacing {
+                remaining -= status_w + spacing;
                 true
             } else {
                 false
@@ -138,8 +159,8 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 false
             };
 
-            let show_status = if remaining >= status_w + spacing {
-                remaining -= status_w + spacing;
+            let show_fps = if remaining >= fps_w + spacing {
+                remaining -= fps_w + spacing;
                 true
             } else {
                 false
@@ -153,7 +174,29 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                     false
                 };
 
-            let show_date_info = remaining >= date_info_w + spacing;
+            let show_date_info = if remaining >= date_info_w + spacing {
+                remaining -= date_info_w + spacing;
+                true
+            } else {
+                false
+            };
+
+            // Capture tools fold gracefully into the "..." overflow menu on narrower screens
+            let show_save = if remaining >= save_w + spacing {
+                remaining -= save_w + spacing;
+                true
+            } else {
+                false
+            };
+
+            let show_record = if remaining >= record_w + spacing {
+                remaining -= record_w + spacing;
+                true
+            } else {
+                false
+            };
+
+            let show_capture_settings = remaining >= capture_settings_w + spacing;
 
             (
                 show_date_info,
@@ -161,6 +204,9 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 show_status,
                 show_loop,
                 show_fps,
+                show_save,
+                show_record,
+                show_capture_settings,
                 show_prev_next,
                 true,
             )
@@ -325,7 +371,14 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             step_size_w + end_date_w + spacing * 2.0
         } else {
             0.0
-        }) + (if show_fps { fps_w + spacing + 8.0 } else { 0.0 })
+        }) + (if show_fps { fps_w + spacing } else { 0.0 })
+            + (if show_save { save_w + spacing } else { 0.0 })
+            + (if show_record { record_w + spacing } else { 0.0 })
+            + (if show_capture_settings {
+                capture_settings_w + spacing
+            } else {
+                0.0
+            })
             + (if show_overflow {
                 overflow_btn_w + spacing
             } else {
@@ -398,18 +451,121 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             widths.insert(BottomBarItem::Fps, fps_resp.response.rect.width());
         }
 
-        // 8. Overflow Button "..."
+        // 8. Save Button
+        if show_save {
+            let save_resp = ui.scope(|ui| {
+                ui.separator();
+                let btn = egui::Button::new(egui::RichText::new("📷 Save").strong());
+                if ui
+                    .add(btn)
+                    .on_hover_text(
+                        "Save high-resolution PNG image of current canvas framing region to ~/Downloads",
+                    )
+                    .clicked()
+                {
+                    app.trigger_save_screenshot();
+                }
+            });
+            widths.insert(BottomBarItem::SaveBtn, save_resp.response.rect.width());
+        }
+
+        // 9. Record Button
+        if show_record {
+            let record_resp = ui.scope(|ui| {
+                ui.separator();
+                let is_recording = app.capture_config.is_recording;
+                let (rec_label, rec_color) = if is_recording {
+                    let elapsed = app
+                        .capture_config
+                        .recording_start_time
+                        .map(|t| t.elapsed().as_secs())
+                        .unwrap_or(0);
+                    let mins = elapsed / 60;
+                    let secs = elapsed % 60;
+                    (
+                        format!("⏹ Stop ({:02}:{:02})", mins, secs),
+                        egui::Color32::from_rgb(255, 70, 70),
+                    )
+                } else {
+                    ("⏺ Record".to_string(), egui::Color32::LIGHT_GRAY)
+                };
+
+                let btn =
+                    egui::Button::new(egui::RichText::new(rec_label).color(rec_color).strong());
+                if ui
+                    .add(btn)
+                    .on_hover_text(if is_recording {
+                        "Click to stop recording and encode MP4 video"
+                    } else {
+                        "Record canvas interactions and animations to MP4 (H.264)"
+                    })
+                    .clicked()
+                {
+                    if is_recording {
+                        app.stop_recording();
+                    } else {
+                        app.start_recording();
+                    }
+                }
+            });
+            widths.insert(BottomBarItem::RecordBtn, record_resp.response.rect.width());
+        }
+
+        // 10. Capture & Recording Settings Wheel (⚙)
+        if show_capture_settings {
+            let settings_resp = ui.scope(|ui| {
+                ui.menu_button(egui::RichText::new("⚙").strong(), |ui| {
+                    render_capture_settings_menu(app, ui, true);
+                })
+                .response
+                .on_hover_text(
+                    "Capture & Recording Settings (Aspect Ratios, Framing Guides, FPS, Output Folder)",
+                );
+            });
+            widths.insert(
+                BottomBarItem::CaptureSettingsBtn,
+                settings_resp.response.rect.width(),
+            );
+        }
+
+        // 10. Overflow Button "..."
         if show_overflow {
             let overflow_resp = ui.scope(|ui| {
                 ui.menu_button(egui::RichText::new("…").strong(), |ui| {
-                    ui.set_min_width(220.0);
+                    ui.set_min_width(260.0);
                     ui.label(
-                        egui::RichText::new("Playback Options & Info")
+                        egui::RichText::new("Playback, Save & Recording Options")
                             .small()
                             .weak(),
                     );
                     ui.separator();
 
+                    if !show_save && ui.button("📷 Save Canvas Plot (PNG)").clicked() {
+                        app.trigger_save_screenshot();
+                    }
+
+                    if !show_record {
+                        let is_rec = app.capture_config.is_recording;
+                        let rec_text = if is_rec {
+                            "⏹ Stop Video Recording"
+                        } else {
+                            "⏺ Start Video Recording (MP4)"
+                        };
+                        if ui.button(rec_text).clicked() {
+                            if is_rec {
+                                app.stop_recording();
+                            } else {
+                                app.start_recording();
+                            }
+                        }
+                    }
+
+                    if !show_capture_settings {
+                        ui.separator();
+                        render_capture_settings_menu(app, ui, true);
+                    }
+
+                    ui.separator();
                     if !show_loop {
                         ui.checkbox(&mut app.loop_playback, "🔄 Loop Playback");
                         ui.separator();
@@ -455,7 +611,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                     ui.label(format!("• Status: {}", status_text));
                 })
                 .response
-                .on_hover_text("More playback options and timeline details");
+                .on_hover_text("More playback, capture, and timeline options");
             });
             widths.insert(
                 BottomBarItem::OverflowBtn,
@@ -464,5 +620,86 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
 
         ui.ctx().data_mut(|d| d.insert_temp(storage_id, widths));
+    });
+}
+
+/// Renders aspect ratio presets, framing guide toggle, and output folder configuration.
+fn render_capture_settings_menu(app: &mut OctantApp, ui: &mut egui::Ui, is_video: bool) {
+    ui.set_min_width(260.0);
+    ui.label(egui::RichText::new("📷 Plot Export & 🎬 Video Recording Settings").strong());
+    ui.separator();
+
+    ui.checkbox(
+        &mut app.capture_config.show_framing_guides,
+        "📐 Show Canvas Framing Guides",
+    );
+
+    ui.add_space(4.0);
+    ui.label(
+        egui::RichText::new("Aspect Ratio Presets:")
+            .small()
+            .strong(),
+    );
+
+    for preset in AspectRatioPreset::ALL {
+        let is_selected = app.capture_config.aspect_preset == preset;
+        if ui.selectable_label(is_selected, preset.label()).clicked() {
+            app.capture_config.aspect_preset = preset;
+            app.capture_config.show_framing_guides = true;
+        }
+    }
+
+    if app.capture_config.aspect_preset == AspectRatioPreset::Custom {
+        ui.horizontal(|ui| {
+            ui.label("W:H Ratio:");
+            ui.add(
+                egui::DragValue::new(&mut app.capture_config.custom_ratio.0)
+                    .speed(0.1)
+                    .range(0.1..=100.0),
+            );
+            ui.label(":");
+            ui.add(
+                egui::DragValue::new(&mut app.capture_config.custom_ratio.1)
+                    .speed(0.1)
+                    .range(0.1..=100.0),
+            );
+        });
+    }
+
+    ui.separator();
+
+    if is_video {
+        ui.horizontal(|ui| {
+            ui.label("Recording FPS:");
+            let mut fps = app.capture_config.recording_fps;
+            if egui::ComboBox::from_id_salt(("capture_fps_combo", 0))
+                .selected_text(format!("{:.0} FPS", fps))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut fps, 15.0, "15 FPS");
+                    ui.selectable_value(&mut fps, 24.0, "24 FPS (Film)");
+                    ui.selectable_value(&mut fps, 30.0, "30 FPS (Standard)");
+                    ui.selectable_value(&mut fps, 60.0, "60 FPS (Smooth)");
+                })
+                .response
+                .changed()
+            {
+                app.capture_config.recording_fps = fps;
+            }
+        });
+    }
+
+    ui.separator();
+    ui.label(egui::RichText::new("Save Destination:").small().strong());
+    let default_dir = app.capture_config.resolve_output_dir(is_video);
+    ui.horizontal(|ui| {
+        ui.small(format!("📁 {}", default_dir.display()));
+        if ui.small_button("Open Folder").clicked() {
+            crate::ui::framing::reveal_in_finder(&default_dir);
+        }
+    });
+
+    ui.horizontal(|ui| {
+        ui.label("Custom Dir:");
+        ui.text_edit_singleline(&mut app.capture_config.output_dir);
     });
 }
