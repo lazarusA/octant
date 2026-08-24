@@ -37,7 +37,8 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
 
         ui.separator();
-        ui.label(egui::RichText::new("Cache Capacity Settings").strong());
+        ui.label(egui::RichText::new("Prefetch & Capacity Settings").strong());
+        ui.checkbox(&mut app.enable_prefetch, "Enable Background Prefetching");
         let old_mb = app.max_cache_mb;
         ui.add(egui::Slider::new(&mut app.max_cache_mb, 256..=4096).suffix(" MB Limit"));
         if old_mb != app.max_cache_mb {
