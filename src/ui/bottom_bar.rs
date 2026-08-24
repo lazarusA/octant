@@ -1,4 +1,3 @@
-use super::cache;
 use crate::app::OctantApp;
 
 pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -202,10 +201,5 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         } else {
             ui.menu_button(format!("{} FPS", fps_int), menu_body);
         }
-
-        // 8. Bottom Right: Cache Menu Dropdown
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            cache::show_cache_menu(app, ui);
-        });
     });
 }

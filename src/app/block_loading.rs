@@ -235,6 +235,10 @@ impl OctantApp {
 
     /// Progressively prefetches all remaining block windows across the selected animated dimension range in the background.
     pub fn prefetch_selected_animated_range(&mut self, shape: &[u64]) {
+        if !self.enable_prefetch {
+            return;
+        }
+
         let Some(anim_dim) = self.plotted_animated_dim else {
             return;
         };
