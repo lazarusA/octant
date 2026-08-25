@@ -1052,7 +1052,25 @@ impl OctantApp {
         let frame_bytes = match self.active_plot_type {
             PlotType::Heatmap => {
                 let renderer = self.renderer.as_ref()?;
-                renderer.update_uniforms(queue, &color_params, [0.0, 0.0], zoom, [1.0, 1.0]);
+                let (orig_w, orig_h) = if let Some(pyr) = &self.active_pyramid {
+                    (pyr.original_width, pyr.original_height)
+                } else if let Some(m) = &self.matrix_data {
+                    (m.width, m.height)
+                } else {
+                    (1, 1)
+                };
+                let data_aspect = (orig_w as f32 / orig_h as f32).max(0.001);
+                let canvas_aspect = aspect_ratio;
+                let aspect_scale = if self.enforce_data_aspect_ratio {
+                    if canvas_aspect > data_aspect {
+                        [data_aspect / canvas_aspect, 1.0]
+                    } else {
+                        [1.0, canvas_aspect / data_aspect]
+                    }
+                } else {
+                    [1.0, 1.0]
+                };
+                renderer.update_uniforms(queue, &color_params, [0.0, 0.0], zoom, aspect_scale);
                 target
                     .render_frame(device, queue, clear_color, |rpass| {
                         renderer.draw(rpass);
