@@ -658,7 +658,11 @@ impl OctantApp {
 
     /// Starts recording canvas interactions into an MP4 video.
     pub fn start_recording(&mut self) {
+        if self.capture_config.export_state.is_some() {
+            self.cancel_deterministic_export();
+        }
         self.capture_config.is_recording = true;
+        self.capture_config.pending_frame_capture = false;
         self.capture_config.recording_start_time = Some(std::time::Instant::now());
         self.capture_config.recorded_frames.clear();
         self.capture_config.last_recording_time = std::time::Instant::now();
@@ -672,6 +676,8 @@ impl OctantApp {
             return;
         }
         self.capture_config.is_recording = false;
+        self.capture_config.pending_frame_capture = false;
+        self.capture_config.recording_start_time = None;
         let frames = std::mem::take(&mut self.capture_config.recorded_frames);
         let (width, height) = self.capture_config.recorded_frame_size;
         let fps = self.capture_config.recording_fps;
@@ -726,6 +732,11 @@ impl OctantApp {
 
     /// Starts deterministic frame-by-frame animation export with optional camera orbit and zoom.
     pub fn start_deterministic_export(&mut self) {
+        if self.capture_config.is_recording {
+            self.stop_recording();
+        }
+        self.capture_config.pending_frame_capture = false;
+
         let total_timesteps = self.animated_dim_extent();
         let total_frames = match self.capture_config.motion_mode {
             crate::app::capture::MotionTrajectory::TimestepOnly => total_timesteps.max(2),
@@ -773,24 +784,28 @@ impl OctantApp {
 
     /// Cancels in-progress deterministic animation export and restores camera state.
     pub fn cancel_deterministic_export(&mut self) {
+        self.capture_config.pending_frame_capture = false;
         if let Some(state) = self.capture_config.export_state.take() {
             self.current_timestep = state.initial_timestep;
             self.sphere_rotation_y = state.initial_rotation_y;
             self.sphere_rotation_x = state.initial_rotation_x;
             self.sphere_zoom = state.initial_zoom_3d;
             self.heatmap_zoom = state.initial_zoom_2d;
+            self.load_selected_variable_block();
             self.status_message = "Animation export cancelled".to_string();
         }
     }
 
     /// Finishes deterministic animation export, restores camera state, and triggers MP4 encoding or PNG sequence saving.
     pub fn finish_deterministic_export(&mut self) {
+        self.capture_config.pending_frame_capture = false;
         if let Some(state) = self.capture_config.export_state.take() {
             self.current_timestep = state.initial_timestep;
             self.sphere_rotation_y = state.initial_rotation_y;
             self.sphere_rotation_x = state.initial_rotation_x;
             self.sphere_zoom = state.initial_zoom_3d;
             self.heatmap_zoom = state.initial_zoom_2d;
+            self.load_selected_variable_block();
 
             let frames = state.captured_frames;
             let (width, height) = state.frame_size;

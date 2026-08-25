@@ -118,20 +118,16 @@ impl eframe::App for OctantApp {
             let offscreen_zoom_3d = (init_zoom_3d / zoom_mult).clamp(0.2, 10.0);
             let offscreen_zoom_2d = (init_zoom_2d * zoom_mult).clamp(0.1, 50.0);
 
-            // 1. Timestep Trajectory
-            match motion_mode {
+            // 1. Timestep Trajectory (Computed headlessly for offscreen render without altering active app state)
+            let offscreen_ts = match motion_mode {
                 crate::app::capture::MotionTrajectory::TimestepOnly
                 | crate::app::capture::MotionTrajectory::TimestepAndTurntable => {
                     let total_ts = self.animated_dim_extent().max(1);
                     let ts = ((f as f32 / total as f32) * total_ts as f32).floor() as usize;
-                    let clamped_ts = ts.min(total_ts - 1);
-                    if self.current_timestep != clamped_ts {
-                        self.current_timestep = clamped_ts;
-                        self.load_selected_variable_block();
-                    }
+                    Some(ts.min(total_ts - 1))
                 }
-                crate::app::capture::MotionTrajectory::Turntable360 => {}
-            }
+                crate::app::capture::MotionTrajectory::Turntable360 => None,
+            };
 
             let (target_w, target_h) = (1920, 1080);
             let offscreen_zoom = if self.active_plot_type == PlotType::Heatmap {
@@ -147,6 +143,7 @@ impl eframe::App for OctantApp {
                 offscreen_rot_y,
                 self.sphere_rotation_x,
                 offscreen_zoom,
+                offscreen_ts,
             ) {
                 let mut should_finish = false;
                 if let Some(ref mut export) = self.capture_config.export_state {
@@ -986,15 +983,23 @@ impl OctantApp {
     }
 
     /// Renders the active plot directly to an offscreen GPU texture at specified dimensions and camera angles.
+    #[allow(clippy::too_many_arguments)]
     pub fn render_offscreen_frame(
-        &self,
+        &mut self,
         ctx: &egui::Context,
         width: u32,
         height: u32,
         rot_y: f32,
         rot_x: f32,
         zoom: f32,
+        timestep: Option<usize>,
     ) -> Option<std::sync::Arc<[u8]>> {
+        // Extract offscreen timestep slice data from resident block cache if requested
+        let (opt_mdata, opt_vdata) = match timestep {
+            Some(ts) => self.extract_slice_for_timestep(ts),
+            None => (None, None),
+        };
+
         let wgpu_state = self.wgpu_render_state.as_ref()?;
         let device = &wgpu_state.device;
         let queue = &wgpu_state.queue;
@@ -1006,9 +1011,12 @@ impl OctantApp {
         let aspect_ratio = (width as f32) / (height as f32).max(1.0);
         let color_params = self.get_color_params();
 
-        match self.active_plot_type {
+        let frame_bytes = match self.active_plot_type {
             PlotType::Heatmap => {
                 let renderer = self.renderer.as_ref()?;
+                if let Some(mdata) = &opt_mdata {
+                    renderer.update_data(queue, &mdata.values);
+                }
                 renderer.update_uniforms(queue, &color_params, [0.0, 0.0], zoom, [1.0, 1.0]);
                 target
                     .render_frame(device, queue, clear_color, |rpass| {
@@ -1018,6 +1026,9 @@ impl OctantApp {
             }
             PlotType::Sphere => {
                 let renderer = self.sphere_renderer.as_ref()?;
+                if let Some(mdata) = &opt_mdata {
+                    renderer.update_data(queue, &mdata.values);
+                }
                 renderer.update_uniforms(
                     queue,
                     &color_params,
@@ -1036,6 +1047,9 @@ impl OctantApp {
             }
             PlotType::Surface => {
                 let renderer = self.surface_renderer.as_ref()?;
+                if let Some(mdata) = &opt_mdata {
+                    renderer.update_data(queue, &mdata.values);
+                }
                 renderer.update_uniforms(
                     queue,
                     &color_params,
@@ -1052,8 +1066,163 @@ impl OctantApp {
                     })
                     .ok()
             }
+            PlotType::Volume => {
+                let renderer = self.volume_renderer.as_ref()?;
+                if let Some(vdata) = &opt_vdata {
+                    renderer.update_data(queue, &vdata.values);
+                }
+                let (data_w, data_h) = opt_vdata
+                    .as_ref()
+                    .map(|v| (v.width as u32, v.height as u32))
+                    .or_else(|| {
+                        self.volume_data
+                            .as_ref()
+                            .map(|v| (v.width as u32, v.height as u32))
+                    })
+                    .unwrap_or_else(|| {
+                        self.matrix_data
+                            .as_ref()
+                            .map_or((64, 64), |m| (m.width as u32, m.height as u32))
+                    });
+                let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+                let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
+                renderer.update_uniforms(
+                    queue,
+                    &color_params,
+                    rot_y,
+                    rot_x,
+                    aspect_x,
+                    aspect_y,
+                    aspect_z,
+                    zoom,
+                    self.volume_opacity,
+                    self.volume_step_count,
+                    data_w,
+                    data_h,
+                    self.volume_algorithm,
+                    self.volume_isovalue,
+                    self.volume_isorange,
+                    self.volume_attenuation,
+                    aspect_ratio,
+                    shift_x,
+                    shift_y,
+                    shift_z,
+                    self.volume_transparency,
+                );
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass);
+                    })
+                    .ok()
+            }
+            PlotType::PointCloud => {
+                let renderer = self.point_cloud_renderer.as_ref()?;
+                if let Some(vdata) = &opt_vdata {
+                    renderer.update_data(queue, &vdata.values);
+                }
+                let (data_w, data_h) = opt_vdata
+                    .as_ref()
+                    .map(|v| (v.width as u32, v.height as u32))
+                    .or_else(|| {
+                        self.volume_data
+                            .as_ref()
+                            .map(|v| (v.width as u32, v.height as u32))
+                    })
+                    .unwrap_or_else(|| {
+                        self.matrix_data
+                            .as_ref()
+                            .map_or((64, 64), |m| (m.width as u32, m.height as u32))
+                    });
+                let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+                let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
+                renderer.update_uniforms(
+                    queue,
+                    &color_params,
+                    rot_y,
+                    rot_x,
+                    aspect_x,
+                    aspect_y,
+                    aspect_z,
+                    zoom,
+                    self.point_cloud_size,
+                    data_w,
+                    data_h,
+                    aspect_ratio,
+                    shift_x,
+                    shift_y,
+                    shift_z,
+                );
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass);
+                    })
+                    .ok()
+            }
+            PlotType::Line => {
+                let renderer = self.line_renderer.as_ref()?;
+                let (profile_values, profile_length, line_count) = if let Some(mdata) = &opt_mdata {
+                    (
+                        mdata.values.clone(),
+                        mdata.width as u32,
+                        mdata.height as u32,
+                    )
+                } else {
+                    self.get_line_profile_payload()
+                };
+                if !profile_values.is_empty() {
+                    renderer.update_data_with_device(device, queue, &profile_values);
+                }
+                renderer.update_uniforms(
+                    queue,
+                    &crate::plots::line::LineUniformParams {
+                        color: color_params,
+                        viewport_padding: [0.0, 0.0],
+                        profile_length,
+                        line_count,
+                        line_mode: if self.line_plot_all_series { 1 } else { 0 },
+                        pan: [0.0, 0.0],
+                        zoom,
+                    },
+                );
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass, profile_length, line_count);
+                    })
+                    .ok()
+            }
             _ => None,
+        };
+
+        // Restore active on-screen data into GPU buffers so on-screen canvas remains stationary
+        if opt_mdata.is_some() || opt_vdata.is_some() {
+            if let Some(mdata) = &self.matrix_data {
+                if let Some(r) = &self.renderer {
+                    r.update_data(queue, &mdata.values);
+                }
+                if let Some(r) = &self.sphere_renderer {
+                    r.update_data(queue, &mdata.values);
+                }
+                if let Some(r) = &self.surface_renderer {
+                    r.update_data(queue, &mdata.values);
+                }
+                if let Some(r) = &self.line_renderer {
+                    let (profile_values, _, _) = self.get_line_profile_payload();
+                    if !profile_values.is_empty() {
+                        r.update_data_with_device(device, queue, &profile_values);
+                    }
+                }
+            }
+            if let Some(vdata) = &self.volume_data {
+                if let Some(r) = &self.volume_renderer {
+                    r.update_data(queue, &vdata.values);
+                }
+                if let Some(r) = &self.point_cloud_renderer {
+                    r.update_data(queue, &vdata.values);
+                }
+            }
         }
+
+        frame_bytes
     }
 
     /// Opens the Settings panel and closes Store, Variables, Controls, and Catalog.

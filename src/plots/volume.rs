@@ -339,6 +339,15 @@ impl VolumeRenderer {
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
+
+    /// Renders the volume raymarching pass directly into the active render pass.
+    pub fn draw(&self, rpass: &mut wgpu::RenderPass<'_>) {
+        rpass.set_pipeline(&self.render_pipeline);
+        rpass.set_bind_group(0, &self.bind_group, &[]);
+        rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        rpass.draw_indexed(0..self.index_count, 0, 0..1);
+    }
 }
 
 impl super::common::PlotRenderer for VolumeRenderer {

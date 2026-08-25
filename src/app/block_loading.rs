@@ -615,4 +615,174 @@ impl OctantApp {
         self.pending_target_step = None;
         self.status_message = "⏹ Data fetch aborted by user.".to_string();
     }
+
+    /// Extracts 2D matrix and 3D volume data for a specific timestep from resident block cache without mutating app state.
+    pub fn extract_slice_for_timestep(
+        &mut self,
+        ts: usize,
+    ) -> (
+        Option<crate::data::matrix_data::MatrixData>,
+        Option<crate::data::volume_data::VolumeData>,
+    ) {
+        let Some(metadata) = &self.plotted_dataset_metadata else {
+            return (None, None);
+        };
+        let Some(var_info) = metadata.variables.get(self.plotted_variable_idx) else {
+            return (None, None);
+        };
+        let var_name = &var_info.name;
+        let source_id = self.plotted_source_id();
+
+        let selections = self
+            .active_slice_request
+            .as_ref()
+            .map(|r| r.selections.as_slice())
+            .unwrap_or(&[]);
+
+        let covering_block = if let Some(b) = self.block_cache.find_covering_block(
+            &source_id,
+            var_name,
+            selections,
+            self.plotted_animated_dim,
+            ts,
+        ) {
+            Some(b)
+        } else if let Some(store) = self.plotted_store_handle() {
+            let anim_chunk_size = self
+                .plotted_animated_dim
+                .and_then(|dim| var_info.chunk_shape.get(dim))
+                .copied()
+                .unwrap_or(1) as usize;
+            let cs = if anim_chunk_size == 0 {
+                1
+            } else {
+                anim_chunk_size
+            };
+            let full_extent = self
+                .plotted_animated_dim
+                .and_then(|dim| var_info.shape.get(dim))
+                .copied()
+                .unwrap_or(1) as usize;
+            let start = (ts / cs) * cs;
+            let end = (start + cs).min(full_extent).max(start + 1);
+
+            let mut req_selections = self
+                .active_slice_request
+                .as_ref()
+                .map(|r| r.selections.clone())
+                .unwrap_or_else(|| {
+                    crate::ui::variables_panel::build_slice_request_for_plotted(
+                        self,
+                        var_name,
+                        &var_info.shape,
+                    )
+                    .selections
+                });
+
+            if let Some(anim_dim) = self.plotted_animated_dim
+                && anim_dim < req_selections.len()
+            {
+                req_selections[anim_dim] = crate::data::DimensionSelection::Range { start, end };
+            }
+
+            let slice_req = crate::data::SliceRequest::new(var_name, req_selections);
+            if let Ok(block) = store.fetch(&slice_req) {
+                let key = crate::data::BlockCacheKey::new(source_id.clone(), &slice_req);
+                self.block_cache.put(key, block.clone());
+                Some(block)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let Some(block) = covering_block else {
+            return (None, None);
+        };
+
+        let orig_dim_names: Vec<String> = var_info.dimension_names.clone();
+        let (x_dim, y_dim, z_dim) = Self::resolve_spatial_axes(
+            block.rank(),
+            &block.dimension_names,
+            &orig_dim_names,
+            &self.plotted_dim_config,
+        );
+
+        let fixed_indices: Vec<usize> = (0..block.rank())
+            .map(|i| {
+                let name = block.dimension_names.get(i);
+                let orig_idx = name
+                    .and_then(|n| orig_dim_names.iter().position(|o| o == n))
+                    .unwrap_or(i);
+                let idx = if Some(orig_idx) == self.plotted_animated_dim {
+                    ts
+                } else {
+                    self.plotted_selected_dim_indices
+                        .get(orig_idx)
+                        .copied()
+                        .unwrap_or(0)
+                };
+                idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0))
+            })
+            .collect();
+
+        let get_local_range = |dim_idx: usize| -> (usize, usize) {
+            let Some(dim_name) = block.dimension_names.get(dim_idx) else {
+                return (0, block.shape.get(dim_idx).copied().unwrap_or(1));
+            };
+            let orig_idx = orig_dim_names
+                .iter()
+                .position(|o| o == dim_name)
+                .unwrap_or(dim_idx);
+            let dim_len = block.shape.get(dim_idx).copied().unwrap_or(1);
+            let block_orig = block.origin.get(dim_idx).copied().unwrap_or(0);
+            let (req_start, req_end) = self
+                .plotted_selected_dim_ranges
+                .get(orig_idx)
+                .copied()
+                .unwrap_or((0, dim_len.saturating_sub(1)));
+
+            let local_start = req_start
+                .saturating_sub(block_orig)
+                .min(dim_len.saturating_sub(1));
+            let local_end = (req_end + 1)
+                .saturating_sub(block_orig)
+                .clamp(local_start + 1, dim_len);
+            (local_start, local_end)
+        };
+
+        let x_range = get_local_range(x_dim);
+        let y_range = get_local_range(y_dim);
+        let z_range = if z_dim < block.rank() {
+            get_local_range(z_dim)
+        } else {
+            (0, 1)
+        };
+
+        let mdata = block.slice_2d_with_ranges(
+            x_dim,
+            y_dim,
+            x_range,
+            y_range,
+            &fixed_indices,
+            self.animated_dim_extent(),
+            &format!("Block Cache [{}]", block.variable_name),
+            false,
+        );
+
+        let vdata = block.volume_with_ranges(
+            x_dim,
+            y_dim,
+            z_dim,
+            x_range,
+            y_range,
+            z_range,
+            &fixed_indices,
+            &format!("Block Cache Volume [{}]", block.variable_name),
+            false,
+        );
+
+        (mdata, vdata)
+    }
 }

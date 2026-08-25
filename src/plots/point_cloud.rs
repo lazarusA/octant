@@ -258,6 +258,21 @@ impl PointCloudRenderer {
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
+
+    /// Renders the instanced point cloud pass directly into the active render pass.
+    pub fn draw(&self, rpass: &mut wgpu::RenderPass<'_>) {
+        rpass.set_pipeline(&self.render_pipeline);
+        rpass.set_bind_group(0, &self.bind_group, &[]);
+        rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        rpass.draw_indexed(
+            0..self.index_count,
+            0,
+            0..self
+                .instance_count
+                .load(std::sync::atomic::Ordering::Relaxed),
+        );
+    }
 }
 
 impl super::common::PlotRenderer for PointCloudRenderer {

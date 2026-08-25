@@ -273,7 +273,7 @@ impl SurfaceRenderer {
     }
 
     pub fn draw(&self, rpass: &mut wgpu::RenderPass<'_>, mode: u32) {
-        let is_voxel = mode == 3;
+        let is_voxel = mode == 2;
         let pipeline = if is_voxel {
             &self.voxel_pipeline
         } else {
