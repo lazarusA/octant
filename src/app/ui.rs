@@ -523,15 +523,7 @@ impl eframe::App for OctantApp {
                 }
                 PlotType::Volume => {
                     if let Some(volume_renderer) = &self.volume_renderer {
-                        let (width, height) = self
-                            .volume_data
-                            .as_ref()
-                            .map(|v| (v.width as u32, v.height as u32))
-                            .unwrap_or_else(|| {
-                                self.matrix_data
-                                    .as_ref()
-                                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
-                            });
+                        let (width, height) = self.get_volume_dimensions();
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
                         let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
 
@@ -539,25 +531,28 @@ impl eframe::App for OctantApp {
                             plot_rect,
                             VolumeCallback {
                                 renderer: volume_renderer.clone(),
-                                color_params: self.get_color_params(),
-                                rot_y: self.sphere_rotation_y,
-                                rot_x: self.sphere_rotation_x,
-                                aspect_x,
-                                aspect_y,
-                                aspect_z,
-                                zoom: self.sphere_zoom,
-                                opacity_scale: self.volume_opacity,
-                                step_count: self.volume_step_count,
-                                width,
-                                height,
-                                algorithm: self.volume_algorithm,
-                                isovalue: self.volume_isovalue,
-                                isorange: self.volume_isorange,
-                                attenuation: self.volume_attenuation,
-                                shift_x,
-                                shift_y,
-                                shift_z,
-                                transparency: self.volume_transparency,
+                                params: crate::plots::volume::VolumeUniformParams {
+                                    color: self.get_color_params(),
+                                    rot_y: self.sphere_rotation_y,
+                                    rot_x: self.sphere_rotation_x,
+                                    aspect_x,
+                                    aspect_y,
+                                    aspect_z,
+                                    zoom: self.sphere_zoom,
+                                    opacity_scale: self.volume_opacity,
+                                    step_count: self.volume_step_count,
+                                    width,
+                                    height,
+                                    algorithm: self.volume_algorithm,
+                                    isovalue: self.volume_isovalue,
+                                    isorange: self.volume_isorange,
+                                    attenuation: self.volume_attenuation,
+                                    screen_aspect: 1.0,
+                                    shift_x,
+                                    shift_y,
+                                    shift_z,
+                                    transparency: self.volume_transparency,
+                                },
                                 rect: plot_rect,
                             },
                         );
@@ -566,15 +561,7 @@ impl eframe::App for OctantApp {
                 }
                 PlotType::PointCloud => {
                     if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
-                        let (width, height) = self
-                            .volume_data
-                            .as_ref()
-                            .map(|v| (v.width as u32, v.height as u32))
-                            .unwrap_or_else(|| {
-                                self.matrix_data
-                                    .as_ref()
-                                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
-                            });
+                        let (width, height) = self.get_volume_dimensions();
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
                         let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
 
@@ -582,19 +569,22 @@ impl eframe::App for OctantApp {
                             plot_rect,
                             PointCloudCallback {
                                 renderer: point_cloud_renderer.clone(),
-                                color_params: self.get_color_params(),
-                                rot_y: self.sphere_rotation_y,
-                                rot_x: self.sphere_rotation_x,
-                                aspect_x,
-                                aspect_y,
-                                aspect_z,
-                                zoom: self.sphere_zoom,
-                                point_size: self.point_cloud_size,
-                                width,
-                                height,
-                                shift_x,
-                                shift_y,
-                                shift_z,
+                                params: crate::plots::point_cloud::PointCloudUniformParams {
+                                    color: self.get_color_params(),
+                                    rot_y: self.sphere_rotation_y,
+                                    rot_x: self.sphere_rotation_x,
+                                    aspect_x,
+                                    aspect_y,
+                                    aspect_z,
+                                    zoom: self.sphere_zoom,
+                                    point_size: self.point_cloud_size,
+                                    width,
+                                    height,
+                                    screen_aspect: 1.0,
+                                    shift_x,
+                                    shift_y,
+                                    shift_z,
+                                },
                                 rect: plot_rect,
                             },
                         );
@@ -1070,40 +1060,33 @@ impl OctantApp {
                 let (data_w, data_h) = opt_vdata
                     .as_ref()
                     .map(|v| (v.width as u32, v.height as u32))
-                    .or_else(|| {
-                        self.volume_data
-                            .as_ref()
-                            .map(|v| (v.width as u32, v.height as u32))
-                    })
-                    .unwrap_or_else(|| {
-                        self.matrix_data
-                            .as_ref()
-                            .map_or((64, 64), |m| (m.width as u32, m.height as u32))
-                    });
+                    .unwrap_or_else(|| self.get_volume_dimensions());
                 let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
                 let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
                 renderer.update_uniforms(
                     queue,
-                    &color_params,
-                    rot_y,
-                    rot_x,
-                    aspect_x,
-                    aspect_y,
-                    aspect_z,
-                    zoom,
-                    self.volume_opacity,
-                    self.volume_step_count,
-                    data_w,
-                    data_h,
-                    self.volume_algorithm,
-                    self.volume_isovalue,
-                    self.volume_isorange,
-                    self.volume_attenuation,
-                    aspect_ratio,
-                    shift_x,
-                    shift_y,
-                    shift_z,
-                    self.volume_transparency,
+                    &crate::plots::volume::VolumeUniformParams {
+                        color: color_params,
+                        rot_y,
+                        rot_x,
+                        aspect_x,
+                        aspect_y,
+                        aspect_z,
+                        zoom,
+                        opacity_scale: self.volume_opacity,
+                        step_count: self.volume_step_count,
+                        width: data_w,
+                        height: data_h,
+                        algorithm: self.volume_algorithm,
+                        isovalue: self.volume_isovalue,
+                        isorange: self.volume_isorange,
+                        attenuation: self.volume_attenuation,
+                        screen_aspect: aspect_ratio,
+                        shift_x,
+                        shift_y,
+                        shift_z,
+                        transparency: self.volume_transparency,
+                    },
                 );
                 target
                     .render_frame(device, queue, clear_color, |rpass| {
@@ -1116,34 +1099,27 @@ impl OctantApp {
                 let (data_w, data_h) = opt_vdata
                     .as_ref()
                     .map(|v| (v.width as u32, v.height as u32))
-                    .or_else(|| {
-                        self.volume_data
-                            .as_ref()
-                            .map(|v| (v.width as u32, v.height as u32))
-                    })
-                    .unwrap_or_else(|| {
-                        self.matrix_data
-                            .as_ref()
-                            .map_or((64, 64), |m| (m.width as u32, m.height as u32))
-                    });
+                    .unwrap_or_else(|| self.get_volume_dimensions());
                 let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
                 let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
                 renderer.update_uniforms(
                     queue,
-                    &color_params,
-                    rot_y,
-                    rot_x,
-                    aspect_x,
-                    aspect_y,
-                    aspect_z,
-                    zoom,
-                    self.point_cloud_size,
-                    data_w,
-                    data_h,
-                    aspect_ratio,
-                    shift_x,
-                    shift_y,
-                    shift_z,
+                    &crate::plots::point_cloud::PointCloudUniformParams {
+                        color: color_params,
+                        rot_y,
+                        rot_x,
+                        aspect_x,
+                        aspect_y,
+                        aspect_z,
+                        zoom,
+                        point_size: self.point_cloud_size,
+                        width: data_w,
+                        height: data_h,
+                        screen_aspect: aspect_ratio,
+                        shift_x,
+                        shift_y,
+                        shift_z,
+                    },
                 );
                 target
                     .render_frame(device, queue, clear_color, |rpass| {

@@ -513,6 +513,19 @@ impl OctantApp {
         self.lock_color_bounds = false;
     }
 
+    /// Resolves active 3D volume/point-cloud dimensions with fallback to matrix data or default.
+    #[inline]
+    pub fn get_volume_dimensions(&self) -> (u32, u32) {
+        self.volume_data
+            .as_ref()
+            .map(|v| (v.width as u32, v.height as u32))
+            .unwrap_or_else(|| {
+                self.matrix_data
+                    .as_ref()
+                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
+            })
+    }
+
     /// Placeholder method to add a secondary dimensionally-compatible variable layer
     /// for multi-variable plotting (e.g., vector fields, RGB composites, dual-curves).
     pub fn add_plotted_layer(&mut self, layer: PlottedVariableState) -> Result<(), String> {
@@ -782,16 +795,24 @@ impl OctantApp {
         );
     }
 
+    /// Restores initial camera, zoom, and timestep state from an export run.
+    pub fn restore_initial_export_state(
+        &mut self,
+        state: &crate::app::capture::DeterministicExportState,
+    ) {
+        self.current_timestep = state.initial_timestep;
+        self.sphere_rotation_y = state.initial_rotation_y;
+        self.sphere_rotation_x = state.initial_rotation_x;
+        self.sphere_zoom = state.initial_zoom_3d;
+        self.heatmap_zoom = state.initial_zoom_2d;
+        self.load_selected_variable_block();
+    }
+
     /// Cancels in-progress deterministic animation export and restores camera state.
     pub fn cancel_deterministic_export(&mut self) {
         self.capture_config.pending_frame_capture = false;
         if let Some(state) = self.capture_config.export_state.take() {
-            self.current_timestep = state.initial_timestep;
-            self.sphere_rotation_y = state.initial_rotation_y;
-            self.sphere_rotation_x = state.initial_rotation_x;
-            self.sphere_zoom = state.initial_zoom_3d;
-            self.heatmap_zoom = state.initial_zoom_2d;
-            self.load_selected_variable_block();
+            self.restore_initial_export_state(&state);
             self.status_message = "Animation export cancelled".to_string();
         }
     }
@@ -800,12 +821,7 @@ impl OctantApp {
     pub fn finish_deterministic_export(&mut self) {
         self.capture_config.pending_frame_capture = false;
         if let Some(state) = self.capture_config.export_state.take() {
-            self.current_timestep = state.initial_timestep;
-            self.sphere_rotation_y = state.initial_rotation_y;
-            self.sphere_rotation_x = state.initial_rotation_x;
-            self.sphere_zoom = state.initial_zoom_3d;
-            self.heatmap_zoom = state.initial_zoom_2d;
-            self.load_selected_variable_block();
+            self.restore_initial_export_state(&state);
 
             let frames = state.captured_frames;
             let (width, height) = state.frame_size;
