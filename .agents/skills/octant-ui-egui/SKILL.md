@@ -42,3 +42,14 @@ This skill guides development of the user interface in Octant using `egui` and `
 ### 5. Smooth Animations & Timers
 - Track elapsed delta time (`ctx.input(|i| i.stable_dt)`).
 - Request continuous repaints only when playing animations or waiting for background prefetch (`ctx.request_repaint()`).
+
+### 6. Canvas Capture, Color Profiles & Animation Export
+- **Apple Display P3 PNG Color Profile (`src/utils/png.rs`)**: Saved PNG images inject standard `cHRM` (D65 white point, DCI-P3 primaries) and `gAMA` (2.2) chunks directly into the PNG chunk stream, ensuring macOS Preview, QuickLook, and Photoshop reproduce exact wide-gamut Retina display saturation.
+- **ITU-R BT.709 Full-Range Video Encoding (`src/utils/video.rs`)**: Videos are encoded using OpenH264 with ITU-R BT.709 Full-Range YUV420 conversion and 30 Mbps bitrate, preserving 100% full-scale `[0..255]` RGB dynamic range without washed-out limited-range tones.
+- **Deterministic Animation Export (`src/app/capture.rs`, `src/app/ui.rs`)**:
+  - `DeterministicExportState` orchestrates camera orbit (`MotionTrajectory`), zoom ease (`ZoomTrajectory`), and timestep playback.
+  - Interactive overlays (framing guides, hover tooltips) are automatically suppressed during export frames.
+  - The initial camera angles, zoom levels, and timesteps are recorded at export start and automatically restored upon completion or cancellation (`finish_deterministic_export` / `cancel_deterministic_export`).
+- **Export Progress Modal (`src/ui/framing.rs`)**:
+  - `show_export_progress_modal` displays an on-screen percentage progress bar, frame status (`Rendering frame X of Y...`), and `[❌ Cancel Export]` button.
+
