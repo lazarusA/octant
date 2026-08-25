@@ -36,10 +36,10 @@ impl YUVSource for Bt709YuvFrame {
     }
 }
 
-/// Converts a raw RGBA buffer into ITU-R BT.709 Full-Range YUV420 planes.
+/// Converts a raw RGBA buffer into ITU-R BT.709 YUV420 planes.
 ///
-/// Unlike standard WebRTC BT.601 limited-range (16-235), BT.709 Full-Range preserves 100%
-/// of the original RGB dynamic range [0..255] and vivid colormap saturation.
+/// Uses accurate Rec.709 standard studio range conversion to ensure video decoders
+/// (Apple QuickTime, Safari, VLC) reconstruct the exact pixel colors and saturation seen on screen.
 pub fn rgba_to_bt709_full_range_frame(rgba: &[u8], width: usize, height: usize) -> Bt709YuvFrame {
     let half_w = width / 2;
     let half_h = height / 2;
@@ -57,9 +57,9 @@ pub fn rgba_to_bt709_full_range_frame(rgba: &[u8], width: usize, height: usize) 
                 let g = rgba[px_idx + 1] as i32;
                 let b = rgba[px_idx + 2] as i32;
 
-                // ITU-R BT.709 Full-Range Y: 0.2126 R + 0.7152 G + 0.0722 B
-                let y = (13933 * r + 46871 * g + 4732 * b + 32768) >> 16;
-                y_plane[row_offset + col] = y.clamp(0, 255) as u8;
+                // ITU-R BT.709 standard Y: 16 + (0.183 R + 0.614 G + 0.062 B)
+                let y = (1048576 + 11966 * r + 40254 * g + 4064 * b + 32768) >> 16;
+                y_plane[row_offset + col] = y.clamp(16, 235) as u8;
             }
         }
     }
@@ -97,14 +97,14 @@ pub fn rgba_to_bt709_full_range_frame(rgba: &[u8], width: usize, height: usize) 
                 let g = g_sum / count;
                 let b = b_sum / count;
 
-                // ITU-R BT.709 Full-Range U: (B - Y) * 0.5389 + 128
-                let u = (-7510 * r - 25258 * g + 32768 * b + 8388608) >> 16;
-                // ITU-R BT.709 Full-Range V: (R - Y) * 0.6350 + 128
-                let v = (32768 * r - 29766 * g - 3002 * b + 8388608) >> 16;
+                // ITU-R BT.709 standard U: 128 + (-0.101 R - 0.339 G + 0.439 B)
+                let u = (8388608 - 6596 * r - 22188 * g + 28784 * b + 32768) >> 16;
+                // ITU-R BT.709 standard V: 128 + (0.439 R - 0.399 G - 0.040 B)
+                let v = (8388608 + 28784 * r - 26145 * g - 2639 * b + 32768) >> 16;
 
                 let uv_idx = uv_row_offset + uv_col;
-                u_plane[uv_idx] = u.clamp(0, 255) as u8;
-                v_plane[uv_idx] = v.clamp(0, 255) as u8;
+                u_plane[uv_idx] = u.clamp(16, 240) as u8;
+                v_plane[uv_idx] = v.clamp(16, 240) as u8;
             }
         }
     }

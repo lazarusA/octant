@@ -129,7 +129,29 @@ impl eframe::App for OctantApp {
                 crate::app::capture::MotionTrajectory::Turntable360 => None,
             };
 
-            let (target_w, target_h) = (1920, 1080);
+            let ppp = ctx.pixels_per_point().max(1.0);
+            let scale_mult = self.capture_config.scale_multiplier.clamp(1.0, 4.0);
+            let (target_w, target_h) = if self.capture_config.last_canvas_rect.is_positive() {
+                let rect = self.capture_config.compute_capture_rect(
+                    self.capture_config.last_canvas_rect,
+                    self.matrix_data.as_ref().and_then(|m| {
+                        if m.height > 0 {
+                            Some(m.width as f32 / m.height as f32)
+                        } else {
+                            None
+                        }
+                    }),
+                );
+                let w = ((rect.width() * ppp * scale_mult).round() as u32) & !1;
+                let h = ((rect.height() * ppp * scale_mult).round() as u32) & !1;
+                if w >= 64 && h >= 64 {
+                    (w, h)
+                } else {
+                    (1920, 1080)
+                }
+            } else {
+                (1920, 1080)
+            };
             let offscreen_zoom = if self.active_plot_type == PlotType::Heatmap {
                 offscreen_zoom_2d
             } else {
@@ -962,13 +984,31 @@ impl OctantApp {
     }
 
     /// Returns the theme-aware background clear color for GPU render passes.
-    pub fn theme_clear_color(&self, ctx: &egui::Context) -> wgpu::Color {
+    pub fn theme_clear_color(
+        &self,
+        ctx: &egui::Context,
+        format: wgpu::TextureFormat,
+    ) -> wgpu::Color {
         let bg = ctx.style_of(ctx.theme()).visuals.panel_fill;
-        wgpu::Color {
-            r: (bg.r() as f64) / 255.0,
-            g: (bg.g() as f64) / 255.0,
-            b: (bg.b() as f64) / 255.0,
-            a: (bg.a() as f64) / 255.0,
+        let is_srgb = matches!(
+            format,
+            wgpu::TextureFormat::Rgba8UnormSrgb | wgpu::TextureFormat::Bgra8UnormSrgb
+        );
+        if is_srgb {
+            let rgba = egui::Rgba::from(bg);
+            wgpu::Color {
+                r: rgba.r() as f64,
+                g: rgba.g() as f64,
+                b: rgba.b() as f64,
+                a: rgba.a() as f64,
+            }
+        } else {
+            wgpu::Color {
+                r: (bg.r() as f64) / 255.0,
+                g: (bg.g() as f64) / 255.0,
+                b: (bg.b() as f64) / 255.0,
+                a: (bg.a() as f64) / 255.0,
+            }
         }
     }
 
@@ -997,7 +1037,7 @@ impl OctantApp {
         let target =
             crate::plots::OffscreenTarget::new(device, width, height, wgpu_state.target_format);
 
-        let clear_color = self.theme_clear_color(ctx);
+        let clear_color = self.theme_clear_color(ctx, wgpu_state.target_format);
         let aspect_ratio = (width as f32) / (height as f32).max(1.0);
         let color_params = self.get_color_params();
 
