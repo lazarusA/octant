@@ -270,12 +270,19 @@ pub fn show_export_progress_modal(app: &mut OctantApp, ctx: &egui::Context) {
     if let Some(ref export) = app.capture_config.export_state
         && export.is_active
     {
-        egui::Window::new("🎬 Exporting Animation Video")
+        let window_title = match export.export_format {
+            crate::app::capture::ExportFormat::Mp4Video => "🎬 Exporting Animation Video",
+            crate::app::capture::ExportFormat::PngImageSequence => {
+                "📁 Exporting PNG Image Sequence"
+            }
+        };
+
+        egui::Window::new(window_title)
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
             .show(ctx, |ui| {
-                ui.set_min_width(300.0);
+                ui.set_min_width(320.0);
                 let current = export.current_frame;
                 let total = export.total_frames.max(1);
                 let progress = (current as f32) / (total as f32);
@@ -285,7 +292,8 @@ pub fn show_export_progress_modal(app: &mut OctantApp, ctx: &egui::Context) {
                 ui.label(format!("Rendering frame {} of {}...", current, total));
                 ui.label(
                     egui::RichText::new(format!(
-                        "Mode: {} | Zoom: {}",
+                        "Format: {} | Mode: {} | Zoom: {}",
+                        export.export_format.label(),
                         export.motion_mode.label(),
                         export.zoom_mode.label()
                     ))

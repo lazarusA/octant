@@ -688,6 +688,18 @@ fn render_capture_settings_menu(app: &mut OctantApp, ui: &mut egui::Ui, is_video
     ui.separator();
 
     ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Export Format:").small().strong());
+        for fmt in crate::app::capture::ExportFormat::ALL {
+            let is_sel = app.capture_config.export_format == fmt;
+            if ui.selectable_label(is_sel, fmt.label()).clicked() {
+                app.capture_config.export_format = fmt;
+            }
+        }
+    });
+
+    ui.separator();
+
+    ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Animation Motion:").small().strong());
         for mode in crate::app::capture::MotionTrajectory::ALL {
             let is_sel = app.capture_config.motion_mode == mode;
@@ -733,8 +745,11 @@ fn render_capture_settings_menu(app: &mut OctantApp, ui: &mut egui::Ui, is_video
 
     ui.separator();
 
-    let export_btn =
-        egui::Button::new(egui::RichText::new("🎬 Export Animation Video (MP4)").strong());
+    let export_label = match app.capture_config.export_format {
+        crate::app::capture::ExportFormat::Mp4Video => "🎬 Export Animation Video (MP4)",
+        crate::app::capture::ExportFormat::PngImageSequence => "📁 Export Display P3 PNG Sequence",
+    };
+    let export_btn = egui::Button::new(egui::RichText::new(export_label).strong());
     if ui
         .add_sized([ui.available_width(), 26.0], export_btn)
         .clicked()

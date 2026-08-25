@@ -1,6 +1,7 @@
 pub mod common;
 pub mod heatmap;
 pub mod line;
+pub mod offscreen;
 pub mod point_cloud;
 pub mod sphere;
 pub mod surface;
@@ -9,6 +10,7 @@ pub mod volume;
 pub use common::PlotRenderer;
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
 pub use line::{LineCallback, LineRenderer};
+pub use offscreen::OffscreenTarget;
 pub use point_cloud::{PointCloudCallback, PointCloudRenderer};
 pub use sphere::{SphereCallback, SpherePlot, SphereRenderer};
 pub use surface::{SurfaceCallback, SurfacePlot, SurfaceRenderer};

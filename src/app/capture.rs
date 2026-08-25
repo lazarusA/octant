@@ -123,6 +123,24 @@ impl ZoomTrajectory {
     }
 }
 
+/// Export format for animation rendering (MP4 video or PNG image sequence).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ExportFormat {
+    Mp4Video,
+    PngImageSequence,
+}
+
+impl ExportFormat {
+    pub const ALL: [Self; 2] = [Self::Mp4Video, Self::PngImageSequence];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Mp4Video => "MP4 Video (H.264 BT.709)",
+            Self::PngImageSequence => "Display P3 PNG Sequence",
+        }
+    }
+}
+
 /// In-flight deterministic video animation export state.
 #[derive(Clone)]
 pub struct DeterministicExportState {
@@ -131,6 +149,7 @@ pub struct DeterministicExportState {
     pub total_frames: usize,
     pub motion_mode: MotionTrajectory,
     pub zoom_mode: ZoomTrajectory,
+    pub export_format: ExportFormat,
     pub export_fps: f32,
     pub output_path: PathBuf,
     pub captured_frames: Vec<Arc<[u8]>>,
@@ -157,6 +176,7 @@ pub struct CaptureConfig {
     // Deterministic Animation Export
     pub motion_mode: MotionTrajectory,
     pub zoom_mode: ZoomTrajectory,
+    pub export_format: ExportFormat,
     pub export_total_frames: usize,
     pub export_state: Option<DeterministicExportState>,
 
@@ -187,6 +207,7 @@ impl Default for CaptureConfig {
             pending_save: false,
             motion_mode: MotionTrajectory::TimestepOnly,
             zoom_mode: ZoomTrajectory::Static,
+            export_format: ExportFormat::Mp4Video,
             export_total_frames: 120,
             export_state: None,
             is_recording: false,

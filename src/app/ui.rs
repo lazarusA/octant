@@ -98,6 +98,26 @@ impl eframe::App for OctantApp {
         {
             let t = (f as f32) / (total.max(1) - 1).max(1) as f32;
 
+            let offscreen_rot_y = match motion_mode {
+                crate::app::capture::MotionTrajectory::Turntable360
+                | crate::app::capture::MotionTrajectory::TimestepAndTurntable => {
+                    init_rot_y + t * std::f32::consts::TAU
+                }
+                crate::app::capture::MotionTrajectory::TimestepOnly => init_rot_y,
+            };
+
+            let zoom_mult = match zoom_mode {
+                crate::app::capture::ZoomTrajectory::Static => 1.0,
+                crate::app::capture::ZoomTrajectory::ZoomIn => {
+                    1.0 + crate::utils::math::ease_in_out_cubic(t) * 0.8
+                }
+                crate::app::capture::ZoomTrajectory::ZoomOut => {
+                    1.8 - crate::utils::math::ease_in_out_cubic(t) * 0.8
+                }
+            };
+            let offscreen_zoom_3d = (init_zoom_3d / zoom_mult).clamp(0.2, 10.0);
+            let offscreen_zoom_2d = (init_zoom_2d * zoom_mult).clamp(0.1, 50.0);
+
             // 1. Timestep Trajectory
             match motion_mode {
                 crate::app::capture::MotionTrajectory::TimestepOnly
@@ -113,29 +133,36 @@ impl eframe::App for OctantApp {
                 crate::app::capture::MotionTrajectory::Turntable360 => {}
             }
 
-            // 2. Camera Turntable Orbit Trajectory
-            match motion_mode {
-                crate::app::capture::MotionTrajectory::Turntable360
-                | crate::app::capture::MotionTrajectory::TimestepAndTurntable => {
-                    self.sphere_rotation_y = init_rot_y + t * std::f32::consts::TAU;
+            let (target_w, target_h) = (1920, 1080);
+            let offscreen_zoom = if self.active_plot_type == PlotType::Heatmap {
+                offscreen_zoom_2d
+            } else {
+                offscreen_zoom_3d
+            };
+
+            if let Some(frame_bytes) = self.render_offscreen_frame(
+                target_w,
+                target_h,
+                offscreen_rot_y,
+                self.sphere_rotation_x,
+                offscreen_zoom,
+            ) {
+                let mut should_finish = false;
+                if let Some(ref mut export) = self.capture_config.export_state {
+                    export.frame_size = (target_w, target_h);
+                    export.captured_frames.push(frame_bytes);
+                    export.current_frame += 1;
+                    if export.current_frame >= export.total_frames {
+                        should_finish = true;
+                    }
                 }
-                crate::app::capture::MotionTrajectory::TimestepOnly => {}
+                if should_finish {
+                    self.finish_deterministic_export();
+                }
+            } else {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
             }
 
-            // 3. Camera Zoom Trajectory
-            let zoom_mult = match zoom_mode {
-                crate::app::capture::ZoomTrajectory::Static => 1.0,
-                crate::app::capture::ZoomTrajectory::ZoomIn => {
-                    1.0 + crate::utils::math::ease_in_out_cubic(t) * 0.8
-                }
-                crate::app::capture::ZoomTrajectory::ZoomOut => {
-                    1.8 - crate::utils::math::ease_in_out_cubic(t) * 0.8
-                }
-            };
-            self.sphere_zoom = (init_zoom_3d / zoom_mult).clamp(0.2, 10.0);
-            self.heatmap_zoom = (init_zoom_2d * zoom_mult).clamp(0.1, 50.0);
-
-            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
             ctx.request_repaint();
         } else if self.capture_config.pending_save {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
@@ -943,6 +970,81 @@ impl OctantApp {
                     }
                 }
             }
+        }
+    }
+
+    /// Renders the active plot directly to an offscreen GPU texture at specified dimensions and camera angles.
+    pub fn render_offscreen_frame(
+        &self,
+        width: u32,
+        height: u32,
+        rot_y: f32,
+        rot_x: f32,
+        zoom: f32,
+    ) -> Option<std::sync::Arc<[u8]>> {
+        let wgpu_state = self.wgpu_render_state.as_ref()?;
+        let device = &wgpu_state.device;
+        let queue = &wgpu_state.queue;
+
+        let target =
+            crate::plots::OffscreenTarget::new(device, width, height, wgpu_state.target_format);
+
+        let clear_color = wgpu::Color {
+            r: 0.04,
+            g: 0.05,
+            b: 0.07,
+            a: 1.0,
+        };
+        let aspect_ratio = (width as f32) / (height as f32).max(1.0);
+        let color_params = self.get_color_params();
+
+        match self.active_plot_type {
+            PlotType::Heatmap => {
+                let renderer = self.renderer.as_ref()?;
+                renderer.update_uniforms(queue, &color_params, [0.0, 0.0], zoom, [1.0, 1.0]);
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass);
+                    })
+                    .ok()
+            }
+            PlotType::Sphere => {
+                let renderer = self.sphere_renderer.as_ref()?;
+                renderer.update_uniforms(
+                    queue,
+                    &color_params,
+                    rot_y,
+                    rot_x,
+                    aspect_ratio,
+                    zoom,
+                    self.sphere_displacement_strength,
+                    self.sphere_mode,
+                );
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass, self.sphere_mode);
+                    })
+                    .ok()
+            }
+            PlotType::Surface => {
+                let renderer = self.surface_renderer.as_ref()?;
+                renderer.update_uniforms(
+                    queue,
+                    &color_params,
+                    rot_y,
+                    rot_x,
+                    aspect_ratio,
+                    zoom,
+                    self.surface_displacement_strength,
+                    self.surface_mode,
+                );
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass, self.surface_mode);
+                    })
+                    .ok()
+            }
+            _ => None,
         }
     }
 
