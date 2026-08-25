@@ -513,110 +513,192 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         // 10. Capture & Recording Settings Wheel (⚙)
         if show_capture_settings {
-            let settings_resp = ui.scope(|ui| {
-                ui.menu_button(egui::RichText::new("⚙").strong(), |ui| {
-                    render_capture_settings_menu(app, ui, true);
-                })
-                .response
+            let popup_open_id = ui.make_persistent_id("capture_settings_open");
+            let popup_area_id = ui.make_persistent_id("capture_settings_area");
+            let mut is_open = ui
+                .data(|d| d.get_temp::<bool>(popup_open_id))
+                .unwrap_or(false);
+
+            let btn_resp = ui
+                .button(egui::RichText::new("⚙").strong())
                 .on_hover_text(
                     "Capture & Recording Settings (Aspect Ratios, Framing Guides, FPS, Output Folder)",
                 );
-            });
-            widths.insert(
-                BottomBarItem::CaptureSettingsBtn,
-                settings_resp.response.rect.width(),
-            );
-        }
+            if btn_resp.clicked() {
+                is_open = !is_open;
+            }
 
-        // 10. Overflow Button "..."
-        if show_overflow {
-            let overflow_resp = ui.scope(|ui| {
-                ui.menu_button(egui::RichText::new("…").strong(), |ui| {
-                    ui.set_min_width(260.0);
-                    ui.label(
-                        egui::RichText::new("Playback, Save & Recording Options")
-                            .small()
-                            .weak(),
-                    );
-                    ui.separator();
+            if is_open {
+                let screen_rect = ui.input(|i| i.raw.screen_rect).unwrap_or(
+                    egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1920.0, 1080.0)),
+                );
+                let popup_w = 280.0;
+                let anchor = btn_resp.rect.left_top();
+                let popup_pos = egui::pos2(
+                    anchor
+                        .x
+                        .clamp(10.0, (screen_rect.max.x - popup_w - 10.0).max(10.0)),
+                    (anchor.y - 480.0).clamp(10.0, (screen_rect.max.y - 480.0).max(10.0)),
+                );
 
-                    if !show_save && ui.button("📷 Save Canvas Plot (PNG)").clicked() {
-                        app.trigger_save_screenshot();
-                    }
-
-                    if !show_record {
-                        let is_rec = app.capture_config.is_recording;
-                        let rec_text = if is_rec {
-                            "⏹ Stop Video Recording"
-                        } else {
-                            "⏺ Start Video Recording (MP4)"
-                        };
-                        if ui.button(rec_text).clicked() {
-                            if is_rec {
-                                app.stop_recording();
-                            } else {
-                                app.start_recording();
-                            }
-                        }
-                    }
-
-                    if !show_capture_settings {
-                        ui.separator();
-                        render_capture_settings_menu(app, ui, true);
-                    }
-
-                    ui.separator();
-                    if !show_loop {
-                        ui.checkbox(&mut app.loop_playback, "🔄 Loop Playback");
-                        ui.separator();
-                    }
-
-                    if !show_fps {
-                        ui.label(egui::RichText::new("Playback Speed").strong());
-                        ui.add(egui::Slider::new(&mut app.playback_fps, 1.0..=60.0).suffix(" FPS"));
-                        ui.separator();
-                    }
-
-                    if !show_prev_next {
-                        ui.horizontal(|ui| {
-                            if ui.button("◀ Prev Step").clicked() {
-                                app.step_prev();
-                            }
-                            if ui.button("Next Step ▶").clicked() {
-                                app.step_next();
+                egui::Area::new(popup_area_id)
+                    .order(egui::Order::Foreground)
+                    .fixed_pos(popup_pos)
+                    .show(ui.ctx(), |ui| {
+                        let frame_resp = egui::Frame::popup(ui.style()).show(ui, |ui| {
+                            ui.set_width(popup_w);
+                            let should_close = render_capture_settings_menu(app, ui, true);
+                            if should_close {
+                                is_open = false;
                             }
                         });
-                        ui.separator();
-                    }
 
-                    // Jump to Start / End
-                    ui.horizontal(|ui| {
-                        if ui.button("⏮ First Step").clicked() {
-                            app.request_step_or_load(0);
-                        }
-                        if ui.button("⏭ Last Step").clicked() {
-                            app.request_step_or_load(slider_max);
+                        if ui.input(|i| i.pointer.any_pressed())
+                            && let Some(pos) = ui.input(|i| i.pointer.interact_pos())
+                            && !frame_resp.response.rect.contains(pos)
+                            && !btn_resp.rect.contains(pos)
+                        {
+                            is_open = false;
                         }
                     });
+            }
 
-                    ui.separator();
+            ui.data_mut(|d| d.insert_temp(popup_open_id, is_open));
+            widths.insert(BottomBarItem::CaptureSettingsBtn, btn_resp.rect.width());
+        }
 
-                    // Detailed Timeline Details
-                    ui.label(egui::RichText::new("Timeline Details").strong());
-                    ui.label(format!("• Dimension: {}", active_anim_dim));
-                    ui.label(format!("• Step: {} / {}", app.current_timestep, slider_max));
-                    ui.label(format!("• Current: {}", formatted_axis));
-                    ui.label(format!("• Range: {} → {}", start_date_str, end_date_str));
-                    ui.label(format!("• Step Size: {}", step_size_str));
-                    ui.label(format!("• Status: {}", status_text));
-                })
-                .response
+        // 11. Overflow Button "..."
+        if show_overflow {
+            let popup_open_id = ui.make_persistent_id("overflow_menu_open");
+            let popup_area_id = ui.make_persistent_id("overflow_menu_area");
+            let mut is_open = ui
+                .data(|d| d.get_temp::<bool>(popup_open_id))
+                .unwrap_or(false);
+
+            let overflow_resp = ui
+                .button(egui::RichText::new("…").strong())
                 .on_hover_text("More playback, capture, and timeline options");
-            });
-            widths.insert(
-                BottomBarItem::OverflowBtn,
-                overflow_resp.response.rect.width(),
-            );
+            if overflow_resp.clicked() {
+                is_open = !is_open;
+            }
+
+            if is_open {
+                let screen_rect = ui.input(|i| i.raw.screen_rect).unwrap_or(
+                    egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1920.0, 1080.0)),
+                );
+                let popup_w = 280.0;
+                let anchor = overflow_resp.rect.left_top();
+                let popup_pos = egui::pos2(
+                    anchor
+                        .x
+                        .clamp(10.0, (screen_rect.max.x - popup_w - 10.0).max(10.0)),
+                    (anchor.y - 480.0).clamp(10.0, (screen_rect.max.y - 480.0).max(10.0)),
+                );
+
+                egui::Area::new(popup_area_id)
+                    .order(egui::Order::Foreground)
+                    .fixed_pos(popup_pos)
+                    .show(ui.ctx(), |ui| {
+                        let frame_resp = egui::Frame::popup(ui.style()).show(ui, |ui| {
+                            ui.set_width(popup_w);
+                            ui.label(
+                                egui::RichText::new("Playback, Save & Recording Options")
+                                    .small()
+                                    .weak(),
+                            );
+                            ui.separator();
+
+                            if !show_save && ui.button("📷 Save Canvas Plot (PNG)").clicked() {
+                                app.trigger_save_screenshot();
+                                is_open = false;
+                            }
+
+                            if !show_record {
+                                let is_rec = app.capture_config.is_recording;
+                                let rec_text = if is_rec {
+                                    "⏹ Stop Video Recording"
+                                } else {
+                                    "⏺ Start Video Recording (MP4)"
+                                };
+                                if ui.button(rec_text).clicked() {
+                                    if is_rec {
+                                        app.stop_recording();
+                                    } else {
+                                        app.start_recording();
+                                    }
+                                    is_open = false;
+                                }
+                            }
+
+                            if !show_capture_settings {
+                                ui.separator();
+                                let should_close = render_capture_settings_menu(app, ui, true);
+                                if should_close {
+                                    is_open = false;
+                                }
+                            }
+
+                            ui.separator();
+                            if !show_loop {
+                                ui.checkbox(&mut app.loop_playback, "🔄 Loop Playback");
+                                ui.separator();
+                            }
+
+                            if !show_fps {
+                                ui.label(egui::RichText::new("Playback Speed").strong());
+                                ui.add(
+                                    egui::Slider::new(&mut app.playback_fps, 1.0..=60.0)
+                                        .suffix(" FPS"),
+                                );
+                                ui.separator();
+                            }
+
+                            if !show_prev_next {
+                                ui.horizontal(|ui| {
+                                    if ui.button("◀ Prev Step").clicked() {
+                                        app.step_prev();
+                                    }
+                                    if ui.button("Next Step ▶").clicked() {
+                                        app.step_next();
+                                    }
+                                });
+                                ui.separator();
+                            }
+
+                            // Jump to Start / End
+                            ui.horizontal(|ui| {
+                                if ui.button("⏮ First Step").clicked() {
+                                    app.request_step_or_load(0);
+                                }
+                                if ui.button("⏭ Last Step").clicked() {
+                                    app.request_step_or_load(slider_max);
+                                }
+                            });
+
+                            ui.separator();
+
+                            // Detailed Timeline Details
+                            ui.label(egui::RichText::new("Timeline Details").strong());
+                            ui.label(format!("• Dimension: {}", active_anim_dim));
+                            ui.label(format!("• Step: {} / {}", app.current_timestep, slider_max));
+                            ui.label(format!("• Current: {}", formatted_axis));
+                            ui.label(format!("• Range: {} → {}", start_date_str, end_date_str));
+                            ui.label(format!("• Step Size: {}", step_size_str));
+                            ui.label(format!("• Status: {}", status_text));
+                        });
+
+                        if ui.input(|i| i.pointer.any_pressed())
+                            && let Some(pos) = ui.input(|i| i.pointer.interact_pos())
+                            && !frame_resp.response.rect.contains(pos)
+                            && !overflow_resp.rect.contains(pos)
+                        {
+                            is_open = false;
+                        }
+                    });
+            }
+
+            ui.data_mut(|d| d.insert_temp(popup_open_id, is_open));
+            widths.insert(BottomBarItem::OverflowBtn, overflow_resp.rect.width());
         }
 
         ui.ctx().data_mut(|d| d.insert_temp(storage_id, widths));
@@ -624,7 +706,9 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 /// Renders aspect ratio presets, framing guide toggle, and output folder configuration.
-fn render_capture_settings_menu(app: &mut OctantApp, ui: &mut egui::Ui, is_video: bool) {
+/// Returns true if an execution button was triggered that should close the popup.
+fn render_capture_settings_menu(app: &mut OctantApp, ui: &mut egui::Ui, is_video: bool) -> bool {
+    let mut close_requested = false;
     ui.set_min_width(260.0);
     ui.label(egui::RichText::new("📷 Plot Export & 🎬 Video Recording Settings").strong());
     ui.separator();
@@ -719,15 +803,32 @@ fn render_capture_settings_menu(app: &mut OctantApp, ui: &mut egui::Ui, is_video
         }
     });
 
-    if app.capture_config.motion_mode != crate::app::capture::MotionTrajectory::TimestepOnly {
-        ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("Orbit Frames:").small().strong());
-            ui.add(
-                egui::Slider::new(&mut app.capture_config.export_total_frames, 30..=480)
-                    .suffix(" frames"),
-            );
-        });
-    }
+    ui.horizontal(|ui| {
+        let total_timesteps = app.animated_dim_extent();
+        let frame_label = match app.capture_config.motion_mode {
+            crate::app::capture::MotionTrajectory::TimestepOnly => "Timestep Frames:",
+            crate::app::capture::MotionTrajectory::Turntable360 => "Orbit Frames:",
+            crate::app::capture::MotionTrajectory::TimestepAndTurntable => "Total Frames:",
+        };
+        ui.label(egui::RichText::new(frame_label).small().strong());
+        let max_range = total_timesteps
+            .max(480)
+            .max(app.capture_config.export_total_frames);
+        ui.add(
+            egui::DragValue::new(&mut app.capture_config.export_total_frames)
+                .range(2..=max_range)
+                .speed(1.0)
+                .suffix(" frames"),
+        );
+        if total_timesteps > 1
+            && ui
+                .small_button(format!("All ({total_timesteps})"))
+                .on_hover_text(format!("Export all {total_timesteps} timesteps (1:1)"))
+                .clicked()
+        {
+            app.capture_config.export_total_frames = total_timesteps;
+        }
+    });
 
     ui.separator();
 
@@ -755,6 +856,7 @@ fn render_capture_settings_menu(app: &mut OctantApp, ui: &mut egui::Ui, is_video
         .clicked()
     {
         app.start_deterministic_export();
+        close_requested = true;
     }
 
     ui.separator();
@@ -771,4 +873,6 @@ fn render_capture_settings_menu(app: &mut OctantApp, ui: &mut egui::Ui, is_video
         ui.label("Custom Dir:");
         ui.text_edit_singleline(&mut app.capture_config.output_dir);
     });
+
+    close_requested
 }

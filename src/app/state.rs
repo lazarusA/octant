@@ -750,11 +750,7 @@ impl OctantApp {
         }
         self.capture_config.pending_frame_capture = false;
 
-        let total_timesteps = self.animated_dim_extent();
-        let total_frames = match self.capture_config.motion_mode {
-            crate::app::capture::MotionTrajectory::TimestepOnly => total_timesteps.max(2),
-            _ => self.capture_config.export_total_frames.max(10),
-        };
+        let total_frames = self.capture_config.export_total_frames.max(2);
 
         let output_path = match self.capture_config.export_format {
             crate::app::capture::ExportFormat::Mp4Video => {
