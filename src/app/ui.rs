@@ -1011,12 +1011,17 @@ impl OctantApp {
         let aspect_ratio = (width as f32) / (height as f32).max(1.0);
         let color_params = self.get_color_params();
 
+        // Upload offscreen frame data to active GPU renderers if available
+        if let Some(mdata) = &opt_mdata {
+            self.update_active_2d_renderer_data(queue, &mdata.values);
+        }
+        if let Some(vdata) = &opt_vdata {
+            self.update_active_3d_renderer_data(queue, &vdata.values);
+        }
+
         let frame_bytes = match self.active_plot_type {
             PlotType::Heatmap => {
                 let renderer = self.renderer.as_ref()?;
-                if let Some(mdata) = &opt_mdata {
-                    renderer.update_data(queue, &mdata.values);
-                }
                 renderer.update_uniforms(queue, &color_params, [0.0, 0.0], zoom, [1.0, 1.0]);
                 target
                     .render_frame(device, queue, clear_color, |rpass| {
@@ -1026,9 +1031,6 @@ impl OctantApp {
             }
             PlotType::Sphere => {
                 let renderer = self.sphere_renderer.as_ref()?;
-                if let Some(mdata) = &opt_mdata {
-                    renderer.update_data(queue, &mdata.values);
-                }
                 renderer.update_uniforms(
                     queue,
                     &color_params,
@@ -1047,9 +1049,6 @@ impl OctantApp {
             }
             PlotType::Surface => {
                 let renderer = self.surface_renderer.as_ref()?;
-                if let Some(mdata) = &opt_mdata {
-                    renderer.update_data(queue, &mdata.values);
-                }
                 renderer.update_uniforms(
                     queue,
                     &color_params,
@@ -1068,9 +1067,6 @@ impl OctantApp {
             }
             PlotType::Volume => {
                 let renderer = self.volume_renderer.as_ref()?;
-                if let Some(vdata) = &opt_vdata {
-                    renderer.update_data(queue, &vdata.values);
-                }
                 let (data_w, data_h) = opt_vdata
                     .as_ref()
                     .map(|v| (v.width as u32, v.height as u32))
@@ -1117,9 +1113,6 @@ impl OctantApp {
             }
             PlotType::PointCloud => {
                 let renderer = self.point_cloud_renderer.as_ref()?;
-                if let Some(vdata) = &opt_vdata {
-                    renderer.update_data(queue, &vdata.values);
-                }
                 let (data_w, data_h) = opt_vdata
                     .as_ref()
                     .map(|v| (v.width as u32, v.height as u32))
@@ -1160,18 +1153,12 @@ impl OctantApp {
             }
             PlotType::Line => {
                 let renderer = self.line_renderer.as_ref()?;
-                let (profile_values, profile_length, line_count) = if let Some(mdata) = &opt_mdata {
-                    (
-                        mdata.values.clone(),
-                        mdata.width as u32,
-                        mdata.height as u32,
-                    )
+                let (profile_length, line_count) = if let Some(mdata) = &opt_mdata {
+                    (mdata.width as u32, mdata.height as u32)
                 } else {
-                    self.get_line_profile_payload()
+                    let (_, len, count) = self.get_line_profile_payload();
+                    (len, count)
                 };
-                if !profile_values.is_empty() {
-                    renderer.update_data_with_device(device, queue, &profile_values);
-                }
                 renderer.update_uniforms(
                     queue,
                     &crate::plots::line::LineUniformParams {
@@ -1196,29 +1183,10 @@ impl OctantApp {
         // Restore active on-screen data into GPU buffers so on-screen canvas remains stationary
         if opt_mdata.is_some() || opt_vdata.is_some() {
             if let Some(mdata) = &self.matrix_data {
-                if let Some(r) = &self.renderer {
-                    r.update_data(queue, &mdata.values);
-                }
-                if let Some(r) = &self.sphere_renderer {
-                    r.update_data(queue, &mdata.values);
-                }
-                if let Some(r) = &self.surface_renderer {
-                    r.update_data(queue, &mdata.values);
-                }
-                if let Some(r) = &self.line_renderer {
-                    let (profile_values, _, _) = self.get_line_profile_payload();
-                    if !profile_values.is_empty() {
-                        r.update_data_with_device(device, queue, &profile_values);
-                    }
-                }
+                self.update_active_2d_renderer_data(queue, &mdata.values);
             }
             if let Some(vdata) = &self.volume_data {
-                if let Some(r) = &self.volume_renderer {
-                    r.update_data(queue, &vdata.values);
-                }
-                if let Some(r) = &self.point_cloud_renderer {
-                    r.update_data(queue, &vdata.values);
-                }
+                self.update_active_3d_renderer_data(queue, &vdata.values);
             }
         }
 
