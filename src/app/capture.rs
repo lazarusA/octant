@@ -79,6 +79,71 @@ impl AspectRatioPreset {
     }
 }
 
+/// Camera and animation motion trajectories for deterministic video export.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MotionTrajectory {
+    TimestepOnly,
+    Turntable360,
+    TimestepAndTurntable,
+}
+
+impl MotionTrajectory {
+    pub const ALL: [Self; 3] = [
+        Self::TimestepOnly,
+        Self::Turntable360,
+        Self::TimestepAndTurntable,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::TimestepOnly => "Timestep Playback",
+            Self::Turntable360 => "360° Turntable Orbit",
+            Self::TimestepAndTurntable => "Time + 360° Orbit",
+        }
+    }
+}
+
+/// Camera zoom trajectories for deterministic video export.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZoomTrajectory {
+    Static,
+    ZoomIn,
+    ZoomOut,
+}
+
+impl ZoomTrajectory {
+    pub const ALL: [Self; 3] = [Self::Static, Self::ZoomIn, Self::ZoomOut];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Static => "Static (No Zoom)",
+            Self::ZoomIn => "Zoom In (Overview → Detail)",
+            Self::ZoomOut => "Zoom Out (Detail → Overview)",
+        }
+    }
+}
+
+/// In-flight deterministic video animation export state.
+#[derive(Clone)]
+pub struct DeterministicExportState {
+    pub is_active: bool,
+    pub current_frame: usize,
+    pub total_frames: usize,
+    pub motion_mode: MotionTrajectory,
+    pub zoom_mode: ZoomTrajectory,
+    pub export_fps: f32,
+    pub output_path: PathBuf,
+    pub captured_frames: Vec<Arc<[u8]>>,
+    pub frame_size: (u32, u32),
+
+    // Initial camera & timestep state to restore upon completion
+    pub initial_timestep: usize,
+    pub initial_rotation_y: f32,
+    pub initial_rotation_x: f32,
+    pub initial_zoom_3d: f32,
+    pub initial_zoom_2d: f32,
+}
+
 /// Configuration and in-flight state for canvas plot saving and interaction video recording.
 #[derive(Clone)]
 pub struct CaptureConfig {
@@ -89,6 +154,12 @@ pub struct CaptureConfig {
     pub output_dir: String,
     pub pending_save: bool,
 
+    // Deterministic Animation Export
+    pub motion_mode: MotionTrajectory,
+    pub zoom_mode: ZoomTrajectory,
+    pub export_total_frames: usize,
+    pub export_state: Option<DeterministicExportState>,
+
     // Video recording state
     pub is_recording: bool,
     pub recording_fps: f32,
@@ -97,6 +168,7 @@ pub struct CaptureConfig {
     pub recorded_frame_size: (u32, u32),
     pub max_record_frames: usize,
     pub last_recording_time: std::time::Instant,
+    pub pending_frame_capture: bool,
 
     // Feedback & Notifications
     pub shutter_flash_time: Option<std::time::Instant>,
@@ -113,6 +185,10 @@ impl Default for CaptureConfig {
             show_framing_guides: false,
             output_dir: String::new(),
             pending_save: false,
+            motion_mode: MotionTrajectory::TimestepOnly,
+            zoom_mode: ZoomTrajectory::Static,
+            export_total_frames: 120,
+            export_state: None,
             is_recording: false,
             recording_fps: 24.0,
             recording_start_time: None,
@@ -120,6 +196,7 @@ impl Default for CaptureConfig {
             recorded_frame_size: (0, 0),
             max_record_frames: 1800, // 75 seconds at 24 fps
             last_recording_time: std::time::Instant::now(),
+            pending_frame_capture: false,
             shutter_flash_time: None,
             save_notification: None,
             last_canvas_rect: egui::Rect::NOTHING,

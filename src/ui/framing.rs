@@ -260,6 +260,48 @@ pub fn draw_canvas_framing_guides(app: &mut OctantApp, ui: &mut egui::Ui, canvas
     if clear_notification {
         app.capture_config.save_notification = None;
     }
+
+    show_export_progress_modal(app, ui.ctx());
+}
+
+/// Displays an on-screen progress modal while deterministic animation export is active.
+pub fn show_export_progress_modal(app: &mut OctantApp, ctx: &egui::Context) {
+    let mut cancel_requested = false;
+    if let Some(ref export) = app.capture_config.export_state
+        && export.is_active
+    {
+        egui::Window::new("🎬 Exporting Animation Video")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .show(ctx, |ui| {
+                ui.set_min_width(300.0);
+                let current = export.current_frame;
+                let total = export.total_frames.max(1);
+                let progress = (current as f32) / (total as f32);
+
+                ui.add(egui::ProgressBar::new(progress).show_percentage());
+                ui.add_space(4.0);
+                ui.label(format!("Rendering frame {} of {}...", current, total));
+                ui.label(
+                    egui::RichText::new(format!(
+                        "Mode: {} | Zoom: {}",
+                        export.motion_mode.label(),
+                        export.zoom_mode.label()
+                    ))
+                    .small()
+                    .weak(),
+                );
+                ui.separator();
+                if ui.button("❌ Cancel Export").clicked() {
+                    cancel_requested = true;
+                }
+            });
+    }
+
+    if cancel_requested {
+        app.cancel_deterministic_export();
+    }
 }
 
 /// Reveals a file in macOS Finder, Windows Explorer, or Linux file manager.

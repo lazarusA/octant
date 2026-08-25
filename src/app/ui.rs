@@ -72,7 +72,72 @@ impl eframe::App for OctantApp {
         };
         self.handle_screenshot_events(&ctx, active_canvas_rect);
 
-        if self.capture_config.pending_save {
+        let export_params = self.capture_config.export_state.as_ref().map(|e| {
+            (
+                e.is_active,
+                e.current_frame,
+                e.total_frames,
+                e.motion_mode,
+                e.zoom_mode,
+                e.initial_rotation_y,
+                e.initial_zoom_3d,
+                e.initial_zoom_2d,
+            )
+        });
+
+        if let Some((
+            true,
+            f,
+            total,
+            motion_mode,
+            zoom_mode,
+            init_rot_y,
+            init_zoom_3d,
+            init_zoom_2d,
+        )) = export_params
+        {
+            let t = (f as f32) / (total.max(1) - 1).max(1) as f32;
+
+            // 1. Timestep Trajectory
+            match motion_mode {
+                crate::app::capture::MotionTrajectory::TimestepOnly
+                | crate::app::capture::MotionTrajectory::TimestepAndTurntable => {
+                    let total_ts = self.animated_dim_extent().max(1);
+                    let ts = ((f as f32 / total as f32) * total_ts as f32).floor() as usize;
+                    let clamped_ts = ts.min(total_ts - 1);
+                    if self.current_timestep != clamped_ts {
+                        self.current_timestep = clamped_ts;
+                        self.load_selected_variable_block();
+                    }
+                }
+                crate::app::capture::MotionTrajectory::Turntable360 => {}
+            }
+
+            // 2. Camera Turntable Orbit Trajectory
+            match motion_mode {
+                crate::app::capture::MotionTrajectory::Turntable360
+                | crate::app::capture::MotionTrajectory::TimestepAndTurntable => {
+                    self.sphere_rotation_y = init_rot_y + t * std::f32::consts::TAU;
+                }
+                crate::app::capture::MotionTrajectory::TimestepOnly => {}
+            }
+
+            // 3. Camera Zoom Trajectory
+            let zoom_mult = match zoom_mode {
+                crate::app::capture::ZoomTrajectory::Static => 1.0,
+                crate::app::capture::ZoomTrajectory::ZoomIn => {
+                    1.0 + crate::utils::math::ease_in_out_cubic(t) * 0.8
+                }
+                crate::app::capture::ZoomTrajectory::ZoomOut => {
+                    1.8 - crate::utils::math::ease_in_out_cubic(t) * 0.8
+                }
+            };
+            self.sphere_zoom = (init_zoom_3d / zoom_mult).clamp(0.2, 10.0);
+            self.heatmap_zoom = (init_zoom_2d * zoom_mult).clamp(0.1, 50.0);
+
+            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+            ctx.request_repaint();
+        } else if self.capture_config.pending_save {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
             ctx.request_repaint();
         } else if self.capture_config.is_recording {
@@ -80,11 +145,19 @@ impl eframe::App for OctantApp {
             let frame_dur = std::time::Duration::from_secs_f32(
                 1.0 / self.capture_config.recording_fps.max(1.0),
             );
-            if now.duration_since(self.capture_config.last_recording_time) >= frame_dur {
+            let elapsed = now.duration_since(self.capture_config.last_recording_time);
+            if !self.capture_config.pending_frame_capture && elapsed >= frame_dur {
                 self.capture_config.last_recording_time = now;
+                self.capture_config.pending_frame_capture = true;
                 ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
             }
-            ctx.request_repaint();
+
+            let next_wake = if elapsed < frame_dur {
+                frame_dur - elapsed
+            } else {
+                std::time::Duration::from_millis(1)
+            };
+            ctx.request_repaint_after(next_wake);
         }
 
         // 2. Playback Animation Timer Loop
@@ -777,14 +850,16 @@ impl OctantApp {
             crop_h &= !1;
 
             if crop_w > 0 && crop_h > 0 {
+                let img_width = image.width();
                 let mut rgba = Vec::with_capacity(crop_w * crop_h * 4);
+                let pixels = &image.pixels;
+
                 for y in y_min..(y_min + crop_h) {
-                    for x in x_min..(x_min + crop_w) {
-                        let idx = y * image.width() + x;
-                        if let Some(c) = image.pixels.get(idx) {
-                            rgba.extend_from_slice(&[c.r(), c.g(), c.b(), c.a()]);
-                        } else {
-                            rgba.extend_from_slice(&[0, 0, 0, 255]);
+                    let row_start = y * img_width + x_min;
+                    let row_end = row_start + crop_w;
+                    if row_end <= pixels.len() {
+                        for &c in &pixels[row_start..row_end] {
+                            rgba.extend_from_slice(&c.to_array());
                         }
                     }
                 }
@@ -794,16 +869,21 @@ impl OctantApp {
                 if self.capture_config.pending_save {
                     self.capture_config.pending_save = false;
                     let output_path = self.capture_config.generate_filepath(false);
-                    let w = crop_w as u32;
-                    let h = crop_h as u32;
+                    let scale_mult = self.capture_config.scale_multiplier.clamp(1.0, 8.0);
+                    let base_w = crop_w as u32;
+                    let base_h = crop_h as u32;
+                    let target_w = ((base_w as f32) * scale_mult).round() as u32;
+                    let target_h = ((base_h as f32) * scale_mult).round() as u32;
+
                     let filename = output_path
                         .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or("octant_plot.png")
                         .to_string();
-                    self.status_message = format!("💾 Saved plot: {} ({}×{})", filename, w, h);
+                    self.status_message =
+                        format!("💾 Saved plot: {} ({}×{})", filename, target_w, target_h);
                     self.capture_config.save_notification = Some((
-                        format!("💾 Saved plot: {} ({}×{})", filename, w, h),
+                        format!("💾 Saved plot: {} ({}×{})", filename, target_w, target_h),
                         output_path.clone(),
                         std::time::Instant::now(),
                     ));
@@ -814,15 +894,46 @@ impl OctantApp {
                         if let Some(parent) = output_path.parent() {
                             let _ = std::fs::create_dir_all(parent);
                         }
-                        if let Some(img) = image::RgbaImage::from_raw(w, h, png_bytes)
-                            && let Err(e) = img.save(&output_path)
-                        {
-                            log::error!("Failed to save PNG: {}", e);
+                        if let Some(img) = image::RgbaImage::from_raw(base_w, base_h, png_bytes) {
+                            let final_img = if (scale_mult - 1.0).abs() > 0.01
+                                && target_w > 0
+                                && target_h > 0
+                            {
+                                image::imageops::resize(
+                                    &img,
+                                    target_w,
+                                    target_h,
+                                    image::imageops::FilterType::Lanczos3,
+                                )
+                            } else {
+                                img
+                            };
+                            if let Err(e) =
+                                crate::utils::png::save_display_p3_png(&final_img, &output_path)
+                            {
+                                log::error!("Failed to save Display P3 PNG: {}", e);
+                            }
                         }
                     });
                 }
 
+                let mut should_finish_export = false;
+                if let Some(ref mut export) = self.capture_config.export_state
+                    && export.is_active
+                {
+                    export.frame_size = (crop_w as u32, crop_h as u32);
+                    export.captured_frames.push(rgba_arc.clone());
+                    export.current_frame += 1;
+                    if export.current_frame >= export.total_frames {
+                        should_finish_export = true;
+                    }
+                }
+                if should_finish_export {
+                    self.finish_deterministic_export();
+                }
+
                 if self.capture_config.is_recording {
+                    self.capture_config.pending_frame_capture = false;
                     self.capture_config.recorded_frame_size = (crop_w as u32, crop_h as u32);
                     self.capture_config.recorded_frames.push(rgba_arc.clone());
                     if self.capture_config.recorded_frames.len()

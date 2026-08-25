@@ -668,24 +668,78 @@ fn render_capture_settings_menu(app: &mut OctantApp, ui: &mut egui::Ui, is_video
 
     ui.separator();
 
-    if is_video {
-        ui.horizontal(|ui| {
-            ui.label("Recording FPS:");
-            let mut fps = app.capture_config.recording_fps;
-            if egui::ComboBox::from_id_salt(("capture_fps_combo", 0))
-                .selected_text(format!("{:.0} FPS", fps))
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut fps, 15.0, "15 FPS");
-                    ui.selectable_value(&mut fps, 24.0, "24 FPS (Film)");
-                    ui.selectable_value(&mut fps, 30.0, "30 FPS (Standard)");
-                    ui.selectable_value(&mut fps, 60.0, "60 FPS (Smooth)");
-                })
-                .response
-                .changed()
-            {
-                app.capture_config.recording_fps = fps;
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Export DPI:").small().strong());
+        let current_scale = app.capture_config.scale_multiplier;
+        let scales = [
+            (1.0, "1× Screen"),
+            (2.0, "2× (300 DPI)"),
+            (3.0, "3× (450 DPI)"),
+            (4.0, "4× (600 DPI)"),
+        ];
+        for (val, label) in scales {
+            let is_sel = (current_scale - val).abs() < 0.01;
+            if ui.selectable_label(is_sel, label).clicked() {
+                app.capture_config.scale_multiplier = val;
             }
+        }
+    });
+
+    ui.separator();
+
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Animation Motion:").small().strong());
+        for mode in crate::app::capture::MotionTrajectory::ALL {
+            let is_sel = app.capture_config.motion_mode == mode;
+            if ui.selectable_label(is_sel, mode.label()).clicked() {
+                app.capture_config.motion_mode = mode;
+            }
+        }
+    });
+
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Camera Zoom:").small().strong());
+        for zoom in crate::app::capture::ZoomTrajectory::ALL {
+            let is_sel = app.capture_config.zoom_mode == zoom;
+            if ui.selectable_label(is_sel, zoom.label()).clicked() {
+                app.capture_config.zoom_mode = zoom;
+            }
+        }
+    });
+
+    if app.capture_config.motion_mode != crate::app::capture::MotionTrajectory::TimestepOnly {
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Orbit Frames:").small().strong());
+            ui.add(
+                egui::Slider::new(&mut app.capture_config.export_total_frames, 30..=480)
+                    .suffix(" frames"),
+            );
         });
+    }
+
+    ui.separator();
+
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Video Framerate:").small().strong());
+        let current_fps = app.capture_config.recording_fps;
+        let fps_opts = [(15.0, "15"), (24.0, "24"), (30.0, "30"), (60.0, "60")];
+        for (val, label) in fps_opts {
+            let is_sel = (current_fps - val).abs() < 0.1;
+            if ui.selectable_label(is_sel, label).clicked() {
+                app.capture_config.recording_fps = val;
+            }
+        }
+    });
+
+    ui.separator();
+
+    let export_btn =
+        egui::Button::new(egui::RichText::new("🎬 Export Animation Video (MP4)").strong());
+    if ui
+        .add_sized([ui.available_width(), 26.0], export_btn)
+        .clicked()
+    {
+        app.start_deterministic_export();
     }
 
     ui.separator();

@@ -6,6 +6,7 @@ pub mod executor;
 pub mod grid;
 pub mod math;
 pub mod metadata;
+pub mod png;
 pub mod units;
 pub mod video;
 

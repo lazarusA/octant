@@ -721,4 +721,115 @@ impl OctantApp {
             }
         });
     }
+
+    /// Starts deterministic frame-by-frame animation export with optional camera orbit and zoom.
+    pub fn start_deterministic_export(&mut self) {
+        let total_timesteps = self.animated_dim_extent();
+        let total_frames = match self.capture_config.motion_mode {
+            crate::app::capture::MotionTrajectory::TimestepOnly => total_timesteps.max(2),
+            _ => self.capture_config.export_total_frames.max(10),
+        };
+
+        let output_path = self.capture_config.generate_filepath(true);
+        self.is_playing = false; // Pause interactive playback during export
+
+        self.capture_config.export_state = Some(crate::app::capture::DeterministicExportState {
+            is_active: true,
+            current_frame: 0,
+            total_frames,
+            motion_mode: self.capture_config.motion_mode,
+            zoom_mode: self.capture_config.zoom_mode,
+            export_fps: self.capture_config.recording_fps,
+            output_path,
+            captured_frames: Vec::with_capacity(total_frames),
+            frame_size: (0, 0),
+            initial_timestep: self.current_timestep,
+            initial_rotation_y: self.sphere_rotation_y,
+            initial_rotation_x: self.sphere_rotation_x,
+            initial_zoom_3d: self.sphere_zoom,
+            initial_zoom_2d: self.heatmap_zoom,
+        });
+
+        self.status_message = format!(
+            "🎬 Starting deterministic animation export ({} frames)...",
+            total_frames
+        );
+    }
+
+    /// Cancels in-progress deterministic animation export and restores camera state.
+    pub fn cancel_deterministic_export(&mut self) {
+        if let Some(state) = self.capture_config.export_state.take() {
+            self.current_timestep = state.initial_timestep;
+            self.sphere_rotation_y = state.initial_rotation_y;
+            self.sphere_rotation_x = state.initial_rotation_x;
+            self.sphere_zoom = state.initial_zoom_3d;
+            self.heatmap_zoom = state.initial_zoom_2d;
+            self.status_message = "Animation export cancelled".to_string();
+        }
+    }
+
+    /// Finishes deterministic animation export, restores camera state, and triggers MP4 encoding.
+    pub fn finish_deterministic_export(&mut self) {
+        if let Some(state) = self.capture_config.export_state.take() {
+            self.current_timestep = state.initial_timestep;
+            self.sphere_rotation_y = state.initial_rotation_y;
+            self.sphere_rotation_x = state.initial_rotation_x;
+            self.sphere_zoom = state.initial_zoom_3d;
+            self.heatmap_zoom = state.initial_zoom_2d;
+
+            let frames = state.captured_frames;
+            let (width, height) = state.frame_size;
+            let fps = state.export_fps;
+            let output_path = state.output_path;
+
+            if frames.is_empty() || width == 0 || height == 0 {
+                self.status_message = "Animation export completed (no frames)".to_string();
+                return;
+            }
+
+            let filename = output_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("octant_animation.mp4")
+                .to_string();
+
+            self.capture_config.save_notification = Some((
+                format!(
+                    "🎬 Saved animation video: {} ({} frames @ {:.0} fps)",
+                    filename,
+                    frames.len(),
+                    fps
+                ),
+                output_path.clone(),
+                std::time::Instant::now(),
+            ));
+
+            self.status_message = format!(
+                "🎬 Encoding MP4 video ({} frames @ {:.0} fps) to {}...",
+                frames.len(),
+                fps,
+                filename
+            );
+
+            rayon::spawn(move || {
+                match crate::utils::video::encode_rgba_frames_to_mp4(
+                    &frames,
+                    width,
+                    height,
+                    fps,
+                    &output_path,
+                ) {
+                    Ok(()) => {
+                        log::info!(
+                            "Successfully encoded animation video to {}",
+                            output_path.display()
+                        );
+                    }
+                    Err(err) => {
+                        log::error!("Failed to encode MP4 animation: {}", err);
+                    }
+                }
+            });
+        }
+    }
 }
