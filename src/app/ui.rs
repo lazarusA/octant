@@ -64,6 +64,149 @@ impl eframe::App for OctantApp {
         // 1. Drain completed block-cache prefetch results.
         self.poll_block_prefetch_results();
 
+        // 1.5 Handle Screenshot events for Plot Saving & Video Recording
+        let active_canvas_rect = if self.capture_config.last_canvas_rect.is_positive() {
+            self.capture_config.last_canvas_rect
+        } else {
+            ui.available_rect_before_wrap()
+        };
+        self.handle_screenshot_events(&ctx, active_canvas_rect);
+
+        let export_params = self.capture_config.export_state.as_ref().map(|e| {
+            (
+                e.is_active,
+                e.current_frame,
+                e.total_frames,
+                e.motion_mode,
+                e.zoom_mode,
+                e.initial_rotation_y,
+                e.initial_zoom_3d,
+                e.initial_zoom_2d,
+            )
+        });
+
+        if let Some((
+            true,
+            f,
+            total,
+            motion_mode,
+            zoom_mode,
+            init_rot_y,
+            init_zoom_3d,
+            init_zoom_2d,
+        )) = export_params
+        {
+            let t = (f as f32) / (total.max(1) - 1).max(1) as f32;
+
+            let offscreen_rot_y = match motion_mode {
+                crate::app::capture::MotionTrajectory::Turntable360
+                | crate::app::capture::MotionTrajectory::TimestepAndTurntable => {
+                    init_rot_y + t * std::f32::consts::TAU
+                }
+                crate::app::capture::MotionTrajectory::TimestepOnly => init_rot_y,
+            };
+
+            let zoom_mult = match zoom_mode {
+                crate::app::capture::ZoomTrajectory::Static => 1.0,
+                crate::app::capture::ZoomTrajectory::ZoomIn => {
+                    1.0 + crate::utils::math::ease_in_out_cubic(t) * 0.8
+                }
+                crate::app::capture::ZoomTrajectory::ZoomOut => {
+                    1.8 - crate::utils::math::ease_in_out_cubic(t) * 0.8
+                }
+            };
+            let offscreen_zoom_3d = (init_zoom_3d / zoom_mult).clamp(0.2, 10.0);
+            let offscreen_zoom_2d = (init_zoom_2d * zoom_mult).clamp(0.1, 50.0);
+
+            // 1. Timestep Trajectory (Computed headlessly for offscreen render without altering active app state)
+            let offscreen_ts = match motion_mode {
+                crate::app::capture::MotionTrajectory::TimestepOnly
+                | crate::app::capture::MotionTrajectory::TimestepAndTurntable => {
+                    let total_ts = self.animated_dim_extent().max(1);
+                    let ts = ((f as f32 / total as f32) * total_ts as f32).floor() as usize;
+                    Some(ts.min(total_ts - 1))
+                }
+                crate::app::capture::MotionTrajectory::Turntable360 => None,
+            };
+
+            let ppp = ctx.pixels_per_point().max(1.0);
+            let scale_mult = self.capture_config.scale_multiplier.clamp(1.0, 4.0);
+            let (target_w, target_h) = if self.capture_config.last_canvas_rect.is_positive() {
+                let rect = self.capture_config.compute_capture_rect(
+                    self.capture_config.last_canvas_rect,
+                    self.matrix_data.as_ref().and_then(|m| {
+                        if m.height > 0 {
+                            Some(m.width as f32 / m.height as f32)
+                        } else {
+                            None
+                        }
+                    }),
+                );
+                let w = ((rect.width() * ppp * scale_mult).round() as u32) & !1;
+                let h = ((rect.height() * ppp * scale_mult).round() as u32) & !1;
+                if w >= 64 && h >= 64 {
+                    (w, h)
+                } else {
+                    (1920, 1080)
+                }
+            } else {
+                (1920, 1080)
+            };
+            let offscreen_zoom = if self.active_plot_type == PlotType::Heatmap {
+                offscreen_zoom_2d
+            } else {
+                offscreen_zoom_3d
+            };
+
+            if let Some(frame_bytes) = self.render_offscreen_frame(
+                &ctx,
+                target_w,
+                target_h,
+                offscreen_rot_y,
+                self.sphere_rotation_x,
+                offscreen_zoom,
+                offscreen_ts,
+            ) {
+                let mut should_finish = false;
+                if let Some(ref mut export) = self.capture_config.export_state {
+                    export.frame_size = (target_w, target_h);
+                    export.captured_frames.push(frame_bytes);
+                    export.current_frame += 1;
+                    if export.current_frame >= export.total_frames {
+                        should_finish = true;
+                    }
+                }
+                if should_finish {
+                    self.finish_deterministic_export();
+                }
+            } else {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+            }
+
+            ctx.request_repaint();
+        } else if self.capture_config.pending_save {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+            ctx.request_repaint();
+        } else if self.capture_config.is_recording {
+            let now = std::time::Instant::now();
+            let frame_dur = std::time::Duration::from_secs_f32(
+                1.0 / self.capture_config.recording_fps.max(1.0),
+            );
+            let elapsed = now.duration_since(self.capture_config.last_recording_time);
+            if !self.capture_config.pending_frame_capture && elapsed >= frame_dur {
+                self.capture_config.last_recording_time = now;
+                self.capture_config.pending_frame_capture = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+            }
+
+            let next_wake = if elapsed < frame_dur {
+                frame_dur - elapsed
+            } else {
+                std::time::Duration::from_millis(1)
+            };
+            ctx.request_repaint_after(next_wake);
+        }
+
         // 2. Playback Animation Timer Loop
         if self.is_playing {
             let now = std::time::Instant::now();
@@ -158,9 +301,7 @@ impl eframe::App for OctantApp {
         }
 
         if !is_hero_active {
-            if self.show_bottom_bar {
-                crate::ui::bottom_bar::show_bottom_bar(self, ui);
-            }
+            crate::ui::bottom_bar::show_bottom_bar(self, ui);
             crate::ui::catalog::show_catalog_window(self, &ctx);
             crate::ui::about::show_about_window(self, &ctx);
             if self.show_colorbar {
@@ -185,6 +326,7 @@ impl eframe::App for OctantApp {
         // 4. Drawing Canvas Area with Aspect Data Ratio
         {
             let canvas_rect = ui.available_rect_before_wrap();
+            self.capture_config.last_canvas_rect = canvas_rect;
 
             // When no dataset is plotted or hero landing view is active, render the clean hero page
             if is_hero_active {
@@ -403,15 +545,7 @@ impl eframe::App for OctantApp {
                 }
                 PlotType::Volume => {
                     if let Some(volume_renderer) = &self.volume_renderer {
-                        let (width, height) = self
-                            .volume_data
-                            .as_ref()
-                            .map(|v| (v.width as u32, v.height as u32))
-                            .unwrap_or_else(|| {
-                                self.matrix_data
-                                    .as_ref()
-                                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
-                            });
+                        let (width, height) = self.get_volume_dimensions();
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
                         let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
 
@@ -419,25 +553,28 @@ impl eframe::App for OctantApp {
                             plot_rect,
                             VolumeCallback {
                                 renderer: volume_renderer.clone(),
-                                color_params: self.get_color_params(),
-                                rot_y: self.sphere_rotation_y,
-                                rot_x: self.sphere_rotation_x,
-                                aspect_x,
-                                aspect_y,
-                                aspect_z,
-                                zoom: self.sphere_zoom,
-                                opacity_scale: self.volume_opacity,
-                                step_count: self.volume_step_count,
-                                width,
-                                height,
-                                algorithm: self.volume_algorithm,
-                                isovalue: self.volume_isovalue,
-                                isorange: self.volume_isorange,
-                                attenuation: self.volume_attenuation,
-                                shift_x,
-                                shift_y,
-                                shift_z,
-                                transparency: self.volume_transparency,
+                                params: crate::plots::volume::VolumeUniformParams {
+                                    color: self.get_color_params(),
+                                    rot_y: self.sphere_rotation_y,
+                                    rot_x: self.sphere_rotation_x,
+                                    aspect_x,
+                                    aspect_y,
+                                    aspect_z,
+                                    zoom: self.sphere_zoom,
+                                    opacity_scale: self.volume_opacity,
+                                    step_count: self.volume_step_count,
+                                    width,
+                                    height,
+                                    algorithm: self.volume_algorithm,
+                                    isovalue: self.volume_isovalue,
+                                    isorange: self.volume_isorange,
+                                    attenuation: self.volume_attenuation,
+                                    screen_aspect: 1.0,
+                                    shift_x,
+                                    shift_y,
+                                    shift_z,
+                                    transparency: self.volume_transparency,
+                                },
                                 rect: plot_rect,
                             },
                         );
@@ -446,15 +583,7 @@ impl eframe::App for OctantApp {
                 }
                 PlotType::PointCloud => {
                     if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
-                        let (width, height) = self
-                            .volume_data
-                            .as_ref()
-                            .map(|v| (v.width as u32, v.height as u32))
-                            .unwrap_or_else(|| {
-                                self.matrix_data
-                                    .as_ref()
-                                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
-                            });
+                        let (width, height) = self.get_volume_dimensions();
                         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
                         let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
 
@@ -462,19 +591,22 @@ impl eframe::App for OctantApp {
                             plot_rect,
                             PointCloudCallback {
                                 renderer: point_cloud_renderer.clone(),
-                                color_params: self.get_color_params(),
-                                rot_y: self.sphere_rotation_y,
-                                rot_x: self.sphere_rotation_x,
-                                aspect_x,
-                                aspect_y,
-                                aspect_z,
-                                zoom: self.sphere_zoom,
-                                point_size: self.point_cloud_size,
-                                width,
-                                height,
-                                shift_x,
-                                shift_y,
-                                shift_z,
+                                params: crate::plots::point_cloud::PointCloudUniformParams {
+                                    color: self.get_color_params(),
+                                    rot_y: self.sphere_rotation_y,
+                                    rot_x: self.sphere_rotation_x,
+                                    aspect_x,
+                                    aspect_y,
+                                    aspect_z,
+                                    zoom: self.sphere_zoom,
+                                    point_size: self.point_cloud_size,
+                                    width,
+                                    height,
+                                    screen_aspect: 1.0,
+                                    shift_x,
+                                    shift_y,
+                                    shift_z,
+                                },
                                 rect: plot_rect,
                             },
                         );
@@ -700,13 +832,401 @@ impl eframe::App for OctantApp {
                 crate::ui::axes::draw_plot_axes(ui, canvas_rect, plot_rect, &options);
             }
 
-            // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle
-            crate::ui::hover_tooltip::show_hover_tooltip(self, &ctx, ui, &response, canvas_rect);
+            // Render interactive Framing Guides & Letterbox Scrim and Hover Tooltip (suppressed during screenshot capture frame)
+            if !self.capture_config.pending_save {
+                crate::ui::framing::draw_canvas_framing_guides(self, ui, canvas_rect);
+                crate::ui::hover_tooltip::show_hover_tooltip(
+                    self,
+                    &ctx,
+                    ui,
+                    &response,
+                    canvas_rect,
+                );
+            }
         }
     }
 }
 
 impl OctantApp {
+    /// Dispatches screenshot events to save PNG or buffer frames for MP4 recording.
+    fn handle_screenshot_events(&mut self, ctx: &egui::Context, canvas_rect: egui::Rect) {
+        let screenshot = ctx.input(|i| {
+            i.events.iter().find_map(|e| {
+                if let egui::Event::Screenshot { image, .. } = e {
+                    Some(image.clone())
+                } else {
+                    None
+                }
+            })
+        });
+
+        if let Some(image) = screenshot {
+            let data_aspect = self.matrix_data.as_ref().and_then(|m| {
+                if m.height > 0 {
+                    Some(m.width as f32 / m.height as f32)
+                } else {
+                    None
+                }
+            });
+
+            let capture_rect = self
+                .capture_config
+                .compute_capture_rect(canvas_rect, data_aspect);
+            let ppp = ctx.pixels_per_point();
+
+            let x_min = ((capture_rect.min.x * ppp).round() as usize).clamp(0, image.width());
+            let x_max = ((capture_rect.max.x * ppp).round() as usize).clamp(x_min, image.width());
+            let y_min = ((capture_rect.min.y * ppp).round() as usize).clamp(0, image.height());
+            let y_max = ((capture_rect.max.y * ppp).round() as usize).clamp(y_min, image.height());
+
+            let mut crop_w = x_max.saturating_sub(x_min);
+            let mut crop_h = y_max.saturating_sub(y_min);
+
+            // H.264 requires even dimensions
+            crop_w &= !1;
+            crop_h &= !1;
+
+            if crop_w > 0 && crop_h > 0 {
+                let img_width = image.width();
+                let mut rgba = Vec::with_capacity(crop_w * crop_h * 4);
+                let pixels = &image.pixels;
+
+                for y in y_min..(y_min + crop_h) {
+                    let row_start = y * img_width + x_min;
+                    let row_end = row_start + crop_w;
+                    if row_end <= pixels.len() {
+                        for &c in &pixels[row_start..row_end] {
+                            rgba.extend_from_slice(&c.to_array());
+                        }
+                    }
+                }
+
+                let rgba_arc: std::sync::Arc<[u8]> = std::sync::Arc::from(rgba.into_boxed_slice());
+
+                if self.capture_config.pending_save {
+                    self.capture_config.pending_save = false;
+                    let output_path = self.capture_config.generate_filepath(false);
+                    let scale_mult = self.capture_config.scale_multiplier.clamp(1.0, 8.0);
+                    let base_w = crop_w as u32;
+                    let base_h = crop_h as u32;
+                    let target_w = ((base_w as f32) * scale_mult).round() as u32;
+                    let target_h = ((base_h as f32) * scale_mult).round() as u32;
+
+                    let filename = output_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("octant_plot.png")
+                        .to_string();
+                    self.status_message =
+                        format!("💾 Saved plot: {} ({}×{})", filename, target_w, target_h);
+                    self.capture_config.save_notification = Some((
+                        format!("💾 Saved plot: {} ({}×{})", filename, target_w, target_h),
+                        output_path.clone(),
+                        std::time::Instant::now(),
+                    ));
+                    self.capture_config.shutter_flash_time = Some(std::time::Instant::now());
+
+                    let png_bytes = rgba_arc.to_vec();
+                    rayon::spawn(move || {
+                        if let Some(parent) = output_path.parent() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
+                        if let Some(img) = image::RgbaImage::from_raw(base_w, base_h, png_bytes) {
+                            let final_img = if (scale_mult - 1.0).abs() > 0.01
+                                && target_w > 0
+                                && target_h > 0
+                            {
+                                image::imageops::resize(
+                                    &img,
+                                    target_w,
+                                    target_h,
+                                    image::imageops::FilterType::Lanczos3,
+                                )
+                            } else {
+                                img
+                            };
+                            if let Err(e) =
+                                crate::utils::png::save_display_p3_png(&final_img, &output_path)
+                            {
+                                log::error!("Failed to save Display P3 PNG: {}", e);
+                            }
+                        }
+                    });
+                }
+
+                let mut should_finish_export = false;
+                if let Some(ref mut export) = self.capture_config.export_state
+                    && export.is_active
+                {
+                    export.frame_size = (crop_w as u32, crop_h as u32);
+                    export.captured_frames.push(rgba_arc.clone());
+                    export.current_frame += 1;
+                    if export.current_frame >= export.total_frames {
+                        should_finish_export = true;
+                    }
+                }
+                if should_finish_export {
+                    self.finish_deterministic_export();
+                }
+
+                if self.capture_config.is_recording {
+                    self.capture_config.pending_frame_capture = false;
+                    self.capture_config.recorded_frame_size = (crop_w as u32, crop_h as u32);
+                    self.capture_config.recorded_frames.push(rgba_arc.clone());
+                    if self.capture_config.recorded_frames.len()
+                        >= self.capture_config.max_record_frames
+                    {
+                        self.stop_recording();
+                    }
+                }
+            }
+        }
+    }
+
+    /// Returns the theme-aware background clear color for GPU render passes.
+    pub fn theme_clear_color(
+        &self,
+        ctx: &egui::Context,
+        format: wgpu::TextureFormat,
+    ) -> wgpu::Color {
+        let bg = ctx.style_of(ctx.theme()).visuals.panel_fill;
+        let is_srgb = matches!(
+            format,
+            wgpu::TextureFormat::Rgba8UnormSrgb | wgpu::TextureFormat::Bgra8UnormSrgb
+        );
+        if is_srgb {
+            let rgba = egui::Rgba::from(bg);
+            wgpu::Color {
+                r: rgba.r() as f64,
+                g: rgba.g() as f64,
+                b: rgba.b() as f64,
+                a: rgba.a() as f64,
+            }
+        } else {
+            wgpu::Color {
+                r: (bg.r() as f64) / 255.0,
+                g: (bg.g() as f64) / 255.0,
+                b: (bg.b() as f64) / 255.0,
+                a: (bg.a() as f64) / 255.0,
+            }
+        }
+    }
+
+    /// Renders the active plot directly to an offscreen GPU texture at specified dimensions and camera angles.
+    #[allow(clippy::too_many_arguments)]
+    pub fn render_offscreen_frame(
+        &mut self,
+        ctx: &egui::Context,
+        width: u32,
+        height: u32,
+        rot_y: f32,
+        rot_x: f32,
+        zoom: f32,
+        timestep: Option<usize>,
+    ) -> Option<std::sync::Arc<[u8]>> {
+        // Extract offscreen timestep slice data from resident block cache if requested
+        let (opt_mdata, opt_vdata) = match timestep {
+            Some(ts) => self.extract_slice_for_timestep(ts),
+            None => (None, None),
+        };
+
+        let wgpu_state = self.wgpu_render_state.as_ref()?;
+        let device = &wgpu_state.device;
+        let queue = &wgpu_state.queue;
+
+        let target =
+            crate::plots::OffscreenTarget::new(device, width, height, wgpu_state.target_format);
+
+        let clear_color = self.theme_clear_color(ctx, wgpu_state.target_format);
+        let aspect_ratio = (width as f32) / (height as f32).max(1.0);
+        let color_params = self.get_color_params();
+
+        // Upload offscreen frame data to active GPU renderers if available
+        if let Some(mdata) = &opt_mdata {
+            self.update_active_2d_renderer_data(queue, &mdata.values);
+        }
+        if let Some(vdata) = &opt_vdata {
+            self.update_active_3d_renderer_data(queue, &vdata.values);
+        }
+
+        let frame_bytes = match self.active_plot_type {
+            PlotType::Heatmap => {
+                let renderer = self.renderer.as_ref()?;
+                let (orig_w, orig_h) = if let Some(pyr) = &self.active_pyramid {
+                    (pyr.original_width, pyr.original_height)
+                } else if let Some(m) = &self.matrix_data {
+                    (m.width, m.height)
+                } else {
+                    (1, 1)
+                };
+                let data_aspect = (orig_w as f32 / orig_h as f32).max(0.001);
+                let canvas_aspect = aspect_ratio;
+                let aspect_scale = if self.enforce_data_aspect_ratio {
+                    if canvas_aspect > data_aspect {
+                        [data_aspect / canvas_aspect, 1.0]
+                    } else {
+                        [1.0, canvas_aspect / data_aspect]
+                    }
+                } else {
+                    [1.0, 1.0]
+                };
+                renderer.update_uniforms(queue, &color_params, [0.0, 0.0], zoom, aspect_scale);
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass);
+                    })
+                    .ok()
+            }
+            PlotType::Sphere => {
+                let renderer = self.sphere_renderer.as_ref()?;
+                renderer.update_uniforms(
+                    queue,
+                    &color_params,
+                    rot_y,
+                    rot_x,
+                    aspect_ratio,
+                    zoom,
+                    self.sphere_displacement_strength,
+                    self.sphere_mode,
+                );
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass, self.sphere_mode);
+                    })
+                    .ok()
+            }
+            PlotType::Surface => {
+                let renderer = self.surface_renderer.as_ref()?;
+                renderer.update_uniforms(
+                    queue,
+                    &color_params,
+                    rot_y,
+                    rot_x,
+                    aspect_ratio,
+                    zoom,
+                    self.surface_displacement_strength,
+                    self.surface_mode,
+                );
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass, self.surface_mode);
+                    })
+                    .ok()
+            }
+            PlotType::Volume => {
+                let renderer = self.volume_renderer.as_ref()?;
+                let (data_w, data_h) = opt_vdata
+                    .as_ref()
+                    .map(|v| (v.width as u32, v.height as u32))
+                    .unwrap_or_else(|| self.get_volume_dimensions());
+                let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+                let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
+                renderer.update_uniforms(
+                    queue,
+                    &crate::plots::volume::VolumeUniformParams {
+                        color: color_params,
+                        rot_y,
+                        rot_x,
+                        aspect_x,
+                        aspect_y,
+                        aspect_z,
+                        zoom,
+                        opacity_scale: self.volume_opacity,
+                        step_count: self.volume_step_count,
+                        width: data_w,
+                        height: data_h,
+                        algorithm: self.volume_algorithm,
+                        isovalue: self.volume_isovalue,
+                        isorange: self.volume_isorange,
+                        attenuation: self.volume_attenuation,
+                        screen_aspect: aspect_ratio,
+                        shift_x,
+                        shift_y,
+                        shift_z,
+                        transparency: self.volume_transparency,
+                    },
+                );
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass);
+                    })
+                    .ok()
+            }
+            PlotType::PointCloud => {
+                let renderer = self.point_cloud_renderer.as_ref()?;
+                let (data_w, data_h) = opt_vdata
+                    .as_ref()
+                    .map(|v| (v.width as u32, v.height as u32))
+                    .unwrap_or_else(|| self.get_volume_dimensions());
+                let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+                let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
+                renderer.update_uniforms(
+                    queue,
+                    &crate::plots::point_cloud::PointCloudUniformParams {
+                        color: color_params,
+                        rot_y,
+                        rot_x,
+                        aspect_x,
+                        aspect_y,
+                        aspect_z,
+                        zoom,
+                        point_size: self.point_cloud_size,
+                        width: data_w,
+                        height: data_h,
+                        screen_aspect: aspect_ratio,
+                        shift_x,
+                        shift_y,
+                        shift_z,
+                    },
+                );
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass);
+                    })
+                    .ok()
+            }
+            PlotType::Line => {
+                let renderer = self.line_renderer.as_ref()?;
+                let (profile_length, line_count) = if let Some(mdata) = &opt_mdata {
+                    (mdata.width as u32, mdata.height as u32)
+                } else {
+                    let (_, len, count) = self.get_line_profile_payload();
+                    (len, count)
+                };
+                renderer.update_uniforms(
+                    queue,
+                    &crate::plots::line::LineUniformParams {
+                        color: color_params,
+                        viewport_padding: [0.0, 0.0],
+                        profile_length,
+                        line_count,
+                        line_mode: if self.line_plot_all_series { 1 } else { 0 },
+                        pan: [0.0, 0.0],
+                        zoom,
+                    },
+                );
+                target
+                    .render_frame(device, queue, clear_color, |rpass| {
+                        renderer.draw(rpass, profile_length, line_count);
+                    })
+                    .ok()
+            }
+            _ => None,
+        };
+
+        // Restore active on-screen data into GPU buffers so on-screen canvas remains stationary
+        if opt_mdata.is_some() || opt_vdata.is_some() {
+            if let Some(mdata) = &self.matrix_data {
+                self.update_active_2d_renderer_data(queue, &mdata.values);
+            }
+            if let Some(vdata) = &self.volume_data {
+                self.update_active_3d_renderer_data(queue, &vdata.values);
+            }
+        }
+
+        frame_bytes
+    }
+
     /// Opens the Settings panel and closes Store, Variables, Controls, and Catalog.
     pub fn open_only_settings_panel(&mut self) {
         self.show_settings_panel = true;

@@ -410,9 +410,16 @@ impl OctantApp {
         (x_dim, y_dim, z_dim)
     }
 
-    /// Projects a resident block into current 2D and 3D views.
-    pub fn apply_block_projection(&mut self, block: &crate::data::octant_block::OctantBlock) {
-        let anim_dim = crate::app::DimConfig::animated_dim(&self.plotted_dim_config);
+    /// Slices 2D matrix and 3D volume data from a resident block for a specific timestep.
+    pub fn slice_block_at_timestep(
+        &self,
+        block: &crate::data::octant_block::OctantBlock,
+        ts: usize,
+        compute_bounds: bool,
+    ) -> (
+        Option<crate::data::matrix_data::MatrixData>,
+        Option<crate::data::volume_data::VolumeData>,
+    ) {
         let orig_dim_names: Vec<String> = self
             .plotted_dataset_metadata
             .as_ref()
@@ -433,11 +440,14 @@ impl OctantApp {
                 let orig_idx = name
                     .and_then(|n| orig_dim_names.iter().position(|o| o == n))
                     .unwrap_or(i);
-                let idx = self
-                    .plotted_selected_dim_indices
-                    .get(orig_idx)
-                    .copied()
-                    .unwrap_or(0);
+                let idx = if Some(orig_idx) == self.plotted_animated_dim {
+                    ts
+                } else {
+                    self.plotted_selected_dim_indices
+                        .get(orig_idx)
+                        .copied()
+                        .unwrap_or(0)
+                };
                 idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0))
             })
             .collect();
@@ -475,9 +485,7 @@ impl OctantApp {
             (0, 1)
         };
 
-        let compute_bounds = !self.lock_color_bounds;
-
-        if let Some(mdata) = block.slice_2d_with_ranges(
+        let mdata = block.slice_2d_with_ranges(
             x_dim,
             y_dim,
             x_range,
@@ -486,7 +494,30 @@ impl OctantApp {
             self.animated_dim_extent(),
             &format!("Block Cache [{}]", block.variable_name),
             compute_bounds,
-        ) {
+        );
+
+        let vdata = block.volume_with_ranges(
+            x_dim,
+            y_dim,
+            z_dim,
+            x_range,
+            y_range,
+            z_range,
+            &fixed_indices,
+            &format!("Block Cache Volume [{}]", block.variable_name),
+            compute_bounds,
+        );
+
+        (mdata, vdata)
+    }
+
+    /// Projects a resident block into current 2D and 3D views.
+    pub fn apply_block_projection(&mut self, block: &crate::data::octant_block::OctantBlock) {
+        let compute_bounds = !self.lock_color_bounds;
+        let (opt_mdata, opt_vdata) =
+            self.slice_block_at_timestep(block, self.current_timestep, compute_bounds);
+
+        if let Some(mdata) = opt_mdata {
             self.rebuild_pipeline_with_matrix_data(mdata);
         }
 
@@ -502,61 +533,12 @@ impl OctantApp {
             || self.active_plot_type == crate::plots::PlotType::PointCloud)
             && is_volume_allowed;
 
-        let is_3d_spatial_anim = anim_dim.is_some_and(|a| a == x_dim || a == y_dim || a == z_dim);
-
-        let current_volume_desc = format!(
-            "Block Cache Volume [{}] origin={:?} shape={:?} fixed={:?} xr={:?} yr={:?} zr={:?}",
-            block.variable_name,
-            block.origin,
-            block.shape,
-            if is_3d_spatial_anim {
-                vec![]
-            } else {
-                fixed_indices.clone()
-            },
-            x_range,
-            y_range,
-            z_range,
-        );
-
-        let req_nx = x_range.1.saturating_sub(x_range.0);
-        let req_ny = y_range.1.saturating_sub(y_range.0);
-        let req_nz = z_range.1.saturating_sub(z_range.0);
-
-        let needs_volume_update = if let Some(existing) = &self.volume_data {
-            let slice_elements = req_nx.saturating_mul(req_ny).max(1);
-            let max_z = (crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS / slice_elements)
-                .clamp(1, req_nz);
-            let eff_nz = req_nz.min(max_z);
-
-            existing.width != req_nx
-                || existing.height != req_ny
-                || existing.depth != eff_nz
-                || self.volume_renderer.is_none()
-                || existing.dataset_name != current_volume_desc
-        } else {
-            true
-        };
-
-        if is_3d_plot
-            && needs_volume_update
-            && let Some(vdata) = block.volume_with_ranges(
-                x_dim,
-                y_dim,
-                z_dim,
-                x_range,
-                y_range,
-                z_range,
-                &fixed_indices,
-                &current_volume_desc,
-                compute_bounds,
-            )
-        {
+        if is_3d_plot && let Some(vdata) = opt_vdata {
             let depth = vdata.depth;
             self.rebuild_pipeline_with_volume_data(vdata);
             self.status_message = format!(
-                "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
-                self.status_message, self.current_timestep
+                "{}  [depth={depth} anim_dim={:?} t={}]",
+                self.status_message, self.plotted_animated_dim, self.current_timestep
             );
         }
     }
@@ -614,5 +596,94 @@ impl OctantApp {
         self.is_playing = false;
         self.pending_target_step = None;
         self.status_message = "⏹ Data fetch aborted by user.".to_string();
+    }
+
+    /// Ensures a resident covering block exists for `ts`, fetching synchronously from store if missing.
+    pub fn ensure_covering_block(
+        &mut self,
+        ts: usize,
+    ) -> Option<crate::data::octant_block::OctantBlock> {
+        let metadata = self.plotted_dataset_metadata.as_ref()?;
+        let var_info = metadata.variables.get(self.plotted_variable_idx)?;
+        let var_name = &var_info.name;
+        let source_id = self.plotted_source_id();
+
+        let selections = self
+            .active_slice_request
+            .as_ref()
+            .map(|r| r.selections.as_slice())
+            .unwrap_or(&[]);
+
+        if let Some(block) = self.block_cache.find_covering_block(
+            &source_id,
+            var_name,
+            selections,
+            self.plotted_animated_dim,
+            ts,
+        ) {
+            return Some(block);
+        }
+
+        let store = self.plotted_store_handle()?;
+        let anim_chunk_size = self
+            .plotted_animated_dim
+            .and_then(|dim| var_info.chunk_shape.get(dim))
+            .copied()
+            .unwrap_or(1) as usize;
+        let cs = if anim_chunk_size == 0 {
+            1
+        } else {
+            anim_chunk_size
+        };
+        let full_extent = self
+            .plotted_animated_dim
+            .and_then(|dim| var_info.shape.get(dim))
+            .copied()
+            .unwrap_or(1) as usize;
+        let start = (ts / cs) * cs;
+        let end = (start + cs).min(full_extent).max(start + 1);
+
+        let mut req_selections = self
+            .active_slice_request
+            .as_ref()
+            .map(|r| r.selections.clone())
+            .unwrap_or_else(|| {
+                crate::ui::variables_panel::build_slice_request_for_plotted(
+                    self,
+                    var_name,
+                    &var_info.shape,
+                )
+                .selections
+            });
+
+        if let Some(anim_dim) = self.plotted_animated_dim
+            && anim_dim < req_selections.len()
+        {
+            req_selections[anim_dim] = crate::data::DimensionSelection::Range { start, end };
+        }
+
+        let slice_req = crate::data::SliceRequest::new(var_name, req_selections);
+        if let Ok(block) = store.fetch(&slice_req) {
+            let key = crate::data::BlockCacheKey::new(source_id, &slice_req);
+            self.block_cache.put(key, block.clone());
+            Some(block)
+        } else {
+            None
+        }
+    }
+
+    /// Extracts 2D matrix and 3D volume data for a specific timestep from resident block cache without mutating app state.
+    pub fn extract_slice_for_timestep(
+        &mut self,
+        ts: usize,
+    ) -> (
+        Option<crate::data::matrix_data::MatrixData>,
+        Option<crate::data::volume_data::VolumeData>,
+    ) {
+        if let Some(block) = self.ensure_covering_block(ts) {
+            self.slice_block_at_timestep(&block, ts, false)
+        } else {
+            (None, None)
+        }
     }
 }

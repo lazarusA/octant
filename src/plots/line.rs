@@ -236,6 +236,19 @@ impl LineRenderer {
                 .store(matrix_data.len() as u32, Ordering::Relaxed);
         }
     }
+
+    /// Renders the 1D line chart series directly into the active render pass.
+    pub fn draw(&self, rpass: &mut wgpu::RenderPass<'_>, profile_length: u32, line_count: u32) {
+        rpass.set_pipeline(&self.render_pipeline);
+        let Ok(guard) = self.gpu_resources.read() else {
+            return;
+        };
+        rpass.set_bind_group(0, &guard.bind_group, &[]);
+        let profile_length = profile_length.max(2);
+        if line_count > 0 {
+            rpass.draw(0..profile_length, 0..line_count);
+        }
+    }
 }
 
 impl super::common::PlotRenderer for LineRenderer {

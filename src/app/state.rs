@@ -289,6 +289,10 @@ pub struct OctantApp {
     pub line_pan: egui::Vec2,
     pub enable_pyramid_resampling: bool,
     pub pyramid_aggregation_op: crate::data::AggregationOp,
+
+    // Canvas Save & Video Recording State
+    pub capture_config: crate::app::capture::CaptureConfig,
+    pub capture_ring: Option<crate::app::capture_ring::CaptureRing>,
 }
 
 impl Default for OctantApp {
@@ -413,6 +417,8 @@ impl Default for OctantApp {
             line_pan: egui::Vec2::ZERO,
             enable_pyramid_resampling: false,
             pyramid_aggregation_op: crate::data::AggregationOp::default(),
+            capture_config: crate::app::capture::CaptureConfig::default(),
+            capture_ring: None,
         }
     }
 }
@@ -505,6 +511,19 @@ impl OctantApp {
             self.volume_cmax = 100.0;
         }
         self.lock_color_bounds = false;
+    }
+
+    /// Resolves active 3D volume/point-cloud dimensions with fallback to matrix data or default.
+    #[inline]
+    pub fn get_volume_dimensions(&self) -> (u32, u32) {
+        self.volume_data
+            .as_ref()
+            .map(|v| (v.width as u32, v.height as u32))
+            .unwrap_or_else(|| {
+                self.matrix_data
+                    .as_ref()
+                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
+            })
     }
 
     /// Placeholder method to add a secondary dimensionally-compatible variable layer
@@ -643,5 +662,254 @@ impl OctantApp {
             }
         }
         false
+    }
+
+    /// Triggers immediate lossless screenshot capture of the canvas framing region.
+    pub fn trigger_save_screenshot(&mut self) {
+        self.capture_config.pending_save = true;
+    }
+
+    /// Starts recording canvas interactions into an MP4 video.
+    pub fn start_recording(&mut self) {
+        if self.capture_config.export_state.is_some() {
+            self.cancel_deterministic_export();
+        }
+        self.capture_config.is_recording = true;
+        self.capture_config.pending_frame_capture = false;
+        self.capture_config.recording_start_time = Some(std::time::Instant::now());
+        self.capture_config.recorded_frames.clear();
+        self.capture_config.last_recording_time = std::time::Instant::now();
+        self.status_message =
+            "⏺ Recording canvas interaction... Click Stop Recording to export MP4.".to_string();
+    }
+
+    /// Stops video recording and initiates background MP4 encoding and muxing.
+    pub fn stop_recording(&mut self) {
+        if !self.capture_config.is_recording {
+            return;
+        }
+        self.capture_config.is_recording = false;
+        self.capture_config.pending_frame_capture = false;
+        self.capture_config.recording_start_time = None;
+        let frames = std::mem::take(&mut self.capture_config.recorded_frames);
+        let (width, height) = self.capture_config.recorded_frame_size;
+        let fps = self.capture_config.recording_fps;
+        let output_path = self.capture_config.generate_filepath(true);
+
+        if frames.is_empty() || width == 0 || height == 0 {
+            self.status_message = "Recording stopped (No frames captured)".to_string();
+            return;
+        }
+
+        let filename = output_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("octant_recording.mp4")
+            .to_string();
+
+        self.capture_config.save_notification = Some((
+            format!(
+                "🎬 Saved video: {} ({} frames @ {:.0} fps)",
+                filename,
+                frames.len(),
+                fps
+            ),
+            output_path.clone(),
+            std::time::Instant::now(),
+        ));
+
+        self.status_message = format!(
+            "🎬 Encoding MP4 video ({} frames @ {:.0} fps) to {}...",
+            frames.len(),
+            fps,
+            filename
+        );
+
+        rayon::spawn(move || {
+            match crate::utils::video::encode_rgba_frames_to_mp4(
+                &frames,
+                width,
+                height,
+                fps,
+                &output_path,
+            ) {
+                Ok(()) => {
+                    log::info!("Successfully saved recording to {}", output_path.display());
+                }
+                Err(err) => {
+                    log::error!("Failed to encode MP4 recording: {}", err);
+                }
+            }
+        });
+    }
+
+    /// Starts deterministic frame-by-frame animation export with optional camera orbit and zoom.
+    pub fn start_deterministic_export(&mut self) {
+        if self.capture_config.is_recording {
+            self.stop_recording();
+        }
+        self.capture_config.pending_frame_capture = false;
+
+        let total_frames = self.capture_config.export_total_frames.max(2);
+
+        let output_path = match self.capture_config.export_format {
+            crate::app::capture::ExportFormat::Mp4Video => {
+                self.capture_config.generate_filepath(true)
+            }
+            crate::app::capture::ExportFormat::PngImageSequence => {
+                let default_dir = self.capture_config.resolve_output_dir(true);
+                default_dir.join(format!(
+                    "octant_sequence_{}",
+                    crate::app::capture::CaptureConfig::timestamp_suffix()
+                ))
+            }
+        };
+
+        self.is_playing = false; // Pause interactive playback during export
+
+        self.capture_config.export_state = Some(crate::app::capture::DeterministicExportState {
+            is_active: true,
+            current_frame: 0,
+            total_frames,
+            motion_mode: self.capture_config.motion_mode,
+            zoom_mode: self.capture_config.zoom_mode,
+            export_format: self.capture_config.export_format,
+            export_fps: self.capture_config.recording_fps,
+            output_path,
+            captured_frames: Vec::with_capacity(total_frames),
+            frame_size: (0, 0),
+            initial_timestep: self.current_timestep,
+            initial_rotation_y: self.sphere_rotation_y,
+            initial_rotation_x: self.sphere_rotation_x,
+            initial_zoom_3d: self.sphere_zoom,
+            initial_zoom_2d: self.heatmap_zoom,
+        });
+
+        self.status_message = format!(
+            "🎬 Starting deterministic animation export ({} frames)...",
+            total_frames
+        );
+    }
+
+    /// Restores initial camera, zoom, and timestep state from an export run.
+    pub fn restore_initial_export_state(
+        &mut self,
+        state: &crate::app::capture::DeterministicExportState,
+    ) {
+        self.current_timestep = state.initial_timestep;
+        self.sphere_rotation_y = state.initial_rotation_y;
+        self.sphere_rotation_x = state.initial_rotation_x;
+        self.sphere_zoom = state.initial_zoom_3d;
+        self.heatmap_zoom = state.initial_zoom_2d;
+        self.load_selected_variable_block();
+    }
+
+    /// Cancels in-progress deterministic animation export and restores camera state.
+    pub fn cancel_deterministic_export(&mut self) {
+        self.capture_config.pending_frame_capture = false;
+        if let Some(state) = self.capture_config.export_state.take() {
+            self.restore_initial_export_state(&state);
+            self.status_message = "Animation export cancelled".to_string();
+        }
+    }
+
+    /// Finishes deterministic animation export, restores camera state, and triggers MP4 encoding or PNG sequence saving.
+    pub fn finish_deterministic_export(&mut self) {
+        self.capture_config.pending_frame_capture = false;
+        if let Some(state) = self.capture_config.export_state.take() {
+            self.restore_initial_export_state(&state);
+
+            let frames = state.captured_frames;
+            let (width, height) = state.frame_size;
+            let fps = state.export_fps;
+            let output_path = state.output_path;
+            let export_format = state.export_format;
+
+            if frames.is_empty() || width == 0 || height == 0 {
+                self.status_message = "Animation export completed (no frames)".to_string();
+                return;
+            }
+
+            let filename = output_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("octant_export")
+                .to_string();
+
+            match export_format {
+                crate::app::capture::ExportFormat::Mp4Video => {
+                    self.capture_config.save_notification = Some((
+                        format!(
+                            "🎬 Saved animation video: {} ({} frames @ {:.0} fps)",
+                            filename,
+                            frames.len(),
+                            fps
+                        ),
+                        output_path.clone(),
+                        std::time::Instant::now(),
+                    ));
+
+                    self.status_message = format!(
+                        "🎬 Encoding MP4 video ({} frames @ {:.0} fps) to {}...",
+                        frames.len(),
+                        fps,
+                        filename
+                    );
+
+                    rayon::spawn(move || {
+                        match crate::utils::video::encode_rgba_frames_to_mp4(
+                            &frames,
+                            width,
+                            height,
+                            fps,
+                            &output_path,
+                        ) {
+                            Ok(()) => {
+                                log::info!(
+                                    "Successfully encoded animation video to {}",
+                                    output_path.display()
+                                );
+                            }
+                            Err(err) => {
+                                log::error!("Failed to encode MP4 animation: {}", err);
+                            }
+                        }
+                    });
+                }
+                crate::app::capture::ExportFormat::PngImageSequence => {
+                    self.capture_config.save_notification = Some((
+                        format!(
+                            "📁 Saved PNG sequence: {} ({} frames)",
+                            filename,
+                            frames.len()
+                        ),
+                        output_path.clone(),
+                        std::time::Instant::now(),
+                    ));
+
+                    self.status_message = format!(
+                        "📁 Saving {} Display P3 PNG frames to {}...",
+                        frames.len(),
+                        filename
+                    );
+
+                    rayon::spawn(move || {
+                        let _ = std::fs::create_dir_all(&output_path);
+                        for (i, frame_bytes) in frames.iter().enumerate() {
+                            let frame_path = output_path.join(format!("frame_{:04}.png", i));
+                            if let Some(img) =
+                                image::RgbaImage::from_raw(width, height, frame_bytes.to_vec())
+                            {
+                                let _ = crate::utils::png::save_display_p3_png(&img, &frame_path);
+                            }
+                        }
+                        log::info!(
+                            "Successfully saved PNG sequence to {}",
+                            output_path.display()
+                        );
+                    });
+                }
+            }
+        }
     }
 }

@@ -11,9 +11,13 @@
 
 mod actions;
 mod block_loading;
+pub mod capture;
+pub mod capture_ring;
 mod data_loading;
 mod pipeline;
 mod state;
 mod ui;
 
+#[allow(unused_imports)]
+pub use capture::{AspectRatioPreset, CaptureConfig};
 pub use state::{AnimationRole, DimConfig, OctantApp, SpatialRole, StoreKind};

@@ -424,4 +424,21 @@ impl OctantApp {
             PlotType::Volume | PlotType::PointCloud => {}
         }
     }
+
+    /// Updates GPU vertex/storage buffer data for the currently active 3D volume/point cloud renderer.
+    pub fn update_active_3d_renderer_data(&self, queue: &wgpu::Queue, values: &[f32]) {
+        match self.active_plot_type {
+            PlotType::Volume => {
+                if let Some(volume_renderer) = &self.volume_renderer {
+                    volume_renderer.update_data(queue, values);
+                }
+            }
+            PlotType::PointCloud => {
+                if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
+                    point_cloud_renderer.update_data(queue, values);
+                }
+            }
+            _ => {}
+        }
+    }
 }

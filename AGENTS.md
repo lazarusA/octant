@@ -18,10 +18,16 @@ When developing and reviewing code in this repository:
    - For all structured, discrete global (HEALPix, ICON, Cubed-Sphere), and unstructured grid formats (UGRID, MPAS), use zero-allocation GPU instancing or GPU vertex pulling. Reserve CPU mesh generation strictly for non-grid geometry (GIS vector polygons, streamlines, Marching Cubes CAD export, UI labels and annotations).
    - UI widgets and layout live in `src/ui/` and `src/app/`, with state actions routed via `AppAction`.
    - In immediate-mode UI loops, prefer zero-allocation tuple salts `("salt", id)` over heap-allocating `format!(...)`.
+   - **Canvas Capture & Animation Export**:
+     - Single image saves (`.png`) must embed Apple Display P3 color profile chunks (`cHRM` with D65 white point + `gAMA` 2.2) via `src/utils/png.rs` to ensure accurate wide-gamut rendering on Retina displays.
+     - Video exports (`.mp4`) must use ITU-R BT.709 Full-Range YUV420 encoding with 30 Mbps bitrate (`src/utils/video.rs`) to prevent washed-out colors.
+     - Live interactive recording uses a 3-buffer non-blocking staging ring (`CaptureRing` in `src/app/capture_ring.rs`) to avoid GPU fence stalls.
+     - Animation export architecture supports deterministic motion trajectories (`MotionTrajectory`, `ZoomTrajectory`) with automatic camera state restoration upon completion or cancellation.
 
 3. **Skills Reference**:
    - `rust-skills`: 265 detailed Rust best practices across 26 categories (ownership, error handling, memory, async, unsafe, etc.).
    - `rust-workflows`: Cargo build, test, lint, clippy, WASM, and logging commands.
    - `octant-data-engine`: Data loading, caching, prefetching, and hyperslab slicing.
-   - `octant-rendering-wgpu`: WGPU render pipelines, uniform buffer alignment, and WGSL shaders.
-   - `octant-ui-egui`: egui immediate-mode GUI components and event dispatch.
+   - `octant-rendering-wgpu`: WGPU render pipelines, uniform buffer alignment, WGSL shaders, and offscreen targets.
+   - `octant-ui-egui`: egui immediate-mode GUI components, color spaces, export workflows, and event dispatch.
+

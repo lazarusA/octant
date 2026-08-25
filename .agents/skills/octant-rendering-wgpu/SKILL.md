@@ -89,3 +89,16 @@ CPU mesh generation is reserved strictly for non-grid geometric processing and e
 ### 8. `egui_wgpu` Paint Callback
 - In `src/plots/` renderers, paint passes execute inside `egui_wgpu::CallbackTrait`.
 - Always use `setup_viewport_and_scissor` from `src/plots/common.rs` to clamp scissor rects strictly within physical surface bounds.
+
+### 9. Offscreen Render Target Architecture (`src/plots/offscreen.rs`)
+- `OffscreenTarget` allocates an offscreen color texture using `wgpu_state.target_format` (e.g. `Bgra8Unorm` on macOS Metal, `Rgba8Unorm` on Windows/Linux) together with a `Depth32Float` depth texture and 256-byte aligned staging buffer.
+- `read_pixels` automatically swizzles `Bgra8Unorm` $\to$ `Rgba8Unorm` in memory for downstream video/image writers.
+- **Format-Aware Theme Clear Color (`theme_clear_color`)**: When clearing unorm textures (`Bgra8Unorm`), use unnormalized sRGB float values (`bg.r() as f64 / 255.0`) to avoid gamma double-compression that turns dark theme backgrounds pitch black. Use linear `egui::Rgba` only for hardware sRGB textures (`*Srgb`).
+- **Overlays & Visual Parity Architecture Note**: Direct WGPU offscreen rendering bypasses `egui` UI layers, scissor rectangles, and dynamic viewport LOD pyramid resampling. If visual parity, vector colorbars, axis tick marks, or Retina screen calibration are required, reuse the main canvas viewport pass with `ViewportCommand::Screenshot` cropped to `canvas_rect`.
+
+### 10. Asynchronous Staging Ring for Interactive Recording (`src/app/capture_ring.rs`)
+- `CaptureRing` manages 3 rotating GPU staging buffers.
+- Texture copies are submitted to the GPU queue, while mapped staging buffers from previous frames are polled non-blockingly via `device.poll(wgpu::PollType::Poll)`.
+- Eliminates synchronous `device.poll(Maintain::Wait)` GPU fences, keeping 3D orbit and UI interactions smooth at 120 FPS / ProMotion while live recording is active.
+
+

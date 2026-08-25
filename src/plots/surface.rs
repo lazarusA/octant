@@ -272,6 +272,26 @@ impl SurfaceRenderer {
         );
     }
 
+    pub fn draw(&self, rpass: &mut wgpu::RenderPass<'_>, mode: u32) {
+        let is_voxel = mode == 2;
+        let pipeline = if is_voxel {
+            &self.voxel_pipeline
+        } else {
+            &self.render_pipeline
+        };
+        rpass.set_pipeline(pipeline);
+        rpass.set_bind_group(0, &self.bind_group, &[]);
+        if is_voxel {
+            rpass.set_vertex_buffer(0, self.cube_vertex_buffer.slice(..));
+            rpass.set_index_buffer(self.cube_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            rpass.draw_indexed(0..36, 0, 0..self.num_instances);
+        } else {
+            rpass.set_vertex_buffer(0, self.quad_vertex_buffer.slice(..));
+            rpass.set_index_buffer(self.quad_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            rpass.draw_indexed(0..6, 0, 0..self.num_instances);
+        }
+    }
+
     fn build_unit_quad() -> (Vec<SurfaceVertex>, Vec<u32>) {
         super::common::build_unit_quad_mesh(|position, uv, normal| SurfaceVertex {
             position,

@@ -288,6 +288,14 @@ impl HeatmapRenderer {
 
         (vertices, indices)
     }
+
+    pub fn draw(&self, rpass: &mut wgpu::RenderPass<'_>) {
+        rpass.set_pipeline(&self.render_pipeline);
+        rpass.set_bind_group(0, &self.bind_group, &[]);
+        rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        rpass.draw_indexed(0..self.num_indices, 0, 0..1);
+    }
 }
 
 impl super::common::PlotRenderer for HeatmapRenderer {

@@ -16,6 +16,11 @@ pub enum AppAction {
     ToggleLineAllSeries,
     TogglePlayback,
     UpdateColorBounds { min: f32, max: f32 },
+    SaveScreenshot,
+    ToggleRecording,
+    SetCaptureAspectPreset(super::capture::AspectRatioPreset),
+    ToggleFramingGuides,
+    SetCaptureScale(f32),
 }
 
 impl OctantApp {
@@ -62,6 +67,25 @@ impl OctantApp {
             AppAction::UpdateColorBounds { min, max } => {
                 self.color_range_min = min;
                 self.color_range_max = max;
+            }
+            AppAction::SaveScreenshot => {
+                self.capture_config.pending_save = true;
+            }
+            AppAction::ToggleRecording => {
+                if self.capture_config.is_recording {
+                    self.stop_recording();
+                } else {
+                    self.start_recording();
+                }
+            }
+            AppAction::SetCaptureAspectPreset(preset) => {
+                self.capture_config.aspect_preset = preset;
+            }
+            AppAction::ToggleFramingGuides => {
+                self.capture_config.show_framing_guides = !self.capture_config.show_framing_guides;
+            }
+            AppAction::SetCaptureScale(scale) => {
+                self.capture_config.scale_multiplier = scale;
             }
         }
     }
