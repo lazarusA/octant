@@ -289,6 +289,15 @@ pub struct OctantApp {
     pub line_pan: egui::Vec2,
     pub enable_pyramid_resampling: bool,
     pub pyramid_aggregation_op: crate::data::AggregationOp,
+
+    // Canvas Save & Export System
+    pub export_settings: crate::export::ExportSettings,
+    pub show_export_modal: bool,
+    pub show_crop_overlay: bool,
+    pub roi_crop_box: crate::export::RoiCropBox,
+    pub pending_export: Option<crate::export::PendingExportRequest>,
+    pub export_flash_timer: Option<std::time::Instant>,
+    pub export_toast: Option<crate::export::ExportToastNotification>,
 }
 
 impl Default for OctantApp {
@@ -413,6 +422,13 @@ impl Default for OctantApp {
             line_pan: egui::Vec2::ZERO,
             enable_pyramid_resampling: false,
             pyramid_aggregation_op: crate::data::AggregationOp::default(),
+            export_settings: crate::export::ExportSettings::default(),
+            show_export_modal: false,
+            show_crop_overlay: false,
+            roi_crop_box: crate::export::RoiCropBox::default(),
+            pending_export: None,
+            export_flash_timer: None,
+            export_toast: None,
         }
     }
 }
@@ -643,5 +659,48 @@ impl OctantApp {
             }
         }
         false
+    }
+
+    /// Triggers an export request for the canvas / figure.
+    pub fn request_canvas_export(
+        &mut self,
+        output_path: std::path::PathBuf,
+        copy_to_clipboard: bool,
+    ) {
+        let target = if self.show_crop_overlay {
+            crate::export::ExportTarget::RoiCrop
+        } else {
+            self.export_settings.target
+        };
+
+        self.pending_export = Some(crate::export::PendingExportRequest {
+            format: self.export_settings.format,
+            target,
+            roi: self.roi_crop_box,
+            jpeg_quality: self.export_settings.jpeg_quality,
+            copy_to_clipboard,
+            output_path: if output_path.as_os_str().is_empty() {
+                None
+            } else {
+                Some(output_path)
+            },
+            canvas_rect_in_points: egui::Rect::NOTHING,
+            pixels_per_point: 1.0,
+        });
+    }
+
+    /// Quick save shortcut (Cmd+S): saves to export_dir with auto-generated filename.
+    pub fn quick_save_canvas(&mut self) {
+        let var_name = self
+            .plotted_variable_info()
+            .map(|v| v.name.as_str())
+            .unwrap_or("plot");
+        let filename = crate::ui::export_modal::generate_export_filename(
+            var_name,
+            self.export_settings.format,
+        );
+        let out_path =
+            crate::export::resolve_export_path(&self.export_settings.export_dir, &filename);
+        self.request_canvas_export(out_path, false);
     }
 }
