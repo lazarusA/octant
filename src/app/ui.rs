@@ -1,7 +1,4 @@
-use crate::plots::{
-    LineCallback, MatrixCallback, PlotType, PointCloudCallback, SphereCallback, SurfaceCallback,
-    VolumeCallback,
-};
+use crate::plots::PlotType;
 use crate::utils::apply_zoom_pan_at_point;
 
 use super::OctantApp;
@@ -322,146 +319,15 @@ impl eframe::App for OctantApp {
 
             let plot_rect = transformed_plot_rect;
 
-            match self.active_plot_type {
-                PlotType::Line => {
-                    if let Some(line_renderer) = &self.line_renderer {
-                        let color_params = self.get_color_params();
-                        let (profile_values, profile_length, line_count) =
-                            self.get_line_profile_payload();
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            canvas_rect,
-                            LineCallback {
-                                renderer: line_renderer.clone(),
-                                color_params,
-                                rect: canvas_rect,
-                                profile_values,
-                                profile_length,
-                                line_count,
-                                line_mode: if self.line_plot_all_series { 1 } else { 0 },
-                                pan: gpu_pan,
-                                zoom: gpu_zoom,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-                PlotType::Sphere => {
-                    if let Some(sphere_renderer) = &self.sphere_renderer {
-                        let aspect_ratio = crate::plots::common::compute_aspect_ratio(&plot_rect);
-                        let params = self.get_mesh_3d_uniform_params(
-                            self.sphere_mode,
-                            self.sphere_displacement_strength,
-                            aspect_ratio,
-                        );
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            plot_rect,
-                            SphereCallback {
-                                renderer: sphere_renderer.clone(),
-                                params,
-                                rect: plot_rect,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-                PlotType::Surface => {
-                    if let Some(surface_renderer) = &self.surface_renderer {
-                        let aspect_ratio = crate::plots::common::compute_aspect_ratio(&plot_rect);
-                        let params = self.get_mesh_3d_uniform_params(
-                            self.surface_mode,
-                            self.surface_displacement_strength,
-                            aspect_ratio,
-                        );
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            plot_rect,
-                            SurfaceCallback {
-                                renderer: surface_renderer.clone(),
-                                params,
-                                rect: plot_rect,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-                PlotType::Volume => {
-                    if let Some(volume_renderer) = &self.volume_renderer {
-                        let screen_aspect = crate::plots::common::compute_aspect_ratio(&plot_rect);
-                        let params = self.get_volume_uniform_params(screen_aspect);
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            plot_rect,
-                            VolumeCallback {
-                                renderer: volume_renderer.clone(),
-                                params,
-                                rect: plot_rect,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-                PlotType::PointCloud => {
-                    if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
-                        let screen_aspect = crate::plots::common::compute_aspect_ratio(&plot_rect);
-                        let params = self.get_point_cloud_uniform_params(screen_aspect);
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            plot_rect,
-                            PointCloudCallback {
-                                renderer: point_cloud_renderer.clone(),
-                                params,
-                                rect: plot_rect,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-                _ => {
-                    if let Some(renderer) = &self.renderer {
-                        if self.active_pyramid.is_some()
-                            && self.active_plot_type == PlotType::Heatmap
-                        {
-                            let ((u_min, u_max), (v_min, v_max)) =
-                                crate::data::ViewportResampler::compute_visible_data_bounds(
-                                    gpu_pan,
-                                    gpu_zoom,
-                                    gpu_aspect_scale,
-                                );
-                            let (orig_w, orig_h) = self.active_data_dimensions_2d();
-                            let (target_w, target_h) =
-                                crate::data::ViewportResampler::compute_target_resolution(
-                                    orig_w, orig_h, 2048,
-                                );
-
-                            if let Some(tile) = self.resampler.resample_if_needed(
-                                (u_min, u_max),
-                                (v_min, v_max),
-                                target_w,
-                                target_h,
-                            ) && let Some(wgpu_render_state) = &self.wgpu_render_state
-                            {
-                                renderer.update_data_and_dimensions(
-                                    &wgpu_render_state.queue,
-                                    &tile.data.values,
-                                    tile.data.width,
-                                    tile.data.height,
-                                    tile.tile_bounds,
-                                );
-                            }
-                        }
-
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            canvas_rect,
-                            MatrixCallback {
-                                renderer: renderer.clone(),
-                                color_params: self.get_color_params(),
-                                rect: canvas_rect,
-                                pan: gpu_pan,
-                                zoom: gpu_zoom,
-                                aspect_scale: gpu_aspect_scale,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-            }
+            // Dispatch active plot GPU rendering callback
+            self.paint_active_plot(
+                ui,
+                canvas_rect,
+                plot_rect,
+                gpu_pan,
+                gpu_zoom,
+                gpu_aspect_scale,
+            );
 
             // Draw Dynamic Plot Axis Lines, Ticks, and Axis Titles
             if !is_3d_canvas_plot && let Some(matrix) = &self.matrix_data {

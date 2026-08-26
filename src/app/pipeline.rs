@@ -123,14 +123,14 @@ impl OctantApp {
 
                 // Instantiate 3D sphere and surface meshes only when within vertex buffer limits
                 if total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
-                    let sphere_renderer = SphereRenderer::new(
+                    let sphere_renderer = SphereRenderer::new_sphere(
                         &wgpu_render_state.device,
                         wgpu_render_state.target_format,
                         &effective_data.values,
                         effective_data.width,
                         effective_data.height,
                     );
-                    let surface_renderer = SurfaceRenderer::new(
+                    let surface_renderer = SurfaceRenderer::new_surface(
                         &wgpu_render_state.device,
                         wgpu_render_state.target_format,
                         &effective_data.values,
@@ -594,5 +594,159 @@ impl OctantApp {
 
         let title = crate::utils::coordinates::format_dimension_axis_title(&name);
         (bounds, title)
+    }
+
+    /// Dispatches the appropriate GPU paint callback to the egui painter for the active plot type.
+    pub fn paint_active_plot(
+        &mut self,
+        ui: &mut egui::Ui,
+        canvas_rect: egui::Rect,
+        plot_rect: egui::Rect,
+        gpu_pan: [f32; 2],
+        gpu_zoom: f32,
+        gpu_aspect_scale: [f32; 2],
+    ) {
+        match self.active_plot_type {
+            crate::plots::PlotType::Line => {
+                if let Some(line_renderer) = &self.line_renderer {
+                    let color_params = self.get_color_params();
+                    let (profile_values, profile_length, line_count) =
+                        self.get_line_profile_payload();
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        canvas_rect,
+                        crate::plots::LineCallback {
+                            renderer: line_renderer.clone(),
+                            color_params,
+                            rect: canvas_rect,
+                            profile_values,
+                            profile_length,
+                            line_count,
+                            line_mode: if self.line_plot_all_series { 1 } else { 0 },
+                            pan: gpu_pan,
+                            zoom: gpu_zoom,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
+            crate::plots::PlotType::Sphere => {
+                if let Some(sphere_renderer) = &self.sphere_renderer {
+                    let aspect_ratio = crate::plots::common::compute_aspect_ratio(&plot_rect);
+                    let params = self.get_mesh_3d_uniform_params(
+                        self.sphere_mode,
+                        self.sphere_displacement_strength,
+                        aspect_ratio,
+                    );
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        plot_rect,
+                        crate::plots::Mesh3DCallback {
+                            renderer: sphere_renderer.clone(),
+                            params,
+                            cube_mode_idx: 3,
+                            rect: plot_rect,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
+            crate::plots::PlotType::Surface => {
+                if let Some(surface_renderer) = &self.surface_renderer {
+                    let aspect_ratio = crate::plots::common::compute_aspect_ratio(&plot_rect);
+                    let params = self.get_mesh_3d_uniform_params(
+                        self.surface_mode,
+                        self.surface_displacement_strength,
+                        aspect_ratio,
+                    );
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        plot_rect,
+                        crate::plots::Mesh3DCallback {
+                            renderer: surface_renderer.clone(),
+                            params,
+                            cube_mode_idx: 2,
+                            rect: plot_rect,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
+            crate::plots::PlotType::Volume => {
+                if let Some(volume_renderer) = &self.volume_renderer {
+                    let screen_aspect = crate::plots::common::compute_aspect_ratio(&plot_rect);
+                    let params = self.get_volume_uniform_params(screen_aspect);
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        plot_rect,
+                        crate::plots::VolumeCallback {
+                            renderer: volume_renderer.clone(),
+                            params,
+                            rect: plot_rect,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
+            crate::plots::PlotType::PointCloud => {
+                if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
+                    let screen_aspect = crate::plots::common::compute_aspect_ratio(&plot_rect);
+                    let params = self.get_point_cloud_uniform_params(screen_aspect);
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        plot_rect,
+                        crate::plots::PointCloudCallback {
+                            renderer: point_cloud_renderer.clone(),
+                            params,
+                            rect: plot_rect,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
+            _ => {
+                if let Some(renderer) = &self.renderer {
+                    if self.active_pyramid.is_some()
+                        && self.active_plot_type == crate::plots::PlotType::Heatmap
+                    {
+                        let ((u_min, u_max), (v_min, v_max)) =
+                            crate::data::ViewportResampler::compute_visible_data_bounds(
+                                gpu_pan,
+                                gpu_zoom,
+                                gpu_aspect_scale,
+                            );
+                        let (orig_w, orig_h) = self.active_data_dimensions_2d();
+                        let (target_w, target_h) =
+                            crate::data::ViewportResampler::compute_target_resolution(
+                                orig_w, orig_h, 2048,
+                            );
+
+                        if let Some(tile) = self.resampler.resample_if_needed(
+                            (u_min, u_max),
+                            (v_min, v_max),
+                            target_w,
+                            target_h,
+                        ) && let Some(wgpu_render_state) = &self.wgpu_render_state
+                        {
+                            renderer.update_data_and_dimensions(
+                                &wgpu_render_state.queue,
+                                &tile.data.values,
+                                tile.data.width,
+                                tile.data.height,
+                                tile.tile_bounds,
+                            );
+                        }
+                    }
+
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        canvas_rect,
+                        crate::plots::MatrixCallback {
+                            renderer: renderer.clone(),
+                            color_params: self.get_color_params(),
+                            rect: canvas_rect,
+                            pan: gpu_pan,
+                            zoom: gpu_zoom,
+                            aspect_scale: gpu_aspect_scale,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
+        }
     }
 }
