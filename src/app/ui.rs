@@ -1,7 +1,5 @@
-use crate::plots::{
-    LineCallback, MatrixCallback, PlotType, PointCloudCallback, SphereCallback, SurfaceCallback,
-    VolumeCallback,
-};
+use crate::plots::PlotType;
+use crate::utils::apply_zoom_pan_at_point;
 
 use super::OctantApp;
 
@@ -161,26 +159,19 @@ impl eframe::App for OctantApp {
             if self.show_bottom_bar {
                 crate::ui::bottom_bar::show_bottom_bar(self, ui);
             }
-            crate::ui::catalog::show_catalog_window(self, &ctx);
-            crate::ui::about::show_about_window(self, &ctx);
             if self.show_colorbar {
                 crate::ui::colorbar::show_colorbar_overlay(self, &ctx);
             }
-
-            // After panels consume their space, the remaining rect is the canvas.
-            // Pass it to the overlays so they can anchor to the canvas left edge.
-            let canvas_rect = ui.available_rect_before_wrap();
-            crate::ui::variables::show_variables_overlay(self, &ctx, canvas_rect);
-            crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
-            crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
-        } else {
-            crate::ui::catalog::show_catalog_window(self, &ctx);
-            crate::ui::about::show_about_window(self, &ctx);
-            let canvas_rect = ui.available_rect_before_wrap();
-            crate::ui::variables::show_variables_overlay(self, &ctx, canvas_rect);
-            crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
-            crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
         }
+
+        crate::ui::catalog::show_catalog_window(self, &ctx);
+        crate::ui::about::show_about_window(self, &ctx);
+
+        // Overlays anchor relative to the remaining canvas rect
+        let canvas_rect = ui.available_rect_before_wrap();
+        crate::ui::variables::show_variables_overlay(self, &ctx, canvas_rect);
+        crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
+        crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
 
         // 4. Drawing Canvas Area with Aspect Data Ratio
         {
@@ -257,26 +248,35 @@ impl eframe::App for OctantApp {
                 if response.hovered() {
                     let scroll = ui.input(|i| i.smooth_scroll_delta.y);
                     if scroll != 0.0 {
-                        let zoom_factor = (1.0 + scroll * 0.002).clamp(0.8, 1.25);
                         let mouse_pos = response.hover_pos().unwrap_or(canvas_rect.center());
                         let center = canvas_rect.center();
 
                         match self.active_plot_type {
                             PlotType::Heatmap => {
-                                let old_zoom = self.heatmap_zoom;
-                                let new_zoom = (old_zoom * zoom_factor).clamp(0.1, 50.0);
-                                let old_pan = self.heatmap_pan;
-                                self.heatmap_pan = old_pan * (new_zoom / old_zoom)
-                                    + (mouse_pos - center) * (1.0 - new_zoom / old_zoom);
-                                self.heatmap_zoom = new_zoom;
+                                let (zoom, pan) = apply_zoom_pan_at_point(
+                                    self.heatmap_zoom,
+                                    self.heatmap_pan,
+                                    mouse_pos,
+                                    center,
+                                    scroll,
+                                    0.1,
+                                    50.0,
+                                );
+                                self.heatmap_zoom = zoom;
+                                self.heatmap_pan = pan;
                             }
                             PlotType::Line => {
-                                let old_zoom = self.line_zoom;
-                                let new_zoom = (old_zoom * zoom_factor).clamp(0.1, 50.0);
-                                let old_pan = self.line_pan;
-                                self.line_pan = old_pan * (new_zoom / old_zoom)
-                                    + (mouse_pos - center) * (1.0 - new_zoom / old_zoom);
-                                self.line_zoom = new_zoom;
+                                let (zoom, pan) = apply_zoom_pan_at_point(
+                                    self.line_zoom,
+                                    self.line_pan,
+                                    mouse_pos,
+                                    center,
+                                    scroll,
+                                    0.1,
+                                    50.0,
+                                );
+                                self.line_zoom = zoom;
+                                self.line_pan = pan;
                             }
                             _ => {}
                         }
@@ -291,9 +291,9 @@ impl eframe::App for OctantApp {
             }
 
             // Compute screen-space transformed plot rect and GPU pan/zoom uniforms
-            let (transformed_plot_rect, gpu_pan, gpu_zoom, gpu_aspect_scale) = if is_3d_canvas_plot
-            {
-                (canvas_rect, [0.0, 0.0], 1.0, [1.0, 1.0])
+            let gpu_aspect_scale = self.compute_aspect_scale(canvas_rect.size());
+            let (transformed_plot_rect, gpu_pan, gpu_zoom) = if is_3d_canvas_plot {
+                (canvas_rect, [0.0, 0.0], 1.0)
             } else if self.active_plot_type == PlotType::Line {
                 let zoom = self.line_zoom;
                 let pan = self.line_pan;
@@ -302,27 +302,9 @@ impl eframe::App for OctantApp {
                 let rect = egui::Rect::from_center_size(scaled_center, scaled_size);
                 let gpu_pan_x = pan.x / (0.5 * canvas_rect.width().max(1.0));
                 let gpu_pan_y = -pan.y / (0.5 * canvas_rect.height().max(1.0));
-                (rect, [gpu_pan_x, gpu_pan_y], zoom, [1.0, 1.0])
+                (rect, [gpu_pan_x, gpu_pan_y], zoom)
             } else {
-                let (aspect_scale_x, aspect_scale_y) = if self.enforce_data_aspect_ratio
-                    && let Some(matrix) = &self.matrix_data
-                {
-                    let (orig_w, orig_h) = if let Some(pyr) = &self.active_pyramid {
-                        (pyr.original_width, pyr.original_height)
-                    } else {
-                        (matrix.width, matrix.height)
-                    };
-                    let data_aspect = (orig_w as f32 / orig_h as f32).max(0.001);
-                    let canvas_aspect = canvas_rect.width() / canvas_rect.height().max(1.0);
-                    if canvas_aspect > data_aspect {
-                        (data_aspect / canvas_aspect, 1.0)
-                    } else {
-                        (1.0, canvas_aspect / data_aspect)
-                    }
-                } else {
-                    (1.0, 1.0)
-                };
-
+                let [aspect_scale_x, aspect_scale_y] = gpu_aspect_scale;
                 let zoom = self.heatmap_zoom;
                 let pan = self.heatmap_pan;
                 let plot_w = canvas_rect.width() * aspect_scale_x * zoom;
@@ -332,210 +314,20 @@ impl eframe::App for OctantApp {
 
                 let gpu_pan_x = pan.x / (0.5 * canvas_rect.width().max(1.0));
                 let gpu_pan_y = -pan.y / (0.5 * canvas_rect.height().max(1.0));
-                (
-                    rect,
-                    [gpu_pan_x, gpu_pan_y],
-                    zoom,
-                    [aspect_scale_x, aspect_scale_y],
-                )
+                (rect, [gpu_pan_x, gpu_pan_y], zoom)
             };
 
             let plot_rect = transformed_plot_rect;
 
-            match self.active_plot_type {
-                PlotType::Line => {
-                    if let Some(line_renderer) = &self.line_renderer {
-                        let color_params = self.get_color_params();
-                        let (profile_values, profile_length, line_count) =
-                            self.get_line_profile_payload();
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            canvas_rect,
-                            LineCallback {
-                                renderer: line_renderer.clone(),
-                                color_params,
-                                rect: canvas_rect,
-                                profile_values,
-                                profile_length,
-                                line_count,
-                                line_mode: if self.line_plot_all_series { 1 } else { 0 },
-                                pan: gpu_pan,
-                                zoom: gpu_zoom,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-                PlotType::Sphere => {
-                    if let Some(sphere_renderer) = &self.sphere_renderer {
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            plot_rect,
-                            SphereCallback {
-                                renderer: sphere_renderer.clone(),
-                                color_params: self.get_color_params(),
-                                rotation_y: self.sphere_rotation_y,
-                                rotation_x: self.sphere_rotation_x,
-                                zoom: self.sphere_zoom,
-                                displacement_strength: self.sphere_displacement_strength,
-                                sphere_mode: self.sphere_mode,
-                                rect: plot_rect,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-                PlotType::Surface => {
-                    if let Some(surface_renderer) = &self.surface_renderer {
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            plot_rect,
-                            SurfaceCallback {
-                                renderer: surface_renderer.clone(),
-                                color_params: self.get_color_params(),
-                                rotation_y: self.sphere_rotation_y,
-                                rotation_x: self.sphere_rotation_x,
-                                zoom: self.sphere_zoom,
-                                displacement_strength: self.surface_displacement_strength,
-                                surface_mode: self.surface_mode,
-                                rect: plot_rect,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-                PlotType::Volume => {
-                    if let Some(volume_renderer) = &self.volume_renderer {
-                        let (width, height) = self
-                            .volume_data
-                            .as_ref()
-                            .map(|v| (v.width as u32, v.height as u32))
-                            .unwrap_or_else(|| {
-                                self.matrix_data
-                                    .as_ref()
-                                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
-                            });
-                        let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
-                        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
-
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            plot_rect,
-                            VolumeCallback {
-                                renderer: volume_renderer.clone(),
-                                color_params: self.get_color_params(),
-                                rot_y: self.sphere_rotation_y,
-                                rot_x: self.sphere_rotation_x,
-                                aspect_x,
-                                aspect_y,
-                                aspect_z,
-                                zoom: self.sphere_zoom,
-                                opacity_scale: self.volume_opacity,
-                                step_count: self.volume_step_count,
-                                width,
-                                height,
-                                algorithm: self.volume_algorithm,
-                                isovalue: self.volume_isovalue,
-                                isorange: self.volume_isorange,
-                                attenuation: self.volume_attenuation,
-                                shift_x,
-                                shift_y,
-                                shift_z,
-                                transparency: self.volume_transparency,
-                                rect: plot_rect,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-                PlotType::PointCloud => {
-                    if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
-                        let (width, height) = self
-                            .volume_data
-                            .as_ref()
-                            .map(|v| (v.width as u32, v.height as u32))
-                            .unwrap_or_else(|| {
-                                self.matrix_data
-                                    .as_ref()
-                                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
-                            });
-                        let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
-                        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
-
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            plot_rect,
-                            PointCloudCallback {
-                                renderer: point_cloud_renderer.clone(),
-                                color_params: self.get_color_params(),
-                                rot_y: self.sphere_rotation_y,
-                                rot_x: self.sphere_rotation_x,
-                                aspect_x,
-                                aspect_y,
-                                aspect_z,
-                                zoom: self.sphere_zoom,
-                                point_size: self.point_cloud_size,
-                                width,
-                                height,
-                                shift_x,
-                                shift_y,
-                                shift_z,
-                                rect: plot_rect,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-                _ => {
-                    if let Some(renderer) = &self.renderer {
-                        if self.active_pyramid.is_some()
-                            && self.active_plot_type == PlotType::Heatmap
-                        {
-                            let ((u_min, u_max), (v_min, v_max)) =
-                                crate::data::ViewportResampler::compute_visible_data_bounds(
-                                    gpu_pan,
-                                    gpu_zoom,
-                                    gpu_aspect_scale,
-                                );
-                            let (orig_w, orig_h) = self.active_pyramid.as_ref().map_or(
-                                (
-                                    self.matrix_data.as_ref().map_or(1024, |m| m.width),
-                                    self.matrix_data.as_ref().map_or(1024, |m| m.height),
-                                ),
-                                |p| (p.original_width, p.original_height),
-                            );
-                            let (target_w, target_h) =
-                                crate::data::ViewportResampler::compute_target_resolution(
-                                    orig_w, orig_h, 2048,
-                                );
-
-                            if let Some(tile) = self.resampler.resample_if_needed(
-                                (u_min, u_max),
-                                (v_min, v_max),
-                                target_w,
-                                target_h,
-                            ) && let Some(wgpu_render_state) = &self.wgpu_render_state
-                            {
-                                renderer.update_data_and_dimensions(
-                                    &wgpu_render_state.queue,
-                                    &tile.data.values,
-                                    tile.data.width,
-                                    tile.data.height,
-                                    tile.tile_bounds,
-                                );
-                            }
-                        }
-
-                        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                            canvas_rect,
-                            MatrixCallback {
-                                renderer: renderer.clone(),
-                                color_params: self.get_color_params(),
-                                rect: canvas_rect,
-                                pan: gpu_pan,
-                                zoom: gpu_zoom,
-                                aspect_scale: gpu_aspect_scale,
-                            },
-                        );
-                        ui.painter().add(callback);
-                    }
-                }
-            }
+            // Dispatch active plot GPU rendering callback
+            self.paint_active_plot(
+                ui,
+                canvas_rect,
+                plot_rect,
+                gpu_pan,
+                gpu_zoom,
+                gpu_aspect_scale,
+            );
 
             // Draw Dynamic Plot Axis Lines, Ticks, and Axis Titles
             if !is_3d_canvas_plot && let Some(matrix) = &self.matrix_data {
@@ -543,149 +335,47 @@ impl eframe::App for OctantApp {
                     let y_min = self.color_range_min as f64;
                     let y_max = self.color_range_max as f64;
                     let profile_len = match self.line_profile_dim_idx {
-                        2 => self.volume_data.as_ref().map_or(matrix.width, |v| v.depth) as f64,
-                        1 => matrix.height as f64,
-                        _ => matrix.width as f64,
+                        2 => self.volume_data.as_ref().map_or(matrix.width, |v| v.depth),
+                        1 => matrix.height,
+                        _ => matrix.width,
                     };
 
-                    let mut x_bounds = (0.0, (profile_len - 1.0).max(1.0));
-                    let mut x_name = match self.line_profile_dim_idx {
-                        2 => "z".to_string(),
-                        1 => "y".to_string(),
-                        _ => "x".to_string(),
-                    };
-                    let mut y_name = "Data Value".to_string();
-
-                    if let Some(meta) = &self.plotted_dataset_metadata
-                        && let Some(var) = meta.variables.get(self.plotted_variable_idx)
-                    {
-                        if let Some(u) = &var.units {
-                            y_name = format!("{} [{u}]", var.name);
-                        } else if let Some(u) = var.attributes.get("units") {
-                            y_name = format!("{} [{u}]", var.name);
-                        } else {
-                            y_name = var.name.clone();
-                        }
-
-                        let (x_dim, y_dim, z_dim) = Self::resolve_spatial_axes(
-                            var.shape.len(),
-                            &var.dimension_names,
-                            &var.dimension_names,
-                            &self.plotted_dim_config,
-                        );
-
-                        let target_dim_idx = match self.line_profile_dim_idx {
-                            2 => z_dim,
-                            1 => y_dim,
-                            _ => x_dim,
-                        };
-
-                        if target_dim_idx < var.shape.len() {
-                            let dim_size = var
-                                .shape
-                                .get(target_dim_idx)
-                                .copied()
-                                .unwrap_or(profile_len as u64)
-                                as usize;
-                            let (start_p, end_p) = self
-                                .plotted_selected_dim_ranges
-                                .get(target_dim_idx)
-                                .copied()
-                                .unwrap_or((0, dim_size.saturating_sub(1)));
-                            x_bounds = (start_p as f64, end_p as f64);
-
-                            if let Some(name) = var.dimension_names.get(target_dim_idx) {
-                                x_name = name.clone();
-                                if let Some(bounds) = meta.get_coord_bounds_for_range(
-                                    name,
-                                    dim_size,
-                                    (start_p, end_p),
-                                ) {
-                                    x_bounds = bounds;
-                                }
+                    let y_name = self
+                        .plotted_variable_info()
+                        .map(|var| {
+                            if let Some(u) = &var.units {
+                                format!("{} [{u}]", var.name)
+                            } else if let Some(u) = var.attributes.get("units") {
+                                format!("{} [{u}]", var.name)
+                            } else {
+                                var.name.clone()
                             }
-                        }
-                    }
+                        })
+                        .unwrap_or_else(|| "Data Value".to_string());
 
-                    let x_title = crate::utils::coordinates::format_dimension_axis_title(&x_name);
+                    let target_dim_idx = self.get_spatial_dim_index(self.line_profile_dim_idx);
+                    let fallback_dim_name = match self.line_profile_dim_idx {
+                        2 => "z",
+                        1 => "y",
+                        _ => "x",
+                    };
+
+                    let (x_bounds, x_title) = self.resolve_axis_bounds_and_title(
+                        target_dim_idx,
+                        fallback_dim_name,
+                        profile_len,
+                    );
 
                     (x_bounds, (y_min, y_max), x_title, y_name)
                 } else {
-                    let mut x_name = "X".to_string();
-                    let mut y_name = "Y".to_string();
-                    let (orig_w, orig_h) = if let Some(pyr) = &self.active_pyramid {
-                        (pyr.original_width, pyr.original_height)
-                    } else {
-                        (matrix.width, matrix.height)
-                    };
-                    let mut x_bounds = (0.0, orig_w as f64);
-                    let mut y_bounds = (0.0, orig_h as f64);
+                    let (orig_w, orig_h) = self.active_data_dimensions_2d();
+                    let x_dim = self.get_spatial_dim_index(0);
+                    let y_dim = self.get_spatial_dim_index(1);
 
-                    if let Some(meta) = &self.plotted_dataset_metadata
-                        && let Some(var) = meta.variables.get(self.plotted_variable_idx)
-                    {
-                        let (x_dim, y_dim, _) = Self::resolve_spatial_axes(
-                            var.shape.len(),
-                            &var.dimension_names,
-                            &var.dimension_names,
-                            &self.plotted_dim_config,
-                        );
-
-                        if x_dim < var.shape.len() {
-                            let dim_size =
-                                var.shape.get(x_dim).copied().unwrap_or(matrix.width as u64)
-                                    as usize;
-                            let (start_x, end_x) = self
-                                .plotted_selected_dim_ranges
-                                .get(x_dim)
-                                .copied()
-                                .unwrap_or((0, dim_size.saturating_sub(1)));
-                            x_bounds = (start_x as f64, end_x as f64);
-
-                            if let Some(x_n) = var.dimension_names.get(x_dim) {
-                                x_name = x_n.clone();
-                                if let Some(bounds) =
-                                    meta.get_coord_bounds_for_range(x_n, dim_size, (start_x, end_x))
-                                {
-                                    x_bounds = bounds;
-                                }
-                            }
-                        }
-
-                        if y_dim < var.shape.len() {
-                            let dim_size = var
-                                .shape
-                                .get(y_dim)
-                                .copied()
-                                .unwrap_or(matrix.height as u64)
-                                as usize;
-                            let (start_y, end_y) = self
-                                .plotted_selected_dim_ranges
-                                .get(y_dim)
-                                .copied()
-                                .unwrap_or((0, dim_size.saturating_sub(1)));
-                            y_bounds = (start_y as f64, end_y as f64);
-
-                            if let Some(y_n) = var.dimension_names.get(y_dim) {
-                                y_name = y_n.clone();
-                                if let Some(bounds) =
-                                    meta.get_coord_bounds_for_range(y_n, dim_size, (start_y, end_y))
-                                {
-                                    y_bounds = bounds;
-                                }
-                            }
-                        }
-                    } else {
-                        if let Some(&(start_x, end_x)) = self.plotted_selected_dim_ranges.first() {
-                            x_bounds = (start_x as f64, end_x as f64);
-                        }
-                        if let Some(&(start_y, end_y)) = self.plotted_selected_dim_ranges.get(1) {
-                            y_bounds = (start_y as f64, end_y as f64);
-                        }
-                    }
-
-                    let x_title = crate::utils::coordinates::format_dimension_axis_title(&x_name);
-                    let y_title = crate::utils::coordinates::format_dimension_axis_title(&y_name);
+                    let (x_bounds, x_title) =
+                        self.resolve_axis_bounds_and_title(x_dim, "X", orig_w);
+                    let (y_bounds, y_title) =
+                        self.resolve_axis_bounds_and_title(y_dim, "Y", orig_h);
 
                     (x_bounds, y_bounds, x_title, y_title)
                 };

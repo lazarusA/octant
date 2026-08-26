@@ -275,81 +275,11 @@ impl VolumeRenderer {
             self.data_len.store(data.len(), Ordering::Relaxed);
         }
     }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn update_uniforms(
-        &self,
-        queue: &wgpu::Queue,
-        color: &super::common::PlotColorParams,
-        rot_y: f32,
-        rot_x: f32,
-        aspect_x: f32,
-        aspect_y: f32,
-        aspect_z: f32,
-        zoom: f32,
-        opacity_scale: f32,
-        step_count: u32,
-        width: u32,
-        height: u32,
-        algorithm: u32,
-        isovalue: f32,
-        isorange: f32,
-        attenuation: f32,
-        screen_aspect: f32,
-        shift_x: u32,
-        shift_y: u32,
-        shift_z: u32,
-        transparency: bool,
-    ) {
-        let data_l = self.data_len.load(Ordering::Relaxed);
-        let depth = super::common::calculate_3d_depth(data_l, width, height);
-        let uniforms = VolumeUniforms {
-            clip_planes: [[0.0; 4]; 8],
-            light_color: [1.0, 1.0, 1.0],
-            num_clip_planes: 0,
-            ambient: [0.2, 0.2, 0.2],
-            shininess: 32.0,
-            light_direction: [1.0, 1.0, 1.0],
-            algorithm,
-            isovalue,
-            isorange,
-            absorption: opacity_scale,
-            samples: step_count,
-            diffuse: 0.8,
-            specular: 0.2,
-            attenuation,
-            picking: 0,
-            object_id: 0,
-            rotation_y: rot_y,
-            rotation_x: rot_x,
-            aspect_x,
-            aspect_y,
-            aspect_z,
-            zoom,
-            width: width.max(1),
-            height: height.max(1),
-            depth,
-            screen_aspect,
-            shift_x,
-            shift_y,
-            shift_z,
-            transparency: if transparency { 1 } else { 0 },
-            _pad1: 0,
-            color: *color,
-        };
-        queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
-    }
 }
 
-impl super::common::PlotRenderer for VolumeRenderer {
-    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
-        VolumeRenderer::update_data(self, queue, values);
-    }
-}
-
-pub struct VolumeCallback {
-    pub renderer: Arc<VolumeRenderer>,
-    pub color_params: super::common::PlotColorParams,
+#[derive(Clone, Debug)]
+pub struct VolumeUniformParams {
+    pub color: super::common::PlotColorParams,
     pub rot_y: f32,
     pub rot_x: f32,
     pub aspect_x: f32,
@@ -364,10 +294,64 @@ pub struct VolumeCallback {
     pub isovalue: f32,
     pub isorange: f32,
     pub attenuation: f32,
+    pub screen_aspect: f32,
     pub shift_x: u32,
     pub shift_y: u32,
     pub shift_z: u32,
     pub transparency: bool,
+}
+
+impl VolumeRenderer {
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &VolumeUniformParams) {
+        let data_l = self.data_len.load(Ordering::Relaxed);
+        let depth = super::common::calculate_3d_depth(data_l, params.width, params.height);
+        let uniforms = VolumeUniforms {
+            clip_planes: [[0.0; 4]; 8],
+            light_color: [1.0, 1.0, 1.0],
+            num_clip_planes: 0,
+            ambient: [0.2, 0.2, 0.2],
+            shininess: 32.0,
+            light_direction: [1.0, 1.0, 1.0],
+            algorithm: params.algorithm,
+            isovalue: params.isovalue,
+            isorange: params.isorange,
+            absorption: params.opacity_scale,
+            samples: params.step_count,
+            diffuse: 0.8,
+            specular: 0.2,
+            attenuation: params.attenuation,
+            picking: 0,
+            object_id: 0,
+            rotation_y: params.rot_y,
+            rotation_x: params.rot_x,
+            aspect_x: params.aspect_x,
+            aspect_y: params.aspect_y,
+            aspect_z: params.aspect_z,
+            zoom: params.zoom,
+            width: params.width.max(1),
+            height: params.height.max(1),
+            depth,
+            screen_aspect: params.screen_aspect,
+            shift_x: params.shift_x,
+            shift_y: params.shift_y,
+            shift_z: params.shift_z,
+            transparency: if params.transparency { 1 } else { 0 },
+            _pad1: 0,
+            color: params.color,
+        };
+        queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+    }
+}
+
+impl super::common::PlotRenderer for VolumeRenderer {
+    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
+        VolumeRenderer::update_data(self, queue, values);
+    }
+}
+
+pub struct VolumeCallback {
+    pub renderer: Arc<VolumeRenderer>,
+    pub params: VolumeUniformParams,
     pub rect: egui::Rect,
 }
 
@@ -380,30 +364,9 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
-        let screen_aspect = super::common::compute_aspect_ratio(&self.rect);
-        self.renderer.update_uniforms(
-            queue,
-            &self.color_params,
-            self.rot_y,
-            self.rot_x,
-            self.aspect_x,
-            self.aspect_y,
-            self.aspect_z,
-            self.zoom,
-            self.opacity_scale,
-            self.step_count,
-            self.width,
-            self.height,
-            self.algorithm,
-            self.isovalue,
-            self.isorange,
-            self.attenuation,
-            screen_aspect,
-            self.shift_x,
-            self.shift_y,
-            self.shift_z,
-            self.transparency,
-        );
+        let mut params = self.params.clone();
+        params.screen_aspect = super::common::compute_aspect_ratio(&self.rect);
+        self.renderer.update_uniforms(queue, &params);
         Vec::new()
     }
 

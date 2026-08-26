@@ -2,22 +2,27 @@ use crate::app::OctantApp;
 use crate::plots::PlotType;
 
 pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let (is_3d_available, is_size_allowed, vol_mb) = if let Some(meta) =
-        &app.active_dataset_metadata
+    let (is_3d_available, is_size_allowed, vol_mb) = if let Some(v) = app
+        .plotted_variable_info()
+        .or_else(|| app.selected_variable_info())
     {
-        if let Some(v) = meta.variables.get(app.selected_variable_idx) {
-            let has_3d = v.shape.len() >= 3 || v.dimension_names.len() >= 3;
-            let vol_elements = crate::ui::variables_panel::calculate_selected_volume_elements(app);
-            let size_ok = vol_elements <= crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
-            let mb = (vol_elements * 4) as f64 / (1024.0 * 1024.0);
-            (has_3d, size_ok, mb)
+        let has_3d = v.shape.len() >= 3 || v.dimension_names.len() >= 3;
+        let vol_elements = if app.volume_data.is_some() {
+            app.volume_data
+                .as_ref()
+                .map_or(0, |v| v.width * v.height * v.depth)
         } else {
-            (false, false, 0.0)
-        }
+            crate::ui::variables_panel::calculate_selected_volume_elements(app)
+        };
+        let size_ok = vol_elements <= crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
+        let mb = (vol_elements * 4) as f64 / (1024.0 * 1024.0);
+        (has_3d, size_ok, mb)
     } else {
         (false, false, 0.0)
     };
-    let is_volume_allowed = is_3d_available && is_size_allowed && !app.enable_pyramid_resampling;
+    let is_volume_allowed = (is_3d_available || app.volume_data.is_some())
+        && is_size_allowed
+        && !app.enable_pyramid_resampling;
 
     let total_2d_elements = if let Some(mdata) = &app.matrix_data {
         mdata.width * mdata.height
@@ -28,15 +33,16 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         && !app.enable_pyramid_resampling;
     let surface_mb = (total_2d_elements * 4) as f64 / (1024.0 * 1024.0);
 
-    // Safety fallback: if any plot is active with invalid data constraints, revert to 2D Plane
+    // Safety fallback: revert to 2D Plane only if the currently active plot lacks valid GPU data or pyramid is on
     if (app.enable_pyramid_resampling && app.active_plot_type != PlotType::Heatmap)
         || ((app.active_plot_type == PlotType::Volume
             || app.active_plot_type == PlotType::PointCloud)
-            && !is_volume_allowed)
+            && app.volume_data.is_none())
         || ((app.active_plot_type == PlotType::Sphere
             || app.active_plot_type == PlotType::Surface
             || app.active_plot_type == PlotType::Block)
-            && !is_surface_allowed)
+            && app.sphere_renderer.is_none()
+            && app.matrix_data.is_none())
     {
         app.active_plot_type = PlotType::Heatmap;
     }

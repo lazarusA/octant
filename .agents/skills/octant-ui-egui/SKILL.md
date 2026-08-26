@@ -42,3 +42,8 @@ This skill guides development of the user interface in Octant using `egui` and `
 ### 5. Smooth Animations & Timers
 - Track elapsed delta time (`ctx.input(|i| i.stable_dt)`).
 - Request continuous repaints only when playing animations or waiting for background prefetch (`ctx.request_repaint()`).
+
+### 6. Canvas Paint Dispatch & Viewport Math
+- In `src/app/ui.rs`, canvas rendering delegates to `self.paint_active_plot(ui, canvas_rect, plot_rect, gpu_pan, gpu_zoom, gpu_aspect_scale)` in `src/app/pipeline.rs`.
+- Use `crate::utils::apply_zoom_pan_at_point(old_zoom, old_pan, mouse_pos, center, scroll, min_zoom, max_zoom)` from `src/utils/math.rs` for cursor-centered zoom and pan offsets.
+- Dynamic 2D aspect ratios are resolved using `self.compute_aspect_scale(canvas_rect.size())` and `self.active_data_dimensions_2d()`.

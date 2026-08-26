@@ -215,46 +215,49 @@ impl PointCloudRenderer {
                 .store(data.len() as u32, Ordering::Relaxed);
         }
     }
+}
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn update_uniforms(
-        &self,
-        queue: &wgpu::Queue,
-        color: &super::common::PlotColorParams,
-        rot_y: f32,
-        rot_x: f32,
-        aspect_x: f32,
-        aspect_y: f32,
-        aspect_z: f32,
-        zoom: f32,
-        point_size: f32,
-        width: u32,
-        height: u32,
-        screen_aspect: f32,
-        shift_x: u32,
-        shift_y: u32,
-        shift_z: u32,
-    ) {
+#[derive(Clone, Debug)]
+pub struct PointCloudUniformParams {
+    pub color: super::common::PlotColorParams,
+    pub rot_y: f32,
+    pub rot_x: f32,
+    pub aspect_x: f32,
+    pub aspect_y: f32,
+    pub aspect_z: f32,
+    pub zoom: f32,
+    pub point_size: f32,
+    pub width: u32,
+    pub height: u32,
+    pub screen_aspect: f32,
+    pub shift_x: u32,
+    pub shift_y: u32,
+    pub shift_z: u32,
+}
+
+impl PointCloudRenderer {
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &PointCloudUniformParams) {
         let instance_cnt = self.instance_count.load(Ordering::Relaxed);
-        let depth = super::common::calculate_3d_depth(instance_cnt as usize, width, height);
+        let depth =
+            super::common::calculate_3d_depth(instance_cnt as usize, params.width, params.height);
         let uniforms = PointCloudUniforms {
-            rotation_y: rot_y,
-            rotation_x: rot_x,
-            aspect_x,
-            aspect_y,
-            aspect_z,
-            zoom,
-            point_size,
-            width: width.max(1),
-            height: height.max(1),
+            rotation_y: params.rot_y,
+            rotation_x: params.rot_x,
+            aspect_x: params.aspect_x,
+            aspect_y: params.aspect_y,
+            aspect_z: params.aspect_z,
+            zoom: params.zoom,
+            point_size: params.point_size,
+            width: params.width.max(1),
+            height: params.height.max(1),
             depth,
-            screen_aspect,
-            shift_x,
-            shift_y,
-            shift_z,
+            screen_aspect: params.screen_aspect,
+            shift_x: params.shift_x,
+            shift_y: params.shift_y,
+            shift_z: params.shift_z,
             _pad0: 0,
             _pad1: 0,
-            color: *color,
+            color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -268,19 +271,7 @@ impl super::common::PlotRenderer for PointCloudRenderer {
 
 pub struct PointCloudCallback {
     pub renderer: Arc<PointCloudRenderer>,
-    pub color_params: super::common::PlotColorParams,
-    pub rot_y: f32,
-    pub rot_x: f32,
-    pub aspect_x: f32,
-    pub aspect_y: f32,
-    pub aspect_z: f32,
-    pub zoom: f32,
-    pub point_size: f32,
-    pub width: u32,
-    pub height: u32,
-    pub shift_x: u32,
-    pub shift_y: u32,
-    pub shift_z: u32,
+    pub params: PointCloudUniformParams,
     pub rect: egui::Rect,
 }
 
@@ -293,24 +284,9 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
-        let screen_aspect = super::common::compute_aspect_ratio(&self.rect);
-        self.renderer.update_uniforms(
-            queue,
-            &self.color_params,
-            self.rot_y,
-            self.rot_x,
-            self.aspect_x,
-            self.aspect_y,
-            self.aspect_z,
-            self.zoom,
-            self.point_size,
-            self.width,
-            self.height,
-            screen_aspect,
-            self.shift_x,
-            self.shift_y,
-            self.shift_z,
-        );
+        let mut params = self.params.clone();
+        params.screen_aspect = super::common::compute_aspect_ratio(&self.rect);
+        self.renderer.update_uniforms(queue, &params);
         Vec::new()
     }
 
