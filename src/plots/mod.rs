@@ -1,18 +1,22 @@
 pub mod common;
 pub mod heatmap;
 pub mod line;
+pub mod mesh;
 pub mod point_cloud;
 pub mod sphere;
 pub mod surface;
 pub mod volume;
 
-pub use common::PlotRenderer;
+pub use common::{
+    Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams, PlotRenderer,
+};
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
 pub use line::{LineCallback, LineRenderer};
-pub use point_cloud::{PointCloudCallback, PointCloudRenderer};
-pub use sphere::{SphereCallback, SpherePlot, SphereRenderer};
-pub use surface::{SurfaceCallback, SurfacePlot, SurfaceRenderer};
-pub use volume::{VolumeCallback, VolumeRenderer};
+pub use mesh::{Mesh3DCallback, Mesh3DRenderer};
+pub use point_cloud::{PointCloudCallback, PointCloudRenderer, PointCloudUniformParams};
+pub use sphere::{SphereCallback, SphereRenderer};
+pub use surface::{SurfaceCallback, SurfaceRenderer};
+pub use volume::{VolumeCallback, VolumeRenderer, VolumeUniformParams};
 
 /// Supported visualization plot types in Octant Engine
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]

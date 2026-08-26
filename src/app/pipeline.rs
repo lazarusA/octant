@@ -123,14 +123,14 @@ impl OctantApp {
 
                 // Instantiate 3D sphere and surface meshes only when within vertex buffer limits
                 if total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
-                    let sphere_renderer = SphereRenderer::new(
+                    let sphere_renderer = SphereRenderer::new_sphere(
                         &wgpu_render_state.device,
                         wgpu_render_state.target_format,
                         &effective_data.values,
                         effective_data.width,
                         effective_data.height,
                     );
-                    let surface_renderer = SurfaceRenderer::new(
+                    let surface_renderer = SurfaceRenderer::new_surface(
                         &wgpu_render_state.device,
                         wgpu_render_state.target_format,
                         &effective_data.values,
@@ -357,8 +357,8 @@ impl OctantApp {
         }
     }
 
-    /// Resolves the metadata dimension name for spatial axis (0 = X, 1 = Y, 2 = Z).
-    pub fn get_spatial_dim_name(&self, axis: usize) -> Option<String> {
+    /// Resolves the metadata dimension index for a given spatial axis (0 = X, 1 = Y, 2 = Z).
+    pub fn get_spatial_dim_index(&self, axis: usize) -> usize {
         if let Some(meta) = &self.plotted_dataset_metadata
             && let Some(var) = meta.variables.get(self.plotted_variable_idx)
         {
@@ -368,14 +368,23 @@ impl OctantApp {
                 &var.dimension_names,
                 &self.plotted_dim_config,
             );
-            let idx = match axis {
+            match axis {
                 0 => x,
                 1 => y,
                 _ => z,
-            };
-            return var.dimension_names.get(idx).cloned();
+            }
+        } else {
+            axis
         }
-        None
+    }
+
+    /// Resolves the metadata dimension name for spatial axis (0 = X, 1 = Y, 2 = Z).
+    pub fn get_spatial_dim_name(&self, axis: usize) -> Option<String> {
+        let idx = self.get_spatial_dim_index(axis);
+        self.plotted_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.variables.get(self.plotted_variable_idx))
+            .and_then(|v| v.dimension_names.get(idx).cloned())
     }
 
     /// Returns a human-friendly label for the spatial axis (e.g., "Along X (lon)", "Along Z (depth)").
@@ -422,6 +431,322 @@ impl OctantApp {
                 }
             }
             PlotType::Volume | PlotType::PointCloud => {}
+        }
+    }
+
+    /// Resolves active (width, height) for 3D Volume and PointCloud shaders.
+    pub fn get_volume_dimensions(&self) -> (u32, u32) {
+        self.volume_data
+            .as_ref()
+            .map(|v| (v.width as u32, v.height as u32))
+            .unwrap_or_else(|| {
+                self.matrix_data
+                    .as_ref()
+                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
+            })
+    }
+
+    /// Assembles VolumeUniformParams for 3D volume raymarching.
+    pub fn get_volume_uniform_params(
+        &self,
+        screen_aspect: f32,
+    ) -> crate::plots::VolumeUniformParams {
+        let (width, height) = self.get_volume_dimensions();
+        let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
+
+        crate::plots::VolumeUniformParams {
+            color: self.get_color_params(),
+            rot_y: self.sphere_rotation_y,
+            rot_x: self.sphere_rotation_x,
+            aspect_x,
+            aspect_y,
+            aspect_z,
+            zoom: self.sphere_zoom,
+            opacity_scale: self.volume_opacity,
+            step_count: self.volume_step_count,
+            width,
+            height,
+            algorithm: self.volume_algorithm,
+            isovalue: self.volume_isovalue,
+            isorange: self.volume_isorange,
+            attenuation: self.volume_attenuation,
+            screen_aspect,
+            shift_x,
+            shift_y,
+            shift_z,
+            transparency: self.volume_transparency,
+        }
+    }
+
+    /// Assembles PointCloudUniformParams for 3D point cloud billboard rendering.
+    pub fn get_point_cloud_uniform_params(
+        &self,
+        screen_aspect: f32,
+    ) -> crate::plots::PointCloudUniformParams {
+        let (width, height) = self.get_volume_dimensions();
+        let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
+
+        crate::plots::PointCloudUniformParams {
+            color: self.get_color_params(),
+            rot_y: self.sphere_rotation_y,
+            rot_x: self.sphere_rotation_x,
+            aspect_x,
+            aspect_y,
+            aspect_z,
+            zoom: self.sphere_zoom,
+            point_size: self.point_cloud_size,
+            width,
+            height,
+            screen_aspect,
+            shift_x,
+            shift_y,
+            shift_z,
+        }
+    }
+
+    /// Assembles Mesh3DUniformParams for Sphere and Surface heightfields.
+    pub fn get_mesh_3d_uniform_params(
+        &self,
+        mode: u32,
+        displacement_strength: f32,
+        aspect_ratio: f32,
+    ) -> crate::plots::Mesh3DUniformParams {
+        crate::plots::Mesh3DUniformParams {
+            color: self.get_color_params(),
+            rotation_y: self.sphere_rotation_y,
+            rotation_x: self.sphere_rotation_x,
+            aspect_ratio,
+            zoom: self.sphere_zoom,
+            displacement_strength,
+            mode,
+        }
+    }
+
+    /// Returns the effective original (width, height) of the active 2D data or pyramid.
+    pub fn active_data_dimensions_2d(&self) -> (usize, usize) {
+        if let Some(pyr) = &self.active_pyramid {
+            (pyr.original_width, pyr.original_height)
+        } else if let Some(m) = &self.matrix_data {
+            (m.width, m.height)
+        } else {
+            (1024, 1024)
+        }
+    }
+
+    /// Returns the aspect ratio (width / height) of the active 2D dataset.
+    pub fn data_aspect_ratio_2d(&self) -> f32 {
+        let (w, h) = self.active_data_dimensions_2d();
+        (w as f32 / (h as f32).max(1.0)).max(0.001)
+    }
+
+    /// Computes data aspect scaling factors [scale_x, scale_y] to preserve proportional aspect framing.
+    pub fn compute_aspect_scale(&self, canvas_size: egui::Vec2) -> [f32; 2] {
+        if self.enforce_data_aspect_ratio && self.matrix_data.is_some() {
+            let data_aspect = self.data_aspect_ratio_2d();
+            let canvas_aspect = canvas_size.x / canvas_size.y.max(1.0);
+            if canvas_aspect > data_aspect {
+                [data_aspect / canvas_aspect, 1.0]
+            } else {
+                [1.0, canvas_aspect / data_aspect]
+            }
+        } else {
+            [1.0, 1.0]
+        }
+    }
+
+    /// Resolves coordinate bounds and formatted title for a given dimension index.
+    pub fn resolve_axis_bounds_and_title(
+        &self,
+        dim_idx: usize,
+        fallback_name: &str,
+        fallback_len: usize,
+    ) -> ((f64, f64), String) {
+        let mut bounds = (0.0, fallback_len.saturating_sub(1).max(1) as f64);
+        let mut name = fallback_name.to_string();
+
+        if let Some(meta) = &self.plotted_dataset_metadata
+            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+            && dim_idx < var.shape.len()
+        {
+            let dim_size = var
+                .shape
+                .get(dim_idx)
+                .copied()
+                .unwrap_or(fallback_len as u64) as usize;
+            let (start_p, end_p) = self
+                .plotted_selected_dim_ranges
+                .get(dim_idx)
+                .copied()
+                .unwrap_or((0, dim_size.saturating_sub(1)));
+            bounds = (start_p as f64, end_p as f64);
+
+            if let Some(dim_n) = var.dimension_names.get(dim_idx) {
+                name = dim_n.clone();
+                if let Some(coord_bounds) =
+                    meta.get_coord_bounds_for_range(dim_n, dim_size, (start_p, end_p))
+                {
+                    bounds = coord_bounds;
+                }
+            }
+        }
+
+        let title = crate::utils::coordinates::format_dimension_axis_title(&name);
+        (bounds, title)
+    }
+
+    /// Dispatches the appropriate GPU paint callback to the egui painter for the active plot type.
+    pub fn paint_active_plot(
+        &mut self,
+        ui: &mut egui::Ui,
+        canvas_rect: egui::Rect,
+        plot_rect: egui::Rect,
+        gpu_pan: [f32; 2],
+        gpu_zoom: f32,
+        gpu_aspect_scale: [f32; 2],
+    ) {
+        match self.active_plot_type {
+            crate::plots::PlotType::Line => {
+                if let Some(line_renderer) = &self.line_renderer {
+                    let color_params = self.get_color_params();
+                    let (profile_values, profile_length, line_count) =
+                        self.get_line_profile_payload();
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        canvas_rect,
+                        crate::plots::LineCallback {
+                            renderer: line_renderer.clone(),
+                            color_params,
+                            rect: canvas_rect,
+                            profile_values,
+                            profile_length,
+                            line_count,
+                            line_mode: if self.line_plot_all_series { 1 } else { 0 },
+                            pan: gpu_pan,
+                            zoom: gpu_zoom,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
+            crate::plots::PlotType::Sphere => {
+                if let Some(sphere_renderer) = &self.sphere_renderer {
+                    let aspect_ratio = crate::plots::common::compute_aspect_ratio(&plot_rect);
+                    let params = self.get_mesh_3d_uniform_params(
+                        self.sphere_mode,
+                        self.sphere_displacement_strength,
+                        aspect_ratio,
+                    );
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        plot_rect,
+                        crate::plots::Mesh3DCallback {
+                            renderer: sphere_renderer.clone(),
+                            params,
+                            cube_mode_idx: 3,
+                            rect: plot_rect,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
+            crate::plots::PlotType::Surface => {
+                if let Some(surface_renderer) = &self.surface_renderer {
+                    let aspect_ratio = crate::plots::common::compute_aspect_ratio(&plot_rect);
+                    let params = self.get_mesh_3d_uniform_params(
+                        self.surface_mode,
+                        self.surface_displacement_strength,
+                        aspect_ratio,
+                    );
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        plot_rect,
+                        crate::plots::Mesh3DCallback {
+                            renderer: surface_renderer.clone(),
+                            params,
+                            cube_mode_idx: 2,
+                            rect: plot_rect,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
+            crate::plots::PlotType::Volume => {
+                if let Some(volume_renderer) = &self.volume_renderer {
+                    let screen_aspect = crate::plots::common::compute_aspect_ratio(&plot_rect);
+                    let params = self.get_volume_uniform_params(screen_aspect);
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        plot_rect,
+                        crate::plots::VolumeCallback {
+                            renderer: volume_renderer.clone(),
+                            params,
+                            rect: plot_rect,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
+            crate::plots::PlotType::PointCloud => {
+                if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
+                    let screen_aspect = crate::plots::common::compute_aspect_ratio(&plot_rect);
+                    let params = self.get_point_cloud_uniform_params(screen_aspect);
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        plot_rect,
+                        crate::plots::PointCloudCallback {
+                            renderer: point_cloud_renderer.clone(),
+                            params,
+                            rect: plot_rect,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
+            _ => {
+                if let Some(renderer) = &self.renderer {
+                    if self.active_pyramid.is_some()
+                        && self.active_plot_type == crate::plots::PlotType::Heatmap
+                    {
+                        let ((u_min, u_max), (v_min, v_max)) =
+                            crate::data::ViewportResampler::compute_visible_data_bounds(
+                                gpu_pan,
+                                gpu_zoom,
+                                gpu_aspect_scale,
+                            );
+                        let (orig_w, orig_h) = self.active_data_dimensions_2d();
+                        let (target_w, target_h) =
+                            crate::data::ViewportResampler::compute_target_resolution(
+                                orig_w, orig_h, 2048,
+                            );
+
+                        if let Some(tile) = self.resampler.resample_if_needed(
+                            (u_min, u_max),
+                            (v_min, v_max),
+                            target_w,
+                            target_h,
+                        ) && let Some(wgpu_render_state) = &self.wgpu_render_state
+                        {
+                            renderer.update_data_and_dimensions(
+                                &wgpu_render_state.queue,
+                                &tile.data.values,
+                                tile.data.width,
+                                tile.data.height,
+                                tile.tile_bounds,
+                            );
+                        }
+                    }
+
+                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                        canvas_rect,
+                        crate::plots::MatrixCallback {
+                            renderer: renderer.clone(),
+                            color_params: self.get_color_params(),
+                            rect: canvas_rect,
+                            pan: gpu_pan,
+                            zoom: gpu_zoom,
+                            aspect_scale: gpu_aspect_scale,
+                        },
+                    );
+                    ui.painter().add(callback);
+                }
+            }
         }
     }
 }

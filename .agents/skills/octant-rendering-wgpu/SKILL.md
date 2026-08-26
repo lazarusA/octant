@@ -11,13 +11,53 @@ This skill covers working with `wgpu` pipelines, WGSL shaders, buffer management
 
 ## Renderers Architecture
 
-Octant contains six core WGPU renderers (located in `src/plots/`):
+Octant organizes WGPU renderers in `src/plots/`:
 1. **`MatrixRenderer` (`src/plots/heatmap.rs`)**: 2D heatmaps and raster scalar fields with bilinear/nearest interpolation.
 2. **`LineRenderer` (`src/plots/line.rs`)**: 1D time-series and profile line plots with dynamic capacity reallocation.
-3. **`PointCloudRenderer` (`src/plots/point_cloud.rs`)**: 3D point cloud coordinate visualization.
-4. **`SphereRenderer` (`src/plots/sphere.rs`)**: Geospatial global projection onto 3D spheres.
-5. **`SurfaceRenderer` (`src/plots/surface.rs`)**: 3D heightfield surface meshes with elevation scaling.
-6. **`VolumeRenderer` (`src/plots/volume.rs`)**: 3D raymarched volumetric data with transfer functions (DVR, MIP, Isosurface).
+3. **`Mesh3DRenderer` (`src/plots/mesh.rs`)**: Unified GPU instanced 3D surface, globe, terrain, and voxel cube mesh renderer.
+   - **`SphereRenderer` (`src/plots/sphere.rs`)**: Thin alias of `Mesh3DRenderer` compiled with `shaders/sphere.wgsl` and backface culling.
+   - **`SurfaceRenderer` (`src/plots/surface.rs`)**: Thin alias of `Mesh3DRenderer` compiled with `shaders/surface.wgsl`.
+4. **`PointCloudRenderer` (`src/plots/point_cloud.rs`)**: 3D point cloud billboard particles with coordinate/shift offsets.
+5. **`VolumeRenderer` (`src/plots/volume.rs`)**: 3D raymarched volumetric data with transfer functions (DVR, MIP, Isosurface).
+
+## Adding New 3D Geometries (Hexagons, Prisms, Custom Meshes)
+
+To add a new 3D geometry shape (such as Hexagonal columns, icosahedra, or discrete global grid cells):
+
+### Approach 1: Add as a Mode to `Mesh3DRenderer`
+1. Define the unit template builder in `src/plots/common.rs`:
+   ```rust
+   pub fn build_unit_hex_prism<V, F>(mut make_vertex: F) -> (Vec<V>, Vec<u32>)
+   where
+       F: FnMut([f32; 3], [f32; 2], [f32; 3]) -> V,
+   {
+       // Return unit-scale vertices and indices
+   }
+   ```
+2. Allocate template buffers once on device initialization in `src/plots/mesh.rs`:
+   ```rust
+   let (hex_verts, hex_indices) = Self::build_unit_hex_prism();
+   let hex_vertex_buffer = create_buffer(device, &hex_verts);
+   let hex_index_buffer = create_buffer(device, &hex_indices);
+   ```
+3. In `Mesh3DCallback::paint()`, branch on `self.params.mode` to bind the new vertex/index buffers and invoke `rpass.draw_indexed(0..indices_len, 0, 0..self.renderer.num_instances)`.
+4. Handle the shape placement and elevation scaling in the corresponding WGSL vertex shader (`vs_main`).
+
+### Approach 2: Add as a Dedicated Plot Type
+1. Define a constructor in a new file `src/plots/<geom>.rs`:
+   ```rust
+   pub type HexRenderer = Mesh3DRenderer;
+   pub type HexCallback = Mesh3DCallback;
+
+   impl HexRenderer {
+       pub fn new_hex(device: &wgpu::Device, target_format: wgpu::TextureFormat, matrix_data: &[f32], width: usize, height: usize) -> Self {
+           let shader_source = crate::assemble_plot_shader!(include_str!("shaders/hex.wgsl"));
+           Self::new(device, target_format, shader_source, Some(wgpu::Face::Back), matrix_data, width, height)
+       }
+   }
+   ```
+2. Register `PlotType::<NewGeom>` in `src/plots/mod.rs`.
+3. Add a dispatch match arm in `OctantApp::paint_active_plot()` in `src/app/pipeline.rs`.
 
 ## Best Practices & Invariants
 
