@@ -56,6 +56,58 @@ impl Default for PlotColorParams {
     }
 }
 
+/// Standard 3D mesh vertex shared across Sphere and Surface heightfield renderers.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub struct MeshVertex3D {
+    pub position: [f32; 3],
+    pub uv: [f32; 2],
+    pub normal: [f32; 3],
+}
+
+impl MeshVertex3D {
+    pub const ATTRIBS: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+        0 => Float32x3,
+        1 => Float32x2,
+        2 => Float32x3,
+    ];
+
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &Self::ATTRIBS,
+        }
+    }
+}
+
+/// Standard 3D uniform buffer layout for heightfields (Sphere & Surface).
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub struct Mesh3DUniforms {
+    pub rotation_y: f32,
+    pub rotation_x: f32,
+    pub aspect_ratio: f32,
+    pub zoom: f32,
+    pub displacement_strength: f32,
+    pub mode: u32,
+    pub width: u32,
+    pub height: u32,
+    pub color: PlotColorParams,
+}
+
+/// Parameter bundle for configuring 3D heightfield mesh renderers.
+#[derive(Clone, Debug)]
+pub struct Mesh3DUniformParams {
+    pub color: PlotColorParams,
+    pub rotation_y: f32,
+    pub rotation_x: f32,
+    pub aspect_ratio: f32,
+    pub zoom: f32,
+    pub displacement_strength: f32,
+    pub mode: u32,
+}
+
 /// Standard trait implemented by all Octant WGPU plot renderers.
 pub trait PlotRenderer: Send + Sync {
     fn update_data(&self, queue: &wgpu::Queue, values: &[f32]);
@@ -232,11 +284,7 @@ pub fn create_uniform_storage_bind_group(
     })
 }
 
-/// Infers 3D volume/grid depth dimension from total elements count and 2D grid dimensions.
-#[inline]
-pub fn calculate_3d_depth(total_len: usize, width: u32, height: u32) -> u32 {
-    (total_len as u32 / (width.max(1) * height.max(1))).max(1)
-}
+pub use crate::utils::math::calculate_3d_depth;
 
 /// Helper to create a standard DepthStencilState with Depth32Float format.
 pub fn default_depth_stencil_state(

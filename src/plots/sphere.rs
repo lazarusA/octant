@@ -1,54 +1,7 @@
-use bytemuck::{Pod, Zeroable};
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub struct SphereVertex {
-    pub position: [f32; 3],
-    pub uv: [f32; 2],
-    pub normal: [f32; 3],
-}
-
-impl SphereVertex {
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<SphereVertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: 12,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-                wgpu::VertexAttribute {
-                    offset: 20,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-            ],
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub struct SphereUniforms {
-    pub rotation_y: f32,
-    pub rotation_x: f32,
-    pub aspect_ratio: f32,
-    pub zoom: f32,
-    pub displacement_strength: f32,
-    pub sphere_mode: u32,
-    pub width: u32,
-    pub height: u32,
-    pub color: super::common::PlotColorParams,
-}
+use super::common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D};
 
 pub struct SphereRenderer {
     render_pipeline: wgpu::RenderPipeline,
@@ -82,13 +35,13 @@ impl SphereRenderer {
 
         let num_instances = (width * height) as u32;
 
-        let initial_uniforms = SphereUniforms {
+        let initial_uniforms = Mesh3DUniforms {
             rotation_y: 0.0,
             rotation_x: 0.0,
             aspect_ratio: 1.0,
             zoom: 2.5,
             displacement_strength: 0.5,
-            sphere_mode: 0,
+            mode: 0,
             width: width as u32,
             height: height as u32,
             color: super::common::PlotColorParams::default(),
@@ -129,7 +82,7 @@ impl SphereRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[Some(SphereVertex::desc())],
+                buffers: &[Some(MeshVertex3D::desc())],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -166,7 +119,7 @@ impl SphereRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[Some(SphereVertex::desc())],
+                buffers: &[Some(MeshVertex3D::desc())],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -236,28 +189,17 @@ impl SphereRenderer {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn update_uniforms(
-        &self,
-        queue: &wgpu::Queue,
-        color: &super::common::PlotColorParams,
-        rotation_y: f32,
-        rotation_x: f32,
-        aspect_ratio: f32,
-        zoom: f32,
-        displacement_strength: f32,
-        sphere_mode: u32,
-    ) {
-        let uniforms = SphereUniforms {
-            rotation_y,
-            rotation_x,
-            aspect_ratio: aspect_ratio.max(0.1),
-            zoom,
-            displacement_strength,
-            sphere_mode,
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &Mesh3DUniformParams) {
+        let uniforms = Mesh3DUniforms {
+            rotation_y: params.rotation_y,
+            rotation_x: params.rotation_x,
+            aspect_ratio: params.aspect_ratio.max(0.1),
+            zoom: params.zoom,
+            displacement_strength: params.displacement_strength,
+            mode: params.mode,
             width: self.width as u32,
             height: self.height as u32,
-            color: *color,
+            color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -271,16 +213,16 @@ impl SphereRenderer {
         );
     }
 
-    fn build_unit_quad() -> (Vec<SphereVertex>, Vec<u32>) {
-        super::common::build_unit_quad_mesh(|position, uv, normal| SphereVertex {
+    fn build_unit_quad() -> (Vec<MeshVertex3D>, Vec<u32>) {
+        super::common::build_unit_quad_mesh(|position, uv, normal| MeshVertex3D {
             position,
             uv,
             normal,
         })
     }
 
-    fn build_unit_cube() -> (Vec<SphereVertex>, Vec<u32>) {
-        super::common::build_unit_cube_mesh(|position, uv, normal| SphereVertex {
+    fn build_unit_cube() -> (Vec<MeshVertex3D>, Vec<u32>) {
+        super::common::build_unit_cube_mesh(|position, uv, normal| MeshVertex3D {
             position,
             uv,
             normal,
@@ -296,12 +238,7 @@ impl super::common::PlotRenderer for SphereRenderer {
 
 pub struct SphereCallback {
     pub renderer: Arc<SphereRenderer>,
-    pub color_params: super::common::PlotColorParams,
-    pub rotation_y: f32,
-    pub rotation_x: f32,
-    pub zoom: f32,
-    pub displacement_strength: f32,
-    pub sphere_mode: u32,
+    pub params: Mesh3DUniformParams,
     pub rect: egui::Rect,
 }
 
@@ -314,17 +251,9 @@ impl eframe::egui_wgpu::CallbackTrait for SphereCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
-        let aspect_ratio = super::common::compute_aspect_ratio(&self.rect);
-        self.renderer.update_uniforms(
-            queue,
-            &self.color_params,
-            self.rotation_y,
-            self.rotation_x,
-            aspect_ratio,
-            self.zoom,
-            self.displacement_strength,
-            self.sphere_mode,
-        );
+        let mut params = self.params.clone();
+        params.aspect_ratio = super::common::compute_aspect_ratio(&self.rect);
+        self.renderer.update_uniforms(queue, &params);
         Vec::new()
     }
 
@@ -338,7 +267,7 @@ impl eframe::egui_wgpu::CallbackTrait for SphereCallback {
             return;
         }
 
-        if self.sphere_mode == 3 {
+        if self.params.mode == 3 {
             // Mode 3: 3D Radial Lego Cubes (Dedicated pipeline with hardware backface culling)
             rpass.set_pipeline(&self.renderer.voxel_pipeline);
             rpass.set_bind_group(0, &self.renderer.bind_group, &[]);

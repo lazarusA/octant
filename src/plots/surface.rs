@@ -1,54 +1,7 @@
-use bytemuck::{Pod, Zeroable};
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub struct SurfaceVertex {
-    pub position: [f32; 3], // x, y, z (unit quad or unit cube coordinates)
-    pub uv: [f32; 2],
-    pub normal: [f32; 3],
-}
-
-impl SurfaceVertex {
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<SurfaceVertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: 12,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-                wgpu::VertexAttribute {
-                    offset: 20,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-            ],
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub struct SurfaceUniforms {
-    pub rotation_y: f32,
-    pub rotation_x: f32,
-    pub aspect_ratio: f32,
-    pub zoom: f32,
-    pub displacement_strength: f32,
-    pub surface_mode: u32,
-    pub width: u32,
-    pub height: u32,
-    pub color: super::common::PlotColorParams,
-}
+use super::common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D};
 
 pub struct SurfaceRenderer {
     render_pipeline: wgpu::RenderPipeline,
@@ -82,13 +35,13 @@ impl SurfaceRenderer {
 
         let num_instances = (width * height) as u32;
 
-        let initial_uniforms = SurfaceUniforms {
+        let initial_uniforms = Mesh3DUniforms {
             rotation_y: 0.0,
             rotation_x: 0.0,
             aspect_ratio: 1.0,
             zoom: 2.5,
             displacement_strength: 0.5,
-            surface_mode: 0,
+            mode: 0,
             width: width as u32,
             height: height as u32,
             color: super::common::PlotColorParams::default(),
@@ -132,7 +85,7 @@ impl SurfaceRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[Some(SurfaceVertex::desc())],
+                buffers: &[Some(MeshVertex3D::desc())],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -147,8 +100,7 @@ impl SurfaceRenderer {
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: None,
-                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None, // Two-sided rendering for open heightfield surfaces
                 ..Default::default()
             },
             depth_stencil: Some(super::common::default_depth_stencil_state(
@@ -160,14 +112,15 @@ impl SurfaceRenderer {
             cache: None,
         });
 
-        // Dedicated pipeline for 3D Lego Cubes with hardware backface culling
+        // Dedicated pipeline for Mode 2 Lego Cubes with hardware backface culling
+        // (eliminates internal hidden voxel cube faces)
         let voxel_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Surface Voxel Render Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[Some(SurfaceVertex::desc())],
+                buffers: &[Some(MeshVertex3D::desc())],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -195,7 +148,7 @@ impl SurfaceRenderer {
             cache: None,
         });
 
-        // 1. Instanced Unit Quad Template for Smooth Terrain and Flat Steps
+        // 1. Instanced Unit Quad Template for Smooth Terrain & Flat Steps
         let (quad_vertices, quad_indices) = Self::build_unit_quad();
         let quad_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Surface Unit Quad Vertex Buffer"),
@@ -237,28 +190,17 @@ impl SurfaceRenderer {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn update_uniforms(
-        &self,
-        queue: &wgpu::Queue,
-        color: &super::common::PlotColorParams,
-        rotation_y: f32,
-        rotation_x: f32,
-        aspect_ratio: f32,
-        zoom: f32,
-        displacement_strength: f32,
-        surface_mode: u32,
-    ) {
-        let uniforms = SurfaceUniforms {
-            rotation_y,
-            rotation_x,
-            aspect_ratio: aspect_ratio.max(0.1),
-            zoom,
-            displacement_strength,
-            surface_mode,
+    pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &Mesh3DUniformParams) {
+        let uniforms = Mesh3DUniforms {
+            rotation_y: params.rotation_y,
+            rotation_x: params.rotation_x,
+            aspect_ratio: params.aspect_ratio.max(0.1),
+            zoom: params.zoom,
+            displacement_strength: params.displacement_strength,
+            mode: params.mode,
             width: self.width as u32,
             height: self.height as u32,
-            color: *color,
+            color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
@@ -272,16 +214,16 @@ impl SurfaceRenderer {
         );
     }
 
-    fn build_unit_quad() -> (Vec<SurfaceVertex>, Vec<u32>) {
-        super::common::build_unit_quad_mesh(|position, uv, normal| SurfaceVertex {
+    fn build_unit_quad() -> (Vec<MeshVertex3D>, Vec<u32>) {
+        super::common::build_unit_quad_mesh(|position, uv, normal| MeshVertex3D {
             position,
             uv,
             normal,
         })
     }
 
-    fn build_unit_cube() -> (Vec<SurfaceVertex>, Vec<u32>) {
-        super::common::build_unit_cube_mesh(|position, uv, normal| SurfaceVertex {
+    fn build_unit_cube() -> (Vec<MeshVertex3D>, Vec<u32>) {
+        super::common::build_unit_cube_mesh(|position, uv, normal| MeshVertex3D {
             position,
             uv,
             normal,
@@ -297,12 +239,7 @@ impl super::common::PlotRenderer for SurfaceRenderer {
 
 pub struct SurfaceCallback {
     pub renderer: Arc<SurfaceRenderer>,
-    pub color_params: super::common::PlotColorParams,
-    pub rotation_y: f32,
-    pub rotation_x: f32,
-    pub zoom: f32,
-    pub displacement_strength: f32,
-    pub surface_mode: u32,
+    pub params: Mesh3DUniformParams,
     pub rect: egui::Rect,
 }
 
@@ -315,17 +252,9 @@ impl eframe::egui_wgpu::CallbackTrait for SurfaceCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
-        let aspect_ratio = super::common::compute_aspect_ratio(&self.rect);
-        self.renderer.update_uniforms(
-            queue,
-            &self.color_params,
-            self.rotation_y,
-            self.rotation_x,
-            aspect_ratio,
-            self.zoom,
-            self.displacement_strength,
-            self.surface_mode,
-        );
+        let mut params = self.params.clone();
+        params.aspect_ratio = super::common::compute_aspect_ratio(&self.rect);
+        self.renderer.update_uniforms(queue, &params);
         Vec::new()
     }
 
@@ -339,7 +268,7 @@ impl eframe::egui_wgpu::CallbackTrait for SurfaceCallback {
             return;
         }
 
-        if self.surface_mode == 2 {
+        if self.params.mode == 2 {
             // Mode 2: 3D Lego Cubes (Dedicated pipeline with hardware backface culling)
             rpass.set_pipeline(&self.renderer.voxel_pipeline);
             rpass.set_bind_group(0, &self.renderer.bind_group, &[]);

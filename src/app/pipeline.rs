@@ -357,8 +357,8 @@ impl OctantApp {
         }
     }
 
-    /// Resolves the metadata dimension name for spatial axis (0 = X, 1 = Y, 2 = Z).
-    pub fn get_spatial_dim_name(&self, axis: usize) -> Option<String> {
+    /// Resolves the metadata dimension index for a given spatial axis (0 = X, 1 = Y, 2 = Z).
+    pub fn get_spatial_dim_index(&self, axis: usize) -> usize {
         if let Some(meta) = &self.plotted_dataset_metadata
             && let Some(var) = meta.variables.get(self.plotted_variable_idx)
         {
@@ -368,14 +368,23 @@ impl OctantApp {
                 &var.dimension_names,
                 &self.plotted_dim_config,
             );
-            let idx = match axis {
+            match axis {
                 0 => x,
                 1 => y,
                 _ => z,
-            };
-            return var.dimension_names.get(idx).cloned();
+            }
+        } else {
+            axis
         }
-        None
+    }
+
+    /// Resolves the metadata dimension name for spatial axis (0 = X, 1 = Y, 2 = Z).
+    pub fn get_spatial_dim_name(&self, axis: usize) -> Option<String> {
+        let idx = self.get_spatial_dim_index(axis);
+        self.plotted_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.variables.get(self.plotted_variable_idx))
+            .and_then(|v| v.dimension_names.get(idx).cloned())
     }
 
     /// Returns a human-friendly label for the spatial axis (e.g., "Along X (lon)", "Along Z (depth)").
@@ -423,5 +432,167 @@ impl OctantApp {
             }
             PlotType::Volume | PlotType::PointCloud => {}
         }
+    }
+
+    /// Resolves active (width, height) for 3D Volume and PointCloud shaders.
+    pub fn get_volume_dimensions(&self) -> (u32, u32) {
+        self.volume_data
+            .as_ref()
+            .map(|v| (v.width as u32, v.height as u32))
+            .unwrap_or_else(|| {
+                self.matrix_data
+                    .as_ref()
+                    .map_or((64, 64), |m| (m.width as u32, m.height as u32))
+            })
+    }
+
+    /// Assembles VolumeUniformParams for 3D volume raymarching.
+    pub fn get_volume_uniform_params(
+        &self,
+        screen_aspect: f32,
+    ) -> crate::plots::VolumeUniformParams {
+        let (width, height) = self.get_volume_dimensions();
+        let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
+
+        crate::plots::VolumeUniformParams {
+            color: self.get_color_params(),
+            rot_y: self.sphere_rotation_y,
+            rot_x: self.sphere_rotation_x,
+            aspect_x,
+            aspect_y,
+            aspect_z,
+            zoom: self.sphere_zoom,
+            opacity_scale: self.volume_opacity,
+            step_count: self.volume_step_count,
+            width,
+            height,
+            algorithm: self.volume_algorithm,
+            isovalue: self.volume_isovalue,
+            isorange: self.volume_isorange,
+            attenuation: self.volume_attenuation,
+            screen_aspect,
+            shift_x,
+            shift_y,
+            shift_z,
+            transparency: self.volume_transparency,
+        }
+    }
+
+    /// Assembles PointCloudUniformParams for 3D point cloud billboard rendering.
+    pub fn get_point_cloud_uniform_params(
+        &self,
+        screen_aspect: f32,
+    ) -> crate::plots::PointCloudUniformParams {
+        let (width, height) = self.get_volume_dimensions();
+        let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
+
+        crate::plots::PointCloudUniformParams {
+            color: self.get_color_params(),
+            rot_y: self.sphere_rotation_y,
+            rot_x: self.sphere_rotation_x,
+            aspect_x,
+            aspect_y,
+            aspect_z,
+            zoom: self.sphere_zoom,
+            point_size: self.point_cloud_size,
+            width,
+            height,
+            screen_aspect,
+            shift_x,
+            shift_y,
+            shift_z,
+        }
+    }
+
+    /// Assembles Mesh3DUniformParams for Sphere and Surface heightfields.
+    pub fn get_mesh_3d_uniform_params(
+        &self,
+        mode: u32,
+        displacement_strength: f32,
+        aspect_ratio: f32,
+    ) -> crate::plots::Mesh3DUniformParams {
+        crate::plots::Mesh3DUniformParams {
+            color: self.get_color_params(),
+            rotation_y: self.sphere_rotation_y,
+            rotation_x: self.sphere_rotation_x,
+            aspect_ratio,
+            zoom: self.sphere_zoom,
+            displacement_strength,
+            mode,
+        }
+    }
+
+    /// Returns the effective original (width, height) of the active 2D data or pyramid.
+    pub fn active_data_dimensions_2d(&self) -> (usize, usize) {
+        if let Some(pyr) = &self.active_pyramid {
+            (pyr.original_width, pyr.original_height)
+        } else if let Some(m) = &self.matrix_data {
+            (m.width, m.height)
+        } else {
+            (1024, 1024)
+        }
+    }
+
+    /// Returns the aspect ratio (width / height) of the active 2D dataset.
+    pub fn data_aspect_ratio_2d(&self) -> f32 {
+        let (w, h) = self.active_data_dimensions_2d();
+        (w as f32 / (h as f32).max(1.0)).max(0.001)
+    }
+
+    /// Computes data aspect scaling factors [scale_x, scale_y] to preserve proportional aspect framing.
+    pub fn compute_aspect_scale(&self, canvas_size: egui::Vec2) -> [f32; 2] {
+        if self.enforce_data_aspect_ratio && self.matrix_data.is_some() {
+            let data_aspect = self.data_aspect_ratio_2d();
+            let canvas_aspect = canvas_size.x / canvas_size.y.max(1.0);
+            if canvas_aspect > data_aspect {
+                [data_aspect / canvas_aspect, 1.0]
+            } else {
+                [1.0, canvas_aspect / data_aspect]
+            }
+        } else {
+            [1.0, 1.0]
+        }
+    }
+
+    /// Resolves coordinate bounds and formatted title for a given dimension index.
+    pub fn resolve_axis_bounds_and_title(
+        &self,
+        dim_idx: usize,
+        fallback_name: &str,
+        fallback_len: usize,
+    ) -> ((f64, f64), String) {
+        let mut bounds = (0.0, fallback_len.saturating_sub(1).max(1) as f64);
+        let mut name = fallback_name.to_string();
+
+        if let Some(meta) = &self.plotted_dataset_metadata
+            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+            && dim_idx < var.shape.len()
+        {
+            let dim_size = var
+                .shape
+                .get(dim_idx)
+                .copied()
+                .unwrap_or(fallback_len as u64) as usize;
+            let (start_p, end_p) = self
+                .plotted_selected_dim_ranges
+                .get(dim_idx)
+                .copied()
+                .unwrap_or((0, dim_size.saturating_sub(1)));
+            bounds = (start_p as f64, end_p as f64);
+
+            if let Some(dim_n) = var.dimension_names.get(dim_idx) {
+                name = dim_n.clone();
+                if let Some(coord_bounds) =
+                    meta.get_coord_bounds_for_range(dim_n, dim_size, (start_p, end_p))
+                {
+                    bounds = coord_bounds;
+                }
+            }
+        }
+
+        let title = crate::utils::coordinates::format_dimension_axis_title(&name);
+        (bounds, title)
     }
 }
