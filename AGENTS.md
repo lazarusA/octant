@@ -22,8 +22,9 @@ When developing and reviewing code in this repository:
    - Transient UI overlays (crop handles, grids, tooltips) must be suppressed during export capture passes (`if self.pending_export.is_none()`).
 
 3. **Skills Reference**:
-   - `rust-skills`: 265 detailed Rust best practices across 26 categories (ownership, error handling, memory, async, unsafe, etc.).
+   - `rust-skills`: 265 detailed Rust best practices across 26 categories (install locally via `git clone --depth 1 https://github.com/leonardomso/rust-skills.git .agents/skills/rust-skills && rm -rf .agents/skills/rust-skills/.git`).
    - `rust-workflows`: Cargo build, test, lint, clippy, WASM, and logging commands.
    - `octant-data-engine`: Data loading, caching, prefetching, and hyperslab slicing.
    - `octant-rendering-wgpu`: WGPU render pipelines, uniform buffer alignment, and WGSL shaders.
    - `octant-ui-egui`: egui immediate-mode GUI components and event dispatch.
+
