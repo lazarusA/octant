@@ -185,13 +185,7 @@ impl eframe::App for OctantApp {
                     let full_w = image.width() as u32;
                     let full_h = image.height() as u32;
 
-                    let mut rgba = Vec::with_capacity(image.width() * image.height() * 4);
-                    for c in &image.pixels {
-                        rgba.push(c.r());
-                        rgba.push(c.g());
-                        rgba.push(c.b());
-                        rgba.push(c.a());
-                    }
+                    let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
 
                     let crop_rect = match req.target {
                         crate::export::ExportTarget::FullCanvas => {
@@ -566,8 +560,16 @@ impl eframe::App for OctantApp {
                 crate::ui::axes::draw_plot_axes(ui, canvas_rect, plot_rect, &options);
             }
 
-            // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle
-            crate::ui::hover_tooltip::show_hover_tooltip(self, &ctx, ui, &response, canvas_rect);
+            // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle (suppressed during export capture)
+            if self.pending_export.is_none() {
+                crate::ui::hover_tooltip::show_hover_tooltip(
+                    self,
+                    &ctx,
+                    ui,
+                    &response,
+                    canvas_rect,
+                );
+            }
 
             // Camera subtle capture flash overlay (confined to ROI guides if active, shown after capture)
             if let Some(flash_start) = self.export_flash_timer {
@@ -616,8 +618,8 @@ impl eframe::App for OctantApp {
                 }
             }
 
-            // Render interactive Region of Interest (ROI) Guiding Lines & Crop Tool
-            if self.show_crop_overlay {
+            // Render interactive Region of Interest (ROI) Guiding Lines & Crop Tool (suppressed during export capture)
+            if self.show_crop_overlay && self.pending_export.is_none() {
                 crate::ui::crop_overlay::show_crop_overlay(
                     ui,
                     canvas_rect,
