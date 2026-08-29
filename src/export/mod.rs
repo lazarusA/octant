@@ -338,24 +338,29 @@ pub fn generate_pdf(rgba: &[u8], width: u32, height: u32, title: &str) -> Result
 
     let mut offsets = Vec::new();
 
-    // 1 0 obj: Pages
+    // 1 0 obj: Catalog (Root)
     offsets.push(pdf.len());
-    let pages = "1 0 obj\n<< /Type /Pages /Kids [2 0 R] /Count 1 >>\nendobj\n";
+    let catalog = "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
+    pdf.extend_from_slice(catalog.as_bytes());
+
+    // 2 0 obj: Pages
+    offsets.push(pdf.len());
+    let pages = "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n";
     pdf.extend_from_slice(pages.as_bytes());
 
-    // 2 0 obj: Page
+    // 3 0 obj: Page
     offsets.push(pdf.len());
     let page = format!(
-        "2 0 obj\n<< /Type /Page /Parent 1 0 R /MediaBox [0 0 {w} {h}] /Contents 4 0 R /Resources << /XObject << /Im0 3 0 R >> >> >>\nendobj\n",
+        "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w} {h}] /Contents 5 0 R /Resources << /XObject << /Im0 4 0 R >> >> >>\nendobj\n",
         w = width,
         h = height
     );
     pdf.extend_from_slice(page.as_bytes());
 
-    // 3 0 obj: Image XObject (JPEG)
+    // 4 0 obj: Image XObject (JPEG)
     offsets.push(pdf.len());
     let img_header = format!(
-        "3 0 obj\n<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len} >>\nstream\n",
+        "4 0 obj\n<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len} >>\nstream\n",
         w = width,
         h = height,
         len = jpeg_bytes.len()
@@ -364,36 +369,37 @@ pub fn generate_pdf(rgba: &[u8], width: u32, height: u32, title: &str) -> Result
     pdf.extend_from_slice(&jpeg_bytes);
     pdf.extend_from_slice(b"\nendstream\nendobj\n");
 
-    // 4 0 obj: Content Stream (draw image full size)
+    // 5 0 obj: Content Stream (draw image full size)
     offsets.push(pdf.len());
     let stream_content = format!("q\n{w} 0 0 {h} 0 0 cm\n/Im0 Do\nQ\n", w = width, h = height);
     let contents_obj = format!(
-        "4 0 obj\n<< /Length {len} >>\nstream\n{content}endstream\nendobj\n",
+        "5 0 obj\n<< /Length {len} >>\nstream\n{content}endstream\nendobj\n",
         len = stream_content.len(),
         content = stream_content
     );
     pdf.extend_from_slice(contents_obj.as_bytes());
 
-    // 5 0 obj: Info
+    // 6 0 obj: Info
     offsets.push(pdf.len());
     let info = format!(
-        "5 0 obj\n<< /Title ({title}) /Producer (Octant Scientific Viewer) >>\nendobj\n",
+        "6 0 obj\n<< /Title ({title}) /Producer (Octant Scientific Viewer) >>\nendobj\n",
         title = escape_pdf_str(title)
     );
     pdf.extend_from_slice(info.as_bytes());
 
-    // XRef table
+    // XRef table (each entry strictly 20 bytes per ISO 32000 / PDF spec)
     let xref_start = pdf.len();
-    pdf.extend_from_slice(b"xref\n0 6\n0000000000 65535 f \n");
+    let num_objects = offsets.len() + 1;
+    let xref_header = format!("xref\n0 {num_objects}\n0000000000 65535 f \r\n");
+    pdf.extend_from_slice(xref_header.as_bytes());
     for off in &offsets {
-        let entry = format!("{:010} 00000 n \n", off);
+        let entry = format!("{:010} 00000 n \r\n", off);
         pdf.extend_from_slice(entry.as_bytes());
     }
 
     // Trailer
     let trailer = format!(
-        "trailer\n<< /Size 6 /Root 1 0 R /Info 5 0 R >>\nstartxref\n{xref_start}\n%%EOF\n",
-        xref_start = xref_start
+        "trailer\n<< /Size {num_objects} /Root 1 0 R /Info 6 0 R >>\nstartxref\n{xref_start}\n%%EOF\n"
     );
     pdf.extend_from_slice(trailer.as_bytes());
 
@@ -606,5 +612,11 @@ mod tests {
 
         let pdf = generate_pdf(&rgba, 1, 1, "Test PDF").unwrap();
         assert!(pdf.starts_with(b"%PDF-1.4"));
+        assert!(pdf.ends_with(b"%%EOF\n"));
+        let pdf_str = String::from_utf8_lossy(&pdf);
+        assert!(pdf_str.contains("/Type /Catalog"));
+        assert!(pdf_str.contains("/Type /Pages"));
+        assert!(pdf_str.contains("/Type /Page"));
+        assert!(pdf_str.contains("xref"));
     }
 }
