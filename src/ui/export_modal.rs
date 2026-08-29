@@ -86,7 +86,8 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
                 .plotted_variable_info()
                 .map(|v| v.name.as_str())
                 .unwrap_or("plot");
-            let default_name = generate_export_filename(var_name, app.export_settings.format);
+            let default_name =
+                crate::export::generate_export_filename(var_name, app.export_settings.format);
 
             ui.label(
                 egui::RichText::new(format!(
@@ -133,15 +134,6 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
         is_open = false;
     }
     app.show_export_modal = is_open;
-}
-
-pub fn generate_export_filename(var_name: &str, format: ExportFormat) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let safe_var = var_name.replace(|c: char| !c.is_alphanumeric() && c != '_', "_");
-    format!("octant_{}_{}.{}", safe_var, now, format.extension())
 }
 
 /// Shows the floating success toast notification with a "Reveal in Finder/Folder" action button.

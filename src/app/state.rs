@@ -695,10 +695,8 @@ impl OctantApp {
             .plotted_variable_info()
             .map(|v| v.name.as_str())
             .unwrap_or("plot");
-        let filename = crate::ui::export_modal::generate_export_filename(
-            var_name,
-            self.export_settings.format,
-        );
+        let filename =
+            crate::export::generate_export_filename(var_name, self.export_settings.format);
         let out_path =
             crate::export::resolve_export_path(&self.export_settings.export_dir, &filename);
         self.request_canvas_export(out_path, false);

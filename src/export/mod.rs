@@ -44,33 +44,6 @@ pub enum ExportTarget {
     RoiCrop,
 }
 
-/// Resolution / DPI multiplier for export.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
-pub enum ResolutionScale {
-    #[default]
-    Scale1x,
-    Scale2x,
-    Scale4x,
-}
-
-impl ResolutionScale {
-    pub fn multiplier(self) -> u32 {
-        match self {
-            Self::Scale1x => 1,
-            Self::Scale2x => 2,
-            Self::Scale4x => 4,
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Scale1x => "1× (Viewport)",
-            Self::Scale2x => "2× (High-DPI / 2K)",
-            Self::Scale4x => "4× (Print / 4K UHD)",
-        }
-    }
-}
-
 /// Aspect ratio presets for the Region of Interest (ROI) crop box.
 #[derive(Clone, Copy, Debug, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub enum AspectPreset {
@@ -139,6 +112,16 @@ impl RoiCropBox {
     }
 }
 
+/// Generates a standardized timestamped export filename for a variable.
+pub fn generate_export_filename(var_name: &str, format: ExportFormat) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let safe_var = var_name.replace(|c: char| !c.is_alphanumeric() && c != '_', "_");
+    format!("octant_{}_{}.{}", safe_var, now, format.extension())
+}
+
 /// Returns default Downloads directory path or fallback.
 pub fn default_downloads_dir() -> String {
     if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
@@ -182,7 +165,6 @@ pub fn resolve_export_path(dir: &str, filename: &str) -> PathBuf {
 pub struct ExportSettings {
     pub format: ExportFormat,
     pub target: ExportTarget,
-    pub scale: ResolutionScale,
     pub jpeg_quality: u8,
     pub export_dir: String,
     pub custom_filename: String,
@@ -193,7 +175,6 @@ impl Default for ExportSettings {
         Self {
             format: ExportFormat::Png,
             target: ExportTarget::FullCanvas,
-            scale: ResolutionScale::Scale1x,
             jpeg_quality: 90,
             export_dir: default_downloads_dir(),
             custom_filename: String::new(),
@@ -212,6 +193,39 @@ pub struct PendingExportRequest {
     pub output_path: Option<PathBuf>,
     pub canvas_rect_in_points: egui::Rect,
     pub pixels_per_point: f32,
+}
+
+impl PendingExportRequest {
+    /// Computes the pixel-space crop rectangle `(crop_x, crop_y, crop_w, crop_h)` clamped to source bounds.
+    pub fn compute_crop_rect(&self, full_w: u32, full_h: u32) -> (u32, u32, u32, u32) {
+        let ppp = self.pixels_per_point.max(1.0);
+        let (cx, cy, cw, ch) = match self.target {
+            ExportTarget::FullCanvas => {
+                let x = (self.canvas_rect_in_points.left() * ppp).round() as u32;
+                let y = (self.canvas_rect_in_points.top() * ppp).round() as u32;
+                let w = (self.canvas_rect_in_points.width() * ppp).round() as u32;
+                let h = (self.canvas_rect_in_points.height() * ppp).round() as u32;
+                (x, y, w, h)
+            }
+            ExportTarget::RoiCrop => {
+                let cr = self.canvas_rect_in_points;
+                let rx = cr.left() + self.roi.u_min * cr.width();
+                let ry = cr.top() + self.roi.v_min * cr.height();
+                let rw = (self.roi.u_max - self.roi.u_min) * cr.width();
+                let rh = (self.roi.v_max - self.roi.v_min) * cr.height();
+                let x = (rx * ppp).round() as u32;
+                let y = (ry * ppp).round() as u32;
+                let w = (rw * ppp).round() as u32;
+                let h = (rh * ppp).round() as u32;
+                (x, y, w, h)
+            }
+        };
+        let crop_x = cx.min(full_w.saturating_sub(1));
+        let crop_y = cy.min(full_h.saturating_sub(1));
+        let crop_w = cw.min(full_w.saturating_sub(crop_x)).max(1);
+        let crop_h = ch.min(full_h.saturating_sub(crop_y)).max(1);
+        (crop_x, crop_y, crop_w, crop_h)
+    }
 }
 
 /// Crops a sub-rectangle from a raw RGBA8 image buffer.
@@ -404,6 +418,25 @@ pub fn generate_pdf(rgba: &[u8], width: u32, height: u32, title: &str) -> Result
     pdf.extend_from_slice(trailer.as_bytes());
 
     Ok(pdf)
+}
+
+/// Encodes raw RGBA8 image pixels into any supported figure export format (PNG, JPEG, WebP, SVG, PDF).
+pub fn encode_figure(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    format: ExportFormat,
+    quality: u8,
+    title: &str,
+    var_name: &str,
+) -> Result<Vec<u8>, String> {
+    match format {
+        ExportFormat::Png | ExportFormat::Jpeg | ExportFormat::Webp => {
+            encode_raster_image(rgba, width, height, format, quality)
+        }
+        ExportFormat::Svg => generate_svg(rgba, width, height, title, var_name),
+        ExportFormat::Pdf => generate_pdf(rgba, width, height, title),
+    }
 }
 
 /// Helper to write an exported file safely to disk (creates directories if missing).

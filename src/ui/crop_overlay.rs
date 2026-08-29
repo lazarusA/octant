@@ -215,71 +215,24 @@ pub fn show_crop_overlay(
     let corner_arm_len = 16.0;
     let corner_stroke = egui::Stroke::new(3.0, accent_color);
 
-    // NW Corner
-    painter.line_segment(
-        [
-            egui::pos2(box_rect.left(), box_rect.top()),
-            egui::pos2(box_rect.left() + corner_arm_len, box_rect.top()),
-        ],
-        corner_stroke,
-    );
-    painter.line_segment(
-        [
-            egui::pos2(box_rect.left(), box_rect.top()),
-            egui::pos2(box_rect.left(), box_rect.top() + corner_arm_len),
-        ],
-        corner_stroke,
-    );
+    // 4 Corner L-Brackets
+    for &(corner, dx, dy) in &[
+        (box_rect.left_top(), 1.0, 1.0),
+        (box_rect.right_top(), -1.0, 1.0),
+        (box_rect.left_bottom(), 1.0, -1.0),
+        (box_rect.right_bottom(), -1.0, -1.0),
+    ] {
+        painter.line_segment(
+            [corner, egui::pos2(corner.x + dx * corner_arm_len, corner.y)],
+            corner_stroke,
+        );
+        painter.line_segment(
+            [corner, egui::pos2(corner.x, corner.y + dy * corner_arm_len)],
+            corner_stroke,
+        );
+    }
 
-    // NE Corner
-    painter.line_segment(
-        [
-            egui::pos2(box_rect.right() - corner_arm_len, box_rect.top()),
-            egui::pos2(box_rect.right(), box_rect.top()),
-        ],
-        corner_stroke,
-    );
-    painter.line_segment(
-        [
-            egui::pos2(box_rect.right(), box_rect.top()),
-            egui::pos2(box_rect.right(), box_rect.top() + corner_arm_len),
-        ],
-        corner_stroke,
-    );
-
-    // SW Corner
-    painter.line_segment(
-        [
-            egui::pos2(box_rect.left(), box_rect.bottom()),
-            egui::pos2(box_rect.left() + corner_arm_len, box_rect.bottom()),
-        ],
-        corner_stroke,
-    );
-    painter.line_segment(
-        [
-            egui::pos2(box_rect.left(), box_rect.bottom() - corner_arm_len),
-            egui::pos2(box_rect.left(), box_rect.bottom()),
-        ],
-        corner_stroke,
-    );
-
-    // SE Corner
-    painter.line_segment(
-        [
-            egui::pos2(box_rect.right() - corner_arm_len, box_rect.bottom()),
-            egui::pos2(box_rect.right(), box_rect.bottom()),
-        ],
-        corner_stroke,
-    );
-    painter.line_segment(
-        [
-            egui::pos2(box_rect.right(), box_rect.bottom() - corner_arm_len),
-            egui::pos2(box_rect.right(), box_rect.bottom()),
-        ],
-        corner_stroke,
-    );
-
-    // Elongated thin side edge pills
+    // 4 Elongated Thin Side Edge Pills
     let edge_pill_stroke = egui::Stroke::new(
         1.0,
         if dark_mode {
@@ -289,55 +242,34 @@ pub fn show_crop_overlay(
         },
     );
 
-    // Top & Bottom horizontal thin pills (28 × 4 px)
-    let top_pill = egui::Rect::from_center_size(
-        egui::pos2(box_rect.center().x, box_rect.top()),
-        egui::vec2(28.0, 4.0),
-    );
-    painter.rect(
-        top_pill,
-        2.0,
-        accent_color,
-        edge_pill_stroke,
-        egui::StrokeKind::Outside,
-    );
+    let edge_pills = [
+        (
+            egui::pos2(box_rect.center().x, box_rect.top()),
+            egui::vec2(28.0, 4.0),
+        ),
+        (
+            egui::pos2(box_rect.center().x, box_rect.bottom()),
+            egui::vec2(28.0, 4.0),
+        ),
+        (
+            egui::pos2(box_rect.left(), box_rect.center().y),
+            egui::vec2(4.0, 28.0),
+        ),
+        (
+            egui::pos2(box_rect.right(), box_rect.center().y),
+            egui::vec2(4.0, 28.0),
+        ),
+    ];
 
-    let bot_pill = egui::Rect::from_center_size(
-        egui::pos2(box_rect.center().x, box_rect.bottom()),
-        egui::vec2(28.0, 4.0),
-    );
-    painter.rect(
-        bot_pill,
-        2.0,
-        accent_color,
-        edge_pill_stroke,
-        egui::StrokeKind::Outside,
-    );
-
-    // Left & Right vertical thin pills (4 × 28 px)
-    let left_pill = egui::Rect::from_center_size(
-        egui::pos2(box_rect.left(), box_rect.center().y),
-        egui::vec2(4.0, 28.0),
-    );
-    painter.rect(
-        left_pill,
-        2.0,
-        accent_color,
-        edge_pill_stroke,
-        egui::StrokeKind::Outside,
-    );
-
-    let right_pill = egui::Rect::from_center_size(
-        egui::pos2(box_rect.right(), box_rect.center().y),
-        egui::vec2(4.0, 28.0),
-    );
-    painter.rect(
-        right_pill,
-        2.0,
-        accent_color,
-        edge_pill_stroke,
-        egui::StrokeKind::Outside,
-    );
+    for (pos, size) in edge_pills {
+        painter.rect(
+            egui::Rect::from_center_size(pos, size),
+            2.0,
+            accent_color,
+            edge_pill_stroke,
+            egui::StrokeKind::Outside,
+        );
+    }
 
     // 6. Floating Theme-Aware Control Toolbar on Top of the Crop Box
     let toolbar_pos = egui::pos2(

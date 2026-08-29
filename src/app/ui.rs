@@ -170,145 +170,9 @@ impl eframe::App for OctantApp {
         }
 
         // Process in-flight export / screenshot requests
-        if let Some(req) = self.pending_export.take() {
-            if req.canvas_rect_in_points != egui::Rect::NOTHING {
-                let screenshot = ctx.input(|i| {
-                    i.raw.events.iter().find_map(|e| match e {
-                        egui::Event::Screenshot { image, .. } => Some(image.clone()),
-                        _ => None,
-                    })
-                });
+        self.process_pending_export(&ctx);
 
-                if let Some(image) = screenshot {
-                    self.export_flash_timer = Some(std::time::Instant::now());
-                    let ppp = req.pixels_per_point.max(1.0);
-                    let full_w = image.width() as u32;
-                    let full_h = image.height() as u32;
-
-                    let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
-
-                    let crop_rect = match req.target {
-                        crate::export::ExportTarget::FullCanvas => {
-                            let cx = (req.canvas_rect_in_points.left() * ppp).round() as u32;
-                            let cy = (req.canvas_rect_in_points.top() * ppp).round() as u32;
-                            let cw = (req.canvas_rect_in_points.width() * ppp).round() as u32;
-                            let ch = (req.canvas_rect_in_points.height() * ppp).round() as u32;
-                            (cx, cy, cw, ch)
-                        }
-                        crate::export::ExportTarget::RoiCrop => {
-                            let cr = req.canvas_rect_in_points;
-                            let rx = cr.left() + req.roi.u_min * cr.width();
-                            let ry = cr.top() + req.roi.v_min * cr.height();
-                            let rw = (req.roi.u_max - req.roi.u_min) * cr.width();
-                            let rh = (req.roi.v_max - req.roi.v_min) * cr.height();
-
-                            let cx = (rx * ppp).round() as u32;
-                            let cy = (ry * ppp).round() as u32;
-                            let cw = (rw * ppp).round() as u32;
-                            let ch = (rh * ppp).round() as u32;
-                            (cx, cy, cw, ch)
-                        }
-                    };
-
-                    let (cropped_rgba, final_w, final_h) = crate::export::crop_rgba_buffer(
-                        &rgba,
-                        full_w,
-                        full_h,
-                        crop_rect.0,
-                        crop_rect.1,
-                        crop_rect.2,
-                        crop_rect.3,
-                    );
-
-                    let var_name = self
-                        .plotted_variable_info()
-                        .map(|v| v.name.as_str())
-                        .unwrap_or("plot");
-                    let title = format!("Octant - {}", var_name);
-
-                    let encode_result = match req.format {
-                        crate::export::ExportFormat::Png
-                        | crate::export::ExportFormat::Jpeg
-                        | crate::export::ExportFormat::Webp => crate::export::encode_raster_image(
-                            &cropped_rgba,
-                            final_w,
-                            final_h,
-                            req.format,
-                            req.jpeg_quality,
-                        ),
-                        crate::export::ExportFormat::Svg => crate::export::generate_svg(
-                            &cropped_rgba,
-                            final_w,
-                            final_h,
-                            &title,
-                            var_name,
-                        ),
-                        crate::export::ExportFormat::Pdf => {
-                            crate::export::generate_pdf(&cropped_rgba, final_w, final_h, &title)
-                        }
-                    };
-
-                    match encode_result {
-                        Ok(data) => {
-                            if req.copy_to_clipboard {
-                                #[cfg(not(target_arch = "wasm32"))]
-                                {
-                                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                                        let img_data = arboard::ImageData {
-                                            width: final_w as usize,
-                                            height: final_h as usize,
-                                            bytes: std::borrow::Cow::Borrowed(&cropped_rgba),
-                                        };
-                                        if clipboard.set_image(img_data).is_ok() {
-                                            self.status_message =
-                                                "✓ Copied figure to clipboard".to_string();
-                                        } else {
-                                            self.status_message =
-                                                "Failed to copy image to clipboard".to_string();
-                                        }
-                                    } else {
-                                        self.status_message =
-                                            "✓ Copied figure to clipboard".to_string();
-                                    }
-                                }
-                                #[cfg(target_arch = "wasm32")]
-                                {
-                                    self.status_message =
-                                        "✓ Copied figure to clipboard".to_string();
-                                }
-                            } else if let Some(ref path) = req.output_path {
-                                if let Err(e) = crate::export::save_exported_file(&data, path) {
-                                    self.status_message = format!("Export error: {}", e);
-                                } else {
-                                    let filename = path
-                                        .file_name()
-                                        .map(|s| s.to_string_lossy().to_string())
-                                        .unwrap_or_else(|| "figure".to_string());
-                                    self.status_message =
-                                        format!("✓ Saved figure to {}", path.display());
-                                    self.export_toast =
-                                        Some(crate::export::ExportToastNotification {
-                                            file_path: path.clone(),
-                                            filename,
-                                            timestamp: std::time::Instant::now(),
-                                        });
-                                }
-                            }
-                        }
-                        Err(err) => {
-                            self.status_message = format!("Encoding error: {}", err);
-                        }
-                    }
-                } else {
-                    self.pending_export = Some(req);
-                    ctx.request_repaint();
-                }
-            } else {
-                self.pending_export = Some(req);
-            }
-        }
-
-        // 3. Render panels (each consumes space from the remaining area)
+        // 3. Render panels (each consumes space from the remaining area)ng area)
         crate::ui::top_bar::show_top_bar(self, ui);
 
         if self.show_left_panel {
@@ -639,6 +503,97 @@ impl eframe::App for OctantApp {
 }
 
 impl OctantApp {
+    /// Processes in-flight export and screenshot events dispatched by the frame lifecycle.
+    fn process_pending_export(&mut self, ctx: &egui::Context) {
+        let Some(req) = self.pending_export.take() else {
+            return;
+        };
+
+        if req.canvas_rect_in_points == egui::Rect::NOTHING {
+            self.pending_export = Some(req);
+            return;
+        }
+
+        let screenshot = ctx.input(|i| {
+            i.raw.events.iter().find_map(|e| match e {
+                egui::Event::Screenshot { image, .. } => Some(image.clone()),
+                _ => None,
+            })
+        });
+
+        let Some(image) = screenshot else {
+            self.pending_export = Some(req);
+            ctx.request_repaint();
+            return;
+        };
+
+        self.export_flash_timer = Some(std::time::Instant::now());
+        let (crop_x, crop_y, crop_w, crop_h) =
+            req.compute_crop_rect(image.width() as u32, image.height() as u32);
+        let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
+
+        let (cropped_rgba, final_w, final_h) = crate::export::crop_rgba_buffer(
+            &rgba,
+            image.width() as u32,
+            image.height() as u32,
+            crop_x,
+            crop_y,
+            crop_w,
+            crop_h,
+        );
+
+        let var_name = self
+            .plotted_variable_info()
+            .map(|v| v.name.as_str())
+            .unwrap_or("plot");
+        let title = format!("Octant - {}", var_name);
+
+        match crate::export::encode_figure(
+            &cropped_rgba,
+            final_w,
+            final_h,
+            req.format,
+            req.jpeg_quality,
+            &title,
+            var_name,
+        ) {
+            Ok(data) => {
+                if req.copy_to_clipboard {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                            let img_data = arboard::ImageData {
+                                width: final_w as usize,
+                                height: final_h as usize,
+                                bytes: std::borrow::Cow::Borrowed(&cropped_rgba),
+                            };
+                            let _ = clipboard.set_image(img_data);
+                        }
+                    }
+                    self.status_message = "✓ Copied figure to clipboard".to_string();
+                } else if let Some(ref path) = req.output_path {
+                    if let Err(e) = crate::export::save_exported_file(&data, path) {
+                        self.status_message = format!("Export error: {}", e);
+                    } else {
+                        let filename = path
+                            .file_name()
+                            .map(|s| s.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "figure".to_string());
+                        self.status_message = format!("✓ Saved figure to {}", path.display());
+                        self.export_toast = Some(crate::export::ExportToastNotification {
+                            file_path: path.clone(),
+                            filename,
+                            timestamp: std::time::Instant::now(),
+                        });
+                    }
+                }
+            }
+            Err(err) => {
+                self.status_message = format!("Encoding error: {}", err);
+            }
+        }
+    }
+
     /// Opens the Settings panel and closes Store, Variables, Controls, and Catalog.
     pub fn open_only_settings_panel(&mut self) {
         self.show_settings_panel = true;
