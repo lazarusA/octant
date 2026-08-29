@@ -32,12 +32,49 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
                             show_plot_options(app, ui);
                             ui.separator();
                             show_clipping_bounds(app, ui);
+                            ui.separator();
+                            show_export_preferences(app, ui);
                         });
                 });
         });
 
     // Store width for next frame so Variable Controls can position to the right.
     app.settings_overlay_width = area_resp.response.rect.width();
+}
+
+fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
+    egui::CollapsingHeader::new("📸 Figure Export Defaults")
+        .default_open(false)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Format:");
+                egui::ComboBox::from_id_salt("settings_export_format")
+                    .selected_text(app.export_settings.format.label())
+                    .show_ui(ui, |ui| {
+                        for format in crate::export::ExportFormat::ALL {
+                            ui.selectable_value(
+                                &mut app.export_settings.format,
+                                format,
+                                format.label(),
+                            );
+                        }
+                    });
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Folder:");
+                ui.text_edit_singleline(&mut app.export_settings.export_dir);
+            });
+
+            ui.horizontal(|ui| {
+                if ui.button("📸 Open Save Dialog").clicked() {
+                    app.show_export_modal = true;
+                }
+                if ui.button("✂️ Crop Tool").clicked() {
+                    app.show_crop_overlay = !app.show_crop_overlay;
+                }
+            });
+        });
 }
 
 fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {

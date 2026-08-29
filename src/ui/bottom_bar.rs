@@ -11,6 +11,7 @@ enum BottomBarItem {
     StepSize,
     EndDate,
     Fps,
+    Export,
     OverflowBtn,
 }
 
@@ -26,6 +27,7 @@ impl BottomBarItem {
             BottomBarItem::StepSize => 75.0,
             BottomBarItem::EndDate => 85.0,
             BottomBarItem::Fps => 75.0,
+            BottomBarItem::Export => 75.0,
             BottomBarItem::OverflowBtn => 36.0,
         }
     }
@@ -84,6 +86,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         let step_size_w = get_w(BottomBarItem::StepSize, &widths);
         let end_date_w = get_w(BottomBarItem::EndDate, &widths);
         let fps_w = get_w(BottomBarItem::Fps, &widths);
+        let export_w = get_w(BottomBarItem::Export, &widths);
         let overflow_btn_w = get_w(BottomBarItem::OverflowBtn, &widths);
         let spacing = ui.spacing().item_spacing.x;
         let total_width = ui.available_width();
@@ -101,7 +104,8 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             + step_size_w
             + end_date_w
             + fps_w
-            + spacing * 14.0;
+            + export_w
+            + spacing * 16.0;
 
         let (
             show_date_info,
@@ -109,13 +113,21 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             show_status,
             show_loop,
             show_fps,
+            show_export,
             show_prev_next,
             show_overflow,
         ) = if total_width >= full_needed {
-            (true, true, true, true, true, true, false)
+            (true, true, true, true, true, true, true, false)
         } else {
             let base_fixed = play_pause_w + overflow_btn_w + min_slider_w + spacing * 4.0;
             let mut remaining = (total_width - base_fixed).max(0.0);
+
+            let show_export = if remaining >= export_w + spacing {
+                remaining -= export_w + spacing;
+                true
+            } else {
+                false
+            };
 
             let show_prev_next = if remaining >= prev_next_w + spacing {
                 remaining -= prev_next_w + spacing;
@@ -161,6 +173,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 show_status,
                 show_loop,
                 show_fps,
+                show_export,
                 show_prev_next,
                 true,
             )
@@ -326,6 +339,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         } else {
             0.0
         }) + (if show_fps { fps_w + spacing + 8.0 } else { 0.0 })
+            + (if show_export { export_w + spacing } else { 0.0 })
             + (if show_overflow {
                 overflow_btn_w + spacing
             } else {
@@ -398,7 +412,24 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             widths.insert(BottomBarItem::Fps, fps_resp.response.rect.width());
         }
 
-        // 8. Overflow Button "..."
+        // 8. Save / Export Figure Button
+        if show_export {
+            let export_resp = ui.scope(|ui| {
+                let save_btn = egui::Button::new("📸 Save");
+                if ui
+                    .add(save_btn)
+                    .on_hover_text(
+                        "Save / Export Figure (Cmd+S for Quick Save, Cmd+Shift+S for Settings)",
+                    )
+                    .clicked()
+                {
+                    app.show_export_modal = true;
+                }
+            });
+            widths.insert(BottomBarItem::Export, export_resp.response.rect.width());
+        }
+
+        // 9. Overflow Button "..."
         if show_overflow {
             let overflow_resp = ui.scope(|ui| {
                 ui.menu_button(egui::RichText::new("…").strong(), |ui| {
@@ -408,6 +439,24 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                             .small()
                             .weak(),
                     );
+                    ui.separator();
+
+                    if !show_export {
+                        ui.horizontal(|ui| {
+                            if ui.button("📸 Save Figure (Cmd+Shift+S)").clicked() {
+                                app.show_export_modal = true;
+                                ui.close();
+                            }
+                        });
+                        ui.separator();
+                    }
+
+                    if ui
+                        .checkbox(&mut app.show_crop_overlay, "✂️ Crop Guiding Lines (C)")
+                        .clicked()
+                    {
+                        ui.close();
+                    }
                     ui.separator();
 
                     if !show_loop {

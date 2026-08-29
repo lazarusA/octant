@@ -148,7 +148,31 @@ impl eframe::App for OctantApp {
         let is_hero_active =
             (self.matrix_data.is_none() && self.volume_data.is_none()) || self.show_hero;
 
-        // 3. Render panels (each consumes space from the remaining area)
+        // Keyboard Shortcuts for Figure Export & Crop Tool
+        if ui.input_mut(|i| {
+            i.consume_key(egui::Modifiers::COMMAND, egui::Key::S)
+                || i.consume_key(egui::Modifiers::CTRL, egui::Key::S)
+        }) {
+            self.quick_save_canvas();
+        }
+
+        if ui.input_mut(|i| {
+            i.consume_key(
+                egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+                egui::Key::S,
+            ) || i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::S)
+        }) {
+            self.show_export_modal = true;
+        }
+
+        if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::C)) {
+            self.show_crop_overlay = !self.show_crop_overlay;
+        }
+
+        // Process in-flight export / screenshot requests
+        self.process_pending_export(&ctx);
+
+        // 3. Render panels (each consumes space from the remaining area)ng area)
         crate::ui::top_bar::show_top_bar(self, ui);
 
         if self.show_left_panel {
@@ -166,6 +190,7 @@ impl eframe::App for OctantApp {
 
         crate::ui::catalog::show_catalog_window(self, &ctx);
         crate::ui::about::show_about_window(self, &ctx);
+        crate::ui::export_modal::show_export_modal(self, &ctx);
 
         // Overlays anchor relative to the remaining canvas rect
         let canvas_rect = ui.available_rect_before_wrap();
@@ -176,6 +201,15 @@ impl eframe::App for OctantApp {
         // 4. Drawing Canvas Area with Aspect Data Ratio
         {
             let canvas_rect = ui.available_rect_before_wrap();
+
+            if let Some(ref mut req) = self.pending_export
+                && req.canvas_rect_in_points == egui::Rect::NOTHING
+            {
+                req.canvas_rect_in_points = canvas_rect;
+                req.pixels_per_point = ctx.pixels_per_point();
+                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+                ctx.request_repaint();
+            }
 
             // When no dataset is plotted or hero landing view is active, render the clean hero page
             if is_hero_active {
@@ -390,13 +424,176 @@ impl eframe::App for OctantApp {
                 crate::ui::axes::draw_plot_axes(ui, canvas_rect, plot_rect, &options);
             }
 
-            // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle
-            crate::ui::hover_tooltip::show_hover_tooltip(self, &ctx, ui, &response, canvas_rect);
+            // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle (suppressed during export capture)
+            if self.pending_export.is_none() {
+                crate::ui::hover_tooltip::show_hover_tooltip(
+                    self,
+                    &ctx,
+                    ui,
+                    &response,
+                    canvas_rect,
+                );
+            }
+
+            // Camera subtle capture flash overlay (confined to ROI guides if active, shown after capture)
+            if let Some(flash_start) = self.export_flash_timer {
+                let elapsed = flash_start.elapsed().as_secs_f32();
+                let duration = 0.32;
+                if elapsed < duration {
+                    let progress = (elapsed / duration).clamp(0.0, 1.0);
+                    let alpha = ((1.0 - progress) * 120.0) as u8;
+                    let flash_rect = if self.show_crop_overlay {
+                        egui::Rect::from_min_max(
+                            egui::pos2(
+                                canvas_rect.left() + self.roi_crop_box.u_min * canvas_rect.width(),
+                                canvas_rect.top() + self.roi_crop_box.v_min * canvas_rect.height(),
+                            ),
+                            egui::pos2(
+                                canvas_rect.left() + self.roi_crop_box.u_max * canvas_rect.width(),
+                                canvas_rect.top() + self.roi_crop_box.v_max * canvas_rect.height(),
+                            ),
+                        )
+                    } else {
+                        canvas_rect
+                    };
+
+                    ui.painter().rect_filled(
+                        flash_rect,
+                        0.0,
+                        egui::Color32::from_white_alpha(alpha),
+                    );
+                    ui.painter().rect_stroke(
+                        flash_rect,
+                        0.0,
+                        egui::Stroke::new(
+                            2.0,
+                            egui::Color32::from_rgba_unmultiplied(
+                                100,
+                                220,
+                                255,
+                                ((alpha as f32) * 1.5).min(255.0) as u8,
+                            ),
+                        ),
+                        egui::StrokeKind::Inside,
+                    );
+                    ctx.request_repaint();
+                } else {
+                    self.export_flash_timer = None;
+                }
+            }
+
+            // Render interactive Region of Interest (ROI) Guiding Lines & Crop Tool (suppressed during export capture)
+            if self.show_crop_overlay
+                && self.pending_export.is_none()
+                && let Some(crate::ui::crop_overlay::CropOverlayAction::Save) =
+                    crate::ui::crop_overlay::show_crop_overlay(
+                        ui,
+                        canvas_rect,
+                        &mut self.roi_crop_box,
+                        &mut self.show_crop_overlay,
+                    )
+            {
+                self.quick_save_canvas();
+            }
+
+            // Render floating Save Figure Toast with "Reveal in Finder / Folder" action
+            crate::ui::export_modal::show_export_toast(self, &ctx, canvas_rect);
         }
     }
 }
 
 impl OctantApp {
+    /// Processes in-flight export and screenshot events dispatched by the frame lifecycle.
+    fn process_pending_export(&mut self, ctx: &egui::Context) {
+        let Some(req) = self.pending_export.take() else {
+            return;
+        };
+
+        if req.canvas_rect_in_points == egui::Rect::NOTHING {
+            self.pending_export = Some(req);
+            return;
+        }
+
+        let screenshot = ctx.input(|i| {
+            i.raw.events.iter().find_map(|e| match e {
+                egui::Event::Screenshot { image, .. } => Some(image.clone()),
+                _ => None,
+            })
+        });
+
+        let Some(image) = screenshot else {
+            self.pending_export = Some(req);
+            ctx.request_repaint();
+            return;
+        };
+
+        self.export_flash_timer = Some(std::time::Instant::now());
+        let (crop_x, crop_y, crop_w, crop_h) =
+            req.compute_crop_rect(image.width() as u32, image.height() as u32);
+        let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
+
+        let (cropped_rgba, final_w, final_h) = crate::export::crop_rgba_buffer(
+            &rgba,
+            image.width() as u32,
+            image.height() as u32,
+            crop_x,
+            crop_y,
+            crop_w,
+            crop_h,
+        );
+
+        let var_name = self
+            .plotted_variable_info()
+            .map(|v| v.name.as_str())
+            .unwrap_or("plot");
+        let title = format!("Octant - {}", var_name);
+
+        match crate::export::encode_figure(
+            &cropped_rgba,
+            final_w,
+            final_h,
+            req.format,
+            req.jpeg_quality,
+            &title,
+            var_name,
+        ) {
+            Ok(data) => {
+                if req.copy_to_clipboard {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                            let img_data = arboard::ImageData {
+                                width: final_w as usize,
+                                height: final_h as usize,
+                                bytes: std::borrow::Cow::Borrowed(&cropped_rgba),
+                            };
+                            let _ = clipboard.set_image(img_data);
+                        }
+                    }
+                    self.status_message = "✓ Copied figure to clipboard".to_string();
+                } else if let Some(ref path) = req.output_path {
+                    if let Err(e) = crate::export::save_exported_file(&data, path) {
+                        self.status_message = format!("Export error: {}", e);
+                    } else {
+                        let filename = path
+                            .file_name()
+                            .map(|s| s.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "figure".to_string());
+                        self.status_message = format!("✓ Saved figure to {}", path.display());
+                        self.export_toast = Some(crate::export::ExportToastNotification {
+                            file_path: path.clone(),
+                            filename,
+                            timestamp: std::time::Instant::now(),
+                        });
+                    }
+                }
+            }
+            Err(err) => {
+                self.status_message = format!("Encoding error: {}", err);
+            }
+        }
+    }
+
     /// Opens the Settings panel and closes Store, Variables, Controls, and Catalog.
     pub fn open_only_settings_panel(&mut self) {
         self.show_settings_panel = true;
