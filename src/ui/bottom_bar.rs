@@ -339,6 +339,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         } else {
             0.0
         }) + (if show_fps { fps_w + spacing + 8.0 } else { 0.0 })
+            + (if show_export { export_w + spacing } else { 0.0 })
             + (if show_overflow {
                 overflow_btn_w + spacing
             } else {

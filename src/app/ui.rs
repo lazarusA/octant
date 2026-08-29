@@ -619,13 +619,17 @@ impl eframe::App for OctantApp {
             }
 
             // Render interactive Region of Interest (ROI) Guiding Lines & Crop Tool (suppressed during export capture)
-            if self.show_crop_overlay && self.pending_export.is_none() {
-                crate::ui::crop_overlay::show_crop_overlay(
-                    ui,
-                    canvas_rect,
-                    &mut self.roi_crop_box,
-                    &mut self.show_crop_overlay,
-                );
+            if self.show_crop_overlay
+                && self.pending_export.is_none()
+                && let Some(crate::ui::crop_overlay::CropOverlayAction::Save) =
+                    crate::ui::crop_overlay::show_crop_overlay(
+                        ui,
+                        canvas_rect,
+                        &mut self.roi_crop_box,
+                        &mut self.show_crop_overlay,
+                    )
+            {
+                self.quick_save_canvas();
             }
 
             // Render floating Save Figure Toast with "Reveal in Finder / Folder" action

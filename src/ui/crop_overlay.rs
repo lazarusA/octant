@@ -1,17 +1,51 @@
 use crate::export::{AspectPreset, RoiCropBox};
 
+/// Actions dispatched from the interactive Crop Toolbar.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CropOverlayAction {
+    Save,
+    Reset,
+    Done,
+}
+
 /// Renders the interactive Region of Interest (ROI) crop box and guiding lines on top of the canvas.
 pub fn show_crop_overlay(
     ui: &mut egui::Ui,
     canvas_rect: egui::Rect,
     crop_box: &mut RoiCropBox,
     is_open: &mut bool,
-) {
+) -> Option<CropOverlayAction> {
     if !*is_open || canvas_rect.width() <= 10.0 || canvas_rect.height() <= 10.0 {
-        return;
+        return None;
     }
 
     crop_box.clamp_bounds();
+    let dark_mode = ui.visuals().dark_mode;
+    let mut action = None;
+
+    // Theme-adaptive colors
+    let mask_color = if dark_mode {
+        egui::Color32::from_black_alpha(150)
+    } else {
+        egui::Color32::from_black_alpha(80)
+    };
+
+    let accent_color = if dark_mode {
+        egui::Color32::from_rgb(0, 190, 255)
+    } else {
+        egui::Color32::from_rgb(0, 125, 220)
+    };
+
+    let grid_stroke = egui::Stroke::new(
+        1.0,
+        if dark_mode {
+            egui::Color32::from_white_alpha(60)
+        } else {
+            egui::Color32::from_black_alpha(50)
+        },
+    );
+
+    let border_stroke = egui::Stroke::new(1.5, accent_color);
 
     // Map normalized [0..1] coordinates to screen pixels
     let rect_min = egui::pos2(
@@ -27,8 +61,6 @@ pub fn show_crop_overlay(
     let painter = ui.painter().with_clip_rect(canvas_rect);
 
     // 1. Dimmed outer mask (4 surrounding rectangles)
-    let mask_color = egui::Color32::from_black_alpha(140);
-    // Top
     painter.rect_filled(
         egui::Rect::from_min_max(
             canvas_rect.min,
@@ -37,7 +69,6 @@ pub fn show_crop_overlay(
         0.0,
         mask_color,
     );
-    // Bottom
     painter.rect_filled(
         egui::Rect::from_min_max(
             egui::pos2(canvas_rect.left(), box_rect.bottom()),
@@ -46,7 +77,6 @@ pub fn show_crop_overlay(
         0.0,
         mask_color,
     );
-    // Left
     painter.rect_filled(
         egui::Rect::from_min_max(
             egui::pos2(canvas_rect.left(), box_rect.top()),
@@ -55,7 +85,6 @@ pub fn show_crop_overlay(
         0.0,
         mask_color,
     );
-    // Right
     painter.rect_filled(
         egui::Rect::from_min_max(
             egui::pos2(box_rect.right(), box_rect.top()),
@@ -66,11 +95,9 @@ pub fn show_crop_overlay(
     );
 
     // 2. Rule-of-Thirds Grid Lines
-    let grid_stroke = egui::Stroke::new(1.0, egui::Color32::from_white_alpha(70));
     let w_third = box_rect.width() / 3.0;
     let h_third = box_rect.height() / 3.0;
 
-    // Vertical third lines
     painter.line_segment(
         [
             egui::pos2(box_rect.left() + w_third, box_rect.top()),
@@ -86,7 +113,6 @@ pub fn show_crop_overlay(
         grid_stroke,
     );
 
-    // Horizontal third lines
     painter.line_segment(
         [
             egui::pos2(box_rect.left(), box_rect.top() + h_third),
@@ -103,27 +129,34 @@ pub fn show_crop_overlay(
     );
 
     // 3. Boundary Border
-    let border_stroke = egui::Stroke::new(2.0, egui::Color32::from_rgb(0, 180, 255));
     painter.rect_stroke(box_rect, 0.0, border_stroke, egui::StrokeKind::Outside);
 
     // 4. Interactive Drag & Resize Handling
-    let handle_size = 12.0;
     let response = ui.allocate_rect(canvas_rect, egui::Sense::click_and_drag());
+    let hit_radius = 18.0;
 
     if let Some(mouse_pos) = response.hover_pos() {
         let handle_rect = |p: egui::Pos2| {
-            egui::Rect::from_center_size(p, egui::vec2(handle_size * 2.0, handle_size * 2.0))
+            egui::Rect::from_center_size(p, egui::vec2(hit_radius * 2.0, hit_radius * 2.0))
         };
 
         let nw = handle_rect(box_rect.left_top());
         let ne = handle_rect(box_rect.right_top());
         let sw = handle_rect(box_rect.left_bottom());
         let se = handle_rect(box_rect.right_bottom());
+        let top_mid = handle_rect(egui::pos2(box_rect.center().x, box_rect.top()));
+        let bot_mid = handle_rect(egui::pos2(box_rect.center().x, box_rect.bottom()));
+        let left_mid = handle_rect(egui::pos2(box_rect.left(), box_rect.center().y));
+        let right_mid = handle_rect(egui::pos2(box_rect.right(), box_rect.center().y));
 
         if nw.contains(mouse_pos) || se.contains(mouse_pos) {
             ui.output_mut(|o| o.cursor_icon = egui::CursorIcon::ResizeNorthWest);
         } else if ne.contains(mouse_pos) || sw.contains(mouse_pos) {
             ui.output_mut(|o| o.cursor_icon = egui::CursorIcon::ResizeNorthEast);
+        } else if top_mid.contains(mouse_pos) || bot_mid.contains(mouse_pos) {
+            ui.output_mut(|o| o.cursor_icon = egui::CursorIcon::ResizeVertical);
+        } else if left_mid.contains(mouse_pos) || right_mid.contains(mouse_pos) {
+            ui.output_mut(|o| o.cursor_icon = egui::CursorIcon::ResizeHorizontal);
         } else if box_rect.contains(mouse_pos) {
             ui.output_mut(|o| o.cursor_icon = egui::CursorIcon::Grab);
         }
@@ -178,36 +211,138 @@ pub fn show_crop_overlay(
         }
     }
 
-    // 5. Draw 8 Corner/Edge Handle markers
-    let handle_stroke = egui::Stroke::new(2.0, egui::Color32::WHITE);
-    let handle_fill = egui::Color32::from_rgb(0, 180, 255);
+    // 5. Draw Modern Pro-Grade Handles (L-shaped Corner Brackets & Elongated Thin Side Blocks)
+    let corner_arm_len = 16.0;
+    let corner_stroke = egui::Stroke::new(3.0, accent_color);
 
-    let handles = [
-        box_rect.left_top(),
+    // NW Corner
+    painter.line_segment(
+        [
+            egui::pos2(box_rect.left(), box_rect.top()),
+            egui::pos2(box_rect.left() + corner_arm_len, box_rect.top()),
+        ],
+        corner_stroke,
+    );
+    painter.line_segment(
+        [
+            egui::pos2(box_rect.left(), box_rect.top()),
+            egui::pos2(box_rect.left(), box_rect.top() + corner_arm_len),
+        ],
+        corner_stroke,
+    );
+
+    // NE Corner
+    painter.line_segment(
+        [
+            egui::pos2(box_rect.right() - corner_arm_len, box_rect.top()),
+            egui::pos2(box_rect.right(), box_rect.top()),
+        ],
+        corner_stroke,
+    );
+    painter.line_segment(
+        [
+            egui::pos2(box_rect.right(), box_rect.top()),
+            egui::pos2(box_rect.right(), box_rect.top() + corner_arm_len),
+        ],
+        corner_stroke,
+    );
+
+    // SW Corner
+    painter.line_segment(
+        [
+            egui::pos2(box_rect.left(), box_rect.bottom()),
+            egui::pos2(box_rect.left() + corner_arm_len, box_rect.bottom()),
+        ],
+        corner_stroke,
+    );
+    painter.line_segment(
+        [
+            egui::pos2(box_rect.left(), box_rect.bottom() - corner_arm_len),
+            egui::pos2(box_rect.left(), box_rect.bottom()),
+        ],
+        corner_stroke,
+    );
+
+    // SE Corner
+    painter.line_segment(
+        [
+            egui::pos2(box_rect.right() - corner_arm_len, box_rect.bottom()),
+            egui::pos2(box_rect.right(), box_rect.bottom()),
+        ],
+        corner_stroke,
+    );
+    painter.line_segment(
+        [
+            egui::pos2(box_rect.right(), box_rect.bottom() - corner_arm_len),
+            egui::pos2(box_rect.right(), box_rect.bottom()),
+        ],
+        corner_stroke,
+    );
+
+    // Elongated thin side edge pills
+    let edge_pill_stroke = egui::Stroke::new(
+        1.0,
+        if dark_mode {
+            egui::Color32::WHITE
+        } else {
+            egui::Color32::BLACK
+        },
+    );
+
+    // Top & Bottom horizontal thin pills (28 × 4 px)
+    let top_pill = egui::Rect::from_center_size(
         egui::pos2(box_rect.center().x, box_rect.top()),
-        box_rect.right_top(),
-        egui::pos2(box_rect.right(), box_rect.center().y),
-        box_rect.right_bottom(),
+        egui::vec2(28.0, 4.0),
+    );
+    painter.rect(
+        top_pill,
+        2.0,
+        accent_color,
+        edge_pill_stroke,
+        egui::StrokeKind::Outside,
+    );
+
+    let bot_pill = egui::Rect::from_center_size(
         egui::pos2(box_rect.center().x, box_rect.bottom()),
-        box_rect.left_bottom(),
+        egui::vec2(28.0, 4.0),
+    );
+    painter.rect(
+        bot_pill,
+        2.0,
+        accent_color,
+        edge_pill_stroke,
+        egui::StrokeKind::Outside,
+    );
+
+    // Left & Right vertical thin pills (4 × 28 px)
+    let left_pill = egui::Rect::from_center_size(
         egui::pos2(box_rect.left(), box_rect.center().y),
-    ];
+        egui::vec2(4.0, 28.0),
+    );
+    painter.rect(
+        left_pill,
+        2.0,
+        accent_color,
+        edge_pill_stroke,
+        egui::StrokeKind::Outside,
+    );
 
-    for &h_pos in &handles {
-        let r = egui::Rect::from_center_size(h_pos, egui::vec2(handle_size, handle_size));
-        painter.rect(
-            r,
-            2.0,
-            handle_fill,
-            handle_stroke,
-            egui::StrokeKind::Outside,
-        );
-    }
+    let right_pill = egui::Rect::from_center_size(
+        egui::pos2(box_rect.right(), box_rect.center().y),
+        egui::vec2(4.0, 28.0),
+    );
+    painter.rect(
+        right_pill,
+        2.0,
+        accent_color,
+        edge_pill_stroke,
+        egui::StrokeKind::Outside,
+    );
 
-    // 6. Floating Control Toolbar on Top of the Crop Box
+    // 6. Floating Theme-Aware Control Toolbar on Top of the Crop Box
     let toolbar_pos = egui::pos2(
         box_rect.left().max(canvas_rect.left() + 8.0),
-        (box_rect.top() - 36.0).max(canvas_rect.top() + 8.0),
+        (box_rect.top() - 38.0).max(canvas_rect.top() + 8.0),
     );
 
     egui::Area::new(egui::Id::new("octant_crop_toolbar"))
@@ -215,19 +350,18 @@ pub fn show_crop_overlay(
         .order(egui::Order::Foreground)
         .show(ui.ctx(), |ui| {
             egui::Frame::window(ui.style())
-                .fill(egui::Color32::from_black_alpha(220))
-                .stroke(egui::Stroke::new(1.0, egui::Color32::DARK_GRAY))
-                .inner_margin(4.0)
+                .inner_margin(egui::Margin::symmetric(8, 5))
+                .corner_radius(6.0)
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("✂️ Crop Area:").small().strong());
+                        ui.label(egui::RichText::new("✂️ ROI:").small().strong());
 
                         let w_px = (box_rect.width()).round() as u32;
                         let h_px = (box_rect.height()).round() as u32;
                         ui.label(
-                            egui::RichText::new(format!("{} × {} px", w_px, h_px))
+                            egui::RichText::new(format!("{}×{} px", w_px, h_px))
                                 .small()
-                                .color(egui::Color32::from_rgb(0, 200, 255)),
+                                .color(accent_color),
                         );
 
                         ui.separator();
@@ -251,21 +385,33 @@ pub fn show_crop_overlay(
                         ui.separator();
 
                         if ui
+                            .button(egui::RichText::new("💾 Save").strong())
+                            .on_hover_text("Save cropped ROI figure (Cmd+S)")
+                            .clicked()
+                        {
+                            action = Some(CropOverlayAction::Save);
+                        }
+
+                        if ui
                             .button("⟲ Reset")
-                            .on_hover_text("Fit to Full Canvas")
+                            .on_hover_text("Fit crop box to full canvas")
                             .clicked()
                         {
                             *crop_box = RoiCropBox::default();
+                            action = Some(CropOverlayAction::Reset);
                         }
 
                         if ui
                             .button("✓ Done")
-                            .on_hover_text("Close Guiding Lines Overlay")
+                            .on_hover_text("Close crop overlay")
                             .clicked()
                         {
                             *is_open = false;
+                            action = Some(CropOverlayAction::Done);
                         }
                     });
                 });
         });
+
+    action
 }

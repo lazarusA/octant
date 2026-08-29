@@ -174,9 +174,26 @@ pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: 
             .fixed_pos(toast_pos)
             .order(egui::Order::Foreground)
             .show(ctx, |ui| {
+                let dark_mode = ui.visuals().dark_mode;
+                let bg_color = if dark_mode {
+                    egui::Color32::from_black_alpha(alpha)
+                } else {
+                    egui::Color32::from_rgba_unmultiplied(245, 248, 255, alpha)
+                };
+                let border_color = if dark_mode {
+                    egui::Color32::from_rgb(0, 190, 255)
+                } else {
+                    egui::Color32::from_rgb(0, 125, 220)
+                };
+                let text_title_color = if dark_mode {
+                    egui::Color32::WHITE
+                } else {
+                    egui::Color32::BLACK
+                };
+
                 egui::Frame::popup(ui.style())
-                    .fill(egui::Color32::from_black_alpha(alpha))
-                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(0, 200, 255)))
+                    .fill(bg_color)
+                    .stroke(egui::Stroke::new(1.0, border_color))
                     .inner_margin(egui::Margin::symmetric(10, 8))
                     .corner_radius(6.0)
                     .show(ui, |ui| {
@@ -184,13 +201,9 @@ pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: 
                             ui.label(
                                 egui::RichText::new("📸 Saved")
                                     .strong()
-                                    .color(egui::Color32::WHITE),
+                                    .color(text_title_color),
                             );
-                            ui.label(
-                                egui::RichText::new(&filename)
-                                    .small()
-                                    .color(egui::Color32::from_rgb(0, 220, 255)),
-                            );
+                            ui.label(egui::RichText::new(&filename).small().color(border_color));
 
                             #[cfg(target_os = "macos")]
                             let reveal_label = "📂 Reveal in Finder";
