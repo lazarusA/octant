@@ -109,10 +109,35 @@ impl GenericZarrBlockStore {
             Array::open(readable_store.clone(), &var_path)?
         };
 
+        let rank = raw_array.shape().len();
+        let chunk_indices = vec![0; rank];
+        let single_chunk_bytes = if let Ok(chunk_dims) = raw_array.chunk_shape(&chunk_indices) {
+            let elem_count = chunk_dims
+                .iter()
+                .try_fold(1u64, |acc, d| acc.checked_mul(d.get()))
+                .unwrap_or(1);
+            let elem_size = match raw_array.data_type().size() {
+                zarrs::array::DataTypeSize::Fixed(s) => (s as u64).max(1),
+                zarrs::array::DataTypeSize::Variable => 4,
+            };
+            elem_count.saturating_mul(elem_size)
+        } else {
+            4 * 1024 * 1024
+        };
+
+        // Cache at least 8 full chunks per variable, clamped between 64 MB and 512 MB
+        let dynamic_cache_bytes = if self.chunk_cache_bytes != DEFAULT_CHUNK_CACHE_BYTES {
+            self.chunk_cache_bytes
+        } else {
+            single_chunk_bytes
+                .saturating_mul(8)
+                .clamp(64 * 1024 * 1024, 512 * 1024 * 1024)
+        };
+
         let array_arc = Arc::new(raw_array);
         let chunk_cache = Arc::new(ChunkCacheDecodedLruSizeLimit::new(
             array_arc.clone(),
-            self.chunk_cache_bytes,
+            dynamic_cache_bytes,
         ));
         let tuple = (array_arc, chunk_cache);
 
