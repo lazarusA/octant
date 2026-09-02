@@ -10,9 +10,7 @@ use zarrs::metadata_ext::codec::blosc::{
 };
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata;
 use zarrs::node::{NodeMetadata, NodePath, get_child_nodes};
-use zarrs::storage::{
-    ReadableStorageTraits, ReadableWritableListableStorage, ReadableWritableListableStorageTraits,
-};
+use zarrs::storage::{ReadableStorageTraits, ReadableWritableListableStorage};
 
 /// Normalizes Zarr v3 array metadata to handle non-standard / Python numcodecs codec representations
 /// using `zarrs_metadata` and `zarrs_metadata_ext`.
@@ -51,11 +49,11 @@ pub fn normalize_v3_array_metadata(mut meta: serde_json::Value) -> serde_json::V
 }
 
 /// Helper to instantiate an Array from NodeMetadata, applying codec normalization if needed.
-pub fn instantiate_array_from_node_metadata(
-    store: ReadableWritableListableStorage,
+pub fn instantiate_array_from_node_metadata<TStorage: ?Sized + ReadableStorageTraits + 'static>(
+    store: std::sync::Arc<TStorage>,
     path: &str,
     node_meta: &NodeMetadata,
-) -> Option<Array<dyn ReadableWritableListableStorageTraits>> {
+) -> Option<Array<TStorage>> {
     match node_meta {
         NodeMetadata::Array(array_meta) => {
             if let Ok(arr) = Array::new_with_metadata(store.clone(), path, array_meta.clone()) {

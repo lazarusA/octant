@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use zarrs::array::ArraySubset;
+use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 use zarrs::storage::ReadableWritableListableStorage;
 
 use super::generic_zarr::ZarrArrayHandle;
@@ -23,9 +24,10 @@ pub fn fetch_block(
     fetch_block_with_progress(store, store_url, request, None)
 }
 
-/// Fetches an arbitrary-rank hyperslab from an already-opened `ZarrArrayHandle`.
+/// Fetches an arbitrary-rank hyperslab from an already-opened `ZarrArrayHandle` through a chunk cache.
 pub fn fetch_block_from_cached_array(
     array: &ZarrArrayHandle,
+    cache: &ChunkCacheDecodedLruSizeLimit,
     store: ReadableWritableListableStorage,
     store_url: &str,
     request: &SliceRequest,
@@ -89,8 +91,10 @@ pub fn fetch_block_from_cached_array(
     }
 
     let subset = ArraySubset::new_with_ranges(&ranges);
-    let raw_values = retrieve_array_subset_as_f32(array, &subset).map_err(|e| e.to_string())?;
+    let raw_values =
+        retrieve_array_subset_as_f32(array, Some(cache), &subset).map_err(|e| e.to_string())?;
     let bytes_read = (raw_values.len() * std::mem::size_of::<f32>()) as u64;
+
     if let Some(ref mut cb) = on_progress {
         cb(bytes_read);
     }
@@ -155,6 +159,13 @@ pub fn fetch_block_with_progress(
 ) -> Result<OctantBlock, BlockStoreError> {
     let dummy_store =
         super::generic_zarr::GenericZarrBlockStore::new(store.clone(), store_url, "zarr", "Zarr");
-    let cached_array = dummy_store.get_or_open_array(&request.variable)?;
-    fetch_block_from_cached_array(&cached_array, store, store_url, request, on_progress)
+    let (cached_array, cache) = dummy_store.get_or_open_array(&request.variable)?;
+    fetch_block_from_cached_array(
+        &cached_array,
+        &cache,
+        store,
+        store_url,
+        request,
+        on_progress,
+    )
 }
