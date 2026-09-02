@@ -2,11 +2,10 @@
 
 use std::collections::HashMap;
 
-use zarrs::array::{Array, ArraySubset};
-use zarrs::group::Group;
-use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata;
+use zarrs::array::ArraySubset;
 use zarrs::storage::ReadableWritableListableStorage;
 
+use super::generic_zarr::ZarrArrayHandle;
 use super::zarr_slice::retrieve_array_subset_as_f32;
 use crate::data::block_store::BlockStoreError;
 use crate::data::octant_block::OctantBlock;
@@ -24,38 +23,14 @@ pub fn fetch_block(
     fetch_block_with_progress(store, store_url, request, None)
 }
 
-/// Fetches an arbitrary-rank hyperslab described by `request` with progress reporting.
-pub fn fetch_block_with_progress(
+/// Fetches an arbitrary-rank hyperslab from an already-opened `ZarrArrayHandle`.
+pub fn fetch_block_from_cached_array(
+    array: &ZarrArrayHandle,
     store: ReadableWritableListableStorage,
     store_url: &str,
     request: &SliceRequest,
     mut on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
 ) -> Result<OctantBlock, BlockStoreError> {
-    let var_path = if request.variable.starts_with('/') {
-        request.variable.clone()
-    } else {
-        format!("/{}", request.variable)
-    };
-
-    let array = if let Ok(arr) = Array::open(store.clone(), &var_path) {
-        arr
-    } else if let Ok(group) = Group::open(store.clone(), "/")
-        && let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata()
-        && let Some(node_meta) = metadata
-            .get(request.variable.trim_start_matches('/'))
-            .or_else(|| metadata.get(&var_path))
-        && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
-            store.clone(),
-            &var_path,
-            node_meta,
-        )
-    {
-        arr
-    } else if request.variable == "data" || request.variable.is_empty() {
-        Array::open(store.clone(), "/")?
-    } else {
-        Array::open(store.clone(), &var_path)?
-    };
     let shape = array.shape();
     let rank = shape.len();
 
@@ -114,7 +89,7 @@ pub fn fetch_block_with_progress(
     }
 
     let subset = ArraySubset::new_with_ranges(&ranges);
-    let raw_values = retrieve_array_subset_as_f32(&array, &subset).map_err(|e| e.to_string())?;
+    let raw_values = retrieve_array_subset_as_f32(array, &subset).map_err(|e| e.to_string())?;
     let bytes_read = (raw_values.len() * std::mem::size_of::<f32>()) as u64;
     if let Some(ref mut cb) = on_progress {
         cb(bytes_read);
@@ -169,4 +144,17 @@ pub fn fetch_block_with_progress(
         coordinates,
         attributes,
     ))
+}
+
+/// Fetches an arbitrary-rank hyperslab described by `request` with progress reporting.
+pub fn fetch_block_with_progress(
+    store: ReadableWritableListableStorage,
+    store_url: &str,
+    request: &SliceRequest,
+    on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+) -> Result<OctantBlock, BlockStoreError> {
+    let dummy_store =
+        super::generic_zarr::GenericZarrBlockStore::new(store.clone(), store_url, "zarr", "Zarr");
+    let cached_array = dummy_store.get_or_open_array(&request.variable)?;
+    fetch_block_from_cached_array(&cached_array, store, store_url, request, on_progress)
 }

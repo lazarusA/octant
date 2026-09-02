@@ -33,6 +33,12 @@ pub struct PyramidLevel {
     pub scale_y: f64,
 }
 
+impl PyramidLevel {
+    pub fn bytes_size(&self) -> usize {
+        self.values.len() * std::mem::size_of::<f32>() + std::mem::size_of::<Self>()
+    }
+}
+
 /// In-memory multi-resolution pyramid of a 2D matrix.
 #[derive(Debug, Clone)]
 pub struct MatrixPyramid {
@@ -45,6 +51,12 @@ pub struct MatrixPyramid {
 }
 
 impl MatrixPyramid {
+    pub fn bytes_size(&self) -> usize {
+        self.levels.iter().map(|l| l.bytes_size()).sum::<usize>()
+            + self.dataset_name.len()
+            + std::mem::size_of::<Self>()
+    }
+
     /// Builds a full multi-resolution pyramid from raw 2D matrix data.
     pub fn new(
         values: &[f32],

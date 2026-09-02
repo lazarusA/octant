@@ -1,6 +1,7 @@
 //! Helper for retrieving Zarr array subsets converted to f32.
 
 use std::error::Error;
+use zarrs::array::data_type::*;
 use zarrs::array::{Array, ArraySubset};
 use zarrs::storage::ReadableWritableListableStorageTraits;
 
@@ -8,43 +9,48 @@ use zarrs::storage::ReadableWritableListableStorageTraits;
 pub fn retrieve_array_subset_as_f32(
     array: &Array<dyn ReadableWritableListableStorageTraits>,
     subset: &ArraySubset,
-) -> Result<Vec<f32>, Box<dyn Error>> {
-    let dt_str = array.data_type().to_string().to_lowercase();
-    if dt_str.contains("float64") || dt_str.contains("f64") {
-        let vals = array.retrieve_array_subset::<Vec<f64>>(subset)?;
+) -> Result<Vec<f32>, Box<dyn Error + Send + Sync>> {
+    let dt = array.data_type();
+
+    if dt.is::<Float32DataType>() {
+        let vals: Vec<f32> = array.retrieve_array_subset(subset)?;
+        Ok(vals)
+    } else if dt.is::<Float64DataType>() {
+        let vals: Vec<f64> = array.retrieve_array_subset(subset)?;
         Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt_str.contains("int64") || dt_str.contains("i64") {
-        let vals = array.retrieve_array_subset::<Vec<i64>>(subset)?;
+    } else if dt.is::<Int32DataType>() {
+        let vals: Vec<i32> = array.retrieve_array_subset(subset)?;
         Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt_str.contains("int32") || dt_str.contains("i32") {
-        let vals = array.retrieve_array_subset::<Vec<i32>>(subset)?;
+    } else if dt.is::<Int64DataType>() {
+        let vals: Vec<i64> = array.retrieve_array_subset(subset)?;
         Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt_str.contains("uint64") || dt_str.contains("u64") {
-        let vals = array.retrieve_array_subset::<Vec<u64>>(subset)?;
+    } else if dt.is::<UInt32DataType>() {
+        let vals: Vec<u32> = array.retrieve_array_subset(subset)?;
         Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt_str.contains("uint32") || dt_str.contains("u32") {
-        let vals = array.retrieve_array_subset::<Vec<u32>>(subset)?;
+    } else if dt.is::<UInt64DataType>() {
+        let vals: Vec<u64> = array.retrieve_array_subset(subset)?;
         Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt_str.contains("int16") || dt_str.contains("i16") {
-        let vals = array.retrieve_array_subset::<Vec<i16>>(subset)?;
+    } else if dt.is::<Int16DataType>() {
+        let vals: Vec<i16> = array.retrieve_array_subset(subset)?;
         Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt_str.contains("uint16") || dt_str.contains("u16") {
-        let vals = array.retrieve_array_subset::<Vec<u16>>(subset)?;
+    } else if dt.is::<UInt16DataType>() {
+        let vals: Vec<u16> = array.retrieve_array_subset(subset)?;
         Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt_str.contains("uint8") || dt_str.contains("u8") || dt_str.contains("|u1") {
-        let vals = array.retrieve_array_subset::<Vec<u8>>(subset)?;
+    } else if dt.is::<Int8DataType>() {
+        let vals: Vec<i8> = array.retrieve_array_subset(subset)?;
         Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt_str.contains("int8") || dt_str.contains("i8") || dt_str.contains("|i1") {
-        let vals = array.retrieve_array_subset::<Vec<i8>>(subset)?;
+    } else if dt.is::<UInt8DataType>() {
+        let vals: Vec<u8> = array.retrieve_array_subset(subset)?;
         Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt_str.contains("bool") || dt_str.contains("|b1") {
-        let vals = array.retrieve_array_subset::<Vec<u8>>(subset)?;
+    } else if dt.is::<BoolDataType>() {
+        let vals: Vec<u8> = array.retrieve_array_subset(subset)?;
         Ok(vals
             .into_iter()
             .map(|v| if v != 0 { 1.0 } else { 0.0 })
             .collect())
     } else {
-        let vals = array.retrieve_array_subset::<Vec<f32>>(subset)?;
+        // Fallback or custom data type: attempt direct f32 decode
+        let vals: Vec<f32> = array.retrieve_array_subset(subset)?;
         Ok(vals)
     }
 }
