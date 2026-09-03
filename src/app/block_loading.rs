@@ -27,10 +27,6 @@ impl OctantApp {
         let start = (step / cs) * cs;
         let end = (start + window_size).min(full_extent).max(start + 1);
 
-        println!(
-            "[BOUNDS] step={}, cs={} -> active_chunk_range=[{}..{}]",
-            step, cs, start, end
-        );
         (start, end, window_size)
     }
 
@@ -270,16 +266,10 @@ impl OctantApp {
         } else if let Some(var_info) = self.plotted_variable_info() {
             crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_info.name, shape)
         } else {
-            println!("[PREFETCH] Abort: no active slice request and no plotted variable info");
             return;
         };
 
         if anim_dim >= base_req.selections.len() {
-            println!(
-                "[PREFETCH] Abort: anim_dim {} >= selections.len {}",
-                anim_dim,
-                base_req.selections.len()
-            );
             return;
         }
 
@@ -315,7 +305,6 @@ impl OctantApp {
         let source_id = self.plotted_source_id();
 
         let Some(store_handle) = self.plotted_store_handle() else {
-            println!("[PREFETCH] Abort: no store handle available");
             return;
         };
 
@@ -348,18 +337,6 @@ impl OctantApp {
             }
         }
 
-        println!(
-            "[PREFETCH] is_playing={}, var='{}', range={}..={}, cs={}, current_chunk={}, chunks_to_queue={:?}",
-            self.is_playing,
-            base_req.variable,
-            range_start,
-            range_end,
-            cs,
-            current_chunk,
-            chunk_indices
-        );
-
-        let mut scheduled_count = 0;
         for chunk_idx in chunk_indices {
             let chunk_start = chunk_idx * cs;
             let chunk_end = (chunk_start + cs).min(full_extent);
@@ -394,31 +371,12 @@ impl OctantApp {
                 SliceRequest::new(base_req.variable.clone(), selections),
             );
 
-            if !self.block_cache.contains(&req.cache_key()) {
-                if self.block_prefetcher.request(req, &self.block_cache) {
-                    scheduled_count += 1;
-                    println!(
-                        "[PREFETCH] Enqueued chunk {} [{}..{}] (active workers: {}/{})",
-                        chunk_idx,
-                        chunk_start,
-                        chunk_end,
-                        self.block_prefetcher.active_worker_threads(),
-                        self.block_prefetcher.max_concurrent_threads()
-                    );
-                } else {
-                    println!(
-                        "[PREFETCH] Worker queue full ({}/{}), pausing chunk dispatch",
-                        self.block_prefetcher.active_worker_threads(),
-                        self.block_prefetcher.max_concurrent_threads()
-                    );
-                    break;
-                }
+            if !self.block_cache.contains(&req.cache_key())
+                && !self.block_prefetcher.request(req, &self.block_cache)
+            {
+                break;
             }
         }
-        println!(
-            "[PREFETCH] Total scheduled in this pass: {}",
-            scheduled_count
-        );
     }
 
     /// Full size of the currently animated dimension in the dataset.
@@ -659,10 +617,6 @@ impl OctantApp {
         for res in completed {
             match res.result {
                 Ok(block) => {
-                    println!(
-                        "[PREFETCH] Downloaded block for '{}', origin={:?}, shape={:?}",
-                        block.variable_name, block.origin, block.shape
-                    );
                     let is_active = self.active_block_key.as_ref() == Some(&res.key);
                     let covers_current = self.plotted_animated_dim.is_some_and(|dim| {
                         let origin = block.origin.get(dim).copied().unwrap_or(0);
@@ -711,7 +665,6 @@ impl OctantApp {
                     }
                 }
                 Err(e) => {
-                    println!("[PREFETCH] Fetch error for key {:?}: {e}", res.key);
                     self.status_message = format!("Block cache fetch error: {e}");
                 }
             }
