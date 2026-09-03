@@ -118,6 +118,16 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             egui::Slider::new(&mut app.block_window_size, 8..=128).suffix(" Window Size (steps)"),
         );
 
+        let old_threads = app.prefetch_threads;
+        ui.add(
+            egui::Slider::new(&mut app.prefetch_threads, 2..=32)
+                .suffix(" Prefetch Workers (threads)"),
+        );
+        if old_threads != app.prefetch_threads {
+            app.block_prefetcher
+                .set_max_concurrent_threads(app.prefetch_threads);
+        }
+
         ui.add_space(4.0);
         if ui.button("🗑 Flush & Clear All Caches").clicked() {
             app.block_cache.clear();

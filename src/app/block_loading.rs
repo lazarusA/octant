@@ -319,6 +319,7 @@ impl OctantApp {
             .min(full_extent.saturating_sub(1))
             .max(range_start);
 
+        let first_chunk = range_start / cs;
         let last_chunk = range_end / cs;
 
         let source_id = self.plotted_source_id();
@@ -333,6 +334,16 @@ impl OctantApp {
         let mut chunk_indices = Vec::new();
         for c in (current_chunk + 1)..=last_chunk {
             chunk_indices.push(c);
+        }
+
+        // If loop playback is active and approaching end of range, buffer starting wrap-around chunks:
+        if self.loop_playback && (self.is_playing || current_chunk + 2 >= last_chunk) {
+            let wrap_end = first_chunk + 2;
+            for c in first_chunk..=wrap_end.min(last_chunk) {
+                if !chunk_indices.contains(&c) && c != current_chunk {
+                    chunk_indices.push(c);
+                }
+            }
         }
 
         for chunk_idx in chunk_indices {
