@@ -319,7 +319,6 @@ impl OctantApp {
             .min(full_extent.saturating_sub(1))
             .max(range_start);
 
-        let first_chunk = range_start / cs;
         let last_chunk = range_end / cs;
 
         let source_id = self.plotted_source_id();
@@ -330,15 +329,10 @@ impl OctantApp {
 
         let current_chunk = self.current_timestep / cs;
 
-        // Schedule chunks ordered by proximity to current_timestep within the selected range [first_chunk..=last_chunk]:
+        // Schedule forward lookahead chunks starting from current_chunk + 1 up to last_chunk:
         let mut chunk_indices = Vec::new();
         for c in (current_chunk + 1)..=last_chunk {
             chunk_indices.push(c);
-        }
-        for c in (first_chunk..=current_chunk).rev() {
-            if !chunk_indices.contains(&c) {
-                chunk_indices.push(c);
-            }
         }
 
         for chunk_idx in chunk_indices {
@@ -622,6 +616,27 @@ impl OctantApp {
                         self.current_timestep >= origin && self.current_timestep < origin + extent
                     });
                     self.block_cache.put(res.key, block.clone());
+
+                    // When cache eviction shifts the oldest resident slice forward, update slider start:
+                    if let Some(dim) = self.plotted_animated_dim
+                        && let Some(meta) = &self.plotted_dataset_metadata
+                        && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                        && dim < self.plotted_selected_dim_ranges.len()
+                    {
+                        let source_id = self.plotted_source_id();
+                        if let Some(min_t) = self
+                            .block_cache
+                            .min_resident_timestep(&source_id, &var.name, dim)
+                        {
+                            let current_start = self.plotted_selected_dim_ranges[dim].0;
+                            if min_t > current_start
+                                && self.block_cache.current_bytes() >= self.block_cache.max_bytes()
+                            {
+                                self.plotted_selected_dim_ranges[dim].0 = min_t;
+                            }
+                        }
+                    }
+
                     if is_active || covers_current {
                         if is_active
                             && let Some(target) = self.pending_target_step.take()

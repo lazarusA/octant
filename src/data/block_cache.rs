@@ -305,6 +305,20 @@ impl BlockCache {
             }
         }
     }
+
+    /// Returns the minimum resident origin timestep for a variable along `anim_dim`, if any.
+    pub fn min_resident_timestep(
+        &self,
+        source_id: &str,
+        variable_name: &str,
+        anim_dim: usize,
+    ) -> Option<usize> {
+        self.entries
+            .iter()
+            .filter(|(k, _)| k.source_id == source_id && k.variable_name == variable_name)
+            .filter_map(|(_, block)| block.origin.get(anim_dim).copied())
+            .min()
+    }
 }
 
 /// Diagnostic summary of memory cached for a specific variable in a dataset source.

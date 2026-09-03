@@ -114,18 +114,22 @@ impl eframe::App for OctantApp {
                             self.last_step_time = now;
                             self.load_selected_variable_block();
 
-                            // Lookahead prefetch: stream upcoming chunks in the background while playing
-                            if let Some(anim_dim) = self.plotted_animated_dim {
-                                let anim_chunk_size = self.plotted_chunk_size(anim_dim).max(1);
-                                let ahead_ts = next_ts + anim_chunk_size;
-                                if ahead_ts < total_steps {
-                                    self.prefetch_block_window_for_next_steps(ahead_ts);
-                                }
+                            // Continuous lookahead streaming: keep forward chunks queued in parallel ahead of playhead
+                            if let Some(meta) = &self.plotted_dataset_metadata
+                                && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                            {
+                                let shape = var.shape.clone();
+                                self.prefetch_selected_animated_range(&shape);
                             }
                         } else {
                             // Target block window for next_ts is not yet in cache.
-                            // Trigger background prefetch for next_ts block window while safely keeping playback on current valid frame.
-                            self.prefetch_block_window_for_next_steps(next_ts);
+                            // Hold on current valid frame and trigger parallel lookahead prefetch without hijacking playhead.
+                            if let Some(meta) = &self.plotted_dataset_metadata
+                                && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                            {
+                                let shape = var.shape.clone();
+                                self.prefetch_selected_animated_range(&shape);
+                            }
                             self.last_step_time = now;
                         }
                     }
