@@ -80,21 +80,24 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                     let mut var_to_clear: Option<(String, String)> = None;
 
                     for s in &summaries {
-                        ui.horizontal(|ui| {
-                            let mb = s.bytes as f64 / (1024.0 * 1024.0);
-                            ui.label(
-                                egui::RichText::new(&s.variable_name)
-                                    .monospace()
-                                    .color(ui.visuals().strong_text_color()),
-                            );
-                            ui.small(format!("({:.1} MB, {} blks)", mb, s.block_count));
-                            if ui
-                                .small_button("🗑")
-                                .on_hover_text("Clear cache for this variable")
-                                .clicked()
-                            {
-                                var_to_clear = Some((s.source_id.clone(), s.variable_name.clone()));
-                            }
+                        ui.push_id(("var_cache_row", &s.source_id, &s.variable_name), |ui| {
+                            ui.horizontal(|ui| {
+                                let mb = s.bytes as f64 / (1024.0 * 1024.0);
+                                ui.label(
+                                    egui::RichText::new(&s.variable_name)
+                                        .monospace()
+                                        .color(ui.visuals().strong_text_color()),
+                                );
+                                ui.small(format!("({:.1} MB, {} blks)", mb, s.block_count));
+                                if ui
+                                    .small_button("🗑")
+                                    .on_hover_text("Clear cache for this variable")
+                                    .clicked()
+                                {
+                                    var_to_clear =
+                                        Some((s.source_id.clone(), s.variable_name.clone()));
+                                }
+                            });
                         });
                     }
 

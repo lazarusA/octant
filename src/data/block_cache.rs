@@ -246,7 +246,11 @@ impl BlockCache {
             )
             .collect();
 
-        summaries.sort_by_key(|b| std::cmp::Reverse(b.bytes));
+        summaries.sort_by(|a, b| {
+            a.variable_name
+                .cmp(&b.variable_name)
+                .then_with(|| a.source_id.cmp(&b.source_id))
+        });
         summaries
     }
 
