@@ -6,16 +6,44 @@ use super::OctantApp;
 
 impl OctantApp {
     /// Aligned `[start, end)` window along the animated dimension that
-    /// contains `self.current_timestep`, clamped to the dataset's actual
-    /// extent and `max_steps` limit.
+    /// contains `step`, clamped to the dataset's actual extent.
     ///
-    /// By default, prefetches in multiples of the variable's chunk size
-    /// along the animated dimension.
-    fn animated_window(&self, full_extent: usize, chunk_size: usize) -> (usize, usize) {
-        let cs = if chunk_size == 0 { 1 } else { chunk_size };
-        let start = (self.current_timestep / cs) * cs;
-        let end = (start + cs).min(full_extent).max(start + 1);
-        (start, end)
+    /// Automatically bounds the window size based on:
+    /// 1. Chunk size along the animated dimension (always chunk-aligned).
+    /// 2. Memory footprint of a single chunk (caps single block footprint to ~64 MB).
+    /// 3. User-configured `block_window_size` (e.g. 8 to 128 steps).
+    pub fn animated_window_bounds(
+        &self,
+        step: usize,
+        full_extent: usize,
+        anim_dim: usize,
+        chunk_shape: &[u64],
+        shape: &[u64],
+    ) -> (usize, usize, usize) {
+        let cs = chunk_shape.get(anim_dim).copied().unwrap_or(1).max(1) as usize;
+
+        // Calculate elements in one slice across all other non-animated dimensions
+        let other_elements: u64 = shape
+            .iter()
+            .enumerate()
+            .filter(|&(d, _)| d != anim_dim)
+            .map(|(_, &len)| len.max(1))
+            .try_fold(1u64, |acc, d| acc.checked_mul(d))
+            .unwrap_or(1);
+
+        let single_chunk_bytes = (cs as u64).saturating_mul(other_elements).saturating_mul(4);
+
+        // Target ~64 MB max per single OctantBlock to avoid huge single-request delays
+        let target_block_bytes = 64 * 1024 * 1024u64;
+        let max_chunks_by_memory =
+            (target_block_bytes / single_chunk_bytes.max(1)).clamp(1, 16) as usize;
+        let max_chunks_by_user = (self.block_window_size / cs).max(1);
+        let chunks_in_window = max_chunks_by_user.min(max_chunks_by_memory);
+        let window_size = chunks_in_window * cs;
+
+        let start = (step / cs) * cs;
+        let end = (start + window_size).min(full_extent).max(start + 1);
+        (start, end, window_size)
     }
 
     /// Returns the open `StoreHandle` for the currently plotted dataset from `dataset_manager`.
@@ -44,12 +72,6 @@ impl OctantApp {
             crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_name, &shape);
         let mut selections = legacy_request.selections.clone();
 
-        let anim_chunk_size = self
-            .plotted_animated_dim
-            .and_then(|dim| var_info.chunk_shape.get(dim))
-            .copied()
-            .unwrap_or(1) as usize;
-
         if let Some(anim_dim) = self.plotted_animated_dim {
             let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
             if full_extent > 0 && self.current_timestep >= full_extent {
@@ -59,7 +81,13 @@ impl OctantApp {
                 self.plotted_selected_dim_indices[anim_dim] = self.current_timestep;
             }
             if anim_dim < selections.len() {
-                let (start, end) = self.animated_window(full_extent, anim_chunk_size);
+                let (start, end, _) = self.animated_window_bounds(
+                    self.current_timestep,
+                    full_extent,
+                    anim_dim,
+                    &var_info.chunk_shape,
+                    &shape,
+                );
                 selections[anim_dim] = DimensionSelection::Range { start, end };
             }
         }
@@ -109,10 +137,11 @@ impl OctantApp {
             return;
         }
 
-        // 3. Cache MISS: dispatch async prefetch request for current chunk.
+        // 3. Cache MISS: dispatch async prefetch request for current chunk and launch background prefetching in parallel.
         self.status_message = format!("⏳ [block cache] Downloading window for '{}'...", var_name);
         self.block_prefetcher
             .request(block_request, &self.block_cache);
+        self.prefetch_selected_animated_range(&shape);
     }
 
     /// Prefetches the block window containing `step` asynchronously using `plotted_store_handle()`,
@@ -154,14 +183,8 @@ impl OctantApp {
             return;
         }
 
-        let anim_chunk_size = var_info.chunk_shape.get(anim_dim).copied().unwrap_or(1) as usize;
-        let cs = if anim_chunk_size == 0 {
-            1
-        } else {
-            anim_chunk_size
-        };
-        let start = (step / cs) * cs;
-        let end = (start + cs).min(full_extent).max(start + 1);
+        let (start, end, _) =
+            self.animated_window_bounds(step, full_extent, anim_dim, &var_info.chunk_shape, &shape);
 
         let mut selections = legacy_request.selections;
         if anim_dim < selections.len() {
@@ -247,12 +270,19 @@ impl OctantApp {
             return;
         }
 
-        let anim_chunk_size = self.plotted_chunk_size(anim_dim);
-        let cs = if anim_chunk_size == 0 {
-            1
-        } else {
-            anim_chunk_size
-        };
+        let chunk_shape = self
+            .plotted_variable_info()
+            .map(|v| v.chunk_shape.clone())
+            .unwrap_or_default();
+
+        let (_, _, window_step) = self.animated_window_bounds(
+            self.current_timestep,
+            full_extent,
+            anim_dim,
+            &chunk_shape,
+            shape,
+        );
+        let cs = window_step.max(1);
 
         // Determine user's selected slider range for the animated dimension
         let (range_start, range_end) = self
