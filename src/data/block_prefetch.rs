@@ -12,8 +12,9 @@ use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 use super::{
     block_cache::{BlockCache, BlockCacheKey},
     block_loader::BlockLoader,
-    block_request::{BlockRequest, BlockRequestBatch},
+    block_request::BlockRequest,
     octant_block::OctantBlock,
+    slice_request::DimensionSelection,
 };
 
 pub struct PrefetchResult {
@@ -44,8 +45,8 @@ impl BlockPrefetcher {
     }
 
     pub fn with_max_concurrent_threads(max_concurrent_threads: usize) -> Self {
-        let max_threads = max_concurrent_threads.max(1);
-        let (tx, rx) = sync_channel(max_threads * 2);
+        let max_threads = max_concurrent_threads.clamp(1, 64);
+        let (tx, rx) = sync_channel(128);
 
         Self {
             tx,
@@ -99,23 +100,6 @@ impl BlockPrefetcher {
         true
     }
 
-    /// Schedules every request in a batch that isn't already cached or pending.
-    pub fn request_batch(&mut self, batch: &BlockRequestBatch, cache: &BlockCache) -> usize {
-        let mut scheduled = 0;
-
-        for request in batch.requests() {
-            if self.active_worker_threads >= self.max_concurrent_threads {
-                break;
-            }
-
-            if self.request(request.clone(), cache) {
-                scheduled += 1;
-            }
-        }
-
-        scheduled
-    }
-
     pub fn poll(&mut self) -> Vec<PrefetchResult> {
         let mut results = Vec::new();
 
@@ -162,38 +146,50 @@ impl BlockPrefetcher {
         self.max_concurrent_threads
     }
 
+    pub fn set_max_concurrent_threads(&mut self, max_threads: usize) {
+        self.max_concurrent_threads = max_threads.clamp(1, 64);
+    }
+
     pub fn is_pending(&self, key: &BlockCacheKey) -> bool {
         self.pending.contains_key(key)
     }
 
-    /// Checks if any pending in-flight request already covers the given timestep.
+    /// Checks if any pending in-flight request already covers the given timestep and matching spatial selections.
     pub fn is_pending_timestep(
         &self,
         source_id: &str,
         variable_name: &str,
+        selections: &[DimensionSelection],
         anim_dim: Option<usize>,
         timestep: usize,
     ) -> bool {
         self.pending.keys().any(|key| {
-            if key.source_id == source_id && key.variable_name == variable_name {
-                if let Some(dim) = anim_dim {
-                    if let Some(sel) = key.selections.get(dim) {
-                        let (start, end) = sel.bounds();
-                        timestep >= start && timestep < end
-                    } else {
-                        true
-                    }
+            if key.source_id != source_id || key.variable_name != variable_name {
+                return false;
+            }
+
+            // Verify all non-animated dimension selections match
+            for (d, current_sel) in selections.iter().enumerate() {
+                if Some(d) == anim_dim {
+                    continue;
+                }
+                if key.selections.get(d) != Some(current_sel) {
+                    return false;
+                }
+            }
+
+            // Check if animated dimension covers the timestep
+            if let Some(dim) = anim_dim {
+                if let Some(sel) = key.selections.get(dim) {
+                    let (start, end) = sel.bounds();
+                    timestep >= start && timestep < end
                 } else {
                     true
                 }
             } else {
-                false
+                true
             }
         })
-    }
-
-    pub fn forget_pending(&mut self, key: &BlockCacheKey) -> bool {
-        self.pending.remove(key).is_some()
     }
 
     /// Cancels all currently queued/in-flight prefetch requests.

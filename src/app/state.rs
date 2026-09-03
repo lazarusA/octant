@@ -228,6 +228,7 @@ pub struct OctantApp {
     pub pending_target_step: Option<usize>,
     pub max_cache_mb: usize,
     pub block_window_size: usize,
+    pub prefetch_threads: usize,
 
     // Animation & Playback Controls
     pub metadata_rx: Option<std::sync::mpsc::Receiver<Result<DatasetMetadata, String>>>,
@@ -370,6 +371,8 @@ impl Default for OctantApp {
             pending_target_step: None,
             max_cache_mb: default_cache_mb,
             block_window_size: 32,
+            prefetch_threads: 16,
+
 
             metadata_rx: None,
             is_playing: false,

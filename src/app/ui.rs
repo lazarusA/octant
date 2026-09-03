@@ -68,14 +68,10 @@ impl eframe::App for OctantApp {
             let frame_dur = std::time::Duration::from_secs_f32(1.0 / self.playback_fps.max(1.0));
 
             if now.duration_since(self.last_step_time) >= frame_dur {
-                let total_steps = self.animated_dim_extent();
+                let total_extent = self.animated_dim_extent();
 
-                if total_steps > 0 && self.current_timestep >= total_steps {
-                    self.current_timestep = total_steps - 1;
-                }
-
-                if total_steps > 1 {
-                    let next_ts = if self.current_timestep + 1 < total_steps {
+                if total_extent > 1 {
+                    let next_ts = if self.current_timestep + 1 < total_extent {
                         Some(self.current_timestep + 1)
                     } else if self.loop_playback {
                         Some(0)
@@ -87,12 +83,12 @@ impl eframe::App for OctantApp {
                     if let Some(next_ts) = next_ts {
                         let source_id = self.plotted_source_id();
                         let var_name = self.plotted_variable_info().map(|v| v.name.clone());
-                        let legacy_request = self.plotted_variable_info().map(|v| {
+                        let base_request = self.plotted_variable_info().map(|v| {
                             crate::ui::variables_panel::build_slice_request_for_plotted(
                                 self, &v.name, &v.shape,
                             )
                         });
-                        let selections = legacy_request
+                        let selections = base_request
                             .as_ref()
                             .map(|r| r.selections.as_slice())
                             .unwrap_or(&[]);
@@ -114,18 +110,22 @@ impl eframe::App for OctantApp {
                             self.last_step_time = now;
                             self.load_selected_variable_block();
 
-                            // Lookahead prefetch: stream upcoming chunks in the background while playing
-                            if let Some(anim_dim) = self.plotted_animated_dim {
-                                let anim_chunk_size = self.plotted_chunk_size(anim_dim).max(1);
-                                let ahead_ts = next_ts + anim_chunk_size;
-                                if ahead_ts < total_steps {
-                                    self.prefetch_block_window_for_next_steps(ahead_ts);
-                                }
+                            // Continuous lookahead streaming: keep forward chunks queued in parallel ahead of playhead
+                            if let Some(meta) = &self.plotted_dataset_metadata
+                                && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                            {
+                                let shape = var.shape.clone();
+                                self.prefetch_selected_animated_range(&shape);
                             }
                         } else {
                             // Target block window for next_ts is not yet in cache.
-                            // Trigger background prefetch for next_ts block window while safely keeping playback on current valid frame.
-                            self.prefetch_block_window_for_next_steps(next_ts);
+                            // Hold on current valid frame and trigger parallel lookahead prefetch without hijacking playhead.
+                            if let Some(meta) = &self.plotted_dataset_metadata
+                                && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                            {
+                                let shape = var.shape.clone();
+                                self.prefetch_selected_animated_range(&shape);
+                            }
                             self.last_step_time = now;
                         }
                     }

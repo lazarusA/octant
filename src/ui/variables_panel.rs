@@ -145,37 +145,13 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
 
     for i in 0..rank {
         let dim_size = var_info.shape[i] as usize;
-        let raw_name = var_info
-            .dimension_names
-            .get(i)
-            .map(|s| s.as_str())
-            .unwrap_or("dim");
-        let name_lower = raw_name.to_ascii_lowercase();
-
-        // Check if dim_name contains time, lon/x, lat/y
-        let is_chunk_based = name_lower.contains("time")
-            || name_lower == "t"
-            || name_lower.contains("step")
-            || name_lower.contains("lon")
-            || name_lower == "x"
-            || name_lower.contains("lat")
-            || name_lower == "y"
-            || name_lower.contains("depth")
-            || name_lower.contains("lev")
-            || name_lower.contains("z");
-
-        let (range_start, range_end) = if is_chunk_based {
-            let chunk_size = var_info.chunk_shape.get(i).copied().unwrap_or(0) as usize;
-            if chunk_size > 0 {
-                (0, chunk_size.min(dim_size).saturating_sub(1))
-            } else {
-                (0, dim_size.saturating_sub(1))
-            }
+        let chunk_size = var_info.chunk_shape.get(i).copied().unwrap_or(0) as usize;
+        let range_end = if chunk_size > 0 {
+            chunk_size.min(dim_size).saturating_sub(1)
         } else {
-            (0, dim_size.saturating_sub(1))
+            dim_size.saturating_sub(1)
         };
-
-        app.selected_dim_ranges.push((range_start, range_end));
+        app.selected_dim_ranges.push((0, range_end));
     }
 
     let mut x_assigned = false;
