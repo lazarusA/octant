@@ -87,12 +87,12 @@ impl eframe::App for OctantApp {
                     if let Some(next_ts) = next_ts {
                         let source_id = self.plotted_source_id();
                         let var_name = self.plotted_variable_info().map(|v| v.name.clone());
-                        let legacy_request = self.plotted_variable_info().map(|v| {
+                        let base_request = self.plotted_variable_info().map(|v| {
                             crate::ui::variables_panel::build_slice_request_for_plotted(
                                 self, &v.name, &v.shape,
                             )
                         });
-                        let selections = legacy_request
+                        let selections = base_request
                             .as_ref()
                             .map(|r| r.selections.as_slice())
                             .unwrap_or(&[]);

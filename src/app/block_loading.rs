@@ -19,15 +19,24 @@ impl OctantApp {
         anim_dim: usize,
         chunk_shape: &[u64],
         shape: &[u64],
+        selections: &[DimensionSelection],
     ) -> (usize, usize, usize) {
         let cs = chunk_shape.get(anim_dim).copied().unwrap_or(1).max(1) as usize;
 
-        // Calculate elements in one slice across all other non-animated dimensions
-        let other_elements: u64 = shape
+        // Calculate elements in one slice across all other non-animated dimensions,
+        // respecting the user's active slider selections and ranges.
+        let other_elements: u64 = selections
             .iter()
             .enumerate()
             .filter(|&(d, _)| d != anim_dim)
-            .map(|(_, &len)| len.max(1))
+            .map(|(d, sel)| match sel {
+                DimensionSelection::Index(_) => 1u64,
+                DimensionSelection::Range { start, end } => {
+                    let extent = shape.get(d).copied().unwrap_or(1) as usize;
+                    let eff_end = (*end).min(extent);
+                    (eff_end.saturating_sub(*start) as u64).max(1)
+                }
+            })
             .try_fold(1u64, |acc, d| acc.checked_mul(d))
             .unwrap_or(1);
 
@@ -68,9 +77,9 @@ impl OctantApp {
         let var_name = var_info.name.clone();
         let shape = var_info.shape.clone();
 
-        let legacy_request =
+        let base_request =
             crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_name, &shape);
-        let mut selections = legacy_request.selections.clone();
+        let mut selections = base_request.selections.clone();
 
         if let Some(anim_dim) = self.plotted_animated_dim {
             let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
@@ -87,6 +96,7 @@ impl OctantApp {
                     anim_dim,
                     &var_info.chunk_shape,
                     &shape,
+                    &selections,
                 );
                 selections[anim_dim] = DimensionSelection::Range { start, end };
             }
@@ -170,23 +180,29 @@ impl OctantApp {
             return;
         }
 
-        let legacy_request =
+        let base_request =
             crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_name, &shape);
 
         if self.block_cache.covers(
             &source_id,
             &var_name,
-            &legacy_request.selections,
+            &base_request.selections,
             Some(anim_dim),
             step,
         ) {
             return;
         }
 
-        let (start, end, _) =
-            self.animated_window_bounds(step, full_extent, anim_dim, &var_info.chunk_shape, &shape);
+        let (start, end, _) = self.animated_window_bounds(
+            step,
+            full_extent,
+            anim_dim,
+            &var_info.chunk_shape,
+            &shape,
+            &base_request.selections,
+        );
 
-        let mut selections = legacy_request.selections;
+        let mut selections = base_request.selections;
         if anim_dim < selections.len() {
             selections[anim_dim] = DimensionSelection::Range { start, end };
         }
@@ -206,10 +222,10 @@ impl OctantApp {
     pub fn request_step_or_load(&mut self, target_step: usize) {
         let source_id = self.plotted_source_id();
         let var_name = self.plotted_variable_info().map(|v| v.name.clone());
-        let legacy_request = self.plotted_variable_info().map(|v| {
+        let base_request = self.plotted_variable_info().map(|v| {
             crate::ui::variables_panel::build_slice_request_for_plotted(self, &v.name, &v.shape)
         });
-        let selections = legacy_request
+        let selections = base_request
             .as_ref()
             .map(|r| r.selections.as_slice())
             .unwrap_or(&[]);
@@ -270,6 +286,13 @@ impl OctantApp {
             return;
         }
 
+        let Some(active_req) = self.active_slice_request.clone() else {
+            return;
+        };
+        if anim_dim >= active_req.selections.len() {
+            return;
+        }
+
         let chunk_shape = self
             .plotted_variable_info()
             .map(|v| v.chunk_shape.clone())
@@ -281,6 +304,7 @@ impl OctantApp {
             anim_dim,
             &chunk_shape,
             shape,
+            &active_req.selections,
         );
         let cs = window_step.max(1);
 
@@ -297,13 +321,6 @@ impl OctantApp {
 
         let first_chunk = range_start / cs;
         let last_chunk = range_end / cs;
-
-        let Some(next_legacy_request) = self.active_slice_request.clone() else {
-            return;
-        };
-        if anim_dim >= next_legacy_request.selections.len() {
-            return;
-        }
 
         let source_id = self.plotted_source_id();
 
@@ -330,27 +347,27 @@ impl OctantApp {
 
             if self.block_cache.covers(
                 &source_id,
-                &next_legacy_request.variable,
-                &next_legacy_request.selections,
+                &active_req.variable,
+                &active_req.selections,
                 self.plotted_animated_dim,
                 chunk_start,
             ) || self.block_prefetcher.is_pending_timestep(
                 &source_id,
-                &next_legacy_request.variable,
+                &active_req.variable,
                 self.plotted_animated_dim,
                 chunk_start,
             ) {
                 continue;
             }
 
-            let mut selections = next_legacy_request.selections.clone();
+            let mut selections = active_req.selections.clone();
             selections[anim_dim] = DimensionSelection::Range {
                 start: chunk_start,
                 end: chunk_end,
             };
             let req = BlockRequest::new(
                 store_handle.clone(),
-                SliceRequest::new(next_legacy_request.variable.clone(), selections),
+                SliceRequest::new(active_req.variable.clone(), selections),
             );
 
             if !self.block_cache.contains(&req.cache_key())
