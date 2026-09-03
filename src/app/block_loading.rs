@@ -348,6 +348,7 @@ impl OctantApp {
             ) || self.block_prefetcher.is_pending_timestep(
                 &source_id,
                 &active_req.variable,
+                &active_req.selections,
                 self.plotted_animated_dim,
                 chunk_start,
             ) {
