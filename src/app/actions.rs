@@ -58,7 +58,15 @@ impl OctantApp {
             }
             AppAction::TogglePlayback => {
                 self.is_playing = !self.is_playing;
+                if self.is_playing
+                    && let Some(meta) = &self.plotted_dataset_metadata
+                    && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                {
+                    let shape = var.shape.clone();
+                    self.prefetch_selected_animated_range(&shape);
+                }
             }
+
             AppAction::UpdateColorBounds { min, max } => {
                 self.color_range_min = min;
                 self.color_range_max = max;

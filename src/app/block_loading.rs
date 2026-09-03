@@ -42,12 +42,17 @@ impl OctantApp {
 
         let single_chunk_bytes = (cs as u64).saturating_mul(other_elements).saturating_mul(4);
 
-        // Target ~64 MB max per single OctantBlock to avoid huge single-request delays
-        let target_block_bytes = 64 * 1024 * 1024u64;
+        // 1 single storage chunk per block request for immediate responsiveness.
+        // For tiny chunks (< 4 MB with cs == 1), group up to block_window_size capped at 16 MB.
+        let target_block_bytes = 16 * 1024 * 1024u64;
         let max_chunks_by_memory =
             (target_block_bytes / single_chunk_bytes.max(1)).clamp(1, 16) as usize;
         let max_chunks_by_user = (self.block_window_size / cs).max(1);
-        let chunks_in_window = max_chunks_by_user.min(max_chunks_by_memory);
+        let chunks_in_window = if single_chunk_bytes >= 4 * 1024 * 1024 || cs > 1 {
+            1
+        } else {
+            max_chunks_by_user.min(max_chunks_by_memory)
+        };
         let window_size = chunks_in_window * cs;
 
         let start = (step / cs) * cs;
