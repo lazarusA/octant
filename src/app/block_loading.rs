@@ -18,45 +18,19 @@ impl OctantApp {
         full_extent: usize,
         anim_dim: usize,
         chunk_shape: &[u64],
-        shape: &[u64],
-        selections: &[DimensionSelection],
+        _shape: &[u64],
+        _selections: &[DimensionSelection],
     ) -> (usize, usize, usize) {
         let cs = chunk_shape.get(anim_dim).copied().unwrap_or(1).max(1) as usize;
-
-        // Calculate elements in one slice across all other non-animated dimensions,
-        // respecting the user's active slider selections and ranges.
-        let other_elements: u64 = selections
-            .iter()
-            .enumerate()
-            .filter(|&(d, _)| d != anim_dim)
-            .map(|(d, sel)| match sel {
-                DimensionSelection::Index(_) => 1u64,
-                DimensionSelection::Range { start, end } => {
-                    let extent = shape.get(d).copied().unwrap_or(1) as usize;
-                    let eff_end = (*end).min(extent);
-                    (eff_end.saturating_sub(*start) as u64).max(1)
-                }
-            })
-            .try_fold(1u64, |acc, d| acc.checked_mul(d))
-            .unwrap_or(1);
-
-        let single_chunk_bytes = (cs as u64).saturating_mul(other_elements).saturating_mul(4);
-
-        // 1 single storage chunk per block request for immediate responsiveness.
-        // For tiny chunks (< 4 MB with cs == 1), group up to block_window_size capped at 16 MB.
-        let target_block_bytes = 16 * 1024 * 1024u64;
-        let max_chunks_by_memory =
-            (target_block_bytes / single_chunk_bytes.max(1)).clamp(1, 16) as usize;
-        let max_chunks_by_user = (self.block_window_size / cs).max(1);
-        let chunks_in_window = if single_chunk_bytes >= 4 * 1024 * 1024 || cs > 1 {
-            1
-        } else {
-            max_chunks_by_user.min(max_chunks_by_memory)
-        };
-        let window_size = chunks_in_window * cs;
+        let window_size = cs; // 1 storage chunk per block for instant initial display
 
         let start = (step / cs) * cs;
         let end = (start + window_size).min(full_extent).max(start + 1);
+
+        println!(
+            "[BOUNDS] step={}, cs={} -> active_chunk_range=[{}..{}]",
+            step, cs, start, end
+        );
         (start, end, window_size)
     }
 
@@ -291,10 +265,21 @@ impl OctantApp {
             return;
         }
 
-        let Some(active_req) = self.active_slice_request.clone() else {
+        let base_req = if let Some(req) = self.active_slice_request.clone() {
+            req
+        } else if let Some(var_info) = self.plotted_variable_info() {
+            crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_info.name, shape)
+        } else {
+            println!("[PREFETCH] Abort: no active slice request and no plotted variable info");
             return;
         };
-        if anim_dim >= active_req.selections.len() {
+
+        if anim_dim >= base_req.selections.len() {
+            println!(
+                "[PREFETCH] Abort: anim_dim {} >= selections.len {}",
+                anim_dim,
+                base_req.selections.len()
+            );
             return;
         }
 
@@ -309,7 +294,7 @@ impl OctantApp {
             anim_dim,
             &chunk_shape,
             shape,
-            &active_req.selections,
+            &base_req.selections,
         );
         let cs = window_step.max(1);
 
@@ -330,20 +315,25 @@ impl OctantApp {
         let source_id = self.plotted_source_id();
 
         let Some(store_handle) = self.plotted_store_handle() else {
+            println!("[PREFETCH] Abort: no store handle available");
             return;
         };
 
         let current_chunk = self.current_timestep / cs;
 
-        // Schedule forward lookahead chunks starting from current_chunk + 1 up to last_chunk:
+        // Schedule forward sliding lookahead window (bounded by user's block_window_size steps ahead of playhead):
+        let lookahead_chunks = (self.block_window_size / cs).max(1);
+        let max_lookahead_chunk = (current_chunk + lookahead_chunks).min(last_chunk);
+
         let mut chunk_indices = Vec::new();
-        for c in (current_chunk + 1)..=last_chunk {
+        for c in (current_chunk + 1)..=max_lookahead_chunk {
             chunk_indices.push(c);
         }
 
         // If loop playback is active and approaching end of range, buffer starting wrap-around chunks:
-        if self.loop_playback && (self.is_playing || current_chunk + 2 >= last_chunk) {
-            let wrap_end = first_chunk + 2;
+        if self.loop_playback && (self.is_playing && current_chunk + lookahead_chunks >= last_chunk)
+        {
+            let wrap_end = first_chunk + lookahead_chunks;
             for c in first_chunk..=wrap_end.min(last_chunk) {
                 if !chunk_indices.contains(&c) && c != current_chunk {
                     chunk_indices.push(c);
@@ -351,42 +341,77 @@ impl OctantApp {
             }
         }
 
+        println!(
+            "[PREFETCH] Scheduling sliding window: var='{}', range={}..={}, cs={}, current_chunk={}, lookahead_chunks={}, chunks_to_queue={:?}",
+            base_req.variable,
+            range_start,
+            range_end,
+            cs,
+            current_chunk,
+            lookahead_chunks,
+            chunk_indices
+        );
+
+        let mut scheduled_count = 0;
         for chunk_idx in chunk_indices {
             let chunk_start = chunk_idx * cs;
             let chunk_end = (chunk_start + cs).min(full_extent);
 
             if self.block_cache.covers(
                 &source_id,
-                &active_req.variable,
-                &active_req.selections,
-                self.plotted_animated_dim,
-                chunk_start,
-            ) || self.block_prefetcher.is_pending_timestep(
-                &source_id,
-                &active_req.variable,
-                &active_req.selections,
+                &base_req.variable,
+                &base_req.selections,
                 self.plotted_animated_dim,
                 chunk_start,
             ) {
                 continue;
             }
 
-            let mut selections = active_req.selections.clone();
+            if self.block_prefetcher.is_pending_timestep(
+                &source_id,
+                &base_req.variable,
+                &base_req.selections,
+                self.plotted_animated_dim,
+                chunk_start,
+            ) {
+                continue;
+            }
+
+            let mut selections = base_req.selections.clone();
             selections[anim_dim] = DimensionSelection::Range {
                 start: chunk_start,
                 end: chunk_end,
             };
             let req = BlockRequest::new(
                 store_handle.clone(),
-                SliceRequest::new(active_req.variable.clone(), selections),
+                SliceRequest::new(base_req.variable.clone(), selections),
             );
 
-            if !self.block_cache.contains(&req.cache_key())
-                && !self.block_prefetcher.request(req, &self.block_cache)
-            {
-                break; // Stop when thread pool is saturated; will continue as worker threads finish
+            if !self.block_cache.contains(&req.cache_key()) {
+                if self.block_prefetcher.request(req, &self.block_cache) {
+                    scheduled_count += 1;
+                    println!(
+                        "[PREFETCH] Enqueued chunk {} [{}..{}] (active workers: {}/{})",
+                        chunk_idx,
+                        chunk_start,
+                        chunk_end,
+                        self.block_prefetcher.active_worker_threads(),
+                        self.block_prefetcher.max_concurrent_threads()
+                    );
+                } else {
+                    println!(
+                        "[PREFETCH] Worker queue full ({}/{}), pausing chunk dispatch",
+                        self.block_prefetcher.active_worker_threads(),
+                        self.block_prefetcher.max_concurrent_threads()
+                    );
+                    break;
+                }
             }
         }
+        println!(
+            "[PREFETCH] Total scheduled in this pass: {}",
+            scheduled_count
+        );
     }
 
     /// Full size of the currently animated dimension in the dataset.
@@ -622,10 +647,15 @@ impl OctantApp {
     /// Drains completed block-cache prefetch results.
     pub fn poll_block_prefetch_results(&mut self) {
         let completed = self.block_prefetcher.poll();
+        let had_completed = !completed.is_empty();
 
         for res in completed {
             match res.result {
                 Ok(block) => {
+                    println!(
+                        "[PREFETCH] Downloaded block for '{}', origin={:?}, shape={:?}",
+                        block.variable_name, block.origin, block.shape
+                    );
                     let is_active = self.active_block_key.as_ref() == Some(&res.key);
                     let covers_current = self.plotted_animated_dim.is_some_and(|dim| {
                         let origin = block.origin.get(dim).copied().unwrap_or(0);
@@ -671,19 +701,22 @@ impl OctantApp {
                         self.status_message =
                             format!("⚡ [block cache] Loaded '{}'", block.variable_name);
                         self.apply_block_projection(&block);
-
-                        if let Some(meta) = &self.plotted_dataset_metadata
-                            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
-                        {
-                            let shape = var.shape.clone();
-                            self.prefetch_selected_animated_range(&shape);
-                        }
                     }
                 }
                 Err(e) => {
+                    println!("[PREFETCH] Fetch error for key {:?}: {e}", res.key);
                     self.status_message = format!("Block cache fetch error: {e}");
                 }
             }
+        }
+
+        // Whenever worker slots free up, replenish and dispatch remaining chunks in the selection:
+        if had_completed
+            && let Some(meta) = &self.plotted_dataset_metadata
+            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+        {
+            let shape = var.shape.clone();
+            self.prefetch_selected_animated_range(&shape);
         }
     }
 
