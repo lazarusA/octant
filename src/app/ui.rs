@@ -68,14 +68,10 @@ impl eframe::App for OctantApp {
             let frame_dur = std::time::Duration::from_secs_f32(1.0 / self.playback_fps.max(1.0));
 
             if now.duration_since(self.last_step_time) >= frame_dur {
-                let total_steps = self.animated_dim_extent();
+                let total_extent = self.animated_dim_extent();
 
-                if total_steps > 0 && self.current_timestep >= total_steps {
-                    self.current_timestep = total_steps - 1;
-                }
-
-                if total_steps > 1 {
-                    let next_ts = if self.current_timestep + 1 < total_steps {
+                if total_extent > 1 {
+                    let next_ts = if self.current_timestep + 1 < total_extent {
                         Some(self.current_timestep + 1)
                     } else if self.loop_playback {
                         Some(0)

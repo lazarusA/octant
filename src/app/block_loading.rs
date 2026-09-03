@@ -309,7 +309,7 @@ impl OctantApp {
             .min(full_extent.saturating_sub(1))
             .max(range_start);
 
-        let first_chunk = range_start / cs;
+        let _first_chunk = range_start / cs;
         let last_chunk = range_end / cs;
 
         let source_id = self.plotted_source_id();
@@ -320,35 +320,42 @@ impl OctantApp {
         };
 
         let current_chunk = self.current_timestep / cs;
-
-        // Schedule forward sliding lookahead window (bounded by user's block_window_size steps ahead of playhead):
-        let lookahead_chunks = (self.block_window_size / cs).max(1);
-        let max_lookahead_chunk = (current_chunk + lookahead_chunks).min(last_chunk);
+        let max_dataset_chunk = full_extent.saturating_sub(1) / cs;
 
         let mut chunk_indices = Vec::new();
-        for c in (current_chunk + 1)..=max_lookahead_chunk {
-            chunk_indices.push(c);
-        }
+        if self.is_playing {
+            // Sliding lookahead window during active animation playback:
+            let lookahead_chunks = (self.block_window_size / cs).max(1);
+            let max_lookahead_chunk = (current_chunk + lookahead_chunks).min(max_dataset_chunk);
+            for c in (current_chunk + 1)..=max_lookahead_chunk {
+                chunk_indices.push(c);
+            }
 
-        // If loop playback is active and approaching end of range, buffer starting wrap-around chunks:
-        if self.loop_playback && (self.is_playing && current_chunk + lookahead_chunks >= last_chunk)
-        {
-            let wrap_end = first_chunk + lookahead_chunks;
-            for c in first_chunk..=wrap_end.min(last_chunk) {
-                if !chunk_indices.contains(&c) && c != current_chunk {
-                    chunk_indices.push(c);
+            // If loop playback is active and approaching end of dataset, buffer starting wrap-around chunks:
+            if self.loop_playback && current_chunk + lookahead_chunks >= max_dataset_chunk {
+                let wrap_end = lookahead_chunks.saturating_sub(1);
+                for c in 0..=wrap_end.min(max_dataset_chunk) {
+                    if !chunk_indices.contains(&c) && c != current_chunk {
+                        chunk_indices.push(c);
+                    }
                 }
+            }
+        } else {
+            // When paused / on initial load with a multi-chunk range selection:
+            // Queue all chunks across the user's requested range in parallel across Rayon workers:
+            for c in (current_chunk + 1)..=last_chunk {
+                chunk_indices.push(c);
             }
         }
 
         println!(
-            "[PREFETCH] Scheduling sliding window: var='{}', range={}..={}, cs={}, current_chunk={}, lookahead_chunks={}, chunks_to_queue={:?}",
+            "[PREFETCH] is_playing={}, var='{}', range={}..={}, cs={}, current_chunk={}, chunks_to_queue={:?}",
+            self.is_playing,
             base_req.variable,
             range_start,
             range_end,
             cs,
             current_chunk,
-            lookahead_chunks,
             chunk_indices
         );
 
