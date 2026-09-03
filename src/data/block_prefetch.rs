@@ -45,8 +45,8 @@ impl BlockPrefetcher {
     }
 
     pub fn with_max_concurrent_threads(max_concurrent_threads: usize) -> Self {
-        let max_threads = max_concurrent_threads.max(1);
-        let (tx, rx) = sync_channel(max_threads * 2);
+        let max_threads = max_concurrent_threads.clamp(1, 64);
+        let (tx, rx) = sync_channel(128);
 
         Self {
             tx,
@@ -147,13 +147,7 @@ impl BlockPrefetcher {
     }
 
     pub fn set_max_concurrent_threads(&mut self, max_threads: usize) {
-        let max_threads = max_threads.clamp(1, 64);
-        if self.max_concurrent_threads != max_threads {
-            self.max_concurrent_threads = max_threads;
-            let (tx, rx) = sync_channel(max_threads * 2);
-            self.tx = tx;
-            self.rx = rx;
-        }
+        self.max_concurrent_threads = max_threads.clamp(1, 64);
     }
 
     pub fn is_pending(&self, key: &BlockCacheKey) -> bool {
