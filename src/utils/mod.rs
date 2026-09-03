@@ -21,8 +21,9 @@ pub use math::{
 };
 pub use metadata::{
     default_dimension_names_for_rank, discover_arrays_via_http_metadata, extract_store_variables,
-    variable_info_from_array,
+    resolve_array_dimension_names, variable_info_from_array,
 };
+
 pub use units::{
     add_days_to_date, calculate_variable_size_bytes, data_type_bytes, format_axis_value,
     format_byte_size, format_count_metric, parse_loc, parse_reference_date, parse_time_unit,

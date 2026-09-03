@@ -46,33 +46,9 @@ pub fn fetch_block_from_cached_array(
         .into());
     }
 
-    let mut dim_names: Vec<String> = array
-        .dimension_names()
-        .as_ref()
-        .map(|names| {
-            names
-                .iter()
-                .enumerate()
-                .map(|(i, n)| n.clone().unwrap_or_else(|| format!("dim_{i}")))
-                .collect()
-        })
-        .or_else(|| {
-            array.attributes().get("_ARRAY_DIMENSIONS").and_then(|v| {
-                v.as_array().map(|arr| {
-                    arr.iter()
-                        .enumerate()
-                        .map(|(i, s)| {
-                            s.as_str()
-                                .map(|str_v| str_v.to_string())
-                                .unwrap_or_else(|| format!("dim_{i}"))
-                        })
-                        .collect()
-                })
-            })
-        })
-        .unwrap_or_else(|| crate::utils::default_dimension_names_for_rank(rank));
-
+    let mut dim_names = crate::utils::resolve_array_dimension_names(array);
     let mut ranges: Vec<std::ops::Range<u64>> = Vec::with_capacity(rank);
+
     let mut block_shape = Vec::with_capacity(rank);
     let mut origin = Vec::with_capacity(rank);
 

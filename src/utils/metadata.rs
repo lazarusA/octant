@@ -175,26 +175,19 @@ pub fn default_dimension_names_for_rank(rank: usize) -> Vec<String> {
     }
 }
 
-/// Constructs a VariableInfo struct from any ReadableStorageTraits zarrs Array.
-pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits>(
+/// Resolves dimension names from array metadata, attributes (_ARRAY_DIMENSIONS), or default fallbacks.
+pub fn resolve_array_dimension_names<TStorage: ?Sized + ReadableStorageTraits + 'static>(
     array: &Array<TStorage>,
-    var_name: &str,
-) -> Option<VariableInfo> {
-    let shape = array.shape().to_vec();
-    if shape.is_empty() {
-        return None;
-    }
-
-    let data_type = format!("{:?}", array.data_type());
-
-    let dimension_names = array
+) -> Vec<String> {
+    let rank = array.shape().len();
+    array
         .dimension_names()
         .as_ref()
         .map(|names| {
             names
                 .iter()
                 .enumerate()
-                .map(|(i, n)| n.as_deref().unwrap_or(&format!("dim_{}", i)).to_string())
+                .map(|(i, n)| n.clone().unwrap_or_else(|| format!("dim_{i}")))
                 .collect()
         })
         .or_else(|| {
@@ -211,7 +204,22 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits>(
                 })
             })
         })
-        .unwrap_or_else(|| default_dimension_names_for_rank(shape.len()));
+        .unwrap_or_else(|| default_dimension_names_for_rank(rank))
+}
+
+/// Constructs a VariableInfo struct from any ReadableStorageTraits zarrs Array.
+pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits + 'static>(
+    array: &Array<TStorage>,
+    var_name: &str,
+) -> Option<VariableInfo> {
+    let shape = array.shape().to_vec();
+    if shape.is_empty() {
+        return None;
+    }
+
+    let data_type = format!("{:?}", array.data_type());
+
+    let dimension_names = resolve_array_dimension_names(array);
 
     let zero_idx = vec![0u64; shape.len()];
     let chunk_shape = array
