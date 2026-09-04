@@ -154,6 +154,14 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &crate::d
         app.selected_dim_ranges.push((0, range_end));
     }
 
+    if rank == 1 {
+        app.dim_config[0].spatial = SpatialRole::X;
+        app.dim_config[0].active = true;
+        app.dim_config[0].range = app.selected_dim_ranges[0];
+        app.spatial_dims.push(0);
+        return;
+    }
+
     let mut x_assigned = false;
     let mut y_assigned = false;
     let mut z_assigned = false;
@@ -439,7 +447,7 @@ pub fn calculate_selected_2d_elements(app: &OctantApp) -> usize {
     };
 
     let nx = get_span(x_dim);
-    let ny = get_span(y_dim);
+    let ny = if rank <= 1 { 1 } else { get_span(y_dim) };
     nx.saturating_mul(ny)
 }
 

@@ -400,6 +400,10 @@ impl OctantApp {
         orig_dim_names: &[String],
         dim_config: &[crate::app::DimConfig],
     ) -> (usize, usize, usize) {
+        if rank <= 1 {
+            return (0, 0, usize::MAX);
+        }
+
         let anim_dim = crate::app::DimConfig::animated_dim(dim_config);
         let all_dims: Vec<usize> = (0..rank).collect();
         let non_anim: Vec<usize> = (0..rank).filter(|&d| Some(d) != anim_dim).collect();

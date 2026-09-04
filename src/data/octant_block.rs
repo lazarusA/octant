@@ -150,6 +150,52 @@ impl OctantBlock {
         dataset_name: &str,
         compute_bounds: bool,
     ) -> Option<crate::data::matrix_data::MatrixData> {
+        if self.rank() == 1 {
+            let full_x = self.shape.first().copied().unwrap_or(1);
+            let x_start = x_range.0.min(full_x);
+            let x_end = x_range.1.clamp(x_start, full_x);
+            let width = x_end.saturating_sub(x_start);
+            if width == 0 {
+                return None;
+            }
+            let values: Vec<f32> = if x_start + width <= self.values.len() {
+                self.values[x_start..x_start + width].to_vec()
+            } else {
+                (0..width)
+                    .map(|x| self.values.get(x_start + x).copied().unwrap_or(f32::NAN))
+                    .collect()
+            };
+            let (min_val, max_val) = if compute_bounds {
+                crate::utils::compute_finite_min_max(&values)
+            } else if self.min_value.is_finite() && self.max_value.is_finite() {
+                (self.min_value, self.max_value)
+            } else {
+                (0.0, 1.0)
+            };
+            return Some(crate::data::matrix_data::MatrixData::new(
+                width,
+                1,
+                values,
+                min_val,
+                max_val,
+                dataset_name.to_string(),
+                max_timesteps,
+            ));
+        }
+
+        if self.rank() == 0 {
+            let val = self.values.first().copied().unwrap_or(0.0);
+            return Some(crate::data::matrix_data::MatrixData::new(
+                1,
+                1,
+                vec![val],
+                val,
+                val,
+                dataset_name.to_string(),
+                max_timesteps,
+            ));
+        }
+
         if x_dim == y_dim
             || x_dim >= self.rank()
             || y_dim >= self.rank()

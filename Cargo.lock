@@ -1663,6 +1663,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "curl-sys"
+version = "0.4.90+curl-8.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97799a0d220bfb3361e0fe4936966ff8c4b24d65c3f06dfc70d7b680b44e7897"
+dependencies = [
+ "cc",
+ "libc",
+ "libz-sys",
+ "openssl-sys",
+ "pkg-config",
+ "vcpkg",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "cursor-icon"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2740,6 +2755,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
  "foldhash",
+]
+
+[[package]]
+name = "hdf5-metno-src"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69c883c565498492954e344c482f8622525e58c7a71100dd9498c4940da82885"
+dependencies = [
+ "cmake",
+ "libz-sys",
+]
+
+[[package]]
+name = "hdf5-metno-sys"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8139abe2218e47a40bdc7822a4365b620e23dce17e6b4735bbe6629410cdfedb"
+dependencies = [
+ "hdf5-metno-src",
+ "libc",
+ "libloading",
+ "libz-sys",
+ "parking_lot",
+ "pkg-config",
+ "regex",
+ "serde",
+ "serde_derive",
+ "winreg",
 ]
 
 [[package]]
@@ -3825,6 +3868,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "netcdf"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db1b055d2ad9d2e845876173c99ac9d8874a56413d5579618da22df35abe342c"
+dependencies = [
+ "bitflags 2.13.1",
+ "libc",
+ "ndarray",
+ "netcdf-sys",
+ "semver",
+]
+
+[[package]]
+name = "netcdf-src"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f8a4c2a96491452c12be9fe0ad0e6e20fd94cb5996eabd4cfcec51dfd4d898a"
+dependencies = [
+ "cmake",
+ "hdf5-metno-src",
+ "hdf5-metno-sys",
+ "libz-sys",
+]
+
+[[package]]
+name = "netcdf-sys"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0e415a9513a707eda0d14294c1dbefb19b87a8ff37511a36e969e71f0aa05f4"
+dependencies = [
+ "curl-sys",
+ "hdf5-metno-sys",
+ "libz-sys",
+ "netcdf-src",
+ "parking_lot",
+ "semver",
+]
+
+[[package]]
 name = "nix"
 version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4333,6 +4415,7 @@ dependencies = [
  "icechunk",
  "image",
  "log",
+ "netcdf",
  "object_store",
  "rayon",
  "reqwest",
@@ -4364,6 +4447,28 @@ name = "openssl-probe"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
+
+[[package]]
+name = "openssl-src"
+version = "300.6.1+3.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46eb8fb9fb3b61ce1c0f8a026c4c1a0714d3a9e138e7fbde78753ce2babc3846"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "openssl-sys"
+version = "0.9.117"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b47e7e6bb2c38cd930d25a23b40fa52e068c10e85f3e03a7f5ba5aaca5713695"
+dependencies = [
+ "cc",
+ "libc",
+ "openssl-src",
+ "pkg-config",
+ "vcpkg",
+]
 
 [[package]]
 name = "orbclient"
@@ -7373,6 +7478,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "winreg"
+version = "0.56.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
+dependencies = [
+ "cfg-if",
+ "serde",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

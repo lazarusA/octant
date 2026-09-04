@@ -4,3 +4,4 @@ egui
 data_new
 wgpu
 .agents/skills/rust-skills/
+netcdf

@@ -3,7 +3,6 @@
 use crate::utils::executor::{TokioBlockOn, get_shared_tokio_rt};
 use std::collections::HashMap;
 use std::error::Error;
-use std::path::Path;
 use std::sync::{Arc, OnceLock, RwLock};
 use zarrs::storage::ReadableWritableListableStorage;
 use zarrs::storage::storage_adapter::async_to_sync::AsyncToSyncStorageAdapter;
@@ -27,9 +26,9 @@ pub fn build_sync_icechunk_store(
     let rt = get_shared_tokio_rt();
 
     let async_store = rt.block_on(async {
-        let path = Path::new(location);
-        let storage = if path.exists() {
-            icechunk::new_local_filesystem_storage(path).await?
+        let expanded = crate::utils::expand_tilde(location);
+        let storage = if expanded.exists() {
+            icechunk::new_local_filesystem_storage(&expanded).await?
         } else {
             let (bucket, prefix, region, endpoint_url) = parse_s3_or_http_url(location)?;
             let mut config = icechunk::config::S3Options::default();

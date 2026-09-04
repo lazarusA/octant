@@ -42,26 +42,12 @@ pub fn build_sync_store(
     Ok(sync_store)
 }
 
-/// Helper to expand tilde `~` or `~/` in path strings to the user's home directory.
-fn expand_tilde(path: &str) -> std::path::PathBuf {
-    if let Some(stripped) = path.strip_prefix("~/") {
-        if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
-            return std::path::PathBuf::from(home).join(stripped);
-        }
-    } else if path == "~"
-        && let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))
-    {
-        return std::path::PathBuf::from(home);
-    }
-    std::path::PathBuf::from(path)
-}
-
 /// Builds a storage handle for a local Zarr store rooted at `path`.
 pub fn open_local_storage(
     path: &str,
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
     let clean_path = path.strip_prefix("file://").unwrap_or(path);
-    let expanded = expand_tilde(clean_path);
+    let expanded = crate::utils::expand_tilde(clean_path);
     let dir_path = if expanded.is_file() {
         expanded
             .parent()

@@ -13,6 +13,7 @@ pub enum StoreKind {
     LocalZarr,
     RemoteIcechunk,
     LocalIcechunk,
+    LocalNetCdf,
     ProceduralVolume4D,
     ProceduralRandom,
 }
@@ -24,6 +25,7 @@ impl StoreKind {
             StoreKind::LocalZarr => crate::data::DataSourceKind::LocalZarr,
             StoreKind::RemoteIcechunk => crate::data::DataSourceKind::RemoteIcechunk,
             StoreKind::LocalIcechunk => crate::data::DataSourceKind::LocalIcechunk,
+            StoreKind::LocalNetCdf => crate::data::DataSourceKind::NetCdf,
             StoreKind::ProceduralVolume4D | StoreKind::ProceduralRandom => {
                 crate::data::DataSourceKind::Procedural
             }
@@ -36,6 +38,7 @@ impl StoreKind {
             crate::data::DataSourceKind::LocalZarr => StoreKind::LocalZarr,
             crate::data::DataSourceKind::RemoteIcechunk => StoreKind::RemoteIcechunk,
             crate::data::DataSourceKind::LocalIcechunk => StoreKind::LocalIcechunk,
+            crate::data::DataSourceKind::NetCdf => StoreKind::LocalNetCdf,
             crate::data::DataSourceKind::Procedural => StoreKind::ProceduralVolume4D,
             _ => StoreKind::ProceduralRandom,
         }
@@ -635,19 +638,21 @@ impl OctantApp {
         if input_target.is_empty() {
             return false;
         }
+        let expanded = crate::utils::expand_tilde_str(input_target);
 
         let existing = self
             .dataset_manager
             .iter()
             .find(|d| {
                 d.source.uri == input_target
+                    || d.source.uri == expanded
                     || d.id == input_target
                     || d.source.display_name == input_target
             })
             .cloned();
 
         if let Some(dataset) = existing {
-            self.store_target_input = dataset.source.uri.clone();
+            self.store_target_input = input_target.to_string();
             self.selected_store_kind = StoreKind::from_data_source_kind(&dataset.source.kind);
             if let Some(meta) = dataset.metadata {
                 self.status_message = format!(

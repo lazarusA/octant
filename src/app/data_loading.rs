@@ -147,8 +147,8 @@ impl OctantApp {
     /// Activates an existing dataset from the dataset manager if already loaded,
     /// or initiates store inspection in the background if not yet loaded.
     pub fn submit_or_activate_source(&mut self, target: &str, explicit_kind: Option<StoreKind>) {
-        let input_target = target.trim().to_string();
-        if input_target.is_empty() {
+        let trimmed = target.trim();
+        if trimmed.is_empty() {
             return;
         }
 
@@ -156,34 +156,46 @@ impl OctantApp {
             self.selected_store_kind = kind;
         }
 
-        if self.try_activate_dataset(&input_target) {
+        if self.try_activate_dataset(trimmed) {
             if let Some(meta) = &self.active_dataset_metadata {
                 self.hero_state.source_label = meta.name.clone();
             }
             self.hero_state.loaded = true;
             self.hero_state.loading = false;
         } else {
-            self.hero_state.begin_submit(&input_target);
-            self.store_target_input = input_target.clone();
+            self.hero_state.begin_submit(trimmed);
+            self.store_target_input = trimmed.to_string();
             if explicit_kind.is_none() {
-                if input_target == "procedural://volume4d" {
+                if trimmed == "procedural://volume4d" {
                     self.selected_store_kind = StoreKind::ProceduralVolume4D;
-                } else if input_target == "procedural://matrix"
-                    || input_target == "procedural://random"
-                    || input_target == "procedural://matrix2d"
+                } else if trimmed == "procedural://matrix"
+                    || trimmed == "procedural://random"
+                    || trimmed == "procedural://matrix2d"
                 {
                     self.selected_store_kind = StoreKind::ProceduralRandom;
-                } else if input_target.starts_with("http://")
-                    || input_target.starts_with("https://")
-                    || input_target.starts_with("s3://")
+                } else if trimmed.starts_with("http://")
+                    || trimmed.starts_with("https://")
+                    || trimmed.starts_with("s3://")
                 {
-                    if input_target.to_lowercase().contains("icechunk") {
+                    if trimmed.to_lowercase().contains("icechunk") {
                         self.selected_store_kind = StoreKind::RemoteIcechunk;
                     } else {
                         self.selected_store_kind = StoreKind::RemoteZarr;
                     }
-                } else if input_target.to_lowercase().contains("icechunk") {
+                } else if trimmed.to_lowercase().contains("icechunk") {
                     self.selected_store_kind = StoreKind::LocalIcechunk;
+                } else if trimmed.ends_with(".nc")
+                    || trimmed.ends_with(".nc4")
+                    || trimmed.ends_with(".cdf")
+                    || trimmed.ends_with(".netcdf")
+                    || trimmed.ends_with(".h5")
+                    || trimmed.ends_with(".hdf5")
+                    || trimmed.ends_with(".hdf")
+                    || trimmed.ends_with(".he5")
+                    || trimmed.starts_with("netcdf://")
+                    || trimmed.starts_with("hdf5://")
+                {
+                    self.selected_store_kind = StoreKind::LocalNetCdf;
                 } else {
                     self.selected_store_kind = StoreKind::LocalZarr;
                 }
