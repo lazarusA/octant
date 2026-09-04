@@ -30,6 +30,8 @@ pub fn expand_tilde_str(path: &str) -> String {
 /// Returns `Ok(StoreKind)` for supported formats and sources, or `Err("Type not supported")` otherwise.
 pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKind, &'static str> {
     use crate::app::StoreKind;
+    let target = target.trim();
+    let target = target.strip_prefix("file://").unwrap_or(target);
     let trimmed = target.trim();
     if trimmed.is_empty() {
         return Err("Type not supported");
@@ -227,6 +229,14 @@ mod tests {
         assert_eq!(
             infer_store_kind_from_target("/path/to/icechunk_repo"),
             Ok(StoreKind::LocalIcechunk)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("file:///data/sample.nc"),
+            Ok(StoreKind::LocalNetCdf)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("file:///data/dataset.zarr"),
+            Ok(StoreKind::LocalZarr)
         );
 
         // Unsupported types

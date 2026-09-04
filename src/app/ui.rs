@@ -194,7 +194,7 @@ impl eframe::App for OctantApp {
             }
         }
 
-        // 3. Render panels (each consumes space from the remaining area)ng area)
+        // 3. Render panels (each consumes space from the remaining area)
         crate::ui::top_bar::show_top_bar(self, ui);
 
         if self.show_left_panel {
@@ -519,8 +519,8 @@ impl eframe::App for OctantApp {
             }
 
             // Render Canvas Drag & Drop hover cue when dragging files over an active plot
-            let hovered_files = ctx.input(|i| i.raw.hovered_files.clone());
-            if !hovered_files.is_empty() && self.pending_export.is_none() {
+            let is_drag_hovering = ctx.input(|i| !i.raw.hovered_files.is_empty());
+            if is_drag_hovering && self.pending_export.is_none() {
                 let is_dark = ui.visuals().dark_mode;
                 let stroke_color = if is_dark {
                     egui::Color32::from_rgb(0, 190, 255)
