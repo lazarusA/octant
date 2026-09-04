@@ -25,22 +25,23 @@ mod desktop {
     }
 
     impl NetCdfBlockStore {
-        /// Opens a NetCDF dataset from a local filesystem path.
+        /// Opens a NetCDF or HDF5 dataset from a local filesystem path.
         pub fn open_local(path: &str) -> Result<Self, BlockStoreError> {
             let clean_path = path
                 .strip_prefix("file://")
                 .or_else(|| path.strip_prefix("netcdf://"))
+                .or_else(|| path.strip_prefix("hdf5://"))
                 .unwrap_or(path)
                 .trim()
                 .trim_matches('\'')
                 .trim_matches('"');
             let p = crate::utils::expand_tilde(clean_path);
             if !p.exists() {
-                return Err(format!("NetCDF file not found: {}", p.display()).into());
+                return Err(format!("File not found: {}", p.display()).into());
             }
             if p.is_dir() {
                 return Err(format!(
-                    "'{}' is a directory. Please specify a .nc / .cdf file path.",
+                    "'{}' is a directory. Please specify a .nc / .h5 / .hdf5 / .cdf file path.",
                     p.display()
                 )
                 .into());

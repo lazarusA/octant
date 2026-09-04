@@ -25,7 +25,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                         StoreKind::LocalZarr => "📁 Local Zarr",
                         StoreKind::RemoteIcechunk => "🧊 Remote Icechunk",
                         StoreKind::LocalIcechunk => "🧊 Local Icechunk",
-                        StoreKind::LocalNetCdf => "📁 Local NetCDF",
+                        StoreKind::LocalNetCdf => "📁 Local NetCDF / HDF5",
                         StoreKind::ProceduralVolume4D => "🌐 4D Known-Truth Volume",
                         StoreKind::ProceduralRandom => "🎲 2D Procedural Matrix",
                     })
@@ -34,7 +34,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                         ui.selectable_value(&mut selected, StoreKind::LocalZarr, "📁 Local Zarr (FileSystem)");
                         ui.selectable_value(&mut selected, StoreKind::RemoteIcechunk, "🧊 Remote Icechunk (HTTP/S3)");
                         ui.selectable_value(&mut selected, StoreKind::LocalIcechunk, "🧊 Local Icechunk (FileSystem)");
-                        ui.selectable_value(&mut selected, StoreKind::LocalNetCdf, "📁 Local NetCDF (.nc/.cdf)");
+                        ui.selectable_value(&mut selected, StoreKind::LocalNetCdf, "📁 Local NetCDF / HDF5 (.nc/.h5/.hdf5)");
                         ui.separator();
                         ui.selectable_value(&mut selected, StoreKind::ProceduralVolume4D, "🌐 4D Known-Truth Volume (Procedural)");
                         ui.selectable_value(&mut selected, StoreKind::ProceduralRandom, "🎲 2D Procedural Matrix (Test)");

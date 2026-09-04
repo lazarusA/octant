@@ -188,7 +188,12 @@ impl OctantApp {
                     || trimmed.ends_with(".nc4")
                     || trimmed.ends_with(".cdf")
                     || trimmed.ends_with(".netcdf")
+                    || trimmed.ends_with(".h5")
+                    || trimmed.ends_with(".hdf5")
+                    || trimmed.ends_with(".hdf")
+                    || trimmed.ends_with(".he5")
                     || trimmed.starts_with("netcdf://")
+                    || trimmed.starts_with("hdf5://")
                 {
                     self.selected_store_kind = StoreKind::LocalNetCdf;
                 } else {
