@@ -172,7 +172,29 @@ impl eframe::App for OctantApp {
         // Process in-flight export / screenshot requests
         self.process_pending_export(&ctx);
 
-        // 3. Render panels (each consumes space from the remaining area)ng area)
+        // Global Drag-and-Drop handler for files and directories
+        let dropped_file = ctx.input(|i| i.raw.dropped_files.first().cloned());
+        if let Some(file) = dropped_file {
+            let path = file.path();
+            let path_str = path.to_string_lossy().trim().to_string();
+            if !path_str.is_empty() {
+                match crate::utils::infer_store_kind_from_target(&path_str) {
+                    Ok(_) => {
+                        crate::ui::drop_zone::clear_drop_zone_warning(&ctx);
+                        self.hero_state.input = path_str.clone();
+                        self.store_target_input = path_str.clone();
+                        self.submit_or_activate_source(&path_str, None);
+                    }
+                    Err(err) => {
+                        self.status_message = format!("⚠️ {err}: '{path_str}'");
+                        crate::ui::drop_zone::trigger_drop_zone_warning(&ctx);
+                        log::warn!("{err}: {path_str}");
+                    }
+                }
+            }
+        }
+
+        // 3. Render panels (each consumes space from the remaining area)
         crate::ui::top_bar::show_top_bar(self, ui);
 
         if self.show_left_panel {
@@ -494,6 +516,41 @@ impl eframe::App for OctantApp {
                     )
             {
                 self.quick_save_canvas();
+            }
+
+            // Render Canvas Drag & Drop hover cue when dragging files over an active plot
+            let is_drag_hovering = ctx.input(|i| !i.raw.hovered_files.is_empty());
+            if is_drag_hovering && self.pending_export.is_none() {
+                let is_dark = ui.visuals().dark_mode;
+                let stroke_color = if is_dark {
+                    egui::Color32::from_rgb(0, 190, 255)
+                } else {
+                    egui::Color32::from_rgb(0, 125, 220)
+                };
+                let fill_color = if is_dark {
+                    egui::Color32::from_rgba_unmultiplied(0, 190, 255, 24)
+                } else {
+                    egui::Color32::from_rgba_unmultiplied(0, 125, 220, 18)
+                };
+
+                let overlay_rect = canvas_rect.shrink(12.0);
+                ui.painter().rect(
+                    overlay_rect,
+                    10.0,
+                    fill_color,
+                    egui::Stroke::new(2.0, stroke_color),
+                    egui::StrokeKind::Inside,
+                );
+
+                let badge_pos = overlay_rect.center();
+                ui.painter().text(
+                    badge_pos,
+                    egui::Align2::CENTER_CENTER,
+                    "📥 Drop dataset to visualize (.nc, .h5, .zarr, .icechunk)",
+                    egui::FontId::proportional(15.0),
+                    stroke_color,
+                );
+                ctx.request_repaint();
             }
 
             // Render floating Save Figure Toast with "Reveal in Finder / Folder" action

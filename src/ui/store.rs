@@ -82,6 +82,9 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.submit_or_activate_source(&target, Some(app.selected_store_kind));
                 }
 
+                ui.add_space(8.0);
+                crate::ui::drop_zone::show_drop_zone(ui, None, 68.0);
+
                 ui.add_space(6.0);
                 ui.separator();
                 ui.collapsing("About this store", |ui| {

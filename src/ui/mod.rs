@@ -8,6 +8,7 @@ pub mod color_picker;
 pub mod colorbar;
 pub mod colormap;
 pub mod crop_overlay;
+pub mod drop_zone;
 pub mod export_modal;
 pub mod hero;
 pub mod hover_tooltip;

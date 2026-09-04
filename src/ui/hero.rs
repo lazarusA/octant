@@ -137,18 +137,6 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
     // Keep animating smoothly at 60 FPS while wandering or loading.
     ui.ctx().request_repaint_after(Duration::from_millis(16));
 
-    // Handle dropped files across the entire window
-    let dropped_files = ui.ctx().input(|i| i.raw.dropped_files.clone());
-    if let Some(file) = dropped_files.first() {
-        let path = file.path();
-        let source_path = path.to_string_lossy().trim().to_string();
-
-        if !source_path.is_empty() {
-            app.hero_state.input = source_path.clone();
-            app.submit_or_activate_source(&source_path, None);
-        }
-    }
-
     // Main centered composition with procedural cube, title, and intake
     let available_h = ui.available_height();
 
@@ -169,6 +157,9 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         ui.add_space(14.0);
         sample_pills_row(ui, app);
+
+        ui.add_space(18.0);
+        crate::ui::drop_zone::show_drop_zone(ui, Some(420.0), 64.0);
 
         if app.is_loading || app.hero_state.loading {
             ui.add_space(20.0);
