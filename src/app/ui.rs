@@ -180,6 +180,9 @@ impl eframe::App for OctantApp {
             if !path_str.is_empty() {
                 match crate::utils::infer_store_kind_from_target(&path_str) {
                     Ok(_) => {
+                        crate::ui::drop_zone::clear_drop_zone_warning(&ctx);
+                        self.hero_state.input = path_str.clone();
+                        self.store_target_input = path_str.clone();
                         self.submit_or_activate_source(&path_str, None);
                     }
                     Err(err) => {
@@ -516,6 +519,41 @@ impl eframe::App for OctantApp {
                     )
             {
                 self.quick_save_canvas();
+            }
+
+            // Render Canvas Drag & Drop hover cue when dragging files over an active plot
+            let hovered_files = ctx.input(|i| i.raw.hovered_files.clone());
+            if !hovered_files.is_empty() && self.pending_export.is_none() {
+                let is_dark = ui.visuals().dark_mode;
+                let stroke_color = if is_dark {
+                    egui::Color32::from_rgb(0, 190, 255)
+                } else {
+                    egui::Color32::from_rgb(0, 125, 220)
+                };
+                let fill_color = if is_dark {
+                    egui::Color32::from_rgba_unmultiplied(0, 190, 255, 24)
+                } else {
+                    egui::Color32::from_rgba_unmultiplied(0, 125, 220, 18)
+                };
+
+                let overlay_rect = canvas_rect.shrink(12.0);
+                ui.painter().rect(
+                    overlay_rect,
+                    10.0,
+                    fill_color,
+                    egui::Stroke::new(2.0, stroke_color),
+                    egui::StrokeKind::Inside,
+                );
+
+                let badge_pos = overlay_rect.center();
+                ui.painter().text(
+                    badge_pos,
+                    egui::Align2::CENTER_CENTER,
+                    "📥 Drop dataset to visualize (.nc, .h5, .zarr, .icechunk)",
+                    egui::FontId::proportional(15.0),
+                    stroke_color,
+                );
+                ctx.request_repaint();
             }
 
             // Render floating Save Figure Toast with "Reveal in Finder / Folder" action

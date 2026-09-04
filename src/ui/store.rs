@@ -83,13 +83,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
 
                 ui.add_space(8.0);
-                if let Some(path) = crate::ui::drop_zone::show_drop_zone(ui, None, 68.0) {
-                    let path_str = path.to_string_lossy().trim().to_string();
-                    if !path_str.is_empty() {
-                        app.store_target_input = path_str.clone();
-                        app.submit_or_activate_source(&path_str, None);
-                    }
-                }
+                crate::ui::drop_zone::show_drop_zone(ui, None, 68.0);
 
                 ui.add_space(6.0);
                 ui.separator();

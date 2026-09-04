@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 #[derive(Clone, Debug)]
@@ -31,14 +30,20 @@ pub fn trigger_drop_zone_warning(ctx: &egui::Context, message: impl Into<String>
     ctx.request_repaint();
 }
 
+/// Clears any active warning state on drop zones.
+pub fn clear_drop_zone_warning(ctx: &egui::Context) {
+    let id = egui::Id::new("drop_zone_warning_state");
+    ctx.data_mut(|d| {
+        d.remove_temp::<DropZoneWarningState>(id);
+    });
+}
+
 /// Renders a modern, theme-adaptive drag-and-drop drop zone widget.
-///
-/// Returns `Some(PathBuf)` if a supported file or directory was dropped during this frame.
 pub fn show_drop_zone(
     ui: &mut egui::Ui,
     desired_width: Option<f32>,
     height: f32,
-) -> Option<PathBuf> {
+) -> egui::Response {
     let width = desired_width.unwrap_or_else(|| ui.available_width().max(120.0));
     let size = egui::vec2(width, height);
     let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
@@ -54,8 +59,6 @@ pub fn show_drop_zone(
     }
 
     let hovered_files = ui.ctx().input(|i| i.raw.hovered_files.clone());
-    let dropped_files = ui.ctx().input(|i| i.raw.dropped_files.clone());
-
     let is_drag_hovering = !hovered_files.is_empty();
     let is_pointer_hovering = response.hovered();
 
@@ -242,26 +245,7 @@ pub fn show_drop_zone(
         );
     }
 
-    // Process dropped files
-    if let Some(first) = dropped_files.first() {
-        let path = first.path();
-        let path_str = path.to_string_lossy().trim().to_string();
-        if !path_str.is_empty() {
-            match crate::utils::infer_store_kind_from_target(&path_str) {
-                Ok(_) => {
-                    ui.ctx()
-                        .data_mut(|d| d.remove_temp::<DropZoneWarningState>(warning_id));
-                    return Some(path.to_path_buf());
-                }
-                Err(err) => {
-                    trigger_drop_zone_warning(ui.ctx(), format!("{err}: {path_str}"));
-                    return None;
-                }
-            }
-        }
-    }
-
-    None
+    response
 }
 
 fn draw_dashed_border(
