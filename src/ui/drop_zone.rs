@@ -1,29 +1,26 @@
 use std::time::{Duration, Instant};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct DropZoneWarningState {
     pub triggered_at: Instant,
-    pub message: String,
 }
 
 impl Default for DropZoneWarningState {
     fn default() -> Self {
         Self {
             triggered_at: Instant::now(),
-            message: String::new(),
         }
     }
 }
 
 /// Triggers an interactive warning on all active drop zones and requests a repaint.
-pub fn trigger_drop_zone_warning(ctx: &egui::Context, message: impl Into<String>) {
+pub fn trigger_drop_zone_warning(ctx: &egui::Context) {
     let id = egui::Id::new("drop_zone_warning_state");
     ctx.data_mut(|d| {
         d.insert_temp(
             id,
             DropZoneWarningState {
                 triggered_at: Instant::now(),
-                message: message.into(),
             },
         );
     });
@@ -58,8 +55,8 @@ pub fn show_drop_zone(
         ui.ctx().request_repaint_after(Duration::from_millis(100));
     }
 
-    let hovered_files = ui.ctx().input(|i| i.raw.hovered_files.clone());
-    let is_drag_hovering = !hovered_files.is_empty();
+    // Zero heap-allocation drag-hover detection
+    let is_drag_hovering = ui.ctx().input(|i| !i.raw.hovered_files.is_empty());
     let is_pointer_hovering = response.hovered();
 
     if is_drag_hovering {
@@ -122,7 +119,7 @@ pub fn show_drop_zone(
 
         // Draw dashed perimeter cue when idle to indicate drop capability
         if !is_drag_hovering && !is_warning_active && stroke_width <= 1.2 {
-            draw_dashed_border(ui.painter(), rect, 8.0, stroke_color.gamma_multiply(0.4));
+            draw_dashed_border(ui.painter(), rect, stroke_color.gamma_multiply(0.4));
         }
 
         let center = rect.center();
@@ -139,7 +136,7 @@ pub fn show_drop_zone(
             ui.painter().line_segment([p_left, p_right], icon_stroke);
             ui.painter().line_segment([p_right, p_top], icon_stroke);
 
-            // Exclamation mark stem
+            // Exclamation mark stem & dot
             ui.painter().line_segment(
                 [
                     egui::pos2(center.x, icon_y - 2.5),
@@ -147,12 +144,10 @@ pub fn show_drop_zone(
                 ],
                 icon_stroke,
             );
-            // Exclamation mark dot
             ui.painter()
                 .circle_filled(egui::pos2(center.x, icon_y + 3.8), 1.0, stroke_color);
         } else {
-            // Custom drawn drop arrow + container tray icon
-            // Arrow shaft
+            // Drop arrow (shaft + head)
             ui.painter().line_segment(
                 [
                     egui::pos2(center.x, icon_y - 6.0),
@@ -160,7 +155,6 @@ pub fn show_drop_zone(
                 ],
                 icon_stroke,
             );
-            // Arrow head
             ui.painter().line_segment(
                 [
                     egui::pos2(center.x - 3.5, icon_y - 1.5),
@@ -175,7 +169,8 @@ pub fn show_drop_zone(
                 ],
                 icon_stroke,
             );
-            // Bottom tray
+
+            // Container tray
             ui.painter().line_segment(
                 [
                     egui::pos2(center.x - 7.0, icon_y + 1.0),
@@ -248,19 +243,18 @@ pub fn show_drop_zone(
     response
 }
 
-fn draw_dashed_border(
-    painter: &egui::Painter,
-    rect: egui::Rect,
-    _corner_radius: f32,
-    color: egui::Color32,
-) {
+/// Draws a unified, dashed border around `rect` without code duplication.
+fn draw_dashed_border(painter: &egui::Painter, rect: egui::Rect, color: egui::Color32) {
     let dash_len = 5.0;
     let gap_len = 4.0;
+    let step = dash_len + gap_len;
     let stroke = egui::Stroke::new(1.0, color);
+    let inset = 8.0;
 
-    // Top edge
-    let mut x = rect.left() + 8.0;
-    while x + dash_len <= rect.right() - 8.0 {
+    // Horizontal edges (Top & Bottom)
+    let mut x = rect.left() + inset;
+    let max_x = rect.right() - inset;
+    while x + dash_len <= max_x {
         painter.line_segment(
             [
                 egui::pos2(x, rect.top()),
@@ -268,12 +262,6 @@ fn draw_dashed_border(
             ],
             stroke,
         );
-        x += dash_len + gap_len;
-    }
-
-    // Bottom edge
-    let mut x = rect.left() + 8.0;
-    while x + dash_len <= rect.right() - 8.0 {
         painter.line_segment(
             [
                 egui::pos2(x, rect.bottom()),
@@ -281,12 +269,13 @@ fn draw_dashed_border(
             ],
             stroke,
         );
-        x += dash_len + gap_len;
+        x += step;
     }
 
-    // Left edge
-    let mut y = rect.top() + 8.0;
-    while y + dash_len <= rect.bottom() - 8.0 {
+    // Vertical edges (Left & Right)
+    let mut y = rect.top() + inset;
+    let max_y = rect.bottom() - inset;
+    while y + dash_len <= max_y {
         painter.line_segment(
             [
                 egui::pos2(rect.left(), y),
@@ -294,12 +283,6 @@ fn draw_dashed_border(
             ],
             stroke,
         );
-        y += dash_len + gap_len;
-    }
-
-    // Right edge
-    let mut y = rect.top() + 8.0;
-    while y + dash_len <= rect.bottom() - 8.0 {
         painter.line_segment(
             [
                 egui::pos2(rect.right(), y),
@@ -307,6 +290,6 @@ fn draw_dashed_border(
             ],
             stroke,
         );
-        y += dash_len + gap_len;
+        y += step;
     }
 }

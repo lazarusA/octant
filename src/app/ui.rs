@@ -173,8 +173,8 @@ impl eframe::App for OctantApp {
         self.process_pending_export(&ctx);
 
         // Global Drag-and-Drop handler for files and directories
-        let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
-        if let Some(file) = dropped_files.first() {
+        let dropped_file = ctx.input(|i| i.raw.dropped_files.first().cloned());
+        if let Some(file) = dropped_file {
             let path = file.path();
             let path_str = path.to_string_lossy().trim().to_string();
             if !path_str.is_empty() {
@@ -187,10 +187,7 @@ impl eframe::App for OctantApp {
                     }
                     Err(err) => {
                         self.status_message = format!("⚠️ {err}: '{path_str}'");
-                        crate::ui::drop_zone::trigger_drop_zone_warning(
-                            &ctx,
-                            format!("{err}: {path_str}"),
-                        );
+                        crate::ui::drop_zone::trigger_drop_zone_warning(&ctx);
                         log::warn!("{err}: {path_str}");
                     }
                 }
