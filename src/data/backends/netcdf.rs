@@ -15,7 +15,7 @@ mod desktop {
     use crate::data::block_store::{BlockStore, BlockStoreError};
     use crate::data::metadata::{DatasetMetadata, VariableInfo};
     use crate::data::octant_block::OctantBlock;
-    use crate::data::slice_request::{DimensionSelection, SliceRequest};
+    use crate::data::slice_request::SliceRequest;
     use crate::utils::grid::check_and_orient_block_grid;
 
     /// NetCDF storage backend reading local files via `libnetcdf`.
@@ -116,6 +116,28 @@ mod desktop {
         }
     }
 
+    /// Extracts all variable-level attributes as a string map.
+    fn extract_variable_attributes(var: &netcdf::Variable<'_>) -> HashMap<String, String> {
+        let mut attributes = HashMap::new();
+        for attr in var.attributes() {
+            if let Ok(val) = attr.value() {
+                attributes.insert(attr.name().to_string(), attribute_value_to_string(&val));
+            }
+        }
+        attributes
+    }
+
+    /// Extracts all dataset-level (global) attributes as a string map.
+    fn extract_global_attributes(file: &netcdf::File) -> HashMap<String, String> {
+        let mut attributes = HashMap::new();
+        for attr in file.attributes() {
+            if let Ok(val) = attr.value() {
+                attributes.insert(attr.name().to_string(), attribute_value_to_string(&val));
+            }
+        }
+        attributes
+    }
+
     /// Converts a NetCDF `NcVariableType` to a descriptive string for metadata.
     fn var_type_to_string(vartype: &NcVariableType) -> &'static str {
         match vartype {
@@ -174,6 +196,15 @@ mod desktop {
             }
         };
 
+        macro_rules! read_and_transform {
+            ($var:expr, $extents:expr, $t:ty, $transform:expr) => {{
+                let raw_vals: Vec<$t> = $var
+                    .get_values::<$t, _>($extents)
+                    .map_err(|e| format!("Failed reading {} hyperslab: {e}", stringify!($t)))?;
+                Ok(raw_vals.into_iter().map(|v| $transform(v as f64)).collect())
+            }};
+        }
+
         match var.vartype() {
             NcVariableType::Float(FloatType::F32) => {
                 let raw_vals: Vec<f32> = var
@@ -190,91 +221,31 @@ mod desktop {
                 }
             }
             NcVariableType::Float(FloatType::F64) => {
-                let raw_vals: Vec<f64> = var
-                    .get_values::<f64, _>(extents)
-                    .map_err(|e| format!("Failed reading float64 hyperslab: {e}"))?;
-
-                Ok(raw_vals.into_iter().map(transform_f64).collect())
+                read_and_transform!(var, extents, f64, transform_f64)
             }
             NcVariableType::Int(IntType::I32) => {
-                let raw_vals: Vec<i32> = var
-                    .get_values::<i32, _>(extents)
-                    .map_err(|e| format!("Failed reading int32 hyperslab: {e}"))?;
-
-                Ok(raw_vals
-                    .into_iter()
-                    .map(|v| transform_f64(v as f64))
-                    .collect())
+                read_and_transform!(var, extents, i32, transform_f64)
             }
             NcVariableType::Int(IntType::I16) => {
-                let raw_vals: Vec<i16> = var
-                    .get_values::<i16, _>(extents)
-                    .map_err(|e| format!("Failed reading int16 hyperslab: {e}"))?;
-
-                Ok(raw_vals
-                    .into_iter()
-                    .map(|v| transform_f64(v as f64))
-                    .collect())
+                read_and_transform!(var, extents, i16, transform_f64)
             }
             NcVariableType::Int(IntType::I8) => {
-                let raw_vals: Vec<i8> = var
-                    .get_values::<i8, _>(extents)
-                    .map_err(|e| format!("Failed reading int8 hyperslab: {e}"))?;
-
-                Ok(raw_vals
-                    .into_iter()
-                    .map(|v| transform_f64(v as f64))
-                    .collect())
+                read_and_transform!(var, extents, i8, transform_f64)
             }
             NcVariableType::Int(IntType::U32) => {
-                let raw_vals: Vec<u32> = var
-                    .get_values::<u32, _>(extents)
-                    .map_err(|e| format!("Failed reading uint32 hyperslab: {e}"))?;
-
-                Ok(raw_vals
-                    .into_iter()
-                    .map(|v| transform_f64(v as f64))
-                    .collect())
+                read_and_transform!(var, extents, u32, transform_f64)
             }
             NcVariableType::Int(IntType::U16) => {
-                let raw_vals: Vec<u16> = var
-                    .get_values::<u16, _>(extents)
-                    .map_err(|e| format!("Failed reading uint16 hyperslab: {e}"))?;
-
-                Ok(raw_vals
-                    .into_iter()
-                    .map(|v| transform_f64(v as f64))
-                    .collect())
+                read_and_transform!(var, extents, u16, transform_f64)
             }
             NcVariableType::Int(IntType::U8) | NcVariableType::Char => {
-                let raw_vals: Vec<u8> = var
-                    .get_values::<u8, _>(extents)
-                    .map_err(|e| format!("Failed reading uint8 hyperslab: {e}"))?;
-
-                Ok(raw_vals
-                    .into_iter()
-                    .map(|v| transform_f64(v as f64))
-                    .collect())
+                read_and_transform!(var, extents, u8, transform_f64)
             }
             NcVariableType::Int(IntType::I64) => {
-                let raw_vals: Vec<i64> = var
-                    .get_values::<i64, _>(extents)
-                    .map_err(|e| format!("Failed reading int64 hyperslab: {e}"))?;
-
-                Ok(raw_vals
-                    .into_iter()
-                    .map(|v| transform_f64(v as f64))
-                    .collect())
+                read_and_transform!(var, extents, i64, transform_f64)
             }
             NcVariableType::Int(IntType::U64) => {
-                let raw_vals: Vec<u64> = var
-                    .get_values::<u64, _>(extents)
-                    .map_err(|e| format!("Failed reading uint64 hyperslab: {e}"))?;
-
-                Ok(raw_vals
-                    .into_iter()
-                    .map(|v| transform_f64(v as f64))
-                    .collect())
+                read_and_transform!(var, extents, u64, transform_f64)
             }
             other => Err(format!("Unsupported NetCDF variable type: {other:?}").into()),
         }
@@ -345,10 +316,7 @@ mod desktop {
             let file = netcdf::open(&self.file_path)
                 .map_err(|e| format!("Failed to open NetCDF file '{}': {e}", self.file_path))?;
 
-            let file_size = std::fs::metadata(&self.file_path)
-                .map(|m| m.len())
-                .unwrap_or(0);
-
+            let global_attrs = extract_global_attributes(&file);
             let mut variables = Vec::new();
 
             for var in file.variables() {
@@ -361,23 +329,30 @@ mod desktop {
                 let dimension_names: Vec<String> = dims.iter().map(|d| d.name()).collect();
                 let chunk_shape = shape.clone();
 
-                let mut attributes = HashMap::new();
-                for attr in var.attributes() {
-                    let attr_name = attr.name().to_string();
-                    if let Ok(val) = attr.value() {
-                        attributes.insert(attr_name, attribute_value_to_string(&val));
-                    }
-                }
+                let attributes = extract_variable_attributes(&var);
 
                 let units = attributes.get("units").cloned();
                 let long_name = attributes
                     .get("long_name")
                     .cloned()
-                    .or_else(|| attributes.get("standard_name").cloned());
+                    .or_else(|| attributes.get("standard_name").cloned())
+                    .or_else(|| attributes.get("description").cloned())
+                    .or_else(|| attributes.get("title").cloned());
 
-                let time_coverage_start = attributes.get("time_coverage_start").cloned();
-                let time_coverage_end = attributes.get("time_coverage_end").cloned();
-                let temporal_resolution = attributes.get("temporal_resolution").cloned();
+                let time_coverage_start = attributes
+                    .get("time_coverage_start")
+                    .cloned()
+                    .or_else(|| global_attrs.get("time_coverage_start").cloned());
+                let time_coverage_end = attributes
+                    .get("time_coverage_end")
+                    .cloned()
+                    .or_else(|| global_attrs.get("time_coverage_end").cloned());
+                let temporal_resolution = attributes
+                    .get("temporal_resolution")
+                    .cloned()
+                    .or_else(|| global_attrs.get("temporal_resolution").cloned());
+
+                let file_size = crate::utils::calculate_variable_size_bytes(&shape, &data_type);
 
                 variables.push(VariableInfo {
                     name,
@@ -397,11 +372,17 @@ mod desktop {
 
             let dimension_coordinates = extract_dimension_coordinates(&file);
 
-            let dataset_name = Path::new(&self.file_path)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("NetCDF Dataset")
-                .to_string();
+            let dataset_name = global_attrs
+                .get("title")
+                .or_else(|| global_attrs.get("dataset_name"))
+                .cloned()
+                .unwrap_or_else(|| {
+                    Path::new(&self.file_path)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("NetCDF Dataset")
+                        .to_string()
+                });
 
             Ok(DatasetMetadata {
                 name: dataset_name,
@@ -446,14 +427,10 @@ mod desktop {
                 let dim_name = dims[i].name();
                 dim_names.push(dim_name);
 
-                let (start, end) = match sel {
-                    DimensionSelection::Index(idx) => (*idx, idx.saturating_add(1)),
-                    DimensionSelection::Range { start, end } => (*start, *end),
-                };
-
+                let (start, end) = sel.bounds();
                 let start = start.min(dim_len.saturating_sub(1));
                 let end = end.max(start + 1).min(dim_len);
-                let count = end - start;
+                let count = end.saturating_sub(start).max(1);
 
                 extents_vec.push(Extent::SliceCount {
                     start,
@@ -476,13 +453,7 @@ mod desktop {
                 cb(bytes_read);
             }
 
-            let mut attributes = HashMap::new();
-            for attr in var.attributes() {
-                let attr_name = attr.name().to_string();
-                if let Ok(val) = attr.value() {
-                    attributes.insert(attr_name, attribute_value_to_string(&val));
-                }
-            }
+            let attributes = extract_variable_attributes(&var);
 
             // Extract coordinates for the sliced block
             let mut coordinates: HashMap<String, Vec<f64>> = HashMap::new();
