@@ -178,7 +178,19 @@ impl eframe::App for OctantApp {
             let path = file.path();
             let path_str = path.to_string_lossy().trim().to_string();
             if !path_str.is_empty() {
-                self.submit_or_activate_source(&path_str, None);
+                match crate::utils::infer_store_kind_from_target(&path_str) {
+                    Ok(_) => {
+                        self.submit_or_activate_source(&path_str, None);
+                    }
+                    Err(err) => {
+                        self.status_message = format!("⚠️ {err}: '{path_str}'");
+                        crate::ui::drop_zone::trigger_drop_zone_warning(
+                            &ctx,
+                            format!("{err}: {path_str}"),
+                        );
+                        log::warn!("{err}: {path_str}");
+                    }
+                }
             }
         }
 

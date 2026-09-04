@@ -143,8 +143,19 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
         let path = file.path();
         let source_path = path.to_string_lossy().trim().to_string();
         if !source_path.is_empty() {
-            app.hero_state.input = source_path.clone();
-            app.submit_or_activate_source(&source_path, None);
+            match crate::utils::infer_store_kind_from_target(&source_path) {
+                Ok(_) => {
+                    app.hero_state.input = source_path.clone();
+                    app.submit_or_activate_source(&source_path, None);
+                }
+                Err(err) => {
+                    app.status_message = format!("⚠️ {err}: '{source_path}'");
+                    crate::ui::drop_zone::trigger_drop_zone_warning(
+                        ui.ctx(),
+                        format!("{err}: {source_path}"),
+                    );
+                }
+            }
         }
     }
 
