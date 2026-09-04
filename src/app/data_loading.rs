@@ -184,6 +184,13 @@ impl OctantApp {
                     }
                 } else if input_target.to_lowercase().contains("icechunk") {
                     self.selected_store_kind = StoreKind::LocalIcechunk;
+                } else if input_target.ends_with(".nc")
+                    || input_target.ends_with(".nc4")
+                    || input_target.ends_with(".cdf")
+                    || input_target.ends_with(".netcdf")
+                    || input_target.starts_with("netcdf://")
+                {
+                    self.selected_store_kind = StoreKind::LocalNetCdf;
                 } else {
                     self.selected_store_kind = StoreKind::LocalZarr;
                 }
