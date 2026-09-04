@@ -142,7 +142,6 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
     if let Some(file) = dropped_files.first() {
         let path = file.path();
         let source_path = path.to_string_lossy().trim().to_string();
-
         if !source_path.is_empty() {
             app.hero_state.input = source_path.clone();
             app.submit_or_activate_source(&source_path, None);
@@ -169,6 +168,15 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         ui.add_space(14.0);
         sample_pills_row(ui, app);
+
+        ui.add_space(18.0);
+        if let Some(path) = crate::ui::drop_zone::show_drop_zone(ui, Some(420.0), 64.0) {
+            let source_path = path.to_string_lossy().trim().to_string();
+            if !source_path.is_empty() {
+                app.hero_state.input = source_path.clone();
+                app.submit_or_activate_source(&source_path, None);
+            }
+        }
 
         if app.is_loading || app.hero_state.loading {
             ui.add_space(20.0);

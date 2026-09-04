@@ -166,39 +166,7 @@ impl OctantApp {
             self.hero_state.begin_submit(trimmed);
             self.store_target_input = trimmed.to_string();
             if explicit_kind.is_none() {
-                if trimmed == "procedural://volume4d" {
-                    self.selected_store_kind = StoreKind::ProceduralVolume4D;
-                } else if trimmed == "procedural://matrix"
-                    || trimmed == "procedural://random"
-                    || trimmed == "procedural://matrix2d"
-                {
-                    self.selected_store_kind = StoreKind::ProceduralRandom;
-                } else if trimmed.starts_with("http://")
-                    || trimmed.starts_with("https://")
-                    || trimmed.starts_with("s3://")
-                {
-                    if trimmed.to_lowercase().contains("icechunk") {
-                        self.selected_store_kind = StoreKind::RemoteIcechunk;
-                    } else {
-                        self.selected_store_kind = StoreKind::RemoteZarr;
-                    }
-                } else if trimmed.to_lowercase().contains("icechunk") {
-                    self.selected_store_kind = StoreKind::LocalIcechunk;
-                } else if trimmed.ends_with(".nc")
-                    || trimmed.ends_with(".nc4")
-                    || trimmed.ends_with(".cdf")
-                    || trimmed.ends_with(".netcdf")
-                    || trimmed.ends_with(".h5")
-                    || trimmed.ends_with(".hdf5")
-                    || trimmed.ends_with(".hdf")
-                    || trimmed.ends_with(".he5")
-                    || trimmed.starts_with("netcdf://")
-                    || trimmed.starts_with("hdf5://")
-                {
-                    self.selected_store_kind = StoreKind::LocalNetCdf;
-                } else {
-                    self.selected_store_kind = StoreKind::LocalZarr;
-                }
+                self.selected_store_kind = StoreKind::infer_from_target(trimmed);
             }
             self.inspect_active_store();
         }

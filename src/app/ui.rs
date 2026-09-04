@@ -172,6 +172,16 @@ impl eframe::App for OctantApp {
         // Process in-flight export / screenshot requests
         self.process_pending_export(&ctx);
 
+        // Global Drag-and-Drop handler for files and directories
+        let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
+        if let Some(file) = dropped_files.first() {
+            let path = file.path();
+            let path_str = path.to_string_lossy().trim().to_string();
+            if !path_str.is_empty() {
+                self.submit_or_activate_source(&path_str, None);
+            }
+        }
+
         // 3. Render panels (each consumes space from the remaining area)ng area)
         crate::ui::top_bar::show_top_bar(self, ui);
 
