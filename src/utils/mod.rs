@@ -6,7 +6,10 @@ pub mod executor;
 pub mod grid;
 pub mod math;
 pub mod metadata;
+pub mod path;
 pub mod units;
+
+pub use path::{expand_tilde, expand_tilde_str};
 
 // Format-agnostic & domain re-exports
 pub use crate::data::backends::icechunk_storage::build_sync_icechunk_store;

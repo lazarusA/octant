@@ -27,17 +27,31 @@ mod desktop {
     impl NetCdfBlockStore {
         /// Opens a NetCDF dataset from a local filesystem path.
         pub fn open_local(path: &str) -> Result<Self, BlockStoreError> {
-            let p = Path::new(path);
+            let clean_path = path
+                .strip_prefix("file://")
+                .or_else(|| path.strip_prefix("netcdf://"))
+                .unwrap_or(path)
+                .trim()
+                .trim_matches('\'')
+                .trim_matches('"');
+            let p = crate::utils::expand_tilde(clean_path);
             if !p.exists() {
-                return Err(format!("NetCDF file not found: {path}").into());
+                return Err(format!("NetCDF file not found: {}", p.display()).into());
+            }
+            if p.is_dir() {
+                return Err(format!(
+                    "'{}' is a directory. Please specify a .nc / .cdf file path.",
+                    p.display()
+                )
+                .into());
             }
 
             // Verify that the file can be opened and parsed by netcdf
-            let _file =
-                netcdf::open(p).map_err(|e| format!("Failed to open NetCDF file '{path}': {e}"))?;
+            let _file = netcdf::open(&p)
+                .map_err(|e| format!("Failed to open NetCDF file '{}': {e}", p.display()))?;
 
             Ok(Self {
-                file_path: path.to_string(),
+                file_path: p.to_string_lossy().to_string(),
             })
         }
 
@@ -717,6 +731,50 @@ mod tests {
         assert!(block.values[1].is_nan());
         assert!((block.values[2] - 30.0).abs() < 1e-4);
         assert!((block.values[3] - 10.0).abs() < 1e-4);
+
+        let _ = std::fs::remove_file(test_file);
+    }
+
+    #[test]
+    fn test_netcdf_1d_variable_loading() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("octant_test_1d_var.nc");
+        let path_str = test_file.to_str().unwrap().to_string();
+
+        {
+            let mut file = netcdf::create(&test_file).expect("create netcdf file");
+            file.add_dimension("lon", 5).expect("add dim");
+
+            let mut lon_var = file
+                .add_variable::<f32>("lon", &["lon"])
+                .expect("add lon var");
+            lon_var
+                .put_attribute("units", "degrees_east")
+                .expect("units");
+            lon_var
+                .put_values(&[-180.0f32, -90.0, 0.0, 90.0, 180.0], ..)
+                .expect("put values");
+        }
+
+        let store = NetCdfBlockStore::open_local(&path_str).expect("open store");
+        let req = SliceRequest::full_range("lon", &[5]);
+        let block = store.fetch_block(&req).expect("fetch 1d block");
+
+        assert_eq!(block.rank(), 1);
+        assert_eq!(block.shape, vec![5]);
+        assert_eq!(block.values.len(), 5);
+        assert_eq!(block.values[0], -180.0);
+        assert_eq!(block.values[4], 180.0);
+
+        // Verify that slicing into 2D MatrixData succeeds with width = 5, height = 1
+        let matrix = block
+            .slice_2d_with_ranges(0, 0, (0, 5), (0, 1), &[0], 1, "test_1d", true)
+            .expect("slice 1d to matrix");
+        assert_eq!(matrix.width, 5);
+        assert_eq!(matrix.height, 1);
+        assert_eq!(matrix.values.len(), 5);
+        assert_eq!(matrix.min_val, -180.0);
+        assert_eq!(matrix.max_val, 180.0);
 
         let _ = std::fs::remove_file(test_file);
     }
