@@ -9,7 +9,7 @@ pub mod metadata;
 pub mod path;
 pub mod units;
 
-pub use path::{expand_tilde, expand_tilde_str};
+pub use path::{expand_tilde, expand_tilde_str, infer_store_kind_from_target};
 
 // Format-agnostic & domain re-exports
 pub use crate::data::backends::icechunk_storage::build_sync_icechunk_store;

@@ -166,7 +166,20 @@ impl OctantApp {
             self.hero_state.begin_submit(trimmed);
             self.store_target_input = trimmed.to_string();
             if explicit_kind.is_none() {
-                self.selected_store_kind = StoreKind::infer_from_target(trimmed);
+                match crate::utils::infer_store_kind_from_target(trimmed) {
+                    Ok(kind) => {
+                        self.selected_store_kind = kind;
+                    }
+                    Err(err) => {
+                        self.status_message = format!("{err}: '{trimmed}'");
+                        self.hero_state.loading = false;
+                        self.hero_state.loaded = false;
+                        self.hero_state.source_label.clear();
+                        self.is_loading = false;
+                        log::warn!("{err}: '{trimmed}'");
+                        return;
+                    }
+                }
             }
             self.inspect_active_store();
         }
