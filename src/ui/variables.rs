@@ -1,4 +1,4 @@
-use crate::app::OctantApp;
+use crate::{app::OctantApp, data::VariableTreeGroup};
 
 pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
     if !app.show_variables_overlay {
@@ -7,7 +7,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
     let screen_size = ctx.input(|i| i.viewport_rect().size());
 
-    let width = (screen_size.x * 0.28).clamp(280.0, 480.0);
+    let width = (screen_size.x * 0.28).clamp(280.0, 520.0);
     let max_height = (screen_size.y * 0.65).clamp(250.0, 750.0);
 
     app.variables_overlay_width = width;
@@ -28,7 +28,11 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         ui.horizontal(|ui| {
                             ui.label("🔍");
                             ui.text_edit_singleline(&mut app.variable_search);
+                            if !app.variable_search.is_empty() && ui.small_button("✕").clicked() {
+                                app.variable_search.clear();
+                            }
                         });
+
                         egui::ScrollArea::vertical()
                             .max_height(max_height)
                             .min_scrolled_height(max_height)
@@ -52,8 +56,8 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                     return;
                                 }
 
-                                let variables = match &app.active_dataset_metadata {
-                                    Some(meta) => &meta.variables,
+                                let metadata = match &app.active_dataset_metadata {
+                                    Some(meta) => meta,
                                     None => {
                                         ui.vertical_centered(|ui| {
                                             ui.add_space(10.0);
@@ -62,9 +66,13 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
                                             ui.add_space(6.0);
 
-                                            if ui.button("🔍 Fetch / Load Store Metadata").clicked() {
+                                            if ui.button("🔍 Fetch / Load Store Metadata").clicked()
+                                            {
                                                 let target = app.store_target_input.clone();
-                                                app.submit_or_activate_source(&target, Some(app.selected_store_kind));
+                                                app.submit_or_activate_source(
+                                                    &target,
+                                                    Some(app.selected_store_kind),
+                                                );
                                             }
 
                                             ui.add_space(10.0);
@@ -74,7 +82,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                     }
                                 };
 
-                                if variables.is_empty() {
+                                if metadata.variables.is_empty() {
                                     ui.vertical_centered(|ui| {
                                         ui.add_space(10.0);
 
@@ -92,38 +100,42 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                     return;
                                 }
 
-                                let search = app.variable_search.to_lowercase();
+                                let tree = metadata.build_variable_tree();
+                                let search_query = app.variable_search.trim();
+                                let search_active = !search_query.is_empty();
+
+                                let display_tree = if search_active {
+                                    tree.filter(search_query, &metadata.variables)
+                                } else {
+                                    Some(tree)
+                                };
+
+                                let Some(root_group) = display_tree else {
+                                    ui.vertical_centered(|ui| {
+                                        ui.add_space(10.0);
+                                        ui.label(
+                                            egui::RichText::new(format!(
+                                                "No variables matching '{}'",
+                                                search_query
+                                            ))
+                                            .italics(),
+                                        );
+                                        ui.add_space(10.0);
+                                    });
+                                    return;
+                                };
 
                                 let mut newly_selected_idx: Option<usize> = None;
 
-                                for (idx, var_info) in variables.iter().enumerate() {
-                                    if !search.is_empty()
-                                        && !var_info.name.to_lowercase().contains(&search)
-                                    {
-                                        continue;
-                                    }
-
-                                    let is_selected = app.selected_variable_idx == idx;
-
-                                    let label_text = if let Some(units) = &var_info.units {
-                                        format!(
-                                            "{}  ({})",
-                                            var_info.name, units
-                                        )
-                                    } else {
-                                        var_info.name.to_string()
-                                    };
-
-                                    if ui
-                                        .selectable_label(
-                                            is_selected,
-                                            egui::RichText::new(label_text).strong(),
-                                        )
-                                        .clicked()
-                                    {
-                                        newly_selected_idx = Some(idx);
-                                    }
-                                }
+                                render_tree_group(
+                                    ui,
+                                    &root_group,
+                                    &metadata.variables,
+                                    app.selected_variable_idx,
+                                    search_active,
+                                    &mut newly_selected_idx,
+                                    true,
+                                );
 
                                 if let Some(idx) = newly_selected_idx {
                                     app.selected_variable_idx = idx;
@@ -150,4 +162,134 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
             });
         });
     app.variables_overlay_width = area_resp.response.rect.width();
+}
+
+fn render_tree_group(
+    ui: &mut egui::Ui,
+    group: &VariableTreeGroup,
+    variables: &[crate::data::VariableInfo],
+    selected_idx: usize,
+    search_active: bool,
+    newly_selected_idx: &mut Option<usize>,
+    is_root: bool,
+) {
+    if is_root {
+        // At root: render subgroups first, then root variables (or vice-versa)
+        for subgroup in &group.subgroups {
+            render_subgroup(
+                ui,
+                subgroup,
+                variables,
+                selected_idx,
+                search_active,
+                newly_selected_idx,
+            );
+        }
+
+        if !group.variable_indices.is_empty() {
+            if !group.subgroups.is_empty() {
+                ui.add_space(4.0);
+                ui.separator();
+                ui.label(egui::RichText::new("Root Variables").small().weak());
+            }
+
+            for &idx in &group.variable_indices {
+                if let Some(var_info) = variables.get(idx) {
+                    render_variable_row(ui, var_info, idx, selected_idx, newly_selected_idx);
+                }
+            }
+        }
+    } else {
+        render_subgroup(
+            ui,
+            group,
+            variables,
+            selected_idx,
+            search_active,
+            newly_selected_idx,
+        );
+    }
+}
+
+fn render_subgroup(
+    ui: &mut egui::Ui,
+    subgroup: &VariableTreeGroup,
+    variables: &[crate::data::VariableInfo],
+    selected_idx: usize,
+    search_active: bool,
+    newly_selected_idx: &mut Option<usize>,
+) {
+    let header_id = ui.make_persistent_id(("var_tree_group", &subgroup.full_path));
+    let total_count = subgroup.total_variable_count();
+    let header_title = format!("📁 {} ({})", subgroup.name, total_count);
+
+    egui::collapsing_header::CollapsingState::load_with_default_open(
+        ui.ctx(),
+        header_id,
+        search_active || subgroup.full_path.split('/').count() <= 1,
+    )
+    .show_header(ui, |ui| {
+        ui.label(egui::RichText::new(header_title).strong());
+    })
+    .body(|ui| {
+        ui.indent(
+            ui.make_persistent_id(("var_tree_body", &subgroup.full_path)),
+            |ui| {
+                for nested_sub in &subgroup.subgroups {
+                    render_subgroup(
+                        ui,
+                        nested_sub,
+                        variables,
+                        selected_idx,
+                        search_active,
+                        newly_selected_idx,
+                    );
+                }
+
+                for &idx in &subgroup.variable_indices {
+                    if let Some(var_info) = variables.get(idx) {
+                        render_variable_row(ui, var_info, idx, selected_idx, newly_selected_idx);
+                    }
+                }
+            },
+        );
+    });
+}
+
+fn render_variable_row(
+    ui: &mut egui::Ui,
+    var_info: &crate::data::VariableInfo,
+    idx: usize,
+    selected_idx: usize,
+    newly_selected_idx: &mut Option<usize>,
+) {
+    let is_selected = selected_idx == idx;
+    let leaf_name = var_info.leaf_name();
+
+    let label_text = if let Some(units) = &var_info.units {
+        format!("📄 {}  ({})", leaf_name, units)
+    } else {
+        format!("📄 {}", leaf_name)
+    };
+
+    let shape_str = format!("{:?}", var_info.shape);
+    let type_str = format!("[{}]", var_info.data_type);
+
+    let response = ui.selectable_label(is_selected, egui::RichText::new(label_text).strong());
+
+    let tooltip_text = if let Some(group) = var_info.group_path() {
+        format!(
+            "Variable: {}\nGroup: {}\nType: {}\nShape: {}",
+            var_info.name, group, type_str, shape_str
+        )
+    } else {
+        format!(
+            "Variable: {}\nType: {}\nShape: {}",
+            var_info.name, type_str, shape_str
+        )
+    };
+
+    if response.on_hover_text(tooltip_text).clicked() {
+        *newly_selected_idx = Some(idx);
+    }
 }

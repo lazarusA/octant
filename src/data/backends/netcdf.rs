@@ -301,16 +301,125 @@ mod desktop {
         dimension_coordinates
     }
 
+    fn with_netcdf_variable<R>(
+        file: &netcdf::File,
+        name: &str,
+        f: impl FnOnce(&netcdf::Variable) -> Result<R, BlockStoreError>,
+    ) -> Result<R, BlockStoreError> {
+        let clean = name.trim_start_matches('/').trim_end_matches('/');
+        if let Some(var) = file.variable(clean) {
+            return f(&var);
+        }
+
+        let segments: Vec<&str> = clean.split('/').filter(|s| !s.is_empty()).collect();
+        if segments.len() > 1 {
+            fn find_in_group<R>(
+                group: &netcdf::Group,
+                segments: &[&str],
+                f: impl FnOnce(&netcdf::Variable) -> Result<R, BlockStoreError>,
+            ) -> Result<R, BlockStoreError> {
+                if segments.len() == 1 {
+                    if let Some(var) = group.variable(segments[0]) {
+                        return f(&var);
+                    }
+                } else if let Some(sub) = group.group(segments[0]) {
+                    return find_in_group(&sub, &segments[1..], f);
+                }
+                Err(format!(
+                    "Variable '{}' not found in NetCDF group",
+                    segments.join("/")
+                )
+                .into())
+            }
+
+            if let Ok(Some(top_group)) = file.group(segments[0]) {
+                return find_in_group(&top_group, &segments[1..], f);
+            }
+        }
+
+        Err(format!("Variable '{name}' not found in NetCDF file").into())
+    }
+
+    fn collect_group_variables(
+        group: &netcdf::Group,
+        prefix: &str,
+        global_attrs: &HashMap<String, String>,
+        variables: &mut Vec<VariableInfo>,
+    ) {
+        for var in group.variables() {
+            let name = if prefix.is_empty() {
+                var.name()
+            } else {
+                format!("{prefix}/{}", var.name())
+            };
+            let vartype = var.vartype();
+            let data_type = var_type_to_string(&vartype).to_string();
+
+            let dims = var.dimensions();
+            let shape: Vec<u64> = dims.iter().map(|d| d.len() as u64).collect();
+            let dimension_names: Vec<String> = dims.iter().map(|d| d.name()).collect();
+            let chunk_shape = shape.clone();
+
+            let attributes = extract_variable_attributes(&var);
+
+            let units = attributes.get("units").cloned();
+            let long_name = attributes
+                .get("long_name")
+                .cloned()
+                .or_else(|| attributes.get("standard_name").cloned())
+                .or_else(|| attributes.get("description").cloned())
+                .or_else(|| attributes.get("title").cloned());
+
+            let time_coverage_start = attributes
+                .get("time_coverage_start")
+                .cloned()
+                .or_else(|| global_attrs.get("time_coverage_start").cloned());
+            let time_coverage_end = attributes
+                .get("time_coverage_end")
+                .cloned()
+                .or_else(|| global_attrs.get("time_coverage_end").cloned());
+            let temporal_resolution = attributes
+                .get("temporal_resolution")
+                .cloned()
+                .or_else(|| global_attrs.get("temporal_resolution").cloned());
+
+            let file_size = crate::utils::calculate_variable_size_bytes(&shape, &data_type);
+
+            variables.push(VariableInfo {
+                name,
+                data_type,
+                shape,
+                dimension_names,
+                chunk_shape,
+                file_size,
+                units,
+                long_name,
+                time_coverage_start,
+                time_coverage_end,
+                temporal_resolution,
+                attributes,
+            });
+        }
+
+        for sub in group.groups() {
+            let sub_name = sub.name();
+            let new_prefix = if prefix.is_empty() {
+                sub_name
+            } else {
+                format!("{prefix}/{sub_name}")
+            };
+            collect_group_variables(&sub, &new_prefix, global_attrs, variables);
+        }
+    }
+
     impl BlockStore for NetCdfBlockStore {
         fn backend_name(&self) -> &str {
             "NetCDF"
         }
 
         fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
-            let file = netcdf::open(&self.file_path)
-                .map_err(|e| format!("Failed to open NetCDF file '{}': {e}", self.file_path))?;
-
-            Ok(file.variables().map(|v| v.name()).collect())
+            let meta = self.inspect()?;
+            Ok(meta.variables.into_iter().map(|v| v.name).collect())
         }
 
         fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError> {
@@ -371,6 +480,13 @@ mod desktop {
                 });
             }
 
+            if let Ok(subgroups) = file.groups() {
+                for sub in subgroups {
+                    let sub_name = sub.name();
+                    collect_group_variables(&sub, &sub_name, &global_attrs, &mut variables);
+                }
+            }
+
             let dimension_coordinates = extract_dimension_coordinates(&file);
 
             let dataset_name = global_attrs
@@ -401,116 +517,114 @@ mod desktop {
             let file = netcdf::open(&self.file_path)
                 .map_err(|e| format!("Failed to open NetCDF file '{}': {e}", self.file_path))?;
 
-            let var = file.variable(&request.variable).ok_or_else(|| {
-                format!("Variable '{}' not found in NetCDF file", request.variable)
-            })?;
+            with_netcdf_variable(&file, &request.variable, |var| {
+                let dims = var.dimensions();
+                let rank = dims.len();
 
-            let dims = var.dimensions();
-            let rank = dims.len();
+                if request.selections.len() != rank {
+                    return Err(format!(
+                        "fetch_block: selection has {} dimension(s) but '{}' has rank {}",
+                        request.selections.len(),
+                        request.variable,
+                        rank
+                    )
+                    .into());
+                }
 
-            if request.selections.len() != rank {
-                return Err(format!(
-                    "fetch_block: selection has {} dimension(s) but '{}' has rank {}",
-                    request.selections.len(),
-                    request.variable,
-                    rank
-                )
-                .into());
-            }
+                let mut extents_vec = Vec::with_capacity(rank);
+                let mut block_shape = Vec::with_capacity(rank);
+                let mut origin = Vec::with_capacity(rank);
+                let mut dim_names = Vec::with_capacity(rank);
 
-            let mut extents_vec = Vec::with_capacity(rank);
-            let mut block_shape = Vec::with_capacity(rank);
-            let mut origin = Vec::with_capacity(rank);
-            let mut dim_names = Vec::with_capacity(rank);
+                for (i, sel) in request.selections.iter().enumerate() {
+                    let dim_len = dims[i].len();
+                    let dim_name = dims[i].name();
+                    dim_names.push(dim_name);
 
-            for (i, sel) in request.selections.iter().enumerate() {
-                let dim_len = dims[i].len();
-                let dim_name = dims[i].name();
-                dim_names.push(dim_name);
-
-                let (start, end) = sel.bounds();
-                let start = start.min(dim_len.saturating_sub(1));
-                let end = end.max(start + 1).min(dim_len);
-                let count = end.saturating_sub(start).max(1);
-
-                extents_vec.push(Extent::SliceCount {
-                    start,
-                    count,
-                    stride: 1,
-                });
-                block_shape.push(count);
-                origin.push(start);
-            }
-
-            let extents = Extents::from(extents_vec);
-            let raw_values = read_variable_hyperslab_as_f32(&var, &extents)?;
-
-            let bytes_read = raw_values
-                .len()
-                .checked_mul(std::mem::size_of::<f32>())
-                .unwrap_or(0) as u64;
-
-            if let Some(ref mut cb) = on_progress {
-                cb(bytes_read);
-            }
-
-            let attributes = extract_variable_attributes(&var);
-
-            // Extract coordinates for the sliced block
-            let mut coordinates: HashMap<String, Vec<f64>> = HashMap::new();
-            for (i, name) in dim_names.iter().enumerate() {
-                let clean = name.trim().to_lowercase();
-                if let Some(coord_var) = file.variable(name).or_else(|| file.variable(&clean))
-                    && coord_var.dimensions().len() == 1
-                {
-                    let dim_len = coord_var.dimensions()[0].len();
-                    let (start, end) = (origin[i], origin[i] + block_shape[i]);
+                    let (start, end) = sel.bounds();
                     let start = start.min(dim_len.saturating_sub(1));
-                    let end = end.min(dim_len);
+                    let end = end.max(start + 1).min(dim_len);
                     let count = end.saturating_sub(start).max(1);
 
-                    let coord_extents = Extents::from(vec![Extent::SliceCount {
+                    extents_vec.push(Extent::SliceCount {
                         start,
                         count,
                         stride: 1,
-                    }]);
+                    });
+                    block_shape.push(count);
+                    origin.push(start);
+                }
 
-                    if let Ok(vals) = read_variable_hyperslab_as_f32(&coord_var, &coord_extents)
-                        && let (Some(&first), Some(&last)) = (vals.first(), vals.last())
+                let extents = Extents::from(extents_vec);
+                let raw_values = read_variable_hyperslab_as_f32(var, &extents)?;
+
+                let bytes_read = raw_values
+                    .len()
+                    .checked_mul(std::mem::size_of::<f32>())
+                    .unwrap_or(0) as u64;
+
+                if let Some(ref mut cb) = on_progress {
+                    cb(bytes_read);
+                }
+
+                let attributes = extract_variable_attributes(var);
+
+                // Extract coordinates for the sliced block
+                let mut coordinates: HashMap<String, Vec<f64>> = HashMap::new();
+                for (i, name) in dim_names.iter().enumerate() {
+                    let clean = name.trim().to_lowercase();
+                    if let Some(coord_var) = file.variable(name).or_else(|| file.variable(&clean))
+                        && coord_var.dimensions().len() == 1
                     {
-                        coordinates.insert(name.clone(), vec![first as f64, last as f64]);
-                        if clean != *name {
-                            coordinates.insert(clean, vec![first as f64, last as f64]);
+                        let dim_len = coord_var.dimensions()[0].len();
+                        let (start, end) = (origin[i], origin[i] + block_shape[i]);
+                        let start = start.min(dim_len.saturating_sub(1));
+                        let end = end.min(dim_len);
+                        let count = end.saturating_sub(start).max(1);
+
+                        let coord_extents = Extents::from(vec![Extent::SliceCount {
+                            start,
+                            count,
+                            stride: 1,
+                        }]);
+
+                        if let Ok(vals) = read_variable_hyperslab_as_f32(&coord_var, &coord_extents)
+                            && let (Some(&first), Some(&last)) = (vals.first(), vals.last())
+                        {
+                            coordinates.insert(name.clone(), vec![first as f64, last as f64]);
+                            if clean != *name {
+                                coordinates.insert(clean, vec![first as f64, last as f64]);
+                            }
                         }
                     }
                 }
-            }
 
-            let json_attrs: serde_json::Map<String, serde_json::Value> = attributes
-                .iter()
-                .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
-                .collect();
+                let json_attrs: serde_json::Map<String, serde_json::Value> = attributes
+                    .iter()
+                    .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+                    .collect();
 
-            let oriented_values = check_and_orient_block_grid(
-                raw_values,
-                &mut block_shape,
-                &mut dim_names,
-                &mut origin,
-                &json_attrs,
-                &coordinates,
-            );
+                let oriented_values = check_and_orient_block_grid(
+                    raw_values,
+                    &mut block_shape,
+                    &mut dim_names,
+                    &mut origin,
+                    &json_attrs,
+                    &coordinates,
+                );
 
-            let block = OctantBlock::new(
-                request.variable.clone(),
-                block_shape,
-                dim_names,
-                origin,
-                Arc::from(oriented_values.into_boxed_slice()),
-                coordinates,
-                attributes,
-            );
+                let block = OctantBlock::new(
+                    request.variable.clone(),
+                    block_shape,
+                    dim_names,
+                    origin,
+                    Arc::from(oriented_values.into_boxed_slice()),
+                    coordinates,
+                    attributes,
+                );
 
-            Ok(block)
+                Ok(block)
+            })
         }
 
         fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {

@@ -97,11 +97,18 @@ pub fn extract_store_variables(
                     format!("/{}", node_path)
                 };
 
+                let clean_var_name = node_path.trim_start_matches('/');
+                let clean_var_name = if clean_var_name.is_empty() {
+                    "data"
+                } else {
+                    clean_var_name
+                };
+
                 let array_opt =
                     instantiate_array_from_node_metadata(store.clone(), &clean_path, &node_meta);
 
                 if let Some(array) = array_opt
-                    && let Some(var_info) = variable_info_from_array(&array, node_path.as_str())
+                    && let Some(var_info) = variable_info_from_array(&array, clean_var_name)
                 {
                     found_vars.push(var_info);
                 }
@@ -297,6 +304,7 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
                 let var_name = key
                     .trim_end_matches("/.zarray")
                     .trim_end_matches("/zarr.json")
+                    .trim_start_matches('/')
                     .to_string();
                 let var_name = if var_name.is_empty() {
                     "data".to_string()

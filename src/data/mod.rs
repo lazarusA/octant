@@ -18,7 +18,7 @@ pub mod source_factory;
 pub mod store_handle;
 pub mod volume_data;
 
-pub use metadata::{DatasetMetadata, VariableInfo};
+pub use metadata::{DatasetMetadata, VariableInfo, VariableTreeGroup};
 
 pub use block_cache::{BlockCache, BlockCacheKey};
 pub use block_loader::{BlockBatchOutcome, BlockLoadOutcome, BlockLoader};
