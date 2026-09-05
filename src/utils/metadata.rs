@@ -83,50 +83,55 @@ pub fn extract_store_variables(
 ) -> Result<Vec<VariableInfo>, Box<dyn Error>> {
     let mut variables = Vec::new();
 
-    // 1. Try opening root as a Zarr Group
-    if let Ok(group) = Group::open(store.clone(), "/") {
-        // Check if group contains consolidated metadata (Zarr v2 or v3 inline)
-        let consolidated_arrays = if let Some(ConsolidatedMetadata { metadata, .. }) =
-            group.consolidated_metadata()
-        {
-            let mut found_vars = Vec::new();
-            for (node_path, node_meta) in metadata {
-                let clean_path = if node_path.starts_with('/') {
-                    node_path.to_string()
-                } else {
-                    format!("/{}", node_path)
-                };
+    // 1. Try opening root as a Zarr Group and check consolidated metadata (Zarr v2 or v3 inline)
+    if let Ok(group) = Group::open(store.clone(), "/")
+        && let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata()
+    {
+        for (node_path, node_meta) in metadata {
+            let clean_path = if node_path.starts_with('/') {
+                node_path.to_string()
+            } else {
+                format!("/{}", node_path)
+            };
 
-                let array_opt =
-                    instantiate_array_from_node_metadata(store.clone(), &clean_path, &node_meta);
+            let clean_var_name = node_path.trim_start_matches('/');
+            let clean_var_name = if clean_var_name.is_empty() {
+                "data"
+            } else {
+                clean_var_name
+            };
 
-                if let Some(array) = array_opt
-                    && let Some(var_info) = variable_info_from_array(&array, node_path.as_str())
-                {
-                    found_vars.push(var_info);
-                }
+            let array_opt =
+                instantiate_array_from_node_metadata(store.clone(), &clean_path, &node_meta);
+
+            if let Some(array) = array_opt
+                && let Some(var_info) = variable_info_from_array(&array, clean_var_name)
+            {
+                variables.push(var_info);
             }
-            found_vars
-        } else {
-            Vec::new()
-        };
-
-        if !consolidated_arrays.is_empty() {
-            return Ok(consolidated_arrays);
         }
-
-        // 2. Discover child nodes recursively via zarrs get_child_nodes
-        if let Ok(root_path) = NodePath::new("/") {
-            discover_child_nodes_recursive(&store, &root_path, &mut variables);
-        }
-    } else if let Ok(array) = Array::open(store.clone(), "/") {
-        // 3. Root itself is a single Array
-        if let Some(var_info) = variable_info_from_array(&array, "data") {
-            variables.push(var_info);
+        if !variables.is_empty() {
+            return Ok(variables);
         }
     }
 
-    // 4. Fallback: discover arrays via remote HTTP manifest inspection if base_url is present
+    // 2. Hierarchical recursive child node discovery via get_child_nodes (fast, zero-chunk listing)
+    if let Ok(root_path) = NodePath::new("/") {
+        discover_child_nodes_recursive(&store, &root_path, &mut variables);
+    }
+    if !variables.is_empty() {
+        return Ok(variables);
+    }
+
+    // 3. Root itself is a single Array
+    if let Ok(array) = Array::open(store.clone(), "/")
+        && let Some(var_info) = variable_info_from_array(&array, "data")
+    {
+        variables.push(var_info);
+        return Ok(variables);
+    }
+
+    // 4. Remote HTTP manifest inspection fallback if base_url is present
     if variables.is_empty() && !base_url.is_empty() {
         variables = discover_arrays_via_http_metadata(base_url);
     }
@@ -148,12 +153,23 @@ fn discover_child_nodes_recursive(
             } else {
                 var_name
             };
-            if let Ok(array) = Array::open(store.clone(), path_str) {
-                if let Some(var_info) = variable_info_from_array(&array, var_name) {
-                    variables.push(var_info);
+
+            match child.metadata() {
+                NodeMetadata::Array(_) => {
+                    if let Some(array) = instantiate_array_from_node_metadata(
+                        store.clone(),
+                        path_str,
+                        child.metadata(),
+                    ) && let Some(var_info) = variable_info_from_array(&array, var_name)
+                    {
+                        variables.push(var_info);
+                    }
                 }
-            } else if let Ok(child_path) = NodePath::new(path_str) {
-                discover_child_nodes_recursive(store, &child_path, variables);
+                NodeMetadata::Group(_) => {
+                    if let Ok(child_path) = NodePath::new(path_str) {
+                        discover_child_nodes_recursive(store, &child_path, variables);
+                    }
+                }
             }
         }
     }
@@ -297,6 +313,7 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
                 let var_name = key
                     .trim_end_matches("/.zarray")
                     .trim_end_matches("/zarr.json")
+                    .trim_start_matches('/')
                     .to_string();
                 let var_name = if var_name.is_empty() {
                     "data".to_string()

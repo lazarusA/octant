@@ -56,7 +56,7 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
         || trimmed.starts_with("az://")
     {
         let lower = trimmed.to_lowercase();
-        if lower.contains("icechunk") {
+        if lower.contains("icechunk") || lower.contains("earthmover") {
             return Ok(StoreKind::RemoteIcechunk);
         }
         return Ok(StoreKind::RemoteZarr);
@@ -185,6 +185,12 @@ mod tests {
         assert_eq!(
             infer_store_kind_from_target("s3://bucket/dataset.zarr"),
             Ok(StoreKind::RemoteZarr)
+        );
+        assert_eq!(
+            infer_store_kind_from_target(
+                "https://earthmover-icechunk-era5.s3.us-east-1.amazonaws.com/era5_surface_aws"
+            ),
+            Ok(StoreKind::RemoteIcechunk)
         );
         assert_eq!(
             infer_store_kind_from_target("https://example.com/repo_icechunk"),

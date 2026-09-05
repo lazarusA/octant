@@ -26,34 +26,48 @@ pub fn build_sync_icechunk_store(
     let rt = get_shared_tokio_rt();
 
     let async_store = rt.block_on(async {
-        let expanded = crate::utils::expand_tilde(location);
-        let storage = if expanded.exists() {
-            icechunk::new_local_filesystem_storage(&expanded).await?
-        } else {
-            let (bucket, prefix, region, endpoint_url) = parse_s3_or_http_url(location)?;
-            let mut config = icechunk::config::S3Options::default();
-            config.region = region.or_else(|| Some("us-east-1".to_string()));
-            config.endpoint_url = endpoint_url;
-            config.anonymous = true;
-            config.allow_http = true;
-            config.force_path_style = true;
+        tokio::time::timeout(std::time::Duration::from_secs(30), async {
+            let expanded = crate::utils::expand_tilde(location);
+            let storage = if expanded.exists() {
+                icechunk::new_local_filesystem_storage(&expanded).await?
+            } else {
+                let (bucket, prefix, region, endpoint_url) = parse_s3_or_http_url(location)?;
+                let force_path_style = endpoint_url.is_some();
 
-            icechunk::new_s3_object_store_storage(
-                config,
-                bucket,
-                prefix,
-                None,
-                Vec::new(),
-                Vec::new(),
-            )
-            .await?
-        };
+                let mut config = icechunk::config::S3Options::default();
+                config.region = region.or_else(|| Some("us-east-1".to_string()));
+                config.endpoint_url = endpoint_url;
+                config.anonymous = true;
+                config.allow_http = true;
+                config.force_path_style = force_path_style;
 
-        let repo = icechunk::Repository::open(None, storage, Default::default()).await?;
-        let version_info = icechunk::repository::VersionInfo::BranchTipRef("main".to_string());
-        let session = repo.readonly_session(&version_info).await?;
-        let ice_store = Arc::new(AsyncIcechunkStore::new(session));
-        Ok::<_, Box<dyn Error>>(ice_store)
+                icechunk::new_s3_object_store_storage(
+                    config,
+                    bucket,
+                    prefix,
+                    None,
+                    Vec::new(),
+                    Vec::new(),
+                )
+                .await
+                .map_err(|e| format!("Failed to create S3 storage for Icechunk: {e}"))?
+            };
+
+            let repo = icechunk::Repository::open(None, storage, Default::default())
+                .await
+                .map_err(|e| format!("Failed to open Icechunk repository: {e}"))?;
+
+            let version_info = icechunk::repository::VersionInfo::BranchTipRef("main".to_string());
+            let session = repo
+                .readonly_session(&version_info)
+                .await
+                .map_err(|e| format!("Failed to open readonly session on branch 'main': {e}"))?;
+
+            let ice_store = Arc::new(AsyncIcechunkStore::new(session));
+            Ok::<_, Box<dyn Error>>(ice_store)
+        })
+        .await
+        .map_err(|_| "Icechunk repository connection timed out after 30 seconds")?
     })?;
 
     let sync_store: ReadableWritableListableStorage = Arc::new(AsyncToSyncStorageAdapter::new(

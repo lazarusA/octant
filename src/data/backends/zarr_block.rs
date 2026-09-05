@@ -11,7 +11,7 @@ use super::zarr_slice::retrieve_array_subset_as_f32;
 use crate::data::block_store::BlockStoreError;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::{DimensionSelection, SliceRequest};
-use crate::utils::coordinates::get_cached_coord_bounds_with_rank;
+use crate::utils::coordinates::get_cached_coord_bounds_scoped;
 use crate::utils::grid::check_and_orient_block_grid;
 
 /// Fetches an arbitrary-rank hyperslab described by `request` and returns it
@@ -81,12 +81,23 @@ pub fn fetch_block_from_cached_array(
         .map(|(k, v)| (k.clone(), v.to_string()))
         .collect();
 
+    let group_path = request
+        .variable
+        .rfind('/')
+        .map(|idx| &request.variable[..idx]);
+
     let mut coordinates: HashMap<String, Vec<f64>> = HashMap::new();
     let total_dims = dim_names.len();
     for (i, name) in dim_names.iter().enumerate() {
-        if let Some((first, last)) =
-            get_cached_coord_bounds_with_rank(store.clone(), store_url, name, i, total_dims)
-        {
+        if let Some((first, last)) = get_cached_coord_bounds_scoped(
+            store.clone(),
+            store_url,
+            name,
+            group_path,
+            &[],
+            i,
+            total_dims,
+        ) {
             coordinates.insert(name.clone(), vec![first, last]);
         }
     }
@@ -94,10 +105,12 @@ pub fn fetch_block_from_cached_array(
     // Fallback: If dim_names contain generic "dim_i" names, query spatial coordinate bounds for lat and lon
     if coordinates.is_empty() || dim_names.iter().any(|d| d.starts_with("dim_")) {
         for candidate in &["lat", "latitude", "y", "lon", "longitude", "x"] {
-            if let Some((first, last)) = get_cached_coord_bounds_with_rank(
+            if let Some((first, last)) = get_cached_coord_bounds_scoped(
                 store.clone(),
                 store_url,
                 candidate,
+                group_path,
+                &[],
                 usize::MAX,
                 total_dims,
             ) {

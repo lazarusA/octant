@@ -140,6 +140,10 @@ impl OctantApp {
                 .and_then(|store| store.inspect())
                 .map_err(|e| e.to_string());
 
+            if let Err(err) = &res {
+                log::error!("Store inspect failed for '{target_input}': {err}");
+            }
+
             let _ = tx.send(res);
         });
     }
@@ -152,9 +156,24 @@ impl OctantApp {
             return;
         }
 
-        if let Some(kind) = explicit_kind {
-            self.selected_store_kind = kind;
-        }
+        let inferred = crate::utils::infer_store_kind_from_target(trimmed).ok();
+        let effective_kind = match (explicit_kind, inferred) {
+            (Some(kind), Some(inf)) => {
+                // Auto-upgrade generic/default Zarr selection if target URL is specifically Icechunk or NetCDF
+                if (kind == StoreKind::RemoteZarr && inf == StoreKind::RemoteIcechunk)
+                    || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalIcechunk)
+                    || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalNetCdf)
+                {
+                    inf
+                } else {
+                    kind
+                }
+            }
+            (Some(kind), None) => kind,
+            (None, Some(inf)) => inf,
+            (None, None) => self.selected_store_kind,
+        };
+        self.selected_store_kind = effective_kind;
 
         if self.try_activate_dataset(trimmed) {
             if let Some(meta) = &self.active_dataset_metadata {
@@ -165,22 +184,6 @@ impl OctantApp {
         } else {
             self.hero_state.begin_submit(trimmed);
             self.store_target_input = trimmed.to_string();
-            if explicit_kind.is_none() {
-                match crate::utils::infer_store_kind_from_target(trimmed) {
-                    Ok(kind) => {
-                        self.selected_store_kind = kind;
-                    }
-                    Err(err) => {
-                        self.status_message = format!("{err}: '{trimmed}'");
-                        self.hero_state.loading = false;
-                        self.hero_state.loaded = false;
-                        self.hero_state.source_label.clear();
-                        self.is_loading = false;
-                        log::warn!("{err}: '{trimmed}'");
-                        return;
-                    }
-                }
-            }
             self.inspect_active_store();
         }
     }

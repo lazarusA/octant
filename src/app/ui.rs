@@ -17,11 +17,16 @@ impl eframe::App for OctantApp {
                 self.is_loading = false;
                 match result {
                     Ok(metadata) => {
-                        self.status_message = format!(
-                            "Inspected '{}' (Found {} variables)",
-                            metadata.name,
-                            metadata.variables.len()
-                        );
+                        if metadata.variables.is_empty() {
+                            self.status_message =
+                                format!("⚠️ No variables discovered in '{}'", metadata.name);
+                        } else {
+                            self.status_message = format!(
+                                "Inspected '{}' (Found {} variables)",
+                                metadata.name,
+                                metadata.variables.len()
+                            );
+                        }
                         self.hero_state.loading = false;
                         self.hero_state.loaded = true;
                         self.hero_state.source_label = metadata.name.clone();
@@ -42,13 +47,15 @@ impl eframe::App for OctantApp {
                             self.dataset_manager.add(dataset);
                         }
 
+                        self.cached_variable_tree = Some(metadata.build_variable_tree());
                         self.active_dataset_metadata = Some(metadata);
                         self.selected_variable_idx = 0;
                         self.show_variables_overlay = true;
                     }
                     Err(err) => {
                         self.hero_state.loading = false;
-                        self.status_message = format!("Store inspect error: {}", err);
+                        self.hero_state.loaded = false;
+                        self.status_message = format!("❌ Store inspect error: {}", err);
                     }
                 }
             } else {

@@ -11,10 +11,10 @@ use app::OctantApp;
 // NATIVE RUNTIME MAIN WINDOW TRIGGER
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
-    // env_logger::Builder::from_env(
+    // let _ = env_logger::Builder::from_env(
     //     env_logger::Env::default().default_filter_or("info,octant=debug,wgpu=warn"),
     // )
-    // .init();
+    // .try_init();
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
