@@ -95,27 +95,30 @@ impl VariableTreeGroup {
         if query_lower.is_empty() {
             return Some(self.clone());
         }
+        self.filter_lowercased(&query_lower, variables)
+    }
 
-        let group_matches = self.name.to_lowercase().contains(&query_lower)
-            || self.full_path.to_lowercase().contains(&query_lower);
+    fn filter_lowercased(
+        &self,
+        query_lower: &str,
+        variables: &[VariableInfo],
+    ) -> Option<VariableTreeGroup> {
+        let group_matches = self.name.to_lowercase().contains(query_lower)
+            || self.full_path.to_lowercase().contains(query_lower);
 
         let mut filtered_vars = Vec::new();
         for &idx in &self.variable_indices {
             if let Some(var) = variables.get(idx)
                 && (group_matches
-                    || var.name.to_lowercase().contains(&query_lower)
+                    || var.name.to_lowercase().contains(query_lower)
                     || var
                         .long_name
                         .as_deref()
-                        .unwrap_or("")
-                        .to_lowercase()
-                        .contains(&query_lower)
+                        .is_some_and(|l| l.to_lowercase().contains(query_lower))
                     || var
                         .units
                         .as_deref()
-                        .unwrap_or("")
-                        .to_lowercase()
-                        .contains(&query_lower))
+                        .is_some_and(|u| u.to_lowercase().contains(query_lower)))
             {
                 filtered_vars.push(idx);
             }
@@ -123,7 +126,7 @@ impl VariableTreeGroup {
 
         let mut filtered_subgroups = Vec::new();
         for sub in &self.subgroups {
-            if let Some(filtered_sub) = sub.filter(&query_lower, variables) {
+            if let Some(filtered_sub) = sub.filter_lowercased(query_lower, variables) {
                 filtered_subgroups.push(filtered_sub);
             }
         }

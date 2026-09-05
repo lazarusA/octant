@@ -87,10 +87,6 @@ pub fn extract_store_variables(
     if let Ok(group) = Group::open(store.clone(), "/")
         && let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata()
     {
-        log::debug!(
-            "Found inline consolidated metadata with {} nodes for '{base_url}'",
-            metadata.len()
-        );
         for (node_path, node_meta) in metadata {
             let clean_path = if node_path.starts_with('/') {
                 node_path.to_string()
@@ -115,10 +111,6 @@ pub fn extract_store_variables(
             }
         }
         if !variables.is_empty() {
-            log::info!(
-                "Extracted {} variables from consolidated metadata for '{base_url}'",
-                variables.len()
-            );
             return Ok(variables);
         }
     }
@@ -128,10 +120,6 @@ pub fn extract_store_variables(
         discover_child_nodes_recursive(&store, &root_path, &mut variables);
     }
     if !variables.is_empty() {
-        log::info!(
-            "Extracted {} variables via hierarchical node discovery for '{base_url}'",
-            variables.len()
-        );
         return Ok(variables);
     }
 
@@ -139,24 +127,13 @@ pub fn extract_store_variables(
     if let Ok(array) = Array::open(store.clone(), "/")
         && let Some(var_info) = variable_info_from_array(&array, "data")
     {
-        log::info!("Discovered root single array 'data' for '{base_url}'");
         variables.push(var_info);
         return Ok(variables);
     }
 
     // 4. Remote HTTP manifest inspection fallback if base_url is present
     if variables.is_empty() && !base_url.is_empty() {
-        log::debug!("Falling back to HTTP remote manifest metadata inspection at '{base_url}'...");
         variables = discover_arrays_via_http_metadata(base_url);
-    }
-
-    if variables.is_empty() {
-        log::warn!("No variables discovered for store '{base_url}' across all discovery passes.");
-    } else {
-        log::info!(
-            "Successfully discovered total {} variables for '{base_url}'",
-            variables.len()
-        );
     }
 
     Ok(variables)
@@ -177,18 +154,22 @@ fn discover_child_nodes_recursive(
                 var_name
             };
 
-            let array_opt = if let Ok(array) = Array::open(store.clone(), path_str) {
-                Some(array)
-            } else {
-                instantiate_array_from_node_metadata(store.clone(), path_str, child.metadata())
-            };
-
-            if let Some(array) = array_opt {
-                if let Some(var_info) = variable_info_from_array(&array, var_name) {
-                    variables.push(var_info);
+            match child.metadata() {
+                NodeMetadata::Array(_) => {
+                    if let Some(array) = instantiate_array_from_node_metadata(
+                        store.clone(),
+                        path_str,
+                        child.metadata(),
+                    ) && let Some(var_info) = variable_info_from_array(&array, var_name)
+                    {
+                        variables.push(var_info);
+                    }
                 }
-            } else if let Ok(child_path) = NodePath::new(path_str) {
-                discover_child_nodes_recursive(store, &child_path, variables);
+                NodeMetadata::Group(_) => {
+                    if let Ok(child_path) = NodePath::new(path_str) {
+                        discover_child_nodes_recursive(store, &child_path, variables);
+                    }
+                }
             }
         }
     }

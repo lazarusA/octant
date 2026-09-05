@@ -128,17 +128,10 @@ impl OctantApp {
         self.store_target_input = self.store_target_input.trim().to_string();
         let target_input = self.store_target_input.clone();
 
-        log::info!(
-            "Initiating store inspection: kind={:?}, target='{}'",
-            store_kind,
-            target_input
-        );
-
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
         self.metadata_rx = Some(rx);
 
         rayon::spawn(move || {
-            let start = std::time::Instant::now();
             let kind = store_kind.to_data_source_kind();
             let source_id = StoreKind::make_source_id(store_kind, &target_input);
             let source = crate::data::DataSource::new(&source_id, kind, &target_input, "Store");
@@ -147,19 +140,8 @@ impl OctantApp {
                 .and_then(|store| store.inspect())
                 .map_err(|e| e.to_string());
 
-            let elapsed = start.elapsed();
-            match &res {
-                Ok(meta) => {
-                    log::info!(
-                        "Store inspect succeeded in {:?}: found {} variables for '{}'",
-                        elapsed,
-                        meta.variables.len(),
-                        meta.name
-                    );
-                }
-                Err(err) => {
-                    log::error!("Store inspect failed in {:?}: {}", elapsed, err);
-                }
+            if let Err(err) = &res {
+                log::error!("Store inspect failed for '{target_input}': {err}");
             }
 
             let _ = tx.send(res);

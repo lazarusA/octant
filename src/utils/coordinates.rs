@@ -81,23 +81,23 @@ pub fn fetch_all_dimension_coordinates_for_variables(
         }
     }
 
-    // Also fallback to generic dim names if any remain unresolved
-    let all_dim_names: Vec<String> = variables
-        .iter()
-        .flat_map(|v| v.dimension_names.clone())
-        .collect();
-    for (i, name) in all_dim_names.iter().enumerate() {
-        let clean = name.trim().to_lowercase();
-        if !coords_map.contains_key(&clean)
-            && let Some((first, last)) = get_cached_coord_bounds_with_rank(
-                store.clone(),
-                url_hint,
-                name,
-                i,
-                all_dim_names.len(),
-            )
-        {
-            coords_map.insert(clean, vec![first.to_string(), last.to_string()]);
+    // Also fallback to root dim names if any remain unresolved
+    for var in variables {
+        for (i, name) in var.dimension_names.iter().enumerate() {
+            let clean = name.trim().to_lowercase();
+            if !coords_map.contains_key(&clean)
+                && let Some((first, last)) = get_cached_coord_bounds_scoped(
+                    store.clone(),
+                    url_hint,
+                    name,
+                    None,
+                    &group_prefixes,
+                    i,
+                    var.dimension_names.len(),
+                )
+            {
+                coords_map.insert(clean, vec![first.to_string(), last.to_string()]);
+            }
         }
     }
 

@@ -266,30 +266,26 @@ fn render_variable_row(
     let is_selected = selected_idx == idx;
     let leaf_name = var_info.leaf_name();
 
-    let label_text = if let Some(units) = &var_info.units {
-        format!("📄 {}  ({})", leaf_name, units)
-    } else {
-        format!("📄 {}", leaf_name)
+    let label_text = match &var_info.units {
+        Some(units) if !units.is_empty() => format!("📄 {}  ({})", leaf_name, units),
+        _ => format!("📄 {}", leaf_name),
     };
-
-    let shape_str = format!("{:?}", var_info.shape);
-    let type_str = format!("[{}]", var_info.data_type);
 
     let response = ui.selectable_label(is_selected, egui::RichText::new(label_text).strong());
 
-    let tooltip_text = if let Some(group) = var_info.group_path() {
-        format!(
-            "Variable: {}\nGroup: {}\nType: {}\nShape: {}",
-            var_info.name, group, type_str, shape_str
-        )
-    } else {
-        format!(
-            "Variable: {}\nType: {}\nShape: {}",
-            var_info.name, type_str, shape_str
-        )
-    };
+    let response = response.on_hover_ui(|ui| {
+        ui.label(egui::RichText::new(&var_info.name).strong());
+        if let Some(group) = var_info.group_path() {
+            ui.label(format!("Group: 📁 {}", group.replace('/', " ❯ ")));
+        }
+        ui.label(format!("Type: [{}]", var_info.data_type));
+        ui.label(format!("Shape: {:?}", var_info.shape));
+        if let Some(desc) = &var_info.long_name {
+            ui.label(format!("Description: {}", desc));
+        }
+    });
 
-    if response.on_hover_text(tooltip_text).clicked() {
+    if response.clicked() {
         *newly_selected_idx = Some(idx);
     }
 }
