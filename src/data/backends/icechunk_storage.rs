@@ -24,28 +24,20 @@ pub fn build_sync_icechunk_store(
         return Ok(store.clone());
     }
 
-    log::info!("🧊 Initializing Icechunk storage adapter for '{location}'...");
-    eprintln!("🧊 Initializing Icechunk storage adapter for '{location}'...");
+    log::info!("Initializing Icechunk storage adapter for '{location}'...");
     let rt = get_shared_tokio_rt();
 
     let async_store = rt.block_on(async {
         tokio::time::timeout(std::time::Duration::from_secs(30), async {
             let expanded = crate::utils::expand_tilde(location);
             let storage = if expanded.exists() {
-                log::info!("🧊 Opening local filesystem Icechunk repo at {:?}", expanded);
-                eprintln!("🧊 Opening local filesystem Icechunk repo at {:?}", expanded);
+                log::info!("Opening local filesystem Icechunk repo at {:?}", expanded);
                 icechunk::new_local_filesystem_storage(&expanded).await?
             } else {
                 let (bucket, prefix, region, endpoint_url) = parse_s3_or_http_url(location)?;
                 let force_path_style = endpoint_url.is_some();
                 log::info!(
-                    "🧊 Configured S3 Icechunk backend: bucket='{bucket}', prefix={:?}, region={:?}, endpoint={:?}, force_path_style={force_path_style}",
-                    prefix,
-                    region,
-                    endpoint_url
-                );
-                eprintln!(
-                    "🧊 Configured S3 Icechunk backend: bucket='{bucket}', prefix={:?}, region={:?}, endpoint={:?}, force_path_style={force_path_style}",
+                    "Configured S3 Icechunk backend: bucket='{bucket}', prefix={:?}, region={:?}, endpoint={:?}, force_path_style={force_path_style}",
                     prefix,
                     region,
                     endpoint_url
@@ -68,34 +60,28 @@ pub fn build_sync_icechunk_store(
                 )
                 .await
                 .map_err(|e| {
-                    log::error!("❌ Failed to create S3 object store storage for Icechunk: {e}");
-                    eprintln!("❌ Failed to create S3 object store storage for Icechunk: {e}");
+                    log::error!("Failed to create S3 object store storage for Icechunk: {e}");
                     e
                 })?
             };
 
-            log::info!("🧊 Opening Icechunk repository...");
-            eprintln!("🧊 Opening Icechunk repository...");
+            log::info!("Opening Icechunk repository...");
             let repo = icechunk::Repository::open(None, storage, Default::default())
                 .await
                 .map_err(|e| {
-                    log::error!("❌ Failed to open Icechunk repository: {e}");
-                    eprintln!("❌ Failed to open Icechunk repository: {e}");
+                    log::error!("Failed to open Icechunk repository: {e}");
                     e
                 })?;
 
             let version_info = icechunk::repository::VersionInfo::BranchTipRef("main".to_string());
-            log::info!("🧊 Opening readonly session on branch 'main'...");
-            eprintln!("🧊 Opening readonly session on branch 'main'...");
+            log::info!("Opening readonly session on branch 'main'...");
             let session = repo.readonly_session(&version_info).await.map_err(|e| {
-                log::error!("❌ Failed to open readonly session on branch 'main': {e}");
-                eprintln!("❌ Failed to open readonly session on branch 'main': {e}");
+                log::error!("Failed to open readonly session on branch 'main': {e}");
                 e
             })?;
 
             let ice_store = Arc::new(AsyncIcechunkStore::new(session));
-            log::info!("✅ Icechunk session and AsyncIcechunkStore initialized successfully.");
-            eprintln!("✅ Icechunk session and AsyncIcechunkStore initialized successfully.");
+            log::info!("Icechunk session and AsyncIcechunkStore initialized successfully.");
             Ok::<_, Box<dyn Error>>(ice_store)
         })
         .await

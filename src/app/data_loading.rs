@@ -129,13 +129,9 @@ impl OctantApp {
         let target_input = self.store_target_input.clone();
 
         log::info!(
-            "🚀 Initiating store inspection: kind={:?}, target='{}'",
+            "Initiating store inspection: kind={:?}, target='{}'",
             store_kind,
             target_input
-        );
-        eprintln!(
-            "🚀 Initiating store inspection: kind={:?}, target='{}'",
-            store_kind, target_input
         );
 
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
@@ -155,21 +151,14 @@ impl OctantApp {
             match &res {
                 Ok(meta) => {
                     log::info!(
-                        "✨ Store inspect succeeded in {:?}: found {} variables for '{}'",
-                        elapsed,
-                        meta.variables.len(),
-                        meta.name
-                    );
-                    eprintln!(
-                        "✨ Store inspect succeeded in {:?}: found {} variables for '{}'",
+                        "Store inspect succeeded in {:?}: found {} variables for '{}'",
                         elapsed,
                         meta.variables.len(),
                         meta.name
                     );
                 }
                 Err(err) => {
-                    log::error!("❌ Store inspect failed in {:?}: {}", elapsed, err);
-                    eprintln!("❌ Store inspect failed in {:?}: {}", elapsed, err);
+                    log::error!("Store inspect failed in {:?}: {}", elapsed, err);
                 }
             }
 

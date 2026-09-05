@@ -135,17 +135,28 @@ pub fn get_cached_coord_bounds_scoped(
     total_dims: usize,
 ) -> Option<(f64, f64)> {
     let cache_lock = COORD_BOUNDS_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
-    let key = format!(
-        "{}:{}:{}",
-        store_url.trim().to_lowercase(),
-        group_scope.unwrap_or(""),
-        dim_name.trim().to_lowercase()
-    );
+    let clean_url = store_url.trim().to_lowercase();
+    let clean_dim = dim_name.trim().to_lowercase();
+    let exact_key = format!("{}:{}:{}", clean_url, group_scope.unwrap_or(""), clean_dim);
 
-    if let Ok(cache) = cache_lock.read()
-        && let Some(bounds) = cache.get(&key)
-    {
-        return *bounds;
+    if let Ok(cache) = cache_lock.read() {
+        if let Some(bounds) = cache.get(&exact_key) {
+            return *bounds;
+        }
+        let root_key = format!("{}::{}", clean_url, clean_dim);
+        if let Some(bounds) = cache.get(&root_key) {
+            return *bounds;
+        }
+        let url_prefix = format!("{}:", clean_url);
+        let dim_suffix = format!(":{}", clean_dim);
+        for (k, v) in cache.iter() {
+            if k.starts_with(&url_prefix)
+                && k.ends_with(&dim_suffix)
+                && let Some(bounds) = v
+            {
+                return Some(*bounds);
+            }
+        }
     }
 
     let bounds = read_coord_bounds_scoped(
@@ -157,7 +168,7 @@ pub fn get_cached_coord_bounds_scoped(
         total_dims,
     );
     if let Ok(mut cache) = cache_lock.write() {
-        cache.insert(key, bounds);
+        cache.insert(exact_key, bounds);
     }
     bounds
 }
@@ -280,6 +291,50 @@ pub fn read_coord_bounds_scoped(
         {
             found_array = Some(arr);
             break;
+        }
+    }
+
+    // 5. Discover child group nodes from root if still not found
+    if found_array.is_none()
+        && let Ok(root_path) = zarrs::node::NodePath::new("/")
+        && let Ok(children) = zarrs::node::get_child_nodes(&store, &root_path, false)
+    {
+        for child in children {
+            let child_group = child.path().as_str().trim_start_matches('/');
+            if child_group.is_empty() {
+                continue;
+            }
+            let child_candidates = [
+                format!("{}/{}", child_group, clean),
+                format!("/{}/{}", child_group, clean),
+            ];
+            for path in child_candidates {
+                if let Ok(arr) = Array::open(store.clone(), &path) {
+                    found_array = Some(arr);
+                    break;
+                }
+            }
+            if found_array.is_some() {
+                break;
+            }
+            for alias in aliases {
+                let alias_candidates = [
+                    format!("{}/{}", child_group, alias),
+                    format!("/{}/{}", child_group, alias),
+                ];
+                for path in alias_candidates {
+                    if let Ok(arr) = Array::open(store.clone(), &path) {
+                        found_array = Some(arr);
+                        break;
+                    }
+                }
+                if found_array.is_some() {
+                    break;
+                }
+            }
+            if found_array.is_some() {
+                break;
+            }
         }
     }
 
