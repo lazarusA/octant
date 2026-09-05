@@ -103,6 +103,26 @@ impl GenericZarrBlockStore {
             )
         {
             arr
+        } else if let Ok(key) = zarrs::storage::StoreKey::new(format!("{}/zarr.json", clean_name))
+            && let Ok(Some(bytes)) = self.storage.get(&key)
+            && let Ok(node_meta) = serde_json::from_slice::<zarrs::node::NodeMetadata>(&bytes)
+            && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
+                readable_store.clone(),
+                &var_path,
+                &node_meta,
+            )
+        {
+            arr
+        } else if let Ok(key) = zarrs::storage::StoreKey::new(format!("{}/.zarray", clean_name))
+            && let Ok(Some(bytes)) = self.storage.get(&key)
+            && let Ok(node_meta) = serde_json::from_slice::<zarrs::node::NodeMetadata>(&bytes)
+            && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
+                readable_store.clone(),
+                &var_path,
+                &node_meta,
+            )
+        {
+            arr
         } else if var_name == "data" || var_name.is_empty() {
             Array::open(readable_store.clone(), "/")?
         } else {
@@ -181,13 +201,9 @@ impl BlockStore for GenericZarrBlockStore {
             crate::utils::extract_store_variables_consolidated(self.storage.clone(), base_url)
                 .map_err(|e| e.to_string())?;
 
-        let dim_names: Vec<String> = variables
-            .iter()
-            .flat_map(|v| v.dimension_names.clone())
-            .collect();
-        let dimension_coordinates = crate::utils::fetch_all_dimension_coordinates(
+        let dimension_coordinates = crate::utils::fetch_all_dimension_coordinates_for_variables(
             self.storage.clone(),
-            &dim_names,
+            &variables,
             Some(base_url),
         );
 

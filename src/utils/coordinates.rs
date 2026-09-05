@@ -32,6 +32,78 @@ pub fn fetch_all_dimension_coordinates(
     coords_map
 }
 
+/// Fetches all dimension coordinate values aware of variable group paths and hierarchy.
+pub fn fetch_all_dimension_coordinates_for_variables(
+    store: ReadableWritableListableStorage,
+    variables: &[crate::data::VariableInfo],
+    store_url_hint: Option<&str>,
+) -> HashMap<String, Vec<String>> {
+    let mut coords_map = HashMap::new();
+    let url_hint = store_url_hint.unwrap_or("local");
+
+    // Collect all group prefixes from variables
+    let mut group_prefixes = Vec::new();
+    for var in variables {
+        if let Some(gp) = var.group_path() {
+            let mut curr = String::new();
+            for seg in gp.split('/') {
+                if !curr.is_empty() {
+                    curr.push('/');
+                }
+                curr.push_str(seg);
+                if !group_prefixes.contains(&curr) {
+                    group_prefixes.push(curr.clone());
+                }
+            }
+        }
+    }
+
+    for var in variables {
+        let group_path = var.group_path();
+        let total_dims = var.dimension_names.len();
+        for (i, name) in var.dimension_names.iter().enumerate() {
+            let clean = name.trim().to_lowercase();
+            if coords_map.contains_key(&clean) {
+                continue;
+            }
+
+            if let Some((first, last)) = get_cached_coord_bounds_scoped(
+                store.clone(),
+                url_hint,
+                name,
+                group_path,
+                &group_prefixes,
+                i,
+                total_dims,
+            ) {
+                coords_map.insert(clean.clone(), vec![first.to_string(), last.to_string()]);
+            }
+        }
+    }
+
+    // Also fallback to generic dim names if any remain unresolved
+    let all_dim_names: Vec<String> = variables
+        .iter()
+        .flat_map(|v| v.dimension_names.clone())
+        .collect();
+    for (i, name) in all_dim_names.iter().enumerate() {
+        let clean = name.trim().to_lowercase();
+        if !coords_map.contains_key(&clean)
+            && let Some((first, last)) = get_cached_coord_bounds_with_rank(
+                store.clone(),
+                url_hint,
+                name,
+                i,
+                all_dim_names.len(),
+            )
+        {
+            coords_map.insert(clean, vec![first.to_string(), last.to_string()]);
+        }
+    }
+
+    coords_map
+}
+
 #[allow(clippy::single_range_in_vec_init)]
 pub fn get_cached_coord_bounds(
     store: ReadableWritableListableStorage,
@@ -49,10 +121,24 @@ pub fn get_cached_coord_bounds_with_rank(
     dim_idx: usize,
     total_dims: usize,
 ) -> Option<(f64, f64)> {
+    get_cached_coord_bounds_scoped(store, store_url, dim_name, None, &[], dim_idx, total_dims)
+}
+
+#[allow(clippy::single_range_in_vec_init)]
+pub fn get_cached_coord_bounds_scoped(
+    store: ReadableWritableListableStorage,
+    store_url: &str,
+    dim_name: &str,
+    group_scope: Option<&str>,
+    known_groups: &[String],
+    dim_idx: usize,
+    total_dims: usize,
+) -> Option<(f64, f64)> {
     let cache_lock = COORD_BOUNDS_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
     let key = format!(
-        "{}:{}",
+        "{}:{}:{}",
         store_url.trim().to_lowercase(),
+        group_scope.unwrap_or(""),
         dim_name.trim().to_lowercase()
     );
 
@@ -62,7 +148,14 @@ pub fn get_cached_coord_bounds_with_rank(
         return *bounds;
     }
 
-    let bounds = read_coord_bounds_with_rank(store, dim_name, dim_idx, total_dims);
+    let bounds = read_coord_bounds_scoped(
+        store,
+        dim_name,
+        group_scope,
+        known_groups,
+        dim_idx,
+        total_dims,
+    );
     if let Ok(mut cache) = cache_lock.write() {
         cache.insert(key, bounds);
     }
@@ -81,42 +174,115 @@ pub fn read_coord_bounds(
 pub fn read_coord_bounds_with_rank(
     store: ReadableWritableListableStorage,
     dim_name: &str,
+    dim_idx: usize,
+    total_dims: usize,
+) -> Option<(f64, f64)> {
+    read_coord_bounds_scoped(store, dim_name, None, &[], dim_idx, total_dims)
+}
+
+#[allow(clippy::single_range_in_vec_init)]
+pub fn read_coord_bounds_scoped(
+    store: ReadableWritableListableStorage,
+    dim_name: &str,
+    group_scope: Option<&str>,
+    known_groups: &[String],
     _dim_idx: usize,
     _total_dims: usize,
 ) -> Option<(f64, f64)> {
     let clean = dim_name.trim().to_lowercase();
-    let mut candidates = vec![format!("/{}", clean), clean.clone()];
+    let mut candidates = Vec::new();
+
+    // 1. Group-scoped candidate path (e.g. atmosphere/forecast/lat)
+    if let Some(scope) = group_scope {
+        candidates.push(format!("{}/{}", scope, clean));
+        candidates.push(format!("/{}/{}", scope, clean));
+    }
+
+    // 2. Direct root candidate paths
+    candidates.push(format!("/{}", clean));
+    candidates.push(clean.clone());
 
     let is_lat = clean.contains("lat") || clean == "y";
     let is_lon = clean.contains("lon") || clean == "x";
 
-    if is_lat {
-        candidates.push("/lat".to_string());
-        candidates.push("lat".to_string());
-        candidates.push("/latitude".to_string());
-        candidates.push("latitude".to_string());
-        candidates.push("/y".to_string());
-        candidates.push("y".to_string());
-        candidates.push("/coords/lat".to_string());
-        candidates.push("/coordinates/latitude".to_string());
+    // 3. Heuristic spatial coordinate names
+    let aliases: &[&str] = if is_lat {
+        &["lat", "latitude", "y", "coords/lat", "coordinates/latitude"]
     } else if is_lon {
-        candidates.push("/lon".to_string());
-        candidates.push("lon".to_string());
-        candidates.push("/longitude".to_string());
-        candidates.push("longitude".to_string());
-        candidates.push("/x".to_string());
-        candidates.push("x".to_string());
-        candidates.push("/coords/lon".to_string());
-        candidates.push("/coordinates/longitude".to_string());
+        &[
+            "lon",
+            "longitude",
+            "x",
+            "coords/lon",
+            "coordinates/longitude",
+        ]
+    } else {
+        &[]
+    };
+
+    for alias in aliases {
+        if let Some(scope) = group_scope {
+            candidates.push(format!("{}/{}", scope, alias));
+            candidates.push(format!("/{}/{}", scope, alias));
+        }
+        candidates.push(format!("/{}", alias));
+        candidates.push(alias.to_string());
+    }
+
+    // 4. Known group prefixes across the store (e.g. nested-only stores)
+    for group in known_groups {
+        candidates.push(format!("{}/{}", group, clean));
+        candidates.push(format!("/{}/{}", group, clean));
+        for alias in aliases {
+            candidates.push(format!("{}/{}", group, alias));
+            candidates.push(format!("/{}/{}", group, alias));
+        }
     }
 
     let mut found_array = None;
     for path in &candidates {
-        if let Ok(arr) = Array::open(store.clone(), path) {
+        let clean_path = if path.starts_with('/') {
+            path.clone()
+        } else {
+            format!("/{}", path)
+        };
+        let clean_key = path.trim_start_matches('/');
+
+        if let Ok(arr) = Array::open(store.clone(), &clean_path) {
+            found_array = Some(arr);
+            break;
+        }
+        if let Ok(arr) = Array::open(store.clone(), clean_key) {
+            found_array = Some(arr);
+            break;
+        }
+        // Direct StoreKey checks for Zarr v3 and v2
+        if let Ok(key) = zarrs::storage::StoreKey::new(format!("{}/zarr.json", clean_key))
+            && let Ok(Some(bytes)) = store.get(&key)
+            && let Ok(node_meta) = serde_json::from_slice::<zarrs::node::NodeMetadata>(&bytes)
+            && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
+                store.clone(),
+                &clean_path,
+                &node_meta,
+            )
+        {
+            found_array = Some(arr);
+            break;
+        }
+        if let Ok(key) = zarrs::storage::StoreKey::new(format!("{}/.zarray", clean_key))
+            && let Ok(Some(bytes)) = store.get(&key)
+            && let Ok(node_meta) = serde_json::from_slice::<zarrs::node::NodeMetadata>(&bytes)
+            && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
+                store.clone(),
+                &clean_path,
+                &node_meta,
+            )
+        {
             found_array = Some(arr);
             break;
         }
     }
+
     if found_array.is_none()
         && let Ok(group) = zarrs::group::Group::open(store.clone(), "/")
         && let Some(zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata {

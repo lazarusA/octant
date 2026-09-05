@@ -128,10 +128,21 @@ impl OctantApp {
         self.store_target_input = self.store_target_input.trim().to_string();
         let target_input = self.store_target_input.clone();
 
+        log::info!(
+            "🚀 Initiating store inspection: kind={:?}, target='{}'",
+            store_kind,
+            target_input
+        );
+        eprintln!(
+            "🚀 Initiating store inspection: kind={:?}, target='{}'",
+            store_kind, target_input
+        );
+
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
         self.metadata_rx = Some(rx);
 
         rayon::spawn(move || {
+            let start = std::time::Instant::now();
             let kind = store_kind.to_data_source_kind();
             let source_id = StoreKind::make_source_id(store_kind, &target_input);
             let source = crate::data::DataSource::new(&source_id, kind, &target_input, "Store");
@@ -139,6 +150,28 @@ impl OctantApp {
             let res = crate::data::SourceFactory::open(source)
                 .and_then(|store| store.inspect())
                 .map_err(|e| e.to_string());
+
+            let elapsed = start.elapsed();
+            match &res {
+                Ok(meta) => {
+                    log::info!(
+                        "✨ Store inspect succeeded in {:?}: found {} variables for '{}'",
+                        elapsed,
+                        meta.variables.len(),
+                        meta.name
+                    );
+                    eprintln!(
+                        "✨ Store inspect succeeded in {:?}: found {} variables for '{}'",
+                        elapsed,
+                        meta.variables.len(),
+                        meta.name
+                    );
+                }
+                Err(err) => {
+                    log::error!("❌ Store inspect failed in {:?}: {}", elapsed, err);
+                    eprintln!("❌ Store inspect failed in {:?}: {}", elapsed, err);
+                }
+            }
 
             let _ = tx.send(res);
         });
@@ -152,9 +185,24 @@ impl OctantApp {
             return;
         }
 
-        if let Some(kind) = explicit_kind {
-            self.selected_store_kind = kind;
-        }
+        let inferred = crate::utils::infer_store_kind_from_target(trimmed).ok();
+        let effective_kind = match (explicit_kind, inferred) {
+            (Some(kind), Some(inf)) => {
+                // Auto-upgrade generic/default Zarr selection if target URL is specifically Icechunk or NetCDF
+                if (kind == StoreKind::RemoteZarr && inf == StoreKind::RemoteIcechunk)
+                    || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalIcechunk)
+                    || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalNetCdf)
+                {
+                    inf
+                } else {
+                    kind
+                }
+            }
+            (Some(kind), None) => kind,
+            (None, Some(inf)) => inf,
+            (None, None) => self.selected_store_kind,
+        };
+        self.selected_store_kind = effective_kind;
 
         if self.try_activate_dataset(trimmed) {
             if let Some(meta) = &self.active_dataset_metadata {
@@ -165,22 +213,6 @@ impl OctantApp {
         } else {
             self.hero_state.begin_submit(trimmed);
             self.store_target_input = trimmed.to_string();
-            if explicit_kind.is_none() {
-                match crate::utils::infer_store_kind_from_target(trimmed) {
-                    Ok(kind) => {
-                        self.selected_store_kind = kind;
-                    }
-                    Err(err) => {
-                        self.status_message = format!("{err}: '{trimmed}'");
-                        self.hero_state.loading = false;
-                        self.hero_state.loaded = false;
-                        self.hero_state.source_label.clear();
-                        self.is_loading = false;
-                        log::warn!("{err}: '{trimmed}'");
-                        return;
-                    }
-                }
-            }
             self.inspect_active_store();
         }
     }

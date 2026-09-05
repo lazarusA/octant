@@ -14,7 +14,9 @@ pub use path::{expand_tilde, expand_tilde_str, infer_store_kind_from_target};
 // Format-agnostic & domain re-exports
 pub use crate::data::backends::icechunk_storage::build_sync_icechunk_store;
 pub use crate::data::backends::zarr_storage::build_sync_store;
-pub use coordinates::fetch_all_dimension_coordinates;
+pub use coordinates::{
+    fetch_all_dimension_coordinates, fetch_all_dimension_coordinates_for_variables,
+};
 pub use error::OctantError;
 pub use executor::{TaskExecutor, TokioBlockOn, get_shared_tokio_rt};
 pub use grid::check_and_orient_axes_with_coords;

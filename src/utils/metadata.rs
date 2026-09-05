@@ -82,60 +82,155 @@ pub fn extract_store_variables(
     base_url: &str,
 ) -> Result<Vec<VariableInfo>, Box<dyn Error>> {
     let mut variables = Vec::new();
+    let start_time = std::time::Instant::now();
+    log::info!(
+        "🔍 [{:?}] Extracting store variables for target '{base_url}'...",
+        start_time.elapsed()
+    );
+    eprintln!(
+        "🔍 [{:?}] Extracting store variables for target '{base_url}'...",
+        start_time.elapsed()
+    );
 
-    // 1. Try opening root as a Zarr Group
-    if let Ok(group) = Group::open(store.clone(), "/") {
-        // Check if group contains consolidated metadata (Zarr v2 or v3 inline)
-        let consolidated_arrays = if let Some(ConsolidatedMetadata { metadata, .. }) =
-            group.consolidated_metadata()
-        {
-            let mut found_vars = Vec::new();
-            for (node_path, node_meta) in metadata {
-                let clean_path = if node_path.starts_with('/') {
-                    node_path.to_string()
-                } else {
-                    format!("/{}", node_path)
-                };
+    // 1. Try opening root as a Zarr Group and check consolidated metadata (Zarr v2 or v3 inline)
+    eprintln!(
+        "🔍 [{:?}] Step 1: Checking root group at '/'...",
+        start_time.elapsed()
+    );
+    let group_opt = Group::open(store.clone(), "/");
+    eprintln!(
+        "🔍 [{:?}] Step 1: Group::open returned: is_ok={}",
+        start_time.elapsed(),
+        group_opt.is_ok()
+    );
 
-                let clean_var_name = node_path.trim_start_matches('/');
-                let clean_var_name = if clean_var_name.is_empty() {
-                    "data"
-                } else {
-                    clean_var_name
-                };
+    if let Ok(group) = group_opt
+        && let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata()
+    {
+        log::info!(
+            "🔍 Found inline consolidated metadata with {} nodes",
+            metadata.len()
+        );
+        eprintln!(
+            "🔍 [{:?}] Found inline consolidated metadata with {} nodes",
+            start_time.elapsed(),
+            metadata.len()
+        );
+        for (node_path, node_meta) in metadata {
+            let clean_path = if node_path.starts_with('/') {
+                node_path.to_string()
+            } else {
+                format!("/{}", node_path)
+            };
 
-                let array_opt =
-                    instantiate_array_from_node_metadata(store.clone(), &clean_path, &node_meta);
+            let clean_var_name = node_path.trim_start_matches('/');
+            let clean_var_name = if clean_var_name.is_empty() {
+                "data"
+            } else {
+                clean_var_name
+            };
 
-                if let Some(array) = array_opt
-                    && let Some(var_info) = variable_info_from_array(&array, clean_var_name)
-                {
-                    found_vars.push(var_info);
-                }
+            let array_opt =
+                instantiate_array_from_node_metadata(store.clone(), &clean_path, &node_meta);
+
+            if let Some(array) = array_opt
+                && let Some(var_info) = variable_info_from_array(&array, clean_var_name)
+            {
+                log::info!(
+                    "✅ Discovered array '{}' from consolidated metadata (shape: {:?})",
+                    var_info.name,
+                    var_info.shape
+                );
+                eprintln!(
+                    "✅ [{:?}] Discovered array '{}' from consolidated metadata (shape: {:?})",
+                    start_time.elapsed(),
+                    var_info.name,
+                    var_info.shape
+                );
+                variables.push(var_info);
             }
-            found_vars
-        } else {
-            Vec::new()
-        };
-
-        if !consolidated_arrays.is_empty() {
-            return Ok(consolidated_arrays);
         }
-
-        // 2. Discover child nodes recursively via zarrs get_child_nodes
-        if let Ok(root_path) = NodePath::new("/") {
-            discover_child_nodes_recursive(&store, &root_path, &mut variables);
-        }
-    } else if let Ok(array) = Array::open(store.clone(), "/") {
-        // 3. Root itself is a single Array
-        if let Some(var_info) = variable_info_from_array(&array, "data") {
-            variables.push(var_info);
+        if !variables.is_empty() {
+            log::info!(
+                "✨ Extracted {} variables from consolidated metadata",
+                variables.len()
+            );
+            eprintln!(
+                "✨ [{:?}] Extracted {} variables from consolidated metadata",
+                start_time.elapsed(),
+                variables.len()
+            );
+            return Ok(variables);
         }
     }
 
-    // 4. Fallback: discover arrays via remote HTTP manifest inspection if base_url is present
+    // 2. Hierarchical recursive child node discovery via get_child_nodes (fast, zero-chunk listing)
+    eprintln!(
+        "🔍 [{:?}] Step 2: Discovering child nodes recursively from root '/'...",
+        start_time.elapsed()
+    );
+    if let Ok(root_path) = NodePath::new("/") {
+        discover_child_nodes_recursive(&store, &root_path, &mut variables);
+    }
+    if !variables.is_empty() {
+        log::info!(
+            "✨ Extracted {} variables via hierarchical node discovery",
+            variables.len()
+        );
+        eprintln!(
+            "✨ [{:?}] Extracted {} variables via hierarchical node discovery",
+            start_time.elapsed(),
+            variables.len()
+        );
+        return Ok(variables);
+    }
+
+    // 3. Root itself is a single Array
+    log::info!("🔍 Checking if root '/' itself is a single array...");
+    eprintln!(
+        "🔍 [{:?}] Checking if root '/' itself is a single array...",
+        start_time.elapsed()
+    );
+    if let Ok(array) = Array::open(store.clone(), "/")
+        && let Some(var_info) = variable_info_from_array(&array, "data")
+    {
+        log::info!(
+            "✅ Root is a single array 'data' (shape: {:?})",
+            var_info.shape
+        );
+        eprintln!(
+            "✅ [{:?}] Root is a single array 'data' (shape: {:?})",
+            start_time.elapsed(),
+            var_info.shape
+        );
+        variables.push(var_info);
+        return Ok(variables);
+    }
+
+    // 4. Remote HTTP manifest inspection fallback if base_url is present
     if variables.is_empty() && !base_url.is_empty() {
+        log::info!(
+            "🔍 Falling back to HTTP remote manifest metadata inspection at '{base_url}'..."
+        );
+        eprintln!("🔍 Falling back to HTTP remote manifest metadata inspection at '{base_url}'...");
         variables = discover_arrays_via_http_metadata(base_url);
+    }
+
+    if variables.is_empty() {
+        log::warn!(
+            "⚠️ No variables discovered for store '{base_url}' across all discovery passes."
+        );
+        eprintln!("⚠️ No variables discovered for store '{base_url}' across all discovery passes.");
+    } else {
+        log::info!(
+            "✨ Successfully discovered total {} variables for '{base_url}'",
+            variables.len()
+        );
+        eprintln!(
+            "✨ [{:?}] Successfully discovered total {} variables for '{base_url}'",
+            start_time.elapsed(),
+            variables.len()
+        );
     }
 
     Ok(variables)
@@ -155,8 +250,25 @@ fn discover_child_nodes_recursive(
             } else {
                 var_name
             };
-            if let Ok(array) = Array::open(store.clone(), path_str) {
+
+            let array_opt = if let Ok(array) = Array::open(store.clone(), path_str) {
+                Some(array)
+            } else {
+                instantiate_array_from_node_metadata(store.clone(), path_str, child.metadata())
+            };
+
+            if let Some(array) = array_opt {
                 if let Some(var_info) = variable_info_from_array(&array, var_name) {
+                    log::info!(
+                        "✅ Discovered array '{}' (shape: {:?}, dtype: {})",
+                        var_info.name,
+                        var_info.shape,
+                        var_info.data_type
+                    );
+                    eprintln!(
+                        "✅ Discovered array '{}' (shape: {:?}, dtype: {})",
+                        var_info.name, var_info.shape, var_info.data_type
+                    );
                     variables.push(var_info);
                 }
             } else if let Ok(child_path) = NodePath::new(path_str) {
