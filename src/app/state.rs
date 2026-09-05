@@ -47,6 +47,32 @@ impl StoreKind {
     pub fn make_source_id(kind: StoreKind, target: &str) -> String {
         format!("{:?}:{}", kind, target)
     }
+
+    /// Resolves the effective store kind from an optional explicit UI selection,
+    /// an inferred target kind, and the current active store kind.
+    /// Automatically upgrades generic Zarr selections if the target specifically matches Icechunk or NetCDF.
+    pub fn resolve_with_inferred(
+        explicit: Option<StoreKind>,
+        target: &str,
+        current: StoreKind,
+    ) -> StoreKind {
+        let inferred = crate::utils::infer_store_kind_from_target(target).ok();
+        match (explicit, inferred) {
+            (Some(kind), Some(inf)) => {
+                if (kind == StoreKind::RemoteZarr && inf == StoreKind::RemoteIcechunk)
+                    || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalIcechunk)
+                    || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalNetCdf)
+                {
+                    inf
+                } else {
+                    kind
+                }
+            }
+            (Some(kind), None) => kind,
+            (None, Some(inf)) => inf,
+            (None, None) => current,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

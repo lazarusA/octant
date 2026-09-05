@@ -156,24 +156,8 @@ impl OctantApp {
             return;
         }
 
-        let inferred = crate::utils::infer_store_kind_from_target(trimmed).ok();
-        let effective_kind = match (explicit_kind, inferred) {
-            (Some(kind), Some(inf)) => {
-                // Auto-upgrade generic/default Zarr selection if target URL is specifically Icechunk or NetCDF
-                if (kind == StoreKind::RemoteZarr && inf == StoreKind::RemoteIcechunk)
-                    || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalIcechunk)
-                    || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalNetCdf)
-                {
-                    inf
-                } else {
-                    kind
-                }
-            }
-            (Some(kind), None) => kind,
-            (None, Some(inf)) => inf,
-            (None, None) => self.selected_store_kind,
-        };
-        self.selected_store_kind = effective_kind;
+        self.selected_store_kind =
+            StoreKind::resolve_with_inferred(explicit_kind, trimmed, self.selected_store_kind);
 
         if self.try_activate_dataset(trimmed) {
             if let Some(meta) = &self.active_dataset_metadata {
