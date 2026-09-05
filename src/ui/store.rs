@@ -26,6 +26,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                         StoreKind::RemoteIcechunk => "🧊 Remote Icechunk",
                         StoreKind::LocalIcechunk => "🧊 Local Icechunk",
                         StoreKind::LocalNetCdf => "📁 Local NetCDF / HDF5",
+                        StoreKind::LocalGrib => "📁 Local GRIB / GRIB2",
                         StoreKind::ProceduralVolume4D => "🌐 4D Known-Truth Volume",
                         StoreKind::ProceduralRandom => "🎲 2D Procedural Matrix",
                     })
@@ -35,6 +36,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                         ui.selectable_value(&mut selected, StoreKind::RemoteIcechunk, "🧊 Remote Icechunk (HTTP/S3)");
                         ui.selectable_value(&mut selected, StoreKind::LocalIcechunk, "🧊 Local Icechunk (FileSystem)");
                         ui.selectable_value(&mut selected, StoreKind::LocalNetCdf, "📁 Local NetCDF / HDF5 (.nc/.h5/.hdf5)");
+                        ui.selectable_value(&mut selected, StoreKind::LocalGrib, "📁 Local GRIB / GRIB2 (.grib/.grib2/.grb)");
                         ui.separator();
                         ui.selectable_value(&mut selected, StoreKind::ProceduralVolume4D, "🌐 4D Known-Truth Volume (Procedural)");
                         ui.selectable_value(&mut selected, StoreKind::ProceduralRandom, "🎲 2D Procedural Matrix (Test)");
@@ -57,6 +59,9 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                         }
                         StoreKind::LocalNetCdf => {
                             app.store_target_input = "./data/sample.nc".to_string();
+                        }
+                        StoreKind::LocalGrib => {
+                            app.store_target_input = "./data/sample.grib2".to_string();
                         }
                         StoreKind::ProceduralVolume4D => {
                             app.submit_or_activate_source("procedural://volume4d", Some(StoreKind::ProceduralVolume4D));

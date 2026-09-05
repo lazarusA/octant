@@ -9,8 +9,8 @@ use super::{
 };
 
 use super::backends::{
-    icechunk::IcechunkBlockStore, netcdf::NetCdfBlockStore, procedural::ProceduralBlockStore,
-    zarr::ZarrBlockStore,
+    gribberish::GribberishBlockStore, icechunk::IcechunkBlockStore, netcdf::NetCdfBlockStore,
+    procedural::ProceduralBlockStore, zarr::ZarrBlockStore,
 };
 
 pub struct SourceFactory;
@@ -29,6 +29,8 @@ impl SourceFactory {
             DataSourceKind::Procedural => Arc::new(ProceduralBlockStore::open(&source.uri)?),
 
             DataSourceKind::NetCdf => Arc::new(NetCdfBlockStore::open_local(&source.uri)?),
+
+            DataSourceKind::Grib => Arc::new(GribberishBlockStore::open_local(&source.uri)?),
 
             DataSourceKind::GeoTiff => {
                 return Err("GeoTIFF backend not yet implemented".into());

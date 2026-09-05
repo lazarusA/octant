@@ -14,6 +14,7 @@ pub enum DataSourceKind {
     Procedural,
 
     NetCdf,
+    Grib,
     GeoTiff,
 
     /// Reserved for future readers.

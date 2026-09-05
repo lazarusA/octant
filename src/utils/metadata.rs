@@ -41,6 +41,8 @@ pub fn normalize_v3_array_metadata(mut meta: serde_json::Value) -> serde_json::V
                     }
                 } else if let Some(suffix) = name.strip_prefix("numcodecs.") {
                     obj.insert("name".to_string(), serde_json::json!(suffix));
+                } else if let Some(suffix) = name.strip_prefix("virtualizarr.") {
+                    obj.insert("name".to_string(), serde_json::json!(suffix));
                 }
             }
         }

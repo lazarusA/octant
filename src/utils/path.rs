@@ -66,6 +66,9 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
     if trimmed.starts_with("netcdf://") || trimmed.starts_with("hdf5://") {
         return Ok(StoreKind::LocalNetCdf);
     }
+    if trimmed.starts_with("grib://") {
+        return Ok(StoreKind::LocalGrib);
+    }
     if trimmed.starts_with("icechunk://") {
         return Ok(StoreKind::LocalIcechunk);
     }
@@ -87,6 +90,9 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
         match ext_str.as_str() {
             "nc" | "nc4" | "cdf" | "netcdf" | "h5" | "hdf5" | "hdf" | "he5" => {
                 return Ok(StoreKind::LocalNetCdf);
+            }
+            "grib" | "grib2" | "grb" | "grb2" => {
+                return Ok(StoreKind::LocalGrib);
             }
             "zarr" | "zip" => {
                 return Ok(StoreKind::LocalZarr);
@@ -134,6 +140,13 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
         || path_str.ends_with(".he5")
     {
         return Ok(StoreKind::LocalNetCdf);
+    }
+    if path_str.ends_with(".grib")
+        || path_str.ends_with(".grib2")
+        || path_str.ends_with(".grb")
+        || path_str.ends_with(".grb2")
+    {
+        return Ok(StoreKind::LocalGrib);
     }
     if path_str.ends_with(".zarr") || path_str.ends_with(".zip") {
         return Ok(StoreKind::LocalZarr);
@@ -217,6 +230,26 @@ mod tests {
         assert_eq!(
             infer_store_kind_from_target("/data/sample.cdf"),
             Ok(StoreKind::LocalNetCdf)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("/data/forecast.grib"),
+            Ok(StoreKind::LocalGrib)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("/data/weather.grib2"),
+            Ok(StoreKind::LocalGrib)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("/data/model.grb"),
+            Ok(StoreKind::LocalGrib)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("/data/model.grb2"),
+            Ok(StoreKind::LocalGrib)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("grib:///path/to/data.grib2"),
+            Ok(StoreKind::LocalGrib)
         );
         assert_eq!(
             infer_store_kind_from_target("netcdf:///path/to/data"),

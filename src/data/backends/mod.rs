@@ -1,4 +1,6 @@
 pub mod generic_zarr;
+pub mod gribberish;
+pub mod gribberish_codec;
 pub mod icechunk;
 pub mod icechunk_storage;
 pub mod netcdf;
@@ -9,5 +11,6 @@ pub mod zarr_slice;
 pub mod zarr_storage;
 
 pub use generic_zarr::GenericZarrBlockStore;
+pub use gribberish::GribberishBlockStore;
 pub use netcdf::NetCdfBlockStore;
 pub use procedural::ProceduralBlockStore;
