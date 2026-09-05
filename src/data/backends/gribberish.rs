@@ -4,12 +4,15 @@
 
 use std::collections::HashMap;
 
+use crate::app::StoreKind;
 use crate::data::block_request::BlockResult;
 use crate::data::block_store::{BlockStore, BlockStoreError};
 use crate::data::metadata::{DatasetMetadata, VariableInfo};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 use crate::utils::grid::check_and_orient_block_grid;
+use crate::utils::path::{expand_tilde, infer_store_kind_from_target};
+use crate::utils::units::calculate_variable_size_bytes;
 
 /// Stores index metadata for a single GRIB message within a file.
 #[derive(Debug, Clone)]
@@ -22,6 +25,19 @@ struct GribMessageInfo {
     level_index: usize,
     level_value: Option<f64>,
     grid_shape: (usize, usize), // (rows/nj/y, cols/ni/x)
+}
+
+/// Stores raw parsed information from scanning a GRIB message header.
+#[derive(Debug, Clone)]
+struct RawGribMessage {
+    var_name: String,
+    full_name: Option<String>,
+    unit: Option<String>,
+    time_str: String,
+    level_val: Option<f64>,
+    grid_shape: (usize, usize),
+    byte_offset: usize,
+    msg_len: usize,
 }
 
 /// Stores variable definition and its constituent GRIB messages.
@@ -64,7 +80,23 @@ impl GribberishBlockStore {
             .trim()
             .trim_matches('\'')
             .trim_matches('"');
-        let p = crate::utils::expand_tilde(clean_path);
+
+        // Check inferred store kind to emit informative warnings if unusual or mismatched
+        match infer_store_kind_from_target(clean_path) {
+            Ok(kind) if kind != StoreKind::LocalGrib => {
+                log::warn!(
+                    "Gribberish backend: Target path '{clean_path}' was inferred as {kind:?}; attempting GRIB indexing regardless"
+                );
+            }
+            Err(err) => {
+                log::warn!(
+                    "Gribberish backend: Target path '{clean_path}' could not be inferred as a known format ({err}); attempting GRIB indexing"
+                );
+            }
+            _ => {}
+        }
+
+        let p = expand_tilde(clean_path);
         if !p.exists() {
             return Err(format!("File not found: {}", p.display()).into());
         }
@@ -87,6 +119,12 @@ impl GribberishBlockStore {
         let (variables, dimension_coordinates, metadata) =
             Self::index_grib_file(&file_bytes, &dataset_name)?;
 
+        log::info!(
+            "Successfully opened GRIB dataset '{}' with {} variables",
+            p.display(),
+            variables.len()
+        );
+
         Ok(Self {
             file_path: p.to_string_lossy().to_string(),
             metadata,
@@ -104,33 +142,55 @@ impl GribberishBlockStore {
         data: &[u8],
         dataset_name: &str,
     ) -> Result<GribIndexResult, BlockStoreError> {
+        let raw_messages = Self::extract_raw_messages(data)?;
+        Self::build_indexed_dataset(raw_messages, dataset_name)
+    }
+
+    /// Scans byte stream and extracts all valid GRIB messages.
+    fn extract_raw_messages(data: &[u8]) -> Result<Vec<RawGribMessage>, BlockStoreError> {
         let mut raw_messages = Vec::new();
         let mut offset = 0;
 
         while offset < data.len() {
             if let Some(msg) = gribberish::message::read_message(data, offset) {
                 let msg_len = msg.len();
-                let var_name = msg
-                    .variable_abbrev()
-                    .or_else(|_| msg.variable_name())
-                    .unwrap_or_else(|_| format!("var_{}", raw_messages.len()));
+                let var_name = match msg.variable_abbrev().or_else(|_| msg.variable_name()) {
+                    Ok(name) if !name.trim().is_empty() => name,
+                    _ => {
+                        let fallback = format!("var_{}", raw_messages.len());
+                        log::warn!(
+                            "GRIB message at byte offset {offset}: variable name could not be identified; defaulting to '{fallback}'"
+                        );
+                        fallback
+                    }
+                };
 
                 let full_name = msg.variable_name().ok();
                 let unit = msg.unit().ok();
 
-                let time_str = msg
-                    .forecast_date()
-                    .or_else(|_| msg.reference_date())
-                    .map(|d| d.to_string())
-                    .unwrap_or_else(|_| "0".to_string());
+                let time_str = match msg.forecast_date().or_else(|_| msg.reference_date()) {
+                    Ok(d) => d.to_string(),
+                    Err(_) => {
+                        log::debug!(
+                            "GRIB message for variable '{var_name}' at byte offset {offset}: missing valid forecast/reference date; defaulting time to '0'"
+                        );
+                        "0".to_string()
+                    }
+                };
 
                 let level_val = msg.first_fixed_surface().ok().and_then(|(_, val)| val);
-
                 let grid_shape = msg.grid_dimensions().unwrap_or((1, 1));
 
-                raw_messages.push((
-                    var_name, full_name, unit, time_str, level_val, grid_shape, offset, msg_len,
-                ));
+                raw_messages.push(RawGribMessage {
+                    var_name,
+                    full_name,
+                    unit,
+                    time_str,
+                    level_val,
+                    grid_shape,
+                    byte_offset: offset,
+                    msg_len,
+                });
 
                 offset = offset.saturating_add(msg_len.max(1));
             } else {
@@ -139,24 +199,29 @@ impl GribberishBlockStore {
         }
 
         if raw_messages.is_empty() {
+            log::warn!(
+                "No valid GRIB messages found in file buffer (length {} bytes)",
+                data.len()
+            );
             return Err("No valid GRIB messages found in file".into());
         }
 
+        Ok(raw_messages)
+    }
+
+    /// Groups raw messages by variable name and builds dataset metadata and coordinate maps.
+    fn build_indexed_dataset(
+        raw_messages: Vec<RawGribMessage>,
+        dataset_name: &str,
+    ) -> Result<GribIndexResult, BlockStoreError> {
         let mut dim_coords: HashMap<String, Vec<String>> = HashMap::new();
-        let mut var_groups: HashMap<String, Vec<_>> = HashMap::new();
+        let mut var_groups: HashMap<String, Vec<RawGribMessage>> = HashMap::new();
 
         for item in raw_messages {
-            let (var_name, full_name, unit, time_str, level_val, grid_shape, byte_offset, msg_len) =
-                item;
-            var_groups.entry(var_name).or_default().push((
-                full_name,
-                unit,
-                time_str,
-                level_val,
-                grid_shape,
-                byte_offset,
-                msg_len,
-            ));
+            var_groups
+                .entry(item.var_name.clone())
+                .or_default()
+                .push(item);
         }
 
         let mut variables: HashMap<String, GribVariable> = HashMap::new();
@@ -167,32 +232,26 @@ impl GribberishBlockStore {
             let mut unique_times: Vec<String> = Vec::new();
             let mut unique_levels: Vec<Option<f64>> = Vec::new();
 
-            for (_, _, time_str, level_val, _, _, _) in &msgs {
-                if !unique_times.contains(time_str) {
-                    unique_times.push(time_str.clone());
+            for m in &msgs {
+                if !unique_times.contains(&m.time_str) {
+                    unique_times.push(m.time_str.clone());
                 }
-                if !unique_levels.contains(level_val) {
-                    unique_levels.push(*level_val);
+                if !unique_levels.contains(&m.level_val) {
+                    unique_levels.push(m.level_val);
                 }
             }
 
             let num_times = unique_times.len();
             let num_levels = unique_levels.len();
-            let (nj, ni) = msgs.first().map(|m| m.4).unwrap_or((1, 1));
+            let (nj, ni) = msgs.first().map(|m| m.grid_shape).unwrap_or((1, 1));
 
             // Default coordinate fallback for lat/lon
-            if !dim_coords.contains_key("latitude") {
-                dim_coords.insert(
-                    "latitude".to_string(),
-                    (0..nj).map(|y| y.to_string()).collect(),
-                );
-            }
-            if !dim_coords.contains_key("longitude") {
-                dim_coords.insert(
-                    "longitude".to_string(),
-                    (0..ni).map(|x| x.to_string()).collect(),
-                );
-            }
+            dim_coords
+                .entry("latitude".to_string())
+                .or_insert_with(|| (0..nj).map(|y| y.to_string()).collect());
+            dim_coords
+                .entry("longitude".to_string())
+                .or_insert_with(|| (0..ni).map(|x| x.to_string()).collect());
 
             let mut dim_names = Vec::new();
             let mut shape = Vec::new();
@@ -212,26 +271,29 @@ impl GribberishBlockStore {
             shape.push(ni);
 
             let mut message_infos = Vec::new();
-            for (_, _, time_str, level_val, gshape, byte_offset, msg_len) in msgs.iter() {
-                let time_idx = unique_times.iter().position(|t| t == time_str).unwrap_or(0);
+            for m in &msgs {
+                let time_idx = unique_times
+                    .iter()
+                    .position(|t| t == &m.time_str)
+                    .unwrap_or(0);
                 let level_idx = unique_levels
                     .iter()
-                    .position(|l| l == level_val)
+                    .position(|l| l == &m.level_val)
                     .unwrap_or(0);
 
                 message_infos.push(GribMessageInfo {
-                    byte_offset: *byte_offset,
-                    message_len: *msg_len,
+                    byte_offset: m.byte_offset,
+                    message_len: m.msg_len,
                     time_index: time_idx,
-                    time_str: time_str.clone(),
+                    time_str: m.time_str.clone(),
                     level_index: level_idx,
-                    level_value: *level_val,
-                    grid_shape: *gshape,
+                    level_value: m.level_val,
+                    grid_shape: m.grid_shape,
                 });
             }
 
-            let first_full_name = msgs.first().and_then(|m| m.0.clone());
-            let first_unit = msgs.first().and_then(|m| m.1.clone());
+            let first_full_name = msgs.first().and_then(|m| m.full_name.clone());
+            let first_unit = msgs.first().and_then(|m| m.unit.clone());
 
             let mut attributes = HashMap::new();
             if let Some(ref long_name) = first_full_name {
@@ -243,7 +305,7 @@ impl GribberishBlockStore {
 
             let level_coords: Vec<String> = unique_levels
                 .iter()
-                .map(|lvl| lvl.map_or("surface".to_string(), |v| format!("{v}")))
+                .map(|lvl| lvl.map_or_else(|| "surface".to_string(), |v| format!("{v}")))
                 .collect();
 
             let var = GribVariable {
@@ -259,6 +321,7 @@ impl GribberishBlockStore {
             };
 
             let shape_u64: Vec<u64> = shape.iter().map(|&s| s as u64).collect();
+            let estimated_uncompressed_bytes = calculate_variable_size_bytes(&shape_u64, "float32");
 
             var_info_list.push(VariableInfo {
                 name: var_name.clone(),
@@ -266,7 +329,7 @@ impl GribberishBlockStore {
                 shape: shape_u64.clone(),
                 dimension_names: dim_names,
                 chunk_shape: shape_u64,
-                file_size: data.len() as u64,
+                file_size: estimated_uncompressed_bytes,
                 units: first_unit,
                 long_name: first_full_name,
                 time_coverage_start: unique_times.first().cloned(),
@@ -353,17 +416,29 @@ impl BlockStore for GribberishBlockStore {
         };
 
         // Find the message corresponding to (time_idx, level_idx)
-        let msg_info = var
+        let msg_info = match var
             .messages
             .iter()
             .find(|m| m.time_index == time_idx && m.level_index == level_idx)
-            .or_else(|| var.messages.first())
-            .ok_or_else(|| {
-                format!(
-                    "No GRIB message found for variable '{}' at time {time_idx}, level {level_idx}",
-                    request.variable
-                )
-            })?;
+        {
+            Some(m) => m,
+            None => {
+                let fallback = var.messages.first().ok_or_else(|| {
+                    format!(
+                        "No GRIB message found for variable '{}' at time {time_idx}, level {level_idx}",
+                        request.variable
+                    )
+                })?;
+                log::warn!(
+                    "Exact GRIB message match not found for variable '{}' at time_index={}, level_index={}; falling back to message at offset {}",
+                    request.variable,
+                    time_idx,
+                    level_idx,
+                    fallback.byte_offset
+                );
+                fallback
+            }
+        };
 
         let message = gribberish::message::read_message(&file_bytes, msg_info.byte_offset)
             .ok_or_else(|| {
@@ -380,6 +455,13 @@ impl BlockStore for GribberishBlockStore {
         let (nj, ni) = msg_info.grid_shape;
         let total_grid_points = nj.saturating_mul(ni);
         if raw_values.len() < total_grid_points {
+            log::warn!(
+                "Decoded GRIB points ({}) is smaller than expected grid dimensions ({} x {} = {})",
+                raw_values.len(),
+                nj,
+                ni,
+                total_grid_points
+            );
             return Err(format!(
                 "Decoded point count {} is smaller than expected grid points {}",
                 raw_values.len(),
