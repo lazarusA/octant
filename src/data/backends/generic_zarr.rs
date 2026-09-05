@@ -103,25 +103,17 @@ impl GenericZarrBlockStore {
             )
         {
             arr
-        } else if let Ok(key) = zarrs::storage::StoreKey::new(format!("{}/zarr.json", clean_name))
-            && let Ok(Some(bytes)) = self.storage.get(&key)
-            && let Ok(node_meta) = serde_json::from_slice::<zarrs::node::NodeMetadata>(&bytes)
-            && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
+        } else if let Some(arr) = ["zarr.json", ".zarray"].into_iter().find_map(|meta_file| {
+            let key =
+                zarrs::storage::StoreKey::new(format!("{}/{}", clean_name, meta_file)).ok()?;
+            let bytes = self.storage.get(&key).ok()??;
+            let node_meta = serde_json::from_slice::<zarrs::node::NodeMetadata>(&bytes).ok()?;
+            crate::utils::metadata::instantiate_array_from_node_metadata(
                 readable_store.clone(),
                 &var_path,
                 &node_meta,
             )
-        {
-            arr
-        } else if let Ok(key) = zarrs::storage::StoreKey::new(format!("{}/.zarray", clean_name))
-            && let Ok(Some(bytes)) = self.storage.get(&key)
-            && let Ok(node_meta) = serde_json::from_slice::<zarrs::node::NodeMetadata>(&bytes)
-            && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
-                readable_store.clone(),
-                &var_path,
-                &node_meta,
-            )
-        {
+        }) {
             arr
         } else if var_name == "data" || var_name.is_empty() {
             Array::open(readable_store.clone(), "/")?

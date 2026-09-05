@@ -100,17 +100,23 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                     return;
                                 }
 
-                                let tree = metadata.build_variable_tree();
+                                if app.cached_variable_tree.is_none() {
+                                    app.cached_variable_tree =
+                                        Some(metadata.build_variable_tree());
+                                }
+                                let tree = app.cached_variable_tree.as_ref().unwrap();
                                 let search_query = app.variable_search.trim();
                                 let search_active = !search_query.is_empty();
 
-                                let display_tree = if search_active {
-                                    tree.filter(search_query, &metadata.variables)
+                                let filtered_tree;
+                                let root_group_ref = if search_active {
+                                    filtered_tree = tree.filter(search_query, &metadata.variables);
+                                    filtered_tree.as_ref()
                                 } else {
                                     Some(tree)
                                 };
 
-                                let Some(root_group) = display_tree else {
+                                let Some(root_group) = root_group_ref else {
                                     ui.vertical_centered(|ui| {
                                         ui.add_space(10.0);
                                         ui.label(
@@ -129,7 +135,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
                                 render_tree_group(
                                     ui,
-                                    &root_group,
+                                    root_group,
                                     &metadata.variables,
                                     app.selected_variable_idx,
                                     search_active,

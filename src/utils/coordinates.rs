@@ -202,16 +202,20 @@ pub fn read_coord_bounds_scoped(
 ) -> Option<(f64, f64)> {
     let clean = dim_name.trim().to_lowercase();
     let mut candidates = Vec::new();
+    let mut add_candidate = |p: String| {
+        let clean_key = p.trim_start_matches('/').to_string();
+        if !clean_key.is_empty() && !candidates.contains(&clean_key) {
+            candidates.push(clean_key);
+        }
+    };
 
     // 1. Group-scoped candidate path (e.g. atmosphere/forecast/lat)
     if let Some(scope) = group_scope {
-        candidates.push(format!("{}/{}", scope, clean));
-        candidates.push(format!("/{}/{}", scope, clean));
+        add_candidate(format!("{}/{}", scope, clean));
     }
 
     // 2. Direct root candidate paths
-    candidates.push(format!("/{}", clean));
-    candidates.push(clean.clone());
+    add_candidate(clean.clone());
 
     let is_lat = clean.contains("lat") || clean == "y";
     let is_lon = clean.contains("lon") || clean == "x";
@@ -233,62 +237,39 @@ pub fn read_coord_bounds_scoped(
 
     for alias in aliases {
         if let Some(scope) = group_scope {
-            candidates.push(format!("{}/{}", scope, alias));
-            candidates.push(format!("/{}/{}", scope, alias));
+            add_candidate(format!("{}/{}", scope, alias));
         }
-        candidates.push(format!("/{}", alias));
-        candidates.push(alias.to_string());
+        add_candidate(alias.to_string());
     }
 
     // 4. Known group prefixes across the store (e.g. nested-only stores)
     for group in known_groups {
-        candidates.push(format!("{}/{}", group, clean));
-        candidates.push(format!("/{}/{}", group, clean));
+        add_candidate(format!("{}/{}", group, clean));
         for alias in aliases {
-            candidates.push(format!("{}/{}", group, alias));
-            candidates.push(format!("/{}/{}", group, alias));
+            add_candidate(format!("{}/{}", group, alias));
         }
     }
 
     let mut found_array = None;
-    for path in &candidates {
-        let clean_path = if path.starts_with('/') {
-            path.clone()
-        } else {
-            format!("/{}", path)
-        };
-        let clean_key = path.trim_start_matches('/');
+    for clean_key in &candidates {
+        let clean_path = format!("/{}", clean_key);
 
         if let Ok(arr) = Array::open(store.clone(), &clean_path) {
             found_array = Some(arr);
             break;
         }
-        if let Ok(arr) = Array::open(store.clone(), clean_key) {
-            found_array = Some(arr);
-            break;
-        }
-        // Direct StoreKey checks for Zarr v3 and v2
-        if let Ok(key) = zarrs::storage::StoreKey::new(format!("{}/zarr.json", clean_key))
-            && let Ok(Some(bytes)) = store.get(&key)
-            && let Ok(node_meta) = serde_json::from_slice::<zarrs::node::NodeMetadata>(&bytes)
-            && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
+
+        // Direct StoreKey checks for Zarr v3 and v2 metadata
+        if let Some(arr) = ["zarr.json", ".zarray"].into_iter().find_map(|meta_file| {
+            let key = zarrs::storage::StoreKey::new(format!("{}/{}", clean_key, meta_file)).ok()?;
+            let bytes = store.get(&key).ok()??;
+            let node_meta = serde_json::from_slice::<zarrs::node::NodeMetadata>(&bytes).ok()?;
+            crate::utils::metadata::instantiate_array_from_node_metadata(
                 store.clone(),
                 &clean_path,
                 &node_meta,
             )
-        {
-            found_array = Some(arr);
-            break;
-        }
-        if let Ok(key) = zarrs::storage::StoreKey::new(format!("{}/.zarray", clean_key))
-            && let Ok(Some(bytes)) = store.get(&key)
-            && let Ok(node_meta) = serde_json::from_slice::<zarrs::node::NodeMetadata>(&bytes)
-            && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
-                store.clone(),
-                &clean_path,
-                &node_meta,
-            )
-        {
+        }) {
             found_array = Some(arr);
             break;
         }
@@ -304,31 +285,15 @@ pub fn read_coord_bounds_scoped(
             if child_group.is_empty() {
                 continue;
             }
-            let child_candidates = [
-                format!("{}/{}", child_group, clean),
-                format!("/{}/{}", child_group, clean),
-            ];
-            for path in child_candidates {
-                if let Ok(arr) = Array::open(store.clone(), &path) {
-                    found_array = Some(arr);
-                    break;
-                }
-            }
-            if found_array.is_some() {
+            let child_target = format!("/{}", child_group);
+            if let Ok(arr) = Array::open(store.clone(), &format!("{}/{}", child_target, clean)) {
+                found_array = Some(arr);
                 break;
             }
             for alias in aliases {
-                let alias_candidates = [
-                    format!("{}/{}", child_group, alias),
-                    format!("/{}/{}", child_group, alias),
-                ];
-                for path in alias_candidates {
-                    if let Ok(arr) = Array::open(store.clone(), &path) {
-                        found_array = Some(arr);
-                        break;
-                    }
-                }
-                if found_array.is_some() {
+                if let Ok(arr) = Array::open(store.clone(), &format!("{}/{}", child_target, alias))
+                {
+                    found_array = Some(arr);
                     break;
                 }
             }
