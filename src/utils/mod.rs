@@ -26,7 +26,7 @@ pub use math::{
 };
 pub use metadata::{
     default_dimension_names_for_rank, discover_arrays_via_http_metadata, extract_store_variables,
-    resolve_array_dimension_names, variable_info_from_array,
+    resolve_array_dimension_names, variable_info_from_array, variable_info_from_node_metadata,
 };
 
 pub use units::{

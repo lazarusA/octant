@@ -254,22 +254,9 @@ pub fn read_coord_bounds_scoped(
     for clean_key in &candidates {
         let clean_path = format!("/{}", clean_key);
 
-        if let Ok(arr) = Array::open(store.clone(), &clean_path) {
-            found_array = Some(arr);
-            break;
-        }
-
-        // Direct StoreKey checks for Zarr v3 and v2 metadata
-        if let Some(arr) = ["zarr.json", ".zarray"].into_iter().find_map(|meta_file| {
-            let key = zarrs::storage::StoreKey::new(format!("{}/{}", clean_key, meta_file)).ok()?;
-            let bytes = store.get(&key).ok()??;
-            let node_meta = serde_json::from_slice::<zarrs::node::NodeMetadata>(&bytes).ok()?;
-            crate::utils::metadata::instantiate_array_from_node_metadata(
-                store.clone(),
-                &clean_path,
-                &node_meta,
-            )
-        }) {
+        if let Ok(arr) =
+            crate::utils::metadata::open_or_instantiate_array_normalized(store.clone(), &clean_path)
+        {
             found_array = Some(arr);
             break;
         }

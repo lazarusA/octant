@@ -67,8 +67,25 @@ pub fn fetch_block_from_cached_array(
     }
 
     let subset = ArraySubset::new_with_ranges(&ranges);
-    let raw_values =
-        retrieve_array_subset_as_f32(array, Some(cache), &subset).map_err(|e| e.to_string())?;
+    log::info!(
+        "[ZarrBlock] Fetching '{}' subset {:?} (elements = {}) from '{}'",
+        request.variable,
+        subset.to_ranges(),
+        subset.num_elements(),
+        store_url
+    );
+
+    let raw_values = match retrieve_array_subset_as_f32(array, Some(cache), &subset) {
+        Ok(vals) => vals,
+        Err(e) => {
+            log::error!(
+                "[ZarrBlock] Failed to retrieve array subset for '{}': {:?}",
+                request.variable,
+                e
+            );
+            return Err(e.to_string().into());
+        }
+    };
     let bytes_read = (raw_values.len() * std::mem::size_of::<f32>()) as u64;
 
     if let Some(ref mut cb) = on_progress {

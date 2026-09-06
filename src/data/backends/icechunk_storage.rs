@@ -28,8 +28,9 @@ pub fn build_sync_icechunk_store(
     let async_store = rt.block_on(async {
         tokio::time::timeout(std::time::Duration::from_secs(30), async {
             let expanded = crate::utils::expand_tilde(location);
-            let storage = if expanded.exists() {
-                icechunk::new_local_filesystem_storage(&expanded).await?
+            let (storage, repo_config, auth_map) = if expanded.exists() {
+                let storage = icechunk::new_local_filesystem_storage(&expanded).await?;
+                (storage, None, HashMap::new())
             } else {
                 let (bucket, prefix, region, endpoint_url) = parse_s3_or_http_url(location)?;
                 let force_path_style = endpoint_url.is_some();
@@ -41,7 +42,64 @@ pub fn build_sync_icechunk_store(
                 config.allow_http = true;
                 config.force_path_style = force_path_style;
 
-                icechunk::new_s3_object_store_storage(
+                let mut repo_config = icechunk::config::RepositoryConfig::default();
+                let mut auth_map: HashMap<String, Option<icechunk::config::Credentials>> =
+                    HashMap::new();
+
+                let mut s3_virt_opts = config.clone();
+                s3_virt_opts.endpoint_url = None;
+                s3_virt_opts.force_path_style = false;
+
+                let known_prefixes = vec![
+                    bucket.clone(),
+                    format!("{}/", bucket),
+                    format!("s3://{}", bucket),
+                    format!("s3://{}/", bucket),
+                    "noaa-cdr-ndvi-pds".to_string(),
+                    "noaa-cdr-ndvi-pds/".to_string(),
+                    "s3://noaa-cdr-ndvi-pds".to_string(),
+                    "s3://noaa-cdr-ndvi-pds/".to_string(),
+                    "https://noaa-cdr-ndvi-pds.s3.amazonaws.com/".to_string(),
+                    "https://noaa-cdr-ndvi-pds.s3.us-east-1.amazonaws.com/".to_string(),
+                    "dynamical-noaa-hrrr".to_string(),
+                    "dynamical-noaa-hrrr/".to_string(),
+                    "s3://dynamical-noaa-hrrr".to_string(),
+                    "s3://dynamical-noaa-hrrr/".to_string(),
+                    "noaa-hrrr-bdp-pds".to_string(),
+                    "noaa-hrrr-bdp-pds/".to_string(),
+                    "s3://noaa-hrrr-bdp-pds".to_string(),
+                    "s3://noaa-hrrr-bdp-pds/".to_string(),
+                    "noaa-goes16".to_string(),
+                    "s3://noaa-goes16/".to_string(),
+                    "noaa-goes17".to_string(),
+                    "s3://noaa-goes17/".to_string(),
+                    "noaa-goes18".to_string(),
+                    "s3://noaa-goes18/".to_string(),
+                    "noaa-gfs-bdp-pds".to_string(),
+                    "s3://noaa-gfs-bdp-pds/".to_string(),
+                    "noaa-nwm-pds".to_string(),
+                    "s3://noaa-nwm-pds/".to_string(),
+                    "copernicus-dem-30m".to_string(),
+                    "s3://copernicus-dem-30m/".to_string(),
+                    "copernicus-dem-90m".to_string(),
+                    "s3://copernicus-dem-90m/".to_string(),
+                    "s3://".to_string(),
+                    "s3".to_string(),
+                    "virtual".to_string(),
+                    "default".to_string(),
+                ];
+
+                for pfx in known_prefixes {
+                    if let Ok(container) = icechunk::virtual_chunks::VirtualChunkContainer::new(
+                        pfx.clone(),
+                        icechunk::config::ObjectStoreConfig::S3(s3_virt_opts.clone()),
+                    ) {
+                        let _ = repo_config.set_virtual_chunk_container(container);
+                    }
+                    auth_map.insert(pfx, None);
+                }
+
+                let storage = icechunk::new_s3_object_store_storage(
                     config,
                     bucket,
                     prefix,
@@ -50,10 +108,12 @@ pub fn build_sync_icechunk_store(
                     Vec::new(),
                 )
                 .await
-                .map_err(|e| format!("Failed to create S3 storage for Icechunk: {e}"))?
+                .map_err(|e| format!("Failed to create S3 storage for Icechunk: {e}"))?;
+
+                (storage, Some(repo_config), auth_map)
             };
 
-            let repo = icechunk::Repository::open(None, storage, Default::default())
+            let repo = icechunk::Repository::open(repo_config, storage, auth_map)
                 .await
                 .map_err(|e| format!("Failed to open Icechunk repository: {e}"))?;
 
