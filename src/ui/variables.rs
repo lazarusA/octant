@@ -1,3 +1,4 @@
+use crate::ui::icons::{Icon, UiIconExt};
 use crate::{app::OctantApp, data::VariableTreeGroup};
 
 pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
@@ -22,11 +23,11 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.set_width(width);
 
-                egui::CollapsingHeader::new("📊 Variables")
+                    egui::CollapsingHeader::new("Variables")
                     .default_open(true)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label("🔍");
+                            ui.icon(Icon::Search, 13.0);
                             let search_has_text = !app.variable_search.is_empty();
                             let edit_width = if search_has_text {
                                 (ui.available_width() - 26.0).max(60.0)
@@ -83,7 +84,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
                                             ui.add_space(6.0);
 
-                                            if ui.button("🔍 Fetch / Load Store Metadata").clicked()
+                                            if ui.icon_button(Icon::Search, "Fetch / Load Store Metadata").clicked()
                                             {
                                                 let target = app.store_target_input.clone();
                                                 app.submit_or_activate_source(
@@ -107,7 +108,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
                                         ui.add_space(6.0);
 
-                                        if ui.button("🔍 Refresh Store Metadata").clicked() {
+                                        if ui.icon_button(Icon::Search, "Refresh Store Metadata").clicked() {
                                             app.inspect_active_store();
                                         }
 
@@ -206,7 +207,6 @@ fn render_tree_group(
                 // If there are both subgroups and root variables, make root variables collapsible (starts collapsed)
                 let root_header_id = ui.make_persistent_id("var_tree_root_vars");
                 let root_count = group.variable_indices.len();
-                let header_title = format!("📁 / ({})", root_count);
 
                 egui::collapsing_header::CollapsingState::load_with_default_open(
                     ui.ctx(),
@@ -214,7 +214,10 @@ fn render_tree_group(
                     ctx.search_active,
                 )
                 .show_header(ui, |ui| {
-                    ui.label(egui::RichText::new(header_title).strong());
+                    ui.horizontal(|ui| {
+                        ui.icon(Icon::Folder, 12.0);
+                        ui.label(egui::RichText::new(format!("/ ({})", root_count)).strong());
+                    });
                 })
                 .body(|ui| {
                     ui.indent(ui.make_persistent_id("var_tree_root_vars_body"), |ui| {
@@ -235,7 +238,7 @@ fn render_tree_group(
         if sub_count > MAX_ITEMS_PER_LEVEL {
             ui.label(
                 egui::RichText::new(format!(
-                    "Showing 100 of {} folders. Use 🔍 search to discover all.",
+                    "Showing 100 of {} folders. Use search to discover all.",
                     sub_count
                 ))
                 .small()
@@ -255,7 +258,6 @@ fn render_subgroup(
 ) {
     let header_id = ui.make_persistent_id(("var_tree_group", &subgroup.full_path));
     let total_count = subgroup.total_variable_count();
-    let header_title = format!("📁 {} ({})", subgroup.name, total_count);
 
     egui::collapsing_header::CollapsingState::load_with_default_open(
         ui.ctx(),
@@ -263,7 +265,10 @@ fn render_subgroup(
         ctx.search_active, // Folders are closed by default, expanded only during search
     )
     .show_header(ui, |ui| {
-        ui.label(egui::RichText::new(header_title).strong());
+        ui.horizontal(|ui| {
+            ui.icon(Icon::Folder, 12.0);
+            ui.label(egui::RichText::new(format!("{} ({})", subgroup.name, total_count)).strong());
+        });
     })
     .body(|ui| {
         ui.indent(
@@ -280,7 +285,7 @@ fn render_subgroup(
                 if sub_count > MAX_ITEMS_PER_LEVEL {
                     ui.label(
                         egui::RichText::new(format!(
-                            "Showing 100 of {} folders. Use 🔍 search to discover all.",
+                            "Showing 100 of {} folders. Use search to discover all.",
                             sub_count
                         ))
                         .small()
@@ -309,7 +314,7 @@ fn render_variable_list(ui: &mut egui::Ui, indices: &[usize], ctx: &mut Variable
     if total > MAX_ITEMS_PER_LEVEL {
         ui.label(
             egui::RichText::new(format!(
-                "Showing 100 of {} variables in this folder. Use 🔍 search to discover all.",
+                "Showing 100 of {} variables in this folder. Use search to discover all.",
                 total
             ))
             .small()
@@ -329,17 +334,26 @@ fn render_variable_row(
     let is_selected = selected_idx == idx;
     let leaf_name = var_info.leaf_name();
 
-    let label_text = match &var_info.units {
-        Some(units) if !units.is_empty() => format!("📄 {}  ({})", leaf_name, units),
-        _ => format!("📄 {}", leaf_name),
+    let display_name = match &var_info.units {
+        Some(units) if !units.is_empty() => format!("{}  ({})", leaf_name, units),
+        _ => leaf_name.to_string(),
     };
 
-    let response = ui.selectable_label(is_selected, egui::RichText::new(label_text).strong());
+    let row_resp = ui.horizontal(|ui| {
+        ui.icon(Icon::VariableDoc, 11.0);
+        ui.selectable_label(is_selected, egui::RichText::new(display_name).strong())
+    });
 
-    let response = response.on_hover_ui(|ui| {
+    let clicked = row_resp.response.clicked() || row_resp.inner.clicked();
+
+    let response = row_resp.response.on_hover_ui(|ui| {
         ui.label(egui::RichText::new(&var_info.name).strong());
         if let Some(group) = var_info.group_path() {
-            ui.label(format!("Group: 📁 {}", group.replace('/', " ❯ ")));
+            ui.horizontal(|ui| {
+                ui.label("Group:");
+                ui.icon(Icon::Folder, 11.0);
+                ui.label(group.replace('/', " / "));
+            });
         }
         ui.label(format!("Type: [{}]", var_info.data_type));
         ui.label(format!("Shape: {:?}", var_info.shape));
@@ -348,7 +362,8 @@ fn render_variable_row(
         }
     });
 
-    if response.clicked() {
+    if clicked {
         *newly_selected_idx = Some(idx);
     }
+    let _ = response;
 }

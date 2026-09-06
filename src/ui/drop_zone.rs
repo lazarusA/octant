@@ -196,7 +196,7 @@ pub fn show_drop_zone(
 
         // Labels
         let title_text = if is_warning_active {
-            "⚠️ Type not supported"
+            "Type not supported"
         } else if is_drag_hovering {
             "Release to load dataset"
         } else {

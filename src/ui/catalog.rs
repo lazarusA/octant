@@ -2,6 +2,7 @@ use crate::app::{OctantApp, StoreKind};
 use crate::catalog::{
     CatalogCategoryFilter, ICECHUNK_CATALOG, PROCEDURAL_CATALOG, ZARR_CATALOG, get_catalog_entries,
 };
+use crate::ui::icons::{Icon, UiIconExt};
 
 pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     if !app.show_catalog_window {
@@ -11,9 +12,9 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     let mut open = app.show_catalog_window;
     let mut should_close = false;
 
-    let max_w = (ctx.viewport_rect().width() * 0.7).clamp(480.0, 950.0);
+    let max_w = (ctx.viewport_rect().width() * 0.75).clamp(520.0, 840.0);
 
-    let response = egui::Window::new("📚 Dataset Catalog")
+    let response = egui::Window::new("Dataset Catalog")
         .open(&mut open)
         .default_size([max_w, 560.0])
         .max_width(max_w)
@@ -25,7 +26,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
-                ui.heading("🌐 Zarr, 🧊 Icechunk & 🎲 Procedural Dataset Catalog");
+                ui.heading("Zarr, Icechunk & Procedural Dataset Catalog");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let total_count =
                         ZARR_CATALOG.len() + ICECHUNK_CATALOG.len() + PROCEDURAL_CATALOG.len();
@@ -41,7 +42,8 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
 
             // Filter and Search Row
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("🔍 Search:").strong());
+                ui.icon(Icon::Search, 13.0);
+                ui.label(egui::RichText::new("Search:").strong());
                 ui.add(
                     egui::TextEdit::singleline(&mut app.catalog_search_query)
                         .hint_text("Filter by name, description or URL...")
@@ -64,17 +66,17 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                 ui.selectable_value(
                     &mut app.catalog_category_filter,
                     CatalogCategoryFilter::Zarr,
-                    format!("🌐 Zarr ({})", zarr_count),
+                    format!("Zarr ({})", zarr_count),
                 );
                 ui.selectable_value(
                     &mut app.catalog_category_filter,
                     CatalogCategoryFilter::Icechunk,
-                    format!("🧊 Icechunk ({})", icechunk_count),
+                    format!("Icechunk ({})", icechunk_count),
                 );
                 ui.selectable_value(
                     &mut app.catalog_category_filter,
                     CatalogCategoryFilter::Procedural,
-                    format!("🎲 Procedural ({})", procedural_count),
+                    format!("Procedural ({})", procedural_count),
                 );
             });
 
@@ -100,7 +102,11 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
             if filtered_entries.is_empty() {
                 ui.vertical_centered(|ui| {
                     ui.add_space(40.0);
-                    ui.label(egui::RichText::new("🚫 No catalog entries found matching your query.").strong());
+                    ui.horizontal(|ui| {
+                        ui.add_space((ui.available_width() - 340.0).max(0.0) * 0.5);
+                        ui.icon_colored(Icon::Info, 14.0, ui.visuals().weak_text_color());
+                        ui.label(egui::RichText::new("No catalog entries found matching your query.").strong());
+                    });
                     if ui.button("Clear Search").clicked() {
                         app.catalog_search_query.clear();
                     }
@@ -116,12 +122,12 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
 
                                 ui.horizontal(|ui| {
                                     // Store type badge using system theme colors
-                                    let badge_label = match entry.store_kind {
-                                        StoreKind::RemoteZarr => "[🌐 Zarr]",
-                                        StoreKind::RemoteIcechunk => "[🧊 Icechunk]",
-                                        StoreKind::ProceduralVolume4D => "[🌐 4D Volume]",
-                                        StoreKind::ProceduralRandom => "[🎲 2D Matrix]",
-                                        _ => "[Store]",
+                                    let (badge_icon, badge_name) = match entry.store_kind {
+                                        StoreKind::RemoteZarr => (Icon::Globe, "Zarr"),
+                                        StoreKind::RemoteIcechunk => (Icon::Icechunk, "Icechunk"),
+                                        StoreKind::ProceduralVolume4D => (Icon::PlotVolume, "4D Volume"),
+                                        StoreKind::ProceduralRandom => (Icon::PlotPlane, "2D Matrix"),
+                                        _ => (Icon::Folder, "Store"),
                                     };
                                     let badge_color = match entry.store_kind {
                                         StoreKind::RemoteZarr => ui.visuals().selection.bg_fill,
@@ -135,8 +141,9 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                                         _ => ui.visuals().widgets.noninteractive.fg_stroke.color,
                                     };
 
+                                    ui.icon_colored(badge_icon, 13.0, badge_color);
                                     ui.label(
-                                        egui::RichText::new(badge_label)
+                                        egui::RichText::new(format!("[{}]", badge_name))
                                             .strong()
                                             .color(badge_color),
                                     );
@@ -144,10 +151,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                                     ui.label(egui::RichText::new(entry.label).strong().size(14.0));
 
                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        let btn = egui::Button::new(
-                                            egui::RichText::new("⚡ Select & Load").strong(),
-                                        );
-                                        if ui.add(btn).clicked() {
+                                        if ui.icon_button(Icon::DropTray, "Select & Load").clicked() {
                                             app.submit_or_activate_source(trimmed_url, Some(entry.store_kind));
                                             should_close = true;
                                         }

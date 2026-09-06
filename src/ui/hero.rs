@@ -232,7 +232,7 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 let right_reserve = if has_input { 58.0 } else { 36.0 };
 
                 let edit = egui::TextEdit::singleline(&mut app.hero_state.input)
-                    .hint_text("https://… (.zarr / .icechunk), or local path…")
+                    .hint_text("https://... (.zarr / .icechunk), or local path...")
                     .font(egui::TextStyle::Monospace)
                     .frame(egui::Frame::NONE)
                     .desired_width(ui.available_width() - right_reserve);
@@ -349,13 +349,13 @@ fn sample_pills_row(ui: &mut egui::Ui, app: &mut OctantApp) {
 
     let samples: [(&str, &str, egui::Color32, egui::Color32); 2] = [
         (
-            "🔥 SeasFire",
+            "SeasFire",
             "https://s3.bgc-jena.mpg.de:9000/misc/seasfire_rechunked.zarr",
             egui::Color32::from_rgb(255, 140, 70), // amber
             egui::Color32::from_rgba_unmultiplied(255, 140, 70, 24),
         ),
         (
-            "🎲 Procedural 4D",
+            "Procedural 4D",
             "procedural://volume4d",
             if is_dark {
                 egui::Color32::from_rgb(222, 228, 238)

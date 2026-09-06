@@ -1,4 +1,7 @@
-use crate::app::OctantApp;
+use crate::{
+    app::OctantApp,
+    ui::icons::{Icon, UiIconExt},
+};
 
 pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     if !app.show_about_window {
@@ -64,13 +67,22 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
                         .inner_margin(egui::Margin::symmetric(12, 8))
                         .show(ui, |ui| {
                             ui.spacing_mut().item_spacing.y = 4.0;
-                            ui.label(egui::RichText::new("⚡ Hyperslab Slicing").strong());
+                            ui.horizontal(|ui| {
+                                ui.icon(Icon::Bolt, 13.0);
+                                ui.label(egui::RichText::new("Hyperslab Slicing").strong());
+                            });
                             ui.label("   Async LRU chunk cache & multi-resolution pyramids.");
-                            ui.label(egui::RichText::new("🧊 Zarr & Icechunk Native").strong());
+                            ui.horizontal(|ui| {
+                                ui.icon(Icon::Icechunk, 13.0);
+                                ui.label(egui::RichText::new("Zarr & Icechunk Native").strong());
+                            });
                             ui.label("   Local, S3, GCS, Azure, and HTTP streaming backends.");
-                            ui.label(
-                                egui::RichText::new("🎨 Hardware-Accelerated WGPU Shaders").strong(),
-                            );
+                            ui.horizontal(|ui| {
+                                ui.icon(Icon::Colormap, 13.0);
+                                ui.label(
+                                    egui::RichText::new("Hardware-Accelerated WGPU Shaders").strong(),
+                                );
+                            });
                             ui.label(
                                 "   2D Flatmaps, 3D Spheres, Elevation Surfaces, Volumes & 1D Profiles.",
                             );
@@ -92,10 +104,21 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
                         );
                     });
                     ui.horizontal_wrapped(|ui| {
-                        ui.hyperlink_to("📓 octant documentation", "https://docs.rs/octant");
+                        ui.icon(Icon::Catalog, 12.0);
+                        ui.hyperlink_to("octant documentation", "https://docs.rs/octant");
                     });
                     ui.horizontal_wrapped(|ui| {
-                        ui.hyperlink_to("👤 @lazarusA", "https://github.com/lazarusA");
+                        ui.icon(Icon::Globe, 12.0);
+                        ui.hyperlink_to("@lazarusA", "https://github.com/lazarusA");
+                    });
+
+                    ui.add_space(8.0);
+                    ui.separator();
+                    ui.add_space(6.0);
+
+                    // Live Icon Gallery
+                    ui.collapsing("Native Vector Icons", |ui| {
+                        crate::ui::icons::show_icon_gallery(ui);
                     });
 
                     ui.add_space(8.0);
