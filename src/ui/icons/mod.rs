@@ -182,8 +182,9 @@ impl UiIconExt for Ui {
         let font_id = egui::TextStyle::Button.resolve(self.style());
         let galley = widget_text.into_galley(self, None, self.available_width(), font_id);
 
+        let has_text = !galley.is_empty();
         let icon_size = 14.0;
-        let gap = 6.0;
+        let gap = if has_text { 6.0 } else { 0.0 };
         let padding = self.spacing().button_padding;
 
         let content_size = vec2(
@@ -219,11 +220,13 @@ impl UiIconExt for Ui {
             let icon_color = visuals.text_color();
             icon.paint(self.painter(), icon_rect, icon_color, is_dark);
 
-            let text_pos = egui::pos2(
-                content_origin.x + icon_size + gap,
-                content_origin.y + (content_size.y - galley.size().y) * 0.5,
-            );
-            self.painter().galley(text_pos, galley, icon_color);
+            if has_text {
+                let text_pos = egui::pos2(
+                    content_origin.x + icon_size + gap,
+                    content_origin.y + (content_size.y - galley.size().y) * 0.5,
+                );
+                self.painter().galley(text_pos, galley, icon_color);
+            }
         }
 
         response
@@ -234,8 +237,9 @@ impl UiIconExt for Ui {
         let font_id = egui::TextStyle::Body.resolve(self.style());
         let galley = widget_text.into_galley(self, None, self.available_width(), font_id);
 
+        let has_text = !galley.is_empty();
         let icon_size = 13.0;
-        let gap = 5.0;
+        let gap = if has_text { 5.0 } else { 0.0 };
 
         let desired_size = vec2(
             icon_size + gap + galley.size().x,
@@ -253,11 +257,13 @@ impl UiIconExt for Ui {
             );
             icon.paint(self.painter(), icon_rect, color, is_dark);
 
-            let text_pos = egui::pos2(
-                rect.min.x + icon_size + gap,
-                rect.min.y + (desired_size.y - galley.size().y) * 0.5,
-            );
-            self.painter().galley(text_pos, galley, color);
+            if has_text {
+                let text_pos = egui::pos2(
+                    rect.min.x + icon_size + gap,
+                    rect.min.y + (desired_size.y - galley.size().y) * 0.5,
+                );
+                self.painter().galley(text_pos, galley, color);
+            }
         }
 
         response

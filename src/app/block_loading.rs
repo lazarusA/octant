@@ -91,7 +91,7 @@ impl OctantApp {
             self.current_timestep,
         ) {
             self.status_message = format!(
-                "🚀 Block cache HIT for '{}' ({} bytes resident)",
+                "Block cache HIT for '{}' ({} bytes resident)",
                 block.variable_name,
                 block.bytes_size()
             );
@@ -113,7 +113,7 @@ impl OctantApp {
         // 2. Exact Key Cache HIT
         if let Some(block) = self.block_cache.get(&key) {
             self.status_message = format!(
-                "🚀 Block cache HIT for '{}' ({} bytes resident)",
+                "Block cache HIT for '{}' ({} bytes resident)",
                 block.variable_name,
                 block.bytes_size()
             );
@@ -123,7 +123,7 @@ impl OctantApp {
         }
 
         // 3. Cache MISS: dispatch async prefetch request for current chunk and launch background prefetching in parallel.
-        self.status_message = format!("⏳ [block cache] Downloading window for '{}'...", var_name);
+        self.status_message = format!("[block cache] Downloading window for '{}'...", var_name);
         self.block_prefetcher
             .request(block_request, &self.block_cache);
         self.prefetch_selected_animated_range(&shape);
@@ -664,7 +664,7 @@ impl OctantApp {
                             }
                         }
                         self.status_message =
-                            format!("⚡ [block cache] Loaded '{}'", block.variable_name);
+                            format!("[block cache] Loaded '{}'", block.variable_name);
                         self.apply_block_projection(&block);
                     }
                 }

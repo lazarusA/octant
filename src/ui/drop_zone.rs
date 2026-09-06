@@ -124,74 +124,14 @@ pub fn show_drop_zone(
 
         let center = rect.center();
         let icon_y = center.y - 12.0;
-        let icon_stroke = egui::Stroke::new(1.4, stroke_color);
+        let icon_rect =
+            egui::Rect::from_center_size(egui::pos2(center.x, icon_y), egui::vec2(16.0, 16.0));
+        let is_dark = ui.visuals().dark_mode;
 
         if is_warning_active {
-            // Draw warning triangle icon
-            let p_top = egui::pos2(center.x, icon_y - 6.5);
-            let p_left = egui::pos2(center.x - 7.5, icon_y + 5.5);
-            let p_right = egui::pos2(center.x + 7.5, icon_y + 5.5);
-
-            ui.painter().line_segment([p_top, p_left], icon_stroke);
-            ui.painter().line_segment([p_left, p_right], icon_stroke);
-            ui.painter().line_segment([p_right, p_top], icon_stroke);
-
-            // Exclamation mark stem & dot
-            ui.painter().line_segment(
-                [
-                    egui::pos2(center.x, icon_y - 2.5),
-                    egui::pos2(center.x, icon_y + 1.5),
-                ],
-                icon_stroke,
-            );
-            ui.painter()
-                .circle_filled(egui::pos2(center.x, icon_y + 3.8), 1.0, stroke_color);
+            crate::ui::icons::Icon::Warning.paint(ui.painter(), icon_rect, stroke_color, is_dark);
         } else {
-            // Drop arrow (shaft + head)
-            ui.painter().line_segment(
-                [
-                    egui::pos2(center.x, icon_y - 6.0),
-                    egui::pos2(center.x, icon_y + 2.0),
-                ],
-                icon_stroke,
-            );
-            ui.painter().line_segment(
-                [
-                    egui::pos2(center.x - 3.5, icon_y - 1.5),
-                    egui::pos2(center.x, icon_y + 2.0),
-                ],
-                icon_stroke,
-            );
-            ui.painter().line_segment(
-                [
-                    egui::pos2(center.x + 3.5, icon_y - 1.5),
-                    egui::pos2(center.x, icon_y + 2.0),
-                ],
-                icon_stroke,
-            );
-
-            // Container tray
-            ui.painter().line_segment(
-                [
-                    egui::pos2(center.x - 7.0, icon_y + 1.0),
-                    egui::pos2(center.x - 7.0, icon_y + 5.0),
-                ],
-                icon_stroke,
-            );
-            ui.painter().line_segment(
-                [
-                    egui::pos2(center.x - 7.0, icon_y + 5.0),
-                    egui::pos2(center.x + 7.0, icon_y + 5.0),
-                ],
-                icon_stroke,
-            );
-            ui.painter().line_segment(
-                [
-                    egui::pos2(center.x + 7.0, icon_y + 5.0),
-                    egui::pos2(center.x + 7.0, icon_y + 1.0),
-                ],
-                icon_stroke,
-            );
+            crate::ui::icons::Icon::DropTray.paint(ui.painter(), icon_rect, stroke_color, is_dark);
         }
 
         // Labels

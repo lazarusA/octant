@@ -68,114 +68,76 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.separator();
 
         let pyramid_disabled = app.enable_pyramid_resampling;
-        let pyramid_reason = "Disabled: 2D Pyramid Resampling active";
 
-        struct PlotOption {
-            plot_type: PlotType,
-            icon: Icon,
-            label: &'static str,
-            enabled: bool,
-            disabled_reason: Option<std::borrow::Cow<'static, str>>,
-        }
-
-        let options = [
-            PlotOption {
-                plot_type: PlotType::Heatmap,
-                icon: Icon::PlotPlane,
-                label: "2D Plane (Flatmap)",
-                enabled: true,
-                disabled_reason: None,
-            },
-            PlotOption {
-                plot_type: PlotType::Line,
-                icon: Icon::PlotLine,
-                label: "1D Line Chart",
-                enabled: !pyramid_disabled,
-                disabled_reason: if pyramid_disabled {
-                    Some(pyramid_reason.into())
-                } else {
-                    None
-                },
-            },
-            PlotOption {
-                plot_type: PlotType::Sphere,
-                icon: Icon::PlotGlobe,
-                label: "3D Globe (Sphere)",
-                enabled: is_surface_allowed,
-                disabled_reason: if pyramid_disabled {
-                    Some(pyramid_reason.into())
-                } else if !is_surface_allowed {
-                    Some(format!("Disabled: {:.0} MB > 128 MB GPU limit", surface_mb).into())
-                } else {
-                    None
-                },
-            },
-            PlotOption {
-                plot_type: PlotType::Surface,
-                icon: Icon::PlotSurface,
-                label: "3D Surface / Blocks",
-                enabled: is_surface_allowed,
-                disabled_reason: if pyramid_disabled {
-                    Some(pyramid_reason.into())
-                } else if !is_surface_allowed {
-                    Some(format!("Disabled: {:.0} MB > 128 MB GPU limit", surface_mb).into())
-                } else {
-                    None
-                },
-            },
-            PlotOption {
-                plot_type: PlotType::Volume,
-                icon: Icon::PlotVolume,
-                label: "3D Volume Raycasting",
-                enabled: is_volume_allowed,
-                disabled_reason: if pyramid_disabled {
-                    Some(pyramid_reason.into())
-                } else if !is_3d_available {
-                    Some("Requires 3D Data".into())
-                } else if !is_size_allowed {
-                    Some(format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb).into())
-                } else {
-                    None
-                },
-            },
-            PlotOption {
-                plot_type: PlotType::PointCloud,
-                icon: Icon::PlotPointCloud,
-                label: "3D Point Cloud",
-                enabled: is_volume_allowed,
-                disabled_reason: if pyramid_disabled {
-                    Some(pyramid_reason.into())
-                } else if !is_3d_available {
-                    Some("Requires 3D Data".into())
-                } else if !is_size_allowed {
-                    Some(format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb).into())
-                } else {
-                    None
-                },
-            },
+        let plot_items = [
+            (
+                PlotType::Heatmap,
+                Icon::PlotPlane,
+                "2D Plane (Flatmap)",
+                true,
+            ),
+            (
+                PlotType::Line,
+                Icon::PlotLine,
+                "1D Line Chart",
+                !pyramid_disabled,
+            ),
+            (
+                PlotType::Sphere,
+                Icon::PlotGlobe,
+                "3D Globe (Sphere)",
+                is_surface_allowed,
+            ),
+            (
+                PlotType::Surface,
+                Icon::PlotSurface,
+                "3D Surface / Blocks",
+                is_surface_allowed,
+            ),
+            (
+                PlotType::Volume,
+                Icon::PlotVolume,
+                "3D Volume Raycasting",
+                is_volume_allowed,
+            ),
+            (
+                PlotType::PointCloud,
+                Icon::PlotPointCloud,
+                "3D Point Cloud",
+                is_volume_allowed,
+            ),
         ];
 
-        for opt in options {
-            let is_selected = app.active_plot_type == opt.plot_type;
-            if opt.enabled {
+        for (plot_type, icon, label, enabled) in plot_items {
+            let is_selected = app.active_plot_type == plot_type;
+            if enabled {
                 let clicked = ui
                     .horizontal(|ui| {
-                        ui.icon(opt.icon, 14.0);
-                        ui.selectable_label(is_selected, opt.label).clicked()
+                        ui.icon(icon, 14.0);
+                        ui.selectable_label(is_selected, label).clicked()
                     })
                     .inner;
                 if clicked {
-                    app.active_plot_type = opt.plot_type;
+                    app.active_plot_type = plot_type;
                     app.load_selected_variable_block();
                     ui.close();
                 }
-            } else if let Some(reason) = opt.disabled_reason {
+            } else {
+                let reason = if pyramid_disabled {
+                    "Disabled: 2D Pyramid Resampling active".to_string()
+                } else if (plot_type == PlotType::Volume || plot_type == PlotType::PointCloud)
+                    && !is_3d_available
+                {
+                    "Requires 3D Data".to_string()
+                } else if plot_type == PlotType::Sphere || plot_type == PlotType::Surface {
+                    format!("Disabled: {:.0} MB > 128 MB GPU limit", surface_mb)
+                } else {
+                    format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb)
+                };
+
                 ui.horizontal(|ui| {
-                    ui.icon_colored(opt.icon, 14.0, ui.visuals().weak_text_color());
-                    ui.add_enabled(
-                        false,
-                        egui::Label::new(format!("{} ({})", opt.label, reason)),
-                    );
+                    ui.icon_colored(icon, 14.0, ui.visuals().weak_text_color());
+                    ui.add_enabled(false, egui::Label::new(format!("{} ({})", label, reason)));
                 });
             }
         }

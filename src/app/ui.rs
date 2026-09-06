@@ -19,7 +19,7 @@ impl eframe::App for OctantApp {
                     Ok(metadata) => {
                         if metadata.variables.is_empty() {
                             self.status_message =
-                                format!("⚠️ No variables discovered in '{}'", metadata.name);
+                                format!("No variables discovered in '{}'", metadata.name);
                         } else {
                             self.status_message = format!(
                                 "Inspected '{}' (Found {} variables)",
@@ -58,7 +58,7 @@ impl eframe::App for OctantApp {
                         self.hero_state.loaded = false;
                         self.active_dataset_metadata = None;
                         self.cached_variable_tree = None;
-                        self.status_message = format!("❌ Store inspect error: {}", err);
+                        self.status_message = format!("Store inspect error: {}", err);
                     }
                 }
             } else {
@@ -198,7 +198,7 @@ impl eframe::App for OctantApp {
                         self.submit_or_activate_source(&path_str, None);
                     }
                     Err(err) => {
-                        self.status_message = format!("⚠️ {err}: '{path_str}'");
+                        self.status_message = format!("{err}: '{path_str}'");
                         crate::ui::drop_zone::trigger_drop_zone_warning(&ctx);
                         log::warn!("{err}: {path_str}");
                     }
@@ -559,7 +559,7 @@ impl eframe::App for OctantApp {
                 ui.painter().text(
                     badge_pos,
                     egui::Align2::CENTER_CENTER,
-                    "📥 Drop dataset to visualize (.nc, .h5, .zarr, .icechunk)",
+                    "Drop dataset to visualize (.nc, .h5, .zarr, .icechunk)",
                     egui::FontId::proportional(15.0),
                     stroke_color,
                 );
@@ -640,7 +640,7 @@ impl OctantApp {
                             let _ = clipboard.set_image(img_data);
                         }
                     }
-                    self.status_message = "✓ Copied figure to clipboard".to_string();
+                    self.status_message = "Copied figure to clipboard".to_string();
                 } else if let Some(ref path) = req.output_path {
                     if let Err(e) = crate::export::save_exported_file(&data, path) {
                         self.status_message = format!("Export error: {}", e);
@@ -649,7 +649,7 @@ impl OctantApp {
                             .file_name()
                             .map(|s| s.to_string_lossy().to_string())
                             .unwrap_or_else(|| "figure".to_string());
-                        self.status_message = format!("✓ Saved figure to {}", path.display());
+                        self.status_message = format!("Saved figure to {}", path.display());
                         self.export_toast = Some(crate::export::ExportToastNotification {
                             file_path: path.clone(),
                             filename,

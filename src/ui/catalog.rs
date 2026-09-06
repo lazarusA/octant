@@ -13,12 +13,14 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     let mut should_close = false;
 
     let max_w = (ctx.viewport_rect().width() * 0.75).clamp(520.0, 840.0);
+    let max_h = (ctx.viewport_rect().height() * 0.85).clamp(380.0, 700.0);
 
     let response = egui::Window::new("Dataset Catalog")
         .open(&mut open)
-        .default_size([max_w, 560.0])
+        .default_size([max_w, max_h])
         .max_width(max_w)
-        .min_size([460.0, 380.0])
+        .max_height(max_h)
+        .min_size([460.0, 320.0])
         .resizable(true)
         .collapsible(false)
         .order(egui::Order::Foreground)
@@ -113,7 +115,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                 });
             } else {
                 egui::ScrollArea::vertical()
-                    .auto_shrink([false, false])
+                    .auto_shrink([false, true])
                     .show(ui, |ui| {
                         for entry in filtered_entries {
                             let trimmed_url = entry.store.trim();

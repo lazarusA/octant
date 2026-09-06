@@ -206,14 +206,20 @@ pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: 
 
                             if ui
                                 .icon_button(Icon::FolderOpen, reveal_label)
-                                .on_hover_text(format!("Show in folder:\n{}", file_path.display()))
+                                .on_hover_ui(|ui| {
+                                    ui.label(format!("Show in folder:\n{}", file_path.display()));
+                                })
                                 .clicked()
                             {
                                 reveal = true;
                                 dismiss = true;
                             }
 
-                            if ui.small_button("x").on_hover_text("Dismiss").clicked() {
+                            if ui
+                                .icon_button(Icon::Cross, "")
+                                .on_hover_text("Dismiss")
+                                .clicked()
+                            {
                                 dismiss = true;
                             }
                         });

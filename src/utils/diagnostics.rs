@@ -5,7 +5,7 @@ use eframe::egui_wgpu::RenderState;
 pub fn log_gpu_diagnostics(wgpu_state: &RenderState) {
     let info = wgpu_state.adapter.get_info();
     log::info!(
-        "🎮 GPU initialized: '{}' ({:?}, backend: {:?}, driver: '{}')",
+        "GPU initialized: '{}' ({:?}, backend: {:?}, driver: '{}')",
         info.name,
         info.device_type,
         info.backend,
@@ -18,7 +18,7 @@ pub fn log_gpu_diagnostics(wgpu_state: &RenderState) {
     let max_tex_2d = limits.max_texture_dimension_2d;
 
     log::info!(
-        "📊 WGPU device limits: max_buffer_size = {} MB, max_storage_buffer = {} MB, max_texture_2d = {}px",
+        "WGPU device limits: max_buffer_size = {} MB, max_storage_buffer = {} MB, max_texture_2d = {}px",
         max_buf_mb,
         max_storage_mb,
         max_tex_2d
@@ -34,7 +34,7 @@ pub fn log_lod_tile_upload(
     tile_bounds: [f32; 4],
 ) {
     log::debug!(
-        "🖼️ [Heatmap] Uploading LOD tile: {}x{} ({} cells, {:.2} MB), tile_bounds: [{:.3}, {:.3}, {:.3}, {:.3}]",
+        "[Heatmap] Uploading LOD tile: {}x{} ({} cells, {:.2} MB), tile_bounds: [{:.3}, {:.3}, {:.3}, {:.3}]",
         width,
         height,
         num_cells,

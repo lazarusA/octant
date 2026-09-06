@@ -43,7 +43,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
                             if search_has_text
                                 && ui
-                                    .small_button("x")
+                                    .icon_button(Icon::Cross, "")
                                     .on_hover_text("Clear search")
                                     .clicked()
                             {
@@ -334,14 +334,20 @@ fn render_variable_row(
     let is_selected = selected_idx == idx;
     let leaf_name = var_info.leaf_name();
 
-    let display_name = match &var_info.units {
-        Some(units) if !units.is_empty() => format!("{}  ({})", leaf_name, units),
-        _ => leaf_name.to_string(),
-    };
-
     let row_resp = ui.horizontal(|ui| {
         ui.icon(Icon::VariableDoc, 11.0);
-        ui.selectable_label(is_selected, egui::RichText::new(display_name).strong())
+        if let Some(units) = &var_info.units {
+            if !units.is_empty() {
+                ui.selectable_label(
+                    is_selected,
+                    egui::RichText::new(format!("{}  ({})", leaf_name, units)).strong(),
+                )
+            } else {
+                ui.selectable_label(is_selected, egui::RichText::new(leaf_name).strong())
+            }
+        } else {
+            ui.selectable_label(is_selected, egui::RichText::new(leaf_name).strong())
+        }
     });
 
     let clicked = row_resp.response.clicked() || row_resp.inner.clicked();

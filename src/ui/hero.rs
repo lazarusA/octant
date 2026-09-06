@@ -163,25 +163,43 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         if app.is_loading || app.hero_state.loading {
             ui.add_space(20.0);
-            let label = if !app.hero_state.source_label.is_empty() {
-                format!("● loading — {}", app.hero_state.source_label)
-            } else {
-                "● loading...".to_string()
-            };
-            ui.label(
-                egui::RichText::new(label)
-                    .monospace()
-                    .size(12.0)
-                    .color(ui.visuals().weak_text_color()),
-            );
+            ui.horizontal(|ui| {
+                ui.add_space((ui.available_width() - 200.0).max(0.0) * 0.5);
+                crate::ui::icons::UiIconExt::icon_colored(
+                    ui,
+                    crate::ui::icons::Icon::Hourglass,
+                    12.0,
+                    ui.visuals().weak_text_color(),
+                );
+                let label = if !app.hero_state.source_label.is_empty() {
+                    format!("loading — {}", app.hero_state.source_label)
+                } else {
+                    "loading...".to_string()
+                };
+                ui.label(
+                    egui::RichText::new(label)
+                        .monospace()
+                        .size(12.0)
+                        .color(ui.visuals().weak_text_color()),
+                );
+            });
         } else if app.hero_state.loaded && !app.hero_state.source_label.is_empty() {
             ui.add_space(20.0);
-            ui.label(
-                egui::RichText::new(format!("● loaded — {}", app.hero_state.source_label))
-                    .monospace()
-                    .size(12.0)
-                    .color(ui.visuals().text_color()),
-            );
+            ui.horizontal(|ui| {
+                ui.add_space((ui.available_width() - 200.0).max(0.0) * 0.5);
+                crate::ui::icons::UiIconExt::icon_colored(
+                    ui,
+                    crate::ui::icons::Icon::Check,
+                    12.0,
+                    ui.visuals().selection.bg_fill,
+                );
+                ui.label(
+                    egui::RichText::new(format!("loaded — {}", app.hero_state.source_label))
+                        .monospace()
+                        .size(12.0)
+                        .color(ui.visuals().text_color()),
+                );
+            });
         }
     });
 }
@@ -253,16 +271,11 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                         } else {
                             ui.visuals().weak_text_color().gamma_multiply(0.65)
                         };
-                        let stroke = egui::Stroke::new(1.2, color);
-                        let c = clear_rect.center();
-                        let r = 3.5_f32;
-                        ui.painter().line_segment(
-                            [egui::pos2(c.x - r, c.y - r), egui::pos2(c.x + r, c.y + r)],
-                            stroke,
-                        );
-                        ui.painter().line_segment(
-                            [egui::pos2(c.x - r, c.y + r), egui::pos2(c.x + r, c.y - r)],
-                            stroke,
+                        crate::ui::icons::Icon::Cross.paint(
+                            ui.painter(),
+                            clear_rect.shrink(2.0),
+                            color,
+                            ui.visuals().dark_mode,
                         );
                     }
 
@@ -286,44 +299,12 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                         egui::StrokeKind::Inside,
                     );
 
-                    let c = btn_rect.center();
-                    let stroke = egui::Stroke::new(1.3, btn_visuals.fg_stroke.color);
-
-                    // Downward arrow stem
-                    ui.painter().line_segment(
-                        [egui::pos2(c.x, c.y - 4.5), egui::pos2(c.x, c.y + 1.5)],
-                        stroke,
-                    );
-                    // Arrowhead wings
-                    ui.painter().line_segment(
-                        [egui::pos2(c.x - 3.2, c.y - 1.2), egui::pos2(c.x, c.y + 2.0)],
-                        stroke,
-                    );
-                    ui.painter().line_segment(
-                        [egui::pos2(c.x + 3.2, c.y - 1.2), egui::pos2(c.x, c.y + 2.0)],
-                        stroke,
-                    );
-                    // Load / tray bracket bottom
-                    ui.painter().line_segment(
-                        [
-                            egui::pos2(c.x - 4.8, c.y + 3.5),
-                            egui::pos2(c.x - 4.8, c.y + 5.2),
-                        ],
-                        stroke,
-                    );
-                    ui.painter().line_segment(
-                        [
-                            egui::pos2(c.x - 4.8, c.y + 5.2),
-                            egui::pos2(c.x + 4.8, c.y + 5.2),
-                        ],
-                        stroke,
-                    );
-                    ui.painter().line_segment(
-                        [
-                            egui::pos2(c.x + 4.8, c.y + 5.2),
-                            egui::pos2(c.x + 4.8, c.y + 3.5),
-                        ],
-                        stroke,
+                    let icon_rect = btn_rect.shrink(4.0);
+                    crate::ui::icons::Icon::DropTray.paint(
+                        ui.painter(),
+                        icon_rect,
+                        btn_visuals.fg_stroke.color,
+                        ui.visuals().dark_mode,
                     );
                 }
 
