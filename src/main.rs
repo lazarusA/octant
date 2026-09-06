@@ -1,3 +1,5 @@
+#![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+
 mod app;
 pub mod catalog;
 pub mod data;
@@ -33,11 +35,7 @@ fn main() -> eframe::Result<()> {
 
 // BROWSER INTERFACE MOUNT BRIDGE
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
-
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(start)]
-pub fn main_web() {
+fn main() {
     console_error_panic_hook::set_once();
     let _ = console_log::init_with_level(log::Level::Debug);
 
@@ -46,13 +44,27 @@ pub fn main_web() {
         ..Default::default()
     };
     wasm_bindgen_futures::spawn_local(async {
-        eframe::WebRunner::new()
+        use wasm_bindgen::JsCast;
+        let document = web_sys::window()
+            .expect("No window")
+            .document()
+            .expect("No document");
+        let canvas = document
+            .get_element_by_id("octant_canvas_anchor")
+            .expect("Canvas element not found")
+            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .expect("Element is not a canvas");
+
+        let runner = eframe::WebRunner::new();
+        if let Err(e) = runner
             .start(
-                "octant_canvas_anchor",
+                canvas,
                 web_options,
                 Box::new(|cc| Ok(Box::new(OctantApp::new(cc)))),
             )
             .await
-            .expect("Failed to bind GPU context execution channel target element");
+        {
+            log::error!("Failed to start Octant web runner: {e:?}");
+        }
     });
 }

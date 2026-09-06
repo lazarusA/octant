@@ -127,7 +127,7 @@ impl BlockStore for ProceduralBlockStore {
     fn fetch_block_with_progress(
         &self,
         request: &SliceRequest,
-        mut on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+        mut on_progress: crate::data::block_store::ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         let (nt_full, nz_full, ny_full, nx_full) = (20, 32, 32, 32);
 

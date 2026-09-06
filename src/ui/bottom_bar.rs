@@ -193,7 +193,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             };
             if ui.icon_button(play_icon, play_text).clicked() {
                 app.is_playing = !app.is_playing;
-                app.last_step_time = std::time::Instant::now();
+                app.last_step_time = web_time::Instant::now();
             }
         });
         widths.insert(BottomBarItem::PlayPause, play_resp.response.rect.width());

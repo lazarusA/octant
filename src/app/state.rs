@@ -266,7 +266,7 @@ pub struct OctantApp {
     pub playback_fps: f32,
     pub loop_playback: bool,
     pub enable_prefetch: bool,
-    pub last_step_time: std::time::Instant,
+    pub last_step_time: web_time::Instant,
 
     // Catalog State
     pub show_catalog_window: bool,
@@ -328,7 +328,7 @@ pub struct OctantApp {
     pub show_crop_overlay: bool,
     pub roi_crop_box: crate::export::RoiCropBox,
     pub pending_export: Option<crate::export::PendingExportRequest>,
-    pub export_flash_timer: Option<std::time::Instant>,
+    pub export_flash_timer: Option<web_time::Instant>,
     pub export_toast: Option<crate::export::ExportToastNotification>,
 }
 
@@ -411,7 +411,7 @@ impl Default for OctantApp {
             playback_fps: 15.0,
             loop_playback: true,
             enable_prefetch: true,
-            last_step_time: std::time::Instant::now(),
+            last_step_time: web_time::Instant::now(),
 
             show_catalog_window: false,
             show_about_window: false,
@@ -475,6 +475,7 @@ impl OctantApp {
         //     crate::utils::diagnostics::log_gpu_diagnostics(wgpu_state);
         // }
 
+        #[allow(unused_mut)]
         let mut app = Self {
             wgpu_render_state: cc.wgpu_render_state.clone(),
             ..Default::default()

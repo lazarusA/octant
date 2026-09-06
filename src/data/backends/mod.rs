@@ -1,5 +1,6 @@
 pub mod generic_zarr;
 pub mod icechunk;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod icechunk_storage;
 pub mod netcdf;
 pub mod procedural;

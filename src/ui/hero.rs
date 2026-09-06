@@ -1,4 +1,5 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use web_time::Instant;
 
 use crate::app::OctantApp;
 use crate::utils::{ease_in_out_cubic, lerp3, xorshift64_f32};

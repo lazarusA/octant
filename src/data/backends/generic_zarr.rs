@@ -100,7 +100,8 @@ impl GenericZarrBlockStore {
             crate::utils::metadata::open_or_instantiate_array_normalized(
                 readable_store.clone(),
                 &var_path,
-            )?
+            )
+            .map_err(|e| format!("{e}"))?
         };
 
         let rank = raw_array.shape().len();
@@ -214,7 +215,7 @@ impl BlockStore for GenericZarrBlockStore {
     fn fetch_block_with_progress(
         &self,
         request: &SliceRequest,
-        on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+        on_progress: crate::data::block_store::ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         let (array, cache) = self.get_or_open_array(&request.variable)?;
         super::zarr_block::fetch_block_from_cached_array(
@@ -228,11 +229,22 @@ impl BlockStore for GenericZarrBlockStore {
     }
 
     fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {
-        use rayon::prelude::*;
-        let blocks: Result<Vec<OctantBlock>, BlockStoreError> = requests
-            .par_iter()
-            .map(|request| self.fetch_block(request))
-            .collect();
-        Ok(BlockResult::new(blocks?))
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            use rayon::prelude::*;
+            let blocks: Result<Vec<OctantBlock>, BlockStoreError> = requests
+                .par_iter()
+                .map(|request| self.fetch_block(request))
+                .collect();
+            Ok(BlockResult::new(blocks?))
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let blocks: Result<Vec<OctantBlock>, BlockStoreError> = requests
+                .iter()
+                .map(|request| self.fetch_block(request))
+                .collect();
+            Ok(BlockResult::new(blocks?))
+        }
     }
 }

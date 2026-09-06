@@ -51,7 +51,7 @@ impl StoreHandle {
     pub fn fetch_with_progress(
         &self,
         request: &SliceRequest,
-        on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+        on_progress: super::block_store::ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         self.backend.fetch_block_with_progress(request, on_progress)
     }

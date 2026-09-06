@@ -114,8 +114,8 @@ impl RoiCropBox {
 
 /// Generates a standardized timestamped export filename for a variable.
 pub fn generate_export_filename(var_name: &str, format: ExportFormat) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+    let now = web_time::SystemTime::now()
+        .duration_since(web_time::SystemTime::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let safe_var = var_name.replace(|c: char| !c.is_alphanumeric() && c != '_', "_");
@@ -453,27 +453,27 @@ pub fn save_exported_file(data: &[u8], path: &Path) -> Result<(), String> {
 pub struct ExportToastNotification {
     pub file_path: PathBuf,
     pub filename: String,
-    pub timestamp: std::time::Instant,
+    pub timestamp: web_time::Instant,
 }
 
 /// Reveals a file in the native file manager (Finder on macOS, Explorer on Windows, xdg-open on Linux).
-pub fn reveal_in_file_manager(path: &Path) {
+pub fn reveal_in_file_manager(_path: &Path) {
     #[cfg(target_os = "macos")]
     {
         let _ = std::process::Command::new("open")
             .arg("-R")
-            .arg(path)
+            .arg(_path)
             .spawn();
     }
     #[cfg(target_os = "windows")]
     {
         let _ = std::process::Command::new("explorer")
-            .arg(format!("/select,{}", path.display()))
+            .arg(format!("/select,{}", _path.display()))
             .spawn();
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        if let Some(parent) = path.parent() {
+        if let Some(parent) = _path.parent() {
             let _ = std::process::Command::new("xdg-open").arg(parent).spawn();
         }
     }

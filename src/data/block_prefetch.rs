@@ -86,7 +86,7 @@ impl BlockPrefetcher {
         let completed_atomic = self.completed_bytes.clone();
         let aborted_atomic = self.aborted.clone();
 
-        rayon::spawn(move || {
+        crate::utils::executor::TaskExecutor::spawn_background(move || {
             let mut on_progress = |chunk_bytes: u64| {
                 if !aborted_atomic.load(Ordering::Relaxed) {
                     completed_atomic.fetch_add(chunk_bytes, Ordering::Relaxed);
