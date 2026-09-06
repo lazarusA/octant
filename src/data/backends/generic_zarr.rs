@@ -76,18 +76,14 @@ impl GenericZarrBlockStore {
         &self,
         var_name: &str,
     ) -> Result<(Arc<ZarrArrayHandle>, Arc<ChunkCacheDecodedLruSizeLimit>), BlockStoreError> {
-        let clean_name = var_name.trim_start_matches('/');
+        let clean_name = var_name.trim_matches('/');
         let cache_guard = self.array_cache.read().unwrap_or_else(|p| p.into_inner());
         if let Some(cached) = cache_guard.get(clean_name) {
             return Ok(cached.clone());
         }
         drop(cache_guard);
 
-        let var_path = if var_name.starts_with('/') {
-            var_name.to_string()
-        } else {
-            format!("/{}", var_name)
-        };
+        let var_path = format!("/{clean_name}");
 
         let readable_store: ReadableStorage = self.storage.clone();
 

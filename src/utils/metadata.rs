@@ -140,6 +140,97 @@ pub fn open_or_instantiate_array_normalized<TStorage: ?Sized + ReadableStorageTr
     Ok(arr)
 }
 
+/// Common CF convention metadata and dimensions parsed from attributes map / metadata.
+#[derive(Debug, Clone, Default)]
+pub struct ParsedCfAttributes {
+    pub attributes: HashMap<String, String>,
+    pub units: Option<String>,
+    pub long_name: Option<String>,
+    pub time_coverage_start: Option<String>,
+    pub time_coverage_end: Option<String>,
+    pub temporal_resolution: Option<String>,
+    pub array_dimensions: Option<Vec<String>>,
+}
+
+impl ParsedCfAttributes {
+    /// Parses CF metadata and dimension names from any key-value JSON map or iterator.
+    pub fn from_json_map<'a, I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = (&'a String, &'a serde_json::Value)>,
+    {
+        let mut attributes = HashMap::new();
+        let mut units = None;
+        let mut long_name = None;
+        let mut time_coverage_start = None;
+        let mut time_coverage_end = None;
+        let mut temporal_resolution = None;
+        let mut array_dimensions = None;
+
+        for (k, v_json) in iter {
+            let val_str = if let Some(s) = v_json.as_str() {
+                s.to_string()
+            } else {
+                v_json.to_string()
+            };
+            attributes.insert(k.clone(), val_str.clone());
+
+            match k.as_str() {
+                "units" => units = Some(val_str),
+                "long_name" => long_name = Some(val_str),
+                "time_coverage_start" => time_coverage_start = Some(val_str),
+                "time_coverage_end" => time_coverage_end = Some(val_str),
+                "temporal_resolution" | "time_period" => temporal_resolution = Some(val_str),
+                "_ARRAY_DIMENSIONS" => {
+                    if let Some(arr) = v_json.as_array() {
+                        array_dimensions = Some(
+                            arr.iter()
+                                .enumerate()
+                                .map(|(i, s)| {
+                                    s.as_str()
+                                        .map(|str_v| str_v.to_string())
+                                        .unwrap_or_else(|| format!("dim_{i}"))
+                                })
+                                .collect(),
+                        );
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Self {
+            attributes,
+            units,
+            long_name,
+            time_coverage_start,
+            time_coverage_end,
+            temporal_resolution,
+            array_dimensions,
+        }
+    }
+
+    /// Resolves final dimension names using explicit names, `_ARRAY_DIMENSIONS`, or rank defaults.
+    pub fn resolve_dimension_names(
+        &self,
+        explicit_dimension_names: Option<&[Option<String>]>,
+        rank: usize,
+    ) -> Vec<String> {
+        if let Some(names) = explicit_dimension_names {
+            return names
+                .iter()
+                .enumerate()
+                .map(|(i, n)| n.clone().unwrap_or_else(|| format!("dim_{i}")))
+                .collect();
+        }
+
+        if let Some(ref dims) = self.array_dimensions {
+            return dims.clone();
+        }
+
+        default_dimension_names_for_rank(rank)
+    }
+}
+
 /// Extracts `VariableInfo` directly from `NodeMetadata` in memory without requiring
 /// a runtime codec decompression pipeline (`Array::new_with_metadata`).
 /// This ensures 100% reliable discovery for all arrays, including those with custom,
@@ -178,63 +269,23 @@ pub fn variable_info_from_node_metadata(
                 .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
                 .unwrap_or_else(|| shape.clone());
 
-            let mut attributes = HashMap::new();
-            let mut units = None;
-            let mut long_name = None;
-            let mut time_coverage_start = None;
-            let mut time_coverage_end = None;
-            let mut temporal_resolution = None;
+            let cf_attrs = val
+                .get("attributes")
+                .and_then(|a| a.as_object())
+                .map(ParsedCfAttributes::from_json_map)
+                .unwrap_or_default();
 
-            if let Some(attrs_obj) = val.get("attributes").and_then(|a| a.as_object()) {
-                for (k, v_json) in attrs_obj {
-                    let val_str = if let Some(s) = v_json.as_str() {
-                        s.to_string()
-                    } else {
-                        v_json.to_string()
-                    };
-                    attributes.insert(k.clone(), val_str.clone());
-                    match k.as_str() {
-                        "units" => units = Some(val_str),
-                        "long_name" => long_name = Some(val_str),
-                        "time_coverage_start" => time_coverage_start = Some(val_str),
-                        "time_coverage_end" => time_coverage_end = Some(val_str),
-                        "temporal_resolution" | "time_period" => {
-                            temporal_resolution = Some(val_str)
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            let dimension_names = val
+            let explicit_dim_names: Option<Vec<Option<String>>> = val
                 .get("dimension_names")
                 .and_then(|d| d.as_array())
                 .map(|arr| {
                     arr.iter()
-                        .enumerate()
-                        .map(|(i, s)| {
-                            s.as_str()
-                                .map(|str_v| str_v.to_string())
-                                .unwrap_or_else(|| format!("dim_{i}"))
-                        })
+                        .map(|e| e.as_str().map(|s| s.to_string()))
                         .collect()
-                })
-                .or_else(|| {
-                    val.get("attributes")
-                        .and_then(|a| a.get("_ARRAY_DIMENSIONS"))
-                        .and_then(|v| v.as_array())
-                        .map(|arr| {
-                            arr.iter()
-                                .enumerate()
-                                .map(|(i, s)| {
-                                    s.as_str()
-                                        .map(|str_v| str_v.to_string())
-                                        .unwrap_or_else(|| format!("dim_{i}"))
-                                })
-                                .collect()
-                        })
-                })
-                .unwrap_or_else(|| default_dimension_names_for_rank(rank));
+                });
+
+            let dimension_names =
+                cf_attrs.resolve_dimension_names(explicit_dim_names.as_deref(), rank);
 
             let file_size = calculate_variable_size_bytes(&shape, &data_type);
 
@@ -245,12 +296,12 @@ pub fn variable_info_from_node_metadata(
                 dimension_names,
                 chunk_shape,
                 file_size,
-                units,
-                long_name,
-                time_coverage_start,
-                time_coverage_end,
-                temporal_resolution,
-                attributes,
+                units: cf_attrs.units,
+                long_name: cf_attrs.long_name,
+                time_coverage_start: cf_attrs.time_coverage_start,
+                time_coverage_end: cf_attrs.time_coverage_end,
+                temporal_resolution: cf_attrs.temporal_resolution,
+                attributes: cf_attrs.attributes,
             })
         }
         _ => None,
@@ -365,32 +416,8 @@ pub fn default_dimension_names_for_rank(rank: usize) -> Vec<String> {
 pub fn resolve_array_dimension_names<TStorage: ?Sized + ReadableStorageTraits + 'static>(
     array: &Array<TStorage>,
 ) -> Vec<String> {
-    let rank = array.shape().len();
-    array
-        .dimension_names()
-        .as_ref()
-        .map(|names| {
-            names
-                .iter()
-                .enumerate()
-                .map(|(i, n)| n.clone().unwrap_or_else(|| format!("dim_{i}")))
-                .collect()
-        })
-        .or_else(|| {
-            array.attributes().get("_ARRAY_DIMENSIONS").and_then(|v| {
-                v.as_array().map(|arr| {
-                    arr.iter()
-                        .enumerate()
-                        .map(|(i, s)| {
-                            s.as_str()
-                                .map(|str_v| str_v.to_string())
-                                .unwrap_or_else(|| format!("dim_{i}"))
-                        })
-                        .collect()
-                })
-            })
-        })
-        .unwrap_or_else(|| default_dimension_names_for_rank(rank))
+    let cf_attrs = ParsedCfAttributes::from_json_map(array.attributes());
+    cf_attrs.resolve_dimension_names(array.dimension_names().as_deref(), array.shape().len())
 }
 
 /// Constructs a VariableInfo struct from any ReadableStorageTraits zarrs Array.
@@ -404,8 +431,9 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits + 'stat
     }
 
     let data_type = format!("{:?}", array.data_type());
-
-    let dimension_names = resolve_array_dimension_names(array);
+    let cf_attrs = ParsedCfAttributes::from_json_map(array.attributes());
+    let dimension_names =
+        cf_attrs.resolve_dimension_names(array.dimension_names().as_deref(), shape.len());
 
     let zero_idx = vec![0u64; shape.len()];
     let chunk_shape = array
@@ -415,32 +443,6 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits + 'stat
         .unwrap_or_else(|| shape.clone());
     let file_size = calculate_variable_size_bytes(&shape, &data_type);
 
-    let attrs_map = array.attributes();
-    let mut attributes = HashMap::new();
-    let mut units = None;
-    let mut long_name = None;
-    let mut time_coverage_start = None;
-    let mut time_coverage_end = None;
-    let mut temporal_resolution = None;
-
-    for (k, v_json) in attrs_map {
-        let val_str = if let Some(s) = v_json.as_str() {
-            s.to_string()
-        } else {
-            v_json.to_string()
-        };
-        attributes.insert(k.clone(), val_str.clone());
-
-        match k.as_str() {
-            "units" => units = Some(val_str),
-            "long_name" => long_name = Some(val_str),
-            "time_coverage_start" => time_coverage_start = Some(val_str),
-            "time_coverage_end" => time_coverage_end = Some(val_str),
-            "temporal_resolution" | "time_period" => temporal_resolution = Some(val_str),
-            _ => {}
-        }
-    }
-
     Some(VariableInfo {
         name: var_name.to_string(),
         data_type,
@@ -448,12 +450,12 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits + 'stat
         dimension_names,
         chunk_shape,
         file_size,
-        units,
-        long_name,
-        time_coverage_start,
-        time_coverage_end,
-        temporal_resolution,
-        attributes,
+        units: cf_attrs.units,
+        long_name: cf_attrs.long_name,
+        time_coverage_start: cf_attrs.time_coverage_start,
+        time_coverage_end: cf_attrs.time_coverage_end,
+        temporal_resolution: cf_attrs.temporal_resolution,
+        attributes: cf_attrs.attributes,
     })
 }
 
@@ -463,7 +465,8 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
 
     let zmetadata_url = format!("{}/.zmetadata", base_url.trim_end_matches('/'));
     let client = reqwest::blocking::Client::builder()
-        .danger_accept_invalid_certs(true)
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .ok();
 
@@ -520,55 +523,12 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
                     .get(&zattrs_key)
                     .or_else(|| metadata_obj.get(".zattrs"));
 
-                let mut attributes = HashMap::new();
-                let mut units = None;
-                let mut long_name = None;
-                let mut time_coverage_start = None;
-                let mut time_coverage_end = None;
-                let mut temporal_resolution = None;
-                let mut dimension_names = match shape.len() {
-                    1 => vec!["x".to_string()],
-                    2 => vec!["lat".to_string(), "lon".to_string()],
-                    3 => vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
-                    4 => vec![
-                        "time".to_string(),
-                        "level".to_string(),
-                        "lat".to_string(),
-                        "lon".to_string(),
-                    ],
-                    _ => (0..shape.len()).map(|i| format!("dim_{}", i)).collect(),
-                };
+                let cf_attrs = attrs_val
+                    .and_then(|a| a.as_object())
+                    .map(ParsedCfAttributes::from_json_map)
+                    .unwrap_or_default();
 
-                if let Some(attrs_obj) = attrs_val.and_then(|a| a.as_object()) {
-                    for (k, v_json) in attrs_obj {
-                        let val_str = v_json
-                            .as_str()
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| v_json.to_string());
-                        attributes.insert(k.clone(), val_str.clone());
-                        match k.as_str() {
-                            "units" => units = Some(val_str),
-                            "long_name" => long_name = Some(val_str),
-                            "time_coverage_start" => time_coverage_start = Some(val_str),
-                            "time_coverage_end" => time_coverage_end = Some(val_str),
-                            "temporal_resolution" | "time_period" => {
-                                temporal_resolution = Some(val_str)
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    if let Some(dims) = attrs_obj
-                        .get("_ARRAY_DIMENSIONS")
-                        .and_then(|d| d.as_array())
-                    {
-                        dimension_names = dims
-                            .iter()
-                            .filter_map(|e| e.as_str().map(|s| s.to_string()))
-                            .collect();
-                    }
-                }
-
+                let dimension_names = cf_attrs.resolve_dimension_names(None, shape.len());
                 let file_size = calculate_variable_size_bytes(&shape, &data_type);
 
                 variables.push(VariableInfo {
@@ -578,12 +538,12 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
                     dimension_names,
                     chunk_shape,
                     file_size,
-                    units,
-                    long_name,
-                    time_coverage_start,
-                    time_coverage_end,
-                    temporal_resolution,
-                    attributes,
+                    units: cf_attrs.units,
+                    long_name: cf_attrs.long_name,
+                    time_coverage_start: cf_attrs.time_coverage_start,
+                    time_coverage_end: cf_attrs.time_coverage_end,
+                    temporal_resolution: cf_attrs.temporal_resolution,
+                    attributes: cf_attrs.attributes,
                 });
             }
         }
@@ -639,5 +599,52 @@ mod tests {
             "ArrayMetadata should successfully parse normalized zlib and shuffle metadata: {:?}",
             array_meta.err()
         );
+    }
+
+    #[test]
+    fn test_parsed_cf_attributes_resolution() {
+        let attrs_json = serde_json::json!({
+            "units": "m/s",
+            "long_name": "Wind Speed",
+            "time_coverage_start": "2024-01-01T00:00:00Z",
+            "time_coverage_end": "2024-01-02T00:00:00Z",
+            "temporal_resolution": "PT1H",
+            "_ARRAY_DIMENSIONS": ["time", "lat", "lon"],
+            "custom_tag": 42
+        });
+
+        let cf_attrs = ParsedCfAttributes::from_json_map(attrs_json.as_object().unwrap());
+        assert_eq!(cf_attrs.units.as_deref(), Some("m/s"));
+        assert_eq!(cf_attrs.long_name.as_deref(), Some("Wind Speed"));
+        assert_eq!(
+            cf_attrs.time_coverage_start.as_deref(),
+            Some("2024-01-01T00:00:00Z")
+        );
+        assert_eq!(
+            cf_attrs.time_coverage_end.as_deref(),
+            Some("2024-01-02T00:00:00Z")
+        );
+        assert_eq!(cf_attrs.temporal_resolution.as_deref(), Some("PT1H"));
+        assert_eq!(
+            cf_attrs.attributes.get("custom_tag").map(|s| s.as_str()),
+            Some("42")
+        );
+
+        let dims = cf_attrs.resolve_dimension_names(None, 3);
+        assert_eq!(dims, vec!["time", "lat", "lon"]);
+
+        // Explicit names take precedence
+        let explicit = vec![
+            Some("t".to_string()),
+            Some("y".to_string()),
+            Some("x".to_string()),
+        ];
+        let dims_explicit = cf_attrs.resolve_dimension_names(Some(&explicit), 3);
+        assert_eq!(dims_explicit, vec!["t", "y", "x"]);
+
+        // Fallback when neither explicit nor _ARRAY_DIMENSIONS present
+        let empty_cf = ParsedCfAttributes::default();
+        let dims_fallback = empty_cf.resolve_dimension_names(None, 2);
+        assert_eq!(dims_fallback, vec!["lat", "lon"]);
     }
 }
