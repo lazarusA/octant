@@ -175,7 +175,9 @@ impl eframe::App for OctantApp {
             self.show_export_modal = true;
         }
 
-        if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::C)) {
+        if !ctx.egui_wants_keyboard_input()
+            && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::C))
+        {
             self.show_crop_overlay = !self.show_crop_overlay;
         }
 
