@@ -224,6 +224,7 @@ impl eframe::App for OctantApp {
 
         crate::ui::catalog::show_catalog_window(self, &ctx);
         crate::ui::about::show_about_window(self, &ctx);
+        crate::ui::about::show_icon_gallery_window(self, &ctx);
         crate::ui::export_modal::show_export_modal(self, &ctx);
 
         // Overlays anchor relative to the remaining canvas rect
@@ -671,5 +672,6 @@ impl OctantApp {
         self.show_variable_controls = false;
         self.show_catalog_window = false;
         self.show_about_window = false;
+        self.show_icon_gallery_window = false;
     }
 }

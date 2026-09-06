@@ -428,11 +428,12 @@ impl Icon {
 
 /// Render a gallery showcase grid of all procedural vector icons.
 pub fn show_icon_gallery(ui: &mut Ui) {
-    ui.heading("Octant Native Vector Icons");
     ui.label(
-        "Resolution-independent, GPU-rasterized vector shapes adapting dynamically to themes.",
+        egui::RichText::new("Resolution-independent vector shapes adapting dynamically to themes.")
+            .small()
+            .color(ui.visuals().weak_text_color()),
     );
-    ui.add_space(8.0);
+    ui.add_space(6.0);
 
     let categories = [
         "Navigation & Menus",
@@ -443,23 +444,40 @@ pub fn show_icon_gallery(ui: &mut Ui) {
     ];
 
     for cat in categories {
-        ui.group(|ui| {
-            ui.strong(cat);
-            ui.add_space(4.0);
-            ui.horizontal_wrapped(|ui| {
-                for icon in Icon::ALL {
-                    if icon.category() == cat {
-                        ui.vertical_centered(|ui| {
-                            let resp = ui.icon(*icon, 24.0);
-                            resp.on_hover_text(icon.name());
-                            ui.small(icon.name());
-                        });
-                        ui.add_space(12.0);
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new(cat).strong().small());
+        ui.add_space(2.0);
+        egui::Frame::default()
+            .fill(ui.visuals().extreme_bg_color)
+            .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+            .corner_radius(4.0)
+            .inner_margin(egui::Margin::symmetric(8, 6))
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    for icon in Icon::ALL {
+                        if icon.category() == cat {
+                            let frame_resp =
+                                egui::Frame::default().corner_radius(4.0).show(ui, |ui| {
+                                    ui.set_width(62.0);
+                                    ui.set_height(48.0);
+                                    ui.vertical_centered(|ui| {
+                                        ui.add_space(2.0);
+                                        let resp = ui.icon(*icon, 18.0);
+                                        resp.on_hover_text(icon.name());
+                                        ui.add_space(2.0);
+                                        ui.label(
+                                            egui::RichText::new(icon.name())
+                                                .small()
+                                                .color(ui.visuals().text_color()),
+                                        );
+                                    });
+                                });
+                            frame_resp.response.on_hover_text(icon.name());
+                            ui.add_space(4.0);
+                        }
                     }
-                }
+                });
             });
-        });
-        ui.add_space(6.0);
     }
 }
 
