@@ -55,7 +55,12 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         false,
                     )
                     .show_header(ui, |ui| {
-                        ui.label(egui::RichText::new(format!("📄 {}", var_info.name)).strong());
+                        let display_name = if let Some(group) = var_info.group_path() {
+                            format!("📄 {} (📁 {})", var_info.leaf_name(), group)
+                        } else {
+                            format!("📄 {}", var_info.name)
+                        };
+                        ui.label(egui::RichText::new(display_name).strong());
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui
                                 .button(egui::RichText::new("📊 Plot Data").strong())
@@ -102,6 +107,10 @@ fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) {
         );
     });
 
+    if let Some(group) = var_info.group_path() {
+        let breadcrumbs = group.replace('/', " ❯ ");
+        ui.small(format!("Path: 📁 {}", breadcrumbs));
+    }
     if let Some(units) = &var_info.units {
         ui.small(format!("Units: {}", units));
     }

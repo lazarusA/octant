@@ -47,6 +47,32 @@ impl StoreKind {
     pub fn make_source_id(kind: StoreKind, target: &str) -> String {
         format!("{:?}:{}", kind, target)
     }
+
+    /// Resolves the effective store kind from an optional explicit UI selection,
+    /// an inferred target kind, and the current active store kind.
+    /// Automatically upgrades generic Zarr selections if the target specifically matches Icechunk or NetCDF.
+    pub fn resolve_with_inferred(
+        explicit: Option<StoreKind>,
+        target: &str,
+        current: StoreKind,
+    ) -> StoreKind {
+        let inferred = crate::utils::infer_store_kind_from_target(target).ok();
+        match (explicit, inferred) {
+            (Some(kind), Some(inf)) => {
+                if (kind == StoreKind::RemoteZarr && inf == StoreKind::RemoteIcechunk)
+                    || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalIcechunk)
+                    || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalNetCdf)
+                {
+                    inf
+                } else {
+                    kind
+                }
+            }
+            (Some(kind), None) => kind,
+            (None, Some(inf)) => inf,
+            (None, None) => current,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -169,6 +195,7 @@ pub struct OctantApp {
     pub selected_store_kind: StoreKind,
     pub store_target_input: String,
     pub active_dataset_metadata: Option<DatasetMetadata>,
+    pub cached_variable_tree: Option<crate::data::VariableTreeGroup>,
     pub selected_variable_idx: usize,
     pub plotted_store_kind: StoreKind,
     pub plotted_store_target_input: String,
@@ -312,6 +339,7 @@ impl Default for OctantApp {
             selected_store_kind: StoreKind::RemoteZarr,
             store_target_input: "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string(),
             active_dataset_metadata: None,
+            cached_variable_tree: None,
             selected_variable_idx: 0,
             plotted_store_kind: StoreKind::RemoteZarr,
             plotted_store_target_input: "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string(),
@@ -632,41 +660,72 @@ impl OctantApp {
     }
 
     /// Checks if a dataset matching `target` (by URI, ID, or display name) is already in `dataset_manager`.
-    /// If found and it has metadata, activates it and opens the variables overlay.
+    /// If found and it has metadata, activates it, updates the variable tree cache, and opens the variables overlay.
     pub fn try_activate_dataset(&mut self, target: &str) -> bool {
-        let input_target = target.trim();
+        let input_target = target.trim().trim_end_matches('/');
         if input_target.is_empty() {
             return false;
         }
         let expanded = crate::utils::expand_tilde_str(input_target);
+        let clean_expanded = expanded.trim_end_matches('/');
 
-        let existing = self
-            .dataset_manager
-            .iter()
-            .find(|d| {
-                d.source.uri == input_target
-                    || d.source.uri == expanded
-                    || d.id == input_target
-                    || d.source.display_name == input_target
-            })
-            .cloned();
+        let existing = self.dataset_manager.iter().find(|d| {
+            let d_uri = d.source.uri.trim().trim_end_matches('/');
+            let d_id = d.id.trim().trim_end_matches('/');
+            d_uri == input_target
+                || d_uri == clean_expanded
+                || d_id == input_target
+                || d_id == clean_expanded
+                || d.source.display_name == input_target
+                || d_id.ends_with(input_target)
+        });
 
         if let Some(dataset) = existing {
-            self.store_target_input = input_target.to_string();
-            self.selected_store_kind = StoreKind::from_data_source_kind(&dataset.source.kind);
-            if let Some(meta) = dataset.metadata {
+            let uri = dataset.source.uri.clone();
+            let kind = StoreKind::from_data_source_kind(&dataset.source.kind);
+            let meta = dataset.metadata.clone();
+            self.store_target_input = uri;
+            self.selected_store_kind = kind;
+            if let Some(meta) = meta {
                 self.status_message = format!(
                     "Activated dataset '{}' (Found {} variables)",
                     meta.name,
                     meta.variables.len()
                 );
                 self.show_variables_overlay = true;
+                self.variable_search.clear();
+                self.cached_variable_tree = Some(meta.build_variable_tree());
                 self.active_dataset_metadata = Some(meta);
                 self.selected_variable_idx = 0;
                 return true;
             }
         }
         false
+    }
+
+    /// Removes a dataset from `dataset_manager` by ID.
+    /// If it is currently active, resets active dataset metadata and variable tree.
+    pub fn remove_dataset(&mut self, dataset_id: &str) {
+        if let Some(removed) = self.dataset_manager.remove(dataset_id) {
+            let is_active = self.active_dataset_metadata.as_ref().is_some_and(|_| {
+                self.store_target_input == removed.source.uri || dataset_id == removed.id
+            });
+            if is_active {
+                self.active_dataset_metadata = None;
+                self.cached_variable_tree = None;
+                self.variable_search.clear();
+            }
+            self.status_message = format!("Removed dataset '{}'", removed.source.display_name);
+        }
+    }
+
+    /// Clears all datasets from `dataset_manager` and resets active dataset state.
+    pub fn clear_all_datasets(&mut self) {
+        self.dataset_manager.clear();
+        self.active_dataset_metadata = None;
+        self.cached_variable_tree = None;
+        self.variable_search.clear();
+        self.status_message = "Cleared all datasets from Dataset Manager".to_string();
     }
 
     /// Triggers an export request for the canvas / figure.

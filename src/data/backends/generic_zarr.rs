@@ -76,42 +76,37 @@ impl GenericZarrBlockStore {
         &self,
         var_name: &str,
     ) -> Result<(Arc<ZarrArrayHandle>, Arc<ChunkCacheDecodedLruSizeLimit>), BlockStoreError> {
-        let clean_name = var_name.trim_start_matches('/');
+        let clean_name = var_name.trim_matches('/');
         let cache_guard = self.array_cache.read().unwrap_or_else(|p| p.into_inner());
         if let Some(cached) = cache_guard.get(clean_name) {
             return Ok(cached.clone());
         }
         drop(cache_guard);
 
-        let var_path = if var_name.starts_with('/') {
-            var_name.to_string()
-        } else {
-            format!("/{}", var_name)
-        };
+        let var_path = format!("/{clean_name}");
 
         let readable_store: ReadableStorage = self.storage.clone();
 
-        let raw_array = if let Ok(arr) = Array::open(readable_store.clone(), &var_path) {
-            arr
-        } else if let Ok(group) = Group::open(self.storage.clone(), "/")
+        let raw_array = if let Ok(group) = Group::open(self.storage.clone(), "/")
             && let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata()
             && let Some(node_meta) = metadata.get(clean_name).or_else(|| metadata.get(&var_path))
             && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
                 readable_store.clone(),
                 &var_path,
                 node_meta,
-            )
-        {
+            ) {
             arr
-        } else if var_name == "data" || var_name.is_empty() {
-            Array::open(readable_store.clone(), "/")?
         } else {
-            Array::open(readable_store.clone(), &var_path)?
+            crate::utils::metadata::open_or_instantiate_array_normalized(
+                readable_store.clone(),
+                &var_path,
+            )?
         };
 
         let rank = raw_array.shape().len();
         let chunk_indices = vec![0; rank];
-        let single_chunk_bytes = if let Ok(chunk_dims) = raw_array.chunk_shape(&chunk_indices) {
+        let chunk_shape_opt = raw_array.chunk_shape(&chunk_indices).ok();
+        let single_chunk_bytes = if let Some(ref chunk_dims) = chunk_shape_opt {
             let elem_count = chunk_dims
                 .iter()
                 .try_fold(1u64, |acc, d| acc.checked_mul(d.get()))
@@ -124,6 +119,16 @@ impl GenericZarrBlockStore {
         } else {
             4 * 1024 * 1024
         };
+
+        log::debug!(
+            "[{}] get_or_open_array '{}': shape={:?}, chunk_shape={:?}, dtype={:?}, single_chunk_bytes={} bytes",
+            self.backend_name,
+            var_name,
+            raw_array.shape(),
+            chunk_shape_opt,
+            raw_array.data_type(),
+            single_chunk_bytes
+        );
 
         // Cache at least 8 full chunks per variable, clamped between 64 MB and 512 MB
         let dynamic_cache_bytes = if self.chunk_cache_bytes != DEFAULT_CHUNK_CACHE_BYTES {
@@ -181,13 +186,9 @@ impl BlockStore for GenericZarrBlockStore {
             crate::utils::extract_store_variables_consolidated(self.storage.clone(), base_url)
                 .map_err(|e| e.to_string())?;
 
-        let dim_names: Vec<String> = variables
-            .iter()
-            .flat_map(|v| v.dimension_names.clone())
-            .collect();
-        let dimension_coordinates = crate::utils::fetch_all_dimension_coordinates(
+        let dimension_coordinates = crate::utils::fetch_all_dimension_coordinates_for_variables(
             self.storage.clone(),
-            &dim_names,
+            &variables,
             Some(base_url),
         );
 

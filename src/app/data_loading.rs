@@ -122,6 +122,9 @@ impl OctantApp {
 
     pub fn inspect_active_store(&mut self) {
         self.is_loading = true;
+        self.active_dataset_metadata = None;
+        self.cached_variable_tree = None;
+        self.variable_search.clear();
         self.status_message = format!("Inspecting {:?} metadata...", self.selected_store_kind);
 
         let store_kind = self.selected_store_kind;
@@ -140,6 +143,10 @@ impl OctantApp {
                 .and_then(|store| store.inspect())
                 .map_err(|e| e.to_string());
 
+            if let Err(err) = &res {
+                log::error!("Store inspect failed for '{target_input}': {err}");
+            }
+
             let _ = tx.send(res);
         });
     }
@@ -152,9 +159,8 @@ impl OctantApp {
             return;
         }
 
-        if let Some(kind) = explicit_kind {
-            self.selected_store_kind = kind;
-        }
+        self.selected_store_kind =
+            StoreKind::resolve_with_inferred(explicit_kind, trimmed, self.selected_store_kind);
 
         if self.try_activate_dataset(trimmed) {
             if let Some(meta) = &self.active_dataset_metadata {
@@ -165,22 +171,6 @@ impl OctantApp {
         } else {
             self.hero_state.begin_submit(trimmed);
             self.store_target_input = trimmed.to_string();
-            if explicit_kind.is_none() {
-                match crate::utils::infer_store_kind_from_target(trimmed) {
-                    Ok(kind) => {
-                        self.selected_store_kind = kind;
-                    }
-                    Err(err) => {
-                        self.status_message = format!("{err}: '{trimmed}'");
-                        self.hero_state.loading = false;
-                        self.hero_state.loaded = false;
-                        self.hero_state.source_label.clear();
-                        self.is_loading = false;
-                        log::warn!("{err}: '{trimmed}'");
-                        return;
-                    }
-                }
-            }
             self.inspect_active_store();
         }
     }
