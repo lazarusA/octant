@@ -669,25 +669,24 @@ impl OctantApp {
         let expanded = crate::utils::expand_tilde_str(input_target);
         let clean_expanded = expanded.trim_end_matches('/');
 
-        let existing = self
-            .dataset_manager
-            .iter()
-            .find(|d| {
-                let d_uri = d.source.uri.trim().trim_end_matches('/');
-                let d_id = d.id.trim().trim_end_matches('/');
-                d_uri == input_target
-                    || d_uri == clean_expanded
-                    || d_id == input_target
-                    || d_id == clean_expanded
-                    || d.source.display_name == input_target
-                    || d_id.ends_with(input_target)
-            })
-            .cloned();
+        let existing = self.dataset_manager.iter().find(|d| {
+            let d_uri = d.source.uri.trim().trim_end_matches('/');
+            let d_id = d.id.trim().trim_end_matches('/');
+            d_uri == input_target
+                || d_uri == clean_expanded
+                || d_id == input_target
+                || d_id == clean_expanded
+                || d.source.display_name == input_target
+                || d_id.ends_with(input_target)
+        });
 
         if let Some(dataset) = existing {
-            self.store_target_input = dataset.source.uri.clone();
-            self.selected_store_kind = StoreKind::from_data_source_kind(&dataset.source.kind);
-            if let Some(meta) = dataset.metadata {
+            let uri = dataset.source.uri.clone();
+            let kind = StoreKind::from_data_source_kind(&dataset.source.kind);
+            let meta = dataset.metadata.clone();
+            self.store_target_input = uri;
+            self.selected_store_kind = kind;
+            if let Some(meta) = meta {
                 self.status_message = format!(
                     "Activated dataset '{}' (Found {} variables)",
                     meta.name,

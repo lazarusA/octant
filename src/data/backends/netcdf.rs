@@ -220,18 +220,14 @@ mod desktop {
 
         match var.vartype() {
             NcVariableType::Float(FloatType::F32) => {
-                let raw_vals: Vec<f32> = var
+                let mut raw_vals: Vec<f32> = var
                     .get_values::<f32, _>(extents)
                     .map_err(|e| format!("Failed reading float32 hyperslab: {e}"))?;
 
-                if !has_tx {
-                    Ok(raw_vals)
-                } else {
-                    Ok(raw_vals
-                        .into_iter()
-                        .map(|v| calibration.transform(v as f64))
-                        .collect())
+                if has_tx {
+                    calibration.transform_slice_in_place(&mut raw_vals);
                 }
+                Ok(raw_vals)
             }
             NcVariableType::Float(FloatType::F64) => {
                 read_and_transform!(var, extents, f64)

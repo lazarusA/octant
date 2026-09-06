@@ -38,103 +38,44 @@ fn decode_with<R: SubsetRetriever>(
 ) -> Result<Vec<f32>, Box<dyn Error + Send + Sync>> {
     let has_tx = calibration.has_transformation();
 
+    macro_rules! decode_typed {
+        ($t:ty) => {{
+            let vals: Vec<$t> = retriever.retrieve_subset(subset)?;
+            if !has_tx {
+                Ok(vals.into_iter().map(|v| v as f32).collect())
+            } else {
+                Ok(vals
+                    .into_iter()
+                    .map(|v| calibration.transform(v as f64))
+                    .collect())
+            }
+        }};
+    }
+
     if dt.is::<Float32DataType>() {
-        let raw_vals: Vec<f32> = retriever.retrieve_subset(subset)?;
-        if !has_tx {
-            Ok(raw_vals)
-        } else {
-            Ok(raw_vals
-                .into_iter()
-                .map(|v| calibration.transform(v as f64))
-                .collect())
+        let mut raw_vals: Vec<f32> = retriever.retrieve_subset(subset)?;
+        if has_tx {
+            calibration.transform_slice_in_place(&mut raw_vals);
         }
+        Ok(raw_vals)
     } else if dt.is::<Float64DataType>() {
-        let vals: Vec<f64> = retriever.retrieve_subset(subset)?;
-        if !has_tx {
-            Ok(vals.into_iter().map(|v| v as f32).collect())
-        } else {
-            Ok(vals.into_iter().map(|v| calibration.transform(v)).collect())
-        }
+        decode_typed!(f64)
     } else if dt.is::<Int32DataType>() {
-        let vals: Vec<i32> = retriever.retrieve_subset(subset)?;
-        if !has_tx {
-            Ok(vals.into_iter().map(|v| v as f32).collect())
-        } else {
-            Ok(vals
-                .into_iter()
-                .map(|v| calibration.transform(v as f64))
-                .collect())
-        }
+        decode_typed!(i32)
     } else if dt.is::<Int16DataType>() {
-        let vals: Vec<i16> = retriever.retrieve_subset(subset)?;
-        if !has_tx {
-            Ok(vals.into_iter().map(|v| v as f32).collect())
-        } else {
-            Ok(vals
-                .into_iter()
-                .map(|v| calibration.transform(v as f64))
-                .collect())
-        }
+        decode_typed!(i16)
     } else if dt.is::<Int8DataType>() {
-        let vals: Vec<i8> = retriever.retrieve_subset(subset)?;
-        if !has_tx {
-            Ok(vals.into_iter().map(|v| v as f32).collect())
-        } else {
-            Ok(vals
-                .into_iter()
-                .map(|v| calibration.transform(v as f64))
-                .collect())
-        }
+        decode_typed!(i8)
     } else if dt.is::<UInt32DataType>() {
-        let vals: Vec<u32> = retriever.retrieve_subset(subset)?;
-        if !has_tx {
-            Ok(vals.into_iter().map(|v| v as f32).collect())
-        } else {
-            Ok(vals
-                .into_iter()
-                .map(|v| calibration.transform(v as f64))
-                .collect())
-        }
+        decode_typed!(u32)
     } else if dt.is::<UInt16DataType>() {
-        let vals: Vec<u16> = retriever.retrieve_subset(subset)?;
-        if !has_tx {
-            Ok(vals.into_iter().map(|v| v as f32).collect())
-        } else {
-            Ok(vals
-                .into_iter()
-                .map(|v| calibration.transform(v as f64))
-                .collect())
-        }
+        decode_typed!(u16)
     } else if dt.is::<UInt8DataType>() {
-        let vals: Vec<u8> = retriever.retrieve_subset(subset)?;
-        if !has_tx {
-            Ok(vals.into_iter().map(|v| v as f32).collect())
-        } else {
-            Ok(vals
-                .into_iter()
-                .map(|v| calibration.transform(v as f64))
-                .collect())
-        }
+        decode_typed!(u8)
     } else if dt.is::<Int64DataType>() {
-        let vals: Vec<i64> = retriever.retrieve_subset(subset)?;
-        if !has_tx {
-            Ok(vals.into_iter().map(|v| v as f32).collect())
-        } else {
-            Ok(vals
-                .into_iter()
-                .map(|v| calibration.transform(v as f64))
-                .collect())
-        }
+        decode_typed!(i64)
     } else if dt.is::<UInt64DataType>() {
-        let vals: Vec<u64> = retriever.retrieve_subset(subset)?;
-        if !has_tx {
-            Ok(vals.into_iter().map(|v| v as f32).collect())
-        } else {
-            Ok(vals
-                .into_iter()
-                .map(|v| calibration.transform(v as f64))
-                .collect())
-        }
+        decode_typed!(u64)
     } else if dt.is::<BoolDataType>() {
         let vals: Vec<u8> = retriever.retrieve_subset(subset)?;
         Ok(vals
