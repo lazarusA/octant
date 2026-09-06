@@ -10,7 +10,9 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
         .default_size(280.0)
         .size_range(180.0..=420.0)
         .show_collapsible(ui, &mut show, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
                 ui.add_space(4.0);
                 if ui.button(egui::RichText::new("📚 Open Catalog").strong()).clicked() {
                     app.show_catalog_window = true;
@@ -101,24 +103,71 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                     if app.dataset_manager.is_empty() {
                         ui.label("No active datasets in DatasetManager.");
                     } else {
-                        ui.label(format!("Active Datasets: {}", app.dataset_manager.len()));
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new(format!("Active ({})", app.dataset_manager.len()))
+                                    .strong(),
+                            );
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui
+                                    .small_button("🗑 Clear All")
+                                    .on_hover_text("Remove all datasets from manager")
+                                    .clicked()
+                                {
+                                    app.clear_all_datasets();
+                                }
+                            });
+                        });
                         ui.add_space(4.0);
 
                         let mut to_activate: Option<(String, StoreKind)> = None;
+                        let mut to_delete: Option<String> = None;
 
-                        for d in app.dataset_manager.iter() {
-                            let is_active = app.store_target_input == d.source.uri;
-                            let label_text = format!("• {} [{}]", d.source.display_name, d.source.uri);
+                        egui::ScrollArea::vertical()
+                            .max_height(200.0)
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| {
+                                for d in app.dataset_manager.iter() {
+                                    let is_active = app.store_target_input == d.source.uri;
+                                    let icon = match d.source.kind {
+                                        crate::data::DataSourceKind::RemoteZarr => "🌐",
+                                        crate::data::DataSourceKind::LocalZarr => "📁",
+                                        crate::data::DataSourceKind::RemoteIcechunk => "🧊",
+                                        crate::data::DataSourceKind::LocalIcechunk => "🧊",
+                                        crate::data::DataSourceKind::NetCdf => "📁",
+                                        crate::data::DataSourceKind::Procedural => "🎲",
+                                        _ => "📦",
+                                    };
 
-                            if ui.selectable_label(is_active, egui::RichText::new(label_text).strong()).clicked() {
-                                to_activate = Some((
-                                    d.source.uri.clone(),
-                                    StoreKind::from_data_source_kind(&d.source.kind),
-                                ));
-                            }
-                        }
+                                    ui.horizontal(|ui| {
+                                        let label_text = format!("{} {}", icon, d.source.display_name);
+                                        let item_btn = ui.selectable_label(
+                                            is_active,
+                                            egui::RichText::new(label_text).strong(),
+                                        );
+                                        if item_btn.on_hover_text(&d.source.uri).clicked() {
+                                            to_activate = Some((
+                                                d.source.uri.clone(),
+                                                StoreKind::from_data_source_kind(&d.source.kind),
+                                            ));
+                                        }
 
-                        if let Some((uri, kind)) = to_activate {
+                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                            if ui
+                                                .small_button("✕")
+                                                .on_hover_text("Remove this dataset")
+                                                .clicked()
+                                            {
+                                                to_delete = Some(d.id.clone());
+                                            }
+                                        });
+                                    });
+                                }
+                            });
+
+                        if let Some(id) = to_delete {
+                            app.remove_dataset(&id);
+                        } else if let Some((uri, kind)) = to_activate {
                             app.submit_or_activate_source(&uri, Some(kind));
                         }
                     }

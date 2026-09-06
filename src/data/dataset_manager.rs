@@ -22,6 +22,10 @@ impl DatasetManager {
         self.datasets.remove(dataset_id)
     }
 
+    pub fn clear(&mut self) {
+        self.datasets.clear();
+    }
+
     pub fn get(&self, dataset_id: &str) -> Option<&Dataset> {
         self.datasets.get(dataset_id)
     }

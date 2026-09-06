@@ -704,6 +704,31 @@ impl OctantApp {
         false
     }
 
+    /// Removes a dataset from `dataset_manager` by ID.
+    /// If it is currently active, resets active dataset metadata and variable tree.
+    pub fn remove_dataset(&mut self, dataset_id: &str) {
+        if let Some(removed) = self.dataset_manager.remove(dataset_id) {
+            let is_active = self.active_dataset_metadata.as_ref().is_some_and(|_| {
+                self.store_target_input == removed.source.uri || dataset_id == removed.id
+            });
+            if is_active {
+                self.active_dataset_metadata = None;
+                self.cached_variable_tree = None;
+                self.variable_search.clear();
+            }
+            self.status_message = format!("Removed dataset '{}'", removed.source.display_name);
+        }
+    }
+
+    /// Clears all datasets from `dataset_manager` and resets active dataset state.
+    pub fn clear_all_datasets(&mut self) {
+        self.dataset_manager.clear();
+        self.active_dataset_metadata = None;
+        self.cached_variable_tree = None;
+        self.variable_search.clear();
+        self.status_message = "Cleared all datasets from Dataset Manager".to_string();
+    }
+
     /// Triggers an export request for the canvas / figure.
     pub fn request_canvas_export(
         &mut self,
