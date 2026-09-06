@@ -4,9 +4,12 @@ use crate::{
 };
 
 pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.menu_button("Cache", |ui| {
+    ui.icon_menu_button(Icon::Cache, "Cache", |ui| {
         ui.set_min_width(360.0);
-        ui.label(egui::RichText::new("Unified Multi-Variable Memory Cache").strong());
+        ui.horizontal(|ui| {
+            ui.icon(Icon::Cache, 14.0);
+            ui.label(egui::RichText::new("Unified Multi-Variable Memory Cache").strong());
+        });
         ui.separator();
 
         let block_bytes = app.block_cache.current_bytes();

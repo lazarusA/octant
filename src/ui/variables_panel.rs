@@ -110,7 +110,12 @@ fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) {
         ui.horizontal(|ui| {
             ui.small("Path:");
             ui.icon(Icon::Folder, 10.0);
-            ui.small(group.replace('/', " / "));
+            for (i, seg) in group.split('/').filter(|s| !s.is_empty()).enumerate() {
+                if i > 0 {
+                    ui.icon_colored(Icon::ChevronRight, 8.0, ui.visuals().weak_text_color());
+                }
+                ui.small(seg);
+            }
         });
     }
     if let Some(units) = &var_info.units {

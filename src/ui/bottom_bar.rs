@@ -450,10 +450,10 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             widths.insert(BottomBarItem::Export, export_resp.response.rect.width());
         }
 
-        // 9. Overflow Button "..."
+        // 9. Overflow Button
         if show_overflow {
             let overflow_resp = ui.scope(|ui| {
-                ui.menu_button(egui::RichText::new("...").strong(), |ui| {
+                ui.icon_menu_button(Icon::Overflow, "", |ui| {
                     ui.set_min_width(220.0);
                     ui.label(
                         egui::RichText::new("Playback Options & Info")
@@ -532,9 +532,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                     ui.label(format!("Range: {} -> {}", start_date_str, end_date_str));
                     ui.label(format!("Step Size: {}", step_size_str));
                     ui.label(format!("Status: {}", status_text));
-                })
-                .response
-                .on_hover_text("More playback options and timeline details");
+                });
             });
             widths.insert(
                 BottomBarItem::OverflowBtn,

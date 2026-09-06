@@ -155,6 +155,14 @@ pub trait UiIconExt {
 
     /// Render a non-interactive label containing a vector icon and text side-by-side.
     fn icon_label(&mut self, icon: Icon, text: impl Into<WidgetText>) -> Response;
+
+    /// Render an interactive dropdown menu button containing a vector icon and text.
+    fn icon_menu_button<R>(
+        &mut self,
+        icon: Icon,
+        text: impl Into<WidgetText>,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+    ) -> Option<R>;
 }
 
 impl UiIconExt for Ui {
@@ -267,6 +275,18 @@ impl UiIconExt for Ui {
         }
 
         response
+    }
+
+    fn icon_menu_button<R>(
+        &mut self,
+        icon: Icon,
+        text: impl Into<WidgetText>,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+    ) -> Option<R> {
+        let button_response = self.icon_button(icon, text);
+        egui::Popup::menu(&button_response)
+            .show(|ui| add_contents(ui))
+            .map(|r| r.inner)
     }
 }
 

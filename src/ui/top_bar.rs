@@ -149,10 +149,10 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                     widths.insert(item, resp.response.rect.width());
                 }
 
-                // 3. Overflow Menu Button "..."
+                // 3. Overflow Menu Button
                 if show_overflow {
                     let overflow_resp = ui.scope(|ui| {
-                        ui.menu_button(egui::RichText::new("...").strong(), |ui| {
+                        ui.icon_menu_button(Icon::Overflow, "", |ui| {
                             ui.set_min_width(180.0);
                             ui.label(egui::RichText::new("More Options").small().weak());
                             ui.separator();
@@ -170,9 +170,7 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                                     render_item(TopBarItem::Theme, true, app, ui);
                                 }
                             }
-                        })
-                        .response
-                        .on_hover_text("More options");
+                        });
                     });
                     widths.insert(TopBarItem::OverflowBtn, overflow_resp.response.rect.width());
                 }
@@ -257,7 +255,14 @@ fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut eg
             }
         }
         TopBarItem::Cache => {
-            cache::show_cache_menu(app, ui);
+            if in_menu {
+                if ui.icon_button(Icon::Cache, "Cache").clicked() {
+                    cache::show_cache_menu(app, ui);
+                    ui.close();
+                }
+            } else {
+                cache::show_cache_menu(app, ui);
+            }
         }
         TopBarItem::Theme => {
             let is_dark = app.theme_preference == egui::ThemePreference::Dark;

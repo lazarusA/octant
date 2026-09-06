@@ -358,7 +358,12 @@ fn render_variable_row(
             ui.horizontal(|ui| {
                 ui.label("Group:");
                 ui.icon(Icon::Folder, 11.0);
-                ui.label(group.replace('/', " / "));
+                for (i, seg) in group.split('/').filter(|s| !s.is_empty()).enumerate() {
+                    if i > 0 {
+                        ui.icon_colored(Icon::ChevronRight, 8.0, ui.visuals().weak_text_color());
+                    }
+                    ui.label(seg);
+                }
             });
         }
         ui.label(format!("Type: [{}]", var_info.data_type));
