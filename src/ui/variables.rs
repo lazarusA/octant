@@ -27,8 +27,25 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.label("🔍");
-                            ui.text_edit_singleline(&mut app.variable_search);
-                            if !app.variable_search.is_empty() && ui.small_button("✕").clicked() {
+                            let search_has_text = !app.variable_search.is_empty();
+                            let edit_width = if search_has_text {
+                                (ui.available_width() - 26.0).max(60.0)
+                            } else {
+                                ui.available_width()
+                            };
+
+                            ui.add(
+                                egui::TextEdit::singleline(&mut app.variable_search)
+                                    .hint_text("Search variables...")
+                                    .desired_width(edit_width),
+                            );
+
+                            if search_has_text
+                                && ui
+                                    .small_button("x")
+                                    .on_hover_text("Clear search")
+                                    .clicked()
+                            {
                                 app.variable_search.clear();
                             }
                         });

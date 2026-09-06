@@ -211,7 +211,7 @@ pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: 
                                 dismiss = true;
                             }
 
-                            if ui.small_button("✕").clicked() {
+                            if ui.small_button("x").on_hover_text("Dismiss").clicked() {
                                 dismiss = true;
                             }
                         });
