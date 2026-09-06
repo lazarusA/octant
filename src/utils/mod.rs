@@ -7,9 +7,11 @@ pub mod grid;
 pub mod math;
 pub mod metadata;
 pub mod path;
+pub mod remote;
 pub mod units;
 
 pub use path::{expand_tilde, expand_tilde_str, infer_store_kind_from_target};
+pub use remote::{ParsedStorageUrl, parse_remote_storage_url};
 
 // Format-agnostic & domain re-exports
 pub use crate::data::backends::icechunk_storage::build_sync_icechunk_store;

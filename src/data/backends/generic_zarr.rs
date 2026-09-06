@@ -124,7 +124,7 @@ impl GenericZarrBlockStore {
             4 * 1024 * 1024
         };
 
-        log::info!(
+        log::debug!(
             "[{}] get_or_open_array '{}': shape={:?}, chunk_shape={:?}, dtype={:?}, single_chunk_bytes={} bytes",
             self.backend_name,
             var_name,

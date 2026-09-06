@@ -4,6 +4,7 @@ pub mod block_loader;
 pub mod block_prefetch;
 pub mod block_request;
 pub mod block_store;
+pub mod codecs;
 pub mod data_source;
 pub mod dataset;
 pub mod dataset_manager;

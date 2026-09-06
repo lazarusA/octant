@@ -2,160 +2,35 @@ use crate::data::VariableInfo;
 use crate::utils::units::calculate_variable_size_bytes;
 use std::collections::HashMap;
 use std::error::Error;
-use zarrs::array::{Array, ArrayMetadata, DataType};
+use zarrs::array::{Array, ArrayMetadata};
 use zarrs::group::Group;
-use zarrs::metadata::v3::MetadataV3;
-use zarrs::metadata_ext::codec::blosc::{
-    BloscCodecConfigurationNumcodecs, codec_blosc_v2_numcodecs_to_v3,
-};
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata;
 
 use zarrs::node::{NodeMetadata, NodePath, get_child_nodes};
 use zarrs::storage::{ReadableStorageTraits, ReadableWritableListableStorage};
 
-/// Normalizes Zarr v3 array metadata to handle non-standard / Python numcodecs codec representations
-/// using `zarrs_metadata` and `zarrs_metadata_ext`.
-pub fn normalize_v3_array_metadata(mut meta: serde_json::Value) -> serde_json::Value {
-    let typesize = meta
-        .get("data_type")
-        .and_then(|d| serde_json::from_value::<MetadataV3>(d.clone()).ok())
-        .and_then(|m| DataType::from_metadata(&m).ok())
-        .map(|dt| dt.size());
+pub use crate::data::codecs::normalize_v3_array_metadata;
 
-    if let Some(codecs) = meta.get_mut("codecs").and_then(|c| c.as_array_mut()) {
-        let mut normalized_codecs = Vec::new();
-        let mut has_array_to_bytes = false;
+/// Generates store candidate keys for array metadata JSON files without polling root group metadata for sub-arrays.
+pub fn resolve_array_candidate_store_keys(clean_path: &str) -> Vec<zarrs::storage::StoreKey> {
+    let path_strs = if clean_path.is_empty() {
+        vec![
+            "meta/root.array.json".to_string(),
+            "zarr.json".to_string(),
+            ".zarray".to_string(),
+        ]
+    } else {
+        vec![
+            format!("meta/root/{}.array.json", clean_path),
+            format!("{}/zarr.json", clean_path),
+            format!("{}/.zarray", clean_path),
+        ]
+    };
 
-        for codec in codecs.iter() {
-            let Some(obj) = codec.as_object() else {
-                continue;
-            };
-            let Some(name) = obj.get("name").and_then(|n| n.as_str()) else {
-                continue;
-            };
-
-            if name == "bytes" || name == "vlen" || name == "vlen_v2" || name == "sharding_indexed"
-            {
-                has_array_to_bytes = true;
-                normalized_codecs.push(codec.clone());
-            } else if name == "numcodecs.blosc" || name.ends_with(".blosc") || name == "blosc" {
-                if let Some(config) = obj.get("configuration").cloned()
-                    && let Ok(blosc_numcodecs) =
-                        serde_json::from_value::<BloscCodecConfigurationNumcodecs>(config)
-                {
-                    let blosc_v3 = codec_blosc_v2_numcodecs_to_v3(&blosc_numcodecs, typesize);
-                    let mut new_obj = serde_json::Map::new();
-                    new_obj.insert("name".to_string(), serde_json::json!("blosc"));
-                    if let Ok(v3_config) = serde_json::to_value(&blosc_v3) {
-                        new_obj.insert("configuration".to_string(), v3_config);
-                    }
-                    normalized_codecs.push(serde_json::Value::Object(new_obj));
-                } else {
-                    let mut new_obj = serde_json::Map::new();
-                    new_obj.insert("name".to_string(), serde_json::json!("blosc"));
-                    if let Some(config) = obj.get("configuration") {
-                        new_obj.insert("configuration".to_string(), config.clone());
-                    }
-                    normalized_codecs.push(serde_json::Value::Object(new_obj));
-                }
-            } else if name == "numcodecs.zlib" || name == "zlib" {
-                let level = obj
-                    .get("configuration")
-                    .and_then(|c| c.get("level"))
-                    .and_then(|l| l.as_u64())
-                    .unwrap_or(1);
-                normalized_codecs.push(serde_json::json!({
-                    "name": "numcodecs.zlib",
-                    "configuration": { "level": level }
-                }));
-            } else if name == "numcodecs.gzip" || name == "gzip" {
-                let level = obj
-                    .get("configuration")
-                    .and_then(|c| c.get("level"))
-                    .and_then(|l| l.as_u64())
-                    .unwrap_or(1);
-                normalized_codecs.push(serde_json::json!({
-                    "name": "gzip",
-                    "configuration": { "level": level }
-                }));
-            } else if name == "numcodecs.shuffle" || name == "shuffle" {
-                let fixed_typesize = typesize.and_then(|ts| match ts {
-                    zarrs::array::DataTypeSize::Fixed(s) => Some(s),
-                    _ => None,
-                });
-                let elementsize = obj
-                    .get("configuration")
-                    .and_then(|c| c.get("elementsize"))
-                    .and_then(|e| e.as_u64())
-                    .map(|e| e as usize)
-                    .or(fixed_typesize)
-                    .unwrap_or(1);
-                normalized_codecs.push(serde_json::json!({
-                    "name": "numcodecs.shuffle",
-                    "configuration": { "elementsize": elementsize }
-                }));
-            } else if name == "numcodecs.zstd" || name == "zstd" {
-                let level = obj
-                    .get("configuration")
-                    .and_then(|c| c.get("level"))
-                    .and_then(|l| l.as_i64())
-                    .unwrap_or(0);
-                let checksum = obj
-                    .get("configuration")
-                    .and_then(|c| c.get("checksum"))
-                    .and_then(|c| c.as_bool())
-                    .unwrap_or(false);
-                normalized_codecs.push(serde_json::json!({
-                    "name": "zstd",
-                    "configuration": { "level": level, "checksum": checksum }
-                }));
-            } else if name == "numcodecs.crc32c" || name == "crc32c" {
-                normalized_codecs.push(serde_json::json!({ "name": "crc32c" }));
-            } else if name == "fletcher32" || name == "bitround" {
-                normalized_codecs.push(codec.clone());
-            }
-            // Note: Filters like numcodecs.shuffle not supported as a standalone codec plugin
-            // in zarrs are omitted so the decompression chain (bytes + gzip/zstd/blosc) executes cleanly.
-        }
-
-        // Ensure array_to_bytes codec ('bytes') is present and placed before bytes-to-bytes codecs
-        if !has_array_to_bytes {
-            normalized_codecs.insert(
-                0,
-                serde_json::json!({
-                    "name": "bytes",
-                    "configuration": {
-                        "endian": "little"
-                    }
-                }),
-            );
-        } else if let Some(bytes_idx) = normalized_codecs.iter().position(|c| {
-            c.get("name")
-                .and_then(|n| n.as_str())
-                .map(|n| n == "bytes" || n == "sharding_indexed" || n == "vlen" || n == "vlen_v2")
-                .unwrap_or(false)
-        }) && bytes_idx > 0
-        {
-            let bytes_codec = normalized_codecs.remove(bytes_idx);
-            normalized_codecs.insert(0, bytes_codec);
-        }
-
-        // Order codecs: bytes (array_to_bytes) -> filters (shuffle, etc.) -> compression (zlib, gzip, zstd, blosc)
-        normalized_codecs.sort_by_key(|c| {
-            let name = c.get("name").and_then(|n| n.as_str()).unwrap_or("");
-            if name == "bytes" || name == "sharding_indexed" || name == "vlen" || name == "vlen_v2"
-            {
-                0
-            } else if name == "numcodecs.shuffle" || name == "shuffle" || name == "bitround" {
-                1
-            } else {
-                2
-            }
-        });
-
-        *codecs = normalized_codecs;
-    }
-    meta
+    path_strs
+        .into_iter()
+        .filter_map(|p| zarrs::storage::StoreKey::new(&p).ok())
+        .collect()
 }
 
 /// Helper to instantiate an Array from NodeMetadata, applying codec normalization if needed.
@@ -174,41 +49,13 @@ pub fn instantiate_array_from_node_metadata<TStorage: ?Sized + ReadableStorageTr
         NodeMetadata::Array(array_meta) => {
             if let Ok(arr) = Array::new_with_metadata(store.clone(), &norm_path, array_meta.clone())
             {
-                log::debug!(
-                    "[Metadata] Directly opened array at '{}' with standard metadata",
-                    norm_path
-                );
                 Some(arr)
             } else if let Ok(meta_val) = serde_json::to_value(array_meta) {
                 let norm_val = normalize_v3_array_metadata(meta_val);
-                match serde_json::from_value::<ArrayMetadata>(norm_val) {
-                    Ok(norm_meta) => match Array::new_with_metadata(store, &norm_path, norm_meta) {
-                        Ok(arr) => {
-                            log::info!(
-                                "[Metadata] Instantiated array at '{}' after normalizing codecs: shape={:?}, dtype={:?}",
-                                norm_path,
-                                arr.shape(),
-                                arr.data_type()
-                            );
-                            Some(arr)
-                        }
-                        Err(e) => {
-                            log::warn!(
-                                "[Metadata] Array::new_with_metadata failed for '{}': {:?}",
-                                norm_path,
-                                e
-                            );
-                            None
-                        }
-                    },
-                    Err(e) => {
-                        log::warn!(
-                            "[Metadata] Deserializing normalized ArrayMetadata failed for '{}': {:?}",
-                            norm_path,
-                            e
-                        );
-                        None
-                    }
+                if let Ok(norm_meta) = serde_json::from_value::<ArrayMetadata>(norm_val) {
+                    Array::new_with_metadata(store, &norm_path, norm_meta).ok()
+                } else {
+                    None
                 }
             } else {
                 None
@@ -241,81 +88,42 @@ pub fn open_or_instantiate_array_normalized<TStorage: ?Sized + ReadableStorageTr
     }
 
     // 2. Try reading metadata JSON files (zarr v3 standard meta/root/..., v3 folder zarr.json, v2 .zarray)
-    let mut meta_files = Vec::new();
-    if clean_path.is_empty() {
-        meta_files.push("meta/root.array.json".to_string());
-        meta_files.push("zarr.json".to_string());
-        meta_files.push(".zarray".to_string());
-    } else {
-        meta_files.push(format!("meta/root/{}.array.json", clean_path));
-        meta_files.push(format!("{}/zarr.json", clean_path));
-        meta_files.push(format!("{}/.zarray", clean_path));
-        meta_files.push("meta/root.array.json".to_string());
-        meta_files.push("zarr.json".to_string());
-        meta_files.push(".zarray".to_string());
-    }
+    let candidate_keys = resolve_array_candidate_store_keys(clean_path);
 
-    for meta_file in meta_files.drain(..) {
-        if let Ok(key) = zarrs::storage::StoreKey::new(&meta_file)
-            && let Ok(Some(bytes)) = store.get(&key)
+    for key in candidate_keys {
+        if let Ok(Some(bytes)) = store.get(&key)
             && let Ok(val) = serde_json::from_slice::<serde_json::Value>(&bytes)
         {
-            log::info!(
-                "[Metadata] Found metadata key '{}' for '{}', normalizing codecs...",
-                meta_file,
-                var_path
-            );
             let norm_val = normalize_v3_array_metadata(val);
-            match serde_json::from_value::<ArrayMetadata>(norm_val) {
-                Ok(norm_meta) => {
-                    match Array::new_with_metadata(store.clone(), &abs_path, norm_meta.clone()) {
-                        Ok(arr) => {
-                            log::info!(
-                                "[Metadata] Successfully instantiated array for '{}' with normalized metadata",
-                                abs_path
-                            );
-                            return Ok(arr);
-                        }
-                        Err(e) => {
-                            log::debug!(
-                                "[Metadata] Array::new_with_metadata failed for '{}': {:?}",
-                                abs_path,
-                                e
-                            );
-                        }
-                    }
-                    if !clean_path.is_empty() {
-                        match Array::new_with_metadata(store.clone(), clean_path, norm_meta.clone())
-                        {
-                            Ok(arr) => {
-                                log::info!(
-                                    "[Metadata] Successfully instantiated array for '{}' with normalized metadata",
-                                    clean_path
-                                );
-                                return Ok(arr);
-                            }
-                            Err(e) => {
-                                log::debug!(
-                                    "[Metadata] Array::new_with_metadata failed for '{}': {:?}",
-                                    clean_path,
-                                    e
-                                );
-                            }
-                        }
-                    }
-                    if let Ok(arr) = Array::new_with_metadata(store.clone(), "/", norm_meta) {
-                        log::info!(
-                            "[Metadata] Successfully instantiated array for '/' with normalized metadata"
-                        );
-                        return Ok(arr);
-                    }
-                }
-                Err(e) => {
+            if let Ok(norm_meta) = serde_json::from_value::<ArrayMetadata>(norm_val) {
+                if let Ok(arr) =
+                    Array::new_with_metadata(store.clone(), &abs_path, norm_meta.clone())
+                {
                     log::debug!(
-                        "[Metadata] Failed to parse normalized ArrayMetadata for '{}': {:?}",
-                        var_path,
-                        e
+                        "[Metadata] Instantiated array '{}' via candidate key '{}'",
+                        abs_path,
+                        key.as_str()
                     );
+                    return Ok(arr);
+                }
+                if !clean_path.is_empty()
+                    && let Ok(arr) =
+                        Array::new_with_metadata(store.clone(), clean_path, norm_meta.clone())
+                {
+                    log::debug!(
+                        "[Metadata] Instantiated array '{}' via candidate key '{}'",
+                        clean_path,
+                        key.as_str()
+                    );
+                    return Ok(arr);
+                }
+                if let Ok(arr) = Array::new_with_metadata(store.clone(), "/", norm_meta) {
+                    log::debug!(
+                        "[Metadata] Instantiated root array for '{}' via candidate key '{}'",
+                        var_path,
+                        key.as_str()
+                    );
+                    return Ok(arr);
                 }
             }
         }

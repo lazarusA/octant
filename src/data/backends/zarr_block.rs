@@ -67,7 +67,7 @@ pub fn fetch_block_from_cached_array(
     }
 
     let subset = ArraySubset::new_with_ranges(&ranges);
-    log::info!(
+    log::debug!(
         "[ZarrBlock] Fetching '{}' subset {:?} (elements = {}) from '{}'",
         request.variable,
         subset.to_ranges(),
