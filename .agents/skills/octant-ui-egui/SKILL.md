@@ -86,3 +86,26 @@ This skill guides development of the user interface in Octant using `egui` and `
     ```
 - **Encapsulated UI Helper Pattern**:
   - Extract complex multi-step frame lifecycle actions (e.g. screenshot polling, buffer cropping, format dispatch) into private helper methods (`self.process_pending_export(&ctx)`) on `OctantApp` rather than inlining large blocks into the main `ui()` loop.
+
+### 9. Native Procedural Vector Icons (`src/ui/icons/`)
+- **Forbid Raw Emojis and Unicode Glyphs**: Never use font-dependent emojis (`🚀`, `⏳`, `⚡`, `⚠️`, `❌`, `📥`, `✓`) or unicode bullet symbols in UI labels, buttons, toasts, status text, or log strings.
+- **Use `crate::ui::icons::Icon`**: Use the GPU-drawn vector icons via the `UiIconExt` trait:
+  ```rust
+  use crate::ui::icons::{Icon, UiIconExt};
+
+  // Icon only
+  ui.icon(Icon::DropTray, 14.0);
+  ui.icon_colored(Icon::Warning, 14.0, warning_color);
+
+  // Buttons with vector icons
+  ui.icon_button(Icon::Save, "Save Figure");
+  ui.icon_button(Icon::Cross, ""); // Pure icon button (automatically centered with 0 gap)
+
+  // Labels with vector icons
+  ui.icon_label(Icon::VariableDoc, "Temperature");
+
+  // Direct GPU Painter drawing
+  Icon::DropTray.paint(ui.painter(), rect, stroke_color, ui.visuals().dark_mode);
+  ```
+- **Extending Icons**: When a new symbol is needed, define a new variant in `Icon` (`src/ui/icons/mod.rs`) and implement its resolution-independent painter drawing routine in `src/ui/icons/nav.rs`, `playback.rs`, `plots.rs`, `status.rs`, or `store.rs` with dark/light theme awareness.
+
