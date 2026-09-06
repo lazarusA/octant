@@ -100,11 +100,9 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                     return;
                                 }
 
-                                if app.cached_variable_tree.is_none() {
-                                    app.cached_variable_tree =
-                                        Some(metadata.build_variable_tree());
-                                }
-                                let tree = app.cached_variable_tree.as_ref().unwrap();
+                                let tree = app
+                                    .cached_variable_tree
+                                    .get_or_insert_with(|| metadata.build_variable_tree());
                                 let search_query = app.variable_search.trim();
                                 let search_active = !search_query.is_empty();
 
@@ -113,7 +111,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                     filtered_tree = tree.filter(search_query, &metadata.variables);
                                     filtered_tree.as_ref()
                                 } else {
-                                    Some(tree)
+                                    Some(&*tree)
                                 };
 
                                 let Some(root_group) = root_group_ref else {

@@ -47,6 +47,7 @@ impl eframe::App for OctantApp {
                             self.dataset_manager.add(dataset);
                         }
 
+                        self.variable_search.clear();
                         self.cached_variable_tree = Some(metadata.build_variable_tree());
                         self.active_dataset_metadata = Some(metadata);
                         self.selected_variable_idx = 0;
@@ -55,6 +56,8 @@ impl eframe::App for OctantApp {
                     Err(err) => {
                         self.hero_state.loading = false;
                         self.hero_state.loaded = false;
+                        self.active_dataset_metadata = None;
+                        self.cached_variable_tree = None;
                         self.status_message = format!("❌ Store inspect error: {}", err);
                     }
                 }

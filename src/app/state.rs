@@ -660,27 +660,32 @@ impl OctantApp {
     }
 
     /// Checks if a dataset matching `target` (by URI, ID, or display name) is already in `dataset_manager`.
-    /// If found and it has metadata, activates it and opens the variables overlay.
+    /// If found and it has metadata, activates it, updates the variable tree cache, and opens the variables overlay.
     pub fn try_activate_dataset(&mut self, target: &str) -> bool {
-        let input_target = target.trim();
+        let input_target = target.trim().trim_end_matches('/');
         if input_target.is_empty() {
             return false;
         }
         let expanded = crate::utils::expand_tilde_str(input_target);
+        let clean_expanded = expanded.trim_end_matches('/');
 
         let existing = self
             .dataset_manager
             .iter()
             .find(|d| {
-                d.source.uri == input_target
-                    || d.source.uri == expanded
-                    || d.id == input_target
+                let d_uri = d.source.uri.trim().trim_end_matches('/');
+                let d_id = d.id.trim().trim_end_matches('/');
+                d_uri == input_target
+                    || d_uri == clean_expanded
+                    || d_id == input_target
+                    || d_id == clean_expanded
                     || d.source.display_name == input_target
+                    || d_id.ends_with(input_target)
             })
             .cloned();
 
         if let Some(dataset) = existing {
-            self.store_target_input = input_target.to_string();
+            self.store_target_input = dataset.source.uri.clone();
             self.selected_store_kind = StoreKind::from_data_source_kind(&dataset.source.kind);
             if let Some(meta) = dataset.metadata {
                 self.status_message = format!(
@@ -689,6 +694,8 @@ impl OctantApp {
                     meta.variables.len()
                 );
                 self.show_variables_overlay = true;
+                self.variable_search.clear();
+                self.cached_variable_tree = Some(meta.build_variable_tree());
                 self.active_dataset_metadata = Some(meta);
                 self.selected_variable_idx = 0;
                 return true;
