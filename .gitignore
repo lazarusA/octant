@@ -7,3 +7,5 @@ wgpu
 netcdf
 gribberish
 pluot
+dist
+.vscode
