@@ -59,18 +59,30 @@ pub fn draw_lock(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
         )
     };
 
-    // U-shaped shackle
-    let shackle_pts = [p(0.32, 0.44), p(0.32, 0.24), p(0.68, 0.24), p(0.68, 0.44)];
+    // Smooth rounded semi-circular shackle
+    let mut shackle_pts = Vec::with_capacity(12);
+    shackle_pts.push(p(0.34, 0.46));
+    let n_arc = 8;
+    for i in 0..=n_arc {
+        let frac = (i as f32) / (n_arc as f32);
+        let angle = std::f32::consts::PI - frac * std::f32::consts::PI;
+        let (s, c) = angle.sin_cos();
+        shackle_pts.push(p(0.50 + c * 0.16, 0.32 - s * 0.16));
+    }
+    shackle_pts.push(p(0.66, 0.46));
+
     for win in shackle_pts.windows(2) {
         painter.line_segment([win[0], win[1]], stroke);
     }
 
-    // Padlock body
-    let body = Rect::from_min_max(p(0.22, 0.44), p(0.78, 0.86));
-    painter.rect(body, 2.0, fill, stroke, StrokeKind::Inside);
+    // Padlock body with subtle rounded corners
+    let body = Rect::from_min_max(p(0.24, 0.46), p(0.76, 0.86));
+    painter.rect(body, 2.5, fill, stroke, StrokeKind::Inside);
 
-    // Keyhole dot
-    painter.circle_filled(p(0.50, 0.62), rect.width() * 0.07, stroke.color);
+    // Refined keyhole: circular top with tapered keyway slot
+    painter.circle_filled(p(0.50, 0.61), rect.width() * 0.055, stroke.color);
+    let keyway = Stroke::new(stroke.width * 1.1, stroke.color);
+    painter.line_segment([p(0.50, 0.61), p(0.50, 0.73)], keyway);
 }
 
 pub fn draw_unlock(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
@@ -81,18 +93,30 @@ pub fn draw_unlock(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32)
         )
     };
 
-    // Open lifted shackle
-    let shackle_pts = [p(0.32, 0.44), p(0.32, 0.16), p(0.68, 0.16), p(0.68, 0.32)];
+    // Lifted & open smooth shackle with distinct clear opening
+    let mut shackle_pts = Vec::with_capacity(12);
+    shackle_pts.push(p(0.34, 0.46));
+    let n_arc = 8;
+    for i in 0..=n_arc {
+        let frac = (i as f32) / (n_arc as f32);
+        let angle = std::f32::consts::PI - frac * std::f32::consts::PI;
+        let (s, c) = angle.sin_cos();
+        shackle_pts.push(p(0.50 + c * 0.16, 0.24 - s * 0.16));
+    }
+    shackle_pts.push(p(0.66, 0.30));
+
     for win in shackle_pts.windows(2) {
         painter.line_segment([win[0], win[1]], stroke);
     }
 
-    // Padlock body
-    let body = Rect::from_min_max(p(0.22, 0.44), p(0.78, 0.86));
-    painter.rect(body, 2.0, fill, stroke, StrokeKind::Inside);
+    // Padlock body (identical placement to Lock for seamless toggle)
+    let body = Rect::from_min_max(p(0.24, 0.46), p(0.76, 0.86));
+    painter.rect(body, 2.5, fill, stroke, StrokeKind::Inside);
 
-    // Keyhole dot
-    painter.circle_filled(p(0.50, 0.62), rect.width() * 0.07, stroke.color);
+    // Refined keyhole
+    painter.circle_filled(p(0.50, 0.61), rect.width() * 0.055, stroke.color);
+    let keyway = Stroke::new(stroke.width * 1.1, stroke.color);
+    painter.line_segment([p(0.50, 0.61), p(0.50, 0.73)], keyway);
 }
 
 pub fn draw_bolt(painter: &Painter, rect: Rect, fill: Color32, stroke: Stroke) {

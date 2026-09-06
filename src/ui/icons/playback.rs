@@ -157,17 +157,21 @@ pub fn draw_loop(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
 
 pub fn draw_reset(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
     let center = rect.center();
-    let r = rect.width().min(rect.height()) * 0.36;
+    let r = rect.width().min(rect.height()) * 0.35;
     if r <= 1.0 {
         return;
     }
 
-    // Counter-clockwise gapped arc
-    let n_pts = 14;
-    let mut arc_pts = Vec::with_capacity(n_pts);
+    // Classic counter-clockwise reset loop:
+    // Starts at top-left (10 o'clock), curves down around 9 -> 6 -> 3 -> 12 o'clock.
+    let n_pts = 20;
+    let mut arc_pts = Vec::with_capacity(n_pts + 1);
+    let start_angle = std::f32::consts::TAU * 0.40; // ~144 deg (10 o'clock)
+    let end_angle = std::f32::consts::TAU * 1.22; // ~439 deg (just behind 12 o'clock)
+
     for i in 0..=n_pts {
         let frac = (i as f32) / (n_pts as f32);
-        let angle = std::f32::consts::PI * 0.2 + frac * (std::f32::consts::PI * 1.55);
+        let angle = start_angle + frac * (end_angle - start_angle);
         let (s, c) = angle.sin_cos();
         arc_pts.push(pos2(center.x + c * r, center.y - s * r));
     }
@@ -176,13 +180,12 @@ pub fn draw_reset(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) 
         painter.line_segment([win[0], win[1]], stroke);
     }
 
-    // Arrow tip pointing down/left at arc start
-    if let Some(&tip) = arc_pts.first() {
-        let ah = vec![
-            pos2(tip.x - r * 0.25, tip.y - r * 0.25),
-            pos2(tip.x + r * 0.10, tip.y - r * 0.35),
-            pos2(tip.x, tip.y + r * 0.10),
-        ];
-        painter.add(egui::Shape::convex_polygon(ah, fill, stroke));
-    }
+    // Arrowhead at top (12 o'clock) pointing leftwards in the direction of the counter-clockwise sweep
+    let tip = pos2(center.x - r * 0.24, center.y - r);
+    let ah = vec![
+        tip,
+        pos2(center.x + r * 0.12, center.y - r - r * 0.28),
+        pos2(center.x + r * 0.12, center.y - r + r * 0.28),
+    ];
+    painter.add(egui::Shape::convex_polygon(ah, fill, stroke));
 }
