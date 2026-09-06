@@ -12,6 +12,7 @@ pub mod drop_zone;
 pub mod export_modal;
 pub mod hero;
 pub mod hover_tooltip;
+pub mod icons;
 pub mod plot_type;
 pub mod settings;
 pub mod status;

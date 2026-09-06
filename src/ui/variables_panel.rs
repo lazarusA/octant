@@ -1,6 +1,7 @@
 use crate::{
     app::{AnimationRole, OctantApp, SpatialRole},
     data::slice_request::{DimensionSelection, SliceRequest},
+    ui::icons::{Icon, UiIconExt},
 };
 use egui::{DragValue, Sense, Stroke, Ui, Vec2};
 
@@ -55,17 +56,15 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         false,
                     )
                     .show_header(ui, |ui| {
+                        ui.icon(Icon::VariableDoc, 13.0);
                         let display_name = if let Some(group) = var_info.group_path() {
-                            format!("📄 {} (📁 {})", var_info.leaf_name(), group)
+                            format!("{} ({})", var_info.leaf_name(), group)
                         } else {
-                            format!("📄 {}", var_info.name)
+                            var_info.name.clone()
                         };
                         ui.label(egui::RichText::new(display_name).strong());
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui
-                                .button(egui::RichText::new("📊 Plot Data").strong())
-                                .clicked()
-                            {
+                            if ui.icon_button(Icon::Variables, "Plot Data").clicked() {
                                 should_plot = true;
                             }
                         });
@@ -89,7 +88,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     ui.add_space(4.0);
 
                     // — Dimension sliders (collapsible) —
-                    egui::CollapsingHeader::new("🎛️ Dimension Sliders")
+                    egui::CollapsingHeader::new("Dimension Sliders")
                         .default_open(true)
                         .show(ui, |ui| {
                             show_dimension_sliders(app, ui, &var_info, &dim_coords);
@@ -108,8 +107,16 @@ fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) {
     });
 
     if let Some(group) = var_info.group_path() {
-        let breadcrumbs = group.replace('/', " ❯ ");
-        ui.small(format!("Path: 📁 {}", breadcrumbs));
+        ui.horizontal(|ui| {
+            ui.small("Path:");
+            ui.icon(Icon::Folder, 10.0);
+            for (i, seg) in group.split('/').filter(|s| !s.is_empty()).enumerate() {
+                if i > 0 {
+                    ui.icon_colored(Icon::ChevronRight, 8.0, ui.visuals().weak_text_color());
+                }
+                ui.small(seg);
+            }
+        });
     }
     if let Some(units) = &var_info.units {
         ui.small(format!("Units: {}", units));
@@ -125,7 +132,7 @@ fn show_variable_info(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) {
     if let (Some(start), Some(end)) = (&var_info.time_coverage_start, &var_info.time_coverage_end) {
         let start_clean = start.split('T').next().unwrap_or(start);
         let end_clean = end.split('T').next().unwrap_or(end);
-        ui.small(format!("Time: {} → {}", start_clean, end_clean));
+        ui.small(format!("Time: {} -> {}", start_clean, end_clean));
     }
     if let Some(res) = &var_info.temporal_resolution {
         ui.small(format!("Resolution: {}", res));
@@ -534,9 +541,10 @@ fn show_dimension_sliders(
         let data_mb = (total_2d_elements * 4) as f64 / (1024.0 * 1024.0);
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
+                ui.icon_colored(Icon::Bolt, 13.0, egui::Color32::from_rgb(100, 200, 255));
                 ui.label(
                     egui::RichText::new(format!(
-                        "⚡ Large 2D selection ({} cells, {:.0} MB): Automatic multi-resolution pyramid aggregation is enabled.",
+                        "Large 2D selection ({} cells, {:.0} MB): Automatic multi-resolution pyramid aggregation is enabled.",
                         crate::utils::format_count_metric(total_2d_elements),
                         data_mb,
                     ))
@@ -550,9 +558,10 @@ fn show_dimension_sliders(
         let data_mb = (total_2d_elements * 4) as f64 / (1024.0 * 1024.0);
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
+                ui.icon_colored(Icon::Info, 13.0, egui::Color32::from_rgb(255, 180, 80));
                 ui.label(
                     egui::RichText::new(format!(
-                        "ℹ️ 3D Globe & 3D Surface meshes are disabled for this large selection ({} cells, {:.0} MB). 2D Plane and 1D Line plots remain fully active.",
+                        "3D Globe & 3D Surface meshes are disabled for this large selection ({} cells, {:.0} MB). 2D Plane and 1D Line plots remain fully active.",
                         crate::utils::format_count_metric(total_2d_elements),
                         data_mb,
                     ))
@@ -570,9 +579,10 @@ fn show_dimension_sliders(
         let vol_mb = (total_vol_elements * 4) as f64 / (1024.0 * 1024.0);
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
+                ui.icon_colored(Icon::Warning, 13.0, egui::Color32::from_rgb(255, 180, 80));
                 ui.label(
                     egui::RichText::new(format!(
-                        "⚠️ 3D Volume & Point Cloud are disabled for this selection: volume size ({:.0} MB) exceeds the 128 MB GPU storage buffer limit. 2D Plane, 1D Line, and 3D Globe remain active.",
+                        "3D Volume & Point Cloud are disabled for this selection: volume size ({:.0} MB) exceeds the 128 MB GPU storage buffer limit. 2D Plane, 1D Line, and 3D Globe remain active.",
                         vol_mb
                     ))
                     .small()

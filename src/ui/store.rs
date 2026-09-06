@@ -1,4 +1,5 @@
 use crate::app::{OctantApp, StoreKind};
+use crate::ui::icons::{Icon, UiIconExt};
 
 pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
     // Extract to a local bool to avoid split-borrow: we can't hold &mut app.field
@@ -14,7 +15,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                 ui.add_space(4.0);
-                if ui.button(egui::RichText::new("📚 Open Catalog").strong()).clicked() {
+                if ui.icon_button(Icon::Catalog, "Open Catalog").clicked() {
                     app.show_catalog_window = true;
                 }
                 ui.add_space(4.0);
@@ -23,23 +24,23 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                 let mut selected = app.selected_store_kind;
                 egui::ComboBox::from_id_salt("left_store_kind_select")
                     .selected_text(match selected {
-                        StoreKind::RemoteZarr => "🌐 Remote Zarr",
-                        StoreKind::LocalZarr => "📁 Local Zarr",
-                        StoreKind::RemoteIcechunk => "🧊 Remote Icechunk",
-                        StoreKind::LocalIcechunk => "🧊 Local Icechunk",
-                        StoreKind::LocalNetCdf => "📁 Local NetCDF / HDF5",
-                        StoreKind::ProceduralVolume4D => "🌐 4D Known-Truth Volume",
-                        StoreKind::ProceduralRandom => "🎲 2D Procedural Matrix",
+                        StoreKind::RemoteZarr => "Remote Zarr",
+                        StoreKind::LocalZarr => "Local Zarr",
+                        StoreKind::RemoteIcechunk => "Remote Icechunk",
+                        StoreKind::LocalIcechunk => "Local Icechunk",
+                        StoreKind::LocalNetCdf => "Local NetCDF / HDF5",
+                        StoreKind::ProceduralVolume4D => "4D Known-Truth Volume",
+                        StoreKind::ProceduralRandom => "2D Procedural Matrix",
                     })
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut selected, StoreKind::RemoteZarr, "🌐 Remote Zarr (HTTP/S3)");
-                        ui.selectable_value(&mut selected, StoreKind::LocalZarr, "📁 Local Zarr (FileSystem)");
-                        ui.selectable_value(&mut selected, StoreKind::RemoteIcechunk, "🧊 Remote Icechunk (HTTP/S3)");
-                        ui.selectable_value(&mut selected, StoreKind::LocalIcechunk, "🧊 Local Icechunk (FileSystem)");
-                        ui.selectable_value(&mut selected, StoreKind::LocalNetCdf, "📁 Local NetCDF / HDF5 (.nc/.h5/.hdf5)");
+                        ui.selectable_value(&mut selected, StoreKind::RemoteZarr, "Remote Zarr (HTTP/S3)");
+                        ui.selectable_value(&mut selected, StoreKind::LocalZarr, "Local Zarr (FileSystem)");
+                        ui.selectable_value(&mut selected, StoreKind::RemoteIcechunk, "Remote Icechunk (HTTP/S3)");
+                        ui.selectable_value(&mut selected, StoreKind::LocalIcechunk, "Local Icechunk (FileSystem)");
+                        ui.selectable_value(&mut selected, StoreKind::LocalNetCdf, "Local NetCDF / HDF5 (.nc/.h5/.hdf5)");
                         ui.separator();
-                        ui.selectable_value(&mut selected, StoreKind::ProceduralVolume4D, "🌐 4D Known-Truth Volume (Procedural)");
-                        ui.selectable_value(&mut selected, StoreKind::ProceduralRandom, "🎲 2D Procedural Matrix (Test)");
+                        ui.selectable_value(&mut selected, StoreKind::ProceduralVolume4D, "4D Known-Truth Volume (Procedural)");
+                        ui.selectable_value(&mut selected, StoreKind::ProceduralRandom, "2D Procedural Matrix (Test)");
                     });
 
                 if selected != app.selected_store_kind {
@@ -78,8 +79,17 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
 
                 ui.add_space(6.0);
-                let btn_label = if app.is_loading { "⏳ Loading..." } else { "⬇️ Load" };
-                if ui.add_enabled(!app.is_loading, egui::Button::new(egui::RichText::new(btn_label).strong())).clicked() {
+                let (btn_icon, btn_label) = if app.is_loading {
+                    (Icon::Hourglass, "Loading...")
+                } else {
+                    (Icon::DropTray, "Load")
+                };
+                if ui
+                    .add_enabled(!app.is_loading, |ui: &mut egui::Ui| {
+                        ui.icon_button(btn_icon, btn_label)
+                    })
+                    .clicked()
+                {
                     let target = app.store_target_input.clone();
                     app.submit_or_activate_source(&target, Some(app.selected_store_kind));
                 }
@@ -99,7 +109,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                     }
                 });
 
-                ui.collapsing("🧊 Dataset Manager", |ui| {
+                ui.collapsing("Dataset Manager", |ui| {
                     if app.dataset_manager.is_empty() {
                         ui.label("No active datasets in DatasetManager.");
                     } else {
@@ -110,7 +120,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                             );
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 if ui
-                                    .small_button("🗑 Clear All")
+                                    .icon_button(Icon::Trash, "Clear All")
                                     .on_hover_text("Remove all datasets from manager")
                                     .clicked()
                                 {
@@ -130,24 +140,24 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                                 for d in app.dataset_manager.iter() {
                                     let is_active = app.store_target_input == d.source.uri;
                                     let icon = match d.source.kind {
-                                        crate::data::DataSourceKind::RemoteZarr => "🌐",
-                                        crate::data::DataSourceKind::LocalZarr => "📁",
-                                        crate::data::DataSourceKind::RemoteIcechunk => "🧊",
-                                        crate::data::DataSourceKind::LocalIcechunk => "🧊",
-                                        crate::data::DataSourceKind::NetCdf => "📁",
-                                        crate::data::DataSourceKind::Procedural => "🎲",
-                                        _ => "📦",
+                                        crate::data::DataSourceKind::RemoteZarr => Icon::Globe,
+                                        crate::data::DataSourceKind::LocalZarr => Icon::Folder,
+                                        crate::data::DataSourceKind::RemoteIcechunk
+                                        | crate::data::DataSourceKind::LocalIcechunk => Icon::Icechunk,
+                                        crate::data::DataSourceKind::NetCdf => Icon::Folder,
+                                        crate::data::DataSourceKind::Procedural => Icon::PlotPlane,
+                                        _ => Icon::PlotVolume,
                                     };
 
                                     ui.horizontal(|ui| {
-                                        let avail_w = (ui.available_width() - 32.0).max(60.0);
+                                        ui.icon(icon, 13.0);
+                                        let avail_w = (ui.available_width() - 44.0).max(60.0);
                                         let approx_chars = ((avail_w - 20.0) / 7.5).floor() as usize;
                                         let short_name = truncate_display_name(&d.source.display_name, approx_chars.max(10));
-                                        let label_text = format!("{} {}", icon, short_name);
 
                                         let item_btn = ui.add_sized(
                                             [avail_w, 20.0],
-                                            egui::Button::new(egui::RichText::new(label_text).strong())
+                                            egui::Button::new(egui::RichText::new(short_name).strong())
                                                 .selected(is_active),
                                         );
                                         if item_btn
@@ -161,7 +171,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                                         }
 
                                         if ui
-                                            .small_button("🗑")
+                                            .icon_button(Icon::Trash, "")
                                             .on_hover_text("Remove this dataset")
                                             .clicked()
                                         {
@@ -193,10 +203,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    if ui
-        .button(egui::RichText::new("🌐 Store").strong())
-        .clicked()
-    {
+    if ui.icon_button(Icon::Globe, "Store").clicked() {
         app.show_left_panel = !app.show_left_panel;
     }
 }

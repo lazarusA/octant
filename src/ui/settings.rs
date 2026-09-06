@@ -1,5 +1,6 @@
 use crate::app::OctantApp;
 use crate::plots::PlotType;
+use crate::ui::icons::{Icon, UiIconExt};
 
 /// Anchored to the left edge of the canvas area, just below the top bar.
 /// Stores its own width so Variable Controls can position to the right without overlap.
@@ -26,7 +27,7 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
                 .stroke(egui::Stroke::NONE)
                 .show(ui, |ui| {
                     ui.set_max_width(280.0);
-                    egui::CollapsingHeader::new("⚙️ Settings")
+                    egui::CollapsingHeader::new("Settings")
                         .default_open(true)
                         .show(ui, |ui| {
                             show_plot_options(app, ui);
@@ -43,7 +44,7 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
 }
 
 fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
-    egui::CollapsingHeader::new("📸 Figure Export Defaults")
+    egui::CollapsingHeader::new("Figure Export Defaults")
         .default_open(false)
         .show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -67,10 +68,10 @@ fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
             });
 
             ui.horizontal(|ui| {
-                if ui.button("📸 Open Save Dialog").clicked() {
+                if ui.icon_button(Icon::Save, "Open Save Dialog").clicked() {
                     app.show_export_modal = true;
                 }
-                if ui.button("✂️ Crop Tool").clicked() {
+                if ui.icon_button(Icon::Scissors, "Crop Tool").clicked() {
                     app.show_crop_overlay = !app.show_crop_overlay;
                 }
             });
@@ -87,34 +88,34 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         PlotType::Volume => {
             ui.horizontal(|ui| {
                 ui.label(
-                    egui::RichText::new("🧪 Experimental")
+                    egui::RichText::new("Experimental")
                         .small()
                         .color(ui.visuals().weak_text_color()),
                 );
                 let algo_label = match app.volume_algorithm {
-                    0 => "☁️ Volume Raymarching",
-                    1 => "🎯 Isosurface (Sobel)",
-                    2 => "⚡ Maximum Intensity (MIP)",
-                    3 => "🌑 Minimum Intensity (MinIP)",
-                    4 => "🔬 Average Projection (X-ray)",
-                    5 => "🏷️ Categorical Label Surface",
-                    6 => "🌫 Absorption RGBA",
-                    7 => "✨ Additive RGBA",
-                    8 => "🎨 Indexed RGBA",
-                    _ => "📐 Shaded Contours",
+                    0 => "Volume Raymarching",
+                    1 => "Isosurface (Sobel)",
+                    2 => "Maximum Intensity (MIP)",
+                    3 => "Minimum Intensity (MinIP)",
+                    4 => "Average Projection (X-ray)",
+                    5 => "Categorical Label Surface",
+                    6 => "Absorption RGBA",
+                    7 => "Additive RGBA",
+                    8 => "Indexed RGBA",
+                    _ => "Shaded Contours",
                 };
                 ui.menu_button(egui::RichText::new(algo_label).small(), |ui| {
                     let algos = [
-                        (0, "☁️ Volume Raymarching (DVR)"),
-                        (1, "🎯 Isosurface (Sub-Voxel + Sobel)"),
-                        (2, "⚡ Maximum Intensity (MIP)"),
-                        (3, "🌑 Minimum Intensity (MinIP)"),
-                        (4, "🔬 Average Projection (X-ray)"),
-                        (5, "🏷️ Categorical Label Surface"),
-                        (6, "🌫 Absorption RGBA"),
-                        (7, "✨ Additive RGBA"),
-                        (8, "🎨 Indexed RGBA"),
-                        (9, "📐 Shaded Contours"),
+                        (0, "Volume Raymarching (DVR)"),
+                        (1, "Isosurface (Sub-Voxel + Sobel)"),
+                        (2, "Maximum Intensity (MIP)"),
+                        (3, "Minimum Intensity (MinIP)"),
+                        (4, "Average Projection (X-ray)"),
+                        (5, "Categorical Label Surface"),
+                        (6, "Absorption RGBA"),
+                        (7, "Additive RGBA"),
+                        (8, "Indexed RGBA"),
+                        (9, "Shaded Contours"),
                     ];
                     for (id, label) in algos {
                         if ui
@@ -130,7 +131,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
             ui.separator();
             ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("Steps"));
-            ui.checkbox(&mut app.volume_transparency, "✨ Transparency");
+            ui.checkbox(&mut app.volume_transparency, "Transparency");
 
             if app.volume_algorithm != 1
                 && app.volume_algorithm != 2
@@ -138,13 +139,12 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                 && app.volume_algorithm != 4
                 && app.volume_algorithm != 5
             {
-                ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("💧 Density"));
+                ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("Density"));
             }
 
             if app.volume_algorithm == 2 {
                 ui.add(
-                    egui::Slider::new(&mut app.volume_attenuation, 0.0..=5.0)
-                        .text("📉 Attenuation"),
+                    egui::Slider::new(&mut app.volume_attenuation, 0.0..=5.0).text("Attenuation"),
                 );
             }
 
@@ -157,28 +157,21 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             {
                 ui.separator();
                 if app.volume_algorithm != 2 {
-                    ui.add(
-                        egui::Slider::new(&mut app.volume_cmin, 0.0..=100.0).text("✂️ Min Clip"),
-                    );
+                    ui.add(egui::Slider::new(&mut app.volume_cmin, 0.0..=100.0).text("Min Clip"));
                 }
-                ui.add(egui::Slider::new(&mut app.volume_cmax, 0.0..=100.0).text("📊 Max Range"));
+                ui.add(egui::Slider::new(&mut app.volume_cmax, 0.0..=100.0).text("Max Range"));
             }
 
             if app.volume_algorithm == 1 {
                 ui.separator();
                 ui.add(
-                    egui::Slider::new(&mut app.volume_isovalue, -100.0..=100.0).text("🎯 Isovalue"),
+                    egui::Slider::new(&mut app.volume_isovalue, -100.0..=100.0).text("Isovalue"),
                 );
-                ui.add(egui::Slider::new(&mut app.volume_isorange, 0.1..=20.0).text("📏 Isorange"));
+                ui.add(egui::Slider::new(&mut app.volume_isorange, 0.1..=20.0).text("Isorange"));
             }
         }
         PlotType::Sphere => {
-            let modes: [(u32, &str); 4] = [
-                (0, "🔵 Smooth"),
-                (1, "🌊 Bumpy"),
-                (2, "Steps"),
-                (3, "📦 Voxel"),
-            ];
+            let modes: [(u32, &str); 4] = [(0, "Smooth"), (1, "Bumpy"), (2, "Steps"), (3, "Voxel")];
 
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 2.0;
@@ -201,7 +194,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
         PlotType::Surface => {
-            let modes: [(u32, &str); 3] = [(0, "🌊 Bumpy"), (1, "Steps"), (2, "📦 Voxel")];
+            let modes: [(u32, &str); 3] = [(0, "Bumpy"), (1, "Steps"), (2, "Voxel")];
 
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 2.0;
@@ -221,13 +214,13 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             );
         }
         PlotType::PointCloud => {
-            ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("✨ Size"));
+            ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("Size"));
         }
         PlotType::Line => {
             ui.horizontal(|ui| {
                 let mut use_flat = app.active_colormap == 999;
                 if ui
-                    .checkbox(&mut use_flat, "🎨 Solid Flat Line Color")
+                    .checkbox(&mut use_flat, "Solid Flat Line Color")
                     .changed()
                 {
                     if use_flat {
@@ -236,7 +229,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                         app.active_colormap = 0;
                     }
                 }
-                ui.selectable_label(app.show_hover_card, "💬")
+                ui.selectable_label(app.show_hover_card, "Hover Card")
                     .on_hover_text(if app.show_hover_card {
                         "Hide hover card"
                     } else {
@@ -256,7 +249,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
             if profile_controls.0 {
                 ui.separator();
-                ui.label(egui::RichText::new("🧭 Line Profile").small().weak());
+                ui.label(egui::RichText::new("Line Profile").small().weak());
 
                 let label_x = app.get_spatial_dim_label(0);
                 let label_y = app.get_spatial_dim_label(1);
@@ -298,10 +291,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
 
                 let mut all_series = app.line_plot_all_series;
-                if ui
-                    .checkbox(&mut all_series, "📈 All Lines Series")
-                    .changed()
-                {
+                if ui.checkbox(&mut all_series, "All Lines Series").changed() {
                     app.line_plot_all_series = all_series;
                 }
 
@@ -325,7 +315,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                         if ui
                             .add(
                                 egui::Slider::new(&mut slice_idx, 0..=max_idx)
-                                    .text("🧪 Profile Index"),
+                                    .text("Profile Index"),
                             )
                             .changed()
                         {
@@ -340,9 +330,9 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         PlotType::Heatmap | PlotType::Block => {
             ui.add_space(2.0);
             ui.horizontal(|ui| {
-                ui.checkbox(&mut app.enforce_data_aspect_ratio, "📐 Aspect Ratio")
+                ui.checkbox(&mut app.enforce_data_aspect_ratio, "Aspect Ratio")
                     .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
-                ui.selectable_label(app.show_hover_card, "💬")
+                ui.selectable_label(app.show_hover_card, "Hover Card")
                     .on_hover_text(if app.show_hover_card { "Hide hover card" } else { "Show hover card" })
                     .clicked().then(|| app.show_hover_card = !app.show_hover_card);
             });
@@ -352,9 +342,9 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     if is_3d_mode {
         ui.separator();
         ui.horizontal(|ui| {
-            ui.checkbox(&mut app.sphere_auto_rotate, "🔁 Rotate");
+            ui.checkbox(&mut app.sphere_auto_rotate, "Auto Rotate");
             if ui
-                .button("🔄 Reset View")
+                .icon_button(Icon::Reset, "Reset View")
                 .on_hover_text("Reset 3D camera orientation")
                 .clicked()
             {
@@ -362,7 +352,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                 app.sphere_rotation_y = 0.0;
                 app.sphere_zoom = 2.5;
             }
-            ui.selectable_label(app.show_hover_card, "💬")
+            ui.selectable_label(app.show_hover_card, "Hover Card")
                 .on_hover_text(if app.show_hover_card {
                     "Hide hover card"
                 } else {
@@ -376,7 +366,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
 fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     // 1. Colorbar Title / Label Controls & Reset
-    ui.label(egui::RichText::new("🏷️ Colorbar Label").strong());
+    ui.label(egui::RichText::new("Colorbar Label").strong());
     let default_label = app.default_colorbar_label();
     let mut label_buf = app.colorbar_label();
     let has_custom_label = app.custom_colorbar_label.is_some();
@@ -395,10 +385,11 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
 
-        if ui
-            .add_enabled(has_custom_label, egui::Button::new("↺"))
-            .on_hover_text("Reset colorbar label to default")
-            .clicked()
+        if has_custom_label
+            && ui
+                .icon_button(Icon::Reset, "")
+                .on_hover_text("Reset colorbar label to default")
+                .clicked()
         {
             app.reset_colorbar_label();
         }
@@ -412,7 +403,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Color Range").strong());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.toggle_value(&mut app.is_categorical, "🎨 Categorical")
+            ui.toggle_value(&mut app.is_categorical, "Categorical")
                 .on_hover_text("Discrete colorbar (auto-detects unique values or 10 equal bins).");
         });
     });
@@ -452,13 +443,13 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
             app.lock_color_bounds = true;
         }
 
-        let lock_label = if app.lock_color_bounds {
-            "🔒"
+        let lock_icon = if app.lock_color_bounds {
+            Icon::Lock
         } else {
-            "🔓"
+            Icon::Unlock
         };
         if ui
-            .selectable_label(app.lock_color_bounds, lock_label)
+            .icon_button(lock_icon, "")
             .on_hover_text("Lock min/max so color mapping stays fixed across timesteps.")
             .clicked()
         {
@@ -466,7 +457,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
 
         if ui
-            .button("↺")
+            .icon_button(Icon::Reset, "")
             .on_hover_text("Reset bounds to current slice/dataset min and max defaults")
             .clicked()
         {
@@ -477,7 +468,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     // Quick Reset All Colorbar Defaults if either label or bounds are customized
     if (has_custom_label || app.lock_color_bounds)
         && ui
-            .button("↺ Reset All Colorbar Defaults")
+            .icon_button(Icon::Reset, "Reset All Colorbar Defaults")
             .on_hover_text("Reset both colorbar label and range to default values")
             .clicked()
     {
@@ -557,7 +548,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("📈 Scale").strong());
+        ui.label(egui::RichText::new("Scale").strong());
         egui::ComboBox::from_id_salt("settings_color_scale_dropdown")
             .selected_text(match app.active_scale_type {
                 1 => "Logarithmic",
@@ -573,7 +564,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
                         .on_hover_text(if is_valid_log {
                             "Log scale (non-negative data)"
                         } else {
-                            "Disabled: requires min ≥ 0. Use Symlog for negative data."
+                            "Disabled: requires min >= 0. Use Symlog for negative data."
                         });
                 });
                 ui.selectable_value(&mut app.active_scale_type, 2, "Symlog");
@@ -612,7 +603,7 @@ fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         let checkbox = egui::Checkbox::new(
             &mut app.enable_pyramid_resampling,
-            egui::RichText::new("🔬 2D Aggregation").strong(),
+            egui::RichText::new("2D Aggregation").strong(),
         );
         let resp = ui.add_enabled(!is_oversized, checkbox);
         if is_oversized {

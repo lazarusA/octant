@@ -1,30 +1,40 @@
 use crate::app::OctantApp;
+use crate::ui::icons::{Icon, UiIconExt};
 
 pub fn show_animation_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         // Play / Pause Button
-        let play_text = if app.is_playing {
-            "⏸ Pause"
+        let (play_icon, play_text) = if app.is_playing {
+            (Icon::Pause, "Pause")
         } else {
-            "▶ Play"
+            (Icon::Play, "Play")
         };
-        if ui.button(egui::RichText::new(play_text).strong()).clicked() {
+        if ui.icon_button(play_icon, play_text).clicked() {
             app.is_playing = !app.is_playing;
             app.last_step_time = std::time::Instant::now();
         }
 
         // Step Prev
-        if ui.button("◀").on_hover_text("Previous Step").clicked() {
+        if ui
+            .icon_button(Icon::StepBackward, "")
+            .on_hover_text("Previous Step")
+            .clicked()
+        {
             app.step_prev();
         }
 
         // Step Next
-        if ui.button("▶").on_hover_text("Next Step").clicked() {
+        if ui
+            .icon_button(Icon::StepForward, "")
+            .on_hover_text("Next Step")
+            .clicked()
+        {
             app.step_next();
         }
 
         // Loop Toggle Checkbox
-        ui.checkbox(&mut app.loop_playback, "🔄");
+        ui.icon(Icon::Loop, 13.0);
+        ui.checkbox(&mut app.loop_playback, "");
 
         // Step Timeline Slider
         let max_steps = app.animated_dim_extent();

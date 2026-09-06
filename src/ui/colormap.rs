@@ -1,14 +1,18 @@
 use crate::app::OctantApp;
+use crate::ui::icons::{Icon, UiIconExt};
 
 pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.menu_button("🎨 Colormap", |ui| {
+    ui.menu_button("Colormap", |ui| {
         ui.set_min_width(170.0);
 
-        ui.label(
-            egui::RichText::new("Select Colormap Palette")
-                .small()
-                .weak(),
-        );
+        ui.horizontal(|ui| {
+            ui.icon(Icon::Colormap, 14.0);
+            ui.label(
+                egui::RichText::new("Select Colormap Palette")
+                    .small()
+                    .weak(),
+            );
+        });
         ui.separator();
 
         let colormaps = [

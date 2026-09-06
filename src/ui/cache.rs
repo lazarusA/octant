@@ -1,9 +1,15 @@
-use crate::app::OctantApp;
+use crate::{
+    app::OctantApp,
+    ui::icons::{Icon, UiIconExt},
+};
 
 pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.menu_button("🧠 Cache", |ui| {
+    ui.icon_menu_button(Icon::Cache, "Cache", |ui| {
         ui.set_min_width(360.0);
-        ui.label(egui::RichText::new("Unified Multi-Variable Memory Cache").strong());
+        ui.horizontal(|ui| {
+            ui.icon(Icon::Cache, 14.0);
+            ui.label(egui::RichText::new("Unified Multi-Variable Memory Cache").strong());
+        });
         ui.separator();
 
         let block_bytes = app.block_cache.current_bytes();
@@ -36,15 +42,17 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .small(),
         );
         ui.horizontal(|ui| {
+            ui.icon(Icon::Bullet, 8.0);
             ui.small(format!(
-                "• Resident Hyperslabs: {:.2} MB ({} blocks)",
+                "Resident Hyperslabs: {:.2} MB ({} blocks)",
                 block_mb,
                 app.block_cache.cached_count()
             ));
         });
         if pyramid_bytes > 0 {
             ui.horizontal(|ui| {
-                ui.small(format!("• Multi-Res Pyramid: {:.2} MB", pyramid_mb));
+                ui.icon(Icon::Bullet, 8.0);
+                ui.small(format!("Multi-Res Pyramid: {:.2} MB", pyramid_mb));
             });
         }
 
@@ -58,9 +66,15 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         let pending = app.block_prefetcher.pending_count();
         if pending > 0 {
-            ui.small(format!("🟢 Background Prefetching: {} in-flight", pending));
+            ui.horizontal(|ui| {
+                ui.icon_colored(Icon::Bolt, 11.0, egui::Color32::from_rgb(100, 220, 100));
+                ui.small(format!("Background Prefetching: {} in-flight", pending));
+            });
         } else {
-            ui.small("⚪ Buffer Warm / All Blocks Cached");
+            ui.horizontal(|ui| {
+                ui.icon_colored(Icon::Check, 11.0, egui::Color32::from_rgb(150, 150, 150));
+                ui.small("Buffer Warm / All Blocks Cached");
+            });
         }
 
         ui.separator();
@@ -90,7 +104,7 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                                 );
                                 ui.small(format!("({:.1} MB, {} blks)", mb, s.block_count));
                                 if ui
-                                    .small_button("🗑")
+                                    .icon_button(Icon::Trash, "")
                                     .on_hover_text("Clear cache for this variable")
                                     .clicked()
                                 {
@@ -132,7 +146,10 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
 
         ui.add_space(4.0);
-        if ui.button("🗑 Flush & Clear All Caches").clicked() {
+        if ui
+            .icon_button(Icon::Trash, "Flush & Clear All Caches")
+            .clicked()
+        {
             app.block_cache.clear();
             app.active_pyramid = None;
             ui.close();

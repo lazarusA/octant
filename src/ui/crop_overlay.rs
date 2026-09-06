@@ -1,4 +1,7 @@
-use crate::export::{AspectPreset, RoiCropBox};
+use crate::{
+    export::{AspectPreset, RoiCropBox},
+    ui::icons::{Icon, UiIconExt},
+};
 
 /// Actions dispatched from the interactive Crop Toolbar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -286,12 +289,13 @@ pub fn show_crop_overlay(
                 .corner_radius(6.0)
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("✂️ ROI:").small().strong());
+                        ui.icon(Icon::Scissors, 12.0);
+                        ui.label(egui::RichText::new("ROI:").small().strong());
 
                         let w_px = (box_rect.width()).round() as u32;
                         let h_px = (box_rect.height()).round() as u32;
                         ui.label(
-                            egui::RichText::new(format!("{}×{} px", w_px, h_px))
+                            egui::RichText::new(format!("{}x{} px", w_px, h_px))
                                 .small()
                                 .color(accent_color),
                         );
@@ -317,7 +321,7 @@ pub fn show_crop_overlay(
                         ui.separator();
 
                         if ui
-                            .button(egui::RichText::new("💾 Save").strong())
+                            .icon_button(Icon::Save, "Save")
                             .on_hover_text("Save cropped ROI figure (Cmd+S)")
                             .clicked()
                         {
@@ -325,7 +329,7 @@ pub fn show_crop_overlay(
                         }
 
                         if ui
-                            .button("⟲ Reset")
+                            .icon_button(Icon::Reset, "Reset")
                             .on_hover_text("Fit crop box to full canvas")
                             .clicked()
                         {
@@ -334,7 +338,7 @@ pub fn show_crop_overlay(
                         }
 
                         if ui
-                            .button("✓ Done")
+                            .icon_button(Icon::Check, "Done")
                             .on_hover_text("Close crop overlay")
                             .clicked()
                         {

@@ -1,5 +1,6 @@
 use crate::app::OctantApp;
 use crate::export::{ExportFormat, ExportTarget};
+use crate::ui::icons::{Icon, UiIconExt};
 use std::path::PathBuf;
 
 /// Shows the floating modal dialog for saving and exporting the canvas/figure.
@@ -11,7 +12,7 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
     let mut is_open = app.show_export_modal;
     let mut should_close = false;
 
-    egui::Window::new("📸 Save & Export Figure")
+    egui::Window::new("Save & Export Figure")
         .open(&mut is_open)
         .resizable(false)
         .collapsible(false)
@@ -49,12 +50,12 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
                 ui.radio_value(
                     &mut app.export_settings.target,
                     ExportTarget::FullCanvas,
-                    "🖼️ Full Canvas (with Overlays)",
+                    "Full Canvas (with Overlays)",
                 );
                 ui.radio_value(
                     &mut app.export_settings.target,
                     ExportTarget::RoiCrop,
-                    "✂️ Framed ROI",
+                    "Framed ROI",
                 );
             });
 
@@ -103,7 +104,7 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
             // 4. Action Buttons
             ui.horizontal(|ui| {
                 if ui
-                    .button(egui::RichText::new("💾 Save Figure").strong())
+                    .icon_button(Icon::Save, "Save Figure")
                     .on_hover_text("Save figure to disk (Cmd+S)")
                     .clicked()
                 {
@@ -116,7 +117,7 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
                 }
 
                 if ui
-                    .button("📋 Copy to Clipboard")
+                    .icon_button(Icon::Clipboard, "Copy to Clipboard")
                     .on_hover_text("Copy image directly to system clipboard")
                     .clicked()
                 {
@@ -190,28 +191,35 @@ pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: 
                     .corner_radius(6.0)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
+                            ui.icon(Icon::Snapshot, 14.0);
                             ui.label(
-                                egui::RichText::new("📸 Saved")
+                                egui::RichText::new("Saved")
                                     .strong()
                                     .color(text_title_color),
                             );
                             ui.label(egui::RichText::new(&filename).small().color(border_color));
 
                             #[cfg(target_os = "macos")]
-                            let reveal_label = "📂 Reveal in Finder";
+                            let reveal_label = "Reveal in Finder";
                             #[cfg(not(target_os = "macos"))]
-                            let reveal_label = "📂 Open Folder";
+                            let reveal_label = "Open Folder";
 
                             if ui
-                                .button(egui::RichText::new(reveal_label).small().strong())
-                                .on_hover_text(format!("Show in folder:\n{}", file_path.display()))
+                                .icon_button(Icon::FolderOpen, reveal_label)
+                                .on_hover_ui(|ui| {
+                                    ui.label(format!("Show in folder:\n{}", file_path.display()));
+                                })
                                 .clicked()
                             {
                                 reveal = true;
                                 dismiss = true;
                             }
 
-                            if ui.small_button("x").on_hover_text("Dismiss").clicked() {
+                            if ui
+                                .icon_button(Icon::Cross, "")
+                                .on_hover_text("Dismiss")
+                                .clicked()
+                            {
                                 dismiss = true;
                             }
                         });

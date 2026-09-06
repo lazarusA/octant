@@ -1,4 +1,7 @@
-use crate::app::OctantApp;
+use crate::{
+    app::OctantApp,
+    ui::icons::{Icon, UiIconExt},
+};
 
 pub fn show_status_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
     let pending_count = app.block_prefetcher.pending_count();
@@ -15,14 +18,8 @@ pub fn show_status_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         ui.horizontal(|ui| {
             // Abort button to interrupt ongoing calls
-            let abort_btn = egui::Button::new(
-                egui::RichText::new("⏹ Abort")
-                    .small()
-                    .strong()
-                    .color(egui::Color32::from_rgb(255, 110, 110)),
-            );
             if ui
-                .add(abort_btn)
+                .icon_button(Icon::Stop, "Abort")
                 .on_hover_text("Interrupt and abort ongoing data transfer")
                 .clicked()
             {

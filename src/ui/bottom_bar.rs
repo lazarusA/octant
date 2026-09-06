@@ -1,4 +1,5 @@
 use crate::app::OctantApp;
+use crate::ui::icons::{Icon, UiIconExt};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum BottomBarItem {
@@ -52,7 +53,11 @@ pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                 show_bottom_bar_content(app, ui);
             } else {
                 ui.vertical_centered(|ui| {
-                    ui.small("▲ Playback (drag to expand)");
+                    ui.horizontal(|ui| {
+                        ui.add_space((ui.available_width() - 180.0).max(0.0) * 0.5);
+                        ui.icon(Icon::Play, 10.0);
+                        ui.small("Playback (drag to expand)");
+                    });
                 });
             }
         },
@@ -181,13 +186,12 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         // 1. Play / Pause Button for Timestep Animation across all plot types
         let play_resp = ui.scope(|ui| {
-            let play_text = if app.is_playing {
-                "⏸ Pause"
+            let (play_icon, play_text) = if app.is_playing {
+                (Icon::Pause, "Pause")
             } else {
-                "▶ Play"
+                (Icon::Play, "Play")
             };
-            let play_button = egui::Button::new(egui::RichText::new(play_text).strong());
-            if ui.add(play_button).clicked() {
+            if ui.icon_button(play_icon, play_text).clicked() {
                 app.is_playing = !app.is_playing;
                 app.last_step_time = std::time::Instant::now();
             }
@@ -200,10 +204,18 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         // 2. Prev / Next Step Buttons
         if show_prev_next {
             let prev_next_resp = ui.scope(|ui| {
-                if ui.button("◀").on_hover_text("Previous Step").clicked() {
+                if ui
+                    .icon_button(Icon::StepBackward, "")
+                    .on_hover_text("Previous Step")
+                    .clicked()
+                {
                     app.step_prev();
                 }
-                if ui.button("▶").on_hover_text("Next Step").clicked() {
+                if ui
+                    .icon_button(Icon::StepForward, "")
+                    .on_hover_text("Next Step")
+                    .clicked()
+                {
                     app.step_next();
                 }
             });
@@ -216,16 +228,19 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         // 3. Loop Toggle
         if show_loop {
             let loop_resp = ui.scope(|ui| {
-                ui.checkbox(&mut app.loop_playback, "🔄 Loop");
+                ui.horizontal(|ui| {
+                    ui.icon(Icon::Loop, 13.0);
+                    ui.checkbox(&mut app.loop_playback, "Loop");
+                });
             });
             widths.insert(BottomBarItem::Loop, loop_resp.response.rect.width());
         }
 
         // 4. Status Indicator
-        let status_text = if app.is_playing {
-            "▶ Playing"
+        let (status_icon, status_text) = if app.is_playing {
+            (Icon::Play, "Playing")
         } else {
-            "⏸ Paused"
+            (Icon::Pause, "Paused")
         };
         if show_status {
             let status_resp = ui.scope(|ui| {
@@ -235,7 +250,10 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 } else {
                     egui::Color32::LIGHT_GRAY
                 };
-                ui.label(egui::RichText::new(status_text).small().color(status_color));
+                ui.horizontal(|ui| {
+                    ui.icon_colored(status_icon, 10.0, status_color);
+                    ui.label(egui::RichText::new(status_text).small().color(status_color));
+                });
                 ui.separator();
             });
             widths.insert(BottomBarItem::Status, status_resp.response.rect.width());
@@ -306,15 +324,19 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         if show_date_info {
             let date_resp = ui.scope(|ui| {
-                ui.label(
-                    egui::RichText::new(format!(
-                        "📅 {} | Current: {}",
-                        start_date_str, formatted_axis
-                    ))
-                    .small()
-                    .monospace()
-                    .strong(),
-                )
+                ui.horizontal(|ui| {
+                    ui.icon(Icon::Hourglass, 11.0);
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "{} | Current: {}",
+                            start_date_str, formatted_axis
+                        ))
+                        .small()
+                        .monospace()
+                        .strong(),
+                    );
+                })
+                .response
                 .on_hover_text(format!(
                     "Start: {} | End: {} | {}",
                     start_date_str, end_date_str, step_size_str
@@ -362,7 +384,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         if show_date_badges {
             let step_size_resp = ui.scope(|ui| {
-                ui.small(format!("⏱ {}", step_size_str));
+                ui.small(&step_size_str);
             });
             widths.insert(
                 BottomBarItem::StepSize,
@@ -415,9 +437,8 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         // 8. Save / Export Figure Button
         if show_export {
             let export_resp = ui.scope(|ui| {
-                let save_btn = egui::Button::new("📸 Save");
                 if ui
-                    .add(save_btn)
+                    .icon_button(Icon::Snapshot, "Save")
                     .on_hover_text(
                         "Save / Export Figure (Cmd+S for Quick Save, Cmd+Shift+S for Settings)",
                     )
@@ -429,10 +450,10 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             widths.insert(BottomBarItem::Export, export_resp.response.rect.width());
         }
 
-        // 9. Overflow Button "..."
+        // 9. Overflow Button
         if show_overflow {
             let overflow_resp = ui.scope(|ui| {
-                ui.menu_button(egui::RichText::new("…").strong(), |ui| {
+                ui.icon_menu_button(Icon::Overflow, "", |ui| {
                     ui.set_min_width(220.0);
                     ui.label(
                         egui::RichText::new("Playback Options & Info")
@@ -443,7 +464,10 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
                     if !show_export {
                         ui.horizontal(|ui| {
-                            if ui.button("📸 Save Figure (Cmd+Shift+S)").clicked() {
+                            if ui
+                                .icon_button(Icon::Snapshot, "Save Figure (Cmd+Shift+S)")
+                                .clicked()
+                            {
                                 app.show_export_modal = true;
                                 ui.close();
                             }
@@ -451,16 +475,22 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                         ui.separator();
                     }
 
-                    if ui
-                        .checkbox(&mut app.show_crop_overlay, "✂️ Crop Guiding Lines (C)")
-                        .clicked()
-                    {
-                        ui.close();
-                    }
+                    ui.horizontal(|ui| {
+                        ui.icon(Icon::Scissors, 12.0);
+                        if ui
+                            .checkbox(&mut app.show_crop_overlay, "Crop Guiding Lines (C)")
+                            .clicked()
+                        {
+                            ui.close();
+                        }
+                    });
                     ui.separator();
 
                     if !show_loop {
-                        ui.checkbox(&mut app.loop_playback, "🔄 Loop Playback");
+                        ui.horizontal(|ui| {
+                            ui.icon(Icon::Loop, 12.0);
+                            ui.checkbox(&mut app.loop_playback, "Loop Playback");
+                        });
                         ui.separator();
                     }
 
@@ -472,10 +502,10 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
                     if !show_prev_next {
                         ui.horizontal(|ui| {
-                            if ui.button("◀ Prev Step").clicked() {
+                            if ui.icon_button(Icon::StepBackward, "Prev Step").clicked() {
                                 app.step_prev();
                             }
-                            if ui.button("Next Step ▶").clicked() {
+                            if ui.icon_button(Icon::StepForward, "Next Step").clicked() {
                                 app.step_next();
                             }
                         });
@@ -484,10 +514,10 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
                     // Jump to Start / End
                     ui.horizontal(|ui| {
-                        if ui.button("⏮ First Step").clicked() {
+                        if ui.icon_button(Icon::SeekStart, "First Step").clicked() {
                             app.request_step_or_load(0);
                         }
-                        if ui.button("⏭ Last Step").clicked() {
+                        if ui.icon_button(Icon::SeekEnd, "Last Step").clicked() {
                             app.request_step_or_load(slider_max);
                         }
                     });
@@ -496,15 +526,13 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
                     // Detailed Timeline Details
                     ui.label(egui::RichText::new("Timeline Details").strong());
-                    ui.label(format!("• Dimension: {}", active_anim_dim));
-                    ui.label(format!("• Step: {} / {}", app.current_timestep, slider_max));
-                    ui.label(format!("• Current: {}", formatted_axis));
-                    ui.label(format!("• Range: {} → {}", start_date_str, end_date_str));
-                    ui.label(format!("• Step Size: {}", step_size_str));
-                    ui.label(format!("• Status: {}", status_text));
-                })
-                .response
-                .on_hover_text("More playback options and timeline details");
+                    ui.label(format!("Dimension: {}", active_anim_dim));
+                    ui.label(format!("Step: {} / {}", app.current_timestep, slider_max));
+                    ui.label(format!("Current: {}", formatted_axis));
+                    ui.label(format!("Range: {} -> {}", start_date_str, end_date_str));
+                    ui.label(format!("Step Size: {}", step_size_str));
+                    ui.label(format!("Status: {}", status_text));
+                });
             });
             widths.insert(
                 BottomBarItem::OverflowBtn,

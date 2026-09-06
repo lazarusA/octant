@@ -1,5 +1,6 @@
 use super::{cache, colormap, plot_type, status, store};
 use crate::app::OctantApp;
+use crate::ui::icons::{Icon, UiIconExt};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum TopBarItem {
@@ -148,10 +149,10 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                     widths.insert(item, resp.response.rect.width());
                 }
 
-                // 3. Overflow Menu Button "..."
+                // 3. Overflow Menu Button
                 if show_overflow {
                     let overflow_resp = ui.scope(|ui| {
-                        ui.menu_button(egui::RichText::new("…").strong(), |ui| {
+                        ui.icon_menu_button(Icon::Overflow, "", |ui| {
                             ui.set_min_width(180.0);
                             ui.label(egui::RichText::new("More Options").small().weak());
                             ui.separator();
@@ -169,9 +170,7 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                                     render_item(TopBarItem::Theme, true, app, ui);
                                 }
                             }
-                        })
-                        .response
-                        .on_hover_text("More options");
+                        });
                     });
                     widths.insert(TopBarItem::OverflowBtn, overflow_resp.response.rect.width());
                 }
@@ -212,10 +211,7 @@ fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut eg
         TopBarItem::Brand | TopBarItem::OverflowBtn | TopBarItem::Status => {}
         TopBarItem::Store => {
             if in_menu {
-                if ui
-                    .button(egui::RichText::new("🌐 Store").strong())
-                    .clicked()
-                {
+                if ui.icon_button(Icon::Globe, "Store").clicked() {
                     app.show_left_panel = !app.show_left_panel;
                     ui.close();
                 }
@@ -224,7 +220,7 @@ fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut eg
             }
         }
         TopBarItem::Variables => {
-            let resp = ui.button(egui::RichText::new("📊 Variables").strong());
+            let resp = ui.icon_button(Icon::Variables, "Variables");
             if resp.clicked() {
                 app.show_variables_overlay = !app.show_variables_overlay;
                 if in_menu {
@@ -234,7 +230,7 @@ fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut eg
         }
         TopBarItem::Dimensions => {
             let resp = ui
-                .button(egui::RichText::new("🎛️ Dimensions").strong())
+                .icon_button(Icon::Dimensions, "Dimensions")
                 .on_hover_text("Toggle Variable Controls Panel");
             if resp.clicked() {
                 app.show_variable_controls = !app.show_variable_controls;
@@ -250,7 +246,7 @@ fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut eg
             colormap::show_colormap_menu(app, ui);
         }
         TopBarItem::Settings => {
-            let resp = ui.button(egui::RichText::new("⚙️ Settings").strong());
+            let resp = ui.icon_button(Icon::Settings, "Settings");
             if resp.clicked() {
                 app.show_settings_panel = !app.show_settings_panel;
                 if in_menu {
@@ -259,18 +255,29 @@ fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut eg
             }
         }
         TopBarItem::Cache => {
-            cache::show_cache_menu(app, ui);
+            if in_menu {
+                if ui.icon_button(Icon::Cache, "Cache").clicked() {
+                    cache::show_cache_menu(app, ui);
+                    ui.close();
+                }
+            } else {
+                cache::show_cache_menu(app, ui);
+            }
         }
         TopBarItem::Theme => {
             let is_dark = app.theme_preference == egui::ThemePreference::Dark;
-            let theme_label = if is_dark { "☀ Light" } else { "🌙 Dark" };
+            let (theme_icon, theme_label) = if is_dark {
+                (Icon::Sun, "Light")
+            } else {
+                (Icon::Moon, "Dark")
+            };
             let theme_hover = if is_dark {
                 "Switch to Light mode"
             } else {
                 "Switch to Dark mode"
             };
             if ui
-                .button(egui::RichText::new(theme_label))
+                .icon_button(theme_icon, theme_label)
                 .on_hover_text(theme_hover)
                 .clicked()
             {

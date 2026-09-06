@@ -1,3 +1,4 @@
+use crate::ui::icons::{Icon, UiIconExt};
 use egui::{Color32, Pos2, Rect, Shape, Stroke, Vec2, ecolor::Hsva};
 use std::sync::Arc;
 
@@ -325,7 +326,7 @@ fn show_clean_color_picker_popup(
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
-                            .small_button("📋 Copy")
+                            .icon_button(Icon::Clipboard, "Copy")
                             .on_hover_text("Copy color values to clipboard")
                             .clicked()
                         {
