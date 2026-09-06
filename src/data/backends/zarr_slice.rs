@@ -1,3 +1,4 @@
+use crate::data::DataCalibration;
 use std::error::Error;
 use zarrs::array::chunk_cache::{ChunkCache, ChunkCacheDecodedLruSizeLimit};
 use zarrs::array::data_type::*;
@@ -32,37 +33,108 @@ impl SubsetRetriever for ChunkCacheDecodedLruSizeLimit {
 fn decode_with<R: SubsetRetriever>(
     retriever: &R,
     dt: &DataType,
+    calibration: &DataCalibration,
     subset: &ArraySubset,
 ) -> Result<Vec<f32>, Box<dyn Error + Send + Sync>> {
+    let has_tx = calibration.has_transformation();
+
     if dt.is::<Float32DataType>() {
-        retriever.retrieve_subset(subset)
+        let raw_vals: Vec<f32> = retriever.retrieve_subset(subset)?;
+        if !has_tx {
+            Ok(raw_vals)
+        } else {
+            Ok(raw_vals
+                .into_iter()
+                .map(|v| calibration.transform(v as f64))
+                .collect())
+        }
     } else if dt.is::<Float64DataType>() {
         let vals: Vec<f64> = retriever.retrieve_subset(subset)?;
-        Ok(vals.into_iter().map(|v| v as f32).collect())
+        if !has_tx {
+            Ok(vals.into_iter().map(|v| v as f32).collect())
+        } else {
+            Ok(vals.into_iter().map(|v| calibration.transform(v)).collect())
+        }
     } else if dt.is::<Int32DataType>() {
         let vals: Vec<i32> = retriever.retrieve_subset(subset)?;
-        Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt.is::<Int64DataType>() {
-        let vals: Vec<i64> = retriever.retrieve_subset(subset)?;
-        Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt.is::<UInt32DataType>() {
-        let vals: Vec<u32> = retriever.retrieve_subset(subset)?;
-        Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt.is::<UInt64DataType>() {
-        let vals: Vec<u64> = retriever.retrieve_subset(subset)?;
-        Ok(vals.into_iter().map(|v| v as f32).collect())
+        if !has_tx {
+            Ok(vals.into_iter().map(|v| v as f32).collect())
+        } else {
+            Ok(vals
+                .into_iter()
+                .map(|v| calibration.transform(v as f64))
+                .collect())
+        }
     } else if dt.is::<Int16DataType>() {
         let vals: Vec<i16> = retriever.retrieve_subset(subset)?;
-        Ok(vals.into_iter().map(|v| v as f32).collect())
-    } else if dt.is::<UInt16DataType>() {
-        let vals: Vec<u16> = retriever.retrieve_subset(subset)?;
-        Ok(vals.into_iter().map(|v| v as f32).collect())
+        if !has_tx {
+            Ok(vals.into_iter().map(|v| v as f32).collect())
+        } else {
+            Ok(vals
+                .into_iter()
+                .map(|v| calibration.transform(v as f64))
+                .collect())
+        }
     } else if dt.is::<Int8DataType>() {
         let vals: Vec<i8> = retriever.retrieve_subset(subset)?;
-        Ok(vals.into_iter().map(|v| v as f32).collect())
+        if !has_tx {
+            Ok(vals.into_iter().map(|v| v as f32).collect())
+        } else {
+            Ok(vals
+                .into_iter()
+                .map(|v| calibration.transform(v as f64))
+                .collect())
+        }
+    } else if dt.is::<UInt32DataType>() {
+        let vals: Vec<u32> = retriever.retrieve_subset(subset)?;
+        if !has_tx {
+            Ok(vals.into_iter().map(|v| v as f32).collect())
+        } else {
+            Ok(vals
+                .into_iter()
+                .map(|v| calibration.transform(v as f64))
+                .collect())
+        }
+    } else if dt.is::<UInt16DataType>() {
+        let vals: Vec<u16> = retriever.retrieve_subset(subset)?;
+        if !has_tx {
+            Ok(vals.into_iter().map(|v| v as f32).collect())
+        } else {
+            Ok(vals
+                .into_iter()
+                .map(|v| calibration.transform(v as f64))
+                .collect())
+        }
     } else if dt.is::<UInt8DataType>() {
         let vals: Vec<u8> = retriever.retrieve_subset(subset)?;
-        Ok(vals.into_iter().map(|v| v as f32).collect())
+        if !has_tx {
+            Ok(vals.into_iter().map(|v| v as f32).collect())
+        } else {
+            Ok(vals
+                .into_iter()
+                .map(|v| calibration.transform(v as f64))
+                .collect())
+        }
+    } else if dt.is::<Int64DataType>() {
+        let vals: Vec<i64> = retriever.retrieve_subset(subset)?;
+        if !has_tx {
+            Ok(vals.into_iter().map(|v| v as f32).collect())
+        } else {
+            Ok(vals
+                .into_iter()
+                .map(|v| calibration.transform(v as f64))
+                .collect())
+        }
+    } else if dt.is::<UInt64DataType>() {
+        let vals: Vec<u64> = retriever.retrieve_subset(subset)?;
+        if !has_tx {
+            Ok(vals.into_iter().map(|v| v as f32).collect())
+        } else {
+            Ok(vals
+                .into_iter()
+                .map(|v| calibration.transform(v as f64))
+                .collect())
+        }
     } else if dt.is::<BoolDataType>() {
         let vals: Vec<u8> = retriever.retrieve_subset(subset)?;
         Ok(vals
@@ -74,15 +146,16 @@ fn decode_with<R: SubsetRetriever>(
     }
 }
 
-/// Dtype-conversion helper for reading array subsets as f32 through an optional chunk cache.
+/// Dtype-conversion and calibration helper for reading array subsets as f32 through an optional chunk cache.
 pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + 'static>(
     array: &Array<TStorage>,
     cache: Option<&ChunkCacheDecodedLruSizeLimit>,
     subset: &ArraySubset,
 ) -> Result<Vec<f32>, Box<dyn Error + Send + Sync>> {
     let dt = array.data_type();
+    let calibration = DataCalibration::from_json_map(array.attributes());
     match cache {
-        Some(c) => decode_with(c, dt, subset),
-        None => decode_with(array, dt, subset),
+        Some(c) => decode_with(c, dt, &calibration, subset),
+        None => decode_with(array, dt, &calibration, subset),
     }
 }

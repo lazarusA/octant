@@ -161,11 +161,8 @@ mod desktop {
         }
     }
 
-    /// Read raw numeric values from a NetCDF variable, convert to `f32`, and apply scale/offset/fill masking.
-    fn read_variable_hyperslab_as_f32(
-        var: &netcdf::Variable<'_>,
-        extents: &Extents,
-    ) -> Result<Vec<f32>, BlockStoreError> {
+    /// Extracts calibration rules (`scale_factor`, `add_offset`, `_FillValue`, `missing_value`, `valid_range`) from a NetCDF variable.
+    fn extract_variable_calibration(var: &netcdf::Variable<'_>) -> crate::data::DataCalibration {
         let scale_factor = var
             .attribute_value("scale_factor")
             .and_then(|r| r.ok())
@@ -179,30 +176,45 @@ mod desktop {
             .or_else(|| var.attribute_value("missing_value"))
             .and_then(|r| r.ok())
             .and_then(|a| attribute_value_to_f64(&a));
+        let valid_min = var
+            .attribute_value("valid_min")
+            .and_then(|r| r.ok())
+            .and_then(|a| attribute_value_to_f64(&a));
+        let valid_max = var
+            .attribute_value("valid_max")
+            .and_then(|r| r.ok())
+            .and_then(|a| attribute_value_to_f64(&a));
 
-        let has_calibration = scale_factor.is_some() || add_offset.is_some();
-        let scale = scale_factor.unwrap_or(1.0);
-        let offset = add_offset.unwrap_or(0.0);
+        crate::data::DataCalibration {
+            scale_factor,
+            add_offset,
+            fill_value,
+            valid_min,
+            valid_max,
+        }
+    }
 
-        let transform_f64 = |val: f64| -> f32 {
-            if let Some(fv) = fill_value
-                && ((val - fv).abs() < 1e-5 || val.is_nan())
-            {
-                return f32::NAN;
-            }
-            if has_calibration {
-                (val * scale + offset) as f32
-            } else {
-                val as f32
-            }
-        };
+    /// Read raw numeric values from a NetCDF variable, convert to `f32`, and apply scale/offset/fill masking.
+    fn read_variable_hyperslab_as_f32(
+        var: &netcdf::Variable<'_>,
+        extents: &Extents,
+    ) -> Result<Vec<f32>, BlockStoreError> {
+        let calibration = extract_variable_calibration(var);
+        let has_tx = calibration.has_transformation();
 
         macro_rules! read_and_transform {
-            ($var:expr, $extents:expr, $t:ty, $transform:expr) => {{
+            ($var:expr, $extents:expr, $t:ty) => {{
                 let raw_vals: Vec<$t> = $var
                     .get_values::<$t, _>($extents)
                     .map_err(|e| format!("Failed reading {} hyperslab: {e}", stringify!($t)))?;
-                Ok(raw_vals.into_iter().map(|v| $transform(v as f64)).collect())
+                if !has_tx {
+                    Ok(raw_vals.into_iter().map(|v| v as f32).collect())
+                } else {
+                    Ok(raw_vals
+                        .into_iter()
+                        .map(|v| calibration.transform(v as f64))
+                        .collect())
+                }
             }};
         }
 
@@ -212,43 +224,45 @@ mod desktop {
                     .get_values::<f32, _>(extents)
                     .map_err(|e| format!("Failed reading float32 hyperslab: {e}"))?;
 
-                if !has_calibration && fill_value.is_none() {
+                if !has_tx {
                     Ok(raw_vals)
                 } else {
                     Ok(raw_vals
                         .into_iter()
-                        .map(|v| transform_f64(v as f64))
+                        .map(|v| calibration.transform(v as f64))
                         .collect())
                 }
             }
             NcVariableType::Float(FloatType::F64) => {
-                read_and_transform!(var, extents, f64, transform_f64)
+                read_and_transform!(var, extents, f64)
             }
             NcVariableType::Int(IntType::I32) => {
-                read_and_transform!(var, extents, i32, transform_f64)
+                read_and_transform!(var, extents, i32)
             }
             NcVariableType::Int(IntType::I16) => {
-                read_and_transform!(var, extents, i16, transform_f64)
+                read_and_transform!(var, extents, i16)
             }
             NcVariableType::Int(IntType::I8) => {
-                read_and_transform!(var, extents, i8, transform_f64)
+                read_and_transform!(var, extents, i8)
             }
             NcVariableType::Int(IntType::U32) => {
-                read_and_transform!(var, extents, u32, transform_f64)
+                read_and_transform!(var, extents, u32)
             }
             NcVariableType::Int(IntType::U16) => {
-                read_and_transform!(var, extents, u16, transform_f64)
+                read_and_transform!(var, extents, u16)
             }
             NcVariableType::Int(IntType::U8) | NcVariableType::Char => {
-                read_and_transform!(var, extents, u8, transform_f64)
+                read_and_transform!(var, extents, u8)
             }
             NcVariableType::Int(IntType::I64) => {
-                read_and_transform!(var, extents, i64, transform_f64)
+                read_and_transform!(var, extents, i64)
             }
             NcVariableType::Int(IntType::U64) => {
-                read_and_transform!(var, extents, u64, transform_f64)
+                read_and_transform!(var, extents, u64)
             }
-            other => Err(format!("Unsupported NetCDF variable type: {other:?}").into()),
+            other => {
+                Err(format!("Unsupported NetCDF variable type for plotting: {other:?}").into())
+            }
         }
     }
 

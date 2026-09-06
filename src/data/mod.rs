@@ -4,6 +4,7 @@ pub mod block_loader;
 pub mod block_prefetch;
 pub mod block_request;
 pub mod block_store;
+pub mod calibration;
 pub mod codecs;
 pub mod data_source;
 pub mod dataset;
@@ -19,6 +20,7 @@ pub mod source_factory;
 pub mod store_handle;
 pub mod volume_data;
 
+pub use calibration::DataCalibration;
 pub use metadata::{DatasetMetadata, VariableInfo, VariableTreeGroup};
 
 pub use block_cache::{BlockCache, BlockCacheKey};
