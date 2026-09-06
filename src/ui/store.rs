@@ -140,27 +140,33 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                                     };
 
                                     ui.horizontal(|ui| {
-                                        let label_text = format!("{} {}", icon, d.source.display_name);
-                                        let item_btn = ui.selectable_label(
-                                            is_active,
-                                            egui::RichText::new(label_text).strong(),
+                                        let avail_w = (ui.available_width() - 32.0).max(60.0);
+                                        let approx_chars = ((avail_w - 20.0) / 7.5).floor() as usize;
+                                        let short_name = truncate_display_name(&d.source.display_name, approx_chars.max(10));
+                                        let label_text = format!("{} {}", icon, short_name);
+
+                                        let item_btn = ui.add_sized(
+                                            [avail_w, 20.0],
+                                            egui::Button::new(egui::RichText::new(label_text).strong())
+                                                .selected(is_active),
                                         );
-                                        if item_btn.on_hover_text(&d.source.uri).clicked() {
+                                        if item_btn
+                                            .on_hover_text(format!("{}\nURI: {}", d.source.display_name, d.source.uri))
+                                            .clicked()
+                                        {
                                             to_activate = Some((
                                                 d.source.uri.clone(),
                                                 StoreKind::from_data_source_kind(&d.source.kind),
                                             ));
                                         }
 
-                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                            if ui
-                                                .small_button("✕")
-                                                .on_hover_text("Remove this dataset")
-                                                .clicked()
-                                            {
-                                                to_delete = Some(d.id.clone());
-                                            }
-                                        });
+                                        if ui
+                                            .small_button("🗑")
+                                            .on_hover_text("Remove this dataset")
+                                            .clicked()
+                                        {
+                                            to_delete = Some(d.id.clone());
+                                        }
                                     });
                                 }
                             });
@@ -192,5 +198,15 @@ pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         .clicked()
     {
         app.show_left_panel = !app.show_left_panel;
+    }
+}
+
+fn truncate_display_name(name: &str, max_chars: usize) -> String {
+    if name.chars().count() > max_chars && max_chars > 3 {
+        let mut truncated: String = name.chars().take(max_chars - 3).collect();
+        truncated.push_str("...");
+        truncated
+    } else {
+        name.to_string()
     }
 }
