@@ -52,6 +52,44 @@ fn lon_lat_to_cartesian(radius: f32, lon: f32, lat: f32) -> vec3<f32> {
     return vec3<f32>(x, y, z);
 }
 
+fn get_cell_coord_bounds(cell_idx: u32, len: u32, is_y: bool) -> vec2<f32> {
+    if (len <= 1u) {
+        return vec2<f32>(0.0, 1.0);
+    }
+    let max_idx = len - 1u;
+    let idx = min(cell_idx, max_idx);
+
+    var curr: f32;
+    var prev: f32;
+    var next: f32;
+
+    if (is_y) {
+        curr = coord_y_buffer[idx];
+        prev = coord_y_buffer[max(idx, 1u) - 1u];
+        next = coord_y_buffer[min(idx + 1u, max_idx)];
+    } else {
+        curr = coord_x_buffer[idx];
+        prev = coord_x_buffer[max(idx, 1u) - 1u];
+        next = coord_x_buffer[min(idx + 1u, max_idx)];
+    }
+
+    var c0: f32;
+    var c1: f32;
+
+    if (idx == 0u) {
+        c0 = curr - 0.5 * (next - curr);
+        c1 = 0.5 * (curr + next);
+    } else if (idx == max_idx) {
+        c0 = 0.5 * (prev + curr);
+        c1 = curr + 0.5 * (curr - prev);
+    } else {
+        c0 = 0.5 * (prev + curr);
+        c1 = 0.5 * (curr + next);
+    }
+
+    return vec2<f32>(c0, c1);
+}
+
 fn get_lon_lat(cell_x: u32, cell_y: u32, model_xy: vec2<f32>, grid_w: u32, grid_h: u32) -> vec2<f32> {
     if (uniforms.coord_mode == 0u) {
         // Mode 0: Global Regular [-π..π] and [π/2..-π/2]
@@ -68,25 +106,13 @@ fn get_lon_lat(cell_x: u32, cell_y: u32, model_xy: vec2<f32>, grid_w: u32, grid_
         let lat = mix(uniforms.lat_bounds.y, uniforms.lat_bounds.x, v);
         return vec2<f32>(lon, lat);
     } else {
-        // Mode 2: Irregular 1D Coordinate Buffers
-        let max_cx = max(arrayLength(&coord_x_buffer), 1u) - 1u;
-        let cx0 = coord_x_buffer[min(cell_x, max_cx)];
-        let cx1 = select(
-            cx0 + (cx0 - coord_x_buffer[max(cell_x, 1u) - 1u]),
-            coord_x_buffer[min(cell_x + 1u, max_cx)],
-            cell_x + 1u <= max_cx
-        );
-        let deg_lon = mix(cx0, cx1, model_xy.x);
+        // Mode 2: Irregular 1D Coordinate Buffers with continuous interval boundaries
+        let bounds_x = get_cell_coord_bounds(cell_x, arrayLength(&coord_x_buffer), false);
+        let deg_lon = mix(bounds_x.x, bounds_x.y, model_xy.x);
         let lon = deg_lon * 0.0174532925;
 
-        let max_cy = max(arrayLength(&coord_y_buffer), 1u) - 1u;
-        let cy0 = coord_y_buffer[min(cell_y, max_cy)];
-        let cy1 = select(
-            cy0 + (cy0 - coord_y_buffer[max(cell_y, 1u) - 1u]),
-            coord_y_buffer[min(cell_y + 1u, max_cy)],
-            cell_y + 1u <= max_cy
-        );
-        let deg_lat = mix(cy0, cy1, model_xy.y);
+        let bounds_y = get_cell_coord_bounds(cell_y, arrayLength(&coord_y_buffer), true);
+        let deg_lat = mix(bounds_y.x, bounds_y.y, model_xy.y);
         let lat = deg_lat * 0.0174532925;
 
         return vec2<f32>(lon, lat);

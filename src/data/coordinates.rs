@@ -114,6 +114,297 @@ impl CoordinateGrid {
         }
     }
 
+    /// Maps normalized `[0, 1]` viewport coordinates `(norm_x, norm_y)` to pixel cell indices `(px, py)`.
+    /// Accurately accounts for irregular 1D coordinate spacings via binary search matching GPU shaders.
+    pub fn find_cell_from_norm(
+        &self,
+        norm_x: f32,
+        norm_y: f32,
+        width: usize,
+        height: usize,
+    ) -> (usize, usize) {
+        let w = width.max(1);
+        let h = height.max(1);
+        let nx = norm_x.clamp(0.0, 1.0);
+        let ny = norm_y.clamp(0.0, 1.0);
+
+        match self {
+            Self::Irregular1D {
+                coords_x, coords_y, ..
+            } => {
+                let px = if coords_x.len() >= 2 {
+                    let first_x = coords_x[0];
+                    let last_x = coords_x[coords_x.len() - 1];
+                    let target_x = first_x + nx * (last_x - first_x);
+                    find_coord_cell_1d(coords_x, target_x)
+                } else {
+                    ((nx * w as f32).floor() as usize).min(w.saturating_sub(1))
+                };
+
+                let py = if coords_y.len() >= 2 {
+                    let first_y = coords_y[0];
+                    let last_y = coords_y[coords_y.len() - 1];
+                    let target_y = first_y + ny * (last_y - first_y);
+                    find_coord_cell_1d(coords_y, target_y)
+                } else {
+                    ((ny * h as f32).floor() as usize).min(h.saturating_sub(1))
+                };
+
+                (px.min(w.saturating_sub(1)), py.min(h.saturating_sub(1)))
+            }
+            _ => {
+                let px = ((nx * w as f32).floor() as usize).min(w.saturating_sub(1));
+                let py = ((ny * h as f32).floor() as usize).min(h.saturating_sub(1));
+                (px, py)
+            }
+        }
+    }
+
+    /// Maps geographic spherical coordinates `(lon_rad, lat_rad)` to cell indices `(px, py)`.
+    /// Returns `None` if the ray misses a bounded regional sector.
+    pub fn find_cell_from_lon_lat_rad(
+        &self,
+        lon_rad: f32,
+        lat_rad: f32,
+        width: usize,
+        height: usize,
+    ) -> Option<(usize, usize)> {
+        let w = width.max(1);
+        let h = height.max(1);
+
+        match self {
+            Self::GlobalRegular => {
+                let u = ((lon_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI))
+                    .clamp(0.0, 1.0);
+                let v = (0.5 - (lat_rad / std::f32::consts::PI)).clamp(0.0, 1.0);
+                let px = ((u * w as f32).floor() as usize).min(w.saturating_sub(1));
+                let py = ((v * h as f32).floor() as usize).min(h.saturating_sub(1));
+                Some((px, py))
+            }
+            Self::RegionalRegular { .. } => {
+                let [lon_min, lon_max] = self.lon_bounds_rad();
+                let [lat_min, lat_max] = self.lat_bounds_rad();
+
+                // Check bounds with slight floating-point tolerance
+                if lon_rad < lon_min - 0.05
+                    || lon_rad > lon_max + 0.05
+                    || lat_rad < lat_min - 0.05
+                    || lat_rad > lat_max + 0.05
+                {
+                    return None;
+                }
+
+                let span_lon = (lon_max - lon_min).abs().max(1e-6);
+                let span_lat = (lat_max - lat_min).abs().max(1e-6);
+
+                let u = ((lon_rad - lon_min) / span_lon).clamp(0.0, 1.0);
+                let v = ((lat_max - lat_rad) / span_lat).clamp(0.0, 1.0);
+
+                let px = ((u * w as f32).floor() as usize).min(w.saturating_sub(1));
+                let py = ((v * h as f32).floor() as usize).min(h.saturating_sub(1));
+                Some((px, py))
+            }
+            Self::Irregular1D {
+                coords_x, coords_y, ..
+            } => {
+                let lon_deg = lon_rad.to_degrees();
+                let lat_deg = lat_rad.to_degrees();
+
+                let px = if coords_x.len() >= 2 {
+                    find_coord_cell_1d(coords_x, lon_deg)
+                } else {
+                    let u = ((lon_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI))
+                        .clamp(0.0, 1.0);
+                    ((u * w as f32).floor() as usize).min(w.saturating_sub(1))
+                };
+
+                let py = if coords_y.len() >= 2 {
+                    find_coord_cell_1d(coords_y, lat_deg)
+                } else {
+                    let v = (0.5 - (lat_rad / std::f32::consts::PI)).clamp(0.0, 1.0);
+                    ((v * h as f32).floor() as usize).min(h.saturating_sub(1))
+                };
+
+                Some((px.min(w.saturating_sub(1)), py.min(h.saturating_sub(1))))
+            }
+            Self::Curvilinear2D { .. } => {
+                let u = ((lon_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI))
+                    .clamp(0.0, 1.0);
+                let v = (0.5 - (lat_rad / std::f32::consts::PI)).clamp(0.0, 1.0);
+                let px = ((u * w as f32).floor() as usize).min(w.saturating_sub(1));
+                let py = ((v * h as f32).floor() as usize).min(h.saturating_sub(1));
+                Some((px, py))
+            }
+        }
+    }
+
+    /// Computes the normalized `[0, 1]` viewport coordinates `(u_c, v_c)` corresponding to the exact center of cell `(px, py)`.
+    pub fn cell_center_norm(
+        &self,
+        px: usize,
+        py: usize,
+        width: usize,
+        height: usize,
+    ) -> (f32, f32) {
+        let w = width.max(1);
+        let h = height.max(1);
+
+        match self {
+            Self::Irregular1D {
+                coords_x, coords_y, ..
+            } => {
+                let u_c = if coords_x.len() >= 2 {
+                    let first_x = coords_x[0];
+                    let last_x = coords_x[coords_x.len() - 1];
+                    let span_x = if (last_x - first_x).abs() > 1e-6 {
+                        last_x - first_x
+                    } else {
+                        1.0
+                    };
+                    let cur_x = coords_x.get(px).copied().unwrap_or(first_x);
+                    ((cur_x - first_x) / span_x).clamp(0.0, 1.0)
+                } else {
+                    (px as f32 + 0.5) / w as f32
+                };
+
+                let v_c = if coords_y.len() >= 2 {
+                    let first_y = coords_y[0];
+                    let last_y = coords_y[coords_y.len() - 1];
+                    let span_y = if (last_y - first_y).abs() > 1e-6 {
+                        last_y - first_y
+                    } else {
+                        1.0
+                    };
+                    let cur_y = coords_y.get(py).copied().unwrap_or(first_y);
+                    ((cur_y - first_y) / span_y).clamp(0.0, 1.0)
+                } else {
+                    (py as f32 + 0.5) / h as f32
+                };
+
+                (u_c, v_c)
+            }
+            _ => {
+                let u_c = (px as f32 + 0.5) / w as f32;
+                let v_c = (py as f32 + 0.5) / h as f32;
+                (u_c, v_c)
+            }
+        }
+    }
+
+    /// Computes the exact geographic longitude and latitude `(lon_rad, lat_rad)` in radians for the center of cell `(px, py)`.
+    pub fn cell_center_lon_lat_rad(
+        &self,
+        px: usize,
+        py: usize,
+        width: usize,
+        height: usize,
+    ) -> (f32, f32) {
+        let w = width.max(1);
+        let h = height.max(1);
+
+        match self {
+            Self::GlobalRegular => {
+                let u_c = (px as f32 + 0.5) / w as f32;
+                let v_c = (py as f32 + 0.5) / h as f32;
+                let lon_rad = (u_c - 0.5) * 2.0 * std::f32::consts::PI;
+                let lat_rad = (0.5 - v_c) * std::f32::consts::PI;
+                (lon_rad, lat_rad)
+            }
+            Self::RegionalRegular { .. } => {
+                let [lon_min, lon_max] = self.lon_bounds_rad();
+                let [lat_min, lat_max] = self.lat_bounds_rad();
+                let u_c = (px as f32 + 0.5) / w as f32;
+                let v_c = (py as f32 + 0.5) / h as f32;
+                let lon_rad = lon_min + u_c * (lon_max - lon_min);
+                let lat_rad = lat_max - v_c * (lat_max - lat_min);
+                (lon_rad, lat_rad)
+            }
+            Self::Irregular1D {
+                coords_x, coords_y, ..
+            } => {
+                let deg_lon = coords_x.get(px).copied().unwrap_or(0.0);
+                let deg_lat = coords_y.get(py).copied().unwrap_or(0.0);
+                (deg_lon.to_radians(), deg_lat.to_radians())
+            }
+            Self::Curvilinear2D { .. } => {
+                let u_c = (px as f32 + 0.5) / w as f32;
+                let v_c = (py as f32 + 0.5) / h as f32;
+                let lon_rad = (u_c - 0.5) * 2.0 * std::f32::consts::PI;
+                let lat_rad = (0.5 - v_c) * std::f32::consts::PI;
+                (lon_rad, lat_rad)
+            }
+        }
+    }
+
+    /// Computes the 3D surface model space `(world_x, world_z)` coordinates for the center of cell `(px, py)` matching `surface.wgsl`.
+    pub fn cell_center_surface_xz(
+        &self,
+        px: usize,
+        py: usize,
+        width: usize,
+        height: usize,
+        data_aspect: f32,
+    ) -> (f32, f32) {
+        let w = width.max(1);
+        let h = height.max(1);
+
+        match self {
+            Self::Irregular1D {
+                coords_x, coords_y, ..
+            } => {
+                let scale_x = 2.0 * data_aspect;
+                let scale_y = 2.0;
+
+                let cx = coords_x.get(px).copied().unwrap_or(0.0);
+                let max_cx = coords_x.len().saturating_sub(1);
+                let first_x = if coords_x.len() >= 2 {
+                    coords_x[0] - 0.5 * (coords_x[1] - coords_x[0])
+                } else {
+                    coords_x.first().copied().unwrap_or(0.0)
+                };
+                let last_x = if coords_x.len() >= 2 {
+                    coords_x[max_cx] + 0.5 * (coords_x[max_cx] - coords_x[max_cx.saturating_sub(1)])
+                } else {
+                    coords_x.last().copied().unwrap_or(1.0)
+                };
+                let span_x = if (last_x - first_x).abs() < 1e-6 {
+                    1e-6
+                } else {
+                    last_x - first_x
+                };
+                let world_x = -data_aspect + ((cx - first_x) / span_x) * scale_x;
+
+                let cy = coords_y.get(py).copied().unwrap_or(0.0);
+                let max_cy = coords_y.len().saturating_sub(1);
+                let first_y = if coords_y.len() >= 2 {
+                    coords_y[0] - 0.5 * (coords_y[1] - coords_y[0])
+                } else {
+                    coords_y.first().copied().unwrap_or(0.0)
+                };
+                let last_y = if coords_y.len() >= 2 {
+                    coords_y[max_cy] + 0.5 * (coords_y[max_cy] - coords_y[max_cy.saturating_sub(1)])
+                } else {
+                    coords_y.last().copied().unwrap_or(1.0)
+                };
+                let span_y = if (last_y - first_y).abs() < 1e-6 {
+                    1e-6
+                } else {
+                    last_y - first_y
+                };
+                let world_z = -1.0 + ((cy - first_y) / span_y) * scale_y;
+
+                (world_x, world_z)
+            }
+            _ => {
+                let u_c = (px as f32 + 0.5) / w as f32;
+                let v_c = (py as f32 + 0.5) / h as f32;
+                let world_x = (2.0 * u_c - 1.0) * data_aspect;
+                let world_z = 2.0 * v_c - 1.0;
+                (world_x, world_z)
+            }
+        }
+    }
+
     /// Automatically classifies and constructs a `CoordinateGrid` from dimension coordinate arrays.
     pub fn detect_grid(
         x_name: &str,
@@ -208,6 +499,49 @@ impl CoordinateGrid {
     }
 }
 
+/// Binary searches a 1D monotonic (ascending or descending) coordinate array for the nearest cell index.
+/// Matches `find_coord_cell_x` and `find_coord_cell_y` in WGSL shaders.
+pub fn find_coord_cell_1d(coords: &[f32], query_val: f32) -> usize {
+    let len = coords.len();
+    if len <= 1 {
+        return 0;
+    }
+    let max_idx = len - 1;
+    let first = coords[0];
+    let last = coords[max_idx];
+    let is_descending = first > last;
+
+    let mut low = 0;
+    let mut high = max_idx.saturating_sub(1);
+
+    if is_descending {
+        while low < high {
+            let mid = (low + high).div_ceil(2);
+            if coords[mid] >= query_val {
+                low = mid;
+            } else {
+                high = mid.saturating_sub(1);
+            }
+        }
+    } else {
+        while low < high {
+            let mid = (low + high).div_ceil(2);
+            if coords[mid] <= query_val {
+                low = mid;
+            } else {
+                high = mid.saturating_sub(1);
+            }
+        }
+    }
+
+    let next = (low + 1).min(max_idx);
+    if (query_val - coords[low]).abs() <= (query_val - coords[next]).abs() {
+        low
+    } else {
+        next
+    }
+}
+
 /// Normalizes longitude degree values to [-180, 180].
 #[inline]
 fn normalize_lon_deg(lon: f32) -> f32 {
@@ -251,6 +585,50 @@ fn is_irregular_series(coords: &[f64]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_find_coord_cell_1d_ascending() {
+        let coords = [10.0, 20.0, 40.0, 80.0];
+        assert_eq!(find_coord_cell_1d(&coords, 5.0), 0);
+        assert_eq!(find_coord_cell_1d(&coords, 10.0), 0);
+        assert_eq!(find_coord_cell_1d(&coords, 14.0), 0);
+        assert_eq!(find_coord_cell_1d(&coords, 16.0), 1);
+        assert_eq!(find_coord_cell_1d(&coords, 35.0), 2);
+        assert_eq!(find_coord_cell_1d(&coords, 70.0), 3);
+        assert_eq!(find_coord_cell_1d(&coords, 100.0), 3);
+    }
+
+    #[test]
+    fn test_find_coord_cell_1d_descending() {
+        let coords = [80.0, 40.0, 20.0, 10.0];
+        assert_eq!(find_coord_cell_1d(&coords, 100.0), 0);
+        assert_eq!(find_coord_cell_1d(&coords, 70.0), 0);
+        assert_eq!(find_coord_cell_1d(&coords, 35.0), 1);
+        assert_eq!(find_coord_cell_1d(&coords, 16.0), 2);
+        assert_eq!(find_coord_cell_1d(&coords, 5.0), 3);
+    }
+
+    #[test]
+    fn test_cell_center_norm_irregular() {
+        let coords_x: Arc<[f32]> = Arc::new([0.0, 10.0, 30.0, 100.0]);
+        let coords_y: Arc<[f32]> = Arc::new([0.0, 50.0, 100.0]);
+        let grid = CoordinateGrid::Irregular1D {
+            coords_x,
+            coords_y,
+            lon_bounds: (0.0, 100.0),
+            lat_bounds: (0.0, 100.0),
+        };
+
+        // For cell px=1 (x=10.0), center in norm should be (10.0 - 0.0)/100.0 = 0.1
+        let (u_c, v_c) = grid.cell_center_norm(1, 1, 4, 3);
+        assert!((u_c - 0.1).abs() < 1e-5);
+        assert!((v_c - 0.5).abs() < 1e-5);
+
+        // find_cell_from_norm with norm_x=0.08 should return px=1 (closest to 10.0)
+        let (px, py) = grid.find_cell_from_norm(0.08, 0.5, 4, 3);
+        assert_eq!(px, 1);
+        assert_eq!(py, 1);
+    }
 
     #[test]
     fn detects_regular_global_grid() {

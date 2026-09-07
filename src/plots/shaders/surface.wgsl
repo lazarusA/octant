@@ -56,6 +56,44 @@ fn get_normalized_height(val: f32) -> f32 {
     }
 }
 
+fn get_cell_coord_bounds(cell_idx: u32, len: u32, is_y: bool) -> vec2<f32> {
+    if (len <= 1u) {
+        return vec2<f32>(0.0, 1.0);
+    }
+    let max_idx = len - 1u;
+    let idx = min(cell_idx, max_idx);
+
+    var curr: f32;
+    var prev: f32;
+    var next: f32;
+
+    if (is_y) {
+        curr = coord_y_buffer[idx];
+        prev = coord_y_buffer[max(idx, 1u) - 1u];
+        next = coord_y_buffer[min(idx + 1u, max_idx)];
+    } else {
+        curr = coord_x_buffer[idx];
+        prev = coord_x_buffer[max(idx, 1u) - 1u];
+        next = coord_x_buffer[min(idx + 1u, max_idx)];
+    }
+
+    var c0: f32;
+    var c1: f32;
+
+    if (idx == 0u) {
+        c0 = curr - 0.5 * (next - curr);
+        c1 = 0.5 * (curr + next);
+    } else if (idx == max_idx) {
+        c0 = 0.5 * (prev + curr);
+        c1 = curr + 0.5 * (curr - prev);
+    } else {
+        c0 = 0.5 * (prev + curr);
+        c1 = 0.5 * (curr + next);
+    }
+
+    return vec2<f32>(c0, c1);
+}
+
 @vertex
 fn vs_main(
     model: VertexInput,
@@ -86,32 +124,22 @@ fn vs_main(
 
     if (uniforms.coord_mode == 2u) {
         let max_cx = max(arrayLength(&coord_x_buffer), 1u) - 1u;
-        let cx0 = coord_x_buffer[min(cell_x, max_cx)];
-        let cx1 = select(
-            cx0 + (cx0 - coord_x_buffer[max(cell_x, 1u) - 1u]),
-            coord_x_buffer[min(cell_x + 1u, max_cx)],
-            cell_x + 1u <= max_cx
-        );
-        let first_x = coord_x_buffer[0];
-        let last_x = coord_x_buffer[max_cx];
+        let bounds_x = get_cell_coord_bounds(cell_x, arrayLength(&coord_x_buffer), false);
+        let first_x = coord_x_buffer[0] - 0.5 * (coord_x_buffer[min(1u, max_cx)] - coord_x_buffer[0]);
+        let last_x = coord_x_buffer[max_cx] + 0.5 * (coord_x_buffer[max_cx] - coord_x_buffer[max(max_cx, 1u) - 1u]);
         let diff_x = last_x - first_x;
         let span_x = select(diff_x, 1e-6, abs(diff_x) < 1e-6);
-        x0 = -data_aspect + ((cx0 - first_x) / span_x) * scale_x;
-        x1 = -data_aspect + ((cx1 - first_x) / span_x) * scale_x;
+        x0 = -data_aspect + ((bounds_x.x - first_x) / span_x) * scale_x;
+        x1 = -data_aspect + ((bounds_x.y - first_x) / span_x) * scale_x;
 
         let max_cy = max(arrayLength(&coord_y_buffer), 1u) - 1u;
-        let cy0 = coord_y_buffer[min(cell_y, max_cy)];
-        let cy1 = select(
-            cy0 + (cy0 - coord_y_buffer[max(cell_y, 1u) - 1u]),
-            coord_y_buffer[min(cell_y + 1u, max_cy)],
-            cell_y + 1u <= max_cy
-        );
-        let first_y = coord_y_buffer[0];
-        let last_y = coord_y_buffer[max_cy];
+        let bounds_y = get_cell_coord_bounds(cell_y, arrayLength(&coord_y_buffer), true);
+        let first_y = coord_y_buffer[0] - 0.5 * (coord_y_buffer[min(1u, max_cy)] - coord_y_buffer[0]);
+        let last_y = coord_y_buffer[max_cy] + 0.5 * (coord_y_buffer[max_cy] - coord_y_buffer[max(max_cy, 1u) - 1u]);
         let diff_y = last_y - first_y;
         let span_y = select(diff_y, 1e-6, abs(diff_y) < 1e-6);
-        y0 = -1.0 + ((cy0 - first_y) / span_y) * scale_y;
-        y1 = -1.0 + ((cy1 - first_y) / span_y) * scale_y;
+        y0 = -1.0 + ((bounds_y.x - first_y) / span_y) * scale_y;
+        y1 = -1.0 + ((bounds_y.y - first_y) / span_y) * scale_y;
     }
 
     let world_x = mix(x0, x1, model.position.x);
