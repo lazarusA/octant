@@ -488,6 +488,38 @@ pub fn find_coord_cell_1d(coords: &[f32], query_val: f32) -> usize {
     }
 }
 
+/// Computes the optimal lookup table (LUT) size for a 1D coordinate axis.
+/// Scales dynamically as clamp(dim_len * 2, 4096, 65536) to prevent cell undersampling
+/// while providing sub-pixel precision on 4K displays.
+#[inline]
+pub fn compute_coord_lut_size(dim_len: usize) -> usize {
+    (dim_len.saturating_mul(2)).clamp(4096, 65536)
+}
+
+/// Builds a 1D coordinate lookup table mapping normalized [0, 1] positions to cell indices.
+/// Returns a `Vec<f32>` where each element is the cell index (stored as f32 for GPU storage buffers).
+pub fn build_1d_coord_lut(coords: &[f32], lut_size: usize) -> Vec<f32> {
+    if coords.is_empty() {
+        return Vec::new();
+    }
+    let m = lut_size.max(1);
+    if coords.len() == 1 {
+        return vec![0.0; m];
+    }
+    let first = coords[0];
+    let last = coords[coords.len() - 1];
+    let span = last - first;
+    let mut lut = Vec::with_capacity(m);
+    let m_denom = (m - 1).max(1) as f32;
+    for k in 0..m {
+        let u = k as f32 / m_denom;
+        let target = first + u * span;
+        let cell_idx = find_coord_cell_1d(coords, target) as f32;
+        lut.push(cell_idx);
+    }
+    lut
+}
+
 /// Normalizes longitude degree values to [-180, 180].
 #[inline]
 fn normalize_lon_deg(lon: f32) -> f32 {
@@ -640,5 +672,46 @@ mod tests {
         assert_eq!(grid.coord_mode(), 2);
         assert!(matches!(grid, CoordinateGrid::Irregular1D { .. }));
         assert!(grid.is_global()); // Global irregular
+    }
+
+    #[test]
+    fn test_coord_lut_matches_binary_search() {
+        // Stretched exponential grid
+        let w = 256;
+        let coords: Vec<f32> = (0..w)
+            .map(|i| {
+                let t = i as f32 / (w - 1) as f32;
+                t * t * 100.0
+            })
+            .collect();
+
+        let lut_size = compute_coord_lut_size(w);
+        assert_eq!(lut_size, 4096);
+        let lut = build_1d_coord_lut(&coords, lut_size);
+        assert_eq!(lut.len(), 4096);
+
+        // Verify across fine sample points that LUT matches direct binary search within +/- 1 cell boundary
+        for sample_k in 0..1000 {
+            let u = sample_k as f32 / 999.0;
+            let target = coords[0] + u * (coords[coords.len() - 1] - coords[0]);
+            let exact_cell = find_coord_cell_1d(&coords, target);
+
+            let lut_idx = ((u * (lut_size - 1) as f32) + 0.5) as usize;
+            let lut_cell = lut[lut_idx.min(lut_size - 1)] as usize;
+
+            let diff = (exact_cell as isize - lut_cell as isize).abs();
+            assert!(
+                diff <= 1,
+                "LUT cell {lut_cell} deviated from exact cell {exact_cell} at u={u}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_coord_lut_descending() {
+        let coords = [100.0, 75.0, 30.0, 10.0, 0.0];
+        let lut = build_1d_coord_lut(&coords, 4096);
+        assert_eq!(lut[0], 0.0);
+        assert_eq!(lut[4095], 4.0);
     }
 }

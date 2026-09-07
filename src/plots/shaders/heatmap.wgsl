@@ -6,6 +6,10 @@ struct Uniforms {
     width: u32,
     height: u32,
     tile_bounds: vec4<f32>,
+    lut_size_x: u32,
+    lut_size_y: u32,
+    _pad0: u32,
+    _pad1: u32,
     color: ColorUniforms,
 };
 
@@ -57,17 +61,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var gy: u32;
 
     if (uniforms.coord_mode == 2u) {
-        let max_cx = min(w - 1u, max(arrayLength(&coord_x_buffer), 1u) - 1u);
-        let first_x = coord_x_buffer[0];
-        let last_x = coord_x_buffer[max_cx];
-        let target_x = mix(first_x, last_x, in.uv.x);
-        gx = find_coord_cell_x(target_x, w);
+        let max_lx = max(uniforms.lut_size_x, 1u) - 1u;
+        let lut_x = clamp(u32(in.uv.x * f32(max_lx) + 0.5), 0u, max_lx);
+        gx = min(u32(coord_x_buffer[lut_x]), w - 1u);
 
-        let max_cy = min(h - 1u, max(arrayLength(&coord_y_buffer), 1u) - 1u);
-        let first_y = coord_y_buffer[0];
-        let last_y = coord_y_buffer[max_cy];
-        let target_y = mix(first_y, last_y, in.uv.y);
-        gy = find_coord_cell_y(target_y, h);
+        let max_ly = max(uniforms.lut_size_y, 1u) - 1u;
+        let lut_y = clamp(u32(in.uv.y * f32(max_ly) + 0.5), 0u, max_ly);
+        gy = min(u32(coord_y_buffer[lut_y]), h - 1u);
     } else {
         gx = clamp(u32(in.uv.x * f32(w)), 0u, w - 1u);
         gy = clamp(u32(in.uv.y * f32(h)), 0u, h - 1u);
@@ -82,4 +82,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     return eval_color;
 }
+
 
