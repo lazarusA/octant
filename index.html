@@ -3,21 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Octant — High-Performance Scientific Tensor Visualizer</title>
+    <title>Octant</title>
     <link data-trunk rel="rust" data-bin="octant" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-color: #0A0C0D;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --track-bg: rgba(255, 255, 255, 0.08);
+            --badge-bg: rgba(255, 255, 255, 0.08);
+            --badge-border: rgba(255, 255, 255, 0.06);
+            --badge-color: #8b949e;
+            --title-color: #fbfbf2;
+            --bar-glow: rgba(56, 139, 253, 0.6);
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg-color: #f6f8fa;
+                --text-primary: #1f2328;
+                --text-secondary: #656d76;
+                --track-bg: rgba(0, 0, 0, 0.07);
+                --badge-bg: rgba(0, 0, 0, 0.05);
+                --badge-border: rgba(0, 0, 0, 0.08);
+                --badge-color: #656d76;
+                --title-color: #1f2328;
+                --bar-glow: rgba(56, 139, 253, 0.35);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         html, body {
             width: 100%;
             height: 100%;
             margin: 0;
             padding: 0;
-            background-color: #0d1117;
-            color: #e6edf3;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             overflow: hidden;
             touch-action: none;
             user-select: none;
             -webkit-user-select: none;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         #octant_canvas_anchor {
@@ -37,64 +71,231 @@
             width: 100%;
             height: 100%;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: #0d1117;
-            z-index: 10;
-            transition: opacity 0.4s ease-out;
+            background-color: var(--bg-color);
+            z-index: 100;
+            transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s ease;
             pointer-events: none;
         }
 
-        .spinner {
-            width: 44px;
-            height: 44px;
-            border: 3px solid rgba(56, 139, 253, 0.2);
-            border-top: 3px solid #58a6ff;
-            border-radius: 50%;
-            animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-            margin-bottom: 18px;
+        .loading-content {
+            position: relative;
+            width: 360px;
+            max-width: 85vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
         }
 
-        .loading-title {
-            font-size: 16px;
+        .brand-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .brand-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: var(--title-color);
+            text-transform: uppercase;
+            transition: color 0.3s ease;
+        }
+
+        .brand-badge {
+            font-size: 10px;
             font-weight: 600;
-            letter-spacing: 0.04em;
-            color: #c9d1d9;
+            letter-spacing: 0.06em;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: var(--badge-bg);
+            color: var(--badge-color);
+            border: 1px solid var(--badge-border);
+            transition: all 0.3s ease;
         }
 
         .loading-subtitle {
-            font-size: 12px;
-            color: #8b949e;
-            margin-top: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            margin-bottom: 24px;
+            font-weight: 400;
+            transition: color 0.3s ease;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        /* Progress Bar with Ivory -> Blue -> Orange gradient */
+        .progress-track {
+            position: relative;
+            width: 100%;
+            height: 6px;
+            background: var(--track-bg);
+            border-radius: 999px;
+            overflow: hidden;
+            margin-bottom: 18px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) inset;
+            transition: background 0.3s ease;
+        }
+
+        .progress-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #fbfbf2 0%, #388bfd 50%, #f0883e 100%);
+            background-size: 200% 100%;
+            animation: gradient-shift 2s ease infinite, progress-pulse 1.8s ease-in-out infinite alternate;
+            box-shadow: 0 0 12px var(--bar-glow);
+            transition: width 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        @keyframes gradient-shift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes progress-pulse {
+            0% { opacity: 0.85; filter: brightness(1); }
+            100% { opacity: 1; filter: brightness(1.15); }
+        }
+
+        /* Backend Detector (Clean text + pulse dot) */
+        .backend-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11.5px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+
+        .backend-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #e3b341;
+            box-shadow: 0 0 8px #e3b341;
+            animation: pulse-dot 1.5s ease-in-out infinite;
+        }
+
+        .backend-dot.webgpu {
+            background: #7B61FF;
+            box-shadow: 0 0 8px rgba(123, 97, 255, 0.7);
+        }
+
+        .backend-dot.webgl {
+            background: #D42027;
+            box-shadow: 0 0 8px rgba(212, 32, 39, 0.7);
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.25); opacity: 1; }
         }
     </style>
 </head>
 <body>
     <div id="loading_screen">
-        <div class="spinner"></div>
-        <div class="loading-title">OCTANT ENGINE</div>
-        <div class="loading-subtitle">Initializing WebGPU / WebGL2 Context...</div>
+        <div class="loading-content">
+            <div class="brand-header">
+                <span class="brand-title">Octant</span>
+                <span class="brand-badge">WASM</span>
+            </div>
+            <div class="loading-subtitle" id="loading_status_text">Loading scientific engine & assets...</div>
+
+            <div class="progress-track">
+                <div class="progress-bar" id="loading_progress_bar"></div>
+            </div>
+
+            <div class="backend-indicator" id="backend_indicator_pill">
+                <div class="backend-dot" id="backend_dot"></div>
+                <span id="backend_name">Detecting graphics backend...</span>
+            </div>
+        </div>
     </div>
+
     <canvas id="octant_canvas_anchor"></canvas>
+
     <script>
-        // Observe canvas or animation loop to fade out loading screen
-        const hideLoading = () => {
-            const el = document.getElementById('loading_screen');
-            if (el) {
-                el.style.opacity = '0';
-                setTimeout(() => el.remove(), 400);
+        (function() {
+            const progressBar = document.getElementById('loading_progress_bar');
+            const statusText = document.getElementById('loading_status_text');
+            const backendName = document.getElementById('backend_name');
+            const backendDot = document.getElementById('backend_dot');
+            const loadingScreen = document.getElementById('loading_screen');
+
+            // Detect WebGPU vs WebGL2 backend
+            async function detectBackend() {
+                try {
+                    if (navigator.gpu) {
+                        const adapter = await navigator.gpu.requestAdapter();
+                        if (adapter) {
+                            backendDot.className = 'backend-dot webgpu';
+                            backendName.textContent = 'WebGPU Native Pipeline';
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[Octant] WebGPU check fallback:', e);
+                }
+
+                // Fallback check for WebGL2
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl2');
+                    if (gl) {
+                        backendDot.className = 'backend-dot webgl';
+                        backendName.textContent = 'WebGL2 Compatibility';
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('[Octant] WebGL2 check fallback:', e);
+                }
+
+                backendName.textContent = 'Software Rasterizer';
             }
-        };
-        // Fallback timer if canvas frame event doesn't trigger immediately
-        window.addEventListener('load', () => {
-            setTimeout(hideLoading, 1500);
-        });
+
+            detectBackend();
+
+            // Progress simulation for WASM compilation & asset download
+            let progress = 15;
+            progressBar.style.width = progress + '%';
+
+            const progressInterval = setInterval(() => {
+                if (progress < 85) {
+                    progress += Math.random() * 12 + 4;
+                    if (progress > 85) progress = 85;
+                    progressBar.style.width = progress + '%';
+                }
+            }, 180);
+
+            // Smooth fadeout when WASM application starts rendering
+            const finishLoading = () => {
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                statusText.textContent = 'Engine ready';
+                
+                setTimeout(() => {
+                    if (loadingScreen) {
+                        loadingScreen.style.opacity = '0';
+                        loadingScreen.style.transform = 'scale(0.98)';
+                        setTimeout(() => loadingScreen.remove(), 500);
+                    }
+                }, 350);
+            };
+
+            // Detect when canvas receives frames or fallback to window load
+            window.addEventListener('load', () => {
+                setTimeout(finishLoading, 1200);
+            });
+        })();
     </script>
 </body>
 </html>
