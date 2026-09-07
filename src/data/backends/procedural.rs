@@ -46,6 +46,7 @@ impl BlockStore for ProceduralBlockStore {
                 "gaussian_grid_2d".to_string(),
                 "stretched_regional_2d".to_string(),
                 "stepped_resolution_2d".to_string(),
+                "curvilinear_vortex_2d".to_string(),
                 "gaussian_wave_packet_4d".to_string(),
                 "procedural_matrix_2d".to_string(),
             ])
@@ -151,6 +152,22 @@ impl BlockStore for ProceduralBlockStore {
                     time_coverage_start: None,
                     time_coverage_end: None,
                     file_size: 32 * 64 * 4,
+                    attributes: HashMap::new(),
+                },
+                VariableInfo {
+                    name: "curvilinear_vortex_2d".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![64, 128],
+                    chunk_shape: vec![64, 128],
+                    dimension_names: vec!["y".to_string(), "x".to_string()],
+                    units: Some("m/s".to_string()),
+                    long_name: Some(
+                        "2D Sheared Curvilinear Vortex (ROMS/WRF-like 2D Coordinates)".to_string(),
+                    ),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: 64 * 128 * 4,
                     attributes: HashMap::new(),
                 },
                 VariableInfo {
@@ -292,6 +309,28 @@ impl BlockStore for ProceduralBlockStore {
             let mut coords = HashMap::new();
             coords.insert("lon".to_string(), xs);
             coords.insert("lat".to_string(), ys);
+
+            if let Some(ref mut cb) = on_progress {
+                cb((data.len() * 4) as u64);
+            }
+            return Ok(OctantBlock::new(
+                request.variable.clone(),
+                vec![h, w],
+                vec!["lat".to_string(), "lon".to_string()],
+                vec![0, 0],
+                data,
+                coords,
+                HashMap::new(),
+            ));
+        }
+
+        if request.variable == "curvilinear_vortex_2d" {
+            let (h, w) = (64, 128);
+            let (data, _, _) = crate::data::procedural::generate_curvilinear_2d(w, h, 0);
+            let (lons, lats) = crate::data::procedural::generate_curvilinear_coords(w, h);
+            let mut coords = HashMap::new();
+            coords.insert("lon".to_string(), lons);
+            coords.insert("lat".to_string(), lats);
 
             if let Some(ref mut cb) = on_progress {
                 cb((data.len() * 4) as u64);

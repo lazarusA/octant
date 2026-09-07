@@ -96,7 +96,7 @@ impl Mesh3DRenderer {
             .filter(|s| !s.is_empty())
             .unwrap_or(&dummy_coords)
             .to_vec();
-        let min_coord_x_capacity = width.max(128);
+        let min_coord_x_capacity = coord_x.map_or(width.max(128), |c| c.len().max(width).max(128));
         if padded_coords_x.len() < min_coord_x_capacity {
             padded_coords_x.resize(min_coord_x_capacity, 0.0);
         }
@@ -105,7 +105,8 @@ impl Mesh3DRenderer {
             .filter(|s| !s.is_empty())
             .unwrap_or(&dummy_coords)
             .to_vec();
-        let min_coord_y_capacity = height.max(128);
+        let min_coord_y_capacity =
+            coord_y.map_or(height.max(128), |c| c.len().max(height).max(128));
         if padded_coords_y.len() < min_coord_y_capacity {
             padded_coords_y.resize(min_coord_y_capacity, 0.0);
         }

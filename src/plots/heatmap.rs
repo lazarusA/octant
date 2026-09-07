@@ -104,7 +104,12 @@ impl HeatmapRenderer {
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
-        let initial_coord_mode = if coord_x.is_some() || coord_y.is_some() {
+        let is_curvilinear = coord_x.is_some_and(|c| c.len() >= width * height)
+            && coord_y.is_some_and(|c| c.len() >= width * height);
+
+        let initial_coord_mode = if is_curvilinear {
+            3
+        } else if coord_x.is_some() || coord_y.is_some() {
             2
         } else {
             0
@@ -157,22 +162,35 @@ impl HeatmapRenderer {
             &padded_initial,
         );
 
-        let mut padded_coords_x = if let Some(cx) = coord_x.filter(|s| !s.is_empty()) {
+        let dummy_coords = [0.0f32; 4];
+        let mut padded_coords_x = if initial_coord_mode == 3 {
+            coord_x.unwrap_or(&dummy_coords).to_vec()
+        } else if let Some(cx) = coord_x.filter(|s| !s.is_empty()) {
             crate::data::coordinates::build_1d_coord_lut(cx, lut_size_x)
         } else {
             vec![0.0; 4]
         };
-        let min_coord_x_capacity = lut_size_x.max(4096);
+        let min_coord_x_capacity = if initial_coord_mode == 3 {
+            width * height
+        } else {
+            lut_size_x.max(4096)
+        };
         if padded_coords_x.len() < min_coord_x_capacity {
             padded_coords_x.resize(min_coord_x_capacity, 0.0);
         }
 
-        let mut padded_coords_y = if let Some(cy) = coord_y.filter(|s| !s.is_empty()) {
+        let mut padded_coords_y = if initial_coord_mode == 3 {
+            coord_y.unwrap_or(&dummy_coords).to_vec()
+        } else if let Some(cy) = coord_y.filter(|s| !s.is_empty()) {
             crate::data::coordinates::build_1d_coord_lut(cy, lut_size_y)
         } else {
             vec![0.0; 4]
         };
-        let min_coord_y_capacity = lut_size_y.max(4096);
+        let min_coord_y_capacity = if initial_coord_mode == 3 {
+            width * height
+        } else {
+            lut_size_y.max(4096)
+        };
         if padded_coords_y.len() < min_coord_y_capacity {
             padded_coords_y.resize(min_coord_y_capacity, 0.0);
         }
@@ -340,29 +358,49 @@ impl HeatmapRenderer {
     }
 
     pub fn update_coords(&self, queue: &wgpu::Queue, coords_x: &[f32], coords_y: &[f32]) {
-        if !coords_x.is_empty() {
-            let w = self.width.load(Ordering::Relaxed) as usize;
-            let lut_size_x = crate::data::coordinates::compute_coord_lut_size(w);
-            self.lut_size_x.store(lut_size_x as u32, Ordering::Relaxed);
-            let lut_x = crate::data::coordinates::build_1d_coord_lut(coords_x, lut_size_x);
-            super::common::safe_write_buffer(
-                queue,
-                &self.coord_x_buffer,
-                &lut_x,
-                "HeatmapRenderer::update_coords_x",
-            );
-        }
-        if !coords_y.is_empty() {
-            let h = self.height.load(Ordering::Relaxed) as usize;
-            let lut_size_y = crate::data::coordinates::compute_coord_lut_size(h);
-            self.lut_size_y.store(lut_size_y as u32, Ordering::Relaxed);
-            let lut_y = crate::data::coordinates::build_1d_coord_lut(coords_y, lut_size_y);
-            super::common::safe_write_buffer(
-                queue,
-                &self.coord_y_buffer,
-                &lut_y,
-                "HeatmapRenderer::update_coords_y",
-            );
+        let mode = self.coord_mode.load(Ordering::Relaxed);
+        if mode == 3 {
+            if !coords_x.is_empty() {
+                super::common::safe_write_buffer(
+                    queue,
+                    &self.coord_x_buffer,
+                    coords_x,
+                    "HeatmapRenderer::update_coords_x_2d",
+                );
+            }
+            if !coords_y.is_empty() {
+                super::common::safe_write_buffer(
+                    queue,
+                    &self.coord_y_buffer,
+                    coords_y,
+                    "HeatmapRenderer::update_coords_y_2d",
+                );
+            }
+        } else {
+            if !coords_x.is_empty() {
+                let w = self.width.load(Ordering::Relaxed) as usize;
+                let lut_size_x = crate::data::coordinates::compute_coord_lut_size(w);
+                self.lut_size_x.store(lut_size_x as u32, Ordering::Relaxed);
+                let lut_x = crate::data::coordinates::build_1d_coord_lut(coords_x, lut_size_x);
+                super::common::safe_write_buffer(
+                    queue,
+                    &self.coord_x_buffer,
+                    &lut_x,
+                    "HeatmapRenderer::update_coords_x",
+                );
+            }
+            if !coords_y.is_empty() {
+                let h = self.height.load(Ordering::Relaxed) as usize;
+                let lut_size_y = crate::data::coordinates::compute_coord_lut_size(h);
+                self.lut_size_y.store(lut_size_y as u32, Ordering::Relaxed);
+                let lut_y = crate::data::coordinates::build_1d_coord_lut(coords_y, lut_size_y);
+                super::common::safe_write_buffer(
+                    queue,
+                    &self.coord_y_buffer,
+                    &lut_y,
+                    "HeatmapRenderer::update_coords_y",
+                );
+            }
         }
     }
 

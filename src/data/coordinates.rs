@@ -98,18 +98,20 @@ impl CoordinateGrid {
         }
     }
 
-    /// Returns a reference to 1D X-coordinates if this grid is Irregular1D.
+    /// Returns a reference to 1D or 2D X-coordinates if available.
     pub fn coords_x(&self) -> Option<&[f32]> {
         match self {
             Self::Irregular1D { coords_x, .. } => Some(coords_x),
+            Self::Curvilinear2D { lons, .. } => Some(lons),
             _ => None,
         }
     }
 
-    /// Returns a reference to 1D Y-coordinates if this grid is Irregular1D.
+    /// Returns a reference to 1D or 2D Y-coordinates if available.
     pub fn coords_y(&self) -> Option<&[f32]> {
         match self {
             Self::Irregular1D { coords_y, .. } => Some(coords_y),
+            Self::Curvilinear2D { lats, .. } => Some(lats),
             _ => None,
         }
     }
@@ -326,12 +328,12 @@ impl CoordinateGrid {
                 let deg_lat = coords_y.get(py).copied().unwrap_or(0.0);
                 (deg_lon.to_radians(), deg_lat.to_radians())
             }
-            Self::Curvilinear2D { .. } => {
-                let u_c = (px as f32 + 0.5) / w as f32;
-                let v_c = (py as f32 + 0.5) / h as f32;
-                let lon_rad = (u_c - 0.5) * 2.0 * std::f32::consts::PI;
-                let lat_rad = (0.5 - v_c) * std::f32::consts::PI;
-                (lon_rad, lat_rad)
+            Self::Curvilinear2D { lons, lats, .. } => {
+                let idx = (py.min(h.saturating_sub(1)) * w + px.min(w.saturating_sub(1)))
+                    .min(lons.len().saturating_sub(1));
+                let deg_lon = lons.get(idx).copied().unwrap_or(0.0);
+                let deg_lat = lats.get(idx).copied().unwrap_or(0.0);
+                (deg_lon.to_radians(), deg_lat.to_radians())
             }
         }
     }
@@ -345,10 +347,34 @@ impl CoordinateGrid {
         height: usize,
         data_aspect: f32,
     ) -> (f32, f32) {
-        let (u_c, v_c) = self.cell_center_norm(px, py, width, height);
-        let world_x = (2.0 * u_c - 1.0) * data_aspect;
-        let world_z = 2.0 * v_c - 1.0;
-        (world_x, world_z)
+        match self {
+            Self::Curvilinear2D {
+                lons,
+                lats,
+                lon_bounds,
+                lat_bounds,
+            } => {
+                let w = width.max(1);
+                let h = height.max(1);
+                let idx = (py.min(h.saturating_sub(1)) * w + px.min(w.saturating_sub(1)))
+                    .min(lons.len().saturating_sub(1));
+                let deg_lon = lons.get(idx).copied().unwrap_or(lon_bounds.0);
+                let deg_lat = lats.get(idx).copied().unwrap_or(lat_bounds.0);
+                let span_lon = (lon_bounds.1 - lon_bounds.0).abs().max(1e-5);
+                let span_lat = (lat_bounds.1 - lat_bounds.0).abs().max(1e-5);
+                let u_c = ((deg_lon - lon_bounds.0) / span_lon).clamp(0.0, 1.0);
+                let v_c = ((lat_bounds.1 - deg_lat) / span_lat).clamp(0.0, 1.0);
+                let world_x = (2.0 * u_c - 1.0) * data_aspect;
+                let world_z = 2.0 * v_c - 1.0;
+                (world_x, world_z)
+            }
+            _ => {
+                let (u_c, v_c) = self.cell_center_norm(px, py, width, height);
+                let world_x = (2.0 * u_c - 1.0) * data_aspect;
+                let world_z = 2.0 * v_c - 1.0;
+                (world_x, world_z)
+            }
+        }
     }
 
     /// Automatically classifies and constructs a `CoordinateGrid` from dimension coordinate arrays.
@@ -372,6 +398,36 @@ impl CoordinateGrid {
 
         if xc.is_empty() || yc.is_empty() {
             return Self::GlobalRegular;
+        }
+
+        // Check for 2D Curvilinear coordinates (length >= width * height)
+        let is_2d_curvilinear =
+            width > 1 && height > 1 && xc.len() >= width * height && yc.len() >= width * height;
+        if is_2d_curvilinear {
+            let total = width * height;
+            let lons: Arc<[f32]> = xc.iter().take(total).map(|&v| v as f32).collect();
+            let lats: Arc<[f32]> = yc.iter().take(total).map(|&v| v as f32).collect();
+            let mut lon_min = f32::INFINITY;
+            let mut lon_max = f32::NEG_INFINITY;
+            for &lon in lons.iter() {
+                lon_min = lon_min.min(lon);
+                lon_max = lon_max.max(lon);
+            }
+            let mut lat_min = f32::INFINITY;
+            let mut lat_max = f32::NEG_INFINITY;
+            for &lat in lats.iter() {
+                lat_min = lat_min.min(lat);
+                lat_max = lat_max.max(lat);
+            }
+            log::info!(
+                "CoordinateGrid: Detected Curvilinear2D grid (w={width}, h={height}, lon=[{lon_min:.2}, {lon_max:.2}], lat=[{lat_min:.2}, {lat_max:.2}])"
+            );
+            return Self::Curvilinear2D {
+                lons,
+                lats,
+                lon_bounds: (lon_min, lon_max),
+                lat_bounds: (lat_min, lat_max),
+            };
         }
 
         let (x_min, x_max) = match (xc.first(), xc.last()) {
@@ -713,5 +769,15 @@ mod tests {
         let lut = build_1d_coord_lut(&coords, 4096);
         assert_eq!(lut[0], 0.0);
         assert_eq!(lut[4095], 4.0);
+    }
+
+    #[test]
+    fn test_detects_curvilinear_2d_grid() {
+        let (lons, lats) = crate::data::procedural::generate_curvilinear_coords(32, 16);
+        let grid = CoordinateGrid::detect_grid("lon", "lat", Some(&lons), Some(&lats), 32, 16);
+        assert_eq!(grid.coord_mode(), 3);
+        assert!(matches!(grid, CoordinateGrid::Curvilinear2D { .. }));
+        assert!(grid.coords_x().is_some_and(|c| c.len() == 32 * 16));
+        assert!(grid.coords_y().is_some_and(|c| c.len() == 32 * 16));
     }
 }

@@ -398,6 +398,66 @@ pub fn generate_stepped_resolution_2d(nx: usize, ny: usize) -> (Vec<f32>, f32, f
     (data, 10.0, 90.0)
 }
 
+/// Generates 2D sheared/swirled curvilinear coordinates lon(y, x) and lat(y, x) of shape [ny * nx].
+pub fn generate_curvilinear_coords(nx: usize, ny: usize) -> (Vec<f64>, Vec<f64>) {
+    let nx = nx.max(2);
+    let ny = ny.max(2);
+    let total = nx * ny;
+    let mut lons = Vec::with_capacity(total);
+    let mut lats = Vec::with_capacity(total);
+
+    for j in 0..ny {
+        let v = j as f64 / (ny - 1) as f64;
+        let base_lat = -45.0 + 90.0 * v;
+
+        for i in 0..nx {
+            let u = i as f64 / (nx - 1) as f64;
+            let base_lon = -60.0 + 120.0 * u;
+
+            let r_sq = (u - 0.5).powi(2) + (v - 0.5).powi(2);
+            let angle = (1.0 - (r_sq.min(0.5) * 2.0)) * 0.45;
+
+            let cur_lon = base_lon + 15.0 * angle.sin() * (1.0 - v * 0.5);
+            let cur_lat = base_lat + 12.0 * angle.cos() * (1.0 - u * 0.5);
+
+            lons.push(cur_lon);
+            lats.push(cur_lat);
+        }
+    }
+
+    (lons, lats)
+}
+
+/// Generates a synthetic 2D multi-core atmospheric vortex / ocean gyre field on the curvilinear grid.
+pub fn generate_curvilinear_2d(nx: usize, ny: usize, timestep: usize) -> (Vec<f32>, f32, f32) {
+    let (lons, lats) = generate_curvilinear_coords(nx, ny);
+    let total = nx * ny;
+    let mut data = Vec::with_capacity(total);
+    let mut min_val = f32::INFINITY;
+    let mut max_val = f32::NEG_INFINITY;
+    let t_phase = (timestep % 360) as f64 * 0.06;
+
+    for k in 0..total {
+        let lon_rad = lons[k].to_radians();
+        let lat_rad = lats[k].to_radians();
+
+        let vortex1 = ((3.0 * lon_rad + t_phase).sin() * (4.0 * lat_rad).cos()) as f32;
+        let vortex2 = ((2.0 * lon_rad - t_phase * 0.7).cos() * (2.0 * lat_rad).sin()) as f32;
+        let val = (50.0 + 30.0 * vortex1 + 20.0 * vortex2).clamp(0.0, 100.0);
+
+        min_val = min_val.min(val);
+        max_val = max_val.max(val);
+        data.push(val);
+    }
+
+    if min_val > max_val {
+        min_val = 0.0;
+        max_val = 100.0;
+    }
+
+    (data, min_val, max_val)
+}
+
 /// Creates a standard 4D `OctantBlock` wrapping the known-truth scalar field with shape `[nt, nz, ny, nx]`.
 pub fn generate_known_truth_4d_block(
     var_name: impl Into<String>,
@@ -554,5 +614,17 @@ mod tests {
         assert_eq!(data.len(), 32 * 16);
         assert_eq!(min_v, 10.0);
         assert_eq!(max_v, 90.0);
+    }
+
+    #[test]
+    fn test_generate_curvilinear_bounds_and_vortex() {
+        let (lons, lats) = generate_curvilinear_coords(32, 16);
+        assert_eq!(lons.len(), 32 * 16);
+        assert_eq!(lats.len(), 32 * 16);
+
+        let (data, min_v, max_v) = generate_curvilinear_2d(32, 16, 0);
+        assert_eq!(data.len(), 32 * 16);
+        assert!(min_v >= 0.0);
+        assert!(max_v <= 100.0);
     }
 }

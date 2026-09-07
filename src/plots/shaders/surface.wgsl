@@ -72,17 +72,52 @@ fn vs_main(
     let scale_x = 2.0 * data_aspect;
     let scale_y = 2.0;
 
-    let bounds_u = get_cell_normalized_bounds_x(cell_x, grid_w, uniforms.coord_mode);
-    let bounds_v = get_cell_normalized_bounds_y(cell_y, grid_h, uniforms.coord_mode);
+    var world_x: f32;
+    var world_z: f32;
 
-    let x0 = -data_aspect + bounds_u.x * scale_x;
-    let x1 = -data_aspect + bounds_u.y * scale_x;
+    if (uniforms.coord_mode == 3u) {
+        let i0 = cell_x;
+        let i1 = min(cell_x + 1u, grid_w - 1u);
+        let j0 = cell_y;
+        let j1 = min(cell_y + 1u, grid_h - 1u);
 
-    let y0 = -1.0 + bounds_v.x * scale_y;
-    let y1 = -1.0 + bounds_v.y * scale_y;
+        let max_cx = max(arrayLength(&coord_x_buffer), 1u) - 1u;
+        let max_cy = max(arrayLength(&coord_y_buffer), 1u) - 1u;
 
-    let world_x = mix(x0, x1, model.position.x);
-    let world_z = mix(y0, y1, model.position.y);
+        let lon00 = coord_x_buffer[min(j0 * grid_w + i0, max_cx)];
+        let lon10 = coord_x_buffer[min(j0 * grid_w + i1, max_cx)];
+        let lon01 = coord_x_buffer[min(j1 * grid_w + i0, max_cx)];
+        let lon11 = coord_x_buffer[min(j1 * grid_w + i1, max_cx)];
+
+        let lat00 = coord_y_buffer[min(j0 * grid_w + i0, max_cy)];
+        let lat10 = coord_y_buffer[min(j0 * grid_w + i1, max_cy)];
+        let lat01 = coord_y_buffer[min(j1 * grid_w + i0, max_cy)];
+        let lat11 = coord_y_buffer[min(j1 * grid_w + i1, max_cy)];
+
+        let cur_lon = mix(mix(lon00, lon10, model.position.x), mix(lon01, lon11, model.position.x), model.position.y);
+        let cur_lat = mix(mix(lat00, lat10, model.position.x), mix(lat01, lat11, model.position.x), model.position.y);
+
+        let span_lon = max(abs(uniforms.lon_bounds.y - uniforms.lon_bounds.x), 1e-5);
+        let span_lat = max(abs(uniforms.lat_bounds.y - uniforms.lat_bounds.x), 1e-5);
+
+        let u = clamp((cur_lon - uniforms.lon_bounds.x) / span_lon, 0.0, 1.0);
+        let v = clamp((uniforms.lat_bounds.y - cur_lat) / span_lat, 0.0, 1.0);
+
+        world_x = (-1.0 + 2.0 * u) * data_aspect;
+        world_z = -1.0 + 2.0 * v;
+    } else {
+        let bounds_u = get_cell_normalized_bounds_x(cell_x, grid_w, uniforms.coord_mode);
+        let bounds_v = get_cell_normalized_bounds_y(cell_y, grid_h, uniforms.coord_mode);
+
+        let x0 = -data_aspect + bounds_u.x * scale_x;
+        let x1 = -data_aspect + bounds_u.y * scale_x;
+
+        let y0 = -1.0 + bounds_v.x * scale_y;
+        let y1 = -1.0 + bounds_v.y * scale_y;
+
+        world_x = mix(x0, x1, model.position.x);
+        world_z = mix(y0, y1, model.position.y);
+    }
 
     var pos_3d: vec3<f32>;
     var normal_3d: vec3<f32>;

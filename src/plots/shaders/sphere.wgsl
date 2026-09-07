@@ -61,6 +61,40 @@ fn get_lon_lat(cell_x: u32, cell_y: u32, model_xy: vec2<f32>, grid_w: u32, grid_
         let lon = mix(uniforms.lon_bounds.x, uniforms.lon_bounds.y, u);
         let lat = mix(uniforms.lat_bounds.y, uniforms.lat_bounds.x, v);
         return vec2<f32>(lon, lat);
+    } else if (uniforms.coord_mode == 3u) {
+        // Mode 3: Curvilinear 2D Grid (GPU Vertex Pulling from 2D Lon/Lat Storage Buffers)
+        let i0 = cell_x;
+        let i1 = min(cell_x + 1u, grid_w - 1u);
+        let j0 = cell_y;
+        let j1 = min(cell_y + 1u, grid_h - 1u);
+
+        let max_cx = max(arrayLength(&coord_x_buffer), 1u) - 1u;
+        let max_cy = max(arrayLength(&coord_y_buffer), 1u) - 1u;
+
+        let idx00 = min(j0 * grid_w + i0, max_cx);
+        let idx10 = min(j0 * grid_w + i1, max_cx);
+        let idx01 = min(j1 * grid_w + i0, max_cx);
+        let idx11 = min(j1 * grid_w + i1, max_cx);
+
+        let lon00 = coord_x_buffer[idx00];
+        let lon10 = coord_x_buffer[idx10];
+        let lon01 = coord_x_buffer[idx01];
+        let lon11 = coord_x_buffer[idx11];
+
+        let idy00 = min(j0 * grid_w + i0, max_cy);
+        let idy10 = min(j0 * grid_w + i1, max_cy);
+        let idy01 = min(j1 * grid_w + i0, max_cy);
+        let idy11 = min(j1 * grid_w + i1, max_cy);
+
+        let lat00 = coord_y_buffer[idy00];
+        let lat10 = coord_y_buffer[idy10];
+        let lat01 = coord_y_buffer[idy01];
+        let lat11 = coord_y_buffer[idy11];
+
+        let deg_lon = mix(mix(lon00, lon10, model_xy.x), mix(lon01, lon11, model_xy.x), model_xy.y);
+        let deg_lat = mix(mix(lat00, lat10, model_xy.x), mix(lat01, lat11, model_xy.x), model_xy.y);
+
+        return vec2<f32>(deg_lon * 0.0174532925, deg_lat * 0.0174532925);
     } else {
         // Mode 2: Irregular 1D Coordinate Buffers with heatmap-matching interval boundaries
         let bounds_u = get_cell_normalized_bounds_x(cell_x, grid_w, uniforms.coord_mode);
