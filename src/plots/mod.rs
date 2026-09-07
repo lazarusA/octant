@@ -45,7 +45,7 @@ impl PlotType {
     }
 }
 
-/// Assembles a plot WGSL shader by prepending all shared WGSL colormap modules.
+/// Assembles a base plot WGSL shader by prepending colormaps and shared 3D camera utilities.
 #[macro_export]
 macro_rules! assemble_plot_shader {
     ($plot_shader:expr) => {
@@ -66,6 +66,38 @@ macro_rules! assemble_plot_shader {
             "\n",
             include_str!("shaders/colormaps/mod.wgsl"),
             "\n",
+            include_str!("shaders/common/camera3d.wgsl"),
+            "\n",
+            $plot_shader
+        )
+    };
+}
+
+/// Assembles a 2D/3D plot WGSL shader with 1D coordinate buffer bindings and coordinate math.
+#[macro_export]
+macro_rules! assemble_plot_with_coords_shader {
+    ($plot_shader:expr) => {
+        concat!(
+            include_str!("shaders/colormaps/viridis.wgsl"),
+            "\n",
+            include_str!("shaders/colormaps/plasma.wgsl"),
+            "\n",
+            include_str!("shaders/colormaps/inferno.wgsl"),
+            "\n",
+            include_str!("shaders/colormaps/magma.wgsl"),
+            "\n",
+            include_str!("shaders/colormaps/turbo.wgsl"),
+            "\n",
+            include_str!("shaders/colormaps/coolwarm.wgsl"),
+            "\n",
+            include_str!("shaders/colormaps/cividis.wgsl"),
+            "\n",
+            include_str!("shaders/colormaps/mod.wgsl"),
+            "\n",
+            include_str!("shaders/common/coords.wgsl"),
+            "\n",
+            include_str!("shaders/common/camera3d.wgsl"),
+            "\n",
             $plot_shader
         )
     };
@@ -78,15 +110,15 @@ mod tests {
         let shaders = [
             (
                 "sphere",
-                crate::assemble_plot_shader!(include_str!("shaders/sphere.wgsl")),
+                crate::assemble_plot_with_coords_shader!(include_str!("shaders/sphere.wgsl")),
             ),
             (
                 "surface",
-                crate::assemble_plot_shader!(include_str!("shaders/surface.wgsl")),
+                crate::assemble_plot_with_coords_shader!(include_str!("shaders/surface.wgsl")),
             ),
             (
                 "heatmap",
-                crate::assemble_plot_shader!(include_str!("shaders/heatmap.wgsl")),
+                crate::assemble_plot_with_coords_shader!(include_str!("shaders/heatmap.wgsl")),
             ),
             (
                 "volume",

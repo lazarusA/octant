@@ -15,12 +15,6 @@ var<uniform> uniforms: Uniforms;
 @group(0) @binding(1)
 var<storage, read> data_buffer: array<f32>;
 
-@group(0) @binding(2)
-var<storage, read> coord_x_buffer: array<f32>;
-
-@group(0) @binding(3)
-var<storage, read> coord_y_buffer: array<f32>;
-
 struct VertexInput {
     @location(0) position: vec2<f32>,
     @location(1) uv: vec2<f32>,
@@ -30,92 +24,6 @@ struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
 };
-
-fn find_coord_cell_x(query_val: f32, len: u32) -> u32 {
-    if (len <= 1u) {
-        return 0u;
-    }
-    let max_idx = min(len - 1u, max(arrayLength(&coord_x_buffer), 1u) - 1u);
-    if (max_idx == 0u) {
-        return 0u;
-    }
-    let first = coord_x_buffer[0];
-    let last = coord_x_buffer[max_idx];
-    let is_descending = first > last;
-
-    var low: u32 = 0u;
-    var high: u32 = max_idx - 1u;
-
-    if (is_descending) {
-        while (low < high) {
-            let mid = (low + high + 1u) / 2u;
-            if (coord_x_buffer[mid] >= query_val) {
-                low = mid;
-            } else {
-                high = mid - 1u;
-            }
-        }
-    } else {
-        while (low < high) {
-            let mid = (low + high + 1u) / 2u;
-            if (coord_x_buffer[mid] <= query_val) {
-                low = mid;
-            } else {
-                high = mid - 1u;
-            }
-        }
-    }
-
-    let next = min(low + 1u, max_idx);
-    if (abs(query_val - coord_x_buffer[low]) <= abs(query_val - coord_x_buffer[next])) {
-        return low;
-    } else {
-        return next;
-    }
-}
-
-fn find_coord_cell_y(query_val: f32, len: u32) -> u32 {
-    if (len <= 1u) {
-        return 0u;
-    }
-    let max_idx = min(len - 1u, max(arrayLength(&coord_y_buffer), 1u) - 1u);
-    if (max_idx == 0u) {
-        return 0u;
-    }
-    let first = coord_y_buffer[0];
-    let last = coord_y_buffer[max_idx];
-    let is_descending = first > last;
-
-    var low: u32 = 0u;
-    var high: u32 = max_idx - 1u;
-
-    if (is_descending) {
-        while (low < high) {
-            let mid = (low + high + 1u) / 2u;
-            if (coord_y_buffer[mid] >= query_val) {
-                low = mid;
-            } else {
-                high = mid - 1u;
-            }
-        }
-    } else {
-        while (low < high) {
-            let mid = (low + high + 1u) / 2u;
-            if (coord_y_buffer[mid] <= query_val) {
-                low = mid;
-            } else {
-                high = mid - 1u;
-            }
-        }
-    }
-
-    let next = min(low + 1u, max_idx);
-    if (abs(query_val - coord_y_buffer[low]) <= abs(query_val - coord_y_buffer[next])) {
-        return low;
-    } else {
-        return next;
-    }
-}
 
 @vertex
 fn vs_main(model: VertexInput) -> VertexOutput {

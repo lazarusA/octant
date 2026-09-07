@@ -21,12 +21,6 @@ var<uniform> uniforms: Uniforms;
 @group(0) @binding(1)
 var<storage, read> data_buffer: array<f32>;
 
-@group(0) @binding(2)
-var<storage, read> coord_x_buffer: array<f32>;
-
-@group(0) @binding(3)
-var<storage, read> coord_y_buffer: array<f32>;
-
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) uv: vec2<f32>,
@@ -52,84 +46,6 @@ fn lon_lat_to_cartesian(radius: f32, lon: f32, lat: f32) -> vec3<f32> {
     return vec3<f32>(x, y, z);
 }
 
-fn get_cell_normalized_bounds_x(cell_idx: u32, grid_w: u32) -> vec2<f32> {
-    if (uniforms.coord_mode != 2u || grid_w <= 1u) {
-        let u0 = f32(cell_idx) / f32(grid_w);
-        let u1 = f32(cell_idx + 1u) / f32(grid_w);
-        return vec2<f32>(u0, u1);
-    }
-    let max_cx = min(grid_w - 1u, max(arrayLength(&coord_x_buffer), 1u) - 1u);
-    if (max_cx == 0u) {
-        return vec2<f32>(0.0, 1.0);
-    }
-    let first_x = coord_x_buffer[0];
-    let last_x = coord_x_buffer[max_cx];
-    let span_x = last_x - first_x;
-    if (abs(span_x) < 1e-6) {
-        let u0 = f32(cell_idx) / f32(grid_w);
-        let u1 = f32(cell_idx + 1u) / f32(grid_w);
-        return vec2<f32>(u0, u1);
-    }
-
-    let idx = min(cell_idx, max_cx);
-    var b0: f32;
-    if (idx == 0u) {
-        b0 = first_x;
-    } else {
-        b0 = 0.5 * (coord_x_buffer[idx - 1u] + coord_x_buffer[idx]);
-    }
-
-    var b1: f32;
-    if (idx >= max_cx) {
-        b1 = last_x;
-    } else {
-        b1 = 0.5 * (coord_x_buffer[idx] + coord_x_buffer[idx + 1u]);
-    }
-
-    let u0 = (b0 - first_x) / span_x;
-    let u1 = (b1 - first_x) / span_x;
-    return vec2<f32>(u0, u1);
-}
-
-fn get_cell_normalized_bounds_y(cell_idx: u32, grid_h: u32) -> vec2<f32> {
-    if (uniforms.coord_mode != 2u || grid_h <= 1u) {
-        let v0 = f32(cell_idx) / f32(grid_h);
-        let v1 = f32(cell_idx + 1u) / f32(grid_h);
-        return vec2<f32>(v0, v1);
-    }
-    let max_cy = min(grid_h - 1u, max(arrayLength(&coord_y_buffer), 1u) - 1u);
-    if (max_cy == 0u) {
-        return vec2<f32>(0.0, 1.0);
-    }
-    let first_y = coord_y_buffer[0];
-    let last_y = coord_y_buffer[max_cy];
-    let span_y = last_y - first_y;
-    if (abs(span_y) < 1e-6) {
-        let v0 = f32(cell_idx) / f32(grid_h);
-        let v1 = f32(cell_idx + 1u) / f32(grid_h);
-        return vec2<f32>(v0, v1);
-    }
-
-    let idx = min(cell_idx, max_cy);
-    var b0: f32;
-    if (idx == 0u) {
-        b0 = first_y;
-    } else {
-        b0 = 0.5 * (coord_y_buffer[idx - 1u] + coord_y_buffer[idx]);
-    }
-
-    var b1: f32;
-    if (idx >= max_cy) {
-        b1 = last_y;
-    } else {
-        b1 = 0.5 * (coord_y_buffer[idx] + coord_y_buffer[idx + 1u]);
-    }
-
-    let v0 = (b0 - first_y) / span_y;
-    let v1 = (b1 - first_y) / span_y;
-    return vec2<f32>(v0, v1);
-}
-
 fn get_lon_lat(cell_x: u32, cell_y: u32, model_xy: vec2<f32>, grid_w: u32, grid_h: u32) -> vec2<f32> {
     if (uniforms.coord_mode == 0u) {
         // Mode 0: Global Regular [-π..π] and [π/2..-π/2]
@@ -147,8 +63,8 @@ fn get_lon_lat(cell_x: u32, cell_y: u32, model_xy: vec2<f32>, grid_w: u32, grid_
         return vec2<f32>(lon, lat);
     } else {
         // Mode 2: Irregular 1D Coordinate Buffers with heatmap-matching interval boundaries
-        let bounds_u = get_cell_normalized_bounds_x(cell_x, grid_w);
-        let bounds_v = get_cell_normalized_bounds_y(cell_y, grid_h);
+        let bounds_u = get_cell_normalized_bounds_x(cell_x, grid_w, uniforms.coord_mode);
+        let bounds_v = get_cell_normalized_bounds_y(cell_y, grid_h, uniforms.coord_mode);
         let u = mix(bounds_u.x, bounds_u.y, model_xy.x);
         let v = mix(bounds_v.x, bounds_v.y, model_xy.y);
 
@@ -245,51 +161,11 @@ fn vs_main(
     }
 
     // Rigid 3D camera rotation around Y and X axes
-    let cy = cos(uniforms.rotation_y);
-    let sy = sin(uniforms.rotation_y);
-    let cx = cos(uniforms.rotation_x);
-    let sx = sin(uniforms.rotation_x);
-
-    // Y-axis rotation
-    let pos_y_rot = vec3<f32>(
-        cy * pos_3d.x + sy * pos_3d.z,
-        pos_3d.y,
-        -sy * pos_3d.x + cy * pos_3d.z
-    );
-
-    // X-axis rotation
-    let pos_rot = vec3<f32>(
-        pos_y_rot.x,
-        cx * pos_y_rot.y - sx * pos_y_rot.z,
-        sx * pos_y_rot.y + cx * pos_y_rot.z
-    );
-
-    // Rigid rotation of normal vector for 3D directional lighting
-    let norm_y_rot = vec3<f32>(
-        cy * normal_3d.x + sy * normal_3d.z,
-        normal_3d.y,
-        -sy * normal_3d.x + cy * normal_3d.z
-    );
-    let norm_rot = normalize(vec3<f32>(
-        norm_y_rot.x,
-        cx * norm_y_rot.y - sx * norm_y_rot.z,
-        sx * norm_y_rot.y + cx * norm_y_rot.z
-    ));
+    let pos_rot = rotate_camera_yx(pos_3d, uniforms.rotation_y, uniforms.rotation_x);
+    let norm_rot = rotate_normal_yx(normal_3d, uniforms.rotation_y, uniforms.rotation_x);
 
     // Perspective projection transformation using dynamic zoom
-    let cam_dist = clamp(uniforms.zoom, 1.1, 10.0);
-    let cam_z = pos_rot.z - cam_dist;
-    let dist_positive = max(-cam_z, 0.001);
-    let fov_scale = 1.6;
-    let proj_x = (pos_rot.x * fov_scale) / uniforms.aspect_ratio;
-    let proj_y = pos_rot.y * fov_scale;
-
-    // Linear depth projection mapped to [0.0, 1.0] for hardware depth testing
-    let z_near = 0.01;
-    let z_far = 50.0;
-    let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
-
-    out.position = vec4<f32>(proj_x, proj_y, proj_z, dist_positive);
+    out.position = project_perspective(pos_rot, uniforms.aspect_ratio, uniforms.zoom, 1.6, 1.1);
     out.uv = model.uv;
     out.val = raw_val;
     out.normal = norm_rot;
@@ -319,10 +195,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // 3D Directional Lighting with two-sided support for transparent / rotated meshes
-    let light_dir = normalize(vec3<f32>(0.5, 0.7, 0.9));
-    let diffuse = max(abs(dot(geom_normal, light_dir)), 0.25);
-    let ambient = 0.35;
-    let lighting = clamp(ambient + diffuse * 0.65, 0.3, 1.0);
+    let lighting = evaluate_directional_lighting(geom_normal, vec3<f32>(0.5, 0.7, 0.9), 0.35, 0.65);
 
     return vec4<f32>(eval_color.rgb * lighting, eval_color.a);
 }

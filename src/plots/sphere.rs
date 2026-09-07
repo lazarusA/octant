@@ -32,7 +32,8 @@ impl SphereRenderer {
         coord_x: Option<&[f32]>,
         coord_y: Option<&[f32]>,
     ) -> Self {
-        let shader_source = crate::assemble_plot_shader!(include_str!("shaders/sphere.wgsl"));
+        let shader_source =
+            crate::assemble_plot_with_coords_shader!(include_str!("shaders/sphere.wgsl"));
         Self::new_with_coords(
             device,
             target_format,

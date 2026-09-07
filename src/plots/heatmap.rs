@@ -90,7 +90,8 @@ impl HeatmapRenderer {
         coord_x: Option<&[f32]>,
         coord_y: Option<&[f32]>,
     ) -> Self {
-        let shader_source = crate::assemble_plot_shader!(include_str!("shaders/heatmap.wgsl"));
+        let shader_source =
+            crate::assemble_plot_with_coords_shader!(include_str!("shaders/heatmap.wgsl"));
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Heatmap Shader Module"),
@@ -166,74 +167,22 @@ impl HeatmapRenderer {
             &padded_coords_y,
         );
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Heatmap Bind Group Layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-        });
+        let bind_group_layout = super::common::create_plot_with_coords_bind_group_layout(
+            device,
+            "Heatmap Bind Group Layout",
+            wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+            wgpu::ShaderStages::FRAGMENT,
+        );
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Heatmap Bind Group"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: data_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: coord_x_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: coord_y_buffer.as_entire_binding(),
-                },
-            ],
-        });
+        let bind_group = super::common::create_plot_with_coords_bind_group(
+            device,
+            "Heatmap Bind Group",
+            &bind_group_layout,
+            &uniform_buffer,
+            &data_buffer,
+            &coord_x_buffer,
+            &coord_y_buffer,
+        );
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Heatmap Pipeline Layout"),
