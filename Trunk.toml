@@ -1,0 +1,12 @@
+# Trunk configuration for Octant WebAssembly portal
+[build]
+target = "index.html"
+dist = "dist"
+
+[watch]
+watch = ["src", "assets", "index.html"]
+ignore = ["target", "dist", ".agents"]
+
+[serve]
+port = 8080
+open = false

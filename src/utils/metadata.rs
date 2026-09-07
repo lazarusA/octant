@@ -461,95 +461,102 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits + 'stat
 
 /// Fallback function: Discover variables via consolidated `.zmetadata` or `zarr.json` HTTP inspection.
 pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
-    let mut variables = Vec::new();
-
-    let zmetadata_url = format!("{}/.zmetadata", base_url.trim_end_matches('/'));
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .build()
-        .ok();
-
-    let resp_opt = client
-        .as_ref()
-        .and_then(|c| c.get(&zmetadata_url).send().ok())
-        .or_else(|| reqwest::blocking::get(&zmetadata_url).ok());
-
-    if let Some(resp) = resp_opt
-        && resp.status().is_success()
-        && let Ok(bytes) = resp.bytes()
-        && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes)
-        && let Some(metadata_obj) = v.get("metadata").and_then(|m| m.as_object())
+    #[cfg(not(target_arch = "wasm32"))]
     {
-        for (key, val) in metadata_obj {
-            if key.ends_with("/.zarray") || key == ".zarray" || key.ends_with("/zarr.json") {
-                let var_name = key
-                    .trim_end_matches("/.zarray")
-                    .trim_end_matches("/zarr.json")
-                    .trim_start_matches('/')
-                    .to_string();
-                let var_name = if var_name.is_empty() {
-                    "data".to_string()
-                } else {
-                    var_name
-                };
+        let mut variables = Vec::new();
 
-                let shape: Vec<u64> = val
-                    .get("shape")
-                    .and_then(|s| s.as_array())
-                    .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
-                    .unwrap_or_else(|| vec![989, 72, 144]);
+        let zmetadata_url = format!("{}/.zmetadata", base_url.trim_end_matches('/'));
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .build()
+            .ok();
 
-                let chunk_shape: Vec<u64> = val
-                    .get("chunks")
-                    .and_then(|c| c.as_array())
-                    .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
-                    .unwrap_or_else(|| shape.clone());
+        let resp_opt = client
+            .as_ref()
+            .and_then(|c| c.get(&zmetadata_url).send().ok())
+            .or_else(|| reqwest::blocking::get(&zmetadata_url).ok());
 
-                let data_type = val
-                    .get("dtype")
-                    .or_else(|| val.get("data_type"))
-                    .and_then(|d| d.as_str())
-                    .unwrap_or("float32")
-                    .to_string();
+        if let Some(resp) = resp_opt
+            && resp.status().is_success()
+            && let Ok(bytes) = resp.bytes()
+            && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes)
+            && let Some(metadata_obj) = v.get("metadata").and_then(|m| m.as_object())
+        {
+            for (key, val) in metadata_obj {
+                if key.ends_with("/.zarray") || key == ".zarray" || key.ends_with("/zarr.json") {
+                    let var_name = key
+                        .trim_end_matches("/.zarray")
+                        .trim_end_matches("/zarr.json")
+                        .trim_start_matches('/')
+                        .to_string();
+                    let var_name = if var_name.is_empty() {
+                        "data".to_string()
+                    } else {
+                        var_name
+                    };
 
-                let zattrs_key = if var_name == "data" {
-                    ".zattrs".to_string()
-                } else {
-                    format!("{}/.zattrs", var_name)
-                };
+                    let shape: Vec<u64> = val
+                        .get("shape")
+                        .and_then(|s| s.as_array())
+                        .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
+                        .unwrap_or_else(|| vec![989, 72, 144]);
 
-                let attrs_val = metadata_obj
-                    .get(&zattrs_key)
-                    .or_else(|| metadata_obj.get(".zattrs"));
+                    let chunk_shape: Vec<u64> = val
+                        .get("chunks")
+                        .and_then(|c| c.as_array())
+                        .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
+                        .unwrap_or_else(|| shape.clone());
 
-                let cf_attrs = attrs_val
-                    .and_then(|a| a.as_object())
-                    .map(ParsedCfAttributes::from_json_map)
-                    .unwrap_or_default();
+                    let data_type = val
+                        .get("dtype")
+                        .or_else(|| val.get("data_type"))
+                        .and_then(|d| d.as_str())
+                        .unwrap_or("float32")
+                        .to_string();
 
-                let dimension_names = cf_attrs.resolve_dimension_names(None, shape.len());
-                let file_size = calculate_variable_size_bytes(&shape, &data_type);
+                    let zattrs_key = if var_name == "data" {
+                        ".zattrs".to_string()
+                    } else {
+                        format!("{}/.zattrs", var_name)
+                    };
 
-                variables.push(VariableInfo {
-                    name: var_name,
-                    data_type,
-                    shape,
-                    dimension_names,
-                    chunk_shape,
-                    file_size,
-                    units: cf_attrs.units,
-                    long_name: cf_attrs.long_name,
-                    time_coverage_start: cf_attrs.time_coverage_start,
-                    time_coverage_end: cf_attrs.time_coverage_end,
-                    temporal_resolution: cf_attrs.temporal_resolution,
-                    attributes: cf_attrs.attributes,
-                });
+                    let attrs_val = metadata_obj
+                        .get(&zattrs_key)
+                        .or_else(|| metadata_obj.get(".zattrs"));
+
+                    let cf_attrs = attrs_val
+                        .and_then(|a| a.as_object())
+                        .map(ParsedCfAttributes::from_json_map)
+                        .unwrap_or_default();
+
+                    let dimension_names = cf_attrs.resolve_dimension_names(None, shape.len());
+                    let file_size = calculate_variable_size_bytes(&shape, &data_type);
+
+                    variables.push(VariableInfo {
+                        name: var_name,
+                        data_type,
+                        shape,
+                        dimension_names,
+                        chunk_shape,
+                        file_size,
+                        units: cf_attrs.units,
+                        long_name: cf_attrs.long_name,
+                        time_coverage_start: cf_attrs.time_coverage_start,
+                        time_coverage_end: cf_attrs.time_coverage_end,
+                        temporal_resolution: cf_attrs.temporal_resolution,
+                        attributes: cf_attrs.attributes,
+                    });
+                }
             }
         }
+        variables
     }
-
-    variables
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = base_url;
+        Vec::new()
+    }
 }
 
 #[cfg(test)]

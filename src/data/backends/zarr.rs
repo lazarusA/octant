@@ -27,12 +27,12 @@ impl ZarrBlockStore {
     }
 
     pub fn open_local(path: &str) -> Result<Self, BlockStoreError> {
-        let storage = zarr_storage::open_local_storage(path)?;
+        let storage = zarr_storage::open_local_storage(path).map_err(|e| format!("{e}"))?;
         Ok(Self::new(storage, path))
     }
 
     pub fn open_remote(url: &str) -> Result<Self, BlockStoreError> {
-        let storage = zarr_storage::build_sync_store(url)?;
+        let storage = zarr_storage::build_sync_store(url).map_err(|e| format!("{e}"))?;
         Ok(Self::new(storage, url.trim_end_matches('/')))
     }
 }
@@ -57,7 +57,7 @@ impl BlockStore for ZarrBlockStore {
     fn fetch_block_with_progress(
         &self,
         request: &SliceRequest,
-        on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+        on_progress: crate::data::block_store::ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         self.inner.fetch_block_with_progress(request, on_progress)
     }

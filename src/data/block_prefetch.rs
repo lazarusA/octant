@@ -9,9 +9,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 
+#[cfg(not(target_arch = "wasm32"))]
+use super::block_loader::BlockLoader;
 use super::{
     block_cache::{BlockCache, BlockCacheKey},
-    block_loader::BlockLoader,
     block_request::BlockRequest,
     octant_block::OctantBlock,
     slice_request::DimensionSelection,
@@ -86,7 +87,8 @@ impl BlockPrefetcher {
         let completed_atomic = self.completed_bytes.clone();
         let aborted_atomic = self.aborted.clone();
 
-        rayon::spawn(move || {
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::utils::executor::TaskExecutor::spawn_background(move || {
             let mut on_progress = |chunk_bytes: u64| {
                 if !aborted_atomic.load(Ordering::Relaxed) {
                     completed_atomic.fetch_add(chunk_bytes, Ordering::Relaxed);
@@ -96,6 +98,26 @@ impl BlockPrefetcher {
                 .map_err(|error| error.to_string());
             let _ = tx.send(PrefetchResult { key, result });
         });
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            let tx = tx.clone();
+            let key = key.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                let mut on_progress = |chunk_bytes: u64| {
+                    if !aborted_atomic.load(Ordering::Relaxed) {
+                        completed_atomic.fetch_add(chunk_bytes, Ordering::Relaxed);
+                    }
+                };
+                let result = crate::data::backends::wasm_zarr::load_one_wasm_with_progress(
+                    &request,
+                    Some(&mut on_progress),
+                )
+                .await
+                .map_err(|error| error.to_string());
+                let _ = tx.send(PrefetchResult { key, result });
+            });
+        }
 
         true
     }

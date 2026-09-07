@@ -49,7 +49,7 @@ impl BlockLoader {
     /// Loads a single block through its own store, reporting progressive bytes downloaded.
     pub fn load_one_with_progress(
         request: &BlockRequest,
-        on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+        on_progress: crate::data::block_store::ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         request
             .store

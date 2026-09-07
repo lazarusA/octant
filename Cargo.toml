@@ -26,27 +26,34 @@ wgpu = { version = "30", features = ["webgpu", "webgl"] }
 bytemuck = { version = "1.25", features = ["derive"] }
 glam = { version = "0.33", features = ["bytemuck"] }
 log = "0.4"
-zarrs = { version = "0.23", features = ["blosc", "zstd", "sharding", "gzip", "zlib", "crc32c", "async"] }
-zarrs_object_store = { version = "0.7", features = ["http"] }
-zarrs_icechunk = "0.5"
-icechunk = "2.1.2"
-object_store = { version = "0.14", features = ["http", "aws", "azure", "gcp"] }
-reqwest = { version = "0.13", features = ["blocking", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-rayon = "1.10"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 flate2 = "1.0"
 inventory = "0.3"
+web-time = "1.1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.53", features = ["full"] }
 env_logger = "0.11"
 arboard = "3.4"
 netcdf = { version = "0.12", features = ["static"] }
+rayon = "1.10"
+reqwest = { version = "0.13", features = ["blocking", "json"] }
+zarrs = { version = "0.23", features = ["blosc", "zstd", "sharding", "gzip", "zlib", "crc32c", "async", "filesystem"] }
+zarrs_object_store = { version = "0.7", features = ["http"] }
+zarrs_icechunk = "0.5"
+icechunk = "2.1.2"
+object_store = { version = "0.14", features = ["http", "aws", "azure", "gcp"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 console_log = "1.1"
+uuid = { version = "1", features = ["v4", "js"] }
+zarrs = { version = "0.23", default-features = false, features = ["ndarray", "crc32c", "gzip", "zlib", "sharding", "transpose", "async", "bitround", "pcodec"] }
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlCanvasElement", "Response", "Request", "RequestInit", "Headers", "RequestMode"] }
+js-sys = "0.3"
+
+

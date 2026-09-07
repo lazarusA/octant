@@ -2,16 +2,20 @@
 
 use std::error::Error;
 use std::sync::Arc;
-
-use object_store::ClientOptions;
-use object_store::http::HttpBuilder;
-
 use zarrs::storage::ReadableWritableListableStorage;
+
+#[cfg(not(target_arch = "wasm32"))]
+use crate::utils::executor::{TokioBlockOn, get_shared_tokio_rt};
+#[cfg(not(target_arch = "wasm32"))]
+use object_store::ClientOptions;
+#[cfg(not(target_arch = "wasm32"))]
+use object_store::http::HttpBuilder;
+#[cfg(not(target_arch = "wasm32"))]
 use zarrs::storage::storage_adapter::async_to_sync::AsyncToSyncStorageAdapter;
+#[cfg(not(target_arch = "wasm32"))]
 use zarrs_object_store::AsyncObjectStore;
 
-use crate::utils::executor::{TokioBlockOn, get_shared_tokio_rt};
-
+#[cfg(not(target_arch = "wasm32"))]
 /// Builds a synchronous Zarr storage adapter over HTTP object_store, for
 /// remote sources.
 pub fn build_sync_store(
@@ -42,6 +46,7 @@ pub fn build_sync_store(
     Ok(sync_store)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 /// Builds a storage handle for a local Zarr store rooted at `path`.
 pub fn open_local_storage(
     path: &str,
@@ -59,4 +64,21 @@ pub fn open_local_storage(
     let store = zarrs::filesystem::FilesystemStore::new(dir_path)?;
 
     Ok(Arc::new(store))
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Builds a synchronous Zarr storage handle for remote sources on WASM.
+pub fn build_sync_store(
+    _url: &str,
+) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
+    let store = Arc::new(zarrs::storage::store::MemoryStore::new());
+    Ok(store)
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Builds a storage handle for a local Zarr store on WASM.
+pub fn open_local_storage(
+    _path: &str,
+) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
+    Err("Local file system is only available on desktop. Please provide a remote HTTP URL or choose a catalog dataset.".into())
 }

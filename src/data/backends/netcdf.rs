@@ -522,7 +522,7 @@ mod desktop {
         fn fetch_block_with_progress(
             &self,
             request: &SliceRequest,
-            mut on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+            mut on_progress: crate::data::block_store::ProgressCallback,
         ) -> Result<OctantBlock, BlockStoreError> {
             let file = netcdf::open(&self.file_path)
                 .map_err(|e| format!("Failed to open NetCDF file '{}': {e}", self.file_path))?;
@@ -686,7 +686,7 @@ mod wasm {
         fn fetch_block_with_progress(
             &self,
             _request: &SliceRequest,
-            _on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+            _on_progress: crate::data::block_store::ProgressCallback,
         ) -> Result<OctantBlock, BlockStoreError> {
             Err("NetCDF is not supported on WASM".into())
         }

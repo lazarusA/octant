@@ -1,4 +1,5 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use web_time::Instant;
 
 use crate::app::OctantApp;
 use crate::utils::{ease_in_out_cubic, lerp3, xorshift64_f32};
@@ -137,66 +138,117 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
     // Keep animating smoothly at 60 FPS while wandering or loading.
     ui.ctx().request_repaint_after(Duration::from_millis(16));
 
+    let is_drag_hovering = ui.ctx().input(|i| !i.raw.hovered_files.is_empty());
+    if is_drag_hovering {
+        ui.ctx().request_repaint();
+    }
+
+    // Check warning state from drop handler
+    let warning_id = egui::Id::new("drop_zone_warning_state");
+    let active_warning: Option<crate::ui::drop_zone::DropZoneWarningState> =
+        ui.ctx().data(|d| d.get_temp(warning_id));
+    let is_warning_active = active_warning
+        .as_ref()
+        .is_some_and(|w| w.triggered_at.elapsed() < Duration::from_millis(3500));
+
+    if is_warning_active {
+        ui.ctx().request_repaint_after(Duration::from_millis(100));
+    }
+
     // Main centered composition with procedural cube, title, and intake
     let available_h = ui.available_height();
 
     ui.vertical_centered(|ui| {
-        ui.add_space((available_h * 0.14).max(16.0));
+        ui.add_space((available_h * 0.16).max(20.0));
 
         // Centered 3D Octant procedural widget (interactive click to hop)
-        let octant_resp = draw_octant_widget(ui, 140.0, filled, extra_rot, extra_scale);
+        let octant_resp = draw_octant_widget(ui, 136.0, filled, extra_rot, extra_scale);
         if octant_resp.on_hover_text("Click to hop octant").clicked() {
             app.hero_state.start_hop(Duration::from_millis(350));
         }
 
-        ui.add_space(22.0);
+        ui.add_space(20.0);
         header_title(ui);
 
-        ui.add_space(28.0);
+        ui.add_space(24.0);
         intake_row(ui, app);
 
         ui.add_space(14.0);
-        sample_pills_row(ui, app);
+        sample_slash_chips_row(ui, app);
 
-        ui.add_space(18.0);
-        crate::ui::drop_zone::show_drop_zone(ui, Some(420.0), 64.0);
+        // Minimalist footer / drag feedback
+        if is_warning_active {
+            ui.add_space(14.0);
+            render_warning_banner(ui);
+        } else if is_drag_hovering {
+            ui.add_space(14.0);
+            render_drag_hover_cue(ui);
+        } else {
+            ui.add_space(14.0);
+            render_idle_hint(ui);
+        }
 
         if app.is_loading || app.hero_state.loading {
-            ui.add_space(20.0);
+            ui.add_space(18.0);
+            let label = if !app.hero_state.source_label.is_empty() {
+                format!("loading — {}", app.hero_state.source_label)
+            } else {
+                "loading...".to_string()
+            };
+            let font_id = egui::FontId::monospace(11.5);
+            let galley =
+                ui.painter()
+                    .layout_no_wrap(label.clone(), font_id, ui.visuals().weak_text_color());
+            let icon_size = 12.0;
+            let gap = 6.0;
+            let total_w = icon_size + gap + galley.size().x;
+            let pad = ((ui.available_width() - total_w) * 0.5).max(0.0);
+
             ui.horizontal(|ui| {
-                ui.add_space((ui.available_width() - 200.0).max(0.0) * 0.5);
+                if pad > 0.0 {
+                    ui.add_space(pad);
+                }
                 crate::ui::icons::UiIconExt::icon_colored(
                     ui,
                     crate::ui::icons::Icon::Hourglass,
-                    12.0,
+                    icon_size,
                     ui.visuals().weak_text_color(),
                 );
-                let label = if !app.hero_state.source_label.is_empty() {
-                    format!("loading — {}", app.hero_state.source_label)
-                } else {
-                    "loading...".to_string()
-                };
+                ui.add_space(gap);
                 ui.label(
                     egui::RichText::new(label)
                         .monospace()
-                        .size(12.0)
+                        .size(11.5)
                         .color(ui.visuals().weak_text_color()),
                 );
             });
         } else if app.hero_state.loaded && !app.hero_state.source_label.is_empty() {
-            ui.add_space(20.0);
+            ui.add_space(18.0);
+            let label = format!("loaded — {}", app.hero_state.source_label);
+            let font_id = egui::FontId::monospace(11.5);
+            let galley =
+                ui.painter()
+                    .layout_no_wrap(label.clone(), font_id, ui.visuals().text_color());
+            let icon_size = 12.0;
+            let gap = 6.0;
+            let total_w = icon_size + gap + galley.size().x;
+            let pad = ((ui.available_width() - total_w) * 0.5).max(0.0);
+
             ui.horizontal(|ui| {
-                ui.add_space((ui.available_width() - 200.0).max(0.0) * 0.5);
+                if pad > 0.0 {
+                    ui.add_space(pad);
+                }
                 crate::ui::icons::UiIconExt::icon_colored(
                     ui,
                     crate::ui::icons::Icon::Check,
-                    12.0,
+                    icon_size,
                     ui.visuals().selection.bg_fill,
                 );
+                ui.add_space(gap);
                 ui.label(
-                    egui::RichText::new(format!("loaded — {}", app.hero_state.source_label))
+                    egui::RichText::new(label)
                         .monospace()
-                        .size(12.0)
+                        .size(11.5)
                         .color(ui.visuals().text_color()),
                 );
             });
@@ -210,7 +262,7 @@ fn header_title(ui: &mut egui::Ui) {
         "Bring data into ",
         0.0,
         egui::TextFormat {
-            font_id: egui::FontId::monospace(14.0),
+            font_id: egui::FontId::monospace(13.5),
             color: ui.visuals().weak_text_color(),
             ..Default::default()
         },
@@ -219,7 +271,7 @@ fn header_title(ui: &mut egui::Ui) {
         "Octant",
         0.0,
         egui::TextFormat {
-            font_id: egui::FontId::monospace(14.0),
+            font_id: egui::FontId::monospace(13.5),
             color: ui.visuals().strong_text_color(),
             ..Default::default()
         },
@@ -228,7 +280,7 @@ fn header_title(ui: &mut egui::Ui) {
         ". Start exploring.",
         0.0,
         egui::TextFormat {
-            font_id: egui::FontId::monospace(14.0),
+            font_id: egui::FontId::monospace(13.5),
             color: ui.visuals().weak_text_color(),
             ..Default::default()
         },
@@ -241,16 +293,16 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
     egui::Frame::default()
         .fill(ui.visuals().extreme_bg_color)
         .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
-        .corner_radius(8.0)
-        .inner_margin(egui::Margin::symmetric(14, 6))
+        .corner_radius(6.0)
+        .inner_margin(egui::Margin::symmetric(12, 6))
         .show(ui, |ui| {
-            ui.set_width(420.0);
+            ui.set_width(430.0);
             ui.horizontal(|ui| {
                 let has_input = !app.hero_state.input.trim().is_empty();
-                let right_reserve = if has_input { 58.0 } else { 36.0 };
+                let right_reserve = if has_input { 56.0 } else { 32.0 };
 
                 let edit = egui::TextEdit::singleline(&mut app.hero_state.input)
-                    .hint_text("https://... (.zarr / .icechunk), or local path...")
+                    .hint_text("https://... or path (.zarr, .icechunk, .nc, .h5)...")
                     .font(egui::TextStyle::Monospace)
                     .frame(egui::Frame::NONE)
                     .desired_width(ui.available_width() - right_reserve);
@@ -285,7 +337,7 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 }
 
                 // Procedural download / load icon button
-                let btn_size = egui::vec2(28.0, 24.0);
+                let btn_size = egui::vec2(26.0, 22.0);
                 let (btn_rect, btn_response) =
                     ui.allocate_exact_size(btn_size, egui::Sense::click());
 
@@ -293,7 +345,7 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                     let btn_visuals = ui.style().interact(&btn_response);
                     ui.painter().rect(
                         btn_rect,
-                        6.0,
+                        4.0,
                         btn_visuals.bg_fill,
                         btn_visuals.bg_stroke,
                         egui::StrokeKind::Inside,
@@ -325,55 +377,61 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
         });
 }
 
-fn sample_pills_row(ui: &mut egui::Ui, app: &mut OctantApp) {
-    let is_dark = ui.visuals().dark_mode;
-
-    let samples: [(&str, &str, egui::Color32, egui::Color32); 2] = [
+fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
+    let samples: [(&str, &str, &str); 2] = [
         (
-            "SeasFire",
+            "/seasfire",
             "https://s3.bgc-jena.mpg.de:9000/misc/seasfire_rechunked.zarr",
-            egui::Color32::from_rgb(255, 140, 70), // amber
-            egui::Color32::from_rgba_unmultiplied(255, 140, 70, 24),
+            "Global wildfire & climate rechunked dataset (Zarr)",
         ),
         (
-            "Procedural 4D",
+            "/procedural-4d",
             "procedural://volume4d",
-            if is_dark {
-                egui::Color32::from_rgb(222, 228, 238)
-            } else {
-                egui::Color32::from_rgb(70, 76, 88)
-            }, // white-ish / neutral
-            if is_dark {
-                egui::Color32::from_rgba_unmultiplied(222, 228, 238, 22)
-            } else {
-                egui::Color32::from_rgba_unmultiplied(70, 76, 88, 16)
-            },
+            "Synthetic 4D spatiotemporal volume",
         ),
     ];
 
     ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 8.0;
+        ui.spacing_mut().item_spacing.x = 6.0;
 
-        let total_w: f32 = samples
+        let prefix = "try:";
+        let prefix_font = egui::FontId::monospace(11.0);
+        let prefix_galley = ui.painter().layout_no_wrap(
+            prefix.to_string(),
+            prefix_font,
+            ui.visuals().weak_text_color(),
+        );
+
+        let chip_font = egui::FontId::monospace(11.0);
+        let chip_padding = egui::vec2(12.0, 6.0);
+        let chip_widths: f32 = samples
             .iter()
-            .map(|(label, _, _, _)| {
-                let galley = ui.painter().layout_no_wrap(
+            .map(|(label, _, _)| {
+                let g = ui.painter().layout_no_wrap(
                     label.to_string(),
-                    egui::FontId::monospace(11.5),
-                    egui::Color32::WHITE,
+                    chip_font.clone(),
+                    ui.visuals().text_color(),
                 );
-                galley.size().x + 20.0
+                g.size().x + chip_padding.x
             })
-            .sum::<f32>()
-            + ((samples.len() - 1) as f32 * 8.0);
+            .sum();
 
+        let total_w =
+            prefix_galley.size().x + chip_widths + ((samples.len() - 1) as f32 * 6.0) + 6.0;
         let pad = ((ui.available_width() - total_w) * 0.5).max(0.0);
         if pad > 0.0 {
             ui.add_space(pad);
         }
 
-        for (label, uri, text_color, bg_color) in samples {
-            let resp = render_pill_button(ui, label, text_color, bg_color);
+        ui.label(
+            egui::RichText::new(prefix)
+                .monospace()
+                .size(11.0)
+                .color(ui.visuals().weak_text_color().gamma_multiply(0.6)),
+        );
+
+        for (label, uri, desc) in samples {
+            let resp = render_ghost_slash_chip(ui, label, desc);
             if resp.clicked() {
                 app.hero_state.input = uri.to_string();
                 app.submit_or_activate_source(uri, None);
@@ -382,46 +440,173 @@ fn sample_pills_row(ui: &mut egui::Ui, app: &mut OctantApp) {
     });
 }
 
-fn render_pill_button(
-    ui: &mut egui::Ui,
-    label: &str,
-    text_color: egui::Color32,
-    bg_color: egui::Color32,
-) -> egui::Response {
-    let font_id = egui::FontId::monospace(11.5);
-    let galley = ui
-        .painter()
-        .layout_no_wrap(label.to_string(), font_id, text_color);
-    let padding = egui::vec2(16.0, 7.0);
+fn render_ghost_slash_chip(ui: &mut egui::Ui, label: &str, desc: &str) -> egui::Response {
+    let font_id = egui::FontId::monospace(11.0);
+    let padding = egui::vec2(10.0, 4.0);
+
+    // Layout text with slash dimmer than the rest
+    let mut job = egui::text::LayoutJob::default();
+    if let Some(rest) = label.strip_prefix('/') {
+        job.append(
+            "/",
+            0.0,
+            egui::TextFormat {
+                font_id: font_id.clone(),
+                color: ui.visuals().weak_text_color().gamma_multiply(0.5),
+                ..Default::default()
+            },
+        );
+        job.append(
+            rest,
+            0.0,
+            egui::TextFormat {
+                font_id: font_id.clone(),
+                color: ui.visuals().text_color(),
+                ..Default::default()
+            },
+        );
+    } else {
+        job.append(
+            label,
+            0.0,
+            egui::TextFormat {
+                font_id: font_id.clone(),
+                color: ui.visuals().text_color(),
+                ..Default::default()
+            },
+        );
+    }
+
+    let galley = ui.painter().layout_job(job);
     let desired_size = galley.size() + padding;
 
     let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
     if ui.is_rect_visible(rect) {
         let is_hovered = response.hovered();
-        let current_bg = if is_hovered {
-            bg_color.gamma_multiply(1.8)
+        let bg_color = if is_hovered {
+            ui.visuals().widgets.hovered.bg_fill
         } else {
-            bg_color
+            egui::Color32::TRANSPARENT
         };
-        let border_stroke = if is_hovered {
-            egui::Stroke::new(1.0, text_color.gamma_multiply(0.85))
+
+        let stroke = if is_hovered {
+            egui::Stroke::new(
+                0.8,
+                ui.visuals()
+                    .widgets
+                    .hovered
+                    .bg_stroke
+                    .color
+                    .gamma_multiply(0.6),
+            )
         } else {
-            egui::Stroke::new(0.8, text_color.gamma_multiply(0.35))
+            egui::Stroke::NONE
+        };
+
+        if is_hovered {
+            ui.painter()
+                .rect(rect, 4.0, bg_color, stroke, egui::StrokeKind::Inside);
+        }
+
+        let text_pos = rect.center() - galley.size() * 0.5;
+        let text_color = if is_hovered {
+            ui.visuals().strong_text_color()
+        } else {
+            ui.visuals().text_color()
+        };
+        ui.painter().galley(text_pos, galley, text_color);
+    }
+
+    response.on_hover_text(format!("Load sample: {desc}"))
+}
+
+fn render_idle_hint(ui: &mut egui::Ui) {
+    ui.label(
+        egui::RichText::new("paste URL, local path, or drag & drop files anywhere")
+            .monospace()
+            .size(10.0)
+            .color(ui.visuals().strong_text_color()),
+    );
+}
+
+fn render_drag_hover_cue(ui: &mut egui::Ui) {
+    let width = 430.0;
+    let height = 40.0;
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+
+    if ui.is_rect_visible(rect) {
+        let is_dark = ui.visuals().dark_mode;
+        let accent = if is_dark {
+            egui::Color32::from_rgb(0, 190, 255)
+        } else {
+            egui::Color32::from_rgb(0, 125, 220)
+        };
+        let bg = if is_dark {
+            egui::Color32::from_rgba_unmultiplied(0, 190, 255, 22)
+        } else {
+            egui::Color32::from_rgba_unmultiplied(0, 125, 220, 16)
         };
 
         ui.painter().rect(
             rect,
-            12.0,
-            current_bg,
-            border_stroke,
+            6.0,
+            bg,
+            egui::Stroke::new(1.2, accent),
             egui::StrokeKind::Inside,
         );
 
-        let text_pos = rect.center() - galley.size() * 0.5;
-        ui.painter().galley(text_pos, galley, text_color);
-    }
+        let icon_rect = egui::Rect::from_center_size(
+            egui::pos2(rect.left() + 24.0, rect.center().y),
+            egui::vec2(14.0, 14.0),
+        );
+        crate::ui::icons::Icon::DropTray.paint(ui.painter(), icon_rect, accent, is_dark);
 
-    response.on_hover_text(format!("Load sample: {}", label))
+        ui.painter().text(
+            egui::pos2(rect.left() + 40.0, rect.center().y),
+            egui::Align2::LEFT_CENTER,
+            "Drop dataset to load (.nc, .h5, .zarr, .icechunk)",
+            egui::FontId::monospace(11.0),
+            accent,
+        );
+    }
+}
+
+fn render_warning_banner(ui: &mut egui::Ui) {
+    let width = 430.0;
+    let height = 36.0;
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+
+    if ui.is_rect_visible(rect) {
+        let is_dark = ui.visuals().dark_mode;
+        let warning_color = egui::Color32::from_rgb(255, 130, 60);
+        let bg = if is_dark {
+            egui::Color32::from_rgba_unmultiplied(255, 110, 50, 26)
+        } else {
+            egui::Color32::from_rgba_unmultiplied(255, 130, 60, 18)
+        };
+
+        ui.painter().rect(
+            rect,
+            6.0,
+            bg,
+            egui::Stroke::new(1.0, warning_color),
+            egui::StrokeKind::Inside,
+        );
+
+        let icon_rect = egui::Rect::from_center_size(
+            egui::pos2(rect.left() + 20.0, rect.center().y),
+            egui::vec2(14.0, 14.0),
+        );
+        crate::ui::icons::Icon::Warning.paint(ui.painter(), icon_rect, warning_color, is_dark);
+
+        ui.painter().text(
+            egui::pos2(rect.left() + 36.0, rect.center().y),
+            egui::Align2::LEFT_CENTER,
+            "Unsupported type — supported: .nc, .h5, .zarr, .icechunk",
+            egui::FontId::monospace(10.5),
+            warning_color,
+        );
+    }
 }
 
 // ---------------------------------------------------------------------

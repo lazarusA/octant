@@ -1,5 +1,6 @@
 //! Remote storage URL parsing, S3 configuration, and virtual chunk container helpers.
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::collections::HashMap;
 use std::error::Error;
 
@@ -139,6 +140,7 @@ pub fn parse_remote_storage_url(
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 /// Builds standard `icechunk::config::S3Options` configured with timeouts and path styling.
 pub fn build_icechunk_s3_options(
     parsed: &ParsedStorageUrl,
@@ -157,6 +159,7 @@ pub fn build_icechunk_s3_options(
 }
 
 /// Registers standard open-data and virtual chunk container prefixes in the Icechunk repository configuration.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn register_standard_virtual_chunk_containers(
     repo_config: &mut icechunk::config::RepositoryConfig,
     auth_map: &mut HashMap<String, Option<icechunk::config::Credentials>>,

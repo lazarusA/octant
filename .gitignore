@@ -6,3 +6,5 @@ wgpu
 .agents/skills/rust-skills/
 netcdf
 gribberish
+dist
+.vscode

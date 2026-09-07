@@ -134,7 +134,8 @@ impl OctantApp {
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
         self.metadata_rx = Some(rx);
 
-        rayon::spawn(move || {
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::utils::executor::TaskExecutor::spawn_background(move || {
             let kind = store_kind.to_data_source_kind();
             let source_id = StoreKind::make_source_id(store_kind, &target_input);
             let source = crate::data::DataSource::new(&source_id, kind, &target_input, "Store");
@@ -149,6 +150,35 @@ impl OctantApp {
 
             let _ = tx.send(res);
         });
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            let target_clone = target_input.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                let res = match store_kind {
+                    StoreKind::RemoteZarr => {
+                        crate::data::backends::wasm_zarr::inspect_wasm_remote_zarr(&target_clone).await
+                    }
+                    StoreKind::LocalZarr => {
+                        Err("Direct local file paths cannot be read in a browser due to web sandbox security.\n\nTo view local Zarr files in the browser:\n1. Serve your directory with a local HTTP server: `npx serve` or `python3 -m http.server`\n2. Enter the URL: `http://localhost:8000/my_dataset.zarr`\n\nOr run the native desktop version of Octant (`cargo run --release`).".to_string())
+                    }
+                    _ => {
+                        let kind = store_kind.to_data_source_kind();
+                        let source_id = StoreKind::make_source_id(store_kind, &target_clone);
+                        let source = crate::data::DataSource::new(&source_id, kind, &target_clone, "Store");
+                        crate::data::SourceFactory::open(source)
+                            .and_then(|store| store.inspect())
+                            .map_err(|e| e.to_string())
+                    }
+                };
+
+                if let Err(err) = &res {
+                    log::error!("Store inspect failed for '{target_clone}': {err}");
+                }
+
+                let _ = tx.send(res);
+            });
+        }
     }
 
     /// Activates an existing dataset from the dataset manager if already loaded,

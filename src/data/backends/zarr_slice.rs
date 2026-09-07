@@ -1,5 +1,5 @@
 use crate::data::DataCalibration;
-use std::error::Error;
+use crate::data::block_store::BlockStoreError;
 use zarrs::array::chunk_cache::{ChunkCache, ChunkCacheDecodedLruSizeLimit};
 use zarrs::array::data_type::*;
 use zarrs::array::{Array, ArraySubset, CodecOptions, DataType, FromArrayBytes};
@@ -9,15 +9,16 @@ trait SubsetRetriever {
     fn retrieve_subset<T: FromArrayBytes>(
         &self,
         subset: &ArraySubset,
-    ) -> Result<T, Box<dyn Error + Send + Sync>>;
+    ) -> Result<T, BlockStoreError>;
 }
 
 impl<TStorage: ?Sized + ReadableStorageTraits + 'static> SubsetRetriever for Array<TStorage> {
     fn retrieve_subset<T: FromArrayBytes>(
         &self,
         subset: &ArraySubset,
-    ) -> Result<T, Box<dyn Error + Send + Sync>> {
-        Ok(self.retrieve_array_subset(subset)?)
+    ) -> Result<T, BlockStoreError> {
+        self.retrieve_array_subset(subset)
+            .map_err(|e| format!("{e}").into())
     }
 }
 
@@ -25,8 +26,9 @@ impl SubsetRetriever for ChunkCacheDecodedLruSizeLimit {
     fn retrieve_subset<T: FromArrayBytes>(
         &self,
         subset: &ArraySubset,
-    ) -> Result<T, Box<dyn Error + Send + Sync>> {
-        Ok(self.retrieve_array_subset(subset, &CodecOptions::default())?)
+    ) -> Result<T, BlockStoreError> {
+        self.retrieve_array_subset(subset, &CodecOptions::default())
+            .map_err(|e| format!("{e}").into())
     }
 }
 
@@ -35,7 +37,7 @@ fn decode_with<R: SubsetRetriever>(
     dt: &DataType,
     calibration: &DataCalibration,
     subset: &ArraySubset,
-) -> Result<Vec<f32>, Box<dyn Error + Send + Sync>> {
+) -> Result<Vec<f32>, BlockStoreError> {
     let has_tx = calibration.has_transformation();
 
     macro_rules! decode_typed {
@@ -92,7 +94,7 @@ pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + '
     array: &Array<TStorage>,
     cache: Option<&ChunkCacheDecodedLruSizeLimit>,
     subset: &ArraySubset,
-) -> Result<Vec<f32>, Box<dyn Error + Send + Sync>> {
+) -> Result<Vec<f32>, BlockStoreError> {
     let dt = array.data_type();
     let calibration = DataCalibration::from_json_map(array.attributes());
     match cache {

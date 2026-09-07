@@ -74,7 +74,7 @@ impl eframe::App for OctantApp {
 
         // 2. Playback Animation Timer Loop
         if self.is_playing {
-            let now = std::time::Instant::now();
+            let now = web_time::Instant::now();
             let frame_dur = std::time::Duration::from_secs_f32(1.0 / self.playback_fps.max(1.0));
 
             if now.duration_since(self.last_step_time) >= frame_dur {
@@ -597,7 +597,7 @@ impl OctantApp {
             return;
         };
 
-        self.export_flash_timer = Some(std::time::Instant::now());
+        self.export_flash_timer = Some(web_time::Instant::now());
         let (crop_x, crop_y, crop_w, crop_h) =
             req.compute_crop_rect(image.width() as u32, image.height() as u32);
         let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
@@ -653,7 +653,7 @@ impl OctantApp {
                         self.export_toast = Some(crate::export::ExportToastNotification {
                             file_path: path.clone(),
                             filename,
-                            timestamp: std::time::Instant::now(),
+                            timestamp: web_time::Instant::now(),
                         });
                     }
                 }

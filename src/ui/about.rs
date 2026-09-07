@@ -250,7 +250,7 @@ fn show_icons_tab(ui: &mut egui::Ui) {
     let mut selected_cat: usize = ui.ctx().data(|d| d.get_temp(cat_id)).unwrap_or(0);
 
     let copied_id = egui::Id::new(("about_icons", "copied_feedback"));
-    let copied_feedback: Option<(String, std::time::Instant)> =
+    let copied_feedback: Option<(String, web_time::Instant)> =
         ui.ctx().data(|d| d.get_temp(copied_id));
 
     ui.horizontal(|ui| {
@@ -437,7 +437,7 @@ fn show_icons_tab(ui: &mut egui::Ui) {
                                                 copied_id,
                                                 Some((
                                                     icon_name.to_string(),
-                                                    std::time::Instant::now(),
+                                                    web_time::Instant::now(),
                                                 )),
                                             );
                                         });

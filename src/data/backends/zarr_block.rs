@@ -31,7 +31,7 @@ pub fn fetch_block_from_cached_array(
     store: ReadableWritableListableStorage,
     store_url: &str,
     request: &SliceRequest,
-    mut on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+    mut on_progress: crate::data::block_store::ProgressCallback,
 ) -> Result<OctantBlock, BlockStoreError> {
     let shape = array.shape();
     let rank = shape.len();
@@ -161,7 +161,7 @@ pub fn fetch_block_with_progress(
     store: ReadableWritableListableStorage,
     store_url: &str,
     request: &SliceRequest,
-    on_progress: Option<&mut (dyn FnMut(u64) + Send)>,
+    on_progress: crate::data::block_store::ProgressCallback,
 ) -> Result<OctantBlock, BlockStoreError> {
     let dummy_store =
         super::generic_zarr::GenericZarrBlockStore::new(store.clone(), store_url, "zarr", "Zarr");
