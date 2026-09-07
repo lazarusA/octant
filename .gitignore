@@ -8,3 +8,6 @@ netcdf
 gribberish
 dist
 .vscode
+tests/data/
+*.nc
+.DS_Store

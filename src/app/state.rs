@@ -685,7 +685,11 @@ impl OctantApp {
 
         if let Some(dataset) = existing {
             let uri = dataset.source.uri.clone();
-            let kind = StoreKind::from_data_source_kind(&dataset.source.kind);
+            let kind = StoreKind::resolve_with_inferred(
+                None,
+                &uri,
+                StoreKind::from_data_source_kind(&dataset.source.kind),
+            );
             let meta = dataset.metadata.clone();
             self.store_target_input = uri;
             self.selected_store_kind = kind;

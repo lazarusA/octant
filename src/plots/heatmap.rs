@@ -35,7 +35,7 @@ impl HeatmapVertex {
 pub struct HeatmapUniforms {
     pub pan: [f32; 2],
     pub zoom: f32,
-    pub _pad: u32,
+    pub coord_mode: u32,
     pub aspect_scale: [f32; 2],
     pub width: u32,
     pub height: u32,
@@ -51,11 +51,14 @@ pub struct HeatmapRenderer {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     data_buffer: wgpu::Buffer,
+    coord_x_buffer: wgpu::Buffer,
+    coord_y_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     num_indices: u32,
     width: AtomicU32,
     height: AtomicU32,
+    coord_mode: AtomicU32,
     tile_bounds: RwLock<[f32; 4]>,
 }
 
@@ -67,6 +70,26 @@ impl HeatmapRenderer {
         width: usize,
         height: usize,
     ) -> Self {
+        Self::new_with_coords(
+            device,
+            target_format,
+            matrix_data,
+            width,
+            height,
+            None,
+            None,
+        )
+    }
+
+    pub fn new_with_coords(
+        device: &wgpu::Device,
+        target_format: wgpu::TextureFormat,
+        matrix_data: &[f32],
+        width: usize,
+        height: usize,
+        coord_x: Option<&[f32]>,
+        coord_y: Option<&[f32]>,
+    ) -> Self {
         let shader_source = crate::assemble_plot_shader!(include_str!("shaders/heatmap.wgsl"));
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -74,10 +97,16 @@ impl HeatmapRenderer {
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
+        let initial_coord_mode = if coord_x.is_some() || coord_y.is_some() {
+            2
+        } else {
+            0
+        };
+
         let initial_uniforms = HeatmapUniforms {
             pan: [0.0, 0.0],
             zoom: 1.0,
-            _pad: 0,
+            coord_mode: initial_coord_mode,
             aspect_scale: [1.0, 1.0],
             width: width.max(1) as u32,
             height: height.max(1) as u32,
@@ -106,19 +135,105 @@ impl HeatmapRenderer {
             &padded_initial,
         );
 
-        let bind_group_layout = super::common::create_uniform_storage_bind_group_layout(
+        let dummy_coords = [0.0f32; 4];
+        let mut padded_coords_x = coord_x
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&dummy_coords)
+            .to_vec();
+        let min_coord_x_capacity = width.max(128);
+        if padded_coords_x.len() < min_coord_x_capacity {
+            padded_coords_x.resize(min_coord_x_capacity, 0.0);
+        }
+
+        let mut padded_coords_y = coord_y
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&dummy_coords)
+            .to_vec();
+        let min_coord_y_capacity = height.max(128);
+        if padded_coords_y.len() < min_coord_y_capacity {
+            padded_coords_y.resize(min_coord_y_capacity, 0.0);
+        }
+
+        let coord_x_buffer = super::common::create_storage_buffer(
             device,
-            "Heatmap Bind Group Layout",
-            wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+            "Heatmap Coord X Storage Buffer",
+            &padded_coords_x,
         );
 
-        let bind_group = super::common::create_uniform_storage_bind_group(
+        let coord_y_buffer = super::common::create_storage_buffer(
             device,
-            "Heatmap Bind Group",
-            &bind_group_layout,
-            &uniform_buffer,
-            &data_buffer,
+            "Heatmap Coord Y Storage Buffer",
+            &padded_coords_y,
         );
+
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Heatmap Bind Group Layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Heatmap Bind Group"),
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: data_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: coord_x_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: coord_y_buffer.as_entire_binding(),
+                },
+            ],
+        });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Heatmap Pipeline Layout"),
@@ -182,11 +297,14 @@ impl HeatmapRenderer {
             vertex_buffer,
             index_buffer,
             data_buffer,
+            coord_x_buffer,
+            coord_y_buffer,
             uniform_buffer,
             bind_group,
             num_indices: indices.len() as u32,
             width: AtomicU32::new(width as u32),
             height: AtomicU32::new(height as u32),
+            coord_mode: AtomicU32::new(initial_coord_mode),
             tile_bounds: RwLock::new([0.0, 0.0, 1.0, 1.0]),
         }
     }
@@ -198,16 +316,18 @@ impl HeatmapRenderer {
         pan: [f32; 2],
         zoom: f32,
         aspect_scale: [f32; 2],
+        coord_mode: u32,
     ) {
         let tile_bounds = self
             .tile_bounds
             .read()
             .map(|b| *b)
             .unwrap_or([0.0, 0.0, 1.0, 1.0]);
+        self.coord_mode.store(coord_mode, Ordering::Relaxed);
         let uniforms = HeatmapUniforms {
             pan,
             zoom,
-            _pad: 0,
+            coord_mode,
             aspect_scale,
             width: self.width.load(Ordering::Relaxed),
             height: self.height.load(Ordering::Relaxed),
@@ -222,7 +342,14 @@ impl HeatmapRenderer {
             colormap,
             ..Default::default()
         };
-        self.update_uniforms(queue, &color, [0.0, 0.0], 1.0, [1.0, 1.0]);
+        self.update_uniforms(
+            queue,
+            &color,
+            [0.0, 0.0],
+            1.0,
+            [1.0, 1.0],
+            self.coord_mode.load(Ordering::Relaxed),
+        );
     }
 
     /// Fast GPU Storage Buffer data channel upload
@@ -235,6 +362,25 @@ impl HeatmapRenderer {
         );
     }
 
+    pub fn update_coords(&self, queue: &wgpu::Queue, coords_x: &[f32], coords_y: &[f32]) {
+        if !coords_x.is_empty() {
+            super::common::safe_write_buffer(
+                queue,
+                &self.coord_x_buffer,
+                coords_x,
+                "HeatmapRenderer::update_coords_x",
+            );
+        }
+        if !coords_y.is_empty() {
+            super::common::safe_write_buffer(
+                queue,
+                &self.coord_y_buffer,
+                coords_y,
+                "HeatmapRenderer::update_coords_y",
+            );
+        }
+    }
+
     /// Updates data, dimensions, and tile bounds for dynamic viewport LOD resampling
     pub fn update_data_and_dimensions(
         &self,
@@ -244,13 +390,6 @@ impl HeatmapRenderer {
         height: usize,
         tile_bounds: [f32; 4],
     ) {
-        // crate::utils::diagnostics::log_lod_tile_upload(
-        //     width,
-        //     height,
-        //     matrix_data.len(),
-        //     (matrix_data.len() * 4) as f64 / (1024.0 * 1024.0),
-        //     tile_bounds,
-        // );
         self.width.store(width as u32, Ordering::Relaxed);
         self.height.store(height as u32, Ordering::Relaxed);
         if let Ok(mut b) = self.tile_bounds.write() {
@@ -303,6 +442,7 @@ pub struct HeatmapCallback {
     pub pan: [f32; 2],
     pub zoom: f32,
     pub aspect_scale: [f32; 2],
+    pub coord_mode: u32,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
@@ -320,6 +460,7 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
             self.pan,
             self.zoom,
             self.aspect_scale,
+            self.coord_mode,
         );
         Vec::new()
     }

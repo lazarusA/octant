@@ -41,10 +41,7 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
     if trimmed == "procedural://volume4d" {
         return Ok(StoreKind::ProceduralVolume4D);
     }
-    if trimmed == "procedural://matrix"
-        || trimmed == "procedural://random"
-        || trimmed == "procedural://matrix2d"
-    {
+    if trimmed.starts_with("procedural://") {
         return Ok(StoreKind::ProceduralRandom);
     }
 
@@ -172,6 +169,10 @@ mod tests {
         );
         assert_eq!(
             infer_store_kind_from_target("procedural://matrix2d"),
+            Ok(StoreKind::ProceduralRandom)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("procedural://irregular"),
             Ok(StoreKind::ProceduralRandom)
         );
     }

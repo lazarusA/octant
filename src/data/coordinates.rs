@@ -156,9 +156,39 @@ impl CoordinateGrid {
         let x_irregular = is_irregular_series(xc);
         let y_irregular = is_irregular_series(yc);
 
-        if (x_irregular || y_irregular) && xc.len() >= width && yc.len() >= height {
-            let coords_x: Arc<[f32]> = xc.iter().take(width).map(|&v| v as f32).collect();
-            let coords_y: Arc<[f32]> = yc.iter().take(height).map(|&v| v as f32).collect();
+        if x_irregular || y_irregular {
+            let coords_x: Arc<[f32]> = if xc.len() >= width {
+                xc.iter().take(width).map(|&v| v as f32).collect()
+            } else {
+                (0..width)
+                    .map(|i| {
+                        if width <= 1 {
+                            x_min
+                        } else {
+                            x_min + (i as f32 / (width - 1) as f32) * (x_max - x_min)
+                        }
+                    })
+                    .collect()
+            };
+
+            let coords_y: Arc<[f32]> = if yc.len() >= height {
+                yc.iter().take(height).map(|&v| v as f32).collect()
+            } else {
+                (0..height)
+                    .map(|i| {
+                        if height <= 1 {
+                            y_min
+                        } else {
+                            y_min + (i as f32 / (height - 1) as f32) * (y_max - y_min)
+                        }
+                    })
+                    .collect()
+            };
+
+            log::info!(
+                "CoordinateGrid: Detected Irregular1D grid (x_irregular={x_irregular}, y_irregular={y_irregular}, w={width}, h={height})"
+            );
+
             Self::Irregular1D {
                 coords_x,
                 coords_y,
@@ -184,7 +214,7 @@ fn normalize_lon_deg(lon: f32) -> f32 {
     if lon > 180.0 { lon - 360.0 } else { lon }
 }
 
-/// Checks if a 1D sequence of coordinates has non-uniform spacing (> 1% relative delta variation).
+/// Checks if a 1D sequence of coordinates has non-uniform spacing (> 0.05% relative delta variation).
 fn is_irregular_series(coords: &[f64]) -> bool {
     if coords.len() < 3 {
         return false;
@@ -215,7 +245,7 @@ fn is_irregular_series(coords: &[f64]) -> bool {
     }
 
     let delta_variation = (max_delta - min_delta) / mean_delta;
-    delta_variation > 0.01 // > 1% variation is considered irregular (e.g. Gaussian grids)
+    delta_variation > 0.0005 // > 0.05% variation is considered irregular (e.g. Gaussian grids, Clenshaw-Curtis)
 }
 
 #[cfg(test)]

@@ -92,11 +92,12 @@ fn vs_main(
             coord_x_buffer[min(cell_x + 1u, max_cx)],
             cell_x + 1u <= max_cx
         );
-        let min_x = coord_x_buffer[0];
-        let max_x = coord_x_buffer[max_cx];
-        let span_x = max(max_x - min_x, 1e-6);
-        x0 = -data_aspect + ((cx0 - min_x) / span_x) * scale_x;
-        x1 = -data_aspect + ((cx1 - min_x) / span_x) * scale_x;
+        let first_x = coord_x_buffer[0];
+        let last_x = coord_x_buffer[max_cx];
+        let diff_x = last_x - first_x;
+        let span_x = select(diff_x, 1e-6, abs(diff_x) < 1e-6);
+        x0 = -data_aspect + ((cx0 - first_x) / span_x) * scale_x;
+        x1 = -data_aspect + ((cx1 - first_x) / span_x) * scale_x;
 
         let max_cy = max(arrayLength(&coord_y_buffer), 1u) - 1u;
         let cy0 = coord_y_buffer[min(cell_y, max_cy)];
@@ -105,11 +106,12 @@ fn vs_main(
             coord_y_buffer[min(cell_y + 1u, max_cy)],
             cell_y + 1u <= max_cy
         );
-        let min_y = coord_y_buffer[0];
-        let max_y = coord_y_buffer[max_cy];
-        let span_y = max(max_y - min_y, 1e-6);
-        y0 = -1.0 + ((cy0 - min_y) / span_y) * scale_y;
-        y1 = -1.0 + ((cy1 - min_y) / span_y) * scale_y;
+        let first_y = coord_y_buffer[0];
+        let last_y = coord_y_buffer[max_cy];
+        let diff_y = last_y - first_y;
+        let span_y = select(diff_y, 1e-6, abs(diff_y) < 1e-6);
+        y0 = -1.0 + ((cy0 - first_y) / span_y) * scale_y;
+        y1 = -1.0 + ((cy1 - first_y) / span_y) * scale_y;
     }
 
     let world_x = mix(x0, x1, model.position.x);

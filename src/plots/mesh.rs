@@ -92,19 +92,34 @@ impl Mesh3DRenderer {
         );
 
         let dummy_coords = [0.0f32; 4];
-        let coord_x_slice = coord_x.filter(|s| !s.is_empty()).unwrap_or(&dummy_coords);
-        let coord_y_slice = coord_y.filter(|s| !s.is_empty()).unwrap_or(&dummy_coords);
+        let mut padded_coords_x = coord_x
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&dummy_coords)
+            .to_vec();
+        let min_coord_x_capacity = width.max(128);
+        if padded_coords_x.len() < min_coord_x_capacity {
+            padded_coords_x.resize(min_coord_x_capacity, 0.0);
+        }
+
+        let mut padded_coords_y = coord_y
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&dummy_coords)
+            .to_vec();
+        let min_coord_y_capacity = height.max(128);
+        if padded_coords_y.len() < min_coord_y_capacity {
+            padded_coords_y.resize(min_coord_y_capacity, 0.0);
+        }
 
         let coord_x_buffer = super::common::create_storage_buffer(
             device,
             "Mesh 3D Coord X Storage Buffer",
-            coord_x_slice,
+            &padded_coords_x,
         );
 
         let coord_y_buffer = super::common::create_storage_buffer(
             device,
             "Mesh 3D Coord Y Storage Buffer",
-            coord_y_slice,
+            &padded_coords_y,
         );
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
