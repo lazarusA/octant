@@ -8,6 +8,7 @@ pub struct MatrixData {
     pub dataset_name: String,
     pub max_timesteps: usize,
     pub unique_values: Option<Vec<f32>>,
+    pub grid: crate::data::CoordinateGrid,
 }
 
 impl MatrixData {
@@ -20,6 +21,29 @@ impl MatrixData {
         dataset_name: String,
         max_timesteps: usize,
     ) -> Self {
+        Self::new_with_grid(
+            width,
+            height,
+            values,
+            min_val,
+            max_val,
+            dataset_name,
+            max_timesteps,
+            crate::data::CoordinateGrid::GlobalRegular,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_grid(
+        width: usize,
+        height: usize,
+        values: Vec<f32>,
+        min_val: f32,
+        max_val: f32,
+        dataset_name: String,
+        max_timesteps: usize,
+        grid: crate::data::CoordinateGrid,
+    ) -> Self {
         let unique_values = Self::compute_unique_values(&values);
         Self {
             width,
@@ -30,7 +54,13 @@ impl MatrixData {
             dataset_name,
             max_timesteps,
             unique_values,
+            grid,
         }
+    }
+
+    pub fn with_grid(mut self, grid: crate::data::CoordinateGrid) -> Self {
+        self.grid = grid;
+        self
     }
 
     /// Generates a random 2D scalar field for visualization

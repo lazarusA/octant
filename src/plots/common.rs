@@ -93,6 +93,11 @@ pub struct Mesh3DUniforms {
     pub mode: u32,
     pub width: u32,
     pub height: u32,
+    pub coord_mode: u32,
+    pub has_reference_globe: u32,
+    pub lon_bounds: [f32; 2],
+    pub lat_bounds: [f32; 2],
+    pub _pad: [u32; 2],
     pub color: PlotColorParams,
 }
 
@@ -106,6 +111,8 @@ pub struct Mesh3DUniformParams {
     pub zoom: f32,
     pub displacement_strength: f32,
     pub mode: u32,
+    pub grid: crate::data::CoordinateGrid,
+    pub has_reference_globe: bool,
 }
 
 /// Standard trait implemented by all Octant WGPU plot renderers.

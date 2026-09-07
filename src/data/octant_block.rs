@@ -172,7 +172,21 @@ impl OctantBlock {
             } else {
                 (0.0, 1.0)
             };
-            return Some(crate::data::matrix_data::MatrixData::new(
+            let x_name = self
+                .dimension_names
+                .first()
+                .map(|s| s.as_str())
+                .unwrap_or("x");
+            let x_coords = self.extract_sliced_coords_for_dim(0, (x_start, x_end));
+            let grid = crate::data::CoordinateGrid::detect_grid(
+                x_name,
+                "y",
+                x_coords.as_deref(),
+                None,
+                width,
+                1,
+            );
+            return Some(crate::data::matrix_data::MatrixData::new_with_grid(
                 width,
                 1,
                 values,
@@ -180,6 +194,7 @@ impl OctantBlock {
                 max_val,
                 dataset_name.to_string(),
                 max_timesteps,
+                grid,
             ));
         }
 
@@ -282,7 +297,28 @@ impl OctantBlock {
             (0.0, 1.0)
         };
 
-        Some(crate::data::matrix_data::MatrixData::new(
+        let x_name = self
+            .dimension_names
+            .get(x_dim)
+            .map(|s| s.as_str())
+            .unwrap_or("x");
+        let y_name = self
+            .dimension_names
+            .get(y_dim)
+            .map(|s| s.as_str())
+            .unwrap_or("y");
+        let x_coords = self.extract_sliced_coords_for_dim(x_dim, (x_start, x_end));
+        let y_coords = self.extract_sliced_coords_for_dim(y_dim, (y_start, y_end));
+        let grid = crate::data::CoordinateGrid::detect_grid(
+            x_name,
+            y_name,
+            x_coords.as_deref(),
+            y_coords.as_deref(),
+            width,
+            height,
+        );
+
+        Some(crate::data::matrix_data::MatrixData::new_with_grid(
             width,
             height,
             values,
@@ -290,7 +326,37 @@ impl OctantBlock {
             max_val,
             dataset_name.to_string(),
             max_timesteps,
+            grid,
         ))
+    }
+
+    fn extract_sliced_coords_for_dim(
+        &self,
+        dim_idx: usize,
+        range: (usize, usize),
+    ) -> Option<Vec<f64>> {
+        let dim_name = self.dimension_names.get(dim_idx)?;
+        let clean = dim_name.trim().to_lowercase();
+        let full_coords = self
+            .coordinates
+            .get(&clean)
+            .or_else(|| self.coordinates.get(dim_name))?;
+        let full_len = self.shape.get(dim_idx).copied().unwrap_or(1);
+        let (start, end) = (range.0.min(range.1), range.1.max(range.0).min(full_len));
+
+        if full_coords.len() >= full_len && full_coords.len() >= end {
+            Some(full_coords[start..end].to_vec())
+        } else if full_coords.len() >= 2 && full_len > 1 {
+            let first = full_coords[0];
+            let last = full_coords[full_coords.len() - 1];
+            let t_start = start as f64 / (full_len - 1) as f64;
+            let t_end = (end.saturating_sub(1)) as f64 / (full_len - 1) as f64;
+            let val_start = first + t_start * (last - first);
+            let val_end = first + t_end * (last - first);
+            Some(vec![val_start, val_end])
+        } else {
+            Some(full_coords.clone())
+        }
     }
 
     pub fn volume(

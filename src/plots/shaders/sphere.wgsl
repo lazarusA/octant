@@ -7,6 +7,11 @@ struct Uniforms {
     sphere_mode: u32,
     width: u32,
     height: u32,
+    coord_mode: u32,
+    has_reference_globe: u32,
+    lon_bounds: vec2<f32>,
+    lat_bounds: vec2<f32>,
+    _pad: vec2<u32>,
     color: ColorUniforms,
 };
 
@@ -15,6 +20,12 @@ var<uniform> uniforms: Uniforms;
 
 @group(0) @binding(1)
 var<storage, read> data_buffer: array<f32>;
+
+@group(0) @binding(2)
+var<storage, read> coord_x_buffer: array<f32>;
+
+@group(0) @binding(3)
+var<storage, read> coord_y_buffer: array<f32>;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -30,10 +41,7 @@ struct VertexOutput {
     @location(3) world_pos: vec3<f32>,
 };
 
-fn spherical_to_cartesian(radius: f32, u: f32, v: f32) -> vec3<f32> {
-    let lon = (u - 0.5) * 2.0 * 3.14159265;
-    let lat = (0.5 - v) * 3.14159265;
-
+fn lon_lat_to_cartesian(radius: f32, lon: f32, lat: f32) -> vec3<f32> {
     let cos_lat = cos(lat);
     let sin_lat = sin(lat);
 
@@ -42,6 +50,47 @@ fn spherical_to_cartesian(radius: f32, u: f32, v: f32) -> vec3<f32> {
     let z = radius * cos_lat * cos(lon);
 
     return vec3<f32>(x, y, z);
+}
+
+fn get_lon_lat(cell_x: u32, cell_y: u32, model_xy: vec2<f32>, grid_w: u32, grid_h: u32) -> vec2<f32> {
+    if (uniforms.coord_mode == 0u) {
+        // Mode 0: Global Regular [-π..π] and [π/2..-π/2]
+        let u = (f32(cell_x) + model_xy.x) / f32(grid_w);
+        let v = (f32(cell_y) + model_xy.y) / f32(grid_h);
+        let lon = (u - 0.5) * 2.0 * 3.14159265;
+        let lat = (0.5 - v) * 3.14159265;
+        return vec2<f32>(lon, lat);
+    } else if (uniforms.coord_mode == 1u) {
+        // Mode 1: Regional Regular with explicit [lon_bounds, lat_bounds]
+        let u = (f32(cell_x) + model_xy.x) / f32(grid_w);
+        let v = (f32(cell_y) + model_xy.y) / f32(grid_h);
+        let lon = mix(uniforms.lon_bounds.x, uniforms.lon_bounds.y, u);
+        let lat = mix(uniforms.lat_bounds.y, uniforms.lat_bounds.x, v);
+        return vec2<f32>(lon, lat);
+    } else {
+        // Mode 2: Irregular 1D Coordinate Buffers
+        let max_cx = max(arrayLength(&coord_x_buffer), 1u) - 1u;
+        let cx0 = coord_x_buffer[min(cell_x, max_cx)];
+        let cx1 = select(
+            cx0 + (cx0 - coord_x_buffer[max(cell_x, 1u) - 1u]),
+            coord_x_buffer[min(cell_x + 1u, max_cx)],
+            cell_x + 1u <= max_cx
+        );
+        let deg_lon = mix(cx0, cx1, model_xy.x);
+        let lon = deg_lon * 0.0174532925;
+
+        let max_cy = max(arrayLength(&coord_y_buffer), 1u) - 1u;
+        let cy0 = coord_y_buffer[min(cell_y, max_cy)];
+        let cy1 = select(
+            cy0 + (cy0 - coord_y_buffer[max(cell_y, 1u) - 1u]),
+            coord_y_buffer[min(cell_y + 1u, max_cy)],
+            cell_y + 1u <= max_cy
+        );
+        let deg_lat = mix(cy0, cy1, model_xy.y);
+        let lat = deg_lat * 0.0174532925;
+
+        return vec2<f32>(lon, lat);
+    }
 }
 
 fn get_normalized_radial_dr(val: f32) -> f32 {
@@ -78,8 +127,9 @@ fn vs_main(
     // 1-to-1 exact raw pixel value (0 NaN contamination)
     var raw_val = data_buffer[safe_idx];
 
-    let u = (f32(cell_x) + model.position.x) / f32(grid_w);
-    let v = (f32(cell_y) + model.position.y) / f32(grid_h);
+    let coords = get_lon_lat(cell_x, cell_y, model.position.xy, grid_w, grid_h);
+    let lon = coords.x;
+    let lat = coords.y;
 
     var pos_3d: vec3<f32>;
     var normal_3d: vec3<f32>;
@@ -87,7 +137,7 @@ fn vs_main(
     if (uniforms.sphere_mode == 0u) {
         // Mode 0: Smooth Sphere Projection (unit sphere)
         raw_val = data_buffer[safe_idx];
-        pos_3d = spherical_to_cartesian(1.0, u, v);
+        pos_3d = lon_lat_to_cartesian(1.0, lon, lat);
         normal_3d = normalize(pos_3d);
     } else if (uniforms.sphere_mode == 1u) {
         // Mode 1: Smooth Bumpy Terrain (Continuous deformed surface mesh connecting corner vertices!)
@@ -97,16 +147,15 @@ fn vs_main(
         raw_val = data_buffer[corner_idx];
 
         let dr = get_normalized_radial_dr(raw_val);
-        pos_3d = spherical_to_cartesian(1.0 + dr, u, v);
+        pos_3d = lon_lat_to_cartesian(1.0 + dr, lon, lat);
         normal_3d = normalize(pos_3d);
     } else if (uniforms.sphere_mode == 2u) {
         // Mode 2: Flat Steps
         raw_val = data_buffer[safe_idx];
         let dr = get_normalized_radial_dr(raw_val);
-        let u_center = (f32(cell_x) + 0.5) / f32(grid_w);
-        let v_center = (f32(cell_y) + 0.5) / f32(grid_h);
-        pos_3d = spherical_to_cartesian(1.0 + dr, u, v);
-        normal_3d = normalize(spherical_to_cartesian(1.0, u_center, v_center));
+        let center_coords = get_lon_lat(cell_x, cell_y, vec2<f32>(0.5, 0.5), grid_w, grid_h);
+        pos_3d = lon_lat_to_cartesian(1.0 + dr, lon, lat);
+        normal_3d = normalize(lon_lat_to_cartesian(1.0, center_coords.x, center_coords.y));
     } else {
         // Mode 3: 3D Radial Lego Cubes
         raw_val = data_buffer[safe_idx];
@@ -118,7 +167,7 @@ fn vs_main(
             radius = mix(1.0 + dr, 1.0, model.position.z);
         }
 
-        pos_3d = spherical_to_cartesian(radius, u, v);
+        pos_3d = lon_lat_to_cartesian(radius, lon, lat);
         normal_3d = model.raw_normal;
     }
 

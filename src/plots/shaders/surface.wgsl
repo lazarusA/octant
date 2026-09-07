@@ -7,6 +7,11 @@ struct Uniforms {
     surface_mode: u32,
     width: u32,
     height: u32,
+    coord_mode: u32,
+    has_reference_globe: u32,
+    lon_bounds: vec2<f32>,
+    lat_bounds: vec2<f32>,
+    _pad: vec2<u32>,
     color: ColorUniforms,
 };
 
@@ -15,6 +20,12 @@ var<uniform> uniforms: Uniforms;
 
 @group(0) @binding(1)
 var<storage, read> data_buffer: array<f32>;
+
+@group(0) @binding(2)
+var<storage, read> coord_x_buffer: array<f32>;
+
+@group(0) @binding(3)
+var<storage, read> coord_y_buffer: array<f32>;
 
 struct VertexInput {
     @location(0) position: vec3<f32>, // x, y, z (unit quad or unit cube coordinates)
@@ -67,11 +78,39 @@ fn vs_main(
     let scale_x = 2.0 * data_aspect;
     let scale_y = 2.0;
 
-    let x0 = -data_aspect + (f32(cell_x) / f32(grid_w)) * scale_x;
-    let x1 = -data_aspect + (f32(cell_x + 1u) / f32(grid_w)) * scale_x;
+    var x0 = -data_aspect + (f32(cell_x) / f32(grid_w)) * scale_x;
+    var x1 = -data_aspect + (f32(cell_x + 1u) / f32(grid_w)) * scale_x;
 
-    let y0 = -1.0 + (f32(cell_y) / f32(grid_h)) * scale_y;
-    let y1 = -1.0 + (f32(cell_y + 1u) / f32(grid_h)) * scale_y;
+    var y0 = -1.0 + (f32(cell_y) / f32(grid_h)) * scale_y;
+    var y1 = -1.0 + (f32(cell_y + 1u) / f32(grid_h)) * scale_y;
+
+    if (uniforms.coord_mode == 2u) {
+        let max_cx = max(arrayLength(&coord_x_buffer), 1u) - 1u;
+        let cx0 = coord_x_buffer[min(cell_x, max_cx)];
+        let cx1 = select(
+            cx0 + (cx0 - coord_x_buffer[max(cell_x, 1u) - 1u]),
+            coord_x_buffer[min(cell_x + 1u, max_cx)],
+            cell_x + 1u <= max_cx
+        );
+        let min_x = coord_x_buffer[0];
+        let max_x = coord_x_buffer[max_cx];
+        let span_x = max(max_x - min_x, 1e-6);
+        x0 = -data_aspect + ((cx0 - min_x) / span_x) * scale_x;
+        x1 = -data_aspect + ((cx1 - min_x) / span_x) * scale_x;
+
+        let max_cy = max(arrayLength(&coord_y_buffer), 1u) - 1u;
+        let cy0 = coord_y_buffer[min(cell_y, max_cy)];
+        let cy1 = select(
+            cy0 + (cy0 - coord_y_buffer[max(cell_y, 1u) - 1u]),
+            coord_y_buffer[min(cell_y + 1u, max_cy)],
+            cell_y + 1u <= max_cy
+        );
+        let min_y = coord_y_buffer[0];
+        let max_y = coord_y_buffer[max_cy];
+        let span_y = max(max_y - min_y, 1e-6);
+        y0 = -1.0 + ((cy0 - min_y) / span_y) * scale_y;
+        y1 = -1.0 + ((cy1 - min_y) / span_y) * scale_y;
+    }
 
     let world_x = mix(x0, x1, model.position.x);
     let world_z = mix(y0, y1, model.position.y);
