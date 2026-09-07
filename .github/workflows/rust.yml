@@ -64,7 +64,7 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
   wasm:
-    name: WebAssembly Target Check
+    name: WebAssembly Trunk Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,5 +72,9 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - name: Check WASM Target
-        run: cargo check --target wasm32-unknown-unknown
+      - name: Download & Install Trunk
+        run: |
+          wget -qO- https://github.com/trunk-rs/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf- -C /usr/local/bin
+          chmod +x /usr/local/bin/trunk
+      - name: Build Web Application
+        run: trunk build --release --public-url /octant/
