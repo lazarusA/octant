@@ -345,64 +345,10 @@ impl CoordinateGrid {
         height: usize,
         data_aspect: f32,
     ) -> (f32, f32) {
-        let w = width.max(1);
-        let h = height.max(1);
-
-        match self {
-            Self::Irregular1D {
-                coords_x, coords_y, ..
-            } => {
-                let scale_x = 2.0 * data_aspect;
-                let scale_y = 2.0;
-
-                let cx = coords_x.get(px).copied().unwrap_or(0.0);
-                let max_cx = coords_x.len().saturating_sub(1);
-                let first_x = if coords_x.len() >= 2 {
-                    coords_x[0] - 0.5 * (coords_x[1] - coords_x[0])
-                } else {
-                    coords_x.first().copied().unwrap_or(0.0)
-                };
-                let last_x = if coords_x.len() >= 2 {
-                    coords_x[max_cx] + 0.5 * (coords_x[max_cx] - coords_x[max_cx.saturating_sub(1)])
-                } else {
-                    coords_x.last().copied().unwrap_or(1.0)
-                };
-                let span_x = if (last_x - first_x).abs() < 1e-6 {
-                    1e-6
-                } else {
-                    last_x - first_x
-                };
-                let world_x = -data_aspect + ((cx - first_x) / span_x) * scale_x;
-
-                let cy = coords_y.get(py).copied().unwrap_or(0.0);
-                let max_cy = coords_y.len().saturating_sub(1);
-                let first_y = if coords_y.len() >= 2 {
-                    coords_y[0] - 0.5 * (coords_y[1] - coords_y[0])
-                } else {
-                    coords_y.first().copied().unwrap_or(0.0)
-                };
-                let last_y = if coords_y.len() >= 2 {
-                    coords_y[max_cy] + 0.5 * (coords_y[max_cy] - coords_y[max_cy.saturating_sub(1)])
-                } else {
-                    coords_y.last().copied().unwrap_or(1.0)
-                };
-                let span_y = if (last_y - first_y).abs() < 1e-6 {
-                    1e-6
-                } else {
-                    last_y - first_y
-                };
-                let world_z = -1.0 + ((cy - first_y) / span_y) * scale_y;
-
-                (world_x, world_z)
-            }
-            _ => {
-                let u_c = (px as f32 + 0.5) / w as f32;
-                let v_c = (py as f32 + 0.5) / h as f32;
-                let world_x = (2.0 * u_c - 1.0) * data_aspect;
-                let world_z = 2.0 * v_c - 1.0;
-                (world_x, world_z)
-            }
-        }
+        let (u_c, v_c) = self.cell_center_norm(px, py, width, height);
+        let world_x = (2.0 * u_c - 1.0) * data_aspect;
+        let world_z = 2.0 * v_c - 1.0;
+        (world_x, world_z)
     }
 
     /// Automatically classifies and constructs a `CoordinateGrid` from dimension coordinate arrays.
