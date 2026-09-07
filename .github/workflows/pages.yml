@@ -35,7 +35,7 @@ jobs:
           chmod +x /usr/local/bin/trunk
 
       - name: Build Web Application
-        run: trunk build --release
+        run: trunk build --release --public-url /octant/
 
       - name: Upload GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v3
