@@ -302,7 +302,7 @@ fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 let right_reserve = if has_input { 56.0 } else { 32.0 };
 
                 let edit = egui::TextEdit::singleline(&mut app.hero_state.input)
-                    .hint_text("https://... (.zarr / .icechunk), or path...")
+                    .hint_text("https://... or path (.zarr, .icechunk, .nc, .h5)...")
                     .font(egui::TextStyle::Monospace)
                     .frame(egui::Frame::NONE)
                     .desired_width(ui.available_width() - right_reserve);
