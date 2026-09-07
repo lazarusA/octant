@@ -8,9 +8,10 @@ use super::{
     store_handle::StoreHandle,
 };
 
+#[cfg(not(target_arch = "wasm32"))]
+use super::backends::zarr::ZarrBlockStore;
 use super::backends::{
     icechunk::IcechunkBlockStore, netcdf::NetCdfBlockStore, procedural::ProceduralBlockStore,
-    zarr::ZarrBlockStore,
 };
 
 pub struct SourceFactory;
@@ -18,9 +19,19 @@ pub struct SourceFactory;
 impl SourceFactory {
     pub fn open(source: DataSource) -> Result<StoreHandle, BlockStoreError> {
         let backend: Arc<dyn BlockStore> = match &source.kind {
+            #[cfg(not(target_arch = "wasm32"))]
             DataSourceKind::LocalZarr => Arc::new(ZarrBlockStore::open_local(&source.uri)?),
+            #[cfg(target_arch = "wasm32")]
+            DataSourceKind::LocalZarr => {
+                crate::data::backends::WasmZarrBlockStore::open_local_notice(&source.uri)
+            }
 
+            #[cfg(not(target_arch = "wasm32"))]
             DataSourceKind::RemoteZarr => Arc::new(ZarrBlockStore::open_remote(&source.uri)?),
+            #[cfg(target_arch = "wasm32")]
+            DataSourceKind::RemoteZarr => {
+                crate::data::backends::WasmZarrBlockStore::get_or_create(&source.uri)
+            }
 
             DataSourceKind::LocalIcechunk | DataSourceKind::RemoteIcechunk => {
                 Arc::new(IcechunkBlockStore::open(&source.uri)?)
