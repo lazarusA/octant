@@ -4,99 +4,6 @@ use super::detection::normalize_lon_deg;
 use super::search::find_coord_cell_1d;
 use std::sync::Arc;
 
-/// Canonical spatial grid classification used across the data and render layers.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum GridKind {
-    #[default]
-    GlobalRegular,
-    RegionalRegular,
-    Irregular1D,
-    Curvilinear2D,
-}
-
-/// Canonical spatial grid representation.
-///
-/// This is the single contract shared by data backends and rendering code.
-/// Backends normalize into this model instead of spreading ad hoc mode values
-/// and raw coordinate-variable names across multiple layers.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct GridGeometry {
-    pub kind: GridKind,
-    pub width: usize,
-    pub height: usize,
-    pub lon_bounds: [f32; 2],
-    pub lat_bounds: [f32; 2],
-    pub flip_i: bool,
-    pub is_periodic_i: bool,
-    pub coords_x: Option<Arc<[f32]>>,
-    pub coords_y: Option<Arc<[f32]>>,
-    pub lons: Option<Arc<[f32]>>,
-    pub lats: Option<Arc<[f32]>>,
-}
-
-impl GridGeometry {
-    /// Shader-facing numeric mode that remains at the render boundary only.
-    #[inline]
-    pub fn coord_mode(&self) -> u32 {
-        match self.kind {
-            GridKind::GlobalRegular => 0,
-            GridKind::RegionalRegular => 1,
-            GridKind::Irregular1D => 2,
-            GridKind::Curvilinear2D => 3,
-        }
-    }
-
-    /// Canonical geometry API: app logic should use geometry semantics, not raw mode integers.
-    #[inline]
-    pub fn shader_mode(&self) -> u32 {
-        self.coord_mode()
-    }
-
-    #[inline]
-    pub fn has_1d_coords(&self) -> bool {
-        self.kind == GridKind::Irregular1D && self.coords_x.is_some() && self.coords_y.is_some()
-    }
-
-    #[inline]
-    pub fn requires_geo_coords(&self) -> bool {
-        self.coord_mode() != 0 || self.has_1d_coords()
-    }
-
-    #[inline]
-    pub fn is_global_extent(&self) -> bool {
-        let x_span = (self.lon_bounds[1] - self.lon_bounds[0]).abs();
-        let y_span = (self.lat_bounds[1] - self.lat_bounds[0]).abs();
-        x_span >= 350.0 && y_span >= 160.0
-    }
-
-    #[inline]
-    pub fn is_global(&self) -> bool {
-        self.kind == GridKind::GlobalRegular || self.is_global_extent()
-    }
-
-    #[inline]
-    pub fn lon_bounds_rad(&self) -> [f32; 2] {
-        let [lon_min, lon_max] = self.lon_bounds;
-        let min_rad = normalize_lon_deg(lon_min).to_radians();
-        let max_rad = normalize_lon_deg(lon_max).to_radians();
-        [min_rad, max_rad]
-    }
-
-    #[inline]
-    pub fn lat_bounds_rad(&self) -> [f32; 2] {
-        let [lat_min, lat_max] = self.lat_bounds;
-        [
-            lat_min.clamp(-90.0, 90.0).to_radians(),
-            lat_max.clamp(-90.0, 90.0).to_radians(),
-        ]
-    }
-
-    #[inline]
-    pub fn is_curvilinear(&self) -> bool {
-        self.kind == GridKind::Curvilinear2D
-    }
-}
-
 /// Represents the coordinate grid configuration for a 2D scalar field slice.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum CoordinateGrid {
@@ -132,94 +39,16 @@ pub enum CoordinateGrid {
 }
 
 impl CoordinateGrid {
-    /// Canonical, backend-agnostic geometry view of this coordinate grid.
-    pub fn geometry(&self) -> GridGeometry {
-        match self {
-            Self::GlobalRegular => GridGeometry {
-                kind: GridKind::GlobalRegular,
-                width: 0,
-                height: 0,
-                lon_bounds: [-180.0, 180.0],
-                lat_bounds: [-90.0, 90.0],
-                flip_i: false,
-                is_periodic_i: false,
-                coords_x: None,
-                coords_y: None,
-                lons: None,
-                lats: None,
-            },
-            Self::RegionalRegular {
-                lon_bounds,
-                lat_bounds,
-            } => GridGeometry {
-                kind: GridKind::RegionalRegular,
-                width: 0,
-                height: 0,
-                lon_bounds: [lon_bounds.0, lon_bounds.1],
-                lat_bounds: [lat_bounds.0, lat_bounds.1],
-                flip_i: false,
-                is_periodic_i: false,
-                coords_x: None,
-                coords_y: None,
-                lons: None,
-                lats: None,
-            },
-            Self::Irregular1D {
-                coords_x,
-                coords_y,
-                lon_bounds,
-                lat_bounds,
-            } => GridGeometry {
-                kind: GridKind::Irregular1D,
-                width: coords_x.len(),
-                height: coords_y.len(),
-                lon_bounds: [lon_bounds.0, lon_bounds.1],
-                lat_bounds: [lat_bounds.0, lat_bounds.1],
-                flip_i: false,
-                is_periodic_i: false,
-                coords_x: Some(coords_x.clone()),
-                coords_y: Some(coords_y.clone()),
-                lons: None,
-                lats: None,
-            },
-            Self::Curvilinear2D {
-                lons,
-                lats,
-                lon_bounds,
-                lat_bounds,
-                ..
-            } => GridGeometry {
-                kind: GridKind::Curvilinear2D,
-                width: 0,
-                height: 0,
-                lon_bounds: [lon_bounds.0, lon_bounds.1],
-                lat_bounds: [lat_bounds.0, lat_bounds.1],
-                flip_i: false,
-                is_periodic_i: false,
-                coords_x: None,
-                coords_y: None,
-                lons: Some(lons.clone()),
-                lats: Some(lats.clone()),
-            },
-        }
-    }
-
-    /// Backward-compatible alias for the canonical geometry view.
-    #[inline]
-    pub fn to_geometry(&self) -> GridGeometry {
-        self.geometry()
-    }
-
-    /// Returns the coordinate mode identifier for GPU shaders:
+    /// Returns the coordinate mode identifier for the GPU render boundary:
     /// 0 = GlobalRegular, 1 = RegionalRegular, 2 = Irregular1D, 3 = Curvilinear2D.
     #[inline]
-    pub fn coord_mode(&self) -> u32 {
-        self.geometry().shader_mode()
-    }
-
-    #[inline]
-    pub fn shader_mode(&self) -> u32 {
-        self.geometry().shader_mode()
+    pub fn render_coord_mode(&self) -> u32 {
+        match self {
+            Self::GlobalRegular => 0,
+            Self::RegionalRegular { .. } => 1,
+            Self::Irregular1D { .. } => 2,
+            Self::Curvilinear2D { .. } => 3,
+        }
     }
 
     #[inline]
@@ -229,12 +58,12 @@ impl CoordinateGrid {
 
     #[inline]
     pub fn requires_geo_coords(&self) -> bool {
-        self.geometry().requires_geo_coords()
+        !matches!(self, Self::GlobalRegular)
     }
 
     #[inline]
     pub fn same_geometry(&self, other: &Self) -> bool {
-        if self.coord_mode() != other.coord_mode()
+        if self.render_coord_mode() != other.render_coord_mode()
             || self.geometry_dimensions() != other.geometry_dimensions()
             || self.lon_bounds_rad() != other.lon_bounds_rad()
             || self.lat_bounds_rad() != other.lat_bounds_rad()
@@ -294,17 +123,50 @@ impl CoordinateGrid {
     /// Returns `true` if this grid spans the full global extent (~360° lon, ~180° lat).
     #[inline]
     pub fn is_global(&self) -> bool {
-        self.to_geometry().is_global()
+        matches!(self, Self::GlobalRegular) || self.is_global_extent()
     }
 
     /// Returns the longitude bounds [lon_min, lon_max] in radians.
     pub fn lon_bounds_rad(&self) -> [f32; 2] {
-        self.to_geometry().lon_bounds_rad()
+        let (lon_min, lon_max) = self.lon_bounds_deg();
+        [
+            normalize_lon_deg(lon_min).to_radians(),
+            normalize_lon_deg(lon_max).to_radians(),
+        ]
     }
 
     /// Returns the latitude bounds [lat_min, lat_max] in radians.
     pub fn lat_bounds_rad(&self) -> [f32; 2] {
-        self.to_geometry().lat_bounds_rad()
+        let (lat_min, lat_max) = self.lat_bounds_deg();
+        [
+            lat_min.clamp(-90.0, 90.0).to_radians(),
+            lat_max.clamp(-90.0, 90.0).to_radians(),
+        ]
+    }
+
+    #[inline]
+    pub fn is_global_extent(&self) -> bool {
+        let (lon_min, lon_max) = self.lon_bounds_deg();
+        let (lat_min, lat_max) = self.lat_bounds_deg();
+        (lon_max - lon_min).abs() >= 350.0 && (lat_max - lat_min).abs() >= 160.0
+    }
+
+    fn lon_bounds_deg(&self) -> (f32, f32) {
+        match self {
+            Self::GlobalRegular => (-180.0, 180.0),
+            Self::RegionalRegular { lon_bounds, .. }
+            | Self::Irregular1D { lon_bounds, .. }
+            | Self::Curvilinear2D { lon_bounds, .. } => *lon_bounds,
+        }
+    }
+
+    fn lat_bounds_deg(&self) -> (f32, f32) {
+        match self {
+            Self::GlobalRegular => (-90.0, 90.0),
+            Self::RegionalRegular { lat_bounds, .. }
+            | Self::Irregular1D { lat_bounds, .. }
+            | Self::Curvilinear2D { lat_bounds, .. } => *lat_bounds,
+        }
     }
 
     /// Returns a reference to 1D X-coordinates if this grid is Irregular1D.

@@ -5,10 +5,10 @@ pub mod lut;
 pub mod search;
 pub mod types;
 
-pub use detection::{detect_grid, normalize_grid};
+pub use detection::detect_grid;
 pub use lut::{build_1d_coord_lut, compute_coord_lut_size};
 pub use search::find_coord_cell_1d;
-pub use types::{CoordinateGrid, GridGeometry, GridKind};
+pub use types::CoordinateGrid;
 
 #[cfg(test)]
 mod tests {
@@ -84,7 +84,7 @@ mod tests {
 
         let grid = CoordinateGrid::detect_grid("lon", "lat", Some(&lons), Some(&lats), 360, 181);
         assert_eq!(grid, CoordinateGrid::GlobalRegular);
-        assert_eq!(grid.coord_mode(), 0);
+        assert_eq!(grid.render_coord_mode(), 0);
     }
 
     #[test]
@@ -103,7 +103,7 @@ mod tests {
             }
             other => panic!("Expected RegionalRegular, got {:?}", other),
         }
-        assert_eq!(grid.coord_mode(), 1);
+        assert_eq!(grid.render_coord_mode(), 1);
     }
 
     #[test]
@@ -117,7 +117,7 @@ mod tests {
         }
 
         let grid = CoordinateGrid::detect_grid("lon", "lat", Some(&lons), Some(&lats), 50, 40);
-        assert_eq!(grid.coord_mode(), 2);
+        assert_eq!(grid.render_coord_mode(), 2);
         assert!(matches!(grid, CoordinateGrid::Irregular1D { .. }));
         assert!(!grid.is_global());
     }
@@ -135,20 +135,9 @@ mod tests {
         }
 
         let grid = CoordinateGrid::detect_grid("lon", "lat", Some(&lons), Some(&lats), 360, 180);
-        assert_eq!(grid.coord_mode(), 2);
+        assert_eq!(grid.render_coord_mode(), 2);
         assert!(matches!(grid, CoordinateGrid::Irregular1D { .. }));
         assert!(grid.is_global());
-    }
-
-    #[test]
-    fn normalize_grid_exposes_geometry_contract() {
-        let lons: Vec<f64> = (0..360).map(|i| -180.0 + i as f64).collect();
-        let lats: Vec<f64> = (0..181).map(|i| -90.0 + i as f64).collect();
-
-        let geometry = normalize_grid("lon", "lat", Some(&lons), Some(&lats), 360, 181);
-        assert_eq!(geometry.kind, GridKind::GlobalRegular);
-        assert!(geometry.is_global_extent());
-        assert!(!geometry.requires_geo_coords());
     }
 
     #[test]

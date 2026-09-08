@@ -1,6 +1,6 @@
 //! Grid auto-detection and dimension classification heuristics.
 
-use super::types::{CoordinateGrid, GridGeometry};
+use super::types::CoordinateGrid;
 use std::sync::Arc;
 
 /// Normalizes longitude degree values to [-180, 180].
@@ -41,21 +41,6 @@ pub fn is_irregular_series(coords: &[f64]) -> bool {
 
     let delta_variation = (max_delta - min_delta) / mean_delta;
     delta_variation > 0.0005 // > 0.05% variation is considered irregular (e.g. Gaussian grids, Clenshaw-Curtis)
-}
-
-/// Canonical grid normalization boundary.
-///
-/// This is the single place where raw coordinate metadata is converted into a
-/// backend-agnostic spatial-grid description before the rest of the app uses it.
-pub fn normalize_grid(
-    x_name: &str,
-    y_name: &str,
-    x_coords: Option<&[f64]>,
-    y_coords: Option<&[f64]>,
-    width: usize,
-    height: usize,
-) -> GridGeometry {
-    detect_grid(x_name, y_name, x_coords, y_coords, width, height).to_geometry()
 }
 
 /// Automatically classifies and constructs a `CoordinateGrid` from dimension coordinate arrays.
