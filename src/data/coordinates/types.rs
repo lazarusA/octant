@@ -65,8 +65,8 @@ impl CoordinateGrid {
     pub fn same_geometry(&self, other: &Self) -> bool {
         if self.render_coord_mode() != other.render_coord_mode()
             || self.geometry_dimensions() != other.geometry_dimensions()
-            || self.lon_bounds_rad() != other.lon_bounds_rad()
-            || self.lat_bounds_rad() != other.lat_bounds_rad()
+            || self.lon_bounds_deg() != other.lon_bounds_deg()
+            || self.lat_bounds_deg() != other.lat_bounds_deg()
         {
             return false;
         }
