@@ -39,10 +39,10 @@ pub enum CoordinateGrid {
 }
 
 impl CoordinateGrid {
-    /// Returns the coordinate mode identifier for GPU shaders:
+    /// Returns the coordinate mode identifier for the GPU render boundary:
     /// 0 = GlobalRegular, 1 = RegionalRegular, 2 = Irregular1D, 3 = Curvilinear2D.
     #[inline]
-    pub fn coord_mode(&self) -> u32 {
+    pub fn render_coord_mode(&self) -> u32 {
         match self {
             Self::GlobalRegular => 0,
             Self::RegionalRegular { .. } => 1,
@@ -51,54 +51,121 @@ impl CoordinateGrid {
         }
     }
 
+    #[inline]
+    pub fn has_1d_coords(&self) -> bool {
+        matches!(self, Self::Irregular1D { .. })
+    }
+
+    #[inline]
+    pub fn requires_geo_coords(&self) -> bool {
+        !matches!(self, Self::GlobalRegular)
+    }
+
+    #[inline]
+    pub fn same_geometry(&self, other: &Self) -> bool {
+        if self.render_coord_mode() != other.render_coord_mode()
+            || self.geometry_dimensions() != other.geometry_dimensions()
+            || self.lon_bounds_deg() != other.lon_bounds_deg()
+            || self.lat_bounds_deg() != other.lat_bounds_deg()
+        {
+            return false;
+        }
+
+        match (self, other) {
+            (
+                Self::Irregular1D {
+                    coords_x: left_x,
+                    coords_y: left_y,
+                    ..
+                },
+                Self::Irregular1D {
+                    coords_x: right_x,
+                    coords_y: right_y,
+                    ..
+                },
+            ) => {
+                (Arc::ptr_eq(left_x, right_x) || left_x.as_ref() == right_x.as_ref())
+                    && (Arc::ptr_eq(left_y, right_y) || left_y.as_ref() == right_y.as_ref())
+            }
+            (
+                Self::Curvilinear2D {
+                    lons: left_lons,
+                    lats: left_lats,
+                    ..
+                },
+                Self::Curvilinear2D {
+                    lons: right_lons,
+                    lats: right_lats,
+                    ..
+                },
+            ) => {
+                (Arc::ptr_eq(left_lons, right_lons) || left_lons.as_ref() == right_lons.as_ref())
+                    && (Arc::ptr_eq(left_lats, right_lats)
+                        || left_lats.as_ref() == right_lats.as_ref())
+            }
+            (Self::GlobalRegular, Self::GlobalRegular)
+            | (Self::RegionalRegular { .. }, Self::RegionalRegular { .. }) => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
+    fn geometry_dimensions(&self) -> (usize, usize) {
+        match self {
+            Self::GlobalRegular | Self::RegionalRegular { .. } => (0, 0),
+            Self::Irregular1D {
+                coords_x, coords_y, ..
+            } => (coords_x.len(), coords_y.len()),
+            Self::Curvilinear2D { lons, lats, .. } => (lons.len(), lats.len()),
+        }
+    }
+
     /// Returns `true` if this grid spans the full global extent (~360° lon, ~180° lat).
     #[inline]
     pub fn is_global(&self) -> bool {
-        match self {
-            Self::GlobalRegular => true,
-            Self::RegionalRegular { .. } => false,
-            Self::Irregular1D {
-                lon_bounds,
-                lat_bounds,
-                ..
-            }
-            | Self::Curvilinear2D {
-                lon_bounds,
-                lat_bounds,
-                ..
-            } => {
-                let x_span = (lon_bounds.1 - lon_bounds.0).abs();
-                let y_span = (lat_bounds.1 - lat_bounds.0).abs();
-                x_span >= 350.0 && y_span >= 160.0
-            }
-        }
+        matches!(self, Self::GlobalRegular) || self.is_global_extent()
     }
 
     /// Returns the longitude bounds [lon_min, lon_max] in radians.
     pub fn lon_bounds_rad(&self) -> [f32; 2] {
-        match self {
-            Self::GlobalRegular => [-std::f32::consts::PI, std::f32::consts::PI],
-            Self::RegionalRegular { lon_bounds, .. }
-            | Self::Irregular1D { lon_bounds, .. }
-            | Self::Curvilinear2D { lon_bounds, .. } => {
-                let min_rad = normalize_lon_deg(lon_bounds.0).to_radians();
-                let max_rad = normalize_lon_deg(lon_bounds.1).to_radians();
-                [min_rad, max_rad]
-            }
-        }
+        let (lon_min, lon_max) = self.lon_bounds_deg();
+        [
+            normalize_lon_deg(lon_min).to_radians(),
+            normalize_lon_deg(lon_max).to_radians(),
+        ]
     }
 
     /// Returns the latitude bounds [lat_min, lat_max] in radians.
     pub fn lat_bounds_rad(&self) -> [f32; 2] {
+        let (lat_min, lat_max) = self.lat_bounds_deg();
+        [
+            lat_min.clamp(-90.0, 90.0).to_radians(),
+            lat_max.clamp(-90.0, 90.0).to_radians(),
+        ]
+    }
+
+    #[inline]
+    pub fn is_global_extent(&self) -> bool {
+        let (lon_min, lon_max) = self.lon_bounds_deg();
+        let (lat_min, lat_max) = self.lat_bounds_deg();
+        (lon_max - lon_min).abs() >= 350.0 && (lat_max - lat_min).abs() >= 160.0
+    }
+
+    fn lon_bounds_deg(&self) -> (f32, f32) {
         match self {
-            Self::GlobalRegular => [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
+            Self::GlobalRegular => (-180.0, 180.0),
+            Self::RegionalRegular { lon_bounds, .. }
+            | Self::Irregular1D { lon_bounds, .. }
+            | Self::Curvilinear2D { lon_bounds, .. } => *lon_bounds,
+        }
+    }
+
+    fn lat_bounds_deg(&self) -> (f32, f32) {
+        match self {
+            Self::GlobalRegular => (-90.0, 90.0),
             Self::RegionalRegular { lat_bounds, .. }
             | Self::Irregular1D { lat_bounds, .. }
-            | Self::Curvilinear2D { lat_bounds, .. } => {
-                let min_rad = lat_bounds.0.clamp(-90.0, 90.0).to_radians();
-                let max_rad = lat_bounds.1.clamp(-90.0, 90.0).to_radians();
-                [min_rad, max_rad]
-            }
+            | Self::Curvilinear2D { lat_bounds, .. } => *lat_bounds,
         }
     }
 

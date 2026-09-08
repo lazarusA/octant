@@ -45,15 +45,22 @@ fn main() {
     };
     wasm_bindgen_futures::spawn_local(async {
         use wasm_bindgen::JsCast;
-        let document = web_sys::window()
-            .expect("No window")
-            .document()
-            .expect("No document");
-        let canvas = document
-            .get_element_by_id("octant_canvas_anchor")
-            .expect("Canvas element not found")
-            .dyn_into::<web_sys::HtmlCanvasElement>()
-            .expect("Element is not a canvas");
+        let Some(window) = web_sys::window() else {
+            log::error!("Unable to start Octant: browser window is unavailable");
+            return;
+        };
+        let Some(document) = window.document() else {
+            log::error!("Unable to start Octant: document is unavailable");
+            return;
+        };
+        let Some(canvas_element) = document.get_element_by_id("octant_canvas_anchor") else {
+            log::error!("Unable to start Octant: canvas element is missing");
+            return;
+        };
+        let Ok(canvas) = canvas_element.dyn_into::<web_sys::HtmlCanvasElement>() else {
+            log::error!("Unable to start Octant: target element is not a canvas");
+            return;
+        };
 
         let runner = eframe::WebRunner::new();
         if let Err(e) = runner

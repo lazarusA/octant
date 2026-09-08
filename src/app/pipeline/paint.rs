@@ -145,7 +145,7 @@ impl OctantApp {
             .as_ref()
             .map(|m| {
                 (
-                    m.grid.coord_mode(),
+                    m.grid.render_coord_mode(),
                     !m.grid.is_global(),
                     m.grid.lon_bounds_rad(),
                     m.grid.lat_bounds_rad(),
@@ -310,7 +310,10 @@ impl OctantApp {
                         }
                     }
 
-                    let coord_mode = self.matrix_data.as_ref().map_or(0, |m| m.grid.coord_mode());
+                    let coord_mode = self
+                        .matrix_data
+                        .as_ref()
+                        .map_or(0, |m| m.grid.render_coord_mode());
                     let callback = eframe::egui_wgpu::Callback::new_paint_callback(
                         canvas_rect,
                         crate::plots::MatrixCallback {

@@ -58,13 +58,33 @@ mod tests {
     }
 
     #[test]
+    fn same_geometry_detects_coordinate_changes() {
+        let first = CoordinateGrid::Irregular1D {
+            coords_x: Arc::from([0.0, 10.0, 30.0]),
+            coords_y: Arc::from([0.0, 50.0, 100.0]),
+            lon_bounds: (0.0, 30.0),
+            lat_bounds: (0.0, 100.0),
+        };
+        let same = first.clone();
+        let changed = CoordinateGrid::Irregular1D {
+            coords_x: Arc::from([0.0, 11.0, 30.0]),
+            coords_y: Arc::from([0.0, 50.0, 100.0]),
+            lon_bounds: (0.0, 30.0),
+            lat_bounds: (0.0, 100.0),
+        };
+
+        assert!(first.same_geometry(&same));
+        assert!(!first.same_geometry(&changed));
+    }
+
+    #[test]
     fn detects_regular_global_grid() {
         let lons: Vec<f64> = (0..360).map(|i| -180.0 + i as f64).collect();
         let lats: Vec<f64> = (0..181).map(|i| -90.0 + i as f64).collect();
 
         let grid = CoordinateGrid::detect_grid("lon", "lat", Some(&lons), Some(&lats), 360, 181);
         assert_eq!(grid, CoordinateGrid::GlobalRegular);
-        assert_eq!(grid.coord_mode(), 0);
+        assert_eq!(grid.render_coord_mode(), 0);
     }
 
     #[test]
@@ -83,7 +103,7 @@ mod tests {
             }
             other => panic!("Expected RegionalRegular, got {:?}", other),
         }
-        assert_eq!(grid.coord_mode(), 1);
+        assert_eq!(grid.render_coord_mode(), 1);
     }
 
     #[test]
@@ -97,7 +117,7 @@ mod tests {
         }
 
         let grid = CoordinateGrid::detect_grid("lon", "lat", Some(&lons), Some(&lats), 50, 40);
-        assert_eq!(grid.coord_mode(), 2);
+        assert_eq!(grid.render_coord_mode(), 2);
         assert!(matches!(grid, CoordinateGrid::Irregular1D { .. }));
         assert!(!grid.is_global());
     }
@@ -115,7 +135,7 @@ mod tests {
         }
 
         let grid = CoordinateGrid::detect_grid("lon", "lat", Some(&lons), Some(&lats), 360, 180);
-        assert_eq!(grid.coord_mode(), 2);
+        assert_eq!(grid.render_coord_mode(), 2);
         assert!(matches!(grid, CoordinateGrid::Irregular1D { .. }));
         assert!(grid.is_global());
     }
