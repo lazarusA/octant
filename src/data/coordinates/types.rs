@@ -234,7 +234,61 @@ impl CoordinateGrid {
 
     #[inline]
     pub fn same_geometry(&self, other: &Self) -> bool {
-        self.geometry() == other.geometry()
+        if self.coord_mode() != other.coord_mode()
+            || self.geometry_dimensions() != other.geometry_dimensions()
+            || self.lon_bounds_rad() != other.lon_bounds_rad()
+            || self.lat_bounds_rad() != other.lat_bounds_rad()
+        {
+            return false;
+        }
+
+        match (self, other) {
+            (
+                Self::Irregular1D {
+                    coords_x: left_x,
+                    coords_y: left_y,
+                    ..
+                },
+                Self::Irregular1D {
+                    coords_x: right_x,
+                    coords_y: right_y,
+                    ..
+                },
+            ) => {
+                (Arc::ptr_eq(left_x, right_x) || left_x.as_ref() == right_x.as_ref())
+                    && (Arc::ptr_eq(left_y, right_y) || left_y.as_ref() == right_y.as_ref())
+            }
+            (
+                Self::Curvilinear2D {
+                    lons: left_lons,
+                    lats: left_lats,
+                    ..
+                },
+                Self::Curvilinear2D {
+                    lons: right_lons,
+                    lats: right_lats,
+                    ..
+                },
+            ) => {
+                (Arc::ptr_eq(left_lons, right_lons) || left_lons.as_ref() == right_lons.as_ref())
+                    && (Arc::ptr_eq(left_lats, right_lats)
+                        || left_lats.as_ref() == right_lats.as_ref())
+            }
+            (Self::GlobalRegular, Self::GlobalRegular)
+            | (Self::RegionalRegular { .. }, Self::RegionalRegular { .. }) => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
+    fn geometry_dimensions(&self) -> (usize, usize) {
+        match self {
+            Self::GlobalRegular | Self::RegionalRegular { .. } => (0, 0),
+            Self::Irregular1D {
+                coords_x, coords_y, ..
+            } => (coords_x.len(), coords_y.len()),
+            Self::Curvilinear2D { lons, lats, .. } => (lons.len(), lats.len()),
+        }
     }
 
     /// Returns `true` if this grid spans the full global extent (~360° lon, ~180° lat).

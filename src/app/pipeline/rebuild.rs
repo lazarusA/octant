@@ -12,7 +12,7 @@ use std::sync::Arc;
 impl OctantApp {
     /// Rebuilds or updates existing GPU buffers for 2D matrix data.
     pub fn rebuild_pipeline_with_matrix_data(&mut self, data: MatrixData) {
-        let total_elements = data.width * data.height;
+        let total_elements = data.width.saturating_mul(data.height);
 
         let var_key = format!(
             "{}:{}",
