@@ -544,23 +544,20 @@ pub fn show_hover_tooltip(
             let pos_3d_y = pos_y_rot_y;
             let pos_3d_z = camera.sy * pos_y_rot_x + camera.cy * pos_y_rot_z;
 
-            let lat_rad = (pos_3d_y / r).clamp(-1.0, 1.0).asin();
-            let lon_rad = pos_3d_x.atan2(pos_3d_z);
+            let mut lat_rad = (pos_3d_y / r).clamp(-1.0, 1.0).asin();
+            let mut lon_rad = pos_3d_x.atan2(pos_3d_z);
 
-            let u = (lon_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
-            let v = 0.5 - (lat_rad / std::f32::consts::PI);
-
-            let mut nx = u.clamp(0.0, 1.0);
-            let mut ny = v.clamp(0.0, 1.0);
-
-            if app.sphere_mode > 0 {
-                let px = ((nx * matrix.width as f32).floor() as usize)
-                    .min(matrix.width.saturating_sub(1));
-                let py = ((ny * matrix.height as f32).floor() as usize)
-                    .min(matrix.height.saturating_sub(1));
+            if app.sphere_mode > 0
+                && let Some((init_px, init_py)) = matrix.grid.find_cell_from_lon_lat_rad(
+                    lon_rad,
+                    lat_rad,
+                    matrix.width,
+                    matrix.height,
+                )
+            {
                 let cell_val = matrix
                     .values
-                    .get(py * matrix.width + px)
+                    .get(init_py * matrix.width + init_px)
                     .copied()
                     .unwrap_or(f32::NAN);
                 let dr = get_normalized_radial_dr(app, cell_val);
@@ -582,18 +579,38 @@ pub fn show_hover_tooltip(
                     let p3_y = py_y;
                     let p3_z = camera.sy * py_x + camera.cy * py_z;
 
-                    let l_rad = (p3_y / r).clamp(-1.0, 1.0).asin();
-                    let o_rad = p3_x.atan2(p3_z);
-                    nx = ((o_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI))
-                        .clamp(0.0, 1.0);
-                    ny = (0.5 - (l_rad / std::f32::consts::PI)).clamp(0.0, 1.0);
+                    lat_rad = (p3_y / r).clamp(-1.0, 1.0).asin();
+                    lon_rad = p3_x.atan2(p3_z);
                 }
             }
 
-            let lat_deg = (0.5 - ny) * 180.0;
-            let lon_deg = (nx - 0.5) * 360.0;
+            let Some((px_found, py_found)) = matrix.grid.find_cell_from_lon_lat_rad(
+                lon_rad,
+                lat_rad,
+                matrix.width,
+                matrix.height,
+            ) else {
+                return;
+            };
 
-            (nx, ny, true, Some((lat_deg, lon_deg)), None)
+            let (nx, ny) =
+                matrix
+                    .grid
+                    .cell_center_norm(px_found, py_found, matrix.width, matrix.height);
+            let (cell_lon_rad, cell_lat_rad) = matrix.grid.cell_center_lon_lat_rad(
+                px_found,
+                py_found,
+                matrix.width,
+                matrix.height,
+            );
+
+            (
+                nx,
+                ny,
+                true,
+                Some((cell_lat_rad.to_degrees(), cell_lon_rad.to_degrees())),
+                None,
+            )
         }
         PlotType::Surface => {
             // 3D Surface Projection Perspective Raycast supporting all Surface Modes (Terrain, Steps, Lego)
@@ -619,10 +636,12 @@ pub fn show_hover_tooltip(
                 return;
             }
 
-            let px = ((u.clamp(0.0, 1.0) * matrix.width as f32).floor() as usize)
-                .min(matrix.width.saturating_sub(1));
-            let py = ((v.clamp(0.0, 1.0) * matrix.height as f32).floor() as usize)
-                .min(matrix.height.saturating_sub(1));
+            let (mut px, mut py) = matrix.grid.find_cell_from_norm(
+                u.clamp(0.0, 1.0),
+                v.clamp(0.0, 1.0),
+                matrix.width,
+                matrix.height,
+            );
             let cell_val = matrix
                 .values
                 .get(py * matrix.width + px)
@@ -640,13 +659,31 @@ pub fn show_hover_tooltip(
                 if (-0.05..=1.05).contains(&u_ref) && (-0.05..=1.05).contains(&v_ref) {
                     u = u_ref;
                     v = v_ref;
+                    let (ref_px, ref_py) = matrix.grid.find_cell_from_norm(
+                        u.clamp(0.0, 1.0),
+                        v.clamp(0.0, 1.0),
+                        matrix.width,
+                        matrix.height,
+                    );
+                    px = ref_px;
+                    py = ref_py;
                 }
             }
 
-            let nx = u.clamp(0.0, 1.0);
-            let ny = v.clamp(0.0, 1.0);
+            let (nx, ny) = matrix
+                .grid
+                .cell_center_norm(px, py, matrix.width, matrix.height);
+            let (cell_lon_rad, cell_lat_rad) =
+                matrix
+                    .grid
+                    .cell_center_lon_lat_rad(px, py, matrix.width, matrix.height);
+            let geo_coords = if matrix.grid.coord_mode() != 0 || matrix.grid.coords_x().is_some() {
+                Some((cell_lat_rad.to_degrees(), cell_lon_rad.to_degrees()))
+            } else {
+                None
+            };
 
-            (nx, ny, true, None, None)
+            (nx, ny, true, geo_coords, None)
         }
         PlotType::PointCloud => {
             // 3D Point Cloud Volumetric Ray Marching
@@ -701,7 +738,20 @@ pub fn show_hover_tooltip(
             // 2D Heatmap Direct Mapping within canvas_rect
             let (nx, ny) = transform_2d.screen_to_norm(hover_pos);
             let is_inside = rect.contains(hover_pos);
-            (nx, ny, is_inside, None, None)
+            let (orig_w, orig_h) = if let Some(pyr) = &app.active_pyramid {
+                (pyr.original_width, pyr.original_height)
+            } else {
+                (matrix.width, matrix.height)
+            };
+            let (px, py) = matrix.grid.find_cell_from_norm(nx, ny, orig_w, orig_h);
+            let (cell_lon_rad, cell_lat_rad) =
+                matrix.grid.cell_center_lon_lat_rad(px, py, orig_w, orig_h);
+            let geo_coords = if matrix.grid.coord_mode() != 0 || matrix.grid.coords_x().is_some() {
+                Some((cell_lat_rad.to_degrees(), cell_lon_rad.to_degrees()))
+            } else {
+                None
+            };
+            (nx, ny, is_inside, geo_coords, None)
         }
     };
 
@@ -1036,8 +1086,9 @@ pub fn show_hover_tooltip(
         } else {
             (matrix.width, matrix.height)
         };
-        let px = ((norm_x * orig_w as f32).floor() as usize).min(orig_w.saturating_sub(1));
-        let py = ((norm_y * orig_h as f32).floor() as usize).min(orig_h.saturating_sub(1));
+        let (px, py) = matrix
+            .grid
+            .find_cell_from_norm(norm_x, norm_y, orig_w, orig_h);
 
         let val = if let Some(pyr) = &app.active_pyramid
             && let Some(base_lvl) = pyr.levels.first()
@@ -1213,14 +1264,13 @@ pub fn show_hover_tooltip(
     // 5. Forward-Project Exact Center of Hovered Point / Face / Particle to Screen Space
     let target_pos = match app.active_plot_type {
         PlotType::Sphere => {
-            let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
-            let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
+            let (lon_c, lat_c) =
+                matrix
+                    .grid
+                    .cell_center_lon_lat_rad(px, py, matrix.width, matrix.height);
 
             let dr = get_normalized_radial_dr(app, raw_val);
             let r = 1.0 + dr;
-
-            let lon_c = (u_c * 2.0 - 1.0) * std::f32::consts::PI;
-            let lat_c = (0.5 - v_c) * std::f32::consts::PI;
 
             let world_x = r * lat_c.cos() * lon_c.sin();
             let world_y = r * lat_c.sin();
@@ -1237,11 +1287,13 @@ pub fn show_hover_tooltip(
                 height
             };
 
-            let u_c = (px as f32 + 0.5) / matrix.width.max(1) as f32;
-            let v_c = (py as f32 + 0.5) / matrix.height.max(1) as f32;
-
-            let world_x = (2.0 * u_c - 1.0) * data_aspect;
-            let world_z = 2.0 * v_c - 1.0;
+            let (world_x, world_z) = matrix.grid.cell_center_surface_xz(
+                px,
+                py,
+                matrix.width,
+                matrix.height,
+                data_aspect,
+            );
 
             camera.project_point([world_x, world_y, world_z])
         }
@@ -1283,8 +1335,7 @@ pub fn show_hover_tooltip(
             } else {
                 (matrix.width, matrix.height)
             };
-            let u_c = (px as f32 + 0.5) / orig_w.max(1) as f32;
-            let v_c = (py as f32 + 0.5) / orig_h.max(1) as f32;
+            let (u_c, v_c) = matrix.grid.cell_center_norm(px, py, orig_w, orig_h);
             Some(transform_2d.norm_to_screen(u_c, v_c))
         }
         _ => None,

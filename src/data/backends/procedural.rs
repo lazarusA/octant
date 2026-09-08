@@ -7,7 +7,12 @@ use crate::data::{
     block_store::{BlockStore, BlockStoreError},
     metadata::{DatasetMetadata, VariableInfo},
     octant_block::OctantBlock,
-    procedural::{eval_known_truth_4d, generate_procedural_matrix},
+    procedural::{
+        eval_known_truth_4d, generate_clenshaw_curtis_2d, generate_clenshaw_curtis_coords,
+        generate_gaussian_coords, generate_gaussian_grid_2d, generate_procedural_matrix,
+        generate_stepped_resolution_2d, generate_stepped_resolution_coords,
+        generate_stretched_regional_2d, generate_stretched_regional_coords,
+    },
     slice_request::SliceRequest,
 };
 
@@ -29,10 +34,22 @@ impl BlockStore for ProceduralBlockStore {
     }
 
     fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
-        Ok(vec![
-            "gaussian_wave_packet_4d".to_string(),
-            "procedural_matrix_2d".to_string(),
-        ])
+        let is_4d = self.uri.contains("volume") || self.uri.contains("4d");
+        if is_4d {
+            Ok(vec![
+                "gaussian_wave_packet_4d".to_string(),
+                "procedural_matrix_2d".to_string(),
+            ])
+        } else {
+            Ok(vec![
+                "clenshaw_curtis_2d".to_string(),
+                "gaussian_grid_2d".to_string(),
+                "stretched_regional_2d".to_string(),
+                "stepped_resolution_2d".to_string(),
+                "gaussian_wave_packet_4d".to_string(),
+                "procedural_matrix_2d".to_string(),
+            ])
+        }
     }
 
     fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError> {
@@ -77,17 +94,63 @@ impl BlockStore for ProceduralBlockStore {
         } else {
             vec![
                 VariableInfo {
-                    name: "procedural_matrix_2d".to_string(),
+                    name: "clenshaw_curtis_2d".to_string(),
                     data_type: "float32".to_string(),
-                    shape: vec![64, 64],
-                    chunk_shape: vec![64, 64],
-                    dimension_names: vec!["y".to_string(), "x".to_string()],
+                    shape: vec![64, 128],
+                    chunk_shape: vec![64, 128],
+                    dimension_names: vec!["lat".to_string(), "lon".to_string()],
                     units: Some("dimensionless".to_string()),
-                    long_name: Some("2D Procedural Wave Field".to_string()),
+                    long_name: Some("2D Clenshaw-Curtis Grid (Boundary Compressed)".to_string()),
                     temporal_resolution: None,
                     time_coverage_start: None,
                     time_coverage_end: None,
-                    file_size: 64 * 64 * 4,
+                    file_size: 64 * 128 * 4,
+                    attributes: HashMap::new(),
+                },
+                VariableInfo {
+                    name: "gaussian_grid_2d".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![64, 128],
+                    chunk_shape: vec![64, 128],
+                    dimension_names: vec!["lat".to_string(), "lon".to_string()],
+                    units: Some("K".to_string()),
+                    long_name: Some("2D Gaussian Latitude Grid (Poles Compressed)".to_string()),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: 64 * 128 * 4,
+                    attributes: HashMap::new(),
+                },
+                VariableInfo {
+                    name: "stretched_regional_2d".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![32, 48],
+                    chunk_shape: vec![32, 48],
+                    dimension_names: vec!["lat".to_string(), "lon".to_string()],
+                    units: Some("dimensionless".to_string()),
+                    long_name: Some(
+                        "2D Geometrically Stretched Regional Grid [10E..50E, 30N..60N]".to_string(),
+                    ),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: 32 * 48 * 4,
+                    attributes: HashMap::new(),
+                },
+                VariableInfo {
+                    name: "stepped_resolution_2d".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![32, 64],
+                    chunk_shape: vec![32, 64],
+                    dimension_names: vec!["lat".to_string(), "lon".to_string()],
+                    units: Some("dimensionless".to_string()),
+                    long_name: Some(
+                        "2D Stepped Multi-Resolution Grid (5x Resolution Jump)".to_string(),
+                    ),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: 32 * 64 * 4,
                     attributes: HashMap::new(),
                 },
                 VariableInfo {
@@ -109,18 +172,43 @@ impl BlockStore for ProceduralBlockStore {
                     file_size: 20 * 32 * 32 * 32 * 4,
                     attributes: HashMap::new(),
                 },
+                VariableInfo {
+                    name: "procedural_matrix_2d".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![64, 64],
+                    chunk_shape: vec![64, 64],
+                    dimension_names: vec!["y".to_string(), "x".to_string()],
+                    units: Some("dimensionless".to_string()),
+                    long_name: Some("2D Procedural Wave Field".to_string()),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: 64 * 64 * 4,
+                    attributes: HashMap::new(),
+                },
             ]
         };
+
+        let (clenshaw_x, clenshaw_y) = generate_clenshaw_curtis_coords(128, 64);
+        let mut dim_coords = HashMap::new();
+        dim_coords.insert(
+            "lon".to_string(),
+            clenshaw_x.iter().map(|v| format!("{v:.3}")).collect(),
+        );
+        dim_coords.insert(
+            "lat".to_string(),
+            clenshaw_y.iter().map(|v| format!("{v:.3}")).collect(),
+        );
 
         Ok(DatasetMetadata {
             name: if is_4d {
                 "4D Known-Truth Procedural Store".to_string()
             } else {
-                "2D Procedural Store".to_string()
+                "Ground Truth Irregular & Procedural Store".to_string()
             },
             store_type: "Procedural / Ground Truth".to_string(),
             variables: vars,
-            dimension_coordinates: HashMap::new(),
+            dimension_coordinates: dim_coords,
         })
     }
 
@@ -130,6 +218,94 @@ impl BlockStore for ProceduralBlockStore {
         mut on_progress: crate::data::block_store::ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         let (nt_full, nz_full, ny_full, nx_full) = (20, 32, 32, 32);
+
+        if request.variable == "clenshaw_curtis_2d" {
+            let (h, w) = (64, 128);
+            let (data, _, _) = generate_clenshaw_curtis_2d(w, h, 0);
+            let (xs, ys) = generate_clenshaw_curtis_coords(w, h);
+            let mut coords = HashMap::new();
+            coords.insert("lon".to_string(), xs);
+            coords.insert("lat".to_string(), ys);
+
+            if let Some(ref mut cb) = on_progress {
+                cb((data.len() * 4) as u64);
+            }
+            return Ok(OctantBlock::new(
+                request.variable.clone(),
+                vec![h, w],
+                vec!["lat".to_string(), "lon".to_string()],
+                vec![0, 0],
+                data,
+                coords,
+                HashMap::new(),
+            ));
+        }
+
+        if request.variable == "gaussian_grid_2d" {
+            let (h, w) = (64, 128);
+            let (data, _, _) = generate_gaussian_grid_2d(w, h, 0);
+            let (xs, ys) = generate_gaussian_coords(w, h);
+            let mut coords = HashMap::new();
+            coords.insert("lon".to_string(), xs);
+            coords.insert("lat".to_string(), ys);
+
+            if let Some(ref mut cb) = on_progress {
+                cb((data.len() * 4) as u64);
+            }
+            return Ok(OctantBlock::new(
+                request.variable.clone(),
+                vec![h, w],
+                vec!["lat".to_string(), "lon".to_string()],
+                vec![0, 0],
+                data,
+                coords,
+                HashMap::new(),
+            ));
+        }
+
+        if request.variable == "stretched_regional_2d" {
+            let (h, w) = (32, 48);
+            let (data, _, _) = generate_stretched_regional_2d(w, h);
+            let (xs, ys) = generate_stretched_regional_coords(w, h);
+            let mut coords = HashMap::new();
+            coords.insert("lon".to_string(), xs);
+            coords.insert("lat".to_string(), ys);
+
+            if let Some(ref mut cb) = on_progress {
+                cb((data.len() * 4) as u64);
+            }
+            return Ok(OctantBlock::new(
+                request.variable.clone(),
+                vec![h, w],
+                vec!["lat".to_string(), "lon".to_string()],
+                vec![0, 0],
+                data,
+                coords,
+                HashMap::new(),
+            ));
+        }
+
+        if request.variable == "stepped_resolution_2d" {
+            let (h, w) = (32, 64);
+            let (data, _, _) = generate_stepped_resolution_2d(w, h);
+            let (xs, ys) = generate_stepped_resolution_coords(w, h);
+            let mut coords = HashMap::new();
+            coords.insert("lon".to_string(), xs);
+            coords.insert("lat".to_string(), ys);
+
+            if let Some(ref mut cb) = on_progress {
+                cb((data.len() * 4) as u64);
+            }
+            return Ok(OctantBlock::new(
+                request.variable.clone(),
+                vec![h, w],
+                vec!["lat".to_string(), "lon".to_string()],
+                vec![0, 0],
+                data,
+                coords,
+                HashMap::new(),
+            ));
+        }
 
         if request.variable == "procedural_matrix_2d" {
             let (h_full, w_full) = (64, 64);

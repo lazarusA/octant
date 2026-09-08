@@ -35,11 +35,15 @@ impl HeatmapVertex {
 pub struct HeatmapUniforms {
     pub pan: [f32; 2],
     pub zoom: f32,
-    pub _pad: u32,
+    pub coord_mode: u32,
     pub aspect_scale: [f32; 2],
     pub width: u32,
     pub height: u32,
     pub tile_bounds: [f32; 4],
+    pub lut_size_x: u32,
+    pub lut_size_y: u32,
+    pub _pad0: u32,
+    pub _pad1: u32,
     pub color: super::common::PlotColorParams,
 }
 
@@ -51,11 +55,16 @@ pub struct HeatmapRenderer {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     data_buffer: wgpu::Buffer,
+    coord_x_buffer: wgpu::Buffer,
+    coord_y_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     num_indices: u32,
     width: AtomicU32,
     height: AtomicU32,
+    coord_mode: AtomicU32,
+    lut_size_x: AtomicU32,
+    lut_size_y: AtomicU32,
     tile_bounds: RwLock<[f32; 4]>,
 }
 
@@ -67,21 +76,63 @@ impl HeatmapRenderer {
         width: usize,
         height: usize,
     ) -> Self {
-        let shader_source = crate::assemble_plot_shader!(include_str!("shaders/heatmap.wgsl"));
+        Self::new_with_coords(
+            device,
+            target_format,
+            matrix_data,
+            width,
+            height,
+            None,
+            None,
+        )
+    }
+
+    pub fn new_with_coords(
+        device: &wgpu::Device,
+        target_format: wgpu::TextureFormat,
+        matrix_data: &[f32],
+        width: usize,
+        height: usize,
+        coord_x: Option<&[f32]>,
+        coord_y: Option<&[f32]>,
+    ) -> Self {
+        let shader_source =
+            crate::assemble_plot_with_coords_shader!(include_str!("shaders/heatmap.wgsl"));
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Heatmap Shader Module"),
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
+        let initial_coord_mode = if coord_x.is_some() || coord_y.is_some() {
+            2
+        } else {
+            0
+        };
+
+        let lut_size_x = if initial_coord_mode == 2 {
+            crate::data::coordinates::compute_coord_lut_size(width)
+        } else {
+            0
+        };
+        let lut_size_y = if initial_coord_mode == 2 {
+            crate::data::coordinates::compute_coord_lut_size(height)
+        } else {
+            0
+        };
+
         let initial_uniforms = HeatmapUniforms {
             pan: [0.0, 0.0],
             zoom: 1.0,
-            _pad: 0,
+            coord_mode: initial_coord_mode,
             aspect_scale: [1.0, 1.0],
             width: width.max(1) as u32,
             height: height.max(1) as u32,
             tile_bounds: [0.0, 0.0, 1.0, 1.0],
+            lut_size_x: lut_size_x as u32,
+            lut_size_y: lut_size_y as u32,
+            _pad0: 0,
+            _pad1: 0,
             color: super::common::PlotColorParams::default(),
         };
 
@@ -106,18 +157,53 @@ impl HeatmapRenderer {
             &padded_initial,
         );
 
-        let bind_group_layout = super::common::create_uniform_storage_bind_group_layout(
+        let mut padded_coords_x = if let Some(cx) = coord_x.filter(|s| !s.is_empty()) {
+            crate::data::coordinates::build_1d_coord_lut(cx, lut_size_x)
+        } else {
+            vec![0.0; 4]
+        };
+        let min_coord_x_capacity = lut_size_x.max(4096);
+        if padded_coords_x.len() < min_coord_x_capacity {
+            padded_coords_x.resize(min_coord_x_capacity, 0.0);
+        }
+
+        let mut padded_coords_y = if let Some(cy) = coord_y.filter(|s| !s.is_empty()) {
+            crate::data::coordinates::build_1d_coord_lut(cy, lut_size_y)
+        } else {
+            vec![0.0; 4]
+        };
+        let min_coord_y_capacity = lut_size_y.max(4096);
+        if padded_coords_y.len() < min_coord_y_capacity {
+            padded_coords_y.resize(min_coord_y_capacity, 0.0);
+        }
+
+        let coord_x_buffer = super::common::create_storage_buffer(
+            device,
+            "Heatmap Coord X Storage Buffer",
+            &padded_coords_x,
+        );
+
+        let coord_y_buffer = super::common::create_storage_buffer(
+            device,
+            "Heatmap Coord Y Storage Buffer",
+            &padded_coords_y,
+        );
+
+        let bind_group_layout = super::common::create_plot_with_coords_bind_group_layout(
             device,
             "Heatmap Bind Group Layout",
             wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+            wgpu::ShaderStages::FRAGMENT,
         );
 
-        let bind_group = super::common::create_uniform_storage_bind_group(
+        let bind_group = super::common::create_plot_with_coords_bind_group(
             device,
             "Heatmap Bind Group",
             &bind_group_layout,
             &uniform_buffer,
             &data_buffer,
+            &coord_x_buffer,
+            &coord_y_buffer,
         );
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -182,11 +268,16 @@ impl HeatmapRenderer {
             vertex_buffer,
             index_buffer,
             data_buffer,
+            coord_x_buffer,
+            coord_y_buffer,
             uniform_buffer,
             bind_group,
             num_indices: indices.len() as u32,
             width: AtomicU32::new(width as u32),
             height: AtomicU32::new(height as u32),
+            coord_mode: AtomicU32::new(initial_coord_mode),
+            lut_size_x: AtomicU32::new(lut_size_x as u32),
+            lut_size_y: AtomicU32::new(lut_size_y as u32),
             tile_bounds: RwLock::new([0.0, 0.0, 1.0, 1.0]),
         }
     }
@@ -198,20 +289,26 @@ impl HeatmapRenderer {
         pan: [f32; 2],
         zoom: f32,
         aspect_scale: [f32; 2],
+        coord_mode: u32,
     ) {
         let tile_bounds = self
             .tile_bounds
             .read()
             .map(|b| *b)
             .unwrap_or([0.0, 0.0, 1.0, 1.0]);
+        self.coord_mode.store(coord_mode, Ordering::Relaxed);
         let uniforms = HeatmapUniforms {
             pan,
             zoom,
-            _pad: 0,
+            coord_mode,
             aspect_scale,
             width: self.width.load(Ordering::Relaxed),
             height: self.height.load(Ordering::Relaxed),
             tile_bounds,
+            lut_size_x: self.lut_size_x.load(Ordering::Relaxed),
+            lut_size_y: self.lut_size_y.load(Ordering::Relaxed),
+            _pad0: 0,
+            _pad1: 0,
             color: *color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -222,7 +319,14 @@ impl HeatmapRenderer {
             colormap,
             ..Default::default()
         };
-        self.update_uniforms(queue, &color, [0.0, 0.0], 1.0, [1.0, 1.0]);
+        self.update_uniforms(
+            queue,
+            &color,
+            [0.0, 0.0],
+            1.0,
+            [1.0, 1.0],
+            self.coord_mode.load(Ordering::Relaxed),
+        );
     }
 
     /// Fast GPU Storage Buffer data channel upload
@@ -235,6 +339,33 @@ impl HeatmapRenderer {
         );
     }
 
+    pub fn update_coords(&self, queue: &wgpu::Queue, coords_x: &[f32], coords_y: &[f32]) {
+        if !coords_x.is_empty() {
+            let w = self.width.load(Ordering::Relaxed) as usize;
+            let lut_size_x = crate::data::coordinates::compute_coord_lut_size(w);
+            self.lut_size_x.store(lut_size_x as u32, Ordering::Relaxed);
+            let lut_x = crate::data::coordinates::build_1d_coord_lut(coords_x, lut_size_x);
+            super::common::safe_write_buffer(
+                queue,
+                &self.coord_x_buffer,
+                &lut_x,
+                "HeatmapRenderer::update_coords_x",
+            );
+        }
+        if !coords_y.is_empty() {
+            let h = self.height.load(Ordering::Relaxed) as usize;
+            let lut_size_y = crate::data::coordinates::compute_coord_lut_size(h);
+            self.lut_size_y.store(lut_size_y as u32, Ordering::Relaxed);
+            let lut_y = crate::data::coordinates::build_1d_coord_lut(coords_y, lut_size_y);
+            super::common::safe_write_buffer(
+                queue,
+                &self.coord_y_buffer,
+                &lut_y,
+                "HeatmapRenderer::update_coords_y",
+            );
+        }
+    }
+
     /// Updates data, dimensions, and tile bounds for dynamic viewport LOD resampling
     pub fn update_data_and_dimensions(
         &self,
@@ -244,13 +375,6 @@ impl HeatmapRenderer {
         height: usize,
         tile_bounds: [f32; 4],
     ) {
-        // crate::utils::diagnostics::log_lod_tile_upload(
-        //     width,
-        //     height,
-        //     matrix_data.len(),
-        //     (matrix_data.len() * 4) as f64 / (1024.0 * 1024.0),
-        //     tile_bounds,
-        // );
         self.width.store(width as u32, Ordering::Relaxed);
         self.height.store(height as u32, Ordering::Relaxed);
         if let Ok(mut b) = self.tile_bounds.write() {
@@ -303,6 +427,7 @@ pub struct HeatmapCallback {
     pub pan: [f32; 2],
     pub zoom: f32,
     pub aspect_scale: [f32; 2],
+    pub coord_mode: u32,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
@@ -320,6 +445,7 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
             self.pan,
             self.zoom,
             self.aspect_scale,
+            self.coord_mode,
         );
         Vec::new()
     }

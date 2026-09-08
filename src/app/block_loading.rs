@@ -33,9 +33,28 @@ impl OctantApp {
     /// Returns the open `StoreHandle` for the currently plotted dataset from `dataset_manager`.
     pub fn plotted_store_handle(&self) -> Option<crate::data::StoreHandle> {
         let source_id = self.plotted_source_id();
-        self.dataset_manager
-            .get(&source_id)
-            .map(|d| d.store.clone())
+        if let Some(d) = self.dataset_manager.get(&source_id) {
+            return Some(d.store.clone());
+        }
+
+        // Fallback: match by URI in dataset_manager
+        let target_uri = self.plotted_store_target_input.trim().trim_end_matches('/');
+        if let Some(d) = self.dataset_manager.iter().find(|d| {
+            let d_uri = d.source.uri.trim().trim_end_matches('/');
+            d_uri == target_uri || d.id == source_id || d.id.ends_with(target_uri)
+        }) {
+            return Some(d.store.clone());
+        }
+
+        // Auto-open through SourceFactory if not yet in dataset_manager
+        let kind = self.plotted_store_kind.to_data_source_kind();
+        let source = crate::data::DataSource::new(
+            &source_id,
+            kind,
+            &self.plotted_store_target_input,
+            "Store",
+        );
+        crate::data::SourceFactory::open(source).ok()
     }
 
     /// Loads the block corresponding to the current animated step and selections.
@@ -81,6 +100,11 @@ impl OctantApp {
         self.active_slice_request = Some(slice_request.clone());
 
         let source_id = self.plotted_source_id();
+        let store_handle = self.plotted_store_handle();
+        let block_key = store_handle
+            .as_ref()
+            .map(|h| BlockRequest::new(h.clone(), slice_request.clone()).cache_key());
+        self.active_block_key = block_key.clone();
 
         // 1. Cache HIT: Check if any resident block in memory (e.g. full dataset array) covers current_timestep
         if let Some(block) = self.block_cache.find_covering_block(
@@ -100,7 +124,7 @@ impl OctantApp {
             return;
         }
 
-        let Some(store_handle) = self.plotted_store_handle() else {
+        let Some(store_handle) = store_handle else {
             self.status_message =
                 format!("Dataset store not open in DatasetManager for '{source_id}'");
             return;
@@ -108,7 +132,6 @@ impl OctantApp {
 
         let block_request = BlockRequest::new(store_handle, slice_request);
         let key = block_request.cache_key();
-        self.active_block_key = Some(key.clone());
 
         // 2. Exact Key Cache HIT
         if let Some(block) = self.block_cache.get(&key) {
@@ -622,17 +645,23 @@ impl OctantApp {
             match res.result {
                 Ok(block) => {
                     let is_active = self.active_block_key.as_ref() == Some(&res.key);
-                    let covers_current = self.plotted_animated_dim.is_some_and(|dim| {
-                        let origin = block.origin.get(dim).copied().unwrap_or(0);
-                        let extent = block.shape.get(dim).copied().unwrap_or(0);
-                        self.current_timestep >= origin && self.current_timestep < origin + extent
-                    });
+                    let is_same_var = self
+                        .plotted_variable_info()
+                        .is_some_and(|v| v.name == block.variable_name);
+                    let covers_current = is_same_var
+                        && self.plotted_animated_dim.is_some_and(|dim| {
+                            let origin = block.origin.get(dim).copied().unwrap_or(0);
+                            let extent = block.shape.get(dim).copied().unwrap_or(0);
+                            self.current_timestep >= origin
+                                && self.current_timestep < origin + extent
+                        });
                     self.block_cache.put(res.key, block.clone());
 
                     // When cache eviction shifts the oldest resident slice forward, update slider start:
                     if let Some(dim) = self.plotted_animated_dim
                         && let Some(meta) = &self.plotted_dataset_metadata
                         && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                        && var.name == block.variable_name
                         && dim < self.plotted_selected_dim_ranges.len()
                     {
                         let source_id = self.plotted_source_id();
@@ -649,7 +678,7 @@ impl OctantApp {
                         }
                     }
 
-                    if is_active || covers_current {
+                    if is_same_var && (is_active || covers_current) {
                         if is_active
                             && let Some(target) = self.pending_target_step.take()
                             && let Some(dim) = self.plotted_animated_dim

@@ -599,11 +599,12 @@ mod desktop {
                         }]);
 
                         if let Ok(vals) = read_variable_hyperslab_as_f32(&coord_var, &coord_extents)
-                            && let (Some(&first), Some(&last)) = (vals.first(), vals.last())
+                            && !vals.is_empty()
                         {
-                            coordinates.insert(name.clone(), vec![first as f64, last as f64]);
+                            let coord_vec: Vec<f64> = vals.iter().map(|&v| v as f64).collect();
+                            coordinates.insert(name.clone(), coord_vec.clone());
                             if clean != *name {
-                                coordinates.insert(clean, vec![first as f64, last as f64]);
+                                coordinates.insert(clean, coord_vec);
                             }
                         }
                     }

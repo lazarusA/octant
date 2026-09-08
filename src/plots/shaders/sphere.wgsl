@@ -7,6 +7,11 @@ struct Uniforms {
     sphere_mode: u32,
     width: u32,
     height: u32,
+    coord_mode: u32,
+    has_reference_globe: u32,
+    lon_bounds: vec2<f32>,
+    lat_bounds: vec2<f32>,
+    _pad: vec2<u32>,
     color: ColorUniforms,
 };
 
@@ -30,10 +35,7 @@ struct VertexOutput {
     @location(3) world_pos: vec3<f32>,
 };
 
-fn spherical_to_cartesian(radius: f32, u: f32, v: f32) -> vec3<f32> {
-    let lon = (u - 0.5) * 2.0 * 3.14159265;
-    let lat = (0.5 - v) * 3.14159265;
-
+fn lon_lat_to_cartesian(radius: f32, lon: f32, lat: f32) -> vec3<f32> {
     let cos_lat = cos(lat);
     let sin_lat = sin(lat);
 
@@ -42,6 +44,42 @@ fn spherical_to_cartesian(radius: f32, u: f32, v: f32) -> vec3<f32> {
     let z = radius * cos_lat * cos(lon);
 
     return vec3<f32>(x, y, z);
+}
+
+fn get_lon_lat(cell_x: u32, cell_y: u32, model_xy: vec2<f32>, grid_w: u32, grid_h: u32) -> vec2<f32> {
+    if (uniforms.coord_mode == 0u) {
+        // Mode 0: Global Regular [-π..π] and [π/2..-π/2]
+        let u = (f32(cell_x) + model_xy.x) / f32(grid_w);
+        let v = (f32(cell_y) + model_xy.y) / f32(grid_h);
+        let lon = (u - 0.5) * 2.0 * 3.14159265;
+        let lat = (0.5 - v) * 3.14159265;
+        return vec2<f32>(lon, lat);
+    } else if (uniforms.coord_mode == 1u) {
+        // Mode 1: Regional Regular with explicit [lon_bounds, lat_bounds]
+        let u = (f32(cell_x) + model_xy.x) / f32(grid_w);
+        let v = (f32(cell_y) + model_xy.y) / f32(grid_h);
+        let lon = mix(uniforms.lon_bounds.x, uniforms.lon_bounds.y, u);
+        let lat = mix(uniforms.lat_bounds.y, uniforms.lat_bounds.x, v);
+        return vec2<f32>(lon, lat);
+    } else {
+        // Mode 2: Irregular 1D Coordinate Buffers with heatmap-matching interval boundaries
+        let bounds_u = get_cell_normalized_bounds_x(cell_x, grid_w, uniforms.coord_mode);
+        let bounds_v = get_cell_normalized_bounds_y(cell_y, grid_h, uniforms.coord_mode);
+        let u = mix(bounds_u.x, bounds_u.y, model_xy.x);
+        let v = mix(bounds_v.x, bounds_v.y, model_xy.y);
+
+        let max_cx = min(grid_w - 1u, max(arrayLength(&coord_x_buffer), 1u) - 1u);
+        let first_x = coord_x_buffer[0];
+        let last_x = coord_x_buffer[max_cx];
+        let deg_lon = mix(first_x, last_x, u);
+
+        let max_cy = min(grid_h - 1u, max(arrayLength(&coord_y_buffer), 1u) - 1u);
+        let first_y = coord_y_buffer[0];
+        let last_y = coord_y_buffer[max_cy];
+        let deg_lat = mix(first_y, last_y, v);
+
+        return vec2<f32>(deg_lon * 0.0174532925, deg_lat * 0.0174532925);
+    }
 }
 
 fn get_normalized_radial_dr(val: f32) -> f32 {
@@ -78,8 +116,9 @@ fn vs_main(
     // 1-to-1 exact raw pixel value (0 NaN contamination)
     var raw_val = data_buffer[safe_idx];
 
-    let u = (f32(cell_x) + model.position.x) / f32(grid_w);
-    let v = (f32(cell_y) + model.position.y) / f32(grid_h);
+    let coords = get_lon_lat(cell_x, cell_y, model.position.xy, grid_w, grid_h);
+    let lon = coords.x;
+    let lat = coords.y;
 
     var pos_3d: vec3<f32>;
     var normal_3d: vec3<f32>;
@@ -87,7 +126,7 @@ fn vs_main(
     if (uniforms.sphere_mode == 0u) {
         // Mode 0: Smooth Sphere Projection (unit sphere)
         raw_val = data_buffer[safe_idx];
-        pos_3d = spherical_to_cartesian(1.0, u, v);
+        pos_3d = lon_lat_to_cartesian(1.0, lon, lat);
         normal_3d = normalize(pos_3d);
     } else if (uniforms.sphere_mode == 1u) {
         // Mode 1: Smooth Bumpy Terrain (Continuous deformed surface mesh connecting corner vertices!)
@@ -97,16 +136,15 @@ fn vs_main(
         raw_val = data_buffer[corner_idx];
 
         let dr = get_normalized_radial_dr(raw_val);
-        pos_3d = spherical_to_cartesian(1.0 + dr, u, v);
+        pos_3d = lon_lat_to_cartesian(1.0 + dr, lon, lat);
         normal_3d = normalize(pos_3d);
     } else if (uniforms.sphere_mode == 2u) {
         // Mode 2: Flat Steps
         raw_val = data_buffer[safe_idx];
         let dr = get_normalized_radial_dr(raw_val);
-        let u_center = (f32(cell_x) + 0.5) / f32(grid_w);
-        let v_center = (f32(cell_y) + 0.5) / f32(grid_h);
-        pos_3d = spherical_to_cartesian(1.0 + dr, u, v);
-        normal_3d = normalize(spherical_to_cartesian(1.0, u_center, v_center));
+        let center_coords = get_lon_lat(cell_x, cell_y, vec2<f32>(0.5, 0.5), grid_w, grid_h);
+        pos_3d = lon_lat_to_cartesian(1.0 + dr, lon, lat);
+        normal_3d = normalize(lon_lat_to_cartesian(1.0, center_coords.x, center_coords.y));
     } else {
         // Mode 3: 3D Radial Lego Cubes
         raw_val = data_buffer[safe_idx];
@@ -118,56 +156,16 @@ fn vs_main(
             radius = mix(1.0 + dr, 1.0, model.position.z);
         }
 
-        pos_3d = spherical_to_cartesian(radius, u, v);
+        pos_3d = lon_lat_to_cartesian(radius, lon, lat);
         normal_3d = model.raw_normal;
     }
 
     // Rigid 3D camera rotation around Y and X axes
-    let cy = cos(uniforms.rotation_y);
-    let sy = sin(uniforms.rotation_y);
-    let cx = cos(uniforms.rotation_x);
-    let sx = sin(uniforms.rotation_x);
-
-    // Y-axis rotation
-    let pos_y_rot = vec3<f32>(
-        cy * pos_3d.x + sy * pos_3d.z,
-        pos_3d.y,
-        -sy * pos_3d.x + cy * pos_3d.z
-    );
-
-    // X-axis rotation
-    let pos_rot = vec3<f32>(
-        pos_y_rot.x,
-        cx * pos_y_rot.y - sx * pos_y_rot.z,
-        sx * pos_y_rot.y + cx * pos_y_rot.z
-    );
-
-    // Rigid rotation of normal vector for 3D directional lighting
-    let norm_y_rot = vec3<f32>(
-        cy * normal_3d.x + sy * normal_3d.z,
-        normal_3d.y,
-        -sy * normal_3d.x + cy * normal_3d.z
-    );
-    let norm_rot = normalize(vec3<f32>(
-        norm_y_rot.x,
-        cx * norm_y_rot.y - sx * norm_y_rot.z,
-        sx * norm_y_rot.y + cx * norm_y_rot.z
-    ));
+    let pos_rot = rotate_camera_yx(pos_3d, uniforms.rotation_y, uniforms.rotation_x);
+    let norm_rot = rotate_normal_yx(normal_3d, uniforms.rotation_y, uniforms.rotation_x);
 
     // Perspective projection transformation using dynamic zoom
-    let cam_dist = clamp(uniforms.zoom, 1.1, 10.0);
-    let cam_z = pos_rot.z - cam_dist;
-    let dist_positive = max(-cam_z, 0.001);
-    let fov_scale = 1.6;
-    let proj_x = (pos_rot.x * fov_scale) / uniforms.aspect_ratio;
-    let proj_y = pos_rot.y * fov_scale;
-
-    // Linear depth projection mapped to [0.0, 1.0] for hardware depth testing
-    let z_near = 0.01;
-    let z_far = 50.0;
-    let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
-
-    out.position = vec4<f32>(proj_x, proj_y, proj_z, dist_positive);
+    out.position = project_perspective(pos_rot, uniforms.aspect_ratio, uniforms.zoom, 1.6, 1.1);
     out.uv = model.uv;
     out.val = raw_val;
     out.normal = norm_rot;
@@ -197,10 +195,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // 3D Directional Lighting with two-sided support for transparent / rotated meshes
-    let light_dir = normalize(vec3<f32>(0.5, 0.7, 0.9));
-    let diffuse = max(abs(dot(geom_normal, light_dir)), 0.25);
-    let ambient = 0.35;
-    let lighting = clamp(ambient + diffuse * 0.65, 0.3, 1.0);
+    let lighting = evaluate_directional_lighting(geom_normal, vec3<f32>(0.5, 0.7, 0.9), 0.35, 0.65);
 
     return vec4<f32>(eval_color.rgb * lighting, eval_color.a);
 }

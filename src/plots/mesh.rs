@@ -11,6 +11,8 @@ pub struct Mesh3DRenderer {
     pub cube_vertex_buffer: wgpu::Buffer,
     pub cube_index_buffer: wgpu::Buffer,
     pub data_buffer: wgpu::Buffer,
+    pub coord_x_buffer: wgpu::Buffer,
+    pub coord_y_buffer: wgpu::Buffer,
     pub uniform_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
     pub num_instances: u32,
@@ -28,6 +30,31 @@ impl Mesh3DRenderer {
         width: usize,
         height: usize,
     ) -> Self {
+        Self::new_with_coords(
+            device,
+            target_format,
+            shader_source,
+            cull_mode,
+            matrix_data,
+            width,
+            height,
+            None,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_coords(
+        device: &wgpu::Device,
+        target_format: wgpu::TextureFormat,
+        shader_source: &str,
+        cull_mode: Option<wgpu::Face>,
+        matrix_data: &[f32],
+        width: usize,
+        height: usize,
+        coord_x: Option<&[f32]>,
+        coord_y: Option<&[f32]>,
+    ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Mesh 3D Shader Module"),
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
@@ -44,6 +71,11 @@ impl Mesh3DRenderer {
             mode: 0,
             width: width as u32,
             height: height as u32,
+            coord_mode: 0,
+            has_reference_globe: 0,
+            lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
+            lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
+            _pad: [0; 2],
             color: super::common::PlotColorParams::default(),
         };
 
@@ -59,18 +91,52 @@ impl Mesh3DRenderer {
             matrix_data,
         );
 
-        let bind_group_layout = super::common::create_uniform_storage_bind_group_layout(
+        let dummy_coords = [0.0f32; 4];
+        let mut padded_coords_x = coord_x
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&dummy_coords)
+            .to_vec();
+        let min_coord_x_capacity = width.max(128);
+        if padded_coords_x.len() < min_coord_x_capacity {
+            padded_coords_x.resize(min_coord_x_capacity, 0.0);
+        }
+
+        let mut padded_coords_y = coord_y
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&dummy_coords)
+            .to_vec();
+        let min_coord_y_capacity = height.max(128);
+        if padded_coords_y.len() < min_coord_y_capacity {
+            padded_coords_y.resize(min_coord_y_capacity, 0.0);
+        }
+
+        let coord_x_buffer = super::common::create_storage_buffer(
+            device,
+            "Mesh 3D Coord X Storage Buffer",
+            &padded_coords_x,
+        );
+
+        let coord_y_buffer = super::common::create_storage_buffer(
+            device,
+            "Mesh 3D Coord Y Storage Buffer",
+            &padded_coords_y,
+        );
+
+        let bind_group_layout = super::common::create_plot_with_coords_bind_group_layout(
             device,
             "Mesh 3D Bind Group Layout",
             wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+            wgpu::ShaderStages::VERTEX,
         );
 
-        let bind_group = super::common::create_uniform_storage_bind_group(
+        let bind_group = super::common::create_plot_with_coords_bind_group(
             device,
             "Mesh 3D Bind Group",
             &bind_group_layout,
             &uniform_buffer,
             &data_buffer,
+            &coord_x_buffer,
+            &coord_y_buffer,
         );
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -182,6 +248,8 @@ impl Mesh3DRenderer {
             cube_vertex_buffer,
             cube_index_buffer,
             data_buffer,
+            coord_x_buffer,
+            coord_y_buffer,
             uniform_buffer,
             bind_group,
             num_instances,
@@ -200,9 +268,33 @@ impl Mesh3DRenderer {
             mode: params.mode,
             width: self.width as u32,
             height: self.height as u32,
+            coord_mode: params.grid.coord_mode(),
+            has_reference_globe: if params.has_reference_globe { 1 } else { 0 },
+            lon_bounds: params.grid.lon_bounds_rad(),
+            lat_bounds: params.grid.lat_bounds_rad(),
+            _pad: [0; 2],
             color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+    }
+
+    pub fn update_coords(&self, queue: &wgpu::Queue, coords_x: &[f32], coords_y: &[f32]) {
+        if !coords_x.is_empty() {
+            super::common::safe_write_buffer(
+                queue,
+                &self.coord_x_buffer,
+                coords_x,
+                "Mesh3DRenderer::update_coords_x",
+            );
+        }
+        if !coords_y.is_empty() {
+            super::common::safe_write_buffer(
+                queue,
+                &self.coord_y_buffer,
+                coords_y,
+                "Mesh3DRenderer::update_coords_y",
+            );
+        }
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {

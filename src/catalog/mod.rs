@@ -284,6 +284,13 @@ pub static ICECHUNK_CATALOG: &[CatalogEntry] = &[
 
 pub static PROCEDURAL_CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
+        key: "procedural-irregular-grids",
+        label: "Irregular Grids (Ground Truth)",
+        subtitle: "Clenshaw-Curtis, Gaussian, Geometrically Stretched & Stepped Resolution Grids",
+        store: "procedural://irregular",
+        store_kind: StoreKind::ProceduralRandom,
+    },
+    CatalogEntry {
         key: "procedural-4d-volume",
         label: "4D Known-Truth Gaussian Volume",
         subtitle: "Synthetic 4D Traveling Wave Packet with Exact Ground Truth & Orbiting Center",

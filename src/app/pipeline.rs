@@ -86,9 +86,16 @@ impl OctantApp {
         };
 
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
-            let same_dimensions = self.matrix_data.as_ref().is_some_and(|m| {
-                m.width == effective_data.width && m.height == effective_data.height
+            let same_grid = self.matrix_data.as_ref().is_some_and(|m| {
+                m.grid.coord_mode() == effective_data.grid.coord_mode()
+                    && m.grid.coords_x().is_some() == effective_data.grid.coords_x().is_some()
+                    && m.grid.coords_y().is_some() == effective_data.grid.coords_y().is_some()
             });
+            let same_dimensions = !is_new_variable
+                && same_grid
+                && self.matrix_data.as_ref().is_some_and(|m| {
+                    m.width == effective_data.width && m.height == effective_data.height
+                });
             let can_have_3d_surface =
                 total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS;
             let surface_renderers_ready = !can_have_3d_surface
@@ -99,17 +106,47 @@ impl OctantApp {
                 && self.line_renderer.is_some()
                 && surface_renderers_ready
             {
-                self.update_active_2d_renderer_data(
-                    &wgpu_render_state.queue,
-                    &effective_data.values,
-                );
+                if let Some(renderer) = &self.renderer {
+                    if let (Some(cx), Some(cy)) = (
+                        effective_data.grid.coords_x(),
+                        effective_data.grid.coords_y(),
+                    ) {
+                        renderer.update_coords(&wgpu_render_state.queue, cx, cy);
+                    }
+                    renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
+                }
+                if let Some(sphere_renderer) = &self.sphere_renderer {
+                    if let (Some(cx), Some(cy)) = (
+                        effective_data.grid.coords_x(),
+                        effective_data.grid.coords_y(),
+                    ) {
+                        sphere_renderer.update_coords(&wgpu_render_state.queue, cx, cy);
+                    }
+                    sphere_renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
+                }
+                if let Some(surface_renderer) = &self.surface_renderer {
+                    if let (Some(cx), Some(cy)) = (
+                        effective_data.grid.coords_x(),
+                        effective_data.grid.coords_y(),
+                    ) {
+                        surface_renderer.update_coords(&wgpu_render_state.queue, cx, cy);
+                    }
+                    surface_renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
+                }
+                if let Some(line_renderer) = &self.line_renderer {
+                    line_renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
+                }
             } else {
-                let renderer = MatrixRenderer::new(
+                let coord_x = effective_data.grid.coords_x();
+                let coord_y = effective_data.grid.coords_y();
+                let renderer = MatrixRenderer::new_with_coords(
                     &wgpu_render_state.device,
                     wgpu_render_state.target_format,
                     &effective_data.values,
                     effective_data.width,
                     effective_data.height,
+                    coord_x,
+                    coord_y,
                 );
                 let line_renderer = LineRenderer::new(
                     &wgpu_render_state.device,
@@ -123,19 +160,25 @@ impl OctantApp {
 
                 // Instantiate 3D sphere and surface meshes only when within vertex buffer limits
                 if total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
-                    let sphere_renderer = SphereRenderer::new_sphere(
+                    let coord_x = effective_data.grid.coords_x();
+                    let coord_y = effective_data.grid.coords_y();
+                    let sphere_renderer = SphereRenderer::new_sphere_with_coords(
                         &wgpu_render_state.device,
                         wgpu_render_state.target_format,
                         &effective_data.values,
                         effective_data.width,
                         effective_data.height,
+                        coord_x,
+                        coord_y,
                     );
-                    let surface_renderer = SurfaceRenderer::new_surface(
+                    let surface_renderer = SurfaceRenderer::new_surface_with_coords(
                         &wgpu_render_state.device,
                         wgpu_render_state.target_format,
                         &effective_data.values,
                         effective_data.width,
                         effective_data.height,
+                        coord_x,
+                        coord_y,
                     );
                     self.sphere_renderer = Some(Arc::new(sphere_renderer));
                     self.surface_renderer = Some(Arc::new(surface_renderer));
@@ -513,6 +556,13 @@ impl OctantApp {
         displacement_strength: f32,
         aspect_ratio: f32,
     ) -> crate::plots::Mesh3DUniformParams {
+        let grid = self
+            .matrix_data
+            .as_ref()
+            .map(|m| m.grid.clone())
+            .unwrap_or_default();
+        let has_reference_globe = !grid.is_global();
+
         crate::plots::Mesh3DUniformParams {
             color: self.get_color_params(),
             rotation_y: self.sphere_rotation_y,
@@ -521,6 +571,8 @@ impl OctantApp {
             zoom: self.sphere_zoom,
             displacement_strength,
             mode,
+            grid,
+            has_reference_globe,
         }
     }
 
@@ -733,6 +785,7 @@ impl OctantApp {
                         }
                     }
 
+                    let coord_mode = self.matrix_data.as_ref().map_or(0, |m| m.grid.coord_mode());
                     let callback = eframe::egui_wgpu::Callback::new_paint_callback(
                         canvas_rect,
                         crate::plots::MatrixCallback {
@@ -742,6 +795,7 @@ impl OctantApp {
                             pan: gpu_pan,
                             zoom: gpu_zoom,
                             aspect_scale: gpu_aspect_scale,
+                            coord_mode,
                         },
                     );
                     ui.painter().add(callback);

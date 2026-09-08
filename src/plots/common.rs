@@ -93,6 +93,11 @@ pub struct Mesh3DUniforms {
     pub mode: u32,
     pub width: u32,
     pub height: u32,
+    pub coord_mode: u32,
+    pub has_reference_globe: u32,
+    pub lon_bounds: [f32; 2],
+    pub lat_bounds: [f32; 2],
+    pub _pad: [u32; 2],
     pub color: PlotColorParams,
 }
 
@@ -106,6 +111,8 @@ pub struct Mesh3DUniformParams {
     pub zoom: f32,
     pub displacement_strength: f32,
     pub mode: u32,
+    pub grid: crate::data::CoordinateGrid,
+    pub has_reference_globe: bool,
 }
 
 /// Standard trait implemented by all Octant WGPU plot renderers.
@@ -279,6 +286,94 @@ pub fn create_uniform_storage_bind_group(
             wgpu::BindGroupEntry {
                 binding: 1,
                 resource: storage_buffer.as_entire_binding(),
+            },
+        ],
+    })
+}
+
+/// Creates a standard 4-binding plot layout (0: Uniform, 1: Data Storage, 2: Coord X, 3: Coord Y).
+pub fn create_plot_with_coords_bind_group_layout(
+    device: &wgpu::Device,
+    label: &str,
+    uniform_data_visibility: wgpu::ShaderStages,
+    coords_visibility: wgpu::ShaderStages,
+) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some(label),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: uniform_data_visibility,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: uniform_data_visibility,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: coords_visibility,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
+                visibility: coords_visibility,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
+    })
+}
+
+/// Creates a standard 4-binding plot bind group (Uniform, Data, Coord X, Coord Y).
+pub fn create_plot_with_coords_bind_group(
+    device: &wgpu::Device,
+    label: &str,
+    layout: &wgpu::BindGroupLayout,
+    uniform_buffer: &wgpu::Buffer,
+    data_buffer: &wgpu::Buffer,
+    coord_x_buffer: &wgpu::Buffer,
+    coord_y_buffer: &wgpu::Buffer,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some(label),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: data_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: coord_x_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: coord_y_buffer.as_entire_binding(),
             },
         ],
     })
