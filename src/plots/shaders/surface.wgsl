@@ -22,7 +22,7 @@ var<uniform> uniforms: Uniforms;
 var<storage, read> data_buffer: array<f32>;
 
 struct VertexInput {
-    @location(0) position: vec3<f32>, // x, y, z (unit quad or unit cube coordinates)
+    @location(0) position: vec3<f32>,
     @location(1) uv: vec2<f32>,
     @location(2) raw_normal: vec3<f32>,
 };
@@ -41,12 +41,11 @@ fn get_normalized_height(val: f32) -> f32 {
     let range = max(cmax - cmin, 1e-6);
 
     if (cmin < 0.0 && cmax > 0.0) {
-        // Signed data: 0.0 is the base ground level. Positive values deform upward (+), negative values deform downward (-)
         let max_abs = max(abs(cmin), abs(cmax));
         return clamp(val / max_abs, -1.0, 1.0);
     } else {
-        // Unsigned data: cmin is the base ground level (0.0), cmax is max height (+1.0)
-        return clamp((val - cmin) / range, 0.0, 1.0);
+        let norm_val = clamp((val - cmin) / range, 0.0, 1.0);
+        return norm_val;
     }
 }
 
@@ -65,7 +64,6 @@ fn vs_main(
     let max_idx = arrayLength(&data_buffer) - 1u;
     let safe_idx = min(instance_idx, max_idx);
 
-    // 1-to-1 exact raw pixel value (0 NaN contamination)
     var raw_val = data_buffer[safe_idx];
 
     let data_aspect = max(f32(grid_w) / f32(grid_h), 0.1);
@@ -88,7 +86,7 @@ fn vs_main(
     var normal_3d: vec3<f32>;
 
     if (uniforms.surface_mode == 0u) {
-        // Mode 0: Smooth Bumpy Terrain (Continuous surface mesh connecting corner vertices!)
+        // Mode 0: Smooth Bumpy Terrain
         let corner_x = min(cell_x + u32(round(model.position.x)), grid_w - 1u);
         let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);
         let corner_idx = min(corner_y * grid_w + corner_x, max_idx);
@@ -117,11 +115,9 @@ fn vs_main(
         normal_3d = model.raw_normal;
     }
 
-    // Rotate 3D terrain/block position around Y and X camera axes
     let pos_rot = rotate_camera_yx(pos_3d, uniforms.rotation_y, uniforms.rotation_x);
     let norm_rot = rotate_normal_yx(normal_3d, uniforms.rotation_y, uniforms.rotation_x);
 
-    // Perspective projection transformation
     out.position = project_perspective(pos_rot, uniforms.aspect_ratio, uniforms.zoom, 1.6, 0.1);
     out.uv = model.uv;
     out.val = raw_val;
@@ -139,20 +135,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    // Compute pixel-perfect surface normal from screen-space derivatives or vertex normal
     var geom_normal = in.normal;
     if (uniforms.surface_mode == 0u) {
-        // Mode 0: Smooth Terrain - use screen-space partial derivatives for realistic terrain lighting (0 memory reads!)
-        let dpx = dpdx(in.world_pos);
-        let dpy = dpdy(in.world_pos);
-        let cross_norm = cross(dpx, dpy);
-        if (dot(cross_norm, cross_norm) > 1e-6) {
-            geom_normal = normalize(-cross_norm);
-        }
+        geom_normal = compute_screen_space_normal(in.world_pos);
     }
 
-    // 3D Directional Lighting for surface terrain & block faces (two-sided)
     let lighting = evaluate_directional_lighting(geom_normal, vec3<f32>(0.4, 0.8, 0.6), 0.35, 0.65);
-
     return vec4<f32>(eval_color.rgb * lighting, eval_color.a);
 }

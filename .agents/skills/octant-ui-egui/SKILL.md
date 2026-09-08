@@ -12,14 +12,34 @@ This skill guides development of the user interface in Octant using `egui` and `
 
 ## Key Patterns
 
-### 1. `AppAction` Event Dispatching (`src/app/actions.rs`)
+### 1. Modular Subsystem Architecture (`src/ui/`, `src/export/`)
+UI and export files are decomposed into focused submodules (< 250 lines per file):
+- **Colorbar Subsystem (`src/ui/colorbar/`)**:
+  - `ticks.rs`: Scientific tick generation (`generate_colorbar_ticks`), label formatting, and `ColorbarTick`.
+  - `handles.rs`: Interactive range inputs (`draw_end_range_inputs`) and clamp triangles (`draw_clip_triangles`).
+  - `mod.rs`: Coordinator overlay widget `show_colorbar_overlay`.
+- **Variables Panel Subsystem (`src/ui/variables_panel/`)**:
+  - `info.rs`: Dataset metadata, summary cards, and chunk shape breakdown (`show_variable_info`).
+  - `dimension_slider.rs`: Sliders, range configuration, download sizes, element limits, and slice builders (`show_dimension_sliders`).
+  - `mod.rs`: Coordinator widget `show_variable_controls`.
+- **Hover Tooltip Subsystem (`src/ui/hover/`)**:
+  - `callout.rs`: Leader lines and anchor callout cards.
+  - `camera.rs`: 3D view frustum, ray projection, and AABB intersection.
+  - `format.rs`: Multi-dimensional coordinate label formatting and dimension enrichment.
+  - `raycast_sphere.rs`, `raycast_surface.rs`, `raycast_volume.rs`: Analytical and voxel raymarching hit-tests.
+  - `sample_1d.rs`, `sample_2d.rs`: Nearest-neighbor and bilinear data sampling.
+- **Export Engine (`src/export/`)**:
+  - `raster.rs`: PNG, JPEG, WebP encoding, zero-allocation row-by-row `crop_rgba_buffer`, and Display P3 chunk injection.
+  - `vector.rs`: SVG and ISO 32000 PDF document generators.
+  - `clipboard.rs`: Platform-native file manager reveal (`open -R`, `xdg-open`, `explorer.exe`).
+
+### 2. `AppAction` Event Dispatching (`src/app/actions.rs`)
 - Do not mutate complex state deep inside nested UI widget closures.
 - Emit an `AppAction` (e.g. `AppAction::SelectVariable(name)`, `AppAction::TogglePlayback`, `AppAction::SetColormap(map)`).
 - Handle mutations centrally in `OctantApp::apply_action` or `update` to keep data flow unidirectional and debuggable.
 
-### 2. Zero-Allocation UI Salts & Performance (`perf-collect-once`)
-- Avoid allocating heap strings via `format!(...)` inside per-frame UI closures (running 60+ FPS).
-- Pass tuple literals directly into ID salts:
+### 3. Zero-Allocation UI Invariants & Performance
+- **Tuple Salts**: Pass tuple literals directly into ID salts to avoid heap strings:
   ```rust
   // Good: Zero heap allocations
   egui::ComboBox::from_id_salt(("spatial_role", dim_idx))
@@ -28,68 +48,53 @@ This skill guides development of the user interface in Octant using `egui` and `
   // Avoid: Allocates a String every single frame
   egui::ComboBox::from_id_salt(format!("spatial_role_{}", dim_idx))
   ```
-- Use `&str` references directly for combo box and button labels instead of `.to_string()`.
+- **Canvas Ticks (`src/ui/axes.rs`)**:
+  - Never allocate `Vec<TickMark>` or `String`s per frame.
+  - Use `[TickMark; 7]` stack arrays with an internal fixed stack buffer (`[u8; 32]`) and in-place `write!` cursor formatting.
+- **Dimension & Coordinate Checks (`src/utils/coordinates.rs`)**:
+  - Use zero-allocation ASCII search (`is_spatial_x_name`, `is_spatial_y_name`, `is_spatial_z_name`, `is_animated_time_name`) without lowercasing or cloning `String`s.
+- **Borrow FontId**: Pass `&FontId` to helper rendering functions instead of cloning `FontId`.
 
-### 3. Float Sorting & Safe Comparisons (`num-nan-inf-checks`)
+### 4. Float Sorting & Safe Comparisons
 - Always sort floats with `f32::total_cmp` (`ticks.sort_by(|a, b| a.t_pos.total_cmp(&b.t_pos))`) to prevent panics when encountering `NaN` or unnormalized coordinates.
 
-### 4. UI Layout Hierarchy
+### 5. UI Layout Hierarchy
 - **Top Panel**: Menu bar, dataset load/open dialog, store selector, preset catalog.
 - **Side Panel (Left)**: Variables inspector, dimension axis mapping (X, Y, Z, Time, Elevation), slice sliders.
 - **Central Panel**: WGPU canvas viewport, dynamic aspect ratio framing, hover tooltips with raw scalar values.
 - **Bottom Panel**: Animation timeline, playback speed slider, loop toggle, step forward/backward buttons.
 
-### 5. Smooth Animations & Timers
+### 6. Smooth Animations & Timers
 - Track elapsed delta time (`ctx.input(|i| i.stable_dt)`).
 - Request continuous repaints only when playing animations or waiting for background prefetch (`ctx.request_repaint()`).
 
-### 6. Canvas Paint Dispatch & Viewport Math
-- In `src/app/ui.rs`, canvas rendering delegates to `self.paint_active_plot(ui, canvas_rect, plot_rect, gpu_pan, gpu_zoom, gpu_aspect_scale)` in `src/app/pipeline.rs`.
-- Use `crate::utils::apply_zoom_pan_at_point(old_zoom, old_pan, mouse_pos, center, scroll, min_zoom, max_zoom)` from `src/utils/math.rs` for cursor-centered zoom and pan offsets.
+### 7. Canvas Paint Dispatch & Viewport Math
+- In `src/app/ui.rs`, canvas rendering delegates to `self.paint_active_plot(...)` in `src/app/pipeline/paint.rs`.
+- Use `crate::utils::apply_zoom_pan_at_point(...)` from `src/utils/math.rs` for cursor-centered zoom and pan offsets.
 - Dynamic 2D aspect ratios are resolved using `self.compute_aspect_scale(canvas_rect.size())` and `self.active_data_dimensions_2d()`.
 
-### 7. Figure Export, Canvas Screenshot & Clean Capture Architecture
-- **Export Formats & Standards** (`src/export/mod.rs`):
-  - Supported formats: PNG, JPEG, WebP, SVG, PDF, and System Clipboard (`arboard`).
-  - **Color Accuracy & Gamut**:
-    - Always inject Display P3 color primaries (`cHRM`) and Gamma 2.2 (`gAMA`) chunks in PNG outputs without conflicting `sRGB` chunks to preserve wide-gamut contrast across macOS Preview / Safari / Photoshop.
-  - **ISO 32000 PDF Specification Compliance**:
-    - Must include a Root `/Type /Catalog` object referencing `/Type /Pages`.
-    - Every entry in the cross-reference (`xref`) table must be strictly 20 bytes long (`{:010} 00000 n \r\n`).
-  - Default export directory: `~/Downloads` (always expand tilde `~` to `$HOME/Downloads` via `resolve_export_path`).
-- **Clean Single-Frame Viewport Capture (`src/app/ui.rs`)**:
-  - Screenshot readback is triggered via `ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()))`.
-  - The resulting image is delivered via `egui::Event::Screenshot { image, .. }` in `ctx.input(...)`.
-  - **Capture Cleanliness**: Interactive UI overlays (crop handles, rule-of-thirds grid lines, dashed borders, hover reticle tooltips) must be suppressed *only* during the single GPU render pass of the screenshot request (`if self.pending_export.is_none()`), ensuring pure scientific visualization data without UI widgets or handles.
-- **ROI Crop & Buffers**:
-  - `crop_rgba_buffer(&rgba, full_w, full_h, crop_rect)` slices raw RGBA buffers based on physical pixel bounds converted via `ctx.pixels_per_point()`.
-- **Camera Flash Shutter Effect**:
-  - Flash timers (`export_flash_timer`) must start **after** screenshot readback finishes so flash luminance is never captured into saved image files.
-  - Flash overlays should be rendered on the topmost visual layer (after crop overlay) and confined to the active ROI box with continuous `ctx.request_repaint()` during decay ($\sim 300\text{ms}$).
-- **Toast Notifications & File Manager Reveal**:
-  - Display floating non-blocking cards (`show_export_toast`) with an action button invoking `reveal_in_file_manager(path)` (`open -R` on macOS, `explorer /select` on Windows, `xdg-open` on Linux).
+### 8. Figure Export & Clean Capture Architecture
+- **Export Standards (`src/export/`)**:
+  - PNG with Display P3 color primaries (`cHRM`) and Gamma 2.2 (`gAMA`) chunks without conflicting `sRGB` chunks.
+  - ISO 32000 PDF with strictly 20-byte cross-reference (`xref`) table entries (`{:010} 00000 n \r\n`).
+  - Expand `~` to `$HOME/Downloads` via `resolve_export_path`.
+- **Capture Cleanliness**:
+  - Suppress interactive overlays (crop handles, grid lines, hover reticles) during the single screenshot pass (`if self.pending_export.is_none()`).
+- **Flash Overlay**:
+  - Flash timers start *after* screenshot readback finishes to prevent capturing flash luminance into exported files.
 
-### 8. Theme Awareness & Pro-Grade Overlay UI Patterns
+### 9. Theme Awareness & Pro-Grade Overlay UI Patterns
 - **Full Theme Adaptation**:
-  - All custom canvas overlays (such as crop guidelines, bounding boxes, toast popups, and floating toolbars) must dynamically adapt to `ui.visuals().dark_mode` or `ui.style().visuals`.
-  - Adapt background fills, outer mask alpha (`from_black_alpha(150)` in dark mode vs `from_black_alpha(80)` in light mode), grid strokes, and border accent colors (`0, 190, 255` dark vs `0, 125, 220` light).
-  - Floating toolbars must use `egui::Frame::window(ui.style())` with `corner_radius(6.0)` to match the current theme palette.
-- **Pro-Grade Overlay Handles & Interaction**:
-  - Use geometric bracket shapes (e.g. L-shaped corner brackets with $16$ px arms, $3$ px thickness) and elongated thin pills/bars ($28\times 4$ px) along edges rather than circular dots.
-  - Render handles using clean loops over coordinate offsets $(dx, dy)$ to avoid code duplication.
-  - Provide responsive cursor changes (`ResizeNorthWest`, `ResizeNorthEast`, `ResizeVertical`, `ResizeHorizontal`, `Grab`).
-- **Responsive Layout & Slider Width Accounting**:
-  - When calculating dynamically expanding widget space in horizontal bars (e.g., timeline slider `slider_w`), all trailing elements (badges, FPS buttons, Save/Export buttons, overflow menus) must be included in `right_elements_w`:
-    ```rust
-    let right_elements_w = ... + (if show_export { export_w + spacing } else { 0.0 }) + ...;
-    let slider_w = (ui.available_width() - right_elements_w - spacing * 2.0).max(min_slider_w);
-    ```
-- **Encapsulated UI Helper Pattern**:
-  - Extract complex multi-step frame lifecycle actions (e.g. screenshot polling, buffer cropping, format dispatch) into private helper methods (`self.process_pending_export(&ctx)`) on `OctantApp` rather than inlining large blocks into the main `ui()` loop.
+  - All custom canvas overlays (crop guidelines, bounding boxes, toast popups, floating toolbars) must dynamically adapt to `ui.visuals().dark_mode`.
+- **Pro-Grade Overlay Handles**:
+  - Use geometric bracket shapes (L-shaped corner brackets with $16$ px arms, $3$ px thickness) and thin bars ($28\times 4$ px) along edges.
+  - Provide responsive cursor feedback (`ResizeNorthWest`, `ResizeNorthEast`, `ResizeVertical`, `ResizeHorizontal`, `Grab`).
+- **Responsive Layout Accounting**:
+  - When calculating dynamic widget space (e.g. `slider_w`), subtract all trailing badges, buttons, and menus in `right_elements_w`.
 
-### 9. Native Procedural Vector Icons (`src/ui/icons/`)
-- **Forbid Raw Emojis and Unicode Glyphs**: Never use font-dependent emojis (`🚀`, `⏳`, `⚡`, `⚠️`, `❌`, `📥`, `✓`) or unicode bullet symbols in UI labels, buttons, toasts, status text, or log strings.
-- **Use `crate::ui::icons::Icon`**: Use the GPU-drawn vector icons via the `UiIconExt` trait:
+### 10. Native Procedural Vector Icons (`src/ui/icons/`)
+- **Forbid Raw Emojis and Unicode Glyphs**: Never use font-dependent emojis or unicode symbols in UI labels, buttons, toasts, status text, or logs.
+- **Use `crate::ui::icons::Icon`**:
   ```rust
   use crate::ui::icons::{Icon, UiIconExt};
 
@@ -99,7 +104,7 @@ This skill guides development of the user interface in Octant using `egui` and `
 
   // Buttons with vector icons
   ui.icon_button(Icon::Save, "Save Figure");
-  ui.icon_button(Icon::Cross, ""); // Pure icon button (automatically centered with 0 gap)
+  ui.icon_button(Icon::Cross, ""); // Pure icon button
 
   // Labels with vector icons
   ui.icon_label(Icon::VariableDoc, "Temperature");
@@ -107,5 +112,4 @@ This skill guides development of the user interface in Octant using `egui` and `
   // Direct GPU Painter drawing
   Icon::DropTray.paint(ui.painter(), rect, stroke_color, ui.visuals().dark_mode);
   ```
-- **Extending Icons**: When a new symbol is needed, define a new variant in `Icon` (`src/ui/icons/mod.rs`) and implement its resolution-independent painter drawing routine in `src/ui/icons/nav.rs`, `playback.rs`, `plots.rs`, `status.rs`, or `store.rs` with dark/light theme awareness.
-
+- **Extending Icons**: Add new variants to `Icon` in `src/ui/icons/mod.rs` and implement procedural painting in `nav.rs`, `playback.rs`, `plots.rs`, `status.rs`, or `store.rs`.

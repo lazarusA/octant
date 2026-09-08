@@ -420,6 +420,50 @@ impl super::common::PlotRenderer for HeatmapRenderer {
     }
 }
 
+impl super::traits::PlotRenderer for HeatmapRenderer {
+    fn update_data(&self, queue: &wgpu::Queue, data: &crate::data::RenderData) {
+        if let crate::data::RenderData::Matrix(m) = data {
+            self.update_data(queue, &m.values);
+        }
+    }
+
+    fn paint(
+        &self,
+        _ui: &mut egui::Ui,
+        _rect: egui::Rect,
+        _params: &super::traits::PlotRenderParams,
+    ) {
+        // Concrete painter dispatched via egui callback
+    }
+
+    fn inspect_hover(
+        &self,
+        pointer_pos: egui::Pos2,
+        rect: egui::Rect,
+        data: &crate::data::RenderData,
+        _params: &super::traits::PlotRenderParams,
+    ) -> Option<super::traits::HoverSample> {
+        let crate::data::RenderData::Matrix(m) = data else {
+            return None;
+        };
+        if !rect.contains(pointer_pos) || m.width == 0 || m.height == 0 {
+            return None;
+        }
+        let nx = ((pointer_pos.x - rect.min.x) / rect.width().max(1.0)).clamp(0.0, 1.0);
+        let ny = ((pointer_pos.y - rect.min.y) / rect.height().max(1.0)).clamp(0.0, 1.0);
+        let (px, py) = m.grid.find_cell_from_norm(nx, ny, m.width, m.height);
+        let val = m.values.get(py * m.width + px).copied().unwrap_or(f32::NAN);
+        let (cell_lon, cell_lat) = m.grid.cell_center_lon_lat_rad(px, py, m.width, m.height);
+        Some(super::traits::HoverSample {
+            cell_x: px,
+            cell_y: py,
+            value: val,
+            coord_lon_lat: Some((cell_lon.to_degrees() as f64, cell_lat.to_degrees() as f64)),
+            world_pos: None,
+        })
+    }
+}
+
 pub struct HeatmapCallback {
     pub renderer: Arc<HeatmapRenderer>,
     pub color_params: super::common::PlotColorParams,

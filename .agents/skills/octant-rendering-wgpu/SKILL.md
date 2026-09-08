@@ -7,18 +7,29 @@ description: >-
 
 # Octant WGPU Rendering Skill
 
-This skill covers working with `wgpu` pipelines, WGSL shaders, buffer management, and integration with `egui` inside `src/plots/`.
+This skill covers working with `wgpu` pipelines, WGSL shaders, buffer management, polymorphic renderer traits, and integration with `egui` inside `src/plots/`.
 
-## Renderers Architecture
+## Renderers Architecture & Polymorphism
 
-Octant organizes WGPU renderers in `src/plots/`:
-1. **`MatrixRenderer` (`src/plots/heatmap.rs`)**: 2D heatmaps and raster scalar fields with bilinear/nearest interpolation.
+Octant organizes WGPU renderers in `src/plots/`, all implementing the polymorphic `crate::plots::traits::PlotRenderer` trait:
+1. **`HeatmapRenderer` (`src/plots/heatmap.rs`)**: 2D heatmaps and raster scalar fields with bilinear/nearest interpolation and coordinate lookups.
 2. **`LineRenderer` (`src/plots/line.rs`)**: 1D time-series and profile line plots with dynamic capacity reallocation.
 3. **`Mesh3DRenderer` (`src/plots/mesh.rs`)**: Unified GPU instanced 3D surface, globe, terrain, and voxel cube mesh renderer.
    - **`SphereRenderer` (`src/plots/sphere.rs`)**: Thin alias of `Mesh3DRenderer` compiled with `shaders/sphere.wgsl` and backface culling.
    - **`SurfaceRenderer` (`src/plots/surface.rs`)**: Thin alias of `Mesh3DRenderer` compiled with `shaders/surface.wgsl`.
 4. **`PointCloudRenderer` (`src/plots/point_cloud.rs`)**: 3D point cloud billboard particles with coordinate/shift offsets.
 5. **`VolumeRenderer` (`src/plots/volume.rs`)**: 3D raymarched volumetric data with transfer functions (DVR, MIP, Isosurface).
+
+## `PlotRenderer` Trait (`src/plots/traits.rs`)
+
+All plot renderers implement `PlotRenderer` to allow polymorphic data and uniform updates:
+```rust
+pub trait PlotRenderer: Send + Sync {
+    fn update_data(&self, queue: &wgpu::Queue, data: &RenderData);
+    fn paint(&self, ui: &mut egui::Ui, rect: egui::Rect, params: &PlotRenderParams);
+    fn inspect_hover(&self, norm_pos: [f32; 2], rect: egui::Rect) -> Option<HoverSample>;
+}
+```
 
 ## Adding New 3D Geometries (Hexagons, Prisms, Custom Meshes)
 
@@ -57,13 +68,17 @@ To add a new 3D geometry shape (such as Hexagonal columns, icosahedra, or discre
    }
    ```
 2. Register `PlotType::<NewGeom>` in `src/plots/mod.rs`.
-3. Add a dispatch match arm in `OctantApp::paint_active_plot()` in `src/app/pipeline.rs`.
+3. Add a dispatch match arm in `OctantApp::paint_active_plot()` in `src/app/pipeline/paint.rs`.
 
 ## Best Practices & Invariants
 
-### 1. Uniform Buffer Layouts (std140 & std430)
+### 1. Zero-Allocation Uniform Structs (`Copy`)
+- Parameter bundles passed to callbacks (e.g. `Mesh3DUniformParams`, `VolumeUniformParams`, `PointCloudUniformParams`) must be zero-allocation `Copy` structs.
+- Never store heap-allocated coordinate buffers (`Vec<f64>`, `CoordinateGrid`) inside uniform parameter structs. Extract primitive bounds (`coord_mode: u32`, `lon_bounds: [f32; 2]`, `lat_bounds: [f32; 2]`) directly.
+
+### 2. Uniform Buffer Layouts (std140 & std430)
 - Align all fields to WGSL alignment rules (`vec4` is 16-byte aligned, `mat4` is 64 bytes).
-- Derive `#[repr(C)]`, `bytemuck::Pod`, and `bytemuck::Zeroable` on uniform structs.
+- Derive `#[repr(C)]`, `bytemuck::Pod`, and `bytemuck::Zeroable` on GPU uniform structs.
 - Add explicit padding fields (`_pad0`, `_pad1`) where necessary to guarantee alignment across all GPU hardware.
 
 ```rust
@@ -88,16 +103,16 @@ pub struct PlotColorParams {
 }
 ```
 
-### 2. WGSL Shaders (`src/plots/shaders/*.wgsl`)
+### 3. WGSL Shaders (`src/plots/shaders/*.wgsl`)
 - Assemble shaders using `crate::assemble_plot_shader!(include_str!("shaders/..."))`.
 - Colormaps are modularized in `src/plots/shaders/colormaps/` (Viridis, Plasma, Inferno, Magma, Turbo, Coolwarm, Cividis).
 - Keep shaders compatible with WebGPU and WebGL2 (via `wgpu` downlevel flags).
 
-### 3. Lock Safety & Poison Resilience in Renderers
+### 4. Lock Safety & Poison Resilience in Renderers
 - When accessing interior GPU buffer handles (`RwLock<LineGpuResources>`, etc.), **never use bare `unwrap()`**.
 - Handle poison states with `if let Ok(...) = lock.read()` or `.unwrap_or_else(|p| p.into_inner())` to avoid UI crashes.
 
-### 4. GPU Instancing & Vertex Pulling (Standard for All Grid Formats)
+### 5. GPU Instancing & Vertex Pulling (Standard for All Grid Formats)
 - **Zero-Allocation GPU Architecture**: Never allocate multi-megabyte/gigabyte vertex buffers on the CPU for grid data. All structured and discrete global grids must use lightweight GPU templates or vertex pulling:
   - **Regular Structured Grids (2D/3D)**: Unit Quad (4 vertices, `build_unit_quad_mesh`) or Unit Cube (24 vertices, `build_unit_cube_mesh`).
   - **Discrete Global Grids (HEALPix, Cubed-Sphere)**: Unit Quad (4 vertices) with analytical coordinate synthesis in WGSL.
@@ -105,14 +120,14 @@ pub struct PlotColorParams {
   - **Unstructured Topology (UGRID, MPAS)**: GPU Vertex Pulling—store static `node_coords` and `triangle_indices` in GPU storage buffers; pull vertices directly in the shader without recreating CPU meshes on dataset or variable changes.
   - **Lines / 1D Profiles**: Index-driven draw calls (`rpass.draw(0..profile_length, 0..line_count)`).
 
-### 5. Valid Use Cases for CPU Mesh Generation
+### 6. Valid Use Cases for CPU Mesh Generation
 CPU mesh generation is reserved strictly for non-grid geometric processing and export workflows:
 - **GIS Vector Polygons**: Arbitrary polygon boundaries, coastlines, and GeoJSON country borders requiring polygon clipping and triangulation (e.g., Earcut/CDT).
 - **Streamlines & Particle Traces**: Dynamic numerical integration of particles through velocity vector fields (CFD/wind) to generate 3D ribbon or tube geometry.
 - **Explicit 3D Model Export**: Marching Cubes or Dual Contouring when exporting polygonal files (.stl, .obj, .gltf) to disk.
 - **UI & Annotations**: Viewport orientation compasses, 3D coordinate triads, and text label overlays.
 
-### 6. Analytical Coordinate & Normal Synthesis in WGSL
+### 7. Analytical Coordinate & Normal Synthesis in WGSL
 - Pass the raw tensor data as a storage buffer (`@group(0) @binding(1) var<storage, read> data_buffer: array<f32>;`).
 - Decode grid coordinates inside `vs_main` using `@builtin(instance_index)`:
   - **2D Regular Grid**: `let cell_x = instance_idx % uniforms.width; let cell_y = instance_idx / uniforms.width;`
@@ -123,9 +138,9 @@ CPU mesh generation is reserved strictly for non-grid geometric processing and e
   - **Lighting normals**: Compute finite-difference gradients from neighboring storage buffer cells (`dh_du = dr(val_right) - dr(val_left)`).
 - **Vertex Shader Fast Culling**: If a cell/point is `NaN` or clipped by color range, immediately return `out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0)` to skip fragment rasterization completely.
 
-### 7. Safe Buffer Updates
+### 8. Safe Buffer Updates
 - Always use `super::common::safe_write_buffer(queue, buffer, data, label)` when writing data slices. It guards against destination buffer overruns when switching datasets or projections.
 
-### 8. `egui_wgpu` Paint Callback
+### 9. `egui_wgpu` Paint Callback
 - In `src/plots/` renderers, paint passes execute inside `egui_wgpu::CallbackTrait`.
 - Always use `setup_viewport_and_scissor` from `src/plots/common.rs` to clamp scissor rects strictly within physical surface bounds.

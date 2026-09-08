@@ -101,8 +101,8 @@ pub struct Mesh3DUniforms {
     pub color: PlotColorParams,
 }
 
-/// Parameter bundle for configuring 3D heightfield mesh renderers.
-#[derive(Clone, Debug)]
+/// Parameter bundle for configuring 3D heightfield mesh renderers (zero-allocation Copy struct).
+#[derive(Copy, Clone, Debug)]
 pub struct Mesh3DUniformParams {
     pub color: PlotColorParams,
     pub rotation_y: f32,
@@ -111,8 +111,10 @@ pub struct Mesh3DUniformParams {
     pub zoom: f32,
     pub displacement_strength: f32,
     pub mode: u32,
-    pub grid: crate::data::CoordinateGrid,
+    pub coord_mode: u32,
     pub has_reference_globe: bool,
+    pub lon_bounds: [f32; 2],
+    pub lat_bounds: [f32; 2],
 }
 
 /// Standard trait implemented by all Octant WGPU plot renderers.

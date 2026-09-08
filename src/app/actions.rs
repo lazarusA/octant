@@ -33,7 +33,6 @@ impl OctantApp {
                     && let Some(var_info) = meta.variables.get(idx).cloned()
                 {
                     crate::ui::variables_panel::init_variable_dimension_defaults(self, &var_info);
-                    self.sync_plotted_state_from_selected();
                 }
                 self.load_selected_variable_block();
             }
