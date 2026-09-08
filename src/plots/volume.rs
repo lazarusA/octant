@@ -345,7 +345,35 @@ impl VolumeRenderer {
 
 impl super::common::PlotRenderer for VolumeRenderer {
     fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
-        VolumeRenderer::update_data(self, queue, values);
+        self.update_data(queue, values);
+    }
+}
+
+impl super::traits::PlotRenderer for VolumeRenderer {
+    fn update_data(&self, queue: &wgpu::Queue, data: &crate::data::RenderData) {
+        match data {
+            crate::data::RenderData::Volume(v) => self.update_data(queue, &v.values),
+            crate::data::RenderData::Matrix(m) => self.update_data(queue, &m.values),
+        }
+    }
+
+    fn paint(
+        &self,
+        _ui: &mut egui::Ui,
+        _rect: egui::Rect,
+        _params: &super::traits::PlotRenderParams,
+    ) {
+        // Concrete painter dispatched via egui callback
+    }
+
+    fn inspect_hover(
+        &self,
+        _pointer_pos: egui::Pos2,
+        _rect: egui::Rect,
+        _data: &crate::data::RenderData,
+        _params: &super::traits::PlotRenderParams,
+    ) -> Option<super::traits::HoverSample> {
+        None
     }
 }
 
