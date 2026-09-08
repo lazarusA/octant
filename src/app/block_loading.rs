@@ -30,6 +30,29 @@ impl OctantApp {
         (start, end, window_size)
     }
 
+    /// Returns the open `StoreHandle` for the currently selected (target) dataset from `dataset_manager`.
+    pub fn selected_store_handle(&self) -> Option<crate::data::StoreHandle> {
+        let source_id = self.selected_source_id();
+        if let Some(d) = self.dataset_manager.get(&source_id) {
+            return Some(d.store.clone());
+        }
+
+        // Fallback: match by URI in dataset_manager
+        let target_uri = self.store_target_input.trim().trim_end_matches('/');
+        if let Some(d) = self.dataset_manager.iter().find(|d| {
+            let d_uri = d.source.uri.trim().trim_end_matches('/');
+            d_uri == target_uri || d.id == source_id || d.id.ends_with(target_uri)
+        }) {
+            return Some(d.store.clone());
+        }
+
+        // Auto-open through SourceFactory if not yet in dataset_manager
+        let kind = self.selected_store_kind.to_data_source_kind();
+        let source =
+            crate::data::DataSource::new(&source_id, kind, &self.store_target_input, "Store");
+        crate::data::SourceFactory::open(source).ok()
+    }
+
     /// Returns the open `StoreHandle` for the currently plotted dataset from `dataset_manager`.
     pub fn plotted_store_handle(&self) -> Option<crate::data::StoreHandle> {
         let source_id = self.plotted_source_id();
@@ -59,29 +82,28 @@ impl OctantApp {
 
     /// Loads the block corresponding to the current animated step and selections.
     pub fn load_selected_variable_block(&mut self) {
-        let Some(metadata) = &self.plotted_dataset_metadata else {
-            self.status_message = "No plotted dataset metadata loaded.".to_string();
+        let Some(metadata) = &self.active_dataset_metadata else {
+            self.status_message = "No dataset metadata loaded.".to_string();
             return;
         };
-        let Some(var_info) = metadata.variables.get(self.plotted_variable_idx) else {
-            self.status_message = "Invalid plotted variable index.".to_string();
+        let Some(var_info) = metadata.variables.get(self.selected_variable_idx) else {
+            self.status_message = "Invalid selected variable index.".to_string();
             return;
         };
 
         let var_name = var_info.name.clone();
         let shape = var_info.shape.clone();
 
-        let base_request =
-            crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_name, &shape);
+        let base_request = crate::ui::variables_panel::build_slice_request(self, &var_name, &shape);
         let mut selections = base_request.selections.clone();
 
-        if let Some(anim_dim) = self.plotted_animated_dim {
+        if let Some(anim_dim) = self.animated_dim {
             let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
             if full_extent > 0 && self.current_timestep >= full_extent {
                 self.current_timestep = full_extent - 1;
             }
-            if anim_dim < self.plotted_selected_dim_indices.len() {
-                self.plotted_selected_dim_indices[anim_dim] = self.current_timestep;
+            if anim_dim < self.selected_dim_indices.len() {
+                self.selected_dim_indices[anim_dim] = self.current_timestep;
             }
             if anim_dim < selections.len() {
                 let (start, end, _) = self.animated_window_bounds(
@@ -99,8 +121,8 @@ impl OctantApp {
         let slice_request = SliceRequest::new(&var_name, selections);
         self.active_slice_request = Some(slice_request.clone());
 
-        let source_id = self.plotted_source_id();
-        let store_handle = self.plotted_store_handle();
+        let source_id = self.selected_source_id();
+        let store_handle = self.selected_store_handle();
         let block_key = store_handle
             .as_ref()
             .map(|h| BlockRequest::new(h.clone(), slice_request.clone()).cache_key());
@@ -111,7 +133,7 @@ impl OctantApp {
             &source_id,
             &var_name,
             &slice_request.selections,
-            self.plotted_animated_dim,
+            self.animated_dim,
             self.current_timestep,
         ) {
             self.status_message = format!(
@@ -149,7 +171,6 @@ impl OctantApp {
         self.status_message = format!("[block cache] Downloading window for '{}'...", var_name);
         self.block_prefetcher
             .request(block_request, &self.block_cache);
-        self.prefetch_selected_animated_range(&shape);
     }
 
     /// Prefetches the block window containing `step` asynchronously using `plotted_store_handle()`,
@@ -487,6 +508,9 @@ impl OctantApp {
 
     /// Projects a resident block into current 2D and 3D views.
     pub fn apply_block_projection(&mut self, block: &crate::data::octant_block::OctantBlock) {
+        // Synchronize plotted state now that the new block has arrived and is being rendered
+        self.sync_plotted_state_from_selected();
+
         let anim_dim = crate::app::DimConfig::animated_dim(&self.plotted_dim_config);
         let orig_dim_names: Vec<String> = self
             .plotted_dataset_metadata
@@ -678,17 +702,19 @@ impl OctantApp {
                         }
                     }
 
-                    if is_same_var && (is_active || covers_current) {
-                        if is_active
-                            && let Some(target) = self.pending_target_step.take()
-                            && let Some(dim) = self.plotted_animated_dim
-                        {
-                            let origin = block.origin.get(dim).copied().unwrap_or(0);
-                            let extent = block.shape.get(dim).copied().unwrap_or(0);
-                            if target >= origin && target < origin + extent {
-                                self.current_timestep = target;
-                                if dim < self.plotted_selected_dim_indices.len() {
-                                    self.plotted_selected_dim_indices[dim] = target;
+                    if is_active || (is_same_var && covers_current) {
+                        if is_active {
+                            self.active_block_key = None;
+                            if let Some(target) = self.pending_target_step.take()
+                                && let Some(dim) = self.plotted_animated_dim
+                            {
+                                let origin = block.origin.get(dim).copied().unwrap_or(0);
+                                let extent = block.shape.get(dim).copied().unwrap_or(0);
+                                if target >= origin && target < origin + extent {
+                                    self.current_timestep = target;
+                                    if dim < self.plotted_selected_dim_indices.len() {
+                                        self.plotted_selected_dim_indices[dim] = target;
+                                    }
                                 }
                             }
                         }

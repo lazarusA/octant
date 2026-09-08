@@ -6,9 +6,10 @@ use crate::plots::common::PlotColorParams;
 impl OctantApp {
     /// Resets global and local colormap normalization limits.
     pub fn reset_variable_bounds(&mut self) {
-        self.global_data_min = f32::MAX;
-        self.global_data_max = f32::MIN;
-        self.lock_color_bounds = false;
+        if !self.lock_color_bounds {
+            self.global_data_min = f32::MAX;
+            self.global_data_max = f32::MIN;
+        }
     }
 
     /// Assembles the complete `PlotColorParams` uniform bundle from current application state.
