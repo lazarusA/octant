@@ -30,15 +30,18 @@ impl OctantApp {
         (start, end, window_size)
     }
 
-    /// Returns the open `StoreHandle` for the currently selected (target) dataset from `dataset_manager`.
-    pub fn selected_store_handle(&self) -> Option<crate::data::StoreHandle> {
-        let source_id = self.selected_source_id();
-        if let Some(d) = self.dataset_manager.get(&source_id) {
+    fn resolve_store_handle(
+        &self,
+        source_id: &str,
+        target_input: &str,
+        kind: crate::app::StoreKind,
+    ) -> Option<crate::data::StoreHandle> {
+        if let Some(d) = self.dataset_manager.get(source_id) {
             return Some(d.store.clone());
         }
 
         // Fallback: match by URI in dataset_manager
-        let target_uri = self.store_target_input.trim().trim_end_matches('/');
+        let target_uri = target_input.trim().trim_end_matches('/');
         if let Some(d) = self.dataset_manager.iter().find(|d| {
             let d_uri = d.source.uri.trim().trim_end_matches('/');
             d_uri == target_uri || d.id == source_id || d.id.ends_with(target_uri)
@@ -47,37 +50,29 @@ impl OctantApp {
         }
 
         // Auto-open through SourceFactory if not yet in dataset_manager
-        let kind = self.selected_store_kind.to_data_source_kind();
-        let source =
-            crate::data::DataSource::new(&source_id, kind, &self.store_target_input, "Store");
+        let kind = kind.to_data_source_kind();
+        let source = crate::data::DataSource::new(source_id, kind, target_input, "Store");
         crate::data::SourceFactory::open(source).ok()
+    }
+
+    /// Returns the open `StoreHandle` for the currently selected (target) dataset from `dataset_manager`.
+    pub fn selected_store_handle(&self) -> Option<crate::data::StoreHandle> {
+        let source_id = self.selected_source_id();
+        self.resolve_store_handle(
+            &source_id,
+            &self.store_target_input,
+            self.selected_store_kind,
+        )
     }
 
     /// Returns the open `StoreHandle` for the currently plotted dataset from `dataset_manager`.
     pub fn plotted_store_handle(&self) -> Option<crate::data::StoreHandle> {
         let source_id = self.plotted_source_id();
-        if let Some(d) = self.dataset_manager.get(&source_id) {
-            return Some(d.store.clone());
-        }
-
-        // Fallback: match by URI in dataset_manager
-        let target_uri = self.plotted_store_target_input.trim().trim_end_matches('/');
-        if let Some(d) = self.dataset_manager.iter().find(|d| {
-            let d_uri = d.source.uri.trim().trim_end_matches('/');
-            d_uri == target_uri || d.id == source_id || d.id.ends_with(target_uri)
-        }) {
-            return Some(d.store.clone());
-        }
-
-        // Auto-open through SourceFactory if not yet in dataset_manager
-        let kind = self.plotted_store_kind.to_data_source_kind();
-        let source = crate::data::DataSource::new(
+        self.resolve_store_handle(
             &source_id,
-            kind,
             &self.plotted_store_target_input,
-            "Store",
-        );
-        crate::data::SourceFactory::open(source).ok()
+            self.plotted_store_kind,
+        )
     }
 
     /// Loads the block corresponding to the current animated step and selections.
@@ -449,8 +444,6 @@ impl OctantApp {
         }
 
         let anim_dim = crate::app::DimConfig::animated_dim(dim_config);
-        let all_dims: Vec<usize> = (0..rank).collect();
-        let non_anim: Vec<usize> = (0..rank).filter(|&d| Some(d) != anim_dim).collect();
 
         let find_explicit_spatial = |role: crate::app::SpatialRole| -> Option<usize> {
             (0..rank).find(|&d| {
@@ -468,40 +461,21 @@ impl OctantApp {
         let explicit_y = find_explicit_spatial(crate::app::SpatialRole::Y);
         let explicit_z = find_explicit_spatial(crate::app::SpatialRole::Z);
 
-        let explicit_spatial: Vec<usize> = crate::app::DimConfig::spatial_dims(dim_config)
-            .into_iter()
-            .filter(|&d| d < rank)
-            .collect();
-
         let x_dim = explicit_x
-            .or_else(|| explicit_spatial.first().copied())
-            .unwrap_or_else(|| non_anim.last().copied().unwrap_or(0));
+            .unwrap_or_else(|| (0..rank).rev().find(|&d| Some(d) != anim_dim).unwrap_or(0));
 
-        let y_dim = explicit_y
-            .or_else(|| explicit_spatial.iter().copied().find(|&d| d != x_dim))
-            .unwrap_or_else(|| {
-                non_anim
-                    .len()
-                    .checked_sub(2)
-                    .and_then(|i| non_anim.get(i))
-                    .copied()
-                    .unwrap_or_else(|| all_dims.iter().copied().find(|&d| d != x_dim).unwrap_or(0))
-            });
+        let y_dim = explicit_y.unwrap_or_else(|| {
+            (0..rank)
+                .rev()
+                .find(|&d| d != x_dim && Some(d) != anim_dim)
+                .unwrap_or_else(|| (0..rank).find(|&d| d != x_dim).unwrap_or(0))
+        });
 
-        let z_dim = explicit_z
-            .or_else(|| {
-                explicit_spatial
-                    .iter()
-                    .copied()
-                    .find(|&d| d != x_dim && d != y_dim)
-            })
-            .unwrap_or_else(|| {
-                all_dims
-                    .iter()
-                    .copied()
-                    .find(|&d| d != x_dim && d != y_dim)
-                    .unwrap_or(usize::MAX)
-            });
+        let z_dim = explicit_z.unwrap_or_else(|| {
+            (0..rank)
+                .find(|&d| d != x_dim && d != y_dim)
+                .unwrap_or(usize::MAX)
+        });
 
         (x_dim, y_dim, z_dim)
     }
