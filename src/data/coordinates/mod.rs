@@ -5,10 +5,10 @@ pub mod lut;
 pub mod search;
 pub mod types;
 
-pub use detection::detect_grid;
+pub use detection::{detect_grid, normalize_grid};
 pub use lut::{build_1d_coord_lut, compute_coord_lut_size};
 pub use search::find_coord_cell_1d;
-pub use types::CoordinateGrid;
+pub use types::{CoordinateGrid, GridGeometry, GridKind};
 
 #[cfg(test)]
 mod tests {

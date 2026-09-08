@@ -4,6 +4,53 @@ use super::detection::normalize_lon_deg;
 use super::search::find_coord_cell_1d;
 use std::sync::Arc;
 
+/// Canonical spatial grid classification used across the data and render layers.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GridKind {
+    #[default]
+    GlobalRegular,
+    RegionalRegular,
+    Irregular1D,
+    Curvilinear2D,
+}
+
+/// Canonical spatial grid representation.
+///
+/// This is the single contract shared by data backends and rendering code.
+/// Backends normalize into this model instead of spreading ad hoc mode values
+/// and raw coordinate-variable names across multiple layers.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct GridGeometry {
+    pub kind: GridKind,
+    pub width: usize,
+    pub height: usize,
+    pub lon_bounds: [f32; 2],
+    pub lat_bounds: [f32; 2],
+    pub flip_i: bool,
+    pub is_periodic_i: bool,
+    pub coords_x: Option<Arc<[f32]>>,
+    pub coords_y: Option<Arc<[f32]>>,
+    pub lons: Option<Arc<[f32]>>,
+    pub lats: Option<Arc<[f32]>>,
+}
+
+impl GridGeometry {
+    #[inline]
+    pub fn coord_mode(&self) -> u32 {
+        match self.kind {
+            GridKind::GlobalRegular => 0,
+            GridKind::RegionalRegular => 1,
+            GridKind::Irregular1D => 2,
+            GridKind::Curvilinear2D => 3,
+        }
+    }
+
+    #[inline]
+    pub fn is_curvilinear(&self) -> bool {
+        self.kind == GridKind::Curvilinear2D
+    }
+}
+
 /// Represents the coordinate grid configuration for a 2D scalar field slice.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum CoordinateGrid {
@@ -39,6 +86,78 @@ pub enum CoordinateGrid {
 }
 
 impl CoordinateGrid {
+    /// Canonical, backend-agnostic geometry view of this coordinate grid.
+    pub fn to_geometry(&self) -> GridGeometry {
+        match self {
+            Self::GlobalRegular => GridGeometry {
+                kind: GridKind::GlobalRegular,
+                width: 0,
+                height: 0,
+                lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
+                lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
+                flip_i: false,
+                is_periodic_i: false,
+                coords_x: None,
+                coords_y: None,
+                lons: None,
+                lats: None,
+            },
+            Self::RegionalRegular {
+                lon_bounds,
+                lat_bounds,
+            } => GridGeometry {
+                kind: GridKind::RegionalRegular,
+                width: 0,
+                height: 0,
+                lon_bounds: [lon_bounds.0, lon_bounds.1],
+                lat_bounds: [lat_bounds.0, lat_bounds.1],
+                flip_i: false,
+                is_periodic_i: false,
+                coords_x: None,
+                coords_y: None,
+                lons: None,
+                lats: None,
+            },
+            Self::Irregular1D {
+                coords_x,
+                coords_y,
+                lon_bounds,
+                lat_bounds,
+            } => GridGeometry {
+                kind: GridKind::Irregular1D,
+                width: coords_x.len(),
+                height: coords_y.len(),
+                lon_bounds: [lon_bounds.0, lon_bounds.1],
+                lat_bounds: [lat_bounds.0, lat_bounds.1],
+                flip_i: false,
+                is_periodic_i: false,
+                coords_x: Some(coords_x.clone()),
+                coords_y: Some(coords_y.clone()),
+                lons: None,
+                lats: None,
+            },
+            Self::Curvilinear2D {
+                lons,
+                lats,
+                lon_bounds,
+                lat_bounds,
+                ..
+            } => GridGeometry {
+                kind: GridKind::Curvilinear2D,
+                width: 0,
+                height: 0,
+                lon_bounds: [lon_bounds.0, lon_bounds.1],
+                lat_bounds: [lat_bounds.0, lat_bounds.1],
+                flip_i: false,
+                is_periodic_i: false,
+                coords_x: None,
+                coords_y: None,
+                lons: Some(lons.clone()),
+                lats: Some(lats.clone()),
+            },
+        }
+    }
+
     /// Returns the coordinate mode identifier for GPU shaders:
     /// 0 = GlobalRegular, 1 = RegionalRegular, 2 = Irregular1D, 3 = Curvilinear2D.
     #[inline]
