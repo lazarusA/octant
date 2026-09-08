@@ -610,6 +610,81 @@ mod desktop {
                     }
                 }
 
+                // Extract 2D curvilinear coordinates (e.g. nav_lon, nav_lat, coordinates attribute)
+                let mut curvilinear_coordinates: HashMap<String, crate::data::CurvilinearCoord2D> =
+                    HashMap::new();
+                if rank >= 2 {
+                    let y_dim_idx = rank - 2;
+                    let x_dim_idx = rank - 1;
+                    let y_full_len = dims[y_dim_idx].len();
+                    let x_full_len = dims[x_dim_idx].len();
+
+                    let mut candidate_names: Vec<String> = vec![
+                        "nav_lon".to_string(),
+                        "nav_lat".to_string(),
+                        "lon".to_string(),
+                        "lat".to_string(),
+                        "longitude".to_string(),
+                        "latitude".to_string(),
+                        "x_lon".to_string(),
+                        "y_lat".to_string(),
+                    ];
+
+                    if let Some(coords_attr) = attributes.get("coordinates") {
+                        for part in coords_attr.split_whitespace() {
+                            let part_clean = part.trim().to_string();
+                            if !part_clean.is_empty() && !candidate_names.contains(&part_clean) {
+                                candidate_names.push(part_clean);
+                            }
+                        }
+                    }
+
+                    for cand in &candidate_names {
+                        if let Some(coord_var) = file
+                            .variable(cand)
+                            .or_else(|| file.variable(&cand.to_lowercase()))
+                            && coord_var.dimensions().len() == 2
+                        {
+                            let c_dims = coord_var.dimensions();
+                            if c_dims[0].len() == y_full_len && c_dims[1].len() == x_full_len {
+                                let y_start = origin[y_dim_idx].min(y_full_len.saturating_sub(1));
+                                let y_count =
+                                    block_shape[y_dim_idx].min(y_full_len - y_start).max(1);
+                                let x_start = origin[x_dim_idx].min(x_full_len.saturating_sub(1));
+                                let x_count =
+                                    block_shape[x_dim_idx].min(x_full_len - x_start).max(1);
+
+                                let coord_extents = Extents::from(vec![
+                                    Extent::SliceCount {
+                                        start: y_start,
+                                        count: y_count,
+                                        stride: 1,
+                                    },
+                                    Extent::SliceCount {
+                                        start: x_start,
+                                        count: x_count,
+                                        stride: 1,
+                                    },
+                                ]);
+
+                                if let Ok(vals) =
+                                    read_variable_hyperslab_as_f32(&coord_var, &coord_extents)
+                                    && !vals.is_empty()
+                                {
+                                    curvilinear_coordinates.insert(
+                                        cand.clone(),
+                                        crate::data::CurvilinearCoord2D {
+                                            values: vals.into(),
+                                            width: x_count,
+                                            height: y_count,
+                                        },
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
                 let json_attrs: serde_json::Map<String, serde_json::Value> = attributes
                     .iter()
                     .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
@@ -632,7 +707,8 @@ mod desktop {
                     Arc::from(oriented_values.into_boxed_slice()),
                     coordinates,
                     attributes,
-                );
+                )
+                .with_curvilinear_coordinates(curvilinear_coordinates);
 
                 Ok(block)
             })

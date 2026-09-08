@@ -398,6 +398,171 @@ pub fn generate_stepped_resolution_2d(nx: usize, ny: usize) -> (Vec<f32>, f32, f
     (data, 10.0, 90.0)
 }
 
+/// Generates a synthetic 2D tripolar / ORCA-like deformed curvilinear ocean grid and temperature field.
+pub fn generate_curvilinear_orca_grid(
+    nx: usize,
+    ny: usize,
+    timestep: usize,
+) -> (Vec<f32>, Vec<f32>, Vec<f32>, f32, f32) {
+    let nx = nx.max(4);
+    let ny = ny.max(4);
+    let total = nx * ny;
+    let mut lons = Vec::with_capacity(total);
+    let mut lats = Vec::with_capacity(total);
+    let mut data = Vec::with_capacity(total);
+    let mut min_val = f32::INFINITY;
+    let mut max_val = f32::NEG_INFINITY;
+    let t_phase = (timestep % 360) as f32 * 0.05;
+
+    for j in 0..ny {
+        let v = j as f32 / (ny - 1) as f32;
+        let base_lat = -80.0 + 170.0 * v; // -80° to +90°
+
+        for i in 0..nx {
+            let u = i as f32 / (nx - 1) as f32;
+            let base_lon = -180.0 + 360.0 * u; // -180° to +180°
+
+            // Deform northern hemisphere coordinates towards two pseudo-poles
+            let (lon, lat) = if base_lat > 20.0 {
+                let nh_factor = ((base_lat - 20.0) / 70.0).clamp(0.0, 1.0);
+                let lon_warp = (base_lon.to_radians() * 2.0).sin() * 18.0 * nh_factor;
+                let lat_warp = (base_lon.to_radians() * 2.0).cos() * 8.0 * nh_factor;
+                (
+                    (base_lon + lon_warp).clamp(-180.0, 180.0),
+                    (base_lat + lat_warp).clamp(-90.0, 90.0),
+                )
+            } else {
+                (base_lon, base_lat)
+            };
+
+            // Ocean temperature field with equatorial warm pool, cold poles, and meandering gyre
+            let lat_rad = lat.to_radians();
+            let lon_rad = lon.to_radians();
+            let sst_base = 28.0 * lat_rad.cos().powi(2);
+            let meander = (3.0 * lon_rad + t_phase).sin() * (2.0 * lat_rad).cos() * 5.0;
+            let val = (sst_base + meander).clamp(-2.0, 35.0);
+
+            min_val = min_val.min(val);
+            max_val = max_val.max(val);
+            lons.push(lon);
+            lats.push(lat);
+            data.push(val);
+        }
+    }
+
+    if min_val > max_val {
+        min_val = 0.0;
+        max_val = 30.0;
+    }
+
+    (lons, lats, data, min_val, max_val)
+}
+
+/// Generates a swirling sheared atmospheric curvilinear mesh and spiral wave field.
+pub fn generate_curvilinear_swirl_grid(
+    nx: usize,
+    ny: usize,
+    timestep: usize,
+) -> (Vec<f32>, Vec<f32>, Vec<f32>, f32, f32) {
+    let nx = nx.max(4);
+    let ny = ny.max(4);
+    let total = nx * ny;
+    let mut lons = Vec::with_capacity(total);
+    let mut lats = Vec::with_capacity(total);
+    let mut data = Vec::with_capacity(total);
+    let mut min_val = f32::INFINITY;
+    let mut max_val = f32::NEG_INFINITY;
+    let t_phase = (timestep % 360) as f32 * 0.08;
+
+    for j in 0..ny {
+        let v = (j as f32 / (ny - 1) as f32) * 2.0 - 1.0; // [-1, 1]
+        for i in 0..nx {
+            let u = (i as f32 / (nx - 1) as f32) * 2.0 - 1.0; // [-1, 1]
+            let r = (u * u + v * v).sqrt();
+            let theta = v.atan2(u);
+
+            // Vortex swirl coordinate shear
+            let twist = (-r * 2.5).exp() * 1.8;
+            let warped_theta = theta + twist;
+            let warped_x = r * warped_theta.cos();
+            let warped_y = r * warped_theta.sin();
+
+            let lon = (warped_x * 50.0).clamp(-180.0, 180.0);
+            let lat = (warped_y * 35.0 + 20.0).clamp(-90.0, 90.0);
+
+            let spiral =
+                ((4.0 * theta - 3.0 * r * std::f32::consts::PI + t_phase).sin() * 0.5 + 0.5) * 80.0;
+            let val = spiral.clamp(0.0, 100.0);
+
+            min_val = min_val.min(val);
+            max_val = max_val.max(val);
+            lons.push(lon);
+            lats.push(lat);
+            data.push(val);
+        }
+    }
+
+    if min_val > max_val {
+        min_val = 0.0;
+        max_val = 100.0;
+    }
+
+    (lons, lats, data, min_val, max_val)
+}
+
+/// Generates a regional curvilinear grid straddling the antimeridian (150°E to 150°W across 180°).
+pub fn generate_curvilinear_antimeridian_grid(
+    nx: usize,
+    ny: usize,
+    timestep: usize,
+) -> (Vec<f32>, Vec<f32>, Vec<f32>, f32, f32) {
+    let nx = nx.max(4);
+    let ny = ny.max(4);
+    let total = nx * ny;
+    let mut lons = Vec::with_capacity(total);
+    let mut lats = Vec::with_capacity(total);
+    let mut data = Vec::with_capacity(total);
+    let mut min_val = f32::INFINITY;
+    let mut max_val = f32::NEG_INFINITY;
+    let t_phase = (timestep % 360) as f32 * 0.06;
+
+    for j in 0..ny {
+        let v = j as f32 / (ny - 1) as f32;
+        let base_lat = 10.0 + 60.0 * v; // 10°N to 70°N (Bering Sea / North Pacific)
+
+        for i in 0..nx {
+            let u = i as f32 / (nx - 1) as f32;
+            // 150°E (150°) to 210°E (-150°W)
+            let deg_span = 150.0 + 60.0 * u;
+            let lon = if deg_span > 180.0 {
+                deg_span - 360.0
+            } else {
+                deg_span
+            };
+
+            // Curvilinear wavy deformation
+            let lat_wave = (u * std::f32::consts::PI * 2.0 + t_phase).sin() * 5.0;
+            let lat = (base_lat + lat_wave).clamp(-90.0, 90.0);
+
+            let val = (((u * 6.0 + t_phase).sin() * (v * 4.0).cos() * 0.5 + 0.5) * 100.0)
+                .clamp(0.0, 100.0);
+
+            min_val = min_val.min(val);
+            max_val = max_val.max(val);
+            lons.push(lon);
+            lats.push(lat);
+            data.push(val);
+        }
+    }
+
+    if min_val > max_val {
+        min_val = 0.0;
+        max_val = 100.0;
+    }
+
+    (lons, lats, data, min_val, max_val)
+}
+
 /// Creates a standard 4D `OctantBlock` wrapping the known-truth scalar field with shape `[nt, nz, ny, nx]`.
 pub fn generate_known_truth_4d_block(
     var_name: impl Into<String>,

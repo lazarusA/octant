@@ -135,3 +135,56 @@ pub fn detect_grid(
         CoordinateGrid::GlobalRegular
     }
 }
+
+/// Automatically classifies and constructs a `CoordinateGrid`, checking 2D curvilinear coordinates first.
+pub fn detect_curvilinear_grid(
+    x_name: &str,
+    y_name: &str,
+    x_coords: Option<&[f64]>,
+    y_coords: Option<&[f64]>,
+    curvilinear_coords: &std::collections::HashMap<String, crate::data::CurvilinearCoord2D>,
+    width: usize,
+    height: usize,
+) -> CoordinateGrid {
+    if !curvilinear_coords.is_empty() {
+        let lon_candidates = ["nav_lon", "lon", "longitude", "lons", "x_lon"];
+        let lat_candidates = ["nav_lat", "lat", "latitude", "lats", "y_lat"];
+
+        let find_coord = |candidates: &[&str]| -> Option<&crate::data::CurvilinearCoord2D> {
+            for cand in candidates {
+                if let Some(c) = curvilinear_coords.get(*cand)
+                    && c.width == width
+                    && c.height == height
+                {
+                    return Some(c);
+                }
+                for (k, v) in curvilinear_coords {
+                    if k.to_lowercase().contains(cand) && v.width == width && v.height == height {
+                        return Some(v);
+                    }
+                }
+            }
+            None
+        };
+
+        if let (Some(lon_c), Some(lat_c)) =
+            (find_coord(&lon_candidates), find_coord(&lat_candidates))
+        {
+            let (lon_min, lon_max) = crate::utils::compute_finite_min_max(&lon_c.values);
+            let (lat_min, lat_max) = crate::utils::compute_finite_min_max(&lat_c.values);
+
+            log::info!(
+                "CoordinateGrid: Detected Curvilinear2D grid (w={width}, h={height}, lon_bounds=[{lon_min:.2}, {lon_max:.2}], lat_bounds=[{lat_min:.2}, {lat_max:.2}])"
+            );
+
+            return CoordinateGrid::Curvilinear2D {
+                lons: lon_c.values.clone(),
+                lats: lat_c.values.clone(),
+                lon_bounds: (lon_min, lon_max),
+                lat_bounds: (lat_min, lat_max),
+            };
+        }
+    }
+
+    detect_grid(x_name, y_name, x_coords, y_coords, width, height)
+}

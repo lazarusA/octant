@@ -1,7 +1,7 @@
 //! Core coordinate grid representations and mapping functions.
 
 use super::detection::normalize_lon_deg;
-use super::search::find_coord_cell_1d;
+use super::search::{find_coord_cell_1d, find_curvilinear_cell_2d};
 use std::sync::Arc;
 
 /// Represents the coordinate grid configuration for a 2D scalar field slice.
@@ -118,6 +118,40 @@ impl CoordinateGrid {
         }
     }
 
+    /// Returns the GPU X/lon coordinate buffer slice (1D coords for Irregular1D, flattened lons for Curvilinear2D).
+    pub fn gpu_coords_x(&self) -> Option<&[f32]> {
+        match self {
+            Self::Irregular1D { coords_x, .. } => Some(coords_x),
+            Self::Curvilinear2D { lons, .. } => Some(lons),
+            _ => None,
+        }
+    }
+
+    /// Returns the GPU Y/lat coordinate buffer slice (1D coords for Irregular1D, flattened lats for Curvilinear2D).
+    pub fn gpu_coords_y(&self) -> Option<&[f32]> {
+        match self {
+            Self::Irregular1D { coords_y, .. } => Some(coords_y),
+            Self::Curvilinear2D { lats, .. } => Some(lats),
+            _ => None,
+        }
+    }
+
+    /// Returns a reference to 2D longitudes if this grid is Curvilinear2D.
+    pub fn lons_2d(&self) -> Option<&[f32]> {
+        match self {
+            Self::Curvilinear2D { lons, .. } => Some(lons),
+            _ => None,
+        }
+    }
+
+    /// Returns a reference to 2D latitudes if this grid is Curvilinear2D.
+    pub fn lats_2d(&self) -> Option<&[f32]> {
+        match self {
+            Self::Curvilinear2D { lats, .. } => Some(lats),
+            _ => None,
+        }
+    }
+
     /// Maps normalized `[0, 1]` viewport coordinates `(norm_x, norm_y)` to pixel cell indices `(px, py)`.
     pub fn find_cell_from_norm(
         &self,
@@ -228,13 +262,9 @@ impl CoordinateGrid {
 
                 Some((px.min(w.saturating_sub(1)), py.min(h.saturating_sub(1))))
             }
-            Self::Curvilinear2D { .. } => {
-                let u = ((lon_rad + std::f32::consts::PI) / (2.0 * std::f32::consts::PI))
-                    .clamp(0.0, 1.0);
-                let v = (0.5 - (lat_rad / std::f32::consts::PI)).clamp(0.0, 1.0);
-                let px = ((u * w as f32).floor() as usize).min(w.saturating_sub(1));
-                let py = ((v * h as f32).floor() as usize).min(h.saturating_sub(1));
-                Some((px, py))
+            Self::Curvilinear2D { lons, lats, .. } => {
+                let (px, py) = find_curvilinear_cell_2d(lons, lats, lon_rad, lat_rad, w, h);
+                Some((px.min(w.saturating_sub(1)), py.min(h.saturating_sub(1))))
             }
         }
     }
@@ -327,12 +357,11 @@ impl CoordinateGrid {
                 let deg_lat = coords_y.get(py).copied().unwrap_or(0.0);
                 (deg_lon.to_radians(), deg_lat.to_radians())
             }
-            Self::Curvilinear2D { .. } => {
-                let u_c = (px as f32 + 0.5) / w as f32;
-                let v_c = (py as f32 + 0.5) / h as f32;
-                let lon_rad = (u_c - 0.5) * 2.0 * std::f32::consts::PI;
-                let lat_rad = (0.5 - v_c) * std::f32::consts::PI;
-                (lon_rad, lat_rad)
+            Self::Curvilinear2D { lons, lats, .. } => {
+                let idx = py * w + px;
+                let deg_lon = lons.get(idx).copied().unwrap_or(0.0);
+                let deg_lat = lats.get(idx).copied().unwrap_or(0.0);
+                (deg_lon.to_radians(), deg_lat.to_radians())
             }
         }
     }
@@ -362,5 +391,26 @@ impl CoordinateGrid {
         height: usize,
     ) -> Self {
         super::detection::detect_grid(x_name, y_name, x_coords, y_coords, width, height)
+    }
+
+    /// Automatically classifies and constructs a `CoordinateGrid`, prioritizing 2D curvilinear coordinates.
+    pub fn detect_curvilinear_grid(
+        x_name: &str,
+        y_name: &str,
+        x_coords: Option<&[f64]>,
+        y_coords: Option<&[f64]>,
+        curvilinear_coords: &std::collections::HashMap<String, crate::data::CurvilinearCoord2D>,
+        width: usize,
+        height: usize,
+    ) -> Self {
+        super::detection::detect_curvilinear_grid(
+            x_name,
+            y_name,
+            x_coords,
+            y_coords,
+            curvilinear_coords,
+            width,
+            height,
+        )
     }
 }

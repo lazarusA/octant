@@ -4,7 +4,9 @@ use crate::data::CoordinateGrid;
 use crate::data::matrix_data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slicing::common::{clamp_slice_range, compute_fixed_dims_offset, resolve_min_max};
-use crate::data::slicing::coords::extract_sliced_coords_for_dim;
+use crate::data::slicing::coords::{
+    extract_sliced_coords_for_dim, extract_sliced_curvilinear_coord_2d,
+};
 
 /// Extracts a 1D slice representation formatted as MatrixData (width x 1).
 fn slice_1d(
@@ -260,11 +262,21 @@ pub fn slice_2d_with_ranges(
         (y_start, y_end),
     );
 
-    let grid = CoordinateGrid::detect_grid(
+    let mut sliced_curv_coords = std::collections::HashMap::new();
+    for (k, v) in &block.curvilinear_coordinates {
+        if let Some(sliced_coord) =
+            extract_sliced_curvilinear_coord_2d(v, (x_start, x_end), (y_start, y_end))
+        {
+            sliced_curv_coords.insert(k.clone(), sliced_coord);
+        }
+    }
+
+    let grid = CoordinateGrid::detect_curvilinear_grid(
         x_name,
         y_name,
         x_coords.as_deref(),
         y_coords.as_deref(),
+        &sliced_curv_coords,
         width,
         height,
     );

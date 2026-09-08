@@ -158,4 +158,61 @@ mod tests {
         assert_eq!(lut[0], 0.0);
         assert_eq!(lut[4095], 4.0);
     }
+
+    #[test]
+    fn test_curvilinear_2d_detection_and_query() {
+        let w = 16;
+        let h = 12;
+        let mut lons = Vec::with_capacity(w * h);
+        let mut lats = Vec::with_capacity(w * h);
+
+        for j in 0..h {
+            let v = j as f32 / (h - 1) as f32;
+            let lat_base = -60.0 + 120.0 * v;
+            for i in 0..w {
+                let u = i as f32 / (w - 1) as f32;
+                let lon_base = -120.0 + 240.0 * u;
+                lons.push(lon_base + (v * 5.0));
+                lats.push(lat_base + (u * 3.0));
+            }
+        }
+
+        let mut curv_map = std::collections::HashMap::new();
+        curv_map.insert(
+            "nav_lon".to_string(),
+            crate::data::CurvilinearCoord2D {
+                values: lons.clone().into(),
+                width: w,
+                height: h,
+            },
+        );
+        curv_map.insert(
+            "nav_lat".to_string(),
+            crate::data::CurvilinearCoord2D {
+                values: lats.clone().into(),
+                width: w,
+                height: h,
+            },
+        );
+
+        let grid = CoordinateGrid::detect_curvilinear_grid("x", "y", None, None, &curv_map, w, h);
+        assert_eq!(grid.coord_mode(), 3);
+        assert!(grid.gpu_coords_x().is_some());
+        assert!(grid.gpu_coords_y().is_some());
+        assert_eq!(grid.gpu_coords_x().map_or(0, |s| s.len()), w * h);
+
+        // Test cell center mapping
+        let (lon_rad, lat_rad) = grid.cell_center_lon_lat_rad(5, 4, w, h);
+        let expected_lon = lons[4 * w + 5].to_radians();
+        let expected_lat = lats[4 * w + 5].to_radians();
+        assert!((lon_rad - expected_lon).abs() < 1e-5);
+        assert!((lat_rad - expected_lat).abs() < 1e-5);
+
+        // Test spherical search
+        let (found_px, found_py) = grid
+            .find_cell_from_lon_lat_rad(lon_rad, lat_rad, w, h)
+            .unwrap_or((0, 0));
+        assert_eq!(found_px, 5);
+        assert_eq!(found_py, 4);
+    }
 }

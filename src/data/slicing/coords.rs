@@ -32,3 +32,39 @@ pub fn extract_sliced_coords_for_dim(
         Some(full_coords.clone())
     }
 }
+
+/// Extracts a 2D sub-rectangle `(x_start..x_end, y_start..y_end)` from a `CurvilinearCoord2D`.
+pub fn extract_sliced_curvilinear_coord_2d(
+    coord: &crate::data::CurvilinearCoord2D,
+    x_range: (usize, usize),
+    y_range: (usize, usize),
+) -> Option<crate::data::CurvilinearCoord2D> {
+    let x_start = x_range.0.min(x_range.1).min(coord.width);
+    let x_end = x_range.1.max(x_range.0).min(coord.width);
+    let y_start = y_range.0.min(y_range.1).min(coord.height);
+    let y_end = y_range.1.max(y_range.0).min(coord.height);
+
+    let sliced_w = x_end.saturating_sub(x_start);
+    let sliced_h = y_end.saturating_sub(y_start);
+
+    if sliced_w == 0 || sliced_h == 0 {
+        return None;
+    }
+
+    if x_start == 0 && x_end == coord.width && y_start == 0 && y_end == coord.height {
+        return Some(coord.clone());
+    }
+
+    let mut out = Vec::with_capacity(sliced_w.checked_mul(sliced_h).unwrap_or(0));
+    for y in y_start..y_end {
+        let row_offset = y * coord.width;
+        let row_slice = &coord.values[row_offset + x_start..row_offset + x_end];
+        out.extend_from_slice(row_slice);
+    }
+
+    Some(crate::data::CurvilinearCoord2D {
+        values: out.into(),
+        width: sliced_w,
+        height: sliced_h,
+    })
+}

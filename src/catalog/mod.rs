@@ -284,6 +284,13 @@ pub static ICECHUNK_CATALOG: &[CatalogEntry] = &[
 
 pub static PROCEDURAL_CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
+        key: "procedural-curvilinear-grids",
+        label: "Curvilinear 2D Grids (Known-Truth)",
+        subtitle: "Tripolar ORCA Grid, Swirl Mesh & Antimeridian Crossing",
+        store: "procedural://curvilinear",
+        store_kind: StoreKind::ProceduralRandom,
+    },
+    CatalogEntry {
         key: "procedural-irregular-grids",
         label: "Irregular Grids (Ground Truth)",
         subtitle: "Clenshaw-Curtis, Gaussian, Geometrically Stretched & Stepped Resolution Grids",

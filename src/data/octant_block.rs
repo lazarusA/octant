@@ -7,6 +7,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// 2D curvilinear coordinate array (e.g. `lon(y, x)` or `lat(y, x)`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CurvilinearCoord2D {
+    pub values: Arc<[f32]>,
+    pub width: usize,
+    pub height: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct OctantBlock {
     pub variable_name: String,
@@ -28,6 +36,9 @@ pub struct OctantBlock {
 
     /// Coordinate metadata keyed by dimension name.
     pub coordinates: HashMap<String, Vec<f64>>,
+
+    /// 2D curvilinear coordinate arrays keyed by variable name (e.g. "nav_lon", "nav_lat", "lon", "lat").
+    pub curvilinear_coordinates: HashMap<String, CurvilinearCoord2D>,
 
     /// Source attributes.
     pub attributes: HashMap<String, String>,
@@ -68,10 +79,19 @@ impl OctantBlock {
             values,
             strides,
             coordinates,
+            curvilinear_coordinates: HashMap::new(),
             attributes,
             min_value,
             max_value,
         }
+    }
+
+    pub fn with_curvilinear_coordinates(
+        mut self,
+        curvilinear_coordinates: HashMap<String, CurvilinearCoord2D>,
+    ) -> Self {
+        self.curvilinear_coordinates = curvilinear_coordinates;
+        self
     }
 
     fn row_major_strides(shape: &[usize]) -> Vec<usize> {

@@ -3,15 +3,18 @@
 use std::collections::HashMap;
 
 use crate::data::{
+    CurvilinearCoord2D,
     block_request::BlockResult,
     block_store::{BlockStore, BlockStoreError},
     metadata::{DatasetMetadata, VariableInfo},
     octant_block::OctantBlock,
     procedural::{
         eval_known_truth_4d, generate_clenshaw_curtis_2d, generate_clenshaw_curtis_coords,
-        generate_gaussian_coords, generate_gaussian_grid_2d, generate_procedural_matrix,
-        generate_stepped_resolution_2d, generate_stepped_resolution_coords,
-        generate_stretched_regional_2d, generate_stretched_regional_coords,
+        generate_curvilinear_antimeridian_grid, generate_curvilinear_orca_grid,
+        generate_curvilinear_swirl_grid, generate_gaussian_coords, generate_gaussian_grid_2d,
+        generate_procedural_matrix, generate_stepped_resolution_2d,
+        generate_stepped_resolution_coords, generate_stretched_regional_2d,
+        generate_stretched_regional_coords,
     },
     slice_request::SliceRequest,
 };
@@ -35,13 +38,23 @@ impl BlockStore for ProceduralBlockStore {
 
     fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
         let is_4d = self.uri.contains("volume") || self.uri.contains("4d");
+        let is_curv = self.uri.contains("curvilinear");
         if is_4d {
             Ok(vec![
                 "gaussian_wave_packet_4d".to_string(),
                 "procedural_matrix_2d".to_string(),
             ])
+        } else if is_curv {
+            Ok(vec![
+                "curvilinear_orca_ocean".to_string(),
+                "curvilinear_swirl_vortex".to_string(),
+                "curvilinear_antimeridian_crossing".to_string(),
+            ])
         } else {
             Ok(vec![
+                "curvilinear_orca_ocean".to_string(),
+                "curvilinear_swirl_vortex".to_string(),
+                "curvilinear_antimeridian_crossing".to_string(),
                 "clenshaw_curtis_2d".to_string(),
                 "gaussian_grid_2d".to_string(),
                 "stretched_regional_2d".to_string(),
@@ -93,6 +106,53 @@ impl BlockStore for ProceduralBlockStore {
             ]
         } else {
             vec![
+                VariableInfo {
+                    name: "curvilinear_orca_ocean".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![64, 128],
+                    chunk_shape: vec![64, 128],
+                    dimension_names: vec!["y".to_string(), "x".to_string()],
+                    units: Some("degC".to_string()),
+                    long_name: Some("2D Tripolar / ORCA-like Ocean Grid (Procedural)".to_string()),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: 64 * 128 * 4,
+                    attributes: HashMap::new(),
+                },
+                VariableInfo {
+                    name: "curvilinear_swirl_vortex".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![64, 64],
+                    chunk_shape: vec![64, 64],
+                    dimension_names: vec!["y".to_string(), "x".to_string()],
+                    units: Some("m/s".to_string()),
+                    long_name: Some(
+                        "2D Swirling Sheared Atmospheric Mesh (Procedural)".to_string(),
+                    ),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: 64 * 64 * 4,
+                    attributes: HashMap::new(),
+                },
+                VariableInfo {
+                    name: "curvilinear_antimeridian_crossing".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![48, 64],
+                    chunk_shape: vec![48, 64],
+                    dimension_names: vec!["y".to_string(), "x".to_string()],
+                    units: Some("hPa".to_string()),
+                    long_name: Some(
+                        "2D Curvilinear Antimeridian Crossing [150E..150W] (Procedural)"
+                            .to_string(),
+                    ),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: 48 * 64 * 4,
+                    attributes: HashMap::new(),
+                },
                 VariableInfo {
                     name: "clenshaw_curtis_2d".to_string(),
                     data_type: "float32".to_string(),
@@ -218,6 +278,114 @@ impl BlockStore for ProceduralBlockStore {
         mut on_progress: crate::data::block_store::ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         let (nt_full, nz_full, ny_full, nx_full) = (20, 32, 32, 32);
+
+        if request.variable == "curvilinear_orca_ocean" {
+            let (h, w) = (64, 128);
+            let (lons, lats, data, _, _) = generate_curvilinear_orca_grid(w, h, 0);
+            let mut curv_coords = HashMap::new();
+            curv_coords.insert(
+                "nav_lon".to_string(),
+                CurvilinearCoord2D {
+                    values: lons.into(),
+                    width: w,
+                    height: h,
+                },
+            );
+            curv_coords.insert(
+                "nav_lat".to_string(),
+                CurvilinearCoord2D {
+                    values: lats.into(),
+                    width: w,
+                    height: h,
+                },
+            );
+
+            if let Some(ref mut cb) = on_progress {
+                cb((data.len() * 4) as u64);
+            }
+            return Ok(OctantBlock::new(
+                request.variable.clone(),
+                vec![h, w],
+                vec!["y".to_string(), "x".to_string()],
+                vec![0, 0],
+                data,
+                HashMap::new(),
+                HashMap::new(),
+            )
+            .with_curvilinear_coordinates(curv_coords));
+        }
+
+        if request.variable == "curvilinear_swirl_vortex" {
+            let (h, w) = (64, 64);
+            let (lons, lats, data, _, _) = generate_curvilinear_swirl_grid(w, h, 0);
+            let mut curv_coords = HashMap::new();
+            curv_coords.insert(
+                "nav_lon".to_string(),
+                CurvilinearCoord2D {
+                    values: lons.into(),
+                    width: w,
+                    height: h,
+                },
+            );
+            curv_coords.insert(
+                "nav_lat".to_string(),
+                CurvilinearCoord2D {
+                    values: lats.into(),
+                    width: w,
+                    height: h,
+                },
+            );
+
+            if let Some(ref mut cb) = on_progress {
+                cb((data.len() * 4) as u64);
+            }
+            return Ok(OctantBlock::new(
+                request.variable.clone(),
+                vec![h, w],
+                vec!["y".to_string(), "x".to_string()],
+                vec![0, 0],
+                data,
+                HashMap::new(),
+                HashMap::new(),
+            )
+            .with_curvilinear_coordinates(curv_coords));
+        }
+
+        if request.variable == "curvilinear_antimeridian_crossing" {
+            let (h, w) = (48, 64);
+            let (lons, lats, data, _, _) = generate_curvilinear_antimeridian_grid(w, h, 0);
+            let mut curv_coords = HashMap::new();
+            curv_coords.insert(
+                "nav_lon".to_string(),
+                CurvilinearCoord2D {
+                    values: lons.into(),
+                    width: w,
+                    height: h,
+                },
+            );
+            curv_coords.insert(
+                "nav_lat".to_string(),
+                CurvilinearCoord2D {
+                    values: lats.into(),
+                    width: w,
+                    height: h,
+                },
+            );
+
+            if let Some(ref mut cb) = on_progress {
+                cb((data.len() * 4) as u64);
+            }
+            return Ok(OctantBlock::new(
+                request.variable.clone(),
+                vec![h, w],
+                vec!["y".to_string(), "x".to_string()],
+                vec![0, 0],
+                data,
+                HashMap::new(),
+                HashMap::new(),
+            )
+            .with_curvilinear_coordinates(curv_coords));
+        }
 
         if request.variable == "clenshaw_curtis_2d" {
             let (h, w) = (64, 128);

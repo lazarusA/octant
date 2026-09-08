@@ -190,11 +190,12 @@ fn resolve_hit_coordinates(
             let (px, py) = matrix.grid.find_cell_from_norm(nx, ny, orig_w, orig_h);
             let (cell_lon_rad, cell_lat_rad) =
                 matrix.grid.cell_center_lon_lat_rad(px, py, orig_w, orig_h);
-            let geo_coords = if matrix.grid.coord_mode() != 0 || matrix.grid.coords_x().is_some() {
-                Some((cell_lat_rad.to_degrees(), cell_lon_rad.to_degrees()))
-            } else {
-                None
-            };
+            let geo_coords =
+                if matrix.grid.coord_mode() != 0 || matrix.grid.gpu_coords_x().is_some() {
+                    Some((cell_lat_rad.to_degrees(), cell_lon_rad.to_degrees()))
+                } else {
+                    None
+                };
             (nx, ny, is_inside, geo_coords, None)
         }
     }

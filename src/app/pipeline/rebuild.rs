@@ -88,8 +88,10 @@ impl OctantApp {
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
             let same_grid = self.matrix_data.as_ref().is_some_and(|m| {
                 m.grid.coord_mode() == effective_data.grid.coord_mode()
-                    && m.grid.coords_x().is_some() == effective_data.grid.coords_x().is_some()
-                    && m.grid.coords_y().is_some() == effective_data.grid.coords_y().is_some()
+                    && m.grid.gpu_coords_x().is_some()
+                        == effective_data.grid.gpu_coords_x().is_some()
+                    && m.grid.gpu_coords_y().is_some()
+                        == effective_data.grid.gpu_coords_y().is_some()
             });
             let same_dimensions = !is_new_variable
                 && same_grid
@@ -108,8 +110,8 @@ impl OctantApp {
             {
                 if let Some(renderer) = &self.renderer {
                     if let (Some(cx), Some(cy)) = (
-                        effective_data.grid.coords_x(),
-                        effective_data.grid.coords_y(),
+                        effective_data.grid.gpu_coords_x(),
+                        effective_data.grid.gpu_coords_y(),
                     ) {
                         renderer.update_coords(&wgpu_render_state.queue, cx, cy);
                     }
@@ -117,8 +119,8 @@ impl OctantApp {
                 }
                 if let Some(sphere_renderer) = &self.sphere_renderer {
                     if let (Some(cx), Some(cy)) = (
-                        effective_data.grid.coords_x(),
-                        effective_data.grid.coords_y(),
+                        effective_data.grid.gpu_coords_x(),
+                        effective_data.grid.gpu_coords_y(),
                     ) {
                         sphere_renderer.update_coords(&wgpu_render_state.queue, cx, cy);
                     }
@@ -126,8 +128,8 @@ impl OctantApp {
                 }
                 if let Some(surface_renderer) = &self.surface_renderer {
                     if let (Some(cx), Some(cy)) = (
-                        effective_data.grid.coords_x(),
-                        effective_data.grid.coords_y(),
+                        effective_data.grid.gpu_coords_x(),
+                        effective_data.grid.gpu_coords_y(),
                     ) {
                         surface_renderer.update_coords(&wgpu_render_state.queue, cx, cy);
                     }
@@ -137,8 +139,8 @@ impl OctantApp {
                     line_renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
                 }
             } else {
-                let coord_x = effective_data.grid.coords_x();
-                let coord_y = effective_data.grid.coords_y();
+                let coord_x = effective_data.grid.gpu_coords_x();
+                let coord_y = effective_data.grid.gpu_coords_y();
                 let renderer = MatrixRenderer::new_with_coords(
                     &wgpu_render_state.device,
                     wgpu_render_state.target_format,
@@ -159,8 +161,8 @@ impl OctantApp {
                 self.line_renderer = Some(Arc::new(line_renderer));
 
                 if total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
-                    let coord_x = effective_data.grid.coords_x();
-                    let coord_y = effective_data.grid.coords_y();
+                    let coord_x = effective_data.grid.gpu_coords_x();
+                    let coord_y = effective_data.grid.gpu_coords_y();
                     let sphere_renderer = SphereRenderer::new_sphere_with_coords(
                         &wgpu_render_state.device,
                         wgpu_render_state.target_format,
