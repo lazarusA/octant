@@ -371,7 +371,7 @@ impl Default for OctantApp {
             point_cloud_renderer: None,
             sphere_rotation_y: 0.0,
             sphere_rotation_x: 0.25,
-            sphere_auto_rotate: true,
+            sphere_auto_rotate: false,
             sphere_zoom: 2.5,
             sphere_displacement_strength: 0.3,
             sphere_mode: 0,
