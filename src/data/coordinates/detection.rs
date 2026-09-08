@@ -9,6 +9,118 @@ pub fn normalize_lon_deg(lon: f32) -> f32 {
     if lon > 180.0 { lon - 360.0 } else { lon }
 }
 
+/// Converts a lon/lat pair in degrees to a unit vector on the unit sphere.
+#[inline]
+pub fn lonlat_deg_to_unit_vec(lon_deg: f32, lat_deg: f32) -> [f32; 3] {
+    let lon = lon_deg.to_radians();
+    let lat = lat_deg.to_radians();
+    let cos_lat = lat.cos();
+    [
+        cos_lat * lon.cos(),
+        lat.sin(),
+        cos_lat * lon.sin(),
+    ]
+}
+
+/// Computes the spherical mean of multiple lon/lat points in degrees.
+/// This is numerically stable near the poles, where simple longitude averaging is undefined.
+#[inline]
+pub fn spherical_mean_lonlat_deg(points: &[(f32, f32)]) -> (f32, f32) {
+    let mut sum = [0.0f32; 3];
+    for &(lon_deg, lat_deg) in points {
+        let v = lonlat_deg_to_unit_vec(lon_deg, lat_deg);
+        sum[0] += v[0];
+        sum[1] += v[1];
+        sum[2] += v[2];
+    }
+
+    let norm = (sum[0] * sum[0] + sum[1] * sum[1] + sum[2] * sum[2]).sqrt();
+    if norm < 1e-6 {
+        return (0.0, 0.0);
+    }
+
+    let x = sum[0] / norm;
+    let y = sum[1] / norm;
+    let z = sum[2] / norm;
+    let lon = z.atan2(x).to_degrees();
+    let lat = y.atan2((x * x + z * z).sqrt()).to_degrees();
+
+    (lon, lat)
+}
+
+/// Detects whether a curvilinear grid has reversed i-axis handedness (i increases westward).
+///
+/// Uses a cross-product sign check on the i/j tangent vectors for the first valid interior cell.
+/// Matches the TypeScript `detectCurvilinearLongitudeFlip` algorithm.
+pub fn detect_curvilinear_longitude_flip(
+    longitudes: &[f32],
+    latitudes: &[f32],
+    ni: usize,
+    nj: usize,
+) -> bool {
+    for row in 0..nj.saturating_sub(1) {
+        let col_limit = (ni - 1).min(10);
+        for col in 0..col_limit {
+            let tl = row * ni + col;
+            let tr = tl + 1;
+            let bl = (row + 1) * ni + col;
+            let br = bl + 1;
+            // Skip any cells with non-finite coordinates
+            if [longitudes[tl], longitudes[tr], longitudes[bl], longitudes[br],
+                latitudes[tl],  latitudes[tr],  latitudes[bl],  latitudes[br]]
+                .iter()
+                .any(|v| !v.is_finite())
+            {
+                continue;
+            }
+            let dlon_i = longitudes[tr] - longitudes[tl];
+            let dlat_i = latitudes[tr]  - latitudes[tl];
+            let dlon_j = longitudes[bl] - longitudes[tl];
+            let dlat_j = latitudes[bl]  - latitudes[tl];
+            // Cross-product z-component; negative means right-handed (westward i)
+            return dlon_i * dlat_j - dlat_i * dlon_j < 0.0;
+        }
+    }
+    false
+}
+
+/// Detects whether a curvilinear grid is periodic in the i-direction (columns wrap around).
+///
+/// Compares the gap between the last and first longitudes in a sample row against the
+/// mean inter-cell spacing (×4 tolerance). Matches the TypeScript
+/// `detectCurvilinearColumnPeriodicity` algorithm.
+pub fn detect_curvilinear_column_periodicity(
+    longitudes: &[f32],
+    ni: usize,
+    nj: usize,
+) -> bool {
+    if ni < 3 {
+        return false;
+    }
+    let sample_row = nj / 2;
+    let sample_count = (ni - 1).min(10);
+    let mut spacing_sum = 0.0f64;
+    let mut valid = 0usize;
+    for col in 0..sample_count {
+        let a = longitudes[sample_row * ni + col] as f64;
+        let b = longitudes[sample_row * ni + col + 1] as f64;
+        let gap = ((b - a + 540.0) % 360.0) - 180.0;
+        let spacing = gap.abs();
+        if spacing > 0.0 {
+            spacing_sum += spacing;
+            valid += 1;
+        }
+    }
+    if valid == 0 {
+        return false;
+    }
+    let mean_spacing = spacing_sum / valid as f64;
+    let first = longitudes[sample_row * ni] as f64;
+    let last  = longitudes[sample_row * ni + ni - 1] as f64;
+    let wrap_gap = (((first - last + 540.0) % 360.0) - 180.0).abs();
+    wrap_gap < mean_spacing * 4.0
+}
+
 /// Checks if a 1D sequence of coordinates has non-uniform spacing (> 0.05% relative delta variation).
 pub fn is_irregular_series(coords: &[f64]) -> bool {
     if coords.len() < 3 {
@@ -137,6 +249,20 @@ pub fn detect_grid(
 }
 
 /// Automatically classifies and constructs a `CoordinateGrid`, checking 2D curvilinear coordinates first.
+#[inline]
+pub fn is_curvilinear_center_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    if lower.ends_with("_bnds")
+        || lower.ends_with("bnds")
+        || lower.contains("_bounds")
+        || lower.contains("bounds")
+        || lower.contains("vertex")
+    {
+        return false;
+    }
+    true
+}
+
 pub fn detect_curvilinear_grid(
     x_name: &str,
     y_name: &str,
@@ -152,14 +278,21 @@ pub fn detect_curvilinear_grid(
 
         let find_coord = |candidates: &[&str]| -> Option<&crate::data::CurvilinearCoord2D> {
             for cand in candidates {
-                if let Some(c) = curvilinear_coords.get(*cand)
-                    && c.width == width
-                    && c.height == height
-                {
-                    return Some(c);
+                if is_curvilinear_center_name(cand) {
+                    if let Some(c) = curvilinear_coords.get(*cand)
+                        && c.width == width
+                        && c.height == height
+                    {
+                        return Some(c);
+                    }
                 }
                 for (k, v) in curvilinear_coords {
-                    if k.to_lowercase().contains(cand) && v.width == width && v.height == height {
+                    let clean = k.to_ascii_lowercase();
+                    if is_curvilinear_center_name(k)
+                        && clean.contains(cand)
+                        && v.width == width
+                        && v.height == height
+                    {
                         return Some(v);
                     }
                 }
@@ -173,8 +306,17 @@ pub fn detect_curvilinear_grid(
             let (lon_min, lon_max) = crate::utils::compute_finite_min_max(&lon_c.values);
             let (lat_min, lat_max) = crate::utils::compute_finite_min_max(&lat_c.values);
 
+            let flip_i =
+                detect_curvilinear_longitude_flip(&lon_c.values, &lat_c.values, width, height);
+            let is_periodic_i =
+                detect_curvilinear_column_periodicity(&lon_c.values, width, height);
+
             log::info!(
-                "CoordinateGrid: Detected Curvilinear2D grid (w={width}, h={height}, lon_bounds=[{lon_min:.2}, {lon_max:.2}], lat_bounds=[{lat_min:.2}, {lat_max:.2}])"
+                "CoordinateGrid: Detected Curvilinear2D grid \
+                 (w={width}, h={height}, \
+                 lon_bounds=[{lon_min:.2}, {lon_max:.2}], \
+                 lat_bounds=[{lat_min:.2}, {lat_max:.2}], \
+                 flip_i={flip_i}, is_periodic_i={is_periodic_i})"
             );
 
             return CoordinateGrid::Curvilinear2D {
@@ -182,9 +324,34 @@ pub fn detect_curvilinear_grid(
                 lats: lat_c.values.clone(),
                 lon_bounds: (lon_min, lon_max),
                 lat_bounds: (lat_min, lat_max),
+                flip_i,
+                is_periodic_i,
             };
         }
     }
 
     detect_grid(x_name, y_name, x_coords, y_coords, width, height)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{lonlat_deg_to_unit_vec, spherical_mean_lonlat_deg};
+
+    #[test]
+    fn spherical_mean_lonlat_deg_is_stable_at_the_north_pole() {
+        let corners = [
+            (0.0, 89.0),
+            (90.0, 88.0),
+            (180.0, 89.0),
+            (270.0, 87.0),
+        ];
+
+        let (lon, lat) = spherical_mean_lonlat_deg(&corners);
+        let pole_vec = lonlat_deg_to_unit_vec(0.0, 90.0);
+        let mean_vec = lonlat_deg_to_unit_vec(lon, lat);
+        let dot = pole_vec[0] * mean_vec[0] + pole_vec[1] * mean_vec[1] + pole_vec[2] * mean_vec[2];
+
+        assert!((lat - 89.0).abs() < 2.0, "lat={lat}");
+        assert!(dot > 0.98, "mean should stay near the north pole; lon={lon}, lat={lat}, dot={dot}");
+    }
 }

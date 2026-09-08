@@ -136,6 +136,89 @@ pub fn fetch_block_from_cached_array(
         }
     }
 
+    let mut curvilinear_coordinates: HashMap<String, crate::data::CurvilinearCoord2D> = HashMap::new();
+    let rank = block_shape.len();
+    if rank >= 2 {
+        let y_dim_idx = rank - 2;
+        let x_dim_idx = rank - 1;
+        let y_full_len = array.shape().get(y_dim_idx).copied().unwrap_or(1) as usize;
+        let x_full_len = array.shape().get(x_dim_idx).copied().unwrap_or(1) as usize;
+
+        let candidate_names = [
+            "nav_lon",
+            "nav_lat",
+            "lon",
+            "lat",
+            "longitude",
+            "latitude",
+            "x_lon",
+            "y_lat",
+        ];
+
+        for cand in candidate_names {
+            let group_candidates = if group_path.is_some() {
+                vec![
+                    format!("{}/{}", group_path.unwrap_or(""), cand),
+                    format!("/{}", cand),
+                    cand.to_string(),
+                ]
+            } else {
+                vec![format!("/{}", cand), cand.to_string()]
+            };
+
+            for path in group_candidates {
+                let clean_path = path.trim_start_matches('/');
+                let Some(coord_array) = crate::utils::metadata::open_or_instantiate_array_normalized(
+                    store.clone(),
+                    clean_path,
+                )
+                .ok()
+                else {
+                    continue;
+                };
+
+                let coord_shape = coord_array.shape();
+                let ok_rank = coord_shape.len() == 2;
+                let coord_h = coord_shape[0] as usize;
+                let coord_w = coord_shape[1] as usize;
+                let matches_shape = ok_rank
+                    && ((coord_h == y_full_len && coord_w == x_full_len)
+                        || (coord_h == x_full_len && coord_w == y_full_len));
+                if !matches_shape {
+                    continue;
+                }
+
+                let y_start = origin.get(y_dim_idx).copied().unwrap_or(0).min(y_full_len.saturating_sub(1));
+                let y_count = block_shape.get(y_dim_idx).copied().unwrap_or(1).min(y_full_len - y_start).max(1);
+                let x_start = origin.get(x_dim_idx).copied().unwrap_or(0).min(x_full_len.saturating_sub(1));
+                let x_count = block_shape.get(x_dim_idx).copied().unwrap_or(1).min(x_full_len - x_start).max(1);
+
+                let coord_subset = ArraySubset::new_with_ranges(&[
+                    y_start as u64..(y_start + y_count) as u64,
+                    x_start as u64..(x_start + x_count) as u64,
+                ]);
+
+                if let Ok(vals) = retrieve_array_subset_as_f32(&coord_array, None, &coord_subset)
+                    && !vals.is_empty()
+                {
+                    curvilinear_coordinates.insert(
+                        cand.to_string(),
+                        crate::data::CurvilinearCoord2D {
+                            values: vals.into(),
+                            width: x_count,
+                            height: y_count,
+                        },
+                    );
+                    break;
+                }
+            }
+
+            if curvilinear_coordinates.contains_key(cand) {
+                break;
+            }
+        }
+    }
+
     let raw_values = check_and_orient_block_grid(
         raw_values,
         &mut block_shape,
@@ -153,7 +236,8 @@ pub fn fetch_block_from_cached_array(
         raw_values,
         coordinates,
         attributes,
-    ))
+    )
+    .with_curvilinear_coordinates(curvilinear_coordinates))
 }
 
 /// Fetches an arbitrary-rank hyperslab described by `request` with progress reporting.

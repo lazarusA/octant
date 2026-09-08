@@ -10,9 +10,9 @@ use crate::data::{
     octant_block::OctantBlock,
     procedural::{
         eval_known_truth_4d, generate_clenshaw_curtis_2d, generate_clenshaw_curtis_coords,
-        generate_curvilinear_antimeridian_grid, generate_curvilinear_orca_grid,
-        generate_curvilinear_swirl_grid, generate_gaussian_coords, generate_gaussian_grid_2d,
-        generate_procedural_matrix, generate_stepped_resolution_2d,
+        generate_curvilinear_antimeridian_grid, generate_curvilinear_orca05_grid,
+        generate_curvilinear_orca_grid, generate_curvilinear_swirl_grid, generate_gaussian_coords,
+        generate_gaussian_grid_2d, generate_procedural_matrix, generate_stepped_resolution_2d,
         generate_stepped_resolution_coords, generate_stretched_regional_2d,
         generate_stretched_regional_coords,
     },
@@ -46,12 +46,14 @@ impl BlockStore for ProceduralBlockStore {
             ])
         } else if is_curv {
             Ok(vec![
+                "curvilinear_orca05_global".to_string(),
                 "curvilinear_orca_ocean".to_string(),
                 "curvilinear_swirl_vortex".to_string(),
                 "curvilinear_antimeridian_crossing".to_string(),
             ])
         } else {
             Ok(vec![
+                "curvilinear_orca05_global".to_string(),
                 "curvilinear_orca_ocean".to_string(),
                 "curvilinear_swirl_vortex".to_string(),
                 "curvilinear_antimeridian_crossing".to_string(),
@@ -106,6 +108,22 @@ impl BlockStore for ProceduralBlockStore {
             ]
         } else {
             vec![
+                VariableInfo {
+                    name: "curvilinear_orca05_global".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![576, 720],
+                    chunk_shape: vec![576, 720],
+                    dimension_names: vec!["y".to_string(), "x".to_string()],
+                    units: Some("degC".to_string()),
+                    long_name: Some(
+                        "2D Global ORCA05 Tripolar Ocean Grid (414,720 values)".to_string(),
+                    ),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: 576 * 720 * 4,
+                    attributes: HashMap::new(),
+                },
                 VariableInfo {
                     name: "curvilinear_orca_ocean".to_string(),
                     data_type: "float32".to_string(),
@@ -278,6 +296,42 @@ impl BlockStore for ProceduralBlockStore {
         mut on_progress: crate::data::block_store::ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         let (nt_full, nz_full, ny_full, nx_full) = (20, 32, 32, 32);
+
+        if request.variable == "curvilinear_orca05_global" {
+            let (h, w) = (576, 720);
+            let (lons, lats, data, _, _) = generate_curvilinear_orca05_grid(0);
+            let mut curv_coords = HashMap::new();
+            curv_coords.insert(
+                "nav_lon".to_string(),
+                CurvilinearCoord2D {
+                    values: lons.into(),
+                    width: w,
+                    height: h,
+                },
+            );
+            curv_coords.insert(
+                "nav_lat".to_string(),
+                CurvilinearCoord2D {
+                    values: lats.into(),
+                    width: w,
+                    height: h,
+                },
+            );
+
+            if let Some(ref mut cb) = on_progress {
+                cb((data.len() * 4) as u64);
+            }
+            return Ok(OctantBlock::new(
+                request.variable.clone(),
+                vec![h, w],
+                vec!["y".to_string(), "x".to_string()],
+                vec![0, 0],
+                data,
+                HashMap::new(),
+                HashMap::new(),
+            )
+            .with_curvilinear_coordinates(curv_coords));
+        }
 
         if request.variable == "curvilinear_orca_ocean" {
             let (h, w) = (64, 128);

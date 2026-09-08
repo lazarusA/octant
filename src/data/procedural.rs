@@ -458,6 +458,71 @@ pub fn generate_curvilinear_orca_grid(
     (lons, lats, data, min_val, max_val)
 }
 
+/// Generates a realistic ORCA05 tripolar global ocean grid (720x576 = 414,720 values)
+/// matching exact benchmark bounds: Lon [-299.997925..59.997932], Lat [-77.907936..89.880600].
+pub fn generate_curvilinear_orca05_grid(
+    timestep: usize,
+) -> (Vec<f32>, Vec<f32>, Vec<f32>, f32, f32) {
+    let nx = 720;
+    let ny = 576;
+    let total = nx * ny;
+    let mut lons = Vec::with_capacity(total);
+    let mut lats = Vec::with_capacity(total);
+    let mut data = Vec::with_capacity(total);
+    let mut min_val = f32::INFINITY;
+    let mut max_val = f32::NEG_INFINITY;
+    let t_phase = (timestep % 360) as f32 * 0.04;
+
+    let lon_min = -299.997_92_f32;
+    let lon_max = 59.997_932_f32;
+    let lat_min = -77.907_936_f32;
+    let lat_max = 89.8806_f32;
+
+    for j in 0..ny {
+        let v = j as f32 / (ny - 1) as f32;
+        let base_lat = lat_min + (lat_max - lat_min) * v;
+
+        for i in 0..nx {
+            let u = i as f32 / (nx - 1) as f32;
+            let base_lon = lon_min + (lon_max - lon_min) * u;
+
+            // Tripolar folding in northern hemisphere (lat > 20°N)
+            let (lon, lat) = if base_lat > 20.0 {
+                let nh_factor = ((base_lat - 20.0) / (lat_max - 20.0)).clamp(0.0, 1.0);
+                let lon_warp = (base_lon.to_radians() * 2.0).sin() * 12.0 * nh_factor;
+                let lat_warp = (base_lon.to_radians() * 2.0).cos() * 5.0 * nh_factor;
+                (
+                    (base_lon + lon_warp).clamp(lon_min, lon_max),
+                    (base_lat + lat_warp).clamp(lat_min, lat_max),
+                )
+            } else {
+                (base_lon, base_lat)
+            };
+
+            // Realistic Sea Surface Temperature (°C) with Gulf Stream / Kuroshio & Antarctic cold ring
+            let lat_rad = lat.to_radians();
+            let lon_rad = lon.to_radians();
+            let sst_base = 29.0 * lat_rad.cos().powf(1.8) - 1.8;
+            let meander = (4.0 * lon_rad + t_phase).sin() * (2.0 * lat_rad).cos() * 4.2;
+            let eddy = ((8.0 * lon_rad - t_phase * 2.0).cos() * (6.0 * lat_rad).sin() * 0.5) * 2.5;
+            let val = (sst_base + meander + eddy).clamp(-2.0, 34.0);
+
+            min_val = min_val.min(val);
+            max_val = max_val.max(val);
+            lons.push(lon);
+            lats.push(lat);
+            data.push(val);
+        }
+    }
+
+    if min_val > max_val {
+        min_val = -2.0;
+        max_val = 32.0;
+    }
+
+    (lons, lats, data, min_val, max_val)
+}
+
 /// Generates a swirling sheared atmospheric curvilinear mesh and spiral wave field.
 pub fn generate_curvilinear_swirl_grid(
     nx: usize,
@@ -719,5 +784,35 @@ mod tests {
         assert_eq!(data.len(), 32 * 16);
         assert_eq!(min_v, 10.0);
         assert_eq!(max_v, 90.0);
+    }
+
+    #[test]
+    fn test_generate_curvilinear_orca05_grid_bounds() {
+        let (lons, lats, data, min_v, max_v) = generate_curvilinear_orca05_grid(0);
+        assert_eq!(lons.len(), 720 * 576);
+        assert_eq!(lats.len(), 720 * 576);
+        assert_eq!(data.len(), 720 * 576);
+        assert!(min_v >= -3.0);
+        assert!(max_v <= 35.0);
+
+        // Check longitude bounds: [-299.997925, 59.997932]
+        let lon_min = lons.iter().copied().fold(f32::INFINITY, f32::min);
+        let lon_max = lons.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        assert!((lon_min - (-299.997_92)).abs() < 1e-3);
+        assert!((lon_max - 59.997_932).abs() < 1e-3);
+
+        // Check latitude bounds: [-77.907936, 89.880600]
+        let lat_min = lats.iter().copied().fold(f32::INFINITY, f32::min);
+        let lat_max = lats.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        assert!((lat_min - (-77.907_936)).abs() < 1e-3);
+        assert!((lat_max - 89.8806).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_generate_curvilinear_swirl_grid() {
+        let (lons, lats, data, _, _) = generate_curvilinear_swirl_grid(30, 20, 0);
+        assert_eq!(lons.len(), 30 * 20);
+        assert_eq!(lats.len(), 30 * 20);
+        assert_eq!(data.len(), 30 * 20);
     }
 }

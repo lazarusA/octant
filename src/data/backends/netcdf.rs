@@ -633,11 +633,24 @@ mod desktop {
                     if let Some(coords_attr) = attributes.get("coordinates") {
                         for part in coords_attr.split_whitespace() {
                             let part_clean = part.trim().to_string();
-                            if !part_clean.is_empty() && !candidate_names.contains(&part_clean) {
+                            if !part_clean.is_empty()
+                                && !candidate_names.contains(&part_clean)
+                                && !part_clean.to_ascii_lowercase().ends_with("_bnds")
+                                && !part_clean.to_ascii_lowercase().contains("bounds")
+                                && !part_clean.to_ascii_lowercase().contains("vertex")
+                            {
                                 candidate_names.push(part_clean);
                             }
                         }
                     }
+
+                    candidate_names.retain(|name| {
+                        let low = name.to_ascii_lowercase();
+                        !low.ends_with("_bnds")
+                            && !low.ends_with("bnds")
+                            && !low.contains("bounds")
+                            && !low.contains("vertex")
+                    });
 
                     for cand in &candidate_names {
                         if let Some(coord_var) = file

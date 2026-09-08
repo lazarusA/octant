@@ -97,7 +97,10 @@ pub struct Mesh3DUniforms {
     pub has_reference_globe: u32,
     pub lon_bounds: [f32; 2],
     pub lat_bounds: [f32; 2],
-    pub _pad: [u32; 2],
+    /// 1 when the curvilinear i-axis increases westward (flip_i from detection).
+    pub curvilinear_flip_i: u32,
+    /// 1 when the curvilinear grid is periodic in i (wraps column 0 ↔ last).
+    pub curvilinear_periodic_i: u32,
     pub color: PlotColorParams,
 }
 
@@ -115,6 +118,8 @@ pub struct Mesh3DUniformParams {
     pub has_reference_globe: bool,
     pub lon_bounds: [f32; 2],
     pub lat_bounds: [f32; 2],
+    /// `[flip_i as u32, is_periodic_i as u32]` from `CoordinateGrid::curvilinear_flags()`.
+    pub curvilinear_flags: [u32; 2],
 }
 
 /// Standard trait implemented by all Octant WGPU plot renderers.

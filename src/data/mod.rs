@@ -39,9 +39,9 @@ pub use matrix_data::MatrixData;
 pub use octant_block::{CurvilinearCoord2D, OctantBlock};
 pub use procedural::{
     KnownTruth4DParams, eval_known_truth_4d, generate_curvilinear_antimeridian_grid,
-    generate_curvilinear_orca_grid, generate_curvilinear_swirl_grid, generate_known_truth_4d_block,
-    generate_procedural_matrix, generate_procedural_volume_3d, generate_procedural_volume_4d,
-    get_known_truth_4d_center,
+    generate_curvilinear_orca05_grid, generate_curvilinear_orca_grid,
+    generate_curvilinear_swirl_grid, generate_known_truth_4d_block, generate_procedural_matrix,
+    generate_procedural_volume_3d, generate_procedural_volume_4d, get_known_truth_4d_center,
 };
 pub use pyramid::{AggregationOp, MatrixPyramid, PyramidLevel};
 pub use render_data::RenderData;

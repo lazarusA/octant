@@ -35,6 +35,10 @@ pub enum CoordinateGrid {
         lats: Arc<[f32]>,
         lon_bounds: (f32, f32),
         lat_bounds: (f32, f32),
+        /// `true` when the i-axis increases westward (grid has reversed handedness).
+        flip_i: bool,
+        /// `true` when the last column wraps around to the first (periodic in i).
+        is_periodic_i: bool,
     },
 }
 
@@ -48,6 +52,18 @@ impl CoordinateGrid {
             Self::RegionalRegular { .. } => 1,
             Self::Irregular1D { .. } => 2,
             Self::Curvilinear2D { .. } => 3,
+        }
+    }
+
+    /// Returns `[flip_i as u32, is_periodic_i as u32]` for `Curvilinear2D` grids,
+    /// or `[0, 0]` for all other grid types.
+    #[inline]
+    pub fn curvilinear_flags(&self) -> [u32; 2] {
+        match self {
+            Self::Curvilinear2D { flip_i, is_periodic_i, .. } => {
+                [*flip_i as u32, *is_periodic_i as u32]
+            }
+            _ => [0, 0],
         }
     }
 

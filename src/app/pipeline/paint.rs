@@ -140,7 +140,7 @@ impl OctantApp {
         displacement_strength: f32,
         aspect_ratio: f32,
     ) -> crate::plots::Mesh3DUniformParams {
-        let (coord_mode, has_reference_globe, lon_bounds, lat_bounds) = self
+        let (coord_mode, has_reference_globe, lon_bounds, lat_bounds, curvilinear_flags) = self
             .matrix_data
             .as_ref()
             .map(|m| {
@@ -149,6 +149,7 @@ impl OctantApp {
                     !m.grid.is_global(),
                     m.grid.lon_bounds_rad(),
                     m.grid.lat_bounds_rad(),
+                    m.grid.curvilinear_flags(),
                 )
             })
             .unwrap_or((
@@ -156,6 +157,7 @@ impl OctantApp {
                 false,
                 [-std::f32::consts::PI, std::f32::consts::PI],
                 [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
+                [0, 0],
             ));
 
         crate::plots::Mesh3DUniformParams {
@@ -170,8 +172,10 @@ impl OctantApp {
             has_reference_globe,
             lon_bounds,
             lat_bounds,
+            curvilinear_flags,
         }
     }
+
 
     /// Dispatches the appropriate GPU paint callback to the egui painter for the active plot type.
     pub fn paint_active_plot(

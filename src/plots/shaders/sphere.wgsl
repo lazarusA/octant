@@ -11,7 +11,8 @@ struct Uniforms {
     has_reference_globe: u32,
     lon_bounds: vec2<f32>,
     lat_bounds: vec2<f32>,
-    _pad: vec2<u32>,
+    curvilinear_flip_i: u32,
+    curvilinear_periodic_i: u32,
     color: ColorUniforms,
 };
 
@@ -66,10 +67,34 @@ fn vs_main(
 
     var raw_val = data_buffer[safe_idx];
 
-    let coords = get_lon_lat(
-        cell_x, cell_y, model.position.xy, grid_w, grid_h,
-        uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
-    );
+    // For curvilinear grids (mode 3) each vertex maps to an exact geographic corner.
+    // The unit quad UVs encode the corner:
+    //   (0,0) = top-left  → corner 0   (1,0) = top-right  → corner 1
+    //   (0,1) = bot-left  → corner 3   (1,1) = bot-right  → corner 2
+    var coords: vec2<f32>;
+    if (uniforms.coord_mode == 3u) {
+        let uv = model.uv;
+        var corner_sel: u32;
+        if (uv.x < 0.5 && uv.y < 0.5) {
+            corner_sel = 0u; // top-left
+        } else if (uv.x >= 0.5 && uv.y < 0.5) {
+            corner_sel = 1u; // top-right
+        } else if (uv.x >= 0.5 && uv.y >= 0.5) {
+            corner_sel = 2u; // bottom-right
+        } else {
+            corner_sel = 3u; // bottom-left
+        }
+        coords = curvilinear_corner_lonlat(
+            cell_x, cell_y, corner_sel,
+            grid_w, grid_h,
+            uniforms.curvilinear_flip_i, uniforms.curvilinear_periodic_i,
+        );
+    } else {
+        coords = get_lon_lat(
+            cell_x, cell_y, model.position.xy, grid_w, grid_h,
+            uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
+        );
+    }
     let lon = coords.x;
     let lat = coords.y;
 
@@ -95,10 +120,22 @@ fn vs_main(
         // Mode 2: Flat Steps
         raw_val = data_buffer[safe_idx];
         let dr = get_normalized_radial_dr(raw_val);
-        let center_coords = get_lon_lat(
-            cell_x, cell_y, vec2<f32>(0.5, 0.5), grid_w, grid_h,
-            uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
-        );
+        var center_coords: vec2<f32>;
+        if (uniforms.coord_mode == 3u) {
+            // Use the cell-centre directly for the normal anchor
+            let max_coord_idx = max(arrayLength(&coord_x_buffer), 1u) - 1u;
+            let ci = min(cell_y * grid_w + cell_x, max_coord_idx);
+            let crad = 3.14159265 / 180.0;
+            center_coords = vec2<f32>(
+                coord_x_buffer[ci] * crad,
+                coord_y_buffer[ci] * crad,
+            );
+        } else {
+            center_coords = get_lon_lat(
+                cell_x, cell_y, vec2<f32>(0.5, 0.5), grid_w, grid_h,
+                uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
+            );
+        }
         pos_3d = lon_lat_to_cartesian(1.0 + dr, lon, lat);
         normal_3d = normalize(lon_lat_to_cartesian(1.0, center_coords.x, center_coords.y));
     } else {

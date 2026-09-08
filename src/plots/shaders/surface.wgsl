@@ -11,7 +11,8 @@ struct Uniforms {
     has_reference_globe: u32,
     lon_bounds: vec2<f32>,
     lat_bounds: vec2<f32>,
-    _pad: vec2<u32>,
+    curvilinear_flip_i: u32,
+    curvilinear_periodic_i: u32,
     color: ColorUniforms,
 };
 
@@ -70,17 +71,44 @@ fn vs_main(
     let scale_x = 2.0 * data_aspect;
     let scale_y = 2.0;
 
-    let bounds_u = get_cell_normalized_bounds_x(cell_x, grid_w, uniforms.coord_mode);
-    let bounds_v = get_cell_normalized_bounds_y(cell_y, grid_h, uniforms.coord_mode);
+    // For curvilinear grids (mode 3) derive world_x/world_z from corner lon/lat
+    // mapped linearly onto [-aspect..aspect] × [-1..1], so irregular cells are
+    // faithfully sized. Other modes keep their normal UV-bounds path.
+    var world_x: f32;
+    var world_z: f32;
+    if (uniforms.coord_mode == 3u) {
+        let uv = model.uv;
+        var corner_sel: u32;
+        if (uv.x < 0.5 && uv.y < 0.5) {
+            corner_sel = 0u;
+        } else if (uv.x >= 0.5 && uv.y < 0.5) {
+            corner_sel = 1u;
+        } else if (uv.x >= 0.5 && uv.y >= 0.5) {
+            corner_sel = 2u;
+        } else {
+            corner_sel = 3u;
+        }
+        let lonlat = curvilinear_corner_lonlat(
+            cell_x, cell_y, corner_sel,
+            grid_w, grid_h,
+            uniforms.curvilinear_flip_i, uniforms.curvilinear_periodic_i,
+        );
+        // Map lon [-π..π] → [-aspect..aspect],  lat [π/2..-π/2] → [-1..1]
+        world_x = (lonlat.x / 3.14159265) * data_aspect;
+        world_z = -(lonlat.y / 1.5707963);  // lat=+π/2 → -1 (top in view)
+    } else {
+        let bounds_u = get_cell_normalized_bounds_x(cell_x, grid_w, uniforms.coord_mode);
+        let bounds_v = get_cell_normalized_bounds_y(cell_y, grid_h, uniforms.coord_mode);
 
-    let x0 = -data_aspect + bounds_u.x * scale_x;
-    let x1 = -data_aspect + bounds_u.y * scale_x;
+        let x0 = -data_aspect + bounds_u.x * scale_x;
+        let x1 = -data_aspect + bounds_u.y * scale_x;
 
-    let y0 = -1.0 + bounds_v.x * scale_y;
-    let y1 = -1.0 + bounds_v.y * scale_y;
+        let y0 = -1.0 + bounds_v.x * scale_y;
+        let y1 = -1.0 + bounds_v.y * scale_y;
 
-    let world_x = mix(x0, x1, model.position.x);
-    let world_z = mix(y0, y1, model.position.y);
+        world_x = mix(x0, x1, model.position.x);
+        world_z = mix(y0, y1, model.position.y);
+    }
 
     var pos_3d: vec3<f32>;
     var normal_3d: vec3<f32>;
