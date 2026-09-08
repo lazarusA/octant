@@ -101,7 +101,7 @@ pub fn raycast_surface(
         matrix
             .grid
             .cell_center_lon_lat_rad(px, py, matrix.width, matrix.height);
-    let geo_coords = if matrix.grid.coord_mode() != 0 || matrix.grid.coords_x().is_some() {
+    let geo_coords = if matrix.grid.requires_geo_coords() {
         Some((cell_lat_rad.to_degrees(), cell_lon_rad.to_degrees()))
     } else {
         None

@@ -86,11 +86,10 @@ impl OctantApp {
         };
 
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
-            let same_grid = self.matrix_data.as_ref().is_some_and(|m| {
-                m.grid.coord_mode() == effective_data.grid.coord_mode()
-                    && m.grid.coords_x().is_some() == effective_data.grid.coords_x().is_some()
-                    && m.grid.coords_y().is_some() == effective_data.grid.coords_y().is_some()
-            });
+            let same_grid = self
+                .matrix_data
+                .as_ref()
+                .is_some_and(|m| m.grid.same_geometry(&effective_data.grid));
             let same_dimensions = !is_new_variable
                 && same_grid
                 && self.matrix_data.as_ref().is_some_and(|m| {

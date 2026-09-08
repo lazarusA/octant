@@ -121,6 +121,17 @@ mod tests {
     }
 
     #[test]
+    fn normalize_grid_exposes_geometry_contract() {
+        let lons: Vec<f64> = (0..360).map(|i| -180.0 + i as f64).collect();
+        let lats: Vec<f64> = (0..181).map(|i| -90.0 + i as f64).collect();
+
+        let geometry = normalize_grid("lon", "lat", Some(&lons), Some(&lats), 360, 181);
+        assert_eq!(geometry.kind, GridKind::GlobalRegular);
+        assert!(geometry.is_global_extent());
+        assert!(!geometry.requires_geo_coords());
+    }
+
+    #[test]
     fn test_coord_lut_matches_binary_search() {
         let w = 256;
         let coords: Vec<f32> = (0..w)
