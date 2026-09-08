@@ -5,17 +5,17 @@ pub mod mesh;
 pub mod point_cloud;
 pub mod sphere;
 pub mod surface;
+pub mod traits;
 pub mod volume;
 
-pub use common::{
-    Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams, PlotRenderer,
-};
+pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
 pub use line::{LineCallback, LineRenderer};
 pub use mesh::{Mesh3DCallback, Mesh3DRenderer};
 pub use point_cloud::{PointCloudCallback, PointCloudRenderer, PointCloudUniformParams};
 pub use sphere::{SphereCallback, SphereRenderer};
 pub use surface::{SurfaceCallback, SurfaceRenderer};
+pub use traits::{HoverSample, PlotRenderParams, PlotRenderer};
 pub use volume::{VolumeCallback, VolumeRenderer, VolumeUniformParams};
 
 /// Supported visualization plot types in Octant Engine
@@ -68,12 +68,14 @@ macro_rules! assemble_plot_shader {
             "\n",
             include_str!("shaders/common/camera3d.wgsl"),
             "\n",
+            include_str!("shaders/common/lighting.wgsl"),
+            "\n",
             $plot_shader
         )
     };
 }
 
-/// Assembles a 2D/3D plot WGSL shader with 1D coordinate buffer bindings and coordinate math.
+/// Assembles a 2D/3D plot WGSL shader with 1D coordinate buffer bindings, projections, and coordinate math.
 #[macro_export]
 macro_rules! assemble_plot_with_coords_shader {
     ($plot_shader:expr) => {
@@ -97,6 +99,10 @@ macro_rules! assemble_plot_with_coords_shader {
             include_str!("shaders/common/coords.wgsl"),
             "\n",
             include_str!("shaders/common/camera3d.wgsl"),
+            "\n",
+            include_str!("shaders/common/lighting.wgsl"),
+            "\n",
+            include_str!("shaders/common/projections.wgsl"),
             "\n",
             $plot_shader
         )

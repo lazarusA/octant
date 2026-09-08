@@ -63,14 +63,3 @@ fn project_perspective(
 
     return vec4<f32>(proj_x, proj_y, proj_z, dist_positive);
 }
-
-/// Evaluates 3D directional lighting with two-sided support for surface meshes.
-fn evaluate_directional_lighting(
-    geom_normal: vec3<f32>,
-    light_dir: vec3<f32>,
-    ambient: f32,
-    diffuse_scale: f32,
-) -> f32 {
-    let diffuse = max(abs(dot(geom_normal, normalize(light_dir))), 0.25);
-    return clamp(ambient + diffuse * diffuse_scale, 0.3, 1.0);
-}
