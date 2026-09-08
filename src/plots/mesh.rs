@@ -268,10 +268,10 @@ impl Mesh3DRenderer {
             mode: params.mode,
             width: self.width as u32,
             height: self.height as u32,
-            coord_mode: params.grid.coord_mode(),
+            coord_mode: params.coord_mode,
             has_reference_globe: if params.has_reference_globe { 1 } else { 0 },
-            lon_bounds: params.grid.lon_bounds_rad(),
-            lat_bounds: params.grid.lat_bounds_rad(),
+            lon_bounds: params.lon_bounds,
+            lat_bounds: params.lat_bounds,
             _pad: [0; 2],
             color: params.color,
         };
@@ -372,7 +372,7 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
-        let mut params = self.params.clone();
+        let mut params = self.params;
         params.aspect_ratio = super::common::compute_aspect_ratio(&self.rect);
         self.renderer.update_uniforms(queue, &params);
         Vec::new()

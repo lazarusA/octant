@@ -46,24 +46,21 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
         let dim_name = var_info
             .dimension_names
             .get(i)
-            .cloned()
-            .unwrap_or_default()
-            .to_lowercase();
+            .map(|s| s.as_str())
+            .unwrap_or("");
 
-        if !x_assigned && crate::utils::coordinates::is_spatial_x_name(&dim_name) {
+        if !x_assigned && crate::utils::coordinates::is_spatial_x_name(dim_name) {
             app.dim_config[i].spatial = SpatialRole::X;
             x_assigned = true;
-        } else if !y_assigned && crate::utils::coordinates::is_spatial_y_name(&dim_name) {
+        } else if !y_assigned && crate::utils::coordinates::is_spatial_y_name(dim_name) {
             app.dim_config[i].spatial = SpatialRole::Y;
             y_assigned = true;
-        } else if !z_assigned && crate::utils::coordinates::is_spatial_z_name(&dim_name) {
+        } else if !z_assigned && crate::utils::coordinates::is_spatial_z_name(dim_name) {
             app.dim_config[i].spatial = SpatialRole::Z;
             z_assigned = true;
         }
 
-        if rank >= 3
-            && !anim_assigned
-            && (dim_name.contains("time") || dim_name == "t" || dim_name.contains("step"))
+        if rank >= 3 && !anim_assigned && crate::utils::coordinates::is_animated_time_name(dim_name)
         {
             app.dim_config[i].animation = AnimationRole::Animated;
             app.animated_dim = Some(i);

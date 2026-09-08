@@ -72,11 +72,10 @@ pub fn draw_plot_axes(
     let vis_y_min = y_min_domain + t_y_min * full_y_span;
     let vis_y_max = y_min_domain + t_y_max * full_y_span;
 
-    // Generate constant count of ticks (7 ticks) for visible viewport
-    let num_x_ticks = 7;
-    let num_y_ticks = 7;
-    let x_ticks = generate_constant_count_ticks(vis_x_min, vis_x_max, num_x_ticks);
-    let y_ticks = generate_constant_count_ticks(vis_y_min, vis_y_max, num_y_ticks);
+    // Generate constant count of ticks (7 ticks) for visible viewport using stack buffers
+    const NUM_TICKS: usize = 7;
+    let x_ticks = generate_constant_count_ticks(vis_x_min, vis_x_max);
+    let y_ticks = generate_constant_count_ticks(vis_y_min, vis_y_max);
 
     // ==========================================
     // 1. BOTTOM & TOP X-AXES
@@ -124,11 +123,7 @@ pub fn draw_plot_axes(
 
     // Render X-Axis Ticks (Bottom & Top)
     for (i, tick) in x_ticks.iter().enumerate() {
-        let fract = if num_x_ticks > 1 {
-            i as f32 / (num_x_ticks - 1) as f32
-        } else {
-            0.5
-        };
+        let fract = i as f32 / (NUM_TICKS - 1) as f32;
         let tick_x = (visible_left + fract * vis_w).round();
 
         if tick_x >= visible_left - 1.0 && tick_x <= visible_right + 1.0 {
@@ -156,8 +151,8 @@ pub fn draw_plot_axes(
                     visuals,
                     painter,
                     b_label_pos,
-                    &tick.label,
-                    font_id.clone(),
+                    tick.as_str(),
+                    &font_id,
                     text_color,
                     b_align,
                     b_use_pill,
@@ -177,8 +172,8 @@ pub fn draw_plot_axes(
                         visuals,
                         painter,
                         t_label_pos,
-                        &tick.label,
-                        font_id.clone(),
+                        tick.as_str(),
+                        &font_id,
                         text_color,
                         egui::Align2::CENTER_TOP,
                         true, // Inward overlay pill
@@ -213,7 +208,7 @@ pub fn draw_plot_axes(
                     painter,
                     title_pos,
                     options.x_title,
-                    title_font_id.clone(),
+                    &title_font_id,
                     text_color,
                     title_align,
                     title_use_pill,
@@ -263,11 +258,7 @@ pub fn draw_plot_axes(
 
     // Render Y-Axis Ticks (Right & Left)
     for (j, tick) in y_ticks.iter().enumerate() {
-        let fract = if num_y_ticks > 1 {
-            j as f32 / (num_y_ticks - 1) as f32
-        } else {
-            0.5
-        };
+        let fract = j as f32 / (NUM_TICKS - 1) as f32;
         // Screen Y decreases upwards
         let tick_y = (visible_bottom - fract * vis_h).round();
 
@@ -294,8 +285,8 @@ pub fn draw_plot_axes(
                     visuals,
                     painter,
                     r_label_pos,
-                    &tick.label,
-                    font_id.clone(),
+                    tick.as_str(),
+                    &font_id,
                     text_color,
                     align,
                     right_y_tick_dir < 0.0, // use bg pill when inward
@@ -315,8 +306,8 @@ pub fn draw_plot_axes(
                         visuals,
                         painter,
                         l_label_pos,
-                        &tick.label,
-                        font_id.clone(),
+                        tick.as_str(),
+                        &font_id,
                         text_color,
                         egui::Align2::LEFT_CENTER,
                         true, // use bg pill for inward left ticks
@@ -327,39 +318,65 @@ pub fn draw_plot_axes(
     }
 }
 
+/// Zero-allocation tick mark storing its formatted label in a fixed stack buffer.
+#[derive(Clone, Copy)]
 pub struct TickMark {
     pub val: f64,
-    pub label: String,
+    len: u8,
+    buf: [u8; 32],
 }
 
-fn generate_constant_count_ticks(min_val: f64, max_val: f64, count: usize) -> Vec<TickMark> {
-    let count = count.max(2);
-    let range = max_val - min_val;
-    let step = range / (count - 1) as f64;
-
-    (0..count)
-        .map(|i| {
-            let val = min_val + i as f64 * step;
-            TickMark {
-                val,
-                label: format_tick_value(val, step),
-            }
-        })
-        .collect()
-}
-
-fn format_tick_value(val: f64, step: f64) -> String {
-    let abs_val = val.abs();
-    if abs_val > 0.0 && !(1e-3..1e5).contains(&abs_val) {
-        format!("{:.2e}", val)
-    } else if step.abs() < 1.0 {
-        let decimals = (-step.abs().log10()).ceil().max(0.0) as usize + 1;
-        format!("{:.1$}", val, decimals.min(4))
-    } else if val.fract().abs() < 1e-6 {
-        format!("{:.0}", val)
-    } else {
-        format!("{:.2}", val)
+impl TickMark {
+    pub fn new(val: f64, step: f64) -> Self {
+        let mut mark = Self {
+            val,
+            len: 0,
+            buf: [0u8; 32],
+        };
+        mark.format(step);
+        mark
     }
+
+    fn format(&mut self, step: f64) {
+        use std::io::Write;
+        let mut cursor = std::io::Cursor::new(&mut self.buf[..]);
+        let abs_val = self.val.abs();
+        let _ = if abs_val > 0.0 && !(1e-3..1e5).contains(&abs_val) {
+            write!(cursor, "{:.2e}", self.val)
+        } else if step.abs() < 1.0 {
+            let decimals = ((-step.abs().log10()).ceil().max(0.0) as usize + 1).min(4);
+            write!(cursor, "{:.*}", decimals, self.val)
+        } else if self.val.fract().abs() < 1e-6 {
+            write!(cursor, "{:.0}", self.val)
+        } else {
+            write!(cursor, "{:.2}", self.val)
+        };
+        self.len = cursor.position() as u8;
+    }
+
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        std::str::from_utf8(&self.buf[..self.len as usize]).unwrap_or("")
+    }
+}
+
+/// Generates a constant 7-count stack array of ticks with zero heap allocation.
+fn generate_constant_count_ticks(min_val: f64, max_val: f64) -> [TickMark; 7] {
+    let range = max_val - min_val;
+    let step = range / 6.0;
+
+    let mut ticks = [TickMark {
+        val: 0.0,
+        len: 0,
+        buf: [0u8; 32],
+    }; 7];
+
+    for (i, tick) in ticks.iter_mut().enumerate() {
+        let val = min_val + i as f64 * step;
+        *tick = TickMark::new(val, step);
+    }
+
+    ticks
 }
 
 /// Helper function to detect if a tick label position lands near any of the 4 canvas corners.
@@ -382,7 +399,7 @@ fn draw_tick_label_aligned(
     painter: &egui::Painter,
     pos: Pos2,
     text: &str,
-    font_id: FontId,
+    font_id: &FontId,
     color: Color32,
     align: egui::Align2,
     use_pill_bg: bool,
@@ -414,5 +431,5 @@ fn draw_tick_label_aligned(
         );
     }
 
-    painter.text(pos, align, text, font_id, color);
+    painter.text(pos, align, text, font_id.clone(), color);
 }

@@ -3,6 +3,19 @@
 use crate::app::OctantApp;
 use crate::plots::PlotType;
 
+#[derive(Clone, Copy)]
+struct Common3DSpatialContext {
+    width: u32,
+    height: u32,
+    aspect_x: f32,
+    aspect_y: f32,
+    aspect_z: f32,
+    shift_x: u32,
+    shift_y: u32,
+    shift_z: u32,
+    color: crate::plots::PlotColorParams,
+}
+
 impl OctantApp {
     /// Updates GPU vertex/storage buffer data for the currently active 2D renderer.
     pub fn update_active_2d_renderer_data(&self, queue: &wgpu::Queue, values: &[f32]) {
@@ -43,35 +56,54 @@ impl OctantApp {
             })
     }
 
+    /// Extracts common 3D spatial dimensions, aspect ratios, shifts, and color uniforms.
+    #[inline]
+    fn get_common_3d_spatial_context(&self) -> Common3DSpatialContext {
+        let (width, height) = self.get_volume_dimensions();
+        let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
+        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
+        let color = self.get_color_params();
+
+        Common3DSpatialContext {
+            width,
+            height,
+            aspect_x,
+            aspect_y,
+            aspect_z,
+            shift_x,
+            shift_y,
+            shift_z,
+            color,
+        }
+    }
+
     /// Assembles VolumeUniformParams for 3D volume raymarching.
     pub fn get_volume_uniform_params(
         &self,
         screen_aspect: f32,
     ) -> crate::plots::VolumeUniformParams {
-        let (width, height) = self.get_volume_dimensions();
-        let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
-        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
+        let ctx = self.get_common_3d_spatial_context();
 
         crate::plots::VolumeUniformParams {
-            color: self.get_color_params(),
+            color: ctx.color,
             rot_y: self.sphere_rotation_y,
             rot_x: self.sphere_rotation_x,
-            aspect_x,
-            aspect_y,
-            aspect_z,
+            aspect_x: ctx.aspect_x,
+            aspect_y: ctx.aspect_y,
+            aspect_z: ctx.aspect_z,
             zoom: self.sphere_zoom,
             opacity_scale: self.volume_opacity,
             step_count: self.volume_step_count,
-            width,
-            height,
+            width: ctx.width,
+            height: ctx.height,
             algorithm: self.volume_algorithm,
             isovalue: self.volume_isovalue,
             isorange: self.volume_isorange,
             attenuation: self.volume_attenuation,
             screen_aspect,
-            shift_x,
-            shift_y,
-            shift_z,
+            shift_x: ctx.shift_x,
+            shift_y: ctx.shift_y,
+            shift_z: ctx.shift_z,
             transparency: self.volume_transparency,
         }
     }
@@ -81,41 +113,50 @@ impl OctantApp {
         &self,
         screen_aspect: f32,
     ) -> crate::plots::PointCloudUniformParams {
-        let (width, height) = self.get_volume_dimensions();
-        let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
-        let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
+        let ctx = self.get_common_3d_spatial_context();
 
         crate::plots::PointCloudUniformParams {
-            color: self.get_color_params(),
+            color: ctx.color,
             rot_y: self.sphere_rotation_y,
             rot_x: self.sphere_rotation_x,
-            aspect_x,
-            aspect_y,
-            aspect_z,
+            aspect_x: ctx.aspect_x,
+            aspect_y: ctx.aspect_y,
+            aspect_z: ctx.aspect_z,
             zoom: self.sphere_zoom,
             point_size: self.point_cloud_size,
-            width,
-            height,
+            width: ctx.width,
+            height: ctx.height,
             screen_aspect,
-            shift_x,
-            shift_y,
-            shift_z,
+            shift_x: ctx.shift_x,
+            shift_y: ctx.shift_y,
+            shift_z: ctx.shift_z,
         }
     }
 
-    /// Assembles Mesh3DUniformParams for Sphere and Surface heightfields.
+    /// Assembles Mesh3DUniformParams for Sphere and Surface heightfields (zero allocation).
     pub fn get_mesh_3d_uniform_params(
         &self,
         mode: u32,
         displacement_strength: f32,
         aspect_ratio: f32,
     ) -> crate::plots::Mesh3DUniformParams {
-        let grid = self
+        let (coord_mode, has_reference_globe, lon_bounds, lat_bounds) = self
             .matrix_data
             .as_ref()
-            .map(|m| m.grid.clone())
-            .unwrap_or_default();
-        let has_reference_globe = !grid.is_global();
+            .map(|m| {
+                (
+                    m.grid.coord_mode(),
+                    !m.grid.is_global(),
+                    m.grid.lon_bounds_rad(),
+                    m.grid.lat_bounds_rad(),
+                )
+            })
+            .unwrap_or((
+                0,
+                false,
+                [-std::f32::consts::PI, std::f32::consts::PI],
+                [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
+            ));
 
         crate::plots::Mesh3DUniformParams {
             color: self.get_color_params(),
@@ -125,8 +166,10 @@ impl OctantApp {
             zoom: self.sphere_zoom,
             displacement_strength,
             mode,
-            grid,
+            coord_mode,
             has_reference_globe,
+            lon_bounds,
+            lat_bounds,
         }
     }
 

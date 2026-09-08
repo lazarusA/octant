@@ -337,28 +337,52 @@ pub fn read_coord_bounds_scoped(
     Some((v_start, v_end))
 }
 
-/// Checks if a dimension name matches Spatial X heuristics (longitude / X / column).
+/// Fast zero-allocation case-insensitive ASCII substring search.
+#[inline]
+fn contains_ascii_case_insensitive(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    haystack
+        .as_bytes()
+        .windows(needle.len())
+        .any(|w| w.eq_ignore_ascii_case(needle.as_bytes()))
+}
+
+/// Checks if a dimension name matches Spatial X heuristics (longitude / X / column) with zero allocation.
 pub fn is_spatial_x_name(dim_name: &str) -> bool {
-    let clean = dim_name.trim().to_lowercase();
-    clean.contains("lon") || clean == "x" || clean.contains("col")
+    let clean = dim_name.trim();
+    clean.eq_ignore_ascii_case("x")
+        || contains_ascii_case_insensitive(clean, "lon")
+        || contains_ascii_case_insensitive(clean, "col")
 }
 
-/// Checks if a dimension name matches Spatial Y heuristics (latitude / Y / row).
+/// Checks if a dimension name matches Spatial Y heuristics (latitude / Y / row) with zero allocation.
 pub fn is_spatial_y_name(dim_name: &str) -> bool {
-    let clean = dim_name.trim().to_lowercase();
-    clean.contains("lat") || clean == "y" || clean.contains("row")
+    let clean = dim_name.trim();
+    clean.eq_ignore_ascii_case("y")
+        || contains_ascii_case_insensitive(clean, "lat")
+        || contains_ascii_case_insensitive(clean, "row")
 }
 
-/// Checks if a dimension name matches Spatial Z heuristics (depth / level / height / alt / sigma / Z).
+/// Checks if a dimension name matches Spatial Z heuristics (depth / level / height / alt / sigma / Z) with zero allocation.
 pub fn is_spatial_z_name(dim_name: &str) -> bool {
-    let clean = dim_name.trim().to_lowercase();
-    clean.contains("depth")
-        || clean.contains("level")
-        || clean.contains("lev")
-        || clean.contains("height")
-        || clean.contains("alt")
-        || clean.contains("sigma")
-        || clean == "z"
+    let clean = dim_name.trim();
+    clean.eq_ignore_ascii_case("z")
+        || contains_ascii_case_insensitive(clean, "depth")
+        || contains_ascii_case_insensitive(clean, "level")
+        || contains_ascii_case_insensitive(clean, "lev")
+        || contains_ascii_case_insensitive(clean, "height")
+        || contains_ascii_case_insensitive(clean, "alt")
+        || contains_ascii_case_insensitive(clean, "sigma")
+}
+
+/// Checks if a dimension name matches animated time heuristics (time / t / step) with zero allocation.
+pub fn is_animated_time_name(dim_name: &str) -> bool {
+    let clean = dim_name.trim();
+    clean.eq_ignore_ascii_case("t")
+        || contains_ascii_case_insensitive(clean, "time")
+        || contains_ascii_case_insensitive(clean, "step")
 }
 
 /// Formats a dimension name into a human-friendly axis title with standard units.
