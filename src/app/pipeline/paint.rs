@@ -333,8 +333,12 @@ impl OctantApp {
             }
         }
 
-        // --- Coastline overlay (Heatmap only) ---
-        if self.show_coastlines {
+        // --- Coastline overlay (Heatmap / Block only) ---
+        let coastline_supported = matches!(
+            self.active_plot_type,
+            PlotType::Heatmap | PlotType::Block
+        );
+        if self.show_coastlines && coastline_supported {
             if let Some(cr) = self.coastline_renderer.as_ref().map(Arc::clone) {
                 // Theme-aware default: white in dark mode, dark gray in light mode
                 let line_color = self.coastline_color.unwrap_or_else(|| {
