@@ -2,8 +2,8 @@ use crate::data::DatasetMetadata;
 use crate::data::matrix_data::MatrixData;
 use crate::data::slice_request::SliceRequest;
 use crate::plots::{
-    CoastlineRenderer, LineRenderer, MatrixRenderer, PlotType, PointCloudRenderer,
-    SphereRenderer, SurfaceRenderer, VolumeRenderer,
+    Coastline3DRenderer, CoastlineRenderer, LineRenderer, MatrixRenderer, PlotType,
+    PointCloudRenderer, SphereRenderer, SurfaceRenderer, VolumeRenderer,
 };
 use std::sync::Arc;
 
@@ -332,13 +332,15 @@ pub struct OctantApp {
     pub export_toast: Option<crate::export::ExportToastNotification>,
 
     // Coastline Overlay
-    /// Whether to render the coastline overlay on 2D Heatmap plots.
+    /// Whether to render the coastline overlay on geographic plot types.
     pub show_coastlines: bool,
     /// RGBA line color for coastlines [0..1]. Theme-aware default applied at
     /// render time if this is `None`; set to `Some` when the user picks a color.
     pub coastline_color: Option<[f32; 4]>,
     /// GPU renderer — initialised lazily on first pipeline build.
     pub coastline_renderer: Option<Arc<CoastlineRenderer>>,
+    /// GPU renderer for coastlines projected onto 3D surfaces and spheres.
+    pub coastline_3d_renderer: Option<Arc<Coastline3DRenderer>>,
     /// Current LOD loaded in the GPU buffer.
     pub coastline_current_lod: crate::plots::CoastlineLod,
 }
@@ -480,6 +482,7 @@ impl Default for OctantApp {
             show_coastlines: false,
             coastline_color: None,
             coastline_renderer: None,
+            coastline_3d_renderer: None,
             coastline_current_lod: crate::plots::CoastlineLod::Lod110m,
         }
     }

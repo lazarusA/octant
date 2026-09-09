@@ -61,9 +61,9 @@ impl CoastlineLod {
 pub fn coastline_110m_static() -> &'static [f32] {
     // The Aligned4 wrapper guarantees the byte slice has at least 4-byte
     // alignment, which bytemuck requires before it will cast &[u8] → &[f32].
-    static ALIGNED: &Aligned4<[u8]> = &Aligned4(
-        *include_bytes!("../../assets/coastlines/coastline_110m.bin"),
-    );
+    static ALIGNED: &Aligned4<[u8]> = &Aligned4(*include_bytes!(
+        "../../assets/coastlines/coastline_110m.bin"
+    ));
     cast_slice(&ALIGNED.0)
 }
 
@@ -127,15 +127,13 @@ pub fn load_coastline(lod: CoastlineLod) -> CoastlineBuffer {
     match lod {
         CoastlineLod::Lod110m => CoastlineBuffer::Static(coastline_110m_static()),
         #[cfg(not(target_arch = "wasm32"))]
-        CoastlineLod::Lod50m | CoastlineLod::Lod10m => {
-            match load_coastline_from_disk(lod) {
-                Some(v) => CoastlineBuffer::Owned(v),
-                None => {
-                    log::warn!("Falling back to embedded 110m coastline.");
-                    CoastlineBuffer::Static(coastline_110m_static())
-                }
+        CoastlineLod::Lod50m | CoastlineLod::Lod10m => match load_coastline_from_disk(lod) {
+            Some(v) => CoastlineBuffer::Owned(v),
+            None => {
+                log::warn!("Falling back to embedded 110m coastline.");
+                CoastlineBuffer::Static(coastline_110m_static())
             }
-        }
+        },
         #[cfg(target_arch = "wasm32")]
         CoastlineLod::Lod50m | CoastlineLod::Lod10m => {
             log::warn!("50m/10m coastlines unavailable on WASM; using 110m.");
@@ -186,9 +184,7 @@ impl CoastlineBuffer {
 ///
 /// Falls back to global defaults `(-180, 180, -90, 90)` when the grid
 /// carries no spatial coordinate information.
-pub fn dataset_geo_bounds(
-    grid: &crate::data::CoordinateGrid,
-) -> (f32, f32, f32, f32) {
+pub fn dataset_geo_bounds(grid: &crate::data::CoordinateGrid) -> (f32, f32, f32, f32) {
     use crate::data::CoordinateGrid;
 
     match grid {

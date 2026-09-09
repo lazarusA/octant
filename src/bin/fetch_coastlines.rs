@@ -172,11 +172,7 @@ fn fetch_and_convert(
 
 /// Appends `[lon, lat]` `f32` pairs from a GeoJSON `LineString` coordinate
 /// array into `verts`. Skips malformed points without panicking.
-fn push_line_string(
-    coords: &serde_json::Value,
-    verts: &mut Vec<f32>,
-    pair_count: &mut usize,
-) {
+fn push_line_string(coords: &serde_json::Value, verts: &mut Vec<f32>, pair_count: &mut usize) {
     let Some(points) = coords.as_array() else {
         return;
     };

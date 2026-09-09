@@ -78,6 +78,81 @@ fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
         });
 }
 
+fn show_coastline_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
+    ui.add_space(2.0);
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut app.show_coastlines, "Coastlines")
+            .on_hover_text("Overlay Natural Earth coastlines on geographic plots.");
+
+        if app.show_coastlines {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if app.coastline_color.is_some()
+                    && ui
+                        .small_button("reset")
+                        .on_hover_text("Reset coastline color to theme default")
+                        .clicked()
+                {
+                    app.coastline_color = None;
+                }
+
+                let mut color = app.coastline_color.unwrap_or(if ui.visuals().dark_mode {
+                    [1.0_f32, 1.0, 1.0, 0.75]
+                } else {
+                    [0.15_f32, 0.15, 0.15, 0.85]
+                });
+                let changed = crate::ui::color_picker::ShapeColorPicker::new(
+                    "settings_coastline_color_picker",
+                    &mut color,
+                    crate::ui::color_picker::ColorShape::Rect(3.0),
+                )
+                .size(egui::vec2(18.0, 16.0))
+                .tooltip("Coastline line color. Click to select.")
+                .anchor_offset(egui::vec2(-240.0, -100.0))
+                .show(ui)
+                .changed();
+
+                if changed {
+                    app.coastline_color = Some(color);
+                }
+            });
+        }
+    });
+
+    if app.show_coastlines {
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Resolution:").small().weak());
+            ui.spacing_mut().item_spacing.x = 2.0;
+            let lods = [
+                (crate::plots::CoastlineLod::Lod110m, "110m"),
+                (crate::plots::CoastlineLod::Lod50m, "50m"),
+                (crate::plots::CoastlineLod::Lod10m, "10m"),
+            ];
+            for (lod, label) in lods {
+                if ui
+                    .selectable_label(
+                        app.coastline_current_lod == lod,
+                        egui::RichText::new(label).small(),
+                    )
+                    .on_hover_text(match lod {
+                        crate::plots::CoastlineLod::Lod110m => {
+                            "110 m — fast, always available (embedded)"
+                        }
+                        crate::plots::CoastlineLod::Lod50m => {
+                            "50 m — medium detail (requires assets/coastlines/)"
+                        }
+                        crate::plots::CoastlineLod::Lod10m => {
+                            "10 m — high detail (requires assets/coastlines/)"
+                        }
+                    })
+                    .clicked()
+                {
+                    app.reload_coastline_lod(lod);
+                }
+            }
+        });
+    }
+}
+
 fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     let is_3d_mode = app.active_plot_type == PlotType::Sphere
         || app.active_plot_type == PlotType::Surface
@@ -171,6 +246,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
         PlotType::Sphere => {
+            show_coastline_controls(app, ui);
             let modes: [(u32, &str); 4] = [(0, "Smooth"), (1, "Bumpy"), (2, "Steps"), (3, "Voxel")];
 
             ui.horizontal(|ui| {
@@ -194,6 +270,7 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
         PlotType::Surface => {
+            show_coastline_controls(app, ui);
             let modes: [(u32, &str); 3] = [(0, "Bumpy"), (1, "Steps"), (2, "Voxel")];
 
             ui.horizontal(|ui| {
@@ -337,82 +414,8 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                     .clicked().then(|| app.show_hover_card = !app.show_hover_card);
             });
 
-            ui.add_space(2.0);
-            ui.horizontal(|ui| {
-                ui.checkbox(&mut app.show_coastlines, "Coastlines")
-                    .on_hover_text("Overlay Natural Earth coastlines on geographic 2D plots.");
-
-                if app.show_coastlines {
-                    // Color override picker — rightmost edge
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        // Reset to theme-aware default
-                        if app.coastline_color.is_some()
-                            && ui
-                                .small_button("reset")
-                                .on_hover_text("Reset coastline color to theme default")
-                                .clicked()
-                        {
-                            app.coastline_color = None;
-                        }
-
-                        let mut color = app.coastline_color.unwrap_or(if ui.visuals().dark_mode {
-                            [1.0_f32, 1.0, 1.0, 0.75]
-                        } else {
-                            [0.15_f32, 0.15, 0.15, 0.85]
-                        });
-
-                        let changed = crate::ui::color_picker::ShapeColorPicker::new(
-                            "settings_coastline_color_picker",
-                            &mut color,
-                            crate::ui::color_picker::ColorShape::Rect(3.0),
-                        )
-                        .size(egui::vec2(18.0, 16.0))
-                        .tooltip("Coastline line color. Click to select.")
-                        .anchor_offset(egui::vec2(-240.0, -100.0))
-                        .show(ui)
-                        .changed();
-
-                        if changed {
-                            app.coastline_color = Some(color);
-                        }
-                    });
-                }
-            });
-
-            if app.show_coastlines {
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("Resolution:").small().weak());
-                    ui.spacing_mut().item_spacing.x = 2.0;
-
-                    let lods = [
-                        (crate::plots::CoastlineLod::Lod110m, "110m"),
-                        (crate::plots::CoastlineLod::Lod50m,  "50m"),
-                        (crate::plots::CoastlineLod::Lod10m,  "10m"),
-                    ];
-                    for (lod, label) in lods {
-                        if ui
-                            .selectable_label(
-                                app.coastline_current_lod == lod,
-                                egui::RichText::new(label).small(),
-                            )
-                            .on_hover_text(match lod {
-                                crate::plots::CoastlineLod::Lod110m =>
-                                    "110 m — fast, always available (embedded)",
-                                crate::plots::CoastlineLod::Lod50m =>
-                                    "50 m — medium detail (requires assets/coastlines/)",
-                                crate::plots::CoastlineLod::Lod10m =>
-                                    "10 m — high detail (requires assets/coastlines/)",
-                            })
-                            .clicked()
-                        {
-                            app.reload_coastline_lod(lod);
-                        }
-                    }
-                });
-            }
+            show_coastline_controls(app, ui);
         }
-
-
     }
 
     if is_3d_mode {

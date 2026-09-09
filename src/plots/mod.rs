@@ -1,4 +1,5 @@
 pub mod coastline;
+pub mod coastline_3d;
 pub mod coastline_data;
 pub mod common;
 pub mod heatmap;
@@ -11,6 +12,7 @@ pub mod traits;
 pub mod volume;
 
 pub use coastline::{CoastlineCallback, CoastlineRenderer};
+pub use coastline_3d::{Coastline3DCallback, Coastline3DParams, Coastline3DRenderer};
 pub use coastline_data::{CoastlineBuffer, CoastlineLod, load_coastline};
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
@@ -141,6 +143,10 @@ mod tests {
             (
                 "point_cloud",
                 crate::assemble_plot_shader!(include_str!("shaders/point_cloud.wgsl")),
+            ),
+            (
+                "coastline_3d",
+                crate::assemble_plot_with_coords_shader!(include_str!("shaders/coastline_3d.wgsl")),
             ),
         ];
 

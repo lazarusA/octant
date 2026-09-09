@@ -228,11 +228,15 @@ impl OctantApp {
                     ui.painter().add(callback);
                 }
             }
-            crate::plots::PlotType::Surface => {
+            crate::plots::PlotType::Surface | crate::plots::PlotType::Block => {
                 if let Some(surface_renderer) = &self.surface_renderer {
                     let aspect_ratio = crate::plots::common::compute_aspect_ratio(&plot_rect);
                     let params = self.get_mesh_3d_uniform_params(
-                        self.surface_mode,
+                        if self.active_plot_type == crate::plots::PlotType::Block {
+                            2
+                        } else {
+                            self.surface_mode
+                        },
                         self.surface_displacement_strength,
                         aspect_ratio,
                     );
@@ -333,10 +337,10 @@ impl OctantApp {
             }
         }
 
-        // --- Coastline overlay (Heatmap / Block only) ---
+        // --- Coastline overlay ---
         let coastline_supported = matches!(
             self.active_plot_type,
-            PlotType::Heatmap | PlotType::Block
+            PlotType::Heatmap | PlotType::Surface | PlotType::Block | PlotType::Sphere
         );
         if self.show_coastlines && coastline_supported {
             if let Some(cr) = self.coastline_renderer.as_ref().map(Arc::clone) {
@@ -357,25 +361,69 @@ impl OctantApp {
                     .map(|m| crate::plots::coastline_data::dataset_geo_bounds(&m.grid))
                     .unwrap_or((-180.0, 180.0, 90.0, -90.0));
 
+                if self.active_plot_type == PlotType::Heatmap {
+                    let cb = eframe::egui_wgpu::Callback::new_paint_callback(
+                        canvas_rect,
+                        crate::plots::CoastlineCallback {
+                            renderer: cr,
+                            pan: gpu_pan,
+                            zoom: gpu_zoom,
+                            aspect_scale: gpu_aspect_scale,
+                            line_color,
+                            rect: canvas_rect,
+                            lon_min,
+                            lon_max,
+                            lat_min,
+                            lat_max,
+                        },
+                    );
+                    ui.painter().add(cb);
+                }
+            }
+
+            if self.active_plot_type != PlotType::Heatmap
+                && let Some(renderer) = self.coastline_3d_renderer.as_ref().map(Arc::clone)
+            {
+                let (mode, plot_kind, displacement_strength) = match self.active_plot_type {
+                    PlotType::Sphere => (self.sphere_mode, 1, self.sphere_displacement_strength),
+                    PlotType::Block => (2, 0, self.surface_displacement_strength),
+                    _ => (self.surface_mode, 0, self.surface_displacement_strength),
+                };
+                let mesh_params = self.get_mesh_3d_uniform_params(
+                    mode,
+                    displacement_strength,
+                    crate::plots::common::compute_aspect_ratio(&plot_rect),
+                );
+                let line_color = self.coastline_color.unwrap_or_else(|| {
+                    if ui.visuals().dark_mode {
+                        [1.0, 1.0, 1.0, 0.75]
+                    } else {
+                        [0.15, 0.15, 0.15, 0.85]
+                    }
+                });
                 let cb = eframe::egui_wgpu::Callback::new_paint_callback(
-                    canvas_rect,
-                    crate::plots::CoastlineCallback {
-                        renderer:     cr,
-                        pan:          gpu_pan,
-                        zoom:         gpu_zoom,
-                        aspect_scale: gpu_aspect_scale,
-                        line_color,
-                        rect:         canvas_rect,
-                        lon_min,
-                        lon_max,
-                        lat_min,
-                        lat_max,
+                    plot_rect,
+                    crate::plots::Coastline3DCallback {
+                        renderer,
+                        params: crate::plots::Coastline3DParams {
+                            rotation_y: mesh_params.rotation_y,
+                            rotation_x: mesh_params.rotation_x,
+                            aspect_ratio: mesh_params.aspect_ratio,
+                            zoom: mesh_params.zoom,
+                            displacement_strength: mesh_params.displacement_strength,
+                            plot_kind,
+                            plot_mode: mode,
+                            coord_mode: mesh_params.coord_mode,
+                            lon_bounds: mesh_params.lon_bounds,
+                            lat_bounds: mesh_params.lat_bounds,
+                            color: line_color,
+                            color_range: [mesh_params.color.cmin, mesh_params.color.cmax],
+                        },
+                        rect: plot_rect,
                     },
                 );
                 ui.painter().add(cb);
             }
         }
-
-
     }
 }

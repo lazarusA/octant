@@ -4,8 +4,8 @@ use crate::app::OctantApp;
 use crate::data::matrix_data::MatrixData;
 use crate::data::volume_data::VolumeData;
 use crate::plots::{
-    CoastlineRenderer, LineRenderer, MatrixRenderer, PlotType, PointCloudRenderer,
-    SphereRenderer, SurfaceRenderer, VolumeRenderer,
+    Coastline3DRenderer, CoastlineRenderer, LineRenderer, MatrixRenderer, PlotType,
+    PointCloudRenderer, SphereRenderer, SurfaceRenderer, VolumeRenderer,
 };
 use std::sync::Arc;
 
@@ -132,6 +132,16 @@ impl OctantApp {
                     }
                     surface_renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
                 }
+                if let Some(coastline_renderer) = &self.coastline_3d_renderer {
+                    if let (Some(cx), Some(cy)) = (
+                        effective_data.grid.coords_x(),
+                        effective_data.grid.coords_y(),
+                    ) {
+                        coastline_renderer.update_coords(&wgpu_render_state.queue, cx, cy);
+                    }
+                    coastline_renderer
+                        .update_data(&wgpu_render_state.queue, &effective_data.values);
+                }
                 if let Some(line_renderer) = &self.line_renderer {
                     line_renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
                 }
@@ -178,11 +188,24 @@ impl OctantApp {
                         coord_x,
                         coord_y,
                     );
+                    let coastline_buffer = crate::plots::load_coastline(self.coastline_current_lod);
+                    let coastline_3d_renderer = Coastline3DRenderer::new(
+                        &wgpu_render_state.device,
+                        wgpu_render_state.target_format,
+                        coastline_buffer.as_slice(),
+                        &effective_data.values,
+                        effective_data.width,
+                        effective_data.height,
+                        coord_x,
+                        coord_y,
+                    );
                     self.sphere_renderer = Some(Arc::new(sphere_renderer));
                     self.surface_renderer = Some(Arc::new(surface_renderer));
+                    self.coastline_3d_renderer = Some(Arc::new(coastline_3d_renderer));
                 } else {
                     self.sphere_renderer = None;
                     self.surface_renderer = None;
+                    self.coastline_3d_renderer = None;
                 }
 
                 if data.height == 1 {
@@ -192,17 +215,17 @@ impl OctantApp {
         }
 
         // --- Coastline renderer: initialise once, upgrade LOD in background ---
-        if self.coastline_renderer.is_none() {
-            if let Some(wgpu_render_state) = &self.wgpu_render_state {
-                let buf = crate::plots::load_coastline(crate::plots::CoastlineLod::Lod110m);
-                let r = CoastlineRenderer::new(
-                    &wgpu_render_state.device,
-                    wgpu_render_state.target_format,
-                    buf.as_slice(),
-                );
-                self.coastline_renderer    = Some(Arc::new(r));
-                self.coastline_current_lod = crate::plots::CoastlineLod::Lod110m;
-            }
+        if self.coastline_renderer.is_none()
+            && let Some(wgpu_render_state) = &self.wgpu_render_state
+        {
+            let buf = crate::plots::load_coastline(crate::plots::CoastlineLod::Lod110m);
+            let r = CoastlineRenderer::new(
+                &wgpu_render_state.device,
+                wgpu_render_state.target_format,
+                buf.as_slice(),
+            );
+            self.coastline_renderer = Some(Arc::new(r));
+            self.coastline_current_lod = crate::plots::CoastlineLod::Lod110m;
         }
 
         self.matrix_data = Some(data);
@@ -309,6 +332,9 @@ impl OctantApp {
 
         let buf = crate::plots::load_coastline(lod);
         renderer.swap_vertices(&wgpu_state.device, &wgpu_state.queue, buf.as_slice());
+        if let Some(renderer_3d) = self.coastline_3d_renderer.as_ref().map(Arc::clone) {
+            renderer_3d.swap_vertices(&wgpu_state.device, &wgpu_state.queue, buf.as_slice());
+        }
         self.coastline_current_lod = lod;
         log::info!(
             "Coastline LOD changed to {:?} ({} vertex pairs)",
