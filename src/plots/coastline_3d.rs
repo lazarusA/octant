@@ -117,10 +117,11 @@ impl Coastline3DRenderer {
             &y_coords,
         );
 
-        let safe_vertices = if coastline_vertices.is_empty() {
+        let line_vertices = expand_coastline_line_list(coastline_vertices);
+        let safe_vertices = if line_vertices.is_empty() {
             &[0.0_f32, 0.0][..]
         } else {
-            coastline_vertices
+            line_vertices.as_slice()
         };
         let coastline_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("3D Coastline Vertex Buffer"),
@@ -193,7 +194,7 @@ impl Coastline3DRenderer {
                 compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineStrip,
+                topology: wgpu::PrimitiveTopology::LineList,
                 cull_mode: None,
                 ..Default::default()
             },
@@ -252,10 +253,11 @@ impl Coastline3DRenderer {
     }
 
     pub fn swap_vertices(&self, device: &wgpu::Device, queue: &wgpu::Queue, vertices: &[f32]) {
-        if vertices.is_empty() {
+        let line_vertices = expand_coastline_line_list(vertices);
+        if line_vertices.is_empty() {
             return;
         }
-        let needed = std::mem::size_of_val(vertices) as u64;
+        let needed = std::mem::size_of_val(line_vertices.as_slice()) as u64;
         let capacity = self
             .gpu
             .read()
@@ -266,13 +268,13 @@ impl Coastline3DRenderer {
                 queue.write_buffer(
                     &resources.coastline_buffer,
                     0,
-                    bytemuck::cast_slice(vertices),
+                    bytemuck::cast_slice(line_vertices.as_slice()),
                 );
             }
         } else {
             let coastline_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("3D Coastline Vertex Buffer (Resized)"),
-                contents: bytemuck::cast_slice(vertices),
+                contents: bytemuck::cast_slice(line_vertices.as_slice()),
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             });
             let bind_group = make_bind_group(
@@ -290,8 +292,33 @@ impl Coastline3DRenderer {
             }
         }
         self.vertex_count
-            .store((vertices.len() / 2) as u32, Ordering::Relaxed);
+            .store((line_vertices.len() / 2) as u32, Ordering::Relaxed);
     }
+}
+
+/// Converts GeoJSON line strings into explicit line-list pairs.
+///
+/// NaN separators cannot restart a GPU line strip, and antimeridian jumps
+/// would otherwise draw a segment across the entire map.
+fn expand_coastline_line_list(vertices: &[f32]) -> Vec<f32> {
+    let mut expanded = Vec::with_capacity(vertices.len().saturating_mul(2));
+    let mut previous: Option<(f32, f32)> = None;
+
+    for pair in vertices.chunks_exact(2) {
+        let point = (pair[0], pair[1]);
+        if !point.0.is_finite() || !point.1.is_finite() {
+            previous = None;
+            continue;
+        }
+        if let Some(last) = previous
+            && (point.0 - last.0).abs() <= 180.0
+        {
+            expanded.extend_from_slice(&[last.0, last.1, point.0, point.1]);
+        }
+        previous = Some(point);
+    }
+
+    expanded
 }
 
 #[derive(Copy, Clone)]

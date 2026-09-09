@@ -79,12 +79,15 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
         return invalid_vertex();
     }
 
-    let lon = lon_deg * 0.0174532925;
+    var lon = lon_deg * 0.0174532925;
     let lat = lat_deg * 0.0174532925;
     let lon_span = coastline_uniforms.lon_bounds.y - coastline_uniforms.lon_bounds.x;
     let lat_span = coastline_uniforms.lat_bounds.y - coastline_uniforms.lat_bounds.x;
     if (abs(lon_span) < 1e-6 || abs(lat_span) < 1e-6) {
         return invalid_vertex();
+    }
+    if (coastline_uniforms.lon_bounds.x >= 0.0 && lon < coastline_uniforms.lon_bounds.x) {
+        lon = lon + 6.2831853;
     }
 
     var cell_x: u32;

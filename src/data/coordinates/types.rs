@@ -129,6 +129,9 @@ impl CoordinateGrid {
     /// Returns the longitude bounds [lon_min, lon_max] in radians.
     pub fn lon_bounds_rad(&self) -> [f32; 2] {
         let (lon_min, lon_max) = self.lon_bounds_deg();
+        if (lon_max - lon_min).abs() >= 350.0 {
+            return [lon_min.to_radians(), lon_max.to_radians()];
+        }
         [
             normalize_lon_deg(lon_min).to_radians(),
             normalize_lon_deg(lon_max).to_radians(),
