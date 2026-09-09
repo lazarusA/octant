@@ -174,9 +174,7 @@ pub fn expand_coastline_line_list(vertices: &[f32]) -> Vec<f32> {
             previous = None;
             continue;
         }
-        if let Some(last) = previous
-            && (point.0 - last.0).abs() <= 180.0
-        {
+        if let Some(last) = previous {
             expanded.extend_from_slice(&[last.0, last.1, point.0, point.1]);
         }
         previous = Some(point);

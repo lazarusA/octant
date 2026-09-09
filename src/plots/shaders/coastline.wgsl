@@ -46,9 +46,14 @@ fn vs_main(@builtin(vertex_index) vid: u32) -> VertexOutput {
     let base = vid * 2u;
     var lon  = verts[base];
     let lat  = verts[base + 1u];
+    let pair_base = (vid / 2u) * 4u;
+    var other_lon = verts[pair_base];
+    let other_lat = verts[pair_base + 1u];
+    if ((vid % 2u) == 0u) {
+        other_lon = verts[pair_base + 2u];
+    }
 
-    // NaN sentinel: set w=0 → degenerate vertex, GPU clips the edge.
-    if (lon != lon || lat != lat) {   // IEEE NaN check
+    if (lon != lon || lat != lat || other_lon != other_lon || other_lat != other_lat) {
         out.pos   = vec4<f32>(0.0, 0.0, 0.0, 0.0);
         out.valid = 0.0;
         return out;
@@ -70,10 +75,16 @@ fn vs_main(@builtin(vertex_index) vid: u32) -> VertexOutput {
     if (u.lon_min >= 0.0 && lon < u.lon_min - 1.0) {
         lon = lon + 360.0;
     }
+    if (u.lon_min >= 0.0 && other_lon < u.lon_min - 1.0) {
+        other_lon = other_lon + 360.0;
+    }
 
-    // Discard vertices outside the dataset's geographic extent.
+    // Reject the complete pair if either endpoint is outside the domain.
     if (lon < u.lon_min - 0.1 || lon > u.lon_max + 0.1
-        || lat < u.lat_min - 0.1 || lat > u.lat_max + 0.1) {
+        || lat < u.lat_min - 0.1 || lat > u.lat_max + 0.1
+        || other_lon < u.lon_min - 0.1 || other_lon > u.lon_max + 0.1
+        || other_lat < u.lat_min - 0.1 || other_lat > u.lat_max + 0.1
+        || abs(other_lon - lon) > 180.0) {
         out.pos   = vec4<f32>(0.0, 0.0, 0.0, 0.0);
         out.valid = 0.0;
         return out;

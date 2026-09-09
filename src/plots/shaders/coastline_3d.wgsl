@@ -75,12 +75,20 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
     let lon_deg = coastline_verts[base];
     let lat_deg = coastline_verts[base + 1u];
-    if (lon_deg != lon_deg || lat_deg != lat_deg) {
+    let pair_base = (vertex_index / 2u) * 4u;
+    var other_lon_deg = coastline_verts[pair_base];
+    let other_lat_deg = coastline_verts[pair_base + 1u];
+    if ((vertex_index % 2u) == 0u) {
+        other_lon_deg = coastline_verts[pair_base + 2u];
+    }
+    if (lon_deg != lon_deg || lat_deg != lat_deg
+        || other_lon_deg != other_lon_deg || other_lat_deg != other_lat_deg) {
         return invalid_vertex();
     }
 
     var lon = lon_deg * 0.0174532925;
     let lat = lat_deg * 0.0174532925;
+    var other_lon = other_lon_deg * 0.0174532925;
     let lon_span = coastline_uniforms.lon_bounds.y - coastline_uniforms.lon_bounds.x;
     let lat_span = coastline_uniforms.lat_bounds.y - coastline_uniforms.lat_bounds.x;
     if (abs(lon_span) < 1e-6 || abs(lat_span) < 1e-6) {
@@ -89,8 +97,17 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     if (coastline_uniforms.lon_bounds.x >= 0.0 && lon < coastline_uniforms.lon_bounds.x) {
         lon = lon + 6.2831853;
     }
+    if (coastline_uniforms.lon_bounds.x >= 0.0
+        && other_lon < coastline_uniforms.lon_bounds.x) {
+        other_lon = other_lon + 6.2831853;
+    }
     if (lon < coastline_uniforms.lon_bounds.x || lon > coastline_uniforms.lon_bounds.y
-        || lat < coastline_uniforms.lat_bounds.x || lat > coastline_uniforms.lat_bounds.y) {
+        || lat < coastline_uniforms.lat_bounds.x || lat > coastline_uniforms.lat_bounds.y
+        || other_lon < coastline_uniforms.lon_bounds.x
+        || other_lon > coastline_uniforms.lon_bounds.y
+        || other_lat_deg * 0.0174532925 < coastline_uniforms.lat_bounds.x
+        || other_lat_deg * 0.0174532925 > coastline_uniforms.lat_bounds.y
+        || abs(other_lon - lon) > 3.14159265) {
         return invalid_vertex();
     }
 
