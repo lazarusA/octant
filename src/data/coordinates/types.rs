@@ -1,6 +1,5 @@
 //! Core coordinate grid representations and mapping functions.
 
-use super::detection::normalize_lon_deg;
 use super::search::find_coord_cell_1d;
 use std::sync::Arc;
 
@@ -129,13 +128,10 @@ impl CoordinateGrid {
     /// Returns the longitude bounds [lon_min, lon_max] in radians.
     pub fn lon_bounds_rad(&self) -> [f32; 2] {
         let (lon_min, lon_max) = self.lon_bounds_deg();
-        if (lon_max - lon_min).abs() >= 350.0 {
-            return [lon_min.to_radians(), lon_max.to_radians()];
-        }
-        [
-            normalize_lon_deg(lon_min).to_radians(),
-            normalize_lon_deg(lon_max).to_radians(),
-        ]
+        // Preserve the dataset's interval. Normalizing endpoints independently
+        // turns valid domains such as [0, 360] or [170, 190] into a zero or
+        // reversed span, which breaks geographic projection on regional grids.
+        [lon_min.to_radians(), lon_max.to_radians()]
     }
 
     /// Returns the latitude bounds [lat_min, lat_max] in radians.
