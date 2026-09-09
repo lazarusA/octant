@@ -1,3 +1,5 @@
+pub mod coastline;
+pub mod coastline_data;
 pub mod common;
 pub mod heatmap;
 pub mod line;
@@ -8,6 +10,8 @@ pub mod surface;
 pub mod traits;
 pub mod volume;
 
+pub use coastline::{CoastlineCallback, CoastlineRenderer};
+pub use coastline_data::{CoastlineBuffer, CoastlineLod, load_coastline};
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
 pub use line::{LineCallback, LineRenderer};

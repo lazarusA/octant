@@ -11,3 +11,5 @@ dist
 tests/data/
 *.nc
 .DS_Store
+# Generated coastline vertex buffers — run `cargo run --bin fetch_coastlines` to rebuild
+assets/coastlines/

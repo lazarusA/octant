@@ -4,8 +4,8 @@ use crate::app::OctantApp;
 use crate::data::matrix_data::MatrixData;
 use crate::data::volume_data::VolumeData;
 use crate::plots::{
-    LineRenderer, MatrixRenderer, PlotType, PointCloudRenderer, SphereRenderer, SurfaceRenderer,
-    VolumeRenderer,
+    CoastlineRenderer, LineRenderer, MatrixRenderer, PlotType, PointCloudRenderer,
+    SphereRenderer, SurfaceRenderer, VolumeRenderer,
 };
 use std::sync::Arc;
 
@@ -191,6 +191,20 @@ impl OctantApp {
             }
         }
 
+        // --- Coastline renderer: initialise once, upgrade LOD in background ---
+        if self.coastline_renderer.is_none() {
+            if let Some(wgpu_render_state) = &self.wgpu_render_state {
+                let buf = crate::plots::load_coastline(crate::plots::CoastlineLod::Lod110m);
+                let r = CoastlineRenderer::new(
+                    &wgpu_render_state.device,
+                    wgpu_render_state.target_format,
+                    buf.as_slice(),
+                );
+                self.coastline_renderer    = Some(Arc::new(r));
+                self.coastline_current_lod = crate::plots::CoastlineLod::Lod110m;
+            }
+        }
+
         self.matrix_data = Some(data);
     }
 
@@ -269,5 +283,37 @@ impl OctantApp {
         }
 
         self.volume_data = Some(data);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Coastline LOD reload (synchronous, user-initiated)
+// ---------------------------------------------------------------------------
+
+impl OctantApp {
+    /// Loads the requested coastline LOD from disk (or the embedded 110m static)
+    /// and immediately swaps it into the GPU vertex buffer.
+    ///
+    /// Call this when the user changes the LOD selector in Settings.
+    /// The data is at most ~3 MB so the disk read is imperceptible.
+    pub fn reload_coastline_lod(&mut self, lod: crate::plots::CoastlineLod) {
+        if lod == self.coastline_current_lod {
+            return;
+        }
+        let Some(renderer) = self.coastline_renderer.as_ref().map(Arc::clone) else {
+            return;
+        };
+        let Some(wgpu_state) = &self.wgpu_render_state else {
+            return;
+        };
+
+        let buf = crate::plots::load_coastline(lod);
+        renderer.swap_vertices(&wgpu_state.device, &wgpu_state.queue, buf.as_slice());
+        self.coastline_current_lod = lod;
+        log::info!(
+            "Coastline LOD changed to {:?} ({} vertex pairs)",
+            lod,
+            buf.as_slice().len() / 2
+        );
     }
 }

@@ -1,5 +1,7 @@
 //! Canvas paint callback assembly and active 2D renderer buffer updates.
 
+use std::sync::Arc;
+
 use crate::app::OctantApp;
 use crate::plots::PlotType;
 
@@ -330,5 +332,46 @@ impl OctantApp {
                 }
             }
         }
+
+        // --- Coastline overlay (Heatmap only) ---
+        if self.show_coastlines {
+            if let Some(cr) = self.coastline_renderer.as_ref().map(Arc::clone) {
+                // Theme-aware default: white in dark mode, dark gray in light mode
+                let line_color = self.coastline_color.unwrap_or_else(|| {
+                    if ui.visuals().dark_mode {
+                        [1.0, 1.0, 1.0, 0.75]
+                    } else {
+                        [0.15, 0.15, 0.15, 0.85]
+                    }
+                });
+
+                // Extract dataset geographic bounds from the active grid so the
+                // shader can project coastline lon/lat into the dataset's domain.
+                let (lon_min, lon_max, lat_min, lat_max) = self
+                    .matrix_data
+                    .as_ref()
+                    .map(|m| crate::plots::coastline_data::dataset_geo_bounds(&m.grid))
+                    .unwrap_or((-180.0, 180.0, 90.0, -90.0));
+
+                let cb = eframe::egui_wgpu::Callback::new_paint_callback(
+                    canvas_rect,
+                    crate::plots::CoastlineCallback {
+                        renderer:     cr,
+                        pan:          gpu_pan,
+                        zoom:         gpu_zoom,
+                        aspect_scale: gpu_aspect_scale,
+                        line_color,
+                        rect:         canvas_rect,
+                        lon_min,
+                        lon_max,
+                        lat_min,
+                        lat_max,
+                    },
+                );
+                ui.painter().add(cb);
+            }
+        }
+
+
     }
 }
