@@ -89,11 +89,17 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     if (coastline_uniforms.lon_bounds.x >= 0.0 && lon < coastline_uniforms.lon_bounds.x) {
         lon = lon + 6.2831853;
     }
+    if (lon < coastline_uniforms.lon_bounds.x || lon > coastline_uniforms.lon_bounds.y
+        || lat < coastline_uniforms.lat_bounds.x || lat > coastline_uniforms.lat_bounds.y) {
+        return invalid_vertex();
+    }
+
+    let query_lon_deg = lon * 57.2957795;
 
     var cell_x: u32;
     var cell_y: u32;
     if (coastline_uniforms.coord_mode == 2u) {
-        cell_x = find_coord_cell_x(lon_deg, coastline_uniforms.width);
+        cell_x = find_coord_cell_x(query_lon_deg, coastline_uniforms.width);
         cell_y = find_coord_cell_y(lat_deg, coastline_uniforms.height);
     } else {
         let normalized_x = clamp((lon - coastline_uniforms.lon_bounds.x) / lon_span, 0.0, 1.0);

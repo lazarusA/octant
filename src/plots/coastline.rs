@@ -16,6 +16,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 use wgpu::util::DeviceExt;
 
+use super::coastline_data::expand_coastline_line_list;
+
 // ---------------------------------------------------------------------------
 // Uniform buffer layout — must match coastline.wgsl `CoastlineUniforms`
 // ---------------------------------------------------------------------------
@@ -86,10 +88,11 @@ impl CoastlineRenderer {
             &initial_uniforms,
         );
 
-        let safe_verts: &[f32] = if verts.is_empty() {
+        let line_vertices = expand_coastline_line_list(verts);
+        let safe_verts: &[f32] = if line_vertices.is_empty() {
             &[0.0_f32, 0.0]
         } else {
-            verts
+            line_vertices.as_slice()
         };
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -138,7 +141,7 @@ impl CoastlineRenderer {
                 compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineStrip,
+                topology: wgpu::PrimitiveTopology::LineList,
                 cull_mode: None,
                 ..Default::default()
             },
@@ -201,20 +204,25 @@ impl CoastlineRenderer {
     /// allocation). Otherwise the buffer is reallocated and the bind group is
     /// recreated.
     pub fn swap_vertices(&self, device: &wgpu::Device, queue: &wgpu::Queue, verts: &[f32]) {
-        if verts.is_empty() {
+        let line_vertices = expand_coastline_line_list(verts);
+        if line_vertices.is_empty() {
             return;
         }
-        let needed = std::mem::size_of_val(verts) as u64;
+        let needed = std::mem::size_of_val(line_vertices.as_slice()) as u64;
         let current_capacity = self.gpu.read().map(|g| g.vertex_buffer.size()).unwrap_or(0);
 
         if needed <= current_capacity {
             if let Ok(guard) = self.gpu.read() {
-                queue.write_buffer(&guard.vertex_buffer, 0, bytemuck::cast_slice(verts));
+                queue.write_buffer(
+                    &guard.vertex_buffer,
+                    0,
+                    bytemuck::cast_slice(line_vertices.as_slice()),
+                );
             }
         } else {
             let new_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Coastline Vertex Buffer (Resized)"),
-                contents: bytemuck::cast_slice(verts),
+                contents: bytemuck::cast_slice(line_vertices.as_slice()),
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             });
             let new_bg = super::common::create_uniform_storage_bind_group(
@@ -231,7 +239,7 @@ impl CoastlineRenderer {
         }
 
         self.vertex_count
-            .store((verts.len() / 2) as u32, Ordering::Relaxed);
+            .store((line_vertices.len() / 2) as u32, Ordering::Relaxed);
     }
 }
 

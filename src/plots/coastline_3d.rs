@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 use wgpu::util::DeviceExt;
 
+use super::coastline_data::expand_coastline_line_list;
 use super::common::safe_write_buffer;
 
 #[repr(C)]
@@ -300,26 +301,6 @@ impl Coastline3DRenderer {
 ///
 /// NaN separators cannot restart a GPU line strip, and antimeridian jumps
 /// would otherwise draw a segment across the entire map.
-fn expand_coastline_line_list(vertices: &[f32]) -> Vec<f32> {
-    let mut expanded = Vec::with_capacity(vertices.len().saturating_mul(2));
-    let mut previous: Option<(f32, f32)> = None;
-
-    for pair in vertices.chunks_exact(2) {
-        let point = (pair[0], pair[1]);
-        if !point.0.is_finite() || !point.1.is_finite() {
-            previous = None;
-            continue;
-        }
-        if let Some(last) = previous
-            && (point.0 - last.0).abs() <= 180.0
-        {
-            expanded.extend_from_slice(&[last.0, last.1, point.0, point.1]);
-        }
-        previous = Some(point);
-    }
-
-    expanded
-}
 
 #[derive(Copy, Clone)]
 pub struct Coastline3DParams {
