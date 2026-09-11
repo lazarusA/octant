@@ -200,9 +200,12 @@ impl OctantApp {
 
             if let Some(dim_n) = var.dimension_names.get(dim_idx) {
                 name = dim_n.clone();
-                if let Some(coord_bounds) =
-                    meta.get_coord_bounds_for_range(dim_n, dim_size, (start_p, end_p))
-                {
+                if let Some(coord_bounds) = meta.get_coord_bounds_for_var_range(
+                    Some(&var.name),
+                    dim_n,
+                    dim_size,
+                    (start_p, end_p),
+                ) {
                     bounds = coord_bounds;
                 }
             }

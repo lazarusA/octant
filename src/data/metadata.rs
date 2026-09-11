@@ -11,31 +11,49 @@ pub struct DatasetMetadata {
 }
 
 impl DatasetMetadata {
-    /// Returns numerical min/max coordinate bounds for a dimension name if available.
-    pub fn get_coord_bounds(&self, dim_name: &str) -> Option<(f64, f64)> {
+    /// Look up the dimension coordinate slice for a given variable and dimension name,
+    /// checking scoped `{var_name}/{dim_name}` first before falling back to `{dim_name}`.
+    pub fn get_dim_coords(&self, var_name: Option<&str>, dim_name: &str) -> Option<&[String]> {
         let clean = dim_name.trim().to_lowercase();
-        let coords = self
-            .dimension_coordinates
+        if let Some(v) = var_name {
+            let scoped = format!("{}/{}", v.trim().to_lowercase(), clean);
+            if let Some(coords) = self.dimension_coordinates.get(&scoped) {
+                return Some(coords.as_slice());
+            }
+        }
+        self.dimension_coordinates
             .get(&clean)
-            .or_else(|| self.dimension_coordinates.get(dim_name))?;
+            .or_else(|| self.dimension_coordinates.get(dim_name))
+            .map(|c| c.as_slice())
+    }
+
+    /// Returns numerical min/max coordinate bounds for a variable dimension name if available.
+    pub fn get_coord_bounds_for_var(
+        &self,
+        var_name: Option<&str>,
+        dim_name: &str,
+    ) -> Option<(f64, f64)> {
+        let coords = self.get_dim_coords(var_name, dim_name)?;
         let (first, last) = (coords.first()?, coords.last()?);
         let f_v: f64 = first.parse().ok()?;
         let l_v: f64 = last.parse().ok()?;
         Some((f_v.min(l_v), f_v.max(l_v)))
     }
 
-    /// Returns numerical coordinate bounds for a subrange `(start_idx, end_idx)` within `dim_size` for `dim_name`.
-    pub fn get_coord_bounds_for_range(
+    /// Returns numerical min/max coordinate bounds for a dimension name if available.
+    pub fn get_coord_bounds(&self, dim_name: &str) -> Option<(f64, f64)> {
+        self.get_coord_bounds_for_var(None, dim_name)
+    }
+
+    /// Returns numerical coordinate bounds for a subrange `(start_idx, end_idx)` within `dim_size` for `dim_name` of `var_name`.
+    pub fn get_coord_bounds_for_var_range(
         &self,
+        var_name: Option<&str>,
         dim_name: &str,
         dim_size: usize,
         range: (usize, usize),
     ) -> Option<(f64, f64)> {
-        let clean = dim_name.trim().to_lowercase();
-        let coords = self
-            .dimension_coordinates
-            .get(&clean)
-            .or_else(|| self.dimension_coordinates.get(dim_name))?;
+        let coords = self.get_dim_coords(var_name, dim_name)?;
 
         let (start, end) = (range.0.min(range.1), range.0.max(range.1));
         let total_len = dim_size.max(coords.len()).max(1);
@@ -61,6 +79,16 @@ impl DatasetMetadata {
         let val_end = first + t_end * (last - first);
 
         Some((val_start.min(val_end), val_start.max(val_end)))
+    }
+
+    /// Returns numerical coordinate bounds for a subrange `(start_idx, end_idx)` within `dim_size` for `dim_name`.
+    pub fn get_coord_bounds_for_range(
+        &self,
+        dim_name: &str,
+        dim_size: usize,
+        range: (usize, usize),
+    ) -> Option<(f64, f64)> {
+        self.get_coord_bounds_for_var_range(None, dim_name, dim_size, range)
     }
 }
 

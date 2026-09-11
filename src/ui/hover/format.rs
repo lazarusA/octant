@@ -147,11 +147,7 @@ pub fn format_dimension_coord(
     });
 
     if let Some(m) = meta {
-        if let Some(coords) = m
-            .dimension_coordinates
-            .get(&clean)
-            .or_else(|| m.dimension_coordinates.get(dim_name))
-        {
+        if let Some(coords) = m.get_dim_coords(var.map(|v| v.name.as_str()), dim_name) {
             if coords.len() == total_len
                 && let Some(c) = coords.get(idx)
                 && !c.trim().is_empty()
@@ -238,7 +234,9 @@ pub fn format_dimension_coord(
             }
         }
 
-        if let Some((min_b, max_b)) = m.get_coord_bounds(dim_name) {
+        if let Some((min_b, max_b)) =
+            m.get_coord_bounds_for_var(var.map(|v| v.name.as_str()), dim_name)
+        {
             if is_time_dim {
                 let time_val = crate::utils::units::format_axis_value(
                     idx,
