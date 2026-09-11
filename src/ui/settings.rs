@@ -258,7 +258,6 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         }
         PlotType::Sphere => {
-            show_coastline_controls(app, ui);
             let modes: [(u32, &str); 4] = [(0, "Smooth"), (1, "Bumpy"), (2, "Steps"), (3, "Voxel")];
 
             ui.horizontal(|ui| {
@@ -280,9 +279,10 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                         .text("Height"),
                 );
             }
+
+            show_coastline_controls(app, ui);
         }
         PlotType::Surface => {
-            show_coastline_controls(app, ui);
             let modes: [(u32, &str); 3] = [(0, "Bumpy"), (1, "Steps"), (2, "Voxel")];
 
             ui.horizontal(|ui| {
@@ -301,6 +301,8 @@ fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             ui.add(
                 egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0).text("Height"),
             );
+
+            show_coastline_controls(app, ui);
         }
         PlotType::PointCloud => {
             ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("Size"));
