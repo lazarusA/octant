@@ -347,6 +347,8 @@ pub struct OctantApp {
     pub coastline_rx: Option<crate::plots::CoastlineReceiver>,
     /// Whether a higher LOD coastline is currently downloading.
     pub coastline_is_loading: bool,
+    /// Whether to clip coastlines strictly to the spatial boundary of the active dataset.
+    pub coastline_crop_to_data_domain: bool,
 }
 
 impl Default for OctantApp {
@@ -490,6 +492,7 @@ impl Default for OctantApp {
             coastline_current_lod: crate::plots::CoastlineLod::Lod110m,
             coastline_rx: None,
             coastline_is_loading: false,
+            coastline_crop_to_data_domain: true,
         }
     }
 }

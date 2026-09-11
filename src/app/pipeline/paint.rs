@@ -396,6 +396,7 @@ impl OctantApp {
                             renderer: cr,
                             pan: gpu_pan,
                             zoom: gpu_zoom,
+                            crop_to_domain: self.coastline_crop_to_data_domain,
                             aspect_scale: gpu_aspect_scale,
                             line_color,
                             rect: canvas_rect,
@@ -442,6 +443,11 @@ impl OctantApp {
                             plot_kind,
                             plot_mode: mode,
                             coord_mode: mesh_params.coord_mode,
+                            crop_to_domain: if self.coastline_crop_to_data_domain {
+                                1
+                            } else {
+                                0
+                            },
                             lon_bounds: mesh_params.lon_bounds,
                             lat_bounds: mesh_params.lat_bounds,
                             color: line_color,

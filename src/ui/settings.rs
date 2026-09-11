@@ -156,6 +156,12 @@ fn show_coastline_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
             }
         });
+
+        ui.checkbox(
+            &mut app.coastline_crop_to_data_domain,
+            "Crop to data domain",
+        )
+        .on_hover_text("Clip coastlines strictly to the spatial boundary of the active dataset.");
     }
 }
 

@@ -9,7 +9,8 @@ struct Coastline3DUniforms {
     width: u32,
     height: u32,
     coord_mode: u32,
-    _pad_bounds: vec2<u32>,
+    crop_to_domain: u32,
+    _pad_crop: u32,
     lon_bounds: vec2<f32>,
     lat_bounds: vec2<f32>,
     color: vec4<f32>,
@@ -31,6 +32,7 @@ var<storage, read> coastline_verts: array<f32>;
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) valid: f32,
+    @location(1) uv: vec2<f32>,
 };
 
 fn normalized_height(value: f32) -> f32 {
@@ -61,105 +63,128 @@ fn radial_height(value: f32) -> f32 {
 
 fn invalid_vertex() -> VertexOutput {
     var out: VertexOutput;
-    out.position = vec4<f32>(0.0, 0.0, 2.0, 1.0);
+    out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
     out.valid = 0.0;
+    out.uv = vec2<f32>(0.0, 0.0);
     return out;
 }
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
-    let base = vertex_index * 2u;
-    if (base + 1u >= arrayLength(&coastline_verts)) {
-        return invalid_vertex();
-    }
-
-    let lon_deg = coastline_verts[base];
-    let lat_deg = coastline_verts[base + 1u];
     let pair_base = (vertex_index / 2u) * 4u;
-    var other_lon_deg = coastline_verts[pair_base];
-    let other_lat_deg = coastline_verts[pair_base + 1u];
-    if ((vertex_index % 2u) == 0u) {
-        other_lon_deg = coastline_verts[pair_base + 2u];
-    }
-    if (lon_deg != lon_deg || lat_deg != lat_deg
-        || other_lon_deg != other_lon_deg || other_lat_deg != other_lat_deg) {
+    if (pair_base + 3u >= arrayLength(&coastline_verts)) {
         return invalid_vertex();
     }
 
-    var lon = lon_deg * 0.0174532925;
-    let lat = lat_deg * 0.0174532925;
-    var other_lon = other_lon_deg * 0.0174532925;
+    var p0_lon_deg = coastline_verts[pair_base];
+    let p0_lat_deg = coastline_verts[pair_base + 1u];
+    var p1_lon_deg = coastline_verts[pair_base + 2u];
+    let p1_lat_deg = coastline_verts[pair_base + 3u];
+
+    if (p0_lon_deg != p0_lon_deg || p0_lat_deg != p0_lat_deg
+        || p1_lon_deg != p1_lon_deg || p1_lat_deg != p1_lat_deg) {
+        return invalid_vertex();
+    }
+
     let lon_span = coastline_uniforms.lon_bounds.y - coastline_uniforms.lon_bounds.x;
     let lat_span = coastline_uniforms.lat_bounds.y - coastline_uniforms.lat_bounds.x;
     if (abs(lon_span) < 1e-6 || abs(lat_span) < 1e-6) {
         return invalid_vertex();
     }
-    if (coastline_uniforms.lon_bounds.x >= 0.0 && lon < coastline_uniforms.lon_bounds.x) {
-        lon = lon + 6.2831853;
-    }
-    if (coastline_uniforms.lon_bounds.x >= 0.0
-        && other_lon < coastline_uniforms.lon_bounds.x) {
-        other_lon = other_lon + 6.2831853;
-    }
-    if (lon < coastline_uniforms.lon_bounds.x || lon > coastline_uniforms.lon_bounds.y
-        || lat < coastline_uniforms.lat_bounds.x || lat > coastline_uniforms.lat_bounds.y
-        || other_lon < coastline_uniforms.lon_bounds.x
-        || other_lon > coastline_uniforms.lon_bounds.y
-        || other_lat_deg * 0.0174532925 < coastline_uniforms.lat_bounds.x
-        || other_lat_deg * 0.0174532925 > coastline_uniforms.lat_bounds.y
-        || abs(other_lon - lon) > 3.14159265) {
-        return invalid_vertex();
-    }
 
-    let query_lon_deg = lon * 57.2957795;
-
-    var cell_x: u32;
-    var cell_y: u32;
-    if (coastline_uniforms.coord_mode == 2u) {
-        cell_x = find_coord_cell_x(query_lon_deg, coastline_uniforms.width);
-        cell_y = find_coord_cell_y(lat_deg, coastline_uniforms.height);
+    // Wrap longitude into [0, 360] ONLY if dataset domain genuinely extends beyond 180° (lon_bounds.y > π)
+    let is_0_to_360 = (coastline_uniforms.lon_bounds.y > 3.14159265);
+    if (is_0_to_360) {
+        if (p0_lon_deg < 0.0) {
+            p0_lon_deg = p0_lon_deg + 360.0;
+        }
+        if (p1_lon_deg < 0.0) {
+            p1_lon_deg = p1_lon_deg + 360.0;
+        }
+        if (abs(p1_lon_deg - p0_lon_deg) > 180.0) {
+            return invalid_vertex();
+        }
     } else {
-        let normalized_x = clamp((lon - coastline_uniforms.lon_bounds.x) / lon_span, 0.0, 1.0);
-        let normalized_y = clamp((coastline_uniforms.lat_bounds.y - lat) / lat_span, 0.0, 1.0);
-        cell_x = min(u32(normalized_x * f32(max(coastline_uniforms.width, 1u))), max(coastline_uniforms.width, 1u) - 1u);
-        cell_y = min(u32(normalized_y * f32(max(coastline_uniforms.height, 1u))), max(coastline_uniforms.height, 1u) - 1u);
+        if (abs(p1_lon_deg - p0_lon_deg) > 180.0) {
+            return invalid_vertex();
+        }
     }
 
-    let data_len = arrayLength(&data_buffer);
-    if (data_len == 0u) {
-        return invalid_vertex();
+    var cur_lon_deg = p0_lon_deg;
+    var cur_lat_deg = p0_lat_deg;
+    if ((vertex_index % 2u) == 1u) {
+        cur_lon_deg = p1_lon_deg;
+        cur_lat_deg = p1_lat_deg;
     }
-    let data_idx = min(cell_y * max(coastline_uniforms.width, 1u) + cell_x, data_len - 1u);
-    let value = data_buffer[data_idx];
+
+    let cur_lon = cur_lon_deg * 0.0174532925;
+    let cur_lat = cur_lat_deg * 0.0174532925;
+
+    // Domain UV coordinates [0, 1] relative to dataset geographic bounds
+    let uv_x = (cur_lon - coastline_uniforms.lon_bounds.x) / lon_span;
+    let uv_y = (cur_lat - coastline_uniforms.lat_bounds.x) / lat_span;
+
+    let in_bounds = (uv_x >= 0.0 && uv_x <= 1.0 && uv_y >= 0.0 && uv_y <= 1.0);
+
+    // Height / displacement sampling from dataset buffer if within domain bounds
+    var value = 0.0;
+    if (in_bounds) {
+        var cell_x: u32;
+        var cell_y: u32;
+        if (coastline_uniforms.coord_mode == 2u) {
+            cell_x = find_coord_cell_x(cur_lon_deg, coastline_uniforms.width);
+            cell_y = find_coord_cell_y(cur_lat_deg, coastline_uniforms.height);
+        } else {
+            let norm_y = clamp((coastline_uniforms.lat_bounds.y - cur_lat) / lat_span, 0.0, 1.0);
+            cell_x = min(u32(clamp(uv_x, 0.0, 1.0) * f32(max(coastline_uniforms.width, 1u))), max(coastline_uniforms.width, 1u) - 1u);
+            cell_y = min(u32(norm_y * f32(max(coastline_uniforms.height, 1u))), max(coastline_uniforms.height, 1u) - 1u);
+        }
+
+        let data_len = arrayLength(&data_buffer);
+        if (data_len > 0u) {
+            let data_idx = min(cell_y * max(coastline_uniforms.width, 1u) + cell_x, data_len - 1u);
+            value = data_buffer[data_idx];
+        }
+    }
 
     var world_pos: vec3<f32>;
+    var min_dist: f32 = 0.1;
+
     if (coastline_uniforms.plot_kind == 1u) {
+        // --- Sphere Mode ---
+        min_dist = 1.1;
         var radius = 1.002;
-        if (coastline_uniforms.plot_mode > 0u) {
+        if (coastline_uniforms.plot_mode > 0u && in_bounds) {
             let dr = radial_height(value);
             radius = 1.002 + dr;
             if (coastline_uniforms.plot_mode == 3u) {
                 radius = max(1.002, radius);
             }
         }
-        world_pos = lon_lat_to_cartesian(radius, lon, lat);
+        world_pos = lon_lat_to_cartesian(radius, cur_lon, cur_lat);
     } else {
+        // --- Surface / Block Mode ---
+        min_dist = 0.1;
         let data_aspect = max(f32(max(coastline_uniforms.width, 1u)) / f32(max(coastline_uniforms.height, 1u)), 0.1);
-        let normalized_x = clamp((lon - coastline_uniforms.lon_bounds.x) / lon_span, 0.0, 1.0);
-        let normalized_y = clamp((coastline_uniforms.lat_bounds.y - lat) / lat_span, 0.0, 1.0);
+        let normalized_x = uv_x;
+        let normalized_y = (coastline_uniforms.lat_bounds.y - cur_lat) / lat_span;
         let world_x = -data_aspect + normalized_x * 2.0 * data_aspect;
         let world_z = -1.0 + normalized_y * 2.0;
-        var height = surface_height(value);
-        if (coastline_uniforms.plot_mode == 2u) {
-            height = max(0.0, height);
+        var height = 0.0;
+        if (in_bounds) {
+            height = surface_height(value);
+            if (coastline_uniforms.plot_mode == 2u) {
+                height = max(0.0, height);
+            }
         }
         world_pos = vec3<f32>(world_x, height + 0.003, world_z);
     }
 
     let rotated = rotate_camera_yx(world_pos, coastline_uniforms.rotation_y, coastline_uniforms.rotation_x);
     var out: VertexOutput;
-    out.position = project_perspective(rotated, coastline_uniforms.aspect_ratio, coastline_uniforms.zoom, 1.6, 0.1);
+    out.position = project_perspective(rotated, coastline_uniforms.aspect_ratio, coastline_uniforms.zoom, 1.6, min_dist);
     out.valid = 1.0;
+    out.uv = vec2<f32>(uv_x, uv_y);
     return out;
 }
 
@@ -167,6 +192,11 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if (in.valid < 0.5) {
         discard;
+    }
+    if (coastline_uniforms.crop_to_domain != 0u) {
+        if (in.uv.x < 0.0 || in.uv.x > 1.0 || in.uv.y < 0.0 || in.uv.y > 1.0) {
+            discard;
+        }
     }
     return coastline_uniforms.color;
 }

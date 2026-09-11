@@ -4,17 +4,17 @@
 // Coordinates are WGS-84 degrees (lon -180..180 / lat -90..90).
 
 struct CoastlineUniforms {
-    pan:          vec2<f32>,
-    zoom:         f32,
-    _pad0:        u32,
-    aspect_scale: vec2<f32>,
-    _pad1:        u32,
-    _pad2:        u32,
-    line_color:   vec4<f32>,
-    lon_min:      f32,
-    lon_max:      f32,
-    lat_min:      f32,
-    lat_max:      f32,
+    pan:            vec2<f32>,
+    zoom:           f32,
+    crop_to_domain: u32,
+    aspect_scale:   vec2<f32>,
+    _pad1:          u32,
+    _pad2:          u32,
+    line_color:     vec4<f32>,
+    lon_min:        f32,
+    lon_max:        f32,
+    lat_min:        f32,
+    lat_max:        f32,
 };
 
 @group(0) @binding(0)
@@ -26,12 +26,14 @@ var<storage, read> verts: array<f32>;
 struct VertexOutput {
     @builtin(position) pos: vec4<f32>,
     @location(0)       valid: f32,
+    @location(1)       uv: vec2<f32>,
 };
 
 fn invalid_vertex() -> VertexOutput {
     var out: VertexOutput;
     out.pos = vec4<f32>(0.0, 0.0, 0.0, 0.0);
     out.valid = 0.0;
+    out.uv = vec2<f32>(0.0, 0.0);
     return out;
 }
 
@@ -85,15 +87,20 @@ fn vs_main(@builtin(vertex_index) vid: u32) -> VertexOutput {
         cur_lat = p1_lat;
     }
 
+    // Normalized data domain coordinates [0, 1] across [lon_min..lon_max, lat_min..lat_max]
+    let uv_x = (cur_lon - u.lon_min) / lon_span;
+    let uv_y = (cur_lat - u.lat_min) / lat_span;
+
     // Map lon/lat to normalized device coordinates [-1, 1]
-    let nx = (cur_lon - u.lon_min) / lon_span * 2.0 - 1.0;
-    let ny = (cur_lat - u.lat_min) / lat_span * 2.0 - 1.0;
+    let nx = uv_x * 2.0 - 1.0;
+    let ny = uv_y * 2.0 - 1.0;
 
     let ndc = vec2<f32>(nx, ny) * u.aspect_scale * u.zoom + u.pan;
 
     var out: VertexOutput;
     out.pos = vec4<f32>(ndc, 0.0, 1.0);
     out.valid = 1.0;
+    out.uv = vec2<f32>(uv_x, uv_y);
     return out;
 }
 
@@ -101,6 +108,11 @@ fn vs_main(@builtin(vertex_index) vid: u32) -> VertexOutput {
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if (in.valid < 0.5) {
         discard;
+    }
+    if (u.crop_to_domain != 0u) {
+        if (in.uv.x < 0.0 || in.uv.x > 1.0 || in.uv.y < 0.0 || in.uv.y > 1.0) {
+            discard;
+        }
     }
     return u.line_color;
 }
