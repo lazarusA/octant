@@ -76,7 +76,8 @@ fn render_header(ui: &mut egui::Ui, total_count: usize, should_close: &mut bool)
         ui.icon_colored(Icon::Catalog, 16.0, ui.visuals().strong_text_color());
         ui.heading("Dataset Catalog");
 
-        let badge_text = format!("{} stores", total_count);
+        let mut badge_buf = [0u8; 32];
+        let badge_text = format_count(&mut badge_buf, total_count, " stores");
         ui.label(
             egui::RichText::new(badge_text)
                 .small()
@@ -141,7 +142,7 @@ fn render_search_and_filters(
 
     ui.add_space(4.0);
 
-    // Filter categories row
+    // Filter categories row with stack-formatted labels
     let spacing = if is_mobile {
         egui::vec2(4.0, 4.0)
     } else {
@@ -151,25 +152,30 @@ fn render_search_and_filters(
         ui.spacing_mut().item_spacing = spacing;
         ui.label(egui::RichText::new("Category:").strong().small());
 
+        let mut buf_all = [0u8; 32];
+        let mut buf_zarr = [0u8; 32];
+        let mut buf_ice = [0u8; 32];
+        let mut buf_proc = [0u8; 32];
+
         ui.selectable_value(
             &mut app.catalog_category_filter,
             CatalogCategoryFilter::All,
-            format!("All ({total_count})"),
+            format_tab(&mut buf_all, "All", total_count),
         );
         ui.selectable_value(
             &mut app.catalog_category_filter,
             CatalogCategoryFilter::Zarr,
-            format!("Zarr ({zarr_count})"),
+            format_tab(&mut buf_zarr, "Zarr", zarr_count),
         );
         ui.selectable_value(
             &mut app.catalog_category_filter,
             CatalogCategoryFilter::Icechunk,
-            format!("Icechunk ({icechunk_count})"),
+            format_tab(&mut buf_ice, "Icechunk", icechunk_count),
         );
         ui.selectable_value(
             &mut app.catalog_category_filter,
             CatalogCategoryFilter::Procedural,
-            format!("Procedural ({procedural_count})"),
+            format_tab(&mut buf_proc, "Procedural", procedural_count),
         );
     });
 }
@@ -183,20 +189,22 @@ fn render_entries_list(
     let query = app.catalog_search_query.trim();
     let entries = get_catalog_entries(app.catalog_category_filter);
 
-    let filtered_entries: Vec<_> = entries
-        .into_iter()
-        .filter(|e| {
-            if query.is_empty() {
-                return true;
-            }
-            contains_ignore_ascii_case(e.key, query)
-                || contains_ignore_ascii_case(e.label, query)
-                || contains_ignore_ascii_case(e.subtitle, query)
-                || contains_ignore_ascii_case(e.store, query)
-        })
-        .collect();
+    let is_match = |e: &&crate::catalog::CatalogEntry| -> bool {
+        if query.is_empty() {
+            return true;
+        }
+        contains_ignore_ascii_case(e.key, query)
+            || contains_ignore_ascii_case(e.label, query)
+            || contains_ignore_ascii_case(e.subtitle, query)
+            || contains_ignore_ascii_case(e.store, query)
+    };
 
-    if filtered_entries.is_empty() {
+    let mut match_count = 0;
+    for _ in entries.iter().copied().filter(is_match) {
+        match_count += 1;
+    }
+
+    if match_count == 0 {
         ui.vertical_centered(|ui| {
             ui.add_space(32.0);
             ui.icon_colored(Icon::Info, 18.0, ui.visuals().weak_text_color());
@@ -210,41 +218,57 @@ fn render_entries_list(
         return;
     }
 
+    let mut to_load: Option<(&str, StoreKind)> = None;
+
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
         .show(ui, |ui| {
-            for entry in filtered_entries {
+            for entry in entries.iter().copied().filter(is_match) {
                 let trimmed_url = entry.store.trim();
-                render_entry_card(app, ui, entry, trimmed_url, is_mobile, should_close);
+                if render_entry_card(ui, entry, trimmed_url, is_mobile) {
+                    to_load = Some((trimmed_url, entry.store_kind));
+                }
                 ui.add_space(6.0);
             }
         });
+
+    if let Some((url, kind)) = to_load {
+        app.submit_or_activate_source(url, Some(kind));
+        *should_close = true;
+    }
 }
 
 fn render_entry_card(
-    app: &mut OctantApp,
     ui: &mut egui::Ui,
     entry: &crate::catalog::CatalogEntry,
     trimmed_url: &str,
     is_mobile: bool,
-    should_close: &mut bool,
-) {
-    let (badge_icon, badge_name) = match entry.store_kind {
-        StoreKind::RemoteZarr => (Icon::Globe, "Zarr"),
-        StoreKind::RemoteIcechunk => (Icon::Icechunk, "Icechunk"),
-        StoreKind::ProceduralVolume4D => (Icon::PlotVolume, "4D Volume"),
-        StoreKind::ProceduralRandom => (Icon::PlotPlane, "2D Matrix"),
-        _ => (Icon::Folder, "Store"),
+) -> bool {
+    let (badge_icon, badge_bracket, badge_color) = match entry.store_kind {
+        StoreKind::RemoteZarr => (Icon::Globe, "[Zarr]", ui.visuals().selection.bg_fill),
+        StoreKind::RemoteIcechunk => (
+            Icon::Icechunk,
+            "[Icechunk]",
+            ui.visuals().widgets.active.bg_fill,
+        ),
+        StoreKind::ProceduralVolume4D => (
+            Icon::PlotVolume,
+            "[4D Volume]",
+            ui.visuals().widgets.hovered.bg_fill,
+        ),
+        StoreKind::ProceduralRandom => (
+            Icon::PlotPlane,
+            "[2D Matrix]",
+            ui.visuals().widgets.hovered.bg_fill,
+        ),
+        _ => (
+            Icon::Folder,
+            "[Store]",
+            ui.visuals().widgets.noninteractive.fg_stroke.color,
+        ),
     };
 
-    let badge_color = match entry.store_kind {
-        StoreKind::RemoteZarr => ui.visuals().selection.bg_fill,
-        StoreKind::RemoteIcechunk => ui.visuals().widgets.active.bg_fill,
-        StoreKind::ProceduralVolume4D | StoreKind::ProceduralRandom => {
-            ui.visuals().widgets.hovered.bg_fill
-        }
-        _ => ui.visuals().widgets.noninteractive.fg_stroke.color,
-    };
+    let mut clicked_load = false;
 
     egui::Frame::default()
         .fill(ui.visuals().faint_bg_color)
@@ -259,7 +283,7 @@ fn render_entry_card(
                 ui.horizontal(|ui| {
                     ui.icon_colored(badge_icon, 13.0, badge_color);
                     ui.label(
-                        egui::RichText::new(format!("[{badge_name}]"))
+                        egui::RichText::new(badge_bracket)
                             .strong()
                             .small()
                             .color(badge_color),
@@ -287,15 +311,14 @@ fn render_entry_card(
                     .icon_button(Icon::DropTray, "Select & Load Dataset")
                     .clicked()
                 {
-                    app.submit_or_activate_source(trimmed_url, Some(entry.store_kind));
-                    *should_close = true;
+                    clicked_load = true;
                 }
             } else {
                 // Desktop layout: Side-by-side header with right-aligned button
                 ui.horizontal(|ui| {
                     ui.icon_colored(badge_icon, 13.0, badge_color);
                     ui.label(
-                        egui::RichText::new(format!("[{badge_name}]"))
+                        egui::RichText::new(badge_bracket)
                             .strong()
                             .small()
                             .color(badge_color),
@@ -304,8 +327,7 @@ fn render_entry_card(
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.icon_button(Icon::DropTray, "Select & Load").clicked() {
-                            app.submit_or_activate_source(trimmed_url, Some(entry.store_kind));
-                            *should_close = true;
+                            clicked_load = true;
                         }
                     });
                 });
@@ -326,6 +348,24 @@ fn render_entry_card(
                 );
             }
         });
+
+    clicked_load
+}
+
+fn format_count<'a>(buf: &'a mut [u8; 32], count: usize, suffix: &str) -> &'a str {
+    use std::io::Write;
+    let mut cursor = std::io::Cursor::new(&mut buf[..]);
+    let _ = write!(cursor, "{}{}", count, suffix);
+    let len = cursor.position() as usize;
+    std::str::from_utf8(&buf[..len]).unwrap_or("")
+}
+
+fn format_tab<'a>(buf: &'a mut [u8; 32], label: &str, count: usize) -> &'a str {
+    use std::io::Write;
+    let mut cursor = std::io::Cursor::new(&mut buf[..]);
+    let _ = write!(cursor, "{} ({})", label, count);
+    let len = cursor.position() as usize;
+    std::str::from_utf8(&buf[..len]).unwrap_or("")
 }
 
 #[inline]

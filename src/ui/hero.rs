@@ -204,79 +204,66 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
 
                 if app.is_loading || app.hero_state.loading {
-                    ui.add_space(16.0);
                     let label = if !app.hero_state.source_label.is_empty() {
                         format!("loading — {}", app.hero_state.source_label)
                     } else {
                         "loading...".to_string()
                     };
-                    let font_id = egui::FontId::monospace(11.0);
-                    let max_text_w = (ui.available_width() - 48.0).max(60.0);
-                    let galley = ui.painter().layout(
-                        label,
-                        font_id,
+                    render_status_pill(
+                        ui,
+                        crate::ui::icons::Icon::Hourglass,
                         ui.visuals().weak_text_color(),
-                        max_text_w,
+                        &label,
+                        ui.visuals().weak_text_color(),
                     );
-                    let icon_size = 12.0;
-                    let gap = 6.0;
-                    let total_w = icon_size + gap + galley.size().x;
-                    let pad = ((ui.available_width() - total_w) * 0.5).max(0.0);
-
-                    ui.horizontal(|ui| {
-                        if pad > 0.0 {
-                            ui.add_space(pad);
-                        }
-                        crate::ui::icons::UiIconExt::icon_colored(
-                            ui,
-                            crate::ui::icons::Icon::Hourglass,
-                            icon_size,
-                            ui.visuals().weak_text_color(),
-                        );
-                        ui.add_space(gap);
-                        ui.label(
-                            egui::RichText::new(galley.text())
-                                .monospace()
-                                .size(11.0)
-                                .color(ui.visuals().weak_text_color()),
-                        );
-                    });
                 } else if app.hero_state.loaded && !app.hero_state.source_label.is_empty() {
-                    ui.add_space(16.0);
                     let label = format!("loaded — {}", app.hero_state.source_label);
-                    let font_id = egui::FontId::monospace(11.0);
-                    let max_text_w = (ui.available_width() - 48.0).max(60.0);
-                    let galley =
-                        ui.painter()
-                            .layout(label, font_id, ui.visuals().text_color(), max_text_w);
-                    let icon_size = 12.0;
-                    let gap = 6.0;
-                    let total_w = icon_size + gap + galley.size().x;
-                    let pad = ((ui.available_width() - total_w) * 0.5).max(0.0);
-
-                    ui.horizontal(|ui| {
-                        if pad > 0.0 {
-                            ui.add_space(pad);
-                        }
-                        crate::ui::icons::UiIconExt::icon_colored(
-                            ui,
-                            crate::ui::icons::Icon::Check,
-                            icon_size,
-                            ui.visuals().selection.bg_fill,
-                        );
-                        ui.add_space(gap);
-                        ui.label(
-                            egui::RichText::new(galley.text())
-                                .monospace()
-                                .size(11.0)
-                                .color(ui.visuals().text_color()),
-                        );
-                    });
+                    render_status_pill(
+                        ui,
+                        crate::ui::icons::Icon::Check,
+                        ui.visuals().selection.bg_fill,
+                        &label,
+                        ui.visuals().text_color(),
+                    );
                 }
 
                 ui.add_space(16.0);
             });
         });
+}
+
+fn render_status_pill(
+    ui: &mut egui::Ui,
+    icon: crate::ui::icons::Icon,
+    icon_color: egui::Color32,
+    text: &str,
+    text_color: egui::Color32,
+) {
+    ui.add_space(16.0);
+    let font_id = egui::FontId::monospace(11.0);
+    let max_text_w = (ui.available_width() - 48.0).max(60.0);
+    let galley = ui
+        .painter()
+        .layout(text.to_string(), font_id, text_color, max_text_w);
+    let icon_size = 12.0;
+    let gap = 6.0;
+    let total_w = icon_size + gap + galley.size().x;
+    let pad = ((ui.available_width() - total_w) * 0.5).max(0.0);
+
+    ui.horizontal(|ui| {
+        ui.set_width(ui.available_width());
+        if pad > 0.0 {
+            ui.add_space(pad);
+        }
+        crate::ui::icons::UiIconExt::icon_colored(ui, icon, icon_size, icon_color);
+        ui.add_space(gap);
+        ui.label(
+            egui::RichText::new(galley.text())
+                .monospace()
+                .size(11.0)
+                .color(text_color),
+        );
+    });
 }
 
 fn header_title(ui: &mut egui::Ui) {
