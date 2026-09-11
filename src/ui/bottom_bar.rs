@@ -288,14 +288,10 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             .as_ref()
             .and_then(|m| m.variables.get(app.plotted_variable_idx))
             .map(|v| v.name.as_str());
-        let scoped_key = plotted_var_name
-            .map(|v| format!("{}/{}", v.to_lowercase(), active_anim_dim.to_lowercase()));
-        let dim_coords = app.plotted_dataset_metadata.as_ref().and_then(|m| {
-            scoped_key
-                .as_ref()
-                .and_then(|k| m.dimension_coordinates.get(k))
-                .or_else(|| m.dimension_coordinates.get(&active_anim_dim.to_lowercase()))
-        });
+        let dim_coords = app
+            .plotted_dataset_metadata
+            .as_ref()
+            .and_then(|m| m.get_dim_coords(plotted_var_name, &active_anim_dim));
 
         let direct_coord_label =
             dim_coords.and_then(|coords| coords.get(app.current_timestep).cloned());

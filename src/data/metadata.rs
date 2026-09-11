@@ -11,19 +11,29 @@ pub struct DatasetMetadata {
 }
 
 impl DatasetMetadata {
+    /// Look up the dimension coordinate slice for a given variable and dimension name,
+    /// checking scoped `{var_name}/{dim_name}` first before falling back to `{dim_name}`.
+    pub fn get_dim_coords(&self, var_name: Option<&str>, dim_name: &str) -> Option<&[String]> {
+        let clean = dim_name.trim().to_lowercase();
+        if let Some(v) = var_name {
+            let scoped = format!("{}/{}", v.trim().to_lowercase(), clean);
+            if let Some(coords) = self.dimension_coordinates.get(&scoped) {
+                return Some(coords.as_slice());
+            }
+        }
+        self.dimension_coordinates
+            .get(&clean)
+            .or_else(|| self.dimension_coordinates.get(dim_name))
+            .map(|c| c.as_slice())
+    }
+
     /// Returns numerical min/max coordinate bounds for a variable dimension name if available.
     pub fn get_coord_bounds_for_var(
         &self,
         var_name: Option<&str>,
         dim_name: &str,
     ) -> Option<(f64, f64)> {
-        let clean = dim_name.trim().to_lowercase();
-        let scoped_key = var_name.map(|v| format!("{}/{}", v.trim().to_lowercase(), clean));
-        let coords = scoped_key
-            .as_ref()
-            .and_then(|k| self.dimension_coordinates.get(k))
-            .or_else(|| self.dimension_coordinates.get(&clean))
-            .or_else(|| self.dimension_coordinates.get(dim_name))?;
+        let coords = self.get_dim_coords(var_name, dim_name)?;
         let (first, last) = (coords.first()?, coords.last()?);
         let f_v: f64 = first.parse().ok()?;
         let l_v: f64 = last.parse().ok()?;
@@ -43,13 +53,7 @@ impl DatasetMetadata {
         dim_size: usize,
         range: (usize, usize),
     ) -> Option<(f64, f64)> {
-        let clean = dim_name.trim().to_lowercase();
-        let scoped_key = var_name.map(|v| format!("{}/{}", v.trim().to_lowercase(), clean));
-        let coords = scoped_key
-            .as_ref()
-            .and_then(|k| self.dimension_coordinates.get(k))
-            .or_else(|| self.dimension_coordinates.get(&clean))
-            .or_else(|| self.dimension_coordinates.get(dim_name))?;
+        let coords = self.get_dim_coords(var_name, dim_name)?;
 
         let (start, end) = (range.0.min(range.1), range.0.max(range.1));
         let total_len = dim_size.max(coords.len()).max(1);

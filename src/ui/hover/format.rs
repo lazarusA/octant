@@ -147,13 +147,7 @@ pub fn format_dimension_coord(
     });
 
     if let Some(m) = meta {
-        let scoped_key = var.map(|v| format!("{}/{}", v.name.to_lowercase(), clean));
-        if let Some(coords) = scoped_key
-            .as_ref()
-            .and_then(|k| m.dimension_coordinates.get(k))
-            .or_else(|| m.dimension_coordinates.get(&clean))
-            .or_else(|| m.dimension_coordinates.get(dim_name))
-        {
+        if let Some(coords) = m.get_dim_coords(var.map(|v| v.name.as_str()), dim_name) {
             if coords.len() == total_len
                 && let Some(c) = coords.get(idx)
                 && !c.trim().is_empty()

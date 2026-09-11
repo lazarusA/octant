@@ -28,6 +28,73 @@ impl ProceduralBlockStore {
     }
 }
 
+fn slice_2d_grid_block(
+    var_name: &str,
+    shape: (usize, usize),
+    full_data: &[f32],
+    coords: (&[f64], &[f64]),
+    request: &SliceRequest,
+    on_progress: &mut crate::data::block_store::ProgressCallback,
+) -> OctantBlock {
+    let (w_full, h_full) = shape;
+    let (xs, ys) = coords;
+
+    let (y_start, y_end) = request
+        .selections
+        .first()
+        .map(|s| s.bounds())
+        .unwrap_or((0, h_full));
+    let (x_start, x_end) = request
+        .selections
+        .get(1)
+        .map(|s| s.bounds())
+        .unwrap_or((0, w_full));
+
+    let y_start = y_start.min(h_full);
+    let y_end = y_end.min(h_full).max(y_start);
+    let x_start = x_start.min(w_full);
+    let x_end = x_end.min(w_full).max(x_start);
+
+    let block_h = y_end - y_start;
+    let block_w = x_end - x_start;
+
+    let mut values = Vec::with_capacity(block_h * block_w);
+    for y in y_start..y_end {
+        for x in x_start..x_end {
+            let idx = y * w_full + x;
+            values.push(full_data.get(idx).copied().unwrap_or(0.0));
+        }
+    }
+
+    if let Some(cb) = on_progress {
+        cb((values.len() * 4) as u64);
+    }
+
+    let mut coords_map = HashMap::new();
+    coords_map.insert(
+        "lon".to_string(),
+        xs.get(x_start..x_end)
+            .map(|s| s.to_vec())
+            .unwrap_or_else(|| xs.to_vec()),
+    );
+    coords_map.insert(
+        "lat".to_string(),
+        ys.get(y_start..y_end)
+            .map(|s| s.to_vec())
+            .unwrap_or_else(|| ys.to_vec()),
+    );
+
+    OctantBlock::new(
+        var_name.to_string(),
+        vec![block_h, block_w],
+        vec!["lat".to_string(), "lon".to_string()],
+        vec![y_start, x_start],
+        values,
+        coords_map,
+        HashMap::new(),
+    )
+}
+
 impl BlockStore for ProceduralBlockStore {
     fn backend_name(&self) -> &str {
         "Procedural / Known-Truth"
@@ -304,201 +371,57 @@ impl BlockStore for ProceduralBlockStore {
 
         if request.variable == "clenshaw_curtis_2d" {
             let (h_full, w_full) = (64, 128);
-            let (y_start, y_end) = request
-                .selections
-                .first()
-                .map(|s| s.bounds())
-                .unwrap_or((0, h_full));
-            let (x_start, x_end) = request
-                .selections
-                .get(1)
-                .map(|s| s.bounds())
-                .unwrap_or((0, w_full));
-
-            let y_start = y_start.min(h_full);
-            let y_end = y_end.min(h_full).max(y_start);
-            let x_start = x_start.min(w_full);
-            let x_end = x_end.min(w_full).max(x_start);
-
-            let block_h = y_end - y_start;
-            let block_w = x_end - x_start;
             let (full_data, _, _) = generate_clenshaw_curtis_2d(w_full, h_full, 0);
             let (xs, ys) = generate_clenshaw_curtis_coords(w_full, h_full);
-
-            let mut values = Vec::with_capacity(block_h * block_w);
-            for y in y_start..y_end {
-                for x in x_start..x_end {
-                    let idx = y * w_full + x;
-                    values.push(full_data.get(idx).copied().unwrap_or(0.0));
-                }
-            }
-
-            if let Some(ref mut cb) = on_progress {
-                cb((values.len() * 4) as u64);
-            }
-
-            let mut coords = HashMap::new();
-            coords.insert("lon".to_string(), xs[x_start..x_end].to_vec());
-            coords.insert("lat".to_string(), ys[y_start..y_end].to_vec());
-
-            return Ok(OctantBlock::new(
-                request.variable.clone(),
-                vec![block_h, block_w],
-                vec!["lat".to_string(), "lon".to_string()],
-                vec![y_start, x_start],
-                values,
-                coords,
-                HashMap::new(),
+            return Ok(slice_2d_grid_block(
+                &request.variable,
+                (w_full, h_full),
+                &full_data,
+                (&xs, &ys),
+                request,
+                &mut on_progress,
             ));
         }
 
         if request.variable == "gaussian_grid_2d" {
             let (h_full, w_full) = (64, 128);
-            let (y_start, y_end) = request
-                .selections
-                .first()
-                .map(|s| s.bounds())
-                .unwrap_or((0, h_full));
-            let (x_start, x_end) = request
-                .selections
-                .get(1)
-                .map(|s| s.bounds())
-                .unwrap_or((0, w_full));
-
-            let y_start = y_start.min(h_full);
-            let y_end = y_end.min(h_full).max(y_start);
-            let x_start = x_start.min(w_full);
-            let x_end = x_end.min(w_full).max(x_start);
-
-            let block_h = y_end - y_start;
-            let block_w = x_end - x_start;
             let (full_data, _, _) = generate_gaussian_grid_2d(w_full, h_full, 0);
             let (xs, ys) = generate_gaussian_coords(w_full, h_full);
-
-            let mut values = Vec::with_capacity(block_h * block_w);
-            for y in y_start..y_end {
-                for x in x_start..x_end {
-                    let idx = y * w_full + x;
-                    values.push(full_data.get(idx).copied().unwrap_or(0.0));
-                }
-            }
-
-            if let Some(ref mut cb) = on_progress {
-                cb((values.len() * 4) as u64);
-            }
-
-            let mut coords = HashMap::new();
-            coords.insert("lon".to_string(), xs[x_start..x_end].to_vec());
-            coords.insert("lat".to_string(), ys[y_start..y_end].to_vec());
-
-            return Ok(OctantBlock::new(
-                request.variable.clone(),
-                vec![block_h, block_w],
-                vec!["lat".to_string(), "lon".to_string()],
-                vec![y_start, x_start],
-                values,
-                coords,
-                HashMap::new(),
+            return Ok(slice_2d_grid_block(
+                &request.variable,
+                (w_full, h_full),
+                &full_data,
+                (&xs, &ys),
+                request,
+                &mut on_progress,
             ));
         }
 
         if request.variable == "stretched_regional_2d" {
             let (h_full, w_full) = (32, 48);
-            let (y_start, y_end) = request
-                .selections
-                .first()
-                .map(|s| s.bounds())
-                .unwrap_or((0, h_full));
-            let (x_start, x_end) = request
-                .selections
-                .get(1)
-                .map(|s| s.bounds())
-                .unwrap_or((0, w_full));
-
-            let y_start = y_start.min(h_full);
-            let y_end = y_end.min(h_full).max(y_start);
-            let x_start = x_start.min(w_full);
-            let x_end = x_end.min(w_full).max(x_start);
-
-            let block_h = y_end - y_start;
-            let block_w = x_end - x_start;
             let (full_data, _, _) = generate_stretched_regional_2d(w_full, h_full);
             let (xs, ys) = generate_stretched_regional_coords(w_full, h_full);
-
-            let mut values = Vec::with_capacity(block_h * block_w);
-            for y in y_start..y_end {
-                for x in x_start..x_end {
-                    let idx = y * w_full + x;
-                    values.push(full_data.get(idx).copied().unwrap_or(0.0));
-                }
-            }
-
-            if let Some(ref mut cb) = on_progress {
-                cb((values.len() * 4) as u64);
-            }
-
-            let mut coords = HashMap::new();
-            coords.insert("lon".to_string(), xs[x_start..x_end].to_vec());
-            coords.insert("lat".to_string(), ys[y_start..y_end].to_vec());
-
-            return Ok(OctantBlock::new(
-                request.variable.clone(),
-                vec![block_h, block_w],
-                vec!["lat".to_string(), "lon".to_string()],
-                vec![y_start, x_start],
-                values,
-                coords,
-                HashMap::new(),
+            return Ok(slice_2d_grid_block(
+                &request.variable,
+                (w_full, h_full),
+                &full_data,
+                (&xs, &ys),
+                request,
+                &mut on_progress,
             ));
         }
 
         if request.variable == "stepped_resolution_2d" {
             let (h_full, w_full) = (32, 64);
-            let (y_start, y_end) = request
-                .selections
-                .first()
-                .map(|s| s.bounds())
-                .unwrap_or((0, h_full));
-            let (x_start, x_end) = request
-                .selections
-                .get(1)
-                .map(|s| s.bounds())
-                .unwrap_or((0, w_full));
-
-            let y_start = y_start.min(h_full);
-            let y_end = y_end.min(h_full).max(y_start);
-            let x_start = x_start.min(w_full);
-            let x_end = x_end.min(w_full).max(x_start);
-
-            let block_h = y_end - y_start;
-            let block_w = x_end - x_start;
             let (full_data, _, _) = generate_stepped_resolution_2d(w_full, h_full);
             let (xs, ys) = generate_stepped_resolution_coords(w_full, h_full);
-
-            let mut values = Vec::with_capacity(block_h * block_w);
-            for y in y_start..y_end {
-                for x in x_start..x_end {
-                    let idx = y * w_full + x;
-                    values.push(full_data.get(idx).copied().unwrap_or(0.0));
-                }
-            }
-
-            if let Some(ref mut cb) = on_progress {
-                cb((values.len() * 4) as u64);
-            }
-
-            let mut coords = HashMap::new();
-            coords.insert("lon".to_string(), xs[x_start..x_end].to_vec());
-            coords.insert("lat".to_string(), ys[y_start..y_end].to_vec());
-
-            return Ok(OctantBlock::new(
-                request.variable.clone(),
-                vec![block_h, block_w],
-                vec!["lat".to_string(), "lon".to_string()],
-                vec![y_start, x_start],
-                values,
-                coords,
-                HashMap::new(),
+            return Ok(slice_2d_grid_block(
+                &request.variable,
+                (w_full, h_full),
+                &full_data,
+                (&xs, &ys),
+                request,
+                &mut on_progress,
             ));
         }
 
