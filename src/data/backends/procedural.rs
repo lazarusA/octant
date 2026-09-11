@@ -189,16 +189,99 @@ impl BlockStore for ProceduralBlockStore {
             ]
         };
 
-        let (clenshaw_x, clenshaw_y) = generate_clenshaw_curtis_coords(128, 64);
         let mut dim_coords = HashMap::new();
-        dim_coords.insert(
-            "lon".to_string(),
-            clenshaw_x.iter().map(|v| format!("{v:.3}")).collect(),
-        );
-        dim_coords.insert(
-            "lat".to_string(),
-            clenshaw_y.iter().map(|v| format!("{v:.3}")).collect(),
-        );
+
+        if is_4d {
+            let t_coords: Vec<String> = (0..20).map(|t| format!("{t}")).collect();
+            let z_coords: Vec<String> = (0..32)
+                .map(|z| format!("{:.1}", z as f64 * (1000.0 / 31.0)))
+                .collect();
+            let lat_coords: Vec<String> = (0..32)
+                .map(|j| format!("{:.3}", 90.0 - j as f64 * (180.0 / 31.0)))
+                .collect();
+            let lon_coords: Vec<String> = (0..32)
+                .map(|i| format!("{:.3}", -180.0 + i as f64 * (360.0 / 31.0)))
+                .collect();
+            let xy_coords: Vec<String> = (0..64).map(|i| format!("{i}")).collect();
+
+            dim_coords.insert("gaussian_wave_packet_4d/time".to_string(), t_coords.clone());
+            dim_coords.insert(
+                "gaussian_wave_packet_4d/depth".to_string(),
+                z_coords.clone(),
+            );
+            dim_coords.insert(
+                "gaussian_wave_packet_4d/lat".to_string(),
+                lat_coords.clone(),
+            );
+            dim_coords.insert(
+                "gaussian_wave_packet_4d/lon".to_string(),
+                lon_coords.clone(),
+            );
+            dim_coords.insert("procedural_matrix_2d/y".to_string(), xy_coords.clone());
+            dim_coords.insert("procedural_matrix_2d/x".to_string(), xy_coords.clone());
+
+            dim_coords.insert("time".to_string(), t_coords);
+            dim_coords.insert("depth".to_string(), z_coords);
+            dim_coords.insert("lat".to_string(), lat_coords);
+            dim_coords.insert("lon".to_string(), lon_coords);
+            dim_coords.insert("y".to_string(), xy_coords.clone());
+            dim_coords.insert("x".to_string(), xy_coords);
+        } else {
+            let (clenshaw_x, clenshaw_y) = generate_clenshaw_curtis_coords(128, 64);
+            let (gauss_x, gauss_y) = generate_gaussian_coords(128, 64);
+            let (stretched_x, stretched_y) = generate_stretched_regional_coords(48, 32);
+            let (stepped_x, stepped_y) = generate_stepped_resolution_coords(64, 32);
+
+            let clenshaw_x_str: Vec<String> =
+                clenshaw_x.iter().map(|v| format!("{v:.3}")).collect();
+            let clenshaw_y_str: Vec<String> =
+                clenshaw_y.iter().map(|v| format!("{v:.3}")).collect();
+            let gauss_x_str: Vec<String> = gauss_x.iter().map(|v| format!("{v:.3}")).collect();
+            let gauss_y_str: Vec<String> = gauss_y.iter().map(|v| format!("{v:.3}")).collect();
+            let stretched_x_str: Vec<String> =
+                stretched_x.iter().map(|v| format!("{v:.3}")).collect();
+            let stretched_y_str: Vec<String> =
+                stretched_y.iter().map(|v| format!("{v:.3}")).collect();
+            let stepped_x_str: Vec<String> = stepped_x.iter().map(|v| format!("{v:.3}")).collect();
+            let stepped_y_str: Vec<String> = stepped_y.iter().map(|v| format!("{v:.3}")).collect();
+
+            let t_coords: Vec<String> = (0..20).map(|t| format!("{t}")).collect();
+            let z_coords: Vec<String> = (0..32)
+                .map(|z| format!("{:.1}", z as f64 * (1000.0 / 31.0)))
+                .collect();
+            let lat_coords_32: Vec<String> = (0..32)
+                .map(|j| format!("{:.3}", 90.0 - j as f64 * (180.0 / 31.0)))
+                .collect();
+            let lon_coords_32: Vec<String> = (0..32)
+                .map(|i| format!("{:.3}", -180.0 + i as f64 * (360.0 / 31.0)))
+                .collect();
+            let xy_coords: Vec<String> = (0..64).map(|i| format!("{i}")).collect();
+
+            dim_coords.insert("clenshaw_curtis_2d/lon".to_string(), clenshaw_x_str.clone());
+            dim_coords.insert("clenshaw_curtis_2d/lat".to_string(), clenshaw_y_str.clone());
+            dim_coords.insert("gaussian_grid_2d/lon".to_string(), gauss_x_str);
+            dim_coords.insert("gaussian_grid_2d/lat".to_string(), gauss_y_str);
+            dim_coords.insert("stretched_regional_2d/lon".to_string(), stretched_x_str);
+            dim_coords.insert("stretched_regional_2d/lat".to_string(), stretched_y_str);
+            dim_coords.insert("stepped_resolution_2d/lon".to_string(), stepped_x_str);
+            dim_coords.insert("stepped_resolution_2d/lat".to_string(), stepped_y_str);
+            dim_coords.insert("gaussian_wave_packet_4d/time".to_string(), t_coords.clone());
+            dim_coords.insert(
+                "gaussian_wave_packet_4d/depth".to_string(),
+                z_coords.clone(),
+            );
+            dim_coords.insert("gaussian_wave_packet_4d/lat".to_string(), lat_coords_32);
+            dim_coords.insert("gaussian_wave_packet_4d/lon".to_string(), lon_coords_32);
+            dim_coords.insert("procedural_matrix_2d/y".to_string(), xy_coords.clone());
+            dim_coords.insert("procedural_matrix_2d/x".to_string(), xy_coords.clone());
+
+            dim_coords.insert("lon".to_string(), clenshaw_x_str);
+            dim_coords.insert("lat".to_string(), clenshaw_y_str);
+            dim_coords.insert("time".to_string(), t_coords);
+            dim_coords.insert("depth".to_string(), z_coords);
+            dim_coords.insert("y".to_string(), xy_coords.clone());
+            dim_coords.insert("x".to_string(), xy_coords);
+        }
 
         Ok(DatasetMetadata {
             name: if is_4d {
@@ -220,88 +303,200 @@ impl BlockStore for ProceduralBlockStore {
         let (nt_full, nz_full, ny_full, nx_full) = (20, 32, 32, 32);
 
         if request.variable == "clenshaw_curtis_2d" {
-            let (h, w) = (64, 128);
-            let (data, _, _) = generate_clenshaw_curtis_2d(w, h, 0);
-            let (xs, ys) = generate_clenshaw_curtis_coords(w, h);
-            let mut coords = HashMap::new();
-            coords.insert("lon".to_string(), xs);
-            coords.insert("lat".to_string(), ys);
+            let (h_full, w_full) = (64, 128);
+            let (y_start, y_end) = request
+                .selections
+                .first()
+                .map(|s| s.bounds())
+                .unwrap_or((0, h_full));
+            let (x_start, x_end) = request
+                .selections
+                .get(1)
+                .map(|s| s.bounds())
+                .unwrap_or((0, w_full));
+
+            let y_start = y_start.min(h_full);
+            let y_end = y_end.min(h_full).max(y_start);
+            let x_start = x_start.min(w_full);
+            let x_end = x_end.min(w_full).max(x_start);
+
+            let block_h = y_end - y_start;
+            let block_w = x_end - x_start;
+            let (full_data, _, _) = generate_clenshaw_curtis_2d(w_full, h_full, 0);
+            let (xs, ys) = generate_clenshaw_curtis_coords(w_full, h_full);
+
+            let mut values = Vec::with_capacity(block_h * block_w);
+            for y in y_start..y_end {
+                for x in x_start..x_end {
+                    let idx = y * w_full + x;
+                    values.push(full_data.get(idx).copied().unwrap_or(0.0));
+                }
+            }
 
             if let Some(ref mut cb) = on_progress {
-                cb((data.len() * 4) as u64);
+                cb((values.len() * 4) as u64);
             }
+
+            let mut coords = HashMap::new();
+            coords.insert("lon".to_string(), xs[x_start..x_end].to_vec());
+            coords.insert("lat".to_string(), ys[y_start..y_end].to_vec());
+
             return Ok(OctantBlock::new(
                 request.variable.clone(),
-                vec![h, w],
+                vec![block_h, block_w],
                 vec!["lat".to_string(), "lon".to_string()],
-                vec![0, 0],
-                data,
+                vec![y_start, x_start],
+                values,
                 coords,
                 HashMap::new(),
             ));
         }
 
         if request.variable == "gaussian_grid_2d" {
-            let (h, w) = (64, 128);
-            let (data, _, _) = generate_gaussian_grid_2d(w, h, 0);
-            let (xs, ys) = generate_gaussian_coords(w, h);
-            let mut coords = HashMap::new();
-            coords.insert("lon".to_string(), xs);
-            coords.insert("lat".to_string(), ys);
+            let (h_full, w_full) = (64, 128);
+            let (y_start, y_end) = request
+                .selections
+                .first()
+                .map(|s| s.bounds())
+                .unwrap_or((0, h_full));
+            let (x_start, x_end) = request
+                .selections
+                .get(1)
+                .map(|s| s.bounds())
+                .unwrap_or((0, w_full));
+
+            let y_start = y_start.min(h_full);
+            let y_end = y_end.min(h_full).max(y_start);
+            let x_start = x_start.min(w_full);
+            let x_end = x_end.min(w_full).max(x_start);
+
+            let block_h = y_end - y_start;
+            let block_w = x_end - x_start;
+            let (full_data, _, _) = generate_gaussian_grid_2d(w_full, h_full, 0);
+            let (xs, ys) = generate_gaussian_coords(w_full, h_full);
+
+            let mut values = Vec::with_capacity(block_h * block_w);
+            for y in y_start..y_end {
+                for x in x_start..x_end {
+                    let idx = y * w_full + x;
+                    values.push(full_data.get(idx).copied().unwrap_or(0.0));
+                }
+            }
 
             if let Some(ref mut cb) = on_progress {
-                cb((data.len() * 4) as u64);
+                cb((values.len() * 4) as u64);
             }
+
+            let mut coords = HashMap::new();
+            coords.insert("lon".to_string(), xs[x_start..x_end].to_vec());
+            coords.insert("lat".to_string(), ys[y_start..y_end].to_vec());
+
             return Ok(OctantBlock::new(
                 request.variable.clone(),
-                vec![h, w],
+                vec![block_h, block_w],
                 vec!["lat".to_string(), "lon".to_string()],
-                vec![0, 0],
-                data,
+                vec![y_start, x_start],
+                values,
                 coords,
                 HashMap::new(),
             ));
         }
 
         if request.variable == "stretched_regional_2d" {
-            let (h, w) = (32, 48);
-            let (data, _, _) = generate_stretched_regional_2d(w, h);
-            let (xs, ys) = generate_stretched_regional_coords(w, h);
-            let mut coords = HashMap::new();
-            coords.insert("lon".to_string(), xs);
-            coords.insert("lat".to_string(), ys);
+            let (h_full, w_full) = (32, 48);
+            let (y_start, y_end) = request
+                .selections
+                .first()
+                .map(|s| s.bounds())
+                .unwrap_or((0, h_full));
+            let (x_start, x_end) = request
+                .selections
+                .get(1)
+                .map(|s| s.bounds())
+                .unwrap_or((0, w_full));
+
+            let y_start = y_start.min(h_full);
+            let y_end = y_end.min(h_full).max(y_start);
+            let x_start = x_start.min(w_full);
+            let x_end = x_end.min(w_full).max(x_start);
+
+            let block_h = y_end - y_start;
+            let block_w = x_end - x_start;
+            let (full_data, _, _) = generate_stretched_regional_2d(w_full, h_full);
+            let (xs, ys) = generate_stretched_regional_coords(w_full, h_full);
+
+            let mut values = Vec::with_capacity(block_h * block_w);
+            for y in y_start..y_end {
+                for x in x_start..x_end {
+                    let idx = y * w_full + x;
+                    values.push(full_data.get(idx).copied().unwrap_or(0.0));
+                }
+            }
 
             if let Some(ref mut cb) = on_progress {
-                cb((data.len() * 4) as u64);
+                cb((values.len() * 4) as u64);
             }
+
+            let mut coords = HashMap::new();
+            coords.insert("lon".to_string(), xs[x_start..x_end].to_vec());
+            coords.insert("lat".to_string(), ys[y_start..y_end].to_vec());
+
             return Ok(OctantBlock::new(
                 request.variable.clone(),
-                vec![h, w],
+                vec![block_h, block_w],
                 vec!["lat".to_string(), "lon".to_string()],
-                vec![0, 0],
-                data,
+                vec![y_start, x_start],
+                values,
                 coords,
                 HashMap::new(),
             ));
         }
 
         if request.variable == "stepped_resolution_2d" {
-            let (h, w) = (32, 64);
-            let (data, _, _) = generate_stepped_resolution_2d(w, h);
-            let (xs, ys) = generate_stepped_resolution_coords(w, h);
-            let mut coords = HashMap::new();
-            coords.insert("lon".to_string(), xs);
-            coords.insert("lat".to_string(), ys);
+            let (h_full, w_full) = (32, 64);
+            let (y_start, y_end) = request
+                .selections
+                .first()
+                .map(|s| s.bounds())
+                .unwrap_or((0, h_full));
+            let (x_start, x_end) = request
+                .selections
+                .get(1)
+                .map(|s| s.bounds())
+                .unwrap_or((0, w_full));
+
+            let y_start = y_start.min(h_full);
+            let y_end = y_end.min(h_full).max(y_start);
+            let x_start = x_start.min(w_full);
+            let x_end = x_end.min(w_full).max(x_start);
+
+            let block_h = y_end - y_start;
+            let block_w = x_end - x_start;
+            let (full_data, _, _) = generate_stepped_resolution_2d(w_full, h_full);
+            let (xs, ys) = generate_stepped_resolution_coords(w_full, h_full);
+
+            let mut values = Vec::with_capacity(block_h * block_w);
+            for y in y_start..y_end {
+                for x in x_start..x_end {
+                    let idx = y * w_full + x;
+                    values.push(full_data.get(idx).copied().unwrap_or(0.0));
+                }
+            }
 
             if let Some(ref mut cb) = on_progress {
-                cb((data.len() * 4) as u64);
+                cb((values.len() * 4) as u64);
             }
+
+            let mut coords = HashMap::new();
+            coords.insert("lon".to_string(), xs[x_start..x_end].to_vec());
+            coords.insert("lat".to_string(), ys[y_start..y_end].to_vec());
+
             return Ok(OctantBlock::new(
                 request.variable.clone(),
-                vec![h, w],
+                vec![block_h, block_w],
                 vec!["lat".to_string(), "lon".to_string()],
-                vec![0, 0],
-                data,
+                vec![y_start, x_start],
+                values,
                 coords,
                 HashMap::new(),
             ));
@@ -470,6 +665,22 @@ impl BlockStore for ProceduralBlockStore {
             vec![90.0 - t_start_lat * 180.0, 90.0 - t_end_lat * 180.0],
         );
 
+        let z_start_m = if nz_full > 1 {
+            z_start as f64 * (1000.0 / (nz_full - 1) as f64)
+        } else {
+            0.0
+        };
+        let z_end_m = if nz_full > 1 {
+            (z_end.saturating_sub(1)) as f64 * (1000.0 / (nz_full - 1) as f64)
+        } else {
+            1000.0
+        };
+        coords.insert("depth".to_string(), vec![z_start_m, z_end_m]);
+        coords.insert(
+            "time".to_string(),
+            vec![t_start as f64, (t_end.saturating_sub(1)) as f64],
+        );
+
         Ok(OctantBlock::new(
             request.variable.clone(),
             vec![
@@ -497,5 +708,174 @@ impl BlockStore for ProceduralBlockStore {
             blocks.push(self.fetch_block(req)?);
         }
         Ok(BlockResult::new(blocks))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data::coordinates::CoordinateGrid;
+    use crate::data::slice_request::DimensionSelection;
+
+    #[test]
+    fn test_procedural_store_metadata_bounds() {
+        let store = ProceduralBlockStore::open("procedural://test").expect("open store");
+        let meta = store.inspect().expect("inspect store");
+
+        // Stretched regional bounds in metadata
+        let stretched_lon = meta.get_coord_bounds_for_var(Some("stretched_regional_2d"), "lon");
+        assert!(stretched_lon.is_some());
+        let (min_lon, max_lon) = stretched_lon.unwrap();
+        assert!((min_lon - 10.0).abs() < 1e-2);
+        assert!((max_lon - 50.0).abs() < 1e-2);
+
+        let stretched_lat = meta.get_coord_bounds_for_var(Some("stretched_regional_2d"), "lat");
+        assert!(stretched_lat.is_some());
+        let (min_lat, max_lat) = stretched_lat.unwrap();
+        assert!((min_lat - 30.0).abs() < 1e-2);
+        assert!((max_lat - 60.0).abs() < 1e-2);
+
+        // Stepped resolution bounds in metadata
+        let stepped_lon = meta.get_coord_bounds_for_var(Some("stepped_resolution_2d"), "lon");
+        assert!(stepped_lon.is_some());
+        let (s_min_lon, s_max_lon) = stepped_lon.unwrap();
+        assert!((s_min_lon - (-40.0)).abs() < 1e-2);
+        assert!((s_max_lon - 40.0).abs() < 1e-2);
+
+        let stepped_lat = meta.get_coord_bounds_for_var(Some("stepped_resolution_2d"), "lat");
+        assert!(stepped_lat.is_some());
+        let (s_min_lat, s_max_lat) = stepped_lat.unwrap();
+        assert!((s_min_lat - (-20.0)).abs() < 1e-2);
+        assert!((s_max_lat - 20.0).abs() < 1e-2);
+    }
+
+    #[test]
+    fn test_procedural_stretched_regional_slicing_and_grid_detection() {
+        let store = ProceduralBlockStore::open("procedural://test").expect("open store");
+        let mut request = SliceRequest::full_range("stretched_regional_2d", &[32, 48]);
+        // Sub-slice: lat 10..20, lon 12..36
+        request.selections = vec![
+            DimensionSelection::range(10, 20),
+            DimensionSelection::range(12, 36),
+        ];
+
+        let block = store.fetch_block(&request).expect("fetch block");
+        assert_eq!(block.shape, vec![10, 24]);
+
+        let matrix = block
+            .slice_2d(1, 0, &[0, 0], 1, "test", true)
+            .expect("slice 2d");
+        assert_eq!(matrix.width, 24);
+        assert_eq!(matrix.height, 10);
+
+        match &matrix.grid {
+            CoordinateGrid::Irregular1D {
+                coords_x,
+                coords_y,
+                lon_bounds,
+                lat_bounds,
+            } => {
+                assert_eq!(coords_x.len(), 24);
+                assert_eq!(coords_y.len(), 10);
+                assert!(lon_bounds.0 >= 10.0 && lon_bounds.1 <= 50.0);
+                assert!(lat_bounds.0 >= 30.0 && lat_bounds.1 <= 60.0);
+            }
+            other => {
+                panic!("Expected Irregular1D grid for sliced stretched regional, got {other:?}")
+            }
+        }
+    }
+
+    #[test]
+    fn test_procedural_stepped_resolution_slicing_and_grid_detection() {
+        let store = ProceduralBlockStore::open("procedural://test").expect("open store");
+
+        // 1. Across-jump sub-slice: lat 0..16, lon 16..48 (spans across the 5x resolution jump at index 32)
+        let mut request_jump = SliceRequest::full_range("stepped_resolution_2d", &[32, 64]);
+        request_jump.selections = vec![
+            DimensionSelection::range(0, 16),
+            DimensionSelection::range(16, 48),
+        ];
+
+        let block_jump = store.fetch_block(&request_jump).expect("fetch block");
+        assert_eq!(block_jump.shape, vec![16, 32]);
+
+        let matrix_jump = block_jump
+            .slice_2d(1, 0, &[0, 0], 1, "test", true)
+            .expect("slice 2d");
+        assert_eq!(matrix_jump.width, 32);
+        assert_eq!(matrix_jump.height, 16);
+
+        match &matrix_jump.grid {
+            CoordinateGrid::Irregular1D {
+                coords_x,
+                coords_y,
+                lon_bounds,
+                lat_bounds,
+            } => {
+                assert_eq!(coords_x.len(), 32);
+                assert_eq!(coords_y.len(), 16);
+                assert!(lon_bounds.0 < 0.0 && lon_bounds.1 > 0.0);
+                assert!((lat_bounds.1 - 20.0).abs() < 1e-2);
+            }
+            other => panic!(
+                "Expected Irregular1D grid for across-jump stepped resolution, got {other:?}"
+            ),
+        }
+
+        // 2. Uniform sub-slice: lat 0..16, lon 0..32 (entirely within fine uniform left half)
+        let mut request_uniform = SliceRequest::full_range("stepped_resolution_2d", &[32, 64]);
+        request_uniform.selections = vec![
+            DimensionSelection::range(0, 16),
+            DimensionSelection::range(0, 32),
+        ];
+
+        let block_uniform = store.fetch_block(&request_uniform).expect("fetch block");
+        let matrix_uniform = block_uniform
+            .slice_2d(1, 0, &[0, 0], 1, "test", true)
+            .expect("slice 2d");
+
+        match &matrix_uniform.grid {
+            CoordinateGrid::RegionalRegular {
+                lon_bounds,
+                lat_bounds,
+            } => {
+                assert!((lon_bounds.0 - (-40.0)).abs() < 1e-2);
+                assert!((lat_bounds.1 - 20.0).abs() < 1e-2);
+            }
+            other => panic!("Expected RegionalRegular grid for uniform half slice, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_procedural_gaussian_wave_packet_4d_slicing() {
+        let store = ProceduralBlockStore::open("procedural://volume").expect("open store");
+        let mut request = SliceRequest::full_range("gaussian_wave_packet_4d", &[20, 32, 32, 32]);
+        request.selections = vec![
+            DimensionSelection::index(2),
+            DimensionSelection::index(5),
+            DimensionSelection::range(4, 20),
+            DimensionSelection::range(8, 24),
+        ];
+
+        let block = store.fetch_block(&request).expect("fetch block");
+        assert_eq!(block.shape, vec![1, 1, 16, 16]);
+
+        let matrix = block
+            .slice_2d(3, 2, &[0, 0, 0, 0], 1, "test", true)
+            .expect("slice 2d");
+        assert_eq!(matrix.width, 16);
+        assert_eq!(matrix.height, 16);
+
+        match &matrix.grid {
+            CoordinateGrid::RegionalRegular {
+                lon_bounds,
+                lat_bounds,
+            } => {
+                assert!(lon_bounds.0 > -180.0 && lon_bounds.1 < 180.0);
+                assert!(lat_bounds.0 > -90.0 && lat_bounds.1 < 90.0);
+            }
+            other => panic!("Expected RegionalRegular grid for sliced 4d packet, got {other:?}"),
+        }
     }
 }
