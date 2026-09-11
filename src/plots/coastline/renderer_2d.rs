@@ -32,7 +32,7 @@ impl CoastlineRenderer {
             zoom: 1.0,
             crop_to_domain: 1,
             aspect_scale: [1.0; 2],
-            _pad1: 0,
+            line_width: 1.0,
             _pad2: 0,
             line_color: [1.0, 1.0, 1.0, 0.8],
             lon_min: -180.0,
@@ -134,6 +134,7 @@ impl CoastlineRenderer {
         crop_to_domain: bool,
         aspect_scale: [f32; 2],
         line_color: [f32; 4],
+        line_width: f32,
         lon_min: f32,
         lon_max: f32,
         lat_min: f32,
@@ -144,7 +145,7 @@ impl CoastlineRenderer {
             zoom,
             crop_to_domain: if crop_to_domain { 1 } else { 0 },
             aspect_scale,
-            _pad1: 0,
+            line_width,
             _pad2: 0,
             line_color,
             lon_min,
@@ -202,6 +203,7 @@ pub struct CoastlineCallback {
     pub crop_to_domain: bool,
     pub aspect_scale: [f32; 2],
     pub line_color: [f32; 4],
+    pub line_width: f32,
     pub rect: egui::Rect,
     pub lon_min: f32,
     pub lon_max: f32,
@@ -225,6 +227,7 @@ impl eframe::egui_wgpu::CallbackTrait for CoastlineCallback {
             self.crop_to_domain,
             self.aspect_scale,
             self.line_color,
+            self.line_width,
             self.lon_min,
             self.lon_max,
             self.lat_min,
@@ -251,6 +254,9 @@ impl eframe::egui_wgpu::CallbackTrait for CoastlineCallback {
             return;
         };
         rpass.set_bind_group(0, &guard.bind_group, &[]);
-        rpass.draw(0..vertex_count, 0..1);
+        let instances = (self.line_width.round() as u32 * 2)
+            .saturating_sub(1)
+            .clamp(1, 7);
+        rpass.draw(0..vertex_count, 0..instances);
     }
 }

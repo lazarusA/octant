@@ -95,12 +95,14 @@ fn show_coastline_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.coastline_color = None;
                 }
 
-                let mut color = app.coastline_color.unwrap_or(if ui.visuals().dark_mode {
+                let default_color = if ui.visuals().dark_mode {
                     [1.0_f32, 1.0, 1.0, 0.75]
                 } else {
                     [0.15_f32, 0.15, 0.15, 0.85]
-                });
-                let changed = crate::ui::color_picker::ShapeColorPicker::new(
+                };
+                let mut color = app.coastline_color.unwrap_or(default_color);
+                let initial_color = color;
+                crate::ui::color_picker::ShapeColorPicker::new(
                     "settings_coastline_color_picker",
                     &mut color,
                     crate::ui::color_picker::ColorShape::Rect(3.0),
@@ -108,10 +110,9 @@ fn show_coastline_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .size(egui::vec2(18.0, 16.0))
                 .tooltip("Coastline line color. Click to select.")
                 .anchor_offset(egui::vec2(-240.0, -100.0))
-                .show(ui)
-                .changed();
+                .show(ui);
 
-                if changed {
+                if color != initial_color {
                     app.coastline_color = Some(color);
                 }
             });
@@ -156,6 +157,12 @@ fn show_coastline_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
             }
         });
+
+        ui.add(
+            egui::Slider::new(&mut app.coastline_line_width, 1.0..=4.0)
+                .step_by(0.1)
+                .text("Line Width"),
+        );
 
         ui.checkbox(
             &mut app.coastline_crop_to_data_domain,

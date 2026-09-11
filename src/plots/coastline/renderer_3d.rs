@@ -61,11 +61,11 @@ impl Coastline3DRenderer {
             displacement_strength: 0.0,
             plot_kind: 0,
             plot_mode: 0,
+            line_width: 1.0,
             width: width as u32,
             height: height as u32,
             coord_mode: 0,
             crop_to_domain: 1,
-            _pad_crop: 0,
             lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
             lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
             color: [1.0, 1.0, 1.0, 0.8],
@@ -310,11 +310,11 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
             displacement_strength: p.displacement_strength,
             plot_kind: p.plot_kind,
             plot_mode: p.plot_mode,
+            line_width: p.line_width,
             width: self.renderer.width,
             height: self.renderer.height,
             coord_mode: p.coord_mode,
             crop_to_domain: p.crop_to_domain,
-            _pad_crop: 0,
             lon_bounds: p.lon_bounds,
             lat_bounds: p.lat_bounds,
             color: p.color,
@@ -349,7 +349,10 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
         };
         rpass.set_pipeline(&self.renderer.render_pipeline);
         rpass.set_bind_group(0, &res.bind_group, &[]);
-        rpass.draw(0..vertex_count, 0..1);
+        let instances = (self.params.line_width.round() as u32 * 2)
+            .saturating_sub(1)
+            .clamp(1, 7);
+        rpass.draw(0..vertex_count, 0..instances);
     }
 }
 

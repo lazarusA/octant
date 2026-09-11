@@ -399,6 +399,7 @@ impl OctantApp {
                             crop_to_domain: self.coastline_crop_to_data_domain,
                             aspect_scale: gpu_aspect_scale,
                             line_color,
+                            line_width: self.coastline_line_width,
                             rect: canvas_rect,
                             lon_min,
                             lon_max,
@@ -442,6 +443,7 @@ impl OctantApp {
                             displacement_strength: mesh_params.displacement_strength,
                             plot_kind,
                             plot_mode: mode,
+                            line_width: self.coastline_line_width,
                             coord_mode: mesh_params.coord_mode,
                             crop_to_domain: if self.coastline_crop_to_data_domain {
                                 1

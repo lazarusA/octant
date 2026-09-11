@@ -349,6 +349,8 @@ pub struct OctantApp {
     pub coastline_is_loading: bool,
     /// Whether to clip coastlines strictly to the spatial boundary of the active dataset.
     pub coastline_crop_to_data_domain: bool,
+    /// Line width for coastline rendering (1.0 to 4.0).
+    pub coastline_line_width: f32,
 }
 
 impl Default for OctantApp {
@@ -493,6 +495,7 @@ impl Default for OctantApp {
             coastline_rx: None,
             coastline_is_loading: false,
             coastline_crop_to_data_domain: true,
+            coastline_line_width: 1.0,
         }
     }
 }

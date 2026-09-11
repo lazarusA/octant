@@ -6,11 +6,11 @@ struct Coastline3DUniforms {
     displacement_strength: f32,
     plot_kind: u32,
     plot_mode: u32,
+    line_width: f32,
     width: u32,
     height: u32,
     coord_mode: u32,
     crop_to_domain: u32,
-    _pad_crop: u32,
     lon_bounds: vec2<f32>,
     lat_bounds: vec2<f32>,
     color: vec4<f32>,
@@ -70,7 +70,10 @@ fn invalid_vertex() -> VertexOutput {
 }
 
 @vertex
-fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+fn vs_main(
+    @builtin(vertex_index) vertex_index: u32,
+    @builtin(instance_index) instance_index: u32,
+) -> VertexOutput {
     let pair_base = (vertex_index / 2u) * 4u;
     if (pair_base + 3u >= arrayLength(&coastline_verts)) {
         return invalid_vertex();
@@ -110,19 +113,31 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
         }
     }
 
+    let p0_lon = p0_lon_deg * 0.0174532925;
+    let p0_lat = p0_lat_deg * 0.0174532925;
+    let p1_lon = p1_lon_deg * 0.0174532925;
+    let p1_lat = p1_lat_deg * 0.0174532925;
+
+    let p0_uv_x = (p0_lon - coastline_uniforms.lon_bounds.x) / lon_span;
+    let p0_uv_y = (p0_lat - coastline_uniforms.lat_bounds.x) / lat_span;
+    let p1_uv_x = (p1_lon - coastline_uniforms.lon_bounds.x) / lon_span;
+    let p1_uv_y = (p1_lat - coastline_uniforms.lat_bounds.x) / lat_span;
+
+    let is_p1 = (vertex_index % 2u) == 1u;
     var cur_lon_deg = p0_lon_deg;
     var cur_lat_deg = p0_lat_deg;
-    if ((vertex_index % 2u) == 1u) {
+    var cur_lon = p0_lon;
+    var cur_lat = p0_lat;
+    var uv_x = p0_uv_x;
+    var uv_y = p0_uv_y;
+    if (is_p1) {
         cur_lon_deg = p1_lon_deg;
         cur_lat_deg = p1_lat_deg;
+        cur_lon = p1_lon;
+        cur_lat = p1_lat;
+        uv_x = p1_uv_x;
+        uv_y = p1_uv_y;
     }
-
-    let cur_lon = cur_lon_deg * 0.0174532925;
-    let cur_lat = cur_lat_deg * 0.0174532925;
-
-    // Domain UV coordinates [0, 1] relative to dataset geographic bounds
-    let uv_x = (cur_lon - coastline_uniforms.lon_bounds.x) / lon_span;
-    let uv_y = (cur_lat - coastline_uniforms.lat_bounds.x) / lat_span;
 
     let in_bounds = (uv_x >= 0.0 && uv_x <= 1.0 && uv_y >= 0.0 && uv_y <= 1.0);
 
@@ -181,8 +196,48 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     }
 
     let rotated = rotate_camera_yx(world_pos, coastline_uniforms.rotation_y, coastline_uniforms.rotation_x);
+    var proj = project_perspective(rotated, coastline_uniforms.aspect_ratio, coastline_uniforms.zoom, 1.6, min_dist);
+
+    // Compute screen space normal from endpoints for line width
+    if (coastline_uniforms.line_width > 1.0) {
+        var other_world_pos: vec3<f32>;
+        var other_lon = p0_lon;
+        var cur_other_lat = p0_lat;
+        if (!is_p1) {
+            other_lon = p1_lon;
+            cur_other_lat = p1_lat;
+        }
+        if (coastline_uniforms.plot_kind == 1u) {
+            other_world_pos = lon_lat_to_cartesian(1.002, other_lon, cur_other_lat);
+        } else {
+            let data_aspect = max(f32(max(coastline_uniforms.width, 1u)) / f32(max(coastline_uniforms.height, 1u)), 0.1);
+            let other_uv_x = select(p1_uv_x, p0_uv_x, !is_p1);
+            let other_norm_y = (coastline_uniforms.lat_bounds.y - cur_other_lat) / lat_span;
+            let other_x = -data_aspect + other_uv_x * 2.0 * data_aspect;
+            let other_z = -1.0 + other_norm_y * 2.0;
+            other_world_pos = vec3<f32>(other_x, 0.003, other_z);
+        }
+        let other_rotated = rotate_camera_yx(other_world_pos, coastline_uniforms.rotation_y, coastline_uniforms.rotation_x);
+        let other_proj = project_perspective(other_rotated, coastline_uniforms.aspect_ratio, coastline_uniforms.zoom, 1.6, min_dist);
+
+        let delta = (other_proj.xy / max(other_proj.w, 1e-4)) - (proj.xy / max(proj.w, 1e-4));
+        let len = length(delta);
+        if (len > 1e-6) {
+            let dir = delta / len;
+            let normal = vec2<f32>(-dir.y, dir.x);
+            let num_inst = u32(clamp(round(coastline_uniforms.line_width * 2.0 - 1.0), 1.0, 7.0));
+            let step_offset = f32(instance_index) - f32(num_inst - 1u) * 0.5;
+            let pixel_scale = 0.0015;
+            proj = vec4<f32>(
+                proj.xy + normal * (step_offset * pixel_scale * proj.w),
+                proj.z,
+                proj.w
+            );
+        }
+    }
+
     var out: VertexOutput;
-    out.position = project_perspective(rotated, coastline_uniforms.aspect_ratio, coastline_uniforms.zoom, 1.6, min_dist);
+    out.position = proj;
     out.valid = 1.0;
     out.uv = vec2<f32>(uv_x, uv_y);
     return out;
