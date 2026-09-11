@@ -341,13 +341,44 @@ impl BlockStore for ProceduralBlockStore {
                 cb((values.len() * 4) as u64);
             }
 
+            let mut coords = HashMap::new();
+            let t_start_x = if w_full > 1 {
+                x_start as f64 / (w_full - 1) as f64
+            } else {
+                0.0
+            };
+            let t_end_x = if w_full > 1 {
+                (x_end.saturating_sub(1)) as f64 / (w_full - 1) as f64
+            } else {
+                1.0
+            };
+            coords.insert(
+                "x".to_string(),
+                vec![-180.0 + t_start_x * 360.0, -180.0 + t_end_x * 360.0],
+            );
+
+            let t_start_y = if h_full > 1 {
+                y_start as f64 / (h_full - 1) as f64
+            } else {
+                0.0
+            };
+            let t_end_y = if h_full > 1 {
+                (y_end.saturating_sub(1)) as f64 / (h_full - 1) as f64
+            } else {
+                1.0
+            };
+            coords.insert(
+                "y".to_string(),
+                vec![90.0 - t_start_y * 180.0, 90.0 - t_end_y * 180.0],
+            );
+
             return Ok(OctantBlock::new(
                 request.variable.clone(),
                 vec![block_h, block_w],
                 vec!["y".to_string(), "x".to_string()],
                 vec![y_start, x_start],
                 values,
-                HashMap::new(),
+                coords,
                 HashMap::new(),
             ));
         }
@@ -408,6 +439,37 @@ impl BlockStore for ProceduralBlockStore {
             cb((values.len() * 4) as u64);
         }
 
+        let mut coords = HashMap::new();
+        let t_start_lon = if nx_full > 1 {
+            x_start as f64 / (nx_full - 1) as f64
+        } else {
+            0.0
+        };
+        let t_end_lon = if nx_full > 1 {
+            (x_end.saturating_sub(1)) as f64 / (nx_full - 1) as f64
+        } else {
+            1.0
+        };
+        coords.insert(
+            "lon".to_string(),
+            vec![-180.0 + t_start_lon * 360.0, -180.0 + t_end_lon * 360.0],
+        );
+
+        let t_start_lat = if ny_full > 1 {
+            y_start as f64 / (ny_full - 1) as f64
+        } else {
+            0.0
+        };
+        let t_end_lat = if ny_full > 1 {
+            (y_end.saturating_sub(1)) as f64 / (ny_full - 1) as f64
+        } else {
+            1.0
+        };
+        coords.insert(
+            "lat".to_string(),
+            vec![90.0 - t_start_lat * 180.0, 90.0 - t_end_lat * 180.0],
+        );
+
         Ok(OctantBlock::new(
             request.variable.clone(),
             vec![
@@ -424,7 +486,7 @@ impl BlockStore for ProceduralBlockStore {
             ],
             vec![t_start, z_start, y_start, x_start],
             values,
-            HashMap::new(),
+            coords,
             HashMap::new(),
         ))
     }

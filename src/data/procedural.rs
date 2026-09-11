@@ -407,6 +407,9 @@ pub fn generate_known_truth_4d_block(
     nx: usize,
 ) -> OctantBlock {
     let (values, _, _) = generate_procedural_volume_4d(nt, nz, ny, nx);
+    let mut coords = HashMap::new();
+    coords.insert("lon".to_string(), vec![-180.0, 180.0]);
+    coords.insert("lat".to_string(), vec![90.0, -90.0]);
     OctantBlock::new(
         var_name.into(),
         vec![nt, nz, ny, nx],
@@ -418,7 +421,7 @@ pub fn generate_known_truth_4d_block(
         ],
         vec![0, 0, 0, 0],
         values,
-        HashMap::new(),
+        coords,
         HashMap::new(),
     )
 }

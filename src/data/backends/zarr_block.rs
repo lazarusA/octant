@@ -103,6 +103,7 @@ pub fn fetch_block_from_cached_array(
         .rfind('/')
         .map(|idx| &request.variable[..idx]);
 
+    let full_shape = array.shape();
     let mut coordinates: HashMap<String, Vec<f64>> = HashMap::new();
     let total_dims = dim_names.len();
     for (i, name) in dim_names.iter().enumerate() {
@@ -115,7 +116,26 @@ pub fn fetch_block_from_cached_array(
             i,
             total_dims,
         ) {
-            coordinates.insert(name.clone(), vec![first, last]);
+            let full_dim_len = full_shape.get(i).copied().unwrap_or(block_shape[i] as u64) as usize;
+            let start_idx = origin.get(i).copied().unwrap_or(0);
+            let end_idx = start_idx + block_shape.get(i).copied().unwrap_or(1);
+            let t_start = if full_dim_len > 1 {
+                start_idx as f64 / (full_dim_len - 1) as f64
+            } else {
+                0.0
+            };
+            let t_end = if full_dim_len > 1 {
+                (end_idx.saturating_sub(1)) as f64 / (full_dim_len - 1) as f64
+            } else {
+                1.0
+            };
+            let block_first = first + t_start * (last - first);
+            let block_last = first + t_end * (last - first);
+            coordinates.insert(name.clone(), vec![block_first, block_last]);
+            let clean = name.trim().to_lowercase();
+            if clean != *name {
+                coordinates.insert(clean, vec![block_first, block_last]);
+            }
         }
     }
 
@@ -131,7 +151,35 @@ pub fn fetch_block_from_cached_array(
                 usize::MAX,
                 total_dims,
             ) {
-                coordinates.insert((*candidate).to_string(), vec![first, last]);
+                let is_x = crate::utils::coordinates::is_spatial_x_name(candidate);
+                let dim_i = dim_names.iter().position(|d| {
+                    if is_x {
+                        crate::utils::coordinates::is_spatial_x_name(d)
+                    } else {
+                        crate::utils::coordinates::is_spatial_y_name(d)
+                    }
+                });
+                if let Some(i) = dim_i {
+                    let full_dim_len =
+                        full_shape.get(i).copied().unwrap_or(block_shape[i] as u64) as usize;
+                    let start_idx = origin.get(i).copied().unwrap_or(0);
+                    let end_idx = start_idx + block_shape.get(i).copied().unwrap_or(1);
+                    let t_start = if full_dim_len > 1 {
+                        start_idx as f64 / (full_dim_len - 1) as f64
+                    } else {
+                        0.0
+                    };
+                    let t_end = if full_dim_len > 1 {
+                        (end_idx.saturating_sub(1)) as f64 / (full_dim_len - 1) as f64
+                    } else {
+                        1.0
+                    };
+                    let block_first = first + t_start * (last - first);
+                    let block_last = first + t_end * (last - first);
+                    coordinates.insert((*candidate).to_string(), vec![block_first, block_last]);
+                } else {
+                    coordinates.insert((*candidate).to_string(), vec![first, last]);
+                }
             }
         }
     }

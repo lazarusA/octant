@@ -200,4 +200,69 @@ mod tests {
         assert_eq!(lut[0], 0.0);
         assert_eq!(lut[4095], 4.0);
     }
+
+    #[test]
+    fn test_slider_selection_from_global_to_regional() {
+        // Full global grid
+        let lons: Vec<f64> = (0..360).map(|i| -180.0 + i as f64).collect();
+        let lats: Vec<f64> = (0..180).map(|i| 90.0 - i as f64).collect();
+
+        // Sliced sub-range (e.g. lon 50..150, lat 30..80)
+        let sliced_lons = &lons[50..150];
+        let sliced_lats = &lats[30..80];
+
+        let grid = CoordinateGrid::detect_grid(
+            "lon",
+            "lat",
+            Some(sliced_lons),
+            Some(sliced_lats),
+            100,
+            50,
+        );
+
+        match grid {
+            CoordinateGrid::RegionalRegular {
+                lon_bounds,
+                lat_bounds,
+            } => {
+                assert_eq!(grid.render_coord_mode(), 1);
+                assert!(!grid.is_global());
+                assert!((lon_bounds.0 - (-130.0)).abs() < 1e-3);
+                assert!((lon_bounds.1 - (-31.0)).abs() < 1e-3);
+                assert!((lat_bounds.0 - 11.0).abs() < 1e-3);
+                assert!((lat_bounds.1 - 60.0).abs() < 1e-3);
+            }
+            other => panic!("Expected RegionalRegular, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_fallback_spatial_coords_slicing() {
+        let empty_coords = std::collections::HashMap::new();
+        let dim_names = vec!["latitude".to_string(), "longitude".to_string()];
+        let shape = vec![180, 360];
+
+        // Slicing longitude range (50, 150)
+        let lon_slice = crate::data::slicing::extract_sliced_coords_for_dim(
+            &empty_coords,
+            &dim_names,
+            &shape,
+            1,
+            (50, 150),
+        );
+        assert!(lon_slice.is_some());
+        let lons = lon_slice.unwrap_or_default();
+        assert_eq!(lons.len(), 2);
+        // Sliced sub-range should be regional
+        let grid = CoordinateGrid::detect_grid(
+            "longitude",
+            "latitude",
+            Some(&lons),
+            Some(&[0.0, 45.0]),
+            100,
+            45,
+        );
+        assert_eq!(grid.render_coord_mode(), 1);
+        assert!(!grid.is_global());
+    }
 }
