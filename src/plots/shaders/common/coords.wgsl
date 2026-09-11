@@ -151,18 +151,28 @@ fn get_cell_normalized_bounds_y(cell_idx: u32, grid_h: u32, coord_mode: u32) -> 
         return vec2<f32>(v0, v1);
     }
 
+    let is_global_lat = abs(span_y) >= 160.0 && min(abs(first_y), abs(last_y)) >= 75.0;
+
     let idx = min(cell_idx, max_cy);
     var b0: f32;
     if (idx == 0u) {
-        b0 = first_y - 0.5 * (coord_y_buffer[min(1u, max_cy)] - first_y);
+        if (is_global_lat) {
+            b0 = select(-90.0, 90.0, first_y > last_y);
+        } else {
+            b0 = first_y - 0.5 * (coord_y_buffer[min(1u, max_cy)] - first_y);
+        }
     } else {
         b0 = 0.5 * (coord_y_buffer[idx - 1u] + coord_y_buffer[idx]);
     }
 
     var b1: f32;
     if (idx >= max_cy) {
-        let prev_idx = select(max_cy - 1u, 0u, max_cy == 0u);
-        b1 = last_y + 0.5 * (last_y - coord_y_buffer[prev_idx]);
+        if (is_global_lat) {
+            b1 = select(90.0, -90.0, first_y > last_y);
+        } else {
+            let prev_idx = select(max_cy - 1u, 0u, max_cy == 0u);
+            b1 = last_y + 0.5 * (last_y - coord_y_buffer[prev_idx]);
+        }
     } else {
         b1 = 0.5 * (coord_y_buffer[idx] + coord_y_buffer[idx + 1u]);
     }
