@@ -61,7 +61,7 @@ fn radial_height(value: f32) -> f32 {
 
 fn invalid_vertex() -> VertexOutput {
     var out: VertexOutput;
-    out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    out.position = vec4<f32>(0.0, 0.0, 2.0, 1.0);
     out.valid = 0.0;
     return out;
 }
@@ -134,16 +134,13 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
     var world_pos: vec3<f32>;
     if (coastline_uniforms.plot_kind == 1u) {
-        var radius = 1.0;
+        var radius = 1.002;
         if (coastline_uniforms.plot_mode > 0u) {
             let dr = radial_height(value);
             radius = 1.002 + dr;
             if (coastline_uniforms.plot_mode == 3u) {
                 radius = max(1.002, radius);
             }
-        }
-        if (coastline_uniforms.plot_mode == 0u) {
-            radius = 1.002;
         }
         world_pos = lon_lat_to_cartesian(radius, lon, lat);
     } else {
@@ -156,7 +153,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
         if (coastline_uniforms.plot_mode == 2u) {
             height = max(0.0, height);
         }
-        world_pos = vec3<f32>(world_x, height + 0.01, world_z);
+        world_pos = vec3<f32>(world_x, height + 0.003, world_z);
     }
 
     let rotated = rotate_camera_yx(world_pos, coastline_uniforms.rotation_y, coastline_uniforms.rotation_x);

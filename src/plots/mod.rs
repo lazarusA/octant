@@ -1,6 +1,4 @@
 pub mod coastline;
-pub mod coastline_3d;
-pub mod coastline_data;
 pub mod common;
 pub mod heatmap;
 pub mod line;
@@ -11,9 +9,12 @@ pub mod surface;
 pub mod traits;
 pub mod volume;
 
-pub use coastline::{CoastlineCallback, CoastlineRenderer};
-pub use coastline_3d::{Coastline3DCallback, Coastline3DParams, Coastline3DRenderer};
-pub use coastline_data::{CoastlineBuffer, CoastlineLod, load_coastline};
+pub use coastline::{
+    Coastline3DCallback, Coastline3DParams, Coastline3DRenderer, CoastlineBuffer,
+    CoastlineCallback, CoastlineFetchResult, CoastlineLod, CoastlineReceiver, CoastlineRenderer,
+    CoastlineSender, dataset_geo_bounds, expand_coastline_line_list, fetch_coastline_async,
+    load_coastline_sync,
+};
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
 pub use line::{LineCallback, LineRenderer};
@@ -144,9 +145,18 @@ mod tests {
                 "point_cloud",
                 crate::assemble_plot_shader!(include_str!("shaders/point_cloud.wgsl")),
             ),
+            ("coastline", include_str!("shaders/coastline.wgsl")),
             (
                 "coastline_3d",
-                crate::assemble_plot_with_coords_shader!(include_str!("shaders/coastline_3d.wgsl")),
+                concat!(
+                    include_str!("shaders/common/coords.wgsl"),
+                    "\n",
+                    include_str!("shaders/common/camera3d.wgsl"),
+                    "\n",
+                    include_str!("shaders/common/projections.wgsl"),
+                    "\n",
+                    include_str!("shaders/coastline_3d.wgsl"),
+                ),
             ),
         ];
 

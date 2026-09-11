@@ -175,6 +175,32 @@ impl OctantApp {
         }
     }
 
+    /// Polls the asynchronous coastline receiver and hot-swaps GPU buffers upon completion.
+    fn poll_coastline_receiver(&mut self) {
+        let Some(rx) = &self.coastline_rx else { return };
+        if let Ok(result) = rx.try_recv() {
+            self.coastline_rx = None;
+            self.coastline_is_loading = false;
+            match result {
+                Ok((lod, verts)) => {
+                    if let Some(wgpu_state) = &self.wgpu_render_state {
+                        if let Some(r) = &self.coastline_renderer {
+                            r.swap_vertices(&wgpu_state.device, &wgpu_state.queue, &verts);
+                        }
+                        if let Some(r3d) = &self.coastline_3d_renderer {
+                            r3d.swap_vertices(&wgpu_state.device, &wgpu_state.queue, &verts);
+                        }
+                    }
+                    self.coastline_current_lod = lod;
+                    log::info!("Coastline hot-swapped to {:?}", lod);
+                }
+                Err(e) => {
+                    log::warn!("Async coastline fetch failed: {e}");
+                }
+            }
+        }
+    }
+
     /// Dispatches the appropriate GPU paint callback to the egui painter for the active plot type.
     pub fn paint_active_plot(
         &mut self,
@@ -185,6 +211,8 @@ impl OctantApp {
         gpu_zoom: f32,
         gpu_aspect_scale: [f32; 2],
     ) {
+        self.poll_coastline_receiver();
+
         match self.active_plot_type {
             crate::plots::PlotType::Line => {
                 if let Some(line_renderer) = &self.line_renderer {
@@ -358,7 +386,7 @@ impl OctantApp {
                 let (lon_min, lon_max, lat_min, lat_max) = self
                     .matrix_data
                     .as_ref()
-                    .map(|m| crate::plots::coastline_data::dataset_geo_bounds(&m.grid))
+                    .map(|m| crate::plots::dataset_geo_bounds(&m.grid))
                     .unwrap_or((-180.0, 180.0, 90.0, -90.0));
 
                 if self.active_plot_type == PlotType::Heatmap {

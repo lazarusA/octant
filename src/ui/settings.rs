@@ -122,31 +122,37 @@ fn show_coastline_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("Resolution:").small().weak());
             ui.spacing_mut().item_spacing.x = 2.0;
-            let lods = [
-                (crate::plots::CoastlineLod::Lod110m, "110m"),
-                (crate::plots::CoastlineLod::Lod50m, "50m"),
-                (crate::plots::CoastlineLod::Lod10m, "10m"),
-            ];
-            for (lod, label) in lods {
-                if ui
-                    .selectable_label(
-                        app.coastline_current_lod == lod,
-                        egui::RichText::new(label).small(),
-                    )
-                    .on_hover_text(match lod {
-                        crate::plots::CoastlineLod::Lod110m => {
-                            "110 m — fast, always available (embedded)"
-                        }
-                        crate::plots::CoastlineLod::Lod50m => {
-                            "50 m — medium detail (requires assets/coastlines/)"
-                        }
-                        crate::plots::CoastlineLod::Lod10m => {
-                            "10 m — high detail (requires assets/coastlines/)"
-                        }
-                    })
-                    .clicked()
-                {
-                    app.reload_coastline_lod(lod);
+
+            if app.coastline_is_loading {
+                ui.spinner();
+                ui.label(egui::RichText::new("Loading...").small().weak());
+            } else {
+                let lods = [
+                    (crate::plots::CoastlineLod::Lod110m, "110m"),
+                    (crate::plots::CoastlineLod::Lod50m, "50m"),
+                    (crate::plots::CoastlineLod::Lod10m, "10m"),
+                ];
+                for (lod, label) in lods {
+                    if ui
+                        .selectable_label(
+                            app.coastline_current_lod == lod,
+                            egui::RichText::new(label).small(),
+                        )
+                        .on_hover_text(match lod {
+                            crate::plots::CoastlineLod::Lod110m => {
+                                "110 m — fast, always available (embedded)"
+                            }
+                            crate::plots::CoastlineLod::Lod50m => {
+                                "50 m — medium detail (loaded in background)"
+                            }
+                            crate::plots::CoastlineLod::Lod10m => {
+                                "10 m — high detail (loaded in background)"
+                            }
+                        })
+                        .clicked()
+                    {
+                        app.reload_coastline_lod(lod);
+                    }
                 }
             }
         });

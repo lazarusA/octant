@@ -343,6 +343,10 @@ pub struct OctantApp {
     pub coastline_3d_renderer: Option<Arc<Coastline3DRenderer>>,
     /// Current LOD loaded in the GPU buffer.
     pub coastline_current_lod: crate::plots::CoastlineLod,
+    /// Receiver for background coastline LOD downloads.
+    pub coastline_rx: Option<crate::plots::CoastlineReceiver>,
+    /// Whether a higher LOD coastline is currently downloading.
+    pub coastline_is_loading: bool,
 }
 
 impl Default for OctantApp {
@@ -484,6 +488,8 @@ impl Default for OctantApp {
             coastline_renderer: None,
             coastline_3d_renderer: None,
             coastline_current_lod: crate::plots::CoastlineLod::Lod110m,
+            coastline_rx: None,
+            coastline_is_loading: false,
         }
     }
 }

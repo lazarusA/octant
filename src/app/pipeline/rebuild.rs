@@ -188,7 +188,8 @@ impl OctantApp {
                         coord_x,
                         coord_y,
                     );
-                    let coastline_buffer = crate::plots::load_coastline(self.coastline_current_lod);
+                    let coastline_buffer =
+                        crate::plots::load_coastline_sync(self.coastline_current_lod);
                     let coastline_3d_renderer = Coastline3DRenderer::new(
                         &wgpu_render_state.device,
                         wgpu_render_state.target_format,
@@ -218,7 +219,7 @@ impl OctantApp {
         if self.coastline_renderer.is_none()
             && let Some(wgpu_render_state) = &self.wgpu_render_state
         {
-            let buf = crate::plots::load_coastline(crate::plots::CoastlineLod::Lod110m);
+            let buf = crate::plots::load_coastline_sync(crate::plots::CoastlineLod::Lod110m);
             let r = CoastlineRenderer::new(
                 &wgpu_render_state.device,
                 wgpu_render_state.target_format,
@@ -310,36 +311,20 @@ impl OctantApp {
 }
 
 // ---------------------------------------------------------------------------
-// Coastline LOD reload (synchronous, user-initiated)
+// Coastline LOD reload (asynchronous background fetch with non-blocking UI)
 // ---------------------------------------------------------------------------
 
 impl OctantApp {
-    /// Loads the requested coastline LOD from disk (or the embedded 110m static)
-    /// and immediately swaps it into the GPU vertex buffer.
-    ///
-    /// Call this when the user changes the LOD selector in Settings.
-    /// The data is at most ~3 MB so the disk read is imperceptible.
+    /// Dispatches an asynchronous fetch for the requested coastline LOD
+    /// and swaps vertices into GPU buffers when ready without blocking UI frames.
     pub fn reload_coastline_lod(&mut self, lod: crate::plots::CoastlineLod) {
-        if lod == self.coastline_current_lod {
+        if lod == self.coastline_current_lod || self.coastline_is_loading {
             return;
         }
-        let Some(renderer) = self.coastline_renderer.as_ref().map(Arc::clone) else {
-            return;
-        };
-        let Some(wgpu_state) = &self.wgpu_render_state else {
-            return;
-        };
-
-        let buf = crate::plots::load_coastline(lod);
-        renderer.swap_vertices(&wgpu_state.device, &wgpu_state.queue, buf.as_slice());
-        if let Some(renderer_3d) = self.coastline_3d_renderer.as_ref().map(Arc::clone) {
-            renderer_3d.swap_vertices(&wgpu_state.device, &wgpu_state.queue, buf.as_slice());
-        }
-        self.coastline_current_lod = lod;
-        log::info!(
-            "Coastline LOD changed to {:?} ({} vertex pairs)",
-            lod,
-            buf.as_slice().len() / 2
-        );
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.coastline_rx = Some(rx);
+        self.coastline_is_loading = true;
+        crate::plots::fetch_coastline_async(lod, tx);
+        log::info!("Coastline LOD fetch requested for {:?}", lod);
     }
 }

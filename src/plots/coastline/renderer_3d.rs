@@ -1,34 +1,11 @@
-//! GPU coastline overlay renderer for 3D surfaces and spherical plots.
+//! 3D GPU coastline overlay renderer for globes and elevation surfaces.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 use wgpu::util::DeviceExt;
 
-use super::coastline_data::expand_coastline_line_list;
-use super::common::safe_write_buffer;
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct Coastline3DUniforms {
-    pub rotation_y: f32,
-    pub rotation_x: f32,
-    pub aspect_ratio: f32,
-    pub zoom: f32,
-    pub displacement_strength: f32,
-    pub plot_kind: u32,
-    pub plot_mode: u32,
-    pub width: u32,
-    pub height: u32,
-    pub coord_mode: u32,
-    pub _pad_bounds: [u32; 2],
-    pub lon_bounds: [f32; 2],
-    pub lat_bounds: [f32; 2],
-    pub color: [f32; 4],
-    pub _pad_color: [u32; 2],
-    pub color_range: [f32; 2],
-    pub _pad: [u32; 2],
-    pub _pad_tail: [u32; 2],
-}
+use super::expansion::expand_coastline_line_list;
+use super::types::{Coastline3DParams, Coastline3DUniforms};
 
 struct Coastline3DGpuResources {
     coastline_buffer: wgpu::Buffer,
@@ -63,8 +40,16 @@ impl Coastline3DRenderer {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("3D Coastline Shader"),
             source: wgpu::ShaderSource::Wgsl(
-                crate::assemble_plot_with_coords_shader!(include_str!("shaders/coastline_3d.wgsl"))
-                    .into(),
+                concat!(
+                    include_str!("../shaders/common/coords.wgsl"),
+                    "\n",
+                    include_str!("../shaders/common/camera3d.wgsl"),
+                    "\n",
+                    include_str!("../shaders/common/projections.wgsl"),
+                    "\n",
+                    include_str!("../shaders/coastline_3d.wgsl"),
+                )
+                .into(),
             ),
         });
 
@@ -88,9 +73,12 @@ impl Coastline3DRenderer {
             _pad: [0; 2],
             _pad_tail: [0; 2],
         };
-        let uniform_buffer =
-            super::common::create_uniform_buffer(device, "3D Coastline Uniform Buffer", &uniforms);
-        let data_buffer = super::common::create_storage_buffer(
+        let uniform_buffer = crate::plots::common::create_uniform_buffer(
+            device,
+            "3D Coastline Uniform Buffer",
+            &uniforms,
+        );
+        let data_buffer = crate::plots::common::create_storage_buffer(
             device,
             "3D Coastline Data Storage Buffer",
             if values.is_empty() { &[0.0] } else { values },
@@ -98,23 +86,23 @@ impl Coastline3DRenderer {
 
         let dummy_coords = [0.0_f32; 1];
         let mut x_coords = coords_x
-            .filter(|coords| !coords.is_empty())
+            .filter(|c| !c.is_empty())
             .unwrap_or(&dummy_coords)
             .to_vec();
         x_coords.resize(x_coords.len().max(width.max(128)), 0.0);
         let mut y_coords = coords_y
-            .filter(|coords| !coords.is_empty())
+            .filter(|c| !c.is_empty())
             .unwrap_or(&dummy_coords)
             .to_vec();
         y_coords.resize(y_coords.len().max(height.max(128)), 0.0);
-        let coord_x_buffer = super::common::create_storage_buffer(
+        let coord_x_buffer = crate::plots::common::create_storage_buffer(
             device,
-            "3D Coastline Coord X Storage Buffer",
+            "3D Coastline Coord X Buffer",
             &x_coords,
         );
-        let coord_y_buffer = super::common::create_storage_buffer(
+        let coord_y_buffer = crate::plots::common::create_storage_buffer(
             device,
-            "3D Coastline Coord Y Storage Buffer",
+            "3D Coastline Coord Y Buffer",
             &y_coords,
         );
 
@@ -133,34 +121,34 @@ impl Coastline3DRenderer {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("3D Coastline Bind Group Layout"),
             entries: &[
-                buffer_layout(
+                bgl_entry(
                     0,
                     wgpu::ShaderStages::VERTEX_FRAGMENT,
                     wgpu::BufferBindingType::Uniform,
                 ),
-                buffer_layout(
+                bgl_entry(
                     1,
                     wgpu::ShaderStages::VERTEX,
                     wgpu::BufferBindingType::Storage { read_only: true },
                 ),
-                buffer_layout(
+                bgl_entry(
                     2,
                     wgpu::ShaderStages::VERTEX,
                     wgpu::BufferBindingType::Storage { read_only: true },
                 ),
-                buffer_layout(
+                bgl_entry(
                     3,
                     wgpu::ShaderStages::VERTEX,
                     wgpu::BufferBindingType::Storage { read_only: true },
                 ),
-                buffer_layout(
+                bgl_entry(
                     4,
                     wgpu::ShaderStages::VERTEX_FRAGMENT,
                     wgpu::BufferBindingType::Storage { read_only: true },
                 ),
             ],
         });
-        let bind_group = make_bind_group(
+        let bind_group = make_3d_bind_group(
             device,
             &bind_group_layout,
             &uniform_buffer,
@@ -199,7 +187,7 @@ impl Coastline3DRenderer {
                 cull_mode: None,
                 ..Default::default()
             },
-            depth_stencil: Some(super::common::default_depth_stencil_state(
+            depth_stencil: Some(crate::plots::common::default_depth_stencil_state(
                 false,
                 wgpu::CompareFunction::LessEqual,
             )),
@@ -226,29 +214,29 @@ impl Coastline3DRenderer {
     }
 
     pub fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
-        safe_write_buffer(
+        crate::plots::common::safe_write_buffer(
             queue,
             &self.data_buffer,
             values,
-            "Coastline3DRenderer::update_data",
+            "Coastline3D::update_data",
         );
     }
 
     pub fn update_coords(&self, queue: &wgpu::Queue, coords_x: &[f32], coords_y: &[f32]) {
         if !coords_x.is_empty() {
-            safe_write_buffer(
+            crate::plots::common::safe_write_buffer(
                 queue,
                 &self.coord_x_buffer,
                 coords_x,
-                "Coastline3DRenderer::update_coords_x",
+                "Coastline3D::update_coords_x",
             );
         }
         if !coords_y.is_empty() {
-            safe_write_buffer(
+            crate::plots::common::safe_write_buffer(
                 queue,
                 &self.coord_y_buffer,
                 coords_y,
-                "Coastline3DRenderer::update_coords_y",
+                "Coastline3D::update_coords_y",
             );
         }
     }
@@ -262,12 +250,12 @@ impl Coastline3DRenderer {
         let capacity = self
             .gpu
             .read()
-            .map(|resources| resources.coastline_buffer.size())
+            .map(|r| r.coastline_buffer.size())
             .unwrap_or(0);
         if needed <= capacity {
-            if let Ok(resources) = self.gpu.read() {
+            if let Ok(res) = self.gpu.read() {
                 queue.write_buffer(
-                    &resources.coastline_buffer,
+                    &res.coastline_buffer,
                     0,
                     bytemuck::cast_slice(line_vertices.as_slice()),
                 );
@@ -278,7 +266,7 @@ impl Coastline3DRenderer {
                 contents: bytemuck::cast_slice(line_vertices.as_slice()),
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             });
-            let bind_group = make_bind_group(
+            let bind_group = make_3d_bind_group(
                 device,
                 &self.bind_group_layout,
                 &self.uniform_buffer,
@@ -287,35 +275,14 @@ impl Coastline3DRenderer {
                 &self.coord_y_buffer,
                 &coastline_buffer,
             );
-            if let Ok(mut resources) = self.gpu.write() {
-                resources.coastline_buffer = coastline_buffer;
-                resources.bind_group = bind_group;
+            if let Ok(mut res) = self.gpu.write() {
+                res.coastline_buffer = coastline_buffer;
+                res.bind_group = bind_group;
             }
         }
         self.vertex_count
             .store((line_vertices.len() / 2) as u32, Ordering::Relaxed);
     }
-}
-
-/// Converts GeoJSON line strings into explicit line-list pairs.
-///
-/// NaN separators cannot restart a GPU line strip, and antimeridian jumps
-/// would otherwise draw a segment across the entire map.
-
-#[derive(Copy, Clone)]
-pub struct Coastline3DParams {
-    pub rotation_y: f32,
-    pub rotation_x: f32,
-    pub aspect_ratio: f32,
-    pub zoom: f32,
-    pub displacement_strength: f32,
-    pub plot_kind: u32,
-    pub plot_mode: u32,
-    pub coord_mode: u32,
-    pub lon_bounds: [f32; 2],
-    pub lat_bounds: [f32; 2],
-    pub color: [f32; 4],
-    pub color_range: [f32; 2],
 }
 
 pub struct Coastline3DCallback {
@@ -333,24 +300,24 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
         _encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
-        let params = self.params;
+        let p = self.params;
         let uniforms = Coastline3DUniforms {
-            rotation_y: params.rotation_y,
-            rotation_x: params.rotation_x,
-            aspect_ratio: params.aspect_ratio.max(0.1),
-            zoom: params.zoom,
-            displacement_strength: params.displacement_strength,
-            plot_kind: params.plot_kind,
-            plot_mode: params.plot_mode,
+            rotation_y: p.rotation_y,
+            rotation_x: p.rotation_x,
+            aspect_ratio: p.aspect_ratio.max(0.1),
+            zoom: p.zoom,
+            displacement_strength: p.displacement_strength,
+            plot_kind: p.plot_kind,
+            plot_mode: p.plot_mode,
             width: self.renderer.width,
             height: self.renderer.height,
-            coord_mode: params.coord_mode,
+            coord_mode: p.coord_mode,
             _pad_bounds: [0; 2],
-            lon_bounds: params.lon_bounds,
-            lat_bounds: params.lat_bounds,
-            color: params.color,
+            lon_bounds: p.lon_bounds,
+            lat_bounds: p.lat_bounds,
+            color: p.color,
             _pad_color: [0; 2],
-            color_range: params.color_range,
+            color_range: p.color_range,
             _pad: [0; 2],
             _pad_tail: [0; 2],
         };
@@ -368,23 +335,23 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
         rpass: &mut wgpu::RenderPass<'static>,
         _callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
-        if !super::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
+        if !crate::plots::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
             return;
         }
         let vertex_count = self.renderer.vertex_count.load(Ordering::Relaxed);
         if vertex_count < 2 {
             return;
         }
-        let Ok(resources) = self.renderer.gpu.read() else {
+        let Ok(res) = self.renderer.gpu.read() else {
             return;
         };
         rpass.set_pipeline(&self.renderer.render_pipeline);
-        rpass.set_bind_group(0, &resources.bind_group, &[]);
+        rpass.set_bind_group(0, &res.bind_group, &[]);
         rpass.draw(0..vertex_count, 0..1);
     }
 }
 
-fn buffer_layout(
+fn bgl_entry(
     binding: u32,
     visibility: wgpu::ShaderStages,
     ty: wgpu::BufferBindingType,
@@ -401,14 +368,14 @@ fn buffer_layout(
     }
 }
 
-fn make_bind_group(
+fn make_3d_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
-    uniform_buffer: &wgpu::Buffer,
-    data_buffer: &wgpu::Buffer,
-    coord_x_buffer: &wgpu::Buffer,
-    coord_y_buffer: &wgpu::Buffer,
-    coastline_buffer: &wgpu::Buffer,
+    uniform_buf: &wgpu::Buffer,
+    data_buf: &wgpu::Buffer,
+    coord_x_buf: &wgpu::Buffer,
+    coord_y_buf: &wgpu::Buffer,
+    coastline_buf: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("3D Coastline Bind Group"),
@@ -416,23 +383,23 @@ fn make_bind_group(
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
+                resource: uniform_buf.as_entire_binding(),
             },
             wgpu::BindGroupEntry {
                 binding: 1,
-                resource: data_buffer.as_entire_binding(),
+                resource: data_buf.as_entire_binding(),
             },
             wgpu::BindGroupEntry {
                 binding: 2,
-                resource: coord_x_buffer.as_entire_binding(),
+                resource: coord_x_buf.as_entire_binding(),
             },
             wgpu::BindGroupEntry {
                 binding: 3,
-                resource: coord_y_buffer.as_entire_binding(),
+                resource: coord_y_buf.as_entire_binding(),
             },
             wgpu::BindGroupEntry {
                 binding: 4,
-                resource: coastline_buffer.as_entire_binding(),
+                resource: coastline_buf.as_entire_binding(),
             },
         ],
     })

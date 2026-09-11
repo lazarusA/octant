@@ -1,50 +1,11 @@
-//! GPU coastline overlay renderer.
-//!
-//! Draws Natural Earth coastline line-strips on top of 2D Heatmap / Flatmap plots
-//! using a vertex-pull approach: lon/lat pairs are stored in a GPU storage buffer
-//! and indexed by `vertex_index` in the WGSL shader.
-//!
-//! # LOD hot-swap
-//!
-//! Call [`CoastlineRenderer::swap_vertices`] with new `&[f32]` data (from the
-//! background tokio task) to upgrade the coastline resolution while the app is
-//! running. If the new data fits in the existing buffer it is written in-place;
-//! otherwise the buffer is reallocated.
+//! 2D GPU coastline overlay renderer for flatmaps and heatmaps.
 
-use bytemuck::{Pod, Zeroable};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 use wgpu::util::DeviceExt;
 
-use super::coastline_data::expand_coastline_line_list;
-
-// ---------------------------------------------------------------------------
-// Uniform buffer layout — must match coastline.wgsl `CoastlineUniforms`
-// ---------------------------------------------------------------------------
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub struct CoastlineUniforms {
-    pub pan: [f32; 2],
-    pub zoom: f32,
-    pub _pad0: u32,
-    pub aspect_scale: [f32; 2],
-    pub _pad1: u32,
-    pub _pad2: u32,
-    pub line_color: [f32; 4],
-    /// Dataset geographic bounds in degrees.
-    /// `lon_min`/`lon_max`: western/eastern edge (e.g. `0`/`360` or `-180`/`180`).
-    /// `lat_min`/`lat_max`: stored in dataset storage order — `lat_min > lat_max`
-    /// means the dataset is north-down (row 0 = 90°N).
-    pub lon_min: f32,
-    pub lon_max: f32,
-    pub lat_min: f32,
-    pub lat_max: f32,
-}
-
-// ---------------------------------------------------------------------------
-// Renderer
-// ---------------------------------------------------------------------------
+use super::expansion::expand_coastline_line_list;
+use super::types::CoastlineUniforms;
 
 struct CoastlineGpuResources {
     vertex_buffer: wgpu::Buffer,
@@ -60,11 +21,10 @@ pub struct CoastlineRenderer {
 }
 
 impl CoastlineRenderer {
-    /// Creates the pipeline and uploads the initial coastline vertices.
     pub fn new(device: &wgpu::Device, target_format: wgpu::TextureFormat, verts: &[f32]) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Coastline Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/coastline.wgsl").into()),
+            label: Some("Coastline 2D Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/coastline.wgsl").into()),
         });
 
         let initial_uniforms = CoastlineUniforms {
@@ -74,17 +34,16 @@ impl CoastlineRenderer {
             aspect_scale: [1.0; 2],
             _pad1: 0,
             _pad2: 0,
-            line_color: [1.0, 1.0, 1.0, 0.8], // default: semi-transparent white
-            // Global defaults — overwritten each frame from the active dataset grid.
+            line_color: [1.0, 1.0, 1.0, 0.8],
             lon_min: -180.0,
             lon_max: 180.0,
-            lat_min: -90.0, // southern edge (canonical min ≤ max)
+            lat_min: -90.0,
             lat_max: 90.0,
         };
 
-        let uniform_buffer = super::common::create_uniform_buffer(
+        let uniform_buffer = crate::plots::common::create_uniform_buffer(
             device,
-            "Coastline Uniform Buffer",
+            "Coastline 2D Uniform Buffer",
             &initial_uniforms,
         );
 
@@ -96,33 +55,33 @@ impl CoastlineRenderer {
         };
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Coastline Vertex Buffer"),
+            label: Some("Coastline 2D Vertex Buffer"),
             contents: bytemuck::cast_slice(safe_verts),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
-        let bind_group_layout = super::common::create_uniform_storage_bind_group_layout(
+        let bind_group_layout = crate::plots::common::create_uniform_storage_bind_group_layout(
             device,
-            "Coastline Bind Group Layout",
+            "Coastline 2D Bind Group Layout",
             wgpu::ShaderStages::VERTEX_FRAGMENT,
         );
 
-        let bind_group = super::common::create_uniform_storage_bind_group(
+        let bind_group = crate::plots::common::create_uniform_storage_bind_group(
             device,
-            "Coastline Bind Group",
+            "Coastline 2D Bind Group",
             &bind_group_layout,
             &uniform_buffer,
             &vertex_buffer,
         );
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Coastline Pipeline Layout"),
+            label: Some("Coastline 2D Pipeline Layout"),
             bind_group_layouts: &[Some(&bind_group_layout)],
             immediate_size: 0,
         });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Coastline Render Pipeline"),
+            label: Some("Coastline 2D Render Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -145,7 +104,7 @@ impl CoastlineRenderer {
                 cull_mode: None,
                 ..Default::default()
             },
-            depth_stencil: Some(super::common::default_depth_stencil_state(
+            depth_stencil: Some(crate::plots::common::default_depth_stencil_state(
                 false,
                 wgpu::CompareFunction::Always,
             )),
@@ -153,8 +112,6 @@ impl CoastlineRenderer {
             multiview_mask: None,
             cache: None,
         });
-
-        let vertex_count = (safe_verts.len() / 2) as u32;
 
         Self {
             render_pipeline,
@@ -164,11 +121,10 @@ impl CoastlineRenderer {
                 vertex_buffer,
                 bind_group,
             }),
-            vertex_count: AtomicU32::new(vertex_count),
+            vertex_count: AtomicU32::new((safe_verts.len() / 2) as u32),
         }
     }
 
-    /// Updates the uniform buffer each frame.
     #[allow(clippy::too_many_arguments)]
     pub fn update_uniforms(
         &self,
@@ -198,11 +154,6 @@ impl CoastlineRenderer {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
-    /// Hot-swaps the vertex buffer with higher/lower LOD data.
-    ///
-    /// If the new data fits in the existing buffer it is written in-place (no
-    /// allocation). Otherwise the buffer is reallocated and the bind group is
-    /// recreated.
     pub fn swap_vertices(&self, device: &wgpu::Device, queue: &wgpu::Queue, verts: &[f32]) {
         let line_vertices = expand_coastline_line_list(verts);
         if line_vertices.is_empty() {
@@ -221,13 +172,13 @@ impl CoastlineRenderer {
             }
         } else {
             let new_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Coastline Vertex Buffer (Resized)"),
+                label: Some("Coastline 2D Vertex Buffer (Resized)"),
                 contents: bytemuck::cast_slice(line_vertices.as_slice()),
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             });
-            let new_bg = super::common::create_uniform_storage_bind_group(
+            let new_bg = crate::plots::common::create_uniform_storage_bind_group(
                 device,
-                "Coastline Bind Group (Resized)",
+                "Coastline 2D Bind Group (Resized)",
                 &self.bind_group_layout,
                 &self.uniform_buffer,
                 &new_buf,
@@ -243,10 +194,6 @@ impl CoastlineRenderer {
     }
 }
 
-// ---------------------------------------------------------------------------
-// egui-wgpu paint callback
-// ---------------------------------------------------------------------------
-
 pub struct CoastlineCallback {
     pub renderer: Arc<CoastlineRenderer>,
     pub pan: [f32; 2],
@@ -254,7 +201,6 @@ pub struct CoastlineCallback {
     pub aspect_scale: [f32; 2],
     pub line_color: [f32; 4],
     pub rect: egui::Rect,
-    /// Dataset geographic bounds in degrees; forwarded to `CoastlineUniforms`.
     pub lon_min: f32,
     pub lon_max: f32,
     pub lat_min: f32,
@@ -290,7 +236,7 @@ impl eframe::egui_wgpu::CallbackTrait for CoastlineCallback {
         rpass: &mut wgpu::RenderPass<'static>,
         _callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
-        if !super::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
+        if !crate::plots::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
             return;
         }
         let vertex_count = self.renderer.vertex_count.load(Ordering::Relaxed);
