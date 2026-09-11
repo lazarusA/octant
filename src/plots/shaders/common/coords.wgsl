@@ -114,14 +114,15 @@ fn get_cell_normalized_bounds_x(cell_idx: u32, grid_w: u32, coord_mode: u32) -> 
     let idx = min(cell_idx, max_cx);
     var b0: f32;
     if (idx == 0u) {
-        b0 = first_x;
+        b0 = first_x - 0.5 * (coord_x_buffer[min(1u, max_cx)] - first_x);
     } else {
         b0 = 0.5 * (coord_x_buffer[idx - 1u] + coord_x_buffer[idx]);
     }
 
     var b1: f32;
     if (idx >= max_cx) {
-        b1 = last_x;
+        let prev_idx = select(max_cx - 1u, 0u, max_cx == 0u);
+        b1 = last_x + 0.5 * (last_x - coord_x_buffer[prev_idx]);
     } else {
         b1 = 0.5 * (coord_x_buffer[idx] + coord_x_buffer[idx + 1u]);
     }
@@ -153,14 +154,15 @@ fn get_cell_normalized_bounds_y(cell_idx: u32, grid_h: u32, coord_mode: u32) -> 
     let idx = min(cell_idx, max_cy);
     var b0: f32;
     if (idx == 0u) {
-        b0 = first_y;
+        b0 = first_y - 0.5 * (coord_y_buffer[min(1u, max_cy)] - first_y);
     } else {
         b0 = 0.5 * (coord_y_buffer[idx - 1u] + coord_y_buffer[idx]);
     }
 
     var b1: f32;
     if (idx >= max_cy) {
-        b1 = last_y;
+        let prev_idx = select(max_cy - 1u, 0u, max_cy == 0u);
+        b1 = last_y + 0.5 * (last_y - coord_y_buffer[prev_idx]);
     } else {
         b1 = 0.5 * (coord_y_buffer[idx] + coord_y_buffer[idx + 1u]);
     }
