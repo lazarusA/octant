@@ -9,8 +9,8 @@ pub fn expand_coastline_line_list(vertices: &[f32]) -> Vec<f32> {
     let mut expanded = Vec::with_capacity(vertices.len().saturating_mul(2));
     let mut prev_pt: Option<(f32, f32)> = None;
 
-    for pair in vertices.chunks_exact(2) {
-        let (lon, lat) = (pair[0], pair[1]);
+    let (chunks, _) = vertices.as_chunks::<2>();
+    for &[lon, lat] in chunks {
         if !lon.is_finite() || !lat.is_finite() {
             prev_pt = None;
             continue;
