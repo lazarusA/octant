@@ -95,22 +95,18 @@ fn vs_main(
         return invalid_vertex();
     }
 
-    // Wrap longitude into [0, 360] ONLY if dataset domain genuinely extends beyond 180° (lon_bounds.y > π)
+    // Wrap longitude into [0, 360] ONLY for flat Surface mode when domain extends beyond 180°
     let is_0_to_360 = (coastline_uniforms.lon_bounds.y > 3.14159265);
-    if (is_0_to_360) {
+    if (coastline_uniforms.plot_kind != 1u && is_0_to_360) {
         if (p0_lon_deg < 0.0) {
             p0_lon_deg = p0_lon_deg + 360.0;
         }
         if (p1_lon_deg < 0.0) {
             p1_lon_deg = p1_lon_deg + 360.0;
         }
-        if (abs(p1_lon_deg - p0_lon_deg) > 180.0) {
-            return invalid_vertex();
-        }
-    } else {
-        if (abs(p1_lon_deg - p0_lon_deg) > 180.0) {
-            return invalid_vertex();
-        }
+    }
+    if (abs(p1_lon_deg - p0_lon_deg) > 180.0) {
+        return invalid_vertex();
     }
 
     let p0_lon = p0_lon_deg * 0.0174532925;
@@ -118,9 +114,15 @@ fn vs_main(
     let p1_lon = p1_lon_deg * 0.0174532925;
     let p1_lat = p1_lat_deg * 0.0174532925;
 
-    let p0_uv_x = (p0_lon - coastline_uniforms.lon_bounds.x) / lon_span;
+    var p0_uv_x = (p0_lon - coastline_uniforms.lon_bounds.x) / lon_span;
+    var p1_uv_x = (p1_lon - coastline_uniforms.lon_bounds.x) / lon_span;
+    if (coastline_uniforms.plot_kind == 1u && is_0_to_360) {
+        let p0_adj_lon = select(p0_lon_deg, p0_lon_deg + 360.0, p0_lon_deg < 0.0) * 0.0174532925;
+        let p1_adj_lon = select(p1_lon_deg, p1_lon_deg + 360.0, p1_lon_deg < 0.0) * 0.0174532925;
+        p0_uv_x = (p0_adj_lon - coastline_uniforms.lon_bounds.x) / lon_span;
+        p1_uv_x = (p1_adj_lon - coastline_uniforms.lon_bounds.x) / lon_span;
+    }
     let p0_uv_y = (p0_lat - coastline_uniforms.lat_bounds.x) / lat_span;
-    let p1_uv_x = (p1_lon - coastline_uniforms.lon_bounds.x) / lon_span;
     let p1_uv_y = (p1_lat - coastline_uniforms.lat_bounds.x) / lat_span;
 
     let is_p1 = (vertex_index % 2u) == 1u;
@@ -146,8 +148,9 @@ fn vs_main(
     if (in_bounds) {
         var cell_x: u32;
         var cell_y: u32;
+        let sample_lon_deg = select(cur_lon_deg, select(cur_lon_deg, cur_lon_deg + 360.0, cur_lon_deg < 0.0), is_0_to_360);
         if (coastline_uniforms.coord_mode == 2u) {
-            cell_x = find_coord_cell_x(cur_lon_deg, coastline_uniforms.width);
+            cell_x = find_coord_cell_x(sample_lon_deg, coastline_uniforms.width);
             cell_y = find_coord_cell_y(cur_lat_deg, coastline_uniforms.height);
         } else {
             let norm_y = clamp((coastline_uniforms.lat_bounds.y - cur_lat) / lat_span, 0.0, 1.0);

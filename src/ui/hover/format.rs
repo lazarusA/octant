@@ -127,18 +127,6 @@ pub fn format_dimension_coord(
 ) -> String {
     let clean = dim_name.trim().to_lowercase();
 
-    if let Some(geo) = geo_fallback {
-        return if clean.contains("lon") {
-            let cardinal = if geo >= 0.0 { "°E" } else { "°W" };
-            format!("{}:\u{00A0}{:.2}{}", dim_name, geo.abs(), cardinal)
-        } else if clean.contains("lat") {
-            let cardinal = if geo >= 0.0 { "°N" } else { "°S" };
-            format!("{}:\u{00A0}{:.2}{}", dim_name, geo.abs(), cardinal)
-        } else {
-            format!("{}:\u{00A0}{:.2}°", dim_name, geo)
-        };
-    }
-
     let is_time_dim =
         clean.contains("time") || clean == "t" || clean.contains("date") || clean.contains("step");
 
@@ -272,6 +260,18 @@ pub fn format_dimension_coord(
             let val = min_b + t * (max_b - min_b);
             return format_coord_scalar(&clean, dim_name, val);
         }
+    }
+
+    if let Some(geo) = geo_fallback {
+        return if clean.contains("lon") {
+            let cardinal = if geo >= 0.0 { "°E" } else { "°W" };
+            format!("{}:\u{00A0}{:.2}{}", dim_name, geo.abs(), cardinal)
+        } else if clean.contains("lat") {
+            let cardinal = if geo >= 0.0 { "°N" } else { "°S" };
+            format!("{}:\u{00A0}{:.2}{}", dim_name, geo.abs(), cardinal)
+        } else {
+            format!("{}:\u{00A0}{:.2}°", dim_name, geo)
+        };
     }
 
     if is_time_dim {

@@ -253,8 +253,14 @@ impl CoordinateGrid {
                 let [lon_min, lon_max] = self.lon_bounds_rad();
                 let [lat_min, lat_max] = self.lat_bounds_rad();
 
-                if lon_rad < lon_min - 0.05
-                    || lon_rad > lon_max + 0.05
+                // If dataset is in [0, 2π] and query lon is negative (Western hemisphere), wrap to positive
+                let mut query_lon = lon_rad;
+                if lon_max > std::f32::consts::PI && query_lon < 0.0 {
+                    query_lon += 2.0 * std::f32::consts::PI;
+                }
+
+                if query_lon < lon_min - 0.05
+                    || query_lon > lon_max + 0.05
                     || lat_rad < lat_min - 0.05
                     || lat_rad > lat_max + 0.05
                 {
@@ -264,7 +270,7 @@ impl CoordinateGrid {
                 let span_lon = (lon_max - lon_min).abs().max(1e-6);
                 let span_lat = (lat_max - lat_min).abs().max(1e-6);
 
-                let u = ((lon_rad - lon_min) / span_lon).clamp(0.0, 1.0);
+                let u = ((query_lon - lon_min) / span_lon).clamp(0.0, 1.0);
                 let v = ((lat_max - lat_rad) / span_lat).clamp(0.0, 1.0);
 
                 let px = ((u * w as f32).floor() as usize).min(w.saturating_sub(1));
@@ -274,8 +280,16 @@ impl CoordinateGrid {
             Self::Irregular1D {
                 coords_x, coords_y, ..
             } => {
-                let lon_deg = lon_rad.to_degrees();
+                let mut lon_deg = lon_rad.to_degrees();
                 let lat_deg = lat_rad.to_degrees();
+
+                if let (Some(&first_x), Some(&last_x)) = (coords_x.first(), coords_x.last()) {
+                    let min_x = first_x.min(last_x);
+                    let max_x = first_x.max(last_x);
+                    if min_x >= -5.0 && max_x > 180.0 && lon_deg < 0.0 {
+                        lon_deg += 360.0;
+                    }
+                }
 
                 let px = if coords_x.len() >= 2 {
                     find_coord_cell_1d(coords_x, lon_deg)
@@ -380,10 +394,16 @@ impl CoordinateGrid {
             Self::RegionalRegular { .. } => {
                 let [lon_min, lon_max] = self.lon_bounds_rad();
                 let [lat_min, lat_max] = self.lat_bounds_rad();
-                let u_c = (px as f32 + 0.5) / w as f32;
-                let v_c = (py as f32 + 0.5) / h as f32;
-                let lon_rad = lon_min + u_c * (lon_max - lon_min);
-                let lat_rad = lat_max - v_c * (lat_max - lat_min);
+                let lon_rad = if w > 1 {
+                    lon_min + (px as f32 / (w - 1) as f32) * (lon_max - lon_min)
+                } else {
+                    lon_min
+                };
+                let lat_rad = if h > 1 {
+                    lat_max - (py as f32 / (h - 1) as f32) * (lat_max - lat_min)
+                } else {
+                    lat_max
+                };
                 (lon_rad, lat_rad)
             }
             Self::Irregular1D {
