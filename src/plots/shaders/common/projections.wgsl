@@ -30,10 +30,20 @@ fn get_lon_lat(
         return vec2<f32>(lon, lat);
     } else if (coord_mode == 1u) {
         // Mode 1: Regional Regular with explicit [lon_bounds, lat_bounds]
-        let u = (f32(cell_x) + model_xy.x) / f32(grid_w);
-        let v = (f32(cell_y) + model_xy.y) / f32(grid_h);
+        // lon_bounds and lat_bounds represent cell centers.
+        // Map vertex cell-edge coordinates (cell_x + model_xy.x) to continuous longitude/latitude.
+        let u = select(
+            (f32(cell_x) + model_xy.x - 0.5) / max(f32(grid_w) - 1.0, 1.0),
+            model_xy.x,
+            grid_w <= 1u
+        );
+        let v = select(
+            (f32(cell_y) + model_xy.y - 0.5) / max(f32(grid_h) - 1.0, 1.0),
+            model_xy.y,
+            grid_h <= 1u
+        );
         let lon = mix(lon_bounds.x, lon_bounds.y, u);
-        let lat = mix(lat_bounds.y, lat_bounds.x, v);
+        let lat = clamp(mix(lat_bounds.y, lat_bounds.x, v), -1.5707963, 1.5707963);
         return vec2<f32>(lon, lat);
     } else {
         // Mode 2: Irregular 1D Coordinate Buffers with heatmap-matching interval boundaries
@@ -50,7 +60,7 @@ fn get_lon_lat(
         let max_cy = min(grid_h - 1u, max(arrayLength(&coord_y_buffer), 1u) - 1u);
         let first_y = coord_y_buffer[0];
         let last_y = coord_y_buffer[max_cy];
-        let deg_lat = mix(first_y, last_y, v);
+        let deg_lat = clamp(mix(first_y, last_y, v), -90.0, 90.0);
 
         return vec2<f32>(deg_lon * 0.0174532925, deg_lat * 0.0174532925);
     }

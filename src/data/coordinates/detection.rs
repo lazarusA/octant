@@ -125,7 +125,23 @@ pub fn detect_grid(
             lat_bounds: (y_min, y_max),
         }
     } else if is_global_extent {
-        CoordinateGrid::GlobalRegular
+        // Standard [-180, 180] origin: collapse to GlobalRegular (no bounds needed).
+        // [0, 360]-origin grids (lon_min ≥ -5°): preserve the actual bounds in
+        // RegionalRegular so downstream systems (e.g. the coastline overlay) can
+        // project into the correct lon domain.  The heatmap shader uses the same
+        // code path for coord_mode 0 and 1, so this is a safe change.
+        if x_min >= -5.0 {
+            log::info!(
+                "CoordinateGrid: Global extent with [0,360] origin (lon_min={x_min:.2}); \
+                 using RegionalRegular to preserve bounds."
+            );
+            CoordinateGrid::RegionalRegular {
+                lon_bounds: (x_min, x_max),
+                lat_bounds: (y_min, y_max),
+            }
+        } else {
+            CoordinateGrid::GlobalRegular
+        }
     } else if is_spatial_x || is_spatial_y {
         CoordinateGrid::RegionalRegular {
             lon_bounds: (x_min, x_max),

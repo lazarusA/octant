@@ -2,8 +2,8 @@ use crate::data::DatasetMetadata;
 use crate::data::matrix_data::MatrixData;
 use crate::data::slice_request::SliceRequest;
 use crate::plots::{
-    LineRenderer, MatrixRenderer, PlotType, PointCloudRenderer, SphereRenderer, SurfaceRenderer,
-    VolumeRenderer,
+    Coastline3DRenderer, CoastlineRenderer, LineRenderer, MatrixRenderer, PlotType,
+    PointCloudRenderer, SphereRenderer, SurfaceRenderer, VolumeRenderer,
 };
 use std::sync::Arc;
 
@@ -330,6 +330,27 @@ pub struct OctantApp {
     pub pending_export: Option<crate::export::PendingExportRequest>,
     pub export_flash_timer: Option<web_time::Instant>,
     pub export_toast: Option<crate::export::ExportToastNotification>,
+
+    // Coastline Overlay
+    /// Whether to render the coastline overlay on geographic plot types.
+    pub show_coastlines: bool,
+    /// RGBA line color for coastlines [0..1]. Theme-aware default applied at
+    /// render time if this is `None`; set to `Some` when the user picks a color.
+    pub coastline_color: Option<[f32; 4]>,
+    /// GPU renderer — initialised lazily on first pipeline build.
+    pub coastline_renderer: Option<Arc<CoastlineRenderer>>,
+    /// GPU renderer for coastlines projected onto 3D surfaces and spheres.
+    pub coastline_3d_renderer: Option<Arc<Coastline3DRenderer>>,
+    /// Current LOD loaded in the GPU buffer.
+    pub coastline_current_lod: crate::plots::CoastlineLod,
+    /// Receiver for background coastline LOD downloads.
+    pub coastline_rx: Option<crate::plots::CoastlineReceiver>,
+    /// Whether a higher LOD coastline is currently downloading.
+    pub coastline_is_loading: bool,
+    /// Whether to clip coastlines strictly to the spatial boundary of the active dataset.
+    pub coastline_crop_to_data_domain: bool,
+    /// Line width for coastline rendering (1.0 to 4.0).
+    pub coastline_line_width: f32,
 }
 
 impl Default for OctantApp {
@@ -465,6 +486,16 @@ impl Default for OctantApp {
             pending_export: None,
             export_flash_timer: None,
             export_toast: None,
+
+            show_coastlines: false,
+            coastline_color: None,
+            coastline_renderer: None,
+            coastline_3d_renderer: None,
+            coastline_current_lod: crate::plots::CoastlineLod::Lod110m,
+            coastline_rx: None,
+            coastline_is_loading: false,
+            coastline_crop_to_data_domain: true,
+            coastline_line_width: 1.0,
         }
     }
 }

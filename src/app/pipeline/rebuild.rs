@@ -4,8 +4,8 @@ use crate::app::OctantApp;
 use crate::data::matrix_data::MatrixData;
 use crate::data::volume_data::VolumeData;
 use crate::plots::{
-    LineRenderer, MatrixRenderer, PlotType, PointCloudRenderer, SphereRenderer, SurfaceRenderer,
-    VolumeRenderer,
+    Coastline3DRenderer, CoastlineRenderer, LineRenderer, MatrixRenderer, PlotType,
+    PointCloudRenderer, SphereRenderer, SurfaceRenderer, VolumeRenderer,
 };
 use std::sync::Arc;
 
@@ -132,6 +132,16 @@ impl OctantApp {
                     }
                     surface_renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
                 }
+                if let Some(coastline_renderer) = &self.coastline_3d_renderer {
+                    if let (Some(cx), Some(cy)) = (
+                        effective_data.grid.coords_x(),
+                        effective_data.grid.coords_y(),
+                    ) {
+                        coastline_renderer.update_coords(&wgpu_render_state.queue, cx, cy);
+                    }
+                    coastline_renderer
+                        .update_data(&wgpu_render_state.queue, &effective_data.values);
+                }
                 if let Some(line_renderer) = &self.line_renderer {
                     line_renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
                 }
@@ -178,17 +188,45 @@ impl OctantApp {
                         coord_x,
                         coord_y,
                     );
+                    let coastline_buffer =
+                        crate::plots::load_coastline_sync(self.coastline_current_lod);
+                    let coastline_3d_renderer = Coastline3DRenderer::new(
+                        &wgpu_render_state.device,
+                        wgpu_render_state.target_format,
+                        coastline_buffer.as_slice(),
+                        &effective_data.values,
+                        effective_data.width,
+                        effective_data.height,
+                        coord_x,
+                        coord_y,
+                    );
                     self.sphere_renderer = Some(Arc::new(sphere_renderer));
                     self.surface_renderer = Some(Arc::new(surface_renderer));
+                    self.coastline_3d_renderer = Some(Arc::new(coastline_3d_renderer));
                 } else {
                     self.sphere_renderer = None;
                     self.surface_renderer = None;
+                    self.coastline_3d_renderer = None;
                 }
 
                 if data.height == 1 {
                     self.active_plot_type = PlotType::Line;
                 }
             }
+        }
+
+        // --- Coastline renderer: initialise once, upgrade LOD in background ---
+        if self.coastline_renderer.is_none()
+            && let Some(wgpu_render_state) = &self.wgpu_render_state
+        {
+            let buf = crate::plots::load_coastline_sync(crate::plots::CoastlineLod::Lod110m);
+            let r = CoastlineRenderer::new(
+                &wgpu_render_state.device,
+                wgpu_render_state.target_format,
+                buf.as_slice(),
+            );
+            self.coastline_renderer = Some(Arc::new(r));
+            self.coastline_current_lod = crate::plots::CoastlineLod::Lod110m;
         }
 
         self.matrix_data = Some(data);
@@ -269,5 +307,24 @@ impl OctantApp {
         }
 
         self.volume_data = Some(data);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Coastline LOD reload (asynchronous background fetch with non-blocking UI)
+// ---------------------------------------------------------------------------
+
+impl OctantApp {
+    /// Dispatches an asynchronous fetch for the requested coastline LOD
+    /// and swaps vertices into GPU buffers when ready without blocking UI frames.
+    pub fn reload_coastline_lod(&mut self, lod: crate::plots::CoastlineLod) {
+        if lod == self.coastline_current_lod || self.coastline_is_loading {
+            return;
+        }
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.coastline_rx = Some(rx);
+        self.coastline_is_loading = true;
+        crate::plots::fetch_coastline_async(lod, tx);
+        log::info!("Coastline LOD fetch requested for {:?}", lod);
     }
 }

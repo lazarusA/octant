@@ -107,6 +107,28 @@ mod tests {
     }
 
     #[test]
+    fn preserves_regional_longitude_intervals() {
+        let grid = CoordinateGrid::RegionalRegular {
+            lon_bounds: (170.0, 190.0),
+            lat_bounds: (-20.0, 20.0),
+        };
+        let bounds = grid.lon_bounds_rad();
+        assert!((bounds[0] - 170.0_f32.to_radians()).abs() < 1e-6);
+        assert!((bounds[1] - 190.0_f32.to_radians()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn preserves_zero_to_360_longitude_interval() {
+        let grid = CoordinateGrid::RegionalRegular {
+            lon_bounds: (0.0, 360.0),
+            lat_bounds: (-90.0, 90.0),
+        };
+        let bounds = grid.lon_bounds_rad();
+        assert!((bounds[0] - 0.0).abs() < 1e-6);
+        assert!((bounds[1] - std::f32::consts::TAU).abs() < 1e-6);
+    }
+
+    #[test]
     fn detects_irregular_1d_grid() {
         let lons: Vec<f64> = (0..50).map(|i| 10.0 + i as f64 * 0.5).collect();
         let mut lats = Vec::new();
