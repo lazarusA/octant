@@ -493,6 +493,6 @@ where
         make_vertex([0.0, 1.0, 0.0], [0.0, 1.0], norm),
         make_vertex([1.0, 1.0, 0.0], [1.0, 1.0], norm),
     ];
-    let indices = vec![0, 2, 1, 1, 2, 3];
+    let indices = vec![0, 1, 3, 0, 3, 2];
     (vertices, indices)
 }
