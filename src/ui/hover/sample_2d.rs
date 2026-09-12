@@ -16,14 +16,9 @@ pub struct Transform2D {
 }
 
 impl Transform2D {
-    pub fn from_app(app: &OctantApp, rect: Rect, matrix: &MatrixData) -> Self {
+    pub fn from_app(app: &OctantApp, rect: Rect, _matrix: &MatrixData) -> Self {
         let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio {
-            let (orig_w, orig_h) = if let Some(pyr) = &app.active_pyramid {
-                (pyr.original_width, pyr.original_height)
-            } else {
-                (matrix.width, matrix.height)
-            };
-            let data_aspect = (orig_w as f32 / orig_h.max(1) as f32).max(0.001);
+            let data_aspect = app.data_aspect_ratio_2d();
             let canvas_aspect = rect.width() / rect.height().max(1.0);
             if canvas_aspect > data_aspect {
                 (data_aspect / canvas_aspect, 1.0)

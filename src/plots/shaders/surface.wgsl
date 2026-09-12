@@ -49,6 +49,69 @@ fn get_normalized_height(val: f32) -> f32 {
     }
 }
 
+fn healpix_get_interpolated_corner_val(
+    pix: u32,
+    corner_uv: vec2<f32>,
+    nside: u32,
+    is_nested: bool,
+    max_idx: u32,
+) -> f32 {
+    let ns = max(nside, 1u);
+    var p_nest = pix;
+    if (!is_nested) {
+        p_nest = healpix_ring2nest(ns, pix);
+    }
+    let nside_sq = ns * ns;
+    let face = min(p_nest / nside_sq, 11u);
+    let in_face = p_nest % nside_sq;
+
+    var ix = 0u;
+    var iy = 0u;
+    for (var b = 0u; b < 16u; b = b + 1u) {
+        ix = ix | (((in_face >> (2u * b)) & 1u) << b);
+        iy = iy | (((in_face >> (2u * b + 1u)) & 1u) << b);
+    }
+
+    let cx = ix + u32(round(corner_uv.x));
+    let cy = iy + u32(round(corner_uv.y));
+
+    var sum: f32 = 0.0;
+    var count: f32 = 0.0;
+
+    let offsets_x = array<i32, 4>(-1, 0, -1, 0);
+    let offsets_y = array<i32, 4>(-1, -1, 0, 0);
+
+    for (var k = 0u; k < 4u; k = k + 1u) {
+        let px_cand = i32(cx) + offsets_x[k];
+        let py_cand = i32(cy) + offsets_y[k];
+
+        if (px_cand >= 0 && px_cand < i32(ns) && py_cand >= 0 && py_cand < i32(ns)) {
+            let ux = u32(px_cand);
+            let uy = u32(py_cand);
+            var cand_in_face = 0u;
+            for (var b = 0u; b < 16u; b = b + 1u) {
+                cand_in_face = cand_in_face | (((ux >> b) & 1u) << (2u * b));
+                cand_in_face = cand_in_face | (((uy >> b) & 1u) << (2u * b + 1u));
+            }
+            var cand_pix = face * nside_sq + cand_in_face;
+            if (!is_nested) {
+                cand_pix = healpix_nest2ring(ns, cand_pix);
+            }
+            let safe_cand = min(cand_pix, max_idx);
+            let v = data_buffer[safe_cand];
+            if (v == v && abs(v) < 1e30) {
+                sum = sum + v;
+                count = count + 1.0;
+            }
+        }
+    }
+
+    if (count > 0.0) {
+        return sum / count;
+    }
+    return data_buffer[min(pix, max_idx)];
+}
+
 @vertex
 fn vs_main(
     model: VertexInput,
@@ -116,7 +179,10 @@ fn vs_main(
     if (uniforms.surface_mode == 0u) {
         // Mode 0: Smooth Bumpy Terrain
         if (uniforms.coord_mode == 4u || uniforms.coord_mode == 5u) {
-            raw_val = data_buffer[safe_idx];
+            let is_nested = (uniforms.coord_mode == 5u);
+            let npix = max(grid_w * grid_h, 12u);
+            let nside = max(u32(round(sqrt(f32(npix) / 12.0))), 1u);
+            raw_val = healpix_get_interpolated_corner_val(safe_idx, model.position.xy, nside, is_nested, max_idx);
         } else {
             let corner_x = min(cell_x + u32(round(model.position.x)), grid_w - 1u);
             let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);

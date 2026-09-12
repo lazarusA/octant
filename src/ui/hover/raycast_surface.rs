@@ -39,7 +39,10 @@ pub fn raycast_surface(
     hover_pos: Pos2,
 ) -> Option<(f32, f32, Option<(f32, f32)>)> {
     let (_, world_ray) = camera.cast_ray(hover_pos);
-    let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.1);
+    let data_aspect = match &matrix.grid {
+        crate::data::CoordinateGrid::Healpix { .. } => 2.0,
+        _ => (matrix.width as f32 / matrix.height.max(1) as f32).max(0.1),
+    };
 
     if world_ray.dir[1].abs() < 1e-5 {
         return None;
@@ -60,12 +63,21 @@ pub fn raycast_surface(
         return None;
     }
 
-    let (mut px, mut py) = matrix.grid.find_cell_from_norm(
-        u.clamp(0.0, 1.0),
-        v.clamp(0.0, 1.0),
-        matrix.width,
-        matrix.height,
-    );
+    let (mut px, mut py) = if let crate::data::CoordinateGrid::Healpix { .. } = &matrix.grid {
+        let lon_rad = u.clamp(0.0, 1.0) * 2.0 * std::f32::consts::PI;
+        let lat_rad = (0.5 - v.clamp(0.0, 1.0)) * std::f32::consts::PI;
+        matrix
+            .grid
+            .find_cell_from_lon_lat_rad(lon_rad, lat_rad, matrix.width, matrix.height)
+            .unwrap_or((0, 0))
+    } else {
+        matrix.grid.find_cell_from_norm(
+            u.clamp(0.0, 1.0),
+            v.clamp(0.0, 1.0),
+            matrix.width,
+            matrix.height,
+        )
+    };
     let cell_val = matrix
         .values
         .get(py * matrix.width + px)
@@ -83,12 +95,22 @@ pub fn raycast_surface(
         if (-0.05..=1.05).contains(&u_ref) && (-0.05..=1.05).contains(&v_ref) {
             u = u_ref;
             v = v_ref;
-            let (ref_px, ref_py) = matrix.grid.find_cell_from_norm(
-                u.clamp(0.0, 1.0),
-                v.clamp(0.0, 1.0),
-                matrix.width,
-                matrix.height,
-            );
+            let (ref_px, ref_py) = if let crate::data::CoordinateGrid::Healpix { .. } = &matrix.grid
+            {
+                let lon_rad = u.clamp(0.0, 1.0) * 2.0 * std::f32::consts::PI;
+                let lat_rad = (0.5 - v.clamp(0.0, 1.0)) * std::f32::consts::PI;
+                matrix
+                    .grid
+                    .find_cell_from_lon_lat_rad(lon_rad, lat_rad, matrix.width, matrix.height)
+                    .unwrap_or((0, 0))
+            } else {
+                matrix.grid.find_cell_from_norm(
+                    u.clamp(0.0, 1.0),
+                    v.clamp(0.0, 1.0),
+                    matrix.width,
+                    matrix.height,
+                )
+            };
             px = ref_px;
             py = ref_py;
         }
@@ -119,7 +141,10 @@ pub fn surface_target_pos(
     py: usize,
     raw_val: f32,
 ) -> Option<Pos2> {
-    let data_aspect = (matrix.width as f32 / matrix.height.max(1) as f32).max(0.1);
+    let data_aspect = match &matrix.grid {
+        crate::data::CoordinateGrid::Healpix { .. } => 2.0,
+        _ => (matrix.width as f32 / matrix.height.max(1) as f32).max(0.1),
+    };
     let height = get_normalized_surface_height(app, raw_val);
     let world_y = if app.surface_mode == 2 {
         height.max(0.0) // Lego cube top face
