@@ -35,11 +35,20 @@ pub enum CoordinateGrid {
         lon_bounds: (f32, f32),
         lat_bounds: (f32, f32),
     },
+
+    /// HEALPix (Hierarchical Equal Area isoLatitude Pixelation) discrete global grid.
+    Healpix {
+        nside: usize,
+        ordering: super::healpix::HealpixOrder,
+        npix: usize,
+        coords_lon: Option<Arc<[f32]>>,
+        coords_lat: Option<Arc<[f32]>>,
+    },
 }
 
 impl CoordinateGrid {
     /// Returns the coordinate mode identifier for the GPU render boundary:
-    /// 0 = GlobalRegular, 1 = RegionalRegular, 2 = Irregular1D, 3 = Curvilinear2D.
+    /// 0 = GlobalRegular, 1 = RegionalRegular, 2 = Irregular1D, 3 = Curvilinear2D, 4 = Healpix (Ring), 5 = Healpix (Nested).
     #[inline]
     pub fn render_coord_mode(&self) -> u32 {
         match self {
@@ -47,7 +56,20 @@ impl CoordinateGrid {
             Self::RegionalRegular { .. } => 1,
             Self::Irregular1D { .. } => 2,
             Self::Curvilinear2D { .. } => 3,
+            Self::Healpix {
+                ordering: super::healpix::HealpixOrder::Ring,
+                ..
+            } => 4,
+            Self::Healpix {
+                ordering: super::healpix::HealpixOrder::Nested,
+                ..
+            } => 5,
         }
+    }
+
+    #[inline]
+    pub fn is_healpix(&self) -> bool {
+        matches!(self, Self::Healpix { .. })
     }
 
     #[inline]
@@ -102,6 +124,18 @@ impl CoordinateGrid {
                     && (Arc::ptr_eq(left_lats, right_lats)
                         || left_lats.as_ref() == right_lats.as_ref())
             }
+            (
+                Self::Healpix {
+                    nside: left_nside,
+                    ordering: left_order,
+                    ..
+                },
+                Self::Healpix {
+                    nside: right_nside,
+                    ordering: right_order,
+                    ..
+                },
+            ) => left_nside == right_nside && left_order == right_order,
             (Self::GlobalRegular, Self::GlobalRegular)
             | (Self::RegionalRegular { .. }, Self::RegionalRegular { .. }) => true,
             _ => false,
@@ -116,21 +150,19 @@ impl CoordinateGrid {
                 coords_x, coords_y, ..
             } => (coords_x.len(), coords_y.len()),
             Self::Curvilinear2D { lons, lats, .. } => (lons.len(), lats.len()),
+            Self::Healpix { npix, .. } => (*npix, 1),
         }
     }
 
     /// Returns `true` if this grid spans the full global extent (~360° lon, ~180° lat).
     #[inline]
     pub fn is_global(&self) -> bool {
-        matches!(self, Self::GlobalRegular) || self.is_global_extent()
+        matches!(self, Self::GlobalRegular | Self::Healpix { .. }) || self.is_global_extent()
     }
 
     /// Returns the longitude bounds [lon_min, lon_max] in radians.
     pub fn lon_bounds_rad(&self) -> [f32; 2] {
         let (lon_min, lon_max) = self.lon_bounds_deg();
-        // Preserve the dataset's interval. Normalizing endpoints independently
-        // turns valid domains such as [0, 360] or [170, 190] into a zero or
-        // reversed span, which breaks geographic projection on regional grids.
         [lon_min.to_radians(), lon_max.to_radians()]
     }
 
@@ -156,6 +188,7 @@ impl CoordinateGrid {
             Self::RegionalRegular { lon_bounds, .. }
             | Self::Irregular1D { lon_bounds, .. }
             | Self::Curvilinear2D { lon_bounds, .. } => *lon_bounds,
+            Self::Healpix { .. } => (0.0, 360.0),
         }
     }
 
@@ -165,6 +198,7 @@ impl CoordinateGrid {
             Self::RegionalRegular { lat_bounds, .. }
             | Self::Irregular1D { lat_bounds, .. }
             | Self::Curvilinear2D { lat_bounds, .. } => *lat_bounds,
+            Self::Healpix { .. } => (-90.0, 90.0),
         }
     }
 
@@ -220,6 +254,21 @@ impl CoordinateGrid {
                 };
 
                 (px.min(w.saturating_sub(1)), py.min(h.saturating_sub(1)))
+            }
+            Self::Healpix {
+                nside, ordering, ..
+            } => {
+                let lon_rad = (nx - 0.5) * 2.0 * std::f32::consts::PI;
+                let lat_rad = (0.5 - ny) * std::f32::consts::PI;
+                let px = match ordering {
+                    super::healpix::HealpixOrder::Ring => {
+                        super::healpix::ang2pix_ring(*nside, lon_rad, lat_rad)
+                    }
+                    super::healpix::HealpixOrder::Nested => {
+                        super::healpix::ang2pix_nest(*nside, lon_rad, lat_rad)
+                    }
+                };
+                (px, 0)
             }
             _ => {
                 let px = ((nx * w as f32).floor() as usize).min(w.saturating_sub(1));
@@ -316,6 +365,22 @@ impl CoordinateGrid {
                 let py = ((v * h as f32).floor() as usize).min(h.saturating_sub(1));
                 Some((px, py))
             }
+            Self::Healpix {
+                nside,
+                npix,
+                ordering,
+                ..
+            } => {
+                let px = match ordering {
+                    super::healpix::HealpixOrder::Ring => {
+                        super::healpix::ang2pix_ring(*nside, lon_rad, lat_rad)
+                    }
+                    super::healpix::HealpixOrder::Nested => {
+                        super::healpix::ang2pix_nest(*nside, lon_rad, lat_rad)
+                    }
+                };
+                Some((px.min(npix.saturating_sub(1)), 0))
+            }
         }
     }
 
@@ -363,6 +428,26 @@ impl CoordinateGrid {
                 };
 
                 (u_c, v_c)
+            }
+            Self::Healpix {
+                nside, ordering, ..
+            } => {
+                let (lon_rad, lat_rad) = match ordering {
+                    super::healpix::HealpixOrder::Ring => super::healpix::pix2ang_ring(*nside, px),
+                    super::healpix::HealpixOrder::Nested => {
+                        super::healpix::pix2ang_nest(*nside, px)
+                    }
+                };
+                let two_pi = 2.0 * std::f32::consts::PI;
+                let pi = std::f32::consts::PI;
+                let lon_wrapped = (lon_rad % two_pi + two_pi) % two_pi;
+                let u_c = if lon_wrapped > pi {
+                    (lon_wrapped - two_pi) / two_pi + 0.5
+                } else {
+                    lon_wrapped / two_pi + 0.5
+                };
+                let v_c = 0.5 - lat_rad / pi;
+                (u_c.clamp(0.0, 1.0), v_c.clamp(0.0, 1.0))
             }
             _ => {
                 let u_c = (px as f32 + 0.5) / w as f32;
@@ -420,6 +505,28 @@ impl CoordinateGrid {
                 let lat_rad = (0.5 - v_c) * std::f32::consts::PI;
                 (lon_rad, lat_rad)
             }
+            Self::Healpix {
+                nside,
+                ordering,
+                coords_lon,
+                coords_lat,
+                ..
+            } => {
+                if let (Some(lons), Some(lats)) = (coords_lon, coords_lat)
+                    && let (Some(&lon_deg), Some(&lat_deg)) = (lons.get(px), lats.get(px))
+                {
+                    (lon_deg.to_radians(), lat_deg.to_radians())
+                } else {
+                    match ordering {
+                        super::healpix::HealpixOrder::Ring => {
+                            super::healpix::pix2ang_ring(*nside, px)
+                        }
+                        super::healpix::HealpixOrder::Nested => {
+                            super::healpix::pix2ang_nest(*nside, px)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -432,10 +539,29 @@ impl CoordinateGrid {
         height: usize,
         data_aspect: f32,
     ) -> (f32, f32) {
-        let (u_c, v_c) = self.cell_center_norm(px, py, width, height);
-        let world_x = (2.0 * u_c - 1.0) * data_aspect;
-        let world_z = 2.0 * v_c - 1.0;
-        (world_x, world_z)
+        match self {
+            Self::Healpix {
+                nside, ordering, ..
+            } => {
+                let (lon_rad, lat_rad) = match ordering {
+                    super::healpix::HealpixOrder::Ring => super::healpix::pix2ang_ring(*nside, px),
+                    super::healpix::HealpixOrder::Nested => {
+                        super::healpix::pix2ang_nest(*nside, px)
+                    }
+                };
+                let u_c = lon_rad / (2.0 * std::f32::consts::PI);
+                let v_c = 0.5 - (lat_rad / std::f32::consts::PI);
+                let world_x = (2.0 * u_c - 1.0) * data_aspect;
+                let world_z = 2.0 * v_c - 1.0;
+                (world_x, world_z)
+            }
+            _ => {
+                let (u_c, v_c) = self.cell_center_norm(px, py, width, height);
+                let world_x = (2.0 * u_c - 1.0) * data_aspect;
+                let world_z = 2.0 * v_c - 1.0;
+                (world_x, world_z)
+            }
+        }
     }
 
     /// Automatically classifies and constructs a `CoordinateGrid` from dimension coordinate arrays.

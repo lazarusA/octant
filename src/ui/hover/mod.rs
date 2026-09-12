@@ -22,7 +22,7 @@ pub use sample_1d::{draw_line_guidelines_and_reticle, sample_line_series, screen
 pub use sample_2d::Transform2D;
 
 use crate::app::OctantApp;
-use crate::data::{DatasetMetadata, MatrixData, VariableInfo};
+use crate::data::{CoordinateGrid, DatasetMetadata, MatrixData, VariableInfo};
 use crate::plots::PlotType;
 use egui::{Pos2, Rect};
 use std::collections::HashSet;
@@ -559,6 +559,67 @@ fn resolve_2d_dim_entries(
     geo_coords: Option<(f32, f32)>,
     used_dims: &mut HashSet<usize>,
 ) -> Vec<String> {
+    if let CoordinateGrid::Healpix { nside, .. } = &app
+        .matrix_data
+        .as_ref()
+        .map(|m| &m.grid)
+        .unwrap_or(&CoordinateGrid::GlobalRegular)
+    {
+        let (ring, _) = crate::data::coordinates::healpix::pix2ring(*nside, px);
+        let (cell_lon_rad, cell_lat_rad) = app
+            .matrix_data
+            .as_ref()
+            .map(|m| m.grid.cell_center_lon_lat_rad(px, py, orig_w, orig_h))
+            .unwrap_or((0.0, 0.0));
+        let lat_deg = cell_lat_rad.to_degrees();
+        let lon_deg = cell_lon_rad.to_degrees();
+
+        let lat_str = if lat_deg >= 0.0 {
+            format!("lat:\u{00A0}{:.2}°N", lat_deg)
+        } else {
+            format!("lat:\u{00A0}{:.2}°S", -lat_deg)
+        };
+        let lon_str = {
+            let lon_norm = ((lon_deg % 360.0) + 360.0) % 360.0;
+            if lon_norm <= 180.0 {
+                format!("lon:\u{00A0}{:.2}°E", lon_norm)
+            } else {
+                format!("lon:\u{00A0}{:.2}°W", 360.0 - lon_norm)
+            }
+        };
+        let healpix_str = format!(
+            "cell:\u{00A0}#{}\u{00A0}(Ring\u{00A0}#{}, Nside={})",
+            px, ring, nside
+        );
+
+        let mut list = vec![healpix_str, lat_str, lon_str];
+        if let Some(v) = var {
+            let (explicit_x, _, _) =
+                v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
+                    &app.plotted_dim_config
+                } else {
+                    &app.dim_config
+                });
+            if let Some(x_idx) = explicit_x {
+                used_dims.insert(x_idx);
+            } else if let Some(cell_idx) = v
+                .dimension_names
+                .iter()
+                .position(|d| crate::utils::coordinates::is_healpix_dim_name(d))
+            {
+                used_dims.insert(cell_idx);
+            }
+            enrich_entries_with_animated_and_collapsed_dims(
+                app,
+                meta,
+                Some(v),
+                &mut list,
+                used_dims,
+            );
+        }
+        return list;
+    }
+
     if let Some(v) = var {
         let (explicit_x, explicit_y, _) =
             v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {

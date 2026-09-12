@@ -101,6 +101,15 @@ impl BlockStore for ProceduralBlockStore {
     }
 
     fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
+        if self.uri.contains("healpix") {
+            return Ok(vec![
+                "temp".to_string(),
+                "mslp".to_string(),
+                "lat".to_string(),
+                "lon".to_string(),
+                "ring".to_string(),
+            ]);
+        }
         let is_4d = self.uri.contains("volume") || self.uri.contains("4d");
         if is_4d {
             Ok(vec![
@@ -120,6 +129,111 @@ impl BlockStore for ProceduralBlockStore {
     }
 
     fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError> {
+        if self.uri.contains("healpix") {
+            let nside = 16;
+            let npix = 12 * nside * nside;
+            let mut global_attrs = HashMap::new();
+            global_attrs.insert("healpix_nside".to_string(), "16".to_string());
+            global_attrs.insert("healpix_npix".to_string(), "3072".to_string());
+            global_attrs.insert("healpix_order".to_string(), "ring".to_string());
+            global_attrs.insert("grid_type".to_string(), "healpix".to_string());
+
+            let vars = vec![
+                VariableInfo {
+                    name: "temp".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![12, 8, npix as u64],
+                    chunk_shape: vec![1, 1, npix as u64],
+                    dimension_names: vec![
+                        "time".to_string(),
+                        "layer".to_string(),
+                        "cell".to_string(),
+                    ],
+                    units: Some("K".to_string()),
+                    long_name: Some("Atmospheric Temperature (HEALPix Nside=16)".to_string()),
+                    temporal_resolution: Some("6 hours".to_string()),
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: (12 * 8 * npix * 4) as u64,
+                    attributes: global_attrs.clone(),
+                },
+                VariableInfo {
+                    name: "mslp".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![12, npix as u64],
+                    chunk_shape: vec![1, npix as u64],
+                    dimension_names: vec!["time".to_string(), "cell".to_string()],
+                    units: Some("hPa".to_string()),
+                    long_name: Some("Mean Sea Level Pressure (HEALPix Nside=16)".to_string()),
+                    temporal_resolution: Some("6 hours".to_string()),
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: (12 * npix * 4) as u64,
+                    attributes: global_attrs.clone(),
+                },
+                VariableInfo {
+                    name: "lat".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![npix as u64],
+                    chunk_shape: vec![npix as u64],
+                    dimension_names: vec!["cell".to_string()],
+                    units: Some("degrees_north".to_string()),
+                    long_name: Some("Cell Center Latitude".to_string()),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: (npix * 4) as u64,
+                    attributes: global_attrs.clone(),
+                },
+                VariableInfo {
+                    name: "lon".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![npix as u64],
+                    chunk_shape: vec![npix as u64],
+                    dimension_names: vec!["cell".to_string()],
+                    units: Some("degrees_east".to_string()),
+                    long_name: Some("Cell Center Longitude".to_string()),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: (npix * 4) as u64,
+                    attributes: global_attrs.clone(),
+                },
+                VariableInfo {
+                    name: "ring".to_string(),
+                    data_type: "float32".to_string(),
+                    shape: vec![npix as u64],
+                    chunk_shape: vec![npix as u64],
+                    dimension_names: vec!["cell".to_string()],
+                    units: Some("index".to_string()),
+                    long_name: Some("Latitude Ring Index (1 to 4*Nside-1)".to_string()),
+                    temporal_resolution: None,
+                    time_coverage_start: None,
+                    time_coverage_end: None,
+                    file_size: (npix * 4) as u64,
+                    attributes: global_attrs,
+                },
+            ];
+
+            let mut dim_coords = HashMap::new();
+            let mut lons_vec = Vec::with_capacity(npix);
+            let mut lats_vec = Vec::with_capacity(npix);
+            for p in 0..npix {
+                let (lon_rad, lat_rad) = crate::data::coordinates::healpix::pix2ang_ring(nside, p);
+                lons_vec.push(format!("{:.4}", lon_rad.to_degrees()));
+                lats_vec.push(format!("{:.4}", lat_rad.to_degrees()));
+            }
+            dim_coords.insert("lon".to_string(), lons_vec);
+            dim_coords.insert("lat".to_string(), lats_vec);
+
+            return Ok(DatasetMetadata {
+                name: "SpeedyWeather HEALPix Grid (Nside=16)".to_string(),
+                store_type: "Procedural / HEALPix".to_string(),
+                variables: vars,
+                dimension_coordinates: dim_coords,
+            });
+        }
+
         let is_4d = self.uri.contains("volume") || self.uri.contains("4d");
 
         let vars = if is_4d {
@@ -367,6 +481,90 @@ impl BlockStore for ProceduralBlockStore {
         request: &SliceRequest,
         mut on_progress: crate::data::block_store::ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
+        if self.uri.contains("healpix") {
+            let nside = 16;
+            let npix = 3072;
+            let mut lons_f64 = Vec::with_capacity(npix);
+            let mut lats_f64 = Vec::with_capacity(npix);
+            for p in 0..npix {
+                let (lon_rad, lat_rad) = crate::data::coordinates::healpix::pix2ang_ring(nside, p);
+                lons_f64.push(lon_rad.to_degrees() as f64);
+                lats_f64.push(lat_rad.to_degrees() as f64);
+            }
+
+            let mut coords_map = HashMap::new();
+            coords_map.insert("lon".to_string(), lons_f64);
+            coords_map.insert("lat".to_string(), lats_f64);
+
+            let t_idx = request
+                .selections
+                .first()
+                .map(|s| s.bounds().0)
+                .unwrap_or(0);
+            let layer_idx = if request.selections.len() >= 3 {
+                request.selections.get(1).map(|s| s.bounds().0).unwrap_or(0)
+            } else {
+                0
+            };
+
+            let values: Vec<f32> = match request.variable.as_str() {
+                "lat" => (0..npix)
+                    .map(|p| {
+                        let (_, lat_rad) =
+                            crate::data::coordinates::healpix::pix2ang_ring(nside, p);
+                        lat_rad.to_degrees()
+                    })
+                    .collect(),
+                "lon" => (0..npix)
+                    .map(|p| {
+                        let (lon_rad, _) =
+                            crate::data::coordinates::healpix::pix2ang_ring(nside, p);
+                        lon_rad.to_degrees()
+                    })
+                    .collect(),
+                "ring" => (0..npix)
+                    .map(|p| crate::data::coordinates::healpix::pix2ring(nside, p).0 as f32)
+                    .collect(),
+                "mslp" => (0..npix)
+                    .map(|p| {
+                        let (lon_rad, lat_rad) =
+                            crate::data::coordinates::healpix::pix2ang_ring(nside, p);
+                        let phase = t_idx as f32 * 0.3;
+                        1013.25 + 25.0 * (4.0 * lon_rad - phase).cos() * lat_rad.cos().powi(2)
+                            - 15.0 * lat_rad.sin()
+                    })
+                    .collect(),
+                _ => (0..npix)
+                    .map(|p| {
+                        let (lon_rad, lat_rad) =
+                            crate::data::coordinates::healpix::pix2ang_ring(nside, p);
+                        let phase = t_idx as f32 * 0.3;
+                        let alt_decay = layer_idx as f32 * 6.5;
+                        285.0 + 35.0 * lat_rad.cos() - 15.0 * lat_rad.sin().powi(2)
+                            + 18.0
+                                * (4.0 * lon_rad - phase).cos()
+                                * lat_rad.cos().powi(2)
+                                * (2.0 * lat_rad).sin()
+                            - alt_decay
+                    })
+                    .collect(),
+            };
+
+            if let Some(cb) = on_progress {
+                cb((values.len() * 4) as u64);
+            }
+
+            return Ok(OctantBlock::new(
+                request.variable.clone(),
+                vec![npix],
+                vec!["cell".to_string()],
+                vec![0],
+                values,
+                coords_map,
+                HashMap::new(),
+            ));
+        }
+
         let (nt_full, nz_full, ny_full, nx_full) = (20, 32, 32, 32);
 
         if request.variable == "clenshaw_curtis_2d" {

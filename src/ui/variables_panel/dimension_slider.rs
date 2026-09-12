@@ -29,10 +29,90 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
     }
 
     if rank == 1 {
-        app.dim_config[0].spatial = SpatialRole::X;
+        let dim_name = var_info
+            .dimension_names
+            .first()
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let is_grid = crate::utils::coordinates::is_healpix_dim_name(dim_name);
+        app.dim_config[0].spatial = if is_grid {
+            SpatialRole::Grid
+        } else {
+            SpatialRole::X
+        };
         app.dim_config[0].active = true;
         app.dim_config[0].range = app.selected_dim_ranges[0];
         app.spatial_dims.push(0);
+        if is_grid {
+            app.active_plot_type = crate::plots::PlotType::Heatmap;
+        }
+        return;
+    }
+
+    // Check if this variable has a discrete global grid / HEALPix dimension
+    let healpix_dim_idx = (0..rank).find(|&i| {
+        let name = var_info
+            .dimension_names
+            .get(i)
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        crate::utils::coordinates::is_healpix_dim_name(name)
+    });
+
+    if let Some(grid_i) = healpix_dim_idx {
+        app.dim_config[grid_i].spatial = SpatialRole::Grid;
+        app.dim_config[grid_i].active = true;
+        app.spatial_dims.push(grid_i);
+        app.active_plot_type = crate::plots::PlotType::Heatmap;
+
+        let mut z_assigned = false;
+        let mut anim_assigned = false;
+
+        // Check for Z (layer/level/depth/elevation) and Anim (time)
+        for i in 0..rank {
+            if i == grid_i {
+                continue;
+            }
+            let dim_name = var_info
+                .dimension_names
+                .get(i)
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            if !z_assigned && crate::utils::coordinates::is_spatial_z_name(dim_name) {
+                app.dim_config[i].spatial = SpatialRole::Z;
+                app.spatial_dims.push(i);
+                z_assigned = true;
+            }
+            if !anim_assigned && crate::utils::coordinates::is_animated_time_name(dim_name) {
+                app.dim_config[i].animation = AnimationRole::Animated;
+                app.animated_dim = Some(i);
+                anim_assigned = true;
+            }
+        }
+
+        // Fallback animation assignment if time name was not standard
+        if !anim_assigned {
+            for i in 0..rank {
+                if i != grid_i && app.dim_config[i].spatial == SpatialRole::None {
+                    app.dim_config[i].animation = AnimationRole::Animated;
+                    app.animated_dim = Some(i);
+                    break;
+                }
+            }
+        }
+
+        // Synchronize active flags
+        for i in 0..rank {
+            let spatial = app.dim_config[i].spatial;
+            let anim = app.dim_config[i].animation;
+            if spatial != SpatialRole::None || anim == AnimationRole::Animated {
+                app.dim_config[i].active = true;
+            }
+            app.dim_config[i].index = app.selected_dim_indices.get(i).copied().unwrap_or(0);
+            if let Some(&r) = app.selected_dim_ranges.get(i) {
+                app.dim_config[i].range = r;
+            }
+        }
         return;
     }
 
@@ -163,9 +243,10 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
 
     app.spatial_dims
         .sort_by_key(|&d| match app.dim_config[d].spatial {
-            SpatialRole::X => 0,
-            SpatialRole::Y => 1,
-            SpatialRole::Z => 2,
+            SpatialRole::Grid => 0,
+            SpatialRole::X => 1,
+            SpatialRole::Y => 2,
+            SpatialRole::Z => 3,
             SpatialRole::None => 99,
         });
 }
@@ -312,7 +393,11 @@ pub fn calculate_selected_2d_elements(app: &OctantApp) -> usize {
     };
 
     let nx = get_span(x_dim);
-    let ny = if rank <= 1 { 1 } else { get_span(y_dim) };
+    let ny = if rank <= 1 || x_dim == y_dim {
+        1
+    } else {
+        get_span(y_dim)
+    };
     nx.saturating_mul(ny)
 }
 
@@ -635,12 +720,14 @@ pub fn show_dimension_sliders(
                 egui::ComboBox::from_id_salt(("spatial_role", i))
                     .selected_text(match spatial {
                         SpatialRole::None => "None",
+                        SpatialRole::Grid => "Grid (2D/Globe)",
                         SpatialRole::X => "X",
                         SpatialRole::Y => "Y",
                         SpatialRole::Z => "Z",
                     })
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut spatial, SpatialRole::None, "None");
+                        ui.selectable_value(&mut spatial, SpatialRole::Grid, "Grid (2D/Globe)");
                         ui.selectable_value(&mut spatial, SpatialRole::X, "X");
                         ui.selectable_value(&mut spatial, SpatialRole::Y, "Y");
                         ui.selectable_value(&mut spatial, SpatialRole::Z, "Z");
@@ -699,10 +786,20 @@ fn apply_role_change(dim: usize, spatial: SpatialRole, anim: AnimationRole, app:
 
     if spatial != old_spatial && spatial != SpatialRole::None {
         for j in 0..app.dim_config.len() {
-            if j != dim && app.dim_config[j].spatial == spatial {
-                app.dim_config[j].spatial = SpatialRole::None;
-                if app.dim_config[j].animation == AnimationRole::None {
-                    app.dim_config[j].active = false;
+            if j != dim {
+                let should_clear = (spatial == SpatialRole::Grid
+                    && (app.dim_config[j].spatial == SpatialRole::Grid
+                        || app.dim_config[j].spatial == SpatialRole::X
+                        || app.dim_config[j].spatial == SpatialRole::Y))
+                    || app.dim_config[j].spatial == spatial
+                    || (app.dim_config[j].spatial == SpatialRole::Grid
+                        && (spatial == SpatialRole::X || spatial == SpatialRole::Y));
+
+                if should_clear {
+                    app.dim_config[j].spatial = SpatialRole::None;
+                    if app.dim_config[j].animation == AnimationRole::None {
+                        app.dim_config[j].active = false;
+                    }
                 }
             }
         }
@@ -750,9 +847,10 @@ fn apply_role_change(dim: usize, spatial: SpatialRole, anim: AnimationRole, app:
     }
     app.spatial_dims
         .sort_by_key(|&d| match app.dim_config[d].spatial {
-            SpatialRole::X => 0,
-            SpatialRole::Y => 1,
-            SpatialRole::Z => 2,
+            SpatialRole::Grid => 0,
+            SpatialRole::X => 1,
+            SpatialRole::Y => 2,
+            SpatialRole::Z => 3,
             SpatialRole::None => 99,
         });
 

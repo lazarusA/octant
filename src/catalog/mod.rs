@@ -284,6 +284,13 @@ pub static ICECHUNK_CATALOG: &[CatalogEntry] = &[
 
 pub static PROCEDURAL_CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
+        key: "procedural-healpix",
+        label: "HEALPix Global Grid (SpeedyWeather)",
+        subtitle: "Synthetic Baroclinic Waves on Nside=16 & 32 HEALPix Discrete Global Grids",
+        store: "procedural://healpix",
+        store_kind: StoreKind::ProceduralRandom,
+    },
+    CatalogEntry {
         key: "procedural-irregular-grids",
         label: "Irregular Grids (Ground Truth)",
         subtitle: "Clenshaw-Curtis, Gaussian, Geometrically Stretched & Stepped Resolution Grids",

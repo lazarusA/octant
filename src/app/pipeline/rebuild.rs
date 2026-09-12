@@ -210,7 +210,13 @@ impl OctantApp {
                 }
 
                 if data.height == 1 {
-                    self.active_plot_type = PlotType::Line;
+                    if data.grid.is_healpix() {
+                        if self.active_plot_type == PlotType::Line {
+                            self.active_plot_type = PlotType::Heatmap;
+                        }
+                    } else {
+                        self.active_plot_type = PlotType::Line;
+                    }
                 }
             }
         }

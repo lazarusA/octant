@@ -457,9 +457,15 @@ impl OctantApp {
             })
         };
 
+        let explicit_grid = find_explicit_spatial(crate::app::SpatialRole::Grid);
         let explicit_x = find_explicit_spatial(crate::app::SpatialRole::X);
         let explicit_y = find_explicit_spatial(crate::app::SpatialRole::Y);
         let explicit_z = find_explicit_spatial(crate::app::SpatialRole::Z);
+
+        if let Some(grid_dim) = explicit_grid {
+            let z_dim = explicit_z.unwrap_or(usize::MAX);
+            return (grid_dim, grid_dim, z_dim);
+        }
 
         let x_dim = explicit_x
             .unwrap_or_else(|| (0..rank).rev().find(|&d| Some(d) != anim_dim).unwrap_or(0));

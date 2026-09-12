@@ -349,12 +349,25 @@ fn contains_ascii_case_insensitive(haystack: &str, needle: &str) -> bool {
         .any(|w| w.eq_ignore_ascii_case(needle.as_bytes()))
 }
 
-/// Checks if a dimension name matches Spatial X heuristics (longitude / X / column) with zero allocation.
+/// Checks if a dimension name matches HEALPix discrete cell heuristics with zero allocation.
+pub fn is_healpix_dim_name(dim_name: &str) -> bool {
+    let clean = dim_name.trim();
+    clean.eq_ignore_ascii_case("cell")
+        || clean.eq_ignore_ascii_case("cells")
+        || clean.eq_ignore_ascii_case("pix")
+        || clean.eq_ignore_ascii_case("pixels")
+        || clean.eq_ignore_ascii_case("healpix")
+        || clean.eq_ignore_ascii_case("ncells")
+        || contains_ascii_case_insensitive(clean, "healpix")
+}
+
+/// Checks if a dimension name matches Spatial X heuristics (longitude / X / column / HEALPix cell) with zero allocation.
 pub fn is_spatial_x_name(dim_name: &str) -> bool {
     let clean = dim_name.trim();
     clean.eq_ignore_ascii_case("x")
         || contains_ascii_case_insensitive(clean, "lon")
         || contains_ascii_case_insensitive(clean, "col")
+        || is_healpix_dim_name(clean)
 }
 
 /// Checks if a dimension name matches Spatial Y heuristics (latitude / Y / row) with zero allocation.
@@ -372,6 +385,7 @@ pub fn is_spatial_z_name(dim_name: &str) -> bool {
         || contains_ascii_case_insensitive(clean, "depth")
         || contains_ascii_case_insensitive(clean, "level")
         || contains_ascii_case_insensitive(clean, "lev")
+        || contains_ascii_case_insensitive(clean, "layer")
         || contains_ascii_case_insensitive(clean, "height")
         || contains_ascii_case_insensitive(clean, "alt")
         || contains_ascii_case_insensitive(clean, "sigma")
@@ -395,7 +409,9 @@ pub fn format_dimension_axis_title(dim_name: &str) -> String {
         return dim_name.to_string();
     }
 
-    if clean.contains("lon") {
+    if is_healpix_dim_name(&clean) {
+        format!("{dim_name} [Cell Index]")
+    } else if clean.contains("lon") {
         format!("{dim_name} [°E]")
     } else if clean.contains("lat") {
         format!("{dim_name} [°N]")

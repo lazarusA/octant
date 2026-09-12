@@ -83,10 +83,14 @@ fn vs_main(
         normal_3d = normalize(pos_3d);
     } else if (uniforms.sphere_mode == 1u) {
         // Mode 1: Smooth Bumpy Terrain
-        let corner_x = min(cell_x + u32(round(model.position.x)), grid_w - 1u);
-        let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);
-        let corner_idx = min(corner_y * grid_w + corner_x, max_idx);
-        raw_val = data_buffer[corner_idx];
+        if (uniforms.coord_mode == 4u || uniforms.coord_mode == 5u) {
+            raw_val = data_buffer[safe_idx];
+        } else {
+            let corner_x = min(cell_x + u32(round(model.position.x)), grid_w - 1u);
+            let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);
+            let corner_idx = min(corner_y * grid_w + corner_x, max_idx);
+            raw_val = data_buffer[corner_idx];
+        }
 
         let dr = get_normalized_radial_dr(raw_val);
         pos_3d = lon_lat_to_cartesian(1.0 + dr, lon, lat);

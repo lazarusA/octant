@@ -52,6 +52,23 @@ pub fn detect_grid(
     width: usize,
     height: usize,
 ) -> CoordinateGrid {
+    let is_healpix_x = crate::utils::coordinates::is_healpix_dim_name(x_name);
+    let is_healpix_y = crate::utils::coordinates::is_healpix_dim_name(y_name);
+
+    if is_healpix_x || is_healpix_y {
+        let npix = if height == 1 { width } else { width * height };
+        if let Some(nside) = super::healpix::npix_to_nside(npix) {
+            log::info!("CoordinateGrid: Detected HEALPix grid (nside={nside}, npix={npix})");
+            return CoordinateGrid::Healpix {
+                nside,
+                ordering: super::healpix::HealpixOrder::Ring,
+                npix,
+                coords_lon: None,
+                coords_lat: None,
+            };
+        }
+    }
+
     let is_spatial_x = crate::utils::coordinates::is_spatial_x_name(x_name);
     let is_spatial_y = crate::utils::coordinates::is_spatial_y_name(y_name);
 

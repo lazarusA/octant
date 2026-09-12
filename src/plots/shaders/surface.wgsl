@@ -66,31 +66,63 @@ fn vs_main(
 
     var raw_val = data_buffer[safe_idx];
 
-    let data_aspect = max(f32(grid_w) / f32(grid_h), 0.1);
-    let scale_x = 2.0 * data_aspect;
-    let scale_y = 2.0;
+    var world_x: f32;
+    var world_z: f32;
 
-    let bounds_u = get_cell_normalized_bounds_x(cell_x, grid_w, uniforms.coord_mode);
-    let bounds_v = get_cell_normalized_bounds_y(cell_y, grid_h, uniforms.coord_mode);
+    if (uniforms.coord_mode == 4u || uniforms.coord_mode == 5u) {
+        let npix = max(grid_w * grid_h, 12u);
+        let nside = max(u32(round(sqrt(f32(npix) / 12.0))), 1u);
+        let is_nested = (uniforms.coord_mode == 5u);
 
-    let x0 = -data_aspect + bounds_u.x * scale_x;
-    let x1 = -data_aspect + bounds_u.y * scale_x;
+        let center_coords = healpix_pixel_uv_to_lon_lat(safe_idx, vec2<f32>(0.5, 0.5), nside, is_nested);
+        let corner_coords = healpix_pixel_uv_to_lon_lat(safe_idx, model.position.xy, nside, is_nested);
 
-    let y0 = -1.0 + bounds_v.x * scale_y;
-    let y1 = -1.0 + bounds_v.y * scale_y;
+        let two_pi = 6.2831853;
+        var d_lon = (corner_coords.x - center_coords.x) % two_pi;
+        if (d_lon > 3.14159265) {
+            d_lon = d_lon - two_pi;
+        } else if (d_lon < -3.14159265) {
+            d_lon = d_lon + two_pi;
+        }
+        let unwrapped_lon = center_coords.x + d_lon;
+        let unwrapped_lat = corner_coords.y;
 
-    let world_x = mix(x0, x1, model.position.x);
-    let world_z = mix(y0, y1, model.position.y);
+        let u = unwrapped_lon / two_pi;
+        let v = 0.5 - unwrapped_lat / 3.14159265;
+
+        world_x = (u * 2.0 - 1.0) * 2.0;
+        world_z = v * 2.0 - 1.0;
+    } else {
+        let data_aspect = max(f32(grid_w) / f32(grid_h), 0.1);
+        let scale_x = 2.0 * data_aspect;
+        let scale_y = 2.0;
+
+        let bounds_u = get_cell_normalized_bounds_x(cell_x, grid_w, uniforms.coord_mode);
+        let bounds_v = get_cell_normalized_bounds_y(cell_y, grid_h, uniforms.coord_mode);
+
+        let x0 = -data_aspect + bounds_u.x * scale_x;
+        let x1 = -data_aspect + bounds_u.y * scale_x;
+
+        let y0 = -1.0 + bounds_v.x * scale_y;
+        let y1 = -1.0 + bounds_v.y * scale_y;
+
+        world_x = mix(x0, x1, model.position.x);
+        world_z = mix(y0, y1, model.position.y);
+    }
 
     var pos_3d: vec3<f32>;
     var normal_3d: vec3<f32>;
 
     if (uniforms.surface_mode == 0u) {
         // Mode 0: Smooth Bumpy Terrain
-        let corner_x = min(cell_x + u32(round(model.position.x)), grid_w - 1u);
-        let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);
-        let corner_idx = min(corner_y * grid_w + corner_x, max_idx);
-        raw_val = data_buffer[corner_idx];
+        if (uniforms.coord_mode == 4u || uniforms.coord_mode == 5u) {
+            raw_val = data_buffer[safe_idx];
+        } else {
+            let corner_x = min(cell_x + u32(round(model.position.x)), grid_w - 1u);
+            let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);
+            let corner_idx = min(corner_y * grid_w + corner_x, max_idx);
+            raw_val = data_buffer[corner_idx];
+        }
 
         let norm_h = get_normalized_height(raw_val);
         let height = norm_h * 0.8 * uniforms.displacement_strength;

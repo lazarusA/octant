@@ -134,7 +134,9 @@ pub struct Coastline3DParams {
 pub fn dataset_geo_bounds(grid: &crate::data::CoordinateGrid) -> (f32, f32, f32, f32) {
     use crate::data::CoordinateGrid;
     match grid {
-        CoordinateGrid::GlobalRegular => (-180.0, 180.0, -90.0, 90.0),
+        CoordinateGrid::GlobalRegular | CoordinateGrid::Healpix { .. } => {
+            (-180.0, 180.0, -90.0, 90.0)
+        }
         CoordinateGrid::RegionalRegular {
             lon_bounds,
             lat_bounds,

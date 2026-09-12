@@ -55,25 +55,35 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     let w = max(uniforms.width, 1u);
     let h = max(uniforms.height, 1u);
-    let max_idx = arrayLength(&data_buffer) - 1u;
+    let total_elements = w * h;
+    let max_idx = min(total_elements, arrayLength(&data_buffer)) - 1u;
 
-    var gx: u32;
-    var gy: u32;
-
-    if (uniforms.coord_mode == 2u) {
+    var cell_index: u32 = 0u;
+    if (uniforms.coord_mode == 4u || uniforms.coord_mode == 5u) {
+        let lon = (in.uv.x - 0.5) * 6.2831853;
+        let lat = (0.5 - in.uv.y) * 3.14159265;
+        let npix = max(total_elements, 12u);
+        let nside = max(u32(round(sqrt(f32(npix) / 12.0))), 1u);
+        var pix = healpix_ang2pix_ring(nside, lon, lat);
+        if (uniforms.coord_mode == 5u) {
+            pix = healpix_ring2nest(nside, pix);
+        }
+        cell_index = min(pix, max_idx);
+    } else if (uniforms.coord_mode == 2u) {
         let max_lx = max(uniforms.lut_size_x, 1u) - 1u;
         let lut_x = clamp(u32(in.uv.x * f32(max_lx) + 0.5), 0u, max_lx);
-        gx = min(u32(coord_x_buffer[lut_x]), w - 1u);
+        let gx = min(u32(coord_x_buffer[lut_x]), w - 1u);
 
         let max_ly = max(uniforms.lut_size_y, 1u) - 1u;
         let lut_y = clamp(u32(in.uv.y * f32(max_ly) + 0.5), 0u, max_ly);
-        gy = min(u32(coord_y_buffer[lut_y]), h - 1u);
+        let gy = min(u32(coord_y_buffer[lut_y]), h - 1u);
+        cell_index = min(gy * w + gx, max_idx);
     } else {
-        gx = clamp(u32(in.uv.x * f32(w)), 0u, w - 1u);
-        gy = clamp(u32(in.uv.y * f32(h)), 0u, h - 1u);
+        let gx = clamp(u32(in.uv.x * f32(w)), 0u, w - 1u);
+        let gy = clamp(u32(in.uv.y * f32(h)), 0u, h - 1u);
+        cell_index = min(gy * w + gx, max_idx);
     }
 
-    let cell_index = min(gy * w + gx, max_idx);
     let val = data_buffer[cell_index];
 
     let eval_color = evaluate_plot_color(val, uniforms.color);
@@ -82,5 +92,3 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     return eval_color;
 }
-
-

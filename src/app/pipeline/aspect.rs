@@ -83,7 +83,9 @@ impl OctantApp {
         let local_step = (self.current_timestep.saturating_sub(origin)) as u32;
 
         match spatial_role {
-            crate::app::SpatialRole::X => (local_step % width, 0, 0),
+            crate::app::SpatialRole::X | crate::app::SpatialRole::Grid => {
+                (local_step % width, 0, 0)
+            }
             crate::app::SpatialRole::Y => (0, local_step % height, 0),
             crate::app::SpatialRole::Z => (0, 0, local_step % depth),
             crate::app::SpatialRole::None => (0, 0, 0),
@@ -153,6 +155,11 @@ impl OctantApp {
 
     /// Returns the aspect ratio (width / height) of the active 2D dataset.
     pub fn data_aspect_ratio_2d(&self) -> f32 {
+        if let Some(m) = &self.matrix_data
+            && m.grid.is_healpix()
+        {
+            return 2.0;
+        }
         let (w, h) = self.active_data_dimensions_2d();
         (w as f32 / (h as f32).max(1.0)).max(0.001)
     }

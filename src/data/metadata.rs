@@ -271,6 +271,21 @@ impl VariableInfo {
         &self,
         dim_configs: &[crate::app::DimConfig],
     ) -> (Option<usize>, Option<usize>, Option<usize>) {
+        let explicit_grid = (0..self.dimension_names.len()).find(|&d| {
+            dim_configs
+                .get(d)
+                .is_some_and(|c| c.spatial == crate::app::SpatialRole::Grid)
+        });
+
+        if let Some(grid_d) = explicit_grid {
+            let explicit_z = (0..self.dimension_names.len()).find(|&d| {
+                dim_configs
+                    .get(d)
+                    .is_some_and(|c| c.spatial == crate::app::SpatialRole::Z)
+            });
+            return (Some(grid_d), None, explicit_z);
+        }
+
         let explicit_x = (0..self.dimension_names.len())
             .find(|&d| {
                 dim_configs

@@ -81,6 +81,7 @@ pub enum SpatialRole {
     X,
     Y,
     Z,
+    Grid,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,8 +128,14 @@ impl DimConfig {
         }
     }
 
+    pub fn grid_dim(configs: &[DimConfig]) -> Option<usize> {
+        configs.iter().position(|c| c.spatial == SpatialRole::Grid)
+    }
+
     pub fn x_dim(configs: &[DimConfig]) -> Option<usize> {
-        configs.iter().position(|c| c.spatial == SpatialRole::X)
+        configs
+            .iter()
+            .position(|c| c.spatial == SpatialRole::X || c.spatial == SpatialRole::Grid)
     }
 
     pub fn y_dim(configs: &[DimConfig]) -> Option<usize> {

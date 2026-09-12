@@ -1,11 +1,16 @@
 //! Geographic and Cartesian coordinate mapping system.
 
 pub mod detection;
+pub mod healpix;
 pub mod lut;
 pub mod search;
 pub mod types;
 
 pub use detection::detect_grid;
+pub use healpix::{
+    HealpixOrder, ang2pix_ring, npix_to_nside, nside_to_npix, pix_boundaries, pix2ang_ring,
+    pix2ring,
+};
 pub use lut::{build_1d_coord_lut, compute_coord_lut_size};
 pub use search::find_coord_cell_1d;
 pub use types::CoordinateGrid;

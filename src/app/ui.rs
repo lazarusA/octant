@@ -436,6 +436,14 @@ impl eframe::App for OctantApp {
                     );
 
                     (x_bounds, (y_min, y_max), x_title, y_name)
+                } else if let Some(m) = &self.matrix_data
+                    && m.grid.is_healpix()
+                {
+                    let x_bounds = (-180.0, 180.0);
+                    let y_bounds = (-90.0, 90.0);
+                    let x_title = "Longitude (°)".to_string();
+                    let y_title = "Latitude (°)".to_string();
+                    (x_bounds, y_bounds, x_title, y_title)
                 } else {
                     let (orig_w, orig_h) = self.active_data_dimensions_2d();
                     let x_dim = self.get_spatial_dim_index(0);

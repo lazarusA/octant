@@ -1,10 +1,62 @@
-//! 2D Hyperslab Slicing from N-Dimensional Resident Blocks.
+use std::sync::Arc;
 
 use crate::data::CoordinateGrid;
 use crate::data::matrix_data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slicing::common::{clamp_slice_range, compute_fixed_dims_offset, resolve_min_max};
 use crate::data::slicing::coords::extract_sliced_coords_for_dim;
+
+fn attach_healpix_metadata(mut grid: CoordinateGrid, block: &OctantBlock) -> CoordinateGrid {
+    if let CoordinateGrid::Healpix {
+        nside,
+        mut ordering,
+        npix,
+        ..
+    } = grid
+    {
+        let is_nested = block
+            .attributes
+            .get("healpix_nest")
+            .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
+            .unwrap_or(false)
+            || block
+                .attributes
+                .get("healpix_order")
+                .map(|v| v.eq_ignore_ascii_case("nested"))
+                .unwrap_or(false)
+            || block
+                .attributes
+                .get("ordering")
+                .map(|v| v.eq_ignore_ascii_case("nested"))
+                .unwrap_or(false)
+            || block
+                .attributes
+                .get("grid_type")
+                .map(|v| v.to_ascii_lowercase().contains("nested"))
+                .unwrap_or(false);
+
+        if is_nested {
+            ordering = crate::data::coordinates::HealpixOrder::Nested;
+        }
+
+        let coords_lon = block.coordinates.get("lon").map(|l| {
+            let slice: Arc<[f32]> = l.iter().map(|&v| v as f32).collect();
+            slice
+        });
+        let coords_lat = block.coordinates.get("lat").map(|l| {
+            let slice: Arc<[f32]> = l.iter().map(|&v| v as f32).collect();
+            slice
+        });
+        grid = CoordinateGrid::Healpix {
+            nside,
+            ordering,
+            npix,
+            coords_lon,
+            coords_lat,
+        };
+    }
+    grid
+}
 
 /// Extracts a 1D slice representation formatted as MatrixData (width x 1).
 fn slice_1d(
@@ -43,6 +95,7 @@ fn slice_1d(
         (x_start, x_end),
     );
     let grid = CoordinateGrid::detect_grid(x_name, "y", x_coords.as_deref(), None, width, 1);
+    let grid = attach_healpix_metadata(grid, block);
 
     Some(MatrixData::new_with_grid(
         width,
@@ -178,12 +231,82 @@ pub fn slice_2d_with_ranges(
         return slice_0d(block, max_timesteps, dataset_name);
     }
 
-    if x_dim == y_dim
-        || x_dim >= block.rank()
-        || y_dim >= block.rank()
-        || fixed_indices.len() != block.rank()
-    {
+    if x_dim >= block.rank() || fixed_indices.len() != block.rank() {
         return None;
+    }
+
+    if x_dim == y_dim || y_dim >= block.rank() {
+        let full_x = block.shape[x_dim];
+        let (x_start, x_end, width) = clamp_slice_range(x_range, full_x);
+        if width == 0 {
+            return None;
+        }
+
+        let stride_x = block.strides[x_dim];
+        let base_offset = compute_fixed_dims_offset(
+            fixed_indices,
+            &block.shape,
+            &block.strides,
+            x_dim,
+            x_dim,
+            None,
+        );
+
+        let values = if stride_x == 1 {
+            let start = base_offset + x_start;
+            let end = base_offset + x_end;
+            if end <= block.values.len() {
+                block.values[start..end].to_vec()
+            } else {
+                (x_start..x_end)
+                    .map(|x| {
+                        block
+                            .values
+                            .get(base_offset + x * stride_x)
+                            .copied()
+                            .unwrap_or(f32::NAN)
+                    })
+                    .collect()
+            }
+        } else {
+            (x_start..x_end)
+                .map(|x| {
+                    block
+                        .values
+                        .get(base_offset + x * stride_x)
+                        .copied()
+                        .unwrap_or(f32::NAN)
+                })
+                .collect()
+        };
+
+        let (min_val, max_val) =
+            resolve_min_max(compute_bounds, &values, block.min_value, block.max_value);
+        let x_name = block
+            .dimension_names
+            .get(x_dim)
+            .map(|s| s.as_str())
+            .unwrap_or("x");
+        let x_coords = extract_sliced_coords_for_dim(
+            &block.coordinates,
+            &block.dimension_names,
+            &block.shape,
+            x_dim,
+            (x_start, x_end),
+        );
+        let grid = CoordinateGrid::detect_grid(x_name, "y", x_coords.as_deref(), None, width, 1);
+        let grid = attach_healpix_metadata(grid, block);
+
+        return Some(MatrixData::new_with_grid(
+            width,
+            1,
+            values,
+            min_val,
+            max_val,
+            dataset_name.to_string(),
+            max_timesteps,
+            grid,
+        ));
     }
 
     let full_x = block.shape[x_dim];
@@ -268,6 +391,7 @@ pub fn slice_2d_with_ranges(
         width,
         height,
     );
+    let grid = attach_healpix_metadata(grid, block);
 
     Some(MatrixData::new_with_grid(
         width,
