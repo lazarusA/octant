@@ -340,7 +340,8 @@ fn get_lon_lat(
         let npix = max(grid_w * grid_h, 12u);
         let nside = max(u32(round(sqrt(f32(npix) / 12.0))), 1u);
         let is_nested = (coord_mode == 5u);
-        return healpix_pixel_uv_to_lon_lat(pix, model_xy, nside, is_nested);
+        let healpix_uv = vec2<f32>(model_xy.x, 1.0 - model_xy.y);
+        return healpix_pixel_uv_to_lon_lat(pix, healpix_uv, nside, is_nested);
     } else {
         // Mode 2: Irregular 1D Coordinate Buffers with heatmap-matching interval boundaries
         let bounds_u = get_cell_normalized_bounds_x(cell_x, grid_w, coord_mode);

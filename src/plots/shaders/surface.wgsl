@@ -138,7 +138,8 @@ fn vs_main(
         let is_nested = (uniforms.coord_mode == 5u);
 
         let center_coords = healpix_pixel_uv_to_lon_lat(safe_idx, vec2<f32>(0.5, 0.5), nside, is_nested);
-        let corner_coords = healpix_pixel_uv_to_lon_lat(safe_idx, model.position.xy, nside, is_nested);
+        let healpix_uv = vec2<f32>(model.position.x, 1.0 - model.position.y);
+        let corner_coords = healpix_pixel_uv_to_lon_lat(safe_idx, healpix_uv, nside, is_nested);
 
         let two_pi = 6.2831853;
         var d_lon = (corner_coords.x - center_coords.x) % two_pi;
@@ -182,7 +183,8 @@ fn vs_main(
             let is_nested = (uniforms.coord_mode == 5u);
             let npix = max(grid_w * grid_h, 12u);
             let nside = max(u32(round(sqrt(f32(npix) / 12.0))), 1u);
-            raw_val = healpix_get_interpolated_corner_val(safe_idx, model.position.xy, nside, is_nested, max_idx);
+            let healpix_uv = vec2<f32>(model.position.x, 1.0 - model.position.y);
+            raw_val = healpix_get_interpolated_corner_val(safe_idx, healpix_uv, nside, is_nested, max_idx);
         } else {
             let corner_x = min(cell_x + u32(round(model.position.x)), grid_w - 1u);
             let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);
