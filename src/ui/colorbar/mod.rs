@@ -11,7 +11,7 @@ use egui::{Color32, Mesh, Pos2, Rect, Shape, Vec2, epaint::Vertex};
 
 /// Renders the floating glassmorphic colorbar overlay panel.
 pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
-    if !app.show_colorbar {
+    if !app.show_colorbar || app.active_colormap == 1000 || app.rgb_composite_mode {
         return;
     }
 

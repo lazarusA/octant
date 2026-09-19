@@ -130,5 +130,111 @@ pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .clicked().then(|| app.show_hover_card = !app.show_hover_card);
     });
 
+    if app.has_rgb_bands() {
+        ui.separator();
+        let is_cmyk = app.is_cmyk();
+        ui.horizontal(|ui| {
+            let mut rgb_mode = app.rgb_composite_mode;
+            let label = if is_cmyk {
+                "CMYK Composite"
+            } else {
+                "RGB Composite"
+            };
+            let tooltip = if is_cmyk {
+                "Composites 4-channel Cyan, Magenta, Yellow, Black (CMYK) into Truecolor RGB."
+            } else {
+                "Composites selected 3 channels into Truecolor RGB."
+            };
+            if ui
+                .checkbox(&mut rgb_mode, label)
+                .on_hover_text(tooltip)
+                .changed()
+            {
+                app.rgb_composite_mode = rgb_mode;
+                if rgb_mode {
+                    app.active_colormap = 1000;
+                } else {
+                    app.active_colormap = 0;
+                }
+                app.load_selected_variable_block();
+            }
+        });
+
+        if app.rgb_composite_mode && is_cmyk {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("Auto-mapped channels: C (1), M (2), Y (3), K (4)")
+                        .small()
+                        .weak(),
+                );
+            });
+        } else if app.rgb_composite_mode {
+            let num_b = app.num_bands();
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("R:").color(egui::Color32::from_rgb(255, 100, 100)));
+                let mut r_ch = app.rgb_composite_channels[0];
+                egui::ComboBox::from_id_salt("rgb_r_ch")
+                    .selected_text(format!("Band {}", r_ch + 1))
+                    .show_ui(ui, |ui| {
+                        for b in 0..num_b {
+                            if ui
+                                .selectable_label(r_ch == b, format!("Band {}", b + 1))
+                                .clicked()
+                            {
+                                r_ch = b;
+                            }
+                        }
+                    });
+                if r_ch != app.rgb_composite_channels[0] {
+                    app.rgb_composite_channels[0] = r_ch;
+                    app.load_selected_variable_block();
+                }
+
+                ui.label(egui::RichText::new("G:").color(egui::Color32::from_rgb(100, 255, 100)));
+                let mut g_ch = app.rgb_composite_channels[1];
+                egui::ComboBox::from_id_salt("rgb_g_ch")
+                    .selected_text(format!("Band {}", g_ch + 1))
+                    .show_ui(ui, |ui| {
+                        for b in 0..num_b {
+                            if ui
+                                .selectable_label(g_ch == b, format!("Band {}", b + 1))
+                                .clicked()
+                            {
+                                g_ch = b;
+                            }
+                        }
+                    });
+                if g_ch != app.rgb_composite_channels[1] {
+                    app.rgb_composite_channels[1] = g_ch;
+                    app.load_selected_variable_block();
+                }
+
+                ui.label(egui::RichText::new("B:").color(egui::Color32::from_rgb(100, 150, 255)));
+                let mut b_ch = app.rgb_composite_channels[2];
+                egui::ComboBox::from_id_salt("rgb_b_ch")
+                    .selected_text(format!("Band {}", b_ch + 1))
+                    .show_ui(ui, |ui| {
+                        for b in 0..num_b {
+                            if ui
+                                .selectable_label(b_ch == b, format!("Band {}", b + 1))
+                                .clicked()
+                            {
+                                b_ch = b;
+                            }
+                        }
+                    });
+                if b_ch != app.rgb_composite_channels[2] {
+                    app.rgb_composite_channels[2] = b_ch;
+                    app.load_selected_variable_block();
+                }
+            });
+        }
+    } else if app.rgb_composite_mode {
+        app.rgb_composite_mode = false;
+        if app.active_colormap == 1000 {
+            app.active_colormap = 0;
+        }
+    }
+
     show_coastline_controls(app, ui);
 }

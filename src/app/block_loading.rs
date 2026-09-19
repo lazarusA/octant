@@ -556,16 +556,33 @@ impl OctantApp {
 
         let compute_bounds = !self.lock_color_bounds;
 
-        if let Some(mdata) = block.slice_2d_with_ranges(
-            x_dim,
-            y_dim,
-            x_range,
-            y_range,
-            &fixed_indices,
-            self.animated_dim_extent(),
-            &format!("Block Cache [{}]", block.variable_name),
-            compute_bounds,
-        ) {
+        let mdata_opt = if self.rgb_composite_mode && block.shape.len() >= 3 && block.shape[0] >= 3
+        {
+            slice_rgb_composite(
+                block,
+                self.rgb_composite_channels,
+                self.animated_dim_extent(),
+            )
+        } else {
+            if self.rgb_composite_mode {
+                self.rgb_composite_mode = false;
+                if self.active_colormap == 1000 {
+                    self.active_colormap = 0;
+                }
+            }
+            block.slice_2d_with_ranges(
+                x_dim,
+                y_dim,
+                x_range,
+                y_range,
+                &fixed_indices,
+                self.animated_dim_extent(),
+                &format!("Block Cache [{}]", block.variable_name),
+                compute_bounds,
+            )
+        };
+
+        if let Some(mdata) = mdata_opt {
             self.rebuild_pipeline_with_matrix_data(mdata);
         }
 
@@ -726,4 +743,154 @@ impl OctantApp {
         self.pending_target_step = None;
         self.status_message = "⏹ Data fetch aborted by user.".to_string();
     }
+}
+
+fn slice_rgb_composite(
+    block: &crate::data::OctantBlock,
+    channels: [usize; 3],
+    anim_extent: usize,
+) -> Option<crate::data::MatrixData> {
+    if block.shape.len() < 3 || block.shape[0] < 3 {
+        return None;
+    }
+    let num_bands = block.shape[0];
+    let height = block.shape[1];
+    let width = block.shape[2];
+    let plane_size = height.checked_mul(width)?;
+
+    let is_cmyk = num_bands >= 4
+        && (block
+            .attributes
+            .get("photometric")
+            .is_some_and(|s| s.eq_ignore_ascii_case("cmyk"))
+            || block
+                .attributes
+                .get("color_space")
+                .is_some_and(|s| s.eq_ignore_ascii_case("cmyk")));
+
+    if is_cmyk {
+        let c_start = 0;
+        let m_start = plane_size;
+        let y_start = 2 * plane_size;
+        let k_start = 3 * plane_size;
+
+        if k_start + plane_size > block.values.len() {
+            return None;
+        }
+
+        let c_slice = &block.values[c_start..c_start + plane_size];
+        let m_slice = &block.values[m_start..m_start + plane_size];
+        let y_slice = &block.values[y_start..y_start + plane_size];
+        let k_slice = &block.values[k_start..k_start + plane_size];
+
+        let (_, c_max) = crate::utils::compute_finite_min_max(c_slice);
+        let (_, m_max) = crate::utils::compute_finite_min_max(m_slice);
+        let (_, y_max) = crate::utils::compute_finite_min_max(y_slice);
+        let (_, k_max) = crate::utils::compute_finite_min_max(k_slice);
+        let global_max = c_max.max(m_max).max(y_max).max(k_max);
+
+        let scale = if global_max > 255.0 {
+            1.0 / global_max
+        } else if global_max > 1.0 {
+            1.0 / 255.0
+        } else {
+            1.0
+        };
+
+        let mut composite_values = Vec::with_capacity(plane_size);
+        for i in 0..plane_size {
+            let c_val = c_slice[i];
+            let m_val = m_slice[i];
+            let y_val = y_slice[i];
+            let k_val = k_slice[i];
+            if c_val.is_nan() || m_val.is_nan() || y_val.is_nan() || k_val.is_nan() {
+                composite_values.push(f32::NAN);
+                continue;
+            }
+            let c = (c_val * scale).clamp(0.0, 1.0);
+            let m = (m_val * scale).clamp(0.0, 1.0);
+            let y = (y_val * scale).clamp(0.0, 1.0);
+            let k = (k_val * scale).clamp(0.0, 1.0);
+
+            let r_norm = ((1.0 - c) * (1.0 - k) * 255.0).clamp(0.0, 255.0) as u32;
+            let g_norm = ((1.0 - m) * (1.0 - k) * 255.0).clamp(0.0, 255.0) as u32;
+            let b_norm = ((1.0 - y) * (1.0 - k) * 255.0).clamp(0.0, 255.0) as u32;
+
+            let packed = r_norm | (g_norm << 8) | (b_norm << 16);
+            composite_values.push(packed as f32);
+        }
+
+        return Some(crate::data::MatrixData::new(
+            width,
+            height,
+            composite_values,
+            0.0,
+            16777215.0,
+            format!("{} (CMYK Composite)", block.variable_name),
+            anim_extent,
+        ));
+    }
+
+    let r_ch = channels[0].min(num_bands.saturating_sub(1));
+    let g_ch = channels[1].min(num_bands.saturating_sub(1));
+    let b_ch = channels[2].min(num_bands.saturating_sub(1));
+
+    let r_start = r_ch * plane_size;
+    let g_start = g_ch * plane_size;
+    let b_start = b_ch * plane_size;
+
+    if b_start + plane_size > block.values.len()
+        || g_start + plane_size > block.values.len()
+        || r_start + plane_size > block.values.len()
+    {
+        return None;
+    }
+
+    let r_slice = &block.values[r_start..r_start + plane_size];
+    let g_slice = &block.values[g_start..g_start + plane_size];
+    let b_slice = &block.values[b_start..b_start + plane_size];
+
+    let (r_min, r_max) = crate::utils::compute_finite_min_max(r_slice);
+    let (g_min, g_max) = crate::utils::compute_finite_min_max(g_slice);
+    let (b_min, b_max) = crate::utils::compute_finite_min_max(b_slice);
+    let global_max = r_max.max(g_max).max(b_max);
+    let global_min = r_min.min(g_min).min(b_min);
+
+    let (scale, offset) = if global_min >= 0.0 && global_max <= 255.0 {
+        (1.0, 0.0)
+    } else if global_min >= 0.0 && global_max <= 1.0 {
+        (255.0, 0.0)
+    } else if global_min >= 0.0 && global_max > 255.0 {
+        (255.0 / global_max, 0.0)
+    } else if global_max > global_min {
+        (255.0 / (global_max - global_min), global_min)
+    } else {
+        (1.0, 0.0)
+    };
+
+    let mut composite_values = Vec::with_capacity(plane_size);
+    for i in 0..plane_size {
+        let r_val = r_slice[i];
+        let g_val = g_slice[i];
+        let b_val = b_slice[i];
+        if r_val.is_nan() || g_val.is_nan() || b_val.is_nan() {
+            composite_values.push(f32::NAN);
+            continue;
+        }
+        let r_norm = ((r_val - offset) * scale).clamp(0.0, 255.0) as u32;
+        let g_norm = ((g_val - offset) * scale).clamp(0.0, 255.0) as u32;
+        let b_norm = ((b_val - offset) * scale).clamp(0.0, 255.0) as u32;
+        let packed = r_norm | (g_norm << 8) | (b_norm << 16);
+        composite_values.push(packed as f32);
+    }
+
+    Some(crate::data::MatrixData::new(
+        width,
+        height,
+        composite_values,
+        0.0,
+        16777215.0,
+        format!("{} (RGB Composite)", block.variable_name),
+        anim_extent,
+    ))
 }

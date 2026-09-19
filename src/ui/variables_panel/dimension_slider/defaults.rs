@@ -13,6 +13,13 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
     app.spatial_dims.clear();
     app.animated_dim = None;
 
+    if rank < 3 || var_info.shape.first().copied().unwrap_or(0) < 3 {
+        app.rgb_composite_mode = false;
+        if app.active_colormap == 1000 {
+            app.active_colormap = 0;
+        }
+    }
+
     for i in 0..rank {
         let dim_size = var_info.shape[i] as usize;
         let chunk_size = var_info.chunk_shape.get(i).copied().unwrap_or(0) as usize;

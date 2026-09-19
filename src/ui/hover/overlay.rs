@@ -133,6 +133,7 @@ pub(crate) fn draw_tooltip_card(
     raw_val: f32,
     units_str: &str,
     dim_entries: &[String],
+    is_rgb: bool,
 ) {
     let tooltip_w = 210.0;
     let tooltip_est_h = if dim_entries.len() > 2 { 84.0 } else { 68.0 };
@@ -178,9 +179,11 @@ pub(crate) fn draw_tooltip_card(
         raw_val,
         units_str,
         dim_entries,
+        is_rgb,
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_tooltip_popup(
     ctx: &egui::Context,
     tooltip_pos: Pos2,
@@ -189,13 +192,20 @@ fn render_tooltip_popup(
     raw_val: f32,
     units_str: &str,
     dim_entries: &[String],
+    is_rgb: bool,
 ) {
-    let val_formatted = if raw_val.is_nan() {
-        "NaN".to_string()
+    let (label_prefix, val_formatted) = if raw_val.is_nan() {
+        ("Val:", "NaN".to_string())
+    } else if is_rgb {
+        let packed = (raw_val.max(0.0) + 0.5) as u32;
+        let r = packed & 0xFF;
+        let g = (packed >> 8) & 0xFF;
+        let b = (packed >> 16) & 0xFF;
+        ("RGB:", format!("({}, {}, {})", r, g, b))
     } else if raw_val.abs() >= 1e4 || (raw_val.abs() <= 1e-3 && raw_val != 0.0) {
-        format!("{:.4e}", raw_val)
+        ("Val:", format!("{:.4e}", raw_val))
     } else {
-        format!("{:.4}", raw_val)
+        ("Val:", format!("{:.4}", raw_val))
     };
 
     let style = ctx.style_of(ctx.theme());
@@ -219,7 +229,7 @@ fn render_tooltip_popup(
                         );
                         ui.add_space(2.0);
                         ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("Val:").small().color(text_color));
+                            ui.label(egui::RichText::new(label_prefix).small().color(text_color));
                             ui.label(
                                 egui::RichText::new(format!("{}{}", val_formatted, units_str))
                                     .size(15.0)

@@ -52,7 +52,14 @@ impl OctantApp {
             self.line_profile_slice_idx = 0;
         }
 
-        let effective_data = if data.height > 1 && (self.enable_pyramid_resampling || is_oversized)
+        let is_rgb_composite = self.rgb_composite_mode
+            || self.active_colormap == 1000
+            || data.dataset_name.contains("RGB Composite")
+            || data.dataset_name.contains("CMYK Composite");
+
+        let effective_data = if !is_rgb_composite
+            && data.height > 1
+            && (self.enable_pyramid_resampling || is_oversized)
         {
             let pyramid = Arc::new(crate::data::MatrixPyramid::new(
                 &data.values,

@@ -14,6 +14,7 @@ pub enum StoreKind {
     RemoteIcechunk,
     LocalIcechunk,
     LocalNetCdf,
+    LocalGeoTiff,
     ProceduralVolume4D,
     ProceduralRandom,
 }
@@ -26,6 +27,7 @@ impl StoreKind {
             StoreKind::RemoteIcechunk => crate::data::DataSourceKind::RemoteIcechunk,
             StoreKind::LocalIcechunk => crate::data::DataSourceKind::LocalIcechunk,
             StoreKind::LocalNetCdf => crate::data::DataSourceKind::NetCdf,
+            StoreKind::LocalGeoTiff => crate::data::DataSourceKind::GeoTiff,
             StoreKind::ProceduralVolume4D | StoreKind::ProceduralRandom => {
                 crate::data::DataSourceKind::Procedural
             }
@@ -39,6 +41,7 @@ impl StoreKind {
             crate::data::DataSourceKind::RemoteIcechunk => StoreKind::RemoteIcechunk,
             crate::data::DataSourceKind::LocalIcechunk => StoreKind::LocalIcechunk,
             crate::data::DataSourceKind::NetCdf => StoreKind::LocalNetCdf,
+            crate::data::DataSourceKind::GeoTiff => StoreKind::LocalGeoTiff,
             crate::data::DataSourceKind::Procedural => StoreKind::ProceduralVolume4D,
             _ => StoreKind::ProceduralRandom,
         }
@@ -62,6 +65,7 @@ impl StoreKind {
                 if (kind == StoreKind::RemoteZarr && inf == StoreKind::RemoteIcechunk)
                     || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalIcechunk)
                     || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalNetCdf)
+                    || (kind == StoreKind::LocalZarr && inf == StoreKind::LocalGeoTiff)
                 {
                     inf
                 } else {
@@ -255,6 +259,8 @@ pub struct OctantApp {
     pub line_plot_all_series: bool,
     pub show_colorbar: bool,
     pub is_categorical: bool,
+    pub rgb_composite_mode: bool,
+    pub rgb_composite_channels: [usize; 3],
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
     // Block-cache & Prefetcher State
@@ -420,6 +426,8 @@ impl Default for OctantApp {
             line_plot_all_series: false,
             show_colorbar: true,
             is_categorical: false,
+            rgb_composite_mode: false,
+            rgb_composite_channels: [0, 1, 2],
             wgpu_render_state: None,
             show_hero: true,
             hero_state: crate::ui::hero::HeroState::default(),
@@ -667,6 +675,12 @@ impl OctantApp {
         self.plotted_selected_dim_ranges = self.selected_dim_ranges.clone();
         self.plotted_spatial_dims = self.spatial_dims.clone();
         self.plotted_animated_dim = self.animated_dim;
+        if !self.has_rgb_bands() {
+            self.rgb_composite_mode = false;
+            if self.active_colormap == 1000 {
+                self.active_colormap = 0;
+            }
+        }
         self.reset_variable_bounds();
     }
 
@@ -812,5 +826,48 @@ impl OctantApp {
         let out_path =
             crate::export::resolve_export_path(&self.export_settings.export_dir, &filename);
         self.request_canvas_export(out_path, false);
+    }
+
+    /// Check if the active dataset/variable has 3 or more bands available for RGB composition.
+    pub fn has_rgb_bands(&self) -> bool {
+        if let Some(var) = self.plotted_variable_info() {
+            return var.shape.len() >= 3 && var.shape[0] >= 3;
+        }
+        if let Some(var) = self.selected_variable_info() {
+            return var.shape.len() >= 3 && var.shape[0] >= 3;
+        }
+        false
+    }
+
+    /// Return the total number of bands for the active variable, if multi-band.
+    pub fn num_bands(&self) -> usize {
+        if let Some(var) = self
+            .plotted_variable_info()
+            .or_else(|| self.selected_variable_info())
+            && var.shape.len() >= 3
+        {
+            var.shape[0] as usize
+        } else {
+            3
+        }
+    }
+
+    /// Returns true if the active variable represents a CMYK color space dataset.
+    pub fn is_cmyk(&self) -> bool {
+        let Some(var) = self
+            .plotted_variable_info()
+            .or_else(|| self.selected_variable_info())
+        else {
+            return false;
+        };
+
+        var.attributes
+            .get("photometric")
+            .is_some_and(|p| p.eq_ignore_ascii_case("cmyk"))
+            || var
+                .attributes
+                .get("color_space")
+                .is_some_and(|cs| cs.eq_ignore_ascii_case("cmyk"))
+            || var.long_name.as_deref().is_some_and(|l| l.contains("CMYK"))
     }
 }

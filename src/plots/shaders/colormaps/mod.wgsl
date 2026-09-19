@@ -105,6 +105,15 @@ fn evaluate_plot_color(val: f32, color: ColorUniforms) -> vec4<f32> {
         return select(vec4<f32>(0.0, 0.0, 0.0, 0.0), color.nan_color, color.use_nan_color == 1u);
     }
 
+    // Direct RGB Composite truecolor mode (colormap 1000)
+    if (color.colormap == 1000u) {
+        let packed = u32(val + 0.5);
+        let r = f32(packed & 0xFFu) / 255.0;
+        let g = f32((packed >> 8u) & 0xFFu) / 255.0;
+        let b = f32((packed >> 16u) & 0xFFu) / 255.0;
+        return vec4<f32>(r, g, b, 1.0);
+    }
+
     // 2. Values below cmin (Lowclip)
     if (val < color.cmin) {
         let default_low = vec4<f32>(sample_colormap(color.colormap, 0.0), 1.0);

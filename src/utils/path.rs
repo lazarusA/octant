@@ -90,6 +90,9 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
             "nc" | "nc4" | "cdf" | "netcdf" | "h5" | "hdf5" | "hdf" | "he5" => {
                 return Ok(StoreKind::LocalNetCdf);
             }
+            "tif" | "tiff" | "geotif" | "geotiff" | "cog" => {
+                return Ok(StoreKind::LocalGeoTiff);
+            }
             "zarr" | "zip" => {
                 return Ok(StoreKind::LocalZarr);
             }
@@ -136,6 +139,14 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
         || path_str.ends_with(".he5")
     {
         return Ok(StoreKind::LocalNetCdf);
+    }
+    if path_str.ends_with(".tif")
+        || path_str.ends_with(".tiff")
+        || path_str.ends_with(".geotif")
+        || path_str.ends_with(".geotiff")
+        || path_str.ends_with(".cog")
+    {
+        return Ok(StoreKind::LocalGeoTiff);
     }
     if path_str.ends_with(".zarr") || path_str.ends_with(".zip") {
         return Ok(StoreKind::LocalZarr);
@@ -309,6 +320,22 @@ mod tests {
         assert_eq!(
             infer_store_kind_from_target("file:///data/dataset.zarr"),
             Ok(StoreKind::LocalZarr)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("/data/elevation.tif"),
+            Ok(StoreKind::LocalGeoTiff)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("/data/satellite.tiff"),
+            Ok(StoreKind::LocalGeoTiff)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("/data/imagery.cog"),
+            Ok(StoreKind::LocalGeoTiff)
+        );
+        assert_eq!(
+            infer_store_kind_from_target("dev/async-tiff/tests/fixtures/geo-5b.tif"),
+            Ok(StoreKind::LocalGeoTiff)
         );
 
         // Unsupported types

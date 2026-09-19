@@ -162,9 +162,9 @@ pub fn show_drop_zone(
         );
 
         let sub_text = if is_warning_active {
-            "Supported: .nc, .h5, .zarr, .icechunk"
+            "Supported: .nc, .h5, .zarr, .icechunk, .tif"
         } else {
-            ".nc, .h5, .zarr, .icechunk"
+            ".nc, .h5, .zarr, .icechunk, .tif"
         };
         let sub_color = if is_warning_active {
             warning_accent.gamma_multiply(0.85)

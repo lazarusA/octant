@@ -471,6 +471,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
 
 [[package]]
+name = "async-tiff"
+version = "0.4.0"
+dependencies = [
+ "async-trait",
+ "bytemuck",
+ "byteorder",
+ "bytes",
+ "flate2",
+ "futures",
+ "jpeg-decoder",
+ "num_enum 0.7.6",
+ "object_store",
+ "reqwest",
+ "thiserror 2.0.19",
+ "tokio",
+ "weezl 0.2.1",
+ "zstd 0.14.0",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1187,7 +1207,7 @@ dependencies = [
  "pkg-config",
  "ruzstd 0.7.3",
  "snap",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -1432,8 +1452,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce2548391e9c1929c21bf6aa2680af86fe4c1b33e6cea9ac1cfeec0bd11218cf"
 dependencies = [
  "compression-core",
- "zstd",
- "zstd-safe",
+ "zstd 0.13.3",
+ "zstd-safe 7.2.4",
 ]
 
 [[package]]
@@ -3072,7 +3092,7 @@ dependencies = [
  "typetag",
  "url",
  "urlencoding",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -3122,7 +3142,7 @@ dependencies = [
  "thiserror 2.0.19",
  "tracing",
  "url",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -3492,6 +3512,12 @@ dependencies = [
  "getrandom 0.4.3",
  "libc",
 ]
+
+[[package]]
+name = "jpeg-decoder"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00810f1d8b74be64b13dbf3db89ac67740615d6c891f0e7b6179326533011a07"
 
 [[package]]
 name = "js-sys"
@@ -4417,8 +4443,11 @@ name = "octant"
 version = "0.2.6"
 dependencies = [
  "arboard",
+ "async-tiff",
+ "async-trait",
  "blusc",
  "bytemuck",
+ "bytes",
  "console_error_panic_hook",
  "console_log",
  "eframe",
@@ -4428,6 +4457,7 @@ dependencies = [
  "futures",
  "getrandom 0.4.3",
  "glam",
+ "half",
  "icechunk",
  "icechunk-format",
  "icechunk-types",
@@ -4448,6 +4478,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
+ "weezl 0.2.1",
  "wgpu",
  "zarrs",
  "zarrs_codec",
@@ -6181,7 +6212,7 @@ dependencies = [
  "flate2",
  "half",
  "quick-error",
- "weezl",
+ "weezl 0.1.12",
  "zune-jpeg",
 ]
 
@@ -6987,6 +7018,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
 
 [[package]]
+name = "weezl"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4ca08e5ef825b65b056d9efbd95c8750683f0a6d0466d02e96dc2e4e360f3d2"
+
+[[package]]
 name = "wgpu"
 version = "30.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7721,7 +7758,7 @@ dependencies = [
  "zarrs_metadata_ext",
  "zarrs_plugin",
  "zarrs_storage",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -8084,7 +8121,16 @@ version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a"
 dependencies = [
- "zstd-safe",
+ "zstd-safe 7.2.4",
+]
+
+[[package]]
+name = "zstd"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf06bd8162af0734b344780deb55b42a2429ae430870d13fcc12f238e880fe6e"
+dependencies = [
+ "zstd-safe 8.0.0",
 ]
 
 [[package]]
@@ -8097,10 +8143,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "zstd-sys"
-version = "2.0.16+zstd.1.5.7"
+name = "zstd-safe"
+version = "8.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e19ebc2adc8f83e43039e79776e3fda8ca919132d68a1fed6a5faca2683748"
+checksum = "ae42c0555055784c70058d19ba8e275528e8a99a706684868ace5da4e716a4ab"
+dependencies = [
+ "zstd-sys",
+]
+
+[[package]]
+name = "zstd-sys"
+version = "2.1.0+zstd.1.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ef0a8027ec3ee71300ab3bcbcd0393f434aa72b91ca6d635a39941deae8eea0"
 dependencies = [
  "cc",
  "pkg-config",

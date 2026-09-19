@@ -567,7 +567,7 @@ impl eframe::App for OctantApp {
                 ui.painter().text(
                     badge_pos,
                     egui::Align2::CENTER_CENTER,
-                    "Drop dataset to visualize (.nc, .h5, .zarr, .icechunk)",
+                    "Drop dataset to visualize (.nc, .h5, .zarr, .icechunk, .tif)",
                     egui::FontId::proportional(15.0),
                     stroke_color,
                 );

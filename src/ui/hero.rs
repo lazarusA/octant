@@ -619,9 +619,9 @@ fn render_drag_hover_cue(ui: &mut egui::Ui) {
         crate::ui::icons::Icon::DropTray.paint(ui.painter(), icon_rect, accent, is_dark);
 
         let msg = if width < 330.0 {
-            "Drop dataset (.nc, .zarr, .icechunk)"
+            "Drop dataset (.nc, .zarr, .icechunk, .tif)"
         } else {
-            "Drop dataset to load (.nc, .h5, .zarr, .icechunk)"
+            "Drop dataset to load (.nc, .h5, .zarr, .icechunk, .tif)"
         };
 
         ui.painter().text(
@@ -663,9 +663,9 @@ fn render_warning_banner(ui: &mut egui::Ui) {
         crate::ui::icons::Icon::Warning.paint(ui.painter(), icon_rect, warning_color, is_dark);
 
         let msg = if width < 340.0 {
-            "Unsupported format (.nc, .zarr, .icechunk)"
+            "Unsupported format (.nc, .zarr, .icechunk, .tif)"
         } else {
-            "Unsupported type — supported: .nc, .h5, .zarr, .icechunk"
+            "Unsupported type — supported: .nc, .h5, .zarr, .icechunk, .tif"
         };
 
         ui.painter().text(

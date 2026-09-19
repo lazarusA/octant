@@ -35,6 +35,10 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
 
             if response.clicked() {
+                if app.rgb_composite_mode {
+                    app.rgb_composite_mode = false;
+                    app.load_selected_variable_block();
+                }
                 app.active_colormap = id;
                 app.preview_colormap = None;
                 ui.close();

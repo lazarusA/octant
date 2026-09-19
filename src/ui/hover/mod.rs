@@ -116,6 +116,7 @@ pub fn show_hover_tooltip(
         point_3d_hit,
     );
 
+    let is_rgb = app.active_colormap == 1000 || app.rgb_composite_mode;
     draw_tooltip_card(
         ctx,
         ui,
@@ -127,5 +128,6 @@ pub fn show_hover_tooltip(
         raw_val,
         &units_str,
         &dim_entries,
+        is_rgb,
     );
 }
