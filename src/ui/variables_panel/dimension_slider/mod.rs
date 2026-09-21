@@ -1,7 +1,9 @@
 //! Dimension slider controls, range configuration, and slice calculations.
 
+pub mod composite;
 pub mod defaults;
 pub mod double_slider;
+
 pub mod metrics;
 pub mod roles;
 pub mod slice_req;

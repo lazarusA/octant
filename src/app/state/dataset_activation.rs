@@ -174,6 +174,17 @@ impl OctantApp {
                 .is_some_and(|cs| cs.eq_ignore_ascii_case("cmyk"))
             || var.long_name.as_deref().is_some_and(|l| l.contains("CMYK"))
     }
+
+    /// Returns true if the active variable represents an OME-Zarr / bioimaging dataset with OMERO channels.
+    pub fn is_ome_dataset(&self) -> bool {
+        let Some(var) = self
+            .plotted_variable_info()
+            .or_else(|| self.selected_variable_info())
+        else {
+            return false;
+        };
+        var.attributes.contains_key("omero_channels") || var.attributes.contains_key("omero_colors")
+    }
 }
 
 /// Helper function to verify dimensional compatibility between two variables

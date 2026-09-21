@@ -133,22 +133,36 @@ impl OctantApp {
             && block.shape.len() >= 2
             && block.shape.get(c_dim).copied().unwrap_or(0) >= 2
         {
-            let opt_channels = [
-                Some(self.rgb_composite_channels[0]),
-                Some(self.rgb_composite_channels[1]),
-                Some(self.rgb_composite_channels[2]),
-            ];
-            crate::data::slicing::slice_rgb_composite_nd(
-                block,
-                c_dim,
-                x_dim,
-                y_dim,
-                x_range,
-                y_range,
-                &fixed_indices,
-                opt_channels,
-                self.animated_dim_extent(),
-            )
+            if !self.composite_channel_configs.is_empty() {
+                crate::data::slicing::slice_multichannel_composite_nd(
+                    block,
+                    c_dim,
+                    x_dim,
+                    y_dim,
+                    x_range,
+                    y_range,
+                    &fixed_indices,
+                    &self.composite_channel_configs,
+                    self.animated_dim_extent(),
+                )
+            } else {
+                let opt_channels = [
+                    Some(self.rgb_composite_channels[0]),
+                    Some(self.rgb_composite_channels[1]),
+                    Some(self.rgb_composite_channels[2]),
+                ];
+                crate::data::slicing::slice_rgb_composite_nd(
+                    block,
+                    c_dim,
+                    x_dim,
+                    y_dim,
+                    x_range,
+                    y_range,
+                    &fixed_indices,
+                    opt_channels,
+                    self.animated_dim_extent(),
+                )
+            }
         } else {
             if self.rgb_composite_mode {
                 self.rgb_composite_mode = false;

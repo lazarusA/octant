@@ -12,19 +12,21 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
     app.selected_dim_ranges.clear();
     app.spatial_dims.clear();
     app.animated_dim = None;
-    app.rgb_composite_channels = [0, 1, 2];
-
-    if rank < 3 || var_info.shape.first().copied().unwrap_or(0) < 3 {
-        app.rgb_composite_mode = false;
-        if app.active_colormap == 1000 {
-            app.active_colormap = 0;
-        }
-    }
+    super::composite::init_composite_defaults(app, var_info, rank);
 
     for i in 0..rank {
         let dim_size = var_info.shape[i] as usize;
+        let dim_name = var_info
+            .dimension_names
+            .get(i)
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let is_channel = crate::data::coordinates::naming::is_channel_dim_name(dim_name);
+
         let chunk_size = var_info.chunk_shape.get(i).copied().unwrap_or(0) as usize;
-        let range_end = if chunk_size > 0 {
+        let range_end = if is_channel {
+            dim_size.saturating_sub(1)
+        } else if chunk_size > 0 {
             chunk_size.min(dim_size).saturating_sub(1)
         } else {
             dim_size.saturating_sub(1)

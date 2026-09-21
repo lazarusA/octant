@@ -72,6 +72,7 @@ pub struct OctantApp {
     pub is_categorical: bool,
     pub rgb_composite_mode: bool,
     pub rgb_composite_channels: [usize; 3],
+    pub composite_channel_configs: Vec<crate::data::slicing::ChannelColorConfig>,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
     // Block-cache & Prefetcher State
@@ -241,7 +242,9 @@ impl Default for OctantApp {
             is_categorical: false,
             rgb_composite_mode: false,
             rgb_composite_channels: [0, 1, 2],
+            composite_channel_configs: Vec::new(),
             wgpu_render_state: None,
+
             show_hero: true,
             hero_state: crate::ui::hero::HeroState::default(),
 

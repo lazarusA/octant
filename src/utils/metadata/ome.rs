@@ -112,6 +112,8 @@ pub struct OmeroChannel {
     pub label: Option<String>,
     pub name: Option<String>,
     pub color: Option<String>,
+    #[serde(default)]
+    pub active: Option<bool>,
     pub window: Option<OmeroWindow>,
 }
 
@@ -188,6 +190,45 @@ pub fn extract_ome_multiscale_variables(
         })
         .unwrap_or_default();
 
+    let channel_colors: Vec<String> = root_zattrs
+        .omero
+        .as_ref()
+        .map(|o| {
+            o.channels
+                .iter()
+                .map(|ch| ch.color.clone().unwrap_or_default())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let channel_windows: Vec<String> = root_zattrs
+        .omero
+        .as_ref()
+        .map(|o| {
+            o.channels
+                .iter()
+                .map(|ch| {
+                    if let Some(ref w) = ch.window {
+                        format!("{}:{}", w.start, w.end)
+                    } else {
+                        String::new()
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let channel_actives: Vec<String> = root_zattrs
+        .omero
+        .as_ref()
+        .map(|o| {
+            o.channels
+                .iter()
+                .map(|ch| ch.active.map(|a| a.to_string()).unwrap_or_default())
+                .collect()
+        })
+        .unwrap_or_default();
+
     let axes_names: Vec<String> = multiscale.axes.iter().map(|a| a.name.clone()).collect();
     let mut variables = Vec::new();
 
@@ -232,6 +273,15 @@ pub fn extract_ome_multiscale_variables(
             let mut attrs: HashMap<String, String> = HashMap::new();
             if !channel_labels.is_empty() {
                 attrs.insert("omero_channels".to_string(), channel_labels.join(","));
+            }
+            if !channel_colors.is_empty() {
+                attrs.insert("omero_colors".to_string(), channel_colors.join(","));
+            }
+            if !channel_windows.is_empty() {
+                attrs.insert("omero_windows".to_string(), channel_windows.join(","));
+            }
+            if !channel_actives.is_empty() {
+                attrs.insert("omero_actives".to_string(), channel_actives.join(","));
             }
             if let Some(ref omero) = root_zattrs.omero
                 && let Some(ref rdefs) = omero.rdefs

@@ -203,8 +203,39 @@ fn test_open_checked_in_synthetic_5ch_ome_zarr_fixture() {
     // Test RGB composite slicing on this 5-channel block
     let composite = crate::data::slicing::slice_rgb_composite(&block, [0, 1, 2], 1);
     assert!(composite.is_some());
-    let mdata = composite.unwrap();
+    let Some(mdata) = composite else {
+        panic!("RGB composite slice failed");
+    };
     assert_eq!(mdata.width, 64);
     assert_eq!(mdata.height, 64);
     assert_eq!(mdata.values.len(), 64 * 64);
+
+    // Test Multi-Channel 5-color additive overlay slicing
+    let configs = vec![
+        crate::data::slicing::ChannelColorConfig::new(0, "DAPI".to_string(), [0, 0, 255]),
+        crate::data::slicing::ChannelColorConfig::new(1, "CD3".to_string(), [0, 255, 0]),
+        crate::data::slicing::ChannelColorConfig::new(2, "PanCK".to_string(), [255, 0, 0]),
+        crate::data::slicing::ChannelColorConfig::new(3, "Ki67".to_string(), [255, 255, 0]),
+        crate::data::slicing::ChannelColorConfig::new(4, "Collagen".to_string(), [255, 0, 255]),
+    ];
+
+    let mc_composite = crate::data::slicing::slice_multichannel_composite_nd(
+        &block,
+        0,
+        2,
+        1,
+        (0, 64),
+        (0, 64),
+        &[0, 0, 0],
+        &configs,
+        1,
+    );
+
+    assert!(mc_composite.is_some());
+    let Some(mc_mdata) = mc_composite else {
+        panic!("Multi-channel composite slice failed");
+    };
+    assert_eq!(mc_mdata.width, 64);
+    assert_eq!(mc_mdata.height, 64);
+    assert_eq!(mc_mdata.values.len(), 64 * 64);
 }

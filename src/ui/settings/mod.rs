@@ -1,7 +1,9 @@
 mod clipping;
 mod coastline;
+pub(crate) mod composite;
 mod export;
 mod plot_2d;
+
 mod plot_3d;
 mod plot_options;
 mod resampling;
