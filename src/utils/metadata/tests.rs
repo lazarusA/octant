@@ -159,35 +159,95 @@ fn test_ome_ngff_v03_remote_dataset_attrs() {
 }
 
 #[test]
-fn test_open_checked_in_synthetic_5ch_ome_zarr_fixture() {
-    let fixture_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("dev/odon/fixtures/synthetic_5ch.ome.zarr");
+fn test_open_synthetic_5ch_ome_zarr() {
+    use std::sync::Arc;
+    use zarrs::storage::WritableStorageTraits;
+    use zarrs::storage::store::MemoryStore;
 
-    if !fixture_path.exists() {
-        return;
+    let store = Arc::new(MemoryStore::new());
+
+    let root_attrs = serde_json::json!({
+        "multiscales": [{
+            "axes": ["c", "y", "x"],
+            "datasets": [{ "path": "0" }, { "path": "1" }],
+            "version": "0.4"
+        }],
+        "omero": {
+            "channels": [
+                { "label": "DAPI", "color": "0000FF", "active": true, "window": { "min": 0.0, "max": 255.0, "start": 0.0, "end": 255.0 } },
+                { "label": "CD3", "color": "00FF00", "active": true, "window": { "min": 0.0, "max": 255.0, "start": 0.0, "end": 255.0 } },
+                { "label": "PanCK", "color": "FF0000", "active": true, "window": { "min": 0.0, "max": 255.0, "start": 0.0, "end": 255.0 } },
+                { "label": "Ki67", "color": "FFFF00", "active": true, "window": { "min": 0.0, "max": 255.0, "start": 0.0, "end": 255.0 } },
+                { "label": "Collagen", "color": "FF00FF", "active": true, "window": { "min": 0.0, "max": 255.0, "start": 0.0, "end": 255.0 } }
+            ]
+        }
+    });
+
+    let set_key = |key: &str, data: Vec<u8>| {
+        let sk = zarrs::storage::StoreKey::new(key).expect("valid store key");
+        store.set(&sk, data.into()).expect("write store key");
+    };
+
+    let root_attrs_bytes = serde_json::to_vec_pretty(&root_attrs).expect("serialize attrs");
+    set_key(".zattrs", root_attrs_bytes);
+    set_key(".zgroup", r#"{"zarr_format": 2}"#.as_bytes().to_vec());
+
+    let zarray_0 = serde_json::json!({
+        "zarr_format": 2,
+        "shape": [5, 64, 64],
+        "chunks": [1, 64, 64],
+        "dtype": "<f4",
+        "order": "C",
+        "fill_value": 0.0,
+        "filters": null,
+        "compressor": null
+    });
+    set_key(
+        "0/.zarray",
+        serde_json::to_vec(&zarray_0).expect("serialize zarray"),
+    );
+
+    let zarray_1 = serde_json::json!({
+        "zarr_format": 2,
+        "shape": [5, 32, 32],
+        "chunks": [1, 32, 32],
+        "dtype": "<f4",
+        "order": "C",
+        "fill_value": 0.0,
+        "filters": null,
+        "compressor": null
+    });
+    set_key(
+        "1/.zarray",
+        serde_json::to_vec(&zarray_1).expect("serialize zarray"),
+    );
+
+    for ch in 0..5 {
+        let chunk_data = vec![ch as f32 * 50.0; 64 * 64];
+        let bytes: Vec<u8> = chunk_data.iter().flat_map(|f| f.to_le_bytes()).collect();
+        set_key(&format!("0/{ch}.0.0"), bytes);
     }
 
-    let store =
-        crate::data::backends::zarr::ZarrBlockStore::open_local(fixture_path.to_str().unwrap())
-            .expect("open local synthetic_5ch.ome.zarr");
+    let zstore =
+        crate::data::backends::zarr::ZarrBlockStore::new(store, "memory://test_synthetic_ome");
 
     use crate::data::blocks::BlockStore;
-    let vars = store.variables().expect("list variables");
-    assert_eq!(vars, vec!["0", "1", "2", "3"]);
 
-    let meta = store.inspect().expect("inspect dataset");
-    assert_eq!(meta.variables.len(), 4);
+    let vars = zstore.variables().expect("list variables");
+    assert_eq!(vars, vec!["0", "1"]);
 
-    let var0 = &meta.variables[0];
-    assert_eq!(var0.name, "0");
-    assert_eq!(var0.shape, vec![5, 512, 512]);
-    assert_eq!(var0.dimension_names, vec!["c", "y", "x"]);
+    let meta = zstore.inspect().expect("inspect dataset");
+    assert_eq!(meta.variables.len(), 2);
+    assert_eq!(meta.variables[0].name, "0");
+    assert_eq!(meta.variables[0].shape, vec![5, 64, 64]);
     assert_eq!(
-        var0.attributes.get("omero_channels").map(|s| s.as_str()),
+        meta.variables[0]
+            .attributes
+            .get("omero_channels")
+            .map(|s| s.as_str()),
         Some("DAPI,CD3,PanCK,Ki67,Collagen")
     );
 
-    // Fetch a 2D block
     use crate::data::slice_request::DimensionSelection;
     let req = crate::data::slice_request::SliceRequest::new(
         "0",
@@ -197,7 +257,7 @@ fn test_open_checked_in_synthetic_5ch_ome_zarr_fixture() {
             DimensionSelection::range(0, 64),
         ],
     );
-    let block = store.fetch_block(&req).expect("fetch block");
+    let block = zstore.fetch_block(&req).expect("fetch block");
     assert_eq!(block.shape, vec![5, 64, 64]);
 
     // Test RGB composite slicing on this 5-channel block
