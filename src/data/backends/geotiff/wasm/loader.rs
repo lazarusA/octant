@@ -21,23 +21,28 @@ pub async fn load_one_geotiff_wasm_with_progress(
     let source_uri = &request.store.source().uri;
     let store = WasmGeoTiffBlockStore::get_or_create(source_uri);
 
-    let (ifd, endianness, reader, decoder_registry) = {
+    let cached = {
         let guard = store.inner.read().unwrap_or_else(|p| p.into_inner());
-        if let Some(ref s) = *guard {
-            let ifd = s
-                .resolve_ifd(&request.slice.variable)
-                .cloned()
-                .ok_or_else(|| {
-                    format!("Variable '{}' not found in GeoTIFF", request.slice.variable)
-                })?;
+        guard.as_ref().map(|s| {
             (
-                ifd,
+                s.resolve_ifd(&request.slice.variable).cloned(),
                 s.tiff.endianness(),
                 s.reader.clone(),
                 s.decoder_registry.clone(),
             )
-        } else {
-            drop(guard);
+        })
+    };
+
+    let (ifd, endianness, reader, decoder_registry) = match cached {
+        Some((Some(ifd), endianness, reader, decoder_registry)) => {
+            (ifd, endianness, reader, decoder_registry)
+        }
+        Some((None, _, _, _)) => {
+            return Err(
+                format!("Variable '{}' not found in GeoTIFF", request.slice.variable).into(),
+            );
+        }
+        None => {
             let reader = Arc::new(WasmHttpTiffReader::new(source_uri));
             let geo_store = GeoTiffBlockStore::from_reader(source_uri, reader)
                 .await

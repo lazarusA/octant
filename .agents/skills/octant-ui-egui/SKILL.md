@@ -14,13 +14,38 @@ This skill guides development of the user interface in Octant using `egui` and `
 
 ### 1. Modular Subsystem Architecture (`src/ui/`, `src/export/`)
 UI and export files are decomposed into focused submodules (< 250 lines per file):
+- **About Modal (`src/ui/about/`)**:
+  - `types.rs`: `AboutTab` variants and tab constants.
+  - `overview.rs`: Architecture overview and subsystem capabilities.
+  - `icons.rs`: Icon gallery preview grid.
+  - `mod.rs`: Coordinator modal window `show_about_window`.
+- **Dataset Catalog (`src/ui/catalog/`)**:
+  - `header.rs`: Modal heading and zero-allocation count badge.
+  - `filters.rs`: Search query text edit and category filter chips.
+  - `card.rs`: Responsive desktop/mobile store cards.
+  - `list.rs`: Scrollable results list and ASCII substring filtering.
+  - `mod.rs`: Modal coordinator `show_catalog_window`.
+- **Color Picker (`src/ui/color_picker/`)**:
+  - `shape.rs`: Geometric triangle, circle, and polygon painter (`ColorShape`).
+  - `popup.rs`: Hex/RGB sliders and popup dropdown.
+  - `widget.rs`: Clickable color swatch.
+  - `mod.rs`: Coordinator `show` / `show_at`.
 - **Colorbar Subsystem (`src/ui/colorbar/`)**:
   - `ticks.rs`: Scientific tick generation (`generate_colorbar_ticks`), label formatting, and `ColorbarTick`.
   - `handles.rs`: Interactive range inputs (`draw_end_range_inputs`) and clamp triangles (`draw_clip_triangles`).
   - `mod.rs`: Coordinator overlay widget `show_colorbar_overlay`.
+- **Crop Overlay (`src/ui/crop_overlay/`)**:
+  - `handles.rs`: Draggable corners, edges, and directional mouse cursors.
+  - `toolbar.rs`: Floating action bar (confirm, reset, cancel).
+  - `mod.rs`: Canvas bounding box coordinator `show_crop_overlay`.
+- **Variables Overlay (`src/ui/variables_overlay/`)**:
+  - `search.rs`: Search input bar and clear trigger.
+  - `item.rs`: Variable rows with stack-formatted badges and units.
+  - `tree.rs`: Recursive hierarchy group folding.
+  - `mod.rs`: Floating overlay coordinator `show_variables_overlay`.
 - **Variables Panel Subsystem (`src/ui/variables_panel/`)**:
   - `info.rs`: Dataset metadata, summary cards, and chunk shape breakdown (`show_variable_info`).
-  - `dimension_slider.rs`: Sliders, range configuration, download sizes, element limits, and slice builders (`show_dimension_sliders`).
+  - `dimension_slider/`: `defaults.rs`, `double_slider.rs`, `metrics.rs`, `roles.rs`, `slice_req.rs`, `slider_row.rs`, `mod.rs`.
   - `mod.rs`: Coordinator widget `show_variable_controls`.
 - **Hover Tooltip Subsystem (`src/ui/hover/`)**:
   - `callout.rs`: Leader lines and anchor callout cards.

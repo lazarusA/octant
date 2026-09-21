@@ -102,10 +102,7 @@ pub async fn create_async_reader(
         if clean.starts_with("http://") || clean.starts_with("https://") {
             let parsed =
                 reqwest::Url::parse(clean).map_err(|e| format!("Invalid URL '{clean}': {e}"))?;
-            let client = reqwest::Client::builder()
-                .connect_timeout(std::time::Duration::from_secs(10))
-                .build()
-                .unwrap_or_default();
+            let client = crate::data::backends::http::get_http_client().clone();
             Ok(Arc::new(async_tiff::reader::ReqwestReader::new(
                 client, parsed,
             )))

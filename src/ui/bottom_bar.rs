@@ -2,6 +2,7 @@ use crate::app::OctantApp;
 use crate::ui::icons::{Icon, UiIconExt};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(usize)]
 enum BottomBarItem {
     PlayPause,
     PrevNext,
@@ -17,6 +18,21 @@ enum BottomBarItem {
 }
 
 impl BottomBarItem {
+    const ALL: &'static [BottomBarItem] = &[
+        Self::PlayPause,
+        Self::PrevNext,
+        Self::Loop,
+        Self::Status,
+        Self::DateInfo,
+        Self::StartDate,
+        Self::StepSize,
+        Self::EndDate,
+        Self::Fps,
+        Self::Export,
+        Self::OverflowBtn,
+    ];
+    const COUNT: usize = Self::ALL.len();
+
     fn default_width(self) -> f32 {
         match self {
             BottomBarItem::PlayPause => 70.0,
@@ -31,6 +47,31 @@ impl BottomBarItem {
             BottomBarItem::Export => 75.0,
             BottomBarItem::OverflowBtn => 36.0,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MeasuredWidths([f32; BottomBarItem::COUNT]);
+
+impl Default for MeasuredWidths {
+    fn default() -> Self {
+        let mut widths = [0.0; BottomBarItem::COUNT];
+        for &item in BottomBarItem::ALL {
+            widths[item as usize] = item.default_width();
+        }
+        Self(widths)
+    }
+}
+
+impl MeasuredWidths {
+    #[inline]
+    fn get(&self, item: BottomBarItem) -> f32 {
+        self.0[item as usize]
+    }
+
+    #[inline]
+    fn set(&mut self, item: BottomBarItem, width: f32) {
+        self.0[item as usize] = width;
     }
 }
 
@@ -70,29 +111,22 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         let storage_id = egui::Id::new(("bottom_bar", "measured_widths"));
-        let mut widths: std::collections::HashMap<BottomBarItem, f32> = ui
+        let mut widths: MeasuredWidths = ui
             .ctx()
             .data(|d| d.get_temp(storage_id))
             .unwrap_or_default();
 
-        let get_w =
-            |item: BottomBarItem, map: &std::collections::HashMap<BottomBarItem, f32>| -> f32 {
-                map.get(&item)
-                    .copied()
-                    .unwrap_or_else(|| item.default_width())
-            };
-
-        let play_pause_w = get_w(BottomBarItem::PlayPause, &widths);
-        let prev_next_w = get_w(BottomBarItem::PrevNext, &widths);
-        let loop_w = get_w(BottomBarItem::Loop, &widths);
-        let status_w = get_w(BottomBarItem::Status, &widths);
-        let date_info_w = get_w(BottomBarItem::DateInfo, &widths);
-        let start_date_w = get_w(BottomBarItem::StartDate, &widths);
-        let step_size_w = get_w(BottomBarItem::StepSize, &widths);
-        let end_date_w = get_w(BottomBarItem::EndDate, &widths);
-        let fps_w = get_w(BottomBarItem::Fps, &widths);
-        let export_w = get_w(BottomBarItem::Export, &widths);
-        let overflow_btn_w = get_w(BottomBarItem::OverflowBtn, &widths);
+        let play_pause_w = widths.get(BottomBarItem::PlayPause);
+        let prev_next_w = widths.get(BottomBarItem::PrevNext);
+        let loop_w = widths.get(BottomBarItem::Loop);
+        let status_w = widths.get(BottomBarItem::Status);
+        let date_info_w = widths.get(BottomBarItem::DateInfo);
+        let start_date_w = widths.get(BottomBarItem::StartDate);
+        let step_size_w = widths.get(BottomBarItem::StepSize);
+        let end_date_w = widths.get(BottomBarItem::EndDate);
+        let fps_w = widths.get(BottomBarItem::Fps);
+        let export_w = widths.get(BottomBarItem::Export);
+        let overflow_btn_w = widths.get(BottomBarItem::OverflowBtn);
         let spacing = ui.spacing().item_spacing.x;
         let total_width = ui.available_width();
 
@@ -196,7 +230,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 app.last_step_time = web_time::Instant::now();
             }
         });
-        widths.insert(BottomBarItem::PlayPause, play_resp.response.rect.width());
+        widths.set(BottomBarItem::PlayPause, play_resp.response.rect.width());
 
         let max_steps = app.animated_dim_extent();
         let slider_max = max_steps.saturating_sub(1);
@@ -219,7 +253,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.step_next();
                 }
             });
-            widths.insert(
+            widths.set(
                 BottomBarItem::PrevNext,
                 prev_next_resp.response.rect.width(),
             );
@@ -233,7 +267,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                     ui.checkbox(&mut app.loop_playback, "Loop");
                 });
             });
-            widths.insert(BottomBarItem::Loop, loop_resp.response.rect.width());
+            widths.set(BottomBarItem::Loop, loop_resp.response.rect.width());
         }
 
         // 4. Status Indicator
@@ -256,7 +290,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                 });
                 ui.separator();
             });
-            widths.insert(BottomBarItem::Status, status_resp.response.rect.width());
+            widths.set(BottomBarItem::Status, status_resp.response.rect.width());
         }
 
         // 5. Dimension-Agnostic Axis Reading
@@ -347,14 +381,14 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                     start_date_str, end_date_str, step_size_str
                 ));
             });
-            widths.insert(BottomBarItem::DateInfo, date_resp.response.rect.width());
+            widths.set(BottomBarItem::DateInfo, date_resp.response.rect.width());
         }
 
         if show_date_badges {
             let start_badge_resp = ui.scope(|ui| {
                 ui.small(format!("[{}]", start_date_str));
             });
-            widths.insert(
+            widths.set(
                 BottomBarItem::StartDate,
                 start_badge_resp.response.rect.width(),
             );
@@ -391,7 +425,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             let step_size_resp = ui.scope(|ui| {
                 ui.small(&step_size_str);
             });
-            widths.insert(
+            widths.set(
                 BottomBarItem::StepSize,
                 step_size_resp.response.rect.width(),
             );
@@ -399,7 +433,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             let end_badge_resp = ui.scope(|ui| {
                 ui.small(format!("[{}]", end_date_str));
             });
-            widths.insert(BottomBarItem::EndDate, end_badge_resp.response.rect.width());
+            widths.set(BottomBarItem::EndDate, end_badge_resp.response.rect.width());
         }
 
         // 7. Playback Speed Button / Menu
@@ -436,7 +470,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                     ui.menu_button(format!("{} FPS", fps_int), menu_body);
                 }
             });
-            widths.insert(BottomBarItem::Fps, fps_resp.response.rect.width());
+            widths.set(BottomBarItem::Fps, fps_resp.response.rect.width());
         }
 
         // 8. Save / Export Figure Button
@@ -452,7 +486,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.show_export_modal = true;
                 }
             });
-            widths.insert(BottomBarItem::Export, export_resp.response.rect.width());
+            widths.set(BottomBarItem::Export, export_resp.response.rect.width());
         }
 
         // 9. Overflow Button
@@ -539,7 +573,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                     ui.label(format!("Status: {}", status_text));
                 });
             });
-            widths.insert(
+            widths.set(
                 BottomBarItem::OverflowBtn,
                 overflow_resp.response.rect.width(),
             );

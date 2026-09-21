@@ -13,10 +13,16 @@ When developing and reviewing code in this repository:
 
 2. **Modular Architecture & Subsystem Layout**:
    - Follow the Open-Closed Principle (OCP): decompose monolithic modules into single-purpose submodules (< 250 lines per file, < 50 lines per function).
+   - **Catalog Subsystem (`src/catalog/`)**:
+     - `entries.rs`: Built-in static catalog tables (GeoTIFF, Zarr, Icechunk, Procedural).
+     - `types.rs`: `CatalogEntry`, `CatalogCategoryFilter`, `CatalogProvider` trait.
+     - `tests.rs`: Category filtering, projection capability, and JSON serialization tests.
+     - `mod.rs`: Re-exports and `get_catalog_entries`.
    - **Data Engine Subsystems (`src/data/`)**:
      - **Blocks Engine (`src/data/blocks/`)**: `cache.rs` (LRU memory cache), `key.rs` (`BlockKey`), `loader.rs` (async background workers), `prefetch.rs` (`BlockPrefetcher`), `request.rs` (`SliceRequest`), `store.rs` (`BlockStore` trait), `summary.rs` (`BlockSummary`), `tests.rs`, `mod.rs`.
      - **Backends (`src/data/backends/`)**:
-       - `http/`: `fetch.rs`, `mod.rs` (Browser `window.fetch` and Desktop `reqwest` range requests).
+       - `geotiff/`: `reader.rs` (async COG header discovery & pooled range reader), `slice.rs`, `tests.rs`, `mod.rs`.
+       - `http/`: `fetch.rs`, `mod.rs` (Browser `window.fetch` and Desktop connection-pooled `get_http_client` range requests).
        - `coord_bounds/`: `cache.rs`, `candidates.rs`, `discover.rs`, `extract.rs`, `tests.rs`, `mod.rs` (Unified coordinate boundary resolution & global cache).
        - `zarr/`: `block.rs`, `generic.rs`, `slice.rs`, `storage.rs`, `store.rs`, `zstd_shim.rs`, `wasm/` (`inspect.rs`, `loader.rs`, `preload.rs`, `store.rs`, `mod.rs`), `mod.rs`.
        - `icechunk/`: `native.rs`, `wasm/` (`discovery.rs`, `header.rs`, `inspect.rs`, `loader.rs`, `preload.rs`, `store.rs`, `tests.rs`, `mod.rs`), `mod.rs`.
@@ -33,11 +39,17 @@ When developing and reviewing code in this repository:
    - **Export Engine (`src/export/`)**:
      - Submodules: `raster.rs` (PNG, JPEG, WebP, Display P3 chunk injection), `vector.rs` (SVG, PDF), `clipboard.rs` (native file manager reveal & clipboard).
    - **UI Subsystems (`src/ui/`)**:
-     - `src/ui/variables_overlay.rs`: Floating modal dialog for fast variable searching and active selection.
-     - `src/ui/variables_panel/`: Docked sidebar inspector (`info.rs`, `mod.rs`) and dimension slider controls (`dimension_slider/`: `defaults.rs`, `double_slider.rs`, `metrics.rs`, `roles.rs`, `slice_req.rs`, `slider_row.rs`, `mod.rs`).
-     - `src/ui/settings/`: Dedicated settings submodules (`clipping.rs`, `coastline.rs`, `export.rs`, `plot_2d.rs`, `plot_3d.rs`, `plot_options.rs`, `resampling.rs`, `mod.rs`).
+     - `src/ui/about/`: Modal window (`types.rs`, `overview.rs`, `icons.rs`, `mod.rs`).
+     - `src/ui/catalog/`: Dataset preset modal (`header.rs`, `filters.rs`, `card.rs`, `list.rs`, `mod.rs`).
+     - `src/ui/color_picker/`: Color swatch and popup selector (`popup.rs`, `shape.rs`, `widget.rs`, `tests.rs`, `mod.rs`).
      - `src/ui/colorbar/`: `ticks.rs` (scientific tick generation), `handles.rs` (input boxes and clip triangles), `mod.rs` (overlay coordinator).
+     - `src/ui/crop_overlay/`: Canvas crop bounding box (`handles.rs`, `toolbar.rs`, `tests.rs`, `mod.rs`).
+     - `src/ui/hero/`: Landing screen and source intake (`chips.rs`, `feedback.rs`, `intake.rs`, `landing.rs`, `state.rs`, `widget.rs`, `mod.rs`).
      - `src/ui/hover/`: `callout.rs`, `camera.rs`, `enrich.rs`, `entries.rs`, `entries_1d.rs`, `entries_2d.rs`, `entries_3d.rs`, `format.rs`, `overlay.rs`, `raycast_sphere.rs`, `raycast_surface.rs`, `raycast_volume.rs`, `sample_1d.rs`, `sample_2d.rs`, `mod.rs`.
+     - `src/ui/icons/`: Procedural vector icons (`nav.rs`, `playback.rs`, `plots.rs`, `status.rs`, `store.rs`, `tests.rs`, `mod.rs`).
+     - `src/ui/settings/`: Dedicated settings submodules (`clipping.rs`, `coastline.rs`, `export.rs`, `plot_2d.rs`, `plot_3d.rs`, `plot_options.rs`, `resampling.rs`, `mod.rs`).
+     - `src/ui/variables_overlay/`: Floating variable search modal (`search.rs`, `item.rs`, `tree.rs`, `mod.rs`).
+     - `src/ui/variables_panel/`: Docked sidebar inspector (`info.rs`, `mod.rs`) and dimension slider controls (`dimension_slider/`: `defaults.rs`, `double_slider.rs`, `metrics.rs`, `roles.rs`, `slice_req.rs`, `slider_row.rs`, `mod.rs`).
      - `src/app/pipeline/`: `aspect.rs`, `camera.rs`, `paint.rs`, `profile.rs`, `mod.rs`.
 
 3. **Zero-Allocation UI & Render Loop Rules**:

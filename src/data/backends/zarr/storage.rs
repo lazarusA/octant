@@ -38,7 +38,7 @@ pub fn build_sync_store(
 
     let sync_store: ReadableWritableListableStorage = Arc::new(AsyncToSyncStorageAdapter::new(
         async_store,
-        TokioBlockOn(rt.clone()),
+        TokioBlockOn(rt),
     ));
 
     Ok(sync_store)

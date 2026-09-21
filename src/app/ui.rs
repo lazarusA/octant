@@ -16,7 +16,7 @@ impl eframe::App for OctantApp {
                 metadata_done = true;
                 self.is_loading = false;
                 match result {
-                    Ok(metadata) => {
+                    Ok((metadata, store_handle)) => {
                         if metadata.variables.is_empty() {
                             self.status_message =
                                 format!("No variables discovered in '{}'", metadata.name);
@@ -33,19 +33,13 @@ impl eframe::App for OctantApp {
                         self.show_variables_overlay = true;
 
                         let source_id = self.selected_source_id();
-                        let kind = self.selected_store_kind.to_data_source_kind();
-                        let data_source = crate::data::DataSource::new(
+                        let mut dataset = crate::data::Dataset::new(
                             &source_id,
-                            kind,
-                            &self.store_target_input,
-                            &metadata.name,
+                            store_handle.source().clone(),
+                            store_handle,
                         );
-                        if let Ok(store) = crate::data::SourceFactory::open(data_source.clone()) {
-                            let mut dataset =
-                                crate::data::Dataset::new(&source_id, data_source, store);
-                            dataset.metadata = Some(metadata.clone());
-                            self.dataset_manager.add(dataset);
-                        }
+                        dataset.metadata = Some(metadata.clone());
+                        self.dataset_manager.add(dataset);
 
                         self.variable_search.clear();
                         self.cached_variable_tree = Some(metadata.build_variable_tree());

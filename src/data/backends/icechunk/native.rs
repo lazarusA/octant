@@ -88,7 +88,7 @@ pub fn build_sync_icechunk_store(
 
     let sync_store: ReadableWritableListableStorage = Arc::new(AsyncToSyncStorageAdapter::new(
         async_store,
-        TokioBlockOn(rt.clone()),
+        TokioBlockOn(rt),
     ));
 
     let mut cache = cache_lock.write().unwrap_or_else(|p| p.into_inner());

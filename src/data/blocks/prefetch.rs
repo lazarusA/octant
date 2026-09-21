@@ -115,7 +115,8 @@ impl BlockPrefetcher {
                         )
                         .await
                     }
-                    crate::data::DataSourceKind::GeoTiff => {
+                    crate::data::DataSourceKind::RemoteGeoTiff
+                    | crate::data::DataSourceKind::LocalGeoTiff => {
                         crate::data::backends::geotiff::wasm::load_one_geotiff_wasm_with_progress(
                             &request,
                             Some(&mut on_progress),

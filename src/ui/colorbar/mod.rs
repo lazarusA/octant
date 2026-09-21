@@ -150,18 +150,23 @@ fn draw_categorical_colorbar(
     min_val: f32,
     max_val: f32,
     effective_colormap: u32,
-    unique_vals: Option<Vec<f32>>,
+    unique_vals: Option<&[f32]>,
     border_color: Color32,
     strong_text_color: Color32,
 ) {
-    let cat_vals: Vec<f32> = if let Some(unique) = unique_vals {
-        unique
-    } else {
-        let range = (max_val - min_val).max(1e-30);
-        (0..10)
-            .map(|i| min_val + (i as f32 + 0.5) / 10.0 * range)
-            .collect()
-    };
+    let fallback_cats = [
+        min_val + 0.05 * (max_val - min_val).max(1e-30),
+        min_val + 0.15 * (max_val - min_val).max(1e-30),
+        min_val + 0.25 * (max_val - min_val).max(1e-30),
+        min_val + 0.35 * (max_val - min_val).max(1e-30),
+        min_val + 0.45 * (max_val - min_val).max(1e-30),
+        min_val + 0.55 * (max_val - min_val).max(1e-30),
+        min_val + 0.65 * (max_val - min_val).max(1e-30),
+        min_val + 0.75 * (max_val - min_val).max(1e-30),
+        min_val + 0.85 * (max_val - min_val).max(1e-30),
+        min_val + 0.95 * (max_val - min_val).max(1e-30),
+    ];
+    let cat_vals: &[f32] = unique_vals.unwrap_or(&fallback_cats);
 
     let num_cats = cat_vals.len();
     let mut mesh = Mesh::default();

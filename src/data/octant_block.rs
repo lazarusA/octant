@@ -123,7 +123,7 @@ impl OctantBlock {
         max_timesteps: usize,
         dataset_name: &str,
         compute_bounds: bool,
-    ) -> Option<crate::data::matrix_data::MatrixData> {
+    ) -> Option<crate::data::MatrixData> {
         let x_len = self.shape.get(x_dim).copied().unwrap_or(0);
         let y_len = self.shape.get(y_dim).copied().unwrap_or(0);
         self.slice_2d_with_ranges(
@@ -149,7 +149,7 @@ impl OctantBlock {
         max_timesteps: usize,
         dataset_name: &str,
         compute_bounds: bool,
-    ) -> Option<crate::data::matrix_data::MatrixData> {
+    ) -> Option<crate::data::MatrixData> {
         super::slicing::slice_2d_with_ranges(
             self,
             x_dim,

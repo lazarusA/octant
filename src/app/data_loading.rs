@@ -7,108 +7,34 @@ impl OctantApp {
             && let Some(vdata) = &self.volume_data
             && vdata.depth > 1
         {
-            // Along Z: profile length = nz (all spatial rays across depth)
-            let (nx, ny, nz) = (vdata.width, vdata.height, vdata.depth);
-            let num_pixels = nx * ny;
             if self.line_plot_all_series {
-                let mut payload = Vec::with_capacity(nx * ny * nz);
-                let mut valid_lines = 0u32;
-                for y in 0..ny {
-                    for x in 0..nx {
-                        let mut has_valid = false;
-                        for z in 0..nz {
-                            let idx = z * (nx * ny) + y * nx + x;
-                            if let Some(&v) = vdata.values.get(idx)
-                                && !v.is_nan()
-                                && v.is_finite()
-                            {
-                                has_valid = true;
-                                break;
-                            }
-                        }
-                        if has_valid {
-                            valid_lines += 1;
-                            for z in 0..nz {
-                                let idx = z * (nx * ny) + y * nx + x;
-                                payload.push(vdata.values.get(idx).copied().unwrap_or(f32::NAN));
-                            }
-                        }
-                    }
-                }
-                (payload, nz as u32, valid_lines)
+                vdata.extract_all_z_lines_payload()
             } else {
+                let (nx, ny, nz) = (vdata.width, vdata.height, vdata.depth);
+                let num_pixels = nx * ny;
                 let target_pixel = self
                     .line_profile_slice_idx
                     .min(num_pixels.saturating_sub(1));
                 let target_y = target_pixel / nx.max(1);
                 let target_x = target_pixel % nx.max(1);
-
-                let mut profile = Vec::with_capacity(nz);
-                for z in 0..nz {
-                    let idx = z * (nx * ny) + target_y * nx + target_x;
-                    profile.push(vdata.values.get(idx).copied().unwrap_or(f32::NAN));
-                }
-                (profile, nz as u32, 1)
+                (
+                    vdata.extract_z_line_profile(target_x, target_y),
+                    nz as u32,
+                    1,
+                )
             }
         } else if let Some(matrix) = &self.matrix_data {
-            // Along X (dim 0) or Along Y (dim 1):
-            // Always extracted from current timestep slice (matrix_data), so lines update dynamically during playback!
-            let (profile_length, line_count, slice_idx) = if self.line_profile_dim_idx == 0 {
-                (
-                    matrix.width,
-                    matrix.height,
-                    self.line_profile_slice_idx
-                        .min(matrix.height.saturating_sub(1)),
-                )
-            } else {
-                (
-                    matrix.height,
-                    matrix.width,
-                    self.line_profile_slice_idx
-                        .min(matrix.width.saturating_sub(1)),
-                )
-            };
-
             if self.line_plot_all_series {
-                if self.line_profile_dim_idx == 0 {
-                    let mut payload = Vec::with_capacity(profile_length * line_count);
-                    let mut valid_lines = 0u32;
-                    for row in 0..line_count {
-                        let start = row * profile_length;
-                        let end = (start + profile_length).min(matrix.values.len());
-                        let row_slice = &matrix.values[start..end];
-                        if row_slice.iter().any(|v| !v.is_nan() && v.is_finite()) {
-                            valid_lines += 1;
-                            payload.extend_from_slice(row_slice);
-                        }
-                    }
-                    (payload, profile_length as u32, valid_lines)
-                } else {
-                    let mut payload = Vec::with_capacity(profile_length * line_count);
-                    let mut valid_lines = 0u32;
-                    for col in 0..line_count {
-                        let mut has_valid = false;
-                        for row in 0..profile_length {
-                            let idx = row * matrix.width + col;
-                            if let Some(&v) = matrix.values.get(idx)
-                                && !v.is_nan()
-                                && v.is_finite()
-                            {
-                                has_valid = true;
-                                break;
-                            }
-                        }
-                        if has_valid {
-                            valid_lines += 1;
-                            for row in 0..profile_length {
-                                let idx = row * matrix.width + col;
-                                payload.push(matrix.values.get(idx).copied().unwrap_or(f32::NAN));
-                            }
-                        }
-                    }
-                    (payload, profile_length as u32, valid_lines)
-                }
+                matrix.extract_all_lines_payload(self.line_profile_dim_idx)
             } else {
+                let (profile_length, max_slices) = if self.line_profile_dim_idx == 0 {
+                    (matrix.width, matrix.height)
+                } else {
+                    (matrix.height, matrix.width)
+                };
+                let slice_idx = self
+                    .line_profile_slice_idx
+                    .min(max_slices.saturating_sub(1));
                 (
                     matrix.extract_1d_line_profile(self.line_profile_dim_idx, slice_idx),
                     profile_length as u32,
@@ -141,7 +67,10 @@ impl OctantApp {
             let source = crate::data::DataSource::new(&source_id, kind, &target_input, "Store");
 
             let res = crate::data::SourceFactory::open(source)
-                .and_then(|store| store.inspect())
+                .and_then(|handle| {
+                    let meta = handle.inspect()?;
+                    Ok((meta, handle))
+                })
                 .map_err(|e| e.to_string());
 
             if let Err(err) = &res {
@@ -155,31 +84,55 @@ impl OctantApp {
         {
             let target_clone = target_input.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let res = match store_kind {
-                    StoreKind::RemoteZarr => {
-                        crate::data::backends::zarr::inspect_wasm_remote_zarr(&target_clone).await
+                let kind = store_kind.to_data_source_kind();
+                let source_id = StoreKind::make_source_id(store_kind, &target_clone);
+                let source = crate::data::DataSource::new(&source_id, kind, &target_clone, "Store");
+
+                let res: Result<(crate::data::DatasetMetadata, crate::data::StoreHandle), String> =
+                    async {
+                        match store_kind {
+                            StoreKind::RemoteZarr => {
+                                let meta = crate::data::backends::zarr::inspect_wasm_remote_zarr(
+                                    &target_clone,
+                                )
+                                .await?;
+                                let handle = crate::data::SourceFactory::open(source)
+                                    .map_err(|e| e.to_string())?;
+                                Ok((meta, handle))
+                            }
+                            StoreKind::RemoteIcechunk => {
+                                let meta = crate::data::backends::icechunk::wasm::inspect_wasm_remote_icechunk(
+                                    &target_clone,
+                                )
+                                .await?;
+                                let handle = crate::data::SourceFactory::open(source)
+                                    .map_err(|e| e.to_string())?;
+                                Ok((meta, handle))
+                            }
+                            StoreKind::RemoteGeoTiff => {
+                                let meta = crate::data::backends::geotiff::wasm::inspect_wasm_remote_geotiff(
+                                    &target_clone,
+                                )
+                                .await?;
+                                let handle = crate::data::SourceFactory::open(source)
+                                    .map_err(|e| e.to_string())?;
+                                Ok((meta, handle))
+                            }
+                            StoreKind::LocalZarr
+                            | StoreKind::LocalIcechunk
+                            | StoreKind::LocalGeoTiff
+                            | StoreKind::LocalNetCdf => {
+                                Err("Direct local file paths cannot be read in a browser due to web sandbox security.\n\nTo view local datasets in the browser:\n1. Serve your directory or file with a local HTTP server: `npx serve` or `python3 -m http.server`\n2. Enter the URL: `http://localhost:8000/my_dataset`\n\nOr run the native desktop version of Octant (`cargo run --release`).".to_string())
+                            }
+                            _ => {
+                                let handle = crate::data::SourceFactory::open(source)
+                                    .map_err(|e| e.to_string())?;
+                                let meta = handle.inspect().map_err(|e| e.to_string())?;
+                                Ok((meta, handle))
+                            }
+                        }
                     }
-                    StoreKind::RemoteIcechunk => {
-                        crate::data::backends::icechunk::wasm::inspect_wasm_remote_icechunk(&target_clone).await
-                    }
-                    StoreKind::RemoteGeoTiff => {
-                        crate::data::backends::geotiff::wasm::inspect_wasm_remote_geotiff(&target_clone).await
-                    }
-                    StoreKind::LocalZarr
-                    | StoreKind::LocalIcechunk
-                    | StoreKind::LocalGeoTiff
-                    | StoreKind::LocalNetCdf => {
-                        Err("Direct local file paths cannot be read in a browser due to web sandbox security.\n\nTo view local datasets in the browser:\n1. Serve your directory or file with a local HTTP server: `npx serve` or `python3 -m http.server`\n2. Enter the URL: `http://localhost:8000/my_dataset`\n\nOr run the native desktop version of Octant (`cargo run --release`).".to_string())
-                    }
-                    _ => {
-                        let kind = store_kind.to_data_source_kind();
-                        let source_id = StoreKind::make_source_id(store_kind, &target_clone);
-                        let source = crate::data::DataSource::new(&source_id, kind, &target_clone, "Store");
-                        crate::data::SourceFactory::open(source)
-                            .and_then(|store| store.inspect())
-                            .map_err(|e| e.to_string())
-                    }
-                };
+                    .await;
 
                 if let Err(err) = &res {
                     log::error!("Store inspect failed for '{target_clone}': {err}");

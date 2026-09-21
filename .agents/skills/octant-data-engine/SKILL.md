@@ -65,6 +65,11 @@ MatrixData / VolumeData (f32 renderable GPU payload in src/data/matrix_data.rs)
 
 ### 1. Storage Backends (`src/data/backends/`)
 Every backend submodule is strictly modularized into single-responsibility files (< 250 LOC per file):
+- **`geotiff/`**:
+  - `reader.rs`: Async Cloud-Optimized GeoTIFF (COG) / TIFF header reader, IFD directory discovery, and pooled HTTP range fetching.
+  - `slice.rs`: GeoTIFF tile hyperslab extraction, RGB/single-band rendering buffer extraction, and coordinate bounding box calculation.
+  - `tests.rs`: COG header parsing, tile index arithmetic, and coordinate spatial bounds tests.
+  - `mod.rs`: `GeoTiffBlockStore` implementation of the `BlockStore` trait.
 - **`http/`**:
   - `fetch.rs`: Low-level byte fetching and HTTP Range requests. WASM targets use browser `window.fetch()` with `js_sys::Uint8Array`; Desktop targets use a static `OnceLock<reqwest::Client>` configured with explicit connect (10s) and request (30s) timeouts.
 - **`coord_bounds/`**:

@@ -92,7 +92,7 @@ pub async fn fetch_url_byte_range(url: &str, offset: u64, length: u64) -> Result
 static HTTP_CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
 
 #[cfg(not(target_arch = "wasm32"))]
-fn get_http_client() -> &'static reqwest::Client {
+pub(crate) fn get_http_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| {
         reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))

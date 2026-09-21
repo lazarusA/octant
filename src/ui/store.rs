@@ -155,7 +155,8 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                                         crate::data::DataSourceKind::RemoteIcechunk
                                         | crate::data::DataSourceKind::LocalIcechunk => Icon::Icechunk,
                                         crate::data::DataSourceKind::NetCdf => Icon::Folder,
-                                        crate::data::DataSourceKind::GeoTiff => Icon::Globe,
+                                        crate::data::DataSourceKind::RemoteGeoTiff => Icon::Globe,
+                                        crate::data::DataSourceKind::LocalGeoTiff => Icon::Folder,
                                         crate::data::DataSourceKind::Procedural => Icon::PlotPlane,
                                         _ => Icon::PlotVolume,
                                     };

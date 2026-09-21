@@ -18,7 +18,13 @@ use super::inspect::inspect_tiff;
 use super::reader::{MemoryTiffReader, create_async_reader};
 use super::slicing::fetch_geotiff_block;
 
+#[cfg(not(target_arch = "wasm32"))]
+static GEOTIFF_STORE_CACHE: std::sync::OnceLock<
+    std::sync::RwLock<std::collections::HashMap<String, GeoTiffBlockStore>>,
+> = std::sync::OnceLock::new();
+
 /// BlockStore for reading tiled and striped TIFF/GeoTIFF raster datasets.
+#[derive(Clone)]
 pub struct GeoTiffBlockStore {
     pub(crate) uri: String,
     pub(crate) reader: Arc<dyn AsyncFileReader>,
@@ -39,9 +45,21 @@ impl GeoTiffBlockStore {
     pub fn open(uri: &str) -> Result<Self, BlockStoreError> {
         #[cfg(not(target_arch = "wasm32"))]
         {
+            let cache_lock = GEOTIFF_STORE_CACHE
+                .get_or_init(|| std::sync::RwLock::new(std::collections::HashMap::new()));
+            let cache = cache_lock.read().unwrap_or_else(|p| p.into_inner());
+            if let Some(store) = cache.get(uri) {
+                return Ok(store.clone());
+            }
+            drop(cache);
+
             let rt = crate::utils::executor::get_shared_tokio_rt();
             let u = uri.to_string();
-            rt.block_on(async move { Self::open_async(&u).await })
+            let store = rt.block_on(async move { Self::open_async(&u).await })?;
+
+            let mut cache = cache_lock.write().unwrap_or_else(|p| p.into_inner());
+            cache.insert(uri.to_string(), store.clone());
+            Ok(store)
         }
         #[cfg(target_arch = "wasm32")]
         {
@@ -54,8 +72,29 @@ impl GeoTiffBlockStore {
 
     /// Asynchronously open a TIFF/GeoTIFF dataset from a URI.
     pub async fn open_async(uri: &str) -> Result<Self, BlockStoreError> {
-        let reader = create_async_reader(uri).await?;
-        Self::from_reader(uri, reader).await
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let cache_lock = GEOTIFF_STORE_CACHE
+                .get_or_init(|| std::sync::RwLock::new(std::collections::HashMap::new()));
+            {
+                let cache = cache_lock.read().unwrap_or_else(|p| p.into_inner());
+                if let Some(store) = cache.get(uri) {
+                    return Ok(store.clone());
+                }
+            }
+
+            let reader = create_async_reader(uri).await?;
+            let store = Self::from_reader(uri, reader).await?;
+
+            let mut cache = cache_lock.write().unwrap_or_else(|p| p.into_inner());
+            cache.insert(uri.to_string(), store.clone());
+            Ok(store)
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let reader = create_async_reader(uri).await?;
+            Self::from_reader(uri, reader).await
+        }
     }
 
     /// Open a TIFF dataset directly from an in-memory byte buffer.
