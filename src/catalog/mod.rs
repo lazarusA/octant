@@ -159,10 +159,10 @@ pub static ICECHUNK_CATALOG: &[CatalogEntry] = &[
         store_kind: StoreKind::RemoteIcechunk,
     },
     CatalogEntry {
-        key: "earthmover-era5-surface",
-        label: "Earthmover ERA5 Surface Reanalysis",
+        key: "earthmover-icechunk-era5",
+        label: "Earthmover Icechunk ERA5",
         subtitle: "Multi-Variable",
-        store: "https://earthmover-icechunk-era5.s3.us-east-1.amazonaws.com/era5_surface_aws",
+        store: "https://earthmover-icechunk-era5.s3.us-east-1.amazonaws.com/icechunkV2",
         store_kind: StoreKind::RemoteIcechunk,
     },
     CatalogEntry {
