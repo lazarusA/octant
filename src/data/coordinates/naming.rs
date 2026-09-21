@@ -60,6 +60,19 @@ pub fn is_animated_time_name(dim_name: &str) -> bool {
         || contains_ascii_case_insensitive(clean, "step")
 }
 
+/// Checks if a dimension name matches channel heuristics (c / chan / channel / band / wavelength) with zero allocation.
+pub fn is_channel_dim_name(dim_name: &str) -> bool {
+    let clean = dim_name.trim();
+    clean.eq_ignore_ascii_case("c")
+        || clean.eq_ignore_ascii_case("chan")
+        || clean.eq_ignore_ascii_case("channel")
+        || clean.eq_ignore_ascii_case("channels")
+        || clean.eq_ignore_ascii_case("band")
+        || clean.eq_ignore_ascii_case("bands")
+        || contains_ascii_case_insensitive(clean, "channel")
+        || contains_ascii_case_insensitive(clean, "wavelength")
+}
+
 /// Formats a dimension name into a human-friendly axis title with standard units.
 pub fn format_dimension_axis_title(dim_name: &str) -> String {
     let clean = dim_name.trim();
@@ -70,7 +83,9 @@ pub fn format_dimension_axis_title(dim_name: &str) -> String {
         return dim_name.to_string();
     }
 
-    if is_healpix_dim_name(clean) {
+    if is_channel_dim_name(clean) {
+        "Channel".to_string()
+    } else if is_healpix_dim_name(clean) {
         format!("{dim_name} [Cell Index]")
     } else if contains_ascii_case_insensitive(clean, "lon") {
         format!("{dim_name} [°E]")
@@ -83,11 +98,12 @@ pub fn format_dimension_axis_title(dim_name: &str) -> String {
         format!("{dim_name} [m]")
     } else if contains_ascii_case_insensitive(clean, "time") {
         dim_name.to_string()
-    } else if clean.eq_ignore_ascii_case("x")
-        || clean.eq_ignore_ascii_case("y")
-        || clean.eq_ignore_ascii_case("z")
-    {
-        format!("{dim_name} Index")
+    } else if clean.eq_ignore_ascii_case("x") {
+        "X [px]".to_string()
+    } else if clean.eq_ignore_ascii_case("y") {
+        "Y [px]".to_string()
+    } else if clean.eq_ignore_ascii_case("z") {
+        "Z [Slice]".to_string()
     } else {
         dim_name.to_string()
     }

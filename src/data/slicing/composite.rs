@@ -9,10 +9,14 @@ pub fn slice_rgb_composite(
     channels: [usize; 3],
     anim_extent: usize,
 ) -> Option<MatrixData> {
-    if block.shape.len() < 3 || block.shape[0] < 3 {
+    if block.shape.len() < 3 {
         return None;
     }
-    let (num_bands, height, width) = (block.shape[0], block.shape[1], block.shape[2]);
+    let (num_bands, height, width) = (
+        block.shape[0],
+        block.shape[block.shape.len() - 2],
+        block.shape[block.shape.len() - 1],
+    );
     let plane_size = height.checked_mul(width)?;
 
     let is_cmyk = num_bands >= 4
@@ -25,7 +29,23 @@ pub fn slice_rgb_composite(
     if is_cmyk {
         slice_cmyk_composite(block, width, height, plane_size, anim_extent)
     } else {
-        slice_rgb_channels(block, channels, width, height, plane_size, anim_extent)
+        let opt_channels = [Some(channels[0]), Some(channels[1]), Some(channels[2])];
+        let x_dim = block.shape.len() - 1;
+        let y_dim = block.shape.len() - 2;
+        let x_range = (0, width.saturating_sub(1));
+        let y_range = (0, height.saturating_sub(1));
+        let fixed = vec![0; block.shape.len()];
+        slice_rgb_composite_nd(
+            block,
+            0,
+            x_dim,
+            y_dim,
+            x_range,
+            y_range,
+            &fixed,
+            opt_channels,
+            anim_extent,
+        )
     }
 }
 
@@ -94,54 +114,94 @@ fn slice_cmyk_composite(
     ))
 }
 
-fn slice_rgb_channels(
+/// Slices an N-dimensional `OctantBlock` with a channel dimension into TrueColor RGB `MatrixData`.
+#[allow(clippy::too_many_arguments)]
+pub fn slice_rgb_composite_nd(
     block: &OctantBlock,
-    channels: [usize; 3],
-    width: usize,
-    height: usize,
-    plane_size: usize,
+    c_dim: usize,
+    x_dim: usize,
+    y_dim: usize,
+    x_range: (usize, usize),
+    y_range: (usize, usize),
+    fixed_indices: &[usize],
+    channels: [Option<usize>; 3],
     anim_extent: usize,
 ) -> Option<MatrixData> {
-    let num_bands = block.shape[0];
-    let [r_ch, g_ch, b_ch] = channels.map(|c| c.min(num_bands.saturating_sub(1)));
-    let (r_off, g_off, b_off) = (r_ch * plane_size, g_ch * plane_size, b_ch * plane_size);
-    if r_off + plane_size > block.values.len()
-        || g_off + plane_size > block.values.len()
-        || b_off + plane_size > block.values.len()
-    {
+    if block.shape.len() < 2 || c_dim >= block.shape.len() {
+        return None;
+    }
+    let num_channels = block.shape[c_dim];
+    if num_channels < 2 && channels[0].is_none() && channels[1].is_none() && channels[2].is_none() {
         return None;
     }
 
-    let (r, g, b) = (
-        &block.values[r_off..r_off + plane_size],
-        &block.values[g_off..g_off + plane_size],
-        &block.values[b_off..b_off + plane_size],
-    );
-    let (r_min, r_max) = crate::utils::compute_finite_min_max(r);
-    let (g_min, g_max) = crate::utils::compute_finite_min_max(g);
-    let (b_min, b_max) = crate::utils::compute_finite_min_max(b);
-    let (g_min, g_max) = (r_min.min(g_min).min(b_min), r_max.max(g_max).max(b_max));
+    let width = (x_range.1.saturating_sub(x_range.0) + 1).max(1);
+    let height = (y_range.1.saturating_sub(y_range.0) + 1).max(1);
+    let plane_size = width.checked_mul(height)?;
 
-    let is_i8_rgb = (-128.0..0.0).contains(&g_min) && g_max <= 127.0;
-    let (scale, offset) = compute_normalization_scale(g_min, g_max, is_i8_rgb, 255.0);
+    let extract_plane = |ch_opt: Option<usize>| -> Option<Vec<f32>> {
+        let ch = ch_opt?.min(num_channels.saturating_sub(1));
+        let mut fixed = fixed_indices.to_vec();
+        if fixed.len() < block.shape.len() {
+            fixed.resize(block.shape.len(), 0);
+        }
+        fixed[c_dim] = ch;
+        let mdata = block.slice_2d_with_ranges(
+            x_dim,
+            y_dim,
+            x_range,
+            y_range,
+            &fixed,
+            1,
+            "composite_ch",
+            true,
+        )?;
+        Some(mdata.values)
+    };
+
+    let r_plane = extract_plane(channels[0]);
+    let g_plane = extract_plane(channels[1]);
+    let b_plane = extract_plane(channels[2]);
+
+    let norm_plane = |plane_opt: Option<Vec<f32>>| -> (Option<Vec<f32>>, f32, f32) {
+        if let Some(ref p) = plane_opt {
+            let (min_v, max_v) = crate::utils::compute_finite_min_max(p);
+            let is_i8 = (-128.0..0.0).contains(&min_v) && max_v <= 127.0;
+            let (scale, offset) = compute_normalization_scale(min_v, max_v, is_i8, 255.0);
+            (plane_opt, scale, offset)
+        } else {
+            (None, 1.0, 0.0)
+        }
+    };
+
+    let (r_p, r_scale, r_off) = norm_plane(r_plane);
+    let (g_p, g_scale, g_off) = norm_plane(g_plane);
+    let (b_p, b_scale, b_off) = norm_plane(b_plane);
 
     let mut values = Vec::with_capacity(plane_size);
     for i in 0..plane_size {
-        if r[i].is_nan() || g[i].is_nan() || b[i].is_nan() {
+        let r_val = r_p.as_ref().and_then(|p| p.get(i).copied()).unwrap_or(0.0);
+        let g_val = g_p.as_ref().and_then(|p| p.get(i).copied()).unwrap_or(0.0);
+        let b_val = b_p.as_ref().and_then(|p| p.get(i).copied()).unwrap_or(0.0);
+
+        if r_val.is_nan() && g_val.is_nan() && b_val.is_nan() {
             values.push(f32::NAN);
         } else {
-            let (raw_r, raw_g, raw_b) = if is_i8_rgb {
-                (
-                    (r[i] as i8 as u8) as f32,
-                    (g[i] as i8 as u8) as f32,
-                    (b[i] as i8 as u8) as f32,
-                )
+            let r_n = if r_p.is_some() && !r_val.is_nan() {
+                ((r_val - r_off) * r_scale).clamp(0.0, 255.0)
             } else {
-                (r[i], g[i], b[i])
+                0.0
             };
-            let r_n = ((raw_r - offset) * scale).clamp(0.0, 255.0);
-            let g_n = ((raw_g - offset) * scale).clamp(0.0, 255.0);
-            let b_n = ((raw_b - offset) * scale).clamp(0.0, 255.0);
+            let g_n = if g_p.is_some() && !g_val.is_nan() {
+                ((g_val - g_off) * g_scale).clamp(0.0, 255.0)
+            } else {
+                0.0
+            };
+            let b_n = if b_p.is_some() && !b_val.is_nan() {
+                ((b_val - b_off) * b_scale).clamp(0.0, 255.0)
+            } else {
+                0.0
+            };
             values.push(pack_rgb(r_n, g_n, b_n));
         }
     }

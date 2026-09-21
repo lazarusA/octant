@@ -128,11 +128,25 @@ impl OctantApp {
 
         let compute_bounds = !self.lock_color_bounds;
 
-        let mdata_opt = if self.rgb_composite_mode && block.shape.len() >= 3 && block.shape[0] >= 3
+        let c_dim = self.channel_dim_index().unwrap_or(0);
+        let mdata_opt = if self.rgb_composite_mode
+            && block.shape.len() >= 2
+            && block.shape.get(c_dim).copied().unwrap_or(0) >= 2
         {
-            crate::data::slicing::slice_rgb_composite(
+            let opt_channels = [
+                Some(self.rgb_composite_channels[0]),
+                Some(self.rgb_composite_channels[1]),
+                Some(self.rgb_composite_channels[2]),
+            ];
+            crate::data::slicing::slice_rgb_composite_nd(
                 block,
-                self.rgb_composite_channels,
+                c_dim,
+                x_dim,
+                y_dim,
+                x_range,
+                y_range,
+                &fixed_indices,
+                opt_channels,
                 self.animated_dim_extent(),
             )
         } else {

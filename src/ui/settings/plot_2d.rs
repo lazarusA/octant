@@ -170,6 +170,21 @@ pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             });
         } else if app.rgb_composite_mode {
             let num_b = app.num_bands();
+            let channel_labels: Vec<String> = app
+                .selected_variable_info()
+                .or_else(|| app.plotted_variable_info())
+                .and_then(|v| v.attributes.get("omero_channels"))
+                .map(|s| s.split(',').map(|c| c.trim().to_string()).collect())
+                .unwrap_or_default();
+
+            let get_channel_title = |b: usize| {
+                if let Some(name) = channel_labels.get(b) {
+                    format!("{}: {name}", b + 1)
+                } else {
+                    format!("Band {}", b + 1)
+                }
+            };
+
             let mut changed = false;
             ui.horizontal(|ui| {
                 let channels = [
@@ -179,15 +194,12 @@ pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ];
                 for (idx, label, color, salt) in channels {
                     ui.label(egui::RichText::new(label).color(color));
-                    let mut ch = app.rgb_composite_channels[idx];
+                    let mut ch = app.rgb_composite_channels[idx].min(num_b.saturating_sub(1));
                     egui::ComboBox::from_id_salt(salt)
-                        .selected_text(format!("Band {}", ch + 1))
+                        .selected_text(get_channel_title(ch))
                         .show_ui(ui, |ui| {
                             for b in 0..num_b {
-                                if ui
-                                    .selectable_label(ch == b, format!("Band {}", b + 1))
-                                    .clicked()
-                                {
+                                if ui.selectable_label(ch == b, get_channel_title(b)).clicked() {
                                     ch = b;
                                 }
                             }

@@ -191,7 +191,44 @@ pub async fn inspect_wasm_remote_zarr(url: &str) -> Result<DatasetMetadata, Stri
         }
     }
 
+    // 3. Fallback: Unconsolidated OME-Zarr root .zattrs and .zgroup
+    let root_zattrs_url = format!("{clean_url}/.zattrs");
+    if let Ok(zattrs_bytes) = fetch_url_bytes(&root_zattrs_url).await
+        && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&zattrs_bytes)
+        && let Some(root_map) = v.as_object()
+    {
+        let _ = store.insert_key_bytes(".zattrs", &zattrs_bytes);
+        let root_zgroup_url = format!("{clean_url}/.zgroup");
+        if let Ok(zgroup_bytes) = fetch_url_bytes(&root_zgroup_url).await {
+            let _ = store.insert_key_bytes(".zgroup", &zgroup_bytes);
+        }
+
+        let normalized = crate::utils::metadata::normalize_ngff_attributes(root_map.clone());
+        if let Ok(root_zattrs) = serde_json::from_value::<crate::utils::metadata::ome::RootZattrs>(
+            serde_json::Value::Object(normalized),
+        ) && let Some(multiscale) = root_zattrs.multiscales.first()
+        {
+            for ds in &multiscale.datasets {
+                let clean_path = ds.path.trim_matches('/');
+                let zarray_url = format!("{clean_url}/{clean_path}/.zarray");
+                if let Ok(zarray_bytes) = fetch_url_bytes(&zarray_url).await {
+                    let _ = store.insert_key_bytes(&format!("{clean_path}/.zarray"), &zarray_bytes);
+                }
+            }
+
+            let variables = crate::utils::metadata::extract_ome_multiscale_variables(
+                store.memory_store.clone(),
+                root_map,
+                "",
+            );
+
+            if !variables.is_empty() {
+                return Ok(store.finalize_metadata(variables, clean_url).await);
+            }
+        }
+    }
+
     Err(format!(
-        "Failed to inspect Zarr metadata at '{clean_url}'. Ensure the server allows CORS (Access-Control-Allow-Origin) and contains '.zmetadata' or 'zarr.json'."
+        "Failed to inspect Zarr metadata at '{clean_url}'. Ensure the server allows CORS (Access-Control-Allow-Origin) and contains '.zmetadata', '.zattrs', or 'zarr.json'."
     ))
 }

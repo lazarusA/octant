@@ -26,13 +26,30 @@ pub fn extract_store_variables(
     store: ReadableWritableListableStorage,
     base_url: &str,
 ) -> Result<Vec<VariableInfo>, Box<dyn Error>> {
-    // 1. Try opening root as a Zarr Group and check consolidated metadata (Zarr v2 or v3 inline)
-    if let Ok(group) = Group::open(store.clone(), "/")
-        && let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata()
+    // 1. Try opening root as a Zarr Group and check consolidated metadata or OME multiscales
+    if let Ok(group) = Group::open(store.clone(), "/") {
+        if let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata() {
+            let variables = extract_store_variables_from_consolidated_metadata(&metadata);
+            if !variables.is_empty() {
+                return Ok(variables);
+            }
+        }
+        let ome_vars =
+            super::ome::extract_ome_multiscale_variables(store.clone(), group.attributes(), "");
+        if !ome_vars.is_empty() {
+            return Ok(ome_vars);
+        }
+    }
+
+    // Direct root .zattrs or zarr.json inspection for unconsolidated stores
+    if let Ok(key) = zarrs::storage::StoreKey::new(".zattrs")
+        && let Ok(Some(bytes)) = store.get(&key)
+        && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes)
+        && let Some(map) = v.as_object()
     {
-        let variables = extract_store_variables_from_consolidated_metadata(&metadata);
-        if !variables.is_empty() {
-            return Ok(variables);
+        let ome_vars = super::ome::extract_ome_multiscale_variables(store.clone(), map, "");
+        if !ome_vars.is_empty() {
+            return Ok(ome_vars);
         }
     }
 
@@ -228,6 +245,26 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
                 }
             }
         }
+
+        // Fallback: check unconsolidated root .zattrs or zarr.json
+        if variables.is_empty() {
+            let clean_base = base_url.trim_end_matches('/');
+            let zattrs_url = format!("{clean_base}/.zattrs");
+            let root_attrs_resp = client
+                .as_ref()
+                .and_then(|c| c.get(&zattrs_url).send().ok())
+                .or_else(|| reqwest::blocking::get(&zattrs_url).ok());
+
+            if let Some(resp) = root_attrs_resp
+                && resp.status().is_success()
+                && let Ok(bytes) = resp.bytes()
+                && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes)
+                && let Some(root_map) = v.as_object()
+            {
+                variables = discover_ome_pyramids_http(client.as_ref(), clean_base, root_map);
+            }
+        }
+
         variables
     }
     #[cfg(target_arch = "wasm32")]
@@ -235,4 +272,119 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
         let _ = base_url;
         Vec::new()
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn discover_ome_pyramids_http(
+    client: Option<&reqwest::blocking::Client>,
+    base_url: &str,
+    root_map: &serde_json::Map<String, serde_json::Value>,
+) -> Vec<VariableInfo> {
+    let normalized = super::ome::normalize_ngff_attributes(root_map.clone());
+    let Ok(root_zattrs) =
+        serde_json::from_value::<super::ome::RootZattrs>(serde_json::Value::Object(normalized))
+    else {
+        return Vec::new();
+    };
+
+    let Some(multiscale) = root_zattrs.multiscales.first() else {
+        return Vec::new();
+    };
+
+    let channel_labels: Vec<String> = root_zattrs
+        .omero
+        .as_ref()
+        .map(|o| {
+            o.channels
+                .iter()
+                .enumerate()
+                .map(|(i, ch)| {
+                    ch.name
+                        .as_deref()
+                        .or(ch.label.as_deref())
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| format!("Channel {i}"))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let axes_names: Vec<String> = multiscale.axes.iter().map(|a| a.name.clone()).collect();
+    let mut variables = Vec::new();
+
+    for ds in &multiscale.datasets {
+        let clean_path = ds.path.trim_matches('/');
+        let zarray_url = format!("{base_url}/{clean_path}/.zarray");
+        let resp_opt = client
+            .and_then(|c| c.get(&zarray_url).send().ok())
+            .or_else(|| reqwest::blocking::get(&zarray_url).ok());
+
+        if let Some(resp) = resp_opt
+            && resp.status().is_success()
+            && let Ok(bytes) = resp.bytes()
+            && let Ok(val) = serde_json::from_slice::<serde_json::Value>(&bytes)
+        {
+            let shape: Vec<u64> = val
+                .get("shape")
+                .and_then(|s| s.as_array())
+                .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
+                .unwrap_or_default();
+
+            if shape.is_empty() {
+                continue;
+            }
+
+            let chunk_shape: Vec<u64> = val
+                .get("chunks")
+                .and_then(|c| c.as_array())
+                .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
+                .unwrap_or_else(|| shape.clone());
+
+            let data_type = val
+                .get("dtype")
+                .or_else(|| val.get("data_type"))
+                .and_then(|d| d.as_str())
+                .unwrap_or("float32")
+                .to_string();
+
+            let dimension_names = if axes_names.len() == shape.len() {
+                axes_names.clone()
+            } else {
+                super::ome::fallback_ome_axes_for_rank(shape.len())
+            };
+
+            let mut attrs: HashMap<String, String> = HashMap::new();
+            if !channel_labels.is_empty() {
+                attrs.insert("omero_channels".to_string(), channel_labels.join(","));
+            }
+            if let Some(ref omero) = root_zattrs.omero
+                && let Some(ref rdefs) = omero.rdefs
+            {
+                if let Some(dz) = rdefs.default_z {
+                    attrs.insert("default_z".to_string(), dz.to_string());
+                }
+                if let Some(dt) = rdefs.default_t {
+                    attrs.insert("default_t".to_string(), dt.to_string());
+                }
+            }
+
+            let file_size = calculate_variable_size_bytes(&shape, &data_type);
+            variables.push(VariableInfo {
+                name: clean_path.to_string(),
+                data_type,
+                shape,
+                dimension_names,
+                chunk_shape,
+                file_size,
+                units: None,
+                long_name: multiscale.name.clone(),
+                time_coverage_start: None,
+                time_coverage_end: None,
+                temporal_resolution: None,
+                attributes: attrs,
+            });
+        }
+    }
+
+    variables
 }

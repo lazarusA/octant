@@ -142,8 +142,16 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
             }
         }
 
-        // 2. Fallback spatial assignment for unassigned dimensions
+        // 2. Fallback spatial assignment for unassigned dimensions (skipping channel dimensions)
         for i in 0..rank {
+            let dim_name = var_info
+                .dimension_names
+                .get(i)
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            if crate::data::coordinates::naming::is_channel_dim_name(dim_name) {
+                continue;
+            }
             if app.dim_config[i].spatial == SpatialRole::None
                 && app.dim_config[i].animation == AnimationRole::None
             {
@@ -160,9 +168,17 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
             }
         }
 
-        // 3. For 3D datasets, assign Z if still unassigned
+        // 3. For 3D datasets, assign Z if still unassigned (skipping channel dimensions)
         if rank >= 3 && !z_assigned {
             for i in 0..rank {
+                let dim_name = var_info
+                    .dimension_names
+                    .get(i)
+                    .map(|s| s.as_str())
+                    .unwrap_or("");
+                if crate::data::coordinates::naming::is_channel_dim_name(dim_name) {
+                    continue;
+                }
                 if app.dim_config[i].spatial == SpatialRole::None {
                     app.dim_config[i].spatial = SpatialRole::Z;
                     break;
@@ -178,6 +194,24 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
             app.dim_config[default_anim].animation = AnimationRole::Animated;
             app.animated_dim = Some(default_anim);
         }
+    }
+
+    if let Some(dz_str) = var_info.attributes.get("default_z")
+        && let Ok(dz) = dz_str.parse::<usize>()
+        && let Some(z_idx) = (0..rank).find(|&i| {
+            let dim_name = var_info
+                .dimension_names
+                .get(i)
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            crate::data::coordinates::naming::is_spatial_z_name(dim_name)
+        })
+    {
+        let dim_max = var_info.shape[z_idx].saturating_sub(1) as usize;
+        let clamped_dz = dz.min(dim_max);
+        app.selected_dim_indices[z_idx] = clamped_dz;
+        app.selected_dim_ranges[z_idx] = (clamped_dz, clamped_dz);
+        app.dim_config[z_idx].range = (clamped_dz, clamped_dz);
     }
 
     for i in 0..rank {

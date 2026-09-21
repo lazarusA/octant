@@ -118,28 +118,42 @@ impl OctantApp {
         self.request_canvas_export(out_path, false);
     }
 
-    /// Check if the active dataset/variable has 3 or more bands available for RGB composition.
+    /// Check if the active dataset/variable has 2 or more bands/channels available for RGB composition.
     pub fn has_rgb_bands(&self) -> bool {
-        if let Some(var) = self.plotted_variable_info() {
-            return var.shape.len() >= 3 && var.shape[0] >= 3;
-        }
-        if let Some(var) = self.selected_variable_info() {
-            return var.shape.len() >= 3 && var.shape[0] >= 3;
-        }
-        false
-    }
-
-    /// Return the total number of bands for the active variable, if multi-band.
-    pub fn num_bands(&self) -> usize {
-        if let Some(var) = self
+        let Some(var) = self
             .plotted_variable_info()
             .or_else(|| self.selected_variable_info())
-            && var.shape.len() >= 3
-        {
-            var.shape[0] as usize
-        } else {
-            3
+        else {
+            return false;
+        };
+        if var.shape.len() < 2 {
+            return false;
         }
+        let c_idx = self.channel_dim_index().unwrap_or(0);
+        var.shape.get(c_idx).copied().unwrap_or(0) >= 2
+    }
+
+    /// Return the dimension index corresponding to channels/bands, if any.
+    pub fn channel_dim_index(&self) -> Option<usize> {
+        let var = self
+            .plotted_variable_info()
+            .or_else(|| self.selected_variable_info())?;
+        var.dimension_names
+            .iter()
+            .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
+            .or(if var.shape.len() >= 3 { Some(0) } else { None })
+    }
+
+    /// Return the total number of bands/channels for the active variable, if multi-band.
+    pub fn num_bands(&self) -> usize {
+        let Some(var) = self
+            .plotted_variable_info()
+            .or_else(|| self.selected_variable_info())
+        else {
+            return 3;
+        };
+        let c_idx = self.channel_dim_index().unwrap_or(0);
+        var.shape.get(c_idx).copied().unwrap_or(3) as usize
     }
 
     /// Returns true if the active variable represents a CMYK color space dataset.
