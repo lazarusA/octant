@@ -131,7 +131,7 @@ impl OctantApp {
         let c_dim = self.channel_dim_index().unwrap_or(0);
         let mdata_opt = if self.rgb_composite_mode
             && block.shape.len() >= 2
-            && block.shape.get(c_dim).copied().unwrap_or(0) >= 2
+            && block.shape.get(c_dim).copied().unwrap_or(0) >= 1
         {
             if !self.composite_channel_configs.is_empty() {
                 crate::data::slicing::slice_multichannel_composite_nd(
@@ -164,12 +164,10 @@ impl OctantApp {
                 )
             }
         } else {
-            if self.rgb_composite_mode {
-                self.rgb_composite_mode = false;
-                if self.active_colormap == 1000 {
-                    self.active_colormap = 0;
-                }
-            }
+            None
+        };
+
+        let mdata_opt = mdata_opt.or_else(|| {
             block.slice_2d_with_ranges(
                 x_dim,
                 y_dim,
@@ -180,7 +178,7 @@ impl OctantApp {
                 &format!("Block Cache [{}]", block.variable_name),
                 compute_bounds,
             )
-        };
+        });
 
         if let Some(mdata) = mdata_opt {
             self.rebuild_pipeline_with_matrix_data(mdata);
@@ -234,26 +232,51 @@ impl OctantApp {
             true
         };
 
-        if is_3d_plot
-            && needs_volume_update
-            && let Some(vdata) = block.volume_with_ranges(
-                x_dim,
-                y_dim,
-                z_dim,
-                x_range,
-                y_range,
-                z_range,
-                &fixed_indices,
-                &current_volume_desc,
-                compute_bounds,
-            )
-        {
-            let depth = vdata.depth;
-            self.rebuild_pipeline_with_volume_data(vdata);
-            self.status_message = format!(
-                "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
-                self.status_message, self.current_timestep
-            );
+        if is_3d_plot && needs_volume_update {
+            let vdata_opt = if self.rgb_composite_mode
+                && block.shape.len() >= 3
+                && block.shape.get(c_dim).copied().unwrap_or(0) >= 1
+                && !self.composite_channel_configs.is_empty()
+            {
+                crate::data::slicing::slice_multichannel_volume_composite_nd(
+                    block,
+                    c_dim,
+                    x_dim,
+                    y_dim,
+                    z_dim,
+                    x_range,
+                    y_range,
+                    z_range,
+                    &fixed_indices,
+                    &self.composite_channel_configs,
+                    &current_volume_desc,
+                )
+            } else {
+                None
+            };
+
+            let vdata_opt = vdata_opt.or_else(|| {
+                block.volume_with_ranges(
+                    x_dim,
+                    y_dim,
+                    z_dim,
+                    x_range,
+                    y_range,
+                    z_range,
+                    &fixed_indices,
+                    &current_volume_desc,
+                    compute_bounds,
+                )
+            });
+
+            if let Some(vdata) = vdata_opt {
+                let depth = vdata.depth;
+                self.rebuild_pipeline_with_volume_data(vdata);
+                self.status_message = format!(
+                    "{}  [x_dim={x_dim} y_dim={y_dim} z_dim={z_dim} depth={depth} anim_dim={anim_dim:?} t={}]",
+                    self.status_message, self.current_timestep
+                );
+            }
         }
     }
 }

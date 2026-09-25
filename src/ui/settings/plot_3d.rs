@@ -4,34 +4,30 @@ use crate::ui::settings::coastline::show_coastline_controls;
 pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.label(
-            egui::RichText::new("Experimental")
+            egui::RichText::new("Algorithm")
                 .small()
                 .color(ui.visuals().weak_text_color()),
         );
         let algo_label = match app.volume_algorithm {
-            0 => "Volume Raymarching",
-            1 => "Isosurface (Sobel)",
-            2 => "Maximum Intensity (MIP)",
-            3 => "Minimum Intensity (MinIP)",
-            4 => "Average Projection (X-ray)",
-            5 => "Categorical Label Surface",
-            6 => "Absorption RGBA",
-            7 => "Additive RGBA",
-            8 => "Indexed RGBA",
-            _ => "Shaded Contours",
+            0 => "Volume Raymarching (DVR)",
+            1 => "Maximum Intensity (MIP)",
+            2 => "Minimum Intensity (MinIP)",
+            3 => "Average Projection (X-ray)",
+            4 => "Categorical Label Surface",
+            5 => "Absorption RGBA",
+            6 => "Additive RGBA",
+            _ => "Indexed RGBA",
         };
         ui.menu_button(egui::RichText::new(algo_label).small(), |ui| {
             let algos = [
                 (0, "Volume Raymarching (DVR)"),
-                (1, "Isosurface (Sub-Voxel + Sobel)"),
-                (2, "Maximum Intensity (MIP)"),
-                (3, "Minimum Intensity (MinIP)"),
-                (4, "Average Projection (X-ray)"),
-                (5, "Categorical Label Surface"),
-                (6, "Absorption RGBA"),
-                (7, "Additive RGBA"),
-                (8, "Indexed RGBA"),
-                (9, "Shaded Contours"),
+                (1, "Maximum Intensity (MIP)"),
+                (2, "Minimum Intensity (MinIP)"),
+                (3, "Average Projection (X-ray)"),
+                (4, "Categorical Label Surface"),
+                (5, "Absorption RGBA"),
+                (6, "Additive RGBA"),
+                (7, "Indexed RGBA"),
             ];
             for (id, label) in algos {
                 if ui
@@ -49,37 +45,24 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("Steps"));
     ui.checkbox(&mut app.volume_transparency, "Transparency");
 
-    if app.volume_algorithm != 1
-        && app.volume_algorithm != 2
-        && app.volume_algorithm != 3
-        && app.volume_algorithm != 4
-        && app.volume_algorithm != 5
-    {
+    if app.volume_algorithm == 0 || app.volume_algorithm >= 5 {
         ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("Density"));
     }
 
-    if app.volume_algorithm == 2 {
+    if app.volume_algorithm == 1 {
         ui.add(egui::Slider::new(&mut app.volume_attenuation, 0.0..=5.0).text("Attenuation"));
     }
 
-    if app.volume_algorithm == 0
-        || app.volume_algorithm == 1
-        || app.volume_algorithm == 2
-        || app.volume_algorithm == 3
-        || app.volume_algorithm == 4
-        || app.volume_algorithm == 9
-    {
+    if app.volume_algorithm <= 3 {
         ui.separator();
-        if app.volume_algorithm != 2 {
+        if app.volume_algorithm != 1 {
             ui.add(egui::Slider::new(&mut app.volume_cmin, 0.0..=100.0).text("Min Clip"));
         }
         ui.add(egui::Slider::new(&mut app.volume_cmax, 0.0..=100.0).text("Max Range"));
     }
 
-    if app.volume_algorithm == 1 {
-        ui.separator();
-        ui.add(egui::Slider::new(&mut app.volume_isovalue, -100.0..=100.0).text("Isovalue"));
-        ui.add(egui::Slider::new(&mut app.volume_isorange, 0.1..=20.0).text("Isorange"));
+    if app.has_rgb_bands() || !app.composite_channel_configs.is_empty() {
+        super::composite::show_composite_controls(app, ui);
     }
 }
 
@@ -129,4 +112,8 @@ pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
 pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("Size"));
+
+    if app.has_rgb_bands() || !app.composite_channel_configs.is_empty() {
+        super::composite::show_composite_controls(app, ui);
+    }
 }

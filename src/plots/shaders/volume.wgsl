@@ -3,21 +3,14 @@
 //
 // Rendering Modes:
 //   0: Volume Raymarching (DVR)    - Front-to-back alpha compositing with Beer-Lambert absorption
-//   1: Solid Isosurface (Sobel)    - Sub-voxel bisection refinement with 3D Sobel-Feldman normals
-//   2: Maximum Intensity (MIP)     - Maximum intensity projection with density-weighted attenuation
-//   3: Minimum Intensity (MinIP)   - Minimum intensity projection along the ray
-//   4: Average Projection (X-ray)  - Average column scalar intensity (radiographic transmission)
-//   5: Categorical Label Surface   - Binary foreground mask isosurface for segmented data
-//   6: Absorption RGBA             - Classical optical absorption model
-//   7: Additive RGBA               - Additive volume emission model
-//   8: Indexed Discrete RGBA       - Palette-indexed discrete material rendering
-//   9: Shaded Contours             - Gradient-based silhouette and contour enhancement
+//   1: Maximum Intensity (MIP)     - Maximum intensity projection with density-weighted attenuation
+//   2: Minimum Intensity (MinIP)   - Minimum intensity projection along the ray
+//   3: Average Projection (X-ray)  - Average column scalar intensity (radiographic transmission)
+//   4: Categorical Label Surface   - Binary foreground mask isosurface for segmented data
+//   5: Absorption RGBA             - Classical optical absorption model
+//   6: Additive RGBA               - Additive volume emission model
+//   7: Indexed Discrete RGBA       - Palette-indexed discrete material rendering
 // =================================================================================================
-
-// Nothing type, to encode if some variable doesn't contain any data
-struct Nothing { // Nothing type, to encode if some variable doesn't contain any data
-    empty: bool, // empty structs are not allowed
-};
 
 struct Uniforms {
     clip_planes: array<vec4<f32>, 8>,
@@ -119,24 +112,13 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     return out;
 }
 
-fn is_nan(val: f32) -> bool {
-    return val != val;
-}
-
-fn no_solution(x: f32) -> bool {
-    return abs(x) < 0.0001 || is_nan(x) || x > 1e20 || x < -1e20;
-}
-
-fn get_lowclip_color() -> vec4<f32> {
-    return uniforms.color.lowclip_color;
-}
-
-fn get_highclip_color() -> vec4<f32> {
-    return uniforms.color.highclip_color;
-}
-
-fn get_nan_color() -> vec4<f32> {
-    return uniforms.color.nan_color;
+fn unpack_rgba_f32(s: f32) -> vec4<f32> {
+    let packed = u32(s);
+    let r = f32(packed & 0xFFu) / 255.0;
+    let g = f32((packed >> 8u) & 0xFFu) / 255.0;
+    let b = f32((packed >> 16u) & 0xFFu) / 255.0;
+    let a = max(r, max(g, b));
+    return vec4<f32>(r, g, b, a);
 }
 
 fn color_lookup(intensity: f32) -> vec4<f32> {
@@ -174,6 +156,13 @@ fn sample_volume_scalar(texCoord: vec3<f32>) -> f32 {
 
 fn sample_volume_rgba(pos: vec3<f32>) -> vec4<f32> {
     let s = sample_volume_scalar(pos);
+    if (uniforms.color.colormap == 1000u) {
+        let is_nan_val = (s != s || abs(s) > 1e30);
+        if (is_nan_val) {
+            return select(vec4<f32>(0.0), uniforms.color.nan_color, uniforms.color.use_nan_color == 1u);
+        }
+        return unpack_rgba_f32(s);
+    }
     return evaluate_plot_color(s, uniforms.color);
 }
 
@@ -186,39 +175,6 @@ fn sample_foreground(pos: vec3<f32>) -> f32 {
     return 1.0;
 }
 
-// 26-neighbor 3D Sobel-Feldman gradient for smooth surface normal estimation
-fn sobel_normal(uvw: vec3<f32>) -> vec3<f32> {
-    let grid_w = f32(max(uniforms.width, 1u));
-    let grid_h = f32(max(uniforms.height, 1u));
-    let grid_d = f32(max(uniforms.depth, 1u));
-    let step = vec3<f32>(1.0 / grid_w, 1.0 / grid_h, 1.0 / grid_d);
-
-    var G = vec3<f32>(0.0);
-    for (var i = -1; i <= 1; i = i + 1) {
-        for (var j = -1; j <= 1; j = j + 1) {
-            for (var k = -1; k <= 1; k = k + 1) {
-                if (i == 0 && j == 0 && k == 0) { continue; }
-                let sample_pos = clamp(uvw + vec3<f32>(f32(i), f32(j), f32(k)) * step, vec3<f32>(0.0), vec3<f32>(1.0));
-                let val = sample_volume_scalar(sample_pos);
-                let on_axis_x = f32(j == 0 && k == 0);
-                let face_x    = f32(j == 0 || k == 0);
-                let wx = f32(-i) * (1.0 + face_x + 2.0 * on_axis_x);
-                let on_axis_y = f32(i == 0 && k == 0);
-                let face_y    = f32(i == 0 || k == 0);
-                let wy = f32(-j) * (1.0 + face_y + 2.0 * on_axis_y);
-                let on_axis_z = f32(i == 0 && j == 0);
-                let face_z    = f32(i == 0 || j == 0);
-                let wz = f32(-k) * (1.0 + face_z + 2.0 * on_axis_z);
-                G += val * vec3<f32>(wx, wy, wz);
-            }
-        }
-    }
-    let len = length(G);
-    if (len < 0.00001) {
-        return vec3<f32>(0.0, 1.0, 0.0);
-    }
-    return normalize(G);
-}
 
 // 26-neighbor 3D Sobel-Feldman normal for binary segmentation foreground masks
 fn sobel_normal_mask(uvw: vec3<f32>) -> vec3<f32> {
@@ -254,8 +210,30 @@ fn sobel_normal_mask(uvw: vec3<f32>) -> vec3<f32> {
     return normalize(G);
 }
 
+// Fast 6-tap central finite-difference gradient for high-performance normal estimation
+fn central_normal(uvw: vec3<f32>) -> vec3<f32> {
+    let grid_w = f32(max(uniforms.width, 1u));
+    let grid_h = f32(max(uniforms.height, 1u));
+    let grid_d = f32(max(uniforms.depth, 1u));
+    let step = vec3<f32>(1.0 / grid_w, 1.0 / grid_h, 1.0 / grid_d);
+
+    let x1 = sample_volume_scalar(clamp(uvw + vec3<f32>(step.x, 0.0, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let x0 = sample_volume_scalar(clamp(uvw - vec3<f32>(step.x, 0.0, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let y1 = sample_volume_scalar(clamp(uvw + vec3<f32>(0.0, step.y, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let y0 = sample_volume_scalar(clamp(uvw - vec3<f32>(0.0, step.y, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let z1 = sample_volume_scalar(clamp(uvw + vec3<f32>(0.0, 0.0, step.z), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let z0 = sample_volume_scalar(clamp(uvw - vec3<f32>(0.0, 0.0, step.z), vec3<f32>(0.0), vec3<f32>(1.0)));
+
+    let G = vec3<f32>(-(x1 - x0), -(y1 - y0), -(z1 - z0));
+    let len = length(G);
+    if (len < 0.00001) {
+        return vec3<f32>(0.0, 1.0, 0.0);
+    }
+    return G / len;
+}
+
 fn blinnphong(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, color: vec3<f32>) -> vec3<f32> {
-    let light_dir = normalize(vec3<f32>(0.4, 0.8, 0.6));
+    let light_dir = select(normalize(L), normalize(vec3<f32>(0.4, 0.8, 0.6)), length(L) < 0.001);
     let diff_coeff = max(dot(light_dir, N), 0.0) + max(dot(light_dir, -N), 0.0) * 0.4;
     let H = normalize(light_dir + V);
     let spec_coeff = pow(max(dot(H, N), 0.0), uniforms.shininess);
@@ -264,52 +242,24 @@ fn blinnphong(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, color: vec3<f32>) -> vec
     return ambient * color + uniforms.diffuse * diff_coeff * color + uniforms.light_color * uniforms.specular * spec_coeff;
 }
 
-fn hitBox(orig: vec3<f32>, dir: vec3<f32>, scale_vec: vec3<f32>) -> vec2<f32> {
-    let box_min = -(scale_vec * 0.5);
-    let box_max = scale_vec * 0.5;
-    let inv_dir = 1.0 / dir;
-    let tmin_tmp = (box_min - orig) * inv_dir;
-    let tmax_tmp = (box_max - orig) * inv_dir;
-    let tmin = min(tmin_tmp, tmax_tmp);
-    let tmax = max(tmin_tmp, tmax_tmp);
-    let t0 = max(tmin.x, max(tmin.y, tmin.z));
-    let t1 = min(tmax.x, min(tmax.y, tmax.z));
-    return vec2<f32>(t0, t1);
-}
-
-// 0. Default Mode: Fast HitBox Threshold Volume Raymarching (Direct Volume Rendering / DVR)
-fn volume_hitbox_threshold(vOrigin: vec3<f32>, rayDir: vec3<f32>, bounds: vec2<f32>, scale_vec: vec3<f32>) -> vec4<f32> {
-    let safe_dir = max(abs(rayDir), vec3<f32>(0.0001));
-    let inc = 1.0 / safe_dir;
-    var delta = min(inc.x, min(inc.y, inc.z));
+// 0. Default Mode: Direct Volume Rendering (DVR) with Alpha Compositing
+fn volume_dvr(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
+    var pos = front;
     let samples_count = i32(max(uniforms.samples, 8u));
-    delta = delta / f32(samples_count);
-
     var accumColor = vec3<f32>(0.0);
     var alphaAcc: f32 = 0.0;
-
     let threshold_min = uniforms.color.cmin;
     let threshold_max = uniforms.color.cmax;
+    let camdir = normalize(-dir);
 
-    var t = bounds.x;
     for (var i = 0; i < samples_count; i = i + 1) {
-        if (t >= bounds.y) {
-            break;
-        }
-        let p = vOrigin + rayDir * t;
-        var texCoord = p / scale_vec + vec3<f32>(0.5);
-
-        let epsilon: f32 = 0.000001;
-        texCoord = clamp(texCoord, vec3<f32>(0.0), vec3<f32>(1.0 - epsilon));
-
-        let d = sample_volume_scalar(texCoord);
-
+        let d = sample_volume_scalar(pos);
         let is_nan_sample = (d != d || abs(d) > 1e30);
         let is_low_sample = (d < threshold_min) && !is_nan_sample;
         let is_high_sample = (d > threshold_max) && !is_nan_sample;
         let is_in_bounds = (d >= threshold_min && d <= threshold_max) && !is_nan_sample;
 
-        var col: vec3<f32> = vec3<f32>(0.0);
+        var col = vec3<f32>(0.0);
         var alpha: f32 = 0.0;
 
         if (is_nan_sample && uniforms.color.use_nan_color == 1u) {
@@ -322,18 +272,34 @@ fn volume_hitbox_threshold(vOrigin: vec3<f32>, rayDir: vec3<f32>, bounds: vec2<f
             col = uniforms.color.highclip_color.rgb;
             alpha = uniforms.color.highclip_color.a;
         } else if (is_in_bounds) {
-            let range = max(threshold_max - threshold_min, 0.0001);
-            let sampLoc = clamp((d - threshold_min) / range, 0.0, 1.0);
-            col = sample_colormap(uniforms.color.colormap, sampLoc);
-
-            if (uniforms.transparency == 1u) {
-                let alpha_exponent = max(uniforms.absorption, 0.1);
-                alpha = clamp(pow(max(sampLoc, 0.001), 1.0 / alpha_exponent), 0.01, 1.0);
+            if (uniforms.color.colormap == 1000u) {
+                let unpacked = unpack_rgba_f32(d);
+                col = unpacked.rgb;
+                let intensity = unpacked.a;
+                if (intensity > 0.001) {
+                    if (uniforms.transparency == 1u) {
+                        let alpha_exponent = max(uniforms.absorption, 0.1);
+                        alpha = clamp(pow(intensity, 1.0 / alpha_exponent), 0.01, 1.0);
+                    } else {
+                        let N = central_normal(pos);
+                        let shaded = blinnphong(N, camdir, uniforms.light_direction, col);
+                        return vec4<f32>(shaded, 1.0);
+                    }
+                }
             } else {
-                // In opaque mode, the first hit boundary is solid with Sobel lighting
-                let N = sobel_normal(texCoord);
-                let shaded = blinnphong(N, -rayDir, uniforms.light_direction, col);
-                return vec4<f32>(shaded, 1.0);
+                let sample_color = evaluate_plot_color(d, uniforms.color);
+                col = sample_color.rgb;
+
+                if (uniforms.transparency == 1u) {
+                    let range = max(threshold_max - threshold_min, 0.0001);
+                    let sampLoc = clamp((d - threshold_min) / range, 0.001, 1.0);
+                    let alpha_exponent = max(uniforms.absorption, 0.1);
+                    alpha = clamp(pow(sampLoc, 1.0 / alpha_exponent), 0.01, 1.0);
+                } else {
+                    let N = central_normal(pos);
+                    let shaded = blinnphong(N, camdir, uniforms.light_direction, col);
+                    return vec4<f32>(shaded, 1.0);
+                }
             }
         }
 
@@ -345,69 +311,43 @@ fn volume_hitbox_threshold(vOrigin: vec3<f32>, rayDir: vec3<f32>, bounds: vec2<f
                 break;
             }
         }
-        t = t + delta;
+        pos = pos + dir;
     }
 
     return vec4<f32>(accumColor, alphaAcc);
 }
 
-// 1. Solid Isosurface with 3-step sub-voxel bisection and 3D Sobel-Feldman normal
-fn isosurface(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
-    var pos = front;
-    let diffuse_color = color_lookup(uniforms.isovalue);
-    let camdir = normalize(-dir);
-    let samples_count = i32(max(uniforms.samples, 8u));
-
-    var accum_color = vec3<f32>(0.0);
-    var accum_alpha: f32 = 0.0;
-    var prev_pos = front;
-
-    for (var i = 0; i < samples_count; i = i + 1) {
-        let density = sample_volume_scalar(pos);
-        if (abs(density - uniforms.isovalue) < uniforms.isorange) {
-            // Sub-voxel bisection refinement: 3 iterations
-            var lo = prev_pos;
-            var hi = pos;
-            for (var step = 0; step < 3; step = step + 1) {
-                let mid = 0.5 * (lo + hi);
-                let s_mid = sample_volume_scalar(mid);
-                if (abs(s_mid - uniforms.isovalue) < uniforms.isorange) {
-                    hi = mid;
-                } else {
-                    lo = mid;
-                }
-            }
-            let exact_pos = hi;
-            let N = sobel_normal(exact_pos);
-            let L = uniforms.light_direction;
-            let shaded = blinnphong(N, camdir, L, diffuse_color.rgb);
-
-            if (uniforms.transparency == 0u) {
-                return vec4<f32>(shaded, 1.0);
-            }
-
-            let iso_alpha = clamp(0.4 * uniforms.absorption, 0.05, 0.95);
-            accum_color = accum_color + (1.0 - accum_alpha) * iso_alpha * shaded;
-            accum_alpha = accum_alpha + (1.0 - accum_alpha) * iso_alpha;
-
-            if (accum_alpha >= 0.95) {
-                break;
-            }
-        }
-        prev_pos = pos;
-        pos = pos + dir;
-    }
-    return vec4<f32>(accum_color, accum_alpha);
-}
-
-// 2. Maximum Intensity Projection (MIP) with density-weighted attenuation
+// 1. Maximum Intensity Projection (MIP) with density-weighted attenuation
 fn mip(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var pos = front + dir;
+    let samples_count = i32(max(uniforms.samples, 8u));
+
+    if (uniforms.color.colormap == 1000u) {
+        var max_rgb = vec3<f32>(0.0);
+        var any_hit = false;
+        for (var i = 0; i < samples_count; i = i + 1) {
+            let density = sample_volume_scalar(pos);
+            let is_nan_val = (density != density || abs(density) > 1e30);
+            if (!is_nan_val) {
+                let unpacked = unpack_rgba_f32(density);
+                max_rgb = max(max_rgb, unpacked.rgb);
+                if (unpacked.a > 0.001) {
+                    any_hit = true;
+                }
+            }
+            pos = pos + dir;
+        }
+        if (!any_hit) {
+            return vec4<f32>(0.0);
+        }
+        let alpha = select(1.0, max(max_rgb.r, max(max_rgb.g, max_rgb.b)), uniforms.transparency == 1u);
+        return vec4<f32>(max_rgb, alpha);
+    }
+
     var maximum: f32 = -1e30;
     var max_raw: f32 = -1e30;
     var density_sum: f32 = 0.0;
     let highclip_visible = uniforms.color.highclip_color.a > 0.0;
-    let samples_count = i32(max(uniforms.samples, 8u));
     let range = max(uniforms.color.cmax - uniforms.color.cmin, 0.0001);
 
     for (var i = 0; i < samples_count; i = i + 1) {
@@ -437,7 +377,7 @@ fn mip(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     return col;
 }
 
-// 3. Minimum Intensity Projection (MinIP)
+// 2. Minimum Intensity Projection (MinIP)
 fn minip(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var pos = front + dir;
     var minimum: f32 = 1e30;
@@ -467,7 +407,7 @@ fn minip(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     return col;
 }
 
-// 4. Average / Mean Intensity Projection (Radiographic Column Transmission)
+// 3. Average / Mean Intensity Projection (Radiographic Column Transmission)
 fn average_projection(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var pos = front + dir;
     var sum_val: f32 = 0.0;
@@ -494,7 +434,7 @@ fn average_projection(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     return col;
 }
 
-// 5. Categorical / Label Segmented Surface (Binary Mask Normals)
+// 4. Categorical / Label Segmented Surface (Binary Mask Normals)
 fn label_iso(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var pos = front;
     let camdir = normalize(-dir);
@@ -537,21 +477,22 @@ fn label_iso(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     return vec4<f32>(shaded, 1.0);
 }
 
-// 6. Optical Absorption RGBA
+// 5. Optical Absorption RGBA
 fn absorptionrgba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var pos = front;
     var transmittance: f32 = 1.0;
     var color_sum = vec3<f32>(0.0);
     let step_size = length(dir);
     let samples_count = i32(max(uniforms.samples, 8u));
+    let camdir = normalize(-dir);
 
     for (var i = 0; i < samples_count; i = i + 1) {
         let color_sample = sample_volume_rgba(pos);
 
         if (uniforms.transparency == 0u) {
             if (color_sample.a > 0.05) {
-                let N = sobel_normal(pos);
-                let shaded = blinnphong(N, normalize(-dir), uniforms.light_direction, color_sample.rgb);
+                let N = central_normal(pos);
+                let shaded = blinnphong(N, camdir, uniforms.light_direction, color_sample.rgb);
                 return vec4<f32>(shaded, 1.0);
             }
         } else {
@@ -575,7 +516,7 @@ fn absorptionrgba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     return vec4<f32>(color_sum / (1.0 - transmittance), 1.0 - transmittance);
 }
 
-// 7. Additive RGBA (Volume Emission)
+// 6. Additive RGBA (Volume Emission)
 fn additivergba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var pos = front;
     var integrated_color = vec4<f32>(0.0);
@@ -590,7 +531,7 @@ fn additivergba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     return integrated_color;
 }
 
-// 8. Volume Indexed RGBA (Palette-indexed materials)
+// 7. Volume Indexed RGBA (Palette-indexed materials)
 fn volumeindexedrgba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var pos = front;
     var transmittance: f32 = 1.0;
@@ -615,46 +556,6 @@ fn volumeindexedrgba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
         return vec4<f32>(0.0);
     }
     return vec4<f32>(color_sum / (1.0 - transmittance), 1.0 - transmittance);
-}
-
-// 9. Shaded Contours (Silhouette and boundary enhancement)
-fn contours(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
-    var pos = front;
-    var transmittance: f32 = 1.0;
-    var color_sum = vec3<f32>(0.0);
-    let camdir = normalize(-dir);
-    let step_size = length(dir);
-    let samples_count = i32(max(uniforms.samples, 8u));
-
-    for (var i = 0; i < samples_count; i = i + 1) {
-        let intensity = sample_volume_scalar(pos);
-        if (intensity >= uniforms.color.cmin && intensity <= uniforms.color.cmax) {
-            let color_sample = color_lookup(intensity);
-            let N = sobel_normal(pos);
-            let L = normalize(vec3<f32>(0.4, 0.8, 0.6));
-            let opaque = blinnphong(N, camdir, L, color_sample.rgb);
-
-            if (uniforms.transparency == 0u) {
-                return vec4<f32>(opaque, 1.0);
-            }
-
-            let opacity = clamp(step_size * max(color_sample.a, 0.1) * uniforms.absorption, 0.0, 1.0);
-            color_sum = color_sum + (transmittance * opacity) * opaque;
-            transmittance = transmittance * (1.0 - opacity);
-
-            if (transmittance <= 0.01) {
-                break;
-            }
-        }
-        pos = pos + dir;
-    }
-    if (uniforms.transparency == 0u) {
-        return vec4<f32>(0.0);
-    }
-    if (1.0 - transmittance <= 0.0) {
-        return vec4<f32>(0.0);
-    }
-    return vec4<f32>(color_sum / max(1.0 - transmittance, 0.001), 1.0 - transmittance);
 }
 
 struct ClipResult {
@@ -691,8 +592,6 @@ fn process_clip_planes(p1_in: vec3<f32>, p2_in: vec3<f32>) -> ClipResult {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    var color: vec4<f32>;
-
     let cy = cos(-uniforms.rotation_y);
     let sy = sin(-uniforms.rotation_y);
     let cx = cos(-uniforms.rotation_x);
@@ -708,86 +607,57 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         max(uniforms.aspect_z, 0.001)
     );
 
+    let eye_unit = vec3<f32>(0.5) + eye_rot / scale_vec;
+    let back_position = in.frag_vert / scale_vec + vec3<f32>(0.5);
+    let dir = normalize(back_position - eye_unit);
+
+    if (dot(dir, dir) < 0.000001 || dir.x != dir.x || dir.y != dir.y || dir.z != dir.z) {
+        discard;
+    }
+
+    // Branchless slab intersection with [0, 1]^3 unit bounding box
+    let inv_dir = 1.0 / dir;
+    let t0 = (vec3<f32>(0.0) - eye_unit) * inv_dir;
+    let t1 = (vec3<f32>(1.0) - eye_unit) * inv_dir;
+    let tmin = min(t0, t1);
+    let tmax = max(t0, t1);
+
+    let t_enter = max(max(tmin.x, tmin.y), tmin.z);
+    let t_exit = min(min(tmax.x, tmax.y), tmax.z);
+
+    if (t_enter > t_exit || t_exit < 0.0) {
+        discard;
+    }
+
+    let start = eye_unit + max(t_enter, 0.0) * dir;
+    let stop = eye_unit + t_exit * dir;
+
+    let clip_res = process_clip_planes(start, stop);
+    if (clip_res.clipped) {
+        discard;
+    }
+
+    let step_in_dir = (clip_res.p2 - clip_res.p1) / f32(max(uniforms.samples, 1u));
+    let ray_start = clip_res.p1;
     let algo = uniforms.algorithm;
 
+    var color: vec4<f32>;
     if (algo == 0u) {
-        // Mode 0: Default HitBox Threshold Volume Raymarching (DVR)
-        let vOrigin = eye_rot;
-        let vDirection = normalize(in.frag_vert - eye_rot);
-        let rayDir = normalize(vDirection);
-        var bounds = hitBox(vOrigin, rayDir, scale_vec);
-        if (bounds.x > bounds.y) {
-            discard;
-        }
-        bounds.x = max(bounds.x, 0.0);
-        color = volume_hitbox_threshold(vOrigin, rayDir, bounds, scale_vec);
+        color = volume_dvr(ray_start, step_in_dir);
+    } else if (algo == 1u) {
+        color = mip(ray_start, step_in_dir);
+    } else if (algo == 2u) {
+        color = minip(ray_start, step_in_dir);
+    } else if (algo == 3u) {
+        color = average_projection(ray_start, step_in_dir);
+    } else if (algo == 4u) {
+        color = label_iso(ray_start, step_in_dir);
+    } else if (algo == 5u) {
+        color = absorptionrgba(ray_start, step_in_dir);
+    } else if (algo == 6u) {
+        color = additivergba(ray_start, step_in_dir);
     } else {
-        // Modes (Isosurface, MIP, MinIP, Average, Label ISO, Absorption, Additive, Indexed, Contours)
-        let eye_unit = vec3<f32>(0.5) + eye_rot / scale_vec;
-        let back_position = in.frag_vert / scale_vec + vec3<f32>(0.5);
-        let dir = normalize(back_position - eye_unit);
-
-        let is_outside_box = (
-            eye_unit.x < 0.0 || eye_unit.y < 0.0 || eye_unit.z < 0.0 ||
-            eye_unit.x > 1.0 || eye_unit.y > 1.0 || eye_unit.z > 1.0
-        );
-
-        if ((dir.x == 0.0 && dir.y == 0.0 && dir.z == 0.0) || is_nan(dir.x) || is_nan(dir.y) || is_nan(dir.z)) {
-            discard;
-        }
-
-        let solution_1 = (vec3<f32>(1.0) - eye_unit) / dir;
-        let solution_0 = (vec3<f32>(0.0) - eye_unit) / dir;
-
-        var solutions_min = min(solution_0, solution_1);
-        var solutions_max = max(solution_0, solution_1);
-
-        let typemax: f32 = 1e30;
-        if (no_solution(solutions_min.x)) { solutions_min.x = -typemax; }
-        if (no_solution(solutions_min.y)) { solutions_min.y = -typemax; }
-        if (no_solution(solutions_min.z)) { solutions_min.z = -typemax; }
-
-        if (no_solution(solutions_max.x)) { solutions_max.x = typemax; }
-        if (no_solution(solutions_max.y)) { solutions_max.y = typemax; }
-        if (no_solution(solutions_max.z)) { solutions_max.z = typemax; }
-
-        let start_solution = max(max(solutions_min.x, solutions_min.y), solutions_min.z);
-        let stop_solution = min(min(solutions_max.x, solutions_max.y), solutions_max.z);
-
-        if (stop_solution < max(start_solution, 0.0)) {
-            discard;
-        }
-
-        let start = eye_unit + select(0.0, start_solution, is_outside_box) * dir;
-        let stop = eye_unit + stop_solution * dir;
-
-        let clip_res = process_clip_planes(start, stop);
-        if (clip_res.clipped) {
-            discard;
-        }
-
-        let step_in_dir = (clip_res.p2 - clip_res.p1) / f32(max(uniforms.samples, 1u));
-        let ray_start = clip_res.p1;
-
-        if (algo == 1u) {
-            color = isosurface(ray_start, step_in_dir);
-        } else if (algo == 2u) {
-            color = mip(ray_start, step_in_dir);
-        } else if (algo == 3u) {
-            color = minip(ray_start, step_in_dir);
-        } else if (algo == 4u) {
-            color = average_projection(ray_start, step_in_dir);
-        } else if (algo == 5u) {
-            color = label_iso(ray_start, step_in_dir);
-        } else if (algo == 6u) {
-            color = absorptionrgba(ray_start, step_in_dir);
-        } else if (algo == 7u) {
-            color = additivergba(ray_start, step_in_dir);
-        } else if (algo == 8u) {
-            color = volumeindexedrgba(ray_start, step_in_dir);
-        } else {
-            color = contours(ray_start, step_in_dir);
-        }
+        color = volumeindexedrgba(ray_start, step_in_dir);
     }
 
     if (color.a <= 0.001) {

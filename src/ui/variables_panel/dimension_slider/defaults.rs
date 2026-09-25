@@ -217,11 +217,22 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
     }
 
     for i in 0..rank {
+        let dim_name = var_info
+            .dimension_names
+            .get(i)
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let is_channel = crate::data::coordinates::naming::is_channel_dim_name(dim_name);
+        let dim_size = var_info.shape[i] as usize;
+
         if app.dim_config[i].spatial != SpatialRole::None {
             app.spatial_dims.push(i);
             app.dim_config[i].active = true;
         }
         if app.dim_config[i].animation == AnimationRole::Animated {
+            app.dim_config[i].active = true;
+        }
+        if is_channel && dim_size >= 2 {
             app.dim_config[i].active = true;
         }
         if let Some(&r) = app.selected_dim_ranges.get(i) {

@@ -293,6 +293,17 @@ pub fn extract_ome_multiscale_variables(
                     attrs.insert("default_t".to_string(), dt.to_string());
                 }
             }
+            for trans in &ds.coordinate_transformations {
+                if let CoordTransform::Scale { scale } = trans
+                    && scale.len() == dimension_names.len()
+                {
+                    for (dim_name, &s_val) in dimension_names.iter().zip(scale.iter()) {
+                        if s_val > 0.0 {
+                            attrs.insert(format!("scale_{dim_name}"), s_val.to_string());
+                        }
+                    }
+                }
+            }
 
             let file_size = calculate_variable_size_bytes(&shape, &data_type);
             variables.push(VariableInfo {

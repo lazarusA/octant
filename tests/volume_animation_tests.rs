@@ -820,8 +820,8 @@ fn test_volume_attenuation_and_advanced_algorithms() {
     app.volume_attenuation = 1.5;
     assert_eq!(app.volume_attenuation, 1.5);
 
-    // Test algorithm IDs: 0..=9
-    for algo_id in 0..=9 {
+    // Test algorithm IDs: 0..=7
+    for algo_id in 0..=7 {
         app.volume_algorithm = algo_id;
         assert_eq!(app.volume_algorithm, algo_id);
     }

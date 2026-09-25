@@ -68,43 +68,48 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
     });
 
-    egui::Grid::new("multichannel_overlay_grid")
-        .num_columns(3)
-        .spacing([6.0, 3.0])
+    egui::ScrollArea::vertical()
+        .max_height(80.0)
+        .auto_shrink([false, true])
         .show(ui, |ui| {
-            for cfg in &mut app.composite_channel_configs {
-                if ui.checkbox(&mut cfg.visible, "").changed() {
-                    changed = true;
-                }
-                let mut color_f32 = [
-                    cfg.color_rgb[0] as f32 / 255.0,
-                    cfg.color_rgb[1] as f32 / 255.0,
-                    cfg.color_rgb[2] as f32 / 255.0,
-                    1.0,
-                ];
-                let initial_f32 = color_f32;
-                crate::ui::color_picker::ShapeColorPicker::new(
-                    ("mc_color_picker", cfg.index),
-                    &mut color_f32,
-                    crate::ui::color_picker::ColorShape::Circle,
-                )
-                .size(egui::vec2(14.0, 14.0))
-                .tooltip("Click to customize channel tint color")
-                .show(ui);
+            egui::Grid::new("multichannel_overlay_grid")
+                .num_columns(3)
+                .spacing([6.0, 3.0])
+                .show(ui, |ui| {
+                    for cfg in &mut app.composite_channel_configs {
+                        if ui.checkbox(&mut cfg.visible, "").changed() {
+                            changed = true;
+                        }
+                        let mut color_f32 = [
+                            cfg.color_rgb[0] as f32 / 255.0,
+                            cfg.color_rgb[1] as f32 / 255.0,
+                            cfg.color_rgb[2] as f32 / 255.0,
+                            1.0,
+                        ];
+                        let initial_f32 = color_f32;
+                        crate::ui::color_picker::ShapeColorPicker::new(
+                            ("mc_color_picker", cfg.index),
+                            &mut color_f32,
+                            crate::ui::color_picker::ColorShape::Circle,
+                        )
+                        .size(egui::vec2(14.0, 14.0))
+                        .tooltip("Click to customize channel tint color")
+                        .show(ui);
 
-                if color_f32 != initial_f32 {
-                    cfg.color_rgb = [
-                        (color_f32[0] * 255.0).round().clamp(0.0, 255.0) as u8,
-                        (color_f32[1] * 255.0).round().clamp(0.0, 255.0) as u8,
-                        (color_f32[2] * 255.0).round().clamp(0.0, 255.0) as u8,
-                    ];
-                    changed = true;
-                }
+                        if color_f32 != initial_f32 {
+                            cfg.color_rgb = [
+                                (color_f32[0] * 255.0).round().clamp(0.0, 255.0) as u8,
+                                (color_f32[1] * 255.0).round().clamp(0.0, 255.0) as u8,
+                                (color_f32[2] * 255.0).round().clamp(0.0, 255.0) as u8,
+                            ];
+                            changed = true;
+                        }
 
-                let label_text = format!("{}: {}", cfg.index + 1, cfg.name);
-                ui.label(egui::RichText::new(label_text).small());
-                ui.end_row();
-            }
+                        let label_text = format!("{}: {}", cfg.index + 1, cfg.name);
+                        ui.label(egui::RichText::new(label_text).small());
+                        ui.end_row();
+                    }
+                });
         });
 
     if changed {

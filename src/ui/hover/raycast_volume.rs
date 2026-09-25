@@ -141,15 +141,6 @@ impl<'a> VolumeSampler<'a> {
                     && app.active_plot_type == PlotType::Volume
                     && app.volume_algorithm == 1
                 {
-                    // Isosurface mode
-                    if !is_nan && (raw_val - app.volume_isovalue).abs() <= app.volume_isorange {
-                        hit_point = Some((cx, cy, cz, raw_val));
-                        break;
-                    }
-                } else if is_half_scale
-                    && app.active_plot_type == PlotType::Volume
-                    && app.volume_algorithm == 2
-                {
                     // MIP mode
                     if !is_nan && raw_val > max_val {
                         let is_visible = app.use_highclip || raw_val <= app.color_range_max;
@@ -160,7 +151,7 @@ impl<'a> VolumeSampler<'a> {
                     }
                 } else if is_half_scale
                     && app.active_plot_type == PlotType::Volume
-                    && app.volume_algorithm == 3
+                    && app.volume_algorithm == 2
                 {
                     // MinIP mode
                     if !is_nan && raw_val < min_val {
@@ -172,9 +163,9 @@ impl<'a> VolumeSampler<'a> {
                     }
                 } else if is_half_scale
                     && app.active_plot_type == PlotType::Volume
-                    && app.volume_algorithm == 5
+                    && app.volume_algorithm == 4
                 {
-                    // Categorical Label Isosurface mode
+                    // Categorical Label Surface mode
                     if !is_nan && raw_val >= 0.5 {
                         hit_point = Some((cx, cy, cz, raw_val));
                         break;
@@ -186,11 +177,11 @@ impl<'a> VolumeSampler<'a> {
             }
         }
 
-        if is_half_scale && app.active_plot_type == PlotType::Volume && app.volume_algorithm == 2 {
+        if is_half_scale && app.active_plot_type == PlotType::Volume && app.volume_algorithm == 1 {
             max_intensity_hit.or(hit_point)
         } else if is_half_scale
             && app.active_plot_type == PlotType::Volume
-            && app.volume_algorithm == 3
+            && app.volume_algorithm == 2
         {
             min_intensity_hit.or(hit_point)
         } else {

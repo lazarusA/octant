@@ -77,13 +77,19 @@ pub fn slice_rgb_composite_nd(
     let height = y_range.1.saturating_sub(y_range.0).max(1);
     let plane_size = width.checked_mul(height)?;
 
+    let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
     let extract_plane = |ch_opt: Option<usize>| -> Option<Vec<f32>> {
-        let ch = ch_opt?.min(num_channels.saturating_sub(1));
+        let ch = ch_opt?;
+        let local_ch = if ch >= c_start && ch < c_start + num_channels {
+            ch - c_start
+        } else {
+            ch.min(num_channels.saturating_sub(1))
+        };
         let mut fixed = fixed_indices.to_vec();
         if fixed.len() < block.shape.len() {
             fixed.resize(block.shape.len(), 0);
         }
-        fixed[c_dim] = ch;
+        fixed[c_dim] = local_ch;
         let mdata = block.slice_2d_with_ranges(
             x_dim,
             y_dim,

@@ -1,25 +1,27 @@
-//! Multi-channel bioimaging additive overlay slicing with per-channel unique color tints.
+//! Multi-channel bioimaging 3D volumetric additive overlay slicing with per-channel color tints.
 
-use crate::data::matrix_data::MatrixData;
 use crate::data::octant_block::OctantBlock;
+use crate::data::volume_data::VolumeData;
 
 use super::types::ChannelColorConfig;
 use super::utils::{compute_normalization_scale, pack_rgb};
 
-/// Slices an N-dimensional `OctantBlock` with unique per-channel color tints additively.
+/// Slices an N-dimensional `OctantBlock` into a 3D `VolumeData` with unique per-channel color tints additively.
 #[allow(clippy::too_many_arguments)]
-pub fn slice_multichannel_composite_nd(
+pub fn slice_multichannel_volume_composite_nd(
     block: &OctantBlock,
     c_dim: usize,
     x_dim: usize,
     y_dim: usize,
+    z_dim: usize,
     x_range: (usize, usize),
     y_range: (usize, usize),
+    z_range: (usize, usize),
     fixed_indices: &[usize],
     channel_configs: &[ChannelColorConfig],
-    anim_extent: usize,
-) -> Option<MatrixData> {
-    if block.shape.len() < 2 || c_dim >= block.shape.len() {
+    dataset_name: &str,
+) -> Option<VolumeData> {
+    if block.shape.len() < 3 || c_dim >= block.shape.len() {
         return None;
     }
     let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
@@ -41,64 +43,72 @@ pub fn slice_multichannel_composite_nd(
         return None;
     }
 
-    let width = x_range.1.saturating_sub(x_range.0).max(1);
-    let height = y_range.1.saturating_sub(y_range.0).max(1);
-    let plane_size = width.checked_mul(height)?;
+    let mut channel_volumes = Vec::with_capacity(visible_configs.len());
+    let mut dims: Option<(usize, usize, usize)> = None;
 
-    let mut channel_planes = Vec::with_capacity(visible_configs.len());
     for (cfg, local_c) in &visible_configs {
-        if let Some(plane) = extract_and_normalize_channel(
+        if let Some((v_data, color)) = extract_and_normalize_channel_volume(
             block,
             c_dim,
             x_dim,
             y_dim,
+            z_dim,
             x_range,
             y_range,
+            z_range,
             fixed_indices,
             cfg,
             *local_c,
         ) {
-            channel_planes.push(plane);
+            if dims.is_none() {
+                dims = Some((v_data.width, v_data.height, v_data.depth));
+            }
+            channel_volumes.push((v_data.values, color));
         }
     }
 
-    if channel_planes.is_empty() {
+    if channel_volumes.is_empty() {
         return None;
     }
 
-    let values = blend_additive_planes(&channel_planes, plane_size);
+    let (nx, ny, nz) = dims?;
+    let total_voxels = nx.checked_mul(ny)?.checked_mul(nz)?;
+    let values = blend_additive_volumes(&channel_volumes, total_voxels);
 
-    Some(MatrixData::new(
-        width,
-        height,
+    Some(VolumeData::new(
+        nx,
+        ny,
+        nz,
         values,
         0.0,
         16777215.0,
-        format!("{} (Multi-Channel Overlay)", block.variable_name),
-        anim_extent,
+        format!("{dataset_name} (Multi-Channel 3D Overlay)"),
     ))
 }
 
 #[allow(clippy::too_many_arguments)]
-fn extract_and_normalize_channel(
+fn extract_and_normalize_channel_volume(
     block: &OctantBlock,
     c_dim: usize,
     x_dim: usize,
     y_dim: usize,
+    z_dim: usize,
     x_range: (usize, usize),
     y_range: (usize, usize),
+    z_range: (usize, usize),
     fixed_indices: &[usize],
     cfg: &ChannelColorConfig,
     local_c: usize,
-) -> Option<(Vec<f32>, [f32; 3])> {
+) -> Option<(VolumeData, [f32; 3])> {
     let mut fixed = fixed_indices.to_vec();
     if fixed.len() < block.shape.len() {
         fixed.resize(block.shape.len(), 0);
     }
     fixed[c_dim] = local_c;
 
-    let mdata =
-        block.slice_2d_with_ranges(x_dim, y_dim, x_range, y_range, &fixed, 1, &cfg.name, true)?;
+    let vdata = block.volume_with_ranges(
+        x_dim, y_dim, z_dim, x_range, y_range, z_range, &fixed, &cfg.name, true,
+    )?;
 
     let (scale, offset, is_i8) = if let Some((w_start, w_end)) = cfg.window {
         let is_i8 = (-128.0..0.0).contains(&w_start) && w_end <= 127.0;
@@ -109,7 +119,7 @@ fn extract_and_normalize_channel(
         };
         (scale, w_start, is_i8)
     } else {
-        let (min_v, max_v) = crate::utils::compute_finite_min_max(&mdata.values);
+        let (min_v, max_v) = crate::utils::compute_finite_min_max(&vdata.values);
         let is_i8 = (-128.0..0.0).contains(&min_v) && max_v <= 127.0;
         let (scale, offset) = compute_normalization_scale(min_v, max_v, is_i8, 1.0);
         (scale, offset, is_i8)
@@ -121,7 +131,7 @@ fn extract_and_normalize_channel(
         cfg.color_rgb[2] as f32,
     ];
 
-    let norm_plane: Vec<f32> = mdata
+    let norm_values: Vec<f32> = vdata
         .values
         .into_iter()
         .map(|raw| {
@@ -136,19 +146,33 @@ fn extract_and_normalize_channel(
         })
         .collect();
 
-    Some((norm_plane, color_rgb))
+    Some((
+        VolumeData::new(
+            vdata.width,
+            vdata.height,
+            vdata.depth,
+            norm_values,
+            0.0,
+            1.0,
+            cfg.name.clone(),
+        ),
+        color_rgb,
+    ))
 }
 
-fn blend_additive_planes(channel_planes: &[(Vec<f32>, [f32; 3])], plane_size: usize) -> Vec<f32> {
-    let mut values = Vec::with_capacity(plane_size);
-    for i in 0..plane_size {
+fn blend_additive_volumes(
+    channel_volumes: &[(Vec<f32>, [f32; 3])],
+    total_voxels: usize,
+) -> Vec<f32> {
+    let mut values = Vec::with_capacity(total_voxels);
+    for i in 0..total_voxels {
         let mut acc_r = 0.0f32;
         let mut acc_g = 0.0f32;
         let mut acc_b = 0.0f32;
         let mut any_valid = false;
 
-        for (plane, color) in channel_planes {
-            let intensity = plane.get(i).copied().unwrap_or(f32::NAN);
+        for (voxels, color) in channel_volumes {
+            let intensity = voxels.get(i).copied().unwrap_or(f32::NAN);
             if !intensity.is_nan() {
                 any_valid = true;
                 acc_r += intensity * color[0];

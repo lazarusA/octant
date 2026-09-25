@@ -5,10 +5,38 @@ use crate::app::OctantApp;
 impl OctantApp {
     /// Computes the 3D bounding aspect ratio `(aspect_x, aspect_y, aspect_z)` for 3D plots.
     pub fn get_3d_aspect_ratio(&self) -> (f32, f32, f32) {
+        let (mut scale_x, mut scale_y, mut scale_z) = (1.0f32, 1.0f32, 1.0f32);
+        if let Some(var) = self
+            .plotted_variable_info()
+            .or_else(|| self.selected_variable_info())
+        {
+            if let Some(sx) = var
+                .attributes
+                .get("scale_x")
+                .and_then(|s| s.parse::<f32>().ok())
+            {
+                scale_x = sx;
+            }
+            if let Some(sy) = var
+                .attributes
+                .get("scale_y")
+                .and_then(|s| s.parse::<f32>().ok())
+            {
+                scale_y = sy;
+            }
+            if let Some(sz) = var
+                .attributes
+                .get("scale_z")
+                .and_then(|s| s.parse::<f32>().ok())
+            {
+                scale_z = sz;
+            }
+        }
+
         if let Some(vdata) = &self.volume_data {
-            let w = vdata.width as f32;
-            let h = vdata.height as f32;
-            let d = vdata.depth as f32;
+            let w = vdata.width as f32 * scale_x;
+            let h = vdata.height as f32 * scale_y;
+            let d = vdata.depth as f32 * scale_z;
             let max_dim = w.max(h).max(d).max(1.0);
             return (w / max_dim, h / max_dim, d / max_dim);
         }
