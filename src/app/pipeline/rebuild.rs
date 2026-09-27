@@ -300,22 +300,34 @@ impl OctantApp {
 
         if is_new_variable {
             self.current_plotted_var_key = Some(var_key);
-            self.global_data_min = data.min_val;
-            self.global_data_max = data.max_val;
-            self.volume_cmin = data.min_val;
-            self.volume_cmax = data.max_val;
-            self.color_range_min = data.min_val;
-            self.color_range_max = data.max_val;
+            if data.min_val.is_finite() {
+                self.global_data_min = data.min_val;
+                self.volume_cmin = data.min_val;
+                self.color_range_min = data.min_val;
+            }
+            if data.max_val.is_finite() {
+                self.global_data_max = data.max_val;
+                self.volume_cmax = data.max_val;
+                self.color_range_max = data.max_val;
+            }
             self.lock_color_bounds = false;
         } else {
-            self.global_data_min = self.global_data_min.min(data.min_val);
-            self.global_data_max = self.global_data_max.max(data.max_val);
+            if data.min_val.is_finite() {
+                self.global_data_min = self.global_data_min.min(data.min_val);
+            }
+            if data.max_val.is_finite() {
+                self.global_data_max = self.global_data_max.max(data.max_val);
+            }
 
             if !self.lock_color_bounds {
-                self.volume_cmin = data.min_val;
-                self.volume_cmax = data.max_val;
-                self.color_range_min = data.min_val;
-                self.color_range_max = data.max_val;
+                if data.min_val.is_finite() {
+                    self.volume_cmin = data.min_val;
+                    self.color_range_min = data.min_val;
+                }
+                if data.max_val.is_finite() {
+                    self.volume_cmax = data.max_val;
+                    self.color_range_max = data.max_val;
+                }
             }
         }
 

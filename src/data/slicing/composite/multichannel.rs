@@ -24,7 +24,7 @@ pub fn slice_multichannel_composite_nd(
     }
     let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
     let num_channels = block.shape[c_dim];
-    let visible_configs: Vec<(&ChannelColorConfig, usize)> = channel_configs
+    let mut visible_configs: Vec<(&ChannelColorConfig, usize)> = channel_configs
         .iter()
         .filter(|c| c.visible)
         .filter_map(|c| {
@@ -36,14 +36,23 @@ pub fn slice_multichannel_composite_nd(
             }
         })
         .collect();
-
-    if visible_configs.is_empty() {
-        return None;
-    }
+    visible_configs.sort_by_key(|(c, _)| c.index);
 
     let width = x_range.1.saturating_sub(x_range.0).max(1);
     let height = y_range.1.saturating_sub(y_range.0).max(1);
     let plane_size = width.checked_mul(height)?;
+
+    if visible_configs.is_empty() {
+        return Some(MatrixData::new(
+            width,
+            height,
+            vec![f32::NAN; plane_size],
+            0.0,
+            16777215.0,
+            format!("{} (Multi-Channel Overlay)", block.variable_name),
+            anim_extent,
+        ));
+    }
 
     let mut channel_planes = Vec::with_capacity(visible_configs.len());
     for (cfg, local_c) in &visible_configs {

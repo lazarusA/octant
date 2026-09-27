@@ -6,7 +6,8 @@ use crate::app::OctantApp;
 pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.separator();
     let is_cmyk = app.is_cmyk();
-    let has_mc = !app.composite_channel_configs.is_empty();
+    let is_tiff = app.is_geotiff();
+    let has_mc = !app.composite_channel_configs.is_empty() && !is_tiff;
 
     let label = if has_mc {
         "Multi-Channel Overlay"
@@ -50,19 +51,68 @@ pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 }
 
+fn get_selected_channel_range(app: &OctantApp) -> (usize, usize) {
+    if let Some(c_idx) = app.channel_dim_index() {
+        if !app.plotted_dim_config.is_empty() {
+            if let Some(cfg) = app.plotted_dim_config.get(c_idx) {
+                if cfg.active {
+                    app.plotted_selected_dim_ranges
+                        .get(c_idx)
+                        .copied()
+                        .unwrap_or((0, usize::MAX))
+                } else {
+                    let idx = app
+                        .plotted_selected_dim_indices
+                        .get(c_idx)
+                        .copied()
+                        .unwrap_or(0);
+                    (idx, idx)
+                }
+            } else {
+                app.plotted_selected_dim_ranges
+                    .get(c_idx)
+                    .copied()
+                    .unwrap_or((0, usize::MAX))
+            }
+        } else if let Some(cfg) = app.dim_config.get(c_idx) {
+            if cfg.active {
+                app.selected_dim_ranges
+                    .get(c_idx)
+                    .copied()
+                    .unwrap_or((0, usize::MAX))
+            } else {
+                let idx = app.selected_dim_indices.get(c_idx).copied().unwrap_or(0);
+                (idx, idx)
+            }
+        } else {
+            app.selected_dim_ranges
+                .get(c_idx)
+                .copied()
+                .unwrap_or((0, usize::MAX))
+        }
+    } else {
+        (0, usize::MAX)
+    }
+}
+
 fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
+    let (c_start, c_end) = get_selected_channel_range(app);
     let mut changed = false;
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Channels:").small().strong());
         if ui.small_button("All").clicked() {
             for cfg in &mut app.composite_channel_configs {
-                cfg.visible = true;
+                if cfg.index >= c_start && cfg.index <= c_end {
+                    cfg.visible = true;
+                }
             }
             changed = true;
         }
         if ui.small_button("None").clicked() {
             for cfg in &mut app.composite_channel_configs {
-                cfg.visible = false;
+                if cfg.index >= c_start && cfg.index <= c_end {
+                    cfg.visible = false;
+                }
             }
             changed = true;
         }
@@ -76,7 +126,11 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .num_columns(3)
                 .spacing([6.0, 3.0])
                 .show(ui, |ui| {
-                    for cfg in &mut app.composite_channel_configs {
+                    for cfg in app
+                        .composite_channel_configs
+                        .iter_mut()
+                        .filter(|cfg| cfg.index >= c_start && cfg.index <= c_end)
+                    {
                         if ui.checkbox(&mut cfg.visible, "").changed() {
                             changed = true;
                         }
@@ -119,6 +173,10 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
 
 fn show_standard_rgb_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     let num_b = app.num_bands();
+    let (c_start, c_end) = get_selected_channel_range(app);
+    let min_b = c_start.min(num_b.saturating_sub(1));
+    let max_b = c_end.min(num_b.saturating_sub(1)).max(min_b);
+
     let channel_labels: Vec<String> = app
         .selected_variable_info()
         .or_else(|| app.plotted_variable_info())
@@ -143,11 +201,11 @@ fn show_standard_rgb_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         ];
         for (idx, label, color, salt) in channels {
             ui.label(egui::RichText::new(label).color(color));
-            let mut ch = app.rgb_composite_channels[idx].min(num_b.saturating_sub(1));
+            let mut ch = app.rgb_composite_channels[idx].clamp(min_b, max_b);
             egui::ComboBox::from_id_salt(salt)
                 .selected_text(get_channel_title(ch))
                 .show_ui(ui, |ui| {
-                    for b in 0..num_b {
+                    for b in min_b..=max_b {
                         if ui.selectable_label(ch == b, get_channel_title(b)).clicked() {
                             ch = b;
                         }

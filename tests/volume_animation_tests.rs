@@ -930,3 +930,45 @@ fn test_2d_and_3d_selected_elements_and_limits() {
     let elements_2d = octant::ui::variables_panel::calculate_selected_2d_elements(&app);
     assert_eq!(elements_2d, 100 * 100);
 }
+
+#[test]
+fn test_progressive_subvolume_updates_and_aspect_stability() {
+    let mut vdata = VolumeData::new(
+        10,
+        10,
+        20,
+        vec![f32::NAN; 10 * 10 * 20],
+        f32::NAN,
+        f32::NAN,
+        "Target Volume".to_string(),
+    );
+
+    // Initial aspect is defined for full 10x10x20
+    assert_eq!(vdata.width, 10);
+    assert_eq!(vdata.height, 10);
+    assert_eq!(vdata.depth, 20);
+    assert!(vdata.values[0].is_nan());
+    assert!(vdata.values[10 * 10 * 10].is_nan());
+
+    // Chunk 0 arrives: Z in 0..10, values 42.0
+    let slab0 = vec![42.0f32; 10 * 10 * 10];
+    vdata.update_subvolume([0, 0, 0], [10, 10, 10], &slab0);
+
+    assert_eq!(vdata.depth, 20);
+    assert_eq!(vdata.values[0], 42.0);
+    assert_eq!(vdata.values[10 * 10 * 9], 42.0);
+    assert!(vdata.values[10 * 10 * 10].is_nan());
+    assert_eq!(vdata.min_val, 42.0);
+    assert_eq!(vdata.max_val, 42.0);
+
+    // Chunk 1 arrives: Z in 10..20, values 99.0
+    let slab1 = vec![99.0f32; 10 * 10 * 10];
+    vdata.update_subvolume([0, 0, 10], [10, 10, 10], &slab1);
+
+    assert_eq!(vdata.depth, 20);
+    assert_eq!(vdata.values[0], 42.0);
+    assert_eq!(vdata.values[10 * 10 * 10], 99.0);
+    assert_eq!(vdata.values[10 * 10 * 20 - 1], 99.0);
+    assert_eq!(vdata.min_val, 42.0);
+    assert_eq!(vdata.max_val, 99.0);
+}

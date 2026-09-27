@@ -26,7 +26,7 @@ pub fn slice_multichannel_volume_composite_nd(
     }
     let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
     let num_channels = block.shape[c_dim];
-    let visible_configs: Vec<(&ChannelColorConfig, usize)> = channel_configs
+    let mut visible_configs: Vec<(&ChannelColorConfig, usize)> = channel_configs
         .iter()
         .filter(|c| c.visible)
         .filter_map(|c| {
@@ -38,9 +38,22 @@ pub fn slice_multichannel_volume_composite_nd(
             }
         })
         .collect();
+    visible_configs.sort_by_key(|(c, _)| c.index);
 
     if visible_configs.is_empty() {
-        return None;
+        let nx = x_range.1.saturating_sub(x_range.0).max(1);
+        let ny = y_range.1.saturating_sub(y_range.0).max(1);
+        let nz = z_range.1.saturating_sub(z_range.0).max(1);
+        let total_voxels = nx.checked_mul(ny)?.checked_mul(nz)?;
+        return Some(VolumeData::new(
+            nx,
+            ny,
+            nz,
+            vec![f32::NAN; total_voxels],
+            0.0,
+            16777215.0,
+            dataset_name.to_string(),
+        ));
     }
 
     let mut channel_volumes = Vec::with_capacity(visible_configs.len());
@@ -82,7 +95,126 @@ pub fn slice_multichannel_volume_composite_nd(
         values,
         0.0,
         16777215.0,
-        format!("{dataset_name} (Multi-Channel 3D Overlay)"),
+        dataset_name.to_string(),
+    ))
+}
+
+/// Slices an N-dimensional `OctantBlock` with a channel dimension into TrueColor RGB `VolumeData`.
+#[allow(clippy::too_many_arguments)]
+pub fn slice_rgb_volume_composite_nd(
+    block: &OctantBlock,
+    c_dim: usize,
+    x_dim: usize,
+    y_dim: usize,
+    z_dim: usize,
+    x_range: (usize, usize),
+    y_range: (usize, usize),
+    z_range: (usize, usize),
+    fixed_indices: &[usize],
+    channels: [Option<usize>; 3],
+    dataset_name: &str,
+) -> Option<VolumeData> {
+    if block.shape.len() < 3 || c_dim >= block.shape.len() {
+        return None;
+    }
+    let num_channels = block.shape[c_dim];
+    if num_channels < 2 && channels[0].is_none() && channels[1].is_none() && channels[2].is_none() {
+        return None;
+    }
+
+    let has_z = z_dim < block.shape.len() && z_dim != c_dim;
+    let eff_z_dim = if has_z { z_dim } else { usize::MAX };
+    let nx = x_range.1.saturating_sub(x_range.0).max(1);
+    let ny = y_range.1.saturating_sub(y_range.0).max(1);
+    let nz = if has_z {
+        z_range.1.saturating_sub(z_range.0).max(1)
+    } else {
+        1
+    };
+    let total_voxels = nx.checked_mul(ny)?.checked_mul(nz)?;
+
+    let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
+    let extract_volume = |ch_opt: Option<usize>| -> Option<Vec<f32>> {
+        let ch = ch_opt?;
+        let local_ch = if ch >= c_start && ch < c_start + num_channels {
+            ch - c_start
+        } else {
+            ch.min(num_channels.saturating_sub(1))
+        };
+        let mut fixed = fixed_indices.to_vec();
+        if fixed.len() < block.shape.len() {
+            fixed.resize(block.shape.len(), 0);
+        }
+        fixed[c_dim] = local_ch;
+        let vdata = block.volume_with_ranges(
+            x_dim,
+            y_dim,
+            eff_z_dim,
+            x_range,
+            y_range,
+            z_range,
+            &fixed,
+            "rgb_volume_ch",
+            true,
+        )?;
+        Some(vdata.values)
+    };
+
+    let r_vol = extract_volume(channels[0]);
+    let g_vol = extract_volume(channels[1]);
+    let b_vol = extract_volume(channels[2]);
+
+    let norm_volume = |vol_opt: Option<Vec<f32>>| -> (Option<Vec<f32>>, f32, f32) {
+        if let Some(ref v) = vol_opt {
+            let (min_v, max_v) = crate::utils::compute_finite_min_max(v);
+            let is_i8 = (-128.0..0.0).contains(&min_v) && max_v <= 127.0;
+            let (scale, offset) = compute_normalization_scale(min_v, max_v, is_i8, 255.0);
+            (vol_opt, scale, offset)
+        } else {
+            (None, 1.0, 0.0)
+        }
+    };
+
+    let (r_v, r_scale, r_off) = norm_volume(r_vol);
+    let (g_v, g_scale, g_off) = norm_volume(g_vol);
+    let (b_v, b_scale, b_off) = norm_volume(b_vol);
+
+    let mut values = Vec::with_capacity(total_voxels);
+    for i in 0..total_voxels {
+        let r_val = r_v.as_ref().and_then(|v| v.get(i).copied()).unwrap_or(0.0);
+        let g_val = g_v.as_ref().and_then(|v| v.get(i).copied()).unwrap_or(0.0);
+        let b_val = b_v.as_ref().and_then(|v| v.get(i).copied()).unwrap_or(0.0);
+
+        if r_val.is_nan() && g_val.is_nan() && b_val.is_nan() {
+            values.push(f32::NAN);
+        } else {
+            let r_n = if r_v.is_some() && !r_val.is_nan() {
+                ((r_val - r_off) * r_scale).clamp(0.0, 255.0)
+            } else {
+                0.0
+            };
+            let g_n = if g_v.is_some() && !g_val.is_nan() {
+                ((g_val - g_off) * g_scale).clamp(0.0, 255.0)
+            } else {
+                0.0
+            };
+            let b_n = if b_v.is_some() && !b_val.is_nan() {
+                ((b_val - b_off) * b_scale).clamp(0.0, 255.0)
+            } else {
+                0.0
+            };
+            values.push(pack_rgb(r_n, g_n, b_n));
+        }
+    }
+
+    Some(VolumeData::new(
+        nx,
+        ny,
+        nz,
+        values,
+        0.0,
+        16777215.0,
+        dataset_name.to_string(),
     ))
 }
 
@@ -106,8 +238,11 @@ fn extract_and_normalize_channel_volume(
     }
     fixed[c_dim] = local_c;
 
+    let has_z = z_dim < block.shape.len() && z_dim != c_dim;
+    let eff_z_dim = if has_z { z_dim } else { usize::MAX };
+
     let vdata = block.volume_with_ranges(
-        x_dim, y_dim, z_dim, x_range, y_range, z_range, &fixed, &cfg.name, true,
+        x_dim, y_dim, eff_z_dim, x_range, y_range, z_range, &fixed, &cfg.name, true,
     )?;
 
     let (scale, offset, is_i8) = if let Some((w_start, w_end)) = cfg.window {

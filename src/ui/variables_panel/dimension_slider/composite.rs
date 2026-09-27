@@ -8,30 +8,48 @@ pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo, ran
     app.rgb_composite_channels = [0, 1, 2];
     app.composite_channel_configs.clear();
 
+    let is_tiff = app.is_geotiff()
+        || var_info.attributes.contains_key("geotiff")
+        || var_info.attributes.contains_key("tiff")
+        || var_info
+            .dimension_names
+            .iter()
+            .any(|d| d.eq_ignore_ascii_case("band") || d.eq_ignore_ascii_case("bands"))
+        || app.selected_store_kind == crate::app::StoreKind::LocalGeoTiff
+        || app.selected_store_kind == crate::app::StoreKind::RemoteGeoTiff;
+
     let has_omero = var_info.attributes.contains_key("omero_channels")
         || var_info.attributes.contains_key("omero_colors");
 
-    let c_idx_opt = var_info
-        .dimension_names
-        .iter()
-        .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
-        .or(if has_omero && rank >= 3 {
-            Some(0)
-        } else {
-            None
-        });
+    if !is_tiff {
+        let c_idx_opt = var_info
+            .dimension_names
+            .iter()
+            .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
+            .or(if has_omero && rank >= 3 {
+                Some(0)
+            } else {
+                None
+            });
 
-    if let Some(c_idx) = c_idx_opt {
-        let num_ch = var_info.shape.get(c_idx).copied().unwrap_or(0) as usize;
-        if num_ch >= 2 {
-            app.composite_channel_configs = extract_channel_configs(var_info, num_ch);
+        if let Some(c_idx) = c_idx_opt {
+            let num_ch = var_info.shape.get(c_idx).copied().unwrap_or(0) as usize;
+            if num_ch >= 2 {
+                app.composite_channel_configs = extract_channel_configs(var_info, num_ch);
+            }
         }
     }
 
-    if has_omero && !app.composite_channel_configs.is_empty() {
+    let num_bands = var_info.shape.first().copied().unwrap_or(0) as usize;
+
+    if is_tiff && rank >= 3 && num_bands >= 3 {
+        app.rgb_composite_mode = true;
+        app.rgb_composite_channels = [0, 1, 2];
+        app.active_colormap = 1000;
+    } else if has_omero && !app.composite_channel_configs.is_empty() {
         app.rgb_composite_mode = true;
         app.active_colormap = 1000;
-    } else if rank < 3 || var_info.shape.first().copied().unwrap_or(0) < 3 {
+    } else {
         app.rgb_composite_mode = false;
         if app.active_colormap == 1000 {
             app.active_colormap = 0;

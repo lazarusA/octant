@@ -142,9 +142,12 @@ fn sample_volume_scalar(texCoord: vec3<f32>) -> f32 {
 
     let norm_y = 1.0 - texCoord.y;
     let norm_z = 1.0 - texCoord.z;
-    let base_x = u32(texCoord.x * f32(grid_w - 1u));
-    let base_y = u32(norm_y * f32(grid_h - 1u));
-    let base_z = u32(norm_z * f32(grid_d - 1u));
+    let fx = clamp(texCoord.x, 0.0, 1.0) * f32(grid_w);
+    let fy = clamp(norm_y, 0.0, 1.0) * f32(grid_h);
+    let fz = clamp(norm_z, 0.0, 1.0) * f32(grid_d);
+    let base_x = min(u32(fx), grid_w - 1u);
+    let base_y = min(u32(fy), grid_h - 1u);
+    let base_z = min(u32(fz), grid_d - 1u);
 
     let gx = (base_x + uniforms.shift_x) % grid_w;
     let gy = (base_y + uniforms.shift_y) % grid_h;
@@ -166,10 +169,31 @@ fn sample_volume_rgba(pos: vec3<f32>) -> vec4<f32> {
     return evaluate_plot_color(s, uniforms.color);
 }
 
+fn sample_volume_intensity(pos: vec3<f32>) -> f32 {
+    let s = sample_volume_scalar(pos);
+    if (s != s || abs(s) > 1e30) {
+        return 0.0;
+    }
+    if (uniforms.color.colormap == 1000u) {
+        return unpack_rgba_f32(s).a;
+    }
+    return s;
+}
+
 fn sample_foreground(pos: vec3<f32>) -> f32 {
     let raw = sample_volume_scalar(pos);
     let is_nan_val = (raw != raw || abs(raw) > 1e30);
-    if (is_nan_val || raw < 0.5) {
+    if (is_nan_val) {
+        return 0.0;
+    }
+    if (uniforms.color.colormap == 1000u) {
+        let intensity = unpack_rgba_f32(raw).a;
+        if (intensity < 0.01) {
+            return 0.0;
+        }
+        return 1.0;
+    }
+    if (raw < 0.5) {
         return 0.0;
     }
     return 1.0;
@@ -217,12 +241,12 @@ fn central_normal(uvw: vec3<f32>) -> vec3<f32> {
     let grid_d = f32(max(uniforms.depth, 1u));
     let step = vec3<f32>(1.0 / grid_w, 1.0 / grid_h, 1.0 / grid_d);
 
-    let x1 = sample_volume_scalar(clamp(uvw + vec3<f32>(step.x, 0.0, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
-    let x0 = sample_volume_scalar(clamp(uvw - vec3<f32>(step.x, 0.0, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
-    let y1 = sample_volume_scalar(clamp(uvw + vec3<f32>(0.0, step.y, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
-    let y0 = sample_volume_scalar(clamp(uvw - vec3<f32>(0.0, step.y, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
-    let z1 = sample_volume_scalar(clamp(uvw + vec3<f32>(0.0, 0.0, step.z), vec3<f32>(0.0), vec3<f32>(1.0)));
-    let z0 = sample_volume_scalar(clamp(uvw - vec3<f32>(0.0, 0.0, step.z), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let x1 = sample_volume_intensity(clamp(uvw + vec3<f32>(step.x, 0.0, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let x0 = sample_volume_intensity(clamp(uvw - vec3<f32>(step.x, 0.0, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let y1 = sample_volume_intensity(clamp(uvw + vec3<f32>(0.0, step.y, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let y0 = sample_volume_intensity(clamp(uvw - vec3<f32>(0.0, step.y, 0.0), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let z1 = sample_volume_intensity(clamp(uvw + vec3<f32>(0.0, 0.0, step.z), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let z0 = sample_volume_intensity(clamp(uvw - vec3<f32>(0.0, 0.0, step.z), vec3<f32>(0.0), vec3<f32>(1.0)));
 
     let G = vec3<f32>(-(x1 - x0), -(y1 - y0), -(z1 - z0));
     let len = length(G);

@@ -134,6 +134,13 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    if (uniforms.color.colormap == 1000u) {
+        let packed = u32(in.val);
+        if ((packed & 0x00FFFFFFu) == 0u) {
+            discard;
+        }
+    }
+
     let eval_color = evaluate_plot_color(in.val, uniforms.color);
 
     if (eval_color.a <= 0.0) {

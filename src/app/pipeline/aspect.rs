@@ -10,33 +10,46 @@ impl OctantApp {
             .plotted_variable_info()
             .or_else(|| self.selected_variable_info())
         {
-            if let Some(sx) = var
-                .attributes
-                .get("scale_x")
-                .and_then(|s| s.parse::<f32>().ok())
-            {
+            let get_scale = |axis_name: &str| -> Option<f32> {
+                let target_key = format!("scale_{axis_name}");
+                for (k, v) in &var.attributes {
+                    if (k.eq_ignore_ascii_case(&target_key) || k.eq_ignore_ascii_case(axis_name))
+                        && let Ok(val) = v.parse::<f32>()
+                        && val > 0.0
+                    {
+                        return Some(val);
+                    }
+                }
+                None
+            };
+
+            let x_name = self
+                .get_spatial_dim_name(0)
+                .unwrap_or_else(|| "x".to_string());
+            let y_name = self
+                .get_spatial_dim_name(1)
+                .unwrap_or_else(|| "y".to_string());
+            let z_name = self
+                .get_spatial_dim_name(2)
+                .unwrap_or_else(|| "z".to_string());
+
+            if let Some(sx) = get_scale(&x_name).or_else(|| get_scale("x")) {
                 scale_x = sx;
             }
-            if let Some(sy) = var
-                .attributes
-                .get("scale_y")
-                .and_then(|s| s.parse::<f32>().ok())
-            {
+            if let Some(sy) = get_scale(&y_name).or_else(|| get_scale("y")) {
                 scale_y = sy;
             }
-            if let Some(sz) = var
-                .attributes
-                .get("scale_z")
-                .and_then(|s| s.parse::<f32>().ok())
-            {
+            if let Some(sz) = get_scale(&z_name).or_else(|| get_scale("z")) {
                 scale_z = sz;
             }
         }
 
+        let z_mult = self.volume_z_scale.clamp(0.01, 50.0);
+
         if let Some(vdata) = &self.volume_data {
             let w = vdata.width as f32 * scale_x;
             let h = vdata.height as f32 * scale_y;
-            let d = vdata.depth as f32 * scale_z;
+            let d = vdata.depth as f32 * scale_z * z_mult;
             let max_dim = w.max(h).max(d).max(1.0);
             return (w / max_dim, h / max_dim, d / max_dim);
         }
@@ -64,9 +77,9 @@ impl OctantApp {
         let depth = shape_d.max(max_t);
 
         let max_spatial = (width.max(height)) as f32;
-        let aspect_x = width as f32 / max_spatial;
-        let aspect_y = height as f32 / max_spatial;
-        let aspect_z = ((depth as f32 / max_spatial) * 0.12).clamp(0.4, 1.0);
+        let aspect_x = (width as f32 * scale_x) / max_spatial;
+        let aspect_y = (height as f32 * scale_y) / max_spatial;
+        let aspect_z = ((depth as f32 * scale_z * z_mult) / max_spatial).clamp(0.05, 1.0);
 
         (aspect_x, aspect_y, aspect_z)
     }

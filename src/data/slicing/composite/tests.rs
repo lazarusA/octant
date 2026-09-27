@@ -367,3 +367,182 @@ fn test_multichannel_volume_with_offset_channels() {
     assert_eq!(unpack_rgb(vdata.values[2]), (0.0, 0.0, 0.0));
     assert_eq!(unpack_rgb(vdata.values[3]), (255.0, 0.0, 0.0));
 }
+
+#[test]
+fn test_multichannel_composite_none_selected() {
+    let values: Arc<[f32]> = Arc::from(vec![1.0, 2.0, 3.0, 4.0]);
+    let block = OctantBlock::new(
+        "test_none".to_string(),
+        vec![2, 2],
+        vec!["y".to_string(), "x".to_string()],
+        vec![0, 0],
+        values,
+        HashMap::new(),
+        HashMap::new(),
+    );
+
+    let configs = vec![ChannelColorConfig {
+        index: 0,
+        name: "DAPI".to_string(),
+        color_rgb: [0, 0, 255],
+        visible: false, // None visible
+        window: None,
+    }];
+
+    let composite =
+        slice_multichannel_composite_nd(&block, 0, 1, 0, (0, 2), (0, 2), &[0, 0], &configs, 1)
+            .expect("multichannel composite with none selected should return NAN plane");
+
+    assert_eq!(composite.width, 2);
+    assert_eq!(composite.height, 2);
+    assert!(composite.values.iter().all(|v| v.is_nan()));
+}
+
+#[test]
+fn test_multichannel_volume_none_selected() {
+    let values: Arc<[f32]> = Arc::from(vec![1.0, 2.0, 3.0, 4.0]);
+    let block = OctantBlock::new(
+        "test_none_vol".to_string(),
+        vec![1, 2, 2],
+        vec!["z".to_string(), "y".to_string(), "x".to_string()],
+        vec![0, 0, 0],
+        values,
+        HashMap::new(),
+        HashMap::new(),
+    );
+
+    let configs = vec![ChannelColorConfig {
+        index: 0,
+        name: "DAPI".to_string(),
+        color_rgb: [0, 0, 255],
+        visible: false,
+        window: None,
+    }];
+
+    let vdata = super::volume::slice_multichannel_volume_composite_nd(
+        &block,
+        0,
+        2,
+        1,
+        0,
+        (0, 2),
+        (0, 2),
+        (0, 1),
+        &[0, 0, 0],
+        &configs,
+        "test_none_vol",
+    )
+    .expect("volume composite with none selected should return NAN volume");
+
+    assert_eq!(vdata.width, 2);
+    assert_eq!(vdata.height, 2);
+    assert_eq!(vdata.depth, 1);
+    assert!(vdata.values.iter().all(|v| v.is_nan()));
+}
+
+#[test]
+fn test_rgb_volume_composite_slicing() {
+    // 3 bands (R, G, B) across shape [3, 2, 2, 2] (bands, z, y, x)
+    // Band 0 (Red): 100.0, Band 1 (Green): 200.0, Band 2 (Blue): 50.0
+    let mut raw_vals = vec![0.0f32; 3 * 2 * 2 * 2];
+    for i in 0..8 {
+        raw_vals[i] = 100.0; // R
+        raw_vals[8 + i] = 200.0; // G
+        raw_vals[16 + i] = 50.0; // B
+    }
+
+    let block = OctantBlock::new(
+        "geotiff_3d_bands".to_string(),
+        vec![3, 2, 2, 2],
+        vec![
+            "band".to_string(),
+            "z".to_string(),
+            "y".to_string(),
+            "x".to_string(),
+        ],
+        vec![0, 0, 0, 0],
+        Arc::from(raw_vals),
+        HashMap::new(),
+        HashMap::new(),
+    );
+
+    let vdata = super::volume::slice_rgb_volume_composite_nd(
+        &block,
+        0, // c_dim (band)
+        3, // x_dim
+        2, // y_dim
+        1, // z_dim
+        (0, 2),
+        (0, 2),
+        (0, 2),
+        &[0, 0, 0, 0],
+        [Some(0), Some(1), Some(2)],
+        "geotiff_rgb_volume",
+    )
+    .expect("rgb volume composite should succeed");
+
+    assert_eq!(vdata.width, 2);
+    assert_eq!(vdata.height, 2);
+    assert_eq!(vdata.depth, 2);
+    assert_eq!(vdata.values.len(), 8);
+
+    // Each voxel should have packed RGB
+    let first_voxel = vdata.values[0];
+    assert!(!first_voxel.is_nan());
+    let (r, g, b) = unpack_rgb(first_voxel);
+    assert!(r >= 0.0 && g >= 0.0 && b >= 0.0);
+}
+
+#[test]
+fn test_rgb_volume_composite_geotiff_3band_distinct_colors() {
+    let mut raw_vals = vec![0.0f32; 12]; // [3, 2, 2] -> 3 bands of 2x2
+    for i in 0..4 {
+        raw_vals[i] = 255.0; // Red band
+        raw_vals[4 + i] = 120.0; // Green band
+        raw_vals[8 + i] = 30.0; // Blue band
+    }
+
+    let block = OctantBlock::new(
+        "geotiff_2d_3band".to_string(),
+        vec![3, 2, 2],
+        vec!["bands".to_string(), "y".to_string(), "x".to_string()],
+        vec![0, 0, 0],
+        Arc::from(raw_vals),
+        HashMap::new(),
+        HashMap::new(),
+    );
+
+    let vdata = super::volume::slice_rgb_volume_composite_nd(
+        &block,
+        0,          // c_dim (band)
+        2,          // x_dim
+        1,          // y_dim
+        usize::MAX, // z_dim (no spatial depth)
+        (0, 2),
+        (0, 2),
+        (0, 1),
+        &[0, 0, 0],
+        [Some(0), Some(1), Some(2)],
+        "geotiff_rgb_volume_2d",
+    )
+    .expect("rgb volume composite should succeed");
+
+    assert_eq!(vdata.width, 2);
+    assert_eq!(vdata.height, 2);
+    assert_eq!(vdata.depth, 1);
+    assert_eq!(vdata.values.len(), 4);
+
+    // Each voxel must have distinct R, G, B colors (not monochrome!)
+    for &voxel in &vdata.values {
+        assert!(!voxel.is_nan());
+        let (r, g, b) = unpack_rgb(voxel);
+        assert!(
+            (r - g).abs() > 1.0,
+            "Red and Green must differ, got r={r}, g={g}"
+        );
+        assert!(
+            (g - b).abs() > 1.0,
+            "Green and Blue must differ, got g={g}, b={b}"
+        );
+    }
+}

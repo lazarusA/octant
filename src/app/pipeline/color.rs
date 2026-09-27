@@ -14,7 +14,10 @@ impl OctantApp {
 
     /// Assembles the complete `PlotColorParams` uniform bundle from current application state.
     pub fn get_color_params(&self) -> PlotColorParams {
-        let effective_colormap = self.preview_colormap.unwrap_or(self.active_colormap);
+        let mut effective_colormap = self.preview_colormap.unwrap_or(self.active_colormap);
+        if self.rgb_composite_mode {
+            effective_colormap = 1000;
+        }
 
         let (is_cat, num_cats) = if self.is_categorical {
             if let Some(mdata) = &self.matrix_data {
