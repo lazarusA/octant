@@ -82,7 +82,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
                     if should_plot {
                         app.show_hero = false;
-                        app.sync_plotted_state_from_selected();
+                        app.block_prefetcher.abort();
                         app.load_selected_variable_block();
                         app.open_only_settings_panel();
                     }

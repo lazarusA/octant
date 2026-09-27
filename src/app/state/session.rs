@@ -134,6 +134,19 @@ impl OctantApp {
         self.plotted_selected_dim_ranges = self.selected_dim_ranges.clone();
         self.plotted_spatial_dims = self.spatial_dims.clone();
         self.plotted_animated_dim = self.animated_dim;
+
+        let var_info_opt = self
+            .plotted_dataset_metadata
+            .as_ref()
+            .and_then(|meta| meta.variables.get(self.plotted_variable_idx).cloned());
+
+        if let Some(var_info) = var_info_opt {
+            let rank = var_info.shape.len();
+            crate::ui::variables_panel::dimension_slider::init_composite_defaults(
+                self, &var_info, rank,
+            );
+        }
+
         if !self.has_rgb_bands() {
             self.rgb_composite_mode = false;
             if self.active_colormap == 1000 {

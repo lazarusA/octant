@@ -188,18 +188,29 @@ impl OctantApp {
 
     /// Returns true if the active dataset represents a GeoTIFF.
     pub fn is_geotiff(&self) -> bool {
+        if self.plotted_dataset_metadata.is_some() {
+            if self.plotted_store_kind == StoreKind::LocalGeoTiff
+                || self.plotted_store_kind == StoreKind::RemoteGeoTiff
+            {
+                return true;
+            }
+            if let Some(var) = self.plotted_variable_info() {
+                return var.attributes.contains_key("geotiff")
+                    || var.attributes.contains_key("tiff")
+                    || var.dimension_names.iter().any(|d| {
+                        d.eq_ignore_ascii_case("band") || d.eq_ignore_ascii_case("bands")
+                    });
+            }
+            return false;
+        }
+
         if self.selected_store_kind == StoreKind::LocalGeoTiff
             || self.selected_store_kind == StoreKind::RemoteGeoTiff
-            || self.plotted_store_kind == StoreKind::LocalGeoTiff
-            || self.plotted_store_kind == StoreKind::RemoteGeoTiff
         {
             return true;
         }
 
-        let Some(var) = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info())
-        else {
+        let Some(var) = self.selected_variable_info() else {
             return false;
         };
 

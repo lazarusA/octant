@@ -12,7 +12,6 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
     app.selected_dim_ranges.clear();
     app.spatial_dims.clear();
     app.animated_dim = None;
-    super::composite::init_composite_defaults(app, var_info, rank);
 
     for i in 0..rank {
         let dim_size = var_info.shape[i] as usize;

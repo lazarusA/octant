@@ -10,6 +10,7 @@ pub mod slice_req;
 pub mod slider_row;
 
 pub use crate::utils::format_byte_size;
+pub use composite::init_composite_defaults;
 pub use defaults::init_variable_dimension_defaults;
 pub use double_slider::double_slider_with_inputs;
 pub use metrics::{

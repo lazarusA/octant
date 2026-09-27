@@ -69,6 +69,7 @@ impl OctantApp {
                 block.variable_name,
                 block.bytes_size()
             );
+            self.sync_plotted_state_from_selected();
             self.apply_block_projection(&block);
             self.prefetch_selected_animated_range(&shape);
             return;
@@ -90,6 +91,7 @@ impl OctantApp {
                 block.variable_name,
                 block.bytes_size()
             );
+            self.sync_plotted_state_from_selected();
             self.apply_block_projection(&block);
             self.prefetch_selected_animated_range(&shape);
             return;
@@ -165,6 +167,7 @@ impl OctantApp {
                     if is_active || (is_same_var && (covers_current || is_volume_or_point_cloud)) {
                         if is_active {
                             self.active_block_key = None;
+                            self.sync_plotted_state_from_selected();
                             if let Some(target) = self.pending_target_step.take()
                                 && let Some(dim) = anim_dim
                             {

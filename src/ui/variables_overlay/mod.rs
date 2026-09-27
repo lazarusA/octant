@@ -159,12 +159,6 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                         );
 
                                         app.show_variable_controls = true;
-
-                                        if var_info.shape.len() <= 1 {
-                                            app.line_plot_all_series = false;
-                                            app.line_profile_dim_idx = 0;
-                                            app.line_profile_slice_idx = 0;
-                                        }
                                     }
                                 }
                             });
