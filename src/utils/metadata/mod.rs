@@ -5,6 +5,7 @@ pub mod cf;
 pub mod discovery;
 pub mod node_info;
 pub mod ome;
+pub mod ome_types;
 #[cfg(test)]
 mod tests;
 
@@ -26,3 +27,4 @@ pub use node_info::{
 pub use ome::{
     extract_ome_multiscale_variables, fallback_ome_axes_for_rank, normalize_ngff_attributes,
 };
+pub use ome_types::*;

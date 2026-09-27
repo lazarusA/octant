@@ -193,7 +193,7 @@ fn test_multichannel_volume_additive_composite() {
         },
     ];
 
-    let vdata = super::volume::slice_multichannel_volume_composite_nd(
+    let vdata = super::slice_multichannel_volume_composite_nd(
         &block,
         0, // c_dim
         3, // x_dim
@@ -343,7 +343,7 @@ fn test_multichannel_volume_with_offset_channels() {
         },
     ];
 
-    let vdata = super::volume::slice_multichannel_volume_composite_nd(
+    let vdata = super::slice_multichannel_volume_composite_nd(
         &block,
         0, // c_dim
         3, // x_dim
@@ -419,7 +419,7 @@ fn test_multichannel_volume_none_selected() {
         window: None,
     }];
 
-    let vdata = super::volume::slice_multichannel_volume_composite_nd(
+    let vdata = super::slice_multichannel_volume_composite_nd(
         &block,
         0,
         2,
@@ -466,7 +466,7 @@ fn test_rgb_volume_composite_slicing() {
         HashMap::new(),
     );
 
-    let vdata = super::volume::slice_rgb_volume_composite_nd(
+    let vdata = super::slice_rgb_volume_composite_nd(
         &block,
         0, // c_dim (band)
         3, // x_dim
@@ -512,7 +512,7 @@ fn test_rgb_volume_composite_geotiff_3band_distinct_colors() {
         HashMap::new(),
     );
 
-    let vdata = super::volume::slice_rgb_volume_composite_nd(
+    let vdata = super::slice_rgb_volume_composite_nd(
         &block,
         0,          // c_dim (band)
         2,          // x_dim

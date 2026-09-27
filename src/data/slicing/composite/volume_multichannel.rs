@@ -1,25 +1,27 @@
-//! Multi-channel bioimaging additive overlay slicing with per-channel unique color tints.
+//! Multi-channel bioimaging 3D volumetric additive overlay slicing with per-channel color tints.
 
-use crate::data::matrix_data::MatrixData;
 use crate::data::octant_block::OctantBlock;
+use crate::data::volume_data::VolumeData;
 
 use super::types::ChannelColorConfig;
 use super::utils::{compute_channel_normalization, normalize_channel_value, pack_rgb};
 
-/// Slices an N-dimensional `OctantBlock` with unique per-channel color tints additively.
+/// Slices an N-dimensional `OctantBlock` into a 3D `VolumeData` with unique per-channel color tints additively.
 #[allow(clippy::too_many_arguments)]
-pub fn slice_multichannel_composite_nd(
+pub fn slice_multichannel_volume_composite_nd(
     block: &OctantBlock,
     c_dim: usize,
     x_dim: usize,
     y_dim: usize,
+    z_dim: usize,
     x_range: (usize, usize),
     y_range: (usize, usize),
+    z_range: (usize, usize),
     fixed_indices: &[usize],
     channel_configs: &[ChannelColorConfig],
-    anim_extent: usize,
-) -> Option<MatrixData> {
-    if block.shape.len() < 2 || c_dim >= block.shape.len() {
+    dataset_name: &str,
+) -> Option<VolumeData> {
+    if block.shape.len() < 3 || c_dim >= block.shape.len() {
         return None;
     }
     let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
@@ -38,26 +40,30 @@ pub fn slice_multichannel_composite_nd(
         .collect();
     visible_configs.sort_by_key(|(c, _)| c.index);
 
-    let width = x_range.1.saturating_sub(x_range.0).max(1);
-    let height = y_range.1.saturating_sub(y_range.0).max(1);
-    let plane_size = width.checked_mul(height)?;
+    let nx = x_range.1.saturating_sub(x_range.0).max(1);
+    let ny = y_range.1.saturating_sub(y_range.0).max(1);
+    let nz = z_range.1.saturating_sub(z_range.0).max(1);
+    let total_voxels = nx.checked_mul(ny)?.checked_mul(nz)?;
 
     if visible_configs.is_empty() {
-        return Some(MatrixData::new(
-            width,
-            height,
-            vec![f32::NAN; plane_size],
+        return Some(VolumeData::new(
+            nx,
+            ny,
+            nz,
+            vec![f32::NAN; total_voxels],
             0.0,
             16777215.0,
-            format!("{} (Multi-Channel Overlay)", block.variable_name),
-            anim_extent,
+            dataset_name.to_string(),
         ));
     }
 
-    let mut acc_r = vec![0.0f32; plane_size];
-    let mut acc_g = vec![0.0f32; plane_size];
-    let mut acc_b = vec![0.0f32; plane_size];
-    let mut any_valid = vec![false; plane_size];
+    let has_z = z_dim < block.shape.len() && z_dim != c_dim;
+    let eff_z_dim = if has_z { z_dim } else { usize::MAX };
+
+    let mut acc_r = vec![0.0f32; total_voxels];
+    let mut acc_g = vec![0.0f32; total_voxels];
+    let mut acc_b = vec![0.0f32; total_voxels];
+    let mut any_valid = vec![false; total_voxels];
     let mut channel_loaded = false;
 
     for (cfg, local_c) in visible_configs {
@@ -67,12 +73,12 @@ pub fn slice_multichannel_composite_nd(
         }
         fixed[c_dim] = local_c;
 
-        if let Some(mdata) =
-            block.slice_2d_with_ranges(x_dim, y_dim, x_range, y_range, &fixed, 1, &cfg.name, true)
-        {
+        if let Some(vdata) = block.volume_with_ranges(
+            x_dim, y_dim, eff_z_dim, x_range, y_range, z_range, &fixed, &cfg.name, true,
+        ) {
             channel_loaded = true;
-            accumulate_channel_pixels(
-                &mdata.values,
+            accumulate_channel_voxels(
+                &vdata.values,
                 cfg,
                 &mut acc_r,
                 &mut acc_g,
@@ -86,35 +92,35 @@ pub fn slice_multichannel_composite_nd(
         return None;
     }
 
-    let values = finalize_composite_pixels(plane_size, &acc_r, &acc_g, &acc_b, &any_valid);
+    let values = finalize_composite_voxels(total_voxels, &acc_r, &acc_g, &acc_b, &any_valid);
 
-    Some(MatrixData::new(
-        width,
-        height,
+    Some(VolumeData::new(
+        nx,
+        ny,
+        nz,
         values,
         0.0,
         16777215.0,
-        format!("{} (Multi-Channel Overlay)", block.variable_name),
-        anim_extent,
+        dataset_name.to_string(),
     ))
 }
 
-fn accumulate_channel_pixels(
-    pixels: &[f32],
+fn accumulate_channel_voxels(
+    voxels: &[f32],
     cfg: &ChannelColorConfig,
     acc_r: &mut [f32],
     acc_g: &mut [f32],
     acc_b: &mut [f32],
     any_valid: &mut [bool],
 ) {
-    let (scale, offset, is_i8) = compute_channel_normalization(pixels, cfg.window, 1.0);
+    let (scale, offset, is_i8) = compute_channel_normalization(voxels, cfg.window, 1.0);
     let col = [
         cfg.color_rgb[0] as f32,
         cfg.color_rgb[1] as f32,
         cfg.color_rgb[2] as f32,
     ];
 
-    for (i, &raw) in pixels.iter().enumerate() {
+    for (i, &raw) in voxels.iter().enumerate() {
         if !raw.is_nan() && i < acc_r.len() {
             let norm = normalize_channel_value(raw, scale, offset, is_i8, 1.0);
             acc_r[i] += norm * col[0];
@@ -125,15 +131,15 @@ fn accumulate_channel_pixels(
     }
 }
 
-fn finalize_composite_pixels(
-    plane_size: usize,
+fn finalize_composite_voxels(
+    total_voxels: usize,
     acc_r: &[f32],
     acc_g: &[f32],
     acc_b: &[f32],
     any_valid: &[bool],
 ) -> Vec<f32> {
-    let mut values = Vec::with_capacity(plane_size);
-    for i in 0..plane_size {
+    let mut values = Vec::with_capacity(total_voxels);
+    for i in 0..total_voxels {
         if !any_valid.get(i).copied().unwrap_or(false) {
             values.push(f32::NAN);
         } else {

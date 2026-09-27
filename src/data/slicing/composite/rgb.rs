@@ -4,7 +4,7 @@ use crate::data::matrix_data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 
 use super::cmyk::slice_cmyk_composite;
-use super::utils::{compute_normalization_scale, pack_rgb};
+use super::utils::{compute_channel_normalization, normalize_channel_value, pack_rgb};
 
 /// Slice an `OctantBlock` into a 24-bit TrueColor composite `MatrixData`.
 pub fn slice_rgb_composite(
@@ -77,78 +77,47 @@ pub fn slice_rgb_composite_nd(
     let height = y_range.1.saturating_sub(y_range.0).max(1);
     let plane_size = width.checked_mul(height)?;
 
-    let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
-    let extract_plane = |ch_opt: Option<usize>| -> Option<Vec<f32>> {
-        let ch = ch_opt?;
-        let local_ch = if ch >= c_start && ch < c_start + num_channels {
-            ch - c_start
-        } else {
-            ch.min(num_channels.saturating_sub(1))
-        };
-        let mut fixed = fixed_indices.to_vec();
-        if fixed.len() < block.shape.len() {
-            fixed.resize(block.shape.len(), 0);
-        }
-        fixed[c_dim] = local_ch;
-        let mdata = block.slice_2d_with_ranges(
-            x_dim,
-            y_dim,
-            x_range,
-            y_range,
-            &fixed,
-            1,
-            "composite_ch",
-            true,
-        )?;
-        Some(mdata.values)
-    };
+    let r_plane = extract_channel_plane(
+        block,
+        c_dim,
+        x_dim,
+        y_dim,
+        x_range,
+        y_range,
+        fixed_indices,
+        channels[0],
+    );
+    let g_plane = extract_channel_plane(
+        block,
+        c_dim,
+        x_dim,
+        y_dim,
+        x_range,
+        y_range,
+        fixed_indices,
+        channels[1],
+    );
+    let b_plane = extract_channel_plane(
+        block,
+        c_dim,
+        x_dim,
+        y_dim,
+        x_range,
+        y_range,
+        fixed_indices,
+        channels[2],
+    );
 
-    let r_plane = extract_plane(channels[0]);
-    let g_plane = extract_plane(channels[1]);
-    let b_plane = extract_plane(channels[2]);
+    let (r_p, r_scale, r_off, r_i8) = norm_plane_info(r_plane);
+    let (g_p, g_scale, g_off, g_i8) = norm_plane_info(g_plane);
+    let (b_p, b_scale, b_off, b_i8) = norm_plane_info(b_plane);
 
-    let norm_plane = |plane_opt: Option<Vec<f32>>| -> (Option<Vec<f32>>, f32, f32) {
-        if let Some(ref p) = plane_opt {
-            let (min_v, max_v) = crate::utils::compute_finite_min_max(p);
-            let is_i8 = (-128.0..0.0).contains(&min_v) && max_v <= 127.0;
-            let (scale, offset) = compute_normalization_scale(min_v, max_v, is_i8, 255.0);
-            (plane_opt, scale, offset)
-        } else {
-            (None, 1.0, 0.0)
-        }
-    };
-
-    let (r_p, r_scale, r_off) = norm_plane(r_plane);
-    let (g_p, g_scale, g_off) = norm_plane(g_plane);
-    let (b_p, b_scale, b_off) = norm_plane(b_plane);
-
-    let mut values = Vec::with_capacity(plane_size);
-    for i in 0..plane_size {
-        let r_val = r_p.as_ref().and_then(|p| p.get(i).copied()).unwrap_or(0.0);
-        let g_val = g_p.as_ref().and_then(|p| p.get(i).copied()).unwrap_or(0.0);
-        let b_val = b_p.as_ref().and_then(|p| p.get(i).copied()).unwrap_or(0.0);
-
-        if r_val.is_nan() && g_val.is_nan() && b_val.is_nan() {
-            values.push(f32::NAN);
-        } else {
-            let r_n = if r_p.is_some() && !r_val.is_nan() {
-                ((r_val - r_off) * r_scale).clamp(0.0, 255.0)
-            } else {
-                0.0
-            };
-            let g_n = if g_p.is_some() && !g_val.is_nan() {
-                ((g_val - g_off) * g_scale).clamp(0.0, 255.0)
-            } else {
-                0.0
-            };
-            let b_n = if b_p.is_some() && !b_val.is_nan() {
-                ((b_val - b_off) * b_scale).clamp(0.0, 255.0)
-            } else {
-                0.0
-            };
-            values.push(pack_rgb(r_n, g_n, b_n));
-        }
-    }
+    let values = blend_rgb_pixels(
+        plane_size,
+        (r_p.as_deref(), r_scale, r_off, r_i8),
+        (g_p.as_deref(), g_scale, g_off, g_i8),
+        (b_p.as_deref(), b_scale, b_off, b_i8),
+    );
 
     Some(MatrixData::new(
         width,
@@ -159,4 +128,88 @@ pub fn slice_rgb_composite_nd(
         format!("{} (RGB Composite)", block.variable_name),
         anim_extent,
     ))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn extract_channel_plane(
+    block: &OctantBlock,
+    c_dim: usize,
+    x_dim: usize,
+    y_dim: usize,
+    x_range: (usize, usize),
+    y_range: (usize, usize),
+    fixed_indices: &[usize],
+    ch_opt: Option<usize>,
+) -> Option<Vec<f32>> {
+    let ch = ch_opt?;
+    let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
+    let num_channels = block.shape.get(c_dim).copied().unwrap_or(1);
+    let local_ch = if ch >= c_start && ch < c_start + num_channels {
+        ch - c_start
+    } else {
+        ch.min(num_channels.saturating_sub(1))
+    };
+    let mut fixed = fixed_indices.to_vec();
+    if fixed.len() < block.shape.len() {
+        fixed.resize(block.shape.len(), 0);
+    }
+    fixed[c_dim] = local_ch;
+    let mdata = block.slice_2d_with_ranges(
+        x_dim,
+        y_dim,
+        x_range,
+        y_range,
+        &fixed,
+        1,
+        "composite_ch",
+        true,
+    )?;
+    Some(mdata.values)
+}
+
+fn norm_plane_info(plane_opt: Option<Vec<f32>>) -> (Option<Vec<f32>>, f32, f32, bool) {
+    if let Some(ref p) = plane_opt {
+        let (scale, offset, is_i8) = compute_channel_normalization(p, None, 255.0);
+        (plane_opt, scale, offset, is_i8)
+    } else {
+        (None, 1.0, 0.0, false)
+    }
+}
+
+type ChannelPlaneTuple<'a> = (Option<&'a [f32]>, f32, f32, bool);
+
+fn blend_rgb_pixels(
+    plane_size: usize,
+    r: ChannelPlaneTuple,
+    g: ChannelPlaneTuple,
+    b: ChannelPlaneTuple,
+) -> Vec<f32> {
+    let mut values = Vec::with_capacity(plane_size);
+    for i in 0..plane_size {
+        let r_val = r.0.and_then(|p| p.get(i).copied()).unwrap_or(f32::NAN);
+        let g_val = g.0.and_then(|p| p.get(i).copied()).unwrap_or(f32::NAN);
+        let b_val = b.0.and_then(|p| p.get(i).copied()).unwrap_or(f32::NAN);
+
+        if r_val.is_nan() && g_val.is_nan() && b_val.is_nan() {
+            values.push(f32::NAN);
+        } else {
+            let r_n = if r.0.is_some() && !r_val.is_nan() {
+                normalize_channel_value(r_val, r.1, r.2, r.3, 255.0)
+            } else {
+                0.0
+            };
+            let g_n = if g.0.is_some() && !g_val.is_nan() {
+                normalize_channel_value(g_val, g.1, g.2, g.3, 255.0)
+            } else {
+                0.0
+            };
+            let b_n = if b.0.is_some() && !b_val.is_nan() {
+                normalize_channel_value(b_val, b.1, b.2, b.3, 255.0)
+            } else {
+                0.0
+            };
+            values.push(pack_rgb(r_n, g_n, b_n));
+        }
+    }
+    values
 }
