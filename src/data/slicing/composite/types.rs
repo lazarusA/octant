@@ -42,14 +42,14 @@ impl ChannelColorConfig {
     }
 }
 
-/// Parse a hex color string (e.g. `"0000FF"`, `"#FFFF00"`, `"FF00FF"`) into `[u8; 3]`.
+/// Parse a hex color string (e.g. `"0000FF"`, `"#FFFF00"`, `"FF00FF"`, `"FF0000FF"`) into `[u8; 3]`.
 pub fn parse_hex_color(hex: &str) -> Option<[u8; 3]> {
     let clean = hex.trim().trim_start_matches('#');
-    if clean.len() != 6 {
-        return None;
+    if clean.len() == 6 || clean.len() == 8 {
+        let r = u8::from_str_radix(&clean[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&clean[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&clean[4..6], 16).ok()?;
+        return Some([r, g, b]);
     }
-    let r = u8::from_str_radix(&clean[0..2], 16).ok()?;
-    let g = u8::from_str_radix(&clean[2..4], 16).ok()?;
-    let b = u8::from_str_radix(&clean[4..6], 16).ok()?;
-    Some([r, g, b])
+    None
 }

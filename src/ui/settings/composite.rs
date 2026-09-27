@@ -60,41 +60,32 @@ fn get_selected_channel_range(app: &OctantApp) -> (usize, usize) {
 }
 
 fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let (c_start, c_end) = get_selected_channel_range(app);
     let mut changed = false;
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Channels:").small().strong());
         if ui.small_button("All").clicked() {
             for cfg in &mut app.composite_channel_configs {
-                if cfg.index >= c_start && cfg.index <= c_end {
-                    cfg.visible = true;
-                }
+                cfg.visible = true;
             }
             changed = true;
         }
         if ui.small_button("None").clicked() {
             for cfg in &mut app.composite_channel_configs {
-                if cfg.index >= c_start && cfg.index <= c_end {
-                    cfg.visible = false;
-                }
+                cfg.visible = false;
             }
             changed = true;
         }
     });
 
     egui::ScrollArea::vertical()
-        .max_height(80.0)
+        .max_height(100.0)
         .auto_shrink([false, true])
         .show(ui, |ui| {
             egui::Grid::new("multichannel_overlay_grid")
                 .num_columns(3)
                 .spacing([6.0, 3.0])
                 .show(ui, |ui| {
-                    for cfg in app
-                        .composite_channel_configs
-                        .iter_mut()
-                        .filter(|cfg| cfg.index >= c_start && cfg.index <= c_end)
-                    {
+                    for cfg in &mut app.composite_channel_configs {
                         if ui.checkbox(&mut cfg.visible, "").changed() {
                             changed = true;
                         }

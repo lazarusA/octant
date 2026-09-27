@@ -189,101 +189,38 @@ impl OctantApp {
     /// Returns true if the active dataset represents a GeoTIFF.
     pub fn is_geotiff(&self) -> bool {
         if self.plotted_dataset_metadata.is_some() {
-            if self.plotted_store_kind == StoreKind::LocalGeoTiff
-                || self.plotted_store_kind == StoreKind::RemoteGeoTiff
-            {
-                return true;
-            }
-            if let Some(var) = self.plotted_variable_info() {
-                return var.attributes.contains_key("geotiff")
-                    || var.attributes.contains_key("tiff")
-                    || var.dimension_names.iter().any(|d| {
-                        d.eq_ignore_ascii_case("band") || d.eq_ignore_ascii_case("bands")
-                    });
-            }
-            return false;
+            return self.plotted_store_kind == StoreKind::LocalGeoTiff
+                || self.plotted_store_kind == StoreKind::RemoteGeoTiff;
         }
 
-        if self.selected_store_kind == StoreKind::LocalGeoTiff
+        self.selected_store_kind == StoreKind::LocalGeoTiff
             || self.selected_store_kind == StoreKind::RemoteGeoTiff
-        {
-            return true;
-        }
-
-        let Some(var) = self.selected_variable_info() else {
-            return false;
-        };
-
-        var.attributes.contains_key("geotiff")
-            || var.attributes.contains_key("tiff")
-            || var
-                .dimension_names
-                .iter()
-                .any(|d| d.eq_ignore_ascii_case("band") || d.eq_ignore_ascii_case("bands"))
     }
 
     /// Returns the effective `(start, end)` selected range for a given dimension index.
     pub fn get_effective_dim_range(&self, dim_idx: usize) -> (usize, usize) {
-        if !self.plotted_dim_config.is_empty() {
-            if let Some(cfg) = self.plotted_dim_config.get(dim_idx) {
-                if cfg.active {
-                    self.plotted_selected_dim_ranges
-                        .get(dim_idx)
-                        .copied()
-                        .unwrap_or((0, usize::MAX))
-                } else {
-                    let idx = self
-                        .plotted_selected_dim_indices
-                        .get(dim_idx)
-                        .copied()
-                        .unwrap_or(0);
-                    (idx, idx)
-                }
-            } else {
-                self.plotted_selected_dim_ranges
-                    .get(dim_idx)
-                    .copied()
-                    .unwrap_or((0, usize::MAX))
-            }
-        } else if let Some(cfg) = self.dim_config.get(dim_idx) {
+        let (configs, ranges, indices) = if !self.plotted_dim_config.is_empty() {
+            (
+                &self.plotted_dim_config,
+                &self.plotted_selected_dim_ranges,
+                &self.plotted_selected_dim_indices,
+            )
+        } else {
+            (
+                &self.dim_config,
+                &self.selected_dim_ranges,
+                &self.selected_dim_indices,
+            )
+        };
+        if let Some(cfg) = configs.get(dim_idx) {
             if cfg.active {
-                self.selected_dim_ranges
-                    .get(dim_idx)
-                    .copied()
-                    .unwrap_or((0, usize::MAX))
+                ranges.get(dim_idx).copied().unwrap_or((0, usize::MAX))
             } else {
-                let idx = self.selected_dim_indices.get(dim_idx).copied().unwrap_or(0);
+                let idx = indices.get(dim_idx).copied().unwrap_or(0);
                 (idx, idx)
             }
         } else {
-            self.selected_dim_ranges
-                .get(dim_idx)
-                .copied()
-                .unwrap_or((0, usize::MAX))
+            ranges.get(dim_idx).copied().unwrap_or((0, usize::MAX))
         }
     }
-}
-
-/// Helper function to verify dimensional compatibility between two variables
-/// (matching rank, shapes, or spatial extent) for multi-layer plotting.
-pub fn check_dimensional_compatibility(
-    var_a: &crate::data::VariableInfo,
-    var_b: &crate::data::VariableInfo,
-) -> Result<(), String> {
-    if var_a.shape.len() != var_b.shape.len() {
-        return Err(format!(
-            "Rank mismatch: '{}' (rank {}) vs '{}' (rank {})",
-            var_a.name,
-            var_a.shape.len(),
-            var_b.name,
-            var_b.shape.len()
-        ));
-    }
-    if var_a.shape != var_b.shape {
-        return Err(format!(
-            "Shape mismatch: '{}' ({:?}) vs '{}' ({:?})",
-            var_a.name, var_a.shape, var_b.name, var_b.shape
-        ));
-    }
-    Ok(())
 }

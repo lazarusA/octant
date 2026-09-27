@@ -45,6 +45,7 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
     finalize_active_configs(app, var_info, rank);
     clamp_2d_selection_to_gpu_limits(app, var_info);
     sort_spatial_dims(app);
+    super::composite::init_composite_defaults(app, var_info, rank);
 }
 
 fn init_initial_ranges(app: &mut OctantApp, var_info: &VariableInfo, rank: usize) {

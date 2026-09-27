@@ -38,7 +38,7 @@ pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo, ran
         app.rgb_composite_mode = true;
         app.rgb_composite_channels = [0, 1, 2];
         app.active_colormap = 1000;
-    } else if has_omero && !app.composite_channel_configs.is_empty() {
+    } else if !app.composite_channel_configs.is_empty() {
         app.rgb_composite_mode = true;
         app.active_colormap = 1000;
     } else {
