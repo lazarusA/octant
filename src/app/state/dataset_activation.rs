@@ -221,6 +221,47 @@ impl OctantApp {
                 .iter()
                 .any(|d| d.eq_ignore_ascii_case("band") || d.eq_ignore_ascii_case("bands"))
     }
+
+    /// Returns the effective `(start, end)` selected range for a given dimension index.
+    pub fn get_effective_dim_range(&self, dim_idx: usize) -> (usize, usize) {
+        if !self.plotted_dim_config.is_empty() {
+            if let Some(cfg) = self.plotted_dim_config.get(dim_idx) {
+                if cfg.active {
+                    self.plotted_selected_dim_ranges
+                        .get(dim_idx)
+                        .copied()
+                        .unwrap_or((0, usize::MAX))
+                } else {
+                    let idx = self
+                        .plotted_selected_dim_indices
+                        .get(dim_idx)
+                        .copied()
+                        .unwrap_or(0);
+                    (idx, idx)
+                }
+            } else {
+                self.plotted_selected_dim_ranges
+                    .get(dim_idx)
+                    .copied()
+                    .unwrap_or((0, usize::MAX))
+            }
+        } else if let Some(cfg) = self.dim_config.get(dim_idx) {
+            if cfg.active {
+                self.selected_dim_ranges
+                    .get(dim_idx)
+                    .copied()
+                    .unwrap_or((0, usize::MAX))
+            } else {
+                let idx = self.selected_dim_indices.get(dim_idx).copied().unwrap_or(0);
+                (idx, idx)
+            }
+        } else {
+            self.selected_dim_ranges
+                .get(dim_idx)
+                .copied()
+                .unwrap_or((0, usize::MAX))
+        }
+    }
 }
 
 /// Helper function to verify dimensional compatibility between two variables

@@ -2,6 +2,9 @@
 
 pub mod composite;
 pub mod defaults;
+pub mod defaults_clamp;
+pub mod defaults_dggs;
+pub mod defaults_spatial;
 pub mod double_slider;
 
 pub mod metrics;

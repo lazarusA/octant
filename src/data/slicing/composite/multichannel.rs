@@ -114,13 +114,31 @@ fn accumulate_channel_pixels(
         cfg.color_rgb[2] as f32,
     ];
 
-    for (i, &raw) in pixels.iter().enumerate() {
-        if !raw.is_nan() && i < acc_r.len() {
-            let norm = normalize_channel_value(raw, scale, offset, is_i8, 1.0);
-            acc_r[i] += norm * col[0];
-            acc_g[i] += norm * col[1];
-            acc_b[i] += norm * col[2];
-            any_valid[i] = true;
+    let len = pixels
+        .len()
+        .min(acc_r.len())
+        .min(acc_g.len())
+        .min(acc_b.len())
+        .min(any_valid.len());
+    let p_slice = &pixels[..len];
+    let r_slice = &mut acc_r[..len];
+    let g_slice = &mut acc_g[..len];
+    let b_slice = &mut acc_b[..len];
+    let val_slice = &mut any_valid[..len];
+
+    for ((((raw, r), g), b), valid) in p_slice
+        .iter()
+        .zip(r_slice.iter_mut())
+        .zip(g_slice.iter_mut())
+        .zip(b_slice.iter_mut())
+        .zip(val_slice.iter_mut())
+    {
+        if !raw.is_nan() {
+            let norm = normalize_channel_value(*raw, scale, offset, is_i8, 1.0);
+            *r += norm * col[0];
+            *g += norm * col[1];
+            *b += norm * col[2];
+            *valid = true;
         }
     }
 }
@@ -132,15 +150,26 @@ fn finalize_composite_pixels(
     acc_b: &[f32],
     any_valid: &[bool],
 ) -> Vec<f32> {
+    let len = plane_size
+        .min(acc_r.len())
+        .min(acc_g.len())
+        .min(acc_b.len())
+        .min(any_valid.len());
     let mut values = Vec::with_capacity(plane_size);
-    for i in 0..plane_size {
-        if !any_valid.get(i).copied().unwrap_or(false) {
+
+    for (((&valid, &r), &g), &b) in any_valid[..len]
+        .iter()
+        .zip(&acc_r[..len])
+        .zip(&acc_g[..len])
+        .zip(&acc_b[..len])
+    {
+        if !valid {
             values.push(f32::NAN);
         } else {
-            let r = acc_r.get(i).copied().unwrap_or(0.0).clamp(0.0, 255.0);
-            let g = acc_g.get(i).copied().unwrap_or(0.0).clamp(0.0, 255.0);
-            let b = acc_b.get(i).copied().unwrap_or(0.0).clamp(0.0, 255.0);
-            values.push(pack_rgb(r, g, b));
+            let r_clamped = r.clamp(0.0, 255.0);
+            let g_clamped = g.clamp(0.0, 255.0);
+            let b_clamped = b.clamp(0.0, 255.0);
+            values.push(pack_rgb(r_clamped, g_clamped, b_clamped));
         }
     }
     values

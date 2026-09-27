@@ -8,15 +8,7 @@ pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo, ran
     app.rgb_composite_channels = [0, 1, 2];
     app.composite_channel_configs.clear();
 
-    let is_tiff = app.is_geotiff()
-        || var_info.attributes.contains_key("geotiff")
-        || var_info.attributes.contains_key("tiff")
-        || var_info
-            .dimension_names
-            .iter()
-            .any(|d| d.eq_ignore_ascii_case("band") || d.eq_ignore_ascii_case("bands"))
-        || app.selected_store_kind == crate::app::StoreKind::LocalGeoTiff
-        || app.selected_store_kind == crate::app::StoreKind::RemoteGeoTiff;
+    let is_tiff = app.is_geotiff();
 
     let has_omero = var_info.attributes.contains_key("omero_channels")
         || var_info.attributes.contains_key("omero_colors");

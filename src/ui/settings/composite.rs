@@ -53,43 +53,7 @@ pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
 
 fn get_selected_channel_range(app: &OctantApp) -> (usize, usize) {
     if let Some(c_idx) = app.channel_dim_index() {
-        if !app.plotted_dim_config.is_empty() {
-            if let Some(cfg) = app.plotted_dim_config.get(c_idx) {
-                if cfg.active {
-                    app.plotted_selected_dim_ranges
-                        .get(c_idx)
-                        .copied()
-                        .unwrap_or((0, usize::MAX))
-                } else {
-                    let idx = app
-                        .plotted_selected_dim_indices
-                        .get(c_idx)
-                        .copied()
-                        .unwrap_or(0);
-                    (idx, idx)
-                }
-            } else {
-                app.plotted_selected_dim_ranges
-                    .get(c_idx)
-                    .copied()
-                    .unwrap_or((0, usize::MAX))
-            }
-        } else if let Some(cfg) = app.dim_config.get(c_idx) {
-            if cfg.active {
-                app.selected_dim_ranges
-                    .get(c_idx)
-                    .copied()
-                    .unwrap_or((0, usize::MAX))
-            } else {
-                let idx = app.selected_dim_indices.get(c_idx).copied().unwrap_or(0);
-                (idx, idx)
-            }
-        } else {
-            app.selected_dim_ranges
-                .get(c_idx)
-                .copied()
-                .unwrap_or((0, usize::MAX))
-        }
+        app.get_effective_dim_range(c_idx)
     } else {
         (0, usize::MAX)
     }

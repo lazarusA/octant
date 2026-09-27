@@ -31,7 +31,7 @@ pub fn compute_channel_normalization(
         let scale = if w_end > w_start {
             target_max / (w_end - w_start)
         } else {
-            1.0
+            0.0
         };
         (scale, w_start, is_i8)
     } else {
