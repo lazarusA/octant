@@ -60,11 +60,12 @@ pub fn slice_multichannel_composite_nd(
     let mut any_valid = vec![false; plane_size];
     let mut channel_loaded = false;
 
+    let mut fixed = fixed_indices.to_vec();
+    if fixed.len() < block.shape.len() {
+        fixed.resize(block.shape.len(), 0);
+    }
+
     for (cfg, local_c) in visible_configs {
-        let mut fixed = fixed_indices.to_vec();
-        if fixed.len() < block.shape.len() {
-            fixed.resize(block.shape.len(), 0);
-        }
         fixed[c_dim] = local_c;
 
         if let Some(mdata) =
