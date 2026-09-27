@@ -134,7 +134,6 @@ fn show_standard_rgb_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     let channel_labels: Vec<String> = app
         .plotted_variable_info()
-        .or_else(|| app.selected_variable_info())
         .and_then(|v| v.attributes.get("omero_channels"))
         .map(|s| s.split(',').map(|c| c.trim().to_string()).collect())
         .unwrap_or_default();

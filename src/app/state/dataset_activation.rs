@@ -118,12 +118,9 @@ impl OctantApp {
         self.request_canvas_export(out_path, false);
     }
 
-    /// Check if the active dataset/variable has 2 or more bands/channels available for RGB composition.
+    /// Check if the currently plotted dataset/variable has 2 or more bands/channels available for RGB composition.
     pub fn has_rgb_bands(&self) -> bool {
-        let Some(var) = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info())
-        else {
+        let Some(var) = self.plotted_variable_info() else {
             return false;
         };
         if var.shape.len() < 2 {
@@ -133,35 +130,36 @@ impl OctantApp {
         var.shape.get(c_idx).copied().unwrap_or(0) >= 2
     }
 
-    /// Return the dimension index corresponding to channels/bands, if any.
+    /// Return the dimension index corresponding to channels/bands for the currently plotted variable.
     pub fn channel_dim_index(&self) -> Option<usize> {
-        let var = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info())?;
+        let var = self.plotted_variable_info()?;
         var.dimension_names
             .iter()
             .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
             .or(if var.shape.len() >= 3 { Some(0) } else { None })
     }
 
-    /// Return the total number of bands/channels for the active variable, if multi-band.
+    /// Return the dimension index corresponding to channels/bands for the currently selected variable.
+    pub fn selected_channel_dim_index(&self) -> Option<usize> {
+        let var = self.selected_variable_info()?;
+        var.dimension_names
+            .iter()
+            .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
+            .or(if var.shape.len() >= 3 { Some(0) } else { None })
+    }
+
+    /// Return the total number of bands/channels for the currently plotted variable, if multi-band.
     pub fn num_bands(&self) -> usize {
-        let Some(var) = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info())
-        else {
+        let Some(var) = self.plotted_variable_info() else {
             return 3;
         };
         let c_idx = self.channel_dim_index().unwrap_or(0);
         var.shape.get(c_idx).copied().unwrap_or(3) as usize
     }
 
-    /// Returns true if the active variable represents a CMYK color space dataset.
+    /// Returns true if the currently plotted variable represents a CMYK color space dataset.
     pub fn is_cmyk(&self) -> bool {
-        let Some(var) = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info())
-        else {
+        let Some(var) = self.plotted_variable_info() else {
             return false;
         };
 
@@ -175,12 +173,9 @@ impl OctantApp {
             || var.long_name.as_deref().is_some_and(|l| l.contains("CMYK"))
     }
 
-    /// Returns true if the active variable represents an OME-Zarr / bioimaging dataset with OMERO channels.
+    /// Returns true if the currently plotted variable represents an OME-Zarr / bioimaging dataset with OMERO channels.
     pub fn is_ome_dataset(&self) -> bool {
-        let Some(var) = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info())
-        else {
+        let Some(var) = self.plotted_variable_info() else {
             return false;
         };
         var.attributes.contains_key("omero_channels") || var.attributes.contains_key("omero_colors")

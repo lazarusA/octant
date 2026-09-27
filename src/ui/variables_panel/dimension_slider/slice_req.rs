@@ -45,7 +45,7 @@ pub fn build_slice_request_for_plotted(
 
 /// Builds a SliceRequest for currently selected dimensions.
 pub fn build_slice_request(app: &OctantApp, var_name: &str, shape: &[u64]) -> SliceRequest {
-    let c_dim = app.channel_dim_index();
+    let c_dim = app.selected_channel_dim_index();
     let selections = shape
         .iter()
         .enumerate()
