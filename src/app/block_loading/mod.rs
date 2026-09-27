@@ -4,4 +4,7 @@ pub mod handles;
 pub mod load;
 pub mod prefetch;
 pub mod projection;
+pub mod projection_2d;
+pub mod projection_3d;
+pub mod projection_hash;
 pub mod step_nav;

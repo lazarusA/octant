@@ -4,6 +4,8 @@ pub mod array_open;
 pub mod cf;
 pub mod discovery;
 pub mod node_info;
+pub mod ome;
+pub mod ome_types;
 #[cfg(test)]
 mod tests;
 
@@ -22,3 +24,7 @@ pub use node_info::{
     extract_store_variables_from_consolidated_metadata, variable_info_from_node_metadata,
     variable_info_from_node_metadata_with_parent_attributes,
 };
+pub use ome::{
+    extract_ome_multiscale_variables, fallback_ome_axes_for_rank, normalize_ngff_attributes,
+};
+pub use ome_types::*;

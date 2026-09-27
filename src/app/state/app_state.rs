@@ -64,6 +64,7 @@ pub struct OctantApp {
     pub volume_isorange: f32,
     pub volume_cmin: f32,
     pub volume_cmax: f32,
+    pub volume_z_scale: f32,
     pub point_cloud_size: f32,
     pub line_profile_dim_idx: usize,
     pub line_profile_slice_idx: usize,
@@ -72,6 +73,7 @@ pub struct OctantApp {
     pub is_categorical: bool,
     pub rgb_composite_mode: bool,
     pub rgb_composite_channels: [usize; 3],
+    pub composite_channel_configs: Vec<crate::data::slicing::ChannelColorConfig>,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
     // Block-cache & Prefetcher State
@@ -233,6 +235,7 @@ impl Default for OctantApp {
             volume_isorange: 5.0,
             volume_cmin: 5.0,
             volume_cmax: 100.0,
+            volume_z_scale: 1.0,
             point_cloud_size: 0.02,
             line_profile_dim_idx: 0,
             line_profile_slice_idx: 0,
@@ -241,7 +244,9 @@ impl Default for OctantApp {
             is_categorical: false,
             rgb_composite_mode: false,
             rgb_composite_channels: [0, 1, 2],
+            composite_channel_configs: Vec::new(),
             wgpu_render_state: None,
+
             show_hero: true,
             hero_state: crate::ui::hero::HeroState::default(),
 

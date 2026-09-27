@@ -118,36 +118,48 @@ impl OctantApp {
         self.request_canvas_export(out_path, false);
     }
 
-    /// Check if the active dataset/variable has 3 or more bands available for RGB composition.
+    /// Check if the currently plotted dataset/variable has 2 or more bands/channels available for RGB composition.
     pub fn has_rgb_bands(&self) -> bool {
-        if let Some(var) = self.plotted_variable_info() {
-            return var.shape.len() >= 3 && var.shape[0] >= 3;
+        let Some(var) = self.plotted_variable_info() else {
+            return false;
+        };
+        if var.shape.len() < 2 {
+            return false;
         }
-        if let Some(var) = self.selected_variable_info() {
-            return var.shape.len() >= 3 && var.shape[0] >= 3;
-        }
-        false
+        let c_idx = self.channel_dim_index().unwrap_or(0);
+        var.shape.get(c_idx).copied().unwrap_or(0) >= 2
     }
 
-    /// Return the total number of bands for the active variable, if multi-band.
+    /// Return the dimension index corresponding to channels/bands for the currently plotted variable.
+    pub fn channel_dim_index(&self) -> Option<usize> {
+        let var = self.plotted_variable_info()?;
+        var.dimension_names
+            .iter()
+            .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
+            .or(if var.shape.len() >= 3 { Some(0) } else { None })
+    }
+
+    /// Return the dimension index corresponding to channels/bands for the currently selected variable.
+    pub fn selected_channel_dim_index(&self) -> Option<usize> {
+        let var = self.selected_variable_info()?;
+        var.dimension_names
+            .iter()
+            .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
+            .or(if var.shape.len() >= 3 { Some(0) } else { None })
+    }
+
+    /// Return the total number of bands/channels for the currently plotted variable, if multi-band.
     pub fn num_bands(&self) -> usize {
-        if let Some(var) = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info())
-            && var.shape.len() >= 3
-        {
-            var.shape[0] as usize
-        } else {
-            3
-        }
+        let Some(var) = self.plotted_variable_info() else {
+            return 3;
+        };
+        let c_idx = self.channel_dim_index().unwrap_or(0);
+        var.shape.get(c_idx).copied().unwrap_or(3) as usize
     }
 
-    /// Returns true if the active variable represents a CMYK color space dataset.
+    /// Returns true if the currently plotted variable represents a CMYK color space dataset.
     pub fn is_cmyk(&self) -> bool {
-        let Some(var) = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info())
-        else {
+        let Some(var) = self.plotted_variable_info() else {
             return false;
         };
 
@@ -160,28 +172,50 @@ impl OctantApp {
                 .is_some_and(|cs| cs.eq_ignore_ascii_case("cmyk"))
             || var.long_name.as_deref().is_some_and(|l| l.contains("CMYK"))
     }
-}
 
-/// Helper function to verify dimensional compatibility between two variables
-/// (matching rank, shapes, or spatial extent) for multi-layer plotting.
-pub fn check_dimensional_compatibility(
-    var_a: &crate::data::VariableInfo,
-    var_b: &crate::data::VariableInfo,
-) -> Result<(), String> {
-    if var_a.shape.len() != var_b.shape.len() {
-        return Err(format!(
-            "Rank mismatch: '{}' (rank {}) vs '{}' (rank {})",
-            var_a.name,
-            var_a.shape.len(),
-            var_b.name,
-            var_b.shape.len()
-        ));
+    /// Returns true if the currently plotted variable represents an OME-Zarr / bioimaging dataset with OMERO channels.
+    pub fn is_ome_dataset(&self) -> bool {
+        let Some(var) = self.plotted_variable_info() else {
+            return false;
+        };
+        var.attributes.contains_key("omero_channels") || var.attributes.contains_key("omero_colors")
     }
-    if var_a.shape != var_b.shape {
-        return Err(format!(
-            "Shape mismatch: '{}' ({:?}) vs '{}' ({:?})",
-            var_a.name, var_a.shape, var_b.name, var_b.shape
-        ));
+
+    /// Returns true if the active dataset represents a GeoTIFF.
+    pub fn is_geotiff(&self) -> bool {
+        if self.plotted_dataset_metadata.is_some() {
+            return self.plotted_store_kind == StoreKind::LocalGeoTiff
+                || self.plotted_store_kind == StoreKind::RemoteGeoTiff;
+        }
+
+        self.selected_store_kind == StoreKind::LocalGeoTiff
+            || self.selected_store_kind == StoreKind::RemoteGeoTiff
     }
-    Ok(())
+
+    /// Returns the effective `(start, end)` selected range for a given dimension index.
+    pub fn get_effective_dim_range(&self, dim_idx: usize) -> (usize, usize) {
+        let (configs, ranges, indices) = if !self.plotted_dim_config.is_empty() {
+            (
+                &self.plotted_dim_config,
+                &self.plotted_selected_dim_ranges,
+                &self.plotted_selected_dim_indices,
+            )
+        } else {
+            (
+                &self.dim_config,
+                &self.selected_dim_ranges,
+                &self.selected_dim_indices,
+            )
+        };
+        if let Some(cfg) = configs.get(dim_idx) {
+            if cfg.active {
+                ranges.get(dim_idx).copied().unwrap_or((0, usize::MAX))
+            } else {
+                let idx = indices.get(dim_idx).copied().unwrap_or(0);
+                (idx, idx)
+            }
+        } else {
+            ranges.get(dim_idx).copied().unwrap_or((0, usize::MAX))
+        }
+    }
 }

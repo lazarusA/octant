@@ -63,6 +63,18 @@ pub fn fetch_all_dimension_coordinates_for_variables(
                 }
             }
         }
+        if let Some(ch_str) = var.attributes.get("omero_channels") {
+            let labels: Vec<String> = ch_str.split(',').map(|s| s.trim().to_string()).collect();
+            for name in &var.dimension_names {
+                if crate::data::coordinates::naming::is_channel_dim_name(name) {
+                    let clean = name.trim().to_lowercase();
+                    coords_map.insert(clean.clone(), labels.clone());
+                    if clean != *name {
+                        coords_map.insert(name.clone(), labels.clone());
+                    }
+                }
+            }
+        }
     }
 
     for var in variables {

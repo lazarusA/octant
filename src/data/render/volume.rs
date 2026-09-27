@@ -57,6 +57,70 @@ impl VolumeData {
         )
     }
 
+    /// In-place update of a 3D sub-volume slab (e.g. progressive chunk arrivals along Z or XY).
+    pub fn update_subvolume(
+        &mut self,
+        dest_pos: [usize; 3],  // [dest_x, dest_y, dest_z]
+        slab_size: [usize; 3], // [slab_w, slab_h, slab_d]
+        slab_values: &[f32],
+    ) {
+        let [dest_x, dest_y, dest_z] = dest_pos;
+        let [slab_w, slab_h, slab_d] = slab_size;
+
+        if self.width == slab_w && self.height == slab_h && dest_x == 0 && dest_y == 0 {
+            // Fast contiguous copy along Z
+            let plane_elements = self.width * self.height;
+            let start_idx = dest_z * plane_elements;
+            let copy_elements = slab_d * plane_elements;
+            let end_idx = (start_idx + copy_elements).min(self.values.len());
+            let copy_len = (end_idx.saturating_sub(start_idx)).min(slab_values.len());
+            if start_idx < self.values.len() && copy_len > 0 {
+                self.values[start_idx..start_idx + copy_len]
+                    .copy_from_slice(&slab_values[..copy_len]);
+            }
+        } else {
+            // General row-by-row sub-volume copy
+            for z in 0..slab_d {
+                let target_z = dest_z + z;
+                if target_z >= self.depth {
+                    break;
+                }
+                for y in 0..slab_h {
+                    let target_y = dest_y + y;
+                    if target_y >= self.height {
+                        break;
+                    }
+                    let target_x = dest_x.min(self.width);
+                    let row_w = slab_w.min(self.width.saturating_sub(target_x));
+                    if row_w == 0 {
+                        continue;
+                    }
+
+                    let dest_idx =
+                        target_z * (self.width * self.height) + target_y * self.width + target_x;
+                    let src_idx = z * (slab_w * slab_h) + y * slab_w;
+                    if dest_idx + row_w <= self.values.len() && src_idx + row_w <= slab_values.len()
+                    {
+                        self.values[dest_idx..dest_idx + row_w]
+                            .copy_from_slice(&slab_values[src_idx..src_idx + row_w]);
+                    }
+                }
+            }
+        }
+
+        // Update min_val and max_val with finite values from the new slab
+        for &v in slab_values {
+            if v.is_finite() && !v.is_nan() {
+                if self.min_val.is_nan() || v < self.min_val {
+                    self.min_val = v;
+                }
+                if self.max_val.is_nan() || v > self.max_val {
+                    self.max_val = v;
+                }
+            }
+        }
+    }
+
     /// Extracts a single 1D ray along Z (depth) for a given (x, y) spatial pixel coordinate.
     pub fn extract_z_line_profile(&self, target_x: usize, target_y: usize) -> Vec<f32> {
         let (nx, ny, nz) = (self.width, self.height, self.depth);

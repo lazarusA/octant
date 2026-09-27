@@ -9,11 +9,18 @@ pub fn build_slice_request_for_plotted(
     var_name: &str,
     shape: &[u64],
 ) -> SliceRequest {
+    let c_dim = app.channel_dim_index();
     let selections = shape
         .iter()
         .enumerate()
         .map(|(i, &s)| {
             let dim_size = s as usize;
+            if app.rgb_composite_mode && c_dim == Some(i) {
+                return DimensionSelection::Range {
+                    start: 0,
+                    end: dim_size,
+                };
+            }
             let (start, end) = app
                 .plotted_selected_dim_ranges
                 .get(i)
@@ -38,11 +45,18 @@ pub fn build_slice_request_for_plotted(
 
 /// Builds a SliceRequest for currently selected dimensions.
 pub fn build_slice_request(app: &OctantApp, var_name: &str, shape: &[u64]) -> SliceRequest {
+    let c_dim = app.selected_channel_dim_index();
     let selections = shape
         .iter()
         .enumerate()
         .map(|(i, &s)| {
             let dim_size = s as usize;
+            if app.rgb_composite_mode && c_dim == Some(i) {
+                return DimensionSelection::Range {
+                    start: 0,
+                    end: dim_size,
+                };
+            }
             let (start, end) = app
                 .selected_dim_ranges
                 .get(i)

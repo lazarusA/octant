@@ -101,7 +101,7 @@ impl OctantApp {
             let new_var = new_meta.variables.get(layer.variable_idx);
 
             if let (Some(v_a), Some(v_b)) = (existing_var, new_var) {
-                super::dataset_activation::check_dimensional_compatibility(v_a, v_b)?;
+                check_dimensional_compatibility(v_a, v_b)?;
             }
         }
         self.multi_plotted_layers.push(layer);
@@ -125,6 +125,10 @@ impl OctantApp {
 
     /// Synchronizes all plotted configuration fields from the current UI selection.
     pub fn sync_plotted_state_from_selected(&mut self) {
+        let is_new_var = self.plotted_variable_idx != self.selected_variable_idx
+            || self.plotted_dataset_metadata.is_none()
+            || self.plotted_store_target_input != self.store_target_input;
+
         self.plotted_store_kind = self.selected_store_kind;
         self.plotted_store_target_input = self.store_target_input.clone();
         self.plotted_dataset_metadata = self.active_dataset_metadata.clone();
@@ -134,6 +138,14 @@ impl OctantApp {
         self.plotted_selected_dim_ranges = self.selected_dim_ranges.clone();
         self.plotted_spatial_dims = self.spatial_dims.clone();
         self.plotted_animated_dim = self.animated_dim;
+
+        if is_new_var && let Some(var_info) = self.plotted_variable_info().cloned() {
+            let rank = var_info.shape.len();
+            crate::ui::variables_panel::dimension_slider::init_composite_defaults(
+                self, &var_info, rank,
+            );
+        }
+
         if !self.has_rgb_bands() {
             self.rgb_composite_mode = false;
             if self.active_colormap == 1000 {
@@ -172,4 +184,28 @@ impl OctantApp {
             .copied()
             .unwrap_or(1) as usize
     }
+}
+
+/// Helper function to verify dimensional compatibility between two variables
+/// (matching rank, shapes, or spatial extent) for multi-layer plotting.
+pub fn check_dimensional_compatibility(
+    var_a: &crate::data::VariableInfo,
+    var_b: &crate::data::VariableInfo,
+) -> Result<(), String> {
+    if var_a.shape.len() != var_b.shape.len() {
+        return Err(format!(
+            "Rank mismatch: '{}' (rank {}) vs '{}' (rank {})",
+            var_a.name,
+            var_a.shape.len(),
+            var_b.name,
+            var_b.shape.len()
+        ));
+    }
+    if var_a.shape != var_b.shape {
+        return Err(format!(
+            "Shape mismatch: '{}' ({:?}) vs '{}' ({:?})",
+            var_a.name, var_a.shape, var_b.name, var_b.shape
+        ));
+    }
+    Ok(())
 }

@@ -1,13 +1,19 @@
 //! Dimension slider controls, range configuration, and slice calculations.
 
+pub mod composite;
 pub mod defaults;
+pub mod defaults_clamp;
+pub mod defaults_dggs;
+pub mod defaults_spatial;
 pub mod double_slider;
+
 pub mod metrics;
 pub mod roles;
 pub mod slice_req;
 pub mod slider_row;
 
 pub use crate::utils::format_byte_size;
+pub use composite::init_composite_defaults;
 pub use defaults::init_variable_dimension_defaults;
 pub use double_slider::double_slider_with_inputs;
 pub use metrics::{

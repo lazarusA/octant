@@ -21,13 +21,17 @@ impl OctantApp {
         let base_request = crate::ui::variables_panel::build_slice_request(self, &var_name, &shape);
         let mut selections = base_request.selections;
 
-        if let Some(anim_dim) = self.animated_dim {
+        let anim_dim = self.plotted_animated_dim.or(self.animated_dim);
+        if let Some(anim_dim) = anim_dim {
             let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
             if full_extent > 0 && self.current_timestep >= full_extent {
                 self.current_timestep = full_extent - 1;
             }
             if anim_dim < self.selected_dim_indices.len() {
                 self.selected_dim_indices[anim_dim] = self.current_timestep;
+            }
+            if anim_dim < self.plotted_selected_dim_indices.len() {
+                self.plotted_selected_dim_indices[anim_dim] = self.current_timestep;
             }
             if anim_dim < selections.len() {
                 let (start, end, _) = self.animated_window_bounds(
@@ -57,7 +61,7 @@ impl OctantApp {
             &source_id,
             &var_name,
             &slice_request.selections,
-            self.animated_dim,
+            anim_dim,
             self.current_timestep,
         ) {
             self.status_message = format!(
@@ -65,6 +69,7 @@ impl OctantApp {
                 block.variable_name,
                 block.bytes_size()
             );
+            self.sync_plotted_state_from_selected();
             self.apply_block_projection(&block);
             self.prefetch_selected_animated_range(&shape);
             return;
@@ -86,6 +91,7 @@ impl OctantApp {
                 block.variable_name,
                 block.bytes_size()
             );
+            self.sync_plotted_state_from_selected();
             self.apply_block_projection(&block);
             self.prefetch_selected_animated_range(&shape);
             return;
@@ -108,49 +114,75 @@ impl OctantApp {
                     let is_active = self.active_block_key.as_ref() == Some(&res.key);
                     let is_same_var = self
                         .plotted_variable_info()
+                        .or_else(|| self.selected_variable_info())
                         .is_some_and(|v| v.name == block.variable_name);
+                    let anim_dim = self.plotted_animated_dim.or(self.animated_dim);
                     let covers_current = is_same_var
-                        && self.plotted_animated_dim.is_some_and(|dim| {
+                        && anim_dim.is_some_and(|dim| {
                             let origin = block.origin.get(dim).copied().unwrap_or(0);
                             let extent = block.shape.get(dim).copied().unwrap_or(0);
                             self.current_timestep >= origin
                                 && self.current_timestep < origin + extent
                         });
+                    let is_volume_or_point_cloud = is_same_var
+                        && (self.active_plot_type == crate::plots::PlotType::Volume
+                            || self.active_plot_type == crate::plots::PlotType::PointCloud);
+
                     self.block_cache.put(res.key, block.clone());
 
                     // When cache eviction shifts the oldest resident slice forward, update slider start:
-                    if let Some(dim) = self.plotted_animated_dim
-                        && let Some(meta) = &self.plotted_dataset_metadata
-                        && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                    if let Some(dim) = anim_dim
+                        && let Some(meta) = self
+                            .plotted_dataset_metadata
+                            .as_ref()
+                            .or(self.active_dataset_metadata.as_ref())
+                        && let Some(var) = meta
+                            .variables
+                            .get(self.plotted_variable_idx)
+                            .or_else(|| meta.variables.get(self.selected_variable_idx))
                         && var.name == block.variable_name
-                        && dim < self.plotted_selected_dim_ranges.len()
                     {
                         let source_id = self.plotted_source_id();
                         if let Some(min_t) = self
                             .block_cache
                             .min_resident_timestep(&source_id, &var.name, dim)
                         {
-                            let current_start = self.plotted_selected_dim_ranges[dim].0;
-                            if min_t > current_start
-                                && self.block_cache.current_bytes() >= self.block_cache.max_bytes()
-                            {
-                                self.plotted_selected_dim_ranges[dim].0 = min_t;
+                            let sel_ranges = if !self.plotted_selected_dim_ranges.is_empty() {
+                                &mut self.plotted_selected_dim_ranges
+                            } else {
+                                &mut self.selected_dim_ranges
+                            };
+                            if dim < sel_ranges.len() {
+                                let current_start = sel_ranges[dim].0;
+                                if min_t > current_start
+                                    && self.block_cache.current_bytes()
+                                        >= self.block_cache.max_bytes()
+                                {
+                                    sel_ranges[dim].0 = min_t;
+                                }
                             }
                         }
                     }
 
-                    if is_active || (is_same_var && covers_current) {
+                    if is_active || (is_same_var && (covers_current || is_volume_or_point_cloud)) {
                         if is_active {
                             self.active_block_key = None;
+                            self.sync_plotted_state_from_selected();
                             if let Some(target) = self.pending_target_step.take()
-                                && let Some(dim) = self.plotted_animated_dim
+                                && let Some(dim) = anim_dim
                             {
                                 let origin = block.origin.get(dim).copied().unwrap_or(0);
                                 let extent = block.shape.get(dim).copied().unwrap_or(0);
                                 if target >= origin && target < origin + extent {
                                     self.current_timestep = target;
-                                    if dim < self.plotted_selected_dim_indices.len() {
-                                        self.plotted_selected_dim_indices[dim] = target;
+                                    let sel_indices =
+                                        if !self.plotted_selected_dim_indices.is_empty() {
+                                            &mut self.plotted_selected_dim_indices
+                                        } else {
+                                            &mut self.selected_dim_indices
+                                        };
+                                    if dim < sel_indices.len() {
+                                        sel_indices[dim] = target;
                                     }
                                 }
                             }

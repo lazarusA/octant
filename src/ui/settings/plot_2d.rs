@@ -130,78 +130,8 @@ pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .clicked().then(|| app.show_hover_card = !app.show_hover_card);
     });
 
-    if app.has_rgb_bands() {
-        ui.separator();
-        let is_cmyk = app.is_cmyk();
-        ui.horizontal(|ui| {
-            let mut rgb_mode = app.rgb_composite_mode;
-            let label = if is_cmyk {
-                "CMYK Composite"
-            } else {
-                "RGB Composite"
-            };
-            let tooltip = if is_cmyk {
-                "Composites 4-channel Cyan, Magenta, Yellow, Black (CMYK) into Truecolor RGB."
-            } else {
-                "Composites selected 3 channels into Truecolor RGB."
-            };
-            if ui
-                .checkbox(&mut rgb_mode, label)
-                .on_hover_text(tooltip)
-                .changed()
-            {
-                app.rgb_composite_mode = rgb_mode;
-                if rgb_mode {
-                    app.active_colormap = 1000;
-                } else {
-                    app.active_colormap = 0;
-                }
-                app.load_selected_variable_block();
-            }
-        });
-
-        if app.rgb_composite_mode && is_cmyk {
-            ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new("Auto-mapped channels: C (1), M (2), Y (3), K (4)")
-                        .small()
-                        .weak(),
-                );
-            });
-        } else if app.rgb_composite_mode {
-            let num_b = app.num_bands();
-            let mut changed = false;
-            ui.horizontal(|ui| {
-                let channels = [
-                    (0, "R:", egui::Color32::from_rgb(255, 100, 100), "rgb_r_ch"),
-                    (1, "G:", egui::Color32::from_rgb(100, 255, 100), "rgb_g_ch"),
-                    (2, "B:", egui::Color32::from_rgb(100, 150, 255), "rgb_b_ch"),
-                ];
-                for (idx, label, color, salt) in channels {
-                    ui.label(egui::RichText::new(label).color(color));
-                    let mut ch = app.rgb_composite_channels[idx];
-                    egui::ComboBox::from_id_salt(salt)
-                        .selected_text(format!("Band {}", ch + 1))
-                        .show_ui(ui, |ui| {
-                            for b in 0..num_b {
-                                if ui
-                                    .selectable_label(ch == b, format!("Band {}", b + 1))
-                                    .clicked()
-                                {
-                                    ch = b;
-                                }
-                            }
-                        });
-                    if ch != app.rgb_composite_channels[idx] {
-                        app.rgb_composite_channels[idx] = ch;
-                        changed = true;
-                    }
-                }
-            });
-            if changed {
-                app.load_selected_variable_block();
-            }
-        }
+    if app.has_rgb_bands() || !app.composite_channel_configs.is_empty() {
+        super::composite::show_composite_controls(app, ui);
     } else if app.rgb_composite_mode {
         app.rgb_composite_mode = false;
         if app.active_colormap == 1000 {

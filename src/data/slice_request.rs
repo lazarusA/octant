@@ -76,12 +76,66 @@ impl SliceRequest {
     pub fn to_array_subset(&self, shape: &[u64]) -> zarrs::array::ArraySubset {
         let mut ranges = Vec::with_capacity(self.selections.len());
         for (i, sel) in self.selections.iter().enumerate() {
-            let dim_len = shape.get(i).copied().unwrap_or(1000) as usize;
+            let Some(&raw_len) = shape.get(i) else {
+                continue;
+            };
+            let dim_len = raw_len as usize;
+            if dim_len == 0 {
+                ranges.push(0..0);
+                continue;
+            }
             let (start, end) = sel.bounds();
-            let start = start.min(dim_len.saturating_sub(1));
-            let end = end.max(start + 1).min(dim_len);
-            ranges.push(start as u64..end as u64);
+            let clamped_start = start.min(dim_len.saturating_sub(1));
+            let clamped_end = end.clamp(clamped_start, dim_len);
+            ranges.push(clamped_start as u64..clamped_end as u64);
         }
         zarrs::array::ArraySubset::new_with_ranges(&ranges)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dimension_selection_bounds() {
+        assert_eq!(DimensionSelection::index(5).bounds(), (5, 6));
+        assert_eq!(DimensionSelection::range(2, 10).bounds(), (2, 10));
+    }
+
+    #[test]
+    fn test_slice_request_estimated_elements() {
+        let req = SliceRequest::new(
+            "temperature",
+            vec![
+                DimensionSelection::range(0, 5),
+                DimensionSelection::range(10, 20),
+            ],
+        );
+        assert_eq!(req.estimated_elements(), 5 * 10);
+    }
+
+    #[test]
+    fn test_slice_request_to_array_subset_clamping() {
+        let req = SliceRequest::new(
+            "var",
+            vec![
+                DimensionSelection::range(0, 100),
+                DimensionSelection::index(5),
+                DimensionSelection::range(50, 60),
+            ],
+        );
+        // Dim 0 length is 20, Dim 1 length is 10, Dim 2 missing
+        let shape = vec![20u64, 10u64];
+        let subset = req.to_array_subset(&shape);
+        assert_eq!(subset.to_ranges(), &[0..20, 5..6]);
+    }
+
+    #[test]
+    fn test_slice_request_to_array_subset_zero_length() {
+        let req = SliceRequest::new("var", vec![DimensionSelection::range(0, 10)]);
+        let shape = vec![0u64];
+        let subset = req.to_array_subset(&shape);
+        assert_eq!(subset.to_ranges(), vec![0..0]);
     }
 }

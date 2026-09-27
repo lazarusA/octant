@@ -61,13 +61,19 @@ fn vs_main(
     out.val = raw_val;
     out.local_uv = model.position;
 
-    // Fast-cull invisible points (NaNs or clipped values) in vertex shader
+    // Fast-cull invisible points (NaNs, empty TrueColor background, or clipped values) in vertex shader
     let is_nan_val = raw_val != raw_val || abs(raw_val) > 1e30;
     if (is_nan_val && uniforms.color.use_nan_color == 0u) {
         out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
         return out;
     }
-    if (!is_nan_val) {
+    if (uniforms.color.colormap == 1000u) {
+        let packed = u32(raw_val);
+        if ((packed & 0x00FFFFFFu) == 0u) {
+            out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+            return out;
+        }
+    } else if (!is_nan_val) {
         if (uniforms.color.use_lowclip == 0u && raw_val < uniforms.color.cmin) {
             out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
             return out;
@@ -77,6 +83,7 @@ fn vs_main(
             return out;
         }
     }
+
 
     // Map cell (z, y, x) to 3D world coordinates with North (+Y) at top and South (-Y) at bottom, and latest/newest slice at front (-Z)
     let norm_x = (-0.5 + (f32(cell_x) + 0.5) / f32(grid_w)) * uniforms.aspect_x;
@@ -127,6 +134,13 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    if (uniforms.color.colormap == 1000u) {
+        let packed = u32(in.val);
+        if ((packed & 0x00FFFFFFu) == 0u) {
+            discard;
+        }
+    }
+
     let eval_color = evaluate_plot_color(in.val, uniforms.color);
 
     if (eval_color.a <= 0.0) {
