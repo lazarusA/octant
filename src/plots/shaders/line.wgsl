@@ -1,9 +1,3 @@
-struct LineVertexInput {
-    @location(0) position: vec2<f32>,
-    @location(1) cell_index: u32,
-    @location(2) line_index: u32,
-};
-
 struct LineVertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) @interpolate(flat) cell_index: u32,
@@ -15,7 +9,7 @@ struct ScatterVertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) quad_uv: vec2<f32>,
     @location(1) @interpolate(flat) line_index: u32,
-    @location(2) raw_val: f32,
+    @location(2) @interpolate(flat) raw_val: f32,
 };
 
 struct LineUniforms {
@@ -38,6 +32,15 @@ struct LineUniforms {
 
 @group(0) @binding(0) var<uniform> uniforms: LineUniforms;
 @group(0) @binding(1) var<storage, read> data_buffer: array<f32>;
+
+const CORNERS = array<vec2<f32>, 6>(
+    vec2<f32>(-1.0, -1.0),
+    vec2<f32>( 1.0, -1.0),
+    vec2<f32>( 1.0,  1.0),
+    vec2<f32>(-1.0, -1.0),
+    vec2<f32>( 1.0,  1.0),
+    vec2<f32>(-1.0,  1.0),
+);
 
 @vertex
 fn vs_main(
@@ -132,18 +135,7 @@ fn vs_scatter(
     let padded_pos = center_pos * (vec2<f32>(1.0, 1.0) - uniforms.viewport_padding);
     let transformed_pos = padded_pos * uniforms.zoom + uniforms.pan;
 
-    // Corner offset for unit quad [-1, 1]
-    var corner = vec2<f32>(0.0, 0.0);
-    switch (vertex_idx) {
-        case 0u: { corner = vec2<f32>(-1.0, -1.0); }
-        case 1u: { corner = vec2<f32>( 1.0, -1.0); }
-        case 2u: { corner = vec2<f32>( 1.0,  1.0); }
-        case 3u: { corner = vec2<f32>(-1.0, -1.0); }
-        case 4u: { corner = vec2<f32>( 1.0,  1.0); }
-        case 5u: { corner = vec2<f32>(-1.0,  1.0); }
-        default: { corner = vec2<f32>( 0.0,  0.0); }
-    }
-
+    let corner = CORNERS[min(vertex_idx, 5u)];
     out.quad_uv = corner;
 
     let size_scale = uniforms.point_size * 0.0025;
@@ -158,10 +150,11 @@ fn vs_scatter(
 
 @fragment
 fn fs_scatter(in: ScatterVertexOutput) -> @location(0) vec4<f32> {
-    let dist = length(in.quad_uv);
-    if (dist > 1.0) {
+    let dist_sq = dot(in.quad_uv, in.quad_uv);
+    if (dist_sq > 1.0) {
         discard;
     }
+    let dist = sqrt(dist_sq);
     let alpha = 1.0 - smoothstep(0.8, 1.0, dist);
 
     var base_color: vec4<f32>;

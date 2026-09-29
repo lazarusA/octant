@@ -11,9 +11,12 @@ impl OctantApp {
             .or_else(|| self.selected_variable_info())
         {
             let get_scale = |axis_name: &str| -> Option<f32> {
-                let target_key = format!("scale_{axis_name}");
                 for (k, v) in &var.attributes {
-                    if (k.eq_ignore_ascii_case(&target_key) || k.eq_ignore_ascii_case(axis_name))
+                    let is_match = k.eq_ignore_ascii_case(axis_name)
+                        || (k.len() == 6 + axis_name.len()
+                            && k[..6].eq_ignore_ascii_case("scale_")
+                            && k[6..].eq_ignore_ascii_case(axis_name));
+                    if is_match
                         && let Ok(val) = v.parse::<f32>()
                         && val > 0.0
                     {
@@ -23,23 +26,29 @@ impl OctantApp {
                 None
             };
 
-            let x_name = self
-                .get_spatial_dim_name(0)
-                .unwrap_or_else(|| "x".to_string());
-            let y_name = self
-                .get_spatial_dim_name(1)
-                .unwrap_or_else(|| "y".to_string());
-            let z_name = self
-                .get_spatial_dim_name(2)
-                .unwrap_or_else(|| "z".to_string());
+            let x_name = self.get_spatial_dim_name(0);
+            let y_name = self.get_spatial_dim_name(1);
+            let z_name = self.get_spatial_dim_name(2);
 
-            if let Some(sx) = get_scale(&x_name).or_else(|| get_scale("x")) {
+            if let Some(sx) = x_name
+                .as_deref()
+                .and_then(get_scale)
+                .or_else(|| get_scale("x"))
+            {
                 scale_x = sx;
             }
-            if let Some(sy) = get_scale(&y_name).or_else(|| get_scale("y")) {
+            if let Some(sy) = y_name
+                .as_deref()
+                .and_then(get_scale)
+                .or_else(|| get_scale("y"))
+            {
                 scale_y = sy;
             }
-            if let Some(sz) = get_scale(&z_name).or_else(|| get_scale("z")) {
+            if let Some(sz) = z_name
+                .as_deref()
+                .and_then(get_scale)
+                .or_else(|| get_scale("z"))
+            {
                 scale_z = sz;
             }
         }
