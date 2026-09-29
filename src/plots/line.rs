@@ -14,14 +14,24 @@ pub struct LineUniforms {
     pub line_mode: u32,
     pub pan: [f32; 2],
     pub zoom: f32,
-    pub _pad1: u32,
-    /// WGSL aligns nested `ColorUniforms` to 16 bytes (offset 48).
-    pub _color_align_pad: [u32; 2],
+    pub point_size: f32,
+    pub use_custom_color: u32,
+    pub show_lines: u32,
+    pub show_points: u32,
+    pub screen_aspect: f32,
+    pub _pad0: [u32; 2],
+    pub line_color: [f32; 4],
     pub color: super::common::PlotColorParams,
 }
 
 pub struct LineUniformParams {
     pub color: super::common::PlotColorParams,
+    pub line_color: [f32; 4],
+    pub use_custom_color: bool,
+    pub show_lines: bool,
+    pub show_points: bool,
+    pub point_size: f32,
+    pub screen_aspect: f32,
     pub viewport_padding: [f32; 2],
     pub profile_length: u32,
     pub line_count: u32,
@@ -34,6 +44,7 @@ use std::sync::RwLock;
 
 pub struct LineRenderer {
     render_pipeline: wgpu::RenderPipeline,
+    scatter_pipeline: wgpu::RenderPipeline,
     bind_group_layout: wgpu::BindGroupLayout,
     uniform_buffer: wgpu::Buffer,
     gpu_resources: RwLock<LineGpuResources>,
@@ -55,7 +66,7 @@ impl LineRenderer {
     ) -> Self {
         let shader_source = crate::assemble_plot_shader!(include_str!("shaders/line.wgsl"));
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("1D Line WGSL Shader"),
+            label: Some("1D Line & Scatter WGSL Shader"),
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
@@ -79,8 +90,13 @@ impl LineRenderer {
             line_mode: 0,
             pan: [0.0, 0.0],
             zoom: 1.0,
-            _pad1: 0,
-            _color_align_pad: [0; 2],
+            point_size: 6.0,
+            use_custom_color: 1,
+            show_lines: 1,
+            show_points: 0,
+            screen_aspect: 1.0,
+            _pad0: [0; 2],
+            line_color: [0.2, 0.65, 1.0, 1.0],
             color: super::common::PlotColorParams::default(),
         };
 
@@ -143,8 +159,42 @@ impl LineRenderer {
             cache: None,
         });
 
+        let scatter_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("1D Scatter Points Render Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_scatter"),
+                buffers: &[],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_scatter"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: target_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                cull_mode: None,
+                ..Default::default()
+            },
+            depth_stencil: Some(super::common::default_depth_stencil_state(
+                false,
+                wgpu::CompareFunction::Always,
+            )),
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+
         Self {
             render_pipeline,
+            scatter_pipeline,
             bind_group_layout,
             uniform_buffer,
             gpu_resources: RwLock::new(LineGpuResources {
@@ -164,8 +214,13 @@ impl LineRenderer {
             line_mode: params.line_mode,
             pan: params.pan,
             zoom: params.zoom,
-            _pad1: 0,
-            _color_align_pad: [0; 2],
+            point_size: params.point_size,
+            use_custom_color: if params.use_custom_color { 1 } else { 0 },
+            show_lines: if params.show_lines { 1 } else { 0 },
+            show_points: if params.show_points { 1 } else { 0 },
+            screen_aspect: params.screen_aspect,
+            _pad0: [0; 2],
+            line_color: params.line_color,
             color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -274,6 +329,11 @@ impl super::traits::PlotRenderer for LineRenderer {
 pub struct LineCallback {
     pub renderer: Arc<LineRenderer>,
     pub color_params: super::common::PlotColorParams,
+    pub line_color: [f32; 4],
+    pub use_custom_color: bool,
+    pub show_lines: bool,
+    pub show_points: bool,
+    pub point_size: f32,
     pub rect: egui::Rect,
     pub profile_values: Vec<f32>,
     pub profile_length: u32,
@@ -296,10 +356,17 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
             self.renderer
                 .update_data_with_device(device, queue, &self.profile_values);
         }
+        let screen_aspect = self.rect.width() / self.rect.height().max(1.0);
         self.renderer.update_uniforms(
             queue,
             &LineUniformParams {
                 color: self.color_params,
+                line_color: self.line_color,
+                use_custom_color: self.use_custom_color,
+                show_lines: self.show_lines,
+                show_points: self.show_points,
+                point_size: self.point_size,
+                screen_aspect,
                 viewport_padding: [0.0, 0.0],
                 profile_length: self.profile_length,
                 line_count: self.line_count,
@@ -321,7 +388,6 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
             return;
         }
 
-        rpass.set_pipeline(&self.renderer.render_pipeline);
         let Ok(guard) = self.renderer.gpu_resources.read() else {
             return;
         };
@@ -330,7 +396,14 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         let profile_length = self.profile_length.max(2);
         let line_count = self.line_count;
         if line_count > 0 && !self.profile_values.is_empty() {
-            rpass.draw(0..profile_length, 0..line_count);
+            if self.show_lines {
+                rpass.set_pipeline(&self.renderer.render_pipeline);
+                rpass.draw(0..profile_length, 0..line_count);
+            }
+            if self.show_points {
+                rpass.set_pipeline(&self.renderer.scatter_pipeline);
+                rpass.draw(0..6, 0..(profile_length * line_count));
+            }
         }
     }
 }

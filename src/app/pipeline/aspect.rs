@@ -259,7 +259,8 @@ impl OctantApp {
             }
         }
 
-        let title = crate::data::coordinates::naming::format_dimension_axis_title(&name);
+        let title =
+            crate::data::coordinates::naming::format_dimension_axis_title(&name).into_owned();
         (bounds, title)
     }
 }

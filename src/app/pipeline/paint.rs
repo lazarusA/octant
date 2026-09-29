@@ -224,6 +224,11 @@ impl OctantApp {
                         crate::plots::LineCallback {
                             renderer: line_renderer.clone(),
                             color_params,
+                            line_color: self.line_color,
+                            use_custom_color: self.line_use_custom_color,
+                            show_lines: self.line_show_lines,
+                            show_points: self.line_show_points,
+                            point_size: self.line_point_size,
                             rect: canvas_rect,
                             profile_values,
                             profile_length,
