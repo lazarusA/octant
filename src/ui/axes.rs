@@ -365,16 +365,7 @@ impl TickMark {
         units: Option<&str>,
     ) {
         let is_time = crate::data::coordinates::naming::is_animated_time_name(title)
-            || units.is_some_and(|u| {
-                let l = u.to_lowercase();
-                l.contains("since")
-                    || l.contains("hour")
-                    || l.contains("day")
-                    || l.contains("sec")
-                    || l.contains("min")
-                    || l.contains("year")
-                    || l.contains("month")
-            });
+            || units.is_some_and(crate::utils::units::is_cf_time_unit);
 
         if is_time && self.try_format_time(total_span, title, units) {
             return;
@@ -389,12 +380,12 @@ impl TickMark {
 
         // 1. CF Relative Units (e.g. "hours since 2024-01-01")
         if let Some(units_str) = units {
-            let lower_units = units_str.trim().to_lowercase();
-            if let Some((unit_part, ref_date_str)) = lower_units.split_once(" since ") {
-                let (y, m, d) = crate::utils::units::parse_iso_date(ref_date_str.trim())
-                    .unwrap_or((1970, 1, 1));
-                let scale_ms = crate::utils::units::unit_to_milliseconds(unit_part.trim())
-                    .unwrap_or(1_000) as f64;
+            let clean_units = units_str.trim();
+            if let Some((unit_part, ref_date_str)) = crate::utils::units::split_since(clean_units) {
+                let (y, m, d) =
+                    crate::utils::units::parse_iso_date(ref_date_str).unwrap_or((1970, 1, 1));
+                let scale_ms =
+                    crate::utils::units::unit_to_milliseconds(unit_part).unwrap_or(1_000) as f64;
                 let total_ms = self.val * scale_ms;
                 let total_hours = (total_ms / 3_600_000.0).round() as i64;
                 let days_added = total_hours.div_euclid(24);
@@ -417,7 +408,7 @@ impl TickMark {
             }
 
             // 2. ISO reference date in units_str (e.g. "2024-01-01" from time_coverage_start)
-            if let Some((y, m, d)) = crate::utils::units::parse_iso_date(units_str.trim()) {
+            if let Some((y, m, d)) = crate::utils::units::parse_iso_date(clean_units) {
                 let days_added = self.val.round() as i64;
                 let (res_y, res_m, res_d) =
                     crate::utils::units::add_days_to_date(y, m, d, days_added);
@@ -434,16 +425,19 @@ impl TickMark {
             }
 
             // 3. Simple duration units (h, d, min, s)
-            if lower_units == "h"
-                || lower_units == "hr"
-                || lower_units == "hours"
-                || lower_units == "hour"
+            if clean_units.eq_ignore_ascii_case("h")
+                || clean_units.eq_ignore_ascii_case("hr")
+                || clean_units.eq_ignore_ascii_case("hours")
+                || clean_units.eq_ignore_ascii_case("hour")
             {
                 let _ = write!(cursor, "{:.0} h", self.val);
                 self.len = cursor.position() as u8;
                 return self.len > 0;
             }
-            if lower_units == "d" || lower_units == "day" || lower_units == "days" {
+            if clean_units.eq_ignore_ascii_case("d")
+                || clean_units.eq_ignore_ascii_case("day")
+                || clean_units.eq_ignore_ascii_case("days")
+            {
                 let _ = write!(cursor, "{:.0} d", self.val);
                 self.len = cursor.position() as u8;
                 return self.len > 0;
