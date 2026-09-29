@@ -5,6 +5,8 @@ pub struct PlotAxisOptions<'a> {
     pub y_domain: (f64, f64),
     pub x_title: &'a str,
     pub y_title: &'a str,
+    pub x_units: Option<&'a str>,
+    pub y_units: Option<&'a str>,
 }
 
 /// Dynamic plot axis renderer with auto-attaching canvas borders, inward/outward ticks,
@@ -74,8 +76,10 @@ pub fn draw_plot_axes(
 
     // Generate constant count of ticks (7 ticks) for visible viewport using stack buffers
     const NUM_TICKS: usize = 7;
-    let x_ticks = generate_constant_count_ticks(vis_x_min, vis_x_max);
-    let y_ticks = generate_constant_count_ticks(vis_y_min, vis_y_max);
+    let x_ticks =
+        generate_constant_count_ticks(vis_x_min, vis_x_max, options.x_title, options.x_units);
+    let y_ticks =
+        generate_constant_count_ticks(vis_y_min, vis_y_max, options.y_title, options.y_units);
 
     // ==========================================
     // 1. BOTTOM & TOP X-AXES
@@ -337,6 +341,151 @@ impl TickMark {
         mark
     }
 
+    pub fn new_with_context(
+        val: f64,
+        step: f64,
+        total_span: f64,
+        title: &str,
+        units: Option<&str>,
+    ) -> Self {
+        let mut mark = Self {
+            val,
+            len: 0,
+            buf: [0u8; 32],
+        };
+        mark.format_with_context(step, total_span, title, units);
+        mark
+    }
+
+    fn format_with_context(
+        &mut self,
+        step: f64,
+        total_span: f64,
+        title: &str,
+        units: Option<&str>,
+    ) {
+        let is_time = crate::data::coordinates::naming::is_animated_time_name(title)
+            || units.is_some_and(crate::utils::units::is_cf_time_unit);
+
+        if is_time && self.try_format_time(total_span, title, units) {
+            return;
+        }
+
+        self.format(step);
+    }
+
+    fn try_format_time(&mut self, total_span: f64, title: &str, units: Option<&str>) -> bool {
+        use std::io::Write;
+        let mut cursor = std::io::Cursor::new(&mut self.buf[..]);
+
+        // 1. CF Relative Units (e.g. "hours since 2024-01-01")
+        if let Some(units_str) = units {
+            let clean_units = units_str.trim();
+            if let Some((unit_part, ref_date_str)) = crate::utils::units::split_since(clean_units) {
+                let (y, m, d) =
+                    crate::utils::units::parse_iso_date(ref_date_str).unwrap_or((1970, 1, 1));
+                let scale_ms =
+                    crate::utils::units::unit_to_milliseconds(unit_part).unwrap_or(1_000) as f64;
+                let total_ms = self.val * scale_ms;
+                let total_hours = (total_ms / 3_600_000.0).round() as i64;
+                let days_added = total_hours.div_euclid(24);
+                let hour_of_day = total_hours.rem_euclid(24) as usize;
+                let (res_y, res_m, res_d) =
+                    crate::utils::units::add_days_to_date(y, m, d, days_added);
+
+                let span_days = (total_span.abs() * scale_ms) / 86_400_000.0;
+                let _ = if span_days > 730.0 {
+                    write!(cursor, "{:04}", res_y)
+                } else if span_days > 60.0 {
+                    write!(cursor, "{:04}-{:02}", res_y, res_m)
+                } else if span_days > 2.0 {
+                    write!(cursor, "{:02}-{:02}", res_m, res_d)
+                } else {
+                    write!(cursor, "{:02}:{:02}", hour_of_day, 0)
+                };
+                self.len = cursor.position() as u8;
+                return self.len > 0;
+            }
+
+            // 2. ISO reference date in units_str (e.g. "2024-01-01" from time_coverage_start)
+            if let Some((y, m, d)) = crate::utils::units::parse_iso_date(clean_units) {
+                let days_added = self.val.round() as i64;
+                let (res_y, res_m, res_d) =
+                    crate::utils::units::add_days_to_date(y, m, d, days_added);
+                let span_days = total_span.abs();
+                let _ = if span_days > 730.0 {
+                    write!(cursor, "{:04}", res_y)
+                } else if span_days > 60.0 {
+                    write!(cursor, "{:04}-{:02}", res_y, res_m)
+                } else {
+                    write!(cursor, "{:02}-{:02}", res_m, res_d)
+                };
+                self.len = cursor.position() as u8;
+                return self.len > 0;
+            }
+
+            // 3. Simple duration units (h, d, min, s)
+            if clean_units.eq_ignore_ascii_case("h")
+                || clean_units.eq_ignore_ascii_case("hr")
+                || clean_units.eq_ignore_ascii_case("hours")
+                || clean_units.eq_ignore_ascii_case("hour")
+            {
+                let _ = write!(cursor, "{:.0} h", self.val);
+                self.len = cursor.position() as u8;
+                return self.len > 0;
+            }
+            if clean_units.eq_ignore_ascii_case("d")
+                || clean_units.eq_ignore_ascii_case("day")
+                || clean_units.eq_ignore_ascii_case("days")
+            {
+                let _ = write!(cursor, "{:.0} d", self.val);
+                self.len = cursor.position() as u8;
+                return self.len > 0;
+            }
+        }
+
+        // 4. Unix epoch timestamps (> 100M seconds or > 100B ms)
+        if self.val.abs() > 1e8 && self.val.abs() < 1e13 {
+            let total_secs = if self.val.abs() > 1e11 {
+                (self.val / 1000.0).round() as i64
+            } else {
+                self.val.round() as i64
+            };
+            let total_hours = total_secs.div_euclid(3600);
+            let days_added = total_hours.div_euclid(24);
+            let hour_of_day = total_hours.rem_euclid(24) as usize;
+            let (res_y, res_m, res_d) =
+                crate::utils::units::add_days_to_date(1970, 1, 1, days_added);
+
+            let span_secs = if total_span.abs() > 1e11 {
+                total_span.abs() / 1000.0
+            } else {
+                total_span.abs()
+            };
+            let span_days = span_secs / 86400.0;
+            let _ = if span_days > 730.0 {
+                write!(cursor, "{:04}", res_y)
+            } else if span_days > 60.0 {
+                write!(cursor, "{:04}-{:02}", res_y, res_m)
+            } else if span_days > 2.0 {
+                write!(cursor, "{:02}-{:02}", res_m, res_d)
+            } else {
+                write!(cursor, "{:02}:{:02}", hour_of_day, 0)
+            };
+            self.len = cursor.position() as u8;
+            return self.len > 0;
+        }
+
+        // 5. Step indices
+        if title.eq_ignore_ascii_case("step") || title.eq_ignore_ascii_case("timestep") {
+            let _ = write!(cursor, "t={:.0}", self.val);
+            self.len = cursor.position() as u8;
+            return self.len > 0;
+        }
+
+        false
+    }
+
     fn format(&mut self, step: f64) {
         use std::io::Write;
         let mut cursor = std::io::Cursor::new(&mut self.buf[..]);
@@ -361,7 +510,12 @@ impl TickMark {
 }
 
 /// Generates a constant 7-count stack array of ticks with zero heap allocation.
-fn generate_constant_count_ticks(min_val: f64, max_val: f64) -> [TickMark; 7] {
+fn generate_constant_count_ticks(
+    min_val: f64,
+    max_val: f64,
+    title: &str,
+    units: Option<&str>,
+) -> [TickMark; 7] {
     let range = max_val - min_val;
     let step = range / 6.0;
 
@@ -373,7 +527,7 @@ fn generate_constant_count_ticks(min_val: f64, max_val: f64) -> [TickMark; 7] {
 
     for (i, tick) in ticks.iter_mut().enumerate() {
         let val = min_val + i as f64 * step;
-        *tick = TickMark::new(val, step);
+        *tick = TickMark::new_with_context(val, step, range, title, units);
     }
 
     ticks
@@ -432,4 +586,43 @@ fn draw_tick_label_aligned(
     }
 
     painter.text(pos, align, text, font_id.clone(), color);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_time_tick_formatting_cf_units() {
+        let tick =
+            TickMark::new_with_context(10.0, 1.0, 30.0, "time", Some("days since 2024-01-01"));
+        assert_eq!(tick.as_str(), "01-11");
+    }
+
+    #[test]
+    fn test_time_tick_formatting_iso_units() {
+        let tick = TickMark::new_with_context(15.0, 1.0, 30.0, "time", Some("2024-01-01"));
+        assert_eq!(tick.as_str(), "01-16");
+    }
+
+    #[test]
+    fn test_time_tick_formatting_durations() {
+        let tick_h = TickMark::new_with_context(24.0, 4.0, 48.0, "time", Some("hours"));
+        assert_eq!(tick_h.as_str(), "24 h");
+
+        let tick_d = TickMark::new_with_context(7.0, 1.0, 14.0, "time", Some("days"));
+        assert_eq!(tick_d.as_str(), "7 d");
+    }
+
+    #[test]
+    fn test_time_tick_formatting_step() {
+        let tick_step = TickMark::new_with_context(42.0, 1.0, 100.0, "step", None);
+        assert_eq!(tick_step.as_str(), "t=42");
+    }
+
+    #[test]
+    fn test_standard_numeric_tick_formatting() {
+        let tick_num = TickMark::new_with_context(123.45, 1.0, 100.0, "lon", None);
+        assert_eq!(tick_num.as_str(), "123.45");
+    }
 }

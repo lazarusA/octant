@@ -3,25 +3,57 @@ use crate::ui::settings::coastline::show_coastline_controls;
 
 pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
-        let mut use_flat = app.active_colormap == 999;
-        if ui
-            .checkbox(&mut use_flat, "Solid Flat Line Color")
-            .changed()
-        {
-            if use_flat {
-                app.active_colormap = 999;
-            } else {
-                app.active_colormap = 0;
-            }
+        ui.checkbox(&mut app.line_show_lines, "Lines")
+            .on_hover_text("Show continuous lines connecting points");
+        ui.checkbox(&mut app.line_show_points, "Scatter")
+            .on_hover_text("Show scatter markers at each point location");
+
+        if !app.line_show_lines && !app.line_show_points {
+            app.line_show_lines = true;
         }
-        ui.selectable_label(app.show_hover_card, "Hover Card")
-            .on_hover_text(if app.show_hover_card {
-                "Hide hover card"
-            } else {
-                "Show hover card"
-            })
-            .clicked()
-            .then(|| app.show_hover_card = !app.show_hover_card);
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.selectable_label(app.show_hover_card, "Hover Card")
+                .on_hover_text(if app.show_hover_card {
+                    "Hide hover card"
+                } else {
+                    "Show hover card"
+                })
+                .clicked()
+                .then(|| app.show_hover_card = !app.show_hover_card);
+        });
+    });
+
+    if app.line_show_points {
+        ui.add_space(2.0);
+        ui.horizontal(|ui| {
+            ui.label("Point Size:");
+            ui.add(
+                egui::Slider::new(&mut app.line_point_size, 2.0..=24.0)
+                    .suffix(" px")
+                    .show_value(true),
+            );
+        });
+    }
+
+    ui.add_space(2.0);
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut app.line_use_custom_color, "Custom Color")
+            .on_hover_text("Use a solid line/scatter color instead of colormap evaluation");
+
+        if app.line_use_custom_color {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                crate::ui::color_picker::ShapeColorPicker::new(
+                    "settings_line_color_picker",
+                    &mut app.line_color,
+                    crate::ui::color_picker::ColorShape::Rect(3.0),
+                )
+                .size(egui::vec2(18.0, 16.0))
+                .tooltip("Line / scatter color. Click to select color.")
+                .anchor_offset(egui::vec2(-240.0, -100.0))
+                .show(ui);
+            });
+        }
     });
 
     show_line_profile_controls(app, ui);
