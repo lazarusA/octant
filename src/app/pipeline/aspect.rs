@@ -229,15 +229,16 @@ impl OctantApp {
         }
     }
 
-    /// Resolves coordinate bounds and formatted title for a given dimension index.
+    /// Resolves coordinate bounds, formatted title, and units/time context for a given dimension index.
     pub fn resolve_axis_bounds_and_title(
         &self,
         dim_idx: usize,
         fallback_name: &str,
         fallback_len: usize,
-    ) -> ((f64, f64), String) {
+    ) -> ((f64, f64), String, Option<String>) {
         let mut bounds = (0.0, fallback_len.saturating_sub(1).max(1) as f64);
         let mut name = fallback_name.to_string();
+        let mut units = None;
 
         if let Some(meta) = &self.plotted_dataset_metadata
             && let Some(var) = meta.variables.get(self.plotted_variable_idx)
@@ -257,6 +258,27 @@ impl OctantApp {
 
             if let Some(dim_n) = var.dimension_names.get(dim_idx) {
                 name = dim_n.clone();
+                if let Some(coord_var) = meta.variables.iter().find(|v| {
+                    v.name.eq_ignore_ascii_case(dim_n)
+                        || v.name
+                            .trim_start_matches('/')
+                            .eq_ignore_ascii_case(dim_n.trim_start_matches('/'))
+                }) {
+                    units = coord_var
+                        .units
+                        .clone()
+                        .or_else(|| coord_var.attributes.get("units").cloned());
+                    if units.is_none() {
+                        units = coord_var.attributes.get("time_coverage_start").cloned();
+                    }
+                }
+                if units.is_none() {
+                    units = var
+                        .units
+                        .clone()
+                        .or_else(|| var.attributes.get("units").cloned())
+                        .or_else(|| var.attributes.get("time_coverage_start").cloned());
+                }
                 if let Some(coord_bounds) = meta.get_coord_bounds_for_var_range(
                     Some(&var.name),
                     dim_n,
@@ -270,6 +292,6 @@ impl OctantApp {
 
         let title =
             crate::data::coordinates::naming::format_dimension_axis_title(&name).into_owned();
-        (bounds, title)
+        (bounds, title, units)
     }
 }

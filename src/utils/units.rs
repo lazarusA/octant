@@ -183,63 +183,59 @@ pub fn parse_reference_date(
     (1979, 1, 1, days_step)
 }
 
-fn parse_iso_date(s: &str) -> Option<(usize, usize, usize)> {
-    let clean = s.replace('T', " ");
-    let date_part = clean.split_whitespace().next().unwrap_or(&clean);
-    let parts: Vec<&str> = date_part.split('-').collect();
-    if parts.len() >= 3 {
-        let y = parts[0].parse().ok()?;
-        let m = parts[1].parse().ok()?;
-        let d = parts[2].parse().ok()?;
-        return Some((y, m, d));
-    }
-    None
+/// Parses ISO date strings like "2024-01-01" or "2024-01-01T00:00:00" into `(year, month, day)`.
+pub fn parse_iso_date(s: &str) -> Option<(usize, usize, usize)> {
+    let clean = s.trim();
+    let date_part = clean.split(['T', ' ']).next().unwrap_or(clean);
+    let mut parts = date_part.split('-');
+    let y = parts.next()?.parse().ok()?;
+    let m = parts.next()?.parse().ok()?;
+    let d = parts.next()?.parse().ok()?;
+    Some((y, m, d))
 }
 
-/// Dynamically add N days to a starting date (year, month, day), handling month lengths and leap years.
+/// Converts civil year, month (1..=12), and day (1..=31) to days since 1970-01-01 (epoch 0).
+/// Negative values represent days before 1970-01-01.
+#[inline]
+pub fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = (y - era * 400) as u32; // [0, 399]
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1; // [0, 365]
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy; // [0, 146096]
+    era * 146097 + (doe as i64) - 719468
+}
+
+/// Converts days since 1970-01-01 (epoch 0) to civil (year, month 1..=12, day 1..=31).
+#[inline]
+pub fn civil_from_days(z: i64) -> (usize, usize, usize) {
+    let z = z + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u32; // [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365; // [0, 399]
+    let y = (yoe as i64) + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153; // [0, 11]
+    let d = doy - (153 * mp + 2) / 5 + 1; // [1, 31]
+    let m = if mp < 10 { mp + 3 } else { mp - 9 }; // [1, 12]
+    let y = if m <= 2 { y + 1 } else { y };
+    (y.max(0) as usize, m as usize, d as usize)
+}
+
+/// Dynamically add N days (positive or negative) to a starting date (year, month, day) in O(1) time.
 pub fn add_days_to_date(
     start_year: usize,
     start_month: usize,
     start_day: usize,
-    days_to_add: usize,
+    days_to_add: i64,
 ) -> (usize, usize, usize) {
-    let mut year = start_year;
-    let mut month = start_month;
-    let mut day = start_day + days_to_add;
-
-    loop {
-        let days_in_cur_month = days_in_month(year, month);
-        if day <= days_in_cur_month {
-            break;
-        }
-        day -= days_in_cur_month;
-        month += 1;
-        if month > 12 {
-            month = 1;
-            year += 1;
-        }
-    }
-
-    (year, month, day)
-}
-
-fn is_leap_year(year: usize) -> bool {
-    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
-}
-
-fn days_in_month(year: usize, month: usize) -> usize {
-    match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 => {
-            if is_leap_year(year) {
-                29
-            } else {
-                28
-            }
-        }
-        _ => 30,
-    }
+    let base = days_from_civil(
+        start_year as i64,
+        start_month.clamp(1, 12) as u32,
+        start_day.clamp(1, 31) as u32,
+    );
+    let target = base.saturating_add(days_to_add);
+    civil_from_days(target)
 }
 
 /// Format axis value dynamically based on dimension name, CF unit string, metadata time attributes, and step index.
@@ -266,7 +262,7 @@ pub fn format_axis_value(
     {
         let (start_year, start_month, start_day, days_per_step) =
             parse_reference_date(units_str, time_start, temp_res, target_hint);
-        let total_days_offset = timestep * days_per_step;
+        let total_days_offset = (timestep * days_per_step) as i64;
         let (year, month, day) =
             add_days_to_date(start_year, start_month, start_day, total_days_offset);
 
@@ -319,7 +315,7 @@ pub fn parse_loc(val: Option<f64>, units_str: &str) -> Option<String> {
         let total_ms = v * scale_ms;
         let total_hours = (total_ms / 3_600_000.0).round() as i64;
 
-        let days_added = total_hours.div_euclid(24) as usize;
+        let days_added = total_hours.div_euclid(24);
         let hour_of_day = total_hours.rem_euclid(24) as usize;
 
         let (res_y, res_m, res_d) = add_days_to_date(y, m, d, days_added);
@@ -486,5 +482,42 @@ mod tests {
         assert_eq!(parse_loc(Some(45.0), "deg"), Some("45.00°".to_string()));
         assert_eq!(parse_loc(Some(100.0), "hPa"), Some("100.00".to_string()));
         assert_eq!(parse_loc(None, "hours"), None);
+    }
+
+    #[test]
+    fn test_add_days_to_date_basic_and_negative() {
+        assert_eq!(add_days_to_date(2024, 1, 1, 0), (2024, 1, 1));
+        assert_eq!(add_days_to_date(2024, 1, 1, 10), (2024, 1, 11));
+        assert_eq!(add_days_to_date(2024, 1, 1, 31), (2024, 2, 1));
+        assert_eq!(add_days_to_date(2024, 1, 1, -1), (2023, 12, 31));
+        assert_eq!(add_days_to_date(2024, 3, 1, -1), (2024, 2, 29)); // Leap year 2024
+        assert_eq!(add_days_to_date(2023, 3, 1, -1), (2023, 2, 28)); // Non-leap year 2023
+    }
+
+    #[test]
+    fn test_add_days_to_date_leap_century_and_large_offset() {
+        assert_eq!(add_days_to_date(2000, 2, 28, 1), (2000, 2, 29)); // 2000 is leap
+        assert_eq!(add_days_to_date(1900, 2, 28, 1), (1900, 3, 1)); // 1900 is non-leap
+        // Extremely large offset should compute in O(1) without loop or hang
+        let (y, m, d) = add_days_to_date(1970, 1, 1, 1_000_000_000);
+        assert!(y > 2000000);
+        assert!((1..=12).contains(&m));
+        assert!((1..=31).contains(&d));
+    }
+
+    #[test]
+    fn test_days_civil_roundtrip() {
+        let cases = [
+            (1970, 1, 1),
+            (2024, 2, 29),
+            (2000, 12, 31),
+            (1600, 3, 1),
+            (2400, 7, 15),
+        ];
+        for &(y, m, d) in &cases {
+            let days = days_from_civil(y as i64, m as u32, d as u32);
+            let res = civil_from_days(days);
+            assert_eq!(res, (y, m, d));
+        }
     }
 }
