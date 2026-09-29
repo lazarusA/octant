@@ -5,7 +5,7 @@ use egui::Color32;
 
 /// Evaluates the RGBA color for a given data scalar matching shader semantics.
 pub fn evaluate_color_cpu(val: f32, params: &PlotColorParams) -> Color32 {
-    if val.is_nan() {
+    if val.is_nan() || !val.is_finite() || val.abs() > 1e30 {
         if params.use_nan_color != 0 {
             rgba_to_color32(params.nan_color)
         } else {
@@ -23,13 +23,18 @@ pub fn evaluate_color_cpu(val: f32, params: &PlotColorParams) -> Color32 {
     } else if params.use_highclip != 0 && val > params.cmax {
         rgba_to_color32(params.highclip_color)
     } else {
-        let t = super::scale::apply_color_scale_cpu(
+        let mut t = super::scale::apply_color_scale_cpu(
             val,
             params.cmin,
             params.cmax,
             params.scale_type,
             params.scale_param,
         );
+        if params.is_categorical != 0 {
+            let num_cats = params.num_categories.max(1) as f32;
+            let bin_idx = (t.clamp(0.0, 0.999999) * num_cats).floor();
+            t = (bin_idx + 0.5) / num_cats;
+        }
         super::sample::sample_colormap_rgb(params.colormap, t)
     }
 }

@@ -102,4 +102,12 @@ fn test_evaluate_color_cpu() {
     let packed_rgb = (100u32) | (150u32 << 8) | (200u32 << 16);
     let rgb_c = evaluate_color_cpu(packed_rgb as f32, &params);
     assert_eq!(rgb_c, egui::Color32::from_rgb(100, 150, 200));
+
+    // Categorical mode
+    params.colormap = 0;
+    params.is_categorical = 1;
+    params.num_categories = 4;
+    // 0..25 should map to first bin center (0.5/4 = 0.125)
+    let cat_c = evaluate_color_cpu(10.0, &params);
+    assert_eq!(cat_c, sample_colormap_rgb(0, 0.125));
 }
