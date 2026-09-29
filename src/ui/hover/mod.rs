@@ -8,6 +8,7 @@ pub mod entries_1d;
 pub mod entries_2d;
 pub mod entries_3d;
 pub mod format;
+pub mod hit;
 pub mod overlay;
 pub mod raycast_sphere;
 pub mod raycast_surface;
@@ -21,6 +22,7 @@ pub use enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
 };
 pub use format::format_dimension_coord;
+pub use hit::{resolve_hit_coordinates, resolve_target_screen_pos};
 pub use raycast_sphere::{get_normalized_radial_dr, raycast_sphere, sphere_target_pos};
 pub use raycast_surface::{get_normalized_surface_height, raycast_surface, surface_target_pos};
 pub use raycast_volume::{VolumeSampler, volume_target_pos};
@@ -29,9 +31,10 @@ pub use sample_2d::Transform2D;
 
 use crate::app::OctantApp;
 use crate::plots::PlotType;
-use egui::Rect;
+use crate::utils::colormap::evaluate_color_cpu;
+use egui::{Color32, Rect};
 use entries::{resolve_cell_value_and_dim_entries, resolve_variable_units};
-use overlay::{draw_tooltip_card, resolve_hit_coordinates, resolve_target_screen_pos};
+use overlay::draw_tooltip_card;
 
 /// Renders the floating glassmorphic tooltip card and connecting leader lines for the hovered data point.
 pub fn show_hover_tooltip(
@@ -117,6 +120,18 @@ pub fn show_hover_tooltip(
     );
 
     let is_rgb = app.active_colormap == 1000 || app.rgb_composite_mode;
+    let color_params = app.get_color_params();
+    let pixel_color = if app.active_plot_type == PlotType::Line && app.line_use_custom_color {
+        Color32::from_rgba_unmultiplied(
+            (app.line_color[0] * 255.0).clamp(0.0, 255.0) as u8,
+            (app.line_color[1] * 255.0).clamp(0.0, 255.0) as u8,
+            (app.line_color[2] * 255.0).clamp(0.0, 255.0) as u8,
+            (app.line_color[3] * 255.0).clamp(0.0, 255.0) as u8,
+        )
+    } else {
+        evaluate_color_cpu(raw_val, &color_params)
+    };
+
     draw_tooltip_card(
         ctx,
         ui,
@@ -129,5 +144,6 @@ pub fn show_hover_tooltip(
         &units_str,
         &dim_entries,
         is_rgb,
+        pixel_color,
     );
 }
