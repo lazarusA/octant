@@ -2,6 +2,19 @@ use crate::app::OctantApp;
 use crate::plots::PlotType;
 use crate::ui::icons::{Icon, UiIconExt};
 
+/// Map a PlotType to its corresponding vector Icon.
+#[inline]
+pub fn plot_type_icon(plot_type: PlotType) -> Icon {
+    match plot_type {
+        PlotType::Heatmap => Icon::PlotPlane,
+        PlotType::Line => Icon::PlotLine,
+        PlotType::Sphere => Icon::PlotGlobe,
+        PlotType::Surface => Icon::PlotSurface,
+        PlotType::Volume => Icon::PlotVolume,
+        PlotType::PointCloud => Icon::PlotPointCloud,
+    }
+}
+
 pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     let (is_3d_available, is_size_allowed, vol_mb) = if let Some(v) = app
         .plotted_variable_info()
@@ -52,31 +65,23 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         && !app.enable_pyramid_resampling;
     let surface_mb = (total_2d_elements as f64 * 4.0) / (1024.0 * 1024.0);
 
-    // Safety fallback: revert to 2D Plane only if the currently active plot lacks valid GPU data or pyramid is on
+    // Safety fallback: revert to Heatmap only if the currently active plot lacks valid GPU data or pyramid is on
     if (app.enable_pyramid_resampling && app.active_plot_type != PlotType::Heatmap)
         || ((app.active_plot_type == PlotType::Volume
             || app.active_plot_type == PlotType::PointCloud)
             && app.volume_data.is_none())
-        || ((app.active_plot_type == PlotType::Sphere
-            || app.active_plot_type == PlotType::Surface
-            || app.active_plot_type == PlotType::Block)
+        || ((app.active_plot_type == PlotType::Sphere || app.active_plot_type == PlotType::Surface)
             && app.sphere_renderer.is_none()
             && app.matrix_data.is_none())
     {
         app.active_plot_type = PlotType::Heatmap;
     }
 
-    let current_label = match app.active_plot_type {
-        PlotType::Heatmap => "Plot: 2D Plane",
-        PlotType::Line => "Plot: 1D Line Chart",
-        PlotType::Sphere => "Plot: 3D Globe",
-        PlotType::Surface | PlotType::Block => "Plot: 3D Surface / Blocks",
-        PlotType::Volume => "Plot: 3D Volume",
-        PlotType::PointCloud => "Plot: 3D Point Cloud",
-    };
+    let current_icon = plot_type_icon(app.active_plot_type);
+    let current_label = app.active_plot_type.display_name();
 
-    ui.menu_button(current_label, |ui| {
-        ui.set_min_width(240.0);
+    ui.icon_menu_button(current_icon, current_label, |ui| {
+        ui.set_min_width(220.0);
 
         ui.label(
             egui::RichText::new("Select Visualization Projection")
@@ -91,37 +96,37 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
             (
                 PlotType::Heatmap,
                 Icon::PlotPlane,
-                "2D Plane (Flatmap)",
+                PlotType::Heatmap.display_name(),
                 true,
             ),
             (
                 PlotType::Line,
                 Icon::PlotLine,
-                "1D Line Chart",
+                PlotType::Line.display_name(),
                 !pyramid_disabled,
             ),
             (
                 PlotType::Sphere,
                 Icon::PlotGlobe,
-                "3D Globe (Sphere)",
+                PlotType::Sphere.display_name(),
                 is_surface_allowed,
             ),
             (
                 PlotType::Surface,
                 Icon::PlotSurface,
-                "3D Surface / Blocks",
+                PlotType::Surface.display_name(),
                 is_surface_allowed,
             ),
             (
                 PlotType::Volume,
                 Icon::PlotVolume,
-                "3D Volume Raycasting",
+                PlotType::Volume.display_name(),
                 is_volume_allowed,
             ),
             (
                 PlotType::PointCloud,
                 Icon::PlotPointCloud,
-                "3D Point Cloud",
+                PlotType::PointCloud.display_name(),
                 is_volume_allowed,
             ),
         ];

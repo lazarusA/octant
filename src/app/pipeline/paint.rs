@@ -32,7 +32,7 @@ impl OctantApp {
                     sphere_renderer.update_data(queue, values);
                 }
             }
-            PlotType::Surface | PlotType::Block => {
+            PlotType::Surface => {
                 if let Some(surface_renderer) = &self.surface_renderer {
                     surface_renderer.update_data(queue, values);
                 }
@@ -261,15 +261,11 @@ impl OctantApp {
                     ui.painter().add(callback);
                 }
             }
-            crate::plots::PlotType::Surface | crate::plots::PlotType::Block => {
+            crate::plots::PlotType::Surface => {
                 if let Some(surface_renderer) = &self.surface_renderer {
                     let aspect_ratio = crate::plots::common::compute_aspect_ratio(&plot_rect);
                     let params = self.get_mesh_3d_uniform_params(
-                        if self.active_plot_type == crate::plots::PlotType::Block {
-                            2
-                        } else {
-                            self.surface_mode
-                        },
+                        self.surface_mode,
                         self.surface_displacement_strength,
                         aspect_ratio,
                     );
@@ -373,7 +369,7 @@ impl OctantApp {
         // --- Coastline overlay ---
         let coastline_supported = matches!(
             self.active_plot_type,
-            PlotType::Heatmap | PlotType::Surface | PlotType::Block | PlotType::Sphere
+            PlotType::Heatmap | PlotType::Surface | PlotType::Sphere
         );
         if self.show_coastlines && coastline_supported {
             if let Some(cr) = self.coastline_renderer.as_ref().map(Arc::clone) {
@@ -421,7 +417,6 @@ impl OctantApp {
             {
                 let (mode, plot_kind, displacement_strength) = match self.active_plot_type {
                     PlotType::Sphere => (self.sphere_mode, 1, self.sphere_displacement_strength),
-                    PlotType::Block => (2, 0, self.surface_displacement_strength),
                     _ => (self.surface_mode, 0, self.surface_displacement_strength),
                 };
                 let mesh_params = self.get_mesh_3d_uniform_params(

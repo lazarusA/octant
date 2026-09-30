@@ -70,8 +70,9 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                             var_info.name.clone()
                         };
                         ui.label(egui::RichText::new(display_name).strong());
+                        let plot_icon = crate::ui::plot_type::plot_type_icon(app.active_plot_type);
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.icon_button(Icon::Variables, "Plot Data").clicked() {
+                            if ui.icon_button(plot_icon, "Plot Data").clicked() {
                                 should_plot = true;
                             }
                         });

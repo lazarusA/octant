@@ -32,7 +32,6 @@ pub enum PlotType {
     Heatmap,
     Line,
     Surface,
-    Block,
     Volume,
     Sphere,
     PointCloud,
@@ -41,13 +40,12 @@ pub enum PlotType {
 impl PlotType {
     pub fn display_name(&self) -> &'static str {
         match self {
-            PlotType::Heatmap => "2D Flatmap Heatmap",
-            PlotType::Line => "1D Line Chart",
-            PlotType::Surface => "3D Surface / Blocks",
-            PlotType::Block => "3D Voxel / Block",
-            PlotType::Volume => "3D Volume Raycasting",
-            PlotType::Sphere => "3D Globe Projection",
-            PlotType::PointCloud => "3D Point Cloud",
+            PlotType::Heatmap => "Heatmap",
+            PlotType::Line => "1D Line",
+            PlotType::Surface => "Surface",
+            PlotType::Volume => "Volume",
+            PlotType::Sphere => "Sphere",
+            PlotType::PointCloud => "Point Cloud",
         }
     }
 }

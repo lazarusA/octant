@@ -109,7 +109,7 @@ pub fn resolve_target_screen_pos(
                 None
             }
         }
-        PlotType::Heatmap | PlotType::Block => {
+        PlotType::Heatmap => {
             let (orig_w, orig_h) = if let Some(pyr) = &app.active_pyramid {
                 (pyr.original_width, pyr.original_height)
             } else {

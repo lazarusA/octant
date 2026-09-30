@@ -24,7 +24,7 @@ impl TopBarItem {
             TopBarItem::Dataset => 88.0,
             TopBarItem::Variables => 105.0,
             TopBarItem::Dimensions => 120.0,
-            TopBarItem::PlotType => 180.0,
+            TopBarItem::PlotType => 115.0,
             TopBarItem::Colormap => 105.0,
             TopBarItem::Settings => 95.0,
             TopBarItem::Cache => 85.0,
