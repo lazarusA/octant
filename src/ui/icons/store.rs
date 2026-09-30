@@ -1,16 +1,8 @@
 //! Data store, file tree, cache, and filesystem procedural vector icons.
 //! Precision-engineered for Octant following standardized 24-unit geometric keylines.
 
-use egui::{Color32, Painter, Pos2, Rect, Stroke, StrokeKind, pos2};
-
-/// Helper to map (0..24) normalized grid coordinates into the target bounding `rect`.
-#[inline]
-fn grid_p(rect: Rect, gx: f32, gy: f32) -> Pos2 {
-    pos2(
-        rect.min.x + (gx / 24.0) * rect.width(),
-        rect.min.y + (gy / 24.0) * rect.height(),
-    )
-}
+use super::grid_p;
+use egui::{Color32, Painter, Rect, Stroke, StrokeKind};
 
 /// Dataset: Structured hierarchical data repository platter with coordinate slice strata (20x20dp keyline).
 pub fn draw_dataset(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {

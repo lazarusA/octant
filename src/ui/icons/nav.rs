@@ -1,16 +1,8 @@
 //! Navigation, panel, and theme procedural vector icons.
 //! Precision-engineered for Octant following standardized 24-unit geometric keylines.
 
+use super::grid_p;
 use egui::{Color32, Painter, Pos2, Rect, Stroke, StrokeKind, pos2};
-
-/// Helper to map (0..24) normalized grid coordinates into the target bounding `rect`.
-#[inline]
-fn grid_p(rect: Rect, gx: f32, gy: f32) -> Pos2 {
-    pos2(
-        rect.min.x + (gx / 24.0) * rect.width(),
-        rect.min.y + (gy / 24.0) * rect.height(),
-    )
-}
 
 /// Globe: High-tech planetary geoid with equatorial plane and curved meridian arcs (20dp circle keyline).
 pub fn draw_globe(painter: &Painter, rect: Rect, stroke: Stroke) {
@@ -36,26 +28,23 @@ pub fn draw_globe(painter: &Painter, rect: Rect, stroke: Stroke) {
         stroke,
     );
 
-    // Eastern & Western curved meridian ellipses (60° parallels)
+    // Eastern & Western curved meridian ellipses (60° parallels) - zero allocation
     let rw = r * 0.52;
     let n_pts = 12;
-    let mut east_pts = Vec::with_capacity(n_pts + 1);
-    let mut west_pts = Vec::with_capacity(n_pts + 1);
+    let subtle_stroke = Stroke::new(stroke.width * 0.85, stroke.color.gamma_multiply(0.70));
+    let mut prev_east = pos2(center.x, center.y - r);
+    let mut prev_west = pos2(center.x, center.y - r);
 
-    for i in 0..=n_pts {
+    for i in 1..=n_pts {
         let frac = (i as f32) / (n_pts as f32);
         let angle = -std::f32::consts::FRAC_PI_2 + frac * std::f32::consts::PI;
         let (s, c) = angle.sin_cos();
-        east_pts.push(pos2(center.x + c * rw, center.y + s * r));
-        west_pts.push(pos2(center.x - c * rw, center.y + s * r));
-    }
-
-    let subtle_stroke = Stroke::new(stroke.width * 0.85, stroke.color.gamma_multiply(0.70));
-    for win in east_pts.windows(2) {
-        painter.line_segment([win[0], win[1]], subtle_stroke);
-    }
-    for win in west_pts.windows(2) {
-        painter.line_segment([win[0], win[1]], subtle_stroke);
+        let curr_east = pos2(center.x + c * rw, center.y + s * r);
+        let curr_west = pos2(center.x - c * rw, center.y + s * r);
+        painter.line_segment([prev_east, curr_east], subtle_stroke);
+        painter.line_segment([prev_west, curr_west], subtle_stroke);
+        prev_east = curr_east;
+        prev_west = curr_west;
     }
 }
 

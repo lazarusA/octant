@@ -1,16 +1,8 @@
 //! Playback and timeline procedural vector icons.
 //! Precision-engineered for Octant following standardized 24-unit geometric keylines.
 
-use egui::{Color32, Painter, Pos2, Rect, Stroke, StrokeKind, pos2};
-
-/// Helper to map (0..24) normalized grid coordinates into the target bounding `rect`.
-#[inline]
-fn grid_p(rect: Rect, gx: f32, gy: f32) -> Pos2 {
-    pos2(
-        rect.min.x + (gx / 24.0) * rect.width(),
-        rect.min.y + (gy / 24.0) * rect.height(),
-    )
-}
+use super::grid_p;
+use egui::{Color32, Painter, Rect, Stroke, StrokeKind, pos2};
 
 /// Play: Precision right-pointing directional triangle with optical center compensation (14x16dp keyline).
 pub fn draw_play(painter: &Painter, rect: Rect, fill: Color32, stroke: Stroke) {
@@ -136,48 +128,48 @@ pub fn draw_loop(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
     }
 
     let n_pts = 12;
-    let mut top_pts = Vec::with_capacity(n_pts + 1);
-    let mut bot_pts = Vec::with_capacity(n_pts + 1);
+    let angle_top_0 = std::f32::consts::PI * 0.08;
+    let (s0, c0) = angle_top_0.sin_cos();
+    let tip_top = pos2(center.x + c0 * r, center.y - s0 * r);
+    let mut prev_top = tip_top;
 
-    for i in 0..=n_pts {
+    let angle_bot_0 = std::f32::consts::PI * 1.08;
+    let (s0_b, c0_b) = angle_bot_0.sin_cos();
+    let tip_bot = pos2(center.x + c0_b * r, center.y - s0_b * r);
+    let mut prev_bot = tip_bot;
+
+    for i in 1..=n_pts {
         let frac = (i as f32) / (n_pts as f32);
         let angle_top = std::f32::consts::PI * 0.08 + frac * (std::f32::consts::PI * 0.84);
         let (s, c) = angle_top.sin_cos();
-        top_pts.push(pos2(center.x + c * r, center.y - s * r));
+        let curr_top = pos2(center.x + c * r, center.y - s * r);
+        painter.line_segment([prev_top, curr_top], stroke);
+        prev_top = curr_top;
 
         let angle_bot = std::f32::consts::PI * 1.08 + frac * (std::f32::consts::PI * 0.84);
         let (s, c) = angle_bot.sin_cos();
-        bot_pts.push(pos2(center.x + c * r, center.y - s * r));
-    }
-
-    for win in top_pts.windows(2) {
-        painter.line_segment([win[0], win[1]], stroke);
-    }
-    for win in bot_pts.windows(2) {
-        painter.line_segment([win[0], win[1]], stroke);
+        let curr_bot = pos2(center.x + c * r, center.y - s * r);
+        painter.line_segment([prev_bot, curr_bot], stroke);
+        prev_bot = curr_bot;
     }
 
     // Top swept arrowhead (pointing right)
-    if let Some(&tip) = top_pts.first() {
-        let ah = vec![
-            pos2(tip.x + r * 0.38, tip.y),
-            pos2(tip.x + r * 0.04, tip.y - r * 0.30),
-            pos2(tip.x + r * 0.10, tip.y),
-            pos2(tip.x + r * 0.04, tip.y + r * 0.30),
-        ];
-        painter.add(egui::Shape::convex_polygon(ah, fill, stroke));
-    }
+    let ah = vec![
+        pos2(tip_top.x + r * 0.38, tip_top.y),
+        pos2(tip_top.x + r * 0.04, tip_top.y - r * 0.30),
+        pos2(tip_top.x + r * 0.10, tip_top.y),
+        pos2(tip_top.x + r * 0.04, tip_top.y + r * 0.30),
+    ];
+    painter.add(egui::Shape::convex_polygon(ah, fill, stroke));
 
     // Bottom swept arrowhead (pointing left)
-    if let Some(&tip) = bot_pts.first() {
-        let ah = vec![
-            pos2(tip.x - r * 0.38, tip.y),
-            pos2(tip.x - r * 0.04, tip.y + r * 0.30),
-            pos2(tip.x - r * 0.10, tip.y),
-            pos2(tip.x - r * 0.04, tip.y - r * 0.30),
-        ];
-        painter.add(egui::Shape::convex_polygon(ah, fill, stroke));
-    }
+    let ah_b = vec![
+        pos2(tip_bot.x - r * 0.38, tip_bot.y),
+        pos2(tip_bot.x - r * 0.04, tip_bot.y + r * 0.30),
+        pos2(tip_bot.x - r * 0.10, tip_bot.y),
+        pos2(tip_bot.x - r * 0.04, tip_bot.y - r * 0.30),
+    ];
+    painter.add(egui::Shape::convex_polygon(ah_b, fill, stroke));
 }
 
 /// Reset: Counter-clockwise telemetry rewind loop with swept technical arrow (18dp circle keyline).
@@ -189,19 +181,19 @@ pub fn draw_reset(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) 
     }
 
     let n_pts = 16;
-    let mut arc_pts = Vec::with_capacity(n_pts + 1);
     let start_angle = std::f32::consts::TAU * 0.38; // ~137 deg
     let end_angle = std::f32::consts::TAU * 1.20; // ~432 deg (past top)
 
-    for i in 0..=n_pts {
+    let (s0, c0) = start_angle.sin_cos();
+    let mut prev_pt = pos2(center.x + c0 * r, center.y - s0 * r);
+
+    for i in 1..=n_pts {
         let frac = (i as f32) / (n_pts as f32);
         let angle = start_angle + frac * (end_angle - start_angle);
         let (s, c) = angle.sin_cos();
-        arc_pts.push(pos2(center.x + c * r, center.y - s * r));
-    }
-
-    for win in arc_pts.windows(2) {
-        painter.line_segment([win[0], win[1]], stroke);
+        let curr_pt = pos2(center.x + c * r, center.y - s * r);
+        painter.line_segment([prev_pt, curr_pt], stroke);
+        prev_pt = curr_pt;
     }
 
     // High-tech swept arrowhead at top pointing left

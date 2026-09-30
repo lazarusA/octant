@@ -10,7 +10,16 @@ pub mod plots;
 pub mod status;
 pub mod store;
 
-use egui::{Color32, Painter, Rect, Response, Sense, Stroke, Ui, WidgetText, vec2};
+use egui::{Color32, Painter, Pos2, Rect, Response, Sense, Stroke, Ui, WidgetText, pos2, vec2};
+
+/// Helper to map (0..24) normalized grid coordinates into the target bounding `rect`.
+#[inline]
+pub(crate) fn grid_p(rect: Rect, gx: f32, gy: f32) -> Pos2 {
+    pos2(
+        rect.min.x + (gx / 24.0) * rect.width(),
+        rect.min.y + (gy / 24.0) * rect.height(),
+    )
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Icon {

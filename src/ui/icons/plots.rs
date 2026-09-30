@@ -1,16 +1,8 @@
 //! Plot types and scientific visualization procedural vector icons.
 //! Precision-engineered for Octant following standardized 24-unit geometric keylines.
 
-use egui::{Color32, Painter, Pos2, Rect, Stroke, StrokeKind, pos2};
-
-/// Helper to map (0..24) normalized grid coordinates into the target bounding `rect`.
-#[inline]
-fn grid_p(rect: Rect, gx: f32, gy: f32) -> Pos2 {
-    pos2(
-        rect.min.x + (gx / 24.0) * rect.width(),
-        rect.min.y + (gy / 24.0) * rect.height(),
-    )
-}
+use super::grid_p;
+use egui::{Color32, Painter, Rect, Stroke, StrokeKind, pos2};
 
 /// PlotPlane: Isometric 2.5D data plane with grid elevation and illuminated facet (18x16dp keyline).
 pub fn draw_plot_plane(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {

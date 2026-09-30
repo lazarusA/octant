@@ -1,16 +1,8 @@
 //! Status badges, indicators, tools, and notification procedural vector icons.
 //! Precision-engineered for Octant following standardized 24-unit geometric keylines.
 
-use egui::{Color32, Painter, Pos2, Rect, Stroke, StrokeKind, pos2};
-
-/// Helper to map (0..24) normalized grid coordinates into the target bounding `rect`.
-#[inline]
-fn grid_p(rect: Rect, gx: f32, gy: f32) -> Pos2 {
-    pos2(
-        rect.min.x + (gx / 24.0) * rect.width(),
-        rect.min.y + (gy / 24.0) * rect.height(),
-    )
-}
+use super::grid_p;
+use egui::{Color32, Painter, Rect, Stroke, StrokeKind, pos2};
 
 /// Scissors: Precision vector slicing shears with optical pivot (20x20dp keyline).
 pub fn draw_scissors(painter: &Painter, rect: Rect, stroke: Stroke) {
@@ -62,21 +54,19 @@ pub fn draw_cross(painter: &Painter, rect: Rect, stroke: Stroke) {
 pub fn draw_lock(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
     let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
 
-    // Smooth rounded semi-circular shackle
-    let mut shackle_pts = Vec::with_capacity(12);
-    shackle_pts.push(p(8.0, 11.0));
+    // Smooth rounded semi-circular shackle (zero-allocation)
+    painter.line_segment([p(8.0, 11.0), p(8.0, 7.5)], stroke);
     let n_arc = 8;
-    for i in 0..=n_arc {
+    let mut prev = p(8.0, 7.5);
+    for i in 1..=n_arc {
         let frac = (i as f32) / (n_arc as f32);
         let angle = std::f32::consts::PI - frac * std::f32::consts::PI;
         let (s, c) = angle.sin_cos();
-        shackle_pts.push(p(12.0 + c * 4.0, 7.5 - s * 4.0));
+        let curr = p(12.0 + c * 4.0, 7.5 - s * 4.0);
+        painter.line_segment([prev, curr], stroke);
+        prev = curr;
     }
-    shackle_pts.push(p(16.0, 11.0));
-
-    for win in shackle_pts.windows(2) {
-        painter.line_segment([win[0], win[1]], stroke);
-    }
+    painter.line_segment([prev, p(16.0, 11.0)], stroke);
 
     // Padlock body with chamfered corners
     let body = Rect::from_min_max(p(5.5, 11.0), p(18.5, 20.5));
@@ -92,21 +82,19 @@ pub fn draw_lock(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
 pub fn draw_unlock(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
     let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
 
-    // Lifted & open smooth shackle
-    let mut shackle_pts = Vec::with_capacity(12);
-    shackle_pts.push(p(8.0, 11.0));
+    // Lifted & open smooth shackle (zero-allocation)
+    painter.line_segment([p(8.0, 11.0), p(8.0, 5.0)], stroke);
     let n_arc = 8;
-    for i in 0..=n_arc {
+    let mut prev = p(8.0, 5.0);
+    for i in 1..=n_arc {
         let frac = (i as f32) / (n_arc as f32);
         let angle = std::f32::consts::PI - frac * std::f32::consts::PI;
         let (s, c) = angle.sin_cos();
-        shackle_pts.push(p(12.0 + c * 4.0, 5.0 - s * 4.0));
+        let curr = p(12.0 + c * 4.0, 5.0 - s * 4.0);
+        painter.line_segment([prev, curr], stroke);
+        prev = curr;
     }
-    shackle_pts.push(p(16.0, 6.5));
-
-    for win in shackle_pts.windows(2) {
-        painter.line_segment([win[0], win[1]], stroke);
-    }
+    painter.line_segment([prev, p(16.0, 6.5)], stroke);
 
     // Padlock body (identical placement to Lock for seamless toggle)
     let body = Rect::from_min_max(p(5.5, 11.0), p(18.5, 20.5));
