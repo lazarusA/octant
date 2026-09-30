@@ -215,7 +215,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    if ui.icon_button(Icon::Globe, "Store").clicked() {
+    if ui.icon_button(Icon::Dataset, "Dataset").clicked() {
         app.show_left_panel = !app.show_left_panel;
     }
 }
