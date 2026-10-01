@@ -213,7 +213,7 @@ impl eframe::App for OctantApp {
         }
 
         if !is_hero_active {
-            if self.show_bottom_bar {
+            if self.has_animated_dimension() {
                 crate::ui::bottom_bar::show_bottom_bar(self, ui);
             }
             if self.show_colorbar {

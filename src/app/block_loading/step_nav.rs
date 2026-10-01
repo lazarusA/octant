@@ -37,4 +37,18 @@ impl OctantApp {
             .map(|&s| s as usize)
             .unwrap_or(1)
     }
+
+    /// Returns true if an animated dimension is currently selected and plotted.
+    pub fn has_animated_dimension(&self) -> bool {
+        self.plotted_animated_dim.is_some()
+    }
+
+    /// Returns the active height of the bottom bar in points.
+    pub fn bottom_bar_height(&self) -> f32 {
+        if self.has_animated_dimension() {
+            if self.show_bottom_bar { 42.0 } else { 20.0 }
+        } else {
+            0.0
+        }
+    }
 }
