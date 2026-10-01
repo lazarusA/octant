@@ -7,18 +7,19 @@ use crate::ui::settings::plot_3d::{
 };
 
 pub(crate) fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
+    let canvas_plot_type = app.effective_canvas_plot_type();
     let is_3d_mode = matches!(
-        app.active_plot_type,
+        canvas_plot_type,
         PlotType::Sphere | PlotType::Surface | PlotType::Volume | PlotType::PointCloud
     );
 
-    match app.active_plot_type {
+    match canvas_plot_type {
         PlotType::Volume => show_volume_options(app, ui),
         PlotType::Sphere => show_sphere_options(app, ui),
         PlotType::Surface => show_surface_options(app, ui),
         PlotType::PointCloud => show_point_cloud_options(app, ui),
         PlotType::Line => show_line_options(app, ui),
-        PlotType::Heatmap | PlotType::Block => show_heatmap_options(app, ui),
+        PlotType::Heatmap => show_heatmap_options(app, ui),
     }
 
     if is_3d_mode {

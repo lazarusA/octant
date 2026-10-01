@@ -43,6 +43,11 @@ impl eframe::App for OctantApp {
 
                         self.variable_search.clear();
                         self.cached_variable_tree = Some(metadata.build_variable_tree());
+                        if let Some(var_info) = metadata.variables.first().cloned() {
+                            crate::ui::variables_panel::init_variable_dimension_defaults(
+                                self, &var_info,
+                            );
+                        }
                         self.active_dataset_metadata = Some(metadata);
                         self.selected_variable_idx = 0;
                         self.show_variables_overlay = true;
@@ -254,10 +259,11 @@ impl eframe::App for OctantApp {
             ui.painter().rect_filled(canvas_rect, 0.0, canvas_bg);
 
             // 3D plots expand to full container width & height, using shader aspect projection to maintain 3D proportions
-            let is_3d_canvas_plot = self.active_plot_type == PlotType::Sphere
-                || self.active_plot_type == PlotType::Surface
-                || self.active_plot_type == PlotType::Volume
-                || self.active_plot_type == PlotType::PointCloud;
+            let canvas_plot_type = self.effective_canvas_plot_type();
+            let is_3d_canvas_plot = canvas_plot_type == PlotType::Sphere
+                || canvas_plot_type == PlotType::Surface
+                || canvas_plot_type == PlotType::Volume
+                || canvas_plot_type == PlotType::PointCloud;
 
             // Handle Zoom & Pan Interactions
             if is_3d_canvas_plot {
@@ -280,7 +286,7 @@ impl eframe::App for OctantApp {
                 if response.hovered() {
                     let scroll = ui.input(|i| i.smooth_scroll_delta.y);
                     if scroll != 0.0 {
-                        let min_zoom = if self.active_plot_type == PlotType::Sphere {
+                        let min_zoom = if canvas_plot_type == PlotType::Sphere {
                             1.1
                         } else {
                             0.2
@@ -292,7 +298,7 @@ impl eframe::App for OctantApp {
             } else {
                 // 2D Flatmap Heatmap & 1D Line Plot zoom & pan interaction
                 if response.double_clicked() {
-                    match self.active_plot_type {
+                    match canvas_plot_type {
                         PlotType::Heatmap => self.reset_heatmap_view(),
                         PlotType::Line => self.reset_line_view(),
                         _ => {}
@@ -301,7 +307,7 @@ impl eframe::App for OctantApp {
 
                 if response.dragged() {
                     let delta = response.drag_delta();
-                    match self.active_plot_type {
+                    match canvas_plot_type {
                         PlotType::Heatmap => self.heatmap_pan += delta,
                         PlotType::Line => self.line_pan += delta,
                         _ => {}
@@ -314,7 +320,7 @@ impl eframe::App for OctantApp {
                         let mouse_pos = response.hover_pos().unwrap_or(canvas_rect.center());
                         let center = canvas_rect.center();
 
-                        match self.active_plot_type {
+                        match canvas_plot_type {
                             PlotType::Heatmap => {
                                 let (zoom, pan) = apply_zoom_pan_at_point(
                                     self.heatmap_zoom,
@@ -357,7 +363,7 @@ impl eframe::App for OctantApp {
             let gpu_aspect_scale = self.compute_aspect_scale(canvas_rect.size());
             let (transformed_plot_rect, gpu_pan, gpu_zoom) = if is_3d_canvas_plot {
                 (canvas_rect, [0.0, 0.0], 1.0)
-            } else if self.active_plot_type == PlotType::Line {
+            } else if canvas_plot_type == PlotType::Line {
                 let zoom = self.line_zoom;
                 let pan = self.line_pan;
                 let scaled_size = canvas_rect.size() * zoom;
@@ -395,7 +401,7 @@ impl eframe::App for OctantApp {
             // Draw Dynamic Plot Axis Lines, Ticks, and Axis Titles
             if !is_3d_canvas_plot && let Some(matrix) = &self.matrix_data {
                 let (x_dom, y_dom, x_label, y_label, x_units, y_units) =
-                    if self.active_plot_type == PlotType::Line {
+                    if canvas_plot_type == PlotType::Line {
                         let y_min = self.color_range_min as f64;
                         let y_max = self.color_range_max as f64;
                         let profile_len = match self.line_profile_dim_idx {

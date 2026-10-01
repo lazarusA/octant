@@ -28,6 +28,7 @@ pub struct OctantApp {
     pub plotted_selected_dim_ranges: Vec<(usize, usize)>,
     pub plotted_spatial_dims: Vec<usize>,
     pub plotted_animated_dim: Option<usize>,
+    pub plotted_plot_type: PlotType,
     pub current_plotted_var_key: Option<String>,
     /// Placeholder list for future multi-variable layer overlays (e.g. vector fields, RGB composites)
     pub multi_plotted_layers: Vec<PlottedVariableState>,
@@ -205,6 +206,7 @@ impl Default for OctantApp {
             plotted_selected_dim_ranges: Vec::new(),
             plotted_spatial_dims: Vec::new(),
             plotted_animated_dim: None,
+            plotted_plot_type: PlotType::Heatmap,
             current_plotted_var_key: None,
             multi_plotted_layers: Vec::new(),
             current_timestep: 0,

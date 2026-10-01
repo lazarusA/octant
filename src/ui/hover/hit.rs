@@ -27,7 +27,8 @@ pub fn resolve_hit_coordinates(
     Option<(f32, f32)>,
     Option<(usize, usize, usize, f32)>,
 ) {
-    match app.active_plot_type {
+    let canvas_plot_type = app.effective_canvas_plot_type();
+    match canvas_plot_type {
         PlotType::Sphere => {
             if let Some((nx, ny, geo)) = raycast_sphere(app, matrix, camera, hover_pos) {
                 (nx, ny, true, geo, None)
@@ -93,7 +94,7 @@ pub fn resolve_target_screen_pos(
     raw_val: f32,
     point_3d_hit: Option<(usize, usize, usize, f32)>,
 ) -> Option<Pos2> {
-    match app.active_plot_type {
+    match app.effective_canvas_plot_type() {
         PlotType::Sphere => sphere_target_pos(app, matrix, camera, px, py, raw_val),
         PlotType::Surface => surface_target_pos(app, matrix, camera, px, py, raw_val),
         PlotType::PointCloud | PlotType::Volume => {
@@ -109,7 +110,7 @@ pub fn resolve_target_screen_pos(
                 None
             }
         }
-        PlotType::Heatmap | PlotType::Block => {
+        PlotType::Heatmap => {
             let (orig_w, orig_h) = if let Some(pyr) = &app.active_pyramid {
                 (pyr.original_width, pyr.original_height)
             } else {

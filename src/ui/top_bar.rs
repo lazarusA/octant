@@ -5,7 +5,7 @@ use crate::ui::icons::{Icon, UiIconExt};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum TopBarItem {
     Brand,
-    Store,
+    Dataset,
     Variables,
     Dimensions,
     PlotType,
@@ -21,10 +21,10 @@ impl TopBarItem {
     fn default_width(self) -> f32 {
         match self {
             TopBarItem::Brand => 115.0,
-            TopBarItem::Store => 80.0,
+            TopBarItem::Dataset => 88.0,
             TopBarItem::Variables => 105.0,
             TopBarItem::Dimensions => 120.0,
-            TopBarItem::PlotType => 180.0,
+            TopBarItem::PlotType => 115.0,
             TopBarItem::Colormap => 105.0,
             TopBarItem::Settings => 95.0,
             TopBarItem::Cache => 85.0,
@@ -55,7 +55,7 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                     };
 
                 let left_items = [
-                    TopBarItem::Store,
+                    TopBarItem::Dataset,
                     TopBarItem::Variables,
                     TopBarItem::Dimensions,
                     TopBarItem::PlotType,
@@ -209,9 +209,9 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
 fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut egui::Ui) {
     match item {
         TopBarItem::Brand | TopBarItem::OverflowBtn | TopBarItem::Status => {}
-        TopBarItem::Store => {
+        TopBarItem::Dataset => {
             if in_menu {
-                if ui.icon_button(Icon::Globe, "Store").clicked() {
+                if ui.icon_button(Icon::Dataset, "Dataset").clicked() {
                     app.show_left_panel = !app.show_left_panel;
                     ui.close();
                 }
@@ -223,6 +223,9 @@ fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut eg
             let resp = ui.icon_button(Icon::Variables, "Variables");
             if resp.clicked() {
                 app.show_variables_overlay = !app.show_variables_overlay;
+                if !app.show_variables_overlay && !app.show_variable_controls {
+                    app.revert_selected_state_to_plotted();
+                }
                 if in_menu {
                     ui.close();
                 }
@@ -234,6 +237,9 @@ fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut eg
                 .on_hover_text("Toggle Variable Controls Panel");
             if resp.clicked() {
                 app.show_variable_controls = !app.show_variable_controls;
+                if !app.show_variables_overlay && !app.show_variable_controls {
+                    app.revert_selected_state_to_plotted();
+                }
                 if in_menu {
                     ui.close();
                 }

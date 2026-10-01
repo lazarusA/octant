@@ -10,7 +10,16 @@ pub mod plots;
 pub mod status;
 pub mod store;
 
-use egui::{Color32, Painter, Rect, Response, Sense, Stroke, Ui, WidgetText, vec2};
+use egui::{Color32, Painter, Pos2, Rect, Response, Sense, Stroke, Ui, WidgetText, pos2, vec2};
+
+/// Helper to map (0..24) normalized grid coordinates into the target bounding `rect`.
+#[inline]
+pub(crate) fn grid_p(rect: Rect, gx: f32, gy: f32) -> Pos2 {
+    pos2(
+        rect.min.x + (gx / 24.0) * rect.width(),
+        rect.min.y + (gy / 24.0) * rect.height(),
+    )
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Icon {
@@ -45,6 +54,7 @@ pub enum Icon {
     Colormap,
 
     // Store & Files
+    Dataset,
     Folder,
     FolderOpen,
     VariableDoc,
@@ -74,7 +84,8 @@ pub enum Icon {
 impl Icon {
     /// Paint the vector icon into `rect` using `painter`.
     pub fn paint(&self, painter: &Painter, rect: Rect, color: Color32, is_dark: bool) {
-        let stroke_w = if rect.width() > 20.0 { 1.3 } else { 1.1 };
+        let dim = rect.width().min(rect.height());
+        let stroke_w = (dim * (1.5 / 24.0)).clamp(1.1, 2.2);
         let stroke = Stroke::new(stroke_w, color);
         let subtle_fill = if is_dark {
             Color32::from_rgba_unmultiplied(255, 255, 255, 18)
@@ -114,6 +125,7 @@ impl Icon {
             Icon::Colormap => plots::draw_colormap(painter, rect, stroke),
 
             // Store & Files
+            Icon::Dataset => store::draw_dataset(painter, rect, stroke, subtle_fill),
             Icon::Folder => store::draw_folder(painter, rect, stroke, subtle_fill),
             Icon::FolderOpen => store::draw_folder_open(painter, rect, stroke, subtle_fill),
             Icon::VariableDoc => store::draw_variable_doc(painter, rect, stroke, subtle_fill),
@@ -320,6 +332,7 @@ impl Icon {
         Icon::PlotPointCloud,
         Icon::Colormap,
         // Store
+        Icon::Dataset,
         Icon::Folder,
         Icon::FolderOpen,
         Icon::VariableDoc,
@@ -371,6 +384,7 @@ impl Icon {
             Icon::PlotVolume => "PlotVolume",
             Icon::PlotPointCloud => "PlotPointCloud",
             Icon::Colormap => "Colormap",
+            Icon::Dataset => "Dataset",
             Icon::Folder => "Folder",
             Icon::FolderOpen => "FolderOpen",
             Icon::VariableDoc => "VariableDoc",
@@ -425,7 +439,8 @@ impl Icon {
             | Icon::PlotPointCloud
             | Icon::Colormap => "Plot Types & Colormaps",
 
-            Icon::Folder
+            Icon::Dataset
+            | Icon::Folder
             | Icon::FolderOpen
             | Icon::VariableDoc
             | Icon::Icechunk
@@ -526,7 +541,7 @@ mod tests {
                 "Category for '{name}' cannot be empty"
             );
         }
-        assert_eq!(Icon::ALL.len(), 46, "Expected 46 total procedural icons");
+        assert_eq!(Icon::ALL.len(), 47, "Expected 47 total procedural icons");
     }
 
     #[test]

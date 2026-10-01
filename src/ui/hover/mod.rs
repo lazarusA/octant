@@ -103,7 +103,8 @@ pub fn show_hover_tooltip(
         point_3d_hit,
     );
 
-    if app.active_plot_type == PlotType::Line {
+    let canvas_plot_type = app.effective_canvas_plot_type();
+    if canvas_plot_type == PlotType::Line {
         draw_line_guidelines_and_reticle(app, ctx, ui, rect, px, raw_val);
     }
 
@@ -121,7 +122,7 @@ pub fn show_hover_tooltip(
 
     let is_rgb = app.active_colormap == 1000 || app.rgb_composite_mode;
     let color_params = app.get_color_params();
-    let pixel_color = if app.active_plot_type == PlotType::Line && app.line_use_custom_color {
+    let pixel_color = if canvas_plot_type == PlotType::Line && app.line_use_custom_color {
         Color32::from_rgba_unmultiplied(
             (app.line_color[0] * 255.0).clamp(0.0, 255.0) as u8,
             (app.line_color[1] * 255.0).clamp(0.0, 255.0) as u8,
@@ -138,7 +139,7 @@ pub fn show_hover_tooltip(
         rect,
         hover_pos,
         target_pos,
-        app.active_plot_type,
+        canvas_plot_type,
         var_name,
         raw_val,
         &units_str,

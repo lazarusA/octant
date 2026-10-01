@@ -8,7 +8,6 @@ static CURVILINEAR_PLOT_TYPES: &[PlotType] = &[
     PlotType::Heatmap,
     PlotType::Line,
     PlotType::Surface,
-    PlotType::Block,
     PlotType::Volume,
     PlotType::Sphere,
     PlotType::PointCloud,

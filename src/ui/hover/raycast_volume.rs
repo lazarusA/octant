@@ -137,8 +137,9 @@ impl<'a> VolumeSampler<'a> {
                 let raw_val = self.sample_cell(cx, cy, cz);
                 let is_nan = raw_val.is_nan() || raw_val.abs() > 1e30;
 
+                let canvas_plot_type = app.effective_canvas_plot_type();
                 if is_half_scale
-                    && app.active_plot_type == PlotType::Volume
+                    && canvas_plot_type == PlotType::Volume
                     && app.volume_algorithm == 1
                 {
                     // MIP mode
@@ -150,7 +151,7 @@ impl<'a> VolumeSampler<'a> {
                         }
                     }
                 } else if is_half_scale
-                    && app.active_plot_type == PlotType::Volume
+                    && canvas_plot_type == PlotType::Volume
                     && app.volume_algorithm == 2
                 {
                     // MinIP mode
@@ -162,7 +163,7 @@ impl<'a> VolumeSampler<'a> {
                         }
                     }
                 } else if is_half_scale
-                    && app.active_plot_type == PlotType::Volume
+                    && canvas_plot_type == PlotType::Volume
                     && app.volume_algorithm == 4
                 {
                     // Categorical Label Surface mode
@@ -177,11 +178,10 @@ impl<'a> VolumeSampler<'a> {
             }
         }
 
-        if is_half_scale && app.active_plot_type == PlotType::Volume && app.volume_algorithm == 1 {
+        let canvas_plot_type = app.effective_canvas_plot_type();
+        if is_half_scale && canvas_plot_type == PlotType::Volume && app.volume_algorithm == 1 {
             max_intensity_hit.or(hit_point)
-        } else if is_half_scale
-            && app.active_plot_type == PlotType::Volume
-            && app.volume_algorithm == 2
+        } else if is_half_scale && canvas_plot_type == PlotType::Volume && app.volume_algorithm == 2
         {
             min_intensity_hit.or(hit_point)
         } else {

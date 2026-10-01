@@ -21,7 +21,7 @@ struct Common3DSpatialContext {
 impl OctantApp {
     /// Updates GPU vertex/storage buffer data for the currently active 2D renderer.
     pub fn update_active_2d_renderer_data(&self, queue: &wgpu::Queue, values: &[f32]) {
-        match self.active_plot_type {
+        match self.effective_canvas_plot_type() {
             PlotType::Heatmap => {
                 if let Some(renderer) = &self.renderer {
                     renderer.update_data(queue, values);
@@ -32,7 +32,7 @@ impl OctantApp {
                     sphere_renderer.update_data(queue, values);
                 }
             }
-            PlotType::Surface | PlotType::Block => {
+            PlotType::Surface => {
                 if let Some(surface_renderer) = &self.surface_renderer {
                     surface_renderer.update_data(queue, values);
                 }
@@ -212,8 +212,9 @@ impl OctantApp {
         gpu_aspect_scale: [f32; 2],
     ) {
         self.poll_coastline_receiver();
+        let canvas_plot_type = self.effective_canvas_plot_type();
 
-        match self.active_plot_type {
+        match canvas_plot_type {
             crate::plots::PlotType::Line => {
                 if let Some(line_renderer) = &self.line_renderer {
                     let color_params = self.get_color_params();
@@ -261,15 +262,11 @@ impl OctantApp {
                     ui.painter().add(callback);
                 }
             }
-            crate::plots::PlotType::Surface | crate::plots::PlotType::Block => {
+            crate::plots::PlotType::Surface => {
                 if let Some(surface_renderer) = &self.surface_renderer {
                     let aspect_ratio = crate::plots::common::compute_aspect_ratio(&plot_rect);
                     let params = self.get_mesh_3d_uniform_params(
-                        if self.active_plot_type == crate::plots::PlotType::Block {
-                            2
-                        } else {
-                            self.surface_mode
-                        },
+                        self.surface_mode,
                         self.surface_displacement_strength,
                         aspect_ratio,
                     );
@@ -318,7 +315,7 @@ impl OctantApp {
             _ => {
                 if let Some(renderer) = &self.renderer {
                     if self.active_pyramid.is_some()
-                        && self.active_plot_type == crate::plots::PlotType::Heatmap
+                        && canvas_plot_type == crate::plots::PlotType::Heatmap
                     {
                         let ((u_min, u_max), (v_min, v_max)) =
                             crate::data::ViewportResampler::compute_visible_data_bounds(
@@ -372,8 +369,8 @@ impl OctantApp {
 
         // --- Coastline overlay ---
         let coastline_supported = matches!(
-            self.active_plot_type,
-            PlotType::Heatmap | PlotType::Surface | PlotType::Block | PlotType::Sphere
+            canvas_plot_type,
+            PlotType::Heatmap | PlotType::Surface | PlotType::Sphere
         );
         if self.show_coastlines && coastline_supported {
             if let Some(cr) = self.coastline_renderer.as_ref().map(Arc::clone) {
@@ -394,7 +391,7 @@ impl OctantApp {
                     .map(|m| crate::plots::dataset_geo_bounds(&m.grid))
                     .unwrap_or((-180.0, 180.0, 90.0, -90.0));
 
-                if self.active_plot_type == PlotType::Heatmap {
+                if canvas_plot_type == PlotType::Heatmap {
                     let cb = eframe::egui_wgpu::Callback::new_paint_callback(
                         canvas_rect,
                         crate::plots::CoastlineCallback {
@@ -416,12 +413,11 @@ impl OctantApp {
                 }
             }
 
-            if self.active_plot_type != PlotType::Heatmap
+            if canvas_plot_type != PlotType::Heatmap
                 && let Some(renderer) = self.coastline_3d_renderer.as_ref().map(Arc::clone)
             {
-                let (mode, plot_kind, displacement_strength) = match self.active_plot_type {
+                let (mode, plot_kind, displacement_strength) = match canvas_plot_type {
                     PlotType::Sphere => (self.sphere_mode, 1, self.sphere_displacement_strength),
-                    PlotType::Block => (2, 0, self.surface_displacement_strength),
                     _ => (self.surface_mode, 0, self.surface_displacement_strength),
                 };
                 let mesh_params = self.get_mesh_3d_uniform_params(

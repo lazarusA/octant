@@ -56,6 +56,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
                     let header_id = ui.make_persistent_id(("var_info_header", &var_info.name));
                     let mut should_plot = false;
+                    let mut should_close = false;
 
                     egui::collapsing_header::CollapsingState::load_with_default_open(
                         ui.ctx(),
@@ -70,8 +71,16 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                             var_info.name.clone()
                         };
                         ui.label(egui::RichText::new(display_name).strong());
+                        let plot_icon = crate::ui::plot_type::plot_type_icon(app.active_plot_type);
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.icon_button(Icon::Variables, "Plot Data").clicked() {
+                            if ui
+                                .icon_button(Icon::Cross, "Close")
+                                .on_hover_text("Close Dimension Panel")
+                                .clicked()
+                            {
+                                should_close = true;
+                            }
+                            if ui.icon_button(plot_icon, "Plot Data").clicked() {
                                 should_plot = true;
                             }
                         });
@@ -79,6 +88,13 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     .body(|ui| {
                         show_variable_info(ui, &var_info);
                     });
+
+                    if should_close {
+                        app.show_variable_controls = false;
+                        if !app.show_variables_overlay {
+                            app.revert_selected_state_to_plotted();
+                        }
+                    }
 
                     if should_plot {
                         app.show_hero = false;
