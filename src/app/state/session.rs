@@ -64,8 +64,9 @@ impl OctantApp {
 
     /// Resets color range min and max to the current dataset/matrix slice bounds and unlocks bounds.
     pub fn reset_color_range(&mut self) {
-        let is_3d = self.active_plot_type == crate::plots::PlotType::Volume
-            || self.active_plot_type == crate::plots::PlotType::PointCloud;
+        let canvas_plot_type = self.effective_canvas_plot_type();
+        let is_3d = canvas_plot_type == crate::plots::PlotType::Volume
+            || canvas_plot_type == crate::plots::PlotType::PointCloud;
 
         if is_3d && let Some(vdata) = &self.volume_data {
             self.color_range_min = vdata.min_val;

@@ -27,7 +27,7 @@ pub struct Camera3D {
 impl Camera3D {
     pub fn from_app(app: &OctantApp, rect: Rect) -> Self {
         let screen_aspect = (rect.width() / rect.height().max(1.0)).max(0.01);
-        let min_zoom = if app.active_plot_type == PlotType::Sphere {
+        let min_zoom = if app.effective_canvas_plot_type() == PlotType::Sphere {
             1.1
         } else {
             0.1

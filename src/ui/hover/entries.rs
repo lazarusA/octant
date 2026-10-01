@@ -35,7 +35,7 @@ pub(crate) fn resolve_cell_value_and_dim_entries(
     geo_coords: Option<(f32, f32)>,
     point_3d_hit: Option<(usize, usize, usize, f32)>,
 ) -> (f32, Vec<String>, usize, usize) {
-    if app.active_plot_type == PlotType::Line {
+    if app.effective_canvas_plot_type() == PlotType::Line {
         resolve_line_plot_entries(app, meta, var, norm_x, norm_y)
     } else if let Some((hit_x, hit_y, hit_z, hit_val)) = point_3d_hit {
         let entries = resolve_3d_dim_entries(app, meta, var, sampler, hit_x, hit_y, hit_z);
