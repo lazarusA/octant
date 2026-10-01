@@ -81,8 +81,9 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
 
                         let bar_rect = Rect::from_min_size(widget_rect.min, Vec2::new(bar_w, 13.0));
 
-                        let is_3d = app.active_plot_type == crate::plots::PlotType::Volume
-                            || app.active_plot_type == crate::plots::PlotType::PointCloud;
+                        let canvas_plot_type = app.effective_canvas_plot_type();
+                        let is_3d = canvas_plot_type == crate::plots::PlotType::Volume
+                            || canvas_plot_type == crate::plots::PlotType::PointCloud;
                         let is_categorical_active = !is_3d && app.is_categorical;
 
                         let unique_vals = if is_categorical_active {

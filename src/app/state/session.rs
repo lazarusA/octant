@@ -123,11 +123,44 @@ impl OctantApp {
         StoreKind::make_source_id(self.selected_store_kind, &self.store_target_input)
     }
 
+    /// Returns the effective plot type that is currently plotted and rendered on canvas.
+    #[inline]
+    pub fn effective_canvas_plot_type(&self) -> crate::plots::PlotType {
+        if self.plotted_dataset_metadata.is_some() {
+            self.plotted_plot_type
+        } else {
+            self.active_plot_type
+        }
+    }
+
+    /// Returns true if the user is currently browsing/configuring a variable or dataset that has not been plotted yet.
+    #[inline]
+    pub fn is_exploring_unplotted_variable(&self) -> bool {
+        self.plotted_dataset_metadata.is_none()
+            || self.plotted_variable_idx != self.selected_variable_idx
+            || self.plotted_store_target_input != self.store_target_input
+    }
+
+    /// Reverts current staged/selected UI configuration back to the plotted dataset and variable.
+    pub fn revert_selected_state_to_plotted(&mut self) {
+        if let Some(meta) = self.plotted_dataset_metadata.clone() {
+            self.selected_store_kind = self.plotted_store_kind;
+            self.store_target_input = self.plotted_store_target_input.clone();
+            self.active_dataset_metadata = Some(meta.clone());
+            self.selected_variable_idx = self.plotted_variable_idx;
+            self.dim_config = self.plotted_dim_config.clone();
+            self.selected_dim_indices = self.plotted_selected_dim_indices.clone();
+            self.selected_dim_ranges = self.plotted_selected_dim_ranges.clone();
+            self.spatial_dims = self.plotted_spatial_dims.clone();
+            self.animated_dim = self.plotted_animated_dim;
+            self.active_plot_type = self.plotted_plot_type;
+            self.cached_variable_tree = Some(meta.build_variable_tree());
+        }
+    }
+
     /// Synchronizes all plotted configuration fields from the current UI selection.
     pub fn sync_plotted_state_from_selected(&mut self) {
-        let is_new_var = self.plotted_variable_idx != self.selected_variable_idx
-            || self.plotted_dataset_metadata.is_none()
-            || self.plotted_store_target_input != self.store_target_input;
+        let is_new_var = self.is_exploring_unplotted_variable();
 
         self.plotted_store_kind = self.selected_store_kind;
         self.plotted_store_target_input = self.store_target_input.clone();
@@ -138,12 +171,17 @@ impl OctantApp {
         self.plotted_selected_dim_ranges = self.selected_dim_ranges.clone();
         self.plotted_spatial_dims = self.spatial_dims.clone();
         self.plotted_animated_dim = self.animated_dim;
+        self.plotted_plot_type = self.active_plot_type;
 
-        if is_new_var && let Some(var_info) = self.plotted_variable_info().cloned() {
-            let rank = var_info.shape.len();
-            crate::ui::variables_panel::dimension_slider::init_composite_defaults(
-                self, &var_info, rank,
-            );
+        if is_new_var {
+            self.enable_pyramid_resampling = false;
+            self.active_pyramid = None;
+            if let Some(var_info) = self.plotted_variable_info().cloned() {
+                let rank = var_info.shape.len();
+                crate::ui::variables_panel::dimension_slider::init_composite_defaults(
+                    self, &var_info, rank,
+                );
+            }
         }
 
         if !self.has_rgb_bands() {

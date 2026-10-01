@@ -223,6 +223,9 @@ fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut eg
             let resp = ui.icon_button(Icon::Variables, "Variables");
             if resp.clicked() {
                 app.show_variables_overlay = !app.show_variables_overlay;
+                if !app.show_variables_overlay && !app.show_variable_controls {
+                    app.revert_selected_state_to_plotted();
+                }
                 if in_menu {
                     ui.close();
                 }
@@ -234,6 +237,9 @@ fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut eg
                 .on_hover_text("Toggle Variable Controls Panel");
             if resp.clicked() {
                 app.show_variable_controls = !app.show_variable_controls;
+                if !app.show_variables_overlay && !app.show_variable_controls {
+                    app.revert_selected_state_to_plotted();
+                }
                 if in_menu {
                     ui.close();
                 }

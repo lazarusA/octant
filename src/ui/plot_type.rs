@@ -16,19 +16,13 @@ pub fn plot_type_icon(plot_type: PlotType) -> Icon {
 }
 
 pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let (is_3d_available, is_size_allowed, vol_mb) = if let Some(v) = app
-        .plotted_variable_info()
-        .or_else(|| app.selected_variable_info())
-    {
+    let target_var = app
+        .selected_variable_info()
+        .or_else(|| app.plotted_variable_info());
+
+    let (is_3d_available, is_size_allowed, vol_mb) = if let Some(v) = target_var {
         let has_3d = v.shape.len() >= 3 || v.dimension_names.len() >= 3;
-        let vol_elements = if let Some(vdata) = &app.volume_data {
-            vdata
-                .width
-                .saturating_mul(vdata.height)
-                .saturating_mul(vdata.depth)
-        } else {
-            crate::ui::variables_panel::calculate_selected_volume_elements(app)
-        };
+        let vol_elements = crate::ui::variables_panel::calculate_selected_volume_elements(app);
         let size_ok = vol_elements <= crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
         let mb = (vol_elements as f64 * 4.0) / (1024.0 * 1024.0);
         (has_3d, size_ok, mb)
@@ -40,39 +34,56 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         .iter()
         .any(|c| c.spatial == crate::app::SpatialRole::Grid);
 
-    let supported_plots = app
-        .matrix_data
-        .as_ref()
-        .map(|m| m.grid.supported_plot_types());
-    let grid_name = app
-        .matrix_data
-        .as_ref()
-        .map(|m| m.grid.name())
-        .unwrap_or("active");
+    let (supported_plots, grid_name) = if is_discrete_grid {
+        (
+            Some(
+                crate::data::coordinates::CoordinateGrid::Healpix {
+                    nside: 1,
+                    ordering: crate::data::coordinates::HealpixOrder::Ring,
+                    npix: 12,
+                    coords_lon: None,
+                    coords_lat: None,
+                }
+                .supported_plot_types(),
+            ),
+            "HEALPix / Discrete",
+        )
+    } else if let Some(m) = &app.matrix_data
+        && target_var.map(|v| &v.name) == app.plotted_variable_info().map(|p| &p.name)
+    {
+        (Some(m.grid.supported_plot_types()), m.grid.name())
+    } else {
+        (None, "active")
+    };
 
-    let is_volume_allowed = (is_3d_available || app.volume_data.is_some())
-        && is_size_allowed
-        && !app.enable_pyramid_resampling
+    let is_exploring_new = app.is_exploring_unplotted_variable();
+    let total_2d_elements = crate::ui::variables_panel::calculate_selected_2d_elements(app);
+    let target_pyramid_disabled = if is_exploring_new {
+        !is_3d_available
+            && total_2d_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
+    } else {
+        app.enable_pyramid_resampling
+    };
+
+    let is_volume_allowed = is_3d_available
+        && (is_size_allowed || vol_mb == 0.0)
         && supported_plots
             .is_none_or(|plots| plots.contains(&PlotType::Volume) && !is_discrete_grid);
 
-    let total_2d_elements = if let Some(mdata) = &app.matrix_data {
-        mdata.width.saturating_mul(mdata.height)
-    } else {
-        crate::ui::variables_panel::calculate_selected_2d_elements(app)
-    };
     let is_surface_allowed = total_2d_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS
-        && !app.enable_pyramid_resampling;
+        && !target_pyramid_disabled;
     let surface_mb = (total_2d_elements as f64 * 4.0) / (1024.0 * 1024.0);
 
-    // Safety fallback: revert to Heatmap only if the currently active plot lacks valid GPU data or pyramid is on
-    if (app.enable_pyramid_resampling && app.active_plot_type != PlotType::Heatmap)
-        || ((app.active_plot_type == PlotType::Volume
-            || app.active_plot_type == PlotType::PointCloud)
-            && app.volume_data.is_none())
-        || ((app.active_plot_type == PlotType::Sphere || app.active_plot_type == PlotType::Surface)
-            && app.sphere_renderer.is_none()
-            && app.matrix_data.is_none())
+    // Safety fallback: revert to Heatmap only if the currently active plot lacks valid GPU data (and user is not staging an unplotted variable) or pyramid is on
+    if !is_exploring_new
+        && ((app.enable_pyramid_resampling && app.active_plot_type != PlotType::Heatmap)
+            || ((app.active_plot_type == PlotType::Volume
+                || app.active_plot_type == PlotType::PointCloud)
+                && app.volume_data.is_none())
+            || ((app.active_plot_type == PlotType::Sphere
+                || app.active_plot_type == PlotType::Surface)
+                && app.sphere_renderer.is_none()
+                && app.matrix_data.is_none()))
     {
         app.active_plot_type = PlotType::Heatmap;
     }
@@ -90,7 +101,7 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         );
         ui.separator();
 
-        let pyramid_disabled = app.enable_pyramid_resampling;
+        let pyramid_disabled = target_pyramid_disabled;
 
         let plot_items = [
             (
@@ -145,7 +156,9 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                     .inner;
                 if clicked {
                     app.active_plot_type = plot_type;
-                    app.load_selected_variable_block();
+                    if !app.is_exploring_unplotted_variable() {
+                        app.load_selected_variable_block();
+                    }
                     ui.close();
                 }
             } else {

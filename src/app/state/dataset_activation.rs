@@ -44,6 +44,9 @@ impl OctantApp {
                 self.show_variables_overlay = true;
                 self.variable_search.clear();
                 self.cached_variable_tree = Some(meta.build_variable_tree());
+                if let Some(var_info) = meta.variables.first().cloned() {
+                    crate::ui::variables_panel::init_variable_dimension_defaults(self, &var_info);
+                }
                 self.active_dataset_metadata = Some(meta);
                 self.selected_variable_idx = 0;
                 return true;
