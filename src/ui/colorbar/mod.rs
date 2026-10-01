@@ -31,7 +31,15 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
     let panel_h = 88.0;
 
     let center_x = screen_rect.center().x;
-    let bottom_bar_top = screen_rect.max.y - 42.0;
+    let bottom_bar_top = if app.has_animated_dimension() {
+        if app.show_bottom_bar {
+            screen_rect.max.y - 42.0
+        } else {
+            screen_rect.max.y - 22.0
+        }
+    } else {
+        screen_rect.max.y - 12.0
+    };
     let panel_min = Pos2::new(center_x - (panel_w / 2.0), bottom_bar_top - panel_h - 8.0);
 
     egui::Area::new(egui::Id::new("octant_colorbar_overlay"))

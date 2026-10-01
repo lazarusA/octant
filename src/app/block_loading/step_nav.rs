@@ -37,4 +37,9 @@ impl OctantApp {
             .map(|&s| s as usize)
             .unwrap_or(1)
     }
+
+    /// Returns true if an animated dimension is currently selected and plotted.
+    pub fn has_animated_dimension(&self) -> bool {
+        self.plotted_animated_dim.is_some()
+    }
 }

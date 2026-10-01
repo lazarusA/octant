@@ -76,35 +76,65 @@ impl MeasuredWidths {
 }
 
 pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
+    if !app.has_animated_dimension() {
+        return;
+    }
+
     // Extract to a local bool to avoid split-borrow: we can't hold &mut app.field
     // AND also borrow all of app inside the closure at the same time.
     let mut expanded = app.show_bottom_bar;
+    let mut request_expand = false;
 
     egui::Panel::show_switched(
         ui,
         &mut expanded,
         egui::Panel::bottom("octant_bottom_bar_collapsed")
             .resizable(true)
-            .exact_size(20.0),
+            .default_size(20.0)
+            .size_range(20.0..=80.0),
         egui::Panel::bottom("octant_bottom_bar_expanded")
             .resizable(true)
+            .default_size(42.0)
             .size_range(38.0..=80.0),
         |ui, is_expanded| {
             if is_expanded {
                 show_bottom_bar_content(app, ui);
             } else {
+                let full_rect = ui.available_rect_before_wrap();
+                let resp = ui
+                    .interact(
+                        full_rect,
+                        ui.id().with("collapsed_bottom_bar_interact"),
+                        egui::Sense::click_and_drag(),
+                    )
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+
+                if resp.clicked() || (resp.dragged() && resp.drag_delta().y < -1.0) {
+                    request_expand = true;
+                }
+
+                let text_color = if resp.hovered() {
+                    ui.visuals().strong_text_color()
+                } else {
+                    ui.visuals().text_color()
+                };
+
                 ui.vertical_centered(|ui| {
                     ui.horizontal(|ui| {
-                        ui.add_space((ui.available_width() - 180.0).max(0.0) * 0.5);
+                        ui.add_space((ui.available_width() - 200.0).max(0.0) * 0.5);
                         ui.icon(Icon::Play, 10.0);
-                        ui.small("Playback (drag to expand)");
+                        ui.label(
+                            egui::RichText::new("Playback (click or drag to expand)")
+                                .small()
+                                .color(text_color),
+                        );
                     });
                 });
             }
         },
     );
 
-    app.show_bottom_bar = expanded;
+    app.show_bottom_bar = expanded || request_expand;
 }
 
 fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
