@@ -15,7 +15,24 @@ pub fn plot_type_icon(plot_type: PlotType) -> Icon {
     }
 }
 
-pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
+pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui, in_menu: bool) {
+    if in_menu {
+        ui.collapsing("Plot Type", |ui| {
+            render_plot_type_contents(app, ui);
+        });
+    } else {
+        let current_icon = plot_type_icon(app.active_plot_type);
+        let current_label = app.active_plot_type.display_name();
+        let button_response = ui.icon_button(current_icon, current_label);
+        egui::Popup::from_toggle_button_response(&button_response)
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+            .show(|ui| {
+                render_plot_type_contents(app, ui);
+            });
+    }
+}
+
+fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     let target_var = app
         .selected_variable_info()
         .or_else(|| app.plotted_variable_info());
@@ -88,99 +105,93 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         app.active_plot_type = PlotType::Heatmap;
     }
 
-    let current_icon = plot_type_icon(app.active_plot_type);
-    let current_label = app.active_plot_type.display_name();
+    ui.set_min_width(220.0);
 
-    ui.icon_menu_button(current_icon, current_label, |ui| {
-        ui.set_min_width(220.0);
+    ui.label(
+        egui::RichText::new("Select Visualization Projection")
+            .small()
+            .weak(),
+    );
+    ui.separator();
 
-        ui.label(
-            egui::RichText::new("Select Visualization Projection")
-                .small()
-                .weak(),
-        );
-        ui.separator();
+    let pyramid_disabled = target_pyramid_disabled;
 
-        let pyramid_disabled = target_pyramid_disabled;
+    let plot_items = [
+        (
+            PlotType::Heatmap,
+            Icon::PlotPlane,
+            PlotType::Heatmap.display_name(),
+            true,
+        ),
+        (
+            PlotType::Line,
+            Icon::PlotLine,
+            PlotType::Line.display_name(),
+            !pyramid_disabled,
+        ),
+        (
+            PlotType::Sphere,
+            Icon::PlotGlobe,
+            PlotType::Sphere.display_name(),
+            is_surface_allowed,
+        ),
+        (
+            PlotType::Surface,
+            Icon::PlotSurface,
+            PlotType::Surface.display_name(),
+            is_surface_allowed,
+        ),
+        (
+            PlotType::Volume,
+            Icon::PlotVolume,
+            PlotType::Volume.display_name(),
+            is_volume_allowed,
+        ),
+        (
+            PlotType::PointCloud,
+            Icon::PlotPointCloud,
+            PlotType::PointCloud.display_name(),
+            is_volume_allowed,
+        ),
+    ];
 
-        let plot_items = [
-            (
-                PlotType::Heatmap,
-                Icon::PlotPlane,
-                PlotType::Heatmap.display_name(),
-                true,
-            ),
-            (
-                PlotType::Line,
-                Icon::PlotLine,
-                PlotType::Line.display_name(),
-                !pyramid_disabled,
-            ),
-            (
-                PlotType::Sphere,
-                Icon::PlotGlobe,
-                PlotType::Sphere.display_name(),
-                is_surface_allowed,
-            ),
-            (
-                PlotType::Surface,
-                Icon::PlotSurface,
-                PlotType::Surface.display_name(),
-                is_surface_allowed,
-            ),
-            (
-                PlotType::Volume,
-                Icon::PlotVolume,
-                PlotType::Volume.display_name(),
-                is_volume_allowed,
-            ),
-            (
-                PlotType::PointCloud,
-                Icon::PlotPointCloud,
-                PlotType::PointCloud.display_name(),
-                is_volume_allowed,
-            ),
-        ];
+    for (plot_type, icon, label, enabled) in plot_items {
+        let is_supported = supported_plots.is_none_or(|plots| plots.contains(&plot_type));
+        let is_enabled = enabled && is_supported;
+        let is_selected = app.active_plot_type == plot_type;
 
-        for (plot_type, icon, label, enabled) in plot_items {
-            let is_supported = supported_plots.is_none_or(|plots| plots.contains(&plot_type));
-            let is_enabled = enabled && is_supported;
-            let is_selected = app.active_plot_type == plot_type;
-
-            if is_enabled {
-                let clicked = ui
-                    .horizontal(|ui| {
-                        ui.icon(icon, 14.0);
-                        ui.selectable_label(is_selected, label).clicked()
-                    })
-                    .inner;
-                if clicked {
-                    app.active_plot_type = plot_type;
-                    if !app.is_exploring_unplotted_variable() {
-                        app.load_selected_variable_block();
-                    }
-                    ui.close();
+        if is_enabled {
+            let clicked = ui
+                .horizontal(|ui| {
+                    ui.icon(icon, 14.0);
+                    ui.selectable_label(is_selected, label).clicked()
+                })
+                .inner;
+            if clicked {
+                app.active_plot_type = plot_type;
+                if !app.is_exploring_unplotted_variable() {
+                    app.load_selected_variable_block();
                 }
-            } else {
-                let reason = if !is_supported {
-                    format!("Unsupported for {} grid", grid_name)
-                } else if pyramid_disabled {
-                    "Disabled: 2D Pyramid Resampling active".to_string()
-                } else if (plot_type == PlotType::Volume || plot_type == PlotType::PointCloud)
-                    && !is_3d_available
-                {
-                    "Requires 3D Data".to_string()
-                } else if plot_type == PlotType::Sphere || plot_type == PlotType::Surface {
-                    format!("Disabled: {:.0} MB > 128 MB GPU limit", surface_mb)
-                } else {
-                    format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb)
-                };
-
-                ui.horizontal(|ui| {
-                    ui.icon_colored(icon, 14.0, ui.visuals().weak_text_color());
-                    ui.add_enabled(false, egui::Label::new(format!("{} ({})", label, reason)));
-                });
             }
+        } else {
+            let reason = if !is_supported {
+                format!("Unsupported for {} grid", grid_name)
+            } else if pyramid_disabled {
+                "Disabled: 2D Pyramid Resampling active".to_string()
+            } else if (plot_type == PlotType::Volume || plot_type == PlotType::PointCloud)
+                && !is_3d_available
+            {
+                "Requires 3D Data".to_string()
+            } else if plot_type == PlotType::Sphere || plot_type == PlotType::Surface {
+                format!("Disabled: {:.0} MB > 128 MB GPU limit", surface_mb)
+            } else {
+                format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb)
+            };
+
+            ui.horizontal(|ui| {
+                ui.icon_colored(icon, 14.0, ui.visuals().weak_text_color());
+                ui.add_enabled(false, egui::Label::new(format!("{} ({})", label, reason)));
+            });
         }
-    });
+    }
 }

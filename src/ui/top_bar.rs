@@ -152,25 +152,28 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                 // 3. Overflow Menu Button
                 if show_overflow {
                     let overflow_resp = ui.scope(|ui| {
-                        ui.icon_menu_button(Icon::Overflow, "", |ui| {
-                            ui.set_min_width(180.0);
-                            ui.label(egui::RichText::new("More Options").small().weak());
-                            ui.separator();
-
-                            for &item in &left_items[num_visible_left..] {
-                                render_item(item, true, app, ui);
-                            }
-
-                            if !show_right_cache || !show_right_theme {
+                        let button_response = ui.icon_button(Icon::Overflow, "");
+                        egui::Popup::from_toggle_button_response(&button_response)
+                            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                            .show(|ui| {
+                                ui.set_min_width(180.0);
+                                ui.label(egui::RichText::new("More Options").small().weak());
                                 ui.separator();
-                                if !show_right_cache {
-                                    render_item(TopBarItem::Cache, true, app, ui);
+
+                                for &item in &left_items[num_visible_left..] {
+                                    render_item(item, true, app, ui);
                                 }
-                                if !show_right_theme {
-                                    render_item(TopBarItem::Theme, true, app, ui);
+
+                                if !show_right_cache || !show_right_theme {
+                                    ui.separator();
+                                    if !show_right_cache {
+                                        render_item(TopBarItem::Cache, true, app, ui);
+                                    }
+                                    if !show_right_theme {
+                                        render_item(TopBarItem::Theme, true, app, ui);
+                                    }
                                 }
-                            }
-                        });
+                            });
                     });
                     widths.insert(TopBarItem::OverflowBtn, overflow_resp.response.rect.width());
                 }
@@ -246,10 +249,10 @@ fn render_item(item: TopBarItem, in_menu: bool, app: &mut OctantApp, ui: &mut eg
             }
         }
         TopBarItem::PlotType => {
-            plot_type::show_plot_type_menu(app, ui);
+            plot_type::show_plot_type_menu(app, ui, in_menu);
         }
         TopBarItem::Colormap => {
-            colormap::show_colormap_menu(app, ui);
+            colormap::show_colormap_menu(app, ui, in_menu);
         }
         TopBarItem::Settings => {
             let resp = ui.icon_button(Icon::Settings, "Settings");
