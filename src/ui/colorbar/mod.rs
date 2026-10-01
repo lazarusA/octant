@@ -27,7 +27,9 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
     let border_color = style.visuals.widgets.noninteractive.fg_stroke.color;
 
     let screen_rect = ctx.input(|i| i.viewport_rect());
-    let panel_w = 490.0;
+    let side_padding = 16.0;
+    let max_panel_w = (screen_rect.width() - 2.0 * side_padding).max(180.0);
+    let panel_w = 490.0_f32.min(max_panel_w);
     let panel_h = 88.0;
 
     let center_x = screen_rect.center().x;
@@ -37,6 +39,16 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
     } else {
         screen_rect.max.y - 4.0
     };
+    let alpha_mult = (1.0 - app.colorbar_transparency).clamp(0.0, 1.0);
+    let bg_fill = style.visuals.window_fill.linear_multiply(alpha_mult);
+    let stroke_color = style
+        .visuals
+        .window_stroke
+        .color
+        .linear_multiply(alpha_mult);
+    let stroke = egui::Stroke::new(style.visuals.window_stroke.width, stroke_color);
+    let mut shadow = style.visuals.window_shadow;
+    shadow.color = shadow.color.linear_multiply(alpha_mult);
     let panel_min = Pos2::new(center_x - (panel_w / 2.0), bottom_bar_top - panel_h - 8.0);
 
     egui::Area::new(egui::Id::new("octant_colorbar_overlay"))
@@ -44,6 +56,9 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
         .fixed_pos(panel_min)
         .show(ctx, |ui| {
             egui::Frame::window(ui.style())
+                .fill(bg_fill)
+                .stroke(stroke)
+                .shadow(shadow)
                 .inner_margin(egui::Margin::symmetric(12, 8))
                 .show(ui, |ui| {
                     ui.set_width(panel_w - 24.0);
@@ -52,7 +67,7 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                         // Editable Colorbar Title
                         ui.horizontal(|ui| {
                             let avail = ui.available_width();
-                            let text_w = (avail - 40.0).clamp(100.0, 320.0);
+                            let text_w = (avail - 40.0).clamp(60.0, 320.0);
                             let pad = ((avail - text_w) / 2.0).max(0.0);
                             ui.add_space(pad);
 
@@ -78,7 +93,7 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
 
                         ui.add_space(3.0);
 
-                        let bar_w = 400.0;
+                        let bar_w = (panel_w - 90.0).max(80.0);
                         let total_h = 38.0;
 
                         let (widget_rect, response) =
@@ -494,5 +509,11 @@ mod tests {
         assert!((major_ticks[0].val - 10.0).abs() < 1e-4);
         assert!((major_ticks[4].val - 50.0).abs() < 1e-4);
         assert!((major_ticks[2].val - 30.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_colorbar_transparency_default() {
+        let app = OctantApp::default();
+        assert_eq!(app.colorbar_transparency, 0.0);
     }
 }
