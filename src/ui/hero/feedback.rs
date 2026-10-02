@@ -1,6 +1,5 @@
 //! Hero header title, status pill, idle hints, drag cues, and warning banners.
 
-use super::intake::INTAKE_TEXT_INSET;
 use super::style::{BODY_FONT, SMALL_FONT, content_width, fit_text, title_font};
 
 /// Height of the drag-hover and warning banners.
@@ -71,11 +70,8 @@ pub fn render_status_pill(
     ui.painter().galley(text_pos, galley, text_color);
 }
 
-/// Helper caption under the intake bar, left-aligned with the bar's edge.
+/// Helper caption under the intake bar, centered in the hero column.
 pub fn render_idle_hint(ui: &mut egui::Ui) {
-    let width = content_width(ui.available_width());
-    // Inset to line up with the text inside the intake frame.
-    let inset = INTAKE_TEXT_INSET;
     let text = fit_text(
         ui,
         &[
@@ -84,19 +80,14 @@ pub fn render_idle_hint(ui: &mut egui::Ui) {
             "paste URL or drop files",
         ],
         SMALL_FONT,
-        width - inset,
+        content_width(ui.available_width()),
     );
-    let color = ui.visuals().strong_text_color();
-    let galley =
-        ui.painter()
-            .layout_no_wrap(text.to_string(), egui::FontId::monospace(SMALL_FONT), color);
-
-    // A full content-width row is centered by the parent column; the text is
-    // then painted from its left edge.
-    let (rect, _) =
-        ui.allocate_exact_size(egui::vec2(width, galley.size().y), egui::Sense::hover());
-    ui.painter()
-        .galley(egui::pos2(rect.min.x + inset, rect.min.y), galley, color);
+    ui.label(
+        egui::RichText::new(text)
+            .monospace()
+            .size(SMALL_FONT)
+            .color(ui.visuals().strong_text_color()),
+    );
 }
 
 pub fn render_drag_hover_cue(ui: &mut egui::Ui) {

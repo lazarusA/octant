@@ -10,11 +10,6 @@ const MARGIN_Y: i8 = 8;
 /// Horizontal margin inside the text field itself (egui's default is 4).
 const EDIT_MARGIN_X: i8 = 4;
 
-/// Distance from the intake frame's outer left edge to its text (frame
-/// stroke + frame padding + field margin), so captions below the bar can
-/// line up with the input text.
-pub const INTAKE_TEXT_INSET: f32 = 1.0 + MARGIN_X as f32 + EDIT_MARGIN_X as f32;
-
 pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
     let stroke = ui.visuals().widgets.noninteractive.bg_stroke;
     // Outer width follows the shared hero gutter; subtract margins and stroke

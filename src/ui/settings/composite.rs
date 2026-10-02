@@ -126,6 +126,11 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 }
 
+/// Width reserved for each "R:" / "G:" / "B:" channel label.
+const RGB_LABEL_W: f32 = 16.0;
+/// Narrowest a channel select may be before the row stacks vertically.
+const RGB_MIN_COMBO_W: f32 = 84.0;
+
 fn show_standard_rgb_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     let num_b = app.num_bands();
     let (c_start, c_end) = get_selected_channel_range(app);
@@ -146,31 +151,60 @@ fn show_standard_rgb_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
     };
 
+    let channels = [
+        (0, "R:", egui::Color32::from_rgb(255, 100, 100), "rgb_r_ch"),
+        (1, "G:", egui::Color32::from_rgb(100, 255, 100), "rgb_g_ch"),
+        (2, "B:", egui::Color32::from_rgb(100, 150, 255), "rgb_b_ch"),
+    ];
+
+    // One row when all three channel selects fit at a usable width,
+    // otherwise one channel per row with the select filling the width.
+    let spacing = ui.spacing().item_spacing.x;
+    let per_channel = RGB_LABEL_W + spacing + RGB_MIN_COMBO_W + spacing;
+    let inline = ui.available_width() >= per_channel * channels.len() as f32;
+
     let mut changed = false;
-    ui.horizontal(|ui| {
-        let channels = [
-            (0, "R:", egui::Color32::from_rgb(255, 100, 100), "rgb_r_ch"),
-            (1, "G:", egui::Color32::from_rgb(100, 255, 100), "rgb_g_ch"),
-            (2, "B:", egui::Color32::from_rgb(100, 150, 255), "rgb_b_ch"),
-        ];
-        for (idx, label, color, salt) in channels {
-            ui.label(egui::RichText::new(label).color(color));
-            let mut ch = app.rgb_composite_channels[idx].clamp(min_b, max_b);
-            egui::ComboBox::from_id_salt(salt)
-                .selected_text(get_channel_title(ch))
-                .show_ui(ui, |ui| {
-                    for b in min_b..=max_b {
-                        if ui.selectable_label(ch == b, get_channel_title(b)).clicked() {
-                            ch = b;
-                        }
+    let mut channel_select = |ui: &mut egui::Ui, idx: usize, label: &str, color, salt: &str| {
+        // Split the width left in the row evenly between the remaining
+        // channels; a stacked row gives its select everything after the label.
+        let share = if inline {
+            (ui.available_width() + spacing) / (channels.len() - idx) as f32 - spacing
+        } else {
+            ui.available_width()
+        };
+        let combo_w = share - RGB_LABEL_W - spacing;
+        ui.add_sized(
+            [RGB_LABEL_W, ui.spacing().interact_size.y],
+            egui::Label::new(egui::RichText::new(label).color(color)),
+        );
+        let mut ch = app.rgb_composite_channels[idx].clamp(min_b, max_b);
+        egui::ComboBox::from_id_salt(salt)
+            .width(combo_w.max(RGB_MIN_COMBO_W))
+            .selected_text(get_channel_title(ch))
+            .show_ui(ui, |ui| {
+                for b in min_b..=max_b {
+                    if ui.selectable_label(ch == b, get_channel_title(b)).clicked() {
+                        ch = b;
                     }
-                });
-            if ch != app.rgb_composite_channels[idx] {
-                app.rgb_composite_channels[idx] = ch;
-                changed = true;
-            }
+                }
+            });
+        if ch != app.rgb_composite_channels[idx] {
+            app.rgb_composite_channels[idx] = ch;
+            changed = true;
         }
-    });
+    };
+
+    if inline {
+        ui.horizontal(|ui| {
+            for (idx, label, color, salt) in channels {
+                channel_select(ui, idx, label, color, salt);
+            }
+        });
+    } else {
+        for (idx, label, color, salt) in channels {
+            ui.horizontal(|ui| channel_select(ui, idx, label, color, salt));
+        }
+    }
     if changed {
         app.load_selected_variable_block();
     }

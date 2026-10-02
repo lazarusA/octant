@@ -131,6 +131,8 @@ pub fn show_dimension_sliders(
         let is_animated = app.dim_config[i].animation == AnimationRole::Animated;
 
         ui.group(|ui| {
+            // Fill the panel width so every dimension box lines up.
+            ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 ui.checkbox(&mut app.dim_config[i].active, "");
 
@@ -140,33 +142,37 @@ pub fn show_dimension_sliders(
                         .small(),
                 );
 
+                // Role selects pinned to the right edge. Right-to-left order:
+                // the animation select is added first so it ends up rightmost.
                 let mut spatial = app.dim_config[i].spatial;
-                egui::ComboBox::from_id_salt(("spatial_role", i))
-                    .selected_text(match spatial {
-                        SpatialRole::None => "None",
-                        SpatialRole::Grid => "Grid",
-                        SpatialRole::X => "X",
-                        SpatialRole::Y => "Y",
-                        SpatialRole::Z => "Z",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut spatial, SpatialRole::None, "None");
-                        ui.selectable_value(&mut spatial, SpatialRole::Grid, "Grid");
-                        ui.selectable_value(&mut spatial, SpatialRole::X, "X");
-                        ui.selectable_value(&mut spatial, SpatialRole::Y, "Y");
-                        ui.selectable_value(&mut spatial, SpatialRole::Z, "Z");
-                    });
-
                 let mut anim = app.dim_config[i].animation;
-                egui::ComboBox::from_id_salt(("anim_role", i))
-                    .selected_text(match anim {
-                        AnimationRole::None => "None",
-                        AnimationRole::Animated => "Animated",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut anim, AnimationRole::None, "None");
-                        ui.selectable_value(&mut anim, AnimationRole::Animated, "Animated");
-                    });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    egui::ComboBox::from_id_salt(("anim_role", i))
+                        .selected_text(match anim {
+                            AnimationRole::None => "None",
+                            AnimationRole::Animated => "Animated",
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut anim, AnimationRole::None, "None");
+                            ui.selectable_value(&mut anim, AnimationRole::Animated, "Animated");
+                        });
+
+                    egui::ComboBox::from_id_salt(("spatial_role", i))
+                        .selected_text(match spatial {
+                            SpatialRole::None => "None",
+                            SpatialRole::Grid => "Grid",
+                            SpatialRole::X => "X",
+                            SpatialRole::Y => "Y",
+                            SpatialRole::Z => "Z",
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut spatial, SpatialRole::None, "None");
+                            ui.selectable_value(&mut spatial, SpatialRole::Grid, "Grid");
+                            ui.selectable_value(&mut spatial, SpatialRole::X, "X");
+                            ui.selectable_value(&mut spatial, SpatialRole::Y, "Y");
+                            ui.selectable_value(&mut spatial, SpatialRole::Z, "Z");
+                        });
+                });
 
                 apply_role_change(i, spatial, anim, app);
             });
@@ -195,10 +201,15 @@ pub fn show_dimension_sliders(
             } else {
                 ui.horizontal(|ui| {
                     ui.label("Index:");
-                    ui.add(egui::Slider::new(
-                        &mut app.selected_dim_indices[i],
-                        0..=dim_size.saturating_sub(1),
-                    ));
+                    // Value box pinned right, slider track filling the rest,
+                    // matching the range slider rows.
+                    let max_index = dim_size.saturating_sub(1);
+                    let index = &mut app.selected_dim_indices[i];
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add(egui::DragValue::new(index).range(0..=max_index).speed(1));
+                        ui.spacing_mut().slider_width = ui.available_width();
+                        ui.add(egui::Slider::new(index, 0..=max_index).show_value(false));
+                    });
                 });
                 app.selected_dim_ranges[i] =
                     (app.selected_dim_indices[i], app.selected_dim_indices[i]);

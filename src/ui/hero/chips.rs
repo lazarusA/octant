@@ -156,7 +156,7 @@ fn chip_galley(ui: &egui::Ui, label: &str, hovered: bool) -> std::sync::Arc<egui
     ui.painter().layout_job(job)
 }
 
-/// Pill-shaped sample chip: faint outline at rest, filled on hover.
+/// Pill-shaped sample chip: plain text at rest, filled on hover.
 pub fn render_ghost_slash_chip(ui: &mut egui::Ui, label: &str, desc: &str) -> egui::Response {
     let rest_galley = chip_galley(ui, label, false);
     let desired_size = rest_galley.size() + CHIP_PADDING * 2.0;
@@ -165,14 +165,11 @@ pub fn render_ghost_slash_chip(ui: &mut egui::Ui, label: &str, desc: &str) -> eg
     if ui.is_rect_visible(rect) {
         let hovered = response.hovered();
         let widgets = &ui.visuals().widgets;
-        let (fill, stroke) = if hovered {
-            (widgets.hovered.bg_fill, widgets.hovered.bg_stroke)
-        } else {
-            (egui::Color32::TRANSPARENT, widgets.noninteractive.bg_stroke)
-        };
-        let radius = rect.height() * 0.5;
-        ui.painter()
-            .rect(rect, radius, fill, stroke, egui::StrokeKind::Inside);
+        // Borderless: only the hover fill marks the pill.
+        if hovered {
+            ui.painter()
+                .rect_filled(rect, rect.height() * 0.5, widgets.hovered.bg_fill);
+        }
 
         let galley = if hovered {
             chip_galley(ui, label, true)
