@@ -9,7 +9,7 @@ mod plot_options;
 mod resampling;
 
 use crate::app::OctantApp;
-use crate::ui::icons::{Icon, IconSize, UiIconExt};
+use crate::ui::icons::{Icon, UiIconExt};
 
 /// Anchored to the left edge of the canvas area, just below the top bar.
 /// Stores its own width so Variable Controls can position to the right without overlap.
@@ -44,21 +44,10 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
                         true,
                     )
                     .show_header(ui, |ui| {
-                        ui.icon(Icon::Settings, IconSize::Sm);
-                        ui.label(egui::RichText::new("Settings").strong());
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.close_button("Close Settings").clicked() {
-                                should_close = true;
-                            }
-                        });
+                        should_close =
+                            ui.panel_header(Icon::Settings, "Settings", "Close Settings");
                     })
-                    .body(|ui| {
-                        plot_options::show_plot_options(app, ui);
-                        ui.separator();
-                        clipping::show_clipping_bounds(app, ui);
-                        ui.separator();
-                        export::show_export_preferences(app, ui);
-                    });
+                    .body(|ui| show_settings_body(app, ui));
                 });
         });
 
@@ -68,4 +57,13 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
 
     // Store width for next frame so Variable Controls can position to the right.
     app.settings_overlay_width = area_resp.response.rect.width();
+}
+
+/// Plot options, clipping bounds and export preferences, separated by rules.
+fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
+    plot_options::show_plot_options(app, ui);
+    ui.separator();
+    clipping::show_clipping_bounds(app, ui);
+    ui.separator();
+    export::show_export_preferences(app, ui);
 }

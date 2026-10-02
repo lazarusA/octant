@@ -91,7 +91,10 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
 
             ui.add_space(8.0);
             if ui
-                .icon_button(Icon::Colormap, "Browse Native Vector Icons (46) →")
+                .icon_button(Icon::Colormap, crate::utils::stack_str(
+                    &mut [0; 48],
+                    format_args!("Browse Native Vector Icons ({})", Icon::ALL.len()),
+                ))
                 .on_hover_text("Explore procedural vector icons in popover")
                 .clicked()
             {

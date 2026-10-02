@@ -9,7 +9,6 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
         return;
     }
 
-    let mut is_open = app.show_export_modal;
     let mut should_close = false;
 
     egui::Window::new("Save & Export Figure")
@@ -141,9 +140,8 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
         });
 
     if should_close || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
-        is_open = false;
+        app.show_export_modal = false;
     }
-    app.show_export_modal = is_open;
 }
 
 /// Shows the floating success toast notification with a "Reveal in Finder/Folder" action button.

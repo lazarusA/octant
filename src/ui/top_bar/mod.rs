@@ -36,21 +36,18 @@ pub fn show_top_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
 
 fn show_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     let spacing = ui.spacing().item_spacing.x;
-    let status_full = FetchProgress::from_app(app, false);
-    let status_compact = FetchProgress::from_app(app, true);
+    let progress = FetchProgress::from_app(app);
 
     let mut widths = [ItemWidths::default(); ITEM_COUNT];
     for item in ALL_ITEMS {
         widths[item as usize] = match item {
-            TopBarItem::Status => {
-                status_widths(ui, status_full.as_ref(), status_compact.as_ref(), spacing)
-            }
+            TopBarItem::Status => status_widths(ui, progress, spacing),
             _ => items::item_widths(item, app, ui),
         };
     }
     let compact = layout::compute_compact(&widths, ui.available_width() - GROUP_GAP);
 
-    items::show_brand(app, ui, compact.get(TopBarItem::Brand));
+    items::show_item(TopBarItem::Brand, compact.get(TopBarItem::Brand), app, ui);
     for item in LEFT_ITEMS {
         items::show_item(item, compact.get(item), app, ui);
     }
@@ -60,28 +57,20 @@ fn show_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.separator();
         items::show_item(TopBarItem::Cache, compact.get(TopBarItem::Cache), app, ui);
 
-        let progress = if compact.get(TopBarItem::Status) {
-            status_compact.as_ref()
-        } else {
-            status_full.as_ref()
-        };
         if let Some(progress) = progress {
             ui.separator();
-            status::show_status_bar(app, ui, progress);
+            status::show_status_bar(app, ui, progress, compact.get(TopBarItem::Status));
         }
     });
 }
 
-fn status_widths(
-    ui: &egui::Ui,
-    full: Option<&FetchProgress>,
-    compact: Option<&FetchProgress>,
-    spacing: f32,
-) -> ItemWidths {
+fn status_widths(ui: &egui::Ui, progress: Option<FetchProgress>, spacing: f32) -> ItemWidths {
+    let Some(progress) = progress else {
+        return ItemWidths::default();
+    };
     let trailing = spacing * 2.0 + items::SEPARATOR_WIDTH;
-    let measure = |p: Option<&FetchProgress>| p.map_or(0.0, |p| p.width(ui) + trailing);
     ItemWidths {
-        full: measure(full),
-        compact: measure(compact),
+        full: progress.width(ui, false) + trailing,
+        compact: progress.width(ui, true) + trailing,
     }
 }

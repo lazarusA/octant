@@ -2,6 +2,8 @@
 
 use super::style::{BODY_FONT, GUTTER, SMALL_FONT, gap};
 use crate::app::OctantApp;
+use egui::Galley;
+use std::sync::Arc;
 
 const SAMPLES: [(&str, &str, &str); 3] = [
     (
@@ -34,35 +36,28 @@ struct Line {
     start: usize,
     end: usize,
     width: f32,
-    height: f32,
 }
 
 /// Centered rows of sample chips, preceded by a `try:` prefix. Rows wrap as
 /// whole chips and every row stays centered.
 pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
-    let prefix_w = ui
-        .painter()
-        .layout_no_wrap(
-            PREFIX.to_string(),
-            egui::FontId::monospace(SMALL_FONT),
-            ui.visuals().weak_text_color(),
-        )
-        .size()
-        .x;
+    // Lay out every label once per frame; the same galleys size and draw.
+    let prefix = ui.painter().layout_no_wrap(
+        PREFIX.to_owned(),
+        egui::FontId::monospace(SMALL_FONT),
+        ui.visuals().weak_text_color(),
+    );
+    let chips: [Arc<Galley>; COUNT] = std::array::from_fn(|i| chip_galley(ui, SAMPLES[i].0, false));
+    let chip_height = chips[0].size().y + CHIP_PADDING.y * 2.0;
 
     // Item 0 is the prefix, items 1..=COUNT are the chips.
-    let mut widths = [0.0_f32; COUNT + 1];
-    widths[0] = prefix_w;
-    for (w, (label, _, _)) in widths[1..].iter_mut().zip(SAMPLES) {
-        *w = chip_galley(ui, label, false).size().x + CHIP_PADDING.x * 2.0;
+    let mut widths = [prefix.size().x; COUNT + 1];
+    for (w, galley) in widths[1..].iter_mut().zip(&chips) {
+        *w = galley.size().x + CHIP_PADDING.x * 2.0;
     }
 
     let max_w = (ui.available_width() - 2.0 * GUTTER).max(0.0);
-    let (mut lines, line_count) = pack_lines(&widths, max_w);
-    let chip_height = chip_galley(ui, SAMPLES[0].0, false).size().y + CHIP_PADDING.y * 2.0;
-    for line in &mut lines[..line_count] {
-        line.height = chip_height;
-    }
+    let (lines, line_count) = pack_lines(&widths, max_w);
 
     for (n, line) in lines[..line_count].iter().enumerate() {
         if n > 0 {
@@ -73,11 +68,12 @@ pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
             ui.add_space(((ui.available_width() - line.width) * 0.5).max(0.0));
             for item in line.start..line.end {
                 if item == 0 {
-                    render_prefix(ui, line.height);
+                    render_prefix(ui, &prefix, chip_height);
                     continue;
                 }
                 let (label, uri, desc) = SAMPLES[item - 1];
-                if render_ghost_slash_chip(ui, label, desc).clicked() {
+                let galley = Arc::clone(&chips[item - 1]);
+                if render_chip(ui, label, galley, desc).clicked() {
                     app.hero_state.input = uri.to_string();
                     app.submit_or_activate_source(uri, None);
                 }
@@ -105,7 +101,6 @@ fn pack_lines(widths: &[f32; COUNT + 1], max_w: f32) -> ([Line; COUNT + 1], usiz
                 start: i,
                 end: i + 1,
                 width: w,
-                height: 0.0,
             };
         } else {
             current.end = i + 1;
@@ -118,21 +113,16 @@ fn pack_lines(widths: &[f32; COUNT + 1], max_w: f32) -> ([Line; COUNT + 1], usiz
 
 /// The `try:` prefix, vertically centered in a box as tall as a chip so it
 /// lines up with the chips beside it.
-fn render_prefix(ui: &mut egui::Ui, height: f32) {
-    let galley = ui.painter().layout_no_wrap(
-        PREFIX.to_string(),
-        egui::FontId::monospace(SMALL_FONT),
-        ui.visuals().weak_text_color(),
-    );
+fn render_prefix(ui: &mut egui::Ui, galley: &Arc<Galley>, height: f32) {
     let (rect, _) =
         ui.allocate_exact_size(egui::vec2(galley.size().x, height), egui::Sense::hover());
     let pos = egui::pos2(rect.min.x, rect.center().y - galley.size().y * 0.5);
     ui.painter()
-        .galley(pos, galley, ui.visuals().weak_text_color());
+        .galley(pos, Arc::clone(galley), ui.visuals().weak_text_color());
 }
 
 /// Label galley with a dimmed leading slash.
-fn chip_galley(ui: &egui::Ui, label: &str, hovered: bool) -> std::sync::Arc<egui::Galley> {
+fn chip_galley(ui: &egui::Ui, label: &str, hovered: bool) -> Arc<Galley> {
     let font_id = egui::FontId::monospace(BODY_FONT);
     let text_color = if hovered {
         ui.visuals().strong_text_color()
@@ -156,25 +146,21 @@ fn chip_galley(ui: &egui::Ui, label: &str, hovered: bool) -> std::sync::Arc<egui
     ui.painter().layout_job(job)
 }
 
-/// Pill-shaped sample chip: plain text at rest, filled on hover.
-pub fn render_ghost_slash_chip(ui: &mut egui::Ui, label: &str, desc: &str) -> egui::Response {
-    let rest_galley = chip_galley(ui, label, false);
-    let desired_size = rest_galley.size() + CHIP_PADDING * 2.0;
-    let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+/// Pill-shaped sample chip: plain text at rest, filled on hover. `galley`
+/// is the at-rest label; the brighter hover label is laid out only while
+/// hovered, and the tooltip text is only formatted while it is shown.
+fn render_chip(ui: &mut egui::Ui, label: &str, galley: Arc<Galley>, desc: &str) -> egui::Response {
+    let size = galley.size() + CHIP_PADDING * 2.0;
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
 
     if ui.is_rect_visible(rect) {
-        let hovered = response.hovered();
-        let widgets = &ui.visuals().widgets;
-        // Borderless: only the hover fill marks the pill.
-        if hovered {
-            ui.painter()
-                .rect_filled(rect, rect.height() * 0.5, widgets.hovered.bg_fill);
-        }
-
-        let galley = if hovered {
+        let galley = if response.hovered() {
+            // Borderless: only the hover fill marks the pill.
+            let fill = ui.visuals().widgets.hovered.bg_fill;
+            ui.painter().rect_filled(rect, rect.height() * 0.5, fill);
             chip_galley(ui, label, true)
         } else {
-            rest_galley
+            galley
         };
         let text_pos = rect.center() - galley.size() * 0.5;
         ui.painter()
@@ -183,7 +169,9 @@ pub fn render_ghost_slash_chip(ui: &mut egui::Ui, label: &str, desc: &str) -> eg
 
     response
         .on_hover_cursor(egui::CursorIcon::PointingHand)
-        .on_hover_text(format!("Load sample: {desc}"))
+        .on_hover_ui(|ui| {
+            ui.label(format!("Load sample: {desc}"));
+        })
 }
 
 #[cfg(test)]

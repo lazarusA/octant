@@ -1,11 +1,16 @@
 //! Native procedural vector icons gallery tab for the About Octant dialog.
 
-use super::types::ICON_CATEGORIES;
+use super::types::{ALL_CATEGORIES, icon_categories_for, icon_category, icon_category_count};
+use crate::data::coordinates::naming::contains_ascii_case_insensitive;
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
 pub fn show_icons_tab(ui: &mut egui::Ui) {
     let search_id = egui::Id::new(("about_icons", "search_query"));
-    let mut search_query: String = ui.ctx().data(|d| d.get_temp(search_id)).unwrap_or_default();
+    // Move the query out of egui's temp storage (and back at the end) instead
+    // of cloning it every frame.
+    let mut search_query: String = ui
+        .ctx()
+        .data_mut(|d| std::mem::take(d.get_temp_mut_or_default::<String>(search_id)));
 
     let cat_id = egui::Id::new(("about_icons", "category_filter"));
     let mut selected_cat: usize = ui.ctx().data(|d| d.get_temp(cat_id)).unwrap_or(0);
@@ -15,29 +20,15 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
         ui.ctx().data(|d| d.get_temp(copied_id));
 
     ui.horizontal(|ui| {
-        ui.icon(Icon::Search, IconSize::Sm);
-        let has_text = !search_query.is_empty();
-        let edit_resp = ui.add(
-            egui::TextEdit::singleline(&mut search_query)
-                .hint_text("Search icons...")
-                .desired_width(180.0),
-        );
-        if edit_resp.changed() {
-            ui.ctx()
-                .data_mut(|d| d.insert_temp(search_id, search_query.clone()));
-        }
-        if has_text && ui.close_button("Clear search").clicked() {
-            search_query.clear();
-            ui.ctx()
-                .data_mut(|d| d.insert_temp(search_id, String::new()));
-        }
+        ui.search_field(&mut search_query, "Search icons...", Some(180.0));
 
         ui.separator();
 
         egui::ComboBox::from_id_salt("about_icon_category_combo")
-            .selected_text(ICON_CATEGORIES[selected_cat])
+            .selected_text(icon_category(selected_cat))
             .show_ui(ui, |ui| {
-                for (idx, &cat_name) in ICON_CATEGORIES.iter().enumerate() {
+                for idx in 0..icon_category_count() {
+                    let cat_name = icon_category(idx);
                     if ui
                         .selectable_value(&mut selected_cat, idx, cat_name)
                         .clicked()
@@ -69,13 +60,14 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
     ui.add_space(4.0);
 
     let query_trimmed = search_query.trim();
-    let current_cat_filter = ICON_CATEGORIES[selected_cat];
+    let current_cat_filter = icon_category(selected_cat);
 
     let icon_matches = |icon: &Icon| -> bool {
-        let matches_cat = current_cat_filter == "All" || icon.category() == current_cat_filter;
+        let matches_cat =
+            current_cat_filter == ALL_CATEGORIES || icon.category() == current_cat_filter;
         let matches_search = query_trimmed.is_empty()
-            || contains_ignore_ascii_case(icon.name(), query_trimmed)
-            || contains_ignore_ascii_case(icon.category(), query_trimmed);
+            || contains_ascii_case_insensitive(icon.name(), query_trimmed)
+            || contains_ascii_case_insensitive(icon.category(), query_trimmed);
         matches_cat && matches_search
     };
 
@@ -98,11 +90,7 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
             .max_height(380.0)
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                let active_categories: &[&str] = if current_cat_filter == "All" {
-                    &ICON_CATEGORIES[1..]
-                } else {
-                    &ICON_CATEGORIES[selected_cat..=selected_cat]
-                };
+                let active_categories = icon_categories_for(selected_cat);
 
                 for &cat in active_categories {
                     let cat_matches_count = Icon::ALL
@@ -228,18 +216,7 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
                 }
             });
     }
-}
 
-#[inline]
-fn contains_ignore_ascii_case(haystack: &str, needle: &str) -> bool {
-    if needle.is_empty() {
-        return true;
-    }
-    if needle.len() > haystack.len() {
-        return false;
-    }
-    haystack
-        .as_bytes()
-        .windows(needle.len())
-        .any(|w| w.eq_ignore_ascii_case(needle.as_bytes()))
+    ui.ctx()
+        .data_mut(|d| d.insert_temp(search_id, search_query));
 }

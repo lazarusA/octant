@@ -8,7 +8,7 @@ pub mod format;
 mod tests;
 
 pub use bytes::{
-    calculate_variable_size_bytes, data_type_bytes, format_byte_size, format_count_metric,
+    ByteSize, calculate_variable_size_bytes, data_type_bytes, format_byte_size, format_count_metric,
 };
 pub use calendar::{add_days_to_date, civil_from_days, days_from_civil};
 pub use cf::{

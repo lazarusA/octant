@@ -5,7 +5,7 @@ pub mod icons;
 pub mod overview;
 pub mod types;
 
-pub use types::{AboutTab, ICON_CATEGORIES, ICONS_TAB_LABEL};
+pub use types::AboutTab;
 
 use crate::app::OctantApp;
 use crate::ui::icons::UiIconExt;
@@ -83,7 +83,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
                         if ui
                             .selectable_label(
                                 active_tab == AboutTab::Icons,
-                                egui::RichText::new(ICONS_TAB_LABEL).strong(),
+                                egui::RichText::new(types::icons_tab_label(&mut [0; 32])).strong(),
                             )
                             .clicked()
                         {

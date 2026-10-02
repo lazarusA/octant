@@ -1,5 +1,5 @@
-//! `egui::Ui` helpers for drawing icons, icon labels, framed icon buttons and
-//! the standard close button.
+//! `egui::Ui` helpers for drawing icons, framed icon buttons, the standard
+//! close button and the search field.
 
 use super::style::{ICON_GAP, IconSize, IconTone};
 use super::{Icon, ToolbarButton};
@@ -20,13 +20,19 @@ pub trait UiIconExt {
     /// Render a framed button with an `Sm` icon and optional label text.
     fn icon_button(&mut self, icon: Icon, text: impl Into<WidgetText>) -> Response;
 
-    /// Render a non-interactive `Sm` icon followed by label text.
-    fn icon_label(&mut self, icon: Icon, text: impl Into<WidgetText>) -> Response;
-
     /// Render the standard frameless close (or clear) button: an `Sm` cross
     /// that highlights on hover and shows `hover` as its tooltip. Place close
     /// buttons in the top-right corner of their panel or window.
     fn close_button(&mut self, hover: &str) -> Response;
+
+    /// Panel title row: `Sm` icon, bold `title`, and a close button pinned to
+    /// the top-right. Returns `true` when the close button was clicked.
+    fn panel_header(&mut self, icon: Icon, title: &str, close_hover: &str) -> bool;
+
+    /// Search row: `Search` icon, a single-line field and, while `text` is
+    /// non-empty, a clear button. The field fills the row unless `width` is
+    /// given. Returns `true` when the text changed (typed or cleared).
+    fn search_field(&mut self, text: &mut String, hint: &str, width: Option<f32>) -> bool;
 
     /// Render a button like [`Self::icon_button`] with no background at rest
     /// and a `tone` outline, marking the primary action of its panel. The
@@ -64,11 +70,41 @@ impl UiIconExt for Ui {
     }
 
     fn close_button(&mut self, hover: &str) -> Response {
-        self.add(
-            ToolbarButton::new(Icon::Cross, hover)
-                .compact(true)
-                .icon_size(IconSize::Sm),
-        )
+        self.add(close_button_widget(hover))
+    }
+
+    fn panel_header(&mut self, icon: Icon, title: &str, close_hover: &str) -> bool {
+        self.icon(icon, IconSize::Sm);
+        self.label(egui::RichText::new(title).strong());
+        self.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.close_button(close_hover).clicked()
+        })
+        .inner
+    }
+
+    fn search_field(&mut self, text: &mut String, hint: &str, width: Option<f32>) -> bool {
+        const HOVER: &str = "Clear search";
+        self.horizontal(|ui| {
+            ui.icon(Icon::Search, IconSize::Sm);
+            let has_text = !text.is_empty();
+            // Reserve exactly the clear button's measured width.
+            let clear_w = if has_text {
+                close_button_widget(HOVER).width(ui) + ui.spacing().item_spacing.x
+            } else {
+                0.0
+            };
+            let field_w = width.unwrap_or(ui.available_width() - clear_w).max(60.0);
+            let edit = egui::TextEdit::singleline(text)
+                .hint_text(hint)
+                .desired_width(field_w);
+            let mut changed = ui.add(edit).changed();
+            if has_text && ui.close_button(HOVER).clicked() {
+                text.clear();
+                changed = true;
+            }
+            changed
+        })
+        .inner
     }
 
     fn outlined_icon_button(
@@ -80,27 +116,14 @@ impl UiIconExt for Ui {
         let outline = tone.color(self.visuals());
         framed_icon_button(self, icon, text.into(), Some(outline))
     }
+}
 
-    fn icon_label(&mut self, icon: Icon, text: impl Into<WidgetText>) -> Response {
-        let font_id = egui::TextStyle::Body.resolve(self.style());
-        let galley = text
-            .into()
-            .into_galley(self, None, self.available_width(), font_id);
-
-        let icon_size = IconSize::Sm.px();
-        let gap = if galley.is_empty() { 0.0 } else { ICON_GAP };
-        let size = vec2(
-            icon_size + gap + galley.size().x,
-            icon_size.max(galley.size().y),
-        );
-        let (rect, response) = self.allocate_exact_size(size, Sense::hover());
-
-        if self.is_rect_visible(rect) {
-            let color = self.visuals().text_color();
-            paint_icon_and_text(self, icon, rect.min, size.y, galley, gap, color);
-        }
-        response
-    }
+/// The standard close / clear button widget, shared by [`UiIconExt::close_button`]
+/// and layouts that need its width.
+fn close_button_widget(hover: &str) -> ToolbarButton<'_> {
+    ToolbarButton::new(Icon::Cross, hover)
+        .compact(true)
+        .icon_size(IconSize::Sm)
 }
 
 /// Framed button with an `Sm` icon and optional label. When `outline` is set

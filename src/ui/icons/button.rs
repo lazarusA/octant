@@ -8,15 +8,15 @@
 
 use super::Icon;
 use super::style::{ICON_GAP, IconSize};
-use egui::{Rect, Response, Sense, TextStyle, Ui, Widget, WidgetText, pos2, vec2};
+use egui::{Galley, Rect, Response, Sense, TextStyle, Ui, Widget, WidgetText, pos2, vec2};
+use std::sync::Arc;
 
 /// Height of every top-bar item, equal to the Octant brand icon.
 pub const TOOLBAR_ITEM_HEIGHT: f32 = IconSize::Lg.px();
-/// Glyph size drawn inside a toolbar button.
-pub const TOOLBAR_ICON_SIZE: f32 = IconSize::Md.px();
 
-/// Horizontal padding around the glyph; makes the compact button a square.
-const PAD_X: f32 = (TOOLBAR_ITEM_HEIGHT - TOOLBAR_ICON_SIZE) * 0.5;
+/// Padding around the glyph on every side; with an `Md` glyph this makes the
+/// compact button a [`TOOLBAR_ITEM_HEIGHT`] square.
+const PAD: f32 = (TOOLBAR_ITEM_HEIGHT - IconSize::Md.px()) * 0.5;
 /// Extra padding after the label so text does not touch the frame edge.
 const LABEL_PAD_RIGHT: f32 = 5.0;
 
@@ -69,32 +69,23 @@ impl<'a> ToolbarButton<'a> {
         self
     }
 
-    /// Glyph size; the button stays `PAD_X` larger on every side. Defaults to
+    /// Glyph size; the button stays [`PAD`] larger on every side. Defaults to
     /// `Md`, giving the 24 px toolbar height.
     pub fn icon_size(mut self, size: IconSize) -> Self {
         self.icon_size = size;
         self
     }
 
-    /// Width the button will occupy, without allocating it.
-    pub fn width(ui: &Ui, label: &str, compact: bool) -> f32 {
-        if compact || label.is_empty() {
-            return TOOLBAR_ITEM_HEIGHT;
-        }
-        let galley = WidgetText::from(label).into_galley(
-            ui,
-            Some(egui::TextWrapMode::Extend),
-            f32::INFINITY,
-            TextStyle::Button,
-        );
-        TOOLBAR_ITEM_HEIGHT + ICON_GAP + galley.size().x + LABEL_PAD_RIGHT
+    /// Width this button will occupy, without allocating it. Uses the same
+    /// layout as drawing, so measured and drawn widths always agree.
+    pub fn width(&self, ui: &Ui) -> f32 {
+        self.layout(ui).0.x
     }
-}
 
-impl Widget for ToolbarButton<'_> {
-    fn ui(self, ui: &mut Ui) -> Response {
-        let show_label = !self.compact && !self.label.is_empty();
-        let galley = show_label.then(|| {
+    /// Button size and, when the label is shown, its galley.
+    fn layout(&self, ui: &Ui) -> (egui::Vec2, Option<Arc<Galley>>) {
+        let side = self.icon_size.px() + PAD * 2.0;
+        let galley = (!self.compact && !self.label.is_empty()).then(|| {
             WidgetText::from(self.label).into_galley(
                 ui,
                 Some(egui::TextWrapMode::Extend),
@@ -105,53 +96,58 @@ impl Widget for ToolbarButton<'_> {
         let label_w = galley
             .as_ref()
             .map_or(0.0, |g| ICON_GAP + g.size().x + LABEL_PAD_RIGHT);
+        (vec2(side + label_w, side), galley)
+    }
 
-        let icon_px = self.icon_size.px();
-        let side = icon_px + PAD_X * 2.0;
-        let size = vec2(side + label_w, side);
+    /// Background: hover / press / focus frame, else the open-state fill.
+    fn paint_frame(&self, ui: &Ui, rect: Rect, response: &Response) {
+        let visuals = ui.style().interact(response);
+        let interacting =
+            response.hovered() || response.is_pointer_button_down_on() || response.has_focus();
+        if interacting {
+            ui.painter().rect(
+                rect,
+                visuals.corner_radius,
+                visuals.bg_fill,
+                visuals.bg_stroke,
+                egui::StrokeKind::Inside,
+            );
+        } else if self.is_active(ui, response) {
+            ui.painter().rect_filled(
+                rect,
+                visuals.corner_radius,
+                ui.visuals().widgets.inactive.weak_bg_fill,
+            );
+        }
+    }
+
+    fn is_active(&self, ui: &Ui, response: &Response) -> bool {
+        self.active
+            || (self.owns_popup
+                && egui::Popup::is_id_open(ui.ctx(), egui::Popup::default_response_id(response)))
+    }
+}
+
+impl Widget for ToolbarButton<'_> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let (size, galley) = self.layout(ui);
         let (rect, response) = ui.allocate_exact_size(size, Sense::click());
 
         if ui.is_rect_visible(rect) {
-            let visuals = ui.style().interact(&response);
-            let active = self.active
-                || (self.owns_popup
-                    && egui::Popup::is_id_open(
-                        ui.ctx(),
-                        egui::Popup::default_response_id(&response),
-                    ));
-            // Frameless at rest; the frame only signals hover, press or focus,
-            // and a muted grey fill marks an open popup or panel.
-            let interacting =
-                response.hovered() || response.is_pointer_button_down_on() || response.has_focus();
-            if active && !interacting {
-                ui.painter().rect_filled(
-                    rect,
-                    visuals.corner_radius,
-                    ui.visuals().widgets.inactive.weak_bg_fill,
-                );
-            } else if interacting {
-                ui.painter().rect(
-                    rect,
-                    visuals.corner_radius,
-                    visuals.bg_fill,
-                    visuals.bg_stroke,
-                    egui::StrokeKind::Inside,
-                );
-            }
+            self.paint_frame(ui, rect, &response);
 
-            let color = visuals.text_color();
+            let color = ui.style().interact(&response).text_color();
+            let icon_px = self.icon_size.px();
             let icon_rect = Rect::from_min_size(
-                pos2(rect.min.x + PAD_X, rect.center().y - icon_px * 0.5),
+                pos2(rect.min.x + PAD, rect.center().y - icon_px * 0.5),
                 vec2(icon_px, icon_px),
             );
             self.icon
                 .paint(ui.painter(), icon_rect, color, ui.visuals().dark_mode);
 
             if let Some(galley) = galley {
-                let text_pos = pos2(
-                    icon_rect.max.x + PAD_X + ICON_GAP,
-                    rect.center().y - galley.size().y * 0.5,
-                );
+                let text_x = icon_rect.max.x + PAD + ICON_GAP;
+                let text_pos = pos2(text_x, rect.center().y - galley.size().y * 0.5);
                 ui.painter().galley(text_pos, galley, color);
             }
         }

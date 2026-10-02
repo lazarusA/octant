@@ -48,7 +48,7 @@ When developing and reviewing code in this repository:
      - `src/ui/hover/`: `callout.rs`, `camera.rs`, `enrich.rs`, `entries.rs`, `entries_1d.rs`, `entries_2d.rs`, `entries_3d.rs`, `format.rs`, `overlay.rs`, `raycast_sphere.rs`, `raycast_surface.rs`, `raycast_volume.rs`, `sample_1d.rs`, `sample_2d.rs`, `mod.rs`.
      - `src/ui/icons/`: Procedural vector icons (`nav.rs`, `playback.rs`, `plots.rs`, `status.rs`, `store.rs` drawing routines; `paint.rs` dispatch; `meta.rs` names & categories; `style.rs` `IconSize`/`IconTone`/stroke weights; `ext.rs` `UiIconExt`; `button.rs` `ToolbarButton`; `tests.rs`, `mod.rs`).
      - `src/ui/settings/`: Dedicated settings submodules (`clipping.rs`, `coastline.rs`, `export.rs`, `plot_2d.rs`, `plot_3d.rs`, `plot_options.rs`, `resampling.rs`, `mod.rs`).
-     - `src/ui/variables_overlay/`: Floating variable search modal (`search.rs`, `item.rs`, `tree.rs`, `mod.rs`).
+     - `src/ui/variables_overlay/`: Floating variable search modal (`item.rs`, `tree.rs`, `mod.rs`; the search row is `UiIconExt::search_field`).
      - `src/ui/variables_panel/`: Docked sidebar inspector (`info.rs`, `mod.rs`) and dimension slider controls (`dimension_slider/`: `defaults.rs`, `double_slider.rs`, `metrics.rs`, `roles.rs`, `slice_req.rs`, `slider_row.rs`, `mod.rs`).
      - `src/app/pipeline/`: `aspect.rs`, `camera.rs`, `paint.rs`, `profile.rs`, `mod.rs`.
 

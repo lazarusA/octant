@@ -105,6 +105,17 @@ impl IconTone {
         Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), alpha)
     }
 
+    /// [`Self::tint`] with a separate opacity per theme; light backgrounds
+    /// usually need a fainter tint for the same visual weight.
+    pub fn themed_tint(self, visuals: &Visuals, dark_alpha: u8, light_alpha: u8) -> Color32 {
+        let alpha = if visuals.dark_mode {
+            dark_alpha
+        } else {
+            light_alpha
+        };
+        self.tint(visuals, alpha)
+    }
+
     pub const fn name(self) -> &'static str {
         match self {
             IconTone::Default => "Default",

@@ -65,16 +65,21 @@ pub(super) fn item_widths(item: TopBarItem, app: &OctantApp, ui: &egui::Ui) -> I
         TopBarItem::Cache => spacing + separator,
         _ => spacing,
     };
-    let text = label(item, app);
+    // Width depends only on label and mode, so any glyph measures the same.
+    let measure = |compact| {
+        ToolbarButton::new(Icon::Settings, label(item, app))
+            .compact(compact)
+            .width(ui)
+    };
     ItemWidths {
-        full: ToolbarButton::width(ui, text, false) + trailing,
-        compact: ToolbarButton::width(ui, text, true) + trailing,
+        full: measure(false) + trailing,
+        compact: measure(true) + trailing,
     }
 }
 
 /// Octant logo (toggles the hero view) and, unless compact, the brand label
 /// (opens About). Right-clicking the logo also opens About.
-pub(super) fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
+fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
     let icon_resp =
         crate::ui::hero::draw_octant_widget(ui, TOOLBAR_ITEM_HEIGHT, [-1.0, -1.0, -1.0], 0.0, 1.0)
             .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -102,6 +107,7 @@ pub(super) fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) 
 pub(super) fn show_item(item: TopBarItem, compact: bool, app: &mut OctantApp, ui: &mut egui::Ui) {
     match item {
         TopBarItem::Brand => show_brand(app, ui, compact),
+        // Drawn by `show_contents`, which owns the fetch progress snapshot.
         TopBarItem::Status => {}
         TopBarItem::Dataset => store::show_store_menu(app, ui, compact),
         TopBarItem::Variables => {

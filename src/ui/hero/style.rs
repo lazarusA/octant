@@ -33,20 +33,18 @@ pub fn title_font(avail: f32) -> f32 {
 
 /// First of `options` (ordered longest first) whose monospace width at
 /// `size` fits in `max_w`; falls back to the last, shortest option.
+///
+/// Monospace glyphs share one advance, so width is measured from a single
+/// glyph times the character count, with no string or galley allocation.
 pub fn fit_text<'a>(ui: &egui::Ui, options: &[&'a str], size: f32, max_w: f32) -> &'a str {
     let font = egui::FontId::monospace(size);
-    let color = ui.visuals().text_color();
-    for &text in options {
-        let width = ui
-            .painter()
-            .layout_no_wrap(text.to_string(), font.clone(), color)
-            .size()
-            .x;
-        if width <= max_w {
-            return text;
-        }
-    }
-    options.last().copied().unwrap_or_default()
+    let advance = ui.ctx().fonts_mut(|f| f.glyph_width(&font, 'M'));
+    options
+        .iter()
+        .copied()
+        .find(|text| text.chars().count() as f32 * advance <= max_w)
+        .or_else(|| options.last().copied())
+        .unwrap_or_default()
 }
 
 /// Vertical gaps between hero sections, at full window height.

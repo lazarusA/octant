@@ -6,7 +6,7 @@ use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 use crate::utils::format_byte_size;
 use egui::{RichText, Ui};
 
-use super::double_slider::double_slider_with_inputs;
+use super::double_slider::{VALUE_BOX_W, double_slider_with_inputs};
 use super::metrics::{
     calculate_download_sizes, calculate_selected_2d_elements, calculate_selected_volume_elements,
 };
@@ -201,15 +201,20 @@ pub fn show_dimension_sliders(
             } else {
                 ui.horizontal(|ui| {
                     ui.label("Index:");
-                    // Value box pinned right, slider track filling the rest,
-                    // matching the range slider rows.
+                    // Slider fills the row up to a fixed-width value box,
+                    // matching the range rows. The slider runs first so the box
+                    // shows the dragged value on the same frame.
                     let max_index = dim_size.saturating_sub(1);
                     let index = &mut app.selected_dim_indices[i];
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.add(egui::DragValue::new(index).range(0..=max_index).speed(1));
-                        ui.spacing_mut().slider_width = ui.available_width();
-                        ui.add(egui::Slider::new(index, 0..=max_index).show_value(false));
-                    });
+                    let spacing = ui.spacing().item_spacing.x;
+                    ui.spacing_mut().slider_width =
+                        (ui.available_width() - VALUE_BOX_W - spacing).max(40.0);
+                    ui.add(egui::Slider::new(index, 0..=max_index).show_value(false));
+                    let height = ui.spacing().interact_size.y;
+                    ui.add_sized(
+                        [VALUE_BOX_W, height],
+                        egui::DragValue::new(index).range(0..=max_index).speed(1),
+                    );
                 });
                 app.selected_dim_ranges[i] =
                     (app.selected_dim_indices[i], app.selected_dim_indices[i]);

@@ -7,10 +7,12 @@ pub mod math;
 pub mod metadata;
 pub mod path;
 pub mod remote;
+pub mod stack_str;
 pub mod units;
 
 pub use path::{expand_tilde, expand_tilde_str, infer_store_kind_from_target};
 pub use remote::{ParsedStorageUrl, parse_remote_storage_url};
+pub use stack_str::stack_str;
 
 // Format-agnostic & domain re-exports
 pub use crate::data::backends::coord_bounds::{
@@ -34,7 +36,7 @@ pub use metadata::{
 };
 
 pub use units::{
-    add_days_to_date, calculate_variable_size_bytes, data_type_bytes, format_axis_value,
+    ByteSize, add_days_to_date, calculate_variable_size_bytes, data_type_bytes, format_axis_value,
     format_byte_size, format_count_metric, parse_loc, parse_reference_date, parse_time_unit,
     unit_to_milliseconds,
 };

@@ -19,6 +19,7 @@ mod tests;
 
 pub use button::{TOOLBAR_ITEM_HEIGHT, ToolbarButton};
 pub use ext::UiIconExt;
+pub use meta::Icon;
 pub use style::{ICON_GAP, IconSize, IconTone};
 
 use egui::{Pos2, Rect, pos2};
@@ -30,64 +31,4 @@ pub(crate) fn grid_p(rect: Rect, gx: f32, gy: f32) -> Pos2 {
         rect.min.x + (gx / 24.0) * rect.width(),
         rect.min.y + (gy / 24.0) * rect.height(),
     )
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Icon {
-    // Nav & Panels
-    Globe,
-    Variables,
-    Dimensions,
-    Settings,
-    Cache,
-    Sun,
-    Moon,
-    Overflow,
-
-    // Playback
-    Play,
-    Pause,
-    Stop,
-    StepBackward,
-    StepForward,
-    SeekStart,
-    SeekEnd,
-    Loop,
-    Reset,
-
-    // Plots
-    PlotPlane,
-    PlotLine,
-    PlotSurface,
-    PlotGlobe,
-    PlotVolume,
-    PlotPointCloud,
-    Colormap,
-
-    // Store & Files
-    Dataset,
-    Folder,
-    FolderOpen,
-    VariableDoc,
-    Icechunk,
-    Catalog,
-    Save,
-    Snapshot,
-    DropTray,
-    Search,
-    Trash,
-    Clipboard,
-
-    // Status & Badges
-    Scissors,
-    Check,
-    Cross,
-    Lock,
-    Unlock,
-    Bolt,
-    Hourglass,
-    Warning,
-    Info,
-    Bullet,
-    ChevronRight,
 }

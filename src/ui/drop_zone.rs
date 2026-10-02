@@ -65,7 +65,6 @@ pub fn show_drop_zone(
     }
 
     if ui.is_rect_visible(rect) {
-        let is_dark = ui.visuals().dark_mode;
         let normal_accent = crate::ui::icons::IconTone::Accent.color(ui.visuals());
         let warning_accent = crate::ui::icons::IconTone::Warning.color(ui.visuals());
 
@@ -76,9 +75,9 @@ pub fn show_drop_zone(
         };
 
         let bg_fill = if is_warning_active {
-            crate::ui::icons::IconTone::Warning.tint(ui.visuals(), if is_dark { 36 } else { 26 })
+            crate::ui::icons::IconTone::Warning.themed_tint(ui.visuals(), 36, 26)
         } else if is_drag_hovering {
-            crate::ui::icons::IconTone::Accent.tint(ui.visuals(), if is_dark { 30 } else { 24 })
+            crate::ui::icons::IconTone::Accent.themed_tint(ui.visuals(), 30, 24)
         } else if is_pointer_hovering {
             ui.visuals().widgets.hovered.bg_fill
         } else {

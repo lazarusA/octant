@@ -1,6 +1,7 @@
 //! Hero header title, status pill, idle hints, drag cues, and warning banners.
 
 use super::style::{BODY_FONT, SMALL_FONT, content_width, fit_text, title_font};
+use crate::ui::icons::{ICON_GAP, Icon, IconSize, IconTone};
 
 /// Height of the drag-hover and warning banners.
 const BANNER_HEIGHT: f32 = 40.0;
@@ -27,13 +28,11 @@ pub fn header_title(ui: &mut egui::Ui) {
 /// two centered lines within the hero content width.
 pub fn render_status_pill(
     ui: &mut egui::Ui,
-    icon: crate::ui::icons::Icon,
+    icon: Icon,
     icon_color: egui::Color32,
     text: &str,
     text_color: egui::Color32,
 ) {
-    use crate::ui::icons::{ICON_GAP, IconSize};
-
     let icon_px = IconSize::Xs.px();
     let max_text_w = content_width(ui.available_width()) - icon_px - ICON_GAP;
 
@@ -91,99 +90,67 @@ pub fn render_idle_hint(ui: &mut egui::Ui) {
 }
 
 pub fn render_drag_hover_cue(ui: &mut egui::Ui) {
-    let width = content_width(ui.available_width());
-    let height = BANNER_HEIGHT;
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
-
-    if ui.is_rect_visible(rect) {
-        let is_dark = ui.visuals().dark_mode;
-        let accent = crate::ui::icons::IconTone::Accent.color(ui.visuals());
-        let bg =
-            crate::ui::icons::IconTone::Accent.tint(ui.visuals(), if is_dark { 22 } else { 16 });
-
-        ui.painter().rect(
-            rect,
-            6.0,
-            bg,
-            egui::Stroke::new(1.2, accent),
-            egui::StrokeKind::Inside,
-        );
-
-        let icon_rect = egui::Rect::from_center_size(
-            egui::pos2(rect.left() + 20.0, rect.center().y),
-            egui::vec2(
-                crate::ui::icons::IconSize::Sm.px(),
-                crate::ui::icons::IconSize::Sm.px(),
-            ),
-        );
-        crate::ui::icons::Icon::DropTray.paint(ui.painter(), icon_rect, accent, is_dark);
-
-        let msg = fit_text(
-            ui,
-            &[
-                "Drop dataset to load (.nc, .h5, .zarr, .icechunk, .tif)",
-                "Drop dataset (.nc, .zarr, .icechunk, .tif)",
-                "Drop dataset to load",
-            ],
-            BODY_FONT,
-            width - 44.0,
-        );
-
-        ui.painter().text(
-            egui::pos2(rect.left() + 34.0, rect.center().y),
-            egui::Align2::LEFT_CENTER,
-            msg,
-            egui::FontId::monospace(BODY_FONT),
-            accent,
-        );
-    }
+    render_banner(
+        ui,
+        Icon::DropTray,
+        IconTone::Accent,
+        &[
+            "Drop dataset to load (.nc, .h5, .zarr, .icechunk, .tif)",
+            "Drop dataset (.nc, .zarr, .icechunk, .tif)",
+            "Drop dataset to load",
+        ],
+    );
 }
 
 pub fn render_warning_banner(ui: &mut egui::Ui) {
+    render_banner(
+        ui,
+        Icon::Warning,
+        IconTone::Warning,
+        &[
+            "Unsupported type. Supported: .nc, .h5, .zarr, .icechunk, .tif",
+            "Unsupported format (.nc, .zarr, .icechunk, .tif)",
+            "Unsupported format",
+        ],
+    );
+}
+
+/// Content-width banner tinted with `tone`: icon at the left, then the
+/// longest of `messages` that fits.
+fn render_banner(ui: &mut egui::Ui, icon: Icon, tone: IconTone, messages: &[&str]) {
+    const PAD_X: f32 = 12.0;
+    let icon_px = IconSize::Sm.px();
+
     let width = content_width(ui.available_width());
-    let height = BANNER_HEIGHT;
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
-
-    if ui.is_rect_visible(rect) {
-        let is_dark = ui.visuals().dark_mode;
-        let warning_color = crate::ui::icons::IconTone::Warning.color(ui.visuals());
-        let bg =
-            crate::ui::icons::IconTone::Warning.tint(ui.visuals(), if is_dark { 26 } else { 18 });
-
-        ui.painter().rect(
-            rect,
-            6.0,
-            bg,
-            egui::Stroke::new(1.0, warning_color),
-            egui::StrokeKind::Inside,
-        );
-
-        let icon_rect = egui::Rect::from_center_size(
-            egui::pos2(rect.left() + 18.0, rect.center().y),
-            egui::vec2(
-                crate::ui::icons::IconSize::Sm.px(),
-                crate::ui::icons::IconSize::Sm.px(),
-            ),
-        );
-        crate::ui::icons::Icon::Warning.paint(ui.painter(), icon_rect, warning_color, is_dark);
-
-        let msg = fit_text(
-            ui,
-            &[
-                "Unsupported type. Supported: .nc, .h5, .zarr, .icechunk, .tif",
-                "Unsupported format (.nc, .zarr, .icechunk, .tif)",
-                "Unsupported format",
-            ],
-            BODY_FONT,
-            width - 42.0,
-        );
-
-        ui.painter().text(
-            egui::pos2(rect.left() + 32.0, rect.center().y),
-            egui::Align2::LEFT_CENTER,
-            msg,
-            egui::FontId::monospace(BODY_FONT),
-            warning_color,
-        );
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, BANNER_HEIGHT), egui::Sense::hover());
+    if !ui.is_rect_visible(rect) {
+        return;
     }
+
+    let visuals = ui.visuals();
+    let color = tone.color(visuals);
+    let fill = tone.themed_tint(visuals, 24, 16);
+    ui.painter().rect(
+        rect,
+        6.0,
+        fill,
+        egui::Stroke::new(1.0, color),
+        egui::StrokeKind::Inside,
+    );
+
+    let icon_rect = egui::Rect::from_min_size(
+        egui::pos2(rect.left() + PAD_X, rect.center().y - icon_px * 0.5),
+        egui::Vec2::splat(icon_px),
+    );
+    icon.paint(ui.painter(), icon_rect, color, visuals.dark_mode);
+
+    let text_x = icon_rect.right() + ICON_GAP + 2.0;
+    let msg = fit_text(ui, messages, BODY_FONT, rect.right() - PAD_X - text_x);
+    ui.painter().text(
+        egui::pos2(text_x, rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        msg,
+        egui::FontId::monospace(BODY_FONT),
+        color,
+    );
 }
