@@ -1,5 +1,5 @@
 use crate::app::{OctantApp, StoreKind};
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, ToolbarButton, UiIconExt};
 
 pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
     // Extract to a local bool to avoid split-borrow: we can't hold &mut app.field
@@ -214,8 +214,15 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
     app.show_left_panel = show;
 }
 
-pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    if ui.icon_button(Icon::Dataset, "Dataset").clicked() {
+pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
+    if ui
+        .add(
+            ToolbarButton::new(Icon::Dataset, "Dataset")
+                .compact(compact)
+                .active(app.show_left_panel),
+        )
+        .clicked()
+    {
         app.show_left_panel = !app.show_left_panel;
     }
 }

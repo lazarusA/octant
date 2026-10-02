@@ -4,11 +4,14 @@
 //! egui's GPU vertex stream with `egui::Painter`. Replaces font-dependent emojis with
 //! crisp scientific icons.
 
+pub mod button;
 pub mod nav;
 pub mod playback;
 pub mod plots;
 pub mod status;
 pub mod store;
+
+pub use button::{TOOLBAR_ICON_SIZE, TOOLBAR_ITEM_HEIGHT, ToolbarButton};
 
 use egui::{Color32, Painter, Pos2, Rect, Response, Sense, Stroke, Ui, WidgetText, pos2, vec2};
 

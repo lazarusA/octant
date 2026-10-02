@@ -1,10 +1,15 @@
 use crate::{
     app::OctantApp,
-    ui::icons::{Icon, UiIconExt},
+    ui::icons::{Icon, ToolbarButton, UiIconExt},
 };
 
-pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.icon_menu_button(Icon::Cache, "Cache", |ui| {
+pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
+    let button_response = ui.add(
+        ToolbarButton::new(Icon::Cache, "Cache")
+            .compact(compact)
+            .owns_popup(),
+    );
+    egui::Popup::menu(&button_response).show(|ui| {
         ui.set_min_width(360.0);
         ui.horizontal(|ui| {
             ui.icon(Icon::Cache, 14.0);
