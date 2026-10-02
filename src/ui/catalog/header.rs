@@ -14,11 +14,7 @@ pub fn render_header(ui: &mut egui::Ui, total_count: usize, should_close: &mut b
         );
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui
-                .icon_button(Icon::Cross, "")
-                .on_hover_text("Close (Esc)")
-                .clicked()
-            {
+            if ui.close_button("Close (Esc)").clicked() {
                 *should_close = true;
             }
         });

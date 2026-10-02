@@ -28,6 +28,7 @@ pub struct ToolbarButton<'a> {
     hover: Option<&'a str>,
     active: bool,
     owns_popup: bool,
+    icon_size: IconSize,
 }
 
 impl<'a> ToolbarButton<'a> {
@@ -39,6 +40,7 @@ impl<'a> ToolbarButton<'a> {
             hover: None,
             active: false,
             owns_popup: false,
+            icon_size: IconSize::Md,
         }
     }
 
@@ -64,6 +66,13 @@ impl<'a> ToolbarButton<'a> {
     /// (via `egui::Popup::from_toggle_button_response` or `menu`) is open.
     pub fn owns_popup(mut self) -> Self {
         self.owns_popup = true;
+        self
+    }
+
+    /// Glyph size; the button stays `PAD_X` larger on every side. Defaults to
+    /// `Md`, giving the 24 px toolbar height.
+    pub fn icon_size(mut self, size: IconSize) -> Self {
+        self.icon_size = size;
         self
     }
 
@@ -97,7 +106,9 @@ impl Widget for ToolbarButton<'_> {
             .as_ref()
             .map_or(0.0, |g| ICON_GAP + g.size().x + LABEL_PAD_RIGHT);
 
-        let size = vec2(TOOLBAR_ITEM_HEIGHT + label_w, TOOLBAR_ITEM_HEIGHT);
+        let icon_px = self.icon_size.px();
+        let side = icon_px + PAD_X * 2.0;
+        let size = vec2(side + label_w, side);
         let (rect, response) = ui.allocate_exact_size(size, Sense::click());
 
         if ui.is_rect_visible(rect) {
@@ -130,11 +141,8 @@ impl Widget for ToolbarButton<'_> {
 
             let color = visuals.text_color();
             let icon_rect = Rect::from_min_size(
-                pos2(
-                    rect.min.x + PAD_X,
-                    rect.center().y - TOOLBAR_ICON_SIZE * 0.5,
-                ),
-                vec2(TOOLBAR_ICON_SIZE, TOOLBAR_ICON_SIZE),
+                pos2(rect.min.x + PAD_X, rect.center().y - icon_px * 0.5),
+                vec2(icon_px, icon_px),
             );
             self.icon
                 .paint(ui.painter(), icon_rect, color, ui.visuals().dark_mode);

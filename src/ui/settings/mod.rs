@@ -9,6 +9,7 @@ mod plot_options;
 mod resampling;
 
 use crate::app::OctantApp;
+use crate::ui::icons::{Icon, IconSize, UiIconExt};
 
 /// Anchored to the left edge of the canvas area, just below the top bar.
 /// Stores its own width so Variable Controls can position to the right without overlap.
@@ -24,6 +25,7 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
         8.0
     };
 
+    let mut should_close = false;
     let area_resp = egui::Area::new(egui::Id::new("octant_settings_area"))
         .fixed_pos(egui::pos2(
             canvas_rect.left() + x_offset,
@@ -35,17 +37,34 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
                 .stroke(egui::Stroke::NONE)
                 .show(ui, |ui| {
                     ui.set_max_width(280.0);
-                    egui::CollapsingHeader::new("Settings")
-                        .default_open(true)
-                        .show(ui, |ui| {
-                            plot_options::show_plot_options(app, ui);
-                            ui.separator();
-                            clipping::show_clipping_bounds(app, ui);
-                            ui.separator();
-                            export::show_export_preferences(app, ui);
+                    let header_id = ui.make_persistent_id("settings_panel_header");
+                    egui::collapsing_header::CollapsingState::load_with_default_open(
+                        ui.ctx(),
+                        header_id,
+                        true,
+                    )
+                    .show_header(ui, |ui| {
+                        ui.icon(Icon::Settings, IconSize::Sm);
+                        ui.label(egui::RichText::new("Settings").strong());
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.close_button("Close Settings").clicked() {
+                                should_close = true;
+                            }
                         });
+                    })
+                    .body(|ui| {
+                        plot_options::show_plot_options(app, ui);
+                        ui.separator();
+                        clipping::show_clipping_bounds(app, ui);
+                        ui.separator();
+                        export::show_export_preferences(app, ui);
+                    });
                 });
         });
+
+    if should_close {
+        app.show_settings_panel = false;
+    }
 
     // Store width for next frame so Variable Controls can position to the right.
     app.settings_overlay_width = area_resp.response.rect.width();

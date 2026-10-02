@@ -26,7 +26,7 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
             ui.ctx()
                 .data_mut(|d| d.insert_temp(search_id, search_query.clone()));
         }
-        if has_text && ui.icon_button(Icon::Cross, "").clicked() {
+        if has_text && ui.close_button("Clear search").clicked() {
             search_query.clear();
             ui.ctx()
                 .data_mut(|d| d.insert_temp(search_id, String::new()));

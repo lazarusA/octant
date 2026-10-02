@@ -1,64 +1,66 @@
 //! Dataset intake bar and input field controls.
 
+use super::style::{BODY_FONT, content_width, fit_text};
 use crate::app::OctantApp;
 
+/// Horizontal / vertical inner padding of the intake frame.
+const MARGIN_X: i8 = 12;
+const MARGIN_Y: i8 = 8;
+
+/// Horizontal margin inside the text field itself (egui's default is 4).
+const EDIT_MARGIN_X: i8 = 4;
+
+/// Distance from the intake frame's outer left edge to its text (frame
+/// stroke + frame padding + field margin), so captions below the bar can
+/// line up with the input text.
+pub const INTAKE_TEXT_INSET: f32 = 1.0 + MARGIN_X as f32 + EDIT_MARGIN_X as f32;
+
 pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
-    let avail_w = ui.available_width();
-    let intake_w = (avail_w - 24.0).clamp(180.0, 460.0);
+    let stroke = ui.visuals().widgets.noninteractive.bg_stroke;
+    // Outer width follows the shared hero gutter; subtract margins and stroke
+    // so the frame itself never touches the window edge.
+    let inner_w = content_width(ui.available_width()) - 2.0 * (f32::from(MARGIN_X) + stroke.width);
 
     egui::Frame::default()
         .fill(ui.visuals().extreme_bg_color)
-        .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
-        .corner_radius(6.0)
-        .inner_margin(egui::Margin::symmetric(10, 6))
+        .stroke(stroke)
+        .corner_radius(8.0)
+        .inner_margin(egui::Margin::symmetric(MARGIN_X, MARGIN_Y))
         .show(ui, |ui| {
-            ui.set_width(intake_w);
+            ui.set_width(inner_w);
             ui.horizontal(|ui| {
                 let has_input = !app.hero_state.input.trim().is_empty();
-                let right_reserve = if has_input { 52.0 } else { 30.0 };
-
-                let hint_text = if intake_w < 310.0 {
-                    "URL or path..."
-                } else if intake_w < 400.0 {
-                    "https://... or path (.zarr, .nc, .tiff, ...)"
-                } else {
-                    "https://... or path (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
-                };
-
+                let right_reserve = if has_input { 60.0 } else { 34.0 };
                 let desired_w = (ui.available_width() - right_reserve).max(30.0);
+
+                let hint_text = fit_text(
+                    ui,
+                    &[
+                        "https://... or path (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
+                        "https://... or path (.zarr, .nc, .tiff, ...)",
+                        "URL or path...",
+                    ],
+                    BODY_FONT,
+                    desired_w,
+                );
+
                 let edit = egui::TextEdit::singleline(&mut app.hero_state.input)
                     .hint_text(hint_text)
-                    .font(egui::TextStyle::Monospace)
+                    .font(egui::FontId::monospace(BODY_FONT))
+                    .vertical_align(egui::Align::Center)
+                    .min_size(egui::vec2(0.0, 22.0))
                     .frame(egui::Frame::NONE)
+                    .margin(egui::Margin::symmetric(EDIT_MARGIN_X, 2))
                     .desired_width(desired_w);
                 let response = ui.add(edit);
 
                 let enter_pressed =
                     response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
-                if has_input {
-                    let clear_size = egui::vec2(18.0, 18.0);
-                    let (clear_rect, clear_resp) =
-                        ui.allocate_exact_size(clear_size, egui::Sense::click());
-
-                    if ui.is_rect_visible(clear_rect) {
-                        let is_hovered = clear_resp.hovered();
-                        let color = if is_hovered {
-                            ui.visuals().strong_text_color()
-                        } else {
-                            ui.visuals().weak_text_color().gamma_multiply(0.65)
-                        };
-                        crate::ui::icons::Icon::Cross.paint(
-                            ui.painter(),
-                            clear_rect.shrink(2.0),
-                            color,
-                            ui.visuals().dark_mode,
-                        );
-                    }
-
-                    if clear_resp.on_hover_text("Clear input").clicked() {
-                        app.hero_state.input.clear();
-                    }
+                if has_input
+                    && crate::ui::icons::UiIconExt::close_button(ui, "Clear input").clicked()
+                {
+                    app.hero_state.input.clear();
                 }
 
                 // Procedural download / load icon button

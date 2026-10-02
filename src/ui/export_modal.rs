@@ -13,12 +13,21 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
     let mut should_close = false;
 
     egui::Window::new("Save & Export Figure")
-        .open(&mut is_open)
+        .title_bar(false)
         .resizable(false)
         .collapsible(false)
         .default_width(380.0)
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("Save & Export Figure").strong());
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.close_button("Close (Esc)").clicked() {
+                        should_close = true;
+                    }
+                });
+            });
+            ui.separator();
             ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
 
             // 1. Format Selection Tabs
@@ -131,7 +140,7 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
             });
         });
 
-    if should_close {
+    if should_close || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
         is_open = false;
     }
     app.show_export_modal = is_open;
@@ -211,11 +220,7 @@ pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: 
                                 dismiss = true;
                             }
 
-                            if ui
-                                .icon_button(Icon::Cross, "")
-                                .on_hover_text("Dismiss")
-                                .clicked()
-                            {
+                            if ui.close_button("Dismiss").clicked() {
                                 dismiss = true;
                             }
                         });

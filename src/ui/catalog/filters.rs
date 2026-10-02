@@ -28,12 +28,7 @@ pub fn render_search_and_filters(
                 .desired_width(search_w),
         );
 
-        if search_has_text
-            && ui
-                .icon_button(Icon::Cross, "")
-                .on_hover_text("Clear search")
-                .clicked()
-        {
+        if search_has_text && ui.close_button("Clear search").clicked() {
             app.catalog_search_query.clear();
         }
     });

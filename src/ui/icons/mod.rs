@@ -19,7 +19,7 @@ mod tests;
 
 pub use button::{TOOLBAR_ITEM_HEIGHT, ToolbarButton};
 pub use ext::UiIconExt;
-pub use style::{IconSize, IconTone};
+pub use style::{ICON_GAP, IconSize, IconTone};
 
 use egui::{Pos2, Rect, pos2};
 

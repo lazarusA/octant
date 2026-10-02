@@ -1,7 +1,8 @@
-//! `egui::Ui` helpers for drawing icons, icon labels and framed icon buttons.
+//! `egui::Ui` helpers for drawing icons, icon labels, framed icon buttons and
+//! the standard close button.
 
-use super::Icon;
 use super::style::{ICON_GAP, IconSize, IconTone};
+use super::{Icon, ToolbarButton};
 use egui::{Color32, Rect, Response, Sense, Ui, WidgetText, pos2, vec2};
 
 /// Helper extension trait for easy rendering in egui UIs.
@@ -21,6 +22,21 @@ pub trait UiIconExt {
 
     /// Render a non-interactive `Sm` icon followed by label text.
     fn icon_label(&mut self, icon: Icon, text: impl Into<WidgetText>) -> Response;
+
+    /// Render the standard frameless close (or clear) button: an `Sm` cross
+    /// that highlights on hover and shows `hover` as its tooltip. Place close
+    /// buttons in the top-right corner of their panel or window.
+    fn close_button(&mut self, hover: &str) -> Response;
+
+    /// Render a button like [`Self::icon_button`] with no background at rest
+    /// and a `tone` outline, marking the primary action of its panel. The
+    /// usual fill appears on hover and press.
+    fn outlined_icon_button(
+        &mut self,
+        icon: Icon,
+        text: impl Into<WidgetText>,
+        tone: IconTone,
+    ) -> Response;
 }
 
 impl UiIconExt for Ui {
@@ -44,35 +60,25 @@ impl UiIconExt for Ui {
     }
 
     fn icon_button(&mut self, icon: Icon, text: impl Into<WidgetText>) -> Response {
-        let font_id = egui::TextStyle::Button.resolve(self.style());
-        let galley = text
-            .into()
-            .into_galley(self, None, self.available_width(), font_id);
+        framed_icon_button(self, icon, text.into(), None)
+    }
 
-        let icon_size = IconSize::Sm.px();
-        let gap = if galley.is_empty() { 0.0 } else { ICON_GAP };
-        let padding = self.spacing().button_padding;
-        let content_size = vec2(
-            icon_size + gap + galley.size().x,
-            icon_size.max(galley.size().y),
-        );
-        let (rect, response) =
-            self.allocate_exact_size(content_size + padding * 2.0, Sense::click());
+    fn close_button(&mut self, hover: &str) -> Response {
+        self.add(
+            ToolbarButton::new(Icon::Cross, hover)
+                .compact(true)
+                .icon_size(IconSize::Sm),
+        )
+    }
 
-        if self.is_rect_visible(rect) {
-            let visuals = self.style().interact(&response);
-            self.painter().rect(
-                rect,
-                visuals.corner_radius,
-                visuals.bg_fill,
-                visuals.bg_stroke,
-                egui::StrokeKind::Inside,
-            );
-            let color = visuals.text_color();
-            let origin = rect.min + padding;
-            paint_icon_and_text(self, icon, origin, content_size.y, galley, gap, color);
-        }
-        response
+    fn outlined_icon_button(
+        &mut self,
+        icon: Icon,
+        text: impl Into<WidgetText>,
+        tone: IconTone,
+    ) -> Response {
+        let outline = tone.color(self.visuals());
+        framed_icon_button(self, icon, text.into(), Some(outline))
     }
 
     fn icon_label(&mut self, icon: Icon, text: impl Into<WidgetText>) -> Response {
@@ -95,6 +101,56 @@ impl UiIconExt for Ui {
         }
         response
     }
+}
+
+/// Framed button with an `Sm` icon and optional label. When `outline` is set
+/// it replaces the frame stroke (thicker while hovered) and the background is
+/// only drawn while hovered or pressed.
+fn framed_icon_button(
+    ui: &mut Ui,
+    icon: Icon,
+    text: WidgetText,
+    outline: Option<Color32>,
+) -> Response {
+    let font_id = egui::TextStyle::Button.resolve(ui.style());
+    let galley = text.into_galley(ui, None, ui.available_width(), font_id);
+
+    let icon_size = IconSize::Sm.px();
+    let gap = if galley.is_empty() { 0.0 } else { ICON_GAP };
+    let padding = ui.spacing().button_padding;
+    let content_size = vec2(
+        icon_size + gap + galley.size().x,
+        icon_size.max(galley.size().y),
+    );
+    let (rect, response) = ui.allocate_exact_size(content_size + padding * 2.0, Sense::click());
+
+    if ui.is_rect_visible(rect) {
+        let visuals = ui.style().interact(&response);
+        let interacting = response.hovered() || response.is_pointer_button_down_on();
+        let (fill, stroke) = match outline {
+            Some(color) => {
+                let width = if response.hovered() { 1.5 } else { 1.0 };
+                let fill = if interacting {
+                    visuals.bg_fill
+                } else {
+                    Color32::TRANSPARENT
+                };
+                (fill, egui::Stroke::new(width, color))
+            }
+            None => (visuals.bg_fill, visuals.bg_stroke),
+        };
+        ui.painter().rect(
+            rect,
+            visuals.corner_radius,
+            fill,
+            stroke,
+            egui::StrokeKind::Inside,
+        );
+        let color = visuals.text_color();
+        let origin = rect.min + padding;
+        paint_icon_and_text(ui, icon, origin, content_size.y, galley, gap, color);
+    }
+    response
 }
 
 /// Paint an `Sm` icon and its label, both vertically centred in a row of

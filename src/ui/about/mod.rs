@@ -8,6 +8,7 @@ pub mod types;
 pub use types::{AboutTab, ICON_CATEGORIES, ICONS_TAB_LABEL};
 
 use crate::app::OctantApp;
+use crate::ui::icons::UiIconExt;
 use icons::show_icons_tab;
 use overview::show_overview_tab;
 
@@ -55,7 +56,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     };
 
     let response = egui::Window::new(title)
-        .open(&mut open)
+        .title_bar(false)
         .default_size(default_size)
         .min_size(min_size)
         .max_size(max_size)
@@ -88,6 +89,12 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
                         {
                             active_tab = AboutTab::Icons;
                         }
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.close_button("Close (Esc)").clicked() {
+                                open = false;
+                            }
+                        });
                     });
 
                     ui.add_space(4.0);

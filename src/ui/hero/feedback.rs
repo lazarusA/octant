@@ -1,48 +1,31 @@
 //! Hero header title, status pill, idle hints, drag cues, and warning banners.
 
-pub fn header_title(ui: &mut egui::Ui) {
-    let avail_w = ui.available_width();
-    let font_size = if avail_w < 380.0 {
-        11.5
-    } else if avail_w < 480.0 {
-        12.5
-    } else {
-        13.5
-    };
+use super::intake::INTAKE_TEXT_INSET;
+use super::style::{BODY_FONT, SMALL_FONT, content_width, fit_text, title_font};
 
+/// Height of the drag-hover and warning banners.
+const BANNER_HEIGHT: f32 = 40.0;
+
+/// "OCTANT" wordmark under the cube: spaced monospace capitals in the strong
+/// text color.
+pub fn header_title(ui: &mut egui::Ui) {
+    let font_size = title_font(ui.available_width());
     let mut job = egui::text::LayoutJob::default();
-    job.wrap.max_width = (avail_w - 24.0).max(100.0);
-    job.halign = egui::Align::Center;
     job.append(
-        "Bring data into ",
-        0.0,
-        egui::TextFormat {
-            font_id: egui::FontId::monospace(font_size),
-            color: ui.visuals().weak_text_color(),
-            ..Default::default()
-        },
-    );
-    job.append(
-        "Octant",
+        "OCTANT",
         0.0,
         egui::TextFormat {
             font_id: egui::FontId::monospace(font_size),
             color: ui.visuals().strong_text_color(),
-            ..Default::default()
-        },
-    );
-    job.append(
-        ". Start exploring.",
-        0.0,
-        egui::TextFormat {
-            font_id: egui::FontId::monospace(font_size),
-            color: ui.visuals().weak_text_color(),
+            extra_letter_spacing: font_size * 0.35,
             ..Default::default()
         },
     );
     ui.label(job);
 }
 
+/// Centered status line: icon followed by `text`, which wraps onto at most
+/// two centered lines within the hero content width.
 pub fn render_status_pill(
     ui: &mut egui::Ui,
     icon: crate::ui::icons::Icon,
@@ -50,51 +33,75 @@ pub fn render_status_pill(
     text: &str,
     text_color: egui::Color32,
 ) {
-    ui.add_space(16.0);
-    let font_id = egui::FontId::monospace(11.0);
-    let max_text_w = (ui.available_width() - 48.0).max(60.0);
-    let galley = ui
-        .painter()
-        .layout(text.to_string(), font_id, text_color, max_text_w);
-    let icon_size = crate::ui::icons::IconSize::Xs;
-    let gap = 6.0;
-    let total_w = icon_size.px() + gap + galley.size().x;
-    let pad = ((ui.available_width() - total_w) * 0.5).max(0.0);
+    use crate::ui::icons::{ICON_GAP, IconSize};
 
-    ui.horizontal(|ui| {
-        ui.set_width(ui.available_width());
-        if pad > 0.0 {
-            ui.add_space(pad);
-        }
-        crate::ui::icons::UiIconExt::icon_colored(ui, icon, icon_size, icon_color);
-        ui.add_space(gap);
-        ui.label(
-            egui::RichText::new(galley.text())
-                .monospace()
-                .size(11.0)
-                .color(text_color),
-        );
-    });
+    let icon_px = IconSize::Xs.px();
+    let max_text_w = content_width(ui.available_width()) - icon_px - ICON_GAP;
+
+    let mut job = egui::text::LayoutJob::simple(
+        text.to_string(),
+        egui::FontId::monospace(BODY_FONT),
+        text_color,
+        max_text_w,
+    );
+    job.wrap.max_rows = 2;
+    job.halign = egui::Align::Center;
+    let galley = ui.painter().layout_job(job);
+
+    // Allocating the exact block size lets the parent vertical_centered
+    // layout center it horizontally.
+    let text_w = galley.size().x;
+    let size = egui::vec2(icon_px + ICON_GAP + text_w, galley.size().y.max(icon_px));
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    if !ui.is_rect_visible(rect) {
+        return;
+    }
+
+    let first_row_h = galley.rows.first().map_or(icon_px, |r| r.height());
+    let icon_rect = egui::Rect::from_min_size(
+        egui::pos2(rect.min.x, rect.min.y + (first_row_h - icon_px) * 0.5),
+        egui::vec2(icon_px, icon_px),
+    );
+    icon.paint(ui.painter(), icon_rect, icon_color, ui.visuals().dark_mode);
+
+    // Offset by the galley's own bounds: center-aligned rows may start at a
+    // negative x relative to the galley origin.
+    let text_min = egui::pos2(rect.min.x + icon_px + ICON_GAP, rect.min.y);
+    let text_pos = text_min - galley.rect.min.to_vec2();
+    ui.painter().galley(text_pos, galley, text_color);
 }
 
+/// Helper caption under the intake bar, left-aligned with the bar's edge.
 pub fn render_idle_hint(ui: &mut egui::Ui) {
-    let avail_w = ui.available_width();
-    let text = if avail_w < 340.0 {
-        "paste URL, path, or drag & drop files"
-    } else {
-        "paste URL, local path, or drag & drop files anywhere"
-    };
-    ui.label(
-        egui::RichText::new(text)
-            .monospace()
-            .size(10.0)
-            .color(ui.visuals().strong_text_color()),
+    let width = content_width(ui.available_width());
+    // Inset to line up with the text inside the intake frame.
+    let inset = INTAKE_TEXT_INSET;
+    let text = fit_text(
+        ui,
+        &[
+            "paste URL, local path, or drag & drop files anywhere",
+            "paste URL, path, or drag & drop files",
+            "paste URL or drop files",
+        ],
+        SMALL_FONT,
+        width - inset,
     );
+    let color = ui.visuals().strong_text_color();
+    let galley =
+        ui.painter()
+            .layout_no_wrap(text.to_string(), egui::FontId::monospace(SMALL_FONT), color);
+
+    // A full content-width row is centered by the parent column; the text is
+    // then painted from its left edge.
+    let (rect, _) =
+        ui.allocate_exact_size(egui::vec2(width, galley.size().y), egui::Sense::hover());
+    ui.painter()
+        .galley(egui::pos2(rect.min.x + inset, rect.min.y), galley, color);
 }
 
 pub fn render_drag_hover_cue(ui: &mut egui::Ui) {
-    let width = (ui.available_width() - 24.0).clamp(180.0, 460.0);
-    let height = 38.0;
+    let width = content_width(ui.available_width());
+    let height = BANNER_HEIGHT;
     let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
 
     if ui.is_rect_visible(rect) {
@@ -120,25 +127,30 @@ pub fn render_drag_hover_cue(ui: &mut egui::Ui) {
         );
         crate::ui::icons::Icon::DropTray.paint(ui.painter(), icon_rect, accent, is_dark);
 
-        let msg = if width < 330.0 {
-            "Drop dataset (.nc, .zarr, .icechunk, .tif)"
-        } else {
-            "Drop dataset to load (.nc, .h5, .zarr, .icechunk, .tif)"
-        };
+        let msg = fit_text(
+            ui,
+            &[
+                "Drop dataset to load (.nc, .h5, .zarr, .icechunk, .tif)",
+                "Drop dataset (.nc, .zarr, .icechunk, .tif)",
+                "Drop dataset to load",
+            ],
+            BODY_FONT,
+            width - 44.0,
+        );
 
         ui.painter().text(
             egui::pos2(rect.left() + 34.0, rect.center().y),
             egui::Align2::LEFT_CENTER,
             msg,
-            egui::FontId::monospace(10.5),
+            egui::FontId::monospace(BODY_FONT),
             accent,
         );
     }
 }
 
 pub fn render_warning_banner(ui: &mut egui::Ui) {
-    let width = (ui.available_width() - 24.0).clamp(180.0, 460.0);
-    let height = 36.0;
+    let width = content_width(ui.available_width());
+    let height = BANNER_HEIGHT;
     let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
 
     if ui.is_rect_visible(rect) {
@@ -164,17 +176,22 @@ pub fn render_warning_banner(ui: &mut egui::Ui) {
         );
         crate::ui::icons::Icon::Warning.paint(ui.painter(), icon_rect, warning_color, is_dark);
 
-        let msg = if width < 340.0 {
-            "Unsupported format (.nc, .zarr, .icechunk, .tif)"
-        } else {
-            "Unsupported type — supported: .nc, .h5, .zarr, .icechunk, .tif"
-        };
+        let msg = fit_text(
+            ui,
+            &[
+                "Unsupported type. Supported: .nc, .h5, .zarr, .icechunk, .tif",
+                "Unsupported format (.nc, .zarr, .icechunk, .tif)",
+                "Unsupported format",
+            ],
+            BODY_FONT,
+            width - 42.0,
+        );
 
         ui.painter().text(
             egui::pos2(rect.left() + 32.0, rect.center().y),
             egui::Align2::LEFT_CENTER,
             msg,
-            egui::FontId::monospace(10.5),
+            egui::FontId::monospace(BODY_FONT),
             warning_color,
         );
     }

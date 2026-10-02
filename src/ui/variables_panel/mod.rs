@@ -12,7 +12,7 @@ pub use dimension_slider::{
 pub use info::show_variable_info;
 
 use crate::app::OctantApp;
-use crate::ui::icons::{Icon, IconSize, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
 /// Positioned to the right of the Settings overlay using the previous frame's settings width.
 pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
@@ -73,14 +73,13 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         ui.label(egui::RichText::new(display_name).strong());
                         let plot_icon = crate::ui::plot_type::plot_type_icon(app.active_plot_type);
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui
-                                .icon_button(Icon::Cross, "Close")
-                                .on_hover_text("Close Dimension Panel")
-                                .clicked()
-                            {
+                            if ui.close_button("Close Dimension Panel").clicked() {
                                 should_close = true;
                             }
-                            if ui.icon_button(plot_icon, "Plot Data").clicked() {
+                            if ui
+                                .outlined_icon_button(plot_icon, "Plot Data", IconTone::Default)
+                                .clicked()
+                            {
                                 should_plot = true;
                             }
                         });

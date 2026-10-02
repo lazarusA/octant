@@ -135,7 +135,7 @@ pub fn show_dimension_sliders(
                 ui.checkbox(&mut app.dim_config[i].active, "");
 
                 ui.label(
-                    RichText::new(format!("{} (size {})", dim_name, dim_size))
+                    RichText::new(format!("{} ({})", dim_name, dim_size))
                         .strong()
                         .small(),
                 );
@@ -144,14 +144,14 @@ pub fn show_dimension_sliders(
                 egui::ComboBox::from_id_salt(("spatial_role", i))
                     .selected_text(match spatial {
                         SpatialRole::None => "None",
-                        SpatialRole::Grid => "Grid (2D/Globe)",
+                        SpatialRole::Grid => "Grid",
                         SpatialRole::X => "X",
                         SpatialRole::Y => "Y",
                         SpatialRole::Z => "Z",
                     })
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut spatial, SpatialRole::None, "None");
-                        ui.selectable_value(&mut spatial, SpatialRole::Grid, "Grid (2D/Globe)");
+                        ui.selectable_value(&mut spatial, SpatialRole::Grid, "Grid");
                         ui.selectable_value(&mut spatial, SpatialRole::X, "X");
                         ui.selectable_value(&mut spatial, SpatialRole::Y, "Y");
                         ui.selectable_value(&mut spatial, SpatialRole::Z, "Z");

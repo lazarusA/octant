@@ -41,11 +41,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     ui.icon(Icon::Variables, IconSize::Sm);
                     ui.label(egui::RichText::new("Variables").strong());
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .icon_button(Icon::Cross, "Close")
-                            .on_hover_text("Close Variables Window")
-                            .clicked()
-                        {
+                        if ui.close_button("Close Variables Window").clicked() {
                             should_close = true;
                         }
                     });

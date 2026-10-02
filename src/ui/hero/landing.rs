@@ -9,6 +9,7 @@ use super::feedback::{
     render_warning_banner,
 };
 use super::intake::intake_row;
+use super::style::{gap, vspace};
 use super::widget::draw_octant_widget;
 use crate::app::OctantApp;
 
@@ -43,7 +44,8 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
     let octant_size = (available_h * 0.22)
         .clamp(80.0, 136.0)
         .min((available_w * 0.40).max(80.0));
-    let top_spacing = (available_h * 0.12).clamp(8.0, 56.0);
+    let top_spacing = (available_h * 0.14).clamp(16.0, 80.0);
+    let space = |base: f32| vspace(base, available_h);
 
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
@@ -64,42 +66,43 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.hero_state.start_hop(Duration::from_millis(350));
                 }
 
-                ui.add_space(16.0);
+                ui.add_space(space(gap::CUBE_TITLE));
                 header_title(ui);
 
-                ui.add_space(20.0);
+                ui.add_space(space(gap::TITLE_INTAKE));
                 intake_row(ui, app);
 
-                ui.add_space(12.0);
-                sample_slash_chips_row(ui, app);
-
-                // Minimalist footer / drag feedback
+                // Helper caption under the input; drag / warning feedback
+                // temporarily takes its place.
+                ui.add_space(gap::INTAKE_HINT);
                 if is_warning_active {
-                    ui.add_space(12.0);
                     render_warning_banner(ui);
                 } else if is_drag_hovering {
-                    ui.add_space(12.0);
                     render_drag_hover_cue(ui);
                 } else {
-                    ui.add_space(12.0);
                     render_idle_hint(ui);
                 }
 
+                ui.add_space(space(gap::HINT_CHIPS));
+                sample_slash_chips_row(ui, app);
+
                 if app.is_loading || app.hero_state.loading {
                     let label = if !app.hero_state.source_label.is_empty() {
-                        format!("loading — {}", app.hero_state.source_label)
+                        format!("loading: {}", app.hero_state.source_label)
                     } else {
                         "loading...".to_string()
                     };
+                    ui.add_space(space(gap::CHIPS_STATUS));
                     render_status_pill(
                         ui,
                         crate::ui::icons::Icon::Hourglass,
                         crate::ui::icons::IconTone::Muted.color(ui.visuals()),
                         &label,
-                        ui.visuals().weak_text_color(),
+                        ui.visuals().text_color(),
                     );
                 } else if app.hero_state.loaded && !app.hero_state.source_label.is_empty() {
-                    let label = format!("loaded — {}", app.hero_state.source_label);
+                    let label = format!("loaded: {}", app.hero_state.source_label);
+                    ui.add_space(space(gap::CHIPS_STATUS));
                     render_status_pill(
                         ui,
                         crate::ui::icons::Icon::Check,
@@ -109,7 +112,7 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                     );
                 }
 
-                ui.add_space(16.0);
+                ui.add_space(top_spacing);
             });
         });
 }

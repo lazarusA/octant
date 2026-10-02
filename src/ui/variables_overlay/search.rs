@@ -16,12 +16,7 @@ pub fn render_search_bar(ui: &mut egui::Ui, variable_search: &mut String) {
                 .desired_width(edit_width),
         );
 
-        if search_has_text
-            && ui
-                .icon_button(Icon::Cross, "")
-                .on_hover_text("Clear search")
-                .clicked()
-        {
+        if search_has_text && ui.close_button("Clear search").clicked() {
             variable_search.clear();
         }
     });
