@@ -1,6 +1,6 @@
 use crate::app::OctantApp;
 use crate::plots::PlotType;
-use crate::ui::icons::{Icon, ToolbarButton, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
 
 /// Map a PlotType to its corresponding vector Icon.
 #[inline]
@@ -161,7 +161,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
         if is_enabled {
             let clicked = ui
                 .horizontal(|ui| {
-                    ui.icon(icon, 14.0);
+                    ui.icon(icon, IconSize::Sm);
                     ui.selectable_label(is_selected, label).clicked()
                 })
                 .inner;
@@ -187,7 +187,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
             };
 
             ui.horizontal(|ui| {
-                ui.icon_colored(icon, 14.0, ui.visuals().weak_text_color());
+                ui.icon_toned(icon, IconSize::Sm, IconTone::Muted);
                 ui.add_enabled(false, egui::Label::new(format!("{} ({})", label, reason)));
             });
         }

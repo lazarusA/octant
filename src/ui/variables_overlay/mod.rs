@@ -3,7 +3,7 @@ pub mod search;
 pub mod tree;
 
 use crate::app::OctantApp;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, UiIconExt};
 use search::render_search_bar;
 use tree::{VariableTreeContext, render_tree_group};
 
@@ -38,7 +38,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     true,
                 )
                 .show_header(ui, |ui| {
-                    ui.icon(Icon::Variables, 13.0);
+                    ui.icon(Icon::Variables, IconSize::Sm);
                     ui.label(egui::RichText::new("Variables").strong());
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui

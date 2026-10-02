@@ -94,7 +94,7 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                     render_status_pill(
                         ui,
                         crate::ui::icons::Icon::Hourglass,
-                        ui.visuals().weak_text_color(),
+                        crate::ui::icons::IconTone::Muted.color(ui.visuals()),
                         &label,
                         ui.visuals().weak_text_color(),
                     );
@@ -103,7 +103,7 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                     render_status_pill(
                         ui,
                         crate::ui::icons::Icon::Check,
-                        ui.visuals().selection.bg_fill,
+                        crate::ui::icons::IconTone::Accent.color(ui.visuals()),
                         &label,
                         ui.visuals().text_color(),
                     );

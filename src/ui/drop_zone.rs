@@ -66,12 +66,8 @@ pub fn show_drop_zone(
 
     if ui.is_rect_visible(rect) {
         let is_dark = ui.visuals().dark_mode;
-        let normal_accent = if is_dark {
-            egui::Color32::from_rgb(0, 190, 255)
-        } else {
-            egui::Color32::from_rgb(0, 125, 220)
-        };
-        let warning_accent = egui::Color32::from_rgb(255, 130, 60);
+        let normal_accent = crate::ui::icons::IconTone::Accent.color(ui.visuals());
+        let warning_accent = crate::ui::icons::IconTone::Warning.color(ui.visuals());
 
         let accent_color = if is_warning_active {
             warning_accent
@@ -80,17 +76,9 @@ pub fn show_drop_zone(
         };
 
         let bg_fill = if is_warning_active {
-            if is_dark {
-                egui::Color32::from_rgba_unmultiplied(255, 110, 50, 36)
-            } else {
-                egui::Color32::from_rgba_unmultiplied(255, 130, 60, 26)
-            }
+            crate::ui::icons::IconTone::Warning.tint(ui.visuals(), if is_dark { 36 } else { 26 })
         } else if is_drag_hovering {
-            if is_dark {
-                egui::Color32::from_rgba_unmultiplied(0, 190, 255, 30)
-            } else {
-                egui::Color32::from_rgba_unmultiplied(0, 125, 220, 24)
-            }
+            crate::ui::icons::IconTone::Accent.tint(ui.visuals(), if is_dark { 30 } else { 24 })
         } else if is_pointer_hovering {
             ui.visuals().widgets.hovered.bg_fill
         } else {
@@ -125,8 +113,10 @@ pub fn show_drop_zone(
 
         let center = rect.center();
         let icon_y = center.y - 12.0;
-        let icon_rect =
-            egui::Rect::from_center_size(egui::pos2(center.x, icon_y), egui::vec2(16.0, 16.0));
+        let icon_rect = egui::Rect::from_center_size(
+            egui::pos2(center.x, icon_y),
+            egui::Vec2::splat(crate::ui::icons::IconSize::Md.px()),
+        );
         let is_dark = ui.visuals().dark_mode;
 
         if is_warning_active {

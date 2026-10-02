@@ -1,5 +1,5 @@
 use crate::data::VariableInfo;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
 pub const MAX_ITEMS_PER_LEVEL: usize = 100;
 
@@ -40,7 +40,7 @@ pub fn render_variable_row(
     let leaf_name = var_info.leaf_name();
 
     let row_resp = ui.horizontal(|ui| {
-        ui.icon(Icon::VariableDoc, 11.0);
+        ui.icon(Icon::VariableDoc, IconSize::Sm);
         if let Some(units) = &var_info.units {
             if !units.is_empty() {
                 let mut buf = [0u8; 96];
@@ -61,10 +61,10 @@ pub fn render_variable_row(
         if let Some(group) = var_info.group_path() {
             ui.horizontal(|ui| {
                 ui.label("Group:");
-                ui.icon(Icon::Folder, 11.0);
+                ui.icon(Icon::Folder, IconSize::Sm);
                 for (i, seg) in group.split('/').filter(|s| !s.is_empty()).enumerate() {
                     if i > 0 {
-                        ui.icon_colored(Icon::ChevronRight, 8.0, ui.visuals().weak_text_color());
+                        ui.icon_toned(Icon::ChevronRight, IconSize::Xs, IconTone::Muted);
                     }
                     ui.label(seg);
                 }

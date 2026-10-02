@@ -1,7 +1,7 @@
 //! Floating theme-aware toolbar for interactive ROI cropping.
 
 use crate::export::{AspectPreset, RoiCropBox};
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
 use egui::{Color32, Rect};
 
 /// Actions dispatched from the interactive Crop Toolbar.
@@ -35,7 +35,7 @@ pub fn render_crop_toolbar(
                 .corner_radius(6.0)
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.icon(Icon::Scissors, 12.0);
+                        ui.icon(Icon::Scissors, IconSize::Xs);
                         ui.label(egui::RichText::new("ROI:").small().strong());
 
                         let w_px = (box_rect.width()).round() as u32;
@@ -67,16 +67,20 @@ pub fn render_crop_toolbar(
                         ui.separator();
 
                         if ui
-                            .icon_button(Icon::Save, "Save")
-                            .on_hover_text("Save cropped ROI figure (Cmd+S)")
+                            .add(
+                                ToolbarButton::new(Icon::Save, "Save")
+                                    .hover("Save cropped ROI figure (Cmd+S)"),
+                            )
                             .clicked()
                         {
                             action = Some(CropOverlayAction::Save);
                         }
 
                         if ui
-                            .icon_button(Icon::Reset, "Reset")
-                            .on_hover_text("Fit crop box to full canvas")
+                            .add(
+                                ToolbarButton::new(Icon::Reset, "Reset")
+                                    .hover("Fit crop box to full canvas"),
+                            )
                             .clicked()
                         {
                             *crop_box = RoiCropBox::default();
@@ -84,8 +88,9 @@ pub fn render_crop_toolbar(
                         }
 
                         if ui
-                            .icon_button(Icon::Check, "Done")
-                            .on_hover_text("Close crop overlay")
+                            .add(
+                                ToolbarButton::new(Icon::Check, "Done").hover("Close crop overlay"),
+                            )
                             .clicked()
                         {
                             *is_open = false;

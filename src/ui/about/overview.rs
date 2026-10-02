@@ -2,7 +2,7 @@
 
 use super::types::AboutTab;
 use crate::app::OctantApp;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, UiIconExt};
 
 pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &mut AboutTab) {
     egui::ScrollArea::vertical()
@@ -45,17 +45,17 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.y = 4.0;
                     ui.horizontal(|ui| {
-                        ui.icon(Icon::Bolt, 13.0);
+                        ui.icon(Icon::Bolt, IconSize::Sm);
                         ui.label(egui::RichText::new("Hyperslab Slicing").strong());
                     });
                     ui.label("   Async LRU chunk cache & multi-resolution pyramids.");
                     ui.horizontal(|ui| {
-                        ui.icon(Icon::Icechunk, 13.0);
+                        ui.icon(Icon::Icechunk, IconSize::Sm);
                         ui.label(egui::RichText::new("Zarr & Icechunk Native").strong());
                     });
                     ui.label("   Local, S3, GCS, Azure, and HTTP streaming backends.");
                     ui.horizontal(|ui| {
-                        ui.icon(Icon::Colormap, 13.0);
+                        ui.icon(Icon::Colormap, IconSize::Sm);
                         ui.label(
                             egui::RichText::new("Hardware-Accelerated WGPU Shaders").strong(),
                         );
@@ -74,18 +74,18 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
             ui.add_space(4.0);
 
             ui.horizontal_wrapped(|ui| {
-                ui.icon(Icon::Catalog, 12.0);
+                ui.icon(Icon::Catalog, IconSize::Sm);
                 ui.hyperlink_to(
                     "github.com/lazarusA/octant",
                     "https://github.com/lazarusA/octant",
                 );
             });
             ui.horizontal_wrapped(|ui| {
-                ui.icon(Icon::VariableDoc, 12.0);
+                ui.icon(Icon::VariableDoc, IconSize::Sm);
                 ui.hyperlink_to("octant documentation", "https://docs.rs/octant");
             });
             ui.horizontal_wrapped(|ui| {
-                ui.icon(Icon::Globe, 12.0);
+                ui.icon(Icon::Globe, IconSize::Sm);
                 ui.hyperlink_to("@lazarusA", "https://github.com/lazarusA");
             });
 

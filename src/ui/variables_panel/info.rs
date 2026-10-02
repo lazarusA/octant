@@ -1,7 +1,7 @@
 //! Variable metadata overview card rendering.
 
 use crate::data::VariableInfo;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 use egui::{RichText, Ui};
 
 /// Renders variable data type, shape, dimensions, time range, and zattrs metadata.
@@ -17,10 +17,10 @@ pub fn show_variable_info(ui: &mut Ui, var_info: &VariableInfo) {
     if let Some(group) = var_info.group_path() {
         ui.horizontal(|ui| {
             ui.small("Path:");
-            ui.icon(Icon::Folder, 10.0);
+            ui.icon(Icon::Folder, IconSize::Xs);
             for (i, seg) in group.split('/').filter(|s| !s.is_empty()).enumerate() {
                 if i > 0 {
-                    ui.icon_colored(Icon::ChevronRight, 8.0, ui.visuals().weak_text_color());
+                    ui.icon_toned(Icon::ChevronRight, IconSize::Xs, IconTone::Muted);
                 }
                 ui.small(seg);
             }

@@ -1,8 +1,8 @@
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
 pub fn render_header(ui: &mut egui::Ui, total_count: usize, should_close: &mut bool) {
     ui.horizontal(|ui| {
-        ui.icon_colored(Icon::Catalog, 16.0, ui.visuals().strong_text_color());
+        ui.icon_toned(Icon::Catalog, IconSize::Md, IconTone::Strong);
         ui.heading("Dataset Catalog");
 
         let mut badge_buf = [0u8; 32];

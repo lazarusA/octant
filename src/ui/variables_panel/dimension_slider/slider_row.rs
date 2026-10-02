@@ -2,7 +2,7 @@
 
 use crate::app::{AnimationRole, OctantApp, SpatialRole};
 use crate::data::VariableInfo;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 use crate::utils::format_byte_size;
 use egui::{RichText, Ui};
 
@@ -69,7 +69,7 @@ pub fn show_dimension_sliders(
         let data_mb = (total_2d_elements as f64 * 4.0) / (1024.0 * 1024.0);
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.icon_colored(Icon::Bolt, 13.0, egui::Color32::from_rgb(100, 200, 255));
+                ui.icon_toned(Icon::Bolt, IconSize::Xs, IconTone::Info);
                 ui.label(
                     RichText::new(format!(
                         "Large 2D selection ({} cells, {:.0} MB): Automatic multi-resolution pyramid aggregation is enabled.",
@@ -77,7 +77,7 @@ pub fn show_dimension_sliders(
                         data_mb,
                     ))
                     .small()
-                    .color(egui::Color32::from_rgb(100, 200, 255)),
+                    .color(IconTone::Info.color(ui.visuals())),
                 );
             });
         });
@@ -86,7 +86,7 @@ pub fn show_dimension_sliders(
         let data_mb = (total_2d_elements as f64 * 4.0) / (1024.0 * 1024.0);
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.icon_colored(Icon::Info, 13.0, egui::Color32::from_rgb(255, 180, 80));
+                ui.icon_toned(Icon::Info, IconSize::Xs, IconTone::Warning);
                 ui.label(
                     RichText::new(format!(
                         "3D Globe & 3D Surface meshes are disabled for this large selection ({} cells, {:.0} MB). 2D Plane and 1D Line plots remain fully active.",
@@ -94,7 +94,7 @@ pub fn show_dimension_sliders(
                         data_mb,
                     ))
                     .small()
-                    .color(egui::Color32::from_rgb(255, 180, 80)),
+                    .color(IconTone::Warning.color(ui.visuals())),
                 );
             });
         });
@@ -106,14 +106,14 @@ pub fn show_dimension_sliders(
         let vol_mb = (total_vol_elements as f64 * 4.0) / (1024.0 * 1024.0);
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.icon_colored(Icon::Warning, 13.0, egui::Color32::from_rgb(255, 180, 80));
+                ui.icon_toned(Icon::Warning, IconSize::Xs, IconTone::Warning);
                 ui.label(
                     RichText::new(format!(
                         "3D Volume & Point Cloud are disabled for this selection: volume size ({:.0} MB) exceeds the 128 MB GPU storage buffer limit. 2D Plane, 1D Line, and 3D Globe remain active.",
                         vol_mb
                     ))
                     .small()
-                    .color(egui::Color32::from_rgb(255, 180, 80)),
+                    .color(IconTone::Warning.color(ui.visuals())),
                 );
             });
         });

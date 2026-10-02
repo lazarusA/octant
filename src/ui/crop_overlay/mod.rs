@@ -30,11 +30,7 @@ pub fn show_crop_overlay(
         egui::Color32::from_black_alpha(80)
     };
 
-    let accent_color = if dark_mode {
-        egui::Color32::from_rgb(0, 190, 255)
-    } else {
-        egui::Color32::from_rgb(0, 125, 220)
-    };
+    let accent_color = crate::ui::icons::IconTone::Accent.color(ui.visuals());
 
     let grid_stroke = egui::Stroke::new(
         1.0,

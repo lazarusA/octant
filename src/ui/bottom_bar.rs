@@ -1,5 +1,5 @@
 use crate::app::OctantApp;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(usize)]
@@ -122,7 +122,7 @@ pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.vertical_centered(|ui| {
                     ui.horizontal(|ui| {
                         ui.add_space((ui.available_width() - 200.0).max(0.0) * 0.5);
-                        ui.icon(Icon::Play, 10.0);
+                        ui.icon(Icon::Play, IconSize::Xs);
                         ui.label(
                             egui::RichText::new("Playback (click or drag to expand)")
                                 .small()
@@ -255,7 +255,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
             } else {
                 (Icon::Play, "Play")
             };
-            if ui.icon_button(play_icon, play_text).clicked() {
+            if ui.add(ToolbarButton::new(play_icon, play_text)).clicked() {
                 app.is_playing = !app.is_playing;
                 app.last_step_time = web_time::Instant::now();
             }
@@ -269,15 +269,13 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         if show_prev_next {
             let prev_next_resp = ui.scope(|ui| {
                 if ui
-                    .icon_button(Icon::StepBackward, "")
-                    .on_hover_text("Previous Step")
+                    .add(ToolbarButton::new(Icon::StepBackward, "Previous Step").compact(true))
                     .clicked()
                 {
                     app.step_prev();
                 }
                 if ui
-                    .icon_button(Icon::StepForward, "")
-                    .on_hover_text("Next Step")
+                    .add(ToolbarButton::new(Icon::StepForward, "Next Step").compact(true))
                     .clicked()
                 {
                     app.step_next();
@@ -293,7 +291,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         if show_loop {
             let loop_resp = ui.scope(|ui| {
                 ui.horizontal(|ui| {
-                    ui.icon(Icon::Loop, 13.0);
+                    ui.icon(Icon::Loop, IconSize::Sm);
                     ui.checkbox(&mut app.loop_playback, "Loop");
                 });
             });
@@ -309,13 +307,14 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         if show_status {
             let status_resp = ui.scope(|ui| {
                 ui.separator();
-                let status_color = if app.is_playing {
-                    egui::Color32::from_rgb(255, 99, 71)
+                let status_tone = if app.is_playing {
+                    IconTone::Accent
                 } else {
-                    egui::Color32::LIGHT_GRAY
+                    IconTone::Muted
                 };
+                let status_color = status_tone.color(ui.visuals());
                 ui.horizontal(|ui| {
-                    ui.icon_colored(status_icon, 10.0, status_color);
+                    ui.icon_toned(status_icon, IconSize::Xs, status_tone);
                     ui.label(egui::RichText::new(status_text).small().color(status_color));
                 });
                 ui.separator();
@@ -394,7 +393,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         if show_date_info {
             let date_resp = ui.scope(|ui| {
                 ui.horizontal(|ui| {
-                    ui.icon(Icon::Hourglass, 11.0);
+                    ui.icon(Icon::Hourglass, IconSize::Xs);
                     ui.label(
                         egui::RichText::new(format!(
                             "{} | Current: {}",
@@ -506,13 +505,9 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         // 8. Save / Export Figure Button
         if show_export {
             let export_resp = ui.scope(|ui| {
-                if ui
-                    .icon_button(Icon::Snapshot, "Save")
-                    .on_hover_text(
-                        "Save / Export Figure (Cmd+S for Quick Save, Cmd+Shift+S for Settings)",
-                    )
-                    .clicked()
-                {
+                let btn = ToolbarButton::new(Icon::Snapshot, "Save")
+                    .hover("Save / Export Figure (Cmd+S for Quick Save, Cmd+Shift+S for Settings)");
+                if ui.add(btn).clicked() {
                     app.show_export_modal = true;
                 }
             });
@@ -522,7 +517,12 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
         // 9. Overflow Button
         if show_overflow {
             let overflow_resp = ui.scope(|ui| {
-                ui.icon_menu_button(Icon::Overflow, "", |ui| {
+                let overflow_btn = ui.add(
+                    ToolbarButton::new(Icon::Overflow, "More Options")
+                        .compact(true)
+                        .owns_popup(),
+                );
+                egui::Popup::menu(&overflow_btn).show(|ui| {
                     ui.set_min_width(220.0);
                     ui.label(
                         egui::RichText::new("Playback Options & Info")
@@ -545,7 +545,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
                     }
 
                     ui.horizontal(|ui| {
-                        ui.icon(Icon::Scissors, 12.0);
+                        ui.icon(Icon::Scissors, IconSize::Sm);
                         if ui
                             .checkbox(&mut app.show_crop_overlay, "Crop Guiding Lines (C)")
                             .clicked()
@@ -557,7 +557,7 @@ fn show_bottom_bar_content(app: &mut OctantApp, ui: &mut egui::Ui) {
 
                     if !show_loop {
                         ui.horizontal(|ui| {
-                            ui.icon(Icon::Loop, 12.0);
+                            ui.icon(Icon::Loop, IconSize::Sm);
                             ui.checkbox(&mut app.loop_playback, "Loop Playback");
                         });
                         ui.separator();

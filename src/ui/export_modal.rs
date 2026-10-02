@@ -1,6 +1,6 @@
 use crate::app::OctantApp;
 use crate::export::{ExportFormat, ExportTarget};
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, UiIconExt};
 use std::path::PathBuf;
 
 /// Shows the floating modal dialog for saving and exporting the canvas/figure.
@@ -173,11 +173,7 @@ pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: 
                 } else {
                     egui::Color32::from_rgba_unmultiplied(245, 248, 255, alpha)
                 };
-                let border_color = if dark_mode {
-                    egui::Color32::from_rgb(0, 190, 255)
-                } else {
-                    egui::Color32::from_rgb(0, 125, 220)
-                };
+                let border_color = crate::ui::icons::IconTone::Accent.color(ui.visuals());
                 let text_title_color = if dark_mode {
                     egui::Color32::WHITE
                 } else {
@@ -191,7 +187,7 @@ pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: 
                     .corner_radius(6.0)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.icon(Icon::Snapshot, 14.0);
+                            ui.icon(Icon::Snapshot, IconSize::Sm);
                             ui.label(
                                 egui::RichText::new("Saved")
                                     .strong()

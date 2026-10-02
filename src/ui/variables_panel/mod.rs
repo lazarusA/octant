@@ -12,7 +12,7 @@ pub use dimension_slider::{
 pub use info::show_variable_info;
 
 use crate::app::OctantApp;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, UiIconExt};
 
 /// Positioned to the right of the Settings overlay using the previous frame's settings width.
 pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
@@ -64,7 +64,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         false,
                     )
                     .show_header(ui, |ui| {
-                        ui.icon(Icon::VariableDoc, 13.0);
+                        ui.icon(Icon::VariableDoc, IconSize::Sm);
                         let display_name = if let Some(group) = var_info.group_path() {
                             format!("{} ({})", var_info.leaf_name(), group)
                         } else {

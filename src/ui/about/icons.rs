@@ -1,7 +1,7 @@
 //! Native procedural vector icons gallery tab for the About Octant dialog.
 
 use super::types::ICON_CATEGORIES;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
 pub fn show_icons_tab(ui: &mut egui::Ui) {
     let search_id = egui::Id::new(("about_icons", "search_query"));
@@ -15,7 +15,7 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
         ui.ctx().data(|d| d.get_temp(copied_id));
 
     ui.horizontal(|ui| {
-        ui.icon(Icon::Search, 13.0);
+        ui.icon(Icon::Search, IconSize::Sm);
         let has_text = !search_query.is_empty();
         let edit_resp = ui.add(
             egui::TextEdit::singleline(&mut search_query)
@@ -57,13 +57,14 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
                             .small()
                             .color(ui.visuals().selection.bg_fill),
                     );
-                    ui.icon_colored(Icon::Check, 12.0, ui.visuals().selection.bg_fill);
+                    ui.icon_toned(Icon::Check, IconSize::Xs, IconTone::Accent);
                 });
             });
         }
     });
 
     ui.add_space(4.0);
+    super::icon_scale::show_scale_reference(ui);
     ui.separator();
     ui.add_space(4.0);
 
@@ -83,7 +84,7 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
     if total_matches == 0 {
         ui.vertical_centered(|ui| {
             ui.add_space(30.0);
-            ui.icon_colored(Icon::Info, 18.0, ui.visuals().weak_text_color());
+            ui.icon_toned(Icon::Info, IconSize::Md, IconTone::Muted);
             ui.add_space(4.0);
             ui.label(
                 egui::RichText::new("No matching vector icons found.")
@@ -162,7 +163,7 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
                                             egui::StrokeKind::Inside,
                                         );
 
-                                        let icon_size = 20.0;
+                                        let icon_size = IconSize::Md.px();
                                         let icon_rect = egui::Rect::from_center_size(
                                             egui::pos2(rect.center().x, rect.top() + 16.0),
                                             egui::vec2(icon_size, icon_size),

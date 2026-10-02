@@ -56,9 +56,9 @@ pub fn render_status_pill(
     let galley = ui
         .painter()
         .layout(text.to_string(), font_id, text_color, max_text_w);
-    let icon_size = 12.0;
+    let icon_size = crate::ui::icons::IconSize::Xs;
     let gap = 6.0;
-    let total_w = icon_size + gap + galley.size().x;
+    let total_w = icon_size.px() + gap + galley.size().x;
     let pad = ((ui.available_width() - total_w) * 0.5).max(0.0);
 
     ui.horizontal(|ui| {
@@ -99,16 +99,9 @@ pub fn render_drag_hover_cue(ui: &mut egui::Ui) {
 
     if ui.is_rect_visible(rect) {
         let is_dark = ui.visuals().dark_mode;
-        let accent = if is_dark {
-            egui::Color32::from_rgb(0, 190, 255)
-        } else {
-            egui::Color32::from_rgb(0, 125, 220)
-        };
-        let bg = if is_dark {
-            egui::Color32::from_rgba_unmultiplied(0, 190, 255, 22)
-        } else {
-            egui::Color32::from_rgba_unmultiplied(0, 125, 220, 16)
-        };
+        let accent = crate::ui::icons::IconTone::Accent.color(ui.visuals());
+        let bg =
+            crate::ui::icons::IconTone::Accent.tint(ui.visuals(), if is_dark { 22 } else { 16 });
 
         ui.painter().rect(
             rect,
@@ -120,7 +113,10 @@ pub fn render_drag_hover_cue(ui: &mut egui::Ui) {
 
         let icon_rect = egui::Rect::from_center_size(
             egui::pos2(rect.left() + 20.0, rect.center().y),
-            egui::vec2(14.0, 14.0),
+            egui::vec2(
+                crate::ui::icons::IconSize::Sm.px(),
+                crate::ui::icons::IconSize::Sm.px(),
+            ),
         );
         crate::ui::icons::Icon::DropTray.paint(ui.painter(), icon_rect, accent, is_dark);
 
@@ -147,12 +143,9 @@ pub fn render_warning_banner(ui: &mut egui::Ui) {
 
     if ui.is_rect_visible(rect) {
         let is_dark = ui.visuals().dark_mode;
-        let warning_color = egui::Color32::from_rgb(255, 130, 60);
-        let bg = if is_dark {
-            egui::Color32::from_rgba_unmultiplied(255, 110, 50, 26)
-        } else {
-            egui::Color32::from_rgba_unmultiplied(255, 130, 60, 18)
-        };
+        let warning_color = crate::ui::icons::IconTone::Warning.color(ui.visuals());
+        let bg =
+            crate::ui::icons::IconTone::Warning.tint(ui.visuals(), if is_dark { 26 } else { 18 });
 
         ui.painter().rect(
             rect,
@@ -164,7 +157,10 @@ pub fn render_warning_banner(ui: &mut egui::Ui) {
 
         let icon_rect = egui::Rect::from_center_size(
             egui::pos2(rect.left() + 18.0, rect.center().y),
-            egui::vec2(14.0, 14.0),
+            egui::vec2(
+                crate::ui::icons::IconSize::Sm.px(),
+                crate::ui::icons::IconSize::Sm.px(),
+            ),
         );
         crate::ui::icons::Icon::Warning.paint(ui.painter(), icon_rect, warning_color, is_dark);
 
