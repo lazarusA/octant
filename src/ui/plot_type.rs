@@ -1,6 +1,6 @@
 use crate::app::OctantApp;
 use crate::plots::PlotType;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
 
 /// Map a PlotType to its corresponding vector Icon.
 #[inline]
@@ -15,21 +15,19 @@ pub fn plot_type_icon(plot_type: PlotType) -> Icon {
     }
 }
 
-pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui, in_menu: bool) {
-    if in_menu {
-        ui.collapsing("Plot Type", |ui| {
+pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
+    let current_icon = plot_type_icon(app.active_plot_type);
+    let current_label = app.active_plot_type.display_name();
+    let button_response = ui.add(
+        ToolbarButton::new(current_icon, current_label)
+            .compact(compact)
+            .owns_popup(),
+    );
+    egui::Popup::from_toggle_button_response(&button_response)
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+        .show(|ui| {
             render_plot_type_contents(app, ui);
         });
-    } else {
-        let current_icon = plot_type_icon(app.active_plot_type);
-        let current_label = app.active_plot_type.display_name();
-        let button_response = ui.icon_button(current_icon, current_label);
-        egui::Popup::from_toggle_button_response(&button_response)
-            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-            .show(|ui| {
-                render_plot_type_contents(app, ui);
-            });
-    }
 }
 
 fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -163,7 +161,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
         if is_enabled {
             let clicked = ui
                 .horizontal(|ui| {
-                    ui.icon(icon, 14.0);
+                    ui.icon(icon, IconSize::Sm);
                     ui.selectable_label(is_selected, label).clicked()
                 })
                 .inner;
@@ -189,7 +187,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
             };
 
             ui.horizontal(|ui| {
-                ui.icon_colored(icon, 14.0, ui.visuals().weak_text_color());
+                ui.icon_toned(icon, IconSize::Sm, IconTone::Muted);
                 ui.add_enabled(false, egui::Label::new(format!("{} ({})", label, reason)));
             });
         }

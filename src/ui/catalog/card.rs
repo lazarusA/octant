@@ -1,6 +1,6 @@
 use crate::app::StoreKind;
 use crate::catalog::CatalogEntry;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
 pub fn render_entry_card(
     ui: &mut egui::Ui,
@@ -8,33 +8,15 @@ pub fn render_entry_card(
     trimmed_url: &str,
     is_mobile: bool,
 ) -> bool {
-    let (badge_icon, badge_bracket, badge_color) = match entry.store_kind {
-        StoreKind::RemoteZarr => (Icon::Globe, "[Zarr]", ui.visuals().selection.bg_fill),
-        StoreKind::RemoteIcechunk => (
-            Icon::Icechunk,
-            "[Icechunk]",
-            ui.visuals().widgets.active.bg_fill,
-        ),
-        StoreKind::RemoteGeoTiff | StoreKind::LocalGeoTiff => (
-            Icon::Folder,
-            "[GeoTIFF/COG]",
-            ui.visuals().widgets.active.bg_fill,
-        ),
-        StoreKind::ProceduralVolume4D => (
-            Icon::PlotVolume,
-            "[4D Volume]",
-            ui.visuals().widgets.hovered.bg_fill,
-        ),
-        StoreKind::ProceduralRandom => (
-            Icon::PlotPlane,
-            "[2D Matrix]",
-            ui.visuals().widgets.hovered.bg_fill,
-        ),
-        _ => (
-            Icon::Folder,
-            "[Store]",
-            ui.visuals().widgets.noninteractive.fg_stroke.color,
-        ),
+    let (badge_icon, badge_bracket, badge_tone) = match entry.store_kind {
+        StoreKind::RemoteZarr => (Icon::Globe, "[Zarr]", IconTone::Accent),
+        StoreKind::RemoteIcechunk => (Icon::Icechunk, "[Icechunk]", IconTone::Info),
+        StoreKind::RemoteGeoTiff | StoreKind::LocalGeoTiff => {
+            (Icon::Folder, "[GeoTIFF/COG]", IconTone::Success)
+        }
+        StoreKind::ProceduralVolume4D => (Icon::PlotVolume, "[4D Volume]", IconTone::Warning),
+        StoreKind::ProceduralRandom => (Icon::PlotPlane, "[2D Matrix]", IconTone::Warning),
+        _ => (Icon::Folder, "[Store]", IconTone::Muted),
     };
 
     let mut clicked_load = false;
@@ -50,12 +32,12 @@ pub fn render_entry_card(
             if is_mobile {
                 // Mobile layout: Stacked
                 ui.horizontal(|ui| {
-                    ui.icon_colored(badge_icon, 13.0, badge_color);
+                    ui.icon_toned(badge_icon, IconSize::Xs, badge_tone);
                     ui.label(
                         egui::RichText::new(badge_bracket)
                             .strong()
                             .small()
-                            .color(badge_color),
+                            .color(badge_tone.color(ui.visuals())),
                     );
                     ui.label(egui::RichText::new(entry.label).strong().size(13.5));
                 });
@@ -85,12 +67,12 @@ pub fn render_entry_card(
             } else {
                 // Desktop layout: Side-by-side header with right-aligned button
                 ui.horizontal(|ui| {
-                    ui.icon_colored(badge_icon, 13.0, badge_color);
+                    ui.icon_toned(badge_icon, IconSize::Xs, badge_tone);
                     ui.label(
                         egui::RichText::new(badge_bracket)
                             .strong()
                             .small()
-                            .color(badge_color),
+                            .color(badge_tone.color(ui.visuals())),
                     );
                     ui.label(egui::RichText::new(entry.label).strong().size(14.0));
 

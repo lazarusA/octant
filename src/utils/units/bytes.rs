@@ -41,45 +41,38 @@ pub fn data_type_bytes(data_type: &str) -> u64 {
     }
 }
 
+/// Human-readable byte count (e.g. "500 B", "50 KB", "1.5 TB") that formats
+/// without allocating, so it can be written into stack buffers per frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ByteSize(pub u64);
+
+impl std::fmt::Display for ByteSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        const UNITS: [(f64, &str); 4] = [
+            (1024.0 * 1024.0 * 1024.0 * 1024.0, "TB"),
+            (1024.0 * 1024.0 * 1024.0, "GB"),
+            (1024.0 * 1024.0, "MB"),
+            (1024.0, "KB"),
+        ];
+        let b = self.0 as f64;
+        for (scale, unit) in UNITS {
+            if b >= scale {
+                let v = b / scale;
+                // Whole numbers drop the decimal: "50 MB", not "50.0 MB".
+                return if (v.fract() * 10.0).round() == 0.0 {
+                    write!(f, "{v:.0} {unit}")
+                } else {
+                    write!(f, "{v:.1} {unit}")
+                };
+            }
+        }
+        write!(f, "{} B", self.0)
+    }
+}
+
 /// Formats a byte count into a human-readable string (e.g. "500 B", "50 KB", "50 MB", "100 GB", "1.5 TB").
 pub fn format_byte_size(bytes: u64) -> String {
-    const KB: f64 = 1024.0;
-    const MB: f64 = KB * 1024.0;
-    const GB: f64 = MB * 1024.0;
-    const TB: f64 = GB * 1024.0;
-
-    let b = bytes as f64;
-    if b >= TB {
-        let tb = b / TB;
-        if (tb.fract() * 10.0).round() == 0.0 {
-            format!("{:.0} TB", tb)
-        } else {
-            format!("{:.1} TB", tb)
-        }
-    } else if b >= GB {
-        let gb = b / GB;
-        if (gb.fract() * 10.0).round() == 0.0 {
-            format!("{:.0} GB", gb)
-        } else {
-            format!("{:.1} GB", gb)
-        }
-    } else if b >= MB {
-        let mb = b / MB;
-        if (mb.fract() * 10.0).round() == 0.0 {
-            format!("{:.0} MB", mb)
-        } else {
-            format!("{:.1} MB", mb)
-        }
-    } else if b >= KB {
-        let kb = b / KB;
-        if (kb.fract() * 10.0).round() == 0.0 {
-            format!("{:.0} KB", kb)
-        } else {
-            format!("{:.1} KB", kb)
-        }
-    } else {
-        format!("{} B", bytes)
-    }
+    ByteSize(bytes).to_string()
 }
 
 /// Formats a large element count with SI metric prefixes (e.g., "6.48M", "500K").

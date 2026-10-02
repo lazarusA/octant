@@ -1,13 +1,18 @@
 use crate::{
     app::OctantApp,
-    ui::icons::{Icon, UiIconExt},
+    ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt},
 };
 
-pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.icon_menu_button(Icon::Cache, "Cache", |ui| {
+pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
+    let button_response = ui.add(
+        ToolbarButton::new(Icon::Cache, "Cache")
+            .compact(compact)
+            .owns_popup(),
+    );
+    egui::Popup::menu(&button_response).show(|ui| {
         ui.set_min_width(360.0);
         ui.horizontal(|ui| {
-            ui.icon(Icon::Cache, 14.0);
+            ui.icon(Icon::Cache, IconSize::Sm);
             ui.label(egui::RichText::new("Unified Multi-Variable Memory Cache").strong());
         });
         ui.separator();
@@ -42,7 +47,7 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .small(),
         );
         ui.horizontal(|ui| {
-            ui.icon(Icon::Bullet, 8.0);
+            ui.icon(Icon::Bullet, IconSize::Xs);
             ui.small(format!(
                 "Resident Hyperslabs: {:.2} MB ({} blocks)",
                 block_mb,
@@ -51,7 +56,7 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         });
         if pyramid_bytes > 0 {
             ui.horizontal(|ui| {
-                ui.icon(Icon::Bullet, 8.0);
+                ui.icon(Icon::Bullet, IconSize::Xs);
                 ui.small(format!("Multi-Res Pyramid: {:.2} MB", pyramid_mb));
             });
         }
@@ -67,12 +72,12 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
         let pending = app.block_prefetcher.pending_count();
         if pending > 0 {
             ui.horizontal(|ui| {
-                ui.icon_colored(Icon::Bolt, 11.0, egui::Color32::from_rgb(100, 220, 100));
+                ui.icon_toned(Icon::Bolt, IconSize::Xs, IconTone::Success);
                 ui.small(format!("Background Prefetching: {} in-flight", pending));
             });
         } else {
             ui.horizontal(|ui| {
-                ui.icon_colored(Icon::Check, 11.0, egui::Color32::from_rgb(150, 150, 150));
+                ui.icon_toned(Icon::Check, IconSize::Xs, IconTone::Muted);
                 ui.small("Buffer Warm / All Blocks Cached");
             });
         }

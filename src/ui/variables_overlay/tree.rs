@@ -1,6 +1,6 @@
 use super::item::{MAX_ITEMS_PER_LEVEL, render_variable_list};
 use crate::data::{VariableInfo, VariableTreeGroup};
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, UiIconExt};
 
 pub struct VariableTreeContext<'a> {
     pub variables: &'a [VariableInfo],
@@ -32,7 +32,7 @@ pub fn render_tree_group(
                 )
                 .show_header(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.icon(Icon::Folder, 12.0);
+                        ui.icon(Icon::Folder, IconSize::Sm);
                         let mut buf = [0u8; 32];
                         let label_text = format_root_count(&mut buf, root_count);
                         ui.label(egui::RichText::new(label_text).strong());
@@ -97,7 +97,7 @@ pub fn render_subgroup(
     )
     .show_header(ui, |ui| {
         ui.horizontal(|ui| {
-            ui.icon(Icon::Folder, 12.0);
+            ui.icon(Icon::Folder, IconSize::Sm);
             let mut buf = [0u8; 96];
             let label_text = format_subgroup_title(&mut buf, &subgroup.name, total_count);
             ui.label(egui::RichText::new(label_text).strong());

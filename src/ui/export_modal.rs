@@ -1,6 +1,6 @@
 use crate::app::OctantApp;
 use crate::export::{ExportFormat, ExportTarget};
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, UiIconExt};
 use std::path::PathBuf;
 
 /// Shows the floating modal dialog for saving and exporting the canvas/figure.
@@ -9,16 +9,24 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
         return;
     }
 
-    let mut is_open = app.show_export_modal;
     let mut should_close = false;
 
     egui::Window::new("Save & Export Figure")
-        .open(&mut is_open)
+        .title_bar(false)
         .resizable(false)
         .collapsible(false)
         .default_width(380.0)
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("Save & Export Figure").strong());
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.close_button("Close (Esc)").clicked() {
+                        should_close = true;
+                    }
+                });
+            });
+            ui.separator();
             ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
 
             // 1. Format Selection Tabs
@@ -131,10 +139,9 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
             });
         });
 
-    if should_close {
-        is_open = false;
+    if should_close || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+        app.show_export_modal = false;
     }
-    app.show_export_modal = is_open;
 }
 
 /// Shows the floating success toast notification with a "Reveal in Finder/Folder" action button.
@@ -173,11 +180,7 @@ pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: 
                 } else {
                     egui::Color32::from_rgba_unmultiplied(245, 248, 255, alpha)
                 };
-                let border_color = if dark_mode {
-                    egui::Color32::from_rgb(0, 190, 255)
-                } else {
-                    egui::Color32::from_rgb(0, 125, 220)
-                };
+                let border_color = crate::ui::icons::IconTone::Accent.color(ui.visuals());
                 let text_title_color = if dark_mode {
                     egui::Color32::WHITE
                 } else {
@@ -191,7 +194,7 @@ pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: 
                     .corner_radius(6.0)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.icon(Icon::Snapshot, 14.0);
+                            ui.icon(Icon::Snapshot, IconSize::Sm);
                             ui.label(
                                 egui::RichText::new("Saved")
                                     .strong()
@@ -215,11 +218,7 @@ pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: 
                                 dismiss = true;
                             }
 
-                            if ui
-                                .icon_button(Icon::Cross, "")
-                                .on_hover_text("Dismiss")
-                                .clicked()
-                            {
+                            if ui.close_button("Dismiss").clicked() {
                                 dismiss = true;
                             }
                         });

@@ -2,11 +2,11 @@
 
 use crate::app::{AnimationRole, OctantApp, SpatialRole};
 use crate::data::VariableInfo;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 use crate::utils::format_byte_size;
 use egui::{RichText, Ui};
 
-use super::double_slider::double_slider_with_inputs;
+use super::double_slider::{VALUE_BOX_W, double_slider_with_inputs};
 use super::metrics::{
     calculate_download_sizes, calculate_selected_2d_elements, calculate_selected_volume_elements,
 };
@@ -69,7 +69,7 @@ pub fn show_dimension_sliders(
         let data_mb = (total_2d_elements as f64 * 4.0) / (1024.0 * 1024.0);
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.icon_colored(Icon::Bolt, 13.0, egui::Color32::from_rgb(100, 200, 255));
+                ui.icon_toned(Icon::Bolt, IconSize::Xs, IconTone::Info);
                 ui.label(
                     RichText::new(format!(
                         "Large 2D selection ({} cells, {:.0} MB): Automatic multi-resolution pyramid aggregation is enabled.",
@@ -77,7 +77,7 @@ pub fn show_dimension_sliders(
                         data_mb,
                     ))
                     .small()
-                    .color(egui::Color32::from_rgb(100, 200, 255)),
+                    .color(IconTone::Info.color(ui.visuals())),
                 );
             });
         });
@@ -86,7 +86,7 @@ pub fn show_dimension_sliders(
         let data_mb = (total_2d_elements as f64 * 4.0) / (1024.0 * 1024.0);
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.icon_colored(Icon::Info, 13.0, egui::Color32::from_rgb(255, 180, 80));
+                ui.icon_toned(Icon::Info, IconSize::Xs, IconTone::Warning);
                 ui.label(
                     RichText::new(format!(
                         "3D Globe & 3D Surface meshes are disabled for this large selection ({} cells, {:.0} MB). 2D Plane and 1D Line plots remain fully active.",
@@ -94,7 +94,7 @@ pub fn show_dimension_sliders(
                         data_mb,
                     ))
                     .small()
-                    .color(egui::Color32::from_rgb(255, 180, 80)),
+                    .color(IconTone::Warning.color(ui.visuals())),
                 );
             });
         });
@@ -106,14 +106,14 @@ pub fn show_dimension_sliders(
         let vol_mb = (total_vol_elements as f64 * 4.0) / (1024.0 * 1024.0);
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.icon_colored(Icon::Warning, 13.0, egui::Color32::from_rgb(255, 180, 80));
+                ui.icon_toned(Icon::Warning, IconSize::Xs, IconTone::Warning);
                 ui.label(
                     RichText::new(format!(
                         "3D Volume & Point Cloud are disabled for this selection: volume size ({:.0} MB) exceeds the 128 MB GPU storage buffer limit. 2D Plane, 1D Line, and 3D Globe remain active.",
                         vol_mb
                     ))
                     .small()
-                    .color(egui::Color32::from_rgb(255, 180, 80)),
+                    .color(IconTone::Warning.color(ui.visuals())),
                 );
             });
         });
@@ -131,42 +131,48 @@ pub fn show_dimension_sliders(
         let is_animated = app.dim_config[i].animation == AnimationRole::Animated;
 
         ui.group(|ui| {
+            // Fill the panel width so every dimension box lines up.
+            ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 ui.checkbox(&mut app.dim_config[i].active, "");
 
                 ui.label(
-                    RichText::new(format!("{} (size {})", dim_name, dim_size))
+                    RichText::new(format!("{} ({})", dim_name, dim_size))
                         .strong()
                         .small(),
                 );
 
+                // Role selects pinned to the right edge. Right-to-left order:
+                // the animation select is added first so it ends up rightmost.
                 let mut spatial = app.dim_config[i].spatial;
-                egui::ComboBox::from_id_salt(("spatial_role", i))
-                    .selected_text(match spatial {
-                        SpatialRole::None => "None",
-                        SpatialRole::Grid => "Grid (2D/Globe)",
-                        SpatialRole::X => "X",
-                        SpatialRole::Y => "Y",
-                        SpatialRole::Z => "Z",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut spatial, SpatialRole::None, "None");
-                        ui.selectable_value(&mut spatial, SpatialRole::Grid, "Grid (2D/Globe)");
-                        ui.selectable_value(&mut spatial, SpatialRole::X, "X");
-                        ui.selectable_value(&mut spatial, SpatialRole::Y, "Y");
-                        ui.selectable_value(&mut spatial, SpatialRole::Z, "Z");
-                    });
-
                 let mut anim = app.dim_config[i].animation;
-                egui::ComboBox::from_id_salt(("anim_role", i))
-                    .selected_text(match anim {
-                        AnimationRole::None => "None",
-                        AnimationRole::Animated => "Animated",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut anim, AnimationRole::None, "None");
-                        ui.selectable_value(&mut anim, AnimationRole::Animated, "Animated");
-                    });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    egui::ComboBox::from_id_salt(("anim_role", i))
+                        .selected_text(match anim {
+                            AnimationRole::None => "None",
+                            AnimationRole::Animated => "Animated",
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut anim, AnimationRole::None, "None");
+                            ui.selectable_value(&mut anim, AnimationRole::Animated, "Animated");
+                        });
+
+                    egui::ComboBox::from_id_salt(("spatial_role", i))
+                        .selected_text(match spatial {
+                            SpatialRole::None => "None",
+                            SpatialRole::Grid => "Grid",
+                            SpatialRole::X => "X",
+                            SpatialRole::Y => "Y",
+                            SpatialRole::Z => "Z",
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut spatial, SpatialRole::None, "None");
+                            ui.selectable_value(&mut spatial, SpatialRole::Grid, "Grid");
+                            ui.selectable_value(&mut spatial, SpatialRole::X, "X");
+                            ui.selectable_value(&mut spatial, SpatialRole::Y, "Y");
+                            ui.selectable_value(&mut spatial, SpatialRole::Z, "Z");
+                        });
+                });
 
                 apply_role_change(i, spatial, anim, app);
             });
@@ -195,10 +201,20 @@ pub fn show_dimension_sliders(
             } else {
                 ui.horizontal(|ui| {
                     ui.label("Index:");
-                    ui.add(egui::Slider::new(
-                        &mut app.selected_dim_indices[i],
-                        0..=dim_size.saturating_sub(1),
-                    ));
+                    // Slider fills the row up to a fixed-width value box,
+                    // matching the range rows. The slider runs first so the box
+                    // shows the dragged value on the same frame.
+                    let max_index = dim_size.saturating_sub(1);
+                    let index = &mut app.selected_dim_indices[i];
+                    let spacing = ui.spacing().item_spacing.x;
+                    ui.spacing_mut().slider_width =
+                        (ui.available_width() - VALUE_BOX_W - spacing).max(40.0);
+                    ui.add(egui::Slider::new(index, 0..=max_index).show_value(false));
+                    let height = ui.spacing().interact_size.y;
+                    ui.add_sized(
+                        [VALUE_BOX_W, height],
+                        egui::DragValue::new(index).range(0..=max_index).speed(1),
+                    );
                 });
                 app.selected_dim_ranges[i] =
                     (app.selected_dim_indices[i], app.selected_dim_indices[i]);

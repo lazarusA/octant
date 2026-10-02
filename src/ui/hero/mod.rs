@@ -5,6 +5,7 @@ pub mod feedback;
 pub mod intake;
 pub mod landing;
 pub mod state;
+pub mod style;
 pub mod widget;
 
 pub use landing::show_hero_landing;

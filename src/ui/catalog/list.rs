@@ -1,7 +1,7 @@
 use super::card::render_entry_card;
 use crate::app::{OctantApp, StoreKind};
 use crate::catalog::get_catalog_entries;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
 pub fn render_entries_list(
     app: &mut OctantApp,
@@ -30,7 +30,7 @@ pub fn render_entries_list(
     if match_count == 0 {
         ui.vertical_centered(|ui| {
             ui.add_space(32.0);
-            ui.icon_colored(Icon::Info, 18.0, ui.visuals().weak_text_color());
+            ui.icon_toned(Icon::Info, IconSize::Md, IconTone::Muted);
             ui.add_space(6.0);
             ui.label(egui::RichText::new("No datasets found matching your search.").strong());
             ui.add_space(8.0);

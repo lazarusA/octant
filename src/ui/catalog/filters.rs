@@ -2,7 +2,7 @@ use crate::app::OctantApp;
 use crate::catalog::{
     CatalogCategoryFilter, GEOTIFF_CATALOG, ICECHUNK_CATALOG, PROCEDURAL_CATALOG, ZARR_CATALOG,
 };
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::UiIconExt;
 
 pub fn render_search_and_filters(
     app: &mut OctantApp,
@@ -15,28 +15,11 @@ pub fn render_search_and_filters(
     let geotiff_count = GEOTIFF_CATALOG.len();
     let procedural_count = PROCEDURAL_CATALOG.len();
 
-    // Search input row
-    ui.horizontal(|ui| {
-        ui.icon(Icon::Search, 13.0);
-        let search_has_text = !app.catalog_search_query.is_empty();
-        let right_pad = if search_has_text { 28.0 } else { 0.0 };
-        let search_w = (ui.available_width() - right_pad).max(80.0);
-
-        ui.add(
-            egui::TextEdit::singleline(&mut app.catalog_search_query)
-                .hint_text("Filter by name, description, or URL...")
-                .desired_width(search_w),
-        );
-
-        if search_has_text
-            && ui
-                .icon_button(Icon::Cross, "")
-                .on_hover_text("Clear search")
-                .clicked()
-        {
-            app.catalog_search_query.clear();
-        }
-    });
+    ui.search_field(
+        &mut app.catalog_search_query,
+        "Filter by name, description, or URL...",
+        None,
+    );
 
     ui.add_space(4.0);
 

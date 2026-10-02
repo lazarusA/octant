@@ -12,7 +12,12 @@ pub use dimension_slider::{
 pub use info::show_variable_info;
 
 use crate::app::OctantApp;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
+
+/// Width of the Dimensions panel's content; every dimension box fills it.
+const PANEL_MAX_W: f32 = 340.0;
+/// Narrowest the panel gets when the canvas leaves little room.
+const PANEL_MIN_W: f32 = 220.0;
 
 /// Positioned to the right of the Settings overlay using the previous frame's settings width.
 pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
@@ -31,6 +36,11 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
             0.0
         };
 
+    // Fixed width, shrinking only when the canvas would otherwise clip it.
+    // The 24 px covers the popup frame margins and the gap to the canvas edge.
+    let room = canvas_rect.width() - x_offset - 24.0;
+    let panel_w = PANEL_MAX_W.min(room).max(PANEL_MIN_W);
+
     egui::Area::new(egui::Id::new("octant_variables_panel"))
         .fixed_pos(egui::pos2(
             canvas_rect.left() + x_offset,
@@ -41,7 +51,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
             egui::Frame::popup(ui.style())
                 .stroke(egui::Stroke::NONE)
                 .show(ui, |ui| {
-                    ui.set_max_width(320.0);
+                    ui.set_width(panel_w);
 
                     let (var_info, dim_coords) = if let Some(meta) = &app.active_dataset_metadata {
                         if let Some(v) = meta.variables.get(app.selected_variable_idx) {
@@ -64,7 +74,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         false,
                     )
                     .show_header(ui, |ui| {
-                        ui.icon(Icon::VariableDoc, 13.0);
+                        ui.icon(Icon::VariableDoc, IconSize::Sm);
                         let display_name = if let Some(group) = var_info.group_path() {
                             format!("{} ({})", var_info.leaf_name(), group)
                         } else {
@@ -73,14 +83,13 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         ui.label(egui::RichText::new(display_name).strong());
                         let plot_icon = crate::ui::plot_type::plot_type_icon(app.active_plot_type);
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui
-                                .icon_button(Icon::Cross, "Close")
-                                .on_hover_text("Close Dimension Panel")
-                                .clicked()
-                            {
+                            if ui.close_button("Close Dimension Panel").clicked() {
                                 should_close = true;
                             }
-                            if ui.icon_button(plot_icon, "Plot Data").clicked() {
+                            if ui
+                                .outlined_icon_button(plot_icon, "Plot Data", IconTone::Default)
+                                .clicked()
+                            {
                                 should_plot = true;
                             }
                         });

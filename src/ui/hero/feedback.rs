@@ -1,185 +1,156 @@
 //! Hero header title, status pill, idle hints, drag cues, and warning banners.
 
-pub fn header_title(ui: &mut egui::Ui) {
-    let avail_w = ui.available_width();
-    let font_size = if avail_w < 380.0 {
-        11.5
-    } else if avail_w < 480.0 {
-        12.5
-    } else {
-        13.5
-    };
+use super::style::{BODY_FONT, SMALL_FONT, content_width, fit_text, title_font};
+use crate::ui::icons::{ICON_GAP, Icon, IconSize, IconTone};
 
+/// Height of the drag-hover and warning banners.
+const BANNER_HEIGHT: f32 = 40.0;
+
+/// "OCTANT" wordmark under the cube: spaced monospace capitals in the strong
+/// text color.
+pub fn header_title(ui: &mut egui::Ui) {
+    let font_size = title_font(ui.available_width());
     let mut job = egui::text::LayoutJob::default();
-    job.wrap.max_width = (avail_w - 24.0).max(100.0);
-    job.halign = egui::Align::Center;
     job.append(
-        "Bring data into ",
-        0.0,
-        egui::TextFormat {
-            font_id: egui::FontId::monospace(font_size),
-            color: ui.visuals().weak_text_color(),
-            ..Default::default()
-        },
-    );
-    job.append(
-        "Octant",
+        "OCTANT",
         0.0,
         egui::TextFormat {
             font_id: egui::FontId::monospace(font_size),
             color: ui.visuals().strong_text_color(),
-            ..Default::default()
-        },
-    );
-    job.append(
-        ". Start exploring.",
-        0.0,
-        egui::TextFormat {
-            font_id: egui::FontId::monospace(font_size),
-            color: ui.visuals().weak_text_color(),
+            extra_letter_spacing: font_size * 0.35,
             ..Default::default()
         },
     );
     ui.label(job);
 }
 
+/// Centered status line: icon followed by `text`, which wraps onto at most
+/// two centered lines within the hero content width.
 pub fn render_status_pill(
     ui: &mut egui::Ui,
-    icon: crate::ui::icons::Icon,
+    icon: Icon,
     icon_color: egui::Color32,
     text: &str,
     text_color: egui::Color32,
 ) {
-    ui.add_space(16.0);
-    let font_id = egui::FontId::monospace(11.0);
-    let max_text_w = (ui.available_width() - 48.0).max(60.0);
-    let galley = ui
-        .painter()
-        .layout(text.to_string(), font_id, text_color, max_text_w);
-    let icon_size = 12.0;
-    let gap = 6.0;
-    let total_w = icon_size + gap + galley.size().x;
-    let pad = ((ui.available_width() - total_w) * 0.5).max(0.0);
+    let icon_px = IconSize::Xs.px();
+    let max_text_w = content_width(ui.available_width()) - icon_px - ICON_GAP;
 
-    ui.horizontal(|ui| {
-        ui.set_width(ui.available_width());
-        if pad > 0.0 {
-            ui.add_space(pad);
-        }
-        crate::ui::icons::UiIconExt::icon_colored(ui, icon, icon_size, icon_color);
-        ui.add_space(gap);
-        ui.label(
-            egui::RichText::new(galley.text())
-                .monospace()
-                .size(11.0)
-                .color(text_color),
-        );
-    });
+    let mut job = egui::text::LayoutJob::simple(
+        text.to_string(),
+        egui::FontId::monospace(BODY_FONT),
+        text_color,
+        max_text_w,
+    );
+    job.wrap.max_rows = 2;
+    job.halign = egui::Align::Center;
+    let galley = ui.painter().layout_job(job);
+
+    // Allocating the exact block size lets the parent vertical_centered
+    // layout center it horizontally.
+    let text_w = galley.size().x;
+    let size = egui::vec2(icon_px + ICON_GAP + text_w, galley.size().y.max(icon_px));
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    if !ui.is_rect_visible(rect) {
+        return;
+    }
+
+    let first_row_h = galley.rows.first().map_or(icon_px, |r| r.height());
+    let icon_rect = egui::Rect::from_min_size(
+        egui::pos2(rect.min.x, rect.min.y + (first_row_h - icon_px) * 0.5),
+        egui::vec2(icon_px, icon_px),
+    );
+    icon.paint(ui.painter(), icon_rect, icon_color, ui.visuals().dark_mode);
+
+    // Offset by the galley's own bounds: center-aligned rows may start at a
+    // negative x relative to the galley origin.
+    let text_min = egui::pos2(rect.min.x + icon_px + ICON_GAP, rect.min.y);
+    let text_pos = text_min - galley.rect.min.to_vec2();
+    ui.painter().galley(text_pos, galley, text_color);
 }
 
+/// Helper caption under the intake bar, centered in the hero column.
 pub fn render_idle_hint(ui: &mut egui::Ui) {
-    let avail_w = ui.available_width();
-    let text = if avail_w < 340.0 {
-        "paste URL, path, or drag & drop files"
-    } else {
-        "paste URL, local path, or drag & drop files anywhere"
-    };
+    let text = fit_text(
+        ui,
+        &[
+            "paste URL, local path, or drag & drop files anywhere",
+            "paste URL, path, or drag & drop files",
+            "paste URL or drop files",
+        ],
+        SMALL_FONT,
+        content_width(ui.available_width()),
+    );
     ui.label(
         egui::RichText::new(text)
             .monospace()
-            .size(10.0)
+            .size(SMALL_FONT)
             .color(ui.visuals().strong_text_color()),
     );
 }
 
 pub fn render_drag_hover_cue(ui: &mut egui::Ui) {
-    let width = (ui.available_width() - 24.0).clamp(180.0, 460.0);
-    let height = 38.0;
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
-
-    if ui.is_rect_visible(rect) {
-        let is_dark = ui.visuals().dark_mode;
-        let accent = if is_dark {
-            egui::Color32::from_rgb(0, 190, 255)
-        } else {
-            egui::Color32::from_rgb(0, 125, 220)
-        };
-        let bg = if is_dark {
-            egui::Color32::from_rgba_unmultiplied(0, 190, 255, 22)
-        } else {
-            egui::Color32::from_rgba_unmultiplied(0, 125, 220, 16)
-        };
-
-        ui.painter().rect(
-            rect,
-            6.0,
-            bg,
-            egui::Stroke::new(1.2, accent),
-            egui::StrokeKind::Inside,
-        );
-
-        let icon_rect = egui::Rect::from_center_size(
-            egui::pos2(rect.left() + 20.0, rect.center().y),
-            egui::vec2(14.0, 14.0),
-        );
-        crate::ui::icons::Icon::DropTray.paint(ui.painter(), icon_rect, accent, is_dark);
-
-        let msg = if width < 330.0 {
-            "Drop dataset (.nc, .zarr, .icechunk, .tif)"
-        } else {
-            "Drop dataset to load (.nc, .h5, .zarr, .icechunk, .tif)"
-        };
-
-        ui.painter().text(
-            egui::pos2(rect.left() + 34.0, rect.center().y),
-            egui::Align2::LEFT_CENTER,
-            msg,
-            egui::FontId::monospace(10.5),
-            accent,
-        );
-    }
+    render_banner(
+        ui,
+        Icon::DropTray,
+        IconTone::Accent,
+        &[
+            "Drop dataset to load (.nc, .h5, .zarr, .icechunk, .tif)",
+            "Drop dataset (.nc, .zarr, .icechunk, .tif)",
+            "Drop dataset to load",
+        ],
+    );
 }
 
 pub fn render_warning_banner(ui: &mut egui::Ui) {
-    let width = (ui.available_width() - 24.0).clamp(180.0, 460.0);
-    let height = 36.0;
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+    render_banner(
+        ui,
+        Icon::Warning,
+        IconTone::Warning,
+        &[
+            "Unsupported type. Supported: .nc, .h5, .zarr, .icechunk, .tif",
+            "Unsupported format (.nc, .zarr, .icechunk, .tif)",
+            "Unsupported format",
+        ],
+    );
+}
 
-    if ui.is_rect_visible(rect) {
-        let is_dark = ui.visuals().dark_mode;
-        let warning_color = egui::Color32::from_rgb(255, 130, 60);
-        let bg = if is_dark {
-            egui::Color32::from_rgba_unmultiplied(255, 110, 50, 26)
-        } else {
-            egui::Color32::from_rgba_unmultiplied(255, 130, 60, 18)
-        };
+/// Content-width banner tinted with `tone`: icon at the left, then the
+/// longest of `messages` that fits.
+fn render_banner(ui: &mut egui::Ui, icon: Icon, tone: IconTone, messages: &[&str]) {
+    const PAD_X: f32 = 12.0;
+    let icon_px = IconSize::Sm.px();
 
-        ui.painter().rect(
-            rect,
-            6.0,
-            bg,
-            egui::Stroke::new(1.0, warning_color),
-            egui::StrokeKind::Inside,
-        );
-
-        let icon_rect = egui::Rect::from_center_size(
-            egui::pos2(rect.left() + 18.0, rect.center().y),
-            egui::vec2(14.0, 14.0),
-        );
-        crate::ui::icons::Icon::Warning.paint(ui.painter(), icon_rect, warning_color, is_dark);
-
-        let msg = if width < 340.0 {
-            "Unsupported format (.nc, .zarr, .icechunk, .tif)"
-        } else {
-            "Unsupported type — supported: .nc, .h5, .zarr, .icechunk, .tif"
-        };
-
-        ui.painter().text(
-            egui::pos2(rect.left() + 32.0, rect.center().y),
-            egui::Align2::LEFT_CENTER,
-            msg,
-            egui::FontId::monospace(10.5),
-            warning_color,
-        );
+    let width = content_width(ui.available_width());
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, BANNER_HEIGHT), egui::Sense::hover());
+    if !ui.is_rect_visible(rect) {
+        return;
     }
+
+    let visuals = ui.visuals();
+    let color = tone.color(visuals);
+    let fill = tone.themed_tint(visuals, 24, 16);
+    ui.painter().rect(
+        rect,
+        6.0,
+        fill,
+        egui::Stroke::new(1.0, color),
+        egui::StrokeKind::Inside,
+    );
+
+    let icon_rect = egui::Rect::from_min_size(
+        egui::pos2(rect.left() + PAD_X, rect.center().y - icon_px * 0.5),
+        egui::Vec2::splat(icon_px),
+    );
+    icon.paint(ui.painter(), icon_rect, color, visuals.dark_mode);
+
+    let text_x = icon_rect.right() + ICON_GAP + 2.0;
+    let msg = fit_text(ui, messages, BODY_FONT, rect.right() - PAD_X - text_x);
+    ui.painter().text(
+        egui::pos2(text_x, rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        msg,
+        egui::FontId::monospace(BODY_FONT),
+        color,
+    );
 }

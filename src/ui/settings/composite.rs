@@ -1,6 +1,7 @@
 //! RGB, CMYK, and Multi-Channel overlay controls for 2D settings panel.
 
 use crate::app::OctantApp;
+use crate::utils::stack_str;
 
 /// Render composite controls (Multi-Channel bioimaging overlay, CMYK, or standard 3-band RGB).
 pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -126,52 +127,97 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 }
 
+/// Width reserved for each "R:" / "G:" / "B:" channel label.
+const RGB_LABEL_W: f32 = 16.0;
+/// Narrowest a channel select may be before the row stacks vertically.
+const RGB_MIN_COMBO_W: f32 = 84.0;
+/// R, G and B: label, label color and widget id salt.
+const RGB_CHANNELS: [(&str, egui::Color32, &str); 3] = [
+    ("R:", egui::Color32::from_rgb(255, 100, 100), "rgb_r_ch"),
+    ("G:", egui::Color32::from_rgb(100, 255, 100), "rgb_g_ch"),
+    ("B:", egui::Color32::from_rgb(100, 150, 255), "rgb_b_ch"),
+];
+
+/// One select per RGB channel: on a single row when all three fit at a usable
+/// width, otherwise stacked, one channel per row.
 fn show_standard_rgb_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     let num_b = app.num_bands();
     let (c_start, c_end) = get_selected_channel_range(app);
     let min_b = c_start.min(num_b.saturating_sub(1));
     let max_b = c_end.min(num_b.saturating_sub(1)).max(min_b);
 
-    let channel_labels: Vec<String> = app
+    let mut selected = app.rgb_composite_channels.map(|b| b.clamp(min_b, max_b));
+    let names = app
         .plotted_variable_info()
         .and_then(|v| v.attributes.get("omero_channels"))
-        .map(|s| s.split(',').map(|c| c.trim().to_string()).collect())
-        .unwrap_or_default();
+        .map(String::as_str);
 
-    let get_channel_title = |b: usize| {
-        if let Some(name) = channel_labels.get(b) {
-            format!("{}: {name}", b + 1)
-        } else {
-            format!("Band {}", b + 1)
-        }
+    let spacing = ui.spacing().item_spacing.x;
+    let per_channel = RGB_LABEL_W + spacing + RGB_MIN_COMBO_W + spacing;
+    let inline = ui.available_width() >= per_channel * RGB_CHANNELS.len() as f32;
+    let mut select = |ui: &mut egui::Ui, idx: usize| {
+        rgb_channel_select(ui, idx, &mut selected[idx], names, min_b..=max_b, inline);
     };
-
-    let mut changed = false;
-    ui.horizontal(|ui| {
-        let channels = [
-            (0, "R:", egui::Color32::from_rgb(255, 100, 100), "rgb_r_ch"),
-            (1, "G:", egui::Color32::from_rgb(100, 255, 100), "rgb_g_ch"),
-            (2, "B:", egui::Color32::from_rgb(100, 150, 255), "rgb_b_ch"),
-        ];
-        for (idx, label, color, salt) in channels {
-            ui.label(egui::RichText::new(label).color(color));
-            let mut ch = app.rgb_composite_channels[idx].clamp(min_b, max_b);
-            egui::ComboBox::from_id_salt(salt)
-                .selected_text(get_channel_title(ch))
-                .show_ui(ui, |ui| {
-                    for b in min_b..=max_b {
-                        if ui.selectable_label(ch == b, get_channel_title(b)).clicked() {
-                            ch = b;
-                        }
-                    }
-                });
-            if ch != app.rgb_composite_channels[idx] {
-                app.rgb_composite_channels[idx] = ch;
-                changed = true;
-            }
+    if inline {
+        ui.horizontal(|ui| (0..RGB_CHANNELS.len()).for_each(|idx| select(ui, idx)));
+    } else {
+        for idx in 0..RGB_CHANNELS.len() {
+            ui.horizontal(|ui| select(ui, idx));
         }
-    });
-    if changed {
+    }
+
+    if selected != app.rgb_composite_channels {
+        app.rgb_composite_channels = selected;
         app.load_selected_variable_block();
+    }
+}
+
+/// Label plus band select for RGB channel `idx`. Inline rows split the
+/// remaining width evenly between the channels still to draw; stacked rows
+/// give the select everything after the label.
+fn rgb_channel_select(
+    ui: &mut egui::Ui,
+    idx: usize,
+    band: &mut usize,
+    names: Option<&str>,
+    bands: std::ops::RangeInclusive<usize>,
+    inline: bool,
+) {
+    let (label, color, salt) = RGB_CHANNELS[idx];
+    let spacing = ui.spacing().item_spacing.x;
+    let share = if inline {
+        (ui.available_width() + spacing) / (RGB_CHANNELS.len() - idx) as f32 - spacing
+    } else {
+        ui.available_width()
+    };
+    ui.add_sized(
+        [RGB_LABEL_W, ui.spacing().interact_size.y],
+        egui::Label::new(egui::RichText::new(label).color(color)),
+    );
+
+    let mut buf = [0u8; 64];
+    egui::ComboBox::from_id_salt(salt)
+        .width((share - RGB_LABEL_W - spacing).max(RGB_MIN_COMBO_W))
+        .selected_text(band_title(&mut buf, names, *band))
+        .show_ui(ui, |ui| {
+            for b in bands {
+                let mut buf = [0u8; 64];
+                if ui
+                    .selectable_label(*band == b, band_title(&mut buf, names, b))
+                    .clicked()
+                {
+                    *band = b;
+                }
+            }
+        });
+}
+
+/// "N: name" from the comma-separated `names` attribute, else "Band N",
+/// written into `buf` without allocating.
+fn band_title<'a>(buf: &'a mut [u8; 64], names: Option<&str>, band: usize) -> &'a str {
+    let number = band + 1;
+    match names.and_then(|n| n.split(',').nth(band)).map(str::trim) {
+        Some(name) => stack_str(buf, format_args!("{number}: {name}")),
+        None => stack_str(buf, format_args!("Band {number}")),
     }
 }

@@ -1,10 +1,8 @@
 pub mod item;
-pub mod search;
 pub mod tree;
 
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, UiIconExt};
-use search::render_search_bar;
 use tree::{VariableTreeContext, render_tree_group};
 
 pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
@@ -38,20 +36,11 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     true,
                 )
                 .show_header(ui, |ui| {
-                    ui.icon(Icon::Variables, 13.0);
-                    ui.label(egui::RichText::new("Variables").strong());
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .icon_button(Icon::Cross, "Close")
-                            .on_hover_text("Close Variables Window")
-                            .clicked()
-                        {
-                            should_close = true;
-                        }
-                    });
+                    should_close =
+                        ui.panel_header(Icon::Variables, "Variables", "Close Variables Window");
                 })
                 .body(|ui| {
-                    render_search_bar(ui, &mut app.variable_search);
+                    ui.search_field(&mut app.variable_search, "Search variables...", None);
 
                     egui::ScrollArea::vertical()
                         .max_height(max_height)

@@ -1,26 +1,24 @@
 use crate::app::OctantApp;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
 
-pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, in_menu: bool) {
-    if in_menu {
-        ui.collapsing("Colormap", |ui| {
+pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
+    let button_response = ui.add(
+        ToolbarButton::new(Icon::Colormap, "Colormap")
+            .compact(compact)
+            .owns_popup(),
+    );
+    egui::Popup::from_toggle_button_response(&button_response)
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+        .show(|ui| {
             render_colormap_contents(app, ui);
         });
-    } else {
-        let button_response = ui.icon_button(Icon::Colormap, "Colormap");
-        egui::Popup::from_toggle_button_response(&button_response)
-            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-            .show(|ui| {
-                render_colormap_contents(app, ui);
-            });
-    }
 }
 
 fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.set_min_width(200.0);
 
     ui.horizontal(|ui| {
-        ui.icon(Icon::Colormap, 14.0);
+        ui.icon(Icon::Colormap, IconSize::Sm);
         ui.label(
             egui::RichText::new("Select Colormap Palette")
                 .small()

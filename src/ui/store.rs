@@ -1,5 +1,5 @@
 use crate::app::{OctantApp, StoreKind};
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
 
 pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
     // Extract to a local bool to avoid split-borrow: we can't hold &mut app.field
@@ -162,7 +162,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                                     };
 
                                     ui.horizontal(|ui| {
-                                        ui.icon(icon, 13.0);
+                                        ui.icon(icon, IconSize::Sm);
                                         let avail_w = (ui.available_width() - 44.0).max(60.0);
                                         let approx_chars = ((avail_w - 20.0) / 7.5).floor() as usize;
                                         let short_name = truncate_display_name(&d.source.display_name, approx_chars.max(10));
@@ -214,8 +214,15 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
     app.show_left_panel = show;
 }
 
-pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    if ui.icon_button(Icon::Dataset, "Dataset").clicked() {
+pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
+    if ui
+        .add(
+            ToolbarButton::new(Icon::Dataset, "Dataset")
+                .compact(compact)
+                .active(app.show_left_panel),
+        )
+        .clicked()
+    {
         app.show_left_panel = !app.show_left_panel;
     }
 }
