@@ -1,5 +1,9 @@
 pub mod item;
+pub mod row;
 pub mod tree;
+
+#[cfg(test)]
+mod tests;
 
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, UiIconExt};

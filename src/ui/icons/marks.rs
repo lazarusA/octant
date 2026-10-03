@@ -1,4 +1,4 @@
-//! Single-glyph marks: check, cross, warning, info, bullet and chevron.
+//! Single-glyph marks: check, cross, warning, info, bullet and chevrons.
 
 use super::canvas::{IconCanvas, Weight, key};
 use egui::{Color32, Stroke};
@@ -43,6 +43,14 @@ pub fn draw_bullet(c: &IconCanvas) {
 pub fn draw_chevron_right(c: &IconCanvas) {
     c.path_round(
         &[(9.0, 5.0), (16.0, 12.0), (9.0, 19.0)],
+        c.stroke(Weight::Bold),
+    );
+}
+
+/// ChevronDown: bold down-pointing chevron with round caps (14x7 keyline).
+pub fn draw_chevron_down(c: &IconCanvas) {
+    c.path_round(
+        &[(5.0, 9.0), (12.0, 16.0), (19.0, 9.0)],
         c.stroke(Weight::Bold),
     );
 }

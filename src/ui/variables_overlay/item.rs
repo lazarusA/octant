@@ -1,3 +1,4 @@
+use super::row::{RowKind, allocate_row, paint_row};
 use crate::data::VariableInfo;
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
@@ -37,26 +38,20 @@ pub fn render_variable_row(
     newly_selected_idx: &mut Option<usize>,
 ) {
     let is_selected = selected_idx == idx;
-    let leaf_name = var_info.leaf_name();
+    let units = var_info.units.as_deref().unwrap_or("");
 
-    let row_resp = ui.horizontal(|ui| {
-        ui.icon(Icon::VariableDoc, IconSize::Sm);
-        if let Some(units) = &var_info.units {
-            if !units.is_empty() {
-                let mut buf = [0u8; 96];
-                let label_text = format_leaf_units(&mut buf, leaf_name, units);
-                ui.selectable_label(is_selected, egui::RichText::new(label_text).strong())
-            } else {
-                ui.selectable_label(is_selected, egui::RichText::new(leaf_name).strong())
-            }
-        } else {
-            ui.selectable_label(is_selected, egui::RichText::new(leaf_name).strong())
-        }
-    });
+    let resp = allocate_row(ui);
+    paint_row(
+        ui,
+        &resp,
+        RowKind::Variable,
+        var_info.leaf_name(),
+        units,
+        is_selected,
+    );
+    let clicked = resp.clicked();
 
-    let clicked = row_resp.response.clicked() || row_resp.inner.clicked();
-
-    row_resp.response.on_hover_ui(|ui| {
+    resp.on_hover_ui(|ui| {
         ui.label(egui::RichText::new(&var_info.name).strong());
         if let Some(group) = var_info.group_path() {
             ui.horizontal(|ui| {
@@ -80,12 +75,4 @@ pub fn render_variable_row(
     if clicked {
         *newly_selected_idx = Some(idx);
     }
-}
-
-fn format_leaf_units<'a>(buf: &'a mut [u8; 96], leaf: &str, units: &str) -> &'a str {
-    use std::io::Write;
-    let mut cursor = std::io::Cursor::new(&mut buf[..]);
-    let _ = write!(cursor, "{}  ({})", leaf, units);
-    let len = cursor.position() as usize;
-    std::str::from_utf8(&buf[..len]).unwrap_or("")
 }

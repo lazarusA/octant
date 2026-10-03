@@ -1,6 +1,7 @@
 use super::item::{MAX_ITEMS_PER_LEVEL, render_variable_list};
+use super::row::{RowKind, allocate_row, paint_row};
 use crate::data::{VariableInfo, VariableTreeGroup};
-use crate::ui::icons::{Icon, IconSize, UiIconExt};
+use egui::collapsing_header::CollapsingState;
 
 pub struct VariableTreeContext<'a> {
     pub variables: &'a [VariableInfo],
@@ -15,42 +16,26 @@ pub fn render_tree_group(
     ctx: &mut VariableTreeContext<'_>,
     is_root: bool,
 ) {
-    if is_root {
-        let has_subgroups = !group.subgroups.is_empty();
-        let has_root_vars = !group.variable_indices.is_empty();
+    if !is_root {
+        render_subgroup(ui, group, ctx);
+        return;
+    }
 
-        if has_root_vars {
-            if has_subgroups {
-                // If there are both subgroups and root variables, make root variables collapsible (starts collapsed)
-                let root_header_id = ui.make_persistent_id("var_tree_root_vars");
-                let root_count = group.variable_indices.len();
-
-                egui::collapsing_header::CollapsingState::load_with_default_open(
-                    ui.ctx(),
-                    root_header_id,
-                    ctx.search_active,
-                )
-                .show_header(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.icon(Icon::Folder, IconSize::Sm);
-                        let mut buf = [0u8; 32];
-                        let label_text = format_root_count(&mut buf, root_count);
-                        ui.label(egui::RichText::new(label_text).strong());
-                    });
-                })
-                .body(|ui| {
-                    ui.indent(ui.make_persistent_id("var_tree_root_vars_body"), |ui| {
-                        render_variable_list(
-                            ui,
-                            &group.variable_indices,
-                            ctx.variables,
-                            ctx.selected_idx,
-                            &mut ctx.newly_selected_idx,
-                        );
-                    });
-                });
-            } else {
-                // When only root variables exist, display them directly up to MAX_ITEMS_PER_LEVEL
+    if !group.variable_indices.is_empty() {
+        if group.subgroups.is_empty() {
+            // Only root variables: list them directly.
+            render_variable_list(
+                ui,
+                &group.variable_indices,
+                ctx.variables,
+                ctx.selected_idx,
+                &mut ctx.newly_selected_idx,
+            );
+        } else {
+            // Root variables next to subgroups get their own collapsible "/" folder.
+            let id = folder_id(ui, "", ctx.search_active);
+            let count = group.variable_indices.len();
+            render_folder(ui, id, ctx.search_active, "/", count, |ui| {
                 render_variable_list(
                     ui,
                     &group.variable_indices,
@@ -58,28 +43,11 @@ pub fn render_tree_group(
                     ctx.selected_idx,
                     &mut ctx.newly_selected_idx,
                 );
-            }
+            });
         }
-
-        // Render root-level subgroups (at most 100)
-        let sub_count = group.subgroups.len();
-        for subgroup in group.subgroups.iter().take(MAX_ITEMS_PER_LEVEL) {
-            render_subgroup(ui, subgroup, ctx);
-        }
-        if sub_count > MAX_ITEMS_PER_LEVEL {
-            ui.label(
-                egui::RichText::new(format!(
-                    "Showing 100 of {} folders. Use search to discover all.",
-                    sub_count
-                ))
-                .small()
-                .italics()
-                .color(ui.visuals().weak_text_color()),
-            );
-        }
-    } else {
-        render_subgroup(ui, group, ctx);
     }
+
+    render_subgroups(ui, &group.subgroups, ctx);
 }
 
 pub fn render_subgroup(
@@ -87,68 +55,78 @@ pub fn render_subgroup(
     subgroup: &VariableTreeGroup,
     ctx: &mut VariableTreeContext<'_>,
 ) {
-    let header_id = ui.make_persistent_id(("var_tree_group", &subgroup.full_path));
-    let total_count = subgroup.total_variable_count();
-
-    egui::collapsing_header::CollapsingState::load_with_default_open(
-        ui.ctx(),
-        header_id,
-        ctx.search_active, // Folders are closed by default, expanded only during search
-    )
-    .show_header(ui, |ui| {
-        ui.horizontal(|ui| {
-            ui.icon(Icon::Folder, IconSize::Sm);
-            let mut buf = [0u8; 96];
-            let label_text = format_subgroup_title(&mut buf, &subgroup.name, total_count);
-            ui.label(egui::RichText::new(label_text).strong());
-        });
-    })
-    .body(|ui| {
-        ui.indent(
-            ui.make_persistent_id(("var_tree_body", &subgroup.full_path)),
-            |ui| {
-                // Direct variables in this subgroup first (at most 100)
-                render_variable_list(
-                    ui,
-                    &subgroup.variable_indices,
-                    ctx.variables,
-                    ctx.selected_idx,
-                    &mut ctx.newly_selected_idx,
-                );
-
-                // Followed by deeper nested subgroups (at most 100)
-                let sub_count = subgroup.subgroups.len();
-                for nested_sub in subgroup.subgroups.iter().take(MAX_ITEMS_PER_LEVEL) {
-                    render_subgroup(ui, nested_sub, ctx);
-                }
-                if sub_count > MAX_ITEMS_PER_LEVEL {
-                    ui.label(
-                        egui::RichText::new(format!(
-                            "Showing 100 of {} folders. Use search to discover all.",
-                            sub_count
-                        ))
-                        .small()
-                        .italics()
-                        .color(ui.visuals().weak_text_color()),
-                    );
-                }
-            },
+    let id = folder_id(ui, &subgroup.full_path, ctx.search_active);
+    let count = subgroup.total_variable_count();
+    render_folder(ui, id, ctx.search_active, &subgroup.name, count, |ui| {
+        // Direct variables first, then deeper subgroups (at most 100 each).
+        render_variable_list(
+            ui,
+            &subgroup.variable_indices,
+            ctx.variables,
+            ctx.selected_idx,
+            &mut ctx.newly_selected_idx,
         );
+        render_subgroups(ui, &subgroup.subgroups, ctx);
     });
 }
 
-fn format_root_count(buf: &mut [u8; 32], count: usize) -> &str {
-    use std::io::Write;
-    let mut cursor = std::io::Cursor::new(&mut buf[..]);
-    let _ = write!(cursor, "/ ({})", count);
-    let len = cursor.position() as usize;
-    std::str::from_utf8(&buf[..len]).unwrap_or("/")
+fn render_subgroups(
+    ui: &mut egui::Ui,
+    subgroups: &[VariableTreeGroup],
+    ctx: &mut VariableTreeContext<'_>,
+) {
+    for subgroup in subgroups.iter().take(MAX_ITEMS_PER_LEVEL) {
+        render_subgroup(ui, subgroup, ctx);
+    }
+    if subgroups.len() > MAX_ITEMS_PER_LEVEL {
+        ui.label(
+            egui::RichText::new(format!(
+                "Showing 100 of {} folders. Use search to discover all.",
+                subgroups.len()
+            ))
+            .small()
+            .italics()
+            .color(ui.visuals().weak_text_color()),
+        );
+    }
 }
 
-fn format_subgroup_title<'a>(buf: &'a mut [u8; 96], name: &str, count: usize) -> &'a str {
+/// Folder open state is kept apart while searching, so search results always
+/// start expanded and clearing the search restores the folders the user had open.
+pub(super) fn folder_id(ui: &egui::Ui, full_path: &str, search_active: bool) -> egui::Id {
+    ui.make_persistent_id(("var_tree_group", search_active, full_path))
+}
+
+/// Full-width folder row: clicking anywhere on it (chevron, icon or name) toggles it.
+fn render_folder(
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    default_open: bool,
+    name: &str,
+    count: usize,
+    add_body: impl FnOnce(&mut egui::Ui),
+) {
+    let mut state = CollapsingState::load_with_default_open(ui.ctx(), id, default_open);
+    let resp = allocate_row(ui);
+    if resp.clicked() {
+        state.toggle(ui);
+        state.store(ui.ctx());
+    }
+
+    let mut buf = [0u8; 24];
+    let detail = format_count(&mut buf, count);
+    let kind = RowKind::Folder {
+        open: state.is_open(),
+    };
+    paint_row(ui, &resp, kind, name, detail, false);
+
+    state.show_body_indented(&resp, ui, add_body);
+}
+
+fn format_count(buf: &mut [u8; 24], count: usize) -> &str {
     use std::io::Write;
     let mut cursor = std::io::Cursor::new(&mut buf[..]);
-    let _ = write!(cursor, "{} ({})", name, count);
+    let _ = write!(cursor, "{}", count);
     let len = cursor.position() as usize;
     std::str::from_utf8(&buf[..len]).unwrap_or("")
 }
