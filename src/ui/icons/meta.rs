@@ -37,10 +37,10 @@ macro_rules! define_icons {
 
 define_icons! {
     "Navigation & Menus" => [
-        Globe, Variables, Dimensions, Settings, Cache, Sun, Moon, Overflow,
+        Globe, Variables, Dimensions, Settings, Cache, Sun, Moon,
     ],
     "Playback & Timeline" => [
-        Play, Pause, Stop, StepBackward, StepForward, SeekStart, SeekEnd, Loop, Reset,
+        Play, Pause, Stop, StepBackward, StepForward, SeekStart, SeekEnd, Loop, Reset, Gauge,
     ],
     "Plot Types & Colormaps" => [
         PlotPlane, PlotLine, PlotSurface, PlotGlobe, PlotVolume, PlotPointCloud, Colormap,

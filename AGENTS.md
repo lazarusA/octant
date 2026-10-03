@@ -40,6 +40,9 @@ When developing and reviewing code in this repository:
      - Submodules: `raster.rs` (PNG, JPEG, WebP, Display P3 chunk injection), `vector.rs` (SVG, PDF), `clipboard.rs` (native file manager reveal & clipboard).
    - **UI Subsystems (`src/ui/`)**:
      - `src/ui/about/`: Modal window (`types.rs`, `overview.rs`, `icons.rs`, `mod.rs`).
+     - `src/ui/toolbar/`: Shared width-driven collapse for both bars (`ItemWidths`, `BarItem`, `CompactFlags`, `compute_compact`, `SEPARATOR_WIDTH`; `tests.rs`, `mod.rs`). Bars collapse items to icon-only (data-only items hide) in a fixed priority order instead of using overflow menus.
+     - `src/ui/top_bar/`: Top navigation bar (`layout.rs` items & collapse order, `items.rs` drawing & widths, `tests.rs`, `mod.rs`).
+     - `src/ui/bottom_bar/`: Playback bar (`layout.rs` items & collapse order, `items.rs` button items, `labels.rs` date & badge items, `timeline.rs` per-frame axis labels, `tests.rs`, `mod.rs`).
      - `src/ui/catalog/`: Dataset preset modal (`header.rs`, `filters.rs`, `card.rs`, `list.rs`, `mod.rs`).
      - `src/ui/color_picker/`: Color swatch and popup selector (`popup.rs`, `shape.rs`, `widget.rs`, `tests.rs`, `mod.rs`).
      - `src/ui/colorbar/`: `ticks.rs` (scientific tick generation), `handles.rs` (input boxes and clip triangles), `mod.rs` (overlay coordinator).

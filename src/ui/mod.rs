@@ -17,6 +17,7 @@ pub mod plot_type;
 pub mod settings;
 pub mod status;
 pub mod store;
+pub mod toolbar;
 pub mod top_bar;
 pub mod variables_overlay;
 pub mod variables_panel;

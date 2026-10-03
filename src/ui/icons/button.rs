@@ -7,7 +7,7 @@
 //! muted grey fill marks a button whose popup or panel is open.
 
 use super::Icon;
-use super::style::{ICON_GAP, IconSize};
+use super::style::{ICON_GAP, IconSize, IconTone};
 use egui::{Galley, Rect, Response, Sense, TextStyle, Ui, Widget, WidgetText, pos2, vec2};
 use std::sync::Arc;
 
@@ -28,6 +28,7 @@ pub struct ToolbarButton<'a> {
     hover: Option<&'a str>,
     active: bool,
     owns_popup: bool,
+    toggled: bool,
     icon_size: IconSize,
 }
 
@@ -40,6 +41,7 @@ impl<'a> ToolbarButton<'a> {
             hover: None,
             active: false,
             owns_popup: false,
+            toggled: false,
             icon_size: IconSize::Md,
         }
     }
@@ -66,6 +68,13 @@ impl<'a> ToolbarButton<'a> {
     /// (via `egui::Popup::from_toggle_button_response` or `menu`) is open.
     pub fn owns_popup(mut self) -> Self {
         self.owns_popup = true;
+        self
+    }
+
+    /// Make this an on/off switch. While on, it shows an `Accent` tinted fill
+    /// and icon that stay visible under hover, so the state is always readable.
+    pub fn toggled(mut self, on: bool) -> Self {
+        self.toggled = on;
         self
     }
 
@@ -99,12 +108,28 @@ impl<'a> ToolbarButton<'a> {
         (vec2(side + label_w, side), galley)
     }
 
-    /// Background: hover / press / focus frame, else the open-state fill.
+    /// Background: an on-switch keeps its accent fill (outlined while
+    /// hovered); otherwise the hover / press / focus frame, else the open-state
+    /// fill.
     fn paint_frame(&self, ui: &Ui, rect: Rect, response: &Response) {
         let visuals = ui.style().interact(response);
         let interacting =
             response.hovered() || response.is_pointer_button_down_on() || response.has_focus();
-        if interacting {
+        if self.toggled {
+            let stroke = if interacting {
+                visuals.bg_stroke
+            } else {
+                egui::Stroke::NONE
+            };
+            let fill = IconTone::Accent.themed_tint(ui.visuals(), 40, 32);
+            ui.painter().rect(
+                rect,
+                visuals.corner_radius,
+                fill,
+                stroke,
+                egui::StrokeKind::Inside,
+            );
+        } else if interacting {
             ui.painter().rect(
                 rect,
                 visuals.corner_radius,
@@ -136,7 +161,11 @@ impl Widget for ToolbarButton<'_> {
         if ui.is_rect_visible(rect) {
             self.paint_frame(ui, rect, &response);
 
-            let color = ui.style().interact(&response).text_color();
+            let color = if self.toggled {
+                IconTone::Accent.color(ui.visuals())
+            } else {
+                ui.style().interact(&response).text_color()
+            };
             let icon_px = self.icon_size.px();
             let icon_rect = Rect::from_min_size(
                 pos2(rect.min.x + PAD, rect.center().y - icon_px * 0.5),

@@ -27,7 +27,6 @@ impl Icon {
             Icon::Cache => nav::draw_cache(painter, rect, stroke, subtle_fill),
             Icon::Sun => nav::draw_sun(painter, rect, stroke),
             Icon::Moon => nav::draw_moon(painter, rect, stroke, color.gamma_multiply(0.25)),
-            Icon::Overflow => nav::draw_overflow(painter, rect, color),
 
             // Playback
             Icon::Play => playback::draw_play(painter, rect, color, Stroke::NONE),
@@ -39,6 +38,7 @@ impl Icon {
             Icon::SeekEnd => playback::draw_seek_end(painter, rect, color, Stroke::NONE),
             Icon::Loop => playback::draw_loop(painter, rect, stroke, color),
             Icon::Reset => playback::draw_reset(painter, rect, stroke, color),
+            Icon::Gauge => playback::draw_gauge(painter, rect, stroke, color),
 
             // Plots
             Icon::PlotPlane => plots::draw_plot_plane(painter, rect, stroke, subtle_fill),
