@@ -1,55 +1,41 @@
 //! Card surface, headline value with color chip, and the coordinate section.
 
-use crate::ui::hover::card::flow::paint_fields;
 use crate::ui::hover::card::layout::{
-    CHIP, CHIP_GAP, CORNER_RADIUS, CardLayout, PAD, SECTION_GAP, TITLE_GAP, UNITS_GAP, line,
-    muted_color, title_font, units_font, value_font,
+    CHIP, CHIP_GAP, CORNER_RADIUS, CardLayout, PAD, SECTION_GAP, TITLE_GAP, UNITS_GAP, muted_color,
 };
 use crate::ui::hover::card::model::{HoverCard, HoverValue};
 use egui::epaint::Shadow;
 use egui::{Color32, Painter, Pos2, Rect, Stroke, StrokeKind, Visuals, pos2, vec2};
+use std::sync::Arc;
 
-/// Paints the whole card into `rect`, which must have the size from [`CardLayout::measure`].
+/// Paints the card into `rect`, which must have the size of `layout`.
 pub fn paint_card(
     painter: &Painter,
     visuals: &Visuals,
     card: &HoverCard,
-    value: &str,
     layout: &CardLayout,
     rect: Rect,
 ) {
     paint_surface(painter, visuals, rect);
     let origin = rect.min + PAD;
-    let inner_w = layout.inner_width();
-    let value_y = origin.y + layout.title_h + TITLE_GAP;
-
-    paint_header(painter, visuals, card, origin, inner_w);
-    paint_value_row(
-        painter,
-        visuals,
-        card,
-        value,
-        layout,
-        pos2(origin.x, value_y),
-        inner_w,
+    painter.galley(
+        origin,
+        Arc::clone(&layout.title),
+        visuals.strong_text_color(),
     );
 
-    if !card.fields.is_empty() {
+    let value_y = origin.y + layout.title.size().y + TITLE_GAP;
+    paint_value_row(painter, visuals, card, layout, pos2(origin.x, value_y));
+
+    if layout.fields.rows > 0 {
         let divider_y = value_y + layout.value_h + SECTION_GAP + 0.5;
         painter.hline(
             rect.x_range().shrink(PAD.x),
             divider_y,
             Stroke::new(1.0, visuals.widgets.noninteractive.bg_stroke.color),
         );
-        let grid_origin = pos2(origin.x, divider_y + 0.5 + SECTION_GAP);
-        paint_fields(
-            painter,
-            visuals,
-            card.fields,
-            grid_origin,
-            inner_w,
-            layout.field_h,
-        );
+        let fields_origin = pos2(origin.x, divider_y + 0.5 + SECTION_GAP);
+        layout.fields.paint(painter, visuals, fields_origin);
     }
 }
 
@@ -71,67 +57,35 @@ fn paint_surface(painter: &Painter, visuals: &Visuals, rect: Rect) {
     );
 }
 
-fn paint_header(
-    painter: &Painter,
-    visuals: &Visuals,
-    card: &HoverCard,
-    origin: Pos2,
-    inner_w: f32,
-) {
-    let strong = visuals.strong_text_color();
-    let title = line(painter, card.title, title_font(), strong, inner_w);
-    painter.galley(origin, title, strong);
-}
-
 fn paint_value_row(
     painter: &Painter,
     visuals: &Visuals,
     card: &HoverCard,
-    value: &str,
     layout: &CardLayout,
     origin: Pos2,
-    inner_w: f32,
 ) {
     let mid_y = origin.y + layout.value_h * 0.5;
     let chip = Rect::from_center_size(pos2(origin.x + CHIP * 0.5, mid_y), vec2(CHIP, CHIP));
-    paint_chip(
-        painter,
-        visuals,
-        chip,
-        card.swatch,
-        card.value == HoverValue::NoData,
-    );
+    let no_data = card.value == HoverValue::NoData;
+    paint_chip(painter, visuals, chip, card.swatch, no_data);
 
-    let strong = visuals.strong_text_color();
-    let text_color = if card.value == HoverValue::NoData {
-        muted_color(visuals)
-    } else {
-        strong
-    };
+    let value = &layout.value;
     let text_x = chip.right() + CHIP_GAP;
-    let galley = line(
-        painter,
-        value,
-        value_font(),
-        text_color,
-        inner_w - (text_x - origin.x),
+    let value_top = mid_y - value.size().y * 0.5;
+    painter.galley(
+        pos2(text_x, value_top),
+        Arc::clone(value),
+        visuals.text_color(),
     );
-    let (value_w, value_h) = (galley.size().x, galley.size().y);
-    let value_top = mid_y - value_h * 0.5;
-    painter.galley(pos2(text_x, value_top), galley, text_color);
 
-    if card.value.shows_units() && !card.units.is_empty() {
-        let units_x = text_x + value_w + UNITS_GAP;
-        let max_w = (origin.x + inner_w - units_x).max(0.0);
-        let units = line(
-            painter,
-            card.units,
-            units_font(),
-            muted_color(visuals),
-            max_w,
-        );
+    if let Some(units) = &layout.units {
         // Same font as the value, so a shared top keeps the baselines aligned.
-        painter.galley(pos2(units_x, value_top), units, muted_color(visuals));
+        let units_x = text_x + value.size().x + UNITS_GAP;
+        painter.galley(
+            pos2(units_x, value_top),
+            Arc::clone(units),
+            visuals.text_color(),
+        );
     }
 }
 

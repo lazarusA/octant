@@ -1,7 +1,7 @@
 //! Reticle marker and elbow leader arm from the hovered point to the card.
 
-use crate::ui::hover::card::layout::CORNER_RADIUS;
-use crate::ui::hover::card::place::{Placement, Side};
+use super::layout::CORNER_RADIUS;
+use super::place::{Placement, Side};
 use egui::{Painter, Pos2, Stroke, Visuals, pos2};
 
 /// How far the leader runs under the card edge, so the card always covers its end.
@@ -9,12 +9,7 @@ const UNDERLAP: f32 = 4.0;
 
 /// Paints the reticle at `target` and the elbow arm to the card. Must be painted before
 /// the card on the same layer: the card covers the arm's end, so they never look detached.
-pub fn draw_leader_callout(
-    painter: &Painter,
-    visuals: &Visuals,
-    target: Pos2,
-    placement: &Placement,
-) {
+pub fn draw_leader(painter: &Painter, visuals: &Visuals, target: Pos2, placement: &Placement) {
     let strong = visuals.strong_text_color();
     let stroke = Stroke::new(1.2, visuals.widgets.noninteractive.fg_stroke.color);
 

@@ -41,6 +41,18 @@ impl Side {
     }
 }
 
+/// Region the card is kept inside: the visible canvas when the card fits in it with
+/// margins, otherwise the whole viewport, so a card never spills off screen.
+pub fn card_bounds(canvas: Rect, viewport: Rect, size: Vec2) -> Rect {
+    let visible = canvas.intersect(viewport);
+    let room = size + Vec2::splat(2.0 * EDGE_MARGIN);
+    if visible.width() >= room.x && visible.height() >= room.y {
+        visible
+    } else {
+        viewport
+    }
+}
+
 /// Places a card connected to `target` by an elbow arm: diagonally off the point, toward
 /// the canvas centre, flipping per axis when that side has no room. Falls back to
 /// directly below or above when neither horizontal side fits.

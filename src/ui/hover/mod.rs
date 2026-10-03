@@ -1,6 +1,5 @@
 //! Interactive hover tooltips, data-point cards with leader lines, and 3D raycasting.
 
-pub mod callout;
 pub mod camera;
 pub mod card;
 pub mod enrich;
@@ -17,7 +16,6 @@ pub mod raycast_volume;
 pub mod sample_1d;
 pub mod sample_2d;
 
-pub use callout::draw_leader_callout;
 pub use camera::{Camera3D, Ray3D, intersect_aabb};
 pub use enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,

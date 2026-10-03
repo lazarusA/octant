@@ -1,7 +1,7 @@
-//! Card typography, spacing, and exact size measurement ahead of painting.
+//! Card typography, spacing, and the one-pass layout that sizes and feeds the painter.
 
-use crate::ui::hover::card::flow::{ROW_GAP, flow, pair_metrics, pair_width};
-use crate::ui::hover::card::model::HoverCard;
+use crate::ui::hover::card::flow::FieldRows;
+use crate::ui::hover::card::model::{HoverCard, HoverValue};
 use egui::text::{LayoutJob, TextWrapping};
 use egui::{Color32, FontId, Galley, Painter, Vec2, Visuals, vec2};
 use std::sync::Arc;
@@ -54,73 +54,78 @@ pub fn line(
     painter.layout_job(job)
 }
 
-/// Exact card dimensions, computed from the same galleys the painter draws.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// Narrowest units worth showing; below this they are dropped rather than ellipsized.
+const MIN_UNITS_WIDTH: f32 = 12.0;
+
+/// Every galley the card paints, laid out once per frame, plus the card size they imply.
 pub struct CardLayout {
     pub size: Vec2,
-    pub title_h: f32,
+    pub title: Arc<Galley>,
+    pub value: Arc<Galley>,
+    pub units: Option<Arc<Galley>>,
+    /// Height of the value row (the taller of the value text and the color chip).
     pub value_h: f32,
-    /// Height of one row of coordinate pairs.
-    pub field_h: f32,
+    pub fields: FieldRows,
 }
 
 impl CardLayout {
-    pub fn measure(painter: &Painter, visuals: &Visuals, card: &HoverCard, value: &str) -> Self {
-        let color = visuals.text_color();
-        let natural =
-            |text: &str, font: FontId| line(painter, text, font, color, f32::INFINITY).size();
-
-        let title = natural(card.title, title_font());
-        let value_size = natural(value, value_font());
-        let units_w = if card.value.shows_units() && !card.units.is_empty() {
-            UNITS_GAP + natural(card.units, units_font()).x
-        } else {
-            0.0
-        };
-
-        let header_w = title.x;
-        let value_w = CHIP + CHIP_GAP + value_size.x + units_w;
-
-        // Flow the pairs at the widest card, then shrink to the widest row they produced:
-        // every row still fits, so the breaks stay where they are.
+    pub fn new(painter: &Painter, visuals: &Visuals, card: &HoverCard, value: &str) -> Self {
+        // Everything is laid out at the widest card; the card then shrinks to its content,
+        // which keeps every truncation and row break valid.
         let max_inner = MAX_WIDTH - 2.0 * PAD.x;
-        let widths = || {
-            card.fields
-                .iter()
-                .map(|f| pair_width(pair_metrics(painter, visuals, f)).min(max_inner))
-        };
-        let (mut rows_w, mut rows) = (0.0_f32, 0.0_f32);
-        for (slot, w) in flow(widths(), max_inner).zip(widths()) {
-            rows_w = rows_w.max(slot.x + w);
-            rows = (slot.row + 1) as f32;
-        }
-        let field_h = card
-            .fields
-            .iter()
-            .map(|f| pair_metrics(painter, visuals, f).2)
-            .fold(0.0_f32, f32::max);
+        let title = line(
+            painter,
+            card.title,
+            title_font(),
+            visuals.strong_text_color(),
+            max_inner,
+        );
+        let (value, units) =
+            value_galleys(painter, visuals, card, value, max_inner - CHIP - CHIP_GAP);
+        let fields = FieldRows::layout(painter, visuals, card.fields, max_inner);
 
-        let content_w = header_w.max(value_w).max(rows_w);
-        // Round up so the painted rows never truncate by a sub-pixel.
+        let units_w = units.as_ref().map_or(0.0, |u| UNITS_GAP + u.size().x);
+        let value_w = CHIP + CHIP_GAP + value.size().x + units_w;
+        let content_w = title.size().x.max(value_w).max(fields.width);
+        // Round up so painted text never truncates by a sub-pixel.
         let width = (content_w + 2.0 * PAD.x).ceil().clamp(MIN_WIDTH, MAX_WIDTH);
-        let value_h = value_size.y.max(CHIP);
-        let grid_h = if rows == 0.0 {
+
+        let value_h = value.size().y.max(CHIP);
+        let fields_h = if fields.rows == 0 {
             0.0
         } else {
-            2.0 * SECTION_GAP + 1.0 + rows * field_h + (rows - 1.0) * ROW_GAP
+            2.0 * SECTION_GAP + 1.0 + fields.height()
         };
-        let height = 2.0 * PAD.y + title.y + TITLE_GAP + value_h + grid_h;
+        let height = 2.0 * PAD.y + title.size().y + TITLE_GAP + value_h + fields_h;
 
         Self {
             size: vec2(width, height.round()),
-            title_h: title.y,
+            title,
+            value,
+            units,
             value_h,
-            field_h,
+            fields,
         }
     }
+}
 
-    /// Width available for content between the side paddings.
-    pub fn inner_width(&self) -> f32 {
-        self.size.x - 2.0 * PAD.x
-    }
+/// The headline value and, when it is a number and there is room, its units.
+fn value_galleys(
+    painter: &Painter,
+    visuals: &Visuals,
+    card: &HoverCard,
+    text: &str,
+    max_width: f32,
+) -> (Arc<Galley>, Option<Arc<Galley>>) {
+    let muted = muted_color(visuals);
+    let color = if card.value == HoverValue::NoData {
+        muted
+    } else {
+        visuals.strong_text_color()
+    };
+    let value = line(painter, text, value_font(), color, max_width);
+    let room = max_width - value.size().x - UNITS_GAP;
+    let units = (card.value.shows_units() && !card.units.is_empty() && room >= MIN_UNITS_WIDTH)
+        .then(|| line(painter, card.units, units_font(), muted, room));
+    (value, units)
 }

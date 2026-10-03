@@ -1,8 +1,8 @@
 //! Hover card content: title, headline value, and coordinate rows.
 
 use crate::ui::hover::field::HoverField;
+use crate::utils::stack_str::stack_str;
 use egui::Color32;
-use std::io::Write;
 
 /// The sampled value shown in the card headline.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -14,8 +14,9 @@ pub enum HoverValue {
 
 impl HoverValue {
     /// Classifies a raw sample; RGB composites pack channels as `r | g << 8 | b << 16`.
+    /// Only NaN is missing data: infinities are real values and display as `inf`.
     pub fn from_raw(raw: f32, is_rgb: bool) -> Self {
-        if !raw.is_finite() {
+        if raw.is_nan() {
             Self::NoData
         } else if is_rgb {
             let packed = raw.max(0.0) as u32;
@@ -33,7 +34,7 @@ impl HoverValue {
     pub fn format<'a>(&self, buf: &'a mut [u8; 32]) -> &'a str {
         match *self {
             Self::NoData => "No data",
-            Self::Rgb([r, g, b]) => write_buf(buf, format_args!("{r}, {g}, {b}")),
+            Self::Rgb([r, g, b]) => stack_str(buf, format_args!("{r}, {g}, {b}")),
             Self::Scalar(v) => format_scalar(buf, v),
         }
     }
@@ -68,21 +69,20 @@ impl<'a> HoverCard<'a> {
 fn format_scalar(buf: &mut [u8; 32], v: f32) -> &str {
     let mag = v.abs();
     let scientific = mag >= 1e6 || (mag < 1e-3 && v != 0.0);
-    let len = if scientific {
-        write_len(buf, format_args!("{v:.4e}"))
-    } else {
-        let int_digits = if mag >= 1.0 { mag.log10() as i32 } else { 0 };
-        let decimals = (5 - int_digits).clamp(0, 4) as usize;
-        write_len(buf, format_args!("{v:.decimals$}"))
-    };
-    let (m_len, e_start) = {
-        let s = std::str::from_utf8(&buf[..len]).unwrap_or("");
-        let e_start = s.find('e').unwrap_or(len);
-        (trim_fraction(&s[..e_start]).len(), e_start)
+    let (len, e_start, m_len) = {
+        let s = if scientific {
+            stack_str(buf, format_args!("{v:.4e}"))
+        } else {
+            let int_digits = if mag >= 1.0 { mag.log10() as i32 } else { 0 };
+            let decimals = (5 - int_digits).clamp(0, 4) as usize;
+            stack_str(buf, format_args!("{v:.decimals$}"))
+        };
+        let e_start = s.find('e').unwrap_or(s.len());
+        (s.len(), e_start, trim_fraction(&s[..e_start]).len())
     };
     // Shift the exponent (if any) left over the trimmed zeros.
     buf.copy_within(e_start..len, m_len);
-    let out = std::str::from_utf8(&buf[..m_len + len - e_start]).unwrap_or("");
+    let out = std::str::from_utf8(&buf[..m_len + len - e_start]).unwrap_or_default();
     // "-0" reads as noise for values that round to zero.
     if out == "-0" { "0" } else { out }
 }
@@ -93,15 +93,4 @@ fn trim_fraction(s: &str) -> &str {
     } else {
         s
     }
-}
-
-fn write_len(buf: &mut [u8; 32], args: std::fmt::Arguments) -> usize {
-    let mut cursor = std::io::Cursor::new(&mut buf[..]);
-    let _ = cursor.write_fmt(args);
-    cursor.position() as usize
-}
-
-fn write_buf<'a>(buf: &'a mut [u8; 32], args: std::fmt::Arguments) -> &'a str {
-    let len = write_len(buf, args);
-    std::str::from_utf8(&buf[..len]).unwrap_or("")
 }

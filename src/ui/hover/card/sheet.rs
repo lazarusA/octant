@@ -6,6 +6,7 @@
 use super::model::{HoverCard, HoverValue};
 use super::tests::sample_fields;
 use super::{Anchoring, show_card};
+use crate::ui::hover::field::HoverField;
 use crate::ui::test_render::{rasterize, sheet_dir, tessellate_pass, themes, to_image};
 use egui::{Color32, Id, LayerId, Order, Pos2, Rect, pos2, vec2};
 
@@ -22,6 +23,21 @@ fn paint_background(ctx: &egui::Context, size: egui::Vec2) {
     }
 }
 
+fn card<'a>(
+    value: HoverValue,
+    title: &'a str,
+    units: &'a str,
+    fields: &'a [HoverField],
+) -> HoverCard<'a> {
+    HoverCard {
+        title,
+        value,
+        units,
+        swatch: Color32::from_rgb(230, 120, 60),
+        fields,
+    }
+}
+
 #[test]
 #[ignore = "writes review images to target/icon_sheets"]
 fn hover_card_contact_sheet() {
@@ -32,13 +48,6 @@ fn hover_card_contact_sheet() {
         let (prims, atlas) = tessellate_pass(size, PPP, visuals, |ctx| {
             paint_background(ctx, size);
             let fields = sample_fields();
-            let card = |value, title, units, fields| HoverCard {
-                title,
-                value,
-                units,
-                swatch: Color32::from_rgb(230, 120, 60),
-                fields,
-            };
             let t2m = card(
                 HoverValue::Scalar(287.43),
                 "2 metre temperature",

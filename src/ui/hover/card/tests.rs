@@ -1,10 +1,10 @@
 use super::flow::{FlowSlot, SEPARATOR, flow};
-use super::layout::{CORNER_RADIUS, CardLayout};
+use super::layout::CORNER_RADIUS;
+use super::leader::{leader_anchor, leader_elbow};
 use super::model::{HoverCard, HoverValue};
-use super::place::{EDGE_MARGIN, Side, place_connected, place_following};
-use crate::ui::hover::callout::{leader_anchor, leader_elbow};
+use super::place::{EDGE_MARGIN, Side, card_bounds, place_connected, place_following};
 use crate::ui::hover::field::HoverField;
-use egui::{Color32, Rect, pos2, vec2};
+use egui::{Rect, pos2, vec2};
 
 const CANVAS: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(800.0, 600.0));
 const CARD: egui::Vec2 = vec2(200.0, 110.0);
@@ -38,6 +38,12 @@ fn raw_samples_classify() {
     assert_eq!(fmt(HoverValue::NoData), "No data");
     assert_eq!(fmt(HoverValue::Rgb([12, 200, 34])), "12, 200, 34");
     assert!(!HoverValue::NoData.shows_units());
+    // Infinities are real values, not missing data.
+    assert_eq!(
+        HoverValue::from_raw(f32::INFINITY, false),
+        HoverValue::Scalar(f32::INFINITY)
+    );
+    assert_eq!(fmt(HoverValue::Scalar(f32::NEG_INFINITY)), "-inf");
 }
 
 #[test]
@@ -190,6 +196,17 @@ fn following_card_flips_near_bottom_right() {
 }
 
 #[test]
+fn small_canvas_falls_back_to_the_viewport() {
+    let viewport = Rect::from_min_size(pos2(0.0, 0.0), vec2(1200.0, 800.0));
+    let narrow = Rect::from_min_size(pos2(1050.0, 0.0), vec2(150.0, 800.0));
+    assert_eq!(card_bounds(CANVAS, viewport, CARD), CANVAS);
+    assert_eq!(card_bounds(narrow, viewport, CARD), viewport);
+    // A canvas partly off screen only counts its visible part.
+    let offscreen = CANVAS.translate(vec2(1100.0, 0.0));
+    assert_eq!(card_bounds(offscreen, viewport, CARD), viewport);
+}
+
+#[test]
 fn oversized_card_does_not_panic() {
     let tiny = Rect::from_min_size(pos2(0.0, 0.0), vec2(50.0, 40.0));
     let p = place_connected(pos2(25.0, 20.0), CARD, tiny);
@@ -203,27 +220,4 @@ pub(super) fn sample_fields() -> Vec<HoverField> {
         HoverField::new("longitude", "12.25°W"),
         HoverField::new("level", "850 hPa"),
     ]
-}
-
-#[test]
-fn layout_grows_with_fields_within_width_limits() {
-    let ctx = egui::Context::default();
-    let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
-        let fields = sample_fields();
-        let mut card = HoverCard {
-            title: "2 metre temperature",
-            value: HoverValue::Scalar(287.43),
-            units: "K",
-            swatch: Color32::RED,
-            fields: &fields,
-        };
-        let with = CardLayout::measure(ui.painter(), ui.visuals(), &card, "287.43");
-        card.fields = &[];
-        let without = CardLayout::measure(ui.painter(), ui.visuals(), &card, "287.43");
-        assert!(with.size.y > without.size.y);
-        for l in [with, without] {
-            assert!((super::layout::MIN_WIDTH..=super::layout::MAX_WIDTH).contains(&l.size.x));
-        }
-    });
-    out.textures_delta.clear();
 }
