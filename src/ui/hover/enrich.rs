@@ -2,6 +2,7 @@
 
 use crate::app::OctantApp;
 use crate::data::{DatasetMetadata, DimensionSelection, VariableInfo};
+use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
 use std::collections::HashSet;
 
@@ -36,7 +37,7 @@ pub fn enrich_entries_with_animated_and_collapsed_dims(
     app: &OctantApp,
     meta: Option<&DatasetMetadata>,
     var: Option<&VariableInfo>,
-    entries: &mut Vec<String>,
+    entries: &mut Vec<HoverField>,
     used_dims: &mut HashSet<usize>,
 ) {
     let Some(v) = var else { return };

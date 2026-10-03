@@ -1,45 +1,55 @@
-//! Reticle marker and leader connector line rendering.
+//! Reticle marker and elbow leader arm from the hovered point to the card.
 
-use egui::{Pos2, Rect, Stroke};
+use crate::ui::hover::card::layout::CORNER_RADIUS;
+use crate::ui::hover::card::place::{Placement, Side};
+use egui::{Painter, Pos2, Stroke, Visuals, pos2};
 
-/// Renders the reticle marker dot, calculates tooltip anchor, and draws the leader elbow line.
+/// How far the leader runs under the card edge, so the card always covers its end.
+const UNDERLAP: f32 = 4.0;
+
+/// Paints the reticle at `target` and the elbow arm to the card. Must be painted before
+/// the card on the same layer: the card covers the arm's end, so they never look detached.
 pub fn draw_leader_callout(
-    painter: &egui::Painter,
-    ctx: &egui::Context,
-    target_pos: Pos2,
-    tooltip_rect: Rect,
+    painter: &Painter,
+    visuals: &Visuals,
+    target: Pos2,
+    placement: &Placement,
 ) {
-    let visuals = &ctx.style_of(ctx.theme()).visuals;
-    let strong_color = visuals.strong_text_color();
-    let text_color = visuals.text_color();
-    let line_color = visuals.widgets.noninteractive.fg_stroke.color;
+    let strong = visuals.strong_text_color();
+    let stroke = Stroke::new(1.2, visuals.widgets.noninteractive.fg_stroke.color);
 
-    // 1. Target reticle marker dot
-    painter.circle_filled(target_pos, 7.0, text_color.linear_multiply(0.12));
-    painter.circle_filled(target_pos, 4.5, text_color.linear_multiply(0.25));
-    painter.circle_stroke(target_pos, 3.5, Stroke::new(1.2, strong_color));
-    painter.circle_filled(target_pos, 1.8, strong_color);
+    let anchor = leader_anchor(target, placement);
+    let elbow = leader_elbow(target, anchor, placement.side);
+    painter.line_segment([target, elbow], stroke);
+    painter.line_segment([elbow, anchor], stroke);
+    if elbow.distance(target) > 2.0 {
+        painter.circle_filled(elbow, 1.6, strong);
+    }
 
-    // 2. Compute anchor on tooltip box
-    let box_anchor = if tooltip_rect.min.x >= target_pos.x {
-        // card is to the right — connect at left edge, vertically centred
-        Pos2::new(tooltip_rect.min.x, tooltip_rect.center().y)
-    } else if tooltip_rect.max.x <= target_pos.x {
-        // card is to the left — connect at right edge, vertically centred
-        Pos2::new(tooltip_rect.max.x, tooltip_rect.center().y)
-    } else if tooltip_rect.min.y >= target_pos.y {
-        Pos2::new(target_pos.x, tooltip_rect.min.y)
-    } else {
-        Pos2::new(target_pos.x, tooltip_rect.max.y)
-    };
+    painter.circle_filled(target, 7.0, visuals.text_color().gamma_multiply(0.12));
+    painter.circle_filled(target, 4.5, visuals.window_fill.gamma_multiply(0.6));
+    painter.circle_stroke(target, 3.5, Stroke::new(1.2, strong));
+    painter.circle_filled(target, 1.8, strong);
+}
 
-    // 3. Elbow connector line
-    let elbow = Pos2::new(target_pos.x, box_anchor.y);
-    let leader_stroke = Stroke::new(1.2, line_color.linear_multiply(0.85));
+/// Point just inside the card edge facing `target`: the vertical middle of a side edge,
+/// or straight above/below the target on a top/bottom edge.
+pub fn leader_anchor(target: Pos2, placement: &Placement) -> Pos2 {
+    let rect = placement.rect;
+    let inset = f32::from(CORNER_RADIUS) + 2.0;
+    let x = target.x.min(rect.right() - inset).max(rect.left() + inset);
+    match placement.side {
+        Side::Right => pos2(rect.left() + UNDERLAP, rect.center().y),
+        Side::Left => pos2(rect.right() - UNDERLAP, rect.center().y),
+        Side::Below => pos2(x, rect.top() + UNDERLAP),
+        Side::Above => pos2(x, rect.bottom() - UNDERLAP),
+    }
+}
 
-    painter.line_segment([target_pos, elbow], leader_stroke);
-    painter.line_segment([elbow, box_anchor], leader_stroke);
-
-    // 4. Subtle junction dot at the elbow vertex
-    painter.circle_filled(elbow, 1.5, strong_color.linear_multiply(0.8));
+/// Corner of the arm: vertical from the target, then horizontal into a side edge.
+pub fn leader_elbow(target: Pos2, anchor: Pos2, side: Side) -> Pos2 {
+    match side {
+        Side::Right | Side::Left => pos2(target.x, anchor.y),
+        Side::Below | Side::Above => pos2(anchor.x, target.y),
+    }
 }

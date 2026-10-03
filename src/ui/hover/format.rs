@@ -2,12 +2,35 @@
 
 use crate::data::coordinates::naming::{contains_ascii_case_insensitive, is_animated_time_name};
 use crate::data::{DatasetMetadata, VariableInfo};
+use crate::ui::hover::field::HoverField;
 use crate::utils::units::{
     format_axis_value, format_cardinal_degrees, format_scalar_coordinate, is_cf_time_unit,
 };
 
-/// Formats dimension coordinate values with physical units, cardinal degrees, pressure, or datetime.
+/// Formats a dimension coordinate as a `label` / `value` row with physical units, cardinal
+/// degrees, pressure, or datetime.
 pub fn format_dimension_coord(
+    meta: Option<&DatasetMetadata>,
+    var: Option<&VariableInfo>,
+    store_target: Option<&str>,
+    dim_name: &str,
+    idx: usize,
+    total_len: usize,
+    geo_fallback: Option<f32>,
+) -> HoverField {
+    let value = format_dimension_value(
+        meta,
+        var,
+        store_target,
+        dim_name,
+        idx,
+        total_len,
+        geo_fallback,
+    );
+    HoverField::new(dim_name, value)
+}
+
+fn format_dimension_value(
     meta: Option<&DatasetMetadata>,
     var: Option<&VariableInfo>,
     store_target: Option<&str>,
@@ -84,7 +107,7 @@ pub fn format_dimension_coord(
                     && !c.contains('T');
 
                 if !is_raw_numeric {
-                    return format!("{}:\u{00A0}{}", dim_name, c.replace(' ', "\u{00A0}"));
+                    return c.trim().to_string();
                 }
 
                 if let Ok(val) = c.parse::<f64>() {
@@ -113,7 +136,7 @@ pub fn format_dimension_coord(
                         temp_res,
                         store_target,
                     );
-                    return format!("{}:\u{00A0}{}", dim_name, time_val);
+                    return time_val;
                 }
 
                 if let (Ok(f_v), Ok(l_v)) = (first.parse::<f64>(), last.parse::<f64>()) {
@@ -143,13 +166,13 @@ pub fn format_dimension_coord(
                     temp_res,
                     store_target,
                 );
-                return format!("{}:\u{00A0}{}", dim_name, time_val);
+                return time_val;
             }
 
             if let Some(first) = coords.first()
                 && !first.trim().is_empty()
             {
-                return format!("{}:\u{00A0}{}", dim_name, first.replace(' ', "\u{00A0}"));
+                return first.trim().to_string();
             }
         }
 
@@ -168,19 +191,11 @@ pub fn format_dimension_coord(
 
     if let Some(geo) = geo_fallback {
         return if contains_ascii_case_insensitive(dim_name, "lon") {
-            format!(
-                "{}:\u{00A0}{}",
-                dim_name,
-                format_cardinal_degrees(geo as f64, true)
-            )
+            format_cardinal_degrees(geo as f64, true)
         } else if contains_ascii_case_insensitive(dim_name, "lat") {
-            format!(
-                "{}:\u{00A0}{}",
-                dim_name,
-                format_cardinal_degrees(geo as f64, false)
-            )
+            format_cardinal_degrees(geo as f64, false)
         } else {
-            format!("{}:\u{00A0}{:.2}°", dim_name, geo)
+            format!("{:.2}°", geo)
         };
     }
 
@@ -194,13 +209,13 @@ pub fn format_dimension_coord(
             temp_res,
             store_target,
         );
-        return format!("{}:\u{00A0}{}", dim_name, time_val);
+        return time_val;
     }
 
     if total_len > 1 {
-        format!("{}:\u{00A0}{}/{}", dim_name, idx + 1, total_len)
+        format!("{} / {}", idx + 1, total_len)
     } else {
-        format!("{}:\u{00A0}{}", dim_name, idx)
+        idx.to_string()
     }
 }
 
@@ -211,18 +226,18 @@ mod tests {
     #[test]
     fn test_format_dimension_coord_fallback() {
         let res_dim = format_dimension_coord(None, None, None, "dim0", 5, 10, None);
-        assert_eq!(res_dim, "dim0:\u{00A0}6/10");
+        assert_eq!(res_dim, HoverField::new("dim0", "6 / 10"));
 
         let res_step = format_dimension_coord(None, None, None, "step", 5, 10, None);
-        assert_eq!(res_step, "step:\u{00A0}Step 6 / 10");
+        assert_eq!(res_step, HoverField::new("step", "Step 6 / 10"));
     }
 
     #[test]
     fn test_format_dimension_coord_geo_fallback() {
         let res_lon = format_dimension_coord(None, None, None, "lon", 0, 1, Some(-45.5));
-        assert_eq!(res_lon, "lon:\u{00A0}45.50°W");
+        assert_eq!(res_lon, HoverField::new("lon", "45.50°W"));
 
         let res_lat = format_dimension_coord(None, None, None, "lat", 0, 1, Some(12.25));
-        assert_eq!(res_lat, "lat:\u{00A0}12.25°N");
+        assert_eq!(res_lat, HoverField::new("lat", "12.25°N"));
     }
 }

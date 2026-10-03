@@ -3,6 +3,7 @@ use crate::data::{DatasetMetadata, VariableInfo};
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
 };
+use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
 use crate::ui::hover::raycast_volume::VolumeSampler;
 use std::collections::HashSet;
@@ -15,7 +16,7 @@ pub(crate) fn resolve_3d_dim_entries(
     hit_x: usize,
     hit_y: usize,
     hit_z: usize,
-) -> Vec<String> {
+) -> Vec<HoverField> {
     let data_x = (hit_x + sampler.shift_x) % sampler.width;
     let data_y = (hit_y + sampler.shift_y) % sampler.height;
     let data_z = (hit_z + sampler.shift_z) % sampler.depth;
@@ -120,9 +121,9 @@ pub(crate) fn resolve_3d_dim_entries(
             .get_spatial_dim_name(0)
             .unwrap_or_else(|| "x".to_string());
         vec![
-            format!("{}:\u{00A0}{}/{}", dim_z_name, data_z + 1, sampler.depth),
-            format!("{}:\u{00A0}{}/{}", dim_y_name, data_y + 1, sampler.height),
-            format!("{}:\u{00A0}{}/{}", dim_x_name, data_x + 1, sampler.width),
+            HoverField::index_of(dim_z_name, data_z, sampler.depth),
+            HoverField::index_of(dim_y_name, data_y, sampler.height),
+            HoverField::index_of(dim_x_name, data_x, sampler.width),
         ]
     } else {
         let dim_y_name = app
@@ -132,8 +133,8 @@ pub(crate) fn resolve_3d_dim_entries(
             .get_spatial_dim_name(0)
             .unwrap_or_else(|| "x".to_string());
         vec![
-            format!("{}:\u{00A0}{}/{}", dim_y_name, data_y + 1, sampler.height),
-            format!("{}:\u{00A0}{}/{}", dim_x_name, data_x + 1, sampler.width),
+            HoverField::index_of(dim_y_name, data_y, sampler.height),
+            HoverField::index_of(dim_x_name, data_x, sampler.width),
         ]
     }
 }
