@@ -41,6 +41,7 @@ pub const ICON_GAP: f32 = 5.0;
 ///
 /// Fixed per size step so icons of different sizes share one optical weight;
 /// larger decorative art scales linearly from the `Lg` weight.
+/// `IconCanvas` rounds this to whole physical pixels so strokes stay crisp.
 pub fn stroke_width(dim: f32) -> f32 {
     if dim <= 13.0 {
         1.25

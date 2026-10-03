@@ -1,242 +1,180 @@
-//! Data store, file tree, cache, and filesystem procedural vector icons.
-//! Precision-engineered for Octant following standardized 24-unit geometric keylines.
+//! Data store and file action icons.
 
-use super::grid_p;
-use egui::{Color32, Painter, Rect, Stroke, StrokeKind};
+use super::canvas::{IconCanvas, Shade, Weight, key};
+use egui::Color32;
 
-/// VariableDoc: Technical schema specification sheet with 45° corner fold (16x20dp keyline).
-pub fn draw_variable_doc(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
+/// Text lines inside documents: three at full size, two when compact.
+fn text_lines(c: &IconCanvas, x0: f32, full: [(f32, f32); 3], compact: [(f32, f32); 2]) {
+    let s = c.detail(Shade::Strong);
+    let lines: &[(f32, f32)] = if c.compact() { &compact } else { &full };
+    for &(y, x1) in lines {
+        c.line((x0, y), (x1, y), s);
+    }
+}
 
-    // Main document body with dog-ear corner cut
-    let sheet_pts = vec![
-        p(5.0, 3.5),
-        p(13.5, 3.5),
-        p(19.0, 9.0),
-        p(19.0, 20.5),
-        p(5.0, 20.5),
+/// VariableDoc: document with a folded corner and text lines (14x18 keyline).
+pub fn draw_variable_doc(c: &IconCanvas) {
+    let sheet = [
+        (5.0, 3.0),
+        (14.0, 3.0),
+        (19.0, 8.0),
+        (19.0, 21.0),
+        (5.0, 21.0),
     ];
-    painter.add(egui::Shape::convex_polygon(sheet_pts, fill, stroke));
-
-    // Dog-ear corner fold facet
-    let fold_pts = vec![p(13.5, 3.5), p(19.0, 9.0), p(13.5, 9.0)];
-    painter.add(egui::Shape::convex_polygon(
-        fold_pts,
-        stroke.color.gamma_multiply(0.35),
-        stroke,
-    ));
-
-    // Micro schema tracks inside document
-    let line_stroke = Stroke::new(stroke.width * 0.9, stroke.color.gamma_multiply(0.65));
-    painter.line_segment([p(7.5, 11.5), p(16.5, 11.5)], line_stroke);
-    painter.line_segment([p(7.5, 14.5), p(16.5, 14.5)], line_stroke);
-    painter.line_segment([p(7.5, 17.5), p(12.5, 17.5)], line_stroke);
-}
-
-/// Icechunk: 3D Isometric crystalline facet cluster with sharp specular reflections (18x18dp keyline).
-pub fn draw_icechunk(painter: &Painter, rect: Rect, stroke: Stroke, _fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // 3 Visible isometric crystalline facets
-    let top_face = vec![p(12.0, 3.0), p(20.0, 7.5), p(12.0, 12.0), p(4.0, 7.5)];
-    let left_face = vec![p(4.0, 7.5), p(12.0, 12.0), p(12.0, 21.0), p(4.0, 16.5)];
-    let right_face = vec![p(12.0, 12.0), p(20.0, 7.5), p(20.0, 16.5), p(12.0, 21.0)];
-
-    let base = stroke.color;
-    painter.add(egui::Shape::convex_polygon(
-        top_face,
-        base.gamma_multiply(0.55),
-        stroke,
-    ));
-    painter.add(egui::Shape::convex_polygon(
-        left_face,
-        base.gamma_multiply(0.20),
-        stroke,
-    ));
-    painter.add(egui::Shape::convex_polygon(
-        right_face,
-        base.gamma_multiply(0.35),
-        stroke,
-    ));
-
-    // Internal crystalline cleavage line on top facet
-    let cleave_stroke = Stroke::new(stroke.width * 0.75, stroke.color.gamma_multiply(0.80));
-    painter.line_segment([p(12.0, 3.0), p(12.0, 12.0)], cleave_stroke);
-}
-
-/// Catalog: Technical dataset cassette library with vertical spine tracks (18x18dp keyline).
-pub fn draw_catalog(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Standing Cartridge 1
-    let c1 = Rect::from_min_max(p(4.0, 4.5), p(8.5, 19.5));
-    painter.rect(c1, 1.5, fill, stroke, StrokeKind::Inside);
-    painter.line_segment(
-        [p(6.25, 7.0), p(6.25, 17.0)],
-        Stroke::new(stroke.width * 0.8, stroke.color.gamma_multiply(0.50)),
+    c.fill(&sheet, c.body());
+    c.fill(
+        &[(14.0, 3.0), (19.0, 8.0), (14.0, 8.0)],
+        c.shade(Shade::Soft),
     );
+    let s = c.stroke(Weight::Base);
+    c.closed(&sheet, s);
+    c.path(&[(14.0, 3.0), (14.0, 8.0), (19.0, 8.0)], s);
+    text_lines(
+        c,
+        8.0,
+        [(12.0, 16.0), (15.0, 16.0), (18.0, 13.0)],
+        [(13.0, 16.0), (17.0, 13.0)],
+    );
+}
 
-    // Standing Cartridge 2
-    let c2 = Rect::from_min_max(p(9.5, 3.5), p(14.0, 19.5));
-    painter.rect(
-        c2,
+/// Icechunk: faceted crystal with a shaded crown, distinct from the voxel cube (18x18 keyline).
+pub fn draw_icechunk(c: &IconCanvas) {
+    let (tl, tr, r, bot, l) = (
+        (7.0, 3.5),
+        (17.0, 3.5),
+        (21.0, 9.0),
+        (12.0, 21.0),
+        (3.0, 9.0),
+    );
+    let (gl, gr) = (9.5, 14.5);
+    c.fill(&[tl, tr, r, bot, l], c.body());
+    c.fill(&[tl, tr, r, l], c.shade(Shade::Soft));
+    c.fill(&[(gl, r.1), (gr, r.1), bot], c.shade(Shade::Faint));
+
+    let s = c.stroke(Weight::Base);
+    c.closed(&[tl, tr, r, bot, l], s);
+    c.line(l, r, s);
+    let facet = c.detail(Shade::Strong);
+    c.line(tl, (gl, r.1), facet);
+    c.line(tr, (gr, r.1), facet);
+    if !c.compact() {
+        c.line((gl, r.1), bot, facet);
+        c.line((gr, r.1), bot, facet);
+    }
+}
+
+/// Catalog: three volumes on a shelf, the last one leaning (18x17 keyline).
+pub fn draw_catalog(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    c.rrect((4.0, 5.0), (8.0, 20.0), 1.0, c.body(), s);
+    c.rrect((9.5, 3.5), (13.5, 20.0), 1.0, c.shade(Shade::Soft), s);
+    let lean = [(15.0, 7.5), (18.8, 5.5), (21.0, 20.0), (17.0, 20.0)];
+    c.fill(&lean, c.body());
+    c.closed(&lean, s);
+}
+
+/// Save: floppy disk with shutter and label, each edge drawn once (16x16 keyline).
+pub fn draw_save(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    let chassis = [
+        (4.0, 4.0),
+        (17.0, 4.0),
+        (20.0, 7.0),
+        (20.0, 20.0),
+        (4.0, 20.0),
+    ];
+    c.fill(&chassis, c.body());
+    c.fill(
+        &[(7.5, 4.0), (16.5, 4.0), (16.5, 10.0), (7.5, 10.0)],
+        c.shade(Shade::Soft),
+    );
+    c.closed(&chassis, s);
+    // Shutter and label reuse the chassis edge as their top and bottom.
+    c.path(&[(7.5, 4.0), (7.5, 10.0), (16.5, 10.0), (16.5, 4.0)], s);
+    c.path(&[(7.0, 20.0), (7.0, 13.5), (17.0, 13.5), (17.0, 20.0)], s);
+    if !c.compact() {
+        c.line((13.5, 5.5), (13.5, 8.5), s);
+    }
+}
+
+/// Snapshot: camera body with a viewfinder hump and lens (18x15 keyline).
+pub fn draw_snapshot(c: &IconCanvas) {
+    let (lo, hi) = (key::SQ_MIN, key::SQ_MAX);
+    // The hump makes the body concave: fill the body and the hump separately.
+    c.fill(&[(lo, 8.0), (hi, 8.0), (hi, 20.0), (lo, 20.0)], c.body());
+    c.fill(
+        &[(7.5, 8.0), (9.5, 5.0), (14.5, 5.0), (16.5, 8.0)],
+        c.body(),
+    );
+    let s = c.stroke(Weight::Base);
+    let body = [
+        (lo, 8.0),
+        (7.5, 8.0),
+        (9.5, 5.0),
+        (14.5, 5.0),
+        (16.5, 8.0),
+        (hi, 8.0),
+        (hi, 20.0),
+        (lo, 20.0),
+    ];
+    c.closed(&body, s);
+    if c.compact() {
+        c.circle((12.0, 14.0), 3.5, Color32::TRANSPARENT, s);
+    } else {
+        c.circle((12.0, 14.0), 4.0, Color32::TRANSPARENT, s);
+        c.dot((12.0, 14.0), 1.5, c.color);
+    }
+}
+
+/// DropTray: open tray with a downward arrow (16x17 keyline).
+pub fn draw_drop_tray(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    c.path(&[(4.0, 12.0), (4.0, 20.0), (20.0, 20.0), (20.0, 12.0)], s);
+    c.line((12.0, 3.5), (12.0, 15.0), s);
+    c.path(&[(7.5, 10.5), (12.0, 15.0), (16.5, 10.5)], s);
+}
+
+/// Search: lens ring and a bold handle with a round end (18x18 keyline).
+pub fn draw_search(c: &IconCanvas) {
+    c.circle(
+        (10.5, 10.5),
+        6.5,
+        Color32::TRANSPARENT,
+        c.stroke(Weight::Base),
+    );
+    c.path_round(&[(15.3, 15.3), (20.5, 20.5)], c.stroke(Weight::Bold));
+}
+
+/// Trash: lid with handle over a tapered can; ribs at full size (17x18 keyline).
+pub fn draw_trash(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    let can = [(5.5, 6.0), (18.5, 6.0), (17.0, 20.5), (7.0, 20.5)];
+    c.fill(&can, c.body());
+    // The lid line doubles as the can's top edge.
+    c.path(&[(5.5, 6.0), (7.0, 20.5), (17.0, 20.5), (18.5, 6.0)], s);
+    c.line((3.5, 6.0), (20.5, 6.0), s);
+    c.path(&[(9.0, 6.0), (9.0, 3.5), (15.0, 3.5), (15.0, 6.0)], s);
+    if !c.compact() {
+        let rib = c.detail(Shade::Mid);
+        c.line((10.0, 9.0), (10.0, 17.5), rib);
+        c.line((14.0, 9.0), (14.0, 17.5), rib);
+    }
+}
+
+/// Clipboard: board with a solid clip over its top edge and text lines (15x18 keyline).
+pub fn draw_clipboard(c: &IconCanvas) {
+    c.rrect(
+        (4.5, 5.0),
+        (19.5, 21.0),
         1.5,
-        stroke.color.gamma_multiply(0.25),
-        stroke,
-        StrokeKind::Inside,
+        c.body(),
+        c.stroke(Weight::Base),
     );
-    painter.line_segment(
-        [p(11.75, 6.0), p(11.75, 17.0)],
-        Stroke::new(stroke.width * 0.8, stroke.color.gamma_multiply(0.65)),
+    c.rrect_fill((8.5, 3.0), (15.5, 7.0), 1.5, c.color);
+    text_lines(
+        c,
+        8.0,
+        [(11.0, 16.0), (14.0, 16.0), (17.0, 13.0)],
+        [(12.0, 16.0), (16.0, 13.0)],
     );
-
-    // Leaning Cartridge 3
-    let b3_pts = vec![p(15.5, 7.5), p(19.5, 5.0), p(20.5, 19.5), p(16.5, 19.5)];
-    painter.add(egui::Shape::convex_polygon(b3_pts, fill, stroke));
-}
-
-/// Save: Technical 3.5" data cartridge with metallic write-shutter (18x18dp keyline).
-pub fn draw_save(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Chamfered cartridge chassis
-    let disk_pts = vec![
-        p(4.0, 4.0),
-        p(17.0, 4.0),
-        p(20.0, 7.0),
-        p(20.0, 20.0),
-        p(4.0, 20.0),
-    ];
-    painter.add(egui::Shape::convex_polygon(disk_pts, fill, stroke));
-
-    // Metallic slider shutter (top)
-    let slider = Rect::from_min_max(p(7.5, 4.0), p(16.5, 10.5));
-    painter.rect_filled(slider, 1.0, stroke.color.gamma_multiply(0.25));
-    painter.rect_stroke(slider, 1.0, stroke, StrokeKind::Inside);
-
-    // Read window slot in shutter
-    painter.line_segment([p(10.0, 5.5), p(10.0, 9.0)], stroke);
-
-    // Bottom label window
-    let label_rect = Rect::from_min_max(p(6.5, 13.0), p(17.5, 19.5));
-    painter.rect_stroke(label_rect, 1.0, stroke, StrokeKind::Inside);
-}
-
-/// Snapshot: Futuristic camera viewfinder with prism ridge and precision lens (20x16dp keyline).
-pub fn draw_snapshot(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Viewfinder chassis with pentaprism top
-    let body_pts = vec![
-        p(3.5, 8.0),
-        p(7.5, 8.0),
-        p(9.5, 5.0),
-        p(14.5, 5.0),
-        p(16.5, 8.0),
-        p(20.5, 8.0),
-        p(20.5, 19.5),
-        p(3.5, 19.5),
-    ];
-    painter.add(egui::Shape::convex_polygon(body_pts, fill, stroke));
-
-    // Central concentric optical lens
-    let center = p(12.0, 13.5);
-    let r_outer = rect.width() * (4.0 / 24.0);
-    let r_inner = rect.width() * (1.8 / 24.0);
-    painter.circle_stroke(center, r_outer, stroke);
-    painter.circle_filled(center, r_inner, stroke.color);
-}
-
-/// DropTray: Inverted data hopper with downward ingestion vector and chamfered cradle (18x18dp keyline).
-pub fn draw_drop_tray(painter: &Painter, rect: Rect, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Chamfered container cradle
-    let tray_pts = [
-        p(4.0, 11.5),
-        p(4.0, 19.0),
-        p(6.0, 20.0),
-        p(18.0, 20.0),
-        p(20.0, 19.0),
-        p(20.0, 11.5),
-    ];
-    for win in tray_pts.windows(2) {
-        painter.line_segment([win[0], win[1]], stroke);
-    }
-
-    // Precision downward arrow
-    let arrow_stem = [p(12.0, 4.0), p(12.0, 15.0)];
-    painter.line_segment(arrow_stem, stroke);
-
-    let arrow_head = [p(7.5, 10.5), p(12.0, 15.0), p(16.5, 10.5)];
-    painter.line_segment([arrow_head[0], arrow_head[1]], stroke);
-    painter.line_segment([arrow_head[1], arrow_head[2]], stroke);
-}
-
-/// Search: Optical sensor scanning reticle with precision focus lens and 45° grip (20x20dp keyline).
-pub fn draw_search(painter: &Painter, rect: Rect, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Sensor lens ring (Diameter 12dp)
-    let center = p(10.5, 10.5);
-    let r = rect.width() * (6.0 / 24.0);
-    painter.circle_stroke(center, r, stroke);
-
-    // Center focal point
-    painter.circle_filled(center, rect.width() * (1.0 / 24.0), stroke.color);
-
-    // 45-degree angled handle with end chamfer
-    let handle_start = p(14.5, 14.5);
-    let handle_end = p(20.5, 20.5);
-    let handle_stroke = Stroke::new(stroke.width * 1.6, stroke.color);
-    painter.line_segment([handle_start, handle_end], handle_stroke);
-}
-
-/// Trash: High-tech deallocation incinerator with top sealing flange and vertical ribs (16x18dp keyline).
-pub fn draw_trash(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Top sealing flange
-    painter.line_segment([p(3.5, 6.0), p(20.5, 6.0)], stroke);
-    let handle_pts = [p(9.0, 6.0), p(9.0, 3.5), p(15.0, 3.5), p(15.0, 6.0)];
-    for win in handle_pts.windows(2) {
-        painter.line_segment([win[0], win[1]], stroke);
-    }
-
-    // Tapered canister body
-    let body_pts = vec![p(5.5, 6.0), p(18.5, 6.0), p(17.0, 20.0), p(7.0, 20.0)];
-    painter.add(egui::Shape::convex_polygon(body_pts, fill, stroke));
-
-    // Vertical dissipation ribs
-    let flute_stroke = Stroke::new(stroke.width * 0.85, stroke.color.gamma_multiply(0.60));
-    painter.line_segment([p(9.5, 8.5), p(9.5, 17.5)], flute_stroke);
-    painter.line_segment([p(12.0, 8.5), p(12.0, 17.5)], flute_stroke);
-    painter.line_segment([p(14.5, 8.5), p(14.5, 17.5)], flute_stroke);
-}
-
-/// Clipboard: Digital manifest tablet with top clamping bus and data track lines (16x20dp keyline).
-pub fn draw_clipboard(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Tablet body with chamfered bottom corners
-    let pad_pts = vec![
-        p(4.5, 5.0),
-        p(19.5, 5.0),
-        p(19.5, 19.0),
-        p(18.0, 20.5),
-        p(6.0, 20.5),
-        p(4.5, 19.0),
-    ];
-    painter.add(egui::Shape::convex_polygon(pad_pts, fill, stroke));
-
-    // Top metal clip connector
-    let clip = Rect::from_min_max(p(8.5, 3.5), p(15.5, 7.0));
-    painter.rect_filled(clip, 2.0, stroke.color.gamma_multiply(0.30));
-    painter.rect_stroke(clip, 2.0, stroke, StrokeKind::Inside);
-
-    // Digital manifest lines
-    let line_stroke = Stroke::new(stroke.width * 0.9, stroke.color.gamma_multiply(0.65));
-    painter.line_segment([p(7.5, 10.5), p(16.5, 10.5)], line_stroke);
-    painter.line_segment([p(7.5, 13.5), p(16.5, 13.5)], line_stroke);
-    painter.line_segment([p(7.5, 16.5), p(13.5, 16.5)], line_stroke);
 }

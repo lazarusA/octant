@@ -1,290 +1,129 @@
-//! Navigation, panel, and theme procedural vector icons.
-//! Precision-engineered for Octant following standardized 24-unit geometric keylines.
+//! Navigation, panel and theme icons.
 
-use super::grid_p;
-use egui::{Color32, Painter, Rect, Stroke, StrokeKind, pos2};
+use super::canvas::{IconCanvas, Shade, Weight, key};
+use egui::Color32;
+use std::f32::consts::{PI, TAU};
 
-/// Globe: High-tech planetary geoid with equatorial plane and curved meridian arcs (20dp circle keyline).
-pub fn draw_globe(painter: &Painter, rect: Rect, stroke: Stroke) {
-    let center = rect.center();
-    // 20dp circle keyline: radius = 10/24 * dimension
-    let r = rect.width().min(rect.height()) * (10.0 / 24.0);
-    if r <= 0.5 {
+/// Globe: circle with an equator and one meridian ellipse (20-unit circle).
+pub fn draw_globe(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    c.circle((key::C, key::C), key::CIRCLE_R, Color32::TRANSPARENT, s);
+    c.line((2.0, key::C), (22.0, key::C), s);
+    c.curve_closed(c.arc((key::C, key::C), (4.5, key::CIRCLE_R), 0.0, TAU), s);
+}
+
+/// Variables: `(x)` with elliptical parentheses (20x18 keyline).
+pub fn draw_variables(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    let sweep = 0.9;
+    c.curve(c.arc((11.0, key::C), (7.0, 9.0), PI - sweep, PI + sweep), s);
+    c.curve(c.arc((13.0, key::C), (7.0, 9.0), -sweep, sweep), s);
+    c.line((8.5, 8.5), (15.5, 15.5), s);
+    c.line((15.5, 8.5), (8.5, 15.5), s);
+}
+
+/// Dimensions: two slider rails with diamond knobs at different positions (16x18 keyline).
+pub fn draw_dimensions(c: &IconCanvas) {
+    let rail = c.stroke_toned(Weight::Base, c.shade(Shade::Mid));
+    c.line((8.0, key::SQ_MIN), (8.0, key::SQ_MAX), rail);
+    c.line((16.0, key::SQ_MIN), (16.0, key::SQ_MAX), rail);
+
+    if c.compact() {
+        c.diamond((8.0, 9.0), 3.0, 3.0, c.color, egui::Stroke::NONE);
+        c.diamond((16.0, 15.0), 3.0, 3.0, c.color, egui::Stroke::NONE);
+    } else {
+        let s = c.stroke(Weight::Base);
+        c.diamond((8.0, 9.0), 3.0, 3.0, c.body(), s);
+        c.diamond((16.0, 15.0), 3.0, 3.0, c.shade(Shade::Soft), s);
+    }
+}
+
+/// Settings: six-tooth cog with a center bore; a ring with solid teeth when compact (20-unit circle).
+pub fn draw_settings(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    let ctr = (key::C, key::C);
+    let (teeth, r_out) = (6, key::CIRCLE_R);
+    let pitch = TAU / teeth as f32;
+    let half = pitch / 4.0;
+    let at = |a: f32, r: f32| c.p(ctr.0 + r * a.cos(), ctr.1 + r * a.sin());
+    let tooth = |a: f32, r_root: f32, root_w: f32, tip_w: f32| {
+        vec![
+            at(a - half * root_w, r_root),
+            at(a - half * tip_w, r_out),
+            at(a + half * tip_w, r_out),
+            at(a + half * root_w, r_root),
+        ]
+    };
+
+    if c.compact() {
+        // A six-tooth outline cannot resolve at 12-14 px: use a ring with solid teeth.
+        let ring = 5.5;
+        c.circle(ctr, ring, Color32::TRANSPARENT, s);
+        for i in 0..teeth {
+            c.fill_pts(tooth(i as f32 * pitch, ring, 1.1, 0.8), c.color);
+        }
         return;
     }
 
-    // Outer perimeter ring (Circle keyline)
-    painter.circle_stroke(center, r, stroke);
-
-    // Horizontal equator line
-    painter.line_segment(
-        [pos2(center.x - r, center.y), pos2(center.x + r, center.y)],
-        stroke,
-    );
-
-    // Central vertical prime meridian
-    painter.line_segment(
-        [pos2(center.x, center.y - r), pos2(center.x, center.y + r)],
-        stroke,
-    );
-
-    // Eastern & Western curved meridian ellipses (60° parallels) - zero allocation
-    let rw = r * 0.52;
-    let n_pts = 12;
-    let subtle_stroke = Stroke::new(stroke.width * 0.85, stroke.color.gamma_multiply(0.70));
-    let mut prev_east = pos2(center.x, center.y - r);
-    let mut prev_west = pos2(center.x, center.y - r);
-
-    for i in 1..=n_pts {
-        let frac = (i as f32) / (n_pts as f32);
-        let angle = -std::f32::consts::FRAC_PI_2 + frac * std::f32::consts::PI;
-        let (s, c) = angle.sin_cos();
-        let curr_east = pos2(center.x + c * rw, center.y + s * r);
-        let curr_west = pos2(center.x - c * rw, center.y + s * r);
-        painter.line_segment([prev_east, curr_east], subtle_stroke);
-        painter.line_segment([prev_west, curr_west], subtle_stroke);
-        prev_east = curr_east;
-        prev_west = curr_west;
-    }
-}
-
-/// Variables: Mathematical coordinate variable (x) with precision scientific curves (20x18dp keyline).
-pub fn draw_variables(painter: &Painter, rect: Rect, stroke: Stroke, _fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Left parenthesis arc '('
-    let left_paren = [
-        p(5.5, 4.0),
-        p(3.8, 7.5),
-        p(2.8, 12.0),
-        p(3.8, 16.5),
-        p(5.5, 20.0),
-    ];
-    for win in left_paren.windows(2) {
-        painter.line_segment([win[0], win[1]], stroke);
-    }
-
-    // Right parenthesis arc ')'
-    let right_paren = [
-        p(18.5, 4.0),
-        p(20.2, 7.5),
-        p(21.2, 12.0),
-        p(20.2, 16.5),
-        p(18.5, 20.0),
-    ];
-    for win in right_paren.windows(2) {
-        painter.line_segment([win[0], win[1]], stroke);
-    }
-
-    // Stylized algebraic variable 'x' with scientific serifs
-    let diag1 = [
-        p(7.5, 8.5),
-        p(8.5, 7.0),
-        p(12.0, 12.0),
-        p(15.5, 17.0),
-        p(16.5, 15.5),
-    ];
-    for win in diag1.windows(2) {
-        painter.line_segment([win[0], win[1]], stroke);
-    }
-
-    let diag2 = [
-        p(16.5, 8.5),
-        p(15.5, 7.0),
-        p(12.0, 12.0),
-        p(8.5, 17.0),
-        p(7.5, 15.5),
-    ];
-    for win in diag2.windows(2) {
-        painter.line_segment([win[0], win[1]], stroke);
-    }
-}
-
-/// Dimensions: Precision dual-rail slider with futuristic diamond knobs (16x20dp vertical keyline).
-pub fn draw_dimensions(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-    let rail_stroke = Stroke::new(stroke.width * 0.85, stroke.color.gamma_multiply(0.60));
-
-    // Left vertical rail & ticks
-    painter.line_segment([p(7.5, 3.5), p(7.5, 20.5)], rail_stroke);
-    painter.line_segment([p(5.5, 3.5), p(9.5, 3.5)], rail_stroke);
-    painter.line_segment([p(5.5, 20.5), p(9.5, 20.5)], rail_stroke);
-
-    // Right vertical rail & ticks
-    painter.line_segment([p(16.5, 3.5), p(16.5, 20.5)], rail_stroke);
-    painter.line_segment([p(14.5, 3.5), p(18.5, 3.5)], rail_stroke);
-    painter.line_segment([p(14.5, 20.5), p(18.5, 20.5)], rail_stroke);
-
-    // Diamond slider knob 1 (Left rail at y=8.5)
-    let k1_c = p(7.5, 8.5);
-    let dw = rect.width() * (3.5 / 24.0);
-    let dh = rect.height() * (3.0 / 24.0);
-    let k1_pts = vec![
-        pos2(k1_c.x, k1_c.y - dh),
-        pos2(k1_c.x + dw, k1_c.y),
-        pos2(k1_c.x, k1_c.y + dh),
-        pos2(k1_c.x - dw, k1_c.y),
-    ];
-    painter.add(egui::Shape::convex_polygon(k1_pts, fill, stroke));
-
-    // Diamond slider knob 2 (Right rail at y=15.5)
-    let k2_c = p(16.5, 15.5);
-    let k2_pts = vec![
-        pos2(k2_c.x, k2_c.y - dh),
-        pos2(k2_c.x + dw, k2_c.y),
-        pos2(k2_c.x, k2_c.y + dh),
-        pos2(k2_c.x - dw, k2_c.y),
-    ];
-    painter.add(egui::Shape::convex_polygon(
-        k2_pts,
-        stroke.color.gamma_multiply(0.28),
-        stroke,
-    ));
-}
-
-/// Settings: Precision 6-flange star drive / technical cog with central bore (20dp circle keyline).
-pub fn draw_settings(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let center = rect.center();
-    let r_out = rect.width().min(rect.height()) * (10.0 / 24.0);
-    let r_in = r_out * 0.44;
-    let r_root = r_out * 0.74;
-    if r_out <= 1.0 {
-        return;
-    }
-
-    let teeth = 6;
-    let mut cog_pts = Vec::with_capacity(teeth * 4);
-
+    // Outline: root chord into each tooth, flat tip, back to the root.
+    let r_root = 7.0;
+    let mut outline = Vec::with_capacity(teeth * 4);
     for i in 0..teeth {
-        let base_angle = (i as f32) * (std::f32::consts::TAU / (teeth as f32));
-        let half_tooth = std::f32::consts::TAU / (teeth as f32 * 4.0);
-
-        // Root entry
-        let a0 = base_angle - half_tooth * 1.35;
-        cog_pts.push(pos2(
-            center.x + a0.cos() * r_root,
-            center.y + a0.sin() * r_root,
-        ));
-
-        // Tip entry
-        let a1 = base_angle - half_tooth * 0.65;
-        cog_pts.push(pos2(
-            center.x + a1.cos() * r_out,
-            center.y + a1.sin() * r_out,
-        ));
-
-        // Tip exit
-        let a2 = base_angle + half_tooth * 0.65;
-        cog_pts.push(pos2(
-            center.x + a2.cos() * r_out,
-            center.y + a2.sin() * r_out,
-        ));
-
-        // Root exit
-        let a3 = base_angle + half_tooth * 1.35;
-        cog_pts.push(pos2(
-            center.x + a3.cos() * r_root,
-            center.y + a3.sin() * r_root,
-        ));
+        let pts = tooth(i as f32 * pitch, r_root, 1.25, 0.7);
+        // The cog is concave, so fill each tooth and the hub separately.
+        c.fill_pts(pts.clone(), c.body());
+        outline.extend(pts);
     }
-
-    painter.add(egui::Shape::convex_polygon(cog_pts, fill, stroke));
-
-    // Center circular bore hole
-    painter.circle_stroke(center, r_in, stroke);
-    painter.circle_filled(center, r_in * 0.38, stroke.color);
+    c.circle(ctr, r_root, c.body(), egui::Stroke::NONE);
+    c.curve_closed(outline, s);
+    c.circle(ctr, 3.0, Color32::TRANSPARENT, s);
 }
 
-/// Cache: High-performance memory die / chip with micro-traces (18x18dp square keyline).
-pub fn draw_cache(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Chamfered microchip package body (12x12dp inside 18x18 keyline)
-    let chip_pts = vec![
-        p(5.5, 7.5),
-        p(7.5, 5.5),
-        p(18.5, 5.5),
-        p(18.5, 18.5),
-        p(5.5, 18.5),
-    ];
-    painter.add(egui::Shape::convex_polygon(chip_pts, fill, stroke));
-
-    // Micro-pin traces along 4 sides reaching 2dp margin
-    let pin_stroke = Stroke::new(stroke.width * 0.95, stroke.color);
-    let pins = [9.0, 15.0];
-    for &offset in &pins {
-        // Top pins
-        painter.line_segment([p(offset, 2.5), p(offset, 5.5)], pin_stroke);
-        // Bottom pins
-        painter.line_segment([p(offset, 18.5), p(offset, 21.5)], pin_stroke);
-        // Left pins
-        painter.line_segment([p(2.5, offset), p(5.5, offset)], pin_stroke);
-        // Right pins
-        painter.line_segment([p(18.5, offset), p(21.5, offset)], pin_stroke);
+/// Cache: memory chip with two pins per side and a shaded die (18-unit square).
+pub fn draw_cache(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    c.rrect((6.0, 6.0), (18.0, 18.0), 1.5, c.body(), s);
+    for o in [10.0, 14.0] {
+        c.line((o, key::SQ_MIN), (o, 6.0), s);
+        c.line((o, 18.0), (o, key::SQ_MAX), s);
+        c.line((key::SQ_MIN, o), (6.0, o), s);
+        c.line((18.0, o), (key::SQ_MAX, o), s);
     }
-
-    // Inner Silicon core matrix
-    let core_rect = Rect::from_min_max(p(9.0, 9.0), p(15.0, 15.0));
-    painter.rect_filled(core_rect, 1.0, stroke.color.gamma_multiply(0.30));
-    painter.rect_stroke(core_rect, 1.0, stroke, StrokeKind::Inside);
+    if !c.compact() {
+        c.rrect_fill((9.5, 9.5), (14.5, 14.5), 0.75, c.shade(Shade::Mid));
+    }
 }
 
-/// Sun: Clean solar beacon with radiant cardinal/intercardinal emitter spikes (20dp circle keyline).
-pub fn draw_sun(painter: &Painter, rect: Rect, stroke: Stroke) {
-    let center = rect.center();
-    let r_core = rect.width().min(rect.height()) * (4.5 / 24.0);
-    let r_cardinal_start = r_core * 1.45;
-    let r_cardinal_end = rect.width().min(rect.height()) * (10.0 / 24.0);
-    let r_inter_start = r_core * 1.40;
-    let r_inter_end = rect.width().min(rect.height()) * (8.5 / 24.0);
-
-    // Center radiant emitter core
-    painter.circle_stroke(center, r_core, stroke);
-    painter.circle_filled(center, r_core * 0.45, stroke.color);
-
-    // 8 Radial precision rays (longer cardinal, shorter diagonal)
+/// Sun: open core ring with eight rays, cardinals longer (20-unit circle).
+pub fn draw_sun(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    let ctr = (key::C, key::C);
+    c.circle(ctr, 4.0, Color32::TRANSPARENT, s);
     for i in 0..8 {
-        let angle = (i as f32) * (std::f32::consts::TAU / 8.0);
-        let (s, c) = angle.sin_cos();
-        let is_cardinal = i % 2 == 0;
-        let (r0, r1) = if is_cardinal {
-            (r_cardinal_start, r_cardinal_end)
-        } else {
-            (r_inter_start, r_inter_end)
-        };
-
-        let p_start = pos2(center.x + c * r0, center.y + s * r0);
-        let p_end = pos2(center.x + c * r1, center.y + s * r1);
-        painter.line_segment([p_start, p_end], stroke);
+        let a = i as f32 * TAU / 8.0;
+        let r1 = if i % 2 == 0 { key::CIRCLE_R } else { 8.75 };
+        let (cos, sin) = (a.cos(), a.sin());
+        let from = c.p(ctr.0 + 6.5 * cos, ctr.1 + 6.5 * sin);
+        let to = c.p(ctr.0 + r1 * cos, ctr.1 + r1 * sin);
+        c.seg(from, to, s);
     }
 }
 
-/// Moon: Full lunar orb with subtle crater mare basins (20dp circle keyline).
-pub fn draw_moon(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let center = rect.center();
-    let dim = rect.width().min(rect.height());
-    let r = dim * (9.5 / 24.0);
-    if r <= 0.5 {
-        return;
-    }
-
-    // Full circular lunar disc body
-    painter.circle(center, r, fill, stroke);
-
-    // Subtle lunar crater mares / impact basins on the lunar surface
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-    let crater_stroke = Stroke::new(stroke.width * 0.85, stroke.color.gamma_multiply(0.70));
-    let crater_fill = stroke.color.gamma_multiply(0.20);
-
-    // Mare Tranquillitatis / Serenetatis crater cluster
-    painter.circle(p(9.0, 9.5), dim * (2.4 / 24.0), crater_fill, crater_stroke);
-    // Oceanus Procellarum / Tycho basin
-    painter.circle(
-        p(14.5, 14.0),
-        dim * (1.8 / 24.0),
-        crater_fill,
-        crater_stroke,
+/// Moon: shaded lunar disc with craters; one crater at small sizes (20-unit circle).
+pub fn draw_moon(c: &IconCanvas) {
+    let ctr = (key::C, key::C);
+    c.circle(
+        ctr,
+        key::CIRCLE_R,
+        c.shade(Shade::Faint),
+        c.stroke(Weight::Base),
     );
-    // Mare Crisium
-    painter.circle(p(8.0, 15.5), dim * (1.3 / 24.0), crater_fill, crater_stroke);
+    let crater = c.shade(Shade::Soft);
+    if c.compact() {
+        c.circle((10.0, 10.0), 3.0, crater, egui::Stroke::NONE);
+    } else {
+        c.circle((9.0, 9.5), 2.6, crater, egui::Stroke::NONE);
+        c.circle((15.0, 14.5), 1.9, crater, egui::Stroke::NONE);
+        c.circle((8.5, 15.5), 1.2, crater, egui::Stroke::NONE);
+    }
 }
