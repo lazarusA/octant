@@ -6,7 +6,7 @@ use super::layout::BottomBarItem as Item;
 use super::timeline::Timeline;
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, ToolbarButton};
-use crate::ui::toolbar::{ItemWidths, SEPARATOR_WIDTH};
+use crate::ui::toolbar::{BarItem, ItemWidths, SEPARATOR_WIDTH};
 use crate::utils::stack_str;
 
 /// Stack buffer for the "N FPS" label.
@@ -46,13 +46,32 @@ fn button<'a>(
             b.toggled(app.show_crop_overlay)
                 .hover("Crop Guiding Lines (C)")
         }),
-        Item::Fps => labelled(Icon::Gauge, fps).map(|b| b.owns_popup().hover("Playback Speed")),
+        // Collapsed, the FPS value itself becomes the tooltip.
+        Item::Fps => labelled(Icon::Gauge, fps).map(|b| {
+            let b = b.owns_popup();
+            if compact {
+                b
+            } else {
+                b.hover("Playback Speed")
+            }
+        }),
         Item::Save => labelled(Icon::Snapshot, "Save").map(|b| b.hover(SAVE_HOVER)),
         Item::DateInfo | Item::StartBadge | Item::StepSize | Item::EndBadge => None,
     }
 }
 
-/// Widths of `item` in both modes, including spacing and any leading separator.
+/// The "N FPS" label for the FPS item; other items need no label buffer.
+fn label_for<'a>(buf: &'a mut FpsBuf, item: Item, app: &OctantApp) -> &'a str {
+    if item == Item::Fps {
+        fps_label(buf, app)
+    } else {
+        ""
+    }
+}
+
+/// Widths of `item` in both modes, including spacing and any leading
+/// separator. The only place that zeroes the width of items that hide when
+/// compact; [`show_item`] skips drawing them with the same predicate.
 pub(super) fn item_widths(item: Item, app: &OctantApp, tl: &Timeline, ui: &egui::Ui) -> ItemWidths {
     let spacing = ui.spacing().item_spacing.x;
     let lead = if opens_group(item) {
@@ -61,20 +80,20 @@ pub(super) fn item_widths(item: Item, app: &OctantApp, tl: &Timeline, ui: &egui:
         0.0
     };
     let mut buf = FpsBuf::default();
-    let fps = fps_label(&mut buf, app);
-    let measured = match button(item, app, fps, false) {
-        Some(full) => ItemWidths {
-            full: full.width(ui) + spacing,
-            compact: button(item, app, fps, true).map_or(0.0, |b| b.width(ui)) + spacing,
-        },
+    let fps = label_for(&mut buf, item, app);
+    let (full, compact) = match button(item, app, fps, false) {
+        Some(full) => {
+            let compact = button(item, app, fps, true).map_or(0.0, |b| b.width(ui));
+            (full.width(ui), compact)
+        }
         None => labels::widths(item, tl, ui),
     };
     ItemWidths {
-        full: measured.full + lead,
-        compact: if measured.compact > 0.0 {
-            measured.compact + lead
-        } else {
+        full: full + spacing + lead,
+        compact: if item.hides_when_compact() {
             0.0
+        } else {
+            compact + spacing + lead
         },
     }
 }
@@ -93,15 +112,19 @@ pub(super) fn show_item(
     if opens_group(item) {
         ui.separator();
     }
-    let mut buf = FpsBuf::default();
-    let fps = fps_label(&mut buf, app);
-    match button(item, app, fps, compact) {
-        Some(btn) => {
-            let response = ui.add(btn);
-            on_click(item, &response, app, tl);
+    // A fixed id per item, so items hiding elsewhere in the bar never shift
+    // this one's auto ids (which would drop drags or close its popup).
+    ui.push_id(("bottom_bar_item", item.index()), |ui| {
+        let mut buf = FpsBuf::default();
+        let fps = label_for(&mut buf, item, app);
+        match button(item, app, fps, compact) {
+            Some(btn) => {
+                let response = ui.add(btn);
+                on_click(item, &response, app, tl);
+            }
+            None => labels::show(item, compact, tl, app, ui),
         }
-        None => labels::show(item, compact, tl, app, ui),
-    }
+    });
 }
 
 fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Timeline) {

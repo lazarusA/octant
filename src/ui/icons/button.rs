@@ -28,7 +28,7 @@ pub struct ToolbarButton<'a> {
     hover: Option<&'a str>,
     active: bool,
     owns_popup: bool,
-    toggled: Option<bool>,
+    toggled: bool,
     icon_size: IconSize,
 }
 
@@ -41,7 +41,7 @@ impl<'a> ToolbarButton<'a> {
             hover: None,
             active: false,
             owns_popup: false,
-            toggled: None,
+            toggled: false,
             icon_size: IconSize::Md,
         }
     }
@@ -74,12 +74,8 @@ impl<'a> ToolbarButton<'a> {
     /// Make this an on/off switch. While on, it shows an `Accent` tinted fill
     /// and icon that stay visible under hover, so the state is always readable.
     pub fn toggled(mut self, on: bool) -> Self {
-        self.toggled = Some(on);
+        self.toggled = on;
         self
-    }
-
-    fn is_on(&self) -> bool {
-        self.toggled == Some(true)
     }
 
     /// Glyph size; the button stays [`PAD`] larger on every side. Defaults to
@@ -119,7 +115,7 @@ impl<'a> ToolbarButton<'a> {
         let visuals = ui.style().interact(response);
         let interacting =
             response.hovered() || response.is_pointer_button_down_on() || response.has_focus();
-        if self.is_on() {
+        if self.toggled {
             let stroke = if interacting {
                 visuals.bg_stroke
             } else {
@@ -165,7 +161,7 @@ impl Widget for ToolbarButton<'_> {
         if ui.is_rect_visible(rect) {
             self.paint_frame(ui, rect, &response);
 
-            let color = if self.is_on() {
+            let color = if self.toggled {
                 IconTone::Accent.color(ui.visuals())
             } else {
                 ui.style().interact(&response).text_color()

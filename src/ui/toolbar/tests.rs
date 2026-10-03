@@ -104,9 +104,3 @@ fn test_hidden_items_free_their_full_width() {
     assert!(flags.get(Item::D));
     assert!(!flags.get(Item::C));
 }
-
-#[test]
-fn test_fixed_widths_never_shrink() {
-    let w = ItemWidths::fixed(24.0);
-    assert_eq!(w.full, w.compact);
-}

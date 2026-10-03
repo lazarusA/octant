@@ -83,7 +83,7 @@ fn show_collapsed_strip(ui: &mut egui::Ui) -> bool {
 /// Measure every item, collapse until they fit around the minimum slider
 /// width, then draw left items, the stretched slider, and right items.
 fn show_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let tl = Timeline::from_app(app);
+    let tl = Timeline::cached(app, ui.ctx());
     let spacing = ui.spacing().item_spacing.x;
 
     let mut widths = [ItemWidths::default(); ITEM_COUNT];
@@ -117,7 +117,11 @@ fn show_slider(app: &mut OctantApp, tl: &Timeline, ui: &mut egui::Ui, reserve_ri
     let slider = egui::Slider::new(&mut step, 0..=tl.last_step)
         .show_value(false)
         .trailing_fill(true);
-    if ui.add(slider).changed() {
+    // Fixed id so badges hiding before the slider never break a drag.
+    let changed = ui
+        .push_id("bottom_bar_slider", |ui| ui.add(slider).changed())
+        .inner;
+    if changed {
         app.request_step_or_load(step);
     }
 }

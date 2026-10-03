@@ -18,16 +18,6 @@ pub struct ItemWidths {
     pub compact: f32,
 }
 
-impl ItemWidths {
-    /// An item whose width does not change when collapsed (e.g. icon-only).
-    pub const fn fixed(width: f32) -> Self {
-        Self {
-            full: width,
-            compact: width,
-        }
-    }
-}
-
 /// A bar item enum whose variants index the bar's width table.
 pub trait BarItem: Copy {
     fn index(self) -> usize;

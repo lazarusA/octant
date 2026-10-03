@@ -5,11 +5,11 @@ use super::layout::BottomBarItem as Item;
 use super::timeline::{Timeline, dim_name};
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
-use crate::ui::toolbar::ItemWidths;
 use crate::utils::stack_str;
 
-/// Stack buffer for date and badge labels.
-type LabelBuf = [u8; 160];
+/// Stack buffer for badge labels.
+const LABEL_BUF_LEN: usize = 160;
+type LabelBuf = [u8; LABEL_BUF_LEN];
 
 /// Text shown by a text item: the current value or a bracketed badge. The
 /// start value is not repeated here; the start badge shows it.
@@ -43,26 +43,33 @@ fn text_width(ui: &egui::Ui, item: Item, text: &str) -> f32 {
         .x
 }
 
-/// Widths of a text item, including trailing spacing. Badges hide when
-/// compact (zero width); the date keeps just its icon.
-pub(super) fn widths(item: Item, tl: &Timeline, ui: &egui::Ui) -> ItemWidths {
-    let spacing = ui.spacing().item_spacing.x;
-    // The date line leads with an `Xs` hourglass icon.
-    let icon = if item == Item::DateInfo {
-        IconSize::Xs.px() + spacing
-    } else {
-        0.0
-    };
-    let mut buf = [0u8; 160];
-    let full = icon + text_width(ui, item, text(&mut buf, item, tl)) + spacing;
-    let compact = if item == Item::DateInfo { icon } else { 0.0 };
-    ItemWidths { full, compact }
+/// Width reserved for the date value: the widest of the start, end and
+/// current labels, so the bar layout stays still while the step changes.
+fn date_value_width(ui: &egui::Ui, tl: &Timeline) -> f32 {
+    [&tl.current, &tl.start, &tl.end]
+        .into_iter()
+        .map(|t| text_width(ui, Item::DateInfo, t))
+        .fold(0.0, f32::max)
+}
+
+/// (full, compact) widths of a text item, without trailing spacing. The
+/// date keeps its `Xs` hourglass icon when compact; whether an item hides
+/// entirely is decided by the caller.
+pub(super) fn widths(item: Item, tl: &Timeline, ui: &egui::Ui) -> (f32, f32) {
+    if item == Item::DateInfo {
+        let icon = IconSize::Xs.px();
+        let spacing = ui.spacing().item_spacing.x;
+        return (icon + spacing + date_value_width(ui, tl), icon);
+    }
+    let mut buf: LabelBuf = [0; LABEL_BUF_LEN];
+    let full = text_width(ui, item, text(&mut buf, item, tl));
+    (full, full)
 }
 
 /// Draw a text item. The date (icon, plus the current value unless compact)
 /// carries the timeline details popover.
 pub(super) fn show(item: Item, compact: bool, tl: &Timeline, app: &OctantApp, ui: &mut egui::Ui) {
-    let mut buf = [0u8; 160];
+    let mut buf: LabelBuf = [0; LABEL_BUF_LEN];
     let label = rich(item, text(&mut buf, item, tl));
     if item != Item::DateInfo {
         ui.label(label);
@@ -71,7 +78,9 @@ pub(super) fn show(item: Item, compact: bool, tl: &Timeline, app: &OctantApp, ui
     ui.horizontal(|ui| {
         ui.icon(Icon::Hourglass, IconSize::Xs);
         if !compact {
-            ui.label(label);
+            // Pad to the reserved width so neighbours never shift.
+            let used = ui.label(label).rect.width();
+            ui.add_space((date_value_width(ui, tl) - used).max(0.0));
         }
     })
     .response

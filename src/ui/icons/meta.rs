@@ -37,7 +37,7 @@ macro_rules! define_icons {
 
 define_icons! {
     "Navigation & Menus" => [
-        Globe, Variables, Dimensions, Settings, Cache, Sun, Moon, Overflow,
+        Globe, Variables, Dimensions, Settings, Cache, Sun, Moon,
     ],
     "Playback & Timeline" => [
         Play, Pause, Stop, StepBackward, StepForward, SeekStart, SeekEnd, Loop, Reset, Gauge,

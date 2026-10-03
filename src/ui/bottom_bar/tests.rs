@@ -38,10 +38,12 @@ fn test_step_buttons_never_collapse() {
 }
 
 #[test]
-fn test_display_coord_keeps_dates_and_formats_bare_numbers() {
+fn test_display_coord_keeps_dates_and_formats_all_numbers() {
     assert!(is_display_coord("2020-01-01"));
     assert!(is_display_coord("12:30"));
-    assert!(is_display_coord("-5"));
+    assert!(is_display_coord("2020-01-01T00:00:00"));
+    assert!(!is_display_coord("-5"));
+    assert!(!is_display_coord("1e-3"));
     assert!(!is_display_coord("42.5"));
     assert!(!is_display_coord("7"));
     assert!(!is_display_coord("   "));

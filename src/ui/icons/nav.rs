@@ -2,7 +2,7 @@
 //! Precision-engineered for Octant following standardized 24-unit geometric keylines.
 
 use super::grid_p;
-use egui::{Color32, Painter, Pos2, Rect, Stroke, StrokeKind, pos2};
+use egui::{Color32, Painter, Rect, Stroke, StrokeKind, pos2};
 
 /// Globe: High-tech planetary geoid with equatorial plane and curved meridian arcs (20dp circle keyline).
 pub fn draw_globe(painter: &Painter, rect: Rect, stroke: Stroke) {
@@ -287,24 +287,4 @@ pub fn draw_moon(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
     );
     // Mare Crisium
     painter.circle(p(8.0, 15.5), dim * (1.3 / 24.0), crater_fill, crater_stroke);
-}
-
-/// Overflow: Precision triple-diamond telemetry markers (Horizontal 20dp alignment).
-pub fn draw_overflow(painter: &Painter, rect: Rect, color: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-    let d = rect.width().min(rect.height()) * (1.8 / 24.0);
-
-    let draw_diamond = |c: Pos2| {
-        let pts = vec![
-            pos2(c.x, c.y - d),
-            pos2(c.x + d, c.y),
-            pos2(c.x, c.y + d),
-            pos2(c.x - d, c.y),
-        ];
-        painter.add(egui::Shape::convex_polygon(pts, color, Stroke::NONE));
-    };
-
-    draw_diamond(p(5.5, 12.0));
-    draw_diamond(p(12.0, 12.0));
-    draw_diamond(p(18.5, 12.0));
 }
