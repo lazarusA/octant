@@ -13,7 +13,7 @@ pub const ITEM_GAP: f32 = 9.0;
 pub const SEPARATOR: f32 = 2.0 * ITEM_GAP + 1.0;
 /// Vertical space between wrapped rows.
 pub const ROW_GAP: f32 = 5.0;
-/// Pairs beyond this are dropped; datasets rarely have more than a handful of dimensions.
+/// Most pairs the card shows; any beyond collapse into a final `+N more` entry.
 pub const MAX_FIELDS: usize = 12;
 
 /// Where one pair lands: its x offset within the row, its row, and whether a divider
@@ -77,20 +77,9 @@ impl FieldRows {
         fields: &[HoverField],
         max_width: f32,
     ) -> Self {
-        let (key_color, val_color) = (muted_color(visuals), visuals.text_color());
-        let mut pairs: [Option<FieldPair>; MAX_FIELDS] = Default::default();
-        for (cell, field) in pairs.iter_mut().zip(fields) {
-            let (key, value) = fit_pair(painter, field, key_color, val_color, max_width);
-            *cell = Some(FieldPair {
-                key,
-                value,
-                slot: FlowSlot::default(),
-            });
-        }
-
+        let (mut pairs, count) = lay_out_pairs(painter, visuals, fields, max_width);
         let widths: [f32; MAX_FIELDS] =
             std::array::from_fn(|i| pairs[i].as_ref().map_or(0.0, FieldPair::width));
-        let count = fields.len().min(MAX_FIELDS);
         let (mut rows, mut width, mut row_h) = (0, 0.0_f32, 0.0_f32);
         let slots = flow(widths[..count].iter().copied(), max_width);
         for (pair, slot) in pairs.iter_mut().flatten().zip(slots) {
@@ -105,6 +94,20 @@ impl FieldRows {
             width,
             row_h,
         }
+    }
+
+    #[cfg(test)]
+    pub fn count(&self) -> usize {
+        self.pairs.iter().flatten().count()
+    }
+
+    #[cfg(test)]
+    pub fn last_label(&self) -> Option<String> {
+        self.pairs
+            .iter()
+            .flatten()
+            .last()
+            .map(|p| p.key.text().to_owned())
     }
 
     pub fn height(&self) -> f32 {
@@ -129,6 +132,41 @@ impl FieldRows {
             painter.galley(val_pos, Arc::clone(value), visuals.text_color());
         }
     }
+}
+
+/// Lays out up to [`MAX_FIELDS`] pairs, replacing the overflow with a `+N more` entry.
+/// Returns the pairs and how many are filled.
+fn lay_out_pairs(
+    painter: &Painter,
+    visuals: &Visuals,
+    fields: &[HoverField],
+    max_width: f32,
+) -> ([Option<FieldPair>; MAX_FIELDS], usize) {
+    let (key_color, val_color) = (muted_color(visuals), visuals.text_color());
+    let pair = |field: &HoverField| {
+        let (key, value) = fit_pair(painter, field, key_color, val_color, max_width);
+        Some(FieldPair {
+            key,
+            value,
+            slot: FlowSlot::default(),
+        })
+    };
+    let overflow = fields.len() > MAX_FIELDS;
+    let shown = if overflow {
+        MAX_FIELDS - 1
+    } else {
+        fields.len()
+    };
+
+    let mut pairs: [Option<FieldPair>; MAX_FIELDS] = Default::default();
+    for (cell, field) in pairs.iter_mut().zip(&fields[..shown]) {
+        *cell = pair(field);
+    }
+    if overflow {
+        let more = HoverField::new(format!("+{} more", fields.len() - shown), "");
+        pairs[shown] = pair(&more);
+    }
+    (pairs, shown + usize::from(overflow))
 }
 
 /// Lays out a pair at its natural width; a pair wider than a whole row truncates, with

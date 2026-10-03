@@ -79,6 +79,23 @@ fn oversized_pair_is_truncated_to_one_row() {
 }
 
 #[test]
+fn overflowing_fields_collapse_into_a_more_entry() {
+    use super::flow::MAX_FIELDS;
+    with_ui(|ui| {
+        let many: Vec<HoverField> = (0..MAX_FIELDS + 3)
+            .map(|i| HoverField::new(format!("d{i}"), "1"))
+            .collect();
+        let exact = &many[..MAX_FIELDS];
+        let max = MAX_WIDTH - 2.0 * PAD.x;
+        let all = FieldRows::layout(ui.painter(), ui.visuals(), exact, max);
+        let over = FieldRows::layout(ui.painter(), ui.visuals(), &many, max);
+        assert_eq!(all.count(), MAX_FIELDS);
+        assert_eq!(over.count(), MAX_FIELDS);
+        assert_eq!(over.last_label().as_deref(), Some("+4 more"));
+    });
+}
+
+#[test]
 fn units_are_dropped_when_the_value_fills_the_row() {
     with_ui(|ui| {
         let long = "1.2345e-12 1.2345e-12 1.2345e-12 1.2345e-12";

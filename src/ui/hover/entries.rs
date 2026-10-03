@@ -6,6 +6,7 @@ use crate::ui::hover::entries_2d::resolve_2d_plot_entries;
 use crate::ui::hover::entries_3d::resolve_3d_dim_entries;
 use crate::ui::hover::field::HoverField;
 use crate::ui::hover::raycast_volume::VolumeSampler;
+use crate::utils::units::is_dimensionless_unit;
 
 /// Display units of the variable; empty for missing or dimensionless units.
 pub(crate) fn resolve_variable_units(var: Option<&VariableInfo>) -> &str {
@@ -15,7 +16,7 @@ pub(crate) fn resolve_variable_units(var: Option<&VariableInfo>) -> &str {
             .or(v.attributes.get("units").map(|s| s.as_str()))
     })
     .map(str::trim)
-    .filter(|u| !matches!(*u, "" | "1" | "none" | "dimensionless"))
+    .filter(|u| !is_dimensionless_unit(u))
     .unwrap_or("")
 }
 

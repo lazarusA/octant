@@ -99,7 +99,7 @@ impl CardLayout {
         let height = 2.0 * PAD.y + title.size().y + TITLE_GAP + value_h + fields_h;
 
         Self {
-            size: vec2(width, height.round()),
+            size: vec2(width, height.ceil()),
             title,
             value,
             units,

@@ -64,8 +64,8 @@ impl<'a> HoverCard<'a> {
     }
 }
 
-/// About six significant digits (at most four decimals), scientific for very large or
-/// small magnitudes, trailing zeros trimmed.
+/// Six significant digits, scientific for very large or small magnitudes, trailing
+/// zeros trimmed.
 fn format_scalar(buf: &mut [u8; 32], v: f32) -> &str {
     let mag = v.abs();
     let scientific = mag >= 1e6 || (mag < 1e-3 && v != 0.0);
@@ -73,8 +73,13 @@ fn format_scalar(buf: &mut [u8; 32], v: f32) -> &str {
         let s = if scientific {
             stack_str(buf, format_args!("{v:.4e}"))
         } else {
-            let int_digits = if mag >= 1.0 { mag.log10() as i32 } else { 0 };
-            let decimals = (5 - int_digits).clamp(0, 4) as usize;
+            // floor(log10) is the exponent of the leading digit: 287 -> 2, 0.0123 -> -2.
+            let lead = if mag > 0.0 {
+                mag.log10().floor() as i32
+            } else {
+                0
+            };
+            let decimals = (5 - lead).clamp(0, 7) as usize;
             stack_str(buf, format_args!("{v:.decimals$}"))
         };
         let e_start = s.find('e').unwrap_or(s.len());

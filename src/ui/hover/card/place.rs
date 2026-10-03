@@ -94,6 +94,20 @@ pub fn place_connected(target: Pos2, size: Vec2, bounds: Rect) -> Placement {
     }
 }
 
+/// Room kept clear around the target so the card never hides the reticle.
+pub const TARGET_CLEARANCE: f32 = 8.0;
+
+/// [`place_connected`] within `bounds`, moving to `fallback` (the viewport) when `bounds`
+/// is too tight to keep the card off the target.
+pub fn place_connected_clear(target: Pos2, size: Vec2, bounds: Rect, fallback: Rect) -> Placement {
+    let placement = place_connected(target, size, bounds);
+    if placement.rect.expand(TARGET_CLEARANCE).contains(target) {
+        place_connected(target, size, fallback)
+    } else {
+        placement
+    }
+}
+
 /// Places a card trailing the pointer, flipping to the other side near the canvas edges.
 pub fn place_following(cursor: Pos2, size: Vec2, bounds: Rect) -> Rect {
     let inner = bounds.shrink(EDGE_MARGIN);

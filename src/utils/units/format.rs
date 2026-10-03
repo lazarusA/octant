@@ -61,6 +61,16 @@ pub fn format_scalar_coordinate(
     format_coord_scalar(clean, val, units)
 }
 
+/// True for missing or dimensionless units (`""`, `"1"`, `"none"`, `"dimensionless"`,
+/// any case), which are not worth displaying.
+pub fn is_dimensionless_unit(units: &str) -> bool {
+    let u = units.trim();
+    u.is_empty()
+        || u == "1"
+        || u.eq_ignore_ascii_case("none")
+        || u.eq_ignore_ascii_case("dimensionless")
+}
+
 /// Formats a spatial or physical scalar with standard symbol suffixes (cardinal degrees, hPa, m).
 pub fn format_coord_scalar(clean: &str, val: f64, units: Option<&str>) -> String {
     if contains_ascii_case_insensitive(clean, "lon") {
@@ -68,10 +78,7 @@ pub fn format_coord_scalar(clean: &str, val: f64, units: Option<&str>) -> String
     } else if contains_ascii_case_insensitive(clean, "lat") {
         format_cardinal_degrees(val, false)
     } else if let Some(u) = units
-        && !u.trim().is_empty()
-        && !u.eq_ignore_ascii_case("1")
-        && !u.eq_ignore_ascii_case("none")
-        && !u.eq_ignore_ascii_case("dimensionless")
+        && !is_dimensionless_unit(u)
     {
         format!("{:.2} {}", val, u.trim())
     } else if contains_ascii_case_insensitive(clean, "depth")

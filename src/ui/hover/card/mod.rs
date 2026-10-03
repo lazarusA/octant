@@ -18,7 +18,7 @@ pub use model::{HoverCard, HoverValue};
 
 use egui::{Id, LayerId, Order, Pos2, Rect};
 use layout::CardLayout;
-use place::{card_bounds, place_connected, place_following};
+use place::{card_bounds, place_connected_clear, place_following};
 
 /// How the card positions itself relative to the hover.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -51,7 +51,7 @@ pub fn show_card(
     let visible = canvas.intersect(viewport);
     let rect = match (anchoring, target.filter(|t| visible.contains(*t))) {
         (Anchoring::Connected, Some(t)) => {
-            let placement = place_connected(t, layout.size, bounds);
+            let placement = place_connected_clear(t, layout.size, bounds, viewport);
             leader::draw_leader(&painter, visuals, t, &placement);
             placement.rect
         }

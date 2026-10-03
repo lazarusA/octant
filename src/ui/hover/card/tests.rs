@@ -2,7 +2,10 @@ use super::flow::{FlowSlot, SEPARATOR, flow};
 use super::layout::CORNER_RADIUS;
 use super::leader::{leader_anchor, leader_elbow};
 use super::model::{HoverCard, HoverValue};
-use super::place::{EDGE_MARGIN, Side, card_bounds, place_connected, place_following};
+use super::place::{
+    EDGE_MARGIN, Side, TARGET_CLEARANCE, card_bounds, place_connected, place_connected_clear,
+    place_following,
+};
 use crate::ui::hover::field::HoverField;
 use egui::{Rect, pos2, vec2};
 
@@ -19,6 +22,10 @@ fn values_format_compactly() {
     assert_eq!(fmt(HoverValue::Scalar(287.43)), "287.43");
     assert_eq!(fmt(HoverValue::Scalar(101_325.0)), "101325");
     assert_eq!(fmt(HoverValue::Scalar(0.0123)), "0.0123");
+    assert_eq!(fmt(HoverValue::Scalar(0.0012345)), "0.0012345");
+    assert_eq!(fmt(HoverValue::Scalar(0.123456)), "0.123456");
+    assert_eq!(fmt(HoverValue::Scalar(1.2345678)), "1.23457");
+    assert_eq!(fmt(HoverValue::Scalar(0.1)), "0.1");
     assert_eq!(fmt(HoverValue::Scalar(2.0)), "2");
     assert_eq!(fmt(HoverValue::Scalar(-0.00001)), "-1e-5");
     assert_eq!(fmt(HoverValue::Scalar(1.25e7)), "1.25e7");
@@ -204,6 +211,18 @@ fn small_canvas_falls_back_to_the_viewport() {
     // A canvas partly off screen only counts its visible part.
     let offscreen = CANVAS.translate(vec2(1100.0, 0.0));
     assert_eq!(card_bounds(offscreen, viewport, CARD), viewport);
+}
+
+#[test]
+fn tight_canvas_escapes_to_the_viewport_instead_of_covering_the_target() {
+    // Fits the card plus margins, but leaves no room for the leader gap or arm rise.
+    let tight = Rect::from_min_size(pos2(300.0, 200.0), vec2(230.0, 140.0));
+    let viewport = Rect::from_min_size(pos2(0.0, 0.0), vec2(1200.0, 800.0));
+    assert_eq!(card_bounds(tight, viewport, CARD), tight);
+    let target = tight.center();
+    assert!(place_connected(target, CARD, tight).rect.contains(target));
+    let p = place_connected_clear(target, CARD, tight, viewport);
+    assert!(!p.rect.expand(TARGET_CLEARANCE).contains(target));
 }
 
 #[test]
