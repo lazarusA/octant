@@ -1,26 +1,26 @@
-//! Interactive hover tooltips, glassmorphic card overlays, and 3D raycasting.
+//! Interactive hover tooltips, data-point cards with leader lines, and 3D raycasting.
 
-pub mod callout;
 pub mod camera;
+pub mod card;
 pub mod enrich;
 pub mod entries;
 pub mod entries_1d;
 pub mod entries_2d;
 pub mod entries_3d;
+pub mod field;
 pub mod format;
 pub mod hit;
-pub mod overlay;
 pub mod raycast_sphere;
 pub mod raycast_surface;
 pub mod raycast_volume;
 pub mod sample_1d;
 pub mod sample_2d;
 
-pub use callout::draw_leader_callout;
 pub use camera::{Camera3D, Ray3D, intersect_aabb};
 pub use enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
 };
+pub use field::HoverField;
 pub use format::format_dimension_coord;
 pub use hit::{resolve_hit_coordinates, resolve_target_screen_pos};
 pub use raycast_sphere::{get_normalized_radial_dr, raycast_sphere, sphere_target_pos};
@@ -32,11 +32,11 @@ pub use sample_2d::Transform2D;
 use crate::app::OctantApp;
 use crate::plots::PlotType;
 use crate::utils::colormap::evaluate_color_cpu;
+use card::{Anchoring, HoverCard, HoverValue};
 use egui::{Color32, Rect};
 use entries::{resolve_cell_value_and_dim_entries, resolve_variable_units};
-use overlay::draw_tooltip_card;
 
-/// Renders the floating glassmorphic tooltip card and connecting leader lines for the hovered data point.
+/// Renders the hover card and its leader line for the hovered data point.
 pub fn show_hover_tooltip(
     app: &OctantApp,
     ctx: &egui::Context,
@@ -133,18 +133,24 @@ pub fn show_hover_tooltip(
         evaluate_color_cpu(raw_val, &color_params)
     };
 
-    draw_tooltip_card(
+    let title = HoverCard::title_for(var_name, var.and_then(|v| v.long_name.as_deref()));
+    let anchoring = if canvas_plot_type == PlotType::Line {
+        Anchoring::FollowPointer
+    } else {
+        Anchoring::Connected
+    };
+    card::show_card(
         ctx,
-        ui,
         rect,
         hover_pos,
         target_pos,
-        canvas_plot_type,
-        var_name,
-        raw_val,
-        &units_str,
-        &dim_entries,
-        is_rgb,
-        pixel_color,
+        anchoring,
+        &HoverCard {
+            title,
+            value: HoverValue::from_raw(raw_val, is_rgb),
+            units: units_str,
+            swatch: pixel_color,
+            fields: &dim_entries,
+        },
     );
 }

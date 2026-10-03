@@ -3,7 +3,9 @@ use crate::data::{CoordinateGrid, DatasetMetadata, MatrixData, VariableInfo};
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
 };
+use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
+use crate::utils::units::format_cardinal_degrees;
 use std::collections::HashSet;
 
 #[allow(clippy::too_many_arguments)]
@@ -15,7 +17,7 @@ pub(crate) fn resolve_2d_plot_entries(
     norm_x: f32,
     norm_y: f32,
     geo_coords: Option<(f32, f32)>,
-) -> (f32, Vec<String>, usize, usize) {
+) -> (f32, Vec<HoverField>, usize, usize) {
     let (orig_w, orig_h) = if let Some(pyr) = &app.active_pyramid {
         (pyr.original_width, pyr.original_height)
     } else {
@@ -62,7 +64,7 @@ fn resolve_2d_dim_entries(
     orig_h: usize,
     geo_coords: Option<(f32, f32)>,
     used_dims: &mut HashSet<usize>,
-) -> Vec<String> {
+) -> Vec<HoverField> {
     if let CoordinateGrid::Healpix { nside, .. } = &app
         .matrix_data
         .as_ref()
@@ -132,8 +134,8 @@ fn resolve_2d_dim_entries(
         list
     } else {
         vec![
-            format!("y:\u{00A0}{}/{}", py + 1, orig_h),
-            format!("x:\u{00A0}{}/{}", px + 1, orig_w),
+            HoverField::index_of("y", py, orig_h),
+            HoverField::index_of("x", px, orig_w),
         ]
     }
 }
@@ -149,7 +151,7 @@ fn resolve_healpix_dim_entries(
     orig_h: usize,
     nside: usize,
     used_dims: &mut HashSet<usize>,
-) -> Vec<String> {
+) -> Vec<HoverField> {
     let (ring, _) = crate::data::coordinates::healpix::pix2ring(nside, px);
     let (cell_lon_rad, cell_lat_rad) = app
         .matrix_data
@@ -159,23 +161,15 @@ fn resolve_healpix_dim_entries(
     let lat_deg = cell_lat_rad.to_degrees();
     let lon_deg = cell_lon_rad.to_degrees();
 
-    let lat_str = if lat_deg >= 0.0 {
-        format!("lat:\u{00A0}{:.2}°N", lat_deg)
+    let lon_norm = ((lon_deg % 360.0) + 360.0) % 360.0;
+    let lon_signed = if lon_norm <= 180.0 {
+        lon_norm
     } else {
-        format!("lat:\u{00A0}{:.2}°S", -lat_deg)
+        lon_norm - 360.0
     };
-    let lon_str = {
-        let lon_norm = ((lon_deg % 360.0) + 360.0) % 360.0;
-        if lon_norm <= 180.0 {
-            format!("lon:\u{00A0}{:.2}°E", lon_norm)
-        } else {
-            format!("lon:\u{00A0}{:.2}°W", 360.0 - lon_norm)
-        }
-    };
-    let healpix_str = format!(
-        "cell:\u{00A0}#{}\u{00A0}(Ring\u{00A0}#{}, Nside={})",
-        px, ring, nside
-    );
+    let lat_str = HoverField::new("lat", format_cardinal_degrees(lat_deg as f64, false));
+    let lon_str = HoverField::new("lon", format_cardinal_degrees(lon_signed as f64, true));
+    let healpix_str = HoverField::new("cell", format!("#{} (ring #{}, nside {})", px, ring, nside));
 
     let mut list = vec![healpix_str, lat_str, lon_str];
     if let Some(v) = var {

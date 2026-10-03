@@ -3,6 +3,7 @@ use crate::data::{DatasetMetadata, VariableInfo};
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
 };
+use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
 use crate::ui::hover::sample_1d::sample_line_series;
 use std::collections::HashSet;
@@ -13,7 +14,7 @@ pub(crate) fn resolve_line_plot_entries(
     var: Option<&VariableInfo>,
     norm_x: f32,
     norm_y: f32,
-) -> (f32, Vec<String>, usize, usize) {
+) -> (f32, Vec<HoverField>, usize, usize) {
     let (profile_values, profile_length, line_count) = app.get_line_profile_payload();
     let prof_len = profile_length as usize;
     let l_count = line_count as usize;
@@ -106,7 +107,7 @@ fn enrich_line_series_ortho_dim(
     app: &OctantApp,
     meta: Option<&DatasetMetadata>,
     var: Option<&VariableInfo>,
-    entries: &mut Vec<String>,
+    entries: &mut Vec<HoverField>,
     used_dims: &mut HashSet<usize>,
     best_line_idx: usize,
     l_count: usize,
@@ -143,15 +144,9 @@ fn enrich_line_series_ortho_dim(
             entries.insert(0, ortho_str);
             used_dims.insert(o_idx);
         } else {
-            entries.insert(
-                0,
-                format!("series:\u{00A0}{}/{}", best_line_idx + 1, l_count),
-            );
+            entries.insert(0, HoverField::index_of("series", best_line_idx, l_count));
         }
     } else {
-        entries.insert(
-            0,
-            format!("series:\u{00A0}{}/{}", best_line_idx + 1, l_count),
-        );
+        entries.insert(0, HoverField::index_of("series", best_line_idx, l_count));
     }
 }

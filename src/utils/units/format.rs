@@ -6,7 +6,8 @@ use super::cf::{
 };
 use crate::data::coordinates::naming::contains_ascii_case_insensitive;
 
-/// Formats a coordinate scalar with units, datetime conversion, or cardinal degrees.
+/// Formats a coordinate scalar value (without the dimension name) with units, datetime
+/// conversion, or cardinal degrees.
 pub fn format_scalar_coordinate(
     dim_name: &str,
     val: f64,
@@ -21,7 +22,7 @@ pub fn format_scalar_coordinate(
         && is_cf_time_unit(u)
         && let Some(formatted) = parse_loc(Some(val), u)
     {
-        return format!("{}:\u{00A0}{}", dim_name, formatted);
+        return formatted;
     }
 
     // 2. ISO reference start date (e.g. from time_coverage_start attribute)
@@ -30,10 +31,7 @@ pub fn format_scalar_coordinate(
         && let Some((y, m, d)) = parse_iso_date(start_str)
     {
         let (res_y, res_m, res_d) = add_days_to_date(y, m, d, val.round() as i64);
-        return format!(
-            "{}:\u{00A0}{:04}-{:02}-{:02}",
-            dim_name, res_y, res_m, res_d
-        );
+        return format!("{:04}-{:02}-{:02}", res_y, res_m, res_d);
     }
 
     // 3. Unix timestamps (> 100M seconds or > 100B ms)
@@ -48,50 +46,55 @@ pub fn format_scalar_coordinate(
         let hour_of_day = total_hours.rem_euclid(24) as usize;
         let (res_y, res_m, res_d) = add_days_to_date(1970, 1, 1, days_added);
         return format!(
-            "{}:\u{00A0}{:04}-{:02}-{:02} {:02}:00",
-            dim_name, res_y, res_m, res_d, hour_of_day
+            "{:04}-{:02}-{:02} {:02}:00",
+            res_y, res_m, res_d, hour_of_day
         );
     }
 
     // 4. Step indices
     if is_time_dim && (clean.eq_ignore_ascii_case("step") || clean.eq_ignore_ascii_case("timestep"))
     {
-        return format!("{}:\u{00A0}t={:.0}", dim_name, val);
+        return format!("t={:.0}", val);
     }
 
     // 5. Physical & spatial coordinate scalar formatting
-    format_coord_scalar(clean, dim_name, val, units)
+    format_coord_scalar(clean, val, units)
+}
+
+/// True for missing or dimensionless units (`""`, `"1"`, `"none"`, `"dimensionless"`,
+/// any case), which are not worth displaying.
+pub fn is_dimensionless_unit(units: &str) -> bool {
+    let u = units.trim();
+    u.is_empty()
+        || u == "1"
+        || u.eq_ignore_ascii_case("none")
+        || u.eq_ignore_ascii_case("dimensionless")
 }
 
 /// Formats a spatial or physical scalar with standard symbol suffixes (cardinal degrees, hPa, m).
-pub fn format_coord_scalar(clean: &str, dim_name: &str, val: f64, units: Option<&str>) -> String {
+pub fn format_coord_scalar(clean: &str, val: f64, units: Option<&str>) -> String {
     if contains_ascii_case_insensitive(clean, "lon") {
-        let cardinal = format_cardinal_degrees(val, true);
-        format!("{}:\u{00A0}{}", dim_name, cardinal)
+        format_cardinal_degrees(val, true)
     } else if contains_ascii_case_insensitive(clean, "lat") {
-        let cardinal = format_cardinal_degrees(val, false);
-        format!("{}:\u{00A0}{}", dim_name, cardinal)
+        format_cardinal_degrees(val, false)
     } else if let Some(u) = units
-        && !u.trim().is_empty()
-        && !u.eq_ignore_ascii_case("1")
-        && !u.eq_ignore_ascii_case("none")
-        && !u.eq_ignore_ascii_case("dimensionless")
+        && !is_dimensionless_unit(u)
     {
-        format!("{}:\u{00A0}{:.2}\u{00A0}{}", dim_name, val, u.trim())
+        format!("{:.2} {}", val, u.trim())
     } else if contains_ascii_case_insensitive(clean, "depth")
         || contains_ascii_case_insensitive(clean, "height")
         || contains_ascii_case_insensitive(clean, "alt")
     {
-        format!("{}:\u{00A0}{:.2}\u{00A0}m", dim_name, val)
+        format!("{:.2} m", val)
     } else if contains_ascii_case_insensitive(clean, "level")
         || contains_ascii_case_insensitive(clean, "lev")
         || contains_ascii_case_insensitive(clean, "plev")
         || contains_ascii_case_insensitive(clean, "pressure")
         || contains_ascii_case_insensitive(clean, "pres")
     {
-        format!("{}:\u{00A0}{:.2}\u{00A0}hPa", dim_name, val)
+        format!("{:.2} hPa", val)
     } else {
-        format!("{}:\u{00A0}{:.2}", dim_name, val)
+        format!("{:.2}", val)
     }
 }
 
