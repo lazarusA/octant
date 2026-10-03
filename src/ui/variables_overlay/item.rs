@@ -17,17 +17,22 @@ pub fn render_variable_list(
             render_variable_row(ui, var_info, idx, ctx);
         }
     }
-    if total > MAX_ITEMS_PER_LEVEL {
-        ui.label(
-            egui::RichText::new(format!(
-                "Showing 100 of {} variables in this folder. Use search to discover all.",
-                total
-            ))
+    truncation_note(ui, total, "variables in this folder");
+}
+
+/// Muted note under a level listing more than [`MAX_ITEMS_PER_LEVEL`] items.
+pub fn truncation_note(ui: &mut egui::Ui, total: usize, what: &str) {
+    if total <= MAX_ITEMS_PER_LEVEL {
+        return;
+    }
+    let text =
+        format!("Showing {MAX_ITEMS_PER_LEVEL} of {total} {what}. Use search to discover all.");
+    ui.label(
+        egui::RichText::new(text)
             .small()
             .italics()
             .color(ui.visuals().weak_text_color()),
-        );
-    }
+    );
 }
 
 fn render_variable_row(

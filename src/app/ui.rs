@@ -41,22 +41,13 @@ impl eframe::App for OctantApp {
                         dataset.metadata = Some(metadata.clone());
                         self.dataset_manager.add(dataset);
 
-                        self.variable_search.clear();
-                        self.cached_variable_tree = Some(metadata.build_variable_tree());
-                        if let Some(var_info) = metadata.variables.first().cloned() {
-                            crate::ui::variables_panel::init_variable_dimension_defaults(
-                                self, &var_info,
-                            );
-                        }
-                        self.active_dataset_metadata = Some(metadata);
-                        self.selected_variable_idx = 0;
+                        self.load_new_metadata(metadata);
                         self.show_variables_overlay = true;
                     }
                     Err(err) => {
                         self.hero_state.loading = false;
                         self.hero_state.loaded = false;
-                        self.active_dataset_metadata = None;
-                        self.cached_variable_tree = None;
+                        self.clear_active_metadata();
                         self.status_message = format!("Store inspect error: {}", err);
                     }
                 }

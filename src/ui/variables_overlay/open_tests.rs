@@ -20,11 +20,12 @@ fn meta(names: &[&str]) -> DatasetMetadata {
 
 /// App with the overlay open on a dataset holding `names`.
 fn open_app(names: &[&str]) -> OctantApp {
-    OctantApp {
-        active_dataset_metadata: Some(meta(names)),
+    let mut app = OctantApp {
         show_variables_overlay: true,
         ..Default::default()
-    }
+    };
+    app.set_active_metadata(meta(names));
+    app
 }
 
 fn run(ctx: &egui::Context, app: &mut OctantApp) {
@@ -66,9 +67,9 @@ fn loading_a_new_dataset_while_open_refocuses_search() {
 
     // The user clicks elsewhere, then loads a folder-only dataset; the overlay stays open.
     drop_focus(&ctx);
-    app.active_dataset_metadata = None;
+    app.clear_active_metadata();
     run(&ctx, &mut app);
-    app.active_dataset_metadata = Some(meta(&["ocean/sst", "land/lai"]));
+    app.set_active_metadata(meta(&["ocean/sst", "land/lai"]));
     run(&ctx, &mut app);
     assert!(search_focused(&ctx), "new dataset takes focus");
 
@@ -90,6 +91,20 @@ fn reopening_the_overlay_refocuses_search() {
     app.show_variables_overlay = false;
     run(&ctx, &mut app);
     app.show_variables_overlay = true;
+    run(&ctx, &mut app);
+    assert!(search_focused(&ctx));
+}
+
+#[test]
+fn a_lookalike_dataset_still_counts_as_new() {
+    // Same name, store type and variables, swapped in without a loading
+    // frame in between (as when re-activating a dataset from the manager).
+    let ctx = egui::Context::default();
+    let mut app = open_app(&["a", "b"]);
+    run(&ctx, &mut app);
+    drop_focus(&ctx);
+
+    app.set_active_metadata(meta(&["a", "b"]));
     run(&ctx, &mut app);
     assert!(search_focused(&ctx));
 }

@@ -19,12 +19,8 @@ fn var(name: &str) -> VariableInfo {
 }
 
 fn group(path: &str, vars: Vec<usize>, subgroups: Vec<VariableTreeGroup>) -> VariableTreeGroup {
-    VariableTreeGroup {
-        name: path.rsplit('/').next().unwrap_or(path).into(),
-        full_path: path.into(),
-        variable_indices: vars,
-        subgroups,
-    }
+    let name = path.rsplit('/').next().unwrap_or(path).into();
+    VariableTreeGroup::new(name, path.into(), vars, subgroups)
 }
 
 /// Display order with every folder open:

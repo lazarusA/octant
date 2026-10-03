@@ -146,3 +146,36 @@ fn test_variable_tree_filter() {
     // Non-existent search
     assert!(tree.filter("nonexistent", &vars).is_none());
 }
+
+/// Counts every variable under `group` by walking it, independent of the
+/// stored totals.
+fn walk_count(group: &VariableTreeGroup) -> usize {
+    group.variable_indices.len() + group.subgroups.iter().map(walk_count).sum::<usize>()
+}
+
+fn assert_counts_match_walk(group: &VariableTreeGroup) {
+    assert_eq!(
+        group.total_variable_count(),
+        walk_count(group),
+        "{}",
+        group.full_path
+    );
+    group.subgroups.iter().for_each(assert_counts_match_walk);
+}
+
+#[test]
+fn test_stored_counts_match_the_tree_after_build_and_filter() {
+    let vars: Vec<VariableInfo> = ["a", "x/b", "x/y/c", "x/y/d", "z/e", "z/w/f"]
+        .map(|name| VariableInfo {
+            name: name.into(),
+            ..Default::default()
+        })
+        .to_vec();
+    let tree = VariableTreeGroup::build_tree_from_variables(&vars);
+    assert_counts_match_walk(&tree);
+    assert_eq!(tree.total_variable_count(), 6);
+
+    let filtered = tree.filter("y", &vars).expect("x/y matches");
+    assert_counts_match_walk(&filtered);
+    assert_eq!(filtered.total_variable_count(), 2);
+}

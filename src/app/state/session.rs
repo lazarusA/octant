@@ -147,7 +147,7 @@ impl OctantApp {
         if let Some(meta) = self.plotted_dataset_metadata.clone() {
             self.selected_store_kind = self.plotted_store_kind;
             self.store_target_input = self.plotted_store_target_input.clone();
-            self.active_dataset_metadata = Some(meta.clone());
+            self.set_active_metadata(meta);
             self.selected_variable_idx = self.plotted_variable_idx;
             self.dim_config = self.plotted_dim_config.clone();
             self.selected_dim_indices = self.plotted_selected_dim_indices.clone();
@@ -155,7 +155,6 @@ impl OctantApp {
             self.spatial_dims = self.plotted_spatial_dims.clone();
             self.animated_dim = self.plotted_animated_dim;
             self.active_plot_type = self.plotted_plot_type;
-            self.cached_variable_tree = Some(meta.build_variable_tree());
         }
     }
 

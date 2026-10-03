@@ -1,5 +1,6 @@
 //! Top-level application state, dimension configurations, multi-layer plotting, and session management.
 
+pub mod active_dataset;
 pub mod app_state;
 pub mod dataset_activation;
 pub mod dimension_state;

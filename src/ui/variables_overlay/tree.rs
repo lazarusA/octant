@@ -1,4 +1,4 @@
-use super::item::{MAX_ITEMS_PER_LEVEL, render_variable_list};
+use super::item::{MAX_ITEMS_PER_LEVEL, render_variable_list, truncation_note};
 use super::nav::{self, NodeKey, SearchJump, folder_state, row_id};
 use super::row::{RowKind, allocate_row, paint_row};
 use crate::data::{VariableInfo, VariableTreeGroup};
@@ -60,17 +60,7 @@ fn render_subgroups(
     for subgroup in subgroups.iter().take(MAX_ITEMS_PER_LEVEL) {
         render_subgroup(ui, subgroup, ctx);
     }
-    if subgroups.len() > MAX_ITEMS_PER_LEVEL {
-        ui.label(
-            egui::RichText::new(format!(
-                "Showing 100 of {} folders. Use search to discover all.",
-                subgroups.len()
-            ))
-            .small()
-            .italics()
-            .color(ui.visuals().weak_text_color()),
-        );
-    }
+    truncation_note(ui, subgroups.len(), "folders");
 }
 
 /// Full-width folder row: clicking anywhere on it (chevron, icon or name) toggles it.
