@@ -1,18 +1,21 @@
 mod focus;
-pub mod item;
-pub mod nav;
-pub mod row;
-pub mod tree;
+mod item;
+mod nav;
+mod row;
+mod tree;
 
 #[cfg(test)]
 mod nav_tests;
 #[cfg(test)]
 mod open_tests;
 #[cfg(test)]
+mod search_tests;
+#[cfg(test)]
 mod tests;
 
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::key_focus;
 use nav::SearchJump;
 use tree::{VariableTreeContext, render_tree_group};
 
@@ -175,11 +178,11 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                 selected_idx: app.selected_variable_idx,
                                 search_active,
                                 newly_selected_idx: None,
-                                search_id: Some(search.id),
+                                search_id: search.id,
                                 search_jump,
                             };
 
-                            render_tree_group(ui, root_group, &mut tree_ctx, true);
+                            render_tree_group(ui, root_group, &mut tree_ctx);
 
                             if let Some(idx) = tree_ctx.newly_selected_idx {
                                 app.selected_variable_idx = idx;
@@ -210,11 +213,13 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 }
 
 /// Down in the search field moves to the first row; Enter (which ends the
-/// single-line edit) moves to the first matching variable.
+/// single-line edit) moves to the first matching variable. With modifiers
+/// (Shift+Down selects, Cmd+Down moves the cursor) the keys stay in the field.
 fn search_jump(ui: &egui::Ui, search: &egui::Response) -> Option<SearchJump> {
-    if search.has_focus() && ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
+    let pressed = |key| key_focus::pressed(ui.ctx(), [key]).is_some();
+    if search.has_focus() && pressed(egui::Key::ArrowDown) {
         Some(SearchJump::FirstRow)
-    } else if search.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+    } else if search.lost_focus() && pressed(egui::Key::Enter) {
         Some(SearchJump::FirstVariable)
     } else {
         None

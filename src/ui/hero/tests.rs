@@ -126,3 +126,44 @@ fn escape_on_a_chip_returns_to_intake() {
     press(&ctx, &mut app, Key::Escape);
     assert!(intake_focused(&ctx));
 }
+
+/// One frame of a left panel (like the Dataset panel) drawn just before the
+/// hero; returns the panel button's rect and whether it was clicked.
+fn panel_frame(ctx: &egui::Context, app: &mut OctantApp, events: Vec<Event>) -> (egui::Rect, bool) {
+    let input = RawInput {
+        events,
+        ..Default::default()
+    };
+    let mut button = (egui::Rect::NOTHING, false);
+    let mut out = ctx.run_ui(input, |ui| {
+        let mut show = true;
+        egui::Panel::left("test_left_panel").show_collapsible(ui, &mut show, |ui| {
+            let resp = ui.button("Load");
+            button = (resp.rect, resp.clicked());
+        });
+        show_hero_landing(app, ui);
+    });
+    out.textures_delta.clear();
+    button
+}
+
+#[test]
+fn hero_background_does_not_cover_side_panels() {
+    let ctx = egui::Context::default();
+    let mut app = OctantApp::default();
+    let (rect, _) = panel_frame(&ctx, &mut app, Vec::new());
+    drop_focus(&ctx);
+
+    let pos = rect.center();
+    let press = |pressed| Event::PointerButton {
+        pos,
+        button: PointerButton::Primary,
+        pressed,
+        modifiers: Default::default(),
+    };
+    panel_frame(&ctx, &mut app, vec![Event::PointerMoved(pos)]);
+    panel_frame(&ctx, &mut app, vec![press(true)]);
+    let (_, clicked) = panel_frame(&ctx, &mut app, vec![press(false)]);
+    assert!(clicked, "the panel button receives its click");
+    assert!(!intake_focused(&ctx), "the hero background did not take it");
+}

@@ -30,7 +30,7 @@ pub fn render_variable_list(
     }
 }
 
-pub fn render_variable_row(
+fn render_variable_row(
     ui: &mut egui::Ui,
     var_info: &VariableInfo,
     idx: usize,

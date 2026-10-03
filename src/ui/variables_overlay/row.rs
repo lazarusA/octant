@@ -2,7 +2,10 @@
 //! `[chevron] [icon] name  detail`, where every pixel of the row is a hit target.
 
 use crate::ui::icons::{Icon, IconSize, IconTone};
-use egui::{Id, Rect, Response, Sense, TextStyle, TextWrapMode, Ui, WidgetText, pos2, vec2};
+use crate::ui::key_focus;
+use egui::{
+    Color32, Id, Rect, Response, Sense, TextStyle, TextWrapMode, Ui, WidgetText, pos2, vec2,
+};
 
 /// Horizontal padding inside the row before the chevron slot.
 const PAD_X: f32 = 4.0;
@@ -47,15 +50,24 @@ pub fn allocate_row(ui: &mut Ui, id: Id) -> Response {
     let resp = ui.interact(rect, id, Sense::click());
     // egui never focuses on click; do it so the keys continue from the clicked row.
     if resp.clicked() && !resp.has_focus() {
-        crate::ui::key_focus::request(ui.ctx(), id);
+        key_focus::request(ui.ctx(), id);
     }
     if resp.has_focus() {
-        crate::ui::key_focus::claim_arrows(ui.ctx(), id);
+        key_focus::claim_arrows(ui.ctx(), id);
     }
     if resp.gained_focus() {
         resp.scroll_to_me(None);
     }
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// Text and icon colors of one row for its hover, focus and selection state.
+#[derive(Clone, Copy)]
+struct RowColors {
+    text: Color32,
+    detail: Color32,
+    icon: Color32,
+    chevron: Color32,
 }
 
 /// Paint a row allocated by [`allocate_row`] and describe it for accessibility.
@@ -67,93 +79,100 @@ pub fn paint_row(
     detail: &str,
     selected: bool,
 ) {
-    let widget_info = match kind {
+    // Built lazily: egui only calls this when accessibility output is wanted,
+    // so idle frames don't allocate the label.
+    resp.widget_info(|| match kind {
         RowKind::Folder { .. } => {
             egui::WidgetInfo::labeled(egui::WidgetType::CollapsingHeader, true, label)
         }
         RowKind::Variable => {
             egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, selected, label)
         }
-    };
-    resp.widget_info(|| widget_info.clone());
+    });
 
-    let rect = resp.rect;
-    if !ui.is_rect_visible(rect) {
+    if !ui.is_rect_visible(resp.rect) {
         return;
     }
-    let visuals = ui.visuals();
-    let painter = ui.painter();
+    let colors = paint_background(ui, resp, selected);
+    let x = paint_icons(ui, resp.rect, kind, colors);
+    paint_labels(ui, resp.rect, x, label, detail, colors);
+}
 
+/// Selection fill, or hover/focus fill, plus the focus ring; returns the
+/// colors for the row's content.
+fn paint_background(ui: &Ui, resp: &Response, selected: bool) -> RowColors {
+    let visuals = ui.visuals();
+    let radius = visuals.widgets.hovered.corner_radius;
     let hot = resp.hovered() || resp.has_focus();
     if selected {
-        painter.rect_filled(
-            rect,
-            visuals.widgets.hovered.corner_radius,
-            visuals.selection.bg_fill,
-        );
+        ui.painter()
+            .rect_filled(resp.rect, radius, visuals.selection.bg_fill);
     } else if hot {
-        let w = &visuals.widgets.hovered;
-        painter.rect_filled(rect, w.corner_radius, w.weak_bg_fill);
+        let fill = visuals.widgets.hovered.weak_bg_fill;
+        ui.painter().rect_filled(resp.rect, radius, fill);
     }
     if resp.has_focus() {
-        let w = &visuals.widgets.hovered;
-        painter.rect_stroke(rect, w.corner_radius, w.bg_stroke, egui::StrokeKind::Inside);
+        key_focus::paint_focus_ring(ui, resp.rect, radius);
     }
 
-    let text_color = if selected {
+    let muted = IconTone::Muted.color(visuals);
+    let text = if selected {
         visuals.selection.stroke.color
     } else if hot {
         visuals.strong_text_color()
     } else {
         visuals.text_color()
     };
-    let muted = IconTone::Muted.color(visuals);
-    let dark = visuals.dark_mode;
+    RowColors {
+        text,
+        detail: if selected { text } else { muted },
+        icon: if selected {
+            text
+        } else {
+            IconTone::Default.color(visuals)
+        },
+        chevron: if hot { text } else { muted },
+    }
+}
 
+/// Chevron slot and kind icon; returns the x where the name starts.
+fn paint_icons(ui: &Ui, rect: Rect, kind: RowKind, colors: RowColors) -> f32 {
+    let painter = ui.painter();
+    let dark = ui.visuals().dark_mode;
     let mut x = rect.left() + PAD_X;
     if let Some(chevron) = kind.chevron() {
-        let r = icon_rect(x, rect, CHEVRON);
-        chevron.paint(painter, r, if hot { text_color } else { muted }, dark);
+        chevron.paint(painter, icon_rect(x, rect, CHEVRON), colors.chevron, dark);
     }
     x += CHEVRON.px() + GAP;
-
-    let icon_color = if selected {
-        text_color
-    } else {
-        IconTone::Default.color(visuals)
-    };
     kind.icon()
-        .paint(painter, icon_rect(x, rect, ICON), icon_color, dark);
-    x += ICON.px() + GAP;
+        .paint(painter, icon_rect(x, rect, ICON), colors.icon, dark);
+    x + ICON.px() + GAP
+}
 
-    // Lay out the detail first so a long name truncates instead of hiding it.
+/// Bold name then muted detail from `x`. The detail is laid out first so a
+/// long name truncates instead of hiding it.
+fn paint_labels(ui: &Ui, rect: Rect, x: f32, label: &str, detail: &str, colors: RowColors) {
     let available = (rect.right() - PAD_X - x).max(0.0);
-    let detail_galley = (!detail.is_empty()).then(|| {
-        WidgetText::from(egui::RichText::new(detail)).into_galley(
-            ui,
-            Some(TextWrapMode::Truncate),
-            available * 0.5,
-            TextStyle::Body,
-        )
-    });
+    let layout = |text: egui::RichText, width: f32| {
+        WidgetText::from(text).into_galley(ui, Some(TextWrapMode::Truncate), width, TextStyle::Body)
+    };
+    let detail_galley =
+        (!detail.is_empty()).then(|| layout(egui::RichText::new(detail), available * 0.5));
     let detail_w = detail_galley
         .as_ref()
         .map_or(0.0, |g| g.size().x + DETAIL_GAP);
-    let name_galley = WidgetText::from(egui::RichText::new(label).strong()).into_galley(
-        ui,
-        Some(TextWrapMode::Truncate),
+    let name_galley = layout(
+        egui::RichText::new(label).strong(),
         (available - detail_w).max(0.0),
-        TextStyle::Body,
     );
 
-    let name_pos = pos2(x, rect.center().y - name_galley.size().y * 0.5);
+    let center_y = |h: f32| rect.center().y - h * 0.5;
     let name_w = name_galley.size().x;
-    painter.galley(name_pos, name_galley, text_color);
-
+    let name_pos = pos2(x, center_y(name_galley.size().y));
+    ui.painter().galley(name_pos, name_galley, colors.text);
     if let Some(g) = detail_galley {
-        let pos = pos2(x + name_w + DETAIL_GAP, rect.center().y - g.size().y * 0.5);
-        let color = if selected { text_color } else { muted };
-        painter.galley(pos, g, color);
+        let pos = pos2(x + name_w + DETAIL_GAP, center_y(g.size().y));
+        ui.painter().galley(pos, g, colors.detail);
     }
 }
 

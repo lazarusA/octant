@@ -21,8 +21,9 @@ pub fn just_appeared(ctx: &Context) -> bool {
     previous.is_none_or(|p| p.saturating_add(1) < pass)
 }
 
-/// Click target covering the whole hero. Register it before the hero's
-/// widgets so they stay on top and keep their own clicks.
+/// Click target covering the hero's own area (`rect`, after side panels).
+/// Register it before the hero's widgets so they stay on top and keep their
+/// own clicks.
 pub fn background(ui: &mut Ui, rect: Rect) -> Response {
     ui.interact(rect, Id::new("hero_background"), Sense::click())
 }

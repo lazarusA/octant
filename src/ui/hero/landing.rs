@@ -49,14 +49,17 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
     let space = |base: f32| vspace(base, available_h);
 
     let mut wants_focus = focus::just_appeared(ui.ctx());
+    // The space left for the hero after side panels. `ui.max_rect()` and
+    // `ui.clip_rect()` still span the whole window, so a click target sized
+    // from them would sit over the panels and swallow their clicks.
+    let hero_rect = ui.available_rect_before_wrap();
 
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
         .show(ui, |ui| {
             ui.set_min_width(available_w);
             ui.set_width(available_w);
-            let background = ui.max_rect().union(ui.clip_rect());
-            wants_focus |= focus::background(ui, background).clicked();
+            wants_focus |= focus::background(ui, hero_rect).clicked();
 
             ui.vertical_centered(|ui| {
                 ui.set_min_width(available_w);

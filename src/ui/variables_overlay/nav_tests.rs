@@ -2,8 +2,8 @@
 //! harness in `tests.rs`. Fixture rows with every folder open:
 //! `/` > lat(0), ocean > sst(1), ocean/deep > temp(2), land > lai(3).
 
-use super::nav::{NodeKey, folder_id, row_id};
-use super::tests::{click, focus, focused, frame, is_open, press};
+use super::nav::{NodeKey, folder_id, folder_state, row_id, visible_row_ids};
+use super::tests::{click, fixture, focus, focused, frame, is_open, press};
 use egui::Key;
 
 fn row(key: NodeKey<'_>) -> Option<egui::Id> {
@@ -126,51 +126,6 @@ fn enter_selects_the_focused_variable() {
 }
 
 #[test]
-fn search_field_and_tree_hand_focus_back_and_forth() {
-    let ctx = egui::Context::default();
-    let f = frame(&ctx, Vec::new(), false);
-    ctx.memory_mut(|m| m.request_focus(f.search_id));
-    frame(&ctx, Vec::new(), false);
-
-    press(&ctx, Key::ArrowDown, false);
-    assert_eq!(
-        focused(&ctx),
-        row(NodeKey::Folder("")),
-        "Down enters the tree"
-    );
-    press(&ctx, Key::ArrowUp, false);
-    assert_eq!(
-        focused(&ctx),
-        Some(f.search_id),
-        "Up on the first row returns"
-    );
-
-    press(&ctx, Key::ArrowDown, false);
-    press(&ctx, Key::ArrowDown, false);
-    press(&ctx, Key::Escape, false);
-    assert_eq!(
-        focused(&ctx),
-        Some(f.search_id),
-        "Escape returns from any row"
-    );
-}
-
-#[test]
-fn enter_in_search_focuses_the_first_matching_variable() {
-    let ctx = egui::Context::default();
-    let f = frame(&ctx, Vec::new(), true);
-    ctx.memory_mut(|m| m.request_focus(f.search_id));
-    frame(&ctx, Vec::new(), true);
-
-    let f = press(&ctx, Key::Enter, true);
-    assert_eq!(focused(&ctx), Some(row_id(NodeKey::Variable(0), true)));
-    assert_eq!(
-        f.selected, None,
-        "several matches: focus only, no selection"
-    );
-}
-
-#[test]
 fn keys_continue_from_a_mouse_click() {
     let ctx = egui::Context::default();
     let f = frame(&ctx, Vec::new(), false);
@@ -195,12 +150,37 @@ fn keys_continue_from_a_mouse_click() {
     assert_eq!(focused(&ctx), row(NodeKey::Folder("ocean/deep")));
 }
 
+/// Navigation must visit exactly the drawn rows, in drawn order: each listed
+/// row was drawn, and each starts one row step below the previous one, so a
+/// drawn row missing from the list would show up as a gap.
+fn assert_nav_order_matches_drawing(ctx: &egui::Context, search: bool) {
+    let f = frame(ctx, Vec::new(), search);
+    let (_, root) = fixture();
+    let ids = visible_row_ids(ctx, &root, search);
+    let rects: Vec<egui::Rect> = ids
+        .iter()
+        .map(|&id| ctx.read_response(id).expect("listed row was drawn").rect)
+        .collect();
+    assert_eq!(rects[0].top(), f.origin.y, "first row is the first drawn");
+    for pair in rects.windows(2) {
+        let step = pair[1].top() - pair[0].top();
+        assert!(
+            (step - f.row_step).abs() < 0.5,
+            "gap or reorder: step {step}"
+        );
+    }
+}
+
 #[test]
-fn down_works_right_after_the_search_field_gets_focus() {
+fn navigation_order_matches_drawn_order() {
+    // Searching: every folder open.
+    assert_nav_order_matches_drawing(&egui::Context::default(), true);
+
+    // Browsing with only `ocean` open, set before its first draw so no
+    // open animation is in flight.
     let ctx = egui::Context::default();
-    let f = frame(&ctx, Vec::new(), false);
-    // What opening the overlay does: focus lands on the search field, no click.
-    ctx.memory_mut(|m| m.request_focus(f.search_id));
-    press(&ctx, Key::ArrowDown, false);
-    assert_eq!(focused(&ctx), row(NodeKey::Folder("")));
+    let mut ocean = folder_state(&ctx, "ocean", false);
+    ocean.set_open(true);
+    ocean.store(&ctx);
+    assert_nav_order_matches_drawing(&ctx, false);
 }

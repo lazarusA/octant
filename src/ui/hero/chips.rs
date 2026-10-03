@@ -3,6 +3,7 @@
 use super::chip_nav::{self, chip_id};
 use super::style::{BODY_FONT, GUTTER, SMALL_FONT, gap};
 use crate::app::OctantApp;
+use crate::ui::key_focus;
 use egui::Galley;
 use std::sync::Arc;
 
@@ -165,7 +166,7 @@ fn render_chip(
     let response = ui.interact(rect, id, egui::Sense::click());
     let focused = response.has_focus();
     if focused {
-        crate::ui::key_focus::claim_arrows(ui.ctx(), id);
+        key_focus::claim_arrows(ui.ctx(), id);
     }
 
     if ui.is_rect_visible(rect) {
@@ -179,9 +180,7 @@ fn render_chip(
             galley
         };
         if focused {
-            let stroke = ui.visuals().widgets.hovered.bg_stroke;
-            ui.painter()
-                .rect_stroke(rect, radius, stroke, egui::StrokeKind::Inside);
+            key_focus::paint_focus_ring(ui, rect, radius);
         }
         let text_pos = rect.center() - galley.size() * 0.5;
         ui.painter()

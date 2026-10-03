@@ -33,9 +33,15 @@ pub fn row_id(key: NodeKey<'_>, search_active: bool) -> Id {
     base_id().with(("var_tree_row", search_active, key))
 }
 
-pub fn is_folder_open(ctx: &Context, full_path: &str, search_active: bool) -> bool {
-    CollapsingState::load(ctx, folder_id(full_path, search_active))
-        .map_or(search_active, |s| s.is_open())
+/// A folder's open/closed state. The single place that says folders start
+/// open while searching and closed while browsing.
+pub fn folder_state(ctx: &Context, full_path: &str, search_active: bool) -> CollapsingState {
+    let id = folder_id(full_path, search_active);
+    CollapsingState::load_with_default_open(ctx, id, search_active)
+}
+
+fn is_folder_open(ctx: &Context, full_path: &str, search_active: bool) -> bool {
+    folder_state(ctx, full_path, search_active).is_open()
 }
 
 /// Where focus should go after a key in the search field.
@@ -106,10 +112,16 @@ fn visible_rows<'a>(ctx: &Context, root: &'a VariableTreeGroup, search: bool) ->
     rows
 }
 
+/// Row ids in navigation order, for checking it against the drawn order.
+#[cfg(test)]
+pub fn visible_row_ids(ctx: &Context, root: &VariableTreeGroup, search: bool) -> Vec<Id> {
+    let rows = visible_rows(ctx, root, search);
+    rows.iter().map(|r| row_id(r.key, search)).collect()
+}
+
 fn set_open(ctx: &Context, key: NodeKey<'_>, search: bool, open: bool) {
     if let NodeKey::Folder(path) = key {
-        let mut state =
-            CollapsingState::load_with_default_open(ctx, folder_id(path, search), search);
+        let mut state = folder_state(ctx, path, search);
         state.set_open(open);
         state.store(ctx);
         ctx.request_repaint();
@@ -158,21 +170,11 @@ pub fn handle_keys(ui: &egui::Ui, root: &VariableTreeGroup, tree: &mut VariableT
 }
 
 /// Act on `key` for the focused row `rows[at]`.
-fn apply_key(
-    ctx: &Context,
-    rows: &[Row<'_>],
-    at: usize,
-    key: Key,
-    search: bool,
-    search_id: Option<Id>,
-) {
+fn apply_key(ctx: &Context, rows: &[Row<'_>], at: usize, key: Key, search: bool, search_id: Id) {
     let row = rows[at];
     let focus = |i: usize| key_focus::request(ctx, row_id(rows[i].key, search));
-    let to_search = || {
-        if let Some(id) = search_id {
-            ctx.memory_mut(|m| m.request_focus(id));
-        }
-    };
+    // Through `key_focus` so egui's own spatial Up can't carry focus past the field.
+    let to_search = || key_focus::request(ctx, search_id);
 
     match key {
         Key::ArrowDown if at + 1 < rows.len() => focus(at + 1),

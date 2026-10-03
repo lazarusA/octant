@@ -29,7 +29,7 @@ fn group(path: &str, vars: Vec<usize>, subgroups: Vec<VariableTreeGroup>) -> Var
 
 /// Display order with every folder open:
 /// `/` > lat(0), ocean > sst(1), ocean/deep > temp(2), land > lai(3).
-fn fixture() -> (Vec<VariableInfo>, VariableTreeGroup) {
+pub(super) fn fixture() -> (Vec<VariableInfo>, VariableTreeGroup) {
     let variables = ["lat", "ocean/sst", "ocean/deep/temp", "land/lai"].map(var);
     let deep = group("ocean/deep", vec![2], Vec::new());
     let ocean = group("ocean", vec![1], vec![deep]);
@@ -55,6 +55,9 @@ pub(super) fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool
     };
     let mut out = None;
     let mut output = ctx.run_ui(input, |ui| {
+        // Stands in for the overlay's close button: above the search field and
+        // overlapping it horizontally, so egui's spatial Up would pick it.
+        let _ = ui.add_sized([ui.available_width(), 20.0], egui::Button::new("Close"));
         let mut text = String::new();
         let search = ui.search_field_response(&mut text, "Search", None);
         let jump = search_jump(ui, &search);
@@ -65,10 +68,10 @@ pub(super) fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool
             selected_idx: usize::MAX,
             search_active,
             newly_selected_idx: None,
-            search_id: Some(search.id),
+            search_id: search.id,
             search_jump: jump,
         };
-        render_tree_group(ui, &root, &mut tree_ctx, true);
+        render_tree_group(ui, &root, &mut tree_ctx);
         out = Some(Frame {
             origin,
             row_step,
@@ -96,12 +99,22 @@ pub(super) fn click(ctx: &egui::Context, pos: Pos2, search_active: bool) -> Fram
 
 /// Press `key` for one frame.
 pub(super) fn press(ctx: &egui::Context, key: Key, search_active: bool) -> Frame {
+    press_with(ctx, key, Modifiers::NONE, search_active)
+}
+
+/// Press `key` with `modifiers` held.
+pub(super) fn press_with(
+    ctx: &egui::Context,
+    key: Key,
+    modifiers: Modifiers,
+    search_active: bool,
+) -> Frame {
     let event = Event::Key {
         key,
         physical_key: None,
         pressed: true,
         repeat: false,
-        modifiers: Modifiers::NONE,
+        modifiers,
     };
     frame(ctx, vec![event], search_active)
 }

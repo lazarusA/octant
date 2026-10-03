@@ -2,7 +2,7 @@
 //! sample chips). egui moves focus spatially on arrow keys; widgets that
 //! navigate themselves claim the arrows so only their own logic moves focus.
 
-use egui::{Context, EventFilter, FocusDirection, Id, Key};
+use egui::{Context, Event, EventFilter, FocusDirection, Id, Key};
 
 /// While focused, the widget owns every arrow key and Escape; Tab still moves
 /// focus on as usual.
@@ -44,12 +44,27 @@ pub fn claim_arrows(ctx: &Context, id: Id) {
     });
 }
 
-/// The first of `keys` pressed this frame without modifiers.
+/// The first of `keys` pressed this frame (key repeat included) without
+/// modifiers. Reads each key event's own modifiers, so Shift+Down or
+/// Cmd+Down never count as a plain Down.
 pub fn pressed<const N: usize>(ctx: &Context, keys: [Key; N]) -> Option<Key> {
     ctx.input(|i| {
-        if !i.modifiers.is_none() {
-            return None;
-        }
-        keys.into_iter().find(|&k| i.key_pressed(k))
+        i.events.iter().find_map(|e| match e {
+            Event::Key {
+                key,
+                pressed: true,
+                modifiers,
+                ..
+            } if modifiers.is_none() && keys.contains(key) => Some(*key),
+            _ => None,
+        })
     })
+}
+
+/// Keyboard focus outline drawn inside `rect`, shared by every widget that
+/// navigates with arrow keys so focus looks the same everywhere.
+pub fn paint_focus_ring(ui: &egui::Ui, rect: egui::Rect, radius: impl Into<egui::CornerRadius>) {
+    let stroke = ui.visuals().widgets.hovered.bg_stroke;
+    ui.painter()
+        .rect_stroke(rect, radius, stroke, egui::StrokeKind::Inside);
 }

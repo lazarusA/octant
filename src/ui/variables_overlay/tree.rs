@@ -1,8 +1,7 @@
 use super::item::{MAX_ITEMS_PER_LEVEL, render_variable_list};
-use super::nav::{self, NodeKey, SearchJump, folder_id, row_id};
+use super::nav::{self, NodeKey, SearchJump, folder_state, row_id};
 use super::row::{RowKind, allocate_row, paint_row};
 use crate::data::{VariableInfo, VariableTreeGroup};
-use egui::collapsing_header::CollapsingState;
 
 pub struct VariableTreeContext<'a> {
     pub variables: &'a [VariableInfo],
@@ -10,22 +9,17 @@ pub struct VariableTreeContext<'a> {
     pub search_active: bool,
     pub newly_selected_idx: Option<usize>,
     /// Search field to return focus to from the first row or on Escape.
-    pub search_id: Option<egui::Id>,
+    pub search_id: egui::Id,
     /// Pending focus jump requested by a key in the search field.
     pub search_jump: Option<SearchJump>,
 }
 
+/// Draw the whole tree from its root group.
 pub fn render_tree_group(
     ui: &mut egui::Ui,
     group: &VariableTreeGroup,
     ctx: &mut VariableTreeContext<'_>,
-    is_root: bool,
 ) {
-    if !is_root {
-        render_subgroup(ui, group, ctx);
-        return;
-    }
-
     nav::handle_keys(ui, group, ctx);
 
     if !group.variable_indices.is_empty() {
@@ -44,7 +38,7 @@ pub fn render_tree_group(
     render_subgroups(ui, &group.subgroups, ctx);
 }
 
-pub fn render_subgroup(
+fn render_subgroup(
     ui: &mut egui::Ui,
     subgroup: &VariableTreeGroup,
     ctx: &mut VariableTreeContext<'_>,
@@ -88,8 +82,7 @@ fn render_folder(
     count: usize,
     add_body: impl FnOnce(&mut egui::Ui),
 ) {
-    let id = folder_id(path, search_active);
-    let mut state = CollapsingState::load_with_default_open(ui.ctx(), id, search_active);
+    let mut state = folder_state(ui.ctx(), path, search_active);
     let resp = allocate_row(ui, row_id(NodeKey::Folder(path), search_active));
     if resp.clicked() {
         state.toggle(ui);
