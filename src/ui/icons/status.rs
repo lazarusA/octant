@@ -66,74 +66,80 @@ pub fn draw_bolt(c: &IconCanvas) {
     c.fill(&[seam_hi, (18.5, 10.5), (9.5, 21.5), seam_lo], c.color);
 }
 
+/// Hourglass glass profile in grid units: plates at `GLASS_TOP` and
+/// `GLASS_BOTTOM`, half widths `GLASS_OUTER` at the plates and `GLASS_INNER`
+/// along the flat waist.
+const GLASS_TOP: f32 = 4.0;
+const GLASS_BOTTOM: f32 = 20.0;
+const WAIST_TOP: f32 = 11.25;
+const WAIST_BOT: f32 = 12.75;
+const GLASS_OUTER: f32 = 5.5;
+const GLASS_INNER: f32 = 0.75;
+
+/// Half width of the hourglass glass at height `y`.
+fn glass_half(y: f32) -> f32 {
+    let slope = (GLASS_OUTER - GLASS_INNER) / (WAIST_TOP - GLASS_TOP);
+    if y <= WAIST_TOP {
+        GLASS_OUTER - (y - GLASS_TOP) * slope
+    } else if y >= WAIST_BOT {
+        GLASS_INNER + (y - WAIST_BOT) * slope
+    } else {
+        GLASS_INNER
+    }
+}
+
 /// Hourglass: sand timer with a flat waist and sand settling in both chambers (14x16 keyline).
 pub fn draw_hourglass(c: &IconCanvas) {
-    // Glass spans x 6.5..17.5 between the plates, narrowing to a flat waist.
-    let (top, bottom, waist_top, waist_bot) = (4.0, 20.0, 11.25, 12.75);
-    let (outer, inner) = (5.5, 0.75);
-    let slope = (outer - inner) / (waist_top - top);
-    // Half width of the glass at height `y`.
-    let half = |y: f32| {
-        if y <= waist_top {
-            outer - (y - top) * slope
-        } else if y >= waist_bot {
-            inner + (y - waist_bot) * slope
-        } else {
-            inner
-        }
-    };
-    let sand_at = |y: f32, side: f32| (12.0 + side * (half(y) - 1.0), y);
-
     // Glass fill in three bands: upper chamber, waist, lower chamber.
-    for (y0, y1) in [
-        (top, waist_top),
-        (waist_top, waist_bot),
-        (waist_bot, bottom),
-    ] {
-        let (h0, h1) = (half(y0), half(y1));
-        c.fill(
-            &[
-                (12.0 - h0, y0),
-                (12.0 + h0, y0),
-                (12.0 + h1, y1),
-                (12.0 - h1, y1),
-            ],
-            c.body(),
-        );
+    let bands = [
+        (GLASS_TOP, WAIST_TOP),
+        (WAIST_TOP, WAIST_BOT),
+        (WAIST_BOT, GLASS_BOTTOM),
+    ];
+    for (y0, y1) in bands {
+        let (h0, h1) = (glass_half(y0), glass_half(y1));
+        let quad = [
+            (12.0 - h0, y0),
+            (12.0 + h0, y0),
+            (12.0 + h1, y1),
+            (12.0 - h1, y1),
+        ];
+        c.fill(&quad, c.body());
     }
-
-    // Sand: a remnant above the waist and a mounded pile below it.
-    let sand = c.shade(Shade::Mid);
-    if !c.compact() {
-        c.fill(&[sand_at(8.0, -1.0), sand_at(8.0, 1.0), (12.0, 10.5)], sand);
-    }
-    c.fill(
-        &[
-            sand_at(17.0, -1.0),
-            (12.0, 15.5),
-            sand_at(17.0, 1.0),
-            sand_at(19.0, 1.0),
-            sand_at(19.0, -1.0),
-        ],
-        sand,
-    );
+    draw_sand(c);
 
     // Glass sides as two open strokes so nothing doubles up at the waist.
     let s = c.stroke(Weight::Base);
     for side in [-1.0_f32, 1.0] {
         let x = |dx: f32| 12.0 + side * dx;
-        c.path(
-            &[
-                (x(outer), top),
-                (x(inner), waist_top),
-                (x(inner), waist_bot),
-                (x(outer), bottom),
-            ],
-            s,
-        );
+        let profile = [
+            (x(GLASS_OUTER), GLASS_TOP),
+            (x(GLASS_INNER), WAIST_TOP),
+            (x(GLASS_INNER), WAIST_BOT),
+            (x(GLASS_OUTER), GLASS_BOTTOM),
+        ];
+        c.path(&profile, s);
     }
 
     // End plates, only slightly wider than the glass.
-    c.line((5.0, top), (19.0, top), s);
-    c.line((5.0, bottom), (19.0, bottom), s);
+    c.line((5.0, GLASS_TOP), (19.0, GLASS_TOP), s);
+    c.line((5.0, GLASS_BOTTOM), (19.0, GLASS_BOTTOM), s);
+}
+
+/// Sand inset one unit inside the glass: a remnant above the waist (full size
+/// only) and a mounded pile below it.
+fn draw_sand(c: &IconCanvas) {
+    let at = |y: f32, side: f32| (12.0 + side * (glass_half(y) - 1.0), y);
+    let sand = c.shade(Shade::Mid);
+    if !c.compact() {
+        c.fill(&[at(8.0, -1.0), at(8.0, 1.0), (12.0, 10.5)], sand);
+    }
+    let pile = [
+        at(17.0, -1.0),
+        (12.0, 15.5),
+        at(17.0, 1.0),
+        at(19.0, 1.0),
+        at(19.0, -1.0),
+    ];
+    c.fill(&pile, sand);
 }

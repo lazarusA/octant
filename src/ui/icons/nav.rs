@@ -45,7 +45,7 @@ pub fn draw_settings(c: &IconCanvas) {
     let (teeth, r_out) = (6, key::CIRCLE_R);
     let pitch = TAU / teeth as f32;
     let half = pitch / 4.0;
-    let at = |a: f32, r: f32| c.p(ctr.0 + r * a.cos(), ctr.1 + r * a.sin());
+    let at = |a: f32, r: f32| c.polar(ctr, r, a);
     let tooth = |a: f32, r_root: f32, root_w: f32, tip_w: f32| {
         vec![
             at(a - half * root_w, r_root),
@@ -102,10 +102,7 @@ pub fn draw_sun(c: &IconCanvas) {
     for i in 0..8 {
         let a = i as f32 * TAU / 8.0;
         let r1 = if i % 2 == 0 { key::CIRCLE_R } else { 8.75 };
-        let (cos, sin) = (a.cos(), a.sin());
-        let from = c.p(ctr.0 + 6.5 * cos, ctr.1 + 6.5 * sin);
-        let to = c.p(ctr.0 + r1 * cos, ctr.1 + r1 * sin);
-        c.seg(from, to, s);
+        c.seg(c.polar(ctr, 6.5, a), c.polar(ctr, r1, a), s);
     }
 }
 

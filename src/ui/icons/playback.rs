@@ -1,7 +1,7 @@
 //! Playback and timeline icons. Transport glyphs are solid fills; loop,
 //! reset and gauge are outlined.
 
-use super::canvas::{IconCanvas, Weight, key};
+use super::canvas::{Caps, IconCanvas, Weight, key};
 use egui::{Pos2, Vec2, vec2};
 use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
@@ -71,13 +71,9 @@ pub fn draw_loop(c: &IconCanvas) {
     // Clockwise screen angles: upper arc left to right, lower arc right to left.
     for start in [PI + gap, gap] {
         let end = start + PI - 2.0 * gap - head;
-        let pts = c.arc(ctr, (r, r), start, end);
-        let (Some(&first), Some(&last)) = (pts.first(), pts.last()) else {
-            continue;
-        };
-        c.curve(pts, s);
-        c.caps([first, first], s);
-        arrowhead(c, last, cw_tangent(end));
+        if let Some((_, tip)) = c.curve_capped(c.arc(ctr, (r, r), start, end), s, Caps::Start) {
+            arrowhead(c, tip, cw_tangent(end));
+        }
     }
 }
 
@@ -86,36 +82,27 @@ pub fn draw_reset(c: &IconCanvas) {
     let s = c.stroke(Weight::Base);
     let (ctr, r) = ((key::C, key::C), 8.0);
     let top = -FRAC_PI_2;
-    let pts = c.arc(ctr, (r, r), top, top + TAU * 0.78);
-    let (Some(&first), Some(&last)) = (pts.first(), pts.last()) else {
-        return;
-    };
-    c.curve(pts, s);
-    c.caps([last, last], s);
-    arrowhead(c, first, -cw_tangent(top));
+    let arc = c.arc(ctr, (r, r), top, top + TAU * 0.78);
+    if let Some((tip, _)) = c.curve_capped(arc, s, Caps::End) {
+        arrowhead(c, tip, -cw_tangent(top));
+    }
 }
 
 /// Gauge: 240-degree dial open at the bottom, three ticks, needle and hub (18x16 keyline).
 pub fn draw_gauge(c: &IconCanvas) {
     let s = c.stroke(Weight::Base);
     let (ctr, r) = ((key::C, 13.5), 8.5);
-    let at = |a: f32, radius: f32| c.p(ctr.0 + radius * a.cos(), ctr.1 + radius * a.sin());
 
     // Clockwise from lower left (150 deg) over the top to lower right (30 deg).
     let (a0, a1) = (PI * 5.0 / 6.0, PI * 13.0 / 6.0);
-    let pts = c.arc(ctr, (r, r), a0, a1);
-    let (Some(&first), Some(&last)) = (pts.first(), pts.last()) else {
-        return;
-    };
-    c.curve(pts, s);
-    c.caps([first, last], s);
+    c.curve_capped(c.arc(ctr, (r, r), a0, a1), s, Caps::Both);
 
     if !c.compact() {
         for a in [PI * 7.0 / 6.0, PI * 1.5, PI * 11.0 / 6.0] {
-            c.seg(at(a, r * 0.6), at(a, r * 0.8), s);
+            c.seg(c.polar(ctr, r * 0.6, a), c.polar(ctr, r * 0.8, a), s);
         }
     }
     let needle = -PI * 0.3;
-    c.seg(at(needle, 0.0), at(needle, r * 0.72), s);
+    c.seg(c.p(ctr.0, ctr.1), c.polar(ctr, r * 0.72, needle), s);
     c.dot(ctr, 1.6, c.color);
 }

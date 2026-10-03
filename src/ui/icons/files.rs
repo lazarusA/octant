@@ -44,12 +44,21 @@ pub fn draw_dataset(c: &IconCanvas) {
     }
 }
 
+/// Fill the folder tab on its own: the step down from the tab makes the
+/// folder outline concave, so the body below is filled separately.
+fn fill_folder_tab(c: &IconCanvas) {
+    let [tl, tab_end, tab_step, _] = FOLDER_TAB;
+    c.fill(
+        &[tl, tab_end, tab_step, (key::SQ_MIN, tab_step.1)],
+        c.body(),
+    );
+}
+
 /// Folder: closed folder with a chamfered tab and a lid divider (20x15 keyline).
 pub fn draw_folder(c: &IconCanvas) {
     let [tl, tab_end, tab_step, tr] = FOLDER_TAB;
     let (lo, hi) = (key::SQ_MIN, key::SQ_MAX);
-    // The tab step makes the outline concave: fill the tab and body separately.
-    c.fill(&[tl, tab_end, tab_step, (lo, tab_step.1)], c.body());
+    fill_folder_tab(c);
     c.fill(
         &[(lo, tr.1), tr, (hi, FOLDER_BOTTOM), (lo, FOLDER_BOTTOM)],
         c.body(),
@@ -81,9 +90,8 @@ pub fn draw_folder_open(c: &IconCanvas) {
     let flap_tr = (22.0, flap_top);
     let flap_br = (19.0, FOLDER_BOTTOM);
 
-    // Back panel fills (the tab step is concave): tab, band above the flap,
-    // and the sliver left of the flap.
-    c.fill(&[tl, tab_end, tab_step, (lo, tab_step.1)], c.body());
+    // Back panel fills: tab, band above the flap, and the sliver left of the flap.
+    fill_folder_tab(c);
     c.fill(
         &[
             (lo, tab_step.1),

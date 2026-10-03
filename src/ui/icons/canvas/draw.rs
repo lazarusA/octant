@@ -1,8 +1,16 @@
 //! Drawing primitives: lines, paths, arcs, fills and basic shapes, all in grid units.
 
 use super::IconCanvas;
-use super::geom::{dedup, is_convex, near};
+use super::geom::{dedup, dedup_closed, is_convex};
 use egui::{Color32, Pos2, Rect, Shape, Stroke, StrokeKind, pos2};
+
+/// Which ends of an open curve get round caps.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Caps {
+    Start,
+    End,
+    Both,
+}
 
 impl IconCanvas<'_> {
     /// Straight segment between grid points, pixel snapped.
@@ -12,22 +20,19 @@ impl IconCanvas<'_> {
             .line_segment([self.ps(a.0, a.1, w), self.ps(b.0, b.1, w)], stroke);
     }
 
+    /// Grid points snapped for a stroke of `width` points.
+    fn snapped(&self, pts: &[(f32, f32)], width: f32) -> Vec<Pos2> {
+        pts.iter().map(|&(x, y)| self.ps(x, y, width)).collect()
+    }
+
     /// Open polyline through grid points with joined corners, pixel snapped.
     pub fn path(&self, pts: &[(f32, f32)], stroke: Stroke) {
-        let pts = pts
-            .iter()
-            .map(|&(x, y)| self.ps(x, y, stroke.width))
-            .collect();
-        self.curve(pts, stroke);
+        self.curve(self.snapped(pts, stroke.width), stroke);
     }
 
     /// Closed polyline through grid points, pixel snapped.
     pub fn closed(&self, pts: &[(f32, f32)], stroke: Stroke) {
-        let pts = pts
-            .iter()
-            .map(|&(x, y)| self.ps(x, y, stroke.width))
-            .collect();
-        self.curve_closed(pts, stroke);
+        self.curve_closed(self.snapped(pts, stroke.width), stroke);
     }
 
     /// Segment between screen points; egui still snaps it when axis aligned.
@@ -35,25 +40,25 @@ impl IconCanvas<'_> {
         self.painter.line_segment([a, b], stroke);
     }
 
-    /// Round caps on the ends of an open stroke (use with opaque strokes).
-    pub fn caps(&self, ends: [Pos2; 2], stroke: Stroke) {
-        for end in ends {
-            self.painter
-                .circle_filled(end, stroke.width * 0.5, stroke.color);
-        }
-    }
-
     /// Open polyline through grid points with round caps, pixel snapped.
     pub fn path_round(&self, pts: &[(f32, f32)], stroke: Stroke) {
-        let (Some(&first), Some(&last)) = (pts.first(), pts.last()) else {
-            return;
-        };
-        let w = stroke.width;
-        self.path(pts, stroke);
-        self.caps(
-            [self.ps(first.0, first.1, w), self.ps(last.0, last.1, w)],
-            stroke,
-        );
+        self.curve_capped(self.snapped(pts, stroke.width), stroke, Caps::Both);
+    }
+
+    /// Open curve with round caps on the chosen ends (use with opaque
+    /// strokes). Returns the first and last points so callers can attach
+    /// arrowheads, or `None` for an empty curve.
+    pub fn curve_capped(&self, pts: Vec<Pos2>, stroke: Stroke, caps: Caps) -> Option<(Pos2, Pos2)> {
+        let ends = (*pts.first()?, *pts.last()?);
+        self.curve(pts, stroke);
+        let r = stroke.width * 0.5;
+        if matches!(caps, Caps::Start | Caps::Both) {
+            self.painter.circle_filled(ends.0, r, stroke.color);
+        }
+        if matches!(caps, Caps::End | Caps::Both) {
+            self.painter.circle_filled(ends.1, r, stroke.color);
+        }
+        Some(ends)
     }
 
     /// Open curve through screen points (no snapping, so curves stay smooth).
@@ -65,15 +70,18 @@ impl IconCanvas<'_> {
     }
 
     /// Closed curve through screen points.
-    pub fn curve_closed(&self, mut pts: Vec<Pos2>, stroke: Stroke) {
-        pts = dedup(pts);
-        if pts.len() > 2 && near(pts[0], pts[pts.len() - 1]) {
-            pts.pop();
-        }
+    pub fn curve_closed(&self, pts: Vec<Pos2>, stroke: Stroke) {
+        let pts = dedup_closed(pts);
         if pts.len() < 3 {
             return;
         }
         self.painter.add(Shape::closed_line(pts, stroke));
+    }
+
+    /// Point at grid radius `r` and angle `a` (0 = right, clockwise on screen)
+    /// around grid center `c`.
+    pub fn polar(&self, c: (f32, f32), r: f32, a: f32) -> Pos2 {
+        self.p(c.0 + r * a.cos(), c.1 + r * a.sin())
     }
 
     /// Points on an ellipse arc centered at grid `(cx, cy)` with grid radii.
@@ -101,6 +109,12 @@ impl IconCanvas<'_> {
         self.add_fill(pts, color);
     }
 
+    /// Convex polygon of grid points: snapped fill plus one snapped outline.
+    pub fn polygon(&self, pts: &[(f32, f32)], fill: Color32, stroke: Stroke) {
+        self.fill(pts, fill);
+        self.closed(pts, stroke);
+    }
+
     /// Fill a convex polygon of screen points.
     pub fn fill_pts(&self, pts: Vec<Pos2>, color: Color32) {
         debug_assert!(is_convex(&pts), "IconCanvas::fill needs a convex polygon");
@@ -109,10 +123,7 @@ impl IconCanvas<'_> {
 
     /// Add a convex fill, skipping polygons that snapping collapsed to a line.
     fn add_fill(&self, pts: Vec<Pos2>, color: Color32) {
-        let mut pts = dedup(pts);
-        if pts.len() > 2 && near(pts[0], pts[pts.len() - 1]) {
-            pts.pop();
-        }
+        let pts = dedup_closed(pts);
         let n = pts.len();
         let twice_area: f32 = (0..n)
             .map(|i| {

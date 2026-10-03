@@ -9,8 +9,17 @@ pub(super) fn dedup(mut pts: Vec<Pos2>) -> Vec<Pos2> {
     pts
 }
 
+/// [`dedup`] for a closed outline: also drops a last point that repeats the first.
+pub(super) fn dedup_closed(pts: Vec<Pos2>) -> Vec<Pos2> {
+    let mut pts = dedup(pts);
+    if pts.len() > 2 && near(pts[0], pts[pts.len() - 1]) {
+        pts.pop();
+    }
+    pts
+}
+
 /// Points closer than a hundredth of a physical pixel at any common scale.
-pub(super) fn near(a: Pos2, b: Pos2) -> bool {
+fn near(a: Pos2, b: Pos2) -> bool {
     (a.x - b.x).abs() < 1e-3 && (a.y - b.y).abs() < 1e-3
 }
 

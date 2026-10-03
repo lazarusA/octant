@@ -21,8 +21,7 @@ pub fn draw_cross(c: &IconCanvas) {
 /// Warning: hazard triangle with an exclamation mark (19x17 keyline).
 pub fn draw_warning(c: &IconCanvas) {
     let tri = [(12.0, 3.0), (21.5, 20.0), (2.5, 20.0)];
-    c.fill(&tri, c.body());
-    c.closed(&tri, c.stroke(Weight::Base));
+    c.polygon(&tri, c.body(), c.stroke(Weight::Base));
     c.path_round(&[(12.0, 9.5), (12.0, 14.0)], c.stroke(Weight::Bold));
     c.dot((12.0, 17.0), 1.2, c.color);
 }

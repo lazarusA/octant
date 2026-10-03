@@ -15,8 +15,11 @@ const A: [u8; 5] = [0b01110, 0b10001, 0b11111, 0b10001, 0b10001];
 const N: [u8; 5] = [0b10001, 0b11001, 0b10101, 0b10011, 0b10001];
 pub(super) const WORD: [[u8; 5]; 6] = [O, C, T, A, N, T];
 
-/// Grid size: six 5-column letters with one empty column between them.
-pub(super) const COLS: usize = WORD.len() * 6 - 1;
+/// Letter width in cells, and the step between letters (one empty column).
+const LETTER_W: usize = 5;
+const PITCH: usize = LETTER_W + 1;
+/// Grid size: six letters with one empty column between them.
+pub(super) const COLS: usize = WORD.len() * PITCH - 1;
 pub(super) const ROWS: usize = 5;
 /// Cells smaller than this many physical pixels drop to the flat style.
 const BLOCK_MIN_PX: f32 = 7.0;
@@ -25,9 +28,9 @@ const BLOCK_MIN_PX: f32 = 7.0;
 fn cells() -> impl Iterator<Item = (usize, usize)> {
     WORD.iter().enumerate().flat_map(|(li, glyph)| {
         (0..ROWS).flat_map(move |r| {
-            (0..5)
-                .filter(move |&c| (glyph[r] >> (4 - c)) & 1 == 1)
-                .map(move |c| (r, li * 6 + c))
+            (0..LETTER_W)
+                .filter(move |&c| (glyph[r] >> (LETTER_W - 1 - c)) & 1 == 1)
+                .map(move |c| (r, li * PITCH + c))
         })
     })
 }
@@ -47,6 +50,7 @@ impl Metrics {
         let depth_px = (cell_px * 0.3).round().max(1.0);
         Self {
             cell: cell_px / ppp,
+            // One physical pixel of gap between neighboring cells.
             side: (cell_px - 1.0) / ppp,
             depth: depth_px / ppp,
             blocks: cell_px >= BLOCK_MIN_PX,

@@ -69,8 +69,7 @@ pub fn draw_catalog(c: &IconCanvas) {
     c.rrect((4.0, 5.0), (8.0, 20.0), 1.0, c.body(), s);
     c.rrect((9.5, 3.5), (13.5, 20.0), 1.0, c.shade(Shade::Soft), s);
     let lean = [(15.0, 7.5), (18.8, 5.5), (21.0, 20.0), (17.0, 20.0)];
-    c.fill(&lean, c.body());
-    c.closed(&lean, s);
+    c.polygon(&lean, c.body(), s);
 }
 
 /// Save: floppy disk with shutter and label, each edge drawn once (16x16 keyline).

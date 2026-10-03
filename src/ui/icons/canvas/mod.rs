@@ -10,6 +10,7 @@ mod draw;
 mod geom;
 mod tokens;
 
+pub(crate) use draw::Caps;
 pub(crate) use tokens::{Shade, Weight, key};
 
 use super::style;
@@ -117,7 +118,7 @@ impl<'a> IconCanvas<'a> {
     }
 
     /// Grid point snapped to pixel boundaries, for fill edges.
-    pub fn pe(&self, gx: f32, gy: f32) -> Pos2 {
+    fn pe(&self, gx: f32, gy: f32) -> Pos2 {
         let q = self.p(gx, gy);
         pos2(self.snap_edge(q.x), self.snap_edge(q.y))
     }
