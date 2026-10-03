@@ -34,6 +34,15 @@ pub trait UiIconExt {
     /// given. Returns `true` when the text changed (typed or cleared).
     fn search_field(&mut self, text: &mut String, hint: &str, width: Option<f32>) -> bool;
 
+    /// [`Self::search_field`] returning the text field's [`Response`], for
+    /// callers that drive its focus. `changed()` also covers the clear button.
+    fn search_field_response(
+        &mut self,
+        text: &mut String,
+        hint: &str,
+        width: Option<f32>,
+    ) -> Response;
+
     /// Render a button like [`Self::icon_button`] with no background at rest
     /// and a `tone` outline, marking the primary action of its panel. The
     /// usual fill appears on hover and press.
@@ -83,6 +92,15 @@ impl UiIconExt for Ui {
     }
 
     fn search_field(&mut self, text: &mut String, hint: &str, width: Option<f32>) -> bool {
+        self.search_field_response(text, hint, width).changed()
+    }
+
+    fn search_field_response(
+        &mut self,
+        text: &mut String,
+        hint: &str,
+        width: Option<f32>,
+    ) -> Response {
         const HOVER: &str = "Clear search";
         self.horizontal(|ui| {
             ui.icon(Icon::Search, IconSize::Sm);
@@ -97,12 +115,12 @@ impl UiIconExt for Ui {
             let edit = egui::TextEdit::singleline(text)
                 .hint_text(hint)
                 .desired_width(field_w);
-            let mut changed = ui.add(edit).changed();
+            let mut resp = ui.add(edit);
             if has_text && ui.close_button(HOVER).clicked() {
                 text.clear();
-                changed = true;
+                resp.mark_changed();
             }
-            changed
+            resp
         })
         .inner
     }

@@ -1,4 +1,6 @@
+use super::nav::{NodeKey, row_id};
 use super::row::{RowKind, allocate_row, paint_row};
+use super::tree::VariableTreeContext;
 use crate::data::VariableInfo;
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
@@ -7,14 +9,12 @@ pub const MAX_ITEMS_PER_LEVEL: usize = 100;
 pub fn render_variable_list(
     ui: &mut egui::Ui,
     indices: &[usize],
-    variables: &[VariableInfo],
-    selected_idx: usize,
-    newly_selected_idx: &mut Option<usize>,
+    ctx: &mut VariableTreeContext<'_>,
 ) {
     let total = indices.len();
     for &idx in indices.iter().take(MAX_ITEMS_PER_LEVEL) {
-        if let Some(var_info) = variables.get(idx) {
-            render_variable_row(ui, var_info, idx, selected_idx, newly_selected_idx);
+        if let Some(var_info) = ctx.variables.get(idx) {
+            render_variable_row(ui, var_info, idx, ctx);
         }
     }
     if total > MAX_ITEMS_PER_LEVEL {
@@ -34,13 +34,12 @@ pub fn render_variable_row(
     ui: &mut egui::Ui,
     var_info: &VariableInfo,
     idx: usize,
-    selected_idx: usize,
-    newly_selected_idx: &mut Option<usize>,
+    ctx: &mut VariableTreeContext<'_>,
 ) {
-    let is_selected = selected_idx == idx;
+    let is_selected = ctx.selected_idx == idx;
     let units = var_info.units.as_deref().unwrap_or("");
 
-    let resp = allocate_row(ui);
+    let resp = allocate_row(ui, row_id(NodeKey::Variable(idx), ctx.search_active));
     paint_row(
         ui,
         &resp,
@@ -73,6 +72,6 @@ pub fn render_variable_row(
     });
 
     if clicked {
-        *newly_selected_idx = Some(idx);
+        ctx.newly_selected_idx = Some(idx);
     }
 }

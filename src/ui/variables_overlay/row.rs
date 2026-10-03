@@ -2,7 +2,7 @@
 //! `[chevron] [icon] name  detail`, where every pixel of the row is a hit target.
 
 use crate::ui::icons::{Icon, IconSize, IconTone};
-use egui::{Rect, Response, Sense, TextStyle, TextWrapMode, Ui, WidgetText, pos2, vec2};
+use egui::{Id, Rect, Response, Sense, TextStyle, TextWrapMode, Ui, WidgetText, pos2, vec2};
 
 /// Horizontal padding inside the row before the chevron slot.
 const PAD_X: f32 = 4.0;
@@ -38,12 +38,23 @@ impl RowKind {
     }
 }
 
-/// Reserve a full-width, clickable row. Paint it with [`paint_row`] after
-/// reacting to the click so the row never lags a frame behind its state.
-pub fn allocate_row(ui: &mut Ui) -> Response {
+/// Reserve a full-width, clickable row under a stable `id` (see
+/// [`super::nav::row_id`]). Paint it with [`paint_row`] after reacting to the
+/// click so the row never lags a frame behind its state.
+pub fn allocate_row(ui: &mut Ui, id: Id) -> Response {
     let height = ui.spacing().interact_size.y.max(ICON.px() + 6.0);
-    let size = vec2(ui.available_width(), height);
-    let (_, resp) = ui.allocate_exact_size(size, Sense::click());
+    let (_, rect) = ui.allocate_space(vec2(ui.available_width(), height));
+    let resp = ui.interact(rect, id, Sense::click());
+    // egui never focuses on click; do it so the keys continue from the clicked row.
+    if resp.clicked() && !resp.has_focus() {
+        super::nav::focus_row(ui.ctx(), id);
+    }
+    if resp.has_focus() {
+        super::nav::lock_row_keys(ui.ctx(), id);
+    }
+    if resp.gained_focus() {
+        resp.scroll_to_me(None);
+    }
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 

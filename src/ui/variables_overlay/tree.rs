@@ -1,4 +1,5 @@
 use super::item::{MAX_ITEMS_PER_LEVEL, render_variable_list};
+use super::nav::{self, NodeKey, SearchJump, folder_id, row_id};
 use super::row::{RowKind, allocate_row, paint_row};
 use crate::data::{VariableInfo, VariableTreeGroup};
 use egui::collapsing_header::CollapsingState;
@@ -8,6 +9,10 @@ pub struct VariableTreeContext<'a> {
     pub selected_idx: usize,
     pub search_active: bool,
     pub newly_selected_idx: Option<usize>,
+    /// Search field to return focus to from the first row or on Escape.
+    pub search_id: Option<egui::Id>,
+    /// Pending focus jump requested by a key in the search field.
+    pub search_jump: Option<SearchJump>,
 }
 
 pub fn render_tree_group(
@@ -21,28 +26,17 @@ pub fn render_tree_group(
         return;
     }
 
+    nav::handle_keys(ui, group, ctx);
+
     if !group.variable_indices.is_empty() {
         if group.subgroups.is_empty() {
             // Only root variables: list them directly.
-            render_variable_list(
-                ui,
-                &group.variable_indices,
-                ctx.variables,
-                ctx.selected_idx,
-                &mut ctx.newly_selected_idx,
-            );
+            render_variable_list(ui, &group.variable_indices, ctx);
         } else {
             // Root variables next to subgroups get their own collapsible "/" folder.
-            let id = folder_id(ui, "", ctx.search_active);
             let count = group.variable_indices.len();
-            render_folder(ui, id, ctx.search_active, "/", count, |ui| {
-                render_variable_list(
-                    ui,
-                    &group.variable_indices,
-                    ctx.variables,
-                    ctx.selected_idx,
-                    &mut ctx.newly_selected_idx,
-                );
+            render_folder(ui, "", ctx.search_active, "/", count, |ui| {
+                render_variable_list(ui, &group.variable_indices, ctx);
             });
         }
     }
@@ -55,17 +49,11 @@ pub fn render_subgroup(
     subgroup: &VariableTreeGroup,
     ctx: &mut VariableTreeContext<'_>,
 ) {
-    let id = folder_id(ui, &subgroup.full_path, ctx.search_active);
     let count = subgroup.total_variable_count();
-    render_folder(ui, id, ctx.search_active, &subgroup.name, count, |ui| {
+    let path = &subgroup.full_path;
+    render_folder(ui, path, ctx.search_active, &subgroup.name, count, |ui| {
         // Direct variables first, then deeper subgroups (at most 100 each).
-        render_variable_list(
-            ui,
-            &subgroup.variable_indices,
-            ctx.variables,
-            ctx.selected_idx,
-            &mut ctx.newly_selected_idx,
-        );
+        render_variable_list(ui, &subgroup.variable_indices, ctx);
         render_subgroups(ui, &subgroup.subgroups, ctx);
     });
 }
@@ -91,23 +79,18 @@ fn render_subgroups(
     }
 }
 
-/// Folder open state is kept apart while searching, so search results always
-/// start expanded and clearing the search restores the folders the user had open.
-pub(super) fn folder_id(ui: &egui::Ui, full_path: &str, search_active: bool) -> egui::Id {
-    ui.make_persistent_id(("var_tree_group", search_active, full_path))
-}
-
 /// Full-width folder row: clicking anywhere on it (chevron, icon or name) toggles it.
 fn render_folder(
     ui: &mut egui::Ui,
-    id: egui::Id,
-    default_open: bool,
+    path: &str,
+    search_active: bool,
     name: &str,
     count: usize,
     add_body: impl FnOnce(&mut egui::Ui),
 ) {
-    let mut state = CollapsingState::load_with_default_open(ui.ctx(), id, default_open);
-    let resp = allocate_row(ui);
+    let id = folder_id(path, search_active);
+    let mut state = CollapsingState::load_with_default_open(ui.ctx(), id, search_active);
+    let resp = allocate_row(ui, row_id(NodeKey::Folder(path), search_active));
     if resp.clicked() {
         state.toggle(ui);
         state.store(ui.ctx());

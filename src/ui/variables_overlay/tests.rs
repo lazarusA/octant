@@ -1,47 +1,52 @@
+//! Headless egui harness for the variable tree, plus mouse interaction tests.
+//! Keyboard navigation tests live in `nav_tests.rs`.
+
+use super::nav::{NodeKey, focus_row, folder_id, row_id};
 use super::row::RowKind;
-use super::tree::{VariableTreeContext, folder_id, render_tree_group};
+use super::search_jump;
+use super::tree::{VariableTreeContext, render_tree_group};
 use crate::data::{VariableInfo, VariableTreeGroup};
-use crate::ui::icons::Icon;
+use crate::ui::icons::{Icon, UiIconExt};
 use egui::collapsing_header::CollapsingState;
-use egui::{Event, PointerButton, Pos2, RawInput, pos2};
+use egui::{Event, Id, Key, Modifiers, PointerButton, Pos2, RawInput, pos2};
 
-/// Root holding one variable plus folder `ocean` with `ocean/sst`.
+fn var(name: &str) -> VariableInfo {
+    VariableInfo {
+        name: name.into(),
+        ..Default::default()
+    }
+}
+
+fn group(path: &str, vars: Vec<usize>, subgroups: Vec<VariableTreeGroup>) -> VariableTreeGroup {
+    VariableTreeGroup {
+        name: path.rsplit('/').next().unwrap_or(path).into(),
+        full_path: path.into(),
+        variable_indices: vars,
+        subgroups,
+    }
+}
+
+/// Display order with every folder open:
+/// `/` > lat(0), ocean > sst(1), ocean/deep > temp(2), land > lai(3).
 fn fixture() -> (Vec<VariableInfo>, VariableTreeGroup) {
-    let variables = vec![
-        VariableInfo {
-            name: "lat".into(),
-            ..Default::default()
-        },
-        VariableInfo {
-            name: "ocean/sst".into(),
-            units: Some("K".into()),
-            ..Default::default()
-        },
-    ];
-    let ocean = VariableTreeGroup {
-        name: "ocean".into(),
-        full_path: "ocean".into(),
-        variable_indices: vec![1],
-        subgroups: Vec::new(),
-    };
-    let root = VariableTreeGroup {
-        name: "Root".into(),
-        full_path: String::new(),
-        variable_indices: vec![0],
-        subgroups: vec![ocean],
-    };
-    (variables, root)
+    let variables = ["lat", "ocean/sst", "ocean/deep/temp", "land/lai"].map(var);
+    let deep = group("ocean/deep", vec![2], Vec::new());
+    let ocean = group("ocean", vec![1], vec![deep]);
+    let land = group("land", vec![3], Vec::new());
+    let root = group("", vec![0], vec![ocean, land]);
+    (variables.to_vec(), root)
 }
 
-struct Frame {
-    origin: Pos2,
-    row_step: f32,
-    ocean_id: egui::Id,
-    selected: Option<usize>,
+pub(super) struct Frame {
+    pub origin: Pos2,
+    pub row_step: f32,
+    pub ocean_id: Id,
+    pub selected: Option<usize>,
+    pub search_id: Id,
 }
 
-/// Run one frame of the tree, feeding `events` as this frame's input.
-fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool) -> Frame {
+/// Run one frame of the search field and tree, feeding `events` as input.
+pub(super) fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool) -> Frame {
     let (variables, root) = fixture();
     let input = RawInput {
         events,
@@ -49,6 +54,9 @@ fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool) -> Frame 
     };
     let mut out = None;
     let mut output = ctx.run_ui(input, |ui| {
+        let mut text = String::new();
+        let search = ui.search_field_response(&mut text, "Search", None);
+        let jump = search_jump(ui, &search);
         let origin = ui.cursor().min;
         let row_step = ui.spacing().interact_size.y.max(20.0) + ui.spacing().item_spacing.y;
         let mut tree_ctx = VariableTreeContext {
@@ -56,13 +64,16 @@ fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool) -> Frame 
             selected_idx: usize::MAX,
             search_active,
             newly_selected_idx: None,
+            search_id: Some(search.id),
+            search_jump: jump,
         };
         render_tree_group(ui, &root, &mut tree_ctx, true);
         out = Some(Frame {
             origin,
             row_step,
-            ocean_id: folder_id(ui, "ocean", search_active),
+            ocean_id: folder_id("ocean", search_active),
             selected: tree_ctx.newly_selected_idx,
+            search_id: search.id,
         });
     });
     output.textures_delta.clear();
@@ -70,7 +81,7 @@ fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool) -> Frame 
 }
 
 /// Click at `pos` over three frames and return the frame that saw the release.
-fn click(ctx: &egui::Context, pos: Pos2, search_active: bool) -> Frame {
+pub(super) fn click(ctx: &egui::Context, pos: Pos2, search_active: bool) -> Frame {
     let button = |pressed| Event::PointerButton {
         pos,
         button: PointerButton::Primary,
@@ -82,7 +93,28 @@ fn click(ctx: &egui::Context, pos: Pos2, search_active: bool) -> Frame {
     frame(ctx, vec![button(false)], search_active)
 }
 
-fn is_open(ctx: &egui::Context, id: egui::Id) -> bool {
+/// Press `key` for one frame.
+pub(super) fn press(ctx: &egui::Context, key: Key, search_active: bool) -> Frame {
+    let event = Event::Key {
+        key,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::NONE,
+    };
+    frame(ctx, vec![event], search_active)
+}
+
+/// Focus the row of `key`, as a click or earlier navigation would.
+pub(super) fn focus(ctx: &egui::Context, key: NodeKey<'_>, search_active: bool) {
+    focus_row(ctx, row_id(key, search_active));
+}
+
+pub(super) fn focused(ctx: &egui::Context) -> Option<Id> {
+    ctx.memory(|m| m.focused())
+}
+
+pub(super) fn is_open(ctx: &egui::Context, id: Id) -> bool {
     CollapsingState::load(ctx, id).is_some_and(|s| s.is_open())
 }
 

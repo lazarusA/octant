@@ -1,15 +1,27 @@
+mod focus;
 pub mod item;
+pub mod nav;
 pub mod row;
 pub mod tree;
 
+#[cfg(test)]
+mod nav_tests;
+#[cfg(test)]
+mod open_tests;
 #[cfg(test)]
 mod tests;
 
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, UiIconExt};
+use nav::SearchJump;
 use tree::{VariableTreeContext, render_tree_group};
 
 pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
+    let shown = app
+        .show_variables_overlay
+        .then(|| dataset_key(app))
+        .flatten();
+    focus::note_shown(ctx, shown);
     if !app.show_variables_overlay {
         return;
     }
@@ -44,7 +56,15 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         ui.panel_header(Icon::Variables, "Variables", "Close Variables Window");
                 })
                 .body(|ui| {
-                    ui.search_field(&mut app.variable_search, "Search variables...", None);
+                    let search = ui.search_field_response(
+                        &mut app.variable_search,
+                        "Search variables...",
+                        None,
+                    );
+                    if focus::take_open_focus(ui.ctx()) {
+                        search.request_focus();
+                    }
+                    let search_jump = search_jump(ui, &search);
 
                     egui::ScrollArea::vertical()
                         .max_height(max_height)
@@ -155,6 +175,8 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                                 selected_idx: app.selected_variable_idx,
                                 search_active,
                                 newly_selected_idx: None,
+                                search_id: Some(search.id),
+                                search_jump,
                             };
 
                             render_tree_group(ui, root_group, &mut tree_ctx, true);
@@ -185,4 +207,28 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
             });
         });
     app.variables_overlay_width = area_resp.response.rect.width();
+}
+
+/// Down in the search field moves to the first row; Enter (which ends the
+/// single-line edit) moves to the first matching variable.
+fn search_jump(ui: &egui::Ui, search: &egui::Response) -> Option<SearchJump> {
+    if search.has_focus() && ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
+        Some(SearchJump::FirstRow)
+    } else if search.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+        Some(SearchJump::FirstVariable)
+    } else {
+        None
+    }
+}
+
+/// Identity of the dataset listed in the overlay, `None` while none is loaded.
+fn dataset_key(app: &OctantApp) -> Option<egui::Id> {
+    let meta = app.active_dataset_metadata.as_ref()?;
+    let first = meta.variables.first().map(|v| v.name.as_str());
+    Some(egui::Id::new((
+        &meta.name,
+        &meta.store_type,
+        meta.variables.len(),
+        first,
+    )))
 }
