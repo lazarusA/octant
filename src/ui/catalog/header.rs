@@ -1,4 +1,5 @@
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
+use crate::utils::stack_str;
 
 pub fn render_header(ui: &mut egui::Ui, total_count: usize, should_close: &mut bool) {
     ui.horizontal(|ui| {
@@ -6,7 +7,7 @@ pub fn render_header(ui: &mut egui::Ui, total_count: usize, should_close: &mut b
         ui.heading("Dataset Catalog");
 
         let mut badge_buf = [0u8; 32];
-        let badge_text = format_count(&mut badge_buf, total_count, " stores");
+        let badge_text = stack_str(&mut badge_buf, format_args!("{total_count} stores"));
         ui.label(
             egui::RichText::new(badge_text)
                 .small()
@@ -30,12 +31,4 @@ pub fn render_header(ui: &mut egui::Ui, total_count: usize, should_close: &mut b
         )
         .wrap_mode(egui::TextWrapMode::Wrap),
     );
-}
-
-pub fn format_count<'a>(buf: &'a mut [u8; 32], count: usize, suffix: &str) -> &'a str {
-    use std::io::Write;
-    let mut cursor = std::io::Cursor::new(&mut buf[..]);
-    let _ = write!(cursor, "{}{}", count, suffix);
-    let len = cursor.position() as usize;
-    std::str::from_utf8(&buf[..len]).unwrap_or("")
 }

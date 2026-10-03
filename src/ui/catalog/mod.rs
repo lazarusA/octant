@@ -6,8 +6,8 @@ pub mod header;
 pub mod list;
 
 pub use card::render_entry_card;
-pub use filters::{format_tab, render_search_and_filters};
-pub use header::{format_count, render_header};
+pub use filters::render_search_and_filters;
+pub use header::render_header;
 pub use list::{contains_ignore_ascii_case, render_entries_list};
 
 use crate::app::OctantApp;

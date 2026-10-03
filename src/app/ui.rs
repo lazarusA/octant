@@ -42,7 +42,6 @@ impl eframe::App for OctantApp {
                         self.dataset_manager.add(dataset);
 
                         self.load_new_metadata(metadata);
-                        self.show_variables_overlay = true;
                     }
                     Err(err) => {
                         self.hero_state.loading = false;

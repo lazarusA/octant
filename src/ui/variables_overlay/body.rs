@@ -93,6 +93,8 @@ fn show_tree(
             &metadata.variables,
         )
     } else {
+        // Don't keep a filtered copy of the tree around while not searching.
+        app.cached_search = None;
         Some(&*tree)
     };
 

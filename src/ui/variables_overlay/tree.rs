@@ -2,6 +2,7 @@ use super::item::{MAX_ITEMS_PER_LEVEL, render_variable_list, truncation_note};
 use super::nav::{self, NodeKey, SearchJump, folder_state, row_id};
 use super::row::{RowKind, allocate_row, paint_row};
 use crate::data::{VariableInfo, VariableTreeGroup};
+use crate::utils::stack_str;
 
 pub struct VariableTreeContext<'a> {
     pub variables: &'a [VariableInfo],
@@ -80,19 +81,11 @@ fn render_folder(
     }
 
     let mut buf = [0u8; 24];
-    let detail = format_count(&mut buf, count);
+    let detail = stack_str(&mut buf, format_args!("{count}"));
     let kind = RowKind::Folder {
         open: state.is_open(),
     };
     paint_row(ui, &resp, kind, name, detail, false);
 
     state.show_body_indented(&resp, ui, add_body);
-}
-
-fn format_count(buf: &mut [u8; 24], count: usize) -> &str {
-    use std::io::Write;
-    let mut cursor = std::io::Cursor::new(&mut buf[..]);
-    let _ = write!(cursor, "{}", count);
-    let len = cursor.position() as usize;
-    std::str::from_utf8(&buf[..len]).unwrap_or("")
 }

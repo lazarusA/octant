@@ -1,4 +1,5 @@
-//! Search focus when the real overlay opens or its dataset changes.
+//! The real overlay: search focus when it opens or its dataset changes, and
+//! the search cache lifetime.
 
 use crate::app::OctantApp;
 use crate::data::{DatasetMetadata, VariableInfo};
@@ -107,4 +108,17 @@ fn a_lookalike_dataset_still_counts_as_new() {
     app.set_active_metadata(meta(&["a", "b"]));
     run(&ctx, &mut app);
     assert!(search_focused(&ctx));
+}
+
+#[test]
+fn clearing_the_search_releases_the_cached_results() {
+    let ctx = egui::Context::default();
+    let mut app = open_app(&["ocean/sst", "land/lai"]);
+    app.variable_search = "sst".into();
+    run(&ctx, &mut app);
+    assert!(app.cached_search.is_some(), "searching caches the results");
+
+    app.variable_search.clear();
+    run(&ctx, &mut app);
+    assert!(app.cached_search.is_none(), "an empty search drops them");
 }
