@@ -1,6 +1,7 @@
 pub mod about;
 pub mod axes;
 pub mod bottom_bar;
+pub mod brand;
 pub mod cache;
 pub mod catalog;
 pub mod color_picker;
@@ -17,6 +18,8 @@ pub mod plot_type;
 pub mod settings;
 pub mod status;
 pub mod store;
+#[cfg(test)]
+pub(crate) mod test_render;
 pub mod toolbar;
 pub mod top_bar;
 pub mod variables_overlay;

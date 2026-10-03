@@ -1,5 +1,7 @@
 //! Procedural isometric wireframe and solid octant cube renderer.
 
+use crate::ui::brand::{FACE_SHADES, darken};
+
 /// Draws a big wireframe cube made of all 8 unit sub-cubes, with one
 /// full solid mini-cube ("the octant") touring all 8 positions.
 /// All wireframe lines remain fully intact during transitions.
@@ -99,14 +101,7 @@ pub fn draw_octant_widget(
         ];
 
         let base = ui.visuals().strong_text_color();
-        let shade = |c: egui::Color32, f: f32| {
-            egui::Color32::from_rgba_unmultiplied(
-                ((c.r() as f32) * f).round() as u8,
-                ((c.g() as f32) * f).round() as u8,
-                ((c.b() as f32) * f).round() as u8,
-                c.a(),
-            )
-        };
+        let [top_shade, right_shade, left_shade] = FACE_SHADES;
 
         // Solid octant is black in light mode, off-white in dark mode.
         // In light mode, crisp panel-fill white seams separate the black facets cleanly.
@@ -118,17 +113,17 @@ pub fn draw_octant_widget(
 
         painter.add(egui::Shape::convex_polygon(
             face_top,
-            shade(base, 1.0),
+            darken(base, top_shade),
             fill_stroke,
         ));
         painter.add(egui::Shape::convex_polygon(
             face_right,
-            shade(base, 0.72),
+            darken(base, right_shade),
             fill_stroke,
         ));
         painter.add(egui::Shape::convex_polygon(
             face_left,
-            shade(base, 0.52),
+            darken(base, left_shade),
             fill_stroke,
         ));
     }
