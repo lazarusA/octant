@@ -101,8 +101,9 @@ pub fn rasterize(
         let egui::epaint::Primitive::Mesh(mesh) = &prim.primitive else {
             continue;
         };
-        for tri in mesh.indices.chunks_exact(3) {
-            let v = std::array::from_fn(|k| &mesh.vertices[tri[k] as usize]);
+        let (triangles, _) = mesh.indices.as_chunks::<3>();
+        for tri in triangles {
+            let v = tri.map(|i| &mesh.vertices[i as usize]);
             raster_triangle(&mut out, v, atlas, ppp);
         }
     }
