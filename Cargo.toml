@@ -23,9 +23,9 @@ exclude = [
 ]
 
 [dependencies]
-egui = "0.36"
-eframe = { version = "0.36", features = ["wgpu"] }
-wgpu = { version = "30", features = ["webgpu", "webgl"] }
+egui = "0.36.2"
+eframe = { version = "0.36.2", features = ["wgpu"] }
+wgpu = { version = "30.0.1", features = ["webgpu", "webgl"] }
 bytemuck = { version = "1.25", features = ["derive"] }
 glam = { version = "0.33", features = ["bytemuck"] }
 log = "0.4"
@@ -37,7 +37,7 @@ inventory = "0.3"
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 web-time = "1.1"
 blusc = "0.0.6"
-ruzstd = "0.8"
+ruzstd = "0.9"
 zarrs_metadata = "0.7"
 zarrs_codec = "0.2"
 zarrs_plugin = "0.4"
