@@ -121,28 +121,69 @@ pub fn draw_bolt(painter: &Painter, rect: Rect, fill: Color32, stroke: Stroke) {
     painter.add(egui::Shape::convex_polygon(bolt_pts, fill, stroke));
 }
 
-/// Hourglass: High-precision chrono-emitter with dual converging chambers (16x18dp keyline).
+/// Hourglass: Crisp sand timer with a flat waist and sand settling in both chambers (14x18dp keyline).
 pub fn draw_hourglass(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
     let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
+    // Glass spans x 6.5..17.5 between the plates, narrowing to a flat waist.
+    let (top, bottom, waist_top, waist_bot) = (4.0, 20.0, 11.25, 12.75);
+    let (outer, inner) = (5.5, 0.75);
+    let slope = (outer - inner) / (waist_top - top);
+    // Half width of the glass at height `y`, and the sand inset inside it.
+    let half = |y: f32| {
+        if y <= waist_top {
+            outer - (y - top) * slope
+        } else if y >= waist_bot {
+            inner + (y - waist_bot) * slope
+        } else {
+            inner
+        }
+    };
+    let sand_at = |y: f32, side: f32| p(12.0 + side * (half(y) - 1.0), y);
 
-    // Top and bottom plates with end notches
-    painter.line_segment([p(4.5, 4.0), p(19.5, 4.0)], stroke);
-    painter.line_segment([p(4.5, 20.0), p(19.5, 20.0)], stroke);
+    // Glass fill in three bands: upper chamber, waist, lower chamber.
+    for (y0, y1) in [
+        (top, waist_top),
+        (waist_top, waist_bot),
+        (waist_bot, bottom),
+    ] {
+        let (h0, h1) = (half(y0), half(y1));
+        let pts = vec![
+            p(12.0 - h0, y0),
+            p(12.0 + h0, y0),
+            p(12.0 + h1, y1),
+            p(12.0 - h1, y1),
+        ];
+        painter.add(egui::Shape::convex_polygon(pts, fill, Stroke::NONE));
+    }
 
-    // Triangular glass chambers meeting at central flux point
-    let top_chamber = vec![p(6.5, 4.0), p(17.5, 4.0), p(12.0, 12.0)];
-    let bot_chamber = vec![p(12.0, 12.0), p(17.5, 20.0), p(6.5, 20.0)];
+    // Sand: a remnant above the waist and a mounded pile below it.
+    let sand = stroke.color.gamma_multiply(0.55);
+    let remnant = vec![sand_at(8.0, -1.0), sand_at(8.0, 1.0), p(12.0, 10.5)];
+    painter.add(egui::Shape::convex_polygon(remnant, sand, Stroke::NONE));
+    let pile = vec![
+        sand_at(17.0, -1.0),
+        p(12.0, 15.5),
+        sand_at(17.0, 1.0),
+        sand_at(19.0, 1.0),
+        sand_at(19.0, -1.0),
+    ];
+    painter.add(egui::Shape::convex_polygon(pile, sand, Stroke::NONE));
 
-    painter.add(egui::Shape::convex_polygon(top_chamber, fill, stroke));
-    painter.add(egui::Shape::convex_polygon(bot_chamber, fill, stroke));
+    // Glass sides as two open strokes so nothing doubles up at the waist.
+    for side in [-1.0_f32, 1.0] {
+        let x = |dx: f32| 12.0 + side * dx;
+        let pts = vec![
+            p(x(outer), top),
+            p(x(inner), waist_top),
+            p(x(inner), waist_bot),
+            p(x(outer), bottom),
+        ];
+        painter.add(egui::Shape::line(pts, stroke));
+    }
 
-    // Lower illuminated sand reservoir
-    let sand = vec![p(8.5, 16.5), p(15.5, 16.5), p(17.0, 20.0), p(7.0, 20.0)];
-    painter.add(egui::Shape::convex_polygon(
-        sand,
-        stroke.color.gamma_multiply(0.45),
-        Stroke::NONE,
-    ));
+    // End plates, only slightly wider than the glass.
+    painter.line_segment([p(5.0, top), p(19.0, top)], stroke);
+    painter.line_segment([p(5.0, bottom), p(19.0, bottom)], stroke);
 }
 
 /// Warning: Caution hazard trihedron with rounded vertex chamfers (18x18dp keyline).

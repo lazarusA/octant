@@ -1,6 +1,6 @@
 //! Dispatch from [`Icon`] to its procedural drawing routine.
 
-use super::{Icon, nav, playback, plots, status, store, style};
+use super::{Icon, files, nav, palette, playback, plots, status, store, style};
 use egui::emath::GuiRounding;
 use egui::{Color32, Painter, Rect, Stroke};
 
@@ -41,18 +41,18 @@ impl Icon {
             Icon::Gauge => playback::draw_gauge(painter, rect, stroke, color),
 
             // Plots
-            Icon::PlotPlane => plots::draw_plot_plane(painter, rect, stroke, subtle_fill),
+            Icon::PlotPlane => palette::draw_plot_plane(painter, rect, stroke, subtle_fill),
             Icon::PlotLine => plots::draw_plot_line(painter, rect, stroke),
             Icon::PlotSurface => plots::draw_plot_surface(painter, rect, stroke, subtle_fill),
             Icon::PlotGlobe => plots::draw_plot_globe(painter, rect, stroke, subtle_fill),
             Icon::PlotVolume => plots::draw_plot_volume(painter, rect, stroke, subtle_fill),
             Icon::PlotPointCloud => plots::draw_plot_point_cloud(painter, rect, color),
-            Icon::Colormap => plots::draw_colormap(painter, rect, stroke),
+            Icon::Colormap => palette::draw_colormap(painter, rect, stroke, is_dark),
 
             // Store & Files
-            Icon::Dataset => store::draw_dataset(painter, rect, stroke, subtle_fill),
-            Icon::Folder => store::draw_folder(painter, rect, stroke, subtle_fill),
-            Icon::FolderOpen => store::draw_folder_open(painter, rect, stroke, subtle_fill),
+            Icon::Dataset => files::draw_dataset(painter, rect, stroke, subtle_fill),
+            Icon::Folder => files::draw_folder(painter, rect, stroke, subtle_fill),
+            Icon::FolderOpen => files::draw_folder_open(painter, rect, stroke, subtle_fill),
             Icon::VariableDoc => store::draw_variable_doc(painter, rect, stroke, subtle_fill),
             Icon::Icechunk => store::draw_icechunk(painter, rect, stroke, subtle_fill),
             Icon::Catalog => store::draw_catalog(painter, rect, stroke, subtle_fill),

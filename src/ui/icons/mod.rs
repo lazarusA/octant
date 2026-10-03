@@ -6,9 +6,11 @@
 
 pub mod button;
 mod ext;
+pub mod files;
 mod meta;
 pub mod nav;
 mod paint;
+pub mod palette;
 pub mod playback;
 pub mod plots;
 pub mod status;

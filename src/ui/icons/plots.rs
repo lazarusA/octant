@@ -2,28 +2,7 @@
 //! Precision-engineered for Octant following standardized 24-unit geometric keylines.
 
 use super::grid_p;
-use egui::{Color32, Painter, Rect, Stroke, StrokeKind, pos2};
-
-/// PlotPlane: Isometric 2.5D data plane with grid elevation and illuminated facet (18x16dp keyline).
-pub fn draw_plot_plane(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Isometric 2.5D diamond plane
-    let plane_pts = vec![p(12.0, 3.5), p(20.5, 11.5), p(12.0, 19.5), p(3.5, 11.5)];
-    painter.add(egui::Shape::convex_polygon(plane_pts, fill, stroke));
-
-    // Isometric grid crosshairs
-    painter.line_segment([p(12.0, 3.5), p(12.0, 19.5)], stroke);
-    painter.line_segment([p(3.5, 11.5), p(20.5, 11.5)], stroke);
-
-    // Active illuminated quadrant (Top-right quadrant facet)
-    let quad_top_right = vec![p(12.0, 3.5), p(20.5, 11.5), p(12.0, 11.5)];
-    painter.add(egui::Shape::convex_polygon(
-        quad_top_right,
-        stroke.color.gamma_multiply(0.35),
-        Stroke::NONE,
-    ));
-}
+use egui::{Color32, Painter, Rect, Stroke, pos2};
 
 /// PlotLine: Analytical precision line chart with crosshair axes and vertex diamond markers (18x18dp keyline).
 pub fn draw_plot_line(painter: &Painter, rect: Rect, stroke: Stroke) {
@@ -198,33 +177,5 @@ pub fn draw_plot_point_cloud(painter: &Painter, rect: Rect, color: Color32) {
 
     for (pos, r) in points {
         painter.circle_filled(pos, r, color);
-    }
-}
-
-/// Colormap: Precision spectral gradient cassette with calibrated tick divisions (18x12dp keyline).
-pub fn draw_colormap(painter: &Painter, rect: Rect, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Palette strip container with subtle chamfer
-    let strip_rect = Rect::from_min_max(p(3.5, 6.5), p(20.5, 17.5));
-    painter.rect_stroke(strip_rect, 2.0, stroke, StrokeKind::Inside);
-
-    // 4 Distinct spectral gradient swatches (Viridis thermal mapping)
-    let swatches = [
-        (3.8, 8.0, Color32::from_rgb(68, 1, 84)),      // Deep purple
-        (8.0, 12.2, Color32::from_rgb(49, 104, 142)),  // Indigo blue
-        (12.2, 16.4, Color32::from_rgb(53, 183, 121)), // Spectral green
-        (16.4, 20.2, Color32::from_rgb(253, 231, 37)), // Solar yellow
-    ];
-
-    for (x0, x1, col) in swatches {
-        let sw_rect = Rect::from_min_max(p(x0, 7.0), p(x1, 17.0));
-        painter.rect_filled(sw_rect, 0.0, col);
-    }
-
-    // Top calibration marks
-    let tick_stroke = Stroke::new(stroke.width * 0.8, stroke.color.gamma_multiply(0.80));
-    for frac_x in [8.0, 12.2, 16.4] {
-        painter.line_segment([p(frac_x, 6.5), p(frac_x, 8.5)], tick_stroke);
     }
 }

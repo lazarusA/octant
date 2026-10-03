@@ -79,3 +79,14 @@ fn test_tones_meet_non_text_contrast_in_both_themes() {
         }
     }
 }
+
+#[test]
+fn test_tone_rgb_matches_visuals_color() {
+    for visuals in [Visuals::dark(), Visuals::light()] {
+        for tone in IconTone::ALL {
+            if let Some(rgb) = tone.rgb(visuals.dark_mode) {
+                assert_eq!(rgb, tone.color(&visuals), "{} drifted", tone.name());
+            }
+        }
+    }
+}
