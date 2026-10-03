@@ -18,6 +18,11 @@ pub struct OctantApp {
     pub store_target_input: String,
     pub active_dataset_metadata: Option<DatasetMetadata>,
     pub cached_variable_tree: Option<crate::data::VariableTreeGroup>,
+    /// Incremented on every change of `active_dataset_metadata`; keys caches
+    /// and focus that belong to one loaded dataset.
+    pub metadata_generation: u64,
+    /// Filtered variable tree for `(metadata_generation, query)`.
+    pub cached_search: Option<crate::ui::variables_overlay::SearchCache>,
     pub selected_variable_idx: usize,
     pub plotted_store_kind: StoreKind,
     pub plotted_store_target_input: String,
@@ -197,6 +202,8 @@ impl Default for OctantApp {
             store_target_input: "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string(),
             active_dataset_metadata: None,
             cached_variable_tree: None,
+            metadata_generation: 0,
+            cached_search: None,
             selected_variable_idx: 0,
             plotted_store_kind: StoreKind::RemoteZarr,
             plotted_store_target_input: "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string(),

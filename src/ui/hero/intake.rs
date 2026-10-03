@@ -33,6 +33,7 @@ pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 let hint_text = intake_hint(ui, desired_w - 2.0 * f32::from(EDIT_MARGIN_X));
 
                 let edit = egui::TextEdit::singleline(&mut app.hero_state.input)
+                    .id(super::focus::intake_id())
                     .hint_text(hint_text)
                     .font(egui::FontId::monospace(BODY_FONT))
                     .vertical_align(egui::Align::Center)
@@ -41,6 +42,7 @@ pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                     .margin(egui::Margin::symmetric(EDIT_MARGIN_X, 2))
                     .desired_width(desired_w);
                 let response = ui.add(edit);
+                super::chip_nav::from_intake(ui.ctx(), &response);
 
                 let enter_pressed =
                     response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));

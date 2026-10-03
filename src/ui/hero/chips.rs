@@ -1,7 +1,9 @@
 //! Sample slash chips and interactive quick-load chip buttons.
 
+use super::chip_nav::{self, chip_id};
 use super::style::{BODY_FONT, GUTTER, SMALL_FONT, gap};
 use crate::app::OctantApp;
+use crate::ui::key_focus;
 use egui::Galley;
 use std::sync::Arc;
 
@@ -41,6 +43,8 @@ struct Line {
 /// Centered rows of sample chips, preceded by a `try:` prefix. Rows wrap as
 /// whole chips and every row stays centered.
 pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
+    chip_nav::handle_keys(ui.ctx(), COUNT);
+
     // Lay out every label once per frame; the same galleys size and draw.
     let prefix = ui.painter().layout_no_wrap(
         PREFIX.to_owned(),
@@ -73,7 +77,7 @@ pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 }
                 let (label, uri, desc) = SAMPLES[item - 1];
                 let galley = Arc::clone(&chips[item - 1]);
-                if render_chip(ui, label, galley, desc).clicked() {
+                if render_chip(ui, item - 1, label, galley, desc).clicked() {
                     app.hero_state.input = uri.to_string();
                     app.submit_or_activate_source(uri, None);
                 }
@@ -146,22 +150,38 @@ fn chip_galley(ui: &egui::Ui, label: &str, hovered: bool) -> Arc<Galley> {
     ui.painter().layout_job(job)
 }
 
-/// Pill-shaped sample chip: plain text at rest, filled on hover. `galley`
-/// is the at-rest label; the brighter hover label is laid out only while
-/// hovered, and the tooltip text is only formatted while it is shown.
-fn render_chip(ui: &mut egui::Ui, label: &str, galley: Arc<Galley>, desc: &str) -> egui::Response {
-    let size = galley.size() + CHIP_PADDING * 2.0;
-    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+/// Pill-shaped sample chip `index`: plain text at rest, filled on hover or
+/// keyboard focus, with a focus ring while focused. `galley` is the at-rest
+/// label; the brighter label is laid out only while active, and the tooltip
+/// text is only formatted while it is shown.
+fn render_chip(
+    ui: &mut egui::Ui,
+    index: usize,
+    label: &str,
+    galley: Arc<Galley>,
+    desc: &str,
+) -> egui::Response {
+    let id = chip_id(index);
+    let (_, rect) = ui.allocate_space(galley.size() + CHIP_PADDING * 2.0);
+    let response = ui.interact(rect, id, egui::Sense::click());
+    let focused = response.has_focus();
+    if focused {
+        key_focus::claim_arrows(ui.ctx(), id);
+    }
 
     if ui.is_rect_visible(rect) {
-        let galley = if response.hovered() {
-            // Borderless: only the hover fill marks the pill.
+        let radius = rect.height() * 0.5;
+        let galley = if response.hovered() || focused {
+            // Borderless: only the fill marks the pill.
             let fill = ui.visuals().widgets.hovered.bg_fill;
-            ui.painter().rect_filled(rect, rect.height() * 0.5, fill);
+            ui.painter().rect_filled(rect, radius, fill);
             chip_galley(ui, label, true)
         } else {
             galley
         };
+        if focused {
+            key_focus::paint_focus_ring(ui, rect, radius);
+        }
         let text_pos = rect.center() - galley.size() * 0.5;
         ui.painter()
             .galley(text_pos, galley, ui.visuals().text_color());

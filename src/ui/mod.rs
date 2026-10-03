@@ -14,6 +14,7 @@ pub mod hero;
 pub mod hover;
 pub use hover as hover_tooltip;
 pub mod icons;
+pub mod key_focus;
 pub mod plot_type;
 pub mod settings;
 pub mod status;

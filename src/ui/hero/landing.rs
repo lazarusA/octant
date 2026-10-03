@@ -7,6 +7,7 @@ use super::chips::sample_slash_chips_row;
 use super::feedback::{
     render_drag_hover_cue, render_idle_hint, render_status_pill, render_warning_banner,
 };
+use super::focus;
 use super::intake::intake_row;
 use super::style::{gap, vspace, wordmark_cell};
 use super::widget::draw_octant_widget;
@@ -47,11 +48,18 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
     let top_spacing = (available_h * 0.14).clamp(16.0, 80.0);
     let space = |base: f32| vspace(base, available_h);
 
+    let mut wants_focus = focus::just_appeared(ui.ctx());
+    // The space left for the hero after side panels. `ui.max_rect()` and
+    // `ui.clip_rect()` still span the whole window, so a click target sized
+    // from them would sit over the panels and swallow their clicks.
+    let hero_rect = ui.available_rect_before_wrap();
+
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
         .show(ui, |ui| {
             ui.set_min_width(available_w);
             ui.set_width(available_w);
+            wants_focus |= focus::background(ui, hero_rect).clicked();
 
             ui.vertical_centered(|ui| {
                 ui.set_min_width(available_w);
@@ -64,6 +72,7 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                     draw_octant_widget(ui, octant_size, filled, extra_rot, extra_scale);
                 if octant_resp.on_hover_text("Click to hop octant").clicked() {
                     app.hero_state.start_hop(Duration::from_millis(350));
+                    wants_focus = true;
                 }
 
                 ui.add_space(space(gap::CUBE_TITLE));
@@ -115,4 +124,9 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.add_space(top_spacing);
             });
         });
+
+    // After the intake field is drawn, so its click-elsewhere unfocus can't undo this.
+    if wants_focus {
+        focus::focus_intake(ui.ctx());
+    }
 }

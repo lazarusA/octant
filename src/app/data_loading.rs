@@ -48,9 +48,7 @@ impl OctantApp {
 
     pub fn inspect_active_store(&mut self) {
         self.is_loading = true;
-        self.active_dataset_metadata = None;
-        self.cached_variable_tree = None;
-        self.variable_search.clear();
+        self.clear_active_metadata();
         self.status_message = format!("Inspecting {:?} metadata...", self.selected_store_kind);
 
         let store_kind = self.selected_store_kind;

@@ -1,3 +1,6 @@
+use super::nav::{NodeKey, row_id};
+use super::row::{RowKind, allocate_row, paint_row};
+use super::tree::VariableTreeContext;
 use crate::data::VariableInfo;
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
@@ -6,57 +9,53 @@ pub const MAX_ITEMS_PER_LEVEL: usize = 100;
 pub fn render_variable_list(
     ui: &mut egui::Ui,
     indices: &[usize],
-    variables: &[VariableInfo],
-    selected_idx: usize,
-    newly_selected_idx: &mut Option<usize>,
+    ctx: &mut VariableTreeContext<'_>,
 ) {
     let total = indices.len();
     for &idx in indices.iter().take(MAX_ITEMS_PER_LEVEL) {
-        if let Some(var_info) = variables.get(idx) {
-            render_variable_row(ui, var_info, idx, selected_idx, newly_selected_idx);
+        if let Some(var_info) = ctx.variables.get(idx) {
+            render_variable_row(ui, var_info, idx, ctx);
         }
     }
-    if total > MAX_ITEMS_PER_LEVEL {
-        ui.label(
-            egui::RichText::new(format!(
-                "Showing 100 of {} variables in this folder. Use search to discover all.",
-                total
-            ))
+    truncation_note(ui, total, "variables in this folder");
+}
+
+/// Muted note under a level listing more than [`MAX_ITEMS_PER_LEVEL`] items.
+pub fn truncation_note(ui: &mut egui::Ui, total: usize, what: &str) {
+    if total <= MAX_ITEMS_PER_LEVEL {
+        return;
+    }
+    let text =
+        format!("Showing {MAX_ITEMS_PER_LEVEL} of {total} {what}. Use search to discover all.");
+    ui.label(
+        egui::RichText::new(text)
             .small()
             .italics()
             .color(ui.visuals().weak_text_color()),
-        );
-    }
+    );
 }
 
-pub fn render_variable_row(
+fn render_variable_row(
     ui: &mut egui::Ui,
     var_info: &VariableInfo,
     idx: usize,
-    selected_idx: usize,
-    newly_selected_idx: &mut Option<usize>,
+    ctx: &mut VariableTreeContext<'_>,
 ) {
-    let is_selected = selected_idx == idx;
-    let leaf_name = var_info.leaf_name();
+    let is_selected = ctx.selected_idx == idx;
+    let units = var_info.units.as_deref().unwrap_or("");
 
-    let row_resp = ui.horizontal(|ui| {
-        ui.icon(Icon::VariableDoc, IconSize::Sm);
-        if let Some(units) = &var_info.units {
-            if !units.is_empty() {
-                let mut buf = [0u8; 96];
-                let label_text = format_leaf_units(&mut buf, leaf_name, units);
-                ui.selectable_label(is_selected, egui::RichText::new(label_text).strong())
-            } else {
-                ui.selectable_label(is_selected, egui::RichText::new(leaf_name).strong())
-            }
-        } else {
-            ui.selectable_label(is_selected, egui::RichText::new(leaf_name).strong())
-        }
-    });
+    let resp = allocate_row(ui, row_id(NodeKey::Variable(idx), ctx.search_active));
+    paint_row(
+        ui,
+        &resp,
+        RowKind::Variable,
+        var_info.leaf_name(),
+        units,
+        is_selected,
+    );
+    let clicked = resp.clicked();
 
-    let clicked = row_resp.response.clicked() || row_resp.inner.clicked();
-
-    row_resp.response.on_hover_ui(|ui| {
+    resp.on_hover_ui(|ui| {
         ui.label(egui::RichText::new(&var_info.name).strong());
         if let Some(group) = var_info.group_path() {
             ui.horizontal(|ui| {
@@ -78,14 +77,6 @@ pub fn render_variable_row(
     });
 
     if clicked {
-        *newly_selected_idx = Some(idx);
+        ctx.newly_selected_idx = Some(idx);
     }
-}
-
-fn format_leaf_units<'a>(buf: &'a mut [u8; 96], leaf: &str, units: &str) -> &'a str {
-    use std::io::Write;
-    let mut cursor = std::io::Cursor::new(&mut buf[..]);
-    let _ = write!(cursor, "{}  ({})", leaf, units);
-    let len = cursor.position() as usize;
-    std::str::from_utf8(&buf[..len]).unwrap_or("")
 }

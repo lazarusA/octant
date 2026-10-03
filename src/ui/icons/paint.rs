@@ -69,6 +69,7 @@ impl Icon {
             Icon::Info => marks::draw_info(c),
             Icon::Bullet => marks::draw_bullet(c),
             Icon::ChevronRight => marks::draw_chevron_right(c),
+            Icon::ChevronDown => marks::draw_chevron_down(c),
         }
     }
 }

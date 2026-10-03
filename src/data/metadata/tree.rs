@@ -12,18 +12,39 @@ pub struct VariableTreeGroup {
     pub variable_indices: Vec<usize>,
     /// Child subgroups.
     pub subgroups: Vec<VariableTreeGroup>,
+    /// Variables in this group and all descendants, computed when the group is
+    /// built so drawing a folder never walks its subtree.
+    total_count: usize,
 }
 
 impl VariableTreeGroup {
+    /// A group whose total count is computed from its (already built) parts.
+    pub fn new(
+        name: String,
+        full_path: String,
+        variable_indices: Vec<usize>,
+        subgroups: Vec<VariableTreeGroup>,
+    ) -> Self {
+        let nested: usize = subgroups.iter().map(|g| g.total_count).sum();
+        Self {
+            total_count: variable_indices.len() + nested,
+            name,
+            full_path,
+            variable_indices,
+            subgroups,
+        }
+    }
+
     /// Returns the total number of variables in this group and all its descendant subgroups.
     pub fn total_variable_count(&self) -> usize {
-        let direct = self.variable_indices.len();
-        let nested: usize = self
-            .subgroups
-            .iter()
-            .map(|g| g.total_variable_count())
-            .sum();
-        direct + nested
+        self.total_count
+    }
+
+    /// Recompute every total count bottom-up after building the tree in place.
+    fn recount(&mut self) -> usize {
+        let nested: usize = self.subgroups.iter_mut().map(Self::recount).sum();
+        self.total_count = self.variable_indices.len() + nested;
+        self.total_count
     }
 
     /// Recursively filters the tree according to a search query string.
@@ -70,12 +91,12 @@ impl VariableTreeGroup {
         }
 
         if !filtered_vars.is_empty() || !filtered_subgroups.is_empty() {
-            Some(VariableTreeGroup {
-                name: self.name.clone(),
-                full_path: self.full_path.clone(),
-                variable_indices: filtered_vars,
-                subgroups: filtered_subgroups,
-            })
+            Some(VariableTreeGroup::new(
+                self.name.clone(),
+                self.full_path.clone(),
+                filtered_vars,
+                filtered_subgroups,
+            ))
         } else {
             None
         }
@@ -85,9 +106,7 @@ impl VariableTreeGroup {
     pub fn build_tree_from_variables(variables: &[VariableInfo]) -> VariableTreeGroup {
         let mut root = VariableTreeGroup {
             name: "Root".to_string(),
-            full_path: String::new(),
-            variable_indices: Vec::new(),
-            subgroups: Vec::new(),
+            ..Default::default()
         };
 
         for (idx, var) in variables.iter().enumerate() {
@@ -116,8 +135,7 @@ impl VariableTreeGroup {
                             current_group.subgroups.push(VariableTreeGroup {
                                 name: seg.to_string(),
                                 full_path: current_path.clone(),
-                                variable_indices: Vec::new(),
-                                subgroups: Vec::new(),
+                                ..Default::default()
                             });
                             current_group.subgroups.len() - 1
                         }
@@ -130,6 +148,7 @@ impl VariableTreeGroup {
             }
         }
 
+        root.recount();
         root
     }
 }
