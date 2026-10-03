@@ -1,28 +1,10 @@
-//! Hero header title, status pill, idle hints, drag cues, and warning banners.
+//! Hero status pill, idle hints, drag cues, and warning banners.
 
-use super::style::{BODY_FONT, SMALL_FONT, content_width, fit_text, title_font};
+use super::style::{BODY_FONT, SMALL_FONT, content_width, fit_text};
 use crate::ui::icons::{ICON_GAP, Icon, IconSize, IconTone};
 
 /// Height of the drag-hover and warning banners.
 const BANNER_HEIGHT: f32 = 40.0;
-
-/// "OCTANT" wordmark under the cube: spaced monospace capitals in the strong
-/// text color.
-pub fn header_title(ui: &mut egui::Ui) {
-    let font_size = title_font(ui.available_width());
-    let mut job = egui::text::LayoutJob::default();
-    job.append(
-        "OCTANT",
-        0.0,
-        egui::TextFormat {
-            font_id: egui::FontId::monospace(font_size),
-            color: ui.visuals().strong_text_color(),
-            extra_letter_spacing: font_size * 0.35,
-            ..Default::default()
-        },
-    );
-    ui.label(job);
-}
 
 /// Centered status line: icon followed by `text`, which wraps onto at most
 /// two centered lines within the hero content width.

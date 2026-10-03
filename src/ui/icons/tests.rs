@@ -1,3 +1,4 @@
+use super::sheet;
 use super::style::stroke_width;
 use super::*;
 use egui::{Color32, Painter, Rect, Visuals, vec2};
@@ -76,6 +77,43 @@ fn test_tones_meet_non_text_contrast_in_both_themes() {
                 tone.name(),
                 if visuals.dark_mode { "dark" } else { "light" }
             );
+        }
+    }
+}
+
+#[test]
+fn test_tone_rgb_matches_visuals_color() {
+    for visuals in [Visuals::dark(), Visuals::light()] {
+        for tone in IconTone::ALL {
+            if let Some(rgb) = tone.rgb(visuals.dark_mode) {
+                assert_eq!(rgb, tone.color(&visuals), "{} drifted", tone.name());
+            }
+        }
+    }
+}
+
+/// Every icon's tessellated geometry stays inside its box at every size and
+/// scale, which also catches NaN vertices and runaway miter spikes.
+#[test]
+fn every_icon_stays_inside_its_box() {
+    for &(size, ppp) in &sheet::COLUMNS {
+        for &icon in Icon::ALL {
+            let (prims, _) = sheet::tessellate(&[icon], size, ppp, &Visuals::dark());
+            // Allow one point of anti-aliasing feather around the box.
+            let bounds = sheet::tile_rect(0, size).expand(1.0);
+            for prim in &prims {
+                let egui::epaint::Primitive::Mesh(mesh) = &prim.primitive else {
+                    continue;
+                };
+                for v in mesh.vertices.iter().filter(|v| v.color.a() > 0) {
+                    assert!(
+                        bounds.contains(v.pos),
+                        "{} at {size}px x{ppp}: vertex {:?} outside {bounds:?}",
+                        icon.name(),
+                        v.pos
+                    );
+                }
+            }
         }
     }
 }

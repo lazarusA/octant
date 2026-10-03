@@ -20,14 +20,14 @@ pub fn content_width(avail: f32) -> f32 {
         .max(CONTENT_MIN_W.min(avail))
 }
 
-/// Wordmark font size, growing with the window.
-pub fn title_font(avail: f32) -> f32 {
+/// Wordmark cell size in points, growing with the window (word is 35 cells wide).
+pub fn wordmark_cell(avail: f32) -> f32 {
     if avail < 380.0 {
-        20.0
+        5.0
     } else if avail < 520.0 {
-        24.0
+        6.0
     } else {
-        28.0
+        7.0
     }
 }
 

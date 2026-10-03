@@ -1,207 +1,145 @@
-//! Status badges, indicators, tools, and notification procedural vector icons.
-//! Precision-engineered for Octant following standardized 24-unit geometric keylines.
+//! Tool and status icons: scissors, padlocks, bolt and hourglass.
+//! Single-glyph marks (check, cross, warning, ...) live in `marks.rs`.
 
-use super::grid_p;
-use egui::{Color32, Painter, Rect, Stroke, StrokeKind, pos2};
+use super::canvas::{IconCanvas, Shade, Weight};
+use egui::Color32;
+use std::f32::consts::PI;
 
-/// Scissors: Precision vector slicing shears with optical pivot (20x20dp keyline).
-pub fn draw_scissors(painter: &Painter, rect: Rect, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
+/// Scissors: two finger rings, crossing blades and a pivot dot (18x18 keyline).
+pub fn draw_scissors(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    c.circle((7.0, 17.5), 2.8, Color32::TRANSPARENT, s);
+    c.circle((17.0, 17.5), 2.8, Color32::TRANSPARENT, s);
+    c.seg(c.p(8.8, 15.3), c.p(18.0, 4.0), s);
+    c.seg(c.p(15.2, 15.3), c.p(6.0, 4.0), s);
+    c.dot((12.0, 11.6), 1.1, c.color);
+}
 
-    // Two geometric handle rings at bottom
-    let r_loop = rect.width() * (2.8 / 24.0);
-    painter.circle_stroke(p(7.0, 17.5), r_loop, stroke);
-    painter.circle_stroke(p(17.0, 17.5), r_loop, stroke);
+/// Shared padlock: body, keyhole and a shackle whose arc is centered at
+/// `arc_y` with its right leg ending at `right_end`.
+fn padlock(c: &IconCanvas, arc_y: f32, right_end: f32) {
+    let s = c.stroke(Weight::Base);
+    // Snap the legs first and build the arc between them in screen space so
+    // the vertical legs stay pixel-crisp and meet the arc without a kink.
+    let (left, right) = (c.ps(8.0, 11.0, s.width), c.ps(16.0, right_end, s.width));
+    let top = c.ps(12.0, arc_y, s.width);
+    let (cx, r) = ((left.x + right.x) * 0.5, (right.x - left.x) * 0.5);
+    let mut shackle = vec![left];
+    shackle.extend((0..=16).map(|i| {
+        let a = PI + PI * i as f32 / 16.0;
+        egui::pos2(cx + r * a.cos(), top.y + r * a.sin())
+    }));
+    shackle.push(right);
+    c.curve(shackle, s);
 
-    // Central optical pivot boss
-    let pivot = p(12.0, 12.0);
-    painter.circle_filled(pivot, rect.width() * (1.2 / 24.0), stroke.color);
+    c.rrect((5.0, 11.0), (19.0, 21.0), 2.0, c.body(), s);
+    if c.compact() {
+        c.dot((12.0, 16.0), 1.6, c.color);
+    } else {
+        c.dot((12.0, 15.0), 1.4, c.color);
+        c.line((12.0, 15.0), (12.0, 18.0), s);
+    }
+}
 
-    // Precision tapered cutting blades
-    let b1 = [p(8.0, 15.0), p(18.0, 4.0)];
-    let b2 = [p(16.0, 15.0), p(6.0, 4.0)];
-    painter.line_segment(b1, stroke);
-    painter.line_segment(b2, stroke);
+/// Lock: closed padlock (14x18 keyline).
+pub fn draw_lock(c: &IconCanvas) {
+    padlock(c, 7.5, 11.0);
+}
 
-    // Secondary blade relief edge
-    let b1_relief = [p(12.0, 12.0), p(17.0, 4.0)];
-    painter.line_segment(
-        b1_relief,
-        Stroke::new(stroke.width * 0.75, stroke.color.gamma_multiply(0.40)),
+/// Unlock: padlock with the shackle lifted and its right leg free (14x18 keyline).
+pub fn draw_unlock(c: &IconCanvas) {
+    padlock(c, 5.0, 7.0);
+}
+
+/// Bolt: solid lightning bolt, filled as two overlapping convex halves (14x19 keyline).
+pub fn draw_bolt(c: &IconCanvas) {
+    // The bolt is concave at its two inner corners. Split it along the seam
+    // between them and push the upper half 0.35 units across the seam so the
+    // halves overlap instead of leaving an anti-aliased hairline.
+    let (seam_lo, seam_hi) = ((11.5, 13.0), (12.5, 10.5));
+    let push = (0.33, 0.13);
+    let over = |p: (f32, f32)| (p.0 + push.0, p.1 + push.1);
+    c.fill(
+        &[(14.5, 2.5), (5.5, 13.0), over(seam_lo), over(seam_hi)],
+        c.color,
     );
+    c.fill(&[seam_hi, (18.5, 10.5), (9.5, 21.5), seam_lo], c.color);
 }
 
-/// Check: High-tech verification vector with 45° dynamic takeoff (18x18dp keyline).
-pub fn draw_check(painter: &Painter, rect: Rect, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
+/// Hourglass glass profile in grid units: plates at `GLASS_TOP` and
+/// `GLASS_BOTTOM`, half widths `GLASS_OUTER` at the plates and `GLASS_INNER`
+/// along the flat waist.
+const GLASS_TOP: f32 = 4.0;
+const GLASS_BOTTOM: f32 = 20.0;
+const WAIST_TOP: f32 = 11.25;
+const WAIST_BOT: f32 = 12.75;
+const GLASS_OUTER: f32 = 5.5;
+const GLASS_INNER: f32 = 0.75;
 
-    let check_stroke = Stroke::new(stroke.width * 1.45, stroke.color);
-    let pts = [p(4.0, 12.0), p(9.5, 17.5), p(20.5, 6.0)];
-    painter.line_segment([pts[0], pts[1]], check_stroke);
-    painter.line_segment([pts[1], pts[2]], check_stroke);
-}
-
-/// Cross: Precision 45° cancel reticle with balanced terminal endpoints (16x16dp keyline).
-pub fn draw_cross(painter: &Painter, rect: Rect, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    let cross_stroke = Stroke::new(stroke.width * 1.35, stroke.color);
-    painter.line_segment([p(5.0, 5.0), p(19.0, 19.0)], cross_stroke);
-    painter.line_segment([p(19.0, 5.0), p(5.0, 19.0)], cross_stroke);
-}
-
-/// Lock: High-security padlock with rounded shackle and laser keyway (14x18dp keyline).
-pub fn draw_lock(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Smooth rounded semi-circular shackle (zero-allocation)
-    painter.line_segment([p(8.0, 11.0), p(8.0, 7.5)], stroke);
-    let n_arc = 8;
-    let mut prev = p(8.0, 7.5);
-    for i in 1..=n_arc {
-        let frac = (i as f32) / (n_arc as f32);
-        let angle = std::f32::consts::PI - frac * std::f32::consts::PI;
-        let (s, c) = angle.sin_cos();
-        let curr = p(12.0 + c * 4.0, 7.5 - s * 4.0);
-        painter.line_segment([prev, curr], stroke);
-        prev = curr;
+/// Half width of the hourglass glass at height `y`.
+fn glass_half(y: f32) -> f32 {
+    let slope = (GLASS_OUTER - GLASS_INNER) / (WAIST_TOP - GLASS_TOP);
+    if y <= WAIST_TOP {
+        GLASS_OUTER - (y - GLASS_TOP) * slope
+    } else if y >= WAIST_BOT {
+        GLASS_INNER + (y - WAIST_BOT) * slope
+    } else {
+        GLASS_INNER
     }
-    painter.line_segment([prev, p(16.0, 11.0)], stroke);
-
-    // Padlock body with chamfered corners
-    let body = Rect::from_min_max(p(5.5, 11.0), p(18.5, 20.5));
-    painter.rect(body, 2.0, fill, stroke, StrokeKind::Inside);
-
-    // Refined circular laser keyhole with vertical stem
-    painter.circle_filled(p(12.0, 14.5), rect.width() * (1.3 / 24.0), stroke.color);
-    let keyway = Stroke::new(stroke.width * 1.2, stroke.color);
-    painter.line_segment([p(12.0, 14.5), p(12.0, 17.5)], keyway);
 }
 
-/// Unlock: Lifted open shackle with clear disengaged clearance (14x18dp keyline).
-pub fn draw_unlock(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Lifted & open smooth shackle (zero-allocation)
-    painter.line_segment([p(8.0, 11.0), p(8.0, 5.0)], stroke);
-    let n_arc = 8;
-    let mut prev = p(8.0, 5.0);
-    for i in 1..=n_arc {
-        let frac = (i as f32) / (n_arc as f32);
-        let angle = std::f32::consts::PI - frac * std::f32::consts::PI;
-        let (s, c) = angle.sin_cos();
-        let curr = p(12.0 + c * 4.0, 5.0 - s * 4.0);
-        painter.line_segment([prev, curr], stroke);
-        prev = curr;
+/// Hourglass: sand timer with a flat waist and sand settling in both chambers (14x16 keyline).
+pub fn draw_hourglass(c: &IconCanvas) {
+    // Glass fill in three bands: upper chamber, waist, lower chamber.
+    let bands = [
+        (GLASS_TOP, WAIST_TOP),
+        (WAIST_TOP, WAIST_BOT),
+        (WAIST_BOT, GLASS_BOTTOM),
+    ];
+    for (y0, y1) in bands {
+        let (h0, h1) = (glass_half(y0), glass_half(y1));
+        let quad = [
+            (12.0 - h0, y0),
+            (12.0 + h0, y0),
+            (12.0 + h1, y1),
+            (12.0 - h1, y1),
+        ];
+        c.fill(&quad, c.body());
     }
-    painter.line_segment([prev, p(16.0, 6.5)], stroke);
+    draw_sand(c);
 
-    // Padlock body (identical placement to Lock for seamless toggle)
-    let body = Rect::from_min_max(p(5.5, 11.0), p(18.5, 20.5));
-    painter.rect(body, 2.0, fill, stroke, StrokeKind::Inside);
-
-    // Refined keyhole
-    painter.circle_filled(p(12.0, 14.5), rect.width() * (1.3 / 24.0), stroke.color);
-    let keyway = Stroke::new(stroke.width * 1.2, stroke.color);
-    painter.line_segment([p(12.0, 14.5), p(12.0, 17.5)], keyway);
-}
-
-/// Bolt: High-voltage discharge vector with dual acute inflection angles (14x20dp keyline).
-pub fn draw_bolt(painter: &Painter, rect: Rect, fill: Color32, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    let bolt_pts = vec![
-        p(14.0, 3.0),
-        p(6.0, 12.0),
-        p(11.5, 12.0),
-        p(9.5, 21.0),
-        p(18.0, 10.0),
-        p(13.0, 10.0),
-    ];
-    painter.add(egui::Shape::convex_polygon(bolt_pts, fill, stroke));
-}
-
-/// Hourglass: High-precision chrono-emitter with dual converging chambers (16x18dp keyline).
-pub fn draw_hourglass(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Top and bottom plates with end notches
-    painter.line_segment([p(4.5, 4.0), p(19.5, 4.0)], stroke);
-    painter.line_segment([p(4.5, 20.0), p(19.5, 20.0)], stroke);
-
-    // Triangular glass chambers meeting at central flux point
-    let top_chamber = vec![p(6.5, 4.0), p(17.5, 4.0), p(12.0, 12.0)];
-    let bot_chamber = vec![p(12.0, 12.0), p(17.5, 20.0), p(6.5, 20.0)];
-
-    painter.add(egui::Shape::convex_polygon(top_chamber, fill, stroke));
-    painter.add(egui::Shape::convex_polygon(bot_chamber, fill, stroke));
-
-    // Lower illuminated sand reservoir
-    let sand = vec![p(8.5, 16.5), p(15.5, 16.5), p(17.0, 20.0), p(7.0, 20.0)];
-    painter.add(egui::Shape::convex_polygon(
-        sand,
-        stroke.color.gamma_multiply(0.45),
-        Stroke::NONE,
-    ));
-}
-
-/// Warning: Caution hazard trihedron with rounded vertex chamfers (18x18dp keyline).
-pub fn draw_warning(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Chamfered hazard triangle
-    let tri_pts = vec![
-        p(12.0, 3.5),
-        p(21.0, 19.5),
-        p(19.5, 20.5),
-        p(4.5, 20.5),
-        p(3.0, 19.5),
-    ];
-    painter.add(egui::Shape::convex_polygon(tri_pts, fill, stroke));
-
-    // Exclamation point stem & dot
-    let ex_stroke = Stroke::new(stroke.width * 1.3, stroke.color);
-    painter.line_segment([p(12.0, 9.0), p(12.0, 14.0)], ex_stroke);
-    painter.circle_filled(p(12.0, 17.5), rect.width() * (1.2 / 24.0), stroke.color);
-}
-
-/// Info: Circular telemetry beacon with notification dot and vertical pillar (20dp circle keyline).
-pub fn draw_info(painter: &Painter, rect: Rect, stroke: Stroke) {
-    let center = rect.center();
-    let r = rect.width().min(rect.height()) * (10.0 / 24.0);
-    if r <= 1.0 {
-        return;
+    // Glass sides as two open strokes so nothing doubles up at the waist.
+    let s = c.stroke(Weight::Base);
+    for side in [-1.0_f32, 1.0] {
+        let x = |dx: f32| 12.0 + side * dx;
+        let profile = [
+            (x(GLASS_OUTER), GLASS_TOP),
+            (x(GLASS_INNER), WAIST_TOP),
+            (x(GLASS_INNER), WAIST_BOT),
+            (x(GLASS_OUTER), GLASS_BOTTOM),
+        ];
+        c.path(&profile, s);
     }
 
-    // Outer circle
-    painter.circle_stroke(center, r, stroke);
-
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    painter.circle_filled(p(12.0, 8.0), rect.width() * (1.3 / 24.0), stroke.color);
-    let stem_stroke = Stroke::new(stroke.width * 1.2, stroke.color);
-    painter.line_segment([p(12.0, 11.0), p(12.0, 16.5)], stem_stroke);
+    // End plates, only slightly wider than the glass.
+    c.line((5.0, GLASS_TOP), (19.0, GLASS_TOP), s);
+    c.line((5.0, GLASS_BOTTOM), (19.0, GLASS_BOTTOM), s);
 }
 
-/// Bullet: Precision geometric diamond telemetry node (Centered 10dp diamond).
-pub fn draw_bullet(painter: &Painter, rect: Rect, color: Color32) {
-    let center = rect.center();
-    let d = rect.width().min(rect.height()) * (5.0 / 24.0);
-    let pts = vec![
-        pos2(center.x, center.y - d),
-        pos2(center.x + d, center.y),
-        pos2(center.x, center.y + d),
-        pos2(center.x - d, center.y),
+/// Sand inset one unit inside the glass: a remnant above the waist (full size
+/// only) and a mounded pile below it.
+fn draw_sand(c: &IconCanvas) {
+    let at = |y: f32, side: f32| (12.0 + side * (glass_half(y) - 1.0), y);
+    let sand = c.shade(Shade::Mid);
+    if !c.compact() {
+        c.fill(&[at(8.0, -1.0), at(8.0, 1.0), (12.0, 10.5)], sand);
+    }
+    let pile = [
+        at(17.0, -1.0),
+        (12.0, 15.5),
+        at(17.0, 1.0),
+        at(19.0, 1.0),
+        at(19.0, -1.0),
     ];
-    painter.add(egui::Shape::convex_polygon(pts, color, Stroke::NONE));
-}
-
-/// ChevronRight: Crisp 90° forward vector pointer (14x16dp keyline).
-pub fn draw_chevron_right(painter: &Painter, rect: Rect, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    let chevron_stroke = Stroke::new(stroke.width * 1.2, stroke.color);
-    let pts = [p(8.5, 5.0), p(15.5, 12.0), p(8.5, 19.0)];
-    painter.line_segment([pts[0], pts[1]], chevron_stroke);
-    painter.line_segment([pts[1], pts[2]], chevron_stroke);
+    c.fill(&pile, sand);
 }

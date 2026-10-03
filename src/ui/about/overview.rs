@@ -1,4 +1,4 @@
-//! Overview tab content for the About Octant dialog.
+//! About tab content for the About Octant dialog.
 
 use super::types::AboutTab;
 use crate::app::OctantApp;

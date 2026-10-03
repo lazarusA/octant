@@ -5,13 +5,13 @@ use web_time::Instant;
 
 use super::chips::sample_slash_chips_row;
 use super::feedback::{
-    header_title, render_drag_hover_cue, render_idle_hint, render_status_pill,
-    render_warning_banner,
+    render_drag_hover_cue, render_idle_hint, render_status_pill, render_warning_banner,
 };
 use super::intake::intake_row;
-use super::style::{gap, vspace};
+use super::style::{gap, vspace, wordmark_cell};
 use super::widget::draw_octant_widget;
 use crate::app::OctantApp;
+use crate::ui::brand::Wordmark;
 
 /// Render the clean, centered Hero Landing page.
 pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -38,7 +38,7 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.ctx().request_repaint_after(Duration::from_millis(100));
     }
 
-    // Main centered composition with procedural cube, title, and intake
+    // Main centered composition with procedural cube, wordmark, and intake
     let available_w = ui.available_width();
     let available_h = ui.available_height();
     let octant_size = (available_h * 0.22)
@@ -67,7 +67,7 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
 
                 ui.add_space(space(gap::CUBE_TITLE));
-                header_title(ui);
+                ui.add(Wordmark::new(wordmark_cell(available_w)));
 
                 ui.add_space(space(gap::TITLE_INTAKE));
                 intake_row(ui, app);

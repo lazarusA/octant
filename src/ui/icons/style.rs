@@ -41,6 +41,7 @@ pub const ICON_GAP: f32 = 5.0;
 ///
 /// Fixed per size step so icons of different sizes share one optical weight;
 /// larger decorative art scales linearly from the `Lg` weight.
+/// `IconCanvas` rounds this to whole physical pixels so strokes stay crisp.
 pub fn stroke_width(dim: f32) -> f32 {
     if dim <= 13.0 {
         1.25
@@ -81,16 +82,24 @@ impl IconTone {
     ];
 
     pub fn color(self, visuals: &Visuals) -> Color32 {
-        let dark = visuals.dark_mode;
-        let pick = |d: [u8; 3], l: [u8; 3]| {
-            let [r, g, b] = if dark { d } else { l };
-            Color32::from_rgb(r, g, b)
-        };
         match self {
             IconTone::Default => visuals.text_color(),
+            IconTone::Strong => visuals.strong_text_color(),
+            _ => self.rgb(visuals.dark_mode).unwrap_or(visuals.text_color()),
+        }
+    }
+
+    /// Fixed theme color of the tone, for multi-color icons drawn without
+    /// [`Visuals`]. `None` for `Default` and `Strong`, which follow the text color.
+    pub fn rgb(self, is_dark: bool) -> Option<Color32> {
+        let pick = |d: [u8; 3], l: [u8; 3]| {
+            let [r, g, b] = if is_dark { d } else { l };
+            Some(Color32::from_rgb(r, g, b))
+        };
+        match self {
+            IconTone::Default | IconTone::Strong => None,
             // Brighter than egui's weak text in dark mode so icons keep 3:1 contrast.
             IconTone::Muted => pick([112, 112, 112], [136, 136, 136]),
-            IconTone::Strong => visuals.strong_text_color(),
             IconTone::Accent => pick([0, 190, 255], [0, 125, 220]),
             IconTone::Info => pick([64, 210, 222], [0, 126, 140]),
             IconTone::Success => pick([48, 204, 162], [0, 124, 94]),

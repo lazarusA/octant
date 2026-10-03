@@ -1,240 +1,108 @@
-//! Playback and timeline procedural vector icons.
-//! Precision-engineered for Octant following standardized 24-unit geometric keylines.
+//! Playback and timeline icons. Transport glyphs are solid fills; loop,
+//! reset and gauge are outlined.
 
-use super::grid_p;
-use egui::{Color32, Painter, Rect, Stroke, StrokeKind, pos2};
+use super::canvas::{Caps, IconCanvas, Weight, key};
+use egui::{Pos2, Vec2, vec2};
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
-/// Play: Precision right-pointing directional triangle with optical center compensation (14x16dp keyline).
-pub fn draw_play(painter: &Painter, rect: Rect, fill: Color32, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
+/// Play: solid right-pointing triangle, nudged right for optical centering (13x16 keyline).
+pub fn draw_play(c: &IconCanvas) {
+    c.fill(&[(7.0, 4.0), (20.0, 12.0), (7.0, 20.0)], c.color);
+}
 
-    // Optically centered with +1.0dp X-shift
+/// Pause: two solid rounded bars (12x16 keyline).
+pub fn draw_pause(c: &IconCanvas) {
+    c.rrect_fill((6.0, 4.0), (10.0, 20.0), 1.0, c.color);
+    c.rrect_fill((14.0, 4.0), (18.0, 20.0), 1.0, c.color);
+}
+
+/// Stop: solid rounded square (15-unit square).
+pub fn draw_stop(c: &IconCanvas) {
+    c.rrect_fill((4.5, 4.5), (19.5, 19.5), 2.0, c.color);
+}
+
+/// StepBackward: end bar and left-pointing triangle (16x16 keyline).
+pub fn draw_step_backward(c: &IconCanvas) {
+    c.rrect_fill((4.0, 4.0), (7.0, 20.0), 1.0, c.color);
+    c.fill(&[(20.0, 4.0), (9.0, 12.0), (20.0, 20.0)], c.color);
+}
+
+/// StepForward: right-pointing triangle and end bar (16x16 keyline).
+pub fn draw_step_forward(c: &IconCanvas) {
+    c.fill(&[(4.0, 4.0), (15.0, 12.0), (4.0, 20.0)], c.color);
+    c.rrect_fill((17.0, 4.0), (20.0, 20.0), 1.0, c.color);
+}
+
+/// SeekStart: limit bar and two left-pointing triangles (18x16 keyline).
+pub fn draw_seek_start(c: &IconCanvas) {
+    c.rrect_fill((3.0, 4.0), (6.0, 20.0), 1.0, c.color);
+    c.fill(&[(13.0, 4.5), (7.0, 12.0), (13.0, 19.5)], c.color);
+    c.fill(&[(21.0, 4.5), (14.5, 12.0), (21.0, 19.5)], c.color);
+}
+
+/// SeekEnd: two right-pointing triangles and limit bar (18x16 keyline).
+pub fn draw_seek_end(c: &IconCanvas) {
+    c.fill(&[(3.0, 4.5), (9.5, 12.0), (3.0, 19.5)], c.color);
+    c.fill(&[(11.0, 4.5), (17.0, 12.0), (11.0, 19.5)], c.color);
+    c.rrect_fill((18.0, 4.0), (21.0, 20.0), 1.0, c.color);
+}
+
+/// Solid arrowhead whose base is centered on `at`, pointing along `dir` (unit vector).
+fn arrowhead(c: &IconCanvas, at: Pos2, dir: Vec2) {
+    let u = c.unit();
+    let normal = vec2(-dir.y, dir.x);
     let pts = vec![
-        p(7.0, 4.0),
-        p(20.0, 12.0),
-        p(7.0, 20.0),
-        p(5.5, 18.5),
-        p(5.5, 5.5),
+        at + dir * (3.0 * u),
+        at + normal * (2.6 * u),
+        at - normal * (2.6 * u),
     ];
-    painter.add(egui::Shape::convex_polygon(pts, fill, stroke));
+    c.fill_pts(pts, c.color);
 }
 
-/// Pause: Dual chamfered technical vertical pillars (16x16dp keyline).
-pub fn draw_pause(painter: &Painter, rect: Rect, fill: Color32, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    let bar1 = Rect::from_min_max(p(5.0, 4.0), p(9.0, 20.0));
-    let bar2 = Rect::from_min_max(p(15.0, 4.0), p(19.0, 20.0));
-
-    painter.rect(bar1, 1.5, fill, stroke, StrokeKind::Inside);
-    painter.rect(bar2, 1.5, fill, stroke, StrokeKind::Inside);
+/// Unit tangent of a clockwise screen-space arc at angle `a`.
+fn cw_tangent(a: f32) -> Vec2 {
+    vec2(-a.sin(), a.cos())
 }
 
-/// Stop: Chamfered technical telemetry square (14x14dp keyline).
-pub fn draw_stop(painter: &Painter, rect: Rect, fill: Color32, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    let pts = vec![
-        p(6.5, 5.0),
-        p(17.5, 5.0),
-        p(19.0, 6.5),
-        p(19.0, 17.5),
-        p(17.5, 19.0),
-        p(6.5, 19.0),
-        p(5.0, 17.5),
-        p(5.0, 6.5),
-    ];
-    painter.add(egui::Shape::convex_polygon(pts, fill, stroke));
-}
-
-/// StepBackward: Left directional triangle with end stop bar (17x16dp keyline).
-pub fn draw_step_backward(painter: &Painter, rect: Rect, fill: Color32, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // End stop bar
-    let bar = Rect::from_min_max(p(4.0, 4.0), p(7.0, 20.0));
-    painter.rect(bar, 1.0, fill, stroke, StrokeKind::Inside);
-
-    // Left-pointing triangle with 2dp clearance to bar
-    let pts = vec![
-        p(19.0, 4.5),
-        p(8.5, 12.0),
-        p(19.0, 19.5),
-        p(20.0, 18.5),
-        p(20.0, 5.5),
-    ];
-    painter.add(egui::Shape::convex_polygon(pts, fill, stroke));
-}
-
-/// StepForward: Right directional triangle with end stop bar (17x16dp keyline).
-pub fn draw_step_forward(painter: &Painter, rect: Rect, fill: Color32, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Right-pointing triangle
-    let pts = vec![
-        p(5.0, 4.5),
-        p(15.5, 12.0),
-        p(5.0, 19.5),
-        p(4.0, 18.5),
-        p(4.0, 5.5),
-    ];
-    painter.add(egui::Shape::convex_polygon(pts, fill, stroke));
-
-    // End stop bar
-    let bar = Rect::from_min_max(p(17.0, 4.0), p(20.0, 20.0));
-    painter.rect(bar, 1.0, fill, stroke, StrokeKind::Inside);
-}
-
-/// SeekStart: Dual rapid seek triangles with left boundary limit (18x16dp keyline).
-pub fn draw_seek_start(painter: &Painter, rect: Rect, fill: Color32, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Left limit bar
-    let bar = Rect::from_min_max(p(3.5, 4.0), p(6.5, 20.0));
-    painter.rect(bar, 1.0, fill, stroke, StrokeKind::Inside);
-
-    // Triangle 1 (inner)
-    let t1 = vec![p(13.5, 5.0), p(7.5, 12.0), p(13.5, 19.0)];
-    painter.add(egui::Shape::convex_polygon(t1, fill, stroke));
-
-    // Triangle 2 (outer)
-    let t2 = vec![p(20.5, 5.0), p(14.5, 12.0), p(20.5, 19.0)];
-    painter.add(egui::Shape::convex_polygon(t2, fill, stroke));
-}
-
-/// SeekEnd: Dual rapid seek triangles with right boundary limit (18x16dp keyline).
-pub fn draw_seek_end(painter: &Painter, rect: Rect, fill: Color32, stroke: Stroke) {
-    let p = |gx: f32, gy: f32| grid_p(rect, gx, gy);
-
-    // Triangle 1 (outer)
-    let t1 = vec![p(3.5, 5.0), p(9.5, 12.0), p(3.5, 19.0)];
-    painter.add(egui::Shape::convex_polygon(t1, fill, stroke));
-
-    // Triangle 2 (inner)
-    let t2 = vec![p(10.5, 5.0), p(16.5, 12.0), p(10.5, 19.0)];
-    painter.add(egui::Shape::convex_polygon(t2, fill, stroke));
-
-    // Right limit bar
-    let bar = Rect::from_min_max(p(17.5, 4.0), p(20.5, 20.0));
-    painter.rect(bar, 1.0, fill, stroke, StrokeKind::Inside);
-}
-
-/// Loop: Dual continuous swept orbital trajectory with stealth arrowheads (18dp circle keyline).
-pub fn draw_loop(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let center = rect.center();
-    let r = rect.width().min(rect.height()) * (8.5 / 24.0);
-    if r <= 1.0 {
-        return;
+/// Loop: two arcs chasing each other around a circle, arrowheads at their ends (18-unit circle).
+pub fn draw_loop(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    let (ctr, r, gap, head) = ((key::C, key::C), 8.0, 0.25, 0.4);
+    // Clockwise screen angles: upper arc left to right, lower arc right to left.
+    for start in [PI + gap, gap] {
+        let end = start + PI - 2.0 * gap - head;
+        if let Some((_, tip)) = c.curve_capped(c.arc(ctr, (r, r), start, end), s, Caps::Start) {
+            arrowhead(c, tip, cw_tangent(end));
+        }
     }
-
-    let n_pts = 12;
-    let angle_top_0 = std::f32::consts::PI * 0.08;
-    let (s0, c0) = angle_top_0.sin_cos();
-    let tip_top = pos2(center.x + c0 * r, center.y - s0 * r);
-    let mut prev_top = tip_top;
-
-    let angle_bot_0 = std::f32::consts::PI * 1.08;
-    let (s0_b, c0_b) = angle_bot_0.sin_cos();
-    let tip_bot = pos2(center.x + c0_b * r, center.y - s0_b * r);
-    let mut prev_bot = tip_bot;
-
-    for i in 1..=n_pts {
-        let frac = (i as f32) / (n_pts as f32);
-        let angle_top = std::f32::consts::PI * 0.08 + frac * (std::f32::consts::PI * 0.84);
-        let (s, c) = angle_top.sin_cos();
-        let curr_top = pos2(center.x + c * r, center.y - s * r);
-        painter.line_segment([prev_top, curr_top], stroke);
-        prev_top = curr_top;
-
-        let angle_bot = std::f32::consts::PI * 1.08 + frac * (std::f32::consts::PI * 0.84);
-        let (s, c) = angle_bot.sin_cos();
-        let curr_bot = pos2(center.x + c * r, center.y - s * r);
-        painter.line_segment([prev_bot, curr_bot], stroke);
-        prev_bot = curr_bot;
-    }
-
-    // Top swept arrowhead (pointing right)
-    let ah = vec![
-        pos2(tip_top.x + r * 0.38, tip_top.y),
-        pos2(tip_top.x + r * 0.04, tip_top.y - r * 0.30),
-        pos2(tip_top.x + r * 0.10, tip_top.y),
-        pos2(tip_top.x + r * 0.04, tip_top.y + r * 0.30),
-    ];
-    painter.add(egui::Shape::convex_polygon(ah, fill, stroke));
-
-    // Bottom swept arrowhead (pointing left)
-    let ah_b = vec![
-        pos2(tip_bot.x - r * 0.38, tip_bot.y),
-        pos2(tip_bot.x - r * 0.04, tip_bot.y + r * 0.30),
-        pos2(tip_bot.x - r * 0.10, tip_bot.y),
-        pos2(tip_bot.x - r * 0.04, tip_bot.y - r * 0.30),
-    ];
-    painter.add(egui::Shape::convex_polygon(ah_b, fill, stroke));
 }
 
-/// Reset: Counter-clockwise telemetry rewind loop with swept technical arrow (18dp circle keyline).
-pub fn draw_reset(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    let center = rect.center();
-    let r = rect.width().min(rect.height()) * (8.5 / 24.0);
-    if r <= 1.0 {
-        return;
+/// Reset: counter-clockwise arc with an arrowhead at the top (18-unit circle).
+pub fn draw_reset(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    let (ctr, r) = ((key::C, key::C), 8.0);
+    let top = -FRAC_PI_2;
+    let arc = c.arc(ctr, (r, r), top, top + TAU * 0.78);
+    if let Some((tip, _)) = c.curve_capped(arc, s, Caps::End) {
+        arrowhead(c, tip, -cw_tangent(top));
     }
-
-    let n_pts = 16;
-    let start_angle = std::f32::consts::TAU * 0.38; // ~137 deg
-    let end_angle = std::f32::consts::TAU * 1.20; // ~432 deg (past top)
-
-    let (s0, c0) = start_angle.sin_cos();
-    let mut prev_pt = pos2(center.x + c0 * r, center.y - s0 * r);
-
-    for i in 1..=n_pts {
-        let frac = (i as f32) / (n_pts as f32);
-        let angle = start_angle + frac * (end_angle - start_angle);
-        let (s, c) = angle.sin_cos();
-        let curr_pt = pos2(center.x + c * r, center.y - s * r);
-        painter.line_segment([prev_pt, curr_pt], stroke);
-        prev_pt = curr_pt;
-    }
-
-    // High-tech swept arrowhead at top pointing left
-    let tip = pos2(center.x - r * 0.28, center.y - r);
-    let ah = vec![
-        tip,
-        pos2(center.x + r * 0.14, center.y - r - r * 0.28),
-        pos2(center.x + r * 0.06, center.y - r),
-        pos2(center.x + r * 0.14, center.y - r + r * 0.28),
-    ];
-    painter.add(egui::Shape::convex_polygon(ah, fill, stroke));
 }
 
-/// Gauge: speedometer dial for playback speed (FPS). A 240-degree arc opening
-/// downward, three tick marks, a needle pointing up-right, and a filled hub.
-pub fn draw_gauge(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
-    use std::f32::consts::PI;
-    let center = grid_p(rect, 12.0, 13.5);
-    let r = rect.width().min(rect.height()) * (8.5 / 24.0);
-    if r <= 1.0 {
-        return;
-    }
-    // Screen y points down, so a point at angle `a` is (cos a, -sin a).
-    let at = |a: f32, radius: f32| pos2(center.x + a.cos() * radius, center.y - a.sin() * radius);
+/// Gauge: 240-degree dial open at the bottom, three ticks, needle and hub (18x16 keyline).
+pub fn draw_gauge(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    let (ctr, r) = ((key::C, 13.5), 8.5);
 
-    // Arc from 210 deg (lower left) clockwise over the top to -30 deg (lower right).
-    const SEGMENTS: usize = 16;
-    let (start, sweep) = (PI * 7.0 / 6.0, PI * 4.0 / 3.0);
-    let mut prev = at(start, r);
-    for i in 1..=SEGMENTS {
-        let next = at(start - sweep * (i as f32 / SEGMENTS as f32), r);
-        painter.line_segment([prev, next], stroke);
-        prev = next;
-    }
+    // Clockwise from lower left (150 deg) over the top to lower right (30 deg).
+    let (a0, a1) = (PI * 5.0 / 6.0, PI * 13.0 / 6.0);
+    c.curve_capped(c.arc(ctr, (r, r), a0, a1), s, Caps::Both);
 
-    // Ticks at the left, top and right of the dial.
-    for a in [PI * 5.0 / 6.0, PI * 0.5, PI / 6.0] {
-        painter.line_segment([at(a, r * 0.62), at(a, r * 0.82)], stroke);
+    if !c.compact() {
+        for a in [PI * 7.0 / 6.0, PI * 1.5, PI * 11.0 / 6.0] {
+            c.seg(c.polar(ctr, r * 0.6, a), c.polar(ctr, r * 0.8, a), s);
+        }
     }
-
-    // Needle toward the upper right, with a solid hub.
-    painter.line_segment([center, at(PI * 0.3, r * 0.72)], stroke);
-    painter.circle_filled(center, (r * 0.18).max(1.2), fill);
+    let needle = -PI * 0.3;
+    c.seg(c.p(ctr.0, ctr.1), c.polar(ctr, r * 0.72, needle), s);
+    c.dot(ctr, 1.6, c.color);
 }
