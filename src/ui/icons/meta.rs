@@ -40,7 +40,7 @@ define_icons! {
         Globe, Variables, Dimensions, Settings, Cache, Sun, Moon, Overflow,
     ],
     "Playback & Timeline" => [
-        Play, Pause, Stop, StepBackward, StepForward, SeekStart, SeekEnd, Loop, Reset,
+        Play, Pause, Stop, StepBackward, StepForward, SeekStart, SeekEnd, Loop, Reset, Gauge,
     ],
     "Plot Types & Colormaps" => [
         PlotPlane, PlotLine, PlotSurface, PlotGlobe, PlotVolume, PlotPointCloud, Colormap,

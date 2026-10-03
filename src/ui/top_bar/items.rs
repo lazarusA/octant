@@ -1,13 +1,11 @@
 //! Drawing and width measurement for individual top-bar items.
 
-use super::layout::{ItemWidths, TopBarItem};
+use super::layout::TopBarItem;
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, TOOLBAR_ITEM_HEIGHT, ToolbarButton};
+use crate::ui::toolbar::{ItemWidths, SEPARATOR_WIDTH};
 use crate::ui::{cache, colormap, plot_type, store};
 
-/// Width reserved for `ui.separator()` in a horizontal layout (its default
-/// `spacing`), excluding item spacing.
-pub(super) const SEPARATOR_WIDTH: f32 = 6.0;
 const BRAND_LABEL: &str = "Octant";
 
 /// Label of a toolbar-button item. Brand and Status are measured separately.

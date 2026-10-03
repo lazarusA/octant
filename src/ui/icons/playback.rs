@@ -206,3 +206,35 @@ pub fn draw_reset(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) 
     ];
     painter.add(egui::Shape::convex_polygon(ah, fill, stroke));
 }
+
+/// Gauge: speedometer dial for playback speed (FPS). A 240-degree arc opening
+/// downward, three tick marks, a needle pointing up-right, and a filled hub.
+pub fn draw_gauge(painter: &Painter, rect: Rect, stroke: Stroke, fill: Color32) {
+    use std::f32::consts::PI;
+    let center = grid_p(rect, 12.0, 13.5);
+    let r = rect.width().min(rect.height()) * (8.5 / 24.0);
+    if r <= 1.0 {
+        return;
+    }
+    // Screen y points down, so a point at angle `a` is (cos a, -sin a).
+    let at = |a: f32, radius: f32| pos2(center.x + a.cos() * radius, center.y - a.sin() * radius);
+
+    // Arc from 210 deg (lower left) clockwise over the top to -30 deg (lower right).
+    const SEGMENTS: usize = 16;
+    let (start, sweep) = (PI * 7.0 / 6.0, PI * 4.0 / 3.0);
+    let mut prev = at(start, r);
+    for i in 1..=SEGMENTS {
+        let next = at(start - sweep * (i as f32 / SEGMENTS as f32), r);
+        painter.line_segment([prev, next], stroke);
+        prev = next;
+    }
+
+    // Ticks at the left, top and right of the dial.
+    for a in [PI * 5.0 / 6.0, PI * 0.5, PI / 6.0] {
+        painter.line_segment([at(a, r * 0.62), at(a, r * 0.82)], stroke);
+    }
+
+    // Needle toward the upper right, with a solid hub.
+    painter.line_segment([center, at(PI * 0.3, r * 0.72)], stroke);
+    painter.circle_filled(center, (r * 0.18).max(1.2), fill);
+}

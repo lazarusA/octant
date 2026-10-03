@@ -8,7 +8,8 @@ mod tests;
 
 use super::status::{self, FetchProgress};
 use crate::app::OctantApp;
-use layout::{ITEM_COUNT, ItemWidths, LEFT_ITEMS, TopBarItem};
+use crate::ui::toolbar::ItemWidths;
+use layout::{ITEM_COUNT, LEFT_ITEMS, TopBarItem};
 
 /// Minimum empty space kept between the left and right item groups.
 const GROUP_GAP: f32 = 8.0;
@@ -68,7 +69,7 @@ fn status_widths(ui: &egui::Ui, progress: Option<FetchProgress>, spacing: f32) -
     let Some(progress) = progress else {
         return ItemWidths::default();
     };
-    let trailing = spacing * 2.0 + items::SEPARATOR_WIDTH;
+    let trailing = spacing * 2.0 + crate::ui::toolbar::SEPARATOR_WIDTH;
     ItemWidths {
         full: progress.width(ui, false) + trailing,
         compact: progress.width(ui, true) + trailing,

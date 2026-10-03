@@ -39,6 +39,7 @@ impl Icon {
             Icon::SeekEnd => playback::draw_seek_end(painter, rect, color, Stroke::NONE),
             Icon::Loop => playback::draw_loop(painter, rect, stroke, color),
             Icon::Reset => playback::draw_reset(painter, rect, stroke, color),
+            Icon::Gauge => playback::draw_gauge(painter, rect, stroke, color),
 
             // Plots
             Icon::PlotPlane => plots::draw_plot_plane(painter, rect, stroke, subtle_fill),
