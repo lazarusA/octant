@@ -1,12 +1,13 @@
 //! Headless egui harness for the variable tree, plus mouse interaction tests.
 //! Keyboard navigation tests live in `nav_tests.rs`.
 
-use super::nav::{NodeKey, focus_row, folder_id, row_id};
+use super::nav::{NodeKey, folder_id, row_id};
 use super::row::RowKind;
 use super::search_jump;
 use super::tree::{VariableTreeContext, render_tree_group};
 use crate::data::{VariableInfo, VariableTreeGroup};
 use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::key_focus;
 use egui::collapsing_header::CollapsingState;
 use egui::{Event, Id, Key, Modifiers, PointerButton, Pos2, RawInput, pos2};
 
@@ -107,7 +108,7 @@ pub(super) fn press(ctx: &egui::Context, key: Key, search_active: bool) -> Frame
 
 /// Focus the row of `key`, as a click or earlier navigation would.
 pub(super) fn focus(ctx: &egui::Context, key: NodeKey<'_>, search_active: bool) {
-    focus_row(ctx, row_id(key, search_active));
+    key_focus::request(ctx, row_id(key, search_active));
 }
 
 pub(super) fn focused(ctx: &egui::Context) -> Option<Id> {

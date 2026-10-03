@@ -1,46 +1,7 @@
-//! Focus handoff for the overlay: focus the search field when the overlay
-//! opens, and claim the arrow keys for tree rows from egui's spatial focus
-//! movement so only the tree navigation moves focus.
+//! Search field focus for the overlay: focused when the overlay opens or a
+//! new dataset arrives while it stays open.
 
-use egui::{Context, EventFilter, FocusDirection, Id, Key};
-
-/// Rows own every arrow key (and Escape) while focused, so egui's spatial
-/// focus movement never competes with tree navigation.
-const ROW_FILTER: EventFilter = EventFilter {
-    tab: false,
-    horizontal_arrows: true,
-    vertical_arrows: true,
-    escape: true,
-};
-
-/// Focus a row. egui only accepts its key filter once the row has held focus
-/// for a frame, so repaint at once to claim the keys before the next press.
-pub fn focus_row(ctx: &Context, id: Id) {
-    ctx.memory_mut(|m| {
-        m.request_focus(id);
-        m.move_focus(FocusDirection::None);
-    });
-    ctx.request_repaint();
-}
-
-/// Keep the arrow keys claimed while a row holds focus, and cancel egui's
-/// spatial move for frames where the filter is not in place yet. Tab is
-/// left alone so it still moves focus out of the tree.
-pub fn lock_row_keys(ctx: &Context, id: Id) {
-    const ARROWS: [Key; 4] = [
-        Key::ArrowUp,
-        Key::ArrowDown,
-        Key::ArrowLeft,
-        Key::ArrowRight,
-    ];
-    let arrow = ctx.input(|i| ARROWS.iter().any(|&k| i.key_pressed(k)));
-    ctx.memory_mut(|m| {
-        m.set_focus_lock_filter(id, ROW_FILTER);
-        if arrow {
-            m.move_focus(FocusDirection::None);
-        }
-    });
-}
+use egui::{Context, Id};
 
 fn pending_id() -> Id {
     Id::new("octant_variables_focus_on_open")

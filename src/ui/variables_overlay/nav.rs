@@ -4,10 +4,10 @@
 //! specific row. The visible row list is only built on frames where a
 //! navigation key is pressed; idle frames allocate nothing.
 
-pub use super::focus::{focus_row, lock_row_keys};
 use super::item::MAX_ITEMS_PER_LEVEL;
 use super::tree::VariableTreeContext;
 use crate::data::VariableTreeGroup;
+use crate::ui::key_focus;
 use egui::collapsing_header::CollapsingState;
 use egui::{Context, Id, Key, Modifiers};
 
@@ -136,8 +136,7 @@ pub fn handle_keys(ui: &egui::Ui, root: &VariableTreeGroup, tree: &mut VariableT
         return;
     }
 
-    let pressed = |k| ui.input(|i| i.modifiers.is_none() && i.key_pressed(k));
-    let Some(key) = NAV_KEYS.into_iter().find(|&k| pressed(k)) else {
+    let Some(key) = key_focus::pressed(ctx, NAV_KEYS) else {
         return;
     };
     // A row focused only since last frame has no filter yet, so egui itself
@@ -168,7 +167,7 @@ fn apply_key(
     search_id: Option<Id>,
 ) {
     let row = rows[at];
-    let focus = |i: usize| focus_row(ctx, row_id(rows[i].key, search));
+    let focus = |i: usize| key_focus::request(ctx, row_id(rows[i].key, search));
     let to_search = || {
         if let Some(id) = search_id {
             ctx.memory_mut(|m| m.request_focus(id));
@@ -210,7 +209,7 @@ fn jump_from_search(
     let Some(row) = target else {
         return;
     };
-    focus_row(ctx, row_id(row.key, search));
+    key_focus::request(ctx, row_id(row.key, search));
     // The Enter that ended the search edit must not also click the newly focused row.
     ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter));
     if let NodeKey::Variable(idx) = row.key

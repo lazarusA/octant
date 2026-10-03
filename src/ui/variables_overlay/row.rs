@@ -47,10 +47,10 @@ pub fn allocate_row(ui: &mut Ui, id: Id) -> Response {
     let resp = ui.interact(rect, id, Sense::click());
     // egui never focuses on click; do it so the keys continue from the clicked row.
     if resp.clicked() && !resp.has_focus() {
-        super::nav::focus_row(ui.ctx(), id);
+        crate::ui::key_focus::request(ui.ctx(), id);
     }
     if resp.has_focus() {
-        super::nav::lock_row_keys(ui.ctx(), id);
+        crate::ui::key_focus::claim_arrows(ui.ctx(), id);
     }
     if resp.gained_focus() {
         resp.scroll_to_me(None);
