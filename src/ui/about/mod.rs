@@ -12,6 +12,11 @@ use crate::ui::icons::UiIconExt;
 use icons::show_icons_tab;
 use overview::show_overview_tab;
 
+/// Window widths shared by every tab.
+const DEFAULT_WIDTH: f32 = 450.0;
+const MIN_WIDTH: f32 = 360.0;
+const MAX_WIDTH: f32 = 720.0;
+
 /// Render the About Octant modal dialog window.
 pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     if app.show_icon_gallery_window {
@@ -25,7 +30,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     let storage_id = egui::Id::new(("about_window", "active_tab"));
     let mut active_tab: AboutTab = ctx
         .data(|d| d.get_temp(storage_id))
-        .unwrap_or(AboutTab::Overview);
+        .unwrap_or(AboutTab::About);
 
     if app.show_icon_gallery_window {
         active_tab = AboutTab::Icons;
@@ -37,21 +42,18 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     let screen_size = ctx.viewport_rect().size();
     let max_screen_h = (screen_size.y * 0.85).max(320.0);
 
-    let (default_size, min_size, max_size) = match active_tab {
-        AboutTab::Overview => (
-            egui::vec2(450.0, (screen_size.y * 0.65).clamp(360.0, 520.0)),
-            egui::vec2(360.0, 260.0),
-            egui::vec2(720.0, max_screen_h),
-        ),
-        AboutTab::Icons => (
-            egui::vec2(560.0, (screen_size.y * 0.75).clamp(420.0, 600.0)),
-            egui::vec2(420.0, 280.0),
-            egui::vec2(840.0, max_screen_h),
-        ),
+    // Both tabs share one width so switching tabs never resizes the window
+    // sideways; only the default height differs.
+    let default_h = match active_tab {
+        AboutTab::About => (screen_size.y * 0.65).clamp(360.0, 520.0),
+        AboutTab::Icons => (screen_size.y * 0.75).clamp(420.0, 600.0),
     };
+    let default_size = egui::vec2(DEFAULT_WIDTH, default_h);
+    let min_size = egui::vec2(MIN_WIDTH, 260.0);
+    let max_size = egui::vec2(MAX_WIDTH, max_screen_h);
 
     let title = match active_tab {
-        AboutTab::Overview => "About Octant",
+        AboutTab::About => "About Octant",
         AboutTab::Icons => "Native Vector Icons",
     };
 
@@ -72,12 +74,12 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
                     ui.horizontal(|ui| {
                         if ui
                             .selectable_label(
-                                active_tab == AboutTab::Overview,
-                                egui::RichText::new("Overview").strong(),
+                                active_tab == AboutTab::About,
+                                egui::RichText::new("About").strong(),
                             )
                             .clicked()
                         {
-                            active_tab = AboutTab::Overview;
+                            active_tab = AboutTab::About;
                         }
 
                         if ui
@@ -102,7 +104,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
                     ui.add_space(6.0);
 
                     match active_tab {
-                        AboutTab::Overview => {
+                        AboutTab::About => {
                             show_overview_tab(app, ui, &mut active_tab);
                         }
                         AboutTab::Icons => {

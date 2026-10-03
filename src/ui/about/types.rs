@@ -34,6 +34,6 @@ pub fn icons_tab_label(buf: &mut [u8; 32]) -> &str {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AboutTab {
-    Overview,
+    About,
     Icons,
 }
