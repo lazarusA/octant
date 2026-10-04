@@ -15,14 +15,23 @@ pub struct EditorState {
     built: Option<CustomColormapSpec>,
 }
 
+/// Id of the "Custom colormap" section's open state (stable, so tests can open it).
+pub fn section_id(ui: &egui::Ui) -> egui::Id {
+    ui.make_persistent_id(("colormap_custom_editor", 0))
+}
+
 pub fn show(app: &mut OctantApp, ui: &mut egui::Ui) {
-    egui::CollapsingHeader::new("Custom colormap")
-        .id_salt(("colormap_custom_editor", 0))
-        .show(ui, |ui| {
-            edit_spec(ui, &mut app.colormaps.picker.editor);
-            show_actions(app, ui);
-            show_saved(app, ui);
-        });
+    egui::collapsing_header::CollapsingState::load_with_default_open(
+        ui.ctx(),
+        section_id(ui),
+        false,
+    )
+    .show_header(ui, |ui| ui.label("Custom colormap"))
+    .body(|ui| {
+        edit_spec(ui, &mut app.colormaps.picker.editor);
+        show_actions(app, ui);
+        show_saved(app, ui);
+    });
 }
 
 fn edit_spec(ui: &mut egui::Ui, editor: &mut EditorState) {

@@ -6,7 +6,7 @@
 //! single bind group serves every pipeline.
 
 use crate::utils::colormap::{LUT_SIZE, registry};
-use eframe::egui_wgpu::{CallbackResources, RenderState};
+use eframe::egui_wgpu::CallbackResources;
 
 /// Rows are allocated in blocks so adding custom maps rarely reallocates.
 const ROW_BLOCK: u32 = 64;
@@ -122,22 +122,17 @@ fn create_texture(device: &wgpu::Device, rows: u32) -> (wgpu::Texture, wgpu::Bin
 }
 
 /// Creates the atlas, or refreshes it after colormaps were added or removed.
+/// Called from every colormapped callback's `prepare`, which runs after the UI
+/// pass, so rows changed anywhere in this frame are uploaded before painting.
 /// Cheap when nothing changed: the registry generation is compared first.
-pub fn sync(render_state: &RenderState, last_generation: &mut u64) {
-    let generation = registry::generation();
-    if *last_generation == generation {
-        return;
-    }
-    let mut renderer = render_state.renderer.write();
-    let resources = &mut renderer.callback_resources;
+pub fn prepare(device: &wgpu::Device, queue: &wgpu::Queue, resources: &mut CallbackResources) {
     match resources.get_mut::<ColormapAtlas>() {
-        Some(atlas) => atlas.sync(&render_state.device, &render_state.queue),
+        Some(atlas) => atlas.sync(device, queue),
         None => {
-            let atlas = ColormapAtlas::new(&render_state.device, &render_state.queue);
+            let atlas = ColormapAtlas::new(device, queue);
             resources.insert(atlas);
         }
     }
-    *last_generation = generation;
 }
 
 /// Binds the atlas at `@group(1)`. Returns `false` (skip drawing) when it is missing.

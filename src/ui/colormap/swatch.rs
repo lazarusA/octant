@@ -77,13 +77,12 @@ impl PreviewSwatch {
         self.texture = None;
     }
 
-    pub fn paint(&self, painter: &egui::Painter, rect: Rect) -> bool {
-        let Some(tex) = &self.texture else {
-            return false;
-        };
-        let uv = Rect::from_min_max(Pos2::new(0.0, 0.5), Pos2::new(1.0, 0.5));
-        painter.image(tex.id(), rect, uv, Color32::WHITE);
-        true
+    /// Paints the preview; nothing is drawn while the spec is invalid.
+    pub fn paint(&self, painter: &egui::Painter, rect: Rect) {
+        if let Some(tex) = &self.texture {
+            let uv = Rect::from_min_max(Pos2::new(0.0, 0.5), Pos2::new(1.0, 0.5));
+            painter.image(tex.id(), rect, uv, Color32::WHITE);
+        }
     }
 }
 

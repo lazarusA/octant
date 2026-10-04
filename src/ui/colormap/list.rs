@@ -5,21 +5,32 @@ use super::label;
 use super::swatch::SwatchAtlas;
 use crate::app::OctantApp;
 use crate::utils::colormap::registry;
-use egui::{FontId, Rect, Sense, vec2};
+use egui::{Rect, Sense, vec2};
 
 const ROW_HEIGHT: f32 = 22.0;
-const LIST_HEIGHT: f32 = 280.0;
+/// Rows visible at most; the list scrolls for the rest.
+const VISIBLE_ROWS: f32 = 7.0;
+/// Tallest the list grows; it shrinks to fit the panel, down to [`MIN_HEIGHT`].
+pub const MAX_HEIGHT: f32 = ROW_HEIGHT * VISIBLE_ROWS;
+/// A few rows always stay visible.
+pub const MIN_HEIGHT: f32 = ROW_HEIGHT * 3.0;
 /// Share of a row's content width given to the gradient preview; the name gets the rest.
 const SWATCH_SHARE: f32 = 0.75;
 const PAD_LEFT: f32 = 4.0;
 const PAD_RIGHT: f32 = 6.0;
 const GAP: f32 = 8.0;
 
-pub fn show(app: &mut OctantApp, ui: &mut egui::Ui) {
+pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
     let active = app.active_colormap;
     let reversed = app.colormaps.reversed;
-    let picker = &mut app.colormaps.picker;
-    let ids = picker.cache.ids(&picker.filter);
+    let super::PickerState {
+        filter,
+        cache,
+        swatches,
+        names,
+        ..
+    } = &mut app.colormaps.picker;
+    let ids = cache.ids(filter);
     if ids.is_empty() {
         ui.label(egui::RichText::new("No colormaps match").small().weak());
         return;
@@ -29,11 +40,11 @@ pub fn show(app: &mut OctantApp, ui: &mut egui::Ui) {
     let mut clicked = None;
     egui::ScrollArea::vertical()
         .id_salt(("colormap_list", 0))
-        .max_height(LIST_HEIGHT)
+        .max_height(max_height)
         .auto_shrink([false, true])
         .show_rows(ui, ROW_HEIGHT, ids.len(), |ui, range| {
             for &id in ids.get(range).unwrap_or_default() {
-                let response = row(ui, &picker.swatches, id, id == active, reversed);
+                let response = row(ui, swatches, names, id, id == active, reversed);
                 if response.hovered() {
                     hovered = Some(id);
                 }
@@ -43,10 +54,12 @@ pub fn show(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         });
 
-    if let Some(id) = hovered
-        && app.preview_colormap != Some(id)
-    {
-        app.preview_colormap = Some(id);
+    if hovered.is_some() {
+        app.preview_colormap = hovered;
+    }
+    // Repaint only when the hovered row changes, not every frame it stays hovered.
+    if hovered != app.colormaps.picker.last_hovered {
+        app.colormaps.picker.last_hovered = hovered;
         ui.ctx().request_repaint();
     }
     if let Some(id) = clicked {
@@ -57,6 +70,7 @@ pub fn show(app: &mut OctantApp, ui: &mut egui::Ui) {
 fn row(
     ui: &mut egui::Ui,
     swatches: &SwatchAtlas,
+    names: &mut label::NameCache,
     id: u32,
     selected: bool,
     reversed: bool,
@@ -80,17 +94,10 @@ fn row(
     let name_x = swatch.max.x + GAP;
     let max_width = rect.max.x - PAD_RIGHT - name_x;
     let text_color = visuals.text_color();
-    registry::with_entry(id, |e| {
-        let galley = label::elided(
-            ui,
-            &e.name,
-            FontId::proportional(13.0),
-            text_color,
-            max_width,
-        );
+    if let Some(galley) = names.get(ui.painter(), id, max_width) {
         let pos = egui::pos2(name_x, rect.center().y - galley.size().y / 2.0);
         ui.painter().galley(pos, galley, text_color);
-    });
+    }
     let response = response.on_hover_ui(|ui| {
         registry::with_entry(id, |e| label::hover_details(ui, e));
     });

@@ -17,6 +17,8 @@ pub mod scale;
 #[cfg(test)]
 mod catalog_tests;
 #[cfg(test)]
+mod smooth_tests;
+#[cfg(test)]
 mod tests;
 
 pub use catalog::{ColormapEntry, ColormapFamily, LICENSES_TEXT, builtin};

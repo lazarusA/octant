@@ -13,14 +13,8 @@ static CATALOG_BYTES: &[u8] = include_bytes!("../../../assets/colormaps/colormap
 pub const LICENSES_TEXT: &str = include_str!("../../../assets/colormaps/LICENSES.md");
 
 /// Provenance of a colormap family, shown in the picker and the About credits.
-#[derive(Debug, Clone)]
-pub struct ColormapFamily {
-    pub key: String,
-    pub name: String,
-    pub license: String,
-    pub source: String,
-    pub attribution: String,
-}
+/// The catalog record is used as is.
+pub type ColormapFamily = FamilyRecord;
 
 /// A ready-to-sample colormap.
 #[derive(Debug, Clone)]
@@ -46,6 +40,10 @@ pub const SMOOTH_MAX_COLORS: usize = 24;
 pub struct BuiltinCatalog {
     pub families: Vec<ColormapFamily>,
     pub maps: Vec<ColormapEntry>,
+    /// For each map, the index of its smooth twin among the built-in twins.
+    pub twin_of: Vec<Option<u32>>,
+    /// For each built-in twin, the index of the map it belongs to.
+    pub twins: Vec<u32>,
 }
 
 static BUILTIN: LazyLock<BuiltinCatalog> = LazyLock::new(|| match format::decode(CATALOG_BYTES) {
@@ -63,7 +61,7 @@ pub fn builtin() -> &'static BuiltinCatalog {
 
 impl BuiltinCatalog {
     fn from_records(records: CatalogRecords) -> Self {
-        let families: Vec<ColormapFamily> = records.families.into_iter().map(family).collect();
+        let families: Vec<ColormapFamily> = records.families;
         let maps: Vec<ColormapEntry> = records
             .maps
             .into_iter()
@@ -72,13 +70,33 @@ impl BuiltinCatalog {
         if maps.is_empty() {
             return Self::fallback();
         }
-        Self { families, maps }
+        Self::with_twins(families, maps)
+    }
+
+    /// Indexes the smooth twins so row lookups are O(1).
+    fn with_twins(families: Vec<ColormapFamily>, maps: Vec<ColormapEntry>) -> Self {
+        let mut twins = Vec::new();
+        let twin_of = maps
+            .iter()
+            .enumerate()
+            .map(|(i, e)| {
+                e.smooth.as_ref()?;
+                twins.push(u32::try_from(i).ok()?);
+                u32::try_from(twins.len() - 1).ok()
+            })
+            .collect();
+        Self {
+            families,
+            maps,
+            twin_of,
+            twins,
+        }
     }
 
     fn fallback() -> Self {
-        Self {
-            families: Vec::new(),
-            maps: vec![ColormapEntry {
+        Self::with_twins(
+            Vec::new(),
+            vec![ColormapEntry {
                 key: "fallback:gray".into(),
                 name: "gray".into(),
                 family: None,
@@ -86,17 +104,7 @@ impl BuiltinCatalog {
                 lut: resample(&[[0, 0, 0], [255, 255, 255]], false),
                 smooth: None,
             }],
-        }
-    }
-}
-
-fn family(f: FamilyRecord) -> ColormapFamily {
-    ColormapFamily {
-        key: f.key,
-        name: f.name,
-        license: f.license,
-        source: f.source,
-        attribution: f.attribution,
+        )
     }
 }
 

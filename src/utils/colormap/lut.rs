@@ -32,21 +32,28 @@ pub fn resample(stops: &[[u8; 3]], discrete: bool) -> Box<Lut> {
 /// Continuous version of a palette: its colors blended in Oklab (evenly
 /// spaced, endpoints kept exactly). Falls back to linear sRGB blending.
 pub fn smooth(stops: &[[u8; 3]]) -> Box<Lut> {
-    use colorgrad::{BlendMode, Color, Gradient, GradientBuilder, LinearGradient};
+    use colorgrad::{BlendMode, Color, GradientBuilder, LinearGradient};
     let colors: Vec<Color> = stops
         .iter()
         .map(|c| Color::from_rgba8(c[0], c[1], c[2], 255))
         .collect();
-    let Ok(gradient) = GradientBuilder::new()
+    match GradientBuilder::new()
         .colors(&colors)
         .mode(BlendMode::Oklab)
         .build::<LinearGradient>()
-    else {
-        return resample(stops, false);
-    };
+    {
+        Ok(gradient) => bake(&gradient),
+        Err(_) => resample(stops, false),
+    }
+}
+
+/// Samples a `colorgrad` gradient across its whole domain into a LUT.
+pub fn bake(gradient: &dyn colorgrad::Gradient) -> Box<Lut> {
+    let (dmin, dmax) = gradient.domain();
     let mut lut = Box::new([[0, 0, 0, 255]; LUT_SIZE]);
     for (i, slot) in lut.iter_mut().enumerate() {
-        let [r, g, b, _] = gradient.at(i as f32 / (LUT_SIZE - 1) as f32).to_rgba8();
+        let t = dmin + (dmax - dmin) * i as f32 / (LUT_SIZE - 1) as f32;
+        let [r, g, b, _] = gradient.at(t).to_rgba8();
         *slot = [r, g, b, 255];
     }
     lut
@@ -66,13 +73,18 @@ pub fn orient(t: f32, reversed: bool) -> f32 {
 }
 
 /// Samples a LUT at `t` in [0, 1] exactly like WGSL `sample_colormap`: two
-/// neighbouring texels blended linearly.
-pub fn sample_lut(lut: &Lut, t: f32) -> Color32 {
+/// neighbouring texels blended linearly, or the nearest texel for stepped
+/// (categorical) maps so a sample between two steps never mixes two colors.
+pub fn sample_lut(lut: &Lut, t: f32, nearest: bool) -> Color32 {
     let x = if t.is_finite() {
         t.clamp(0.0, 1.0)
     } else {
         0.0
     } * (LUT_SIZE - 1) as f32;
+    if nearest {
+        let [r, g, b, _] = lut[((x + 0.5).floor() as usize).min(LUT_SIZE - 1)];
+        return Color32::from_rgb(r, g, b);
+    }
     let i0 = (x.floor() as usize).min(LUT_SIZE - 2);
     let f = x - i0 as f32;
     let (c0, c1) = (lut[i0], lut[i0 + 1]);

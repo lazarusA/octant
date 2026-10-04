@@ -3,7 +3,7 @@
 
 use super::catalog::ColormapEntry;
 use super::kind::ColormapKind;
-use super::lut::{LUT_SIZE, Lut};
+use super::lut::Lut;
 use colorgrad::{BlendMode, Gradient, GradientBuilder};
 use serde::{Deserialize, Serialize};
 
@@ -112,14 +112,7 @@ impl CustomColormapSpec {
         } else {
             gradient
         };
-        let (dmin, dmax) = gradient.domain();
-        let mut lut = Box::new([[0, 0, 0, 255]; LUT_SIZE]);
-        for (i, slot) in lut.iter_mut().enumerate() {
-            let t = dmin + (dmax - dmin) * i as f32 / (LUT_SIZE - 1) as f32;
-            let [r, g, b, _] = gradient.at(t).to_rgba8();
-            *slot = [r, g, b, 255];
-        }
-        Ok(lut)
+        Ok(super::lut::bake(gradient.as_ref()))
     }
 
     /// Validates the spec and builds a registry entry.

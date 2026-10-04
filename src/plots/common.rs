@@ -29,7 +29,8 @@ pub struct PlotColorParams {
     pub num_categories: u32,
     /// Non-zero samples the colormap from its end (reversed).
     pub reverse: u32,
-    pub _pad1: u32,
+    /// Non-zero samples the nearest LUT texel (stepped categorical maps).
+    pub nearest: u32,
     pub nan_color: [f32; 4],
     pub lowclip_color: [f32; 4],
     pub highclip_color: [f32; 4],
@@ -49,7 +50,7 @@ impl Default for PlotColorParams {
             is_categorical: 0,
             num_categories: 10,
             reverse: 0,
-            _pad1: 0,
+            nearest: 0,
             nan_color: [0.0, 0.0, 0.0, 0.0],
             lowclip_color: [0.0, 0.0, 1.0, 1.0],
             highclip_color: [1.0, 0.0, 0.0, 1.0],

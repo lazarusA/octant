@@ -12,7 +12,7 @@ struct ColorUniforms {
     is_categorical: u32,
     num_categories: u32,
     reverse: u32,
-    _pad1: u32,
+    nearest: u32,
     nan_color: vec4<f32>,
     lowclip_color: vec4<f32>,
     highclip_color: vec4<f32>,
@@ -26,11 +26,16 @@ const COLORMAP_RGB_COMPOSITE: u32 = 0xFFFFFFFFu;
 @group(1) @binding(0)
 var colormap_lut: texture_2d<f32>;
 
-// Samples row `colormap_id` at t in [0, 1] by blending the two neighbouring texels.
-fn sample_colormap(colormap_id: u32, t: f32) -> vec3<f32> {
+// Samples row `colormap_id` at t in [0, 1] by blending the two neighbouring
+// texels, or with the nearest texel for stepped (categorical) maps.
+fn sample_colormap(colormap_id: u32, t: f32, nearest: bool) -> vec3<f32> {
     let rows = textureDimensions(colormap_lut).y;
     let row = i32(min(colormap_id, rows - 1u));
     let x = clamp(t, 0.0, 1.0) * 255.0;
+    if (nearest) {
+        let i = min(u32(floor(x + 0.5)), 255u);
+        return textureLoad(colormap_lut, vec2<i32>(i32(i), row), 0).rgb;
+    }
     let i0 = min(u32(floor(x)), 254u);
     let f = x - f32(i0);
     let c0 = textureLoad(colormap_lut, vec2<i32>(i32(i0), row), 0).rgb;
@@ -40,7 +45,7 @@ fn sample_colormap(colormap_id: u32, t: f32) -> vec3<f32> {
 
 // Samples the plot's active colormap, honoring the reversed flag.
 fn sample_plot_colormap(color: ColorUniforms, t: f32) -> vec3<f32> {
-    return sample_colormap(color.colormap, select(t, 1.0 - t, color.reverse == 1u));
+    return sample_colormap(color.colormap, select(t, 1.0 - t, color.reverse == 1u), color.nearest == 1u);
 }
 
 fn evaluate_scaled_norm(val: f32, cmin: f32, cmax: f32, scale_type: u32, scale_param: f32) -> f32 {

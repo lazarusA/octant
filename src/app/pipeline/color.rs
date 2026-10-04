@@ -46,7 +46,9 @@ impl OctantApp {
             is_categorical: is_cat,
             num_categories: num_cats,
             reverse: u32::from(self.colormaps.reversed),
-            _pad1: 0,
+            nearest: u32::from(crate::utils::colormap::registry::is_stepped(
+                effective_colormap,
+            )),
             nan_color: self.nan_color,
             lowclip_color: self.lowclip_color,
             highclip_color: self.highclip_color,

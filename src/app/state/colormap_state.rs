@@ -15,8 +15,6 @@ pub struct ColormapState {
     pub smooth: bool,
     /// User-defined colormaps, registered in `utils::colormap::registry`.
     pub custom: Vec<CustomColormapSpec>,
-    /// Registry generation last uploaded to the GPU atlas.
-    pub gpu_generation: u64,
     pub picker: crate::ui::colormap::PickerState,
 }
 
@@ -51,7 +49,11 @@ impl OctantApp {
     /// Atlas row actually drawn: the previewed or active colormap, or its smooth
     /// twin when "Smooth" is on and the palette has one.
     pub fn effective_colormap(&self) -> u32 {
-        let id = self.preview_colormap.unwrap_or(self.active_colormap);
+        self.shown_colormap(self.preview_colormap.unwrap_or(self.active_colormap))
+    }
+
+    /// Atlas row drawn for colormap `id`: its smooth twin when "Smooth" is on.
+    pub fn shown_colormap(&self, id: u32) -> u32 {
         if self.colormaps.smooth {
             registry::smooth_variant(id).unwrap_or(id)
         } else {
@@ -106,6 +108,7 @@ mod tests {
 
     #[test]
     fn only_custom_colormaps_survive_a_restart() {
+        let _registry = crate::utils::colormap::registry::test_lock();
         let mut app = OctantApp::default();
         let spec = CustomColormapSpec {
             name: "persist_test_map".into(),
@@ -137,6 +140,7 @@ mod tests {
 
     #[test]
     fn older_prefs_with_a_saved_selection_are_ignored() {
+        let _registry = crate::utils::colormap::registry::test_lock();
         let mut storage = MemoryStorage::default();
         let old = "(active: \"cmocean:thermal\", reversed: true, custom: [(name: \"legacy_test_map\", \
                    colors: \"red, blue\", interpolation: Linear, blend: Oklab, classes: 0)])";
@@ -161,6 +165,7 @@ mod smooth_tests {
 
     #[test]
     fn smooth_toggle_switches_to_the_twin_only_when_one_exists() {
+        let _registry = crate::utils::colormap::registry::test_lock();
         let mut app = OctantApp::default();
         let set1 = registry::find("colorbrewer:Set1").unwrap_or(0);
         app.active_colormap = set1;

@@ -17,9 +17,6 @@ impl eframe::App for OctantApp {
         let ctx = ui.ctx().clone();
         // Reset hover preview at start of frame
         self.preview_colormap = None;
-        if let Some(render_state) = &self.wgpu_render_state {
-            crate::plots::colormap_atlas::sync(render_state, &mut self.colormaps.gpu_generation);
-        }
 
         // 0. Poll completed background metadata inspection
         let mut metadata_done = false;

@@ -3,7 +3,9 @@
 mod json;
 mod julia;
 pub mod matplotlib;
+mod mpl_functions;
 pub mod pylit;
+mod pylit_parser;
 mod python;
 pub mod text;
 mod zip;
@@ -18,14 +20,44 @@ use octant::utils::colormap::ColormapKind;
 pub type Converted = (String, ColormapKind, Vec<[f64; 3]>);
 
 pub fn convert(fetcher: &mut Fetcher, source: &Source) -> Result<Vec<Converted>, Error> {
+    match source {
+        Source::MatplotlibCm { .. }
+        | Source::PyTables { .. }
+        | Source::Cmyt { .. }
+        | Source::SeabornPalettes { .. }
+        | Source::Colorcet { .. }
+        | Source::Cmocean { .. } => python_source(fetcher, source),
+        Source::CBytes { .. }
+        | Source::Table { .. }
+        | Source::CartoTs { .. }
+        | Source::RList { .. }
+        | Source::Yaml { .. }
+        | Source::CssVars { .. }
+        | Source::Krzywinski { .. }
+        | Source::Hex { .. } => text_source(fetcher, source),
+        Source::Cmasher { .. }
+        | Source::CrameriZip { .. }
+        | Source::ColorBrewer { .. }
+        | Source::Tol { .. }
+        | Source::Catppuccin { .. }
+        | Source::ColorSchemesJl { .. } => structured_source(fetcher, source),
+    }
+}
+
+/// One map from one upstream file.
+fn one(name: &str, kind: ColormapKind, stops: Vec<[f64; 3]>) -> Vec<Converted> {
+    vec![(name.to_string(), kind, stops)]
+}
+
+/// Sources stored as Python modules (Matplotlib, BIDS, seaborn, colorcet, cmocean, cmyt).
+fn python_source(fetcher: &mut Fetcher, source: &Source) -> Result<Vec<Converted>, Error> {
     Ok(match *source {
         Source::MatplotlibCm { url, maps } => {
             let text = fetcher.text(url)?;
             maps.iter()
                 .map(|&(mpl, name, kind)| {
-                    let stops = match matplotlib::datad_map(text, mpl)? {
-                        MplMap::Sampled(s) | MplMap::Listed(s) => s,
-                    };
+                    let (MplMap::Sampled(stops) | MplMap::Listed(stops)) =
+                        matplotlib::datad_map(text, mpl)?;
                     Ok((name.to_string(), kind, stops))
                 })
                 .collect::<Result<_, String>>()?
@@ -36,72 +68,71 @@ pub fn convert(fetcher: &mut Fetcher, source: &Source) -> Result<Vec<Converted>,
                 .map(|&(var, name, kind)| Ok((name.to_string(), kind, python::table(text, var)?)))
                 .collect::<Result<_, String>>()?
         }
-        Source::CBytes {
-            url,
-            array,
-            name,
-            kind,
-        } => {
-            vec![(
-                name.into(),
-                kind,
-                text::c_byte_triples(fetcher.text(url)?, array),
-            )]
-        }
-        Source::Table { url, name, kind } => {
-            vec![(name.into(), kind, text::numeric_table(fetcher.text(url)?))]
-        }
-        Source::Colorcet { url } => colorcet(fetcher.text(url)?)?,
-        Source::Cmocean { cm_py, rgb_base } => cmocean(fetcher, cm_py, rgb_base)?,
-        Source::Cmasher { tree_api, raw_base } => cmasher(fetcher, tree_api, raw_base)?,
-        Source::CrameriZip { url, cache } => crameri(&fetcher.cached_bytes(url, cache)?)?,
         Source::Cmyt { base, names } => names
             .iter()
             .map(|n| {
-                Ok((
-                    n.to_string(),
-                    ColormapKind::Sequential,
-                    python::cmyt(fetcher.text(&format!("{base}{n}.py"))?)?,
-                ))
+                let stops = python::cmyt(fetcher.text(&format!("{base}{n}.py"))?)?;
+                Ok((n.to_string(), ColormapKind::Sequential, stops))
             })
             .collect::<Result<_, Error>>()?,
         Source::SeabornPalettes { url } => {
             categorical(python::seaborn_palettes(fetcher.text(url)?)?)
         }
-        Source::ColorBrewer { url } => json::colorbrewer(fetcher.text(url)?)?,
-        Source::Tol { url } => json::tol(fetcher.text(url)?)?,
+        Source::Colorcet { url } => colorcet(fetcher.text(url)?)?,
+        Source::Cmocean { cm_py, rgb_base } => cmocean(fetcher, cm_py, rgb_base)?,
+        _ => return Err("not a Python source".into()),
+    })
+}
+
+/// Plain-text sources (tables, C arrays, TypeScript, R, YAML, CSS, published values).
+fn text_source(fetcher: &mut Fetcher, source: &Source) -> Result<Vec<Converted>, Error> {
+    Ok(match *source {
+        Source::CBytes {
+            url,
+            array,
+            name,
+            kind,
+        } => one(name, kind, text::c_byte_triples(fetcher.text(url)?, array)),
+        Source::Table { url, name, kind } => {
+            one(name, kind, text::numeric_table(fetcher.text(url)?))
+        }
         Source::CartoTs { url } => text::carto_ts(fetcher.text(url)?)
             .into_iter()
             .map(|(name, colors, tags)| (name, classify::carto(&tags), colors))
             .collect(),
         Source::RList { url, list } => palettes(text::r_list(fetcher.text(url)?, list)),
         Source::Yaml { url } => palettes(text::yaml_hex_lists(fetcher.text(url)?)),
+        Source::CssVars { url, prefix, name } => one(
+            name,
+            ColormapKind::Categorical,
+            text::css_vars(fetcher.text(url)?, prefix),
+        ),
+        Source::Krzywinski { url, name } => one(
+            name,
+            ColormapKind::Categorical,
+            text::krzywinski(fetcher.text(url)?),
+        ),
+        Source::Hex { name, kind, colors } => one(
+            name,
+            kind,
+            colors.iter().filter_map(|h| text::hex_rgb(h)).collect(),
+        ),
+        _ => return Err("not a text source".into()),
+    })
+}
+
+/// JSON, archive and ColorSchemes.jl sources.
+fn structured_source(fetcher: &mut Fetcher, source: &Source) -> Result<Vec<Converted>, Error> {
+    Ok(match *source {
+        Source::Cmasher { tree_api, raw_base } => cmasher(fetcher, tree_api, raw_base)?,
+        Source::CrameriZip { url, cache } => crameri(&fetcher.cached_bytes(url, cache)?)?,
+        Source::ColorBrewer { url } => json::colorbrewer(fetcher.text(url)?)?,
+        Source::Tol { url } => json::tol(fetcher.text(url)?)?,
         Source::Catppuccin { url } => json::catppuccin(fetcher.text(url)?)?,
-        Source::CssVars { url, prefix, name } => {
-            vec![(
-                name.into(),
-                ColormapKind::Categorical,
-                text::css_vars(fetcher.text(url)?, prefix),
-            )]
+        Source::ColorSchemesJl { url, names } => {
+            categorical(julia::schemes(fetcher.text(url)?, names)?)
         }
-        Source::Krzywinski { url, name } => {
-            vec![(
-                name.into(),
-                ColormapKind::Categorical,
-                text::krzywinski(fetcher.text(url)?),
-            )]
-        }
-        Source::ColorSchemesJl { url, names } => julia::schemes(fetcher.text(url)?, names)?
-            .into_iter()
-            .map(|(n, c)| (n, ColormapKind::Categorical, c))
-            .collect(),
-        Source::Hex { name, kind, colors } => {
-            vec![(
-                name.into(),
-                kind,
-                colors.iter().filter_map(|h| text::hex_rgb(h)).collect(),
-            )]
-        }
+        _ => return Err("not a structured source".into()),
     })
 }
 

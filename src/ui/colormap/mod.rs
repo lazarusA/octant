@@ -23,9 +23,18 @@ pub struct PickerState {
     pub cache: search::FilterCache,
     pub swatches: swatch::SwatchAtlas,
     pub editor: editor::EditorState,
+    pub names: label::NameCache,
+    /// Height of everything below the list (editor, colorbar options) last frame.
+    pub below_list_height: f32,
+    /// Row hovered last frame; `preview_colormap` itself resets every frame.
+    pub last_hovered: Option<u32>,
 }
 
 const POPUP_WIDTH: f32 = 300.0;
+/// Room left below the content: the popup frame's padding and border (6 + 1 px,
+/// top and bottom) plus 2 px so the panel never touches the window edge.
+const POPUP_MARGIN: f32 = 16.0;
+const MIN_POPUP_HEIGHT: f32 = 160.0;
 const ACTIVE_SWATCH_WIDTH: f32 = 120.0;
 
 pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
@@ -34,13 +43,30 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool)
             .compact(compact)
             .owns_popup(),
     );
+    // Pinned below the button: egui otherwise re-picks the side every frame from
+    // the content size, so expanding the editor would jump the panel right or up.
+    // The height is capped to the space below the button and scrolls instead.
+    let viewport = ui.ctx().input(|i| i.viewport_rect());
+    let max_height =
+        (viewport.max.y - button_response.rect.max.y - POPUP_MARGIN).max(MIN_POPUP_HEIGHT);
     egui::Popup::from_toggle_button_response(&button_response)
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-        .show(|ui| render_colormap_contents(app, ui));
+        .align(egui::RectAlign::BOTTOM_START)
+        .align_alternatives(&[])
+        .show(|ui| {
+            egui::ScrollArea::vertical()
+                .id_salt(("colormap_popup_scroll", 0))
+                .max_height(max_height)
+                .show(ui, |ui| render_colormap_contents(app, ui, max_height));
+        });
 }
 
-fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
+/// Lays out the panel so everything fits in `max_height`: the colormap list
+/// takes whatever height is left after the controls above it and the editor and
+/// colorbar options below it (measured on the previous frame).
+fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
     ui.set_width(POPUP_WIDTH);
+    let top = ui.cursor().min.y;
     app.colormaps.picker.swatches.ensure(ui.ctx());
 
     show_active_row(app, ui);
@@ -57,12 +83,25 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     );
     filters::show(ui, &mut app.colormaps.picker.filter);
     ui.add_space(2.0);
-    list::show(app, ui);
+    let used_above = ui.cursor().min.y - top;
+    let below = app.colormaps.picker.below_list_height;
+    // The list is followed by one item spacing before the content below it.
+    let spacing = ui.spacing().item_spacing.y;
+    let list_height =
+        (max_height - used_above - spacing - below).clamp(list::MIN_HEIGHT, list::MAX_HEIGHT);
+    list::show(app, ui, list_height);
 
+    let below_start = ui.cursor().min.y;
     ui.separator();
     editor::show(app, ui);
     ui.separator();
     show_colorbar_options(app, ui);
+    let measured = ui.cursor().min.y - below_start;
+    if (measured - below).abs() > 0.5 {
+        // The editor opened or closed: resize the list on the next frame.
+        app.colormaps.picker.below_list_height = measured;
+        ui.ctx().request_repaint();
+    }
 }
 
 /// Active colormap swatch, its (elided) name and the reverse toggle.
@@ -71,11 +110,7 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         let (rect, swatch_response) =
             ui.allocate_exact_size(egui::vec2(ACTIVE_SWATCH_WIDTH, 14.0), egui::Sense::hover());
-        let shown = if app.colormaps.smooth {
-            registry::smooth_variant(id).unwrap_or(id)
-        } else {
-            id
-        };
+        let shown = app.shown_colormap(id);
         app.colormaps
             .picker
             .swatches
@@ -86,7 +121,13 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
                 let color = ui.visuals().strong_text_color();
                 let font = egui::TextStyle::Body.resolve(ui.style());
                 registry::with_entry(id, |e| {
-                    let galley = label::elided(ui, &e.name, font, color, ui.available_width());
+                    let galley = crate::ui::hover::card::layout::line(
+                        ui.painter(),
+                        &e.name,
+                        font,
+                        color,
+                        ui.available_width(),
+                    );
                     ui.label(galley)
                         .union(swatch_response)
                         .on_hover_ui(|ui| label::hover_details(ui, e));

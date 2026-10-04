@@ -1,12 +1,13 @@
 //! GPU/CPU parity: renders WGSL `sample_colormap` from the real atlas into a
-//! 256×1 target and compares every pixel with the CPU `sample_lut`.
+//! 256×1 target and compares every pixel with the CPU `sample_lut`, for
+//! continuous, stepped (nearest-texel) and smooth-twin rows.
 //! Skipped (passes) when no GPU adapter is available.
 
 use super::ColormapAtlas;
 use crate::utils::colormap::{LUT_SIZE, registry, sample_colormap_rgb};
 
 const PROBE_SHADER: &str = r#"
-struct Probe { colormap: u32, _p0: u32, _p1: u32, _p2: u32 };
+struct Probe { colormap: u32, nearest: u32, _p1: u32, _p2: u32 };
 @group(0) @binding(0) var<uniform> probe: Probe;
 
 @vertex
@@ -17,7 +18,7 @@ fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
 
 @fragment
 fn fs(@builtin(position) p: vec4<f32>) -> @location(0) vec4<f32> {
-    return vec4<f32>(sample_colormap(probe.colormap, (p.x - 0.5) / 255.0), 1.0);
+    return vec4<f32>(sample_colormap(probe.colormap, p.x / 256.0, probe.nearest == 1u), 1.0);
 }
 "#;
 
@@ -38,7 +39,7 @@ fn gpu() -> Option<(wgpu::Device, wgpu::Queue)> {
 
 fn probe_bind_group(device: &wgpu::Device, id: u32) -> (wgpu::BindGroupLayout, wgpu::BindGroup) {
     use wgpu::util::DeviceExt;
-    let probe = [id, 0, 0, 0];
+    let probe = [id, u32::from(registry::is_stepped(id)), 0, 0];
     let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("probe uniform"),
         contents: bytemuck::cast_slice(&probe),
@@ -205,6 +206,7 @@ fn read_back(
 
 #[test]
 fn gpu_atlas_matches_cpu_sampling() {
+    let _registry = crate::utils::colormap::registry::test_lock();
     let Some((device, queue)) = gpu() else {
         eprintln!("no GPU adapter; skipping colormap GPU parity test");
         return;
@@ -214,12 +216,14 @@ fn gpu_atlas_matches_cpu_sampling() {
     for id in [
         registry::default_id(),
         registry::find("classic:turbo").unwrap_or(0),
+        registry::find("classic:tab10").unwrap_or(0),
         last,
     ] {
         let pixels = render_row(&device, &queue, &atlas, id);
         assert_eq!(pixels.len(), LUT_SIZE * 4, "readback failed");
         for x in 0..LUT_SIZE {
-            let cpu = sample_colormap_rgb(id, x as f32 / 255.0);
+            // Pixel centers fall between LUT texels, exercising blending and nearest.
+            let cpu = sample_colormap_rgb(id, (x as f32 + 0.5) / 256.0);
             let gpu = &pixels[x * 4..x * 4 + 3];
             for (c, (g, e)) in gpu.iter().zip([cpu.r(), cpu.g(), cpu.b()]).enumerate() {
                 assert!(

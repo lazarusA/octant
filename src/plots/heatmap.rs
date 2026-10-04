@@ -315,21 +315,6 @@ impl HeatmapRenderer {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
-    pub fn update_colormap(&self, queue: &wgpu::Queue, colormap: u32) {
-        let color = super::common::PlotColorParams {
-            colormap,
-            ..Default::default()
-        };
-        self.update_uniforms(
-            queue,
-            &color,
-            [0.0, 0.0],
-            1.0,
-            [1.0, 1.0],
-            self.coord_mode.load(Ordering::Relaxed),
-        );
-    }
-
     /// Fast GPU Storage Buffer data channel upload
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
         super::common::safe_write_buffer(
@@ -478,12 +463,13 @@ pub struct HeatmapCallback {
 impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
     fn prepare(
         &self,
-        _device: &wgpu::Device,
+        device: &wgpu::Device,
         queue: &wgpu::Queue,
         _screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
         _encoder: &mut wgpu::CommandEncoder,
-        _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
+        callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
+        super::colormap_atlas::prepare(device, queue, callback_resources);
         self.renderer.update_uniforms(
             queue,
             &self.color_params,

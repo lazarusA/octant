@@ -69,42 +69,7 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
             ui.separator();
             ui.add_space(6.0);
 
-            // Links & Resources
-            ui.heading("Links & Resources");
-            ui.add_space(4.0);
-
-            ui.horizontal_wrapped(|ui| {
-                ui.icon(Icon::Catalog, IconSize::Sm);
-                ui.hyperlink_to(
-                    "github.com/lazarusA/octant",
-                    "https://github.com/lazarusA/octant",
-                );
-            });
-            ui.horizontal_wrapped(|ui| {
-                ui.icon(Icon::VariableDoc, IconSize::Sm);
-                ui.hyperlink_to("octant documentation", "https://docs.rs/octant");
-            });
-            ui.horizontal_wrapped(|ui| {
-                ui.icon(Icon::Globe, IconSize::Sm);
-                ui.hyperlink_to("@lazarusA", "https://github.com/lazarusA");
-            });
-
-            ui.add_space(6.0);
-            ui.label(
-                egui::RichText::new(
-                    "Octant credits third-party work in good faith. If you believe something \
-                     is missing or incorrectly attributed, please let us know and we will \
-                     correct or remove it.",
-                )
-                .small()
-                .weak(),
-            );
-            ui.hyperlink_to(
-                egui::RichText::new("github.com/lazarusA/octant/issues").small(),
-                "https://github.com/lazarusA/octant/issues",
-            );
-            super::credits::show_colormap_credits(ui);
-            super::licenses::show_third_party_licenses(ui);
+            show_links_and_credits(ui);
 
             ui.add_space(8.0);
             if ui
@@ -118,4 +83,44 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
                 *active_tab = AboutTab::Icons;
             }
         });
+}
+
+/// Project links, the good-faith notice, colormap credits and third-party licenses.
+fn show_links_and_credits(ui: &mut egui::Ui) {
+    // Links & Resources
+    ui.heading("Links & Resources");
+    ui.add_space(4.0);
+
+    ui.horizontal_wrapped(|ui| {
+        ui.icon(Icon::Catalog, IconSize::Sm);
+        ui.hyperlink_to(
+            "github.com/lazarusA/octant",
+            "https://github.com/lazarusA/octant",
+        );
+    });
+    ui.horizontal_wrapped(|ui| {
+        ui.icon(Icon::VariableDoc, IconSize::Sm);
+        ui.hyperlink_to("octant documentation", "https://docs.rs/octant");
+    });
+    ui.horizontal_wrapped(|ui| {
+        ui.icon(Icon::Globe, IconSize::Sm);
+        ui.hyperlink_to("@lazarusA", "https://github.com/lazarusA");
+    });
+
+    ui.add_space(6.0);
+    ui.label(
+        egui::RichText::new(
+            "Octant credits third-party work in good faith. If you believe something \
+             is missing or incorrectly attributed, please let us know and we will \
+             correct or remove it.",
+        )
+        .small()
+        .weak(),
+    );
+    ui.hyperlink_to(
+        egui::RichText::new("github.com/lazarusA/octant/issues").small(),
+        "https://github.com/lazarusA/octant/issues",
+    );
+    super::credits::show_colormap_credits(ui);
+    super::licenses::show_third_party_licenses(ui);
 }

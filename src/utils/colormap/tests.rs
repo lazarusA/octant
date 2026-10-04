@@ -75,7 +75,7 @@ fn test_evaluate_color_cpu() {
         is_categorical: 0,
         num_categories: 10,
         reverse: 0,
-        _pad1: 0,
+        nearest: 0,
         nan_color: [1.0, 0.0, 0.0, 1.0],
         lowclip_color: [0.0, 1.0, 0.0, 1.0],
         highclip_color: [0.0, 0.0, 1.0, 1.0],

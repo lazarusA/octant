@@ -367,12 +367,13 @@ pub struct Mesh3DCallback {
 impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
     fn prepare(
         &self,
-        _device: &wgpu::Device,
+        device: &wgpu::Device,
         queue: &wgpu::Queue,
         _screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
         _encoder: &mut wgpu::CommandEncoder,
-        _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
+        callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
+        super::colormap_atlas::prepare(device, queue, callback_resources);
         let mut params = self.params;
         params.aspect_ratio = super::common::compute_aspect_ratio(&self.rect);
         self.renderer.update_uniforms(queue, &params);
