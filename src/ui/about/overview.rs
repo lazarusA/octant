@@ -90,6 +90,19 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
             });
 
             ui.add_space(6.0);
+            ui.label(
+                egui::RichText::new(
+                    "Octant credits third-party work in good faith. If you believe something \
+                     is missing or incorrectly attributed, please let us know and we will \
+                     correct or remove it.",
+                )
+                .small()
+                .weak(),
+            );
+            ui.hyperlink_to(
+                egui::RichText::new("github.com/lazarusA/octant/issues").small(),
+                "https://github.com/lazarusA/octant/issues",
+            );
             super::credits::show_colormap_credits(ui);
             super::licenses::show_third_party_licenses(ui);
 

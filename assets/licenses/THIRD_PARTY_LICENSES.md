@@ -9,6 +9,8 @@ Desktop builds statically link the netCDF-C and HDF5 C libraries (licenses below
 `netcdf-src` and `hdf5-metno-src`); netCDF-C's `libncpoco` is derived from the POCO C++
 Libraries (Boost Software License 1.0).
 
+**Good-faith notice.** We have made a good-faith effort to identify the authors and licenses of all third-party software, fonts and colormap data included in Octant, and to comply with their terms. If you are a rights holder and believe that any material is used without proper permission, attribution or license compliance, please contact us by opening an issue at https://github.com/lazarusA/octant/issues. Any such issue is unintentional. We will review your report promptly and, where appropriate, correct the attribution, add the required notice, or remove the material.
+
 ## Overview
 
 - MIT License (569)
