@@ -1,13 +1,14 @@
 //! Colormap selection state and user-defined colormaps (the only persisted part).
 
 use super::app_state::OctantApp;
-use crate::utils::colormap::{CustomColormapSpec, registry};
+use crate::utils::colormap::{ColormapEntry, CustomColormapSpec, registry};
 use serde::{Deserialize, Serialize};
 
 pub(super) const STORAGE_KEY: &str = "octant.colormaps";
-/// Stored preferences that failed to parse are copied here, so a format change
-/// never destroys the user's colormaps.
+/// Stored preferences that failed to parse are copied here (then to `.1`, `.2`,
+/// ... for later, different ones), so a format change never destroys them.
 pub(super) const UNREADABLE_KEY: &str = "octant.colormaps.unreadable";
+const MAX_UNREADABLE_BACKUPS: usize = 8;
 
 /// Colormap state beyond the active id (which stays on `OctantApp::active_colormap`).
 #[derive(Default)]
@@ -54,20 +55,24 @@ impl OctantApp {
             return;
         };
         for spec in prefs.custom {
-            if let Err(e) = spec.to_entry() {
-                log::warn!("Stored custom colormap `{}` does not build: {e}", spec.name);
-                self.colormaps.unloaded.push(spec);
-            } else if let Err(e) = self.add_custom_colormap(spec) {
-                log::warn!("Skipping stored custom colormap: {e}");
+            match spec.to_entry() {
+                Ok(entry) => {
+                    self.register_custom(spec, entry);
+                }
+                Err(e) => {
+                    log::warn!("Stored custom colormap `{}` does not build: {e}", spec.name);
+                    // A map that builds wins over a broken one with the same name.
+                    if !self.has_custom_name(&spec.name) {
+                        self.colormaps.unloaded.push(spec);
+                    }
+                }
             }
         }
     }
 
     pub fn save_colormap_prefs(&self, storage: &mut dyn eframe::Storage) {
-        if let Some(raw) = &self.colormaps.unreadable_prefs
-            && storage.get_string(UNREADABLE_KEY).is_none()
-        {
-            storage.set_string(UNREADABLE_KEY, raw.clone());
+        if let Some(raw) = &self.colormaps.unreadable_prefs {
+            back_up_unreadable(storage, raw);
         }
         let prefs = ColormapPrefsRef {
             custom: self
@@ -96,9 +101,25 @@ impl OctantApp {
         }
     }
 
+    /// Whether a saved custom map (built or not) is named `name` (trimmed).
+    pub fn has_custom_name(&self, name: &str) -> bool {
+        let name = name.trim();
+        let colormaps = &self.colormaps;
+        colormaps
+            .custom
+            .iter()
+            .chain(&colormaps.unloaded)
+            .any(|s| s.name.trim() == name)
+    }
+
     /// Registers (or replaces) a custom colormap and returns its id.
     pub fn add_custom_colormap(&mut self, spec: CustomColormapSpec) -> Result<u32, String> {
         let entry = spec.to_entry()?;
+        Ok(self.register_custom(spec, entry))
+    }
+
+    /// Registers `entry` built from `spec`, replacing a map with the same name.
+    fn register_custom(&mut self, spec: CustomColormapSpec, entry: ColormapEntry) -> u32 {
         let id = registry::upsert_custom(entry);
         let name = spec.name.trim();
         self.colormaps.unloaded.retain(|s| s.name.trim() != name);
@@ -111,7 +132,7 @@ impl OctantApp {
             Some(existing) => *existing = spec,
             None => self.colormaps.custom.push(spec),
         }
-        Ok(id)
+        id
     }
 
     /// Saves `spec`, replacing the custom map keyed `replaces` when it was
@@ -145,6 +166,26 @@ impl OctantApp {
         // Ids after the removed row shifted, so a remembered hover is stale.
         self.colormaps.picker.last_hovered = None;
     }
+}
+
+/// Copies unparseable prefs to the first free backup slot, unless a slot
+/// already holds them, so older backups are never overwritten.
+fn back_up_unreadable(storage: &mut dyn eframe::Storage, raw: &str) {
+    for n in 0..MAX_UNREADABLE_BACKUPS {
+        let key = match n {
+            0 => UNREADABLE_KEY.to_string(),
+            n => format!("{UNREADABLE_KEY}.{n}"),
+        };
+        match storage.get_string(&key) {
+            Some(existing) if existing == raw => return,
+            Some(_) => {}
+            None => {
+                storage.set_string(&key, raw.to_owned());
+                return;
+            }
+        }
+    }
+    log::warn!("All {MAX_UNREADABLE_BACKUPS} colormap preference backups are in use");
 }
 
 #[cfg(test)]

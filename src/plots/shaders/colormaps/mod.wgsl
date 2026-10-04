@@ -35,8 +35,10 @@ var colormap_lut: texture_2d<f32>;
 fn sample_colormap(colormap_id: u32, t: f32, nearest: bool) -> vec3<f32> {
     let rows = textureDimensions(colormap_lut).y;
     let row = i32(min(colormap_id, rows - 1u));
-    // NaN samples the start, as on the CPU; infinities clamp to the ends.
-    let x = clamp(select(0.0, t, t == t), 0.0, 1.0) * 255.0;
+    // NaN samples the start, as on the CPU; infinities clamp to the ends. NaN is
+    // detected from its bits: WGSL may fold float comparisons with NaN.
+    let is_nan = (bitcast<u32>(t) & 0x7fffffffu) > 0x7f800000u;
+    let x = clamp(select(t, 0.0, is_nan), 0.0, 1.0) * 255.0;
     if (nearest) {
         let i = min(u32(floor(x + 0.5)), 255u);
         return textureLoad(colormap_lut, vec2<i32>(i32(i), row), 0).rgb;

@@ -3,6 +3,7 @@
 
 use crate::utils::colormap::LICENSES_TEXT;
 use egui::{Color32, FontId, Galley, Label, Rect, RichText, Sense, vec2};
+use std::ops::Range;
 use std::sync::{Arc, LazyLock};
 
 /// Notices for every crate, font and C library compiled into Octant, generated
@@ -51,37 +52,48 @@ impl Document {
     }
 }
 
-/// Galleys of the lines laid out so far, reused across frames until the display
-/// scale changes (kept in egui temp memory per document).
+/// Galleys of the rows shown last frame (kept in egui temp memory per
+/// document): rows still visible are reused, rows scrolled away are dropped.
 #[derive(Clone, Default)]
 struct LineGalleys {
     pixels_per_point: u32,
-    galleys: Vec<Option<Arc<Galley>>>,
+    first: usize,
+    galleys: Vec<Arc<Galley>>,
 }
 
 impl LineGalleys {
-    fn get(
+    /// Galleys of `rows`, laying out only rows not shown last frame.
+    fn update(
         &mut self,
         ui: &egui::Ui,
         doc: &Document,
-        row: usize,
+        rows: Range<usize>,
         font: &FontId,
-    ) -> Option<Arc<Galley>> {
+    ) -> &[Arc<Galley>] {
         let ppp = ui.ctx().pixels_per_point().to_bits();
-        if self.pixels_per_point != ppp || self.galleys.len() != doc.len() {
+        if self.pixels_per_point != ppp {
             self.pixels_per_point = ppp;
-            self.galleys = vec![None; doc.len()];
+            self.galleys.clear();
         }
-        let slot = self.galleys.get_mut(row)?;
-        if slot.is_none() {
-            let line = doc.lines.get(row)?;
-            *slot = Some(ui.painter().layout_no_wrap(
-                (*line).to_owned(),
-                font.clone(),
-                Color32::PLACEHOLDER,
-            ));
+        let cached = self.first..self.first + self.galleys.len();
+        if cached != rows {
+            let old = std::mem::take(&mut self.galleys);
+            self.galleys = rows
+                .clone()
+                .filter_map(|row| match old.get(row.wrapping_sub(cached.start)) {
+                    Some(galley) if cached.contains(&row) => Some(Arc::clone(galley)),
+                    _ => doc.lines.get(row).map(|line| {
+                        ui.painter().layout_no_wrap(
+                            (*line).to_owned(),
+                            font.clone(),
+                            Color32::PLACEHOLDER,
+                        )
+                    }),
+                })
+                .collect();
+            self.first = rows.start;
         }
-        slot.clone()
+        &self.galleys
     }
 }
 
@@ -108,7 +120,7 @@ pub fn show_colormap_licenses(ui: &mut egui::Ui) {
 }
 
 /// Scrollable monospace view of `doc`; only the visible rows are laid out, and
-/// each row's galley is built once.
+/// a row's galley is reused while it stays visible.
 fn show_document(ui: &mut egui::Ui, salt: &'static str, doc: &Document, url: &str) {
     let font = FontId::monospace(FONT_SIZE);
     let (row_height, glyph_width) =
@@ -126,10 +138,9 @@ fn show_document(ui: &mut egui::Ui, salt: &'static str, doc: &Document, url: &st
         .auto_shrink([false, true])
         .show_viewport(ui, |ui, viewport| {
             let (rect, _) = ui.allocate_exact_size(content, Sense::hover());
-            for row in visible_rows(viewport, row_height, doc.len()) {
-                let Some(galley) = cache.get(ui, doc, row, &font) else {
-                    continue;
-                };
+            let rows = visible_rows(viewport, row_height, doc.len());
+            for (row, galley) in rows.clone().zip(cache.update(ui, doc, rows, &font)) {
+                let galley = Arc::clone(galley);
                 let min = rect.min + vec2(0.0, row as f32 * row_height);
                 let row_rect = Rect::from_min_size(min, vec2(content.x, row_height));
                 ui.put(row_rect, Label::new(galley).halign(egui::Align::Min));
@@ -173,6 +184,26 @@ mod tests {
         assert!(THIRD_PARTY_LINES.len() > 1000);
         assert!(COLORMAP_LINES.len() > 0);
         assert!(THIRD_PARTY_LINES.columns >= 80);
+    }
+
+    #[test]
+    fn line_cache_keeps_only_the_visible_rows() {
+        let doc = Document::new("a\nb\nc\nd\ne\nf");
+        let font = FontId::monospace(FONT_SIZE);
+        let mut cache = LineGalleys::default();
+        let ctx = egui::Context::default();
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+            let first: Vec<_> = cache.update(ui, &doc, 0..3, &font).to_vec();
+            assert_eq!(first.len(), 3);
+            let scrolled = cache.update(ui, &doc, 2..5, &font);
+            assert_eq!(scrolled.len(), 3, "rows scrolled away are dropped");
+            assert!(
+                Arc::ptr_eq(&scrolled[0], &first[2]),
+                "visible rows are reused"
+            );
+            assert_eq!(scrolled[2].text(), "e");
+        });
+        out.textures_delta.clear();
     }
 
     #[test]

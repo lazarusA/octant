@@ -69,7 +69,9 @@ pub fn cmasher(
                 .unwrap_or_default()
                 .trim_end_matches(".jscm")
                 .to_string();
-            let (kind, stops) = json::jscm(fetcher.pinned_text(&format!("{raw_base}{path}"))?)?;
+            let url = format!("{raw_base}{path}");
+            let (kind, stops) =
+                json::jscm(fetcher.pinned_text(&url)?).map_err(|e| format!("{url}: {e}"))?;
             Ok((name, kind, stops))
         })
         .collect()
@@ -87,7 +89,8 @@ pub fn crameri(zip_bytes: &[u8]) -> Result<Vec<Unit>, Error> {
             }
             _ => continue,
         };
-        let text = String::from_utf8(zip::read(zip_bytes, entry)?)?;
+        let text = String::from_utf8(zip::read(zip_bytes, entry)?)
+            .map_err(|e| format!("{}: {e}", entry.name))?;
         out.push((
             name.to_string(),
             classify::crameri(name),

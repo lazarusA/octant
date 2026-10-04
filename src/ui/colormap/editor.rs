@@ -70,10 +70,7 @@ fn edit_spec(ui: &mut egui::Ui, editor: &mut EditorState) {
         ui.allocate_exact_size(egui::vec2(ui.available_width(), 14.0), egui::Sense::hover());
     editor.preview.paint(ui.painter(), rect);
     if let Some(err) = &editor.error {
-        ui.horizontal(|ui| {
-            ui.icon_toned(Icon::Warning, IconSize::Xs, IconTone::Warning);
-            ui.label(egui::RichText::new(err).small());
-        });
+        warning(ui, err);
     }
 }
 
@@ -113,69 +110,100 @@ fn refresh_preview(ctx: &egui::Context, editor: &mut EditorState) {
 
 fn show_actions(app: &mut OctantApp, ui: &mut egui::Ui) {
     let editor = &app.colormaps.picker.editor;
-    let can_save = editor.error.is_none() && !editor.spec.name.trim().is_empty();
     let renames = editor
         .editing_key
         .as_deref()
         .is_some_and(|key| !editor.spec.has_key(key));
+    // Saving an edited map under another saved map's name would replace that map.
+    let clashes = renames && app.has_custom_name(&editor.spec.name);
+    let can_save = editor.error.is_none() && !editor.spec.name.trim().is_empty() && !clashes;
     let label = if renames {
         "Rename & apply"
     } else {
         "Save & apply"
     };
-    let save = ui
-        .add_enabled_ui(can_save, |ui| {
-            ui.outlined_icon_button(Icon::Save, label, IconTone::Accent)
-        })
-        .inner;
-    if save.clicked() {
-        let editor = &app.colormaps.picker.editor;
-        let spec = editor.spec.clone();
-        let key = spec.key();
-        let replaces = editor.editing_key.clone().filter(|_| renames);
-        match app.save_custom_colormap(spec, replaces.as_deref()) {
-            Ok(id) => {
-                // Later saves keep editing the map just saved.
-                app.colormaps.picker.editor.editing_key = Some(key);
-                super::select_colormap(app, id);
+    let mut rename = None;
+    ui.add_enabled_ui(can_save, |ui| {
+        ui.horizontal(|ui| {
+            if ui
+                .outlined_icon_button(Icon::Save, label, IconTone::Accent)
+                .clicked()
+            {
+                rename = Some(renames);
             }
-            Err(e) => app.colormaps.picker.editor.error = Some(e),
-        }
+            if renames && ui.button("Save as new").clicked() {
+                rename = Some(false);
+            }
+        });
+    });
+    if clashes {
+        warning(ui, "A saved colormap already has this name");
+    }
+    if let Some(rename) = rename {
+        save(app, rename);
     }
 }
 
-/// Saved custom maps: click a name to edit it, trash to delete it.
+/// Saves the editor's spec and applies it; `rename` replaces the map being edited.
+fn save(app: &mut OctantApp, rename: bool) {
+    let editor = &app.colormaps.picker.editor;
+    let spec = editor.spec.clone();
+    let key = spec.key();
+    let replaces = editor.editing_key.clone().filter(|_| rename);
+    match app.save_custom_colormap(spec, replaces.as_deref()) {
+        Ok(id) => {
+            // Later saves keep editing the map just saved.
+            app.colormaps.picker.editor.editing_key = Some(key);
+            super::select_colormap(app, id);
+        }
+        Err(e) => app.colormaps.picker.editor.error = Some(e),
+    }
+}
+
+fn warning(ui: &mut egui::Ui, text: &str) {
+    ui.horizontal(|ui| {
+        ui.icon_toned(Icon::Warning, IconSize::Xs, IconTone::Warning);
+        ui.label(egui::RichText::new(text).small());
+    });
+}
+
+/// Saved custom maps: click a name to edit it, trash to delete it. Maps that no
+/// longer build are listed after them with a warning, to fix or delete.
 fn show_saved(app: &mut OctantApp, ui: &mut egui::Ui) {
-    if app.colormaps.custom.is_empty() {
+    let colormaps = &app.colormaps;
+    if colormaps.custom.is_empty() && colormaps.unloaded.is_empty() {
         return;
     }
     ui.add_space(4.0);
     ui.label(egui::RichText::new("Saved").small().weak());
     let mut edit = None;
     let mut delete = None;
-    for (i, spec) in app.colormaps.custom.iter().enumerate() {
+    let built = colormaps.custom.iter().map(|s| (s, false));
+    let broken = colormaps.unloaded.iter().map(|s| (s, true));
+    for (spec, broken) in built.chain(broken) {
         ui.horizontal(|ui| {
+            if broken {
+                ui.icon_toned(Icon::Warning, IconSize::Xs, IconTone::Warning)
+                    .on_hover_text("Does not build with this version: edit to fix, or delete");
+            }
             if ui.link(&spec.name).on_hover_text("Edit").clicked() {
-                edit = Some(i);
+                edit = Some(spec.clone());
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let trash = ToolbarButton::new(Icon::Trash, "Delete")
                     .compact(true)
                     .hover("Delete colormap");
                 if ui.add(trash).clicked() {
-                    delete = Some(i);
+                    delete = Some(spec.key());
                 }
             });
         });
     }
-    if let Some(spec) = edit.and_then(|i| app.colormaps.custom.get(i)).cloned() {
+    if let Some(spec) = edit {
         app.colormaps.picker.editor.editing_key = Some(spec.key());
         app.colormaps.picker.editor.spec = spec;
     }
-    if let Some(key) = delete
-        .and_then(|i| app.colormaps.custom.get(i))
-        .map(CustomColormapSpec::key)
-    {
+    if let Some(key) = delete {
         let editor = &mut app.colormaps.picker.editor;
         if editor.editing_key.as_deref() == Some(key.as_str()) {
             editor.editing_key = None;

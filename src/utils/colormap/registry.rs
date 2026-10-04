@@ -26,12 +26,13 @@ struct Custom {
 }
 
 impl Custom {
-    /// Rebuilds `twins` and the lock-free length after `maps` changed.
+    /// Rebuilds `twins` and the lock-free counts after `maps` changed.
     fn reindex(&mut self) {
         self.twins = (0..self.maps.len())
             .filter(|&i| self.maps[i].smooth.is_some())
             .collect();
         CUSTOM_LEN.store(self.maps.len(), Ordering::Release);
+        CUSTOM_TWINS.store(self.twins.len(), Ordering::Release);
         GENERATION.fetch_add(1, Ordering::AcqRel);
     }
 }
@@ -41,6 +42,8 @@ static GENERATION: AtomicU64 = AtomicU64::new(1);
 /// Number of custom maps, kept in sync under the write lock so built-in rows
 /// and their twins resolve without taking the lock.
 static CUSTOM_LEN: AtomicUsize = AtomicUsize::new(0);
+/// Number of custom maps with a smooth twin, kept in sync the same way.
+static CUSTOM_TWINS: AtomicUsize = AtomicUsize::new(0);
 
 fn custom() -> RwLockReadGuard<'static, Custom> {
     CUSTOM.read().unwrap_or_else(|p| p.into_inner())
@@ -51,7 +54,7 @@ pub fn generation() -> u64 {
     GENERATION.load(Ordering::Acquire)
 }
 
-pub(crate) fn builtin_len() -> usize {
+fn builtin_len() -> usize {
     builtin().maps.len()
 }
 
@@ -77,7 +80,7 @@ pub fn with_entry<R>(id: u32, f: impl FnOnce(&ColormapEntry) -> R) -> Option<R> 
 /// Atlas rows: every colormap, then the built-in smooth twins, then the twins
 /// of custom maps.
 pub fn rows() -> usize {
-    len() + builtin_twins() + custom().twins.len()
+    len() + builtin_twins() + CUSTOM_TWINS.load(Ordering::Acquire)
 }
 
 /// Visits every atlas row in order (see [`rows`]).

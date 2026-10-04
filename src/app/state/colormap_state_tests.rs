@@ -114,6 +114,65 @@ fn unreadable_prefs_are_backed_up_before_being_replaced() {
 }
 
 #[test]
+fn later_unreadable_prefs_get_their_own_backup() {
+    let _registry = registry::test_lock();
+    let mut storage = stored("first broken {");
+    let mut app = OctantApp::default();
+    app.load_colormap_prefs(Some(&storage));
+    app.save_colormap_prefs(&mut storage);
+    app.save_colormap_prefs(&mut storage);
+
+    storage.set_string(STORAGE_KEY, "second broken {".into());
+    let mut later = OctantApp::default();
+    later.load_colormap_prefs(Some(&storage));
+    later.save_colormap_prefs(&mut storage);
+    let second_key = format!("{UNREADABLE_KEY}.1");
+    assert_eq!(
+        storage.get_string(UNREADABLE_KEY).as_deref(),
+        Some("first broken {")
+    );
+    assert_eq!(
+        storage.get_string(&second_key).as_deref(),
+        Some("second broken {")
+    );
+}
+
+#[test]
+fn a_map_that_builds_wins_over_a_broken_one_with_its_name() {
+    let _registry = registry::test_lock();
+    for raw in [
+        "(custom: [(name: \"dup_test_map\", colors: \"red, blue\"), \
+         (name: \"dup_test_map\", colors: \"definitely-not-a-color\")])",
+        "(custom: [(name: \"dup_test_map\", colors: \"definitely-not-a-color\"), \
+         (name: \"dup_test_map\", colors: \"red, blue\")])",
+    ] {
+        let mut app = OctantApp::default();
+        app.load_colormap_prefs(Some(&stored(raw)));
+        assert!(has_custom(&app, "dup_test_map"), "{raw}");
+        assert!(app.colormaps.unloaded.is_empty(), "{raw}");
+        registry::remove_custom("custom:dup_test_map");
+    }
+}
+
+#[test]
+fn saving_an_edit_as_new_keeps_the_original() {
+    let _registry = registry::test_lock();
+    let mut app = OctantApp::default();
+    assert!(
+        app.add_custom_colormap(spec("copy_from_test_map", "red, blue"))
+            .is_ok()
+    );
+    assert!(
+        app.save_custom_colormap(spec("copy_to_test_map", "red, blue"), None)
+            .is_ok()
+    );
+    assert!(app.has_custom_name(" copy_from_test_map "));
+    assert!(app.has_custom_name("copy_to_test_map"));
+    registry::remove_custom("custom:copy_from_test_map");
+    registry::remove_custom("custom:copy_to_test_map");
+}
+
+#[test]
 fn renaming_while_editing_replaces_the_original() {
     let _registry = registry::test_lock();
     let mut app = OctantApp::default();

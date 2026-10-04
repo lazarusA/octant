@@ -133,6 +133,7 @@ fn lut_sampling_clamps_infinities_and_maps_nan_to_the_start() {
 
 #[test]
 fn unknown_rows_sample_the_default_colormap() {
+    let _registry = registry::test_lock();
     let unknown = u32::try_from(registry::rows()).unwrap_or(u32::MAX);
     assert!(!registry::is_row(unknown));
     assert!(!registry::is_stepped(unknown));
