@@ -1,8 +1,10 @@
 //! Process-wide colormap registry: built-in catalog followed by user-defined maps.
 //!
-//! A colormap id is a row index: `0..builtin_len` are bundled maps, the rest are
-//! custom maps in insertion order. The id is also the row of the GPU atlas, and
-//! [`generation`] changes whenever rows change so GPU and UI caches can refresh.
+//! A colormap id is a row index: `0..builtin_len` are bundled maps, then custom
+//! maps in insertion order. The id is also the row of the GPU atlas. After those
+//! [`len`] rows come the smooth twins of short categorical palettes (see
+//! [`smooth_variant`]), for [`rows`] rows in total. [`generation`] changes
+//! whenever rows change so GPU and UI caches can refresh.
 
 use super::catalog::{ColormapEntry, builtin};
 use super::lut::{Lut, sample_lut};
@@ -47,12 +49,48 @@ pub fn with_entry<R>(id: u32, f: impl FnOnce(&ColormapEntry) -> R) -> Option<R> 
     custom().get(idx - maps.len()).map(f)
 }
 
-/// Visits every row in id order (used to fill GPU and UI atlases).
+/// Atlas rows: every colormap followed by the smooth twins.
+pub fn rows() -> usize {
+    let custom = custom();
+    let entries = builtin().maps.iter().chain(custom.iter());
+    builtin_len() + custom.len() + entries.filter(|e| e.smooth.is_some()).count()
+}
+
+/// Visits every atlas row in order: colormaps first, then smooth twins.
 pub fn for_each_lut(mut f: impl FnMut(u32, &Lut)) {
     let custom = custom();
-    for (id, entry) in builtin().maps.iter().chain(custom.iter()).enumerate() {
-        f(u32::try_from(id).unwrap_or(u32::MAX), &entry.lut);
+    let entries = || builtin().maps.iter().chain(custom.iter());
+    let luts = entries()
+        .map(|e| &*e.lut)
+        .chain(entries().filter_map(|e| e.smooth.as_deref()));
+    for (row, lut) in luts.enumerate() {
+        f(u32::try_from(row).unwrap_or(u32::MAX), lut);
     }
+}
+
+/// Atlas row of the smooth twin of colormap `id`, if it has one.
+pub fn smooth_variant(id: u32) -> Option<u32> {
+    let custom = custom();
+    let entries = || builtin().maps.iter().chain(custom.iter());
+    let idx = id as usize;
+    entries().nth(idx)?.smooth.as_ref()?;
+    let before = entries().take(idx).filter(|e| e.smooth.is_some()).count();
+    u32::try_from(builtin_len() + custom.len() + before).ok()
+}
+
+/// Runs `f` on the LUT of an atlas row (a colormap or a smooth twin).
+fn with_row_lut<R>(row: u32, f: impl FnOnce(&Lut) -> R) -> Option<R> {
+    let custom = custom();
+    let entries = || builtin().maps.iter().chain(custom.iter());
+    let row = row as usize;
+    let base = builtin_len() + custom.len();
+    if row < base {
+        return entries().nth(row).map(|e| f(&e.lut));
+    }
+    entries()
+        .filter_map(|e| e.smooth.as_deref())
+        .nth(row - base)
+        .map(f)
 }
 
 /// Finds a colormap id by its stable key (`"family:name"`).
@@ -75,9 +113,10 @@ pub fn key_of(id: u32) -> String {
     with_entry(id, |e| e.key.clone()).unwrap_or_else(|| DEFAULT_COLORMAP_KEY.to_string())
 }
 
-/// Samples colormap `id` at `t` in [0, 1]; unknown ids use the first map.
+/// Samples atlas row `id` (a colormap or a smooth twin) at `t` in [0, 1];
+/// unknown rows use the first map.
 pub fn sample(id: u32, t: f32) -> Color32 {
-    with_entry(id, |e| sample_lut(&e.lut, t))
+    with_row_lut(id, |lut| sample_lut(lut, t))
         .or_else(|| builtin().maps.first().map(|e| sample_lut(&e.lut, t)))
         .unwrap_or(Color32::BLACK)
 }

@@ -1,6 +1,6 @@
 //! Colormap picker: toolbar popup with search, kind/family filters, gradient
-//! swatches for every registered colormap, a reverse toggle and the custom
-//! colormap editor.
+//! swatches for every registered colormap, reverse and smooth toggles, and the
+//! custom colormap editor.
 
 pub mod editor;
 pub mod filters;
@@ -44,6 +44,10 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     app.colormaps.picker.swatches.ensure(ui.ctx());
 
     show_active_row(app, ui);
+    if registry::smooth_variant(app.active_colormap).is_some() {
+        ui.checkbox(&mut app.colormaps.smooth, "Smooth")
+            .on_hover_text("Blend this palette's colors into a continuous gradient (Oklab)");
+    }
     ui.separator();
 
     ui.search_field(
@@ -67,10 +71,15 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         let (rect, swatch_response) =
             ui.allocate_exact_size(egui::vec2(ACTIVE_SWATCH_WIDTH, 14.0), egui::Sense::hover());
+        let shown = if app.colormaps.smooth {
+            registry::smooth_variant(id).unwrap_or(id)
+        } else {
+            id
+        };
         app.colormaps
             .picker
             .swatches
-            .paint(ui, rect, id, app.colormaps.reversed);
+            .paint(ui, rect, shown, app.colormaps.reversed);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.checkbox(&mut app.colormaps.reversed, "Reversed");
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {

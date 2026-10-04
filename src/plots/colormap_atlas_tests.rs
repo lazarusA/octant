@@ -210,7 +210,7 @@ fn gpu_atlas_matches_cpu_sampling() {
         return;
     };
     let atlas = ColormapAtlas::new(&device, &queue);
-    let last = u32::try_from(registry::len() - 1).unwrap_or(0);
+    let last = u32::try_from(registry::rows() - 1).unwrap_or(0);
     for id in [
         registry::default_id(),
         registry::find("classic:turbo").unwrap_or(0),

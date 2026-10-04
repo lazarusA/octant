@@ -29,6 +29,29 @@ pub fn resample(stops: &[[u8; 3]], discrete: bool) -> Box<Lut> {
     lut
 }
 
+/// Continuous version of a palette: its colors blended in Oklab (evenly
+/// spaced, endpoints kept exactly). Falls back to linear sRGB blending.
+pub fn smooth(stops: &[[u8; 3]]) -> Box<Lut> {
+    use colorgrad::{BlendMode, Color, Gradient, GradientBuilder, LinearGradient};
+    let colors: Vec<Color> = stops
+        .iter()
+        .map(|c| Color::from_rgba8(c[0], c[1], c[2], 255))
+        .collect();
+    let Ok(gradient) = GradientBuilder::new()
+        .colors(&colors)
+        .mode(BlendMode::Oklab)
+        .build::<LinearGradient>()
+    else {
+        return resample(stops, false);
+    };
+    let mut lut = Box::new([[0, 0, 0, 255]; LUT_SIZE]);
+    for (i, slot) in lut.iter_mut().enumerate() {
+        let [r, g, b, _] = gradient.at(i as f32 / (LUT_SIZE - 1) as f32).to_rgba8();
+        *slot = [r, g, b, 255];
+    }
+    lut
+}
+
 fn mix_u8(a: [u8; 3], b: [u8; 3], f: f32) -> [u8; 3] {
     std::array::from_fn(|k| {
         let (a, b) = (f32::from(a[k]), f32::from(b[k]));

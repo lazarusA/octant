@@ -17,7 +17,7 @@ impl OctantApp {
         let effective_colormap = if self.rgb_composite_mode {
             crate::utils::colormap::COLORMAP_RGB_COMPOSITE
         } else {
-            self.preview_colormap.unwrap_or(self.active_colormap)
+            self.effective_colormap()
         };
 
         let (is_cat, num_cats) = if self.is_categorical {

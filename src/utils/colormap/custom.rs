@@ -139,6 +139,17 @@ impl CustomColormapSpec {
             family: None,
             kind,
             lut: self.build_lut()?,
+            smooth: if self.classes > 1 {
+                Some(
+                    Self {
+                        classes: 0,
+                        ..self.clone()
+                    }
+                    .build_lut()?,
+                )
+            } else {
+                None
+            },
         })
     }
 }

@@ -3,7 +3,7 @@
 
 use super::format::{self, CatalogRecords, FamilyRecord, MapRecord};
 use super::kind::ColormapKind;
-use super::lut::{Lut, resample};
+use super::lut::{Lut, resample, smooth};
 use std::sync::LazyLock;
 
 static CATALOG_BYTES: &[u8] = include_bytes!("../../../assets/colormaps/colormaps.bin");
@@ -32,7 +32,15 @@ pub struct ColormapEntry {
     pub family: Option<usize>,
     pub kind: ColormapKind,
     pub lut: Box<Lut>,
+    /// Continuous "smooth twin" of a short categorical palette (its colors
+    /// blended in Oklab); `None` for continuous maps and long palettes.
+    pub smooth: Option<Box<Lut>>,
 }
+
+/// Categorical palettes up to this many colors get a smooth twin. Longer ones
+/// (Glasbey, Crameri's 100-color `S` palettes) are unordered, so blending them
+/// would only produce noise.
+pub const SMOOTH_MAX_COLORS: usize = 24;
 
 #[derive(Debug, Default)]
 pub struct BuiltinCatalog {
@@ -76,6 +84,7 @@ impl BuiltinCatalog {
                 family: None,
                 kind: ColormapKind::Sequential,
                 lut: resample(&[[0, 0, 0], [255, 255, 255]], false),
+                smooth: None,
             }],
         }
     }
@@ -99,6 +108,8 @@ fn entry(m: MapRecord, families: &[ColormapFamily]) -> ColormapEntry {
     ColormapEntry {
         key: format!("{family_key}:{}", m.name),
         lut: resample(&m.stops, m.kind.is_discrete()),
+        smooth: (m.kind.is_discrete() && (2..=SMOOTH_MAX_COLORS).contains(&m.stops.len()))
+            .then(|| smooth(&m.stops)),
         name: m.name,
         family: Some(family_idx),
         kind: m.kind,

@@ -37,7 +37,7 @@ pub fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 
 impl ColormapAtlas {
     fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
-        let rows = row_capacity(device, registry::len());
+        let rows = row_capacity(device, registry::rows());
         let (texture, bind_group) = create_texture(device, rows);
         let mut atlas = Self {
             texture,
@@ -55,7 +55,7 @@ impl ColormapAtlas {
         if generation == self.generation {
             return;
         }
-        let needed = row_capacity(device, registry::len());
+        let needed = row_capacity(device, registry::rows());
         if needed > self.rows {
             (self.texture, self.bind_group) = create_texture(device, needed);
             self.rows = needed;

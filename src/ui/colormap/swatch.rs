@@ -18,7 +18,7 @@ impl SwatchAtlas {
         if self.texture.is_some() && self.generation == generation {
             return;
         }
-        let rows = registry::len().max(1);
+        let rows = registry::rows().max(1);
         let mut image = ColorImage::filled([LUT_SIZE, rows], Color32::BLACK);
         registry::for_each_lut(|id, lut| {
             let start = id as usize * LUT_SIZE;

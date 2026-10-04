@@ -15,7 +15,7 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
         return;
     }
 
-    let effective_colormap = app.preview_colormap.unwrap_or(app.active_colormap);
+    let effective_colormap = app.effective_colormap();
     let (min_val, max_val) = (app.color_range_min, app.color_range_max);
 
     let default_label = app.default_colorbar_label();

@@ -11,6 +11,8 @@ const STORAGE_KEY: &str = "octant.colormaps";
 pub struct ColormapState {
     /// Samples the active colormap from its end.
     pub reversed: bool,
+    /// Uses the smooth twin of a short categorical palette (not persisted).
+    pub smooth: bool,
     /// User-defined colormaps, registered in `utils::colormap::registry`.
     pub custom: Vec<CustomColormapSpec>,
     /// Registry generation last uploaded to the GPU atlas.
@@ -44,6 +46,17 @@ impl OctantApp {
             custom: self.colormaps.custom.clone(),
         };
         eframe::set_value(storage, STORAGE_KEY, &prefs);
+    }
+
+    /// Atlas row actually drawn: the previewed or active colormap, or its smooth
+    /// twin when "Smooth" is on and the palette has one.
+    pub fn effective_colormap(&self) -> u32 {
+        let id = self.preview_colormap.unwrap_or(self.active_colormap);
+        if self.colormaps.smooth {
+            registry::smooth_variant(id).unwrap_or(id)
+        } else {
+            id
+        }
     }
 
     /// Registers (or replaces) a custom colormap and returns its id.
@@ -139,5 +152,30 @@ mod tests {
                 .any(|s| s.name == "legacy_test_map")
         );
         registry::remove_custom("custom:legacy_test_map");
+    }
+}
+
+#[cfg(test)]
+mod smooth_tests {
+    use super::*;
+
+    #[test]
+    fn smooth_toggle_switches_to_the_twin_only_when_one_exists() {
+        let mut app = OctantApp::default();
+        let set1 = registry::find("colorbrewer:Set1").unwrap_or(0);
+        app.active_colormap = set1;
+        assert_eq!(app.effective_colormap(), set1);
+        app.colormaps.smooth = true;
+        assert_eq!(
+            Some(app.effective_colormap()),
+            registry::smooth_variant(set1)
+        );
+        app.active_colormap = registry::default_id();
+        assert_eq!(
+            app.effective_colormap(),
+            registry::default_id(),
+            "continuous maps are unaffected"
+        );
+        assert!(!OctantApp::default().colormaps.smooth, "smooth starts off");
     }
 }
