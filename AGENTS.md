@@ -10,6 +10,7 @@ When developing and reviewing code in this repository:
    - Always use checked arithmetic when computing multi-dimensional tensor shape volumes (`shape.iter().try_fold(...)`).
    - Run `cargo fmt --all -- --check` and `cargo clippy --all-targets -- -D warnings`.
    - For C-library/FFI test suites (e.g. NetCDF), serialize file creation with static mutex test locks to prevent concurrent non-reentrant IO collisions.
+   - Build size: `[profile.release]` (desktop and `trunk build --release`) keeps full speed (`opt-level = 3`) with `lto = true`, `codegen-units = 1` and `strip = true`; do not trade speed for size. Trunk runs `wasm-opt` at `-O3` (`data-wasm-opt` in `index.html`), with `data-wasm-opt-params` enabling the WASM features rustc emits by default (bulk memory, sign extension, ...); when rustc enables a new one, `wasm-opt` fails validation and the flag must be added there. CI (`rust.yml` `wasm` job, Trunk pinned in `rust.yml` and `pages.yml`) runs `scripts/check_wasm_size.sh`, which fails when the brotli-compressed `*_bg.wasm` exceeds `.github/wasm-size-budget` (bytes, set about 8% above the measured size). Raise the budget only in a dedicated commit that explains the growth.
 
 2. **Modular Architecture & Subsystem Layout**:
    - Follow the Open-Closed Principle (OCP): decompose monolithic modules into single-purpose submodules (< 250 lines per file, < 50 lines per function).
