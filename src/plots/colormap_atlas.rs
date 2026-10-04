@@ -145,5 +145,8 @@ pub fn bind(rpass: &mut wgpu::RenderPass<'static>, resources: &CallbackResources
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
+#[path = "colormap_atlas_probe.rs"]
+mod probe;
+#[cfg(all(test, not(target_arch = "wasm32")))]
 #[path = "colormap_atlas_tests.rs"]
 mod tests;

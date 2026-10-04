@@ -12,7 +12,7 @@
 
 use super::kind::ColormapKind;
 
-pub const MAGIC: &[u8; 8] = b"OCMAPS01";
+const MAGIC: &[u8; 8] = b"OCMAPS01";
 
 /// Provenance and license of one colormap family.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,7 +83,9 @@ pub fn decode(bytes: &[u8]) -> Result<CatalogRecords, String> {
     for _ in 0..map_count {
         let name = r.string()?;
         let family = r.u8()?;
-        let kind = ColormapKind::from_u8(r.u8()?);
+        let kind_byte = r.u8()?;
+        let kind = ColormapKind::from_u8(kind_byte)
+            .ok_or_else(|| format!("colormap '{name}' has unknown kind {kind_byte}"))?;
         let n = r.u16()?;
         let raw = r.take(n * 3)?;
         let stops = raw.as_chunks::<3>().0.to_vec();
@@ -98,6 +100,9 @@ pub fn decode(bytes: &[u8]) -> Result<CatalogRecords, String> {
             kind,
             stops,
         });
+    }
+    if r.pos != bytes.len() {
+        return Err(format!("{} trailing bytes", bytes.len() - r.pos));
     }
     Ok(CatalogRecords { families, maps })
 }

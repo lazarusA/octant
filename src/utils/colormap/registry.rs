@@ -18,13 +18,31 @@ pub const COLORMAP_RGB_COMPOSITE: u32 = u32::MAX;
 /// Key of the colormap selected on startup.
 pub const DEFAULT_COLORMAP_KEY: &str = "matplotlib:viridis";
 
-static CUSTOM: LazyLock<RwLock<Vec<ColormapEntry>>> = LazyLock::new(|| RwLock::new(Vec::new()));
+/// User-defined maps, plus the indexes of those with a smooth twin in row order.
+#[derive(Default)]
+struct Custom {
+    maps: Vec<ColormapEntry>,
+    twins: Vec<usize>,
+}
+
+impl Custom {
+    /// Rebuilds `twins` and the lock-free length after `maps` changed.
+    fn reindex(&mut self) {
+        self.twins = (0..self.maps.len())
+            .filter(|&i| self.maps[i].smooth.is_some())
+            .collect();
+        CUSTOM_LEN.store(self.maps.len(), Ordering::Release);
+        GENERATION.fetch_add(1, Ordering::AcqRel);
+    }
+}
+
+static CUSTOM: LazyLock<RwLock<Custom>> = LazyLock::new(|| RwLock::new(Custom::default()));
 static GENERATION: AtomicU64 = AtomicU64::new(1);
 /// Number of custom maps, kept in sync under the write lock so built-in rows
 /// and their twins resolve without taking the lock.
 static CUSTOM_LEN: AtomicUsize = AtomicUsize::new(0);
 
-fn custom() -> RwLockReadGuard<'static, Vec<ColormapEntry>> {
+fn custom() -> RwLockReadGuard<'static, Custom> {
     CUSTOM.read().unwrap_or_else(|p| p.into_inner())
 }
 
@@ -33,7 +51,7 @@ pub fn generation() -> u64 {
     GENERATION.load(Ordering::Acquire)
 }
 
-pub fn builtin_len() -> usize {
+pub(crate) fn builtin_len() -> usize {
     builtin().maps.len()
 }
 
@@ -53,19 +71,19 @@ pub fn with_entry<R>(id: u32, f: impl FnOnce(&ColormapEntry) -> R) -> Option<R> 
     if let Some(entry) = maps.get(idx) {
         return Some(f(entry));
     }
-    custom().get(idx - maps.len()).map(f)
+    custom().maps.get(idx - maps.len()).map(f)
 }
 
 /// Atlas rows: every colormap, then the built-in smooth twins, then the twins
 /// of custom maps.
 pub fn rows() -> usize {
-    len() + builtin_twins() + custom().iter().filter(|e| e.smooth.is_some()).count()
+    len() + builtin_twins() + custom().twins.len()
 }
 
 /// Visits every atlas row in order (see [`rows`]).
 pub fn for_each_lut(mut f: impl FnMut(u32, &Lut)) {
     let custom = custom();
-    let entries = || builtin().maps.iter().chain(custom.iter());
+    let entries = || builtin().maps.iter().chain(custom.maps.iter());
     let luts = entries()
         .map(|e| &*e.lut)
         .chain(entries().filter_map(|e| e.smooth.as_deref()));
@@ -75,7 +93,7 @@ pub fn for_each_lut(mut f: impl FnMut(u32, &Lut)) {
 }
 
 /// Atlas row of the smooth twin of colormap `id`, if it has one. O(1) for
-/// built-in maps; custom maps scan the (short) custom list.
+/// built-in maps, O(log n) for custom maps.
 pub fn smooth_variant(id: u32) -> Option<u32> {
     let idx = id as usize;
     let twin = if let Some(k) = builtin().twin_of.get(idx) {
@@ -83,12 +101,8 @@ pub fn smooth_variant(id: u32) -> Option<u32> {
     } else {
         let custom = custom();
         let local = idx - builtin_len();
-        custom.get(local)?.smooth.as_ref()?;
-        builtin_twins()
-            + custom[..local]
-                .iter()
-                .filter(|e| e.smooth.is_some())
-                .count()
+        custom.maps.get(local)?.smooth.as_ref()?;
+        builtin_twins() + custom.twins.partition_point(|&i| i < local)
     };
     u32::try_from(len() + twin).ok()
 }
@@ -105,11 +119,8 @@ fn with_row_lut<R>(row: u32, f: impl FnOnce(&Lut) -> R) -> Option<R> {
         return builtin().maps.get(map as usize)?.smooth.as_deref().map(f);
     }
     let custom = custom();
-    custom
-        .iter()
-        .filter_map(|e| e.smooth.as_deref())
-        .nth(k - builtin_twins())
-        .map(f)
+    let map = *custom.twins.get(k - builtin_twins())?;
+    custom.maps.get(map)?.smooth.as_deref().map(f)
 }
 
 /// Finds a colormap id by its stable key (`"family:name"`).
@@ -118,7 +129,7 @@ pub fn find(key: &str) -> Option<u32> {
     if let Some(i) = maps.iter().position(|e| e.key == key) {
         return u32::try_from(i).ok();
     }
-    let i = custom().iter().position(|e| e.key == key)?;
+    let i = custom().maps.iter().position(|e| e.key == key)?;
     u32::try_from(maps.len() + i).ok()
 }
 
@@ -135,45 +146,53 @@ pub fn key_of(id: u32) -> String {
 /// Whether atlas row `row` is a stepped (categorical) map, sampled with the
 /// nearest texel on both CPU and GPU. Smooth twins are continuous.
 pub fn is_stepped(row: u32) -> bool {
-    with_entry(row, |e| e.kind.is_discrete()).unwrap_or(false)
+    (row as usize) < len() && with_entry(row, |e| e.kind.is_discrete()).unwrap_or(false)
+}
+
+/// Whether `row` is an atlas row (a colormap or a smooth twin).
+pub fn is_row(row: u32) -> bool {
+    (row as usize) < rows()
 }
 
 /// Samples atlas row `id` (a colormap or a smooth twin) at `t` in [0, 1];
-/// unknown rows use the first map.
+/// unknown rows use the default colormap.
 pub fn sample(id: u32, t: f32) -> Color32 {
-    let nearest = is_stepped(id);
+    sample_row(id, t, is_stepped(id))
+}
+
+/// [`sample`] with the nearest-texel flag given by the caller (the plot
+/// uniforms carry it), as WGSL `sample_colormap` does.
+pub fn sample_row(id: u32, t: f32, nearest: bool) -> Color32 {
     with_row_lut(id, |lut| sample_lut(lut, t, nearest))
-        .or_else(|| builtin().maps.first().map(|e| sample_lut(&e.lut, t, false)))
+        .or_else(|| with_row_lut(default_id(), |lut| sample_lut(lut, t, false)))
         .unwrap_or(Color32::BLACK)
 }
 
 /// Adds a custom map, or replaces the one with the same key. Returns its id.
 pub fn upsert_custom(entry: ColormapEntry) -> u32 {
-    let mut maps = CUSTOM.write().unwrap_or_else(|p| p.into_inner());
-    let idx = match maps.iter().position(|e| e.key == entry.key) {
+    let mut custom = CUSTOM.write().unwrap_or_else(|p| p.into_inner());
+    let idx = match custom.maps.iter().position(|e| e.key == entry.key) {
         Some(i) => {
-            maps[i] = entry;
+            custom.maps[i] = entry;
             i
         }
         None => {
-            maps.push(entry);
-            CUSTOM_LEN.store(maps.len(), Ordering::Release);
-            maps.len() - 1
+            custom.maps.push(entry);
+            custom.maps.len() - 1
         }
     };
-    GENERATION.fetch_add(1, Ordering::AcqRel);
+    custom.reindex();
     u32::try_from(builtin_len() + idx).unwrap_or(0)
 }
 
 /// Removes a custom map by key. Ids of later custom maps shift down by one.
 pub fn remove_custom(key: &str) -> bool {
-    let mut maps = CUSTOM.write().unwrap_or_else(|p| p.into_inner());
-    let before = maps.len();
-    maps.retain(|e| e.key != key);
-    CUSTOM_LEN.store(maps.len(), Ordering::Release);
-    let removed = maps.len() != before;
+    let mut custom = CUSTOM.write().unwrap_or_else(|p| p.into_inner());
+    let before = custom.maps.len();
+    custom.maps.retain(|e| e.key != key);
+    let removed = custom.maps.len() != before;
     if removed {
-        GENERATION.fetch_add(1, Ordering::AcqRel);
+        custom.reindex();
     }
     removed
 }

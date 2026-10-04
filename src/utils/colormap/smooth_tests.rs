@@ -30,17 +30,11 @@ fn short_categorical_palettes_get_smooth_twins() {
 
     // The twin keeps the palette's first and last colors and blends in between,
     // while the original stays a step function.
-    assert_eq!(
-        sample_colormap_rgb(twin, 0.0),
-        sample_colormap_rgb(set1, 0.0)
-    );
-    assert_eq!(
-        sample_colormap_rgb(twin, 1.0),
-        sample_colormap_rgb(set1, 1.0)
-    );
+    assert_eq!(registry::sample(twin, 0.0), registry::sample(set1, 0.0));
+    assert_eq!(registry::sample(twin, 1.0), registry::sample(set1, 1.0));
     let distinct = |id: u32| {
         let mut seen: Vec<egui::Color32> = (0..=255)
-            .map(|i| sample_colormap_rgb(id, i as f32 / 255.0))
+            .map(|i| registry::sample(id, i as f32 / 255.0))
             .collect();
         seen.dedup();
         seen.len()
@@ -95,12 +89,12 @@ fn stepped_maps_never_mix_two_palette_colors() {
     let tab10 = registry::find("classic:tab10").unwrap_or(u32::MAX);
     assert!(registry::is_stepped(tab10));
     let palette: Vec<egui::Color32> = (0..10)
-        .map(|k| sample_colormap_rgb(tab10, (k as f32 + 0.5) / 10.0))
+        .map(|k| registry::sample(tab10, (k as f32 + 0.5) / 10.0))
         .collect();
     // Bin centers for any category count, including those landing between steps.
     for n in 1..=12 {
         for k in 0..n {
-            let c = sample_colormap_rgb(tab10, (k as f32 + 0.5) / n as f32);
+            let c = registry::sample(tab10, (k as f32 + 0.5) / n as f32);
             assert!(
                 palette.contains(&c),
                 "n={n} k={k} produced a mixed color {c:?}"

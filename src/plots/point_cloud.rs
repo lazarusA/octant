@@ -218,7 +218,7 @@ impl PointCloudRenderer {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct PointCloudUniformParams {
     pub color: super::common::PlotColorParams,
     pub rot_y: f32,
@@ -314,7 +314,7 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         super::colormap_atlas::prepare(device, queue, callback_resources);
-        let mut params = self.params.clone();
+        let mut params = self.params;
         params.screen_aspect = super::common::compute_aspect_ratio(&self.rect);
         self.renderer.update_uniforms(queue, &params);
         Vec::new()

@@ -40,7 +40,7 @@ impl FilterCache {
 
 /// Ids whose name or family name contain the query (ASCII case-insensitive) and
 /// that match the kind and family filters.
-pub fn filter_ids(key: &FilterKey) -> Vec<u32> {
+pub(super) fn filter_ids(key: &FilterKey) -> Vec<u32> {
     let families = &builtin().families;
     let query = key.query.trim();
     let total = u32::try_from(registry::len()).unwrap_or(u32::MAX);

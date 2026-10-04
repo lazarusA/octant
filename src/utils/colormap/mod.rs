@@ -11,7 +11,6 @@ pub mod format;
 pub mod kind;
 pub mod lut;
 pub mod registry;
-pub mod sample;
 pub mod scale;
 
 #[cfg(test)]
@@ -25,7 +24,6 @@ pub use catalog::{ColormapEntry, ColormapFamily, LICENSES_TEXT, builtin};
 pub use custom::{BlendSpace, CustomColormapSpec, Interpolation};
 pub use eval::evaluate_color_cpu;
 pub use kind::ColormapKind;
-pub use lut::{LUT_SIZE, Lut, orient, sample_lut};
+pub use lut::{LUT_SIZE, Lut, orient};
 pub use registry::COLORMAP_RGB_COMPOSITE;
-pub use sample::sample_colormap_rgb;
 pub use scale::{apply_color_scale_cpu, unscale_norm_to_value};

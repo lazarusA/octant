@@ -203,9 +203,12 @@ fn draw_categorical_colorbar(
             app.active_scale_type,
             app.scale_param,
         );
-        let color = crate::utils::colormap::sample_colormap_rgb(
+        // Same bin centering as the plot shaders, so swatches match the plot.
+        let bin = (norm_scaled.clamp(0.0, 0.999_999) * num_cats as f32).floor();
+        let t = (bin + 0.5) / num_cats as f32;
+        let color = crate::utils::colormap::registry::sample(
             effective_colormap,
-            crate::utils::colormap::orient(norm_scaled, app.colormaps.reversed),
+            crate::utils::colormap::orient(t, app.colormaps.reversed),
         );
 
         let x_start = bar_rect.min.x + t_start * bar_rect.width();
@@ -317,7 +320,7 @@ fn draw_continuous_colorbar(
             app.active_scale_type,
             app.scale_param,
         );
-        let color = crate::utils::colormap::sample_colormap_rgb(
+        let color = crate::utils::colormap::registry::sample(
             effective_colormap,
             crate::utils::colormap::orient(norm_scaled, app.colormaps.reversed),
         );

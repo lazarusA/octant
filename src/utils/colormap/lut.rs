@@ -76,11 +76,8 @@ pub fn orient(t: f32, reversed: bool) -> f32 {
 /// neighbouring texels blended linearly, or the nearest texel for stepped
 /// (categorical) maps so a sample between two steps never mixes two colors.
 pub fn sample_lut(lut: &Lut, t: f32, nearest: bool) -> Color32 {
-    let x = if t.is_finite() {
-        t.clamp(0.0, 1.0)
-    } else {
-        0.0
-    } * (LUT_SIZE - 1) as f32;
+    // NaN samples the start; infinities clamp to the ends (as WGSL `clamp`).
+    let x = if t.is_nan() { 0.0 } else { t.clamp(0.0, 1.0) } * (LUT_SIZE - 1) as f32;
     if nearest {
         let [r, g, b, _] = lut[((x + 0.5).floor() as usize).min(LUT_SIZE - 1)];
         return Color32::from_rgb(r, g, b);

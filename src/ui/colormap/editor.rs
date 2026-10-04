@@ -18,7 +18,7 @@ pub struct EditorState {
 }
 
 /// Id of the "Custom colormap" section's open state (stable, so tests can open it).
-pub fn section_id(ui: &egui::Ui) -> egui::Id {
+pub(super) fn section_id(ui: &egui::Ui) -> egui::Id {
     ui.make_persistent_id(("colormap_custom_editor", 0))
 }
 

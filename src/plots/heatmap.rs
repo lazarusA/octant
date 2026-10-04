@@ -62,7 +62,6 @@ pub struct HeatmapRenderer {
     num_indices: u32,
     width: AtomicU32,
     height: AtomicU32,
-    coord_mode: AtomicU32,
     lut_size_x: AtomicU32,
     lut_size_y: AtomicU32,
     tile_bounds: RwLock<[f32; 4]>,
@@ -276,7 +275,6 @@ impl HeatmapRenderer {
             num_indices: indices.len() as u32,
             width: AtomicU32::new(width as u32),
             height: AtomicU32::new(height as u32),
-            coord_mode: AtomicU32::new(initial_coord_mode),
             lut_size_x: AtomicU32::new(lut_size_x as u32),
             lut_size_y: AtomicU32::new(lut_size_y as u32),
             tile_bounds: RwLock::new([0.0, 0.0, 1.0, 1.0]),
@@ -297,7 +295,6 @@ impl HeatmapRenderer {
             .read()
             .map(|b| *b)
             .unwrap_or([0.0, 0.0, 1.0, 1.0]);
-        self.coord_mode.store(coord_mode, Ordering::Relaxed);
         let uniforms = HeatmapUniforms {
             pan,
             zoom,

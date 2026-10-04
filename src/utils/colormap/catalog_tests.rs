@@ -65,11 +65,11 @@ fn previously_shipped_colormaps_remain_available() {
 fn viridis_matches_reference_endpoints() {
     let id = registry::default_id();
     assert_eq!(
-        sample_colormap_rgb(id, 0.0),
+        registry::sample(id, 0.0),
         egui::Color32::from_rgb(68, 1, 84)
     );
     assert_eq!(
-        sample_colormap_rgb(id, 1.0),
+        registry::sample(id, 1.0),
         egui::Color32::from_rgb(253, 231, 37)
     );
 }
@@ -80,11 +80,11 @@ fn lut_resampling_and_sampling() {
     assert_eq!(lut[0], [0, 0, 0, 255]);
     assert_eq!(lut[255], [255, 255, 255, 255]);
     assert_eq!(
-        sample_lut(&lut, 0.5, false),
+        lut::sample_lut(&lut, 0.5, false),
         egui::Color32::from_rgb(128, 128, 128)
     );
     assert_eq!(
-        sample_lut(&lut, f32::NAN, false),
+        lut::sample_lut(&lut, f32::NAN, false),
         egui::Color32::from_rgb(0, 0, 0)
     );
 
@@ -104,14 +104,8 @@ fn reversed_params_flip_sampling() {
     params.cmin = 0.0;
     params.cmax = 1.0;
     let id = params.colormap;
-    assert_eq!(
-        evaluate_color_cpu(0.0, &params),
-        sample_colormap_rgb(id, 1.0)
-    );
-    assert_eq!(
-        evaluate_color_cpu(1.0, &params),
-        sample_colormap_rgb(id, 0.0)
-    );
+    assert_eq!(evaluate_color_cpu(0.0, &params), registry::sample(id, 1.0));
+    assert_eq!(evaluate_color_cpu(1.0, &params), registry::sample(id, 0.0));
 }
 
 #[test]
@@ -135,6 +129,15 @@ fn format_round_trips() {
     assert_eq!(format::decode(&bytes), Ok(records));
     assert!(format::decode(&bytes[..bytes.len() - 1]).is_err());
     assert!(format::decode(b"nope").is_err());
+
+    let mut trailing = bytes.clone();
+    trailing.push(0);
+    assert!(format::decode(&trailing).is_err());
+    // The kind byte precedes the stop count (u16) and the two RGB stops.
+    let mut bad_kind = bytes;
+    let kind_at = bad_kind.len() - 6 - 2 - 1;
+    bad_kind[kind_at] = 99;
+    assert!(format::decode(&bad_kind).is_err());
 }
 
 #[test]
@@ -171,7 +174,7 @@ fn custom_colormaps_register_replace_and_remove() {
         "same name replaces in place"
     );
     assert_eq!(
-        sample_colormap_rgb(id, 0.5),
+        registry::sample(id, 0.5),
         egui::Color32::from_rgb(255, 0, 0)
     );
 
