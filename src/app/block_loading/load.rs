@@ -4,6 +4,20 @@ use crate::app::OctantApp;
 use crate::data::{BlockRequest, DimensionSelection, SliceRequest};
 
 impl OctantApp {
+    /// Plots the current slider selection (the Plot button): aborts pending
+    /// fetches, moves the step into the selected range of the animated axis so
+    /// a new selection never shows a step it excludes, and loads. Playback
+    /// loads with `load_selected_variable_block` and may run past that range.
+    pub fn plot_selection(&mut self) {
+        self.block_prefetcher.abort();
+        if let Some(anim_dim) = self.animated_dim
+            && let Some(&(start, end)) = self.selected_dim_ranges.get(anim_dim)
+        {
+            self.current_timestep = self.current_timestep.clamp(start, end.max(start));
+        }
+        self.load_selected_variable_block();
+    }
+
     /// Loads the block corresponding to the current animated step and selections.
     pub fn load_selected_variable_block(&mut self) {
         let Some(metadata) = &self.active_dataset_metadata else {
@@ -26,10 +40,6 @@ impl OctantApp {
             let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
             if full_extent > 0 && self.current_timestep >= full_extent {
                 self.current_timestep = full_extent - 1;
-            }
-            // A new selection never plots a step it excludes.
-            if let Some(&(start, end)) = self.selected_dim_ranges.get(anim_dim) {
-                self.current_timestep = self.current_timestep.clamp(start, end.max(start));
             }
             if anim_dim < self.selected_dim_indices.len() {
                 self.selected_dim_indices[anim_dim] = self.current_timestep;

@@ -27,8 +27,7 @@ fn new_volume_app() -> OctantApp {
 /// What the Plot button does (`src/ui/variables_panel/mod.rs`), then drains
 /// the prefetcher the way the frame loop does.
 fn press_plot(app: &mut OctantApp) {
-    app.block_prefetcher.abort();
-    app.load_selected_variable_block();
+    app.plot_selection();
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
         app.poll_block_prefetch_results();
@@ -216,4 +215,35 @@ fn depth_animated_volume_plot_with_step_past_the_range() {
     set_range(&mut app, 1, (0, 15));
     press_plot(&mut app);
     assert_volume_matches(&app, 0, [(0, 15), (0, 31), (0, 31)], "step past range");
+}
+
+/// What the playback timer does each frame (`src/app/ui.rs`): advance the step
+/// and load, then drain the prefetcher.
+fn play_to(app: &mut OctantApp, t: usize) {
+    app.current_timestep = t;
+    app.load_selected_variable_block();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        app.poll_block_prefetch_results();
+        if app.block_prefetcher.pending_count() == 0 {
+            break;
+        }
+        assert!(Instant::now() < deadline, "prefetcher did not finish");
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+
+#[test]
+fn volume_playback_steps_past_the_selected_time_window() {
+    let mut app = new_volume_app();
+    // A short time window, as the memory budget picks for large datasets:
+    // playback still runs over every timestep.
+    set_range(&mut app, 0, (0, 3));
+    press_plot(&mut app);
+    assert_volume_matches(&app, 0, [(0, 31), (0, 31), (0, 31)], "first plot");
+    for t in 1..8 {
+        play_to(&mut app, t);
+        assert_eq!(app.current_timestep, t, "playback must reach step {t}");
+        assert_volume_matches(&app, t, [(0, 31), (0, 31), (0, 31)], "playback");
+    }
 }
