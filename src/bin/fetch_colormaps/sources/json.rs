@@ -1,5 +1,6 @@
 //! JSON upstream formats: ColorBrewer, Paul Tol's `colors.json`, Catppuccin's
 //! `palette.json` and CMasher's `.jscm` files.
+//! Objects are read in file order (`serde_json` with `preserve_order`).
 
 use super::text::{css_rgb, hex_rgb};
 use octant::utils::colormap::ColormapKind;
@@ -38,12 +39,14 @@ pub fn tol(text: &str) -> Result<Vec<Palette>, String> {
         .get("colorsets")
         .and_then(Value::as_object)
         .ok_or("no colorsets")?;
-    for name in sets.keys() {
-        out.push((
-            name.clone(),
-            ColormapKind::Categorical,
-            object_hexes_in_order(text, name),
-        ));
+    for (name, set) in sets {
+        let colors = set
+            .as_object()
+            .ok_or_else(|| format!("colorset `{name}` is not an object"))?
+            .values()
+            .filter_map(|c| hex_rgb(c.as_str()?))
+            .collect();
+        out.push((name.clone(), ColormapKind::Categorical, colors));
     }
     let maps = root
         .get("colormaps")
@@ -93,15 +96,6 @@ fn tol_discrete_rainbow(root: &Value) -> Vec<[f64; 3]> {
                 .collect()
         })
         .unwrap_or(colors)
-}
-
-/// Hex values of `"name": { ... }` in source order (`serde_json` maps are sorted).
-fn object_hexes_in_order(text: &str, name: &str) -> Vec<[f64; 3]> {
-    let Some(start) = text.find(&format!("\"{name}\": {{")) else {
-        return Vec::new();
-    };
-    let body = text[start..].split('}').next().unwrap_or_default();
-    body.split('"').filter_map(hex_rgb).collect()
 }
 
 /// Catppuccin `palette.json`: the accent colors of each flavor, in palette order.
@@ -197,6 +191,42 @@ mod tests {
         assert_eq!(
             jscm(j),
             Ok((ColormapKind::Cyclic, vec![[0.0; 3], [1.0; 3]]))
+        );
+    }
+
+    #[test]
+    fn names_and_colors_follow_file_order() {
+        let pair = r#"["rgb(0,0,0)", "rgb(255,255,255)"]"#;
+        let brewer = format!(
+            r#"{{"YlGn": {{"2": {pair}, "type": "seq"}}, "Accent": {{"2": {pair}, "type": "qual"}}, "PuOr": {{"2": {pair}, "type": "div"}}}}"#
+        );
+        let names: Vec<String> = colorbrewer(&brewer)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| p.0)
+            .collect();
+        assert_eq!(names, ["YlGn", "Accent", "PuOr"]);
+
+        let tol_json = r##"{"colorsets": {"vibrant": {"orange": "#FF0000", "blue": "#0000FF", "cyan": "#00FF00"}, "bright": {"blue": "#0000FF"}},
+            "colormaps": {"YlOrBr": {"colors": ["#000000", "#FFFFFF"]}, "BuRd": {"colors": ["#000000", "#FFFFFF"]}},
+            "rainbow_linear": {"colors": ["#000000", "#FFFFFF"]},
+            "rainbow_discrete": {"colors": ["#000000", "#FFFFFF"], "indexes": [[0, 1]]}}"##;
+        let t = tol(tol_json).unwrap_or_default();
+        let names: Vec<&str> = t.iter().map(|p| p.0.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "vibrant",
+                "bright",
+                "YlOrBr",
+                "BuRd",
+                "rainbow",
+                "rainbow_discrete"
+            ]
+        );
+        assert_eq!(
+            t[0].2,
+            vec![[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]]
         );
     }
 }

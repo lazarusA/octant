@@ -1,7 +1,7 @@
 //! Palette collections (mostly categorical) from R packages, themes and paintings.
 
 use super::notices::{PAINTINGS_NOTICE, PNW_LICENSE};
-use super::urls::*;
+use super::palette_urls::*;
 use super::{Family, License, Source, picks};
 
 pub const FAMILIES: &[Family] = &[

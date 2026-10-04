@@ -5,37 +5,8 @@ use super::notices::{
     CVD_FACTS_NOTICE, KRZYWINSKI_COPYRIGHT, KRZYWINSKI_NOTICE, MORELAND_NOTICE, PETROFF_NOTICE,
 };
 use super::urls::*;
-use super::{Family, License, Source, picks};
-use octant::utils::colormap::ColormapKind::{Categorical, Diverging, Other, Sequential};
-
-macro_rules! moreland {
-    ($dir:literal, $name:literal, $kind:expr) => {
-        Source::Table {
-            url: concat!(
-                "https://www.kennethmoreland.com/color-advice/",
-                $dir,
-                "/",
-                $dir,
-                "-table-byte-0256.csv"
-            ),
-            name: $name,
-            kind: $kind,
-        }
-    };
-}
-
-macro_rules! krzywinski {
-    ($n:literal) => {
-        Source::Krzywinski {
-            url: concat!(
-                "https://mk.bcgsc.ca/colorblind/palettes/",
-                $n,
-                ".color.blindness.palette.txt"
-            ),
-            name: concat!("krzywinski", $n),
-        }
-    };
-}
+use super::{Family, License, Source, live, picks};
+use octant::utils::colormap::ColormapKind::Categorical;
 
 pub const FAMILIES: &[Family] = &[
     Family {
@@ -89,14 +60,7 @@ pub const FAMILIES: &[Family] = &[
         source: MORELAND,
         attribution: "Kenneth Moreland; Kindlmann, Reinhard & Creem (2002); \
                       Samsel, Scott & Moreland (Fast, 2024); ParaView (Kitware)",
-        sources: &[
-            moreland!("smooth-cool-warm", "smooth_cool_warm", Diverging),
-            moreland!("bent-cool-warm", "bent_cool_warm", Diverging),
-            moreland!("black-body", "black_body", Sequential),
-            moreland!("kindlmann", "kindlmann", Sequential),
-            moreland!("extended-kindlmann", "extended_kindlmann", Sequential),
-            moreland!("fast", "fast", Other),
-        ],
+        sources: live::MORELAND_TABLES,
     },
     Family {
         key: "tol",
@@ -132,12 +96,7 @@ pub const FAMILIES: &[Family] = &[
         notice: Some(KRZYWINSKI_NOTICE),
         source: "https://mk.bcgsc.ca/colorblind/palettes.mhtml",
         attribution: "Martin Krzywinski (8-color palette adapted from Bang Wong, Nature Methods 8:441, 2011)",
-        sources: &[
-            krzywinski!("8"),
-            krzywinski!("12"),
-            krzywinski!("15"),
-            krzywinski!("24"),
-        ],
+        sources: live::KRZYWINSKI_PALETTES,
     },
     Family {
         key: "colorblind",

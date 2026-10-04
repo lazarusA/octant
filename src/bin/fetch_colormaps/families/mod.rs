@@ -6,7 +6,9 @@
 //! Copyleft and non-commercial licenses are refused by [`check_compatible`].
 
 mod classic;
+mod live;
 mod notices;
+mod palette_urls;
 mod palettes;
 mod picks;
 mod scientific;
@@ -30,10 +32,18 @@ pub const COMPATIBLE_LICENSES: &[&str] = &[
     "LicenseRef-Public-Domain-Facts",
 ];
 
+/// A downloaded file and the MD5 of its expected content. Fresh downloads and
+/// cached copies are both verified, so upstream drift is an error, not a silent change.
+#[derive(Clone, Copy)]
+pub struct Remote {
+    pub url: &'static str,
+    pub md5: &'static str,
+}
+
 /// Where a family's license text comes from.
 pub enum License {
     /// The official license file(s) published by the upstream project(s).
-    Urls(&'static [&'static str]),
+    Urls(&'static [Remote]),
     /// Text kept here because upstream ships no license file.
     Inline(&'static str),
     /// Packages declaring MIT without the full text: the MIT text with this copyright line.
@@ -44,48 +54,50 @@ pub enum License {
 pub type Pick = (&'static str, &'static str, ColormapKind);
 
 /// Where a family's colormaps come from. Every URL points at the original
-/// project, pinned to a commit or release where the host allows it.
+/// project, pinned to a commit or release where the host allows it, and every
+/// [`Remote`] is checked against its MD5. Per-map files listed upstream
+/// (`rgb_base`, `raw_base`, `base`) must be commit-pinned.
 pub enum Source {
     /// Matplotlib `_cm.py` `datad` entries (segment tables, functions, lists, listed).
     MatplotlibCm {
-        url: &'static str,
+        url: Remote,
         maps: &'static [Pick],
     },
     /// Python float tables `var = [[r, g, b], ...]` (Matplotlib, BIDS, seaborn).
     PyTables {
-        url: &'static str,
+        url: Remote,
         maps: &'static [Pick],
     },
     /// A C source with an `unsigned char <array>[256][3]` table (Turbo).
     CBytes {
-        url: &'static str,
+        url: Remote,
         array: &'static str,
         name: &'static str,
         kind: ColormapKind,
     },
     /// One numeric table (CSV or whitespace separated, 0–1 or 0–255).
     Table {
-        url: &'static str,
+        url: Remote,
         name: &'static str,
         kind: ColormapKind,
     },
     /// colorcet `__init__.py`: every `# cmap_def` table, named by its alias table.
     Colorcet {
-        url: &'static str,
+        url: Remote,
     },
     /// cmocean `cm.py` `cmapnames`, each read from `<rgb_base><name>-rgb.txt`.
     Cmocean {
-        cm_py: &'static str,
+        cm_py: Remote,
         rgb_base: &'static str,
     },
     /// CMasher `.jscm` files listed through the GitHub tree API.
     Cmasher {
-        tree_api: &'static str,
+        tree_api: Remote,
         raw_base: &'static str,
     },
     /// Crameri's Zenodo archive: `<n>/<n>.txt` and `CategoricalPalettes/<n>S.txt`.
     CrameriZip {
-        url: &'static str,
+        url: Remote,
         cache: &'static str,
     },
     /// cmyt modules `<base><name>.py`.
@@ -95,44 +107,44 @@ pub enum Source {
     },
     /// seaborn `SEABORN_PALETTES`.
     SeabornPalettes {
-        url: &'static str,
+        url: Remote,
     },
     ColorBrewer {
-        url: &'static str,
+        url: Remote,
     },
     Tol {
-        url: &'static str,
+        url: Remote,
     },
     CartoTs {
-        url: &'static str,
+        url: Remote,
     },
     /// An R `<list> <- list(name = c("#..."), ...)` of palettes.
     RList {
-        url: &'static str,
+        url: Remote,
         list: &'static str,
     },
     /// YAML `Name:` / `- '#hex'` lists (ghibli).
     Yaml {
-        url: &'static str,
+        url: Remote,
     },
     Catppuccin {
-        url: &'static str,
+        url: Remote,
     },
     /// CSS custom properties `--<prefix>N` (Nord).
     CssVars {
-        url: &'static str,
+        url: Remote,
         prefix: &'static str,
         name: &'static str,
     },
     /// Krzywinski palette file (`-main` rows).
     Krzywinski {
-        url: &'static str,
+        url: Remote,
         name: &'static str,
     },
     /// Named schemes from a ColorSchemes.jl data file. Deliberate exception: only
     /// for palettes the ColorSchemes.jl authors created themselves (Paintings).
     ColorSchemesJl {
-        url: &'static str,
+        url: Remote,
         names: &'static [&'static str],
     },
     /// Published values without a machine-readable file, cited in the notice.

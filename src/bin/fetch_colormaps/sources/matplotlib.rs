@@ -2,38 +2,54 @@
 //! does for a 256-entry lookup table: segment tables, generator functions,
 //! color lists (`LinearSegmentedColormap.from_list`) and listed palettes.
 
-use super::mpl_functions::function;
+use super::mpl_functions::{CUBEHELIX_SOURCE, function, require_lines};
 use super::pylit::{Value, assignment};
 use std::f64::consts::PI;
 
 pub const N: usize = 256;
 
-/// A Matplotlib map: 256 interpolated samples, or the colors of a listed palette.
-pub enum MplMap {
-    Sampled(Vec<[f64; 3]>),
-    Listed(Vec<[f64; 3]>),
+/// `datad` of a `_cm.py` module, parsed once and evaluated per map.
+pub struct Datad<'a> {
+    text: &'a str,
+    dict: Value,
 }
 
-/// Resolves `datad[name]` from `_cm.py` and evaluates it.
-pub fn datad_map(text: &str, name: &str) -> Result<MplMap, String> {
-    let datad = assignment(text, "datad")?;
-    let entry = datad
-        .get(name)
-        .ok_or_else(|| format!("datad has no `{name}`"))?;
-    if let Some(Value::Ident(var)) = entry.get("listed") {
-        return listed(&assignment(text, var)?).map(MplMap::Listed);
+impl<'a> Datad<'a> {
+    pub fn parse(text: &'a str) -> Result<Self, String> {
+        Ok(Self {
+            text,
+            dict: assignment(text, "datad")?,
+        })
     }
-    let Value::Ident(var) = entry else {
-        return Err(format!("datad `{name}` is not a variable"));
-    };
-    spec(&assignment(text, var)?).map(MplMap::Sampled)
+
+    /// Evaluates `datad[name]`: 256 samples, or the colors of a listed palette.
+    pub fn map(&self, name: &str) -> Result<Vec<[f64; 3]>, String> {
+        let entry = self
+            .dict
+            .get(name)
+            .ok_or_else(|| format!("datad has no `{name}`"))?;
+        if let Some(Value::Ident(var)) = entry.get("listed") {
+            return listed(&assignment(self.text, var)?);
+        }
+        let Value::Ident(var) = entry else {
+            return Err(format!("datad `{name}` is not a variable"));
+        };
+        spec(&assignment(self.text, var)?, self.text).map_err(|e| format!("datad `{name}`: {e}"))
+    }
 }
 
 /// Evaluates a segment-data dict, a `cubehelix()` call, or a color list.
-pub fn spec(value: &Value) -> Result<Vec<[f64; 3]>, String> {
-    if let Value::Call { name, .. } = value
+/// Generator functions must still be defined in `source` as they were ported.
+pub fn spec(value: &Value, source: &str) -> Result<Vec<[f64; 3]>, String> {
+    if let Value::Call { name, args, kwargs } = value
         && name == "cubehelix"
     {
+        if !args.is_empty() || !kwargs.is_empty() {
+            return Err(
+                "cubehelix() is called with arguments; only the defaults are ported".into(),
+            );
+        }
+        require_lines(source, "cubehelix", CUBEHELIX_SOURCE)?;
         return Ok(sample_fns(
             |x| cubehelix(x, -0.14861, 1.78277),
             |x| cubehelix(x, -0.29227, -0.90649),
@@ -42,7 +58,8 @@ pub fn spec(value: &Value) -> Result<Vec<[f64; 3]>, String> {
     }
     if value.get("red").is_some() {
         let channel = |key: &str| -> Result<Vec<f64>, String> {
-            channel_lut(value.get(key).ok_or_else(|| format!("missing `{key}`"))?)
+            let def = value.get(key).ok_or_else(|| format!("missing `{key}`"))?;
+            channel_lut(def, source)
         };
         let (r, g, b) = (channel("red")?, channel("green")?, channel("blue")?);
         return Ok((0..N).map(|i| [r[i], g[i], b[i]]).collect());
@@ -66,9 +83,9 @@ fn from_list(value: &Value) -> Result<Vec<[f64; 3]>, String> {
     }
     let table = |k: usize| rows.iter().map(|r| [r[0], r[k], r[k]]).collect::<Vec<_>>();
     let (r, g, b) = (
-        segment_lut(&table(1)),
-        segment_lut(&table(2)),
-        segment_lut(&table(3)),
+        segment_lut(&table(1))?,
+        segment_lut(&table(2))?,
+        segment_lut(&table(3))?,
     );
     Ok((0..N).map(|i| [r[i], g[i], b[i]]).collect())
 }
@@ -94,30 +111,42 @@ fn rgb(parts: &[Value]) -> Result<[f64; 3], String> {
     }
 }
 
-fn channel_lut(value: &Value) -> Result<Vec<f64>, String> {
+fn channel_lut(value: &Value, source: &str) -> Result<Vec<f64>, String> {
     match value {
         Value::Seq(rows) => {
             let table: Result<Vec<[f64; 3]>, String> = rows
                 .iter()
                 .map(|r| rgb(r.seq().unwrap_or_default()))
                 .collect();
-            Ok(segment_lut(&table?))
+            segment_lut(&table?)
         }
         Value::Ident(name) => {
             let f = function(name).ok_or_else(|| format!("unknown function `{name}`"))?;
+            require_lines(source, name, f.source)?;
             Ok((0..N)
-                .map(|i| f(i as f64 / (N - 1) as f64).clamp(0.0, 1.0))
+                .map(|i| (f.eval)(i as f64 / (N - 1) as f64).clamp(0.0, 1.0))
                 .collect())
         }
         _ => Err("unsupported channel definition".into()),
     }
 }
 
-/// `matplotlib.colors._create_lookup_table` for `(x, y0, y1)` rows, gamma 1.
-pub fn segment_lut(rows: &[[f64; 3]]) -> Vec<f64> {
+/// `matplotlib.colors._create_lookup_table` for `(x, y0, y1)` rows, gamma 1,
+/// with the checks of `LinearSegmentedColormap`: at least two rows, `x` from 0
+/// to 1 and never decreasing.
+pub fn segment_lut(rows: &[[f64; 3]]) -> Result<Vec<f64>, String> {
     let (Some(first), Some(last)) = (rows.first(), rows.last()) else {
-        return vec![0.0; N];
+        return Err("segment table is empty".into());
     };
+    if rows.len() < 2 {
+        return Err("segment table needs at least two rows".into());
+    }
+    if first[0] != 0.0 || last[0] != 1.0 {
+        return Err("segment table must start at x=0 and end at x=1".into());
+    }
+    if rows.windows(2).any(|w| w[1][0] < w[0][0]) {
+        return Err("segment table x must be in increasing order".into());
+    }
     let x: Vec<f64> = rows.iter().map(|r| r[0] * (N - 1) as f64).collect();
     let mut lut = vec![first[2]; N];
     for (i, v) in lut.iter_mut().enumerate().take(N - 1).skip(1) {
@@ -127,7 +156,7 @@ pub fn segment_lut(rows: &[[f64; 3]]) -> Vec<f64> {
         *v = distance * (rows[ind][1] - rows[ind - 1][2]) + rows[ind - 1][2];
     }
     lut[N - 1] = last[1];
-    lut.iter().map(|v| v.clamp(0.0, 1.0)).collect()
+    Ok(lut.iter().map(|v| v.clamp(0.0, 1.0)).collect())
 }
 
 fn sample_fns(
@@ -155,37 +184,5 @@ fn cubehelix(x: f64, p0: f64, p1: f64) -> f64 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn segment_lut_matches_matplotlib_gray_and_steps() {
-        let gray = segment_lut(&[[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]);
-        assert_eq!(gray[0], 0.0);
-        assert!((gray[128] - 128.0 / 255.0).abs() < 1e-12);
-        assert_eq!(gray[255], 1.0);
-        // A discontinuity at 0.5 jumps from y0 (left side) to y1 (right side).
-        let step = segment_lut(&[[0.0, 0.0, 0.0], [0.5, 0.2, 0.8], [1.0, 1.0, 1.0]]);
-        assert!(step[127] < 0.2 && step[128] > 0.8);
-    }
-
-    #[test]
-    fn evaluates_datad_entries() {
-        let py = "_gray_data = {'red': ((0., 0, 0), (1., 1, 1)), 'green': ((0., 0, 0), (1., 1, 1)), 'blue': ((0., 0, 0), (1., 1, 1))}\n\
-                  _ocean_data = {'red': gfunc[23], 'green': gfunc[28], 'blue': gfunc[3]}\n\
-                  _t_data = ((1.0, 0.0, 0.0), (0.0, 0.0, 1.0))\n\
-                  datad = {'gray': _gray_data, 'ocean': _ocean_data, 't': {'listed': _t_data}}\n";
-        let Ok(MplMap::Sampled(gray)) = datad_map(py, "gray") else {
-            panic!("gray")
-        };
-        assert_eq!(gray[255], [1.0, 1.0, 1.0]);
-        let Ok(MplMap::Sampled(ocean)) = datad_map(py, "ocean") else {
-            panic!("ocean")
-        };
-        assert_eq!(ocean[0], [0.0, 0.5, 0.0]);
-        let Ok(MplMap::Listed(t)) = datad_map(py, "t") else {
-            panic!("listed")
-        };
-        assert_eq!(t.len(), 2);
-    }
-}
+#[path = "matplotlib_tests.rs"]
+mod tests;
