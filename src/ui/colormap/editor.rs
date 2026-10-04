@@ -41,22 +41,12 @@ fn edit_spec(ui: &mut egui::Ui, editor: &mut EditorState) {
             .on_hover_text("Hex, rgb(), hsl() or CSS color names, optionally with positions");
             ui.end_row();
             ui.label("Interpolation");
-            combo(
-                ui,
-                "colormap_editor_interp",
-                &mut spec.interpolation,
-                &Interpolation::ALL,
-                |i| i.label(),
-            );
+            choices(ui, &mut spec.interpolation, &Interpolation::ALL, |i| {
+                i.label()
+            });
             ui.end_row();
             ui.label("Blend");
-            combo(
-                ui,
-                "colormap_editor_blend",
-                &mut spec.blend,
-                &BlendSpace::ALL,
-                |b| b.label(),
-            );
+            choices(ui, &mut spec.blend, &BlendSpace::ALL, |b| b.label());
             ui.end_row();
             ui.label("Classes");
             ui.add(egui::DragValue::new(&mut spec.classes).range(0..=64))
@@ -76,20 +66,20 @@ fn edit_spec(ui: &mut egui::Ui, editor: &mut EditorState) {
     }
 }
 
-fn combo<T: Copy + PartialEq>(
+/// Inline selectable options. A dropdown would open its own popup layer, and a
+/// click there counts as "outside" the colormap popup and closes it.
+fn choices<T: Copy + PartialEq>(
     ui: &mut egui::Ui,
-    salt: &'static str,
     value: &mut T,
     options: &[T],
     label: fn(T) -> &'static str,
 ) {
-    egui::ComboBox::from_id_salt((salt, 0))
-        .selected_text(label(*value))
-        .show_ui(ui, |ui| {
-            for &opt in options {
-                ui.selectable_value(value, opt, label(opt));
-            }
-        });
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        for &opt in options {
+            ui.selectable_value(value, opt, label(opt));
+        }
+    });
 }
 
 /// Rebuilds the preview LUT only when the spec changed.

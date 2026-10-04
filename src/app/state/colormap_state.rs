@@ -1,4 +1,4 @@
-//! Colormap selection, user-defined colormaps and their persistence.
+//! Colormap selection state and user-defined colormaps (the only persisted part).
 
 use super::app_state::OctantApp;
 use crate::utils::colormap::{CustomColormapSpec, registry};
@@ -18,16 +18,15 @@ pub struct ColormapState {
     pub picker: crate::ui::colormap::PickerState,
 }
 
-/// Persisted colormap preferences (eframe storage).
+/// Persisted colormap preferences (eframe storage). Only user-defined colormaps
+/// are kept; the active colormap and the reversed toggle reset on every launch.
 #[derive(Serialize, Deserialize, Default)]
 struct ColormapPrefs {
-    active: String,
-    reversed: bool,
     custom: Vec<CustomColormapSpec>,
 }
 
 impl OctantApp {
-    /// Restores custom colormaps and the active selection from eframe storage.
+    /// Restores the user's custom colormaps from eframe storage.
     pub fn load_colormap_prefs(&mut self, storage: Option<&dyn eframe::Storage>) {
         let Some(prefs) = storage.and_then(|s| eframe::get_value::<ColormapPrefs>(s, STORAGE_KEY))
         else {
@@ -38,14 +37,10 @@ impl OctantApp {
                 log::warn!("Skipping stored custom colormap: {e}");
             }
         }
-        self.colormaps.reversed = prefs.reversed;
-        self.active_colormap = registry::find(&prefs.active).unwrap_or_else(registry::default_id);
     }
 
     pub fn save_colormap_prefs(&self, storage: &mut dyn eframe::Storage) {
         let prefs = ColormapPrefs {
-            active: registry::key_of(self.active_colormap),
-            reversed: self.colormaps.reversed,
             custom: self.colormaps.custom.clone(),
         };
         eframe::set_value(storage, STORAGE_KEY, &prefs);
@@ -71,5 +66,78 @@ impl OctantApp {
         self.colormaps.custom.retain(|s| s.key() != key);
         self.active_colormap = registry::find(&active_key).unwrap_or_else(registry::default_id);
         self.preview_colormap = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eframe::Storage as _;
+    use std::collections::HashMap;
+
+    #[derive(Default)]
+    struct MemoryStorage(HashMap<String, String>);
+
+    impl eframe::Storage for MemoryStorage {
+        fn get_string(&self, key: &str) -> Option<String> {
+            self.0.get(key).cloned()
+        }
+        fn set_string(&mut self, key: &str, value: String) {
+            self.0.insert(key.to_string(), value);
+        }
+        fn remove_string(&mut self, key: &str) {
+            self.0.remove(key);
+        }
+        fn flush(&mut self) {}
+    }
+
+    #[test]
+    fn only_custom_colormaps_survive_a_restart() {
+        let mut app = OctantApp::default();
+        let spec = CustomColormapSpec {
+            name: "persist_test_map".into(),
+            colors: "black, white".into(),
+            ..Default::default()
+        };
+        let Ok(custom_id) = app.add_custom_colormap(spec) else {
+            panic!("valid spec rejected");
+        };
+        app.active_colormap = custom_id;
+        app.colormaps.reversed = true;
+
+        let mut storage = MemoryStorage::default();
+        app.save_colormap_prefs(&mut storage);
+
+        let mut restarted = OctantApp::default();
+        restarted.load_colormap_prefs(Some(&storage));
+        assert_eq!(restarted.active_colormap, registry::default_id());
+        assert!(!restarted.colormaps.reversed);
+        assert!(
+            restarted
+                .colormaps
+                .custom
+                .iter()
+                .any(|s| s.name == "persist_test_map")
+        );
+        registry::remove_custom("custom:persist_test_map");
+    }
+
+    #[test]
+    fn older_prefs_with_a_saved_selection_are_ignored() {
+        let mut storage = MemoryStorage::default();
+        let old = "(active: \"cmocean:thermal\", reversed: true, custom: [(name: \"legacy_test_map\", \
+                   colors: \"red, blue\", interpolation: Linear, blend: Oklab, classes: 0)])";
+        storage.set_string(STORAGE_KEY, old.into());
+        let mut app = OctantApp::default();
+        app.load_colormap_prefs(Some(&storage));
+        assert_eq!(app.active_colormap, registry::default_id());
+        assert!(!app.colormaps.reversed);
+        assert!(
+            app.colormaps
+                .custom
+                .iter()
+                .any(|s| s.name == "legacy_test_map")
+        );
+        registry::remove_custom("custom:legacy_test_map");
     }
 }

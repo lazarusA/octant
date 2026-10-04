@@ -1,10 +1,11 @@
-//! Virtualized colormap list: one clickable row (swatch, name, family) per match.
+//! Virtualized colormap list: one clickable row (swatch, elided name) per match;
+//! the full name, family, kind and license show on hover.
 
-use super::search::family_label;
+use super::label;
 use super::swatch::SwatchAtlas;
 use crate::app::OctantApp;
 use crate::utils::colormap::registry;
-use egui::{Align2, FontId, Rect, Sense, vec2};
+use egui::{FontId, Rect, Sense, vec2};
 
 const ROW_HEIGHT: f32 = 22.0;
 const LIST_HEIGHT: f32 = 280.0;
@@ -71,22 +72,22 @@ fn row(
     );
     swatches.paint(ui, swatch, id, reversed);
 
-    let font = FontId::proportional(13.0);
-    let small = FontId::proportional(11.0);
+    let name_x = swatch.max.x + 8.0;
+    let max_width = rect.max.x - 6.0 - name_x;
     let text_color = visuals.text_color();
-    let weak = ui.visuals().weak_text_color();
     registry::with_entry(id, |e| {
-        let name_pos = egui::pos2(swatch.max.x + 8.0, rect.center().y);
-        ui.painter()
-            .text(name_pos, Align2::LEFT_CENTER, &e.name, font, text_color);
-        let family_pos = rect.right_center() - vec2(6.0, 0.0);
-        ui.painter().text(
-            family_pos,
-            Align2::RIGHT_CENTER,
-            family_label(e.family),
-            small,
-            weak,
+        let galley = label::elided(
+            ui,
+            &e.name,
+            FontId::proportional(13.0),
+            text_color,
+            max_width,
         );
+        let pos = egui::pos2(name_x, rect.center().y - galley.size().y / 2.0);
+        ui.painter().galley(pos, galley, text_color);
+    });
+    let response = response.on_hover_ui(|ui| {
+        registry::with_entry(id, |e| label::hover_details(ui, e));
     });
     response.on_hover_cursor(egui::CursorIcon::PointingHand)
 }

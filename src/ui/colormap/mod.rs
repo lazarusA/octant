@@ -4,6 +4,7 @@
 
 pub mod editor;
 pub mod filters;
+pub mod label;
 pub mod list;
 pub mod search;
 pub mod swatch;
@@ -12,7 +13,7 @@ pub mod swatch;
 mod tests;
 
 use crate::app::OctantApp;
-use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
+use crate::ui::icons::{Icon, ToolbarButton, UiIconExt};
 use crate::utils::colormap::registry;
 
 /// Persistent (per-session) picker UI state.
@@ -24,7 +25,8 @@ pub struct PickerState {
     pub editor: editor::EditorState,
 }
 
-const POPUP_WIDTH: f32 = 320.0;
+const POPUP_WIDTH: f32 = 300.0;
+const ACTIVE_SWATCH_WIDTH: f32 = 120.0;
 
 pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
     let button_response = ui.add(
@@ -41,10 +43,6 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.set_width(POPUP_WIDTH);
     app.colormaps.picker.swatches.ensure(ui.ctx());
 
-    ui.horizontal(|ui| {
-        ui.icon(Icon::Colormap, IconSize::Sm);
-        ui.label(egui::RichText::new("Colormap").small().weak());
-    });
     show_active_row(app, ui);
     ui.separator();
 
@@ -63,17 +61,28 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     show_colorbar_options(app, ui);
 }
 
-/// Active colormap swatch, its name and the reverse toggle.
+/// Active colormap swatch, its (elided) name and the reverse toggle.
 fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
     let id = app.active_colormap;
-    let name = registry::with_entry(id, |e| e.name.clone()).unwrap_or_default();
     ui.horizontal(|ui| {
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(120.0, 14.0), egui::Sense::hover());
-        let reversed = app.colormaps.reversed;
-        app.colormaps.picker.swatches.paint(ui, rect, id, reversed);
-        ui.label(egui::RichText::new(name).strong());
+        let (rect, swatch_response) =
+            ui.allocate_exact_size(egui::vec2(ACTIVE_SWATCH_WIDTH, 14.0), egui::Sense::hover());
+        app.colormaps
+            .picker
+            .swatches
+            .paint(ui, rect, id, app.colormaps.reversed);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.checkbox(&mut app.colormaps.reversed, "Reversed");
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                let color = ui.visuals().strong_text_color();
+                let font = egui::TextStyle::Body.resolve(ui.style());
+                registry::with_entry(id, |e| {
+                    let galley = label::elided(ui, &e.name, font, color, ui.available_width());
+                    ui.label(galley)
+                        .union(swatch_response)
+                        .on_hover_ui(|ui| label::hover_details(ui, e));
+                });
+            });
         });
     });
 }

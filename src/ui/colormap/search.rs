@@ -65,10 +65,3 @@ pub fn filter_ids(key: &FilterKey) -> Vec<u32> {
         })
         .collect()
 }
-
-/// Display name of an entry's family.
-pub fn family_label(family: Option<usize>) -> &'static str {
-    family
-        .and_then(|f| builtin().families.get(f))
-        .map_or("Custom", |f| f.name.as_str())
-}
