@@ -9,7 +9,11 @@ use egui::{FontId, Rect, Sense, vec2};
 
 const ROW_HEIGHT: f32 = 22.0;
 const LIST_HEIGHT: f32 = 280.0;
-const SWATCH_WIDTH: f32 = 96.0;
+/// Share of a row's content width given to the gradient preview; the name gets the rest.
+const SWATCH_SHARE: f32 = 0.75;
+const PAD_LEFT: f32 = 4.0;
+const PAD_RIGHT: f32 = 6.0;
+const GAP: f32 = 8.0;
 
 pub fn show(app: &mut OctantApp, ui: &mut egui::Ui) {
     let active = app.active_colormap;
@@ -66,14 +70,15 @@ fn row(
     if selected || response.hovered() {
         ui.painter().rect_filled(rect, 3.0, visuals.weak_bg_fill);
     }
+    let content = (rect.width() - PAD_LEFT - PAD_RIGHT - GAP).max(0.0);
     let swatch = Rect::from_min_size(
-        rect.left_center() + vec2(4.0, -6.0),
-        vec2(SWATCH_WIDTH, 12.0),
+        rect.left_center() + vec2(PAD_LEFT, -6.0),
+        vec2(content * SWATCH_SHARE, 12.0),
     );
     swatches.paint(ui, swatch, id, reversed);
 
-    let name_x = swatch.max.x + 8.0;
-    let max_width = rect.max.x - 6.0 - name_x;
+    let name_x = swatch.max.x + GAP;
+    let max_width = rect.max.x - PAD_RIGHT - name_x;
     let text_color = visuals.text_color();
     registry::with_entry(id, |e| {
         let galley = label::elided(
