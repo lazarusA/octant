@@ -64,6 +64,7 @@ When developing and reviewing code in this repository:
 3. **Zero-Allocation UI & Render Loop Rules**:
    - In immediate-mode UI loops, prefer zero-allocation tuple salts `("salt", id)` over heap-allocating `format!(...)`.
    - Never allocate `String`s or dynamic `Vec`s per frame for tick labels; use stack buffers (`[u8; 32]`) and stack arrays (e.g. `[TickMark; 7]`).
+   - Never keep text galleys (`Arc<Galley>`) across frames: egui rebuilds its fonts and glyph atlas when the text options change (switching dark/light mode) or the atlas fills up, and an old galley then draws stale atlas texels as scrambled text. Lay text out every frame through egui (its galley cache makes unchanged text a hash lookup); within one frame, laying out once and reusing the galley is fine.
    - Use zero-allocation case-insensitive ASCII searches (`contains_ascii_case_insensitive`) from `crate::data::coordinates::naming` for dimension and coordinate parsing.
    - All custom canvas overlays and floating toolbars must dynamically adapt to dark and light visual themes (`ui.visuals().dark_mode`).
    - Transient UI overlays (crop handles, grids, tooltips) must be suppressed during export capture passes (`if self.pending_export.is_none()`).

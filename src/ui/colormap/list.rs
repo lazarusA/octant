@@ -27,7 +27,6 @@ pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
         filter,
         cache,
         swatches,
-        names,
         ..
     } = &mut app.colormaps.picker;
     let ids = cache.ids(filter);
@@ -44,7 +43,7 @@ pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
         .auto_shrink([false, true])
         .show_rows(ui, ROW_HEIGHT, ids.len(), |ui, range| {
             for &id in ids.get(range).unwrap_or_default() {
-                let response = row(ui, swatches, names, id, id == active, reversed);
+                let response = row(ui, swatches, id, id == active, reversed);
                 if response.hovered() {
                     hovered = Some(id);
                 }
@@ -70,7 +69,6 @@ pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
 fn row(
     ui: &mut egui::Ui,
     swatches: &SwatchAtlas,
-    names: &mut label::NameCache,
     id: u32,
     selected: bool,
     reversed: bool,
@@ -94,7 +92,7 @@ fn row(
     let name_x = swatch.max.x + GAP;
     let max_width = rect.max.x - PAD_RIGHT - name_x;
     let text_color = visuals.text_color();
-    if let Some(galley) = names.get(ui.painter(), id, label::ROW_FONT_SIZE, max_width) {
+    if let Some(galley) = label::name_galley(ui.painter(), id, label::ROW_FONT_SIZE, max_width) {
         let pos = egui::pos2(name_x, rect.center().y - galley.size().y / 2.0);
         ui.painter().galley(pos, galley, text_color);
     }

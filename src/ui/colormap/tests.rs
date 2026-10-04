@@ -56,27 +56,28 @@ fn kind_and_family_filters_compose() {
 }
 
 #[test]
-fn row_names_are_elided_and_cached() {
+fn row_names_are_elided_to_fit() {
     let _registry = registry::test_lock();
     let ctx = egui::Context::default();
     let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
-        let mut names = super::label::NameCache::default();
         let painter = ui.painter();
         let long =
             registry::find("colorcet:linear_protanopic_deuteranopic_kbjyw_5_95_c25").unwrap_or(0);
-        let Some(cut) = names.get(painter, long, super::label::ROW_FONT_SIZE, 80.0) else {
+        let name =
+            |width| super::label::name_galley(painter, long, super::label::ROW_FONT_SIZE, width);
+        let Some(cut) = name(80.0) else {
             panic!("missing galley")
         };
         assert!(cut.elided);
         assert!(cut.size().x <= 80.5);
-        let Some(again) = names.get(painter, long, super::label::ROW_FONT_SIZE, 80.0) else {
+        let Some(again) = name(80.0) else {
             panic!("missing galley")
         };
         assert!(
             std::sync::Arc::ptr_eq(&cut, &again),
-            "same width reuses the galley"
+            "egui's galley cache reuses the layout within a frame"
         );
-        let Some(wider) = names.get(painter, long, super::label::ROW_FONT_SIZE, 400.0) else {
+        let Some(wider) = name(400.0) else {
             panic!("missing galley")
         };
         assert!(!wider.elided, "a new width lays out again");
@@ -161,4 +162,51 @@ fn panel_grows_with_its_content_instead_of_scrolling() {
 fn panel_scrolls_only_past_the_space_below_the_button() {
     let heights = panel_heights(&[100.0, 900.0, 900.0, 900.0], 600.0);
     assert_eq!(heights.last().copied(), Some(600.0), "heights: {heights:?}");
+}
+
+/// Atlas texel corners of every glyph of `galley`.
+fn glyph_uvs(galley: Option<&std::sync::Arc<egui::Galley>>) -> Vec<[[u16; 2]; 2]> {
+    galley
+        .into_iter()
+        .flat_map(|g| g.rows.iter())
+        .flat_map(|r| r.row.glyphs.iter().map(|g| [g.uv_rect.min, g.uv_rect.max]))
+        .collect()
+}
+
+/// Switching theme changes egui's text options, which rebuilds the fonts and
+/// their glyph atlas: names laid out before must not keep stale atlas positions.
+#[test]
+fn colormap_names_follow_the_font_atlas_across_theme_switches() {
+    let _registry = registry::test_lock();
+    let ctx = egui::Context::default();
+    let id = registry::default_id();
+    for theme in [egui::Theme::Dark, egui::Theme::Light, egui::Theme::Dark] {
+        ctx.set_theme(theme);
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            let painter = ui.painter();
+            // Other text first, as in the app, so the rebuilt atlas fills differently.
+            let font = egui::FontId::proportional(super::label::ROW_FONT_SIZE);
+            let _ = painter.layout_no_wrap(
+                format!("{theme:?} unrelated 0123456789 qwxz"),
+                font.clone(),
+                egui::Color32::PLACEHOLDER,
+            );
+            let shown = super::label::name_galley(painter, id, super::label::ROW_FONT_SIZE, 200.0);
+            let fresh = registry::with_entry(id, |e| {
+                crate::ui::hover::card::layout::line(
+                    painter,
+                    &e.name,
+                    font,
+                    egui::Color32::PLACEHOLDER,
+                    200.0,
+                )
+            });
+            assert_eq!(
+                glyph_uvs(shown.as_ref()),
+                glyph_uvs(fresh.as_ref()),
+                "{theme:?}"
+            );
+        });
+        output.textures_delta.clear();
+    }
 }

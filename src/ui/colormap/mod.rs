@@ -23,9 +23,6 @@ pub struct PickerState {
     pub cache: search::FilterCache,
     pub swatches: swatch::SwatchAtlas,
     pub editor: editor::EditorState,
-    pub names: label::NameCache,
-    /// Name of the active colormap (own cache: its width and font differ from rows).
-    pub active_name: label::NameCache,
     /// Height of everything below the list (editor, colorbar options) last frame.
     pub below_list_height: f32,
     /// Row hovered last frame; `preview_colormap` itself resets every frame.
@@ -134,11 +131,7 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 let font_size = egui::TextStyle::Body.resolve(ui.style()).size;
                 let max_width = ui.available_width();
-                let Some(galley) =
-                    app.colormaps
-                        .picker
-                        .active_name
-                        .get(ui.painter(), id, font_size, max_width)
+                let Some(galley) = label::name_galley(ui.painter(), id, font_size, max_width)
                 else {
                     return;
                 };

@@ -3,55 +3,34 @@
 use crate::ui::hover::card::layout::line;
 use crate::utils::colormap::{ColormapEntry, builtin, registry};
 use egui::{Color32, FontId, Galley, Painter};
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Name font size of list rows.
 pub const ROW_FONT_SIZE: f32 = 13.0;
 
-/// Elided name galleys, laid out once per colormap and reused across frames
-/// until the width, font size, registry or display scale changes. Galleys use
-/// the placeholder color, so painters pass the row's text color.
-#[derive(Default)]
-pub struct NameCache {
-    key: (u64, u32, u32, u32),
-    galleys: HashMap<u32, Arc<Galley>>,
-}
-
-impl NameCache {
-    pub fn get(
-        &mut self,
-        painter: &Painter,
-        id: u32,
-        font_size: f32,
-        max_width: f32,
-    ) -> Option<Arc<Galley>> {
-        let key = (
-            registry::generation(),
-            max_width.to_bits(),
-            font_size.to_bits(),
-            painter.pixels_per_point().to_bits(),
-        );
-        if self.key != key {
-            self.galleys.clear();
-            self.key = key;
-        }
-        if let Some(galley) = self.galleys.get(&id) {
-            return Some(Arc::clone(galley));
-        }
-        let font = FontId::proportional(font_size);
-        let galley = registry::with_entry(id, |e| {
-            line(
-                painter,
-                &e.name,
-                font,
-                Color32::PLACEHOLDER,
-                max_width.max(0.0),
-            )
-        })?;
-        self.galleys.insert(id, Arc::clone(&galley));
-        Some(galley)
-    }
+/// Elided single-line name galley of colormap `id`, in the placeholder color so
+/// painters pass the row's text color.
+///
+/// Laid out through egui every frame (a cache hit while unchanged), never kept
+/// across frames: egui rebuilds its fonts and glyph atlas when the text options
+/// change (switching between dark and light mode) or the atlas fills up, and a
+/// galley from before would draw stale atlas texels as scrambled text.
+pub fn name_galley(
+    painter: &Painter,
+    id: u32,
+    font_size: f32,
+    max_width: f32,
+) -> Option<Arc<Galley>> {
+    let font = FontId::proportional(font_size);
+    registry::with_entry(id, |e| {
+        line(
+            painter,
+            &e.name,
+            font,
+            Color32::PLACEHOLDER,
+            max_width.max(0.0),
+        )
+    })
 }
 
 /// Hover details for a colormap: full name, family and kind, and license.
