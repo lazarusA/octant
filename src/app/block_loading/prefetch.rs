@@ -169,7 +169,8 @@ impl OctantApp {
             // Sliding lookahead window during active animation playback:
             let lookahead_chunks = (self.block_window_size / cs).max(1);
             let max_lookahead_chunk = (current_chunk + lookahead_chunks).min(max_dataset_chunk);
-            for c in (current_chunk + 1)..=max_lookahead_chunk {
+            // The current chunk too: nothing else fetches it once it is evicted.
+            for c in current_chunk..=max_lookahead_chunk {
                 chunk_indices.push(c);
             }
 

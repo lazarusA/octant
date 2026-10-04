@@ -4,8 +4,9 @@
 // registers it needs.
 override ALGORITHM: u32 = 0u;
 
-// Upper bound on samples per ray (a 2048-voxel diagonal at 2 samples per voxel).
-const MAX_SAMPLES: i32 = 4096;
+// Upper bound on samples per ray: large volumes sample coarser than one per
+// voxel (opacity stays step-corrected) instead of costing thousands of taps.
+const MAX_SAMPLES: i32 = 384;
 
 struct ClipResult {
     clipped: bool,
@@ -47,7 +48,7 @@ fn dither(frag: vec2<f32>) -> f32 {
 // Headlight above and left of the camera, so lighting follows the view.
 const HEADLIGHT_CAMERA: vec3<f32> = vec3<f32>(-0.35, 0.45, 1.0);
 
-// Samples for the segment p1..p2: `quality` per voxel crossed (at least 8),
+// Samples for the segment p1..p2: `quality` per voxel crossed (8 to MAX_SAMPLES),
 // starting a jittered fraction of a step in. `face` is the world normal of the
 // entry face, or zero when the camera is inside the volume.
 fn build_ray(p1: vec3<f32>, p2: vec3<f32>, face: vec3<f32>, frag: vec2<f32>) -> Ray {
@@ -116,10 +117,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         color = volumeindexedrgba(ray);
     }
 
+    if (algo != 0u) {
+        // The classic modes return straight alpha.
+        color = premultiply(color);
+    }
     if (color.a <= 0.001) {
         discard;
     }
-    // Every mode returns premultiplied color (see the pipeline's blend state),
-    // kept premultiplied through the dither.
+    // Premultiplied color, kept premultiplied through the dither.
     return vec4<f32>(clamp(color.rgb + dither(in.position.xy), vec3<f32>(0.0), vec3<f32>(color.a)), color.a);
 }

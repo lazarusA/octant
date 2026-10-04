@@ -1,7 +1,7 @@
 //! GPU tests: renders small volumes offscreen and compares the images.
 //! Skipped (with a note) when no adapter is available.
 
-use super::gpu_render::{gpu, params, render_sized, renderer_n};
+use super::gpu_render::{atlas, gpu, params, render_sized, renderer_n};
 use super::{VolumeRenderer, VolumeUniformParams};
 use crate::utils::colormap::registry;
 
@@ -167,9 +167,10 @@ fn gpu_frame_cache_rerenders_only_on_change() {
     };
     let data = blob();
     let renderer = renderer(&device, &queue, &data, false);
+    let resources = atlas(&device, &queue);
     let mut encoder = device.create_command_encoder(&Default::default());
     let mut frame = |p: &VolumeUniformParams, size: [u32; 2]| {
-        renderer.render_frame(&device, &queue, &mut encoder, p, size)
+        renderer.render_frame(&device, &queue, &mut encoder, p, size, &resources)
     };
     let base = params(0, 1.0, 0);
     assert!(frame(&base, [32, 32]), "first frame renders");
@@ -180,7 +181,7 @@ fn gpu_frame_cache_rerenders_only_on_change() {
     renderer.update_data(&queue, &data);
     let mut encoder = device.create_command_encoder(&Default::default());
     assert!(
-        renderer.render_frame(&device, &queue, &mut encoder, &turned, [16, 16]),
+        renderer.render_frame(&device, &queue, &mut encoder, &turned, [16, 16], &resources),
         "new data re-renders"
     );
 }

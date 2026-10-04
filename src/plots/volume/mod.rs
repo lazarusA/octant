@@ -1,22 +1,18 @@
-//! Volume raymarcher: voxel values in 3D textures, sampled trilinearly on a
-//! fixed step per voxel with jittered starts and step-independent opacity,
-//! rendered into a cached offscreen frame.
+//! Volume raymarcher: voxel values in 3D textures, marched with jittered
+//! samples per voxel (DVR trilinear with step-independent opacity, the classic
+//! modes on nearest voxels), rendered into a cached offscreen frame.
 //!
 //! - `encode.rs`: CPU plane encoding (missing-voxel fill, validity).
-//! - `textures.rs`: value, validity and brick 3D textures, plane uploads.
-//! - `bricks.rs`: empty-space skipping grid (per-brick value range).
-//! - `lut.rs`: transfer-function lookup texture from the colormap registry.
+//! - `textures.rs`: value and validity 3D textures, plane uploads.
 //! - `uniforms.rs`: uniform block and per-frame parameters.
 //! - `pipeline.rs`: shader variants, bind group layout, per-mode pipelines.
 //! - `frame.rs`: offscreen frame, its cache key and the blit.
 //! - `render.rs`: re-renders the frame when its key changes, blits it.
 //! - `callback.rs`: egui paint callback.
 
-mod bricks;
 mod callback;
 pub mod encode;
 mod frame;
-pub mod lut;
 pub mod pipeline;
 mod render;
 mod textures;
@@ -26,16 +22,8 @@ mod uniforms;
 mod gpu_render;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod gpu_tests;
-#[cfg(all(test, not(target_arch = "wasm32")))]
-mod sheet;
-#[cfg(all(test, not(target_arch = "wasm32")))]
-mod skip_tests;
-#[cfg(all(test, not(target_arch = "wasm32")))]
-mod slab_sheet;
 #[cfg(test)]
 mod tests;
-#[cfg(all(test, not(target_arch = "wasm32")))]
-mod upload_bench;
 
 pub use callback::VolumeCallback;
 pub use encode::VolumeEncoding;
@@ -44,7 +32,6 @@ pub use uniforms::{VolumeState, VolumeUniformParams, VolumeUniforms};
 use bytemuck::Zeroable;
 use encode::Dims;
 use frame::Blit;
-use lut::TransferLut;
 use render::RenderCache;
 use std::sync::Mutex;
 use textures::VolumeTextures;
@@ -56,7 +43,6 @@ pub struct VolumeRenderer {
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     textures: VolumeTextures,
-    transfer: TransferLut,
     blit: Blit,
     cache: Mutex<RenderCache>,
 }
@@ -103,7 +89,6 @@ impl VolumeRenderer {
         };
         let textures = VolumeTextures::new(device, dims, encoding)?;
         let layout = pipeline::bind_group_layout(device, hardware_filter);
-        let transfer = TransferLut::new(device);
         let sampler = pipeline::create_sampler(device);
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Volume Uniform Buffer"),
@@ -120,12 +105,10 @@ impl VolumeRenderer {
                 },
                 view_entry(1, &textures.value_view),
                 view_entry(2, &textures.validity_view),
-                view_entry(3, &transfer.view),
                 wgpu::BindGroupEntry {
-                    binding: 4,
+                    binding: 3,
                     resource: wgpu::BindingResource::Sampler(&sampler),
                 },
-                view_entry(5, &textures.bricks.view),
             ],
         });
         let renderer = Self {
@@ -134,7 +117,6 @@ impl VolumeRenderer {
             uniform_buffer,
             bind_group,
             textures,
-            transfer,
             blit: Blit::new(device, target_format),
             cache: Mutex::new(RenderCache::default()),
         };

@@ -76,70 +76,7 @@ impl eframe::App for OctantApp {
             let frame_dur = std::time::Duration::from_secs_f32(1.0 / self.playback_fps.max(1.0));
 
             if now.duration_since(self.last_step_time) >= frame_dur {
-                let total_extent = self.animated_dim_extent();
-
-                if total_extent > 1 {
-                    let next_ts = if self.current_timestep + 1 < total_extent {
-                        Some(self.current_timestep + 1)
-                    } else if self.loop_playback {
-                        Some(0)
-                    } else {
-                        self.is_playing = false;
-                        None
-                    };
-
-                    if let Some(next_ts) = next_ts {
-                        let source_id = self.plotted_source_id();
-                        let var_name = self.plotted_variable_info().map(|v| v.name.clone());
-                        let base_request = self.plotted_variable_info().map(|v| {
-                            crate::ui::variables_panel::build_slice_request_for_plotted(
-                                self, &v.name, &v.shape,
-                            )
-                        });
-                        let selections = base_request
-                            .as_ref()
-                            .map(|r| r.selections.as_slice())
-                            .unwrap_or(&[]);
-
-                        let has_next_block = if let Some(ref name) = var_name {
-                            self.block_cache.covers(
-                                &source_id,
-                                name,
-                                selections,
-                                self.plotted_animated_dim,
-                                next_ts,
-                            )
-                        } else {
-                            false
-                        };
-
-                        if has_next_block {
-                            self.current_timestep = next_ts;
-                            self.last_step_time = now;
-                            self.load_selected_variable_block();
-
-                            // Continuous lookahead streaming: keep forward chunks queued in parallel ahead of playhead
-                            if let Some(meta) = &self.plotted_dataset_metadata
-                                && let Some(var) = meta.variables.get(self.plotted_variable_idx)
-                            {
-                                let shape = var.shape.clone();
-                                self.prefetch_selected_animated_range(&shape);
-                            }
-                        } else {
-                            // Target block window for next_ts is not yet in cache.
-                            // Hold on current valid frame and trigger parallel lookahead prefetch without hijacking playhead.
-                            if let Some(meta) = &self.plotted_dataset_metadata
-                                && let Some(var) = meta.variables.get(self.plotted_variable_idx)
-                            {
-                                let shape = var.shape.clone();
-                                self.prefetch_selected_animated_range(&shape);
-                            }
-                            self.last_step_time = now;
-                        }
-                    }
-                } else {
-                    self.is_playing = false;
-                }
+                self.advance_playback(now);
             }
 
             let elapsed = now.duration_since(self.last_step_time);

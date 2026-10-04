@@ -144,6 +144,13 @@ pub fn bind(rpass: &mut wgpu::RenderPass<'static>, resources: &CallbackResources
     true
 }
 
+/// The atlas bind group, for pipelines that draw in their own passes.
+pub fn bind_group(resources: &CallbackResources) -> Option<&wgpu::BindGroup> {
+    resources
+        .get::<ColormapAtlas>()
+        .map(|atlas| &atlas.bind_group)
+}
+
 #[cfg(all(test, not(target_arch = "wasm32")))]
 #[path = "colormap_atlas_probe.rs"]
 mod probe;

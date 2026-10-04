@@ -1,8 +1,7 @@
 //! Volume render pipeline: shader assembly, bind group layout and sampler.
 
 /// Assembles the volume shader around `$filter`, the file defining `fetch_trilinear`.
-/// Only the colormap prelude is needed (`ColorUniforms`, `evaluate_scaled_norm`);
-/// colors come from the transfer LUT, so the atlas at `@group(1)` stays unbound.
+/// Colors come from the shared colormap atlas at `@group(1)`.
 macro_rules! volume_shader {
     ($filter:expr) => {
         concat!(
@@ -14,11 +13,11 @@ macro_rules! volume_shader {
             "\n",
             include_str!("../shaders/volume/sample.wgsl"),
             "\n",
-            include_str!("../shaders/volume/skip.wgsl"),
-            "\n",
             include_str!("../shaders/volume/shading.wgsl"),
             "\n",
             include_str!("../shaders/volume/dvr.wgsl"),
+            "\n",
+            include_str!("../shaders/volume/classic.wgsl"),
             "\n",
             include_str!("../shaders/volume/projections.wgsl"),
             "\n",
@@ -60,10 +59,9 @@ fn texture_entry(
     }
 }
 
-/// `@group(0)`: uniforms, values, validity, transfer LUT, the shared sampler
-/// and the brick grid.
+/// `@group(0)`: uniforms, values, validity and the sampler.
 pub fn bind_group_layout(device: &wgpu::Device, hardware_filter: bool) -> wgpu::BindGroupLayout {
-    use wgpu::TextureViewDimension::{D2, D3};
+    use wgpu::TextureViewDimension::D3;
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Volume Bind Group Layout"),
         entries: &[
@@ -79,14 +77,12 @@ pub fn bind_group_layout(device: &wgpu::Device, hardware_filter: bool) -> wgpu::
             },
             texture_entry(1, hardware_filter, D3),
             texture_entry(2, true, D3),
-            texture_entry(3, true, D2),
             wgpu::BindGroupLayoutEntry {
-                binding: 4,
+                binding: 3,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                 count: None,
             },
-            texture_entry(5, false, D3),
         ],
     })
 }
@@ -124,9 +120,10 @@ pub fn create_pipeline_layout(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
 ) -> wgpu::PipelineLayout {
+    let atlas = crate::plots::colormap_atlas::bind_group_layout(device);
     device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Volume Pipeline Layout"),
-        bind_group_layouts: &[Some(layout)],
+        bind_group_layouts: &[Some(layout), Some(&atlas)],
         immediate_size: 0,
     })
 }

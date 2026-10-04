@@ -1,9 +1,9 @@
-//! Test-only offscreen rendering of volume renderers (shared by the GPU tests
-//! and the contact sheet).
+//! Test-only offscreen rendering of volume renderers for the GPU tests.
 
 use super::{VolumeEncoding, VolumeRenderer, VolumeUniformParams};
 use crate::plots::common::PlotColorParams;
 use crate::utils::colormap::registry;
+use eframe::egui_wgpu::CallbackResources;
 
 /// Stand-in for egui's target format (only the blit draws into it).
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
@@ -25,6 +25,13 @@ pub(super) fn gpu() -> Option<(wgpu::Device, wgpu::Queue, bool)> {
         let (device, queue) = adapter.request_device(&descriptor).await.ok()?;
         Some((device, queue, !filterable.is_empty()))
     })
+}
+
+/// Callback resources holding the colormap atlas, as egui's `prepare` builds them.
+pub(super) fn atlas(device: &wgpu::Device, queue: &wgpu::Queue) -> CallbackResources {
+    let mut resources = CallbackResources::default();
+    crate::plots::colormap_atlas::prepare(device, queue, &mut resources);
+    resources
 }
 
 pub(super) fn params(algorithm: u32, quality: f32, shift_x: u32) -> VolumeUniformParams {
@@ -65,7 +72,8 @@ pub(super) fn render_sized(
     size: u32,
 ) -> Vec<u8> {
     let mut encoder = device.create_command_encoder(&Default::default());
-    renderer.render_frame(device, queue, &mut encoder, p, [size, size]);
+    let resources = atlas(device, queue);
+    renderer.render_frame(device, queue, &mut encoder, p, [size, size], &resources);
     let color = renderer.frame_texture().expect("rendered frame");
     let readback = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,

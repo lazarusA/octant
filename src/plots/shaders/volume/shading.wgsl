@@ -48,31 +48,6 @@ fn gradient_intensity(p: vec3<f32>) -> vec3<f32> {
     return g / (4.0 * h * world_scale());
 }
 
-// Label foreground smoothed over half a voxel: the trilinear mask has
-// voxel-sized facets, which this level set rounds off.
-fn mask_smooth(p: vec3<f32>) -> f32 {
-    let h = 0.5 * voxel_step();
-    var offsets = TETRA;
-    var sum = 0.0;
-    for (var i = 0; i < 4; i = i + 1) {
-        sum += mask_filtered(p + offsets[i] * h);
-    }
-    return 0.25 * sum;
-}
-
-// Gradient of the label mask at `p` per world unit, over two voxels so the
-// normals follow the surface rather than its voxel facets.
-fn gradient_mask(p: vec3<f32>) -> vec3<f32> {
-    let h = 2.0 * voxel_step();
-    let c = stencil_center(p, 2.0);
-    var offsets = TETRA;
-    var g = vec3<f32>(0.0);
-    for (var i = 0; i < 4; i = i + 1) {
-        g += offsets[i] * mask_smooth(c + offsets[i] * h);
-    }
-    return g / (4.0 * h * world_scale());
-}
-
 // Unit normal across gradient `g`, turned toward the viewer (surfaces are seen
 // from whichever side the ray arrives).
 fn facing_normal(g: vec3<f32>, view: vec3<f32>) -> vec3<f32> {
@@ -97,7 +72,8 @@ fn shade_surface(ray: Ray, n: vec3<f32>, color: vec3<f32>) -> vec4<f32> {
 }
 
 // Transparent sample color lit by its gradient (diffuse only: highlights on
-// semi-transparent media read as hard glints; optional, off by default), blended in by gradient strength
+// semi-transparent media read as hard glints; optional, off by default),
+// blended in by gradient strength
 // `m / (m + 1)` (m: color ranges per world unit), so flat regions keep their
 // colormap color and fronts and edges gain shape.
 fn lit_sample(ray: Ray, p: vec3<f32>, color: vec3<f32>, range: f32) -> vec3<f32> {

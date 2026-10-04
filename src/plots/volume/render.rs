@@ -4,6 +4,7 @@
 use super::frame::{Frame, FrameKey};
 use super::{VolumeRenderer, VolumeUniformParams, pipeline};
 use crate::utils::colormap::registry;
+use eframe::egui_wgpu::CallbackResources;
 
 /// Rendering modes (WGSL `ALGORITHM`); higher values select the last one.
 pub const ALGORITHMS: usize = 8;
@@ -19,7 +20,8 @@ pub struct RenderCache {
 impl VolumeRenderer {
     /// Brings the cached frame up to date for `params` at `size` pixels,
     /// recording the raymarch into `encoder` only when the frame's inputs
-    /// changed. Returns whether it re-rendered.
+    /// changed (colors from the atlas in `resources`, which `prepare` keeps
+    /// current). Returns whether it re-rendered.
     pub fn render_frame(
         &self,
         device: &wgpu::Device,
@@ -27,7 +29,11 @@ impl VolumeRenderer {
         encoder: &mut wgpu::CommandEncoder,
         params: &VolumeUniformParams,
         size: [u32; 2],
+        resources: &CallbackResources,
     ) -> bool {
+        let Some(atlas) = crate::plots::colormap_atlas::bind_group(resources) else {
+            return false;
+        };
         let max = device.limits().max_texture_dimension_2d;
         let size = size.map(|s| s.clamp(1, max));
         let key = FrameKey {
@@ -40,8 +46,6 @@ impl VolumeRenderer {
         if cache.key == Some(key) && cache.frame.is_some() {
             return false;
         }
-        self.transfer
-            .sync(queue, &params.color, params.opacity_scale);
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&key.uniforms));
         if cache.frame.as_ref().is_none_or(|f| f.size != size) {
             cache.frame = Some(self.blit.create_frame(device, size));
@@ -58,7 +62,7 @@ impl VolumeRenderer {
             })
             .clone();
         if let Some(frame) = &cache.frame {
-            self.raymarch(encoder, &pipeline, &frame.view);
+            self.raymarch(encoder, &pipeline, atlas, &frame.view);
         }
         cache.key = Some(key);
         true
@@ -68,6 +72,7 @@ impl VolumeRenderer {
         &self,
         encoder: &mut wgpu::CommandEncoder,
         pipeline: &wgpu::RenderPipeline,
+        atlas: &wgpu::BindGroup,
         target: &wgpu::TextureView,
     ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -85,6 +90,7 @@ impl VolumeRenderer {
         });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &self.bind_group, &[]);
+        pass.set_bind_group(1, atlas, &[]);
         // The bounding box's 36 vertices come from `vs_main`'s vertex index.
         pass.draw(0..36, 0..1);
     }

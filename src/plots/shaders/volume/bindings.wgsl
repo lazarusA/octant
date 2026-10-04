@@ -7,11 +7,12 @@
 //   2: Minimum Intensity (MinIP)   - Minimum intensity projection along the ray
 //   3: Average Projection (X-ray)  - Average column scalar intensity (radiographic transmission)
 //   4: Categorical Label Surface   - Binary foreground mask isosurface for segmented data
-//   5: Absorption RGBA             - Beer-Lambert optical absorption model
+//   5: Absorption RGBA             - Classical optical absorption model
 //   6: Additive RGBA               - Additive volume emission model
 //   7: Indexed Discrete RGBA       - Palette-indexed discrete material rendering
 //
-// Every mode returns premultiplied color.
+// DVR returns premultiplied color; modes 1-7 keep their classic straight-alpha
+// output, premultiplied in `fs_main`.
 // =================================================================================================
 
 struct Uniforms {
@@ -62,18 +63,9 @@ var volume_values: texture_3d<f32>;
 @group(0) @binding(2)
 var volume_validity: texture_3d<f32>;
 
-// Transfer function: colormap RGB and DVR opacity at 256 scale positions.
-@group(0) @binding(3)
-var transfer_lut: texture_2d<f32>;
-
 // Linear, Repeat on every axis (see `texture_coord`).
-@group(0) @binding(4)
+@group(0) @binding(3)
 var volume_sampler: sampler;
-
-// Empty-space grid, one texel per 8³ brick: (min, max, has_missing, 0) of the
-// valid values sampling inside the brick can read; min > max when none.
-@group(0) @binding(5)
-var volume_bricks: texture_3d<f32>;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,

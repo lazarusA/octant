@@ -19,8 +19,9 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
         queue: &wgpu::Queue,
         screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
         encoder: &mut wgpu::CommandEncoder,
-        _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
+        callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
+        crate::plots::colormap_atlas::prepare(device, queue, callback_resources);
         let mut params = self.params;
         params.screen_aspect = crate::plots::common::compute_aspect_ratio(&self.rect);
         // Viewport pixels, rounded as `setup_viewport_and_scissor` does.
@@ -28,7 +29,7 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
         let scale = self.scale.clamp(0.1, 1.0);
         let size = [pixels.x, pixels.y].map(|p| (p.round() * scale).round().max(1.0) as u32);
         self.renderer
-            .render_frame(device, queue, encoder, &params, size);
+            .render_frame(device, queue, encoder, &params, size, callback_resources);
         Vec::new()
     }
 

@@ -1,8 +1,6 @@
 //! Volume 3D textures: values (`R32Float`, or `Rgba8Unorm` for RGB composites),
-//! validity (`R8Unorm`) and the empty-space brick grid (`Rgba32Float`),
-//! uploaded as whole Z planes and brick layers.
+//! and validity (`R8Unorm`), uploaded as whole Z planes.
 
-use super::bricks::{self, BrickGrid};
 use super::encode::{self, Dims, Encoded, VolumeEncoding};
 use std::ops::Range;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -17,7 +15,6 @@ pub struct VolumeTextures {
     validity: wgpu::Texture,
     pub value_view: wgpu::TextureView,
     pub validity_view: wgpu::TextureView,
-    pub bricks: BrickGrid,
     invalid_per_plane: Vec<AtomicU32>,
     invalid_total: AtomicU64,
     /// Counts uploads, so cached frames know the data changed.
@@ -49,16 +46,9 @@ impl VolumeTextures {
             dims,
             wgpu::TextureFormat::R8Unorm,
         );
-        let bricks = create_texture(
-            device,
-            "Volume Bricks",
-            bricks::brick_dims(dims),
-            wgpu::TextureFormat::Rgba32Float,
-        );
         Some(Self {
             encoding,
             dims,
-            bricks: BrickGrid::new(bricks, dims),
             value_view: value.create_view(&wgpu::TextureViewDescriptor::default()),
             validity_view: validity.create_view(&wgpu::TextureViewDescriptor::default()),
             value,
@@ -82,8 +72,7 @@ impl VolumeTextures {
     }
 
     /// Uploads planes `z` of the full volume `values`, plus one plane on each
-    /// side (their missing-voxel fill reads the changed planes), and the
-    /// bricks covering them.
+    /// side (their missing-voxel fill reads the changed planes).
     pub fn upload_planes(&self, queue: &wgpu::Queue, values: &[f32], z: Range<usize>) {
         let Dims { w, h, d } = self.dims;
         if values.len() != w * h * d {
@@ -108,8 +97,6 @@ impl VolumeTextures {
             }
             z0 = z1;
         }
-        let composite = self.encoding == VolumeEncoding::PackedRgb;
-        self.bricks.update(queue, values, self.dims, composite, z);
     }
 
     /// Scalar planes `z`: without missing voxels (the common case) the values
@@ -174,14 +161,6 @@ impl VolumeTextures {
         }
     }
 
-    /// Marks every brick as mattering, turning skipping off (tests compare
-    /// against it).
-    #[cfg(test)]
-    pub fn disable_skipping(&self, queue: &wgpu::Queue) {
-        self.bricks.disable(queue);
-        self.version.fetch_add(1, Ordering::Relaxed);
-    }
-
     fn write<T: bytemuck::Pod>(&self, queue: &wgpu::Queue, planes: Encoded<T>, texel_bytes: u32) {
         if planes.z.is_empty() {
             return;
@@ -201,7 +180,7 @@ impl VolumeTextures {
     }
 }
 
-pub(super) fn write_region(
+fn write_region(
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     origin: wgpu::Origin3d,

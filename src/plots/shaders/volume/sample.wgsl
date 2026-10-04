@@ -1,10 +1,10 @@
 // Volume sampling: unit-box positions to texture coordinates, trilinear and
-// exact reads, and the transfer function.
+// exact reads, and the ray lattice.
 
 // Returned for missing voxels; every mode treats |v| > 1e30 as missing.
 const MISSING: f32 = 3.0e38;
 
-// World length the transfer opacity (and NaN and clip colors' alpha) is
+// World length the DVR opacity (and NaN and clip colors' alpha) is
 // defined for: 64 samples across a unit box, so Density keeps its meaning at
 // any quality.
 const REFERENCE_STEP: f32 = 1.0 / 64.0;
@@ -84,88 +84,24 @@ fn wrap_texel(i: vec3<i32>, n: vec3<i32>) -> vec3<i32> {
     return ((i % n) + n) % n;
 }
 
-// 1 where texel `t` is label foreground (value >= 0.5, or a lit composite), 0
-// for background and missing voxels.
-fn foreground_texel(t: vec3<i32>) -> f32 {
-    if (uniforms.has_invalid != 0u && textureLoad(volume_validity, t, 0).r < 0.5) {
-        return 0.0;
-    }
-    let v = textureLoad(volume_values, t, 0);
-    let inside = select(v.r >= 0.5, v.a >= 0.01, is_composite());
-    return select(0.0, 1.0, inside);
-}
-
-// Label foreground blended trilinearly from the eight surrounding voxels: its
-// 0.5 level is a smooth surface through a categorical mask, which plain
-// filtering of label values cannot give.
-fn mask_filtered(p: vec3<f32>) -> f32 {
-    let n = vec3<i32>(textureDimensions(volume_values));
-    let c = texture_coord(p) * vec3<f32>(n) - 0.5;
-    let base = floor(c);
-    let f = c - base;
-    let a = wrap_texel(vec3<i32>(base), n);
-    let b = wrap_texel(vec3<i32>(base) + vec3<i32>(1), n);
-    let y0 = mix(
-        mix(foreground_texel(vec3<i32>(a.x, a.y, a.z)), foreground_texel(vec3<i32>(b.x, a.y, a.z)), f.x),
-        mix(foreground_texel(vec3<i32>(a.x, b.y, a.z)), foreground_texel(vec3<i32>(b.x, b.y, a.z)), f.x),
-        f.y,
-    );
-    let y1 = mix(
-        mix(foreground_texel(vec3<i32>(a.x, a.y, b.z)), foreground_texel(vec3<i32>(b.x, a.y, b.z)), f.x),
-        mix(foreground_texel(vec3<i32>(a.x, b.y, b.z)), foreground_texel(vec3<i32>(b.x, b.y, b.z)), f.x),
-        f.y,
-    );
-    return mix(y0, y1, f.z);
-}
-
-// Exact value of the voxel containing `p`, or MISSING: labels and palette
-// indices must never blend.
-fn sample_exact(p: vec3<f32>) -> f32 {
+// Texel holding `p` (nearest voxel), ring-buffer shift applied.
+fn exact_texel(p: vec3<f32>) -> vec3<u32> {
     let dims = vec3<u32>(textureDimensions(volume_values));
     let l = clamp(logical_coord(p), vec3<f32>(0.0), vec3<f32>(1.0));
-    let texel = (min(vec3<u32>(l * vec3<f32>(dims)), dims - 1u) + volume_shift()) % dims;
-    if (uniforms.has_invalid != 0u && textureLoad(volume_validity, texel, 0).r < 0.5) {
+    return (min(vec3<u32>(l * vec3<f32>(dims)), dims - 1u) + volume_shift()) % dims;
+}
+
+fn texel_missing(t: vec3<u32>) -> bool {
+    return uniforms.has_invalid != 0u && textureLoad(volume_validity, t, 0).r < 0.5;
+}
+
+// Exact value of the voxel containing `p`, or MISSING.
+fn sample_exact(p: vec3<f32>) -> f32 {
+    let t = exact_texel(p);
+    if (texel_missing(t)) {
         return MISSING;
     }
-    return textureLoad(volume_values, texel, 0).r;
-}
-
-// Position of `value` on the color scale, quantized as `evaluate_plot_color`
-// does for categorical scales and as `sample_colormap` does for stepped maps.
-fn scale_position(value: f32) -> f32 {
-    let c = uniforms.color;
-    var t = evaluate_scaled_norm(value, c.cmin, c.cmax, c.scale_type, c.scale_param);
-    if (c.is_categorical == 1u) {
-        let n = f32(max(c.num_categories, 1u));
-        t = (floor(clamp(t, 0.0, 0.999999) * n) + 0.5) / n;
-    }
-    if (c.nearest == 1u) {
-        t = floor(clamp(t, 0.0, 1.0) * 255.0 + 0.5) / 255.0;
-    }
-    return t;
-}
-
-// Transfer function at scale position `t`: RGB and DVR opacity, blended between
-// texels as `sample_colormap` blends atlas texels.
-fn transfer_at(t: f32) -> vec4<f32> {
-    let u = (clamp(t, 0.0, 1.0) * 255.0 + 0.5) / 256.0;
-    return textureSampleLevel(transfer_lut, volume_sampler, vec2<f32>(u, 0.5), 0.0);
-}
-
-// Display color of `value` (opaque in range), with NaN and clip colors as in
-// `evaluate_plot_color`.
-fn value_color(value: f32) -> vec4<f32> {
-    let c = uniforms.color;
-    if (is_missing(value)) {
-        return select(vec4<f32>(0.0), c.nan_color, c.use_nan_color == 1u);
-    }
-    if (value < c.cmin) {
-        return select(vec4<f32>(transfer_at(0.0).rgb, 1.0), c.lowclip_color, c.use_lowclip == 1u);
-    }
-    if (value > c.cmax) {
-        return select(vec4<f32>(transfer_at(1.0).rgb, 1.0), c.highclip_color, c.use_highclip == 1u);
-    }
-    return vec4<f32>(transfer_at(scale_position(value)).rgb, 1.0);
+    return textureLoad(volume_values, t, 0).r;
 }
 
 // Opacity of one step of `step_world` for a sample whose opacity is defined
@@ -174,12 +110,15 @@ fn corrected_alpha(alpha: f32, step_world: f32) -> f32 {
     return 1.0 - pow(1.0 - clamp(alpha, 0.0, 0.9999), step_world / REFERENCE_STEP);
 }
 
-// Beer-Lambert opacity of one step through a medium of `density` (scaled by
-// Density) in the RGBA modes.
-fn extinction_alpha(density: f32, step_world: f32) -> f32 {
-    return 1.0 - exp(-uniforms.absorption * max(density, 0.0) * step_world);
-}
-
 fn premultiply(c: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(c.rgb * c.a, c.a);
+}
+
+fn sample_pos(ray: Ray, i: i32) -> vec3<f32> {
+    return ray.start + f32(i) * ray.step;
+}
+
+// Sample before `i` (the ray entry for the first): where a surface search starts.
+fn previous_pos(ray: Ray, i: i32) -> vec3<f32> {
+    return select(sample_pos(ray, i - 1), ray.entry, i == 0);
 }
