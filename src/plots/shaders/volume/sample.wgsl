@@ -9,12 +9,18 @@ const MISSING: f32 = 3.0e38;
 const REFERENCE_STEP: f32 = 1.0 / 64.0;
 
 // A ray's samples: `count` steps of `step` (unit-box units) from `start`, each
-// `step_world` long in world units.
+// `step_world` long in world units. `entry` is where the ray enters the volume
+// and `entry_normal` the world normal of the face there (facing the viewer);
+// `view` points toward the viewer and `light` toward the headlight (world).
 struct Ray {
     start: vec3<f32>,
     step: vec3<f32>,
     count: i32,
     step_world: f32,
+    entry: vec3<f32>,
+    entry_normal: vec3<f32>,
+    view: vec3<f32>,
+    light: vec3<f32>,
 };
 
 fn is_missing(v: f32) -> bool {
@@ -71,6 +77,44 @@ fn sample_composite(p: vec3<f32>) -> vec4<f32> {
         return vec4<f32>(0.0);
     }
     return fetch_trilinear(uvw);
+}
+
+fn wrap_texel(i: vec3<i32>, n: vec3<i32>) -> vec3<i32> {
+    return ((i % n) + n) % n;
+}
+
+// 1 where texel `t` is label foreground (value >= 0.5, or a lit composite), 0
+// for background and missing voxels.
+fn foreground_texel(t: vec3<i32>) -> f32 {
+    if (uniforms.has_invalid != 0u && textureLoad(volume_validity, t, 0).r < 0.5) {
+        return 0.0;
+    }
+    let v = textureLoad(volume_values, t, 0);
+    let inside = select(v.r >= 0.5, v.a >= 0.01, is_composite());
+    return select(0.0, 1.0, inside);
+}
+
+// Label foreground blended trilinearly from the eight surrounding voxels: its
+// 0.5 level is a smooth surface through a categorical mask, which plain
+// filtering of label values cannot give.
+fn mask_filtered(p: vec3<f32>) -> f32 {
+    let n = vec3<i32>(textureDimensions(volume_values));
+    let c = texture_coord(p) * vec3<f32>(n) - 0.5;
+    let base = floor(c);
+    let f = c - base;
+    let a = wrap_texel(vec3<i32>(base), n);
+    let b = wrap_texel(vec3<i32>(base) + vec3<i32>(1), n);
+    let y0 = mix(
+        mix(foreground_texel(vec3<i32>(a.x, a.y, a.z)), foreground_texel(vec3<i32>(b.x, a.y, a.z)), f.x),
+        mix(foreground_texel(vec3<i32>(a.x, b.y, a.z)), foreground_texel(vec3<i32>(b.x, b.y, a.z)), f.x),
+        f.y,
+    );
+    let y1 = mix(
+        mix(foreground_texel(vec3<i32>(a.x, a.y, b.z)), foreground_texel(vec3<i32>(b.x, a.y, b.z)), f.x),
+        mix(foreground_texel(vec3<i32>(a.x, b.y, b.z)), foreground_texel(vec3<i32>(b.x, b.y, b.z)), f.x),
+        f.y,
+    );
+    return mix(y0, y1, f.z);
 }
 
 // Exact value of the voxel containing `p`, or MISSING: labels and palette

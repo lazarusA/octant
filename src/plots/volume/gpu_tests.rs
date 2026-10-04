@@ -76,6 +76,27 @@ fn gpu_volume_rendering() {
     let dvr = render(&device, &queue, &manual, &params(0, 1.0, 0));
     assert_eq!(dvr.len(), (SIZE * SIZE * 4) as usize, "readback failed");
     assert!(mean_alpha(&dvr) > 0.05, "the blob must be visible");
+    // Dithered output stays premultiplied (no channel above alpha).
+    assert!(
+        dvr.as_chunks::<4>()
+            .0
+            .iter()
+            .all(|p| p[..3].iter().all(|&c| c <= p[3]))
+    );
+
+    // Lighting shades color only: opacity is unchanged.
+    let unlit_params = VolumeUniformParams {
+        lighting: false,
+        ..params(0, 1.0, 0)
+    };
+    let unlit = render(&device, &queue, &manual, &unlit_params);
+    assert!(
+        dvr.iter()
+            .skip(3)
+            .step_by(4)
+            .eq(unlit.iter().skip(3).step_by(4))
+    );
+    assert_ne!(dvr, unlit, "lighting must change the shading");
 
     // Opacity is corrected for the step: quality changes grain, not density.
     let fine = render(&device, &queue, &manual, &params(0, 2.0, 0));

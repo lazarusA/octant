@@ -1,7 +1,7 @@
 //! Review sheet: `cargo test --lib volume_contact_sheet -- --ignored` writes
 //! `target/icon_sheets/volume.png`: a 48³ gyroid with a missing corner octant
-//! in every mode (0-7), then opaque DVR and close-ups of opaque DVR, MIP and
-//! absorption, over a mid-gray background.
+//! in every mode (0-7), then opaque DVR and close-ups of opaque DVR, MIP,
+//! absorption, lit and unlit DVR and the label surface, over mid-gray.
 
 use super::gpu_render::{gpu, params, render_sized, renderer_n};
 use crate::ui::test_render::sheet_dir;
@@ -47,6 +47,10 @@ fn volume_contact_sheet() {
         },
         ..params(0, 1.0, 0)
     };
+    let unlit = super::VolumeUniformParams {
+        lighting: false,
+        ..params(0, 1.0, 0)
+    };
     let close = |p: super::VolumeUniformParams| super::VolumeUniformParams { zoom: 1.1, ..p };
     let cases: Vec<_> = (0..8u32)
         .map(|algorithm| params(algorithm, 1.0, 0))
@@ -55,6 +59,11 @@ fn volume_contact_sheet() {
             close(opaque),
             close(params(1, 1.0, 0)),
             close(params(5, 1.0, 0)),
+        ])
+        .chain([
+            close(params(0, 1.0, 0)),
+            close(unlit),
+            close(params(4, 1.0, 0)),
         ])
         .collect();
     let rows = (cases.len() as u32).div_ceil(COLUMNS);

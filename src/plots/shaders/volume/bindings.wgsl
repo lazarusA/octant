@@ -45,7 +45,7 @@ struct Uniforms {
     shift_y: u32,
     shift_z: u32,
     transparency: u32,
-    _pad1: u32,
+    lighting: u32,
     color: ColorUniforms,
 };
 
@@ -98,6 +98,17 @@ const CUBE_INDICES = array<u32, 36>(
 
 fn camera_distance() -> f32 {
     return clamp(uniforms.zoom, 0.1, 10.0);
+}
+
+// Camera-space vector (x right, y up, z toward the viewer) in object space:
+// the inverse of `vs_main`'s rotation (about Y, then X).
+fn camera_to_object(v: vec3<f32>) -> vec3<f32> {
+    let cy = cos(-uniforms.rotation_y);
+    let sy = sin(-uniforms.rotation_y);
+    let cx = cos(-uniforms.rotation_x);
+    let sx = sin(-uniforms.rotation_x);
+    let x_rot = vec3<f32>(v.x, cx * v.y - sx * v.z, sx * v.y + cx * v.z);
+    return vec3<f32>(cy * x_rot.x + sy * x_rot.z, x_rot.y, -sy * x_rot.x + cy * x_rot.z);
 }
 
 @vertex

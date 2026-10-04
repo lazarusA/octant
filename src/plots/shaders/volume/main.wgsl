@@ -35,28 +35,32 @@ fn pixel_jitter(frag: vec2<f32>) -> f32 {
     return fract(52.9829189 * fract(dot(frag, vec2<f32>(0.06711056, 0.00583715))));
 }
 
+// Triangular noise of one 8-bit step, breaking banding in smooth gradients.
+fn dither(frag: vec2<f32>) -> f32 {
+    return (pixel_jitter(frag) + pixel_jitter(frag + vec2<f32>(17.0, 29.0)) - 1.0) / 255.0;
+}
+
+// Headlight above and left of the camera, so lighting follows the view.
+const HEADLIGHT_CAMERA: vec3<f32> = vec3<f32>(-0.35, 0.45, 1.0);
+
 // Samples for the segment p1..p2: `quality` per voxel crossed (at least 8),
-// starting a jittered fraction of a step in.
-fn build_ray(p1: vec3<f32>, p2: vec3<f32>, frag: vec2<f32>) -> Ray {
+// starting a jittered fraction of a step in. `face` is the world normal of the
+// entry face, or zero when the camera is inside the volume.
+fn build_ray(p1: vec3<f32>, p2: vec3<f32>, face: vec3<f32>, frag: vec2<f32>) -> Ray {
     let segment = p2 - p1;
     let voxels = length(segment * volume_dims());
     let count = clamp(i32(ceil(voxels * max(uniforms.quality, 0.05))), 8, MAX_SAMPLES);
     let step = segment / f32(count);
-    let world_scale = vec3<f32>(uniforms.aspect_x, uniforms.aspect_y, uniforms.aspect_z);
-    return Ray(p1 + pixel_jitter(frag) * step, step, count, length(step * world_scale));
+    let view = normalize(-segment * world_scale());
+    let entry_normal = select(face, view, dot(face, face) < 0.5);
+    let light = normalize(camera_to_object(HEADLIGHT_CAMERA));
+    return Ray(p1 + pixel_jitter(frag) * step, step, count, length(step * world_scale()), p1, entry_normal, view, light);
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let cy = cos(-uniforms.rotation_y);
-    let sy = sin(-uniforms.rotation_y);
-    let cx = cos(-uniforms.rotation_x);
-    let sx = sin(-uniforms.rotation_x);
-
     // Same camera distance as `vs_main`, so rays pass through the rasterized box.
-    let eye_cam = vec3<f32>(0.0, 0.0, camera_distance());
-    let eye_x_rot = vec3<f32>(eye_cam.x, cx * eye_cam.y - sx * eye_cam.z, sx * eye_cam.y + cx * eye_cam.z);
-    let eye_rot = vec3<f32>(cy * eye_x_rot.x + sy * eye_x_rot.z, eye_x_rot.y, -sy * eye_x_rot.x + cy * eye_x_rot.z);
+    let eye_rot = camera_to_object(vec3<f32>(0.0, 0.0, camera_distance()));
 
     let scale_vec = max(vec3<f32>(uniforms.aspect_x, uniforms.aspect_y, uniforms.aspect_z), vec3<f32>(0.001));
     let eye_unit = vec3<f32>(0.5) + eye_rot / scale_vec;
@@ -84,7 +88,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    let ray = build_ray(clip_res.p1, clip_res.p2, in.position.xy);
+    // Entry face: the slab axis that entered last, facing against the ray.
+    let entered_on = vec3<f32>(tmin == vec3<f32>(t_enter));
+    let face = select(-sign(dir) * entered_on, vec3<f32>(0.0), t_enter <= 0.0);
+    let ray = build_ray(clip_res.p1, clip_res.p2, face, in.position.xy);
     let algo = uniforms.algorithm;
     var color: vec4<f32>;
     if (algo == 0u) {
@@ -108,6 +115,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if (color.a <= 0.001) {
         discard;
     }
-    // Every mode returns premultiplied color (see the pipeline's blend state).
-    return color;
+    // Every mode returns premultiplied color (see the pipeline's blend state),
+    // kept premultiplied through the dither.
+    return vec4<f32>(clamp(color.rgb + dither(in.position.xy), vec3<f32>(0.0), vec3<f32>(color.a)), color.a);
 }

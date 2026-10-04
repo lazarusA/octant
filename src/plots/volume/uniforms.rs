@@ -41,7 +41,8 @@ pub struct VolumeUniforms {
     pub shift_y: u32,
     pub shift_z: u32,
     pub transparency: u32,
-    pub _pad1: u32,
+    /// Non-zero lights transparent DVR samples by their gradient.
+    pub lighting: u32,
     pub color: PlotColorParams,
 }
 
@@ -66,6 +67,8 @@ pub struct VolumeUniformParams {
     pub shift_y: u32,
     pub shift_z: u32,
     pub transparency: bool,
+    /// Lights transparent DVR samples by their gradient.
+    pub lighting: bool,
 }
 
 /// Texture state the uniforms report alongside the frame parameters.
@@ -83,7 +86,7 @@ impl VolumeUniformParams {
             clip_planes: [[0.0; 4]; 8],
             light_color: [1.0, 1.0, 1.0],
             num_clip_planes: 0,
-            ambient: [0.2, 0.2, 0.2],
+            ambient: [0.25, 0.25, 0.25],
             shininess: 32.0,
             light_direction: [1.0, 1.0, 1.0],
             algorithm: self.algorithm,
@@ -91,8 +94,8 @@ impl VolumeUniformParams {
             isorange: self.isorange,
             absorption: self.opacity_scale,
             quality: self.quality,
-            diffuse: 0.8,
-            specular: 0.2,
+            diffuse: 0.75,
+            specular: 0.25,
             attenuation: self.attenuation,
             has_invalid: u32::from(state.has_invalid),
             composite: u32::from(state.composite),
@@ -110,7 +113,7 @@ impl VolumeUniformParams {
             shift_y: self.shift_y,
             shift_z: self.shift_z,
             transparency: u32::from(self.transparency),
-            _pad1: 0,
+            lighting: u32::from(self.lighting),
             color: self.color,
         }
     }

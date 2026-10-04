@@ -67,6 +67,8 @@ pub struct OctantApp {
     /// Volume raymarching samples per voxel crossed by each ray.
     pub volume_quality: f32,
     pub volume_transparency: bool,
+    /// Lights transparent DVR samples by their gradient.
+    pub volume_lighting: bool,
     pub volume_attenuation: f32,
     pub volume_algorithm: u32,
     pub volume_isovalue: f32,
@@ -248,6 +250,7 @@ impl Default for OctantApp {
             volume_opacity: 3.0,
             volume_quality: 1.0,
             volume_transparency: true,
+            volume_lighting: true,
             volume_attenuation: 0.0,
             volume_algorithm: 0,
             volume_isovalue: 50.0,

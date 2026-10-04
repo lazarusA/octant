@@ -51,6 +51,7 @@ pub(super) fn params(algorithm: u32, quality: f32, shift_x: u32) -> VolumeUnifor
         shift_y: 0,
         shift_z: 0,
         transparency: true,
+        lighting: true,
     }
 }
 

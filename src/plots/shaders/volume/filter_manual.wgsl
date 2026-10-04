@@ -1,9 +1,5 @@
 // Trilinear fetch blending eight texel loads, for devices that cannot filter
-// R32Float. Addressing repeats on every axis, as the sampler does.
-fn wrap_texel(i: vec3<i32>, n: vec3<i32>) -> vec3<i32> {
-    return ((i % n) + n) % n;
-}
-
+// R32Float. Addressing repeats on every axis (`wrap_texel`), as the sampler does.
 fn fetch_trilinear(uvw: vec3<f32>) -> vec4<f32> {
     let n = vec3<i32>(textureDimensions(volume_values));
     let c = uvw * vec3<f32>(n) - 0.5;

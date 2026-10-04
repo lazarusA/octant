@@ -17,6 +17,7 @@ fn step_opacity(density: f32, step_world: f32) -> f32 {
 // 5. Optical Absorption RGBA
 fn absorptionrgba(ray: Ray) -> vec4<f32> {
     var pos = ray.start;
+    var prev = ray.entry;
     var transmittance: f32 = 1.0;
     var color_sum = vec3<f32>(0.0);
 
@@ -24,7 +25,7 @@ fn absorptionrgba(ray: Ray) -> vec4<f32> {
         let s = sample_rgba(pos);
         if (uniforms.transparency == 0u) {
             if (s.a > 0.05) {
-                return shade_surface(pos, ray.step, s.rgb);
+                return opaque_surface(ray, prev, pos, SURFACE_OPAQUE, i == 0);
             }
         } else {
             let opacity = step_opacity(s.a, ray.step_world);
@@ -34,6 +35,7 @@ fn absorptionrgba(ray: Ray) -> vec4<f32> {
                 break;
             }
         }
+        prev = pos;
         pos += ray.step;
     }
     if (uniforms.transparency == 0u) {

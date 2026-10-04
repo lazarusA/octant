@@ -105,6 +105,7 @@ impl OctantApp {
             shift_y: ctx.shift_y,
             shift_z: ctx.shift_z,
             transparency: self.volume_transparency,
+            lighting: self.volume_lighting,
         }
     }
 
