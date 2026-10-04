@@ -60,7 +60,9 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .text("Density")
                 .logarithmic(true),
         )
-        .on_hover_text("Optical depth across the volume at the top of the color range");
+        .on_hover_text(
+            "Optical depth across the volume's thinnest side at the top of the color range",
+        );
     }
 
     if app.volume_algorithm == 1 {

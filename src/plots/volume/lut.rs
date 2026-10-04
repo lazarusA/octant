@@ -33,12 +33,11 @@ impl TransferKey {
 }
 
 /// DVR extinction weight at scale position `t`, in [0, 1]: the shader scales
-/// it by Density (optical depth per world unit at the top of the range). The
-/// quadratic ramp keeps low values clear, so structure shows through instead of
-/// every in-range sample adding fog.
+/// it by Density (optical depth across the volume's thinnest side at the top
+/// of the range). The linear ramp keeps the bottom of the range clear while
+/// mid-range values, where most data lie, stay readable.
 pub fn dvr_extinction(t: f32) -> f32 {
-    let t = t.clamp(0.0, 1.0);
-    t * t
+    t.clamp(0.0, 1.0)
 }
 
 /// RGBA texels for `key`, in [0, 1]: texel `i` is the atlas row texel at scale

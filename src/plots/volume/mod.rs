@@ -30,6 +30,8 @@ mod gpu_tests;
 mod sheet;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod skip_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod slab_sheet;
 #[cfg(test)]
 mod tests;
 

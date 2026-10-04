@@ -107,7 +107,18 @@ pub(super) fn renderer_n(
     n: usize,
     hardware: bool,
 ) -> VolumeRenderer {
-    let geometry = (data, n as u32, n as u32);
+    renderer_wh(device, queue, data, [n, n], hardware)
+}
+
+/// Renderer for a scalar volume of `w`×`h` planes (depth from `data`).
+pub(super) fn renderer_wh(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    data: &[f32],
+    [w, h]: [usize; 2],
+    hardware: bool,
+) -> VolumeRenderer {
+    let geometry = (data, w as u32, h as u32);
     VolumeRenderer::build(
         device,
         queue,

@@ -173,11 +173,18 @@ fn corrected_alpha(alpha: f32, step_world: f32) -> f32 {
     return 1.0 - pow(1.0 - clamp(alpha, 0.0, 0.9999), step_world / REFERENCE_STEP);
 }
 
-// Beer-Lambert opacity of one step through extinction `Density * weight` per
-// world unit: Density is the optical depth across one world unit (about the
-// volume's longest side) at weight 1.
+// Extinction per world unit at weight 1: Density is the optical depth across
+// the volume's thinnest side, so a thin slab (few levels, scaled flat) reads
+// as well as a cube instead of fading with its thickness.
+fn extinction_scale() -> f32 {
+    let sides = vec3<f32>(uniforms.aspect_x, uniforms.aspect_y, uniforms.aspect_z);
+    return uniforms.absorption / max(min(sides.x, min(sides.y, sides.z)), 0.01);
+}
+
+// Beer-Lambert opacity of one step through extinction `weight` (in units of
+// `extinction_scale`).
 fn extinction_alpha(weight: f32, step_world: f32) -> f32 {
-    return 1.0 - exp(-uniforms.absorption * max(weight, 0.0) * step_world);
+    return 1.0 - exp(-extinction_scale() * max(weight, 0.0) * step_world);
 }
 
 fn premultiply(c: vec4<f32>) -> vec4<f32> {
