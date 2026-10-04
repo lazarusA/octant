@@ -1,7 +1,9 @@
 //! About Octant modal dialog and vector icons gallery.
 
+pub mod credits;
 pub mod icon_scale;
 pub mod icons;
+pub mod licenses;
 pub mod overview;
 pub mod types;
 

@@ -67,7 +67,7 @@ fn vs_main(
         out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
         return out;
     }
-    if (uniforms.color.colormap == 1000u) {
+    if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE) {
         let packed = u32(raw_val);
         if ((packed & 0x00FFFFFFu) == 0u) {
             out.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
@@ -134,7 +134,7 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    if (uniforms.color.colormap == 1000u) {
+    if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE) {
         let packed = u32(in.val);
         if ((packed & 0x00FFFFFFu) == 0u) {
             discard;

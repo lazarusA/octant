@@ -89,6 +89,10 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
                 ui.hyperlink_to("@lazarusA", "https://github.com/lazarusA");
             });
 
+            ui.add_space(6.0);
+            super::credits::show_colormap_credits(ui);
+            super::licenses::show_third_party_licenses(ui);
+
             ui.add_space(8.0);
             if ui
                 .icon_button(Icon::Colormap, crate::utils::stack_str(

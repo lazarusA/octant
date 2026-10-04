@@ -120,7 +120,7 @@ pub fn show_hover_tooltip(
         point_3d_hit,
     );
 
-    let is_rgb = app.active_colormap == 1000 || app.rgb_composite_mode;
+    let is_rgb = app.rgb_composite_mode;
     let color_params = app.get_color_params();
     let pixel_color = if canvas_plot_type == PlotType::Line && app.line_use_custom_color {
         Color32::from_rgba_unmultiplied(

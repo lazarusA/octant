@@ -166,9 +166,6 @@ pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         super::composite::show_composite_controls(app, ui);
     } else if app.rgb_composite_mode {
         app.rgb_composite_mode = false;
-        if app.active_colormap == 1000 {
-            app.active_colormap = 0;
-        }
     }
 
     show_coastline_controls(app, ui);

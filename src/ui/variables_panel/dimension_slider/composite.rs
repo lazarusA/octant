@@ -37,15 +37,8 @@ pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo, ran
     if is_tiff && rank >= 3 && num_bands >= 3 {
         app.rgb_composite_mode = true;
         app.rgb_composite_channels = [0, 1, 2];
-        app.active_colormap = 1000;
-    } else if !app.composite_channel_configs.is_empty() {
-        app.rgb_composite_mode = true;
-        app.active_colormap = 1000;
     } else {
-        app.rgb_composite_mode = false;
-        if app.active_colormap == 1000 {
-            app.active_colormap = 0;
-        }
+        app.rgb_composite_mode = !app.composite_channel_configs.is_empty();
     }
 }
 

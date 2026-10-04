@@ -11,7 +11,7 @@ use egui::{Color32, Mesh, Pos2, Rect, Shape, Vec2, epaint::Vertex};
 
 /// Renders the floating glassmorphic colorbar overlay panel.
 pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
-    if !app.show_colorbar || app.active_colormap == 1000 || app.rgb_composite_mode {
+    if !app.show_colorbar || app.rgb_composite_mode {
         return;
     }
 
@@ -203,7 +203,10 @@ fn draw_categorical_colorbar(
             app.active_scale_type,
             app.scale_param,
         );
-        let color = crate::utils::colormap::sample_colormap_rgb(effective_colormap, norm_scaled);
+        let color = crate::utils::colormap::sample_colormap_rgb(
+            effective_colormap,
+            crate::utils::colormap::orient(norm_scaled, app.colormaps.reversed),
+        );
 
         let x_start = bar_rect.min.x + t_start * bar_rect.width();
         let x_end = bar_rect.min.x + t_end * bar_rect.width();
@@ -314,7 +317,10 @@ fn draw_continuous_colorbar(
             app.active_scale_type,
             app.scale_param,
         );
-        let color = crate::utils::colormap::sample_colormap_rgb(effective_colormap, norm_scaled);
+        let color = crate::utils::colormap::sample_colormap_rgb(
+            effective_colormap,
+            crate::utils::colormap::orient(norm_scaled, app.colormaps.reversed),
+        );
 
         let x = bar_rect.min.x + t * bar_rect.width();
 

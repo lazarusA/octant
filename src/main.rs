@@ -23,6 +23,8 @@ fn main() -> eframe::Result<()> {
             .with_inner_size([1150.0, 720.0])
             .with_title("Octant: N-dimensional Data Explorer"),
         depth_buffer: 32,
+        // Persistence stores colormap preferences only; keep window geometry unmanaged.
+        persist_window: false,
         ..Default::default()
     };
 

@@ -47,6 +47,8 @@ jobs:
 
 # FUTURE STEP: Pre-compiled App Bundles (.dmg for macOS, .zip for Windows, .tar.gz for Linux)
 # Uncomment the block below once cargo-bundle metadata is configured in Cargo.toml
+# Every asset ships Octant's licenses and the third-party / colormap notices next to
+# the executable (they are also embedded in the app under About).
 #
 #  build-bundles:
 #    name: Build Application Bundles (${{ matrix.target }})
@@ -59,25 +61,25 @@ jobs:
 #            target: x86_64-unknown-linux-gnu
 #            asset_name: octant-linux-x86_64.tar.gz
 #            build_cmd: cargo build --release --target x86_64-unknown-linux-gnu
-#            package_cmd: tar -czf octant-linux-x86_64.tar.gz -C target/x86_64-unknown-linux-gnu/release octant
+#            package_cmd: tar -czf octant-linux-x86_64.tar.gz -C target/x86_64-unknown-linux-gnu/release octant -C "$GITHUB_WORKSPACE" LICENSE-MIT LICENSE-APACHE assets/licenses/THIRD_PARTY_LICENSES.md assets/colormaps/LICENSES.md
 #
 #          - os: macos-latest
 #            target: aarch64-apple-darwin
 #            asset_name: octant-macos-arm64-dmg.tar.gz
 #            build_cmd: cargo install cargo-bundle && cargo bundle --release --target aarch64-apple-darwin
-#            package_cmd: tar -czf octant-macos-arm64-dmg.tar.gz -C target/aarch64-apple-darwin/release/bundle/osx Octant.dmg
+#            package_cmd: tar -czf octant-macos-arm64-dmg.tar.gz -C target/aarch64-apple-darwin/release/bundle/osx Octant.dmg -C "$GITHUB_WORKSPACE" LICENSE-MIT LICENSE-APACHE assets/licenses/THIRD_PARTY_LICENSES.md assets/colormaps/LICENSES.md
 #
 #          - os: macos-13
 #            target: x86_64-apple-darwin
 #            asset_name: octant-macos-x86_64-dmg.tar.gz
 #            build_cmd: cargo install cargo-bundle && cargo bundle --release --target x86_64-apple-darwin
-#            package_cmd: tar -czf octant-macos-x86_64-dmg.tar.gz -C target/x86_64-apple-darwin/release/bundle/osx Octant.dmg
+#            package_cmd: tar -czf octant-macos-x86_64-dmg.tar.gz -C target/x86_64-apple-darwin/release/bundle/osx Octant.dmg -C "$GITHUB_WORKSPACE" LICENSE-MIT LICENSE-APACHE assets/licenses/THIRD_PARTY_LICENSES.md assets/colormaps/LICENSES.md
 #
 #          - os: windows-latest
 #            target: x86_64-pc-windows-msvc
 #            asset_name: octant-windows-x86_64.zip
 #            build_cmd: cargo build --release --target x86_64-pc-windows-msvc
-#            package_cmd: 7z a octant-windows-x86_64.zip target/x86_64-pc-windows-msvc/release/octant.exe
+#            package_cmd: 7z a octant-windows-x86_64.zip target/x86_64-pc-windows-msvc/release/octant.exe LICENSE-MIT LICENSE-APACHE assets/licenses/THIRD_PARTY_LICENSES.md assets/colormaps/LICENSES.md
 #    runs-on: ${{ matrix.os }}
 #    steps:
 #      - name: Checkout repository

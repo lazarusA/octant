@@ -88,13 +88,9 @@ fn fs_main(in: LineVertexOutput) -> @location(0) vec4<f32> {
     if (uniforms.use_custom_color != 0u) {
         return uniforms.line_color;
     }
-    if (uniforms.color.colormap == 999u) {
-        // Flat solid line color mode (uses highclip_color as flat line color)
-        return uniforms.color.highclip_color;
-    }
     if (uniforms.line_mode == 1u) {
         let line_t = f32(in.line_index) / max(1.0, f32(uniforms.line_count - 1u));
-        let rgb = sample_colormap(uniforms.color.colormap, line_t);
+        let rgb = sample_plot_colormap(uniforms.color, line_t);
         return vec4<f32>(rgb, 1.0);
     }
     return evaluate_plot_color(in.raw_val, uniforms.color);
@@ -160,11 +156,9 @@ fn fs_scatter(in: ScatterVertexOutput) -> @location(0) vec4<f32> {
     var base_color: vec4<f32>;
     if (uniforms.use_custom_color != 0u) {
         base_color = uniforms.line_color;
-    } else if (uniforms.color.colormap == 999u) {
-        base_color = uniforms.color.highclip_color;
     } else if (uniforms.line_mode == 1u) {
         let line_t = f32(in.line_index) / max(1.0, f32(uniforms.line_count - 1u));
-        let rgb = sample_colormap(uniforms.color.colormap, line_t);
+        let rgb = sample_plot_colormap(uniforms.color, line_t);
         base_color = vec4<f32>(rgb, 1.0);
     } else {
         base_color = evaluate_plot_color(in.raw_val, uniforms.color);

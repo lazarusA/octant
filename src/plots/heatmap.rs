@@ -206,9 +206,10 @@ impl HeatmapRenderer {
             &coord_y_buffer,
         );
 
+        let colormap_layout = super::colormap_atlas::bind_group_layout(device);
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Heatmap Pipeline Layout"),
-            bind_group_layouts: &[Some(&bind_group_layout)],
+            bind_group_layouts: &[Some(&bind_group_layout), Some(&colormap_layout)],
             immediate_size: 0,
         });
 
@@ -498,9 +499,12 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
         &self,
         info: egui::PaintCallbackInfo,
         rpass: &mut wgpu::RenderPass<'static>,
-        _callback_resources: &eframe::egui_wgpu::CallbackResources,
+        callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
         if !super::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
+            return;
+        }
+        if !super::colormap_atlas::bind(rpass, callback_resources) {
             return;
         }
 

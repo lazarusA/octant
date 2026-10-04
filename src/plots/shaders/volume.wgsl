@@ -125,9 +125,9 @@ fn color_lookup(intensity: f32) -> vec4<f32> {
     return evaluate_plot_color(intensity, uniforms.color);
 }
 
-fn color_lookup_indexed(colormap: u32, index: i32) -> vec4<f32> {
+fn color_lookup_indexed(index: i32) -> vec4<f32> {
     let norm = clamp(f32(max(index, 0)) / 255.0, 0.0, 1.0);
-    let rgb = sample_colormap(colormap, norm);
+    let rgb = sample_plot_colormap(uniforms.color, norm);
     return vec4<f32>(rgb, 1.0);
 }
 
@@ -159,7 +159,7 @@ fn sample_volume_scalar(texCoord: vec3<f32>) -> f32 {
 
 fn sample_volume_rgba(pos: vec3<f32>) -> vec4<f32> {
     let s = sample_volume_scalar(pos);
-    if (uniforms.color.colormap == 1000u) {
+    if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE) {
         let is_nan_val = (s != s || abs(s) > 1e30);
         if (is_nan_val) {
             return select(vec4<f32>(0.0), uniforms.color.nan_color, uniforms.color.use_nan_color == 1u);
@@ -174,7 +174,7 @@ fn sample_volume_intensity(pos: vec3<f32>) -> f32 {
     if (s != s || abs(s) > 1e30) {
         return 0.0;
     }
-    if (uniforms.color.colormap == 1000u) {
+    if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE) {
         return unpack_rgba_f32(s).a;
     }
     return s;
@@ -186,7 +186,7 @@ fn sample_foreground(pos: vec3<f32>) -> f32 {
     if (is_nan_val) {
         return 0.0;
     }
-    if (uniforms.color.colormap == 1000u) {
+    if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE) {
         let intensity = unpack_rgba_f32(raw).a;
         if (intensity < 0.01) {
             return 0.0;
@@ -296,7 +296,7 @@ fn volume_dvr(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
             col = uniforms.color.highclip_color.rgb;
             alpha = uniforms.color.highclip_color.a;
         } else if (is_in_bounds) {
-            if (uniforms.color.colormap == 1000u) {
+            if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE) {
                 let unpacked = unpack_rgba_f32(d);
                 col = unpacked.rgb;
                 let intensity = unpacked.a;
@@ -346,7 +346,7 @@ fn mip(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var pos = front + dir;
     let samples_count = i32(max(uniforms.samples, 8u));
 
-    if (uniforms.color.colormap == 1000u) {
+    if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE) {
         var max_rgb = vec3<f32>(0.0);
         var any_hit = false;
         for (var i = 0; i < samples_count; i = i + 1) {
@@ -565,7 +565,7 @@ fn volumeindexedrgba(front: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
 
     for (var i = 0; i < samples_count; i = i + 1) {
         let index = i32(sample_volume_scalar(pos)) - 1;
-        let color_sample = color_lookup_indexed(uniforms.color.colormap, index);
+        let color_sample = color_lookup_indexed(index);
 
         let opacity = clamp(step_size * color_sample.a * uniforms.absorption, 0.0, 1.0);
         color_sum = color_sum + (transmittance * opacity) * color_sample.rgb;

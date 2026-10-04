@@ -11,7 +11,7 @@ pub fn evaluate_color_cpu(val: f32, params: &PlotColorParams) -> Color32 {
         } else {
             Color32::TRANSPARENT
         }
-    } else if params.colormap == 1000 {
+    } else if params.colormap == super::COLORMAP_RGB_COMPOSITE {
         // RGB packed u32
         let packed = val.max(0.0) as u32;
         let r = (packed & 0xFF) as u8;
@@ -35,7 +35,7 @@ pub fn evaluate_color_cpu(val: f32, params: &PlotColorParams) -> Color32 {
             let bin_idx = (t.clamp(0.0, 0.999999) * num_cats).floor();
             t = (bin_idx + 0.5) / num_cats;
         }
-        super::sample::sample_colormap_rgb(params.colormap, t)
+        super::sample::sample_colormap_rgb(params.colormap, super::orient(t, params.reverse != 0))
     }
 }
 

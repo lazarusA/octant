@@ -95,7 +95,7 @@ pub struct PlotColorParams {
     pub scale_param: f32,
     pub is_categorical: u32,
     pub num_categories: u32,
-    pub _pad0: u32,
+    pub reverse: u32,
     pub _pad1: u32,
     pub nan_color: [f32; 4],
     pub lowclip_color: [f32; 4],
@@ -105,7 +105,7 @@ pub struct PlotColorParams {
 
 ### 3. WGSL Shaders (`src/plots/shaders/*.wgsl`)
 - Assemble shaders using `crate::assemble_plot_shader!(include_str!("shaders/..."))`.
-- Colormaps are modularized in `src/plots/shaders/colormaps/` (Viridis, Plasma, Inferno, Magma, Turbo, Coolwarm, Cividis).
+- Colormaps are data, not code: `src/plots/shaders/colormaps/mod.wgsl` samples the shared 256×K colormap atlas bound at `@group(1)` (`src/plots/colormap_atlas.rs`), filled from `crate::utils::colormap::registry`. Use `sample_plot_colormap(color, t)`; the CPU mirror is `crate::utils::colormap::sample_lut`. `colormap == COLORMAP_RGB_COMPOSITE` (`0xFFFFFFFF`) selects truecolor RGB.
 - Keep shaders compatible with WebGPU and WebGL2 (via `wgpu` downlevel flags).
 
 ### 4. Lock Safety & Poison Resilience in Renderers

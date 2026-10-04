@@ -1,0 +1,131 @@
+//! Palette collections (mostly categorical) from R packages, themes and paintings.
+
+use super::notices::{PAINTINGS_NOTICE, PNW_LICENSE};
+use super::urls::*;
+use super::{Family, License, Source, picks};
+
+pub const FAMILIES: &[Family] = &[
+    Family {
+        key: "metbrewer",
+        name: "MetBrewer",
+        license_id: "CC0-1.0",
+        spdx: &["CC0-1.0"],
+        license: License::Urls(&[METBREWER_LICENSE]),
+        notice: None,
+        source: "https://github.com/BlakeRMills/MetBrewer",
+        attribution: "Blake Robert Mills, palettes inspired by works at the Metropolitan Museum of Art",
+        sources: &[Source::RList {
+            url: METBREWER_R,
+            list: "MetPalettes",
+        }],
+    },
+    Family {
+        key: "pnw",
+        name: "PNWColors",
+        license_id: "CC0-1.0",
+        spdx: &["CC0-1.0"],
+        license: License::Inline(PNW_LICENSE),
+        notice: None,
+        source: "https://github.com/jakelawlor/PNWColors",
+        attribution: "Jake Lawlor, palettes inspired by the US Pacific Northwest",
+        sources: &[Source::RList {
+            url: PNW_R,
+            list: "pnw_palettes",
+        }],
+    },
+    Family {
+        key: "wesanderson",
+        name: "wesanderson",
+        license_id: "MIT",
+        spdx: &["MIT"],
+        license: License::Mit("Copyright (c) 2022 Karthik Ram"),
+        notice: None,
+        source: "https://github.com/karthik/wesanderson",
+        attribution: "Karthik Ram, wesanderson R package",
+        sources: &[Source::RList {
+            url: WES_R,
+            list: "wes_palettes",
+        }],
+    },
+    Family {
+        key: "ghibli",
+        name: "ghibli",
+        license_id: "MIT",
+        spdx: &["MIT"],
+        license: License::Urls(&[GHIBLI_LICENSE]),
+        notice: None,
+        source: "https://github.com/ewenme/ghibli",
+        attribution: "Ewen Henderson, ghibli R package",
+        sources: &[Source::Yaml { url: GHIBLI_YML }],
+    },
+    Family {
+        key: "ltc",
+        name: "ltc",
+        license_id: "MIT",
+        spdx: &["MIT"],
+        license: License::Urls(&[LTC_LICENSE]),
+        notice: None,
+        source: "https://github.com/loukesio/ltc-color-palettes",
+        attribution: "ltc authors, ltc R package",
+        sources: &[Source::RList {
+            url: LTC_R,
+            list: "palettes",
+        }],
+    },
+    Family {
+        key: "feathers",
+        name: "feathers",
+        license_id: "MIT",
+        spdx: &["MIT"],
+        license: License::Urls(&[FEATHERS_LICENSE]),
+        notice: None,
+        source: "https://github.com/shandiya/feathers",
+        attribution: "Shandiya Balasubramaniam, Australian bird palettes",
+        sources: &[Source::RList {
+            url: FEATHERS_R,
+            list: "feathers_palettes",
+        }],
+    },
+    Family {
+        key: "catppuccin",
+        name: "Catppuccin",
+        license_id: "MIT",
+        spdx: &["MIT"],
+        license: License::Urls(&[CATPPUCCIN_LICENSE]),
+        notice: None,
+        source: "https://github.com/catppuccin/palette",
+        attribution: "Catppuccin (accent colors of each flavor)",
+        sources: &[Source::Catppuccin {
+            url: CATPPUCCIN_JSON,
+        }],
+    },
+    Family {
+        key: "nord",
+        name: "Nord",
+        license_id: "MIT",
+        spdx: &["MIT"],
+        license: License::Urls(&[NORD_LICENSE]),
+        notice: None,
+        source: "https://www.nordtheme.com",
+        attribution: "Sven Greb, Nord theme",
+        sources: &[Source::CssVars {
+            url: NORD_CSS,
+            prefix: "nord",
+            name: "nord",
+        }],
+    },
+    Family {
+        key: "artists",
+        name: "Paintings",
+        license_id: "MIT",
+        spdx: &["MIT"],
+        license: License::Urls(&[COLORSCHEMES_LICENSE]),
+        notice: Some(PAINTINGS_NOTICE),
+        source: "https://github.com/JuliaGraphics/ColorSchemes.jl",
+        attribution: "ColorSchemes.jl authors (cormullion and contributors), palettes from public-domain paintings",
+        sources: &[Source::ColorSchemesJl {
+            url: COLORSCHEMES_ALL,
+            names: picks::PAINTINGS,
+        }],
+    },
+];

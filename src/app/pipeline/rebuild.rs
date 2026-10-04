@@ -53,7 +53,6 @@ impl OctantApp {
         }
 
         let is_rgb_composite = self.rgb_composite_mode
-            || self.active_colormap == 1000
             || data.dataset_name.contains("RGB Composite")
             || data.dataset_name.contains("CMYK Composite");
 

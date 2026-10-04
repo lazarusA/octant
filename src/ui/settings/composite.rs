@@ -33,7 +33,6 @@ pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         .changed()
     {
         app.rgb_composite_mode = rgb_mode;
-        app.active_colormap = if rgb_mode { 1000 } else { 0 };
         app.load_selected_variable_block();
     }
 

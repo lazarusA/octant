@@ -11,6 +11,7 @@ impl OctantApp {
             wgpu_render_state: cc.wgpu_render_state.clone(),
             ..Default::default()
         };
+        app.load_colormap_prefs(cc.storage);
 
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(target) = std::env::args().nth(1) {
@@ -186,9 +187,6 @@ impl OctantApp {
 
         if !self.has_rgb_bands() {
             self.rgb_composite_mode = false;
-            if self.active_colormap == 1000 {
-                self.active_colormap = 0;
-            }
         }
         self.reset_variable_bounds();
     }

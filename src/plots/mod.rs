@@ -1,4 +1,5 @@
 pub mod coastline;
+pub mod colormap_atlas;
 pub mod common;
 pub mod heatmap;
 pub mod line;
@@ -50,25 +51,11 @@ impl PlotType {
     }
 }
 
-/// Assembles a base plot WGSL shader by prepending colormaps and shared 3D camera utilities.
+/// Assembles a base plot WGSL shader by prepending the colormap atlas sampler and shared 3D camera utilities.
 #[macro_export]
 macro_rules! assemble_plot_shader {
     ($plot_shader:expr) => {
         concat!(
-            include_str!("shaders/colormaps/viridis.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/plasma.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/inferno.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/magma.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/turbo.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/coolwarm.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/cividis.wgsl"),
-            "\n",
             include_str!("shaders/colormaps/mod.wgsl"),
             "\n",
             include_str!("shaders/common/camera3d.wgsl"),
@@ -85,20 +72,6 @@ macro_rules! assemble_plot_shader {
 macro_rules! assemble_plot_with_coords_shader {
     ($plot_shader:expr) => {
         concat!(
-            include_str!("shaders/colormaps/viridis.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/plasma.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/inferno.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/magma.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/turbo.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/coolwarm.wgsl"),
-            "\n",
-            include_str!("shaders/colormaps/cividis.wgsl"),
-            "\n",
             include_str!("shaders/colormaps/mod.wgsl"),
             "\n",
             include_str!("shaders/common/coords.wgsl"),

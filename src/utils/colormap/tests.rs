@@ -74,7 +74,7 @@ fn test_evaluate_color_cpu() {
         scale_param: 1.0,
         is_categorical: 0,
         num_categories: 10,
-        _pad0: 0,
+        reverse: 0,
         _pad1: 0,
         nan_color: [1.0, 0.0, 0.0, 1.0],
         lowclip_color: [0.0, 1.0, 0.0, 1.0],
@@ -98,7 +98,7 @@ fn test_evaluate_color_cpu() {
     assert_eq!(mid_c, sample_colormap_rgb(0, 0.5));
 
     // RGB composite mode
-    params.colormap = 1000;
+    params.colormap = COLORMAP_RGB_COMPOSITE;
     let packed_rgb = (100u32) | (150u32 << 8) | (200u32 << 16);
     let rgb_c = evaluate_color_cpu(packed_rgb as f32, &params);
     assert_eq!(rgb_c, egui::Color32::from_rgb(100, 150, 200));
