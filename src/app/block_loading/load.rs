@@ -78,22 +78,7 @@ impl OctantApp {
             anim_dim,
             self.current_timestep,
         ) {
-            self.status_message = format!(
-                "Block cache HIT for '{}' ({} bytes resident)",
-                block.variable_name,
-                block.bytes_size()
-            );
-            self.sync_plotted_state_from_selected();
-            let allocations = self.volume_allocations;
-            self.apply_block_projection(&block);
-            self.project_cached_volume_blocks(
-                &source_id,
-                &var_name,
-                &slice_request.selections,
-                anim_dim,
-                allocations,
-            );
-            self.prefetch_selected_animated_range(&shape);
+            self.show_cached_block(&block, &slice_request.selections, anim_dim, &shape);
             return;
         }
 
@@ -109,26 +94,13 @@ impl OctantApp {
 
         // 2. Exact Key Cache HIT
         if let Some(block) = self.block_cache.get(&key) {
-            self.status_message = format!(
-                "Block cache HIT for '{}' ({} bytes resident)",
-                block.variable_name,
-                block.bytes_size()
-            );
-            self.sync_plotted_state_from_selected();
-            let allocations = self.volume_allocations;
-            self.apply_block_projection(&block);
-            self.project_cached_volume_blocks(
-                &source_id,
-                &var_name,
-                &selections,
-                anim_dim,
-                allocations,
-            );
-            self.prefetch_selected_animated_range(&shape);
+            self.show_cached_block(&block, &selections, anim_dim, &shape);
             return;
         }
 
         // 3. Cache MISS: dispatch async prefetch request for current chunk and launch background prefetching in parallel.
+        // Playback may move on meanwhile; the block is shown at this step.
+        self.pending_target_step = Some(self.current_timestep);
         self.status_message = format!("[block cache] Downloading window for '{}'...", var_name);
         self.block_prefetcher
             .request(block_request, &self.block_cache);
@@ -155,6 +127,9 @@ impl OctantApp {
                             self.current_timestep >= origin
                                 && self.current_timestep < origin + extent
                         });
+                    // Only blocks of the requested view: not of an older
+                    // selection, variable or plot layout.
+                    let is_same_var = is_same_var && self.key_matches_view(&res.key, anim_dim);
                     let is_volume_or_point_cloud = is_same_var
                         && (self.active_plot_type == crate::plots::PlotType::Volume
                             || self.active_plot_type == crate::plots::PlotType::PointCloud);
@@ -200,7 +175,7 @@ impl OctantApp {
                             self.active_block_key = None;
                             self.sync_plotted_state_from_selected();
                             if let Some(target) = self.pending_target_step.take()
-                                && let Some(dim) = anim_dim
+                                && let Some(dim) = self.plotted_animated_dim
                             {
                                 let origin = block.origin.get(dim).copied().unwrap_or(0);
                                 let extent = block.shape.get(dim).copied().unwrap_or(0);

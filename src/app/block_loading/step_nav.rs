@@ -27,9 +27,9 @@ impl OctantApp {
 
     /// One playback step, called by the frame timer: moves to the next step
     /// when its block is resident, and keeps the lookahead chunks queued.
-    /// Holds while the block a new plot requested is still loading, or while
-    /// another variable is selected but not plotted, so the step never moves
-    /// away from the requested block and playback never plots the selection.
+    /// While another variable is only selected, or a new plot's block is still
+    /// loading, it animates the plotted view (`with_plotted_selection`); the
+    /// new plot replaces it when its block arrives.
     pub fn advance_playback(&mut self, now: web_time::Instant) {
         let total_extent = self.animated_dim_extent();
         if total_extent <= 1 {
@@ -45,13 +45,15 @@ impl OctantApp {
             return;
         };
         self.last_step_time = now;
-        let request_pending = self
-            .active_block_key
-            .as_ref()
-            .is_some_and(|key| self.block_prefetcher.is_pending(key));
-        if request_pending || self.is_exploring_unplotted_variable() {
-            return;
+        if self.staging_differs() {
+            self.with_plotted_selection(|app| app.play_step(next_ts));
+        } else {
+            self.play_step(next_ts);
         }
+    }
+
+    /// Shows step `next_ts` when it is resident, then queues the lookahead.
+    fn play_step(&mut self, next_ts: usize) {
         if self.plotted_step_resident(next_ts) {
             self.current_timestep = next_ts;
             self.load_selected_variable_block();

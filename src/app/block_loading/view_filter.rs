@@ -43,6 +43,36 @@ impl OctantApp {
             })
     }
 
+    /// Plots resident `block` for the selection (`selections`, any step along
+    /// `anim_dim`): syncs the plotted state, projects it (and the other blocks
+    /// of a reset volume) and queues the rest of the animated range.
+    pub(crate) fn show_cached_block(
+        &mut self,
+        block: &OctantBlock,
+        selections: &[DimensionSelection],
+        anim_dim: Option<usize>,
+        shape: &[u64],
+    ) {
+        self.status_message = format!(
+            "Block cache HIT for '{}' ({} bytes resident)",
+            block.variable_name,
+            block.bytes_size()
+        );
+        self.pending_target_step = None;
+        self.sync_plotted_state_from_selected();
+        let allocations = self.volume_allocations;
+        self.apply_block_projection(block);
+        let source_id = self.selected_source_id();
+        self.project_cached_volume_blocks(
+            &source_id,
+            &block.variable_name,
+            selections,
+            anim_dim,
+            allocations,
+        );
+        self.prefetch_selected_animated_range(shape);
+    }
+
     /// Projects every cached block of the plotted selection after the volume
     /// was reset (`volume_allocations` moved past `since`, a new selection): a
     /// volume can be built from several resident blocks (along an animated
