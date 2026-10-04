@@ -14,6 +14,8 @@ macro_rules! volume_shader {
             "\n",
             include_str!("../shaders/volume/sample.wgsl"),
             "\n",
+            include_str!("../shaders/volume/skip.wgsl"),
+            "\n",
             include_str!("../shaders/volume/shading.wgsl"),
             "\n",
             include_str!("../shaders/volume/dvr.wgsl"),
@@ -58,7 +60,8 @@ fn texture_entry(
     }
 }
 
-/// `@group(0)`: uniforms, values, validity, transfer LUT and the shared sampler.
+/// `@group(0)`: uniforms, values, validity, transfer LUT, the shared sampler
+/// and the brick grid.
 pub fn bind_group_layout(device: &wgpu::Device, hardware_filter: bool) -> wgpu::BindGroupLayout {
     use wgpu::TextureViewDimension::{D2, D3};
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -83,6 +86,7 @@ pub fn bind_group_layout(device: &wgpu::Device, hardware_filter: bool) -> wgpu::
                 ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                 count: None,
             },
+            texture_entry(5, false, D3),
         ],
     })
 }
@@ -101,45 +105,63 @@ pub fn create_sampler(device: &wgpu::Device) -> wgpu::Sampler {
     })
 }
 
-pub fn create_pipeline(
-    device: &wgpu::Device,
-    target_format: wgpu::TextureFormat,
-    layout: &wgpu::BindGroupLayout,
-    hardware_filter: bool,
-) -> wgpu::RenderPipeline {
+/// Format of the cached offscreen frame the raymarcher renders into.
+pub const FRAME_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+
+pub fn create_module(device: &wgpu::Device, hardware_filter: bool) -> wgpu::ShaderModule {
     let source = if hardware_filter {
         SHADER_HARDWARE_FILTER
     } else {
         SHADER_MANUAL_FILTER
     };
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+    device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Volume Raymarching Shader"),
         source: wgpu::ShaderSource::Wgsl(source.into()),
-    });
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+    })
+}
+
+pub fn create_pipeline_layout(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+) -> wgpu::PipelineLayout {
+    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Volume Pipeline Layout"),
         bind_group_layouts: &[Some(layout)],
         immediate_size: 0,
-    });
+    })
+}
+
+/// Raymarching pipeline for mode `algorithm` (the WGSL `ALGORITHM` override),
+/// drawing into a cleared [`FRAME_FORMAT`] frame: every pixel is written once,
+/// already premultiplied, so neither blending nor depth is needed.
+pub fn create_raymarch_pipeline(
+    device: &wgpu::Device,
+    module: &wgpu::ShaderModule,
+    layout: &wgpu::PipelineLayout,
+    algorithm: u32,
+) -> wgpu::RenderPipeline {
+    let constants = [("ALGORITHM", f64::from(algorithm))];
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Volume Render Pipeline"),
-        layout: Some(&pipeline_layout),
+        label: Some("Volume Raymarch Pipeline"),
+        layout: Some(layout),
         vertex: wgpu::VertexState {
-            module: &shader,
+            module,
             entry_point: Some("vs_main"),
             buffers: &[],
             compilation_options: Default::default(),
         },
         fragment: Some(wgpu::FragmentState {
-            module: &shader,
+            module,
             entry_point: Some("fs_main"),
             targets: &[Some(wgpu::ColorTargetState {
-                format: target_format,
-                // The raymarcher composites front to back, so it emits premultiplied color.
-                blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                format: FRAME_FORMAT,
+                blend: None,
                 write_mask: wgpu::ColorWrites::ALL,
             })],
-            compilation_options: Default::default(),
+            compilation_options: wgpu::PipelineCompilationOptions {
+                constants: &constants,
+                ..Default::default()
+            },
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
@@ -148,10 +170,7 @@ pub fn create_pipeline(
             cull_mode: Some(wgpu::Face::Front),
             ..Default::default()
         },
-        depth_stencil: Some(crate::plots::common::default_depth_stencil_state(
-            false,
-            wgpu::CompareFunction::Always,
-        )),
+        depth_stencil: None,
         multisample: wgpu::MultisampleState::default(),
         multiview_mask: None,
         cache: None,

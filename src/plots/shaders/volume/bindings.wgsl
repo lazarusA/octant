@@ -70,6 +70,11 @@ var transfer_lut: texture_2d<f32>;
 @group(0) @binding(4)
 var volume_sampler: sampler;
 
+// Empty-space grid, one texel per 8³ brick: (min, max, has_missing, 0) of the
+// valid values sampling inside the brick can read; min > max when none.
+@group(0) @binding(5)
+var volume_bricks: texture_3d<f32>;
+
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) frag_vert: vec3<f32>,

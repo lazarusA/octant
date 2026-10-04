@@ -69,6 +69,9 @@ pub struct OctantApp {
     pub volume_transparency: bool,
     /// Lights transparent DVR samples by their gradient.
     pub volume_lighting: bool,
+    /// The user is rotating or zooming the 3D view this frame: volumes render
+    /// at reduced resolution until it settles.
+    pub view_interacting: bool,
     pub volume_attenuation: f32,
     pub volume_algorithm: u32,
     pub volume_isovalue: f32,
@@ -251,6 +254,7 @@ impl Default for OctantApp {
             volume_quality: 1.0,
             volume_transparency: true,
             volume_lighting: true,
+            view_interacting: false,
             volume_attenuation: 0.0,
             volume_algorithm: 0,
             volume_isovalue: 50.0,

@@ -96,15 +96,14 @@ fn volume_dvr(ray: Ray) -> vec4<f32> {
         return dvr_composite(ray);
     }
     let range = uniforms.color.cmax - uniforms.color.cmin;
-    var pos = ray.start;
-    var prev = ray.entry;
     var accum = vec3<f32>(0.0);
     var alpha_acc: f32 = 0.0;
 
-    for (var i = 0; i < ray.count; i = i + 1) {
+    for (var i = skip_empty(ray, 0, SKIP_DVR, 0.0); i < ray.count; i = skip_empty(ray, i + 1, SKIP_DVR, 0.0)) {
+        let pos = sample_pos(ray, i);
         let d = sample_scalar(pos);
         if (uniforms.transparency == 0u && in_display_range(d)) {
-            return opaque_surface(ray, prev, pos, SURFACE_RANGE, i == 0);
+            return opaque_surface(ray, previous_pos(ray, i), pos, SURFACE_RANGE, i == 0);
         }
         let s = dvr_sample(d, ray.step_world);
         let a = s.a;
@@ -117,24 +116,21 @@ fn volume_dvr(ray: Ray) -> vec4<f32> {
                 break;
             }
         }
-        prev = pos;
-        pos += ray.step;
     }
     return vec4<f32>(accum, alpha_acc);
 }
 
 // DVR of RGB composite colors: opacity follows brightness.
 fn dvr_composite(ray: Ray) -> vec4<f32> {
-    var pos = ray.start;
-    var prev = ray.entry;
     var accum = vec3<f32>(0.0);
     var alpha_acc: f32 = 0.0;
 
-    for (var i = 0; i < ray.count; i = i + 1) {
+    for (var i = skip_empty(ray, 0, SKIP_ABOVE, 0.001); i < ray.count; i = skip_empty(ray, i + 1, SKIP_ABOVE, 0.001)) {
+        let pos = sample_pos(ray, i);
         let s = sample_composite(pos);
         if (s.a > 0.001) {
             if (uniforms.transparency == 0u) {
-                return opaque_surface(ray, prev, pos, SURFACE_BRIGHT, i == 0);
+                return opaque_surface(ray, previous_pos(ray, i), pos, SURFACE_BRIGHT, i == 0);
             }
             let a = extinction_alpha(s.a * s.a, ray.step_world);
             let lit = uniforms.lighting != 0u && a > LIT_ALPHA_MIN;
@@ -145,8 +141,6 @@ fn dvr_composite(ray: Ray) -> vec4<f32> {
                 break;
             }
         }
-        prev = pos;
-        pos += ray.step;
     }
     return vec4<f32>(accum, alpha_acc);
 }
@@ -154,16 +148,15 @@ fn dvr_composite(ray: Ray) -> vec4<f32> {
 // 4. Categorical / Label Segmented Surface: found on exact voxels, placed and
 // lit on the smooth filtered mask, colored by the voxel's label.
 fn label_iso(ray: Ray) -> vec4<f32> {
-    var pos = ray.start;
-    var prev = ray.entry;
-    for (var i = 0; i < ray.count; i = i + 1) {
+    // Bricks matter when they reach the foreground threshold.
+    let level = select(0.4999, 0.0099, is_composite());
+    for (var i = skip_empty(ray, 0, SKIP_ABOVE, level); i < ray.count; i = skip_empty(ray, i + 1, SKIP_ABOVE, level)) {
+        let pos = sample_pos(ray, i);
         let label = sample_exact(pos);
         if (!is_missing(label) && label >= 0.5) {
-            let hit = surface_hit(ray, prev, pos, SURFACE_MASK, i == 0);
+            let hit = surface_hit(ray, previous_pos(ray, i), pos, SURFACE_MASK, i == 0);
             return shade_surface(ray, hit[1], value_color(label).rgb);
         }
-        prev = pos;
-        pos += ray.step;
     }
     return vec4<f32>(0.0);
 }

@@ -291,6 +291,9 @@ impl OctantApp {
                             renderer: volume_renderer.clone(),
                             params,
                             rect: plot_rect,
+                            // Half resolution while rotating or zooming; the
+                            // frame after the input stops renders in full.
+                            scale: if self.view_interacting { 0.5 } else { 1.0 },
                         },
                     );
                     ui.painter().add(callback);

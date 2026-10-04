@@ -265,6 +265,7 @@ impl eframe::App for OctantApp {
                 || canvas_plot_type == PlotType::PointCloud;
 
             // Handle Zoom & Pan Interactions
+            self.view_interacting = false;
             if is_3d_canvas_plot {
                 if response.double_clicked() {
                     self.sphere_rotation_x = 0.25;
@@ -274,6 +275,7 @@ impl eframe::App for OctantApp {
                 }
 
                 if response.dragged() {
+                    self.view_interacting = true;
                     let delta = response.drag_delta();
                     self.sphere_rotation_y += delta.x * 0.008;
                     self.sphere_rotation_x = (self.sphere_rotation_x + delta.y * 0.008).clamp(
@@ -291,6 +293,7 @@ impl eframe::App for OctantApp {
                             0.2
                         };
                         self.sphere_zoom = (self.sphere_zoom - scroll * 0.003).clamp(min_zoom, 8.0);
+                        self.view_interacting = true;
                         ui.ctx().request_repaint();
                     }
                 }
@@ -351,6 +354,13 @@ impl eframe::App for OctantApp {
                         ui.ctx().request_repaint();
                     }
                 }
+            }
+
+            if self.view_interacting {
+                // Smoothed scrolling can end without another frame: schedule
+                // one so the settled view renders at full resolution.
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(120));
             }
 
             if self.sphere_auto_rotate && is_3d_canvas_plot {

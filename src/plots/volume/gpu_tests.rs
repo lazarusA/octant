@@ -157,3 +157,30 @@ fn gpu_volume_rendering() {
         0.0
     );
 }
+
+#[test]
+fn gpu_frame_cache_rerenders_only_on_change() {
+    let _registry = registry::test_lock();
+    let Some((device, queue, _)) = gpu() else {
+        eprintln!("SKIPPED gpu_frame_cache_rerenders_only_on_change: no GPU adapter");
+        return;
+    };
+    let data = blob();
+    let renderer = renderer(&device, &queue, &data, false);
+    let mut encoder = device.create_command_encoder(&Default::default());
+    let mut frame = |p: &VolumeUniformParams, size: [u32; 2]| {
+        renderer.render_frame(&device, &queue, &mut encoder, p, size)
+    };
+    let base = params(0, 1.0, 0);
+    assert!(frame(&base, [32, 32]), "first frame renders");
+    assert!(!frame(&base, [32, 32]), "unchanged view reuses the frame");
+    let turned = VolumeUniformParams { rot_y: 1.0, ..base };
+    assert!(frame(&turned, [32, 32]), "camera change re-renders");
+    assert!(frame(&turned, [16, 16]), "size change re-renders");
+    renderer.update_data(&queue, &data);
+    let mut encoder = device.create_command_encoder(&Default::default());
+    assert!(
+        renderer.render_frame(&device, &queue, &mut encoder, &turned, [16, 16]),
+        "new data re-renders"
+    );
+}

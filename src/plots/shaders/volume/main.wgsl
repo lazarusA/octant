@@ -1,5 +1,9 @@
 // Fragment stage: ray setup against the box and clip planes, then mode dispatch.
 
+// Rendering mode, fixed per pipeline so each mode compiles with only the
+// registers it needs.
+override ALGORITHM: u32 = 0u;
+
 // Upper bound on samples per ray (a 2048-voxel diagonal at 2 samples per voxel).
 const MAX_SAMPLES: i32 = 4096;
 
@@ -92,7 +96,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let entered_on = vec3<f32>(tmin == vec3<f32>(t_enter));
     let face = select(-sign(dir) * entered_on, vec3<f32>(0.0), t_enter <= 0.0);
     let ray = build_ray(clip_res.p1, clip_res.p2, face, in.position.xy);
-    let algo = uniforms.algorithm;
+    let algo = ALGORITHM;
     var color: vec4<f32>;
     if (algo == 0u) {
         color = volume_dvr(ray);

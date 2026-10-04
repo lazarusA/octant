@@ -7,20 +7,28 @@ pub struct VolumeCallback {
     pub renderer: Arc<VolumeRenderer>,
     pub params: VolumeUniformParams,
     pub rect: egui::Rect,
+    /// Frame resolution relative to the viewport's pixels: below 1 while the
+    /// user drags or zooms, 1 once the view settles.
+    pub scale: f32,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
     fn prepare(
         &self,
-        _device: &wgpu::Device,
+        device: &wgpu::Device,
         queue: &wgpu::Queue,
-        _screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
-        _encoder: &mut wgpu::CommandEncoder,
+        screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
+        encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         let mut params = self.params;
         params.screen_aspect = crate::plots::common::compute_aspect_ratio(&self.rect);
-        self.renderer.update_uniforms(queue, &params);
+        // Viewport pixels, rounded as `setup_viewport_and_scissor` does.
+        let pixels = self.rect.size() * screen_descriptor.pixels_per_point;
+        let scale = self.scale.clamp(0.1, 1.0);
+        let size = [pixels.x, pixels.y].map(|p| (p.round() * scale).round().max(1.0) as u32);
+        self.renderer
+            .render_frame(device, queue, encoder, &params, size);
         Vec::new()
     }
 
@@ -33,9 +41,6 @@ impl eframe::egui_wgpu::CallbackTrait for VolumeCallback {
         if !crate::plots::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
             return;
         }
-        rpass.set_pipeline(&self.renderer.render_pipeline);
-        rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
-        // The bounding box's 36 vertices come from `vs_main`'s vertex index.
-        rpass.draw(0..36, 0..1);
+        self.renderer.paint_frame(rpass);
     }
 }

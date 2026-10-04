@@ -1,6 +1,8 @@
-//! Volume 3D textures: values (`R32Float`, or `Rgba8Unorm` for RGB composites)
-//! and validity (`R8Unorm`), uploaded as whole Z planes.
+//! Volume 3D textures: values (`R32Float`, or `Rgba8Unorm` for RGB composites),
+//! validity (`R8Unorm`) and the empty-space brick grid (`Rgba32Float`),
+//! uploaded as whole Z planes and brick layers.
 
+use super::bricks;
 use super::encode::{self, Dims, Encoded, VolumeEncoding};
 use std::ops::Range;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -15,8 +17,12 @@ pub struct VolumeTextures {
     validity: wgpu::Texture,
     pub value_view: wgpu::TextureView,
     pub validity_view: wgpu::TextureView,
+    bricks: wgpu::Texture,
+    pub bricks_view: wgpu::TextureView,
     invalid_per_plane: Vec<AtomicU32>,
     invalid_total: AtomicU64,
+    /// Counts uploads, so cached frames know the data changed.
+    version: AtomicU64,
 }
 
 impl VolumeTextures {
@@ -44,9 +50,17 @@ impl VolumeTextures {
             dims,
             wgpu::TextureFormat::R8Unorm,
         );
+        let bricks = create_texture(
+            device,
+            "Volume Bricks",
+            bricks::brick_dims(dims),
+            wgpu::TextureFormat::Rgba32Float,
+        );
         Some(Self {
             encoding,
             dims,
+            bricks_view: bricks.create_view(&wgpu::TextureViewDescriptor::default()),
+            bricks,
             value_view: value.create_view(&wgpu::TextureViewDescriptor::default()),
             validity_view: validity.create_view(&wgpu::TextureViewDescriptor::default()),
             value,
@@ -56,7 +70,12 @@ impl VolumeTextures {
                 .map(|_| AtomicU32::new(dims.plane() as u32))
                 .collect(),
             invalid_total: AtomicU64::new((dims.d * dims.plane()) as u64),
+            version: AtomicU64::new(0),
         })
+    }
+
+    pub fn version(&self) -> u64 {
+        self.version.load(Ordering::Relaxed)
     }
 
     /// Whether any voxel is missing; the shader skips validity reads otherwise.
@@ -75,6 +94,7 @@ impl VolumeTextures {
             );
             return;
         }
+        self.version.fetch_add(1, Ordering::Relaxed);
         let start = z.start.saturating_sub(1).min(d);
         let end = z.end.saturating_add(1).min(d);
         let chunk = (UPLOAD_CHUNK_VOXELS / self.dims.plane().max(1)).max(1);
@@ -90,6 +110,58 @@ impl VolumeTextures {
                 }
             }
             z0 = z1;
+        }
+        self.write_bricks(queue, values, z);
+    }
+
+    /// Marks every brick as mattering, turning skipping off (tests compare
+    /// against it).
+    #[cfg(test)]
+    pub fn disable_skipping(&self, queue: &wgpu::Queue) {
+        let grid = bricks::brick_dims(self.dims);
+        let stats = vec![[f32::MIN, f32::MAX, 1.0, 0.0]; grid.w * grid.h * grid.d];
+        let extent = wgpu::Extent3d {
+            width: grid.w as u32,
+            height: grid.h as u32,
+            depth_or_array_layers: grid.d as u32,
+        };
+        let bytes = bytemuck::cast_slice(&stats);
+        write_region(
+            queue,
+            &self.bricks,
+            wgpu::Origin3d::ZERO,
+            extent,
+            bytes,
+            grid.w as u32 * 16,
+        );
+        self.version.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Recomputes the brick layers whose footprint covers changed planes `z`.
+    fn write_bricks(&self, queue: &wgpu::Queue, values: &[f32], z: Range<usize>) {
+        let grid = bricks::brick_dims(self.dims);
+        let composite = self.encoding == VolumeEncoding::PackedRgb;
+        for layer in bricks::affected_layers(z, self.dims.d) {
+            let stats = bricks::brick_stats(values, self.dims, composite, layer..layer + 1);
+            let extent = wgpu::Extent3d {
+                width: grid.w as u32,
+                height: grid.h as u32,
+                depth_or_array_layers: 1,
+            };
+            let origin = wgpu::Origin3d {
+                x: 0,
+                y: 0,
+                z: layer as u32,
+            };
+            let bytes = bytemuck::cast_slice(&stats);
+            write_region(
+                queue,
+                &self.bricks,
+                origin,
+                extent,
+                bytes,
+                grid.w as u32 * 16,
+            );
         }
     }
 

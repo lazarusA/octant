@@ -5,6 +5,7 @@ use super::{VolumeEncoding, VolumeRenderer, VolumeUniformParams};
 use crate::plots::common::PlotColorParams;
 use crate::utils::colormap::registry;
 
+/// Stand-in for egui's target format (only the blit draws into it).
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 /// Device with `FLOAT32_FILTERABLE` when the adapter has it, and whether it does.
@@ -55,23 +56,6 @@ pub(super) fn params(algorithm: u32, quality: f32, shift_x: u32) -> VolumeUnifor
     }
 }
 
-fn attachment(device: &wgpu::Device, format: wgpu::TextureFormat, size: u32) -> wgpu::Texture {
-    device.create_texture(&wgpu::TextureDescriptor {
-        label: None,
-        size: wgpu::Extent3d {
-            width: size,
-            height: size,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        view_formats: &[],
-    })
-}
-
 /// Premultiplied RGBA8 pixels of one `size`² frame of `renderer` with `p`.
 pub(super) fn render_sized(
     device: &wgpu::Device,
@@ -80,39 +64,9 @@ pub(super) fn render_sized(
     p: &VolumeUniformParams,
     size: u32,
 ) -> Vec<u8> {
-    renderer.update_uniforms(queue, p);
-    let color = attachment(device, FORMAT, size);
-    let depth = attachment(device, wgpu::TextureFormat::Depth32Float, size);
-    let (color_view, depth_view) = (
-        color.create_view(&Default::default()),
-        depth.create_view(&Default::default()),
-    );
     let mut encoder = device.create_command_encoder(&Default::default());
-    {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &color_view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            ..Default::default()
-        });
-        pass.set_pipeline(&renderer.render_pipeline);
-        pass.set_bind_group(0, &renderer.bind_group, &[]);
-        pass.draw(0..36, 0..1);
-    }
+    renderer.render_frame(device, queue, &mut encoder, p, [size, size]);
+    let color = renderer.frame_texture().expect("rendered frame");
     let readback = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
         size: u64::from(size * size * 4),

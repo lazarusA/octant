@@ -119,6 +119,7 @@ mod tests {
                 "volume_manual_filter",
                 crate::plots::volume::pipeline::SHADER_MANUAL_FILTER,
             ),
+            ("volume_blit", include_str!("shaders/volume/blit.wgsl")),
             (
                 "line",
                 crate::assemble_plot_shader!(include_str!("shaders/line.wgsl")),
