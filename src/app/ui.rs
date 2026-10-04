@@ -4,6 +4,15 @@ use crate::utils::apply_zoom_pan_at_point;
 use super::OctantApp;
 
 impl eframe::App for OctantApp {
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        self.save_colormap_prefs(storage);
+    }
+
+    /// Only colormap preferences are persisted; window and widget state are not.
+    fn persist_egui_memory(&self) -> bool {
+        false
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         // Reset hover preview at start of frame

@@ -120,9 +120,10 @@ impl LineRenderer {
             &data_buffer,
         );
 
+        let colormap_layout = super::colormap_atlas::bind_group_layout(device);
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("1D Line Pipeline Layout"),
-            bind_group_layouts: &[Some(&bind_group_layout)],
+            bind_group_layouts: &[Some(&bind_group_layout), Some(&colormap_layout)],
             immediate_size: 0,
         });
 
@@ -350,8 +351,9 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         queue: &wgpu::Queue,
         _screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
         _encoder: &mut wgpu::CommandEncoder,
-        _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
+        callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
+        super::colormap_atlas::prepare(device, queue, callback_resources);
         if !self.profile_values.is_empty() {
             self.renderer
                 .update_data_with_device(device, queue, &self.profile_values);
@@ -382,9 +384,12 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         &self,
         info: egui::PaintCallbackInfo,
         rpass: &mut wgpu::RenderPass<'static>,
-        _callback_resources: &eframe::egui_wgpu::CallbackResources,
+        callback_resources: &eframe::egui_wgpu::CallbackResources,
     ) {
         if !super::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
+            return;
+        }
+        if !super::colormap_atlas::bind(rpass, callback_resources) {
             return;
         }
 

@@ -74,11 +74,10 @@ fn test_evaluate_color_cpu() {
         scale_param: 1.0,
         is_categorical: 0,
         num_categories: 10,
-        _pad0: 0,
-        _pad1: 0,
         nan_color: [1.0, 0.0, 0.0, 1.0],
         lowclip_color: [0.0, 1.0, 0.0, 1.0],
         highclip_color: [0.0, 0.0, 1.0, 1.0],
+        ..Default::default()
     };
 
     // NaN color
@@ -95,10 +94,10 @@ fn test_evaluate_color_cpu() {
 
     // Normal viridis midpoint
     let mid_c = evaluate_color_cpu(50.0, &params);
-    assert_eq!(mid_c, sample_colormap_rgb(0, 0.5));
+    assert_eq!(mid_c, registry::sample(0, 0.5));
 
     // RGB composite mode
-    params.colormap = 1000;
+    params.colormap = COLORMAP_RGB_COMPOSITE;
     let packed_rgb = (100u32) | (150u32 << 8) | (200u32 << 16);
     let rgb_c = evaluate_color_cpu(packed_rgb as f32, &params);
     assert_eq!(rgb_c, egui::Color32::from_rgb(100, 150, 200));
@@ -109,5 +108,38 @@ fn test_evaluate_color_cpu() {
     params.num_categories = 4;
     // 0..25 should map to first bin center (0.5/4 = 0.125)
     let cat_c = evaluate_color_cpu(10.0, &params);
-    assert_eq!(cat_c, sample_colormap_rgb(0, 0.125));
+    assert_eq!(cat_c, registry::sample(0, 0.125));
+
+    // Unclipped values outside the range take the colormap ends, unquantized (as the GPU)
+    params.use_lowclip = 0;
+    params.use_highclip = 0;
+    assert_eq!(evaluate_color_cpu(-10.0, &params), registry::sample(0, 0.0));
+    assert_eq!(evaluate_color_cpu(150.0, &params), registry::sample(0, 1.0));
+}
+
+#[test]
+fn lut_sampling_clamps_infinities_and_maps_nan_to_the_start() {
+    let id = registry::default_id();
+    assert_eq!(registry::sample(id, f32::NAN), registry::sample(id, 0.0));
+    assert_eq!(
+        registry::sample(id, f32::INFINITY),
+        registry::sample(id, 1.0)
+    );
+    assert_eq!(
+        registry::sample(id, f32::NEG_INFINITY),
+        registry::sample(id, 0.0)
+    );
+}
+
+#[test]
+fn unknown_rows_sample_the_default_colormap() {
+    let _registry = registry::test_lock();
+    let unknown = u32::try_from(registry::rows()).unwrap_or(u32::MAX);
+    assert!(!registry::is_row(unknown));
+    assert!(!registry::is_stepped(unknown));
+    let default = registry::default_id();
+    assert_eq!(
+        registry::sample(unknown, 0.3),
+        registry::sample(default, 0.3)
+    );
 }

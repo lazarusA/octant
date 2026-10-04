@@ -14,10 +14,17 @@ impl OctantApp {
 
     /// Assembles the complete `PlotColorParams` uniform bundle from current application state.
     pub fn get_color_params(&self) -> PlotColorParams {
-        let mut effective_colormap = self.preview_colormap.unwrap_or(self.active_colormap);
-        if self.rgb_composite_mode {
-            effective_colormap = 1000;
-        }
+        use crate::utils::colormap::{COLORMAP_RGB_COMPOSITE, registry};
+        // Ids that are no atlas row (e.g. a stale selection) draw the default,
+        // so the GPU never reads a padding row the CPU would not.
+        let row = Some(self.effective_colormap())
+            .filter(|&id| registry::is_row(id))
+            .unwrap_or_else(registry::default_id);
+        let effective_colormap = if self.rgb_composite_mode {
+            COLORMAP_RGB_COMPOSITE
+        } else {
+            row
+        };
 
         let (is_cat, num_cats) = if self.is_categorical {
             if let Some(mdata) = &self.matrix_data {
@@ -44,8 +51,10 @@ impl OctantApp {
             scale_param: self.scale_param,
             is_categorical: is_cat,
             num_categories: num_cats,
-            _pad0: 0,
-            _pad1: 0,
+            reverse: u32::from(self.colormaps.reversed),
+            nearest: u32::from(registry::is_stepped(row)),
+            fallback_colormap: row,
+            _pad: [0; 3],
             nan_color: self.nan_color,
             lowclip_color: self.lowclip_color,
             highclip_color: self.highclip_color,

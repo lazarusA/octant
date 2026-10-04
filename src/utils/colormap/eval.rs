@@ -11,7 +11,7 @@ pub fn evaluate_color_cpu(val: f32, params: &PlotColorParams) -> Color32 {
         } else {
             Color32::TRANSPARENT
         }
-    } else if params.colormap == 1000 {
+    } else if params.colormap == super::COLORMAP_RGB_COMPOSITE {
         // RGB packed u32
         let packed = val.max(0.0) as u32;
         let r = (packed & 0xFF) as u8;
@@ -22,6 +22,11 @@ pub fn evaluate_color_cpu(val: f32, params: &PlotColorParams) -> Color32 {
         rgba_to_color32(params.lowclip_color)
     } else if params.use_highclip != 0 && val > params.cmax {
         rgba_to_color32(params.highclip_color)
+    } else if val < params.cmin || val > params.cmax {
+        // Unclipped values outside the range take the colormap ends without
+        // categorical quantization, as WGSL `evaluate_plot_color` does.
+        let t = if val < params.cmin { 0.0 } else { 1.0 };
+        sample(params, t)
     } else {
         let mut t = super::scale::apply_color_scale_cpu(
             val,
@@ -35,8 +40,17 @@ pub fn evaluate_color_cpu(val: f32, params: &PlotColorParams) -> Color32 {
             let bin_idx = (t.clamp(0.0, 0.999999) * num_cats).floor();
             t = (bin_idx + 0.5) / num_cats;
         }
-        super::sample::sample_colormap_rgb(params.colormap, t)
+        sample(params, t)
     }
+}
+
+/// Samples the plot colormap at `t`, honoring the reversed and nearest flags.
+fn sample(params: &PlotColorParams, t: f32) -> Color32 {
+    super::registry::sample_row(
+        params.colormap,
+        super::orient(t, params.reverse != 0),
+        params.nearest != 0,
+    )
 }
 
 fn rgba_to_color32(rgba: [f32; 4]) -> Color32 {

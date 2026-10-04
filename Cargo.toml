@@ -24,13 +24,13 @@ exclude = [
 
 [dependencies]
 egui = "0.36.2"
-eframe = { version = "0.36.2", features = ["wgpu"] }
+eframe = { version = "0.36.2", features = ["persistence", "wgpu"] }
 wgpu = { version = "30.0.1", features = ["webgpu", "webgl"] }
 bytemuck = { version = "1.25", features = ["derive"] }
 glam = { version = "0.33", features = ["bytemuck"] }
 log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = { version = "1.0", features = ["preserve_order"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 flate2 = "1.0"
 inventory = "0.3"
@@ -48,6 +48,7 @@ weezl = "0.2"
 
 icechunk-format = { version = "2.1.2", default-features = false }
 icechunk-types = { version = "2.1.2", default-features = false }
+colorgrad = { version = "0.9", default-features = false, features = ["std", "named-colors"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.53", features = ["full"] }
@@ -56,6 +57,8 @@ arboard = "3.4"
 netcdf = { version = "0.12", features = ["static"] }
 rayon = "1.10"
 reqwest = { version = "0.13", features = ["blocking", "json"] }
+md-5 = "0.11"
+crc32fast = "1.5"
 zarrs = { version = "0.23", features = ["blosc", "zstd", "sharding", "gzip", "zlib", "crc32c", "async", "filesystem"] }
 zarrs_object_store = { version = "0.7", features = ["http"] }
 zarrs_icechunk = "0.5"
