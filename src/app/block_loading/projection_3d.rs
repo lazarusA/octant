@@ -104,7 +104,10 @@ impl OctantApp {
                     || ex.height != ny
                     || ex.depth != nz
                     || ex.dataset_name != desc
-                    || self.volume_renderer.is_none()
+                    || self
+                        .volume_renderer
+                        .as_ref()
+                        .is_none_or(|r| r.encoding() != self.volume_encoding())
                     || self.point_cloud_renderer.is_none()
             }
             None => true,
@@ -199,12 +202,20 @@ impl OctantApp {
                 &slab.values,
             );
 
-            if let Some(render_state) = &self.wgpu_render_state {
+            // Upload only the planes this slab touched, not the whole volume.
+            let range = vdata.plane_range(dest_z, slab.depth);
+            if let Some(render_state) = &self.wgpu_render_state
+                && let Some(planes) = vdata.values.get(range.clone())
+            {
                 if let Some(r) = &self.volume_renderer {
-                    r.update_data(&render_state.queue, &vdata.values);
+                    r.update_planes(
+                        &render_state.queue,
+                        &vdata.values,
+                        dest_z..dest_z + slab.depth,
+                    );
                 }
                 if let Some(r) = &self.point_cloud_renderer {
-                    r.update_data(&render_state.queue, &vdata.values);
+                    r.update_data_range(&render_state.queue, range.start, planes);
                 }
             }
             bounds_opt = Some((vdata.min_val, vdata.max_val));

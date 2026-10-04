@@ -1,0 +1,165 @@
+//! Test-only offscreen rendering of volume renderers (shared by the GPU tests
+//! and the contact sheet).
+
+use super::{VolumeEncoding, VolumeRenderer, VolumeUniformParams};
+use crate::plots::common::PlotColorParams;
+use crate::utils::colormap::registry;
+
+const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+
+/// Device with `FLOAT32_FILTERABLE` when the adapter has it, and whether it does.
+pub(super) fn gpu() -> Option<(wgpu::Device, wgpu::Queue, bool)> {
+    let rt = tokio::runtime::Runtime::new().ok()?;
+    rt.block_on(async {
+        let instance = wgpu::Instance::default();
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions::default())
+            .await
+            .ok()?;
+        let filterable = adapter.features() & wgpu::Features::FLOAT32_FILTERABLE;
+        let descriptor = wgpu::DeviceDescriptor {
+            required_features: filterable,
+            ..Default::default()
+        };
+        let (device, queue) = adapter.request_device(&descriptor).await.ok()?;
+        Some((device, queue, !filterable.is_empty()))
+    })
+}
+
+pub(super) fn params(algorithm: u32, quality: f32, shift_x: u32) -> VolumeUniformParams {
+    VolumeUniformParams {
+        color: PlotColorParams {
+            colormap: registry::default_id(),
+            cmin: 0.0,
+            cmax: 1.0,
+            ..Default::default()
+        },
+        rot_y: 0.6,
+        rot_x: 0.4,
+        aspect_x: 1.0,
+        aspect_y: 1.0,
+        aspect_z: 1.0,
+        zoom: 2.5,
+        opacity_scale: 2.0,
+        quality,
+        algorithm,
+        isovalue: 0.5,
+        isorange: 0.1,
+        attenuation: 0.0,
+        screen_aspect: 1.0,
+        shift_x,
+        shift_y: 0,
+        shift_z: 0,
+        transparency: true,
+    }
+}
+
+fn attachment(device: &wgpu::Device, format: wgpu::TextureFormat, size: u32) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: wgpu::Extent3d {
+            width: size,
+            height: size,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    })
+}
+
+/// Premultiplied RGBA8 pixels of one `size`² frame of `renderer` with `p`.
+pub(super) fn render_sized(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    renderer: &VolumeRenderer,
+    p: &VolumeUniformParams,
+    size: u32,
+) -> Vec<u8> {
+    renderer.update_uniforms(queue, p);
+    let color = attachment(device, FORMAT, size);
+    let depth = attachment(device, wgpu::TextureFormat::Depth32Float, size);
+    let (color_view, depth_view) = (
+        color.create_view(&Default::default()),
+        depth.create_view(&Default::default()),
+    );
+    let mut encoder = device.create_command_encoder(&Default::default());
+    {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &color_view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            ..Default::default()
+        });
+        pass.set_pipeline(&renderer.render_pipeline);
+        pass.set_bind_group(0, &renderer.bind_group, &[]);
+        pass.draw(0..36, 0..1);
+    }
+    let readback = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: u64::from(size * size * 4),
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    encoder.copy_texture_to_buffer(
+        color.as_image_copy(),
+        wgpu::TexelCopyBufferInfo {
+            buffer: &readback,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(size * 4),
+                rows_per_image: None,
+            },
+        },
+        wgpu::Extent3d {
+            width: size,
+            height: size,
+            depth_or_array_layers: 1,
+        },
+    );
+    queue.submit([encoder.finish()]);
+    readback.slice(..).map_async(wgpu::MapMode::Read, |_| {});
+    let _ = device.poll(wgpu::PollType::wait_indefinitely());
+    readback
+        .slice(..)
+        .get_mapped_range()
+        .map(|v| v.to_vec())
+        .unwrap_or_default()
+}
+
+/// Renderer for an `n`³ scalar volume.
+pub(super) fn renderer_n(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    data: &[f32],
+    n: usize,
+    hardware: bool,
+) -> VolumeRenderer {
+    let geometry = (data, n as u32, n as u32);
+    VolumeRenderer::build(
+        device,
+        queue,
+        FORMAT,
+        geometry,
+        VolumeEncoding::Scalar,
+        hardware,
+    )
+    .expect("small volumes fit any device")
+}

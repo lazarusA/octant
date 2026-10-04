@@ -244,6 +244,15 @@ impl OctantApp {
         self.matrix_data = Some(data);
     }
 
+    /// How volume values reach the GPU: packed RGB in composite mode.
+    pub(crate) fn volume_encoding(&self) -> crate::plots::VolumeEncoding {
+        if self.rgb_composite_mode {
+            crate::plots::VolumeEncoding::PackedRgb
+        } else {
+            crate::plots::VolumeEncoding::Scalar
+        }
+    }
+
     /// Rebuilds or updates existing GPU buffers for 3D volume data.
     pub fn rebuild_pipeline_with_volume_data(&mut self, data: VolumeData) {
         if data.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
@@ -257,9 +266,13 @@ impl OctantApp {
         }
 
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
+            let encoding = self.volume_encoding();
             let same_dimensions = self.volume_data.as_ref().is_some_and(|v| {
                 v.width == data.width && v.height == data.height && v.depth == data.depth
-            });
+            }) && self
+                .volume_renderer
+                .as_ref()
+                .is_some_and(|r| r.encoding() == encoding);
 
             if same_dimensions
                 && self.volume_renderer.is_some()
@@ -274,10 +287,12 @@ impl OctantApp {
             } else {
                 let volume_renderer = VolumeRenderer::new(
                     &wgpu_render_state.device,
+                    &wgpu_render_state.queue,
                     wgpu_render_state.target_format,
                     &data.values,
                     data.width as u32,
                     data.height as u32,
+                    encoding,
                 );
                 let point_cloud_renderer = PointCloudRenderer::new(
                     &wgpu_render_state.device,
@@ -286,7 +301,7 @@ impl OctantApp {
                     data.width as u32,
                     data.height as u32,
                 );
-                self.volume_renderer = Some(Arc::new(volume_renderer));
+                self.volume_renderer = volume_renderer.map(Arc::new);
                 self.point_cloud_renderer = Some(Arc::new(point_cloud_renderer));
             }
         }

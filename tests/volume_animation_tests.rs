@@ -972,3 +972,32 @@ fn test_progressive_subvolume_updates_and_aspect_stability() {
     assert_eq!(vdata.min_val, 42.0);
     assert_eq!(vdata.max_val, 99.0);
 }
+
+#[test]
+fn test_volume_plane_range_covers_slab_planes() {
+    let vdata = VolumeData::new(
+        4,
+        3,
+        5,
+        vec![0.0; 4 * 3 * 5],
+        0.0,
+        0.0,
+        "Planes".to_string(),
+    );
+    let plane = 4 * 3;
+    assert_eq!(vdata.plane_range(0, 5), 0..5 * plane);
+    assert_eq!(vdata.plane_range(2, 2), 2 * plane..4 * plane);
+    // Slabs reaching past the last plane are clamped to the volume.
+    assert_eq!(vdata.plane_range(4, 3), 4 * plane..5 * plane);
+    assert!(vdata.plane_range(7, 1).is_empty());
+    assert!(vdata.plane_range(usize::MAX, usize::MAX).is_empty());
+}
+
+#[test]
+fn test_buffer_range_bytes_bounds() {
+    use octant::plots::common::buffer_range_bytes;
+    assert_eq!(buffer_range_bytes::<f32>(0, 4, 16), Some((0, 16)));
+    assert_eq!(buffer_range_bytes::<f32>(2, 2, 16), Some((8, 16)));
+    assert_eq!(buffer_range_bytes::<f32>(3, 2, 16), None);
+    assert_eq!(buffer_range_bytes::<f32>(usize::MAX, 1, u64::MAX), None);
+}

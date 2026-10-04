@@ -64,7 +64,8 @@ pub struct OctantApp {
     pub surface_displacement_strength: f32,
     pub surface_mode: u32,
     pub volume_opacity: f32,
-    pub volume_step_count: u32,
+    /// Volume raymarching samples per voxel crossed by each ray.
+    pub volume_quality: f32,
     pub volume_transparency: bool,
     pub volume_attenuation: f32,
     pub volume_algorithm: u32,
@@ -245,7 +246,7 @@ impl Default for OctantApp {
             surface_displacement_strength: 0.3,
             surface_mode: 0,
             volume_opacity: 3.0,
-            volume_step_count: 64,
+            volume_quality: 1.0,
             volume_transparency: true,
             volume_attenuation: 0.0,
             volume_algorithm: 0,

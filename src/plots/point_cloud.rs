@@ -216,6 +216,17 @@ impl PointCloudRenderer {
                 .store(data.len() as u32, Ordering::Relaxed);
         }
     }
+
+    /// Uploads `data` at element `offset` without touching the rest of the volume.
+    pub fn update_data_range(&self, queue: &wgpu::Queue, offset: usize, data: &[f32]) {
+        super::common::safe_write_buffer_range(
+            queue,
+            &self.data_buffer,
+            offset,
+            data,
+            "PointCloudRenderer::update_data_range",
+        );
+    }
 }
 
 #[derive(Copy, Clone, Debug)]

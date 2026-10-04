@@ -121,6 +121,17 @@ impl VolumeData {
         }
     }
 
+    /// Element range of the whole Z planes `[dest_z, dest_z + slab_d)` in `values`,
+    /// clamped to the volume: the contiguous span a slab written by
+    /// [`Self::update_subvolume`] touches, for partial GPU uploads.
+    pub fn plane_range(&self, dest_z: usize, slab_d: usize) -> std::ops::Range<usize> {
+        let plane = self.width.saturating_mul(self.height);
+        let z0 = dest_z.min(self.depth);
+        let z1 = dest_z.saturating_add(slab_d).min(self.depth);
+        let len = self.values.len();
+        z0.saturating_mul(plane).min(len)..z1.saturating_mul(plane).min(len)
+    }
+
     /// Extracts a single 1D ray along Z (depth) for a given (x, y) spatial pixel coordinate.
     pub fn extract_z_line_profile(&self, target_x: usize, target_y: usize) -> Vec<f32> {
         let (nx, ny, nz) = (self.width, self.height, self.depth);

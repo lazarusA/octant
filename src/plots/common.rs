@@ -244,6 +244,39 @@ pub fn safe_write_buffer<T: bytemuck::Pod>(
     }
 }
 
+/// Writes `data` into `buffer` starting at element `offset`, rejecting writes that
+/// would overrun the buffer. Returns `true` if the write was queued.
+pub fn safe_write_buffer_range<T: bytemuck::Pod>(
+    queue: &wgpu::Queue,
+    buffer: &wgpu::Buffer,
+    offset: usize,
+    data: &[T],
+    label: &str,
+) -> bool {
+    let Some((start, end)) = buffer_range_bytes::<T>(offset, data.len(), buffer.size()) else {
+        log::warn!(
+            "{label}: range at element {offset} (+{} elements) exceeds GPU buffer capacity ({} bytes), skipping write",
+            data.len(),
+            buffer.size()
+        );
+        return false;
+    };
+    if start < end {
+        queue.write_buffer(buffer, start, bytemuck::cast_slice(data));
+    }
+    true
+}
+
+/// Byte range `[start, end)` of `len` elements of `T` at element `offset`, or
+/// `None` if it overflows or ends past `capacity` bytes.
+pub fn buffer_range_bytes<T>(offset: usize, len: usize, capacity: u64) -> Option<(u64, u64)> {
+    let size = std::mem::size_of::<T>();
+    let start = u64::try_from(offset.checked_mul(size)?).ok()?;
+    let bytes = u64::try_from(len.checked_mul(size)?).ok()?;
+    let end = start.checked_add(bytes)?;
+    (end <= capacity).then_some((start, end))
+}
+
 /// Creates a standard plot bind group layout with binding 0 (Uniform) and binding 1 (Storage).
 pub fn create_uniform_storage_bind_group_layout(
     device: &wgpu::Device,
