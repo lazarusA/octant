@@ -97,6 +97,17 @@ impl OctantApp {
         }
     }
 
+    /// Whether the GPU renderers are missing or encode the wrong format. Without
+    /// a GPU (headless) there are none to rebuild.
+    fn volume_renderers_stale(&self) -> bool {
+        self.wgpu_render_state.is_some()
+            && (self
+                .volume_renderer
+                .as_ref()
+                .is_none_or(|r| r.encoding() != self.volume_encoding())
+                || self.point_cloud_renderer.is_none())
+    }
+
     fn ensure_volume_allocated(&mut self, nx: usize, ny: usize, nz: usize, desc: &str) {
         let needs_realloc = match &self.volume_data {
             Some(ex) => {
@@ -104,11 +115,7 @@ impl OctantApp {
                     || ex.height != ny
                     || ex.depth != nz
                     || ex.dataset_name != desc
-                    || self
-                        .volume_renderer
-                        .as_ref()
-                        .is_none_or(|r| r.encoding() != self.volume_encoding())
-                    || self.point_cloud_renderer.is_none()
+                    || self.volume_renderers_stale()
             }
             None => true,
         };

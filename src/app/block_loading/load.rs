@@ -27,6 +27,10 @@ impl OctantApp {
             if full_extent > 0 && self.current_timestep >= full_extent {
                 self.current_timestep = full_extent - 1;
             }
+            // A new selection never plots a step it excludes.
+            if let Some(&(start, end)) = self.selected_dim_ranges.get(anim_dim) {
+                self.current_timestep = self.current_timestep.clamp(start, end.max(start));
+            }
             if anim_dim < self.selected_dim_indices.len() {
                 self.selected_dim_indices[anim_dim] = self.current_timestep;
             }
@@ -71,6 +75,12 @@ impl OctantApp {
             );
             self.sync_plotted_state_from_selected();
             self.apply_block_projection(&block);
+            self.project_cached_volume_blocks(
+                &source_id,
+                &var_name,
+                &slice_request.selections,
+                anim_dim,
+            );
             self.prefetch_selected_animated_range(&shape);
             return;
         }
@@ -81,6 +91,7 @@ impl OctantApp {
             return;
         };
 
+        let selections = slice_request.selections.clone();
         let block_request = BlockRequest::new(store_handle, slice_request);
         let key = block_request.cache_key();
 
@@ -93,6 +104,7 @@ impl OctantApp {
             );
             self.sync_plotted_state_from_selected();
             self.apply_block_projection(&block);
+            self.project_cached_volume_blocks(&source_id, &var_name, &selections, anim_dim);
             self.prefetch_selected_animated_range(&shape);
             return;
         }

@@ -108,6 +108,10 @@ impl OctantApp {
             && is_vol_allowed;
 
         let is_3d_anim = anim_dim.is_some_and(|a| a == x_dim || a == y_dim || a == z_dim);
+        let axes = [(x_dim, req_x), (y_dim, req_y), (z_dim, req_z)];
+        if !self.block_in_view(block, anim_dim, is_3d_anim, axes) {
+            return;
+        }
 
         if is_3d_plot {
             self.apply_3d_volume_projection(

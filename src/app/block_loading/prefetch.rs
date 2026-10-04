@@ -152,7 +152,7 @@ impl OctantApp {
             .min(full_extent.saturating_sub(1))
             .max(range_start);
 
-        let _first_chunk = range_start / cs;
+        let first_chunk = range_start / cs;
         let last_chunk = range_end / cs;
 
         let source_id = self.plotted_source_id();
@@ -184,10 +184,9 @@ impl OctantApp {
             }
         } else {
             // When paused / on initial load with a multi-chunk range selection:
-            // Queue all chunks across the user's requested range in parallel across Rayon workers:
-            for c in (current_chunk + 1)..=last_chunk {
-                chunk_indices.push(c);
-            }
+            // queue every other chunk of the user's range (also those before the
+            // current step) in parallel across Rayon workers:
+            chunk_indices.extend((first_chunk..=last_chunk).filter(|&c| c != current_chunk));
         }
 
         for chunk_idx in chunk_indices {
