@@ -68,20 +68,23 @@ fn opaque_surface(ray: Ray, prev: vec3<f32>, pos: vec3<f32>, kind: u32, first: b
     return shade_surface(ray, hit[1], surface_color(hit[0], kind));
 }
 
-// Straight RGBA of a DVR sample: transfer color and opacity in range, enabled
-// NaN or clip colors outside it, transparent otherwise.
-fn dvr_sample(d: f32) -> vec4<f32> {
+// Straight color of a DVR sample and its opacity over one step: transfer
+// color and extinction in range, enabled NaN or clip colors outside it,
+// transparent otherwise.
+fn dvr_sample(d: f32, step_world: f32) -> vec4<f32> {
     let c = uniforms.color;
+    var user = vec4<f32>(0.0);
     if (is_missing(d)) {
-        return select(vec4<f32>(0.0), c.nan_color, c.use_nan_color == 1u);
+        user = select(user, c.nan_color, c.use_nan_color == 1u);
+    } else if (d < c.cmin) {
+        user = select(user, c.lowclip_color, c.use_lowclip == 1u);
+    } else if (d > c.cmax) {
+        user = select(user, c.highclip_color, c.use_highclip == 1u);
+    } else {
+        let tf = transfer_at(scale_position(d));
+        return vec4<f32>(tf.rgb, extinction_alpha(tf.a, step_world));
     }
-    if (d < c.cmin) {
-        return select(vec4<f32>(0.0), c.lowclip_color, c.use_lowclip == 1u);
-    }
-    if (d > c.cmax) {
-        return select(vec4<f32>(0.0), c.highclip_color, c.use_highclip == 1u);
-    }
-    return transfer_at(scale_position(d));
+    return vec4<f32>(user.rgb, corrected_alpha(user.a, step_world));
 }
 
 // Samples this faint skip the lighting gradient.
@@ -103,8 +106,8 @@ fn volume_dvr(ray: Ray) -> vec4<f32> {
         if (uniforms.transparency == 0u && in_display_range(d)) {
             return opaque_surface(ray, prev, pos, SURFACE_RANGE, i == 0);
         }
-        let s = dvr_sample(d);
-        let a = corrected_alpha(s.a, ray.step_world);
+        let s = dvr_sample(d, ray.step_world);
+        let a = s.a;
         if (a > 0.0) {
             let lit = uniforms.lighting != 0u && a > LIT_ALPHA_MIN && in_display_range(d);
             let rgb = select(s.rgb, lit_sample(ray, pos, s.rgb, range), lit);
@@ -126,7 +129,6 @@ fn dvr_composite(ray: Ray) -> vec4<f32> {
     var prev = ray.entry;
     var accum = vec3<f32>(0.0);
     var alpha_acc: f32 = 0.0;
-    let alpha_exponent = 1.0 / max(uniforms.absorption, 0.1);
 
     for (var i = 0; i < ray.count; i = i + 1) {
         let s = sample_composite(pos);
@@ -134,7 +136,7 @@ fn dvr_composite(ray: Ray) -> vec4<f32> {
             if (uniforms.transparency == 0u) {
                 return opaque_surface(ray, prev, pos, SURFACE_BRIGHT, i == 0);
             }
-            let a = corrected_alpha(clamp(pow(s.a, alpha_exponent), 0.01, 1.0), ray.step_world);
+            let a = extinction_alpha(s.a * s.a, ray.step_world);
             let lit = uniforms.lighting != 0u && a > LIT_ALPHA_MIN;
             let rgb = select(s.rgb, lit_sample(ray, pos, s.rgb, 1.0), lit);
             accum += (1.0 - alpha_acc) * a * rgb;

@@ -1,7 +1,7 @@
 //! CPU tests: plane encoding, transfer LUT and the uniform layout.
 
 use super::encode::{Dims, encode_rgba, encode_scalar, is_valid};
-use super::lut::{TransferKey, build_transfer, dvr_opacity};
+use super::lut::{TransferKey, build_transfer, dvr_extinction};
 use super::pipeline::SHADER_HARDWARE_FILTER;
 use super::uniforms::VolumeUniforms;
 use crate::plots::common::PlotColorParams;
@@ -81,7 +81,7 @@ fn transfer_rgb_matches_atlas_texels() {
     let _registry = registry::test_lock();
     let id = registry::default_id();
     for reverse in [false, true] {
-        let lut = build_transfer(&TransferKey::new(&color(id, reverse), 3.0));
+        let lut = build_transfer(&TransferKey::new(&color(id, reverse)));
         assert_eq!(lut.len(), LUT_SIZE);
         for (i, texel) in lut.iter().enumerate() {
             let t = i as f32 / (LUT_SIZE - 1) as f32;
@@ -95,20 +95,21 @@ fn transfer_rgb_matches_atlas_texels() {
 #[test]
 fn composite_transfer_uses_fallback_row() {
     let _registry = registry::test_lock();
-    let composite = TransferKey::new(&color(COLORMAP_RGB_COMPOSITE, false), 1.0);
-    let fallback = TransferKey::new(&color(registry::default_id(), false), 1.0);
+    let composite = TransferKey::new(&color(COLORMAP_RGB_COMPOSITE, false));
+    let fallback = TransferKey::new(&color(registry::default_id(), false));
     assert_eq!(composite, fallback);
 }
 
 #[test]
-fn dvr_opacity_is_monotone_and_bounded() {
-    for absorption in [0.1, 1.0, 3.0, 10.0] {
-        let mut prev = 0.0;
-        for i in 0..=100 {
-            let a = dvr_opacity(i as f32 / 100.0, absorption);
-            assert!((0.01..=1.0).contains(&a) && a >= prev);
-            prev = a;
-        }
+fn dvr_extinction_ramps_from_clear_to_full() {
+    assert_eq!(dvr_extinction(0.0), 0.0);
+    assert_eq!(dvr_extinction(1.0), 1.0);
+    assert_eq!(dvr_extinction(-1.0), 0.0);
+    let mut prev = 0.0;
+    for i in 0..=100 {
+        let w = dvr_extinction(i as f32 / 100.0);
+        assert!((0.0..=1.0).contains(&w) && w >= prev);
+        prev = w;
     }
 }
 

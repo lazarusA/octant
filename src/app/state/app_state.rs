@@ -247,7 +247,7 @@ impl Default for OctantApp {
             sphere_mode: 0,
             surface_displacement_strength: 0.3,
             surface_mode: 0,
-            volume_opacity: 3.0,
+            volume_opacity: 6.0,
             volume_quality: 1.0,
             volume_transparency: true,
             volume_lighting: true,

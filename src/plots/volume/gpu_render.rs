@@ -40,7 +40,7 @@ pub(super) fn params(algorithm: u32, quality: f32, shift_x: u32) -> VolumeUnifor
         aspect_y: 1.0,
         aspect_z: 1.0,
         zoom: 2.5,
-        opacity_scale: 2.0,
+        opacity_scale: 6.0,
         quality,
         algorithm,
         isovalue: 0.5,

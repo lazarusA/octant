@@ -4,8 +4,8 @@
 // Returned for missing voxels; every mode treats |v| > 1e30 as missing.
 const MISSING: f32 = 3.0e38;
 
-// World length the transfer opacity is defined for: 64 samples across a unit
-// box, the former default, so Density keeps its meaning at any quality.
+// World length user colors' alpha (NaN and clip colors) is defined for: 64
+// samples across a unit box.
 const REFERENCE_STEP: f32 = 1.0 / 64.0;
 
 // A ray's samples: `count` steps of `step` (unit-box units) from `start`, each
@@ -171,6 +171,13 @@ fn value_color(value: f32) -> vec4<f32> {
 // per REFERENCE_STEP: view- and quality-independent accumulation.
 fn corrected_alpha(alpha: f32, step_world: f32) -> f32 {
     return 1.0 - pow(1.0 - clamp(alpha, 0.0, 0.9999), step_world / REFERENCE_STEP);
+}
+
+// Beer-Lambert opacity of one step through extinction `Density * weight` per
+// world unit: Density is the optical depth across one world unit (about the
+// volume's longest side) at weight 1.
+fn extinction_alpha(weight: f32, step_world: f32) -> f32 {
+    return 1.0 - exp(-uniforms.absorption * max(weight, 0.0) * step_world);
 }
 
 fn premultiply(c: vec4<f32>) -> vec4<f32> {

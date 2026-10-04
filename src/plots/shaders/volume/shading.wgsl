@@ -96,12 +96,14 @@ fn shade_surface(ray: Ray, n: vec3<f32>, color: vec3<f32>) -> vec4<f32> {
     return vec4<f32>(blinnphong(n, ray.view, ray.light, color), 1.0);
 }
 
-// Transparent sample color lit by its gradient, blended in by gradient
-// strength `m / (m + 1)` (m: color ranges per world unit), so flat regions keep
-// their colormap color and fronts and edges gain shape.
+// Transparent sample color lit by its gradient (diffuse only: highlights on
+// semi-transparent media read as hard glints), blended in by gradient strength
+// `m / (m + 1)` (m: color ranges per world unit), so flat regions keep their
+// colormap color and fronts and edges gain shape.
 fn lit_sample(ray: Ray, p: vec3<f32>, color: vec3<f32>, range: f32) -> vec3<f32> {
     let g = gradient_intensity(p);
     let m = length(g) / max(range, 1e-30);
-    let lit = blinnphong(facing_normal(g, ray.view), ray.view, ray.light, color);
+    let diffuse = max(dot(facing_normal(g, ray.view), ray.light), 0.0);
+    let lit = color * (uniforms.ambient + uniforms.diffuse * diffuse);
     return mix(color, lit, m / (m + 1.0));
 }

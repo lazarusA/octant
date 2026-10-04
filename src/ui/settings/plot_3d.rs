@@ -55,7 +55,12 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 
     if app.volume_algorithm == 0 || app.volume_algorithm >= 5 {
-        ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("Density"));
+        ui.add(
+            egui::Slider::new(&mut app.volume_opacity, 0.1..=50.0)
+                .text("Density")
+                .logarithmic(true),
+        )
+        .on_hover_text("Optical depth across the volume at the top of the color range");
     }
 
     if app.volume_algorithm == 1 {

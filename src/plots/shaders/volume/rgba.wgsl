@@ -9,11 +9,6 @@ fn sample_rgba(p: vec3<f32>) -> vec4<f32> {
     return value_color(sample_scalar(p));
 }
 
-// Beer-Lambert opacity of one step through a medium of `density`.
-fn step_opacity(density: f32, step_world: f32) -> f32 {
-    return 1.0 - exp(-max(density, 0.0) * uniforms.absorption * step_world);
-}
-
 // 5. Optical Absorption RGBA
 fn absorptionrgba(ray: Ray) -> vec4<f32> {
     var pos = ray.start;
@@ -28,7 +23,7 @@ fn absorptionrgba(ray: Ray) -> vec4<f32> {
                 return opaque_surface(ray, prev, pos, SURFACE_OPAQUE, i == 0);
             }
         } else {
-            let opacity = step_opacity(s.a, ray.step_world);
+            let opacity = extinction_alpha(s.a, ray.step_world);
             color_sum += (transmittance * opacity) * s.rgb;
             transmittance *= 1.0 - opacity;
             if (transmittance <= 0.01) {
@@ -71,7 +66,7 @@ fn volumeindexedrgba(ray: Ray) -> vec4<f32> {
         if (!is_missing(raw)) {
             let index = max(i32(raw) - 1, 0);
             let rgb = transfer_at(clamp(f32(index) / 255.0, 0.0, 1.0)).rgb;
-            let opacity = step_opacity(1.0, ray.step_world);
+            let opacity = extinction_alpha(1.0, ray.step_world);
             color_sum += (transmittance * opacity) * rgb;
             transmittance *= 1.0 - opacity;
             if (transmittance <= 0.01) {

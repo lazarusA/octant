@@ -147,8 +147,7 @@ impl VolumeRenderer {
 
     /// Writes this frame's uniforms and refreshes the transfer LUT if needed.
     pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &VolumeUniformParams) {
-        self.transfer
-            .sync(queue, &params.color, params.opacity_scale);
+        self.transfer.sync(queue, &params.color);
         let uniforms = params.to_uniforms(self.state());
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }

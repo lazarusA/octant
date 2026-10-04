@@ -1,7 +1,8 @@
 //! Review sheet: `cargo test --lib volume_contact_sheet -- --ignored` writes
 //! `target/icon_sheets/volume.png`: a 48³ gyroid with a missing corner octant
 //! in every mode (0-7), then opaque DVR and close-ups of opaque DVR, MIP,
-//! absorption, lit and unlit DVR and the label surface, over mid-gray.
+//! absorption, lit and unlit DVR and the label surface, then DVR at Density
+//! 2, 15 and 40 (the default is 6), over mid-gray.
 
 use super::gpu_render::{gpu, params, render_sized, renderer_n};
 use crate::ui::test_render::sheet_dir;
@@ -65,6 +66,12 @@ fn volume_contact_sheet() {
             close(unlit),
             close(params(4, 1.0, 0)),
         ])
+        .chain(
+            [2.0, 15.0, 40.0].map(|opacity_scale| super::VolumeUniformParams {
+                opacity_scale,
+                ..params(0, 1.0, 0)
+            }),
+        )
         .collect();
     let rows = (cases.len() as u32).div_ceil(COLUMNS);
     let mut sheet =
