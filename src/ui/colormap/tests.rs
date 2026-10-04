@@ -124,3 +124,41 @@ fn panel_fits_its_height_with_the_editor_open_or_closed() {
         }
     }
 }
+
+/// Heights of a popup-like `Area` (which sizes its content from last frame)
+/// holding the panel's scroll area, over frames whose content is `contents` tall.
+fn panel_heights(contents: &[f32], max_height: f32) -> Vec<f32> {
+    let ctx = egui::Context::default();
+    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 800.0));
+    let mut heights = Vec::new();
+    for &content in contents {
+        let input = egui::RawInput {
+            screen_rect: Some(screen),
+            ..Default::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| {
+            let area = egui::Area::new(egui::Id::new("colormap_panel_test"))
+                .fixed_pos(egui::Pos2::ZERO)
+                .show(ui.ctx(), |ui| {
+                    super::panel_scroll_area(max_height).show(ui, |ui| {
+                        ui.allocate_exact_size(egui::vec2(100.0, content), egui::Sense::hover());
+                    });
+                });
+            heights.push(area.response.rect.height());
+        });
+        output.textures_delta.clear();
+    }
+    heights
+}
+
+#[test]
+fn panel_grows_with_its_content_instead_of_scrolling() {
+    let heights = panel_heights(&[100.0, 300.0, 300.0, 300.0], 600.0);
+    assert_eq!(heights.last().copied(), Some(300.0), "heights: {heights:?}");
+}
+
+#[test]
+fn panel_scrolls_only_past_the_space_below_the_button() {
+    let heights = panel_heights(&[100.0, 900.0, 900.0, 900.0], 600.0);
+    assert_eq!(heights.last().copied(), Some(600.0), "heights: {heights:?}");
+}

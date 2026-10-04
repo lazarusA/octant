@@ -56,11 +56,23 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool)
         .align(egui::RectAlign::BOTTOM_START)
         .align_alternatives(&[])
         .show(|ui| {
-            egui::ScrollArea::vertical()
-                .id_salt(("colormap_popup_scroll", 0))
-                .max_height(max_height)
+            panel_scroll_area(max_height)
                 .show(ui, |ui| render_colormap_contents(app, ui, max_height));
         });
+}
+
+/// Scroll area of the whole panel. It grows with the content and scrolls only
+/// when the content does not fit in `max_height`.
+///
+/// A popup's `Area` offers its content only last frame's size, so a plain
+/// scroll area could never grow past it: when the editor opened, the panel kept
+/// its old height and scrolled. `min_scrolled_height` lets it take up to
+/// `max_height`, and auto-shrink trims it back to the content.
+fn panel_scroll_area(max_height: f32) -> egui::ScrollArea {
+    egui::ScrollArea::vertical()
+        .id_salt(("colormap_popup_scroll", 0))
+        .max_height(max_height)
+        .min_scrolled_height(max_height)
 }
 
 /// Lays out the panel so everything fits in `max_height`: the colormap list
