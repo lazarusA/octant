@@ -3,6 +3,9 @@
 pub mod credits;
 pub mod icon_scale;
 pub mod icons;
+#[cfg(test)]
+mod license_sheet;
+mod license_wrap;
 pub mod licenses;
 pub mod overview;
 pub mod types;

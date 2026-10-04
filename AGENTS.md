@@ -42,7 +42,7 @@ When developing and reviewing code in this repository:
    - **Export Engine (`src/export/`)**:
      - Submodules: `raster.rs` (PNG, JPEG, WebP, Display P3 chunk injection), `vector.rs` (SVG, PDF), `clipboard.rs` (native file manager reveal & clipboard).
    - **UI Subsystems (`src/ui/`)**:
-     - `src/ui/about/`: Modal window (`types.rs`, `overview.rs`, `credits.rs` colormap family licenses, `icons.rs`, `mod.rs`).
+     - `src/ui/about/`: Modal window (`types.rs`, `overview.rs`, `credits.rs` colormap family licenses, `icons.rs`, `licenses.rs` embedded license documents in a framed, virtualized viewer, `license_wrap.rs` word wrapping into `'static` visual lines rebuilt only when the width changes, `license_sheet.rs` `cargo test --lib license_viewer_contact_sheet -- --ignored` review sheet, `mod.rs`).
      - `src/ui/toolbar/`: Shared width-driven collapse for both bars (`ItemWidths`, `BarItem`, `CompactFlags`, `compute_compact`, `SEPARATOR_WIDTH`; `tests.rs`, `mod.rs`). Bars collapse items to icon-only (data-only items hide) in a fixed priority order instead of using overflow menus.
      - `src/ui/top_bar/`: Top navigation bar (`layout.rs` items & collapse order, `items.rs` drawing & widths, `tests.rs`, `mod.rs`).
      - `src/ui/bottom_bar/`: Playback bar (`layout.rs` items & collapse order, `items.rs` button items, `labels.rs` date & badge items, `timeline.rs` per-frame axis labels, `tests.rs`, `mod.rs`).
