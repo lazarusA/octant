@@ -97,7 +97,7 @@ fn shade_surface(ray: Ray, n: vec3<f32>, color: vec3<f32>) -> vec4<f32> {
 }
 
 // Transparent sample color lit by its gradient (diffuse only: highlights on
-// semi-transparent media read as hard glints), blended in by gradient strength
+// semi-transparent media read as hard glints; optional, off by default), blended in by gradient strength
 // `m / (m + 1)` (m: color ranges per world unit), so flat regions keep their
 // colormap color and fronts and edges gain shape.
 fn lit_sample(ray: Ray, p: vec3<f32>, color: vec3<f32>, range: f32) -> vec3<f32> {

@@ -69,8 +69,8 @@ fn opaque_surface(ray: Ray, prev: vec3<f32>, pos: vec3<f32>, kind: u32, first: b
 }
 
 // Straight color of a DVR sample and its opacity over one step: transfer
-// color and extinction in range, enabled NaN or clip colors outside it,
-// transparent otherwise.
+// color and opacity in range, enabled NaN or clip colors outside it,
+// transparent otherwise. Opacities are defined per REFERENCE_STEP.
 fn dvr_sample(d: f32, step_world: f32) -> vec4<f32> {
     let c = uniforms.color;
     var user = vec4<f32>(0.0);
@@ -81,8 +81,7 @@ fn dvr_sample(d: f32, step_world: f32) -> vec4<f32> {
     } else if (d > c.cmax) {
         user = select(user, c.highclip_color, c.use_highclip == 1u);
     } else {
-        let tf = transfer_at(scale_position(d));
-        return vec4<f32>(tf.rgb, extinction_alpha(tf.a, step_world));
+        user = transfer_at(scale_position(d));
     }
     return vec4<f32>(user.rgb, corrected_alpha(user.a, step_world));
 }
@@ -132,7 +131,8 @@ fn dvr_composite(ray: Ray) -> vec4<f32> {
             if (uniforms.transparency == 0u) {
                 return opaque_surface(ray, previous_pos(ray, i), pos, SURFACE_BRIGHT, i == 0);
             }
-            let a = extinction_alpha(s.a * s.a, ray.step_world);
+            let opacity = clamp(pow(s.a, 1.0 / max(uniforms.absorption, 0.1)), 0.01, 1.0);
+            let a = corrected_alpha(opacity, ray.step_world);
             let lit = uniforms.lighting != 0u && a > LIT_ALPHA_MIN;
             let rgb = select(s.rgb, lit_sample(ray, pos, s.rgb, 1.0), lit);
             accum += (1.0 - alpha_acc) * a * rgb;

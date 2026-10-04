@@ -34,6 +34,8 @@ mod skip_tests;
 mod slab_sheet;
 #[cfg(test)]
 mod tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod upload_bench;
 
 pub use callback::VolumeCallback;
 pub use encode::VolumeEncoding;
@@ -123,7 +125,7 @@ impl VolumeRenderer {
                     binding: 4,
                     resource: wgpu::BindingResource::Sampler(&sampler),
                 },
-                view_entry(5, &textures.bricks_view),
+                view_entry(5, &textures.bricks.view),
             ],
         });
         let renderer = Self {

@@ -84,12 +84,14 @@ impl OctantApp {
                 block.bytes_size()
             );
             self.sync_plotted_state_from_selected();
+            let allocations = self.volume_allocations;
             self.apply_block_projection(&block);
             self.project_cached_volume_blocks(
                 &source_id,
                 &var_name,
                 &slice_request.selections,
                 anim_dim,
+                allocations,
             );
             self.prefetch_selected_animated_range(&shape);
             return;
@@ -113,8 +115,15 @@ impl OctantApp {
                 block.bytes_size()
             );
             self.sync_plotted_state_from_selected();
+            let allocations = self.volume_allocations;
             self.apply_block_projection(&block);
-            self.project_cached_volume_blocks(&source_id, &var_name, &selections, anim_dim);
+            self.project_cached_volume_blocks(
+                &source_id,
+                &var_name,
+                &selections,
+                anim_dim,
+                allocations,
+            );
             self.prefetch_selected_animated_range(&shape);
             return;
         }

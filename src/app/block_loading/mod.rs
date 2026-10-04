@@ -9,3 +9,4 @@ pub mod projection_3d;
 pub mod projection_hash;
 pub mod step_nav;
 pub mod view_filter;
+pub mod volume_upload;

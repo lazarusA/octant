@@ -43,16 +43,22 @@ impl OctantApp {
             })
     }
 
-    /// Projects every cached block of the plotted selection: a volume can be
-    /// built from several resident blocks (along an animated spatial axis),
-    /// and a cache hit only delivers the one covering the current step.
+    /// Projects every cached block of the plotted selection after the volume
+    /// was reset (`volume_allocations` moved past `since`, a new selection): a
+    /// volume can be built from several resident blocks (along an animated
+    /// spatial axis), and a cache hit only delivers the one covering the
+    /// current step. Playback steps keep the volume and skip this.
     pub(crate) fn project_cached_volume_blocks(
         &mut self,
         source_id: &str,
         var_name: &str,
         selections: &[DimensionSelection],
         anim_dim: Option<usize>,
+        since: u64,
     ) {
+        if self.volume_allocations == since {
+            return;
+        }
         let is_volume = matches!(
             self.active_plot_type,
             crate::plots::PlotType::Volume | crate::plots::PlotType::PointCloud

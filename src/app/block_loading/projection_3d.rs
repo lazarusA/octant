@@ -121,6 +121,7 @@ impl OctantApp {
         };
 
         if needs_realloc {
+            self.volume_allocations += 1;
             let initial_vdata = VolumeData::new(
                 nx,
                 ny,
@@ -209,24 +210,10 @@ impl OctantApp {
                 &slab.values,
             );
 
-            // Upload only the planes this slab touched, not the whole volume.
-            let range = vdata.plane_range(dest_z, slab.depth);
-            if let Some(render_state) = &self.wgpu_render_state
-                && let Some(planes) = vdata.values.get(range.clone())
-            {
-                if let Some(r) = &self.volume_renderer {
-                    r.update_planes(
-                        &render_state.queue,
-                        &vdata.values,
-                        dest_z..dest_z + slab.depth,
-                    );
-                }
-                if let Some(r) = &self.point_cloud_renderer {
-                    r.update_data_range(&render_state.queue, range.start, planes);
-                }
-            }
             bounds_opt = Some((vdata.min_val, vdata.max_val));
         }
+        // Uploaded before the next paint, to the renderer on screen only.
+        self.mark_volume_dirty(dest_z..dest_z + slab.depth);
 
         if let Some((min_val, max_val)) = bounds_opt {
             self.sync_volume_color_bounds(min_val, max_val);

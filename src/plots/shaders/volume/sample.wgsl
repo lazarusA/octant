@@ -4,8 +4,9 @@
 // Returned for missing voxels; every mode treats |v| > 1e30 as missing.
 const MISSING: f32 = 3.0e38;
 
-// World length user colors' alpha (NaN and clip colors) is defined for: 64
-// samples across a unit box.
+// World length the transfer opacity (and NaN and clip colors' alpha) is
+// defined for: 64 samples across a unit box, so Density keeps its meaning at
+// any quality.
 const REFERENCE_STEP: f32 = 1.0 / 64.0;
 
 // A ray's samples: `count` steps of `step` (unit-box units) from `start`, each
@@ -173,18 +174,10 @@ fn corrected_alpha(alpha: f32, step_world: f32) -> f32 {
     return 1.0 - pow(1.0 - clamp(alpha, 0.0, 0.9999), step_world / REFERENCE_STEP);
 }
 
-// Extinction per world unit at weight 1: Density is the optical depth across
-// the volume's thinnest side, so a thin slab (few levels, scaled flat) reads
-// as well as a cube instead of fading with its thickness.
-fn extinction_scale() -> f32 {
-    let sides = vec3<f32>(uniforms.aspect_x, uniforms.aspect_y, uniforms.aspect_z);
-    return uniforms.absorption / max(min(sides.x, min(sides.y, sides.z)), 0.01);
-}
-
-// Beer-Lambert opacity of one step through extinction `weight` (in units of
-// `extinction_scale`).
-fn extinction_alpha(weight: f32, step_world: f32) -> f32 {
-    return 1.0 - exp(-extinction_scale() * max(weight, 0.0) * step_world);
+// Beer-Lambert opacity of one step through a medium of `density` (scaled by
+// Density) in the RGBA modes.
+fn extinction_alpha(density: f32, step_world: f32) -> f32 {
+    return 1.0 - exp(-uniforms.absorption * max(density, 0.0) * step_world);
 }
 
 fn premultiply(c: vec4<f32>) -> vec4<f32> {

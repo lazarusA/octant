@@ -1,7 +1,7 @@
 //! Transfer-function lookup texture: 256 `Rgba16Float` texels holding the
-//! colormap RGB (atlas row texels, from the registry) and the DVR extinction
-//! weight at each scale position. One filtered read per sample replaces the
-//! colormap blend; it is rebuilt only when its inputs change.
+//! colormap RGB (atlas row texels, from the registry) and the DVR opacity at
+//! each scale position. One filtered read per sample replaces the colormap
+//! blend and the opacity `pow`; it is rebuilt only when its inputs change.
 
 use crate::plots::common::PlotColorParams;
 use crate::utils::colormap::{COLORMAP_RGB_COMPOSITE, LUT_SIZE, registry};
@@ -14,10 +14,11 @@ pub struct TransferKey {
     row: u32,
     reverse: bool,
     generation: u64,
+    absorption: f32,
 }
 
 impl TransferKey {
-    pub fn new(color: &PlotColorParams) -> Self {
+    pub fn new(color: &PlotColorParams, absorption: f32) -> Self {
         // Same row choice as WGSL `plot_colormap_row`.
         let row = if color.colormap == COLORMAP_RGB_COMPOSITE {
             color.fallback_colormap
@@ -28,20 +29,21 @@ impl TransferKey {
             row,
             reverse: color.reverse != 0,
             generation: registry::generation(),
+            absorption,
         }
     }
 }
 
-/// DVR extinction weight at scale position `t`, in [0, 1]: the shader scales
-/// it by Density (optical depth across the volume's thinnest side at the top
-/// of the range). The linear ramp keeps the bottom of the range clear while
-/// mid-range values, where most data lie, stay readable.
-pub fn dvr_extinction(t: f32) -> f32 {
-    t.clamp(0.0, 1.0)
+/// DVR opacity at scale position `t`: the curve `t^(1/absorption)`, floored so
+/// every in-range sample stays faintly visible.
+pub fn dvr_opacity(t: f32, absorption: f32) -> f32 {
+    t.clamp(0.001, 1.0)
+        .powf(1.0 / absorption.max(0.1))
+        .clamp(0.01, 1.0)
 }
 
 /// RGBA texels for `key`, in [0, 1]: texel `i` is the atlas row texel at scale
-/// position `i / 255` (reversed if requested) with that position's extinction.
+/// position `i / 255` (reversed if requested) with that position's opacity.
 pub fn build_transfer(key: &TransferKey) -> Vec<[f32; 4]> {
     let last = (LUT_SIZE - 1) as f32;
     (0..LUT_SIZE)
@@ -50,7 +52,7 @@ pub fn build_transfer(key: &TransferKey) -> Vec<[f32; 4]> {
             let along = if key.reverse { 1.0 - t } else { t };
             let c = registry::sample_row(key.row, along, false);
             let [r, g, b] = [c.r(), c.g(), c.b()].map(|v| f32::from(v) / 255.0);
-            [r, g, b, dvr_extinction(t)]
+            [r, g, b, dvr_opacity(t, key.absorption)]
         })
         .collect()
 }
@@ -80,9 +82,9 @@ impl TransferLut {
         }
     }
 
-    /// Uploads the lookup texture when the colormap changed.
-    pub fn sync(&self, queue: &wgpu::Queue, color: &PlotColorParams) {
-        let key = TransferKey::new(color);
+    /// Uploads the lookup texture when `color` or `absorption` changed.
+    pub fn sync(&self, queue: &wgpu::Queue, color: &PlotColorParams, absorption: f32) {
+        let key = TransferKey::new(color, absorption);
         let mut current = self.key.lock().unwrap_or_else(|p| p.into_inner());
         if *current == Some(key) {
             return;

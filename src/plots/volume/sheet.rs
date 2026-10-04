@@ -2,7 +2,7 @@
 //! `target/icon_sheets/volume.png`: a 48³ gyroid with a missing corner octant
 //! in every mode (0-7), then opaque DVR and close-ups of opaque DVR, MIP,
 //! absorption, lit and unlit DVR and the label surface, then DVR at Density
-//! 2, 15 and 40 (the default is 6), over mid-gray.
+//! 1, 6 and 10 (the default is 3), over mid-gray.
 
 use super::gpu_render::{gpu, params, render_sized, renderer_n};
 use crate::ui::test_render::sheet_dir;
@@ -67,7 +67,7 @@ fn volume_contact_sheet() {
             close(params(4, 1.0, 0)),
         ])
         .chain(
-            [2.0, 15.0, 40.0].map(|opacity_scale| super::VolumeUniformParams {
+            [1.0, 6.0, 10.0].map(|opacity_scale| super::VolumeUniformParams {
                 opacity_scale,
                 ..params(0, 1.0, 0)
             }),

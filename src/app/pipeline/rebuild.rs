@@ -265,6 +265,7 @@ impl OctantApp {
             return;
         }
 
+        let mut upload_later = false;
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
             let encoding = self.volume_encoding();
             let same_dimensions = self.volume_data.as_ref().is_some_and(|v| {
@@ -278,12 +279,8 @@ impl OctantApp {
                 && self.volume_renderer.is_some()
                 && self.point_cloud_renderer.is_some()
             {
-                if let Some(volume_renderer) = &self.volume_renderer {
-                    volume_renderer.update_data(&wgpu_render_state.queue, &data.values);
-                }
-                if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
-                    point_cloud_renderer.update_data(&wgpu_render_state.queue, &data.values);
-                }
+                // Uploaded before the next paint, to the renderer on screen.
+                upload_later = true;
             } else {
                 let volume_renderer = VolumeRenderer::new(
                     &wgpu_render_state.device,
@@ -303,6 +300,9 @@ impl OctantApp {
                 );
                 self.volume_renderer = volume_renderer.map(Arc::new);
                 self.point_cloud_renderer = Some(Arc::new(point_cloud_renderer));
+                // New renderers start from `data`: nothing is pending.
+                self.volume_dirty = None;
+                self.point_cloud_dirty = None;
             }
         }
 
@@ -345,7 +345,11 @@ impl OctantApp {
             }
         }
 
+        let depth = data.depth;
         self.volume_data = Some(data);
+        if upload_later {
+            self.mark_volume_dirty(0..depth);
+        }
     }
 }
 

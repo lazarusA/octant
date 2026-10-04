@@ -67,55 +67,92 @@ fn unpack_rgb(v: f32) -> Option<[f32; 4]> {
     Some([r, g, b, r.max(g).max(b)])
 }
 
-fn encode<const C: usize, T>(
+/// Whether every value of `slice` is drawable (parallel on native).
+pub fn all_valid(slice: &[f32]) -> bool {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use rayon::prelude::*;
+        slice
+            .par_chunks(1 << 16)
+            .all(|c| c.iter().all(|&v| is_valid(v)))
+    }
+    #[cfg(target_arch = "wasm32")]
+    slice.iter().all(|&v| is_valid(v))
+}
+
+fn encode<const C: usize, T: Copy + Default + Send>(
     values: &[f32],
     dims: Dims,
     z: Range<usize>,
-    decode: impl Fn(f32) -> Option<[f32; C]>,
-    store: impl Fn([f32; C]) -> T,
+    decode: impl Fn(f32) -> Option<[f32; C]> + Sync,
+    store: impl Fn([f32; C]) -> T + Sync,
 ) -> Encoded<T> {
     let plane = dims.plane();
     let z = z.start.min(dims.d)..z.end.min(dims.d);
-    let voxels = z.len() * plane;
-    let mut out = Encoded {
-        z: z.clone(),
-        texels: Vec::with_capacity(voxels),
-        validity: Vec::with_capacity(voxels),
-        invalid_per_plane: Vec::with_capacity(z.len()),
-    };
     if values.len() < dims.d * plane {
-        return out;
+        return Encoded {
+            z: z.start..z.start,
+            texels: Vec::new(),
+            validity: Vec::new(),
+            invalid_per_plane: Vec::new(),
+        };
     }
+    let voxels = z.len() * plane;
+    let mut texels = vec![T::default(); voxels];
+    let mut validity = vec![0u8; voxels];
     let sampler = Neighborhood {
         values,
         dims,
         decode: &decode,
     };
-    for zi in z {
+    // Planes are independent: each reads `values` and writes its own slices.
+    let encode_plane = |(k, (texels, validity)): (usize, (&mut [T], &mut [u8]))| -> u32 {
+        let zi = z.start + k;
         let mut invalid = 0u32;
         // A plane with no data around it fills with zeros without searching.
         let isolated = !sampler.planes_have_data(zi);
         for yi in 0..dims.h {
             for xi in 0..dims.w {
-                let raw = values[zi * plane + yi * dims.w + xi];
-                if let Some(c) = decode(raw) {
-                    out.texels.push(store(c));
-                    out.validity.push(255);
+                let i = yi * dims.w + xi;
+                if let Some(c) = decode(values[zi * plane + i]) {
+                    texels[i] = store(c);
+                    validity[i] = 255;
                 } else {
                     let fill = if isolated {
                         [0.0; C]
                     } else {
                         sampler.average(xi, yi, zi)
                     };
-                    out.texels.push(store(fill));
-                    out.validity.push(0);
+                    texels[i] = store(fill);
                     invalid += 1;
                 }
             }
         }
-        out.invalid_per_plane.push(invalid);
+        invalid
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    let invalid_per_plane: Vec<u32> = {
+        use rayon::prelude::*;
+        texels
+            .par_chunks_mut(plane)
+            .zip(validity.par_chunks_mut(plane))
+            .enumerate()
+            .map(encode_plane)
+            .collect()
+    };
+    #[cfg(target_arch = "wasm32")]
+    let invalid_per_plane: Vec<u32> = texels
+        .chunks_mut(plane)
+        .zip(validity.chunks_mut(plane))
+        .enumerate()
+        .map(encode_plane)
+        .collect();
+    Encoded {
+        z,
+        texels,
+        validity,
+        invalid_per_plane,
     }
-    out
 }
 
 struct Neighborhood<'a, const C: usize, F> {

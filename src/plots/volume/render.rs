@@ -40,7 +40,8 @@ impl VolumeRenderer {
         if cache.key == Some(key) && cache.frame.is_some() {
             return false;
         }
-        self.transfer.sync(queue, &params.color);
+        self.transfer
+            .sync(queue, &params.color, params.opacity_scale);
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&key.uniforms));
         if cache.frame.as_ref().is_none_or(|f| f.size != size) {
             cache.frame = Some(self.blit.create_frame(device, size));

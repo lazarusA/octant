@@ -397,6 +397,9 @@ impl eframe::App for OctantApp {
 
             let plot_rect = transformed_plot_rect;
 
+            // Volume planes changed since the last frame reach the shown renderer.
+            self.flush_volume_uploads();
+
             // Dispatch active plot GPU rendering callback
             self.paint_active_plot(
                 ui,

@@ -50,7 +50,7 @@ fn additivergba(ray: Ray) -> vec4<f32> {
     let kind = rgba_skip_kind();
 
     for (var i = skip_empty(ray, 0, kind, 0.0); i < ray.count; i = skip_empty(ray, i + 1, kind, 0.0)) {
-        let density = extinction_scale() * ray.step_world * sample_rgba(sample_pos(ray, i));
+        let density = uniforms.absorption * ray.step_world * sample_rgba(sample_pos(ray, i));
         integrated = 1.0 - (1.0 - integrated) * (1.0 - clamp(density, vec4<f32>(0.0), vec4<f32>(1.0)));
         if (min(min(integrated.r, integrated.g), min(integrated.b, integrated.a)) >= 0.99) {
             break;

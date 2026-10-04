@@ -247,3 +247,16 @@ fn volume_playback_steps_past_the_selected_time_window() {
         assert_volume_matches(&app, t, [(0, 31), (0, 31), (0, 31)], "playback");
     }
 }
+
+#[test]
+fn depth_animated_volume_playback_keeps_the_full_volume() {
+    // The depth axis is animated: the volume is a ring buffer of its Z blocks,
+    // and playback moves through it without losing any of them.
+    let mut app = new_depth_animated_app(8);
+    press_plot(&mut app);
+    for t in 1..12 {
+        play_to(&mut app, t);
+        assert_eq!(app.current_timestep, t, "playback must reach step {t}");
+        assert_volume_matches(&app, 0, [(0, 31), (0, 31), (0, 31)], "depth playback");
+    }
+}

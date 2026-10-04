@@ -45,9 +45,8 @@ fn brick_matters(s: vec4<f32>, kind: u32, level: f32) -> bool {
         case 1u: {
             let low = c.use_lowclip == 1u && c.lowclip_color.a > 0.0 && s.x < c.cmin;
             let high = c.use_highclip == 1u && c.highclip_color.a > 0.0 && s.y > c.cmax;
-            // Translucent DVR has zero extinction at cmin; opaque mode hits it.
-            let above_min = select(s.y > c.cmin, s.y >= c.cmin, uniforms.transparency == 0u);
-            return nan_shown || (valid && ((above_min && s.x <= c.cmax) || low || high));
+            // Every in-range sample is at least faintly visible.
+            return nan_shown || (valid && ((s.y >= c.cmin && s.x <= c.cmax) || low || high));
         }
         case 2u: { return valid && s.y >= c.cmin && s.x <= c.cmax; }
         case 3u: { return valid || nan_shown; }

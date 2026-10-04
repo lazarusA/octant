@@ -109,15 +109,17 @@ impl VolumeData {
         }
 
         // Update min_val and max_val with finite values from the new slab
-        for &v in slab_values {
-            if v.is_finite() && !v.is_nan() {
-                if self.min_val.is_nan() || v < self.min_val {
-                    self.min_val = v;
-                }
-                if self.max_val.is_nan() || v > self.max_val {
-                    self.max_val = v;
-                }
-            }
+        if let Some((lo, hi)) = finite_range(slab_values) {
+            self.min_val = if self.min_val.is_nan() {
+                lo
+            } else {
+                self.min_val.min(lo)
+            };
+            self.max_val = if self.max_val.is_nan() {
+                hi
+            } else {
+                self.max_val.max(hi)
+            };
         }
     }
 
@@ -176,4 +178,28 @@ impl VolumeData {
         }
         (payload, nz as u32, valid_lines)
     }
+}
+
+/// Min and max of the finite values in `values`, or `None` when there are
+/// none (parallel on native: slabs arrive on every animation step).
+pub fn finite_range(values: &[f32]) -> Option<(f32, f32)> {
+    let fold = |(lo, hi): (f32, f32), &v: &f32| {
+        if v.is_finite() {
+            (lo.min(v), hi.max(v))
+        } else {
+            (lo, hi)
+        }
+    };
+    let empty = (f32::INFINITY, f32::NEG_INFINITY);
+    #[cfg(not(target_arch = "wasm32"))]
+    let (lo, hi) = {
+        use rayon::prelude::*;
+        values
+            .par_chunks(1 << 16)
+            .map(|c| c.iter().fold(empty, fold))
+            .reduce(|| empty, |a, b| (a.0.min(b.0), a.1.max(b.1)))
+    };
+    #[cfg(target_arch = "wasm32")]
+    let (lo, hi) = values.iter().fold(empty, fold);
+    (lo <= hi).then_some((lo, hi))
 }

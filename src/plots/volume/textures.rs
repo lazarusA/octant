@@ -2,7 +2,7 @@
 //! validity (`R8Unorm`) and the empty-space brick grid (`Rgba32Float`),
 //! uploaded as whole Z planes and brick layers.
 
-use super::bricks;
+use super::bricks::{self, BrickGrid};
 use super::encode::{self, Dims, Encoded, VolumeEncoding};
 use std::ops::Range;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -17,8 +17,7 @@ pub struct VolumeTextures {
     validity: wgpu::Texture,
     pub value_view: wgpu::TextureView,
     pub validity_view: wgpu::TextureView,
-    bricks: wgpu::Texture,
-    pub bricks_view: wgpu::TextureView,
+    pub bricks: BrickGrid,
     invalid_per_plane: Vec<AtomicU32>,
     invalid_total: AtomicU64,
     /// Counts uploads, so cached frames know the data changed.
@@ -59,8 +58,7 @@ impl VolumeTextures {
         Some(Self {
             encoding,
             dims,
-            bricks_view: bricks.create_view(&wgpu::TextureViewDescriptor::default()),
-            bricks,
+            bricks: BrickGrid::new(bricks, dims),
             value_view: value.create_view(&wgpu::TextureViewDescriptor::default()),
             validity_view: validity.create_view(&wgpu::TextureViewDescriptor::default()),
             value,
@@ -83,8 +81,9 @@ impl VolumeTextures {
         self.invalid_total.load(Ordering::Relaxed) > 0
     }
 
-    /// Re-encodes and uploads planes `z` of the full volume `values`, plus one
-    /// plane on each side, whose missing-voxel fill reads the changed planes.
+    /// Uploads planes `z` of the full volume `values`, plus one plane on each
+    /// side (their missing-voxel fill reads the changed planes), and the
+    /// bricks covering them.
     pub fn upload_planes(&self, queue: &wgpu::Queue, values: &[f32], z: Range<usize>) {
         let Dims { w, h, d } = self.dims;
         if values.len() != w * h * d {
@@ -102,94 +101,69 @@ impl VolumeTextures {
         while z0 < end {
             let z1 = (z0 + chunk).min(end);
             match self.encoding {
-                VolumeEncoding::Scalar => {
-                    self.write(queue, encode::encode_scalar(values, self.dims, z0..z1), 4)
-                }
+                VolumeEncoding::Scalar => self.upload_scalar(queue, values, z0..z1),
                 VolumeEncoding::PackedRgb => {
                     self.write(queue, encode::encode_rgba(values, self.dims, z0..z1), 4)
                 }
             }
             z0 = z1;
         }
-        self.write_bricks(queue, values, z);
-    }
-
-    /// Marks every brick as mattering, turning skipping off (tests compare
-    /// against it).
-    #[cfg(test)]
-    pub fn disable_skipping(&self, queue: &wgpu::Queue) {
-        let grid = bricks::brick_dims(self.dims);
-        let stats = vec![[f32::MIN, f32::MAX, 1.0, 0.0]; grid.w * grid.h * grid.d];
-        let extent = wgpu::Extent3d {
-            width: grid.w as u32,
-            height: grid.h as u32,
-            depth_or_array_layers: grid.d as u32,
-        };
-        let bytes = bytemuck::cast_slice(&stats);
-        write_region(
-            queue,
-            &self.bricks,
-            wgpu::Origin3d::ZERO,
-            extent,
-            bytes,
-            grid.w as u32 * 16,
-        );
-        self.version.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// Recomputes the brick layers whose footprint covers changed planes `z`.
-    fn write_bricks(&self, queue: &wgpu::Queue, values: &[f32], z: Range<usize>) {
-        let grid = bricks::brick_dims(self.dims);
         let composite = self.encoding == VolumeEncoding::PackedRgb;
-        for layer in bricks::affected_layers(z, self.dims.d) {
-            let stats = bricks::brick_stats(values, self.dims, composite, layer..layer + 1);
-            let extent = wgpu::Extent3d {
-                width: grid.w as u32,
-                height: grid.h as u32,
-                depth_or_array_layers: 1,
-            };
-            let origin = wgpu::Origin3d {
-                x: 0,
-                y: 0,
-                z: layer as u32,
-            };
-            let bytes = bytemuck::cast_slice(&stats);
-            write_region(
-                queue,
-                &self.bricks,
-                origin,
-                extent,
-                bytes,
-                grid.w as u32 * 16,
-            );
-        }
+        self.bricks.update(queue, values, self.dims, composite, z);
     }
 
-    fn write<T: bytemuck::Pod>(&self, queue: &wgpu::Queue, planes: Encoded<T>, texel_bytes: u32) {
-        if planes.z.is_empty() {
-            return;
+    /// Scalar planes `z`: without missing voxels (the common case) the values
+    /// upload as they are, and validity only where planes had missing voxels.
+    fn upload_scalar(&self, queue: &wgpu::Queue, values: &[f32], z: Range<usize>) {
+        let plane = self.dims.plane();
+        let slice = &values[z.start * plane..z.end * plane];
+        if !encode::all_valid(slice) {
+            return self.write(queue, encode::encode_scalar(values, self.dims, z), 4);
         }
-        let (w, h) = (self.dims.w as u32, self.dims.h as u32);
-        let extent = wgpu::Extent3d {
-            width: w,
-            height: h,
-            depth_or_array_layers: planes.z.len() as u32,
-        };
-        let origin = wgpu::Origin3d {
-            x: 0,
-            y: 0,
-            z: planes.z.start as u32,
-        };
+        let (origin, extent) = self.region(&z);
+        let w = self.dims.w as u32;
         write_region(
             queue,
             &self.value,
             origin,
             extent,
-            bytemuck::cast_slice(&planes.texels),
-            w * texel_bytes,
+            bytemuck::cast_slice(slice),
+            w * 4,
         );
-        write_region(queue, &self.validity, origin, extent, &planes.validity, w);
-        for (zi, invalid) in planes.z.clone().zip(planes.invalid_per_plane) {
+        let stale = z.clone().any(|zi| {
+            self.invalid_per_plane
+                .get(zi)
+                .is_some_and(|c| c.load(Ordering::Relaxed) != 0)
+        });
+        if stale {
+            write_region(
+                queue,
+                &self.validity,
+                origin,
+                extent,
+                &vec![255; slice.len()],
+                w,
+            );
+            self.set_invalid_counts(z.start, std::iter::repeat_n(0, z.len()));
+        }
+    }
+
+    fn region(&self, z: &Range<usize>) -> (wgpu::Origin3d, wgpu::Extent3d) {
+        let origin = wgpu::Origin3d {
+            x: 0,
+            y: 0,
+            z: z.start as u32,
+        };
+        let extent = wgpu::Extent3d {
+            width: self.dims.w as u32,
+            height: self.dims.h as u32,
+            depth_or_array_layers: z.len() as u32,
+        };
+        (origin, extent)
+    }
+
+    fn set_invalid_counts(&self, z0: usize, counts: impl Iterator<Item = u32>) {
+        for (zi, invalid) in (z0..).zip(counts) {
             if let Some(slot) = self.invalid_per_plane.get(zi) {
                 let old = slot.swap(invalid, Ordering::Relaxed);
                 self.invalid_total
@@ -199,9 +173,35 @@ impl VolumeTextures {
             }
         }
     }
+
+    /// Marks every brick as mattering, turning skipping off (tests compare
+    /// against it).
+    #[cfg(test)]
+    pub fn disable_skipping(&self, queue: &wgpu::Queue) {
+        self.bricks.disable(queue);
+        self.version.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn write<T: bytemuck::Pod>(&self, queue: &wgpu::Queue, planes: Encoded<T>, texel_bytes: u32) {
+        if planes.z.is_empty() {
+            return;
+        }
+        let w = self.dims.w as u32;
+        let (origin, extent) = self.region(&planes.z);
+        write_region(
+            queue,
+            &self.value,
+            origin,
+            extent,
+            bytemuck::cast_slice(&planes.texels),
+            w * texel_bytes,
+        );
+        write_region(queue, &self.validity, origin, extent, &planes.validity, w);
+        self.set_invalid_counts(planes.z.start, planes.invalid_per_plane.into_iter());
+    }
 }
 
-fn write_region(
+pub(super) fn write_region(
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     origin: wgpu::Origin3d,
