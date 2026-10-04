@@ -84,3 +84,10 @@ blusc = "0.0.6"
 
 [patch.crates-io]
 blusc = { git = "https://github.com/lazarusA/blusc", branch = "la/fix_linker" }
+
+# Shipped builds (desktop and `trunk build --release`): full speed (opt-level 3),
+# optimized across crates, without symbols. Debug builds and tests are unaffected.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
