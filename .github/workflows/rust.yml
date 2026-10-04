@@ -90,8 +90,15 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Download & Install Trunk
+        env:
+          # Pinned: trunk (and the wasm-opt it downloads) change the output size.
+          TRUNK_VERSION: "0.21.14"
         run: |
-          wget -qO- https://github.com/trunk-rs/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf- -C /usr/local/bin
+          wget -qO- https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf- -C /usr/local/bin
           chmod +x /usr/local/bin/trunk
       - name: Build Web Application
         run: trunk build --release --public-url /octant/
+      - name: Install brotli
+        run: sudo apt-get update && sudo apt-get install -y brotli
+      - name: Check wasm size budget
+        run: scripts/check_wasm_size.sh dist .github/wasm-size-budget
