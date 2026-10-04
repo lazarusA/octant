@@ -1,0 +1,84 @@
+# cargo-about configuration: third-party license notices for everything compiled
+# into Octant's native and web builds. Regenerate with:
+#   cargo about generate --fail -o assets/licenses/THIRD_PARTY_LICENSES.md about.hbs
+# Only permissive licenses are accepted; a new dependency under anything else
+# makes generation fail until it is reviewed.
+
+accepted = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "BSL-1.0",
+    "CC0-1.0",
+    "Unlicense",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "OFL-1.1",
+    "Ubuntu-font-1.0",
+    "CDLA-Permissive-2.0",
+    "Bitstream-Vera",
+]
+
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "wasm32-unknown-unknown",
+]
+
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+# Octant itself is covered by LICENSE-MIT / LICENSE-APACHE.
+workarounds = []
+
+# The bundled C libraries declare their licenses through files, not SPDX fields.
+# HDF5: BSD-3-Clause plus statements that must be retained in binaries (the
+# whole file is reproduced). netCDF-C: BSD-3-Clause (Unidata).
+[hdf5-metno-src.clarify]
+license = "BSD-3-Clause"
+
+[[hdf5-metno-src.clarify.files]]
+path = "ext/hdf5/LICENSE"
+license = "BSD-3-Clause"
+checksum = "b384492d25c6e4a49f371b646d9a81bc0a4b97cf0c66c2f3ed1b35f78a148732"
+
+[netcdf-src.clarify]
+license = "BSD-3-Clause"
+
+[[netcdf-src.clarify.files]]
+path = "source/COPYRIGHT"
+license = "BSD-3-Clause"
+checksum = "d3b81bcbe2b4fd7057e7bc603f58dd0c855c5c9b5635966d2c22d9a13f384fb8"
+
+# egui's bundled fonts: Ubuntu-Light (Ubuntu Font Licence), Noto Emoji (OFL-1.1),
+# Hack (MIT, with Bitstream Vera Sans Mono under the Bitstream Vera License) and
+# emoji-icon-font (MIT). Every font notice file is reproduced verbatim.
+[epaint_default_fonts.clarify]
+license = "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0 AND Bitstream-Vera"
+
+[[epaint_default_fonts.clarify.files]]
+path = "fonts/OFL.txt"
+license = "OFL-1.1"
+checksum = "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+
+[[epaint_default_fonts.clarify.files]]
+path = "fonts/UFL.txt"
+license = "Ubuntu-font-1.0"
+checksum = "2f0015108d68627bd788d313f529c21ff4da2c2c42a5e1f3883acc83480f9002"
+
+[[epaint_default_fonts.clarify.files]]
+path = "fonts/Hack-Regular.txt"
+license = "Bitstream-Vera"
+checksum = "47c0cccbeec7e8614548cc485588b28149e7874188df5f41b36efebcee285c87"
+
+[[epaint_default_fonts.clarify.files]]
+path = "fonts/emoji-icon-font-mit-license.txt"
+license = "MIT"
+checksum = "b9d2c1d909aa149996fd4c91dcb92b2362a04431640c1d200959da94caf8cde1"
