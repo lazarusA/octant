@@ -94,7 +94,7 @@ fn row(
     let name_x = swatch.max.x + GAP;
     let max_width = rect.max.x - PAD_RIGHT - name_x;
     let text_color = visuals.text_color();
-    if let Some(galley) = names.get(ui.painter(), id, max_width) {
+    if let Some(galley) = names.get(ui.painter(), id, label::ROW_FONT_SIZE, max_width) {
         let pos = egui::pos2(name_x, rect.center().y - galley.size().y / 2.0);
         ui.painter().galley(pos, galley, text_color);
     }

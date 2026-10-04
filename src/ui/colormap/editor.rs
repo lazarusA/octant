@@ -11,6 +11,8 @@ pub struct EditorState {
     pub spec: CustomColormapSpec,
     pub preview: PreviewSwatch,
     pub error: Option<String>,
+    /// Key of the saved map loaded with "Edit"; saving under a new name renames it.
+    pub editing_key: Option<String>,
     /// Spec the preview was last built from; `None` forces a rebuild.
     built: Option<CustomColormapSpec>,
 }
@@ -110,16 +112,33 @@ fn refresh_preview(ctx: &egui::Context, editor: &mut EditorState) {
 }
 
 fn show_actions(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let can_save = app.colormaps.picker.editor.error.is_none();
+    let editor = &app.colormaps.picker.editor;
+    let can_save = editor.error.is_none() && !editor.spec.name.trim().is_empty();
+    let renames = editor
+        .editing_key
+        .as_deref()
+        .is_some_and(|key| !editor.spec.has_key(key));
+    let label = if renames {
+        "Rename & apply"
+    } else {
+        "Save & apply"
+    };
     let save = ui
         .add_enabled_ui(can_save, |ui| {
-            ui.outlined_icon_button(Icon::Save, "Save & apply", IconTone::Accent)
+            ui.outlined_icon_button(Icon::Save, label, IconTone::Accent)
         })
         .inner;
     if save.clicked() {
-        let spec = app.colormaps.picker.editor.spec.clone();
-        match app.add_custom_colormap(spec) {
-            Ok(id) => super::select_colormap(app, id),
+        let editor = &app.colormaps.picker.editor;
+        let spec = editor.spec.clone();
+        let key = spec.key();
+        let replaces = editor.editing_key.clone().filter(|_| renames);
+        match app.save_custom_colormap(spec, replaces.as_deref()) {
+            Ok(id) => {
+                // Later saves keep editing the map just saved.
+                app.colormaps.picker.editor.editing_key = Some(key);
+                super::select_colormap(app, id);
+            }
             Err(e) => app.colormaps.picker.editor.error = Some(e),
         }
     }
@@ -150,12 +169,17 @@ fn show_saved(app: &mut OctantApp, ui: &mut egui::Ui) {
         });
     }
     if let Some(spec) = edit.and_then(|i| app.colormaps.custom.get(i)).cloned() {
+        app.colormaps.picker.editor.editing_key = Some(spec.key());
         app.colormaps.picker.editor.spec = spec;
     }
     if let Some(key) = delete
         .and_then(|i| app.colormaps.custom.get(i))
         .map(CustomColormapSpec::key)
     {
+        let editor = &mut app.colormaps.picker.editor;
+        if editor.editing_key.as_deref() == Some(key.as_str()) {
+            editor.editing_key = None;
+        }
         app.remove_custom_colormap(&key);
     }
 }

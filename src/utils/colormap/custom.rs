@@ -61,8 +61,10 @@ impl BlendSpace {
     }
 }
 
-/// Persisted description of a user colormap.
+/// Persisted description of a user colormap. Missing fields take their defaults,
+/// so specs saved by older versions still load.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct CustomColormapSpec {
     pub name: String,
     /// CSS gradient syntax: comma separated colors (hex, `rgb()`, `hsl()`, names),
@@ -89,6 +91,13 @@ impl Default for CustomColormapSpec {
 impl CustomColormapSpec {
     pub fn key(&self) -> String {
         format!("{CUSTOM_FAMILY_KEY}:{}", self.name.trim())
+    }
+
+    /// Whether `key` is this spec's registry key, without building it.
+    pub fn has_key(&self, key: &str) -> bool {
+        key.strip_prefix(CUSTOM_FAMILY_KEY)
+            .and_then(|rest| rest.strip_prefix(':'))
+            == Some(self.name.trim())
     }
 
     /// Bakes the spec into a 256-entry LUT.

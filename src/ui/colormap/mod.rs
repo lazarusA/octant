@@ -24,6 +24,8 @@ pub struct PickerState {
     pub swatches: swatch::SwatchAtlas,
     pub editor: editor::EditorState,
     pub names: label::NameCache,
+    /// Name of the active colormap (own cache: its width and font differ from rows).
+    pub active_name: label::NameCache,
     /// Height of everything below the list (editor, colorbar options) last frame.
     pub below_list_height: f32,
     /// Row hovered last frame; `preview_colormap` itself resets every frame.
@@ -118,19 +120,22 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.checkbox(&mut app.colormaps.reversed, "Reversed");
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                let font_size = egui::TextStyle::Body.resolve(ui.style()).size;
+                let max_width = ui.available_width();
+                let Some(galley) =
+                    app.colormaps
+                        .picker
+                        .active_name
+                        .get(ui.painter(), id, font_size, max_width)
+                else {
+                    return;
+                };
+                let (rect, name_response) =
+                    ui.allocate_exact_size(galley.size(), egui::Sense::hover());
                 let color = ui.visuals().strong_text_color();
-                let font = egui::TextStyle::Body.resolve(ui.style());
-                registry::with_entry(id, |e| {
-                    let galley = crate::ui::hover::card::layout::line(
-                        ui.painter(),
-                        &e.name,
-                        font,
-                        color,
-                        ui.available_width(),
-                    );
-                    ui.label(galley)
-                        .union(swatch_response)
-                        .on_hover_ui(|ui| label::hover_details(ui, e));
+                ui.painter().galley(rect.min, galley, color);
+                name_response.union(swatch_response).on_hover_ui(|ui| {
+                    registry::with_entry(id, |e| label::hover_details(ui, e));
                 });
             });
         });

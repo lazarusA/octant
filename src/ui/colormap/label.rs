@@ -7,22 +7,29 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Name font size of list rows.
-const ROW_FONT_SIZE: f32 = 13.0;
+pub const ROW_FONT_SIZE: f32 = 13.0;
 
-/// Elided name galleys of list rows, laid out once per row and reused across
-/// frames until the width, the registry or the display scale changes. Galleys
-/// use the placeholder color, so painters pass the row's text color.
+/// Elided name galleys, laid out once per colormap and reused across frames
+/// until the width, font size, registry or display scale changes. Galleys use
+/// the placeholder color, so painters pass the row's text color.
 #[derive(Default)]
 pub struct NameCache {
-    key: (u64, u32, u32),
+    key: (u64, u32, u32, u32),
     galleys: HashMap<u32, Arc<Galley>>,
 }
 
 impl NameCache {
-    pub fn get(&mut self, painter: &Painter, id: u32, max_width: f32) -> Option<Arc<Galley>> {
+    pub fn get(
+        &mut self,
+        painter: &Painter,
+        id: u32,
+        font_size: f32,
+        max_width: f32,
+    ) -> Option<Arc<Galley>> {
         let key = (
             registry::generation(),
             max_width.to_bits(),
+            font_size.to_bits(),
             painter.pixels_per_point().to_bits(),
         );
         if self.key != key {
@@ -32,7 +39,7 @@ impl NameCache {
         if let Some(galley) = self.galleys.get(&id) {
             return Some(Arc::clone(galley));
         }
-        let font = FontId::proportional(ROW_FONT_SIZE);
+        let font = FontId::proportional(font_size);
         let galley = registry::with_entry(id, |e| {
             line(
                 painter,

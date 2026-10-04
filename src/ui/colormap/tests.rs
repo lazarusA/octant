@@ -64,19 +64,19 @@ fn row_names_are_elided_and_cached() {
         let painter = ui.painter();
         let long =
             registry::find("colorcet:linear_protanopic_deuteranopic_kbjyw_5_95_c25").unwrap_or(0);
-        let Some(cut) = names.get(painter, long, 80.0) else {
+        let Some(cut) = names.get(painter, long, super::label::ROW_FONT_SIZE, 80.0) else {
             panic!("missing galley")
         };
         assert!(cut.elided);
         assert!(cut.size().x <= 80.5);
-        let Some(again) = names.get(painter, long, 80.0) else {
+        let Some(again) = names.get(painter, long, super::label::ROW_FONT_SIZE, 80.0) else {
             panic!("missing galley")
         };
         assert!(
             std::sync::Arc::ptr_eq(&cut, &again),
             "same width reuses the galley"
         );
-        let Some(wider) = names.get(painter, long, 400.0) else {
+        let Some(wider) = names.get(painter, long, super::label::ROW_FONT_SIZE, 400.0) else {
             panic!("missing galley")
         };
         assert!(!wider.elided, "a new width lays out again");

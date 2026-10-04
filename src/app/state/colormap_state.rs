@@ -4,7 +4,10 @@ use super::app_state::OctantApp;
 use crate::utils::colormap::{CustomColormapSpec, registry};
 use serde::{Deserialize, Serialize};
 
-const STORAGE_KEY: &str = "octant.colormaps";
+pub(super) const STORAGE_KEY: &str = "octant.colormaps";
+/// Stored preferences that failed to parse are copied here, so a format change
+/// never destroys the user's colormaps.
+pub(super) const UNREADABLE_KEY: &str = "octant.colormaps.unreadable";
 
 /// Colormap state beyond the active id (which stays on `OctantApp::active_colormap`).
 #[derive(Default)]
@@ -15,33 +18,64 @@ pub struct ColormapState {
     pub smooth: bool,
     /// User-defined colormaps, registered in `utils::colormap::registry`.
     pub custom: Vec<CustomColormapSpec>,
+    /// Stored specs that no longer build (e.g. after a color parser change); not
+    /// registered, but saved back unchanged.
+    pub unloaded: Vec<CustomColormapSpec>,
+    /// Raw stored preferences that could not be parsed, backed up on save.
+    pub unreadable_prefs: Option<String>,
     pub picker: crate::ui::colormap::PickerState,
 }
 
 /// Persisted colormap preferences (eframe storage). Only user-defined colormaps
 /// are kept; the active colormap and the reversed toggle reset on every launch.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
+#[serde(default)]
 struct ColormapPrefs {
     custom: Vec<CustomColormapSpec>,
+}
+
+/// Borrowed form of `ColormapPrefs` for saving without cloning the specs.
+#[derive(Serialize)]
+struct ColormapPrefsRef<'a> {
+    custom: Vec<&'a CustomColormapSpec>,
 }
 
 impl OctantApp {
     /// Restores the user's custom colormaps from eframe storage.
     pub fn load_colormap_prefs(&mut self, storage: Option<&dyn eframe::Storage>) {
-        let Some(prefs) = storage.and_then(|s| eframe::get_value::<ColormapPrefs>(s, STORAGE_KEY))
-        else {
+        let Some(storage) = storage else {
+            return;
+        };
+        let Some(prefs) = eframe::get_value::<ColormapPrefs>(storage, STORAGE_KEY) else {
+            if let Some(raw) = storage.get_string(STORAGE_KEY) {
+                log::warn!("Unreadable colormap preferences; backed up under `{UNREADABLE_KEY}`");
+                self.colormaps.unreadable_prefs = Some(raw);
+            }
             return;
         };
         for spec in prefs.custom {
-            if let Err(e) = self.add_custom_colormap(spec) {
+            if let Err(e) = spec.to_entry() {
+                log::warn!("Stored custom colormap `{}` does not build: {e}", spec.name);
+                self.colormaps.unloaded.push(spec);
+            } else if let Err(e) = self.add_custom_colormap(spec) {
                 log::warn!("Skipping stored custom colormap: {e}");
             }
         }
     }
 
     pub fn save_colormap_prefs(&self, storage: &mut dyn eframe::Storage) {
-        let prefs = ColormapPrefs {
-            custom: self.colormaps.custom.clone(),
+        if let Some(raw) = &self.colormaps.unreadable_prefs
+            && storage.get_string(UNREADABLE_KEY).is_none()
+        {
+            storage.set_string(UNREADABLE_KEY, raw.clone());
+        }
+        let prefs = ColormapPrefsRef {
+            custom: self
+                .colormaps
+                .custom
+                .iter()
+                .chain(&self.colormaps.unloaded)
+                .collect(),
         };
         eframe::set_value(storage, STORAGE_KEY, &prefs);
     }
@@ -53,8 +87,9 @@ impl OctantApp {
     }
 
     /// Atlas row drawn for colormap `id`: its smooth twin when "Smooth" is on.
+    /// The toggle only shows (and so only applies) while the active map has a twin.
     pub fn shown_colormap(&self, id: u32) -> u32 {
-        if self.colormaps.smooth {
+        if self.colormaps.smooth && registry::smooth_variant(self.active_colormap).is_some() {
             registry::smooth_variant(id).unwrap_or(id)
         } else {
             id
@@ -65,12 +100,37 @@ impl OctantApp {
     pub fn add_custom_colormap(&mut self, spec: CustomColormapSpec) -> Result<u32, String> {
         let entry = spec.to_entry()?;
         let id = registry::upsert_custom(entry);
-        let key = spec.key();
-        match self.colormaps.custom.iter_mut().find(|s| s.key() == key) {
+        let name = spec.name.trim();
+        self.colormaps.unloaded.retain(|s| s.name.trim() != name);
+        match self
+            .colormaps
+            .custom
+            .iter_mut()
+            .find(|s| s.name.trim() == name)
+        {
             Some(existing) => *existing = spec,
             None => self.colormaps.custom.push(spec),
         }
         Ok(id)
+    }
+
+    /// Saves `spec`, replacing the custom map keyed `replaces` when it was
+    /// renamed, and returns the saved map's id.
+    pub fn save_custom_colormap(
+        &mut self,
+        spec: CustomColormapSpec,
+        replaces: Option<&str>,
+    ) -> Result<u32, String> {
+        let key = spec.key();
+        let id = self.add_custom_colormap(spec)?;
+        match replaces.filter(|old| *old != key) {
+            // Removing a map shifts the ids after it, so look the new one up again.
+            Some(old) => {
+                self.remove_custom_colormap(old);
+                registry::find(&key).ok_or_else(|| format!("Colormap {key} was not registered"))
+            }
+            None => Ok(id),
+        }
     }
 
     /// Removes a custom colormap, keeping the active selection on the same map
@@ -78,109 +138,15 @@ impl OctantApp {
     pub fn remove_custom_colormap(&mut self, key: &str) {
         let active_key = registry::key_of(self.active_colormap);
         registry::remove_custom(key);
-        self.colormaps.custom.retain(|s| s.key() != key);
+        self.colormaps.custom.retain(|s| !s.has_key(key));
+        self.colormaps.unloaded.retain(|s| !s.has_key(key));
         self.active_colormap = registry::find(&active_key).unwrap_or_else(registry::default_id);
         self.preview_colormap = None;
+        // Ids after the removed row shifted, so a remembered hover is stale.
+        self.colormaps.picker.last_hovered = None;
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use eframe::Storage as _;
-    use std::collections::HashMap;
-
-    #[derive(Default)]
-    struct MemoryStorage(HashMap<String, String>);
-
-    impl eframe::Storage for MemoryStorage {
-        fn get_string(&self, key: &str) -> Option<String> {
-            self.0.get(key).cloned()
-        }
-        fn set_string(&mut self, key: &str, value: String) {
-            self.0.insert(key.to_string(), value);
-        }
-        fn remove_string(&mut self, key: &str) {
-            self.0.remove(key);
-        }
-        fn flush(&mut self) {}
-    }
-
-    #[test]
-    fn only_custom_colormaps_survive_a_restart() {
-        let _registry = crate::utils::colormap::registry::test_lock();
-        let mut app = OctantApp::default();
-        let spec = CustomColormapSpec {
-            name: "persist_test_map".into(),
-            colors: "black, white".into(),
-            ..Default::default()
-        };
-        let Ok(custom_id) = app.add_custom_colormap(spec) else {
-            panic!("valid spec rejected");
-        };
-        app.active_colormap = custom_id;
-        app.colormaps.reversed = true;
-
-        let mut storage = MemoryStorage::default();
-        app.save_colormap_prefs(&mut storage);
-
-        let mut restarted = OctantApp::default();
-        restarted.load_colormap_prefs(Some(&storage));
-        assert_eq!(restarted.active_colormap, registry::default_id());
-        assert!(!restarted.colormaps.reversed);
-        assert!(
-            restarted
-                .colormaps
-                .custom
-                .iter()
-                .any(|s| s.name == "persist_test_map")
-        );
-        registry::remove_custom("custom:persist_test_map");
-    }
-
-    #[test]
-    fn older_prefs_with_a_saved_selection_are_ignored() {
-        let _registry = crate::utils::colormap::registry::test_lock();
-        let mut storage = MemoryStorage::default();
-        let old = "(active: \"cmocean:thermal\", reversed: true, custom: [(name: \"legacy_test_map\", \
-                   colors: \"red, blue\", interpolation: Linear, blend: Oklab, classes: 0)])";
-        storage.set_string(STORAGE_KEY, old.into());
-        let mut app = OctantApp::default();
-        app.load_colormap_prefs(Some(&storage));
-        assert_eq!(app.active_colormap, registry::default_id());
-        assert!(!app.colormaps.reversed);
-        assert!(
-            app.colormaps
-                .custom
-                .iter()
-                .any(|s| s.name == "legacy_test_map")
-        );
-        registry::remove_custom("custom:legacy_test_map");
-    }
-}
-
-#[cfg(test)]
-mod smooth_tests {
-    use super::*;
-
-    #[test]
-    fn smooth_toggle_switches_to_the_twin_only_when_one_exists() {
-        let _registry = crate::utils::colormap::registry::test_lock();
-        let mut app = OctantApp::default();
-        let set1 = registry::find("colorbrewer:Set1").unwrap_or(0);
-        app.active_colormap = set1;
-        assert_eq!(app.effective_colormap(), set1);
-        app.colormaps.smooth = true;
-        assert_eq!(
-            Some(app.effective_colormap()),
-            registry::smooth_variant(set1)
-        );
-        app.active_colormap = registry::default_id();
-        assert_eq!(
-            app.effective_colormap(),
-            registry::default_id(),
-            "continuous maps are unaffected"
-        );
-        assert!(!OctantApp::default().colormaps.smooth, "smooth starts off");
-    }
-}
+#[path = "colormap_state_tests.rs"]
+mod tests;
