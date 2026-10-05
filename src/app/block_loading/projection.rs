@@ -66,11 +66,7 @@ impl OctantApp {
 
     /// Projects a resident block into current 2D or 3D views.
     pub fn apply_block_projection(&mut self, block: &OctantBlock) {
-        let dim_configs = if !self.plotted_dim_config.is_empty() {
-            &self.plotted_dim_config
-        } else {
-            &self.dim_config
-        };
+        let dim_configs = self.effective_dim_config();
         let anim_dim = self
             .plotted_animated_dim
             .or_else(|| crate::app::DimConfig::animated_dim(dim_configs));
@@ -145,9 +141,7 @@ impl OctantApp {
     }
 
     fn resolve_orig_dim_names(&self, block: &OctantBlock) -> Vec<String> {
-        self.plotted_dataset_metadata
-            .as_ref()
-            .or(self.active_dataset_metadata.as_ref())
+        self.effective_dataset_metadata()
             .and_then(|meta| {
                 meta.variables
                     .get(self.plotted_variable_idx)
@@ -163,11 +157,7 @@ impl OctantApp {
         orig_dim_names: &[String],
         anim_dim: Option<usize>,
     ) -> Vec<usize> {
-        let sel_indices = if !self.plotted_selected_dim_indices.is_empty() {
-            &self.plotted_selected_dim_indices
-        } else {
-            &self.selected_dim_indices
-        };
+        let sel_indices = self.effective_selected_dim_indices();
 
         (0..block.rank())
             .map(|i| {
@@ -191,11 +181,7 @@ impl OctantApp {
         orig_dim_names: &[String],
         dim_idx: usize,
     ) -> ((usize, usize), (usize, usize)) {
-        let sel_ranges = if !self.plotted_selected_dim_ranges.is_empty() {
-            &self.plotted_selected_dim_ranges
-        } else {
-            &self.selected_dim_ranges
-        };
+        let sel_ranges = self.effective_selected_dim_ranges();
 
         let dim_len = block.shape.get(dim_idx).copied().unwrap_or(1);
         let block_orig = block.origin.get(dim_idx).copied().unwrap_or(0);

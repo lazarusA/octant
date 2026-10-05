@@ -25,11 +25,7 @@ pub(crate) fn resolve_3d_dim_entries(
 
     if let Some(v) = var {
         let (explicit_x, explicit_y, explicit_z) =
-            v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
-                &app.plotted_dim_config
-            } else {
-                &app.dim_config
-            });
+            v.resolve_spatial_dim_indices(app.effective_dim_config());
 
         let x_idx = explicit_x.unwrap_or(v.dimension_names.len().saturating_sub(1));
         let y_idx = explicit_y.unwrap_or(v.dimension_names.len().saturating_sub(2));

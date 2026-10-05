@@ -24,52 +24,62 @@ struct Staged {
     target_step: Option<usize>,
 }
 
+impl Staged {
+    fn swap_with_plotted(app: &mut OctantApp) -> Self {
+        Self {
+            store_kind: replace(&mut app.selected_store_kind, app.plotted_store_kind),
+            target: replace(
+                &mut app.store_target_input,
+                app.plotted_store_target_input.clone(),
+            ),
+            metadata: replace(
+                &mut app.active_dataset_metadata,
+                app.plotted_dataset_metadata.clone(),
+            ),
+            variable: replace(&mut app.selected_variable_idx, app.plotted_variable_idx),
+            dim_config: replace(&mut app.dim_config, app.plotted_dim_config.clone()),
+            indices: replace(
+                &mut app.selected_dim_indices,
+                app.plotted_selected_dim_indices.clone(),
+            ),
+            ranges: replace(
+                &mut app.selected_dim_ranges,
+                app.plotted_selected_dim_ranges.clone(),
+            ),
+            spatial_dims: replace(&mut app.spatial_dims, app.plotted_spatial_dims.clone()),
+            animated_dim: replace(&mut app.animated_dim, app.plotted_animated_dim),
+            plot_type: replace(&mut app.active_plot_type, app.plotted_plot_type),
+            block_key: app.active_block_key.clone(),
+            slice_request: app.active_slice_request.clone(),
+            target_step: app.pending_target_step,
+        }
+    }
+
+    fn restore(self, app: &mut OctantApp) {
+        app.selected_store_kind = self.store_kind;
+        app.store_target_input = self.target;
+        app.active_dataset_metadata = self.metadata;
+        app.selected_variable_idx = self.variable;
+        app.dim_config = self.dim_config;
+        app.selected_dim_indices = self.indices;
+        app.selected_dim_ranges = self.ranges;
+        app.spatial_dims = self.spatial_dims;
+        app.animated_dim = self.animated_dim;
+        app.active_plot_type = self.plot_type;
+        app.active_block_key = self.block_key;
+        app.active_slice_request = self.slice_request;
+        app.pending_target_step = self.target_step;
+    }
+}
+
 impl OctantApp {
     /// Runs `f` with the plotted selection in place of the staged one: loads in
     /// `f` show (and re-sync) the plotted view, then the staged selection and
     /// its pending request come back untouched.
     pub(crate) fn with_plotted_selection(&mut self, f: impl FnOnce(&mut Self)) {
-        let staged = Staged {
-            store_kind: replace(&mut self.selected_store_kind, self.plotted_store_kind),
-            target: replace(
-                &mut self.store_target_input,
-                self.plotted_store_target_input.clone(),
-            ),
-            metadata: replace(
-                &mut self.active_dataset_metadata,
-                self.plotted_dataset_metadata.clone(),
-            ),
-            variable: replace(&mut self.selected_variable_idx, self.plotted_variable_idx),
-            dim_config: replace(&mut self.dim_config, self.plotted_dim_config.clone()),
-            indices: replace(
-                &mut self.selected_dim_indices,
-                self.plotted_selected_dim_indices.clone(),
-            ),
-            ranges: replace(
-                &mut self.selected_dim_ranges,
-                self.plotted_selected_dim_ranges.clone(),
-            ),
-            spatial_dims: replace(&mut self.spatial_dims, self.plotted_spatial_dims.clone()),
-            animated_dim: replace(&mut self.animated_dim, self.plotted_animated_dim),
-            plot_type: replace(&mut self.active_plot_type, self.plotted_plot_type),
-            block_key: self.active_block_key.clone(),
-            slice_request: self.active_slice_request.clone(),
-            target_step: self.pending_target_step,
-        };
+        let staged = Staged::swap_with_plotted(self);
         f(self);
-        self.selected_store_kind = staged.store_kind;
-        self.store_target_input = staged.target;
-        self.active_dataset_metadata = staged.metadata;
-        self.selected_variable_idx = staged.variable;
-        self.dim_config = staged.dim_config;
-        self.selected_dim_indices = staged.indices;
-        self.selected_dim_ranges = staged.ranges;
-        self.spatial_dims = staged.spatial_dims;
-        self.animated_dim = staged.animated_dim;
-        self.active_plot_type = staged.plot_type;
-        self.active_block_key = staged.block_key;
-        self.active_slice_request = staged.slice_request;
-        self.pending_target_step = staged.target_step;
+        staged.restore(self);
     }
 
     /// Whether the UI stages something other than the plotted view: another

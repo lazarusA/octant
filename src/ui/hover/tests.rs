@@ -46,7 +46,7 @@ fn test_volume_hover_hit_coordinates_resolved() {
     let camera = Camera3D::from_app(&app, rect);
     let transform_2d = Transform2D::from_app(&app, rect);
 
-    let (norm_x, norm_y, is_valid_hit, geo_coords, point_3d_hit) = resolve_hit_coordinates(
+    let hit = resolve_hit_coordinates(
         &app,
         None,
         &camera,
@@ -56,16 +56,16 @@ fn test_volume_hover_hit_coordinates_resolved() {
         hover_pos,
     );
 
-    assert!(is_valid_hit, "center of volume must be a valid raycast hit");
-    assert!(geo_coords.is_none());
-    assert!(point_3d_hit.is_some());
-    let (hit_x, hit_y, hit_z, hit_val) = point_3d_hit.unwrap_or((0, 0, 0, 0.0));
+    assert!(hit.is_valid, "center of volume must be a valid raycast hit");
+    assert!(hit.geo_coords.is_none());
+    assert!(hit.point_3d.is_some());
+    let (hit_x, hit_y, hit_z, hit_val) = hit.point_3d.unwrap_or((0, 0, 0, 0.0));
     assert!(hit_x < 2);
     assert!(hit_y < 2);
     assert!(hit_z < 2);
     assert!((10.0..=80.0).contains(&hit_val));
-    assert!(norm_x > 0.0 && norm_x < 1.0);
-    assert!(norm_y > 0.0 && norm_y < 1.0);
+    assert!(hit.norm_x > 0.0 && hit.norm_x < 1.0);
+    assert!(hit.norm_y > 0.0 && hit.norm_y < 1.0);
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn test_point_cloud_hover_hit_coordinates_resolved() {
     let camera = Camera3D::from_app(&app, rect);
     let transform_2d = Transform2D::from_app(&app, rect);
 
-    let (_, _, is_valid_hit, _, point_3d_hit) = resolve_hit_coordinates(
+    let hit = resolve_hit_coordinates(
         &app,
         None,
         &camera,
@@ -89,10 +89,10 @@ fn test_point_cloud_hover_hit_coordinates_resolved() {
     );
 
     assert!(
-        is_valid_hit,
+        hit.is_valid,
         "center of point cloud must be a valid raycast hit"
     );
-    assert!(point_3d_hit.is_some());
+    assert!(hit.point_3d.is_some());
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn test_volume_target_pos_and_entries_without_matrix_data() {
     let camera = Camera3D::from_app(&app, rect);
     let transform_2d = Transform2D::from_app(&app, rect);
 
-    let (norm_x, norm_y, _, geo_coords, point_3d_hit) = resolve_hit_coordinates(
+    let hit = resolve_hit_coordinates(
         &app,
         None,
         &camera,
@@ -120,10 +120,10 @@ fn test_volume_target_pos_and_entries_without_matrix_data() {
         None,
         None,
         sampler.as_ref(),
-        norm_x,
-        norm_y,
-        geo_coords,
-        point_3d_hit,
+        hit.norm_x,
+        hit.norm_y,
+        hit.geo_coords,
+        hit.point_3d,
     );
 
     assert!((10.0..=80.0).contains(&raw_val));
@@ -142,7 +142,7 @@ fn test_volume_target_pos_and_entries_without_matrix_data() {
         px,
         py,
         raw_val,
-        point_3d_hit,
+        hit.point_3d,
     );
 
     assert!(

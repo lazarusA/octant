@@ -47,15 +47,9 @@ pub fn enrich_entries_with_animated_and_collapsed_dims(
 
     // 1. Identify Animated Dimension
     let anim_dim = app
-        .plotted_animated_dim
-        .or(app.animated_dim)
+        .effective_animated_dim()
         .or_else(|| {
-            let configs = if !app.plotted_dim_config.is_empty() {
-                &app.plotted_dim_config
-            } else {
-                &app.dim_config
-            };
-            configs
+            app.effective_dim_config()
                 .iter()
                 .position(|c| c.animation == crate::app::AnimationRole::Animated)
         })

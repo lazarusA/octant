@@ -77,12 +77,7 @@ fn resolve_2d_dim_entries(
     }
 
     if let Some(v) = var {
-        let (explicit_x, explicit_y, _) =
-            v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
-                &app.plotted_dim_config
-            } else {
-                &app.dim_config
-            });
+        let (explicit_x, explicit_y, _) = v.resolve_spatial_dim_indices(app.effective_dim_config());
 
         let x_idx = explicit_x.unwrap_or(v.dimension_names.len().saturating_sub(1));
         let y_idx = explicit_y.unwrap_or(v.dimension_names.len().saturating_sub(2));
@@ -173,12 +168,7 @@ fn resolve_healpix_dim_entries(
 
     let mut list = vec![healpix_str, lat_str, lon_str];
     if let Some(v) = var {
-        let (explicit_x, _, _) =
-            v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
-                &app.plotted_dim_config
-            } else {
-                &app.dim_config
-            });
+        let (explicit_x, _, _) = v.resolve_spatial_dim_indices(app.effective_dim_config());
         if let Some(x_idx) = explicit_x {
             used_dims.insert(x_idx);
         } else if let Some(cell_idx) = v

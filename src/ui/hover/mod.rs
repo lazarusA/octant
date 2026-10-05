@@ -22,7 +22,7 @@ pub use enrich::{
 };
 pub use field::HoverField;
 pub use format::format_dimension_coord;
-pub use hit::{resolve_hit_coordinates, resolve_target_screen_pos};
+pub use hit::{HitResult, resolve_hit_coordinates, resolve_target_screen_pos};
 pub use raycast_sphere::{get_normalized_radial_dr, raycast_sphere, sphere_target_pos};
 pub use raycast_surface::{get_normalized_surface_height, raycast_surface, surface_target_pos};
 pub use raycast_volume::{VolumeSampler, volume_target_pos};
@@ -64,9 +64,7 @@ pub fn show_hover_tooltip(
         return;
     }
 
-    let Some((camera, norm_x, norm_y, geo_coords, point_3d_hit)) =
-        resolve_hit(app, matrix, sampler.as_ref(), rect, hover_pos)
-    else {
+    let Some((camera, hit)) = resolve_hit(app, matrix, sampler.as_ref(), rect, hover_pos) else {
         return;
     };
 
@@ -77,10 +75,10 @@ pub fn show_hover_tooltip(
         meta,
         var,
         sampler.as_ref(),
-        norm_x,
-        norm_y,
-        geo_coords,
-        point_3d_hit,
+        hit.norm_x,
+        hit.norm_y,
+        hit.geo_coords,
+        hit.point_3d,
     );
 
     let canvas_plot_type = app.effective_canvas_plot_type();
@@ -98,7 +96,7 @@ pub fn show_hover_tooltip(
         px,
         py,
         raw_val,
-        point_3d_hit,
+        hit.point_3d,
     );
 
     paint_hover_card(
@@ -116,23 +114,16 @@ pub fn show_hover_tooltip(
     );
 }
 
-#[allow(clippy::type_complexity)]
 fn resolve_hit(
     app: &OctantApp,
     matrix: Option<&MatrixData>,
     sampler: Option<&VolumeSampler>,
     rect: Rect,
     hover_pos: Pos2,
-) -> Option<(
-    Camera3D,
-    f32,
-    f32,
-    Option<(f32, f32)>,
-    Option<(usize, usize, usize, f32)>,
-)> {
+) -> Option<(Camera3D, HitResult)> {
     let camera = Camera3D::from_app(app, rect);
     let transform_2d = Transform2D::from_app(app, rect);
-    let (norm_x, norm_y, is_valid_hit, geo_coords, point_3d_hit) = resolve_hit_coordinates(
+    let hit = resolve_hit_coordinates(
         app,
         matrix,
         &camera,
@@ -141,10 +132,10 @@ fn resolve_hit(
         rect,
         hover_pos,
     );
-    if !is_valid_hit {
+    if !hit.is_valid {
         return None;
     }
-    Some((camera, norm_x, norm_y, geo_coords, point_3d_hit))
+    Some((camera, hit))
 }
 
 fn resolve_hover_target_info(

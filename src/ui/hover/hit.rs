@@ -11,65 +11,91 @@ use crate::ui::hover::sample_1d::screen_to_norm_1d;
 use crate::ui::hover::sample_2d::Transform2D;
 use egui::{Pos2, Rect};
 
-#[allow(clippy::type_complexity)]
+/// Result of resolving hover hit coordinates over active 1D, 2D, or 3D plots.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct HitResult {
+    pub norm_x: f32,
+    pub norm_y: f32,
+    pub is_valid: bool,
+    pub geo_coords: Option<(f32, f32)>,
+    pub point_3d: Option<(usize, usize, usize, f32)>,
+}
+
+impl HitResult {
+    pub const fn invalid() -> Self {
+        Self {
+            norm_x: 0.0,
+            norm_y: 0.0,
+            is_valid: false,
+            geo_coords: None,
+            point_3d: None,
+        }
+    }
+
+    pub const fn norm_2d(
+        norm_x: f32,
+        norm_y: f32,
+        is_valid: bool,
+        geo: Option<(f32, f32)>,
+    ) -> Self {
+        Self {
+            norm_x,
+            norm_y,
+            is_valid,
+            geo_coords: geo,
+            point_3d: None,
+        }
+    }
+
+    pub const fn point_3d(norm_x: f32, norm_y: f32, point: (usize, usize, usize, f32)) -> Self {
+        Self {
+            norm_x,
+            norm_y,
+            is_valid: true,
+            geo_coords: None,
+            point_3d: Some(point),
+        }
+    }
+}
+
 fn hit_sphere(
     app: &OctantApp,
     matrix: Option<&MatrixData>,
     camera: &Camera3D,
     hover_pos: Pos2,
-) -> (
-    f32,
-    f32,
-    bool,
-    Option<(f32, f32)>,
-    Option<(usize, usize, usize, f32)>,
-) {
+) -> HitResult {
     if let Some(matrix) = matrix
         && let Some((nx, ny, geo)) = raycast_sphere(app, matrix, camera, hover_pos)
     {
-        (nx, ny, true, geo, None)
+        HitResult::norm_2d(nx, ny, true, geo)
     } else {
-        (0.0, 0.0, false, None, None)
+        HitResult::invalid()
     }
 }
 
-#[allow(clippy::type_complexity)]
 fn hit_surface(
     app: &OctantApp,
     matrix: Option<&MatrixData>,
     camera: &Camera3D,
     hover_pos: Pos2,
-) -> (
-    f32,
-    f32,
-    bool,
-    Option<(f32, f32)>,
-    Option<(usize, usize, usize, f32)>,
-) {
+) -> HitResult {
     if let Some(matrix) = matrix
         && let Some((nx, ny, geo)) = raycast_surface(app, matrix, camera, hover_pos)
     {
-        (nx, ny, true, geo, None)
+        HitResult::norm_2d(nx, ny, true, geo)
     } else {
-        (0.0, 0.0, false, None, None)
+        HitResult::invalid()
     }
 }
 
-#[allow(clippy::type_complexity)]
 fn hit_3d_volume(
     app: &OctantApp,
     camera: &Camera3D,
     sampler: Option<&VolumeSampler>,
     hover_pos: Pos2,
-) -> (
-    f32,
-    f32,
-    bool,
-    Option<(f32, f32)>,
-    Option<(usize, usize, usize, f32)>,
-) {
+) -> HitResult {
     let Some(sampler) = sampler else {
-        return (0.0, 0.0, false, None, None);
+        return HitResult::invalid();
     };
     let (_, world_ray) = camera.cast_ray(hover_pos);
     let aspects = app.get_3d_aspect_ratio();
@@ -77,28 +103,21 @@ fn hit_3d_volume(
     {
         let nx = (hit_x as f32 + 0.5) / sampler.width as f32;
         let ny = (hit_y as f32 + 0.5) / sampler.height as f32;
-        (nx, ny, true, None, Some((hit_x, hit_y, hit_z, hit_val)))
+        HitResult::point_3d(nx, ny, (hit_x, hit_y, hit_z, hit_val))
     } else {
-        (0.0, 0.0, false, None, None)
+        HitResult::invalid()
     }
 }
 
-#[allow(clippy::type_complexity)]
 fn hit_2d_grid(
     app: &OctantApp,
     matrix: Option<&MatrixData>,
     transform_2d: &Transform2D,
     rect: Rect,
     hover_pos: Pos2,
-) -> (
-    f32,
-    f32,
-    bool,
-    Option<(f32, f32)>,
-    Option<(usize, usize, usize, f32)>,
-) {
+) -> HitResult {
     let Some(matrix) = matrix else {
-        return (0.0, 0.0, false, None, None);
+        return HitResult::invalid();
     };
     let (nx, ny) = transform_2d.screen_to_norm(hover_pos);
     let is_inside = rect.contains(hover_pos);
@@ -114,10 +133,9 @@ fn hit_2d_grid(
     } else {
         None
     };
-    (nx, ny, is_inside, geo_coords, None)
+    HitResult::norm_2d(nx, ny, is_inside, geo_coords)
 }
 
-#[allow(clippy::type_complexity)]
 pub fn resolve_hit_coordinates(
     app: &OctantApp,
     matrix: Option<&MatrixData>,
@@ -126,13 +144,7 @@ pub fn resolve_hit_coordinates(
     transform_2d: &Transform2D,
     rect: Rect,
     hover_pos: Pos2,
-) -> (
-    f32,
-    f32,
-    bool,
-    Option<(f32, f32)>,
-    Option<(usize, usize, usize, f32)>,
-) {
+) -> HitResult {
     match app.effective_canvas_plot_type() {
         PlotType::Sphere => hit_sphere(app, matrix, camera, hover_pos),
         PlotType::Surface => hit_surface(app, matrix, camera, hover_pos),
@@ -140,7 +152,7 @@ pub fn resolve_hit_coordinates(
         PlotType::Line => {
             let is_inside = rect.contains(hover_pos);
             let (nx, ny) = screen_to_norm_1d(app, rect, hover_pos);
-            (nx, ny, is_inside, None, None)
+            HitResult::norm_2d(nx, ny, is_inside, None)
         }
         _ => hit_2d_grid(app, matrix, transform_2d, rect, hover_pos),
     }

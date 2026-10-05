@@ -140,33 +140,15 @@ impl OctantApp {
     /// Reverts current staged/selected UI configuration back to the plotted dataset and variable.
     pub fn revert_selected_state_to_plotted(&mut self) {
         if let Some(meta) = self.plotted_dataset_metadata.clone() {
-            self.selected_store_kind = self.plotted_store_kind;
-            self.store_target_input = self.plotted_store_target_input.clone();
             self.set_active_metadata(meta);
-            self.selected_variable_idx = self.plotted_variable_idx;
-            self.dim_config = self.plotted_dim_config.clone();
-            self.selected_dim_indices = self.plotted_selected_dim_indices.clone();
-            self.selected_dim_ranges = self.plotted_selected_dim_ranges.clone();
-            self.spatial_dims = self.plotted_spatial_dims.clone();
-            self.animated_dim = self.plotted_animated_dim;
-            self.active_plot_type = self.plotted_plot_type;
+            self.copy_plotted_to_selected();
         }
     }
 
     /// Synchronizes all plotted configuration fields from the current UI selection.
     pub fn sync_plotted_state_from_selected(&mut self) {
         let is_new_var = self.is_exploring_unplotted_variable();
-
-        self.plotted_store_kind = self.selected_store_kind;
-        self.plotted_store_target_input = self.store_target_input.clone();
-        self.plotted_dataset_metadata = self.active_dataset_metadata.clone();
-        self.plotted_variable_idx = self.selected_variable_idx;
-        self.plotted_dim_config = self.dim_config.clone();
-        self.plotted_selected_dim_indices = self.selected_dim_indices.clone();
-        self.plotted_selected_dim_ranges = self.selected_dim_ranges.clone();
-        self.plotted_spatial_dims = self.spatial_dims.clone();
-        self.plotted_animated_dim = self.animated_dim;
-        self.plotted_plot_type = self.active_plot_type;
+        self.copy_selected_to_plotted();
 
         if is_new_var {
             self.enable_pyramid_resampling = false;

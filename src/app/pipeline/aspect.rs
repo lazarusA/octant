@@ -102,16 +102,11 @@ impl OctantApp {
 
     /// Computes circular shift offsets (shift_x, shift_y, shift_z) along the animated spatial dimension.
     pub fn get_volume_shifts(&self) -> (u32, u32, u32) {
-        let Some(anim_dim) = self.plotted_animated_dim.or(self.animated_dim) else {
+        let Some(anim_dim) = self.effective_animated_dim() else {
             return (0, 0, 0);
         };
 
-        let dim_configs = if !self.plotted_dim_config.is_empty() {
-            &self.plotted_dim_config
-        } else {
-            &self.dim_config
-        };
-
+        let dim_configs = self.effective_dim_config();
         let spatial_role = dim_configs
             .get(anim_dim)
             .map(|c| c.spatial)
@@ -128,10 +123,9 @@ impl OctantApp {
         };
 
         let origin = self
-            .plotted_selected_dim_ranges
+            .effective_selected_dim_ranges()
             .get(anim_dim)
             .map(|r| r.0)
-            .or_else(|| self.selected_dim_ranges.get(anim_dim).map(|r| r.0))
             .unwrap_or(0);
 
         let local_step = (self.current_timestep.saturating_sub(origin)) as u32;
@@ -148,20 +142,13 @@ impl OctantApp {
 
     /// Resolves the metadata dimension index for a given spatial axis (0 = X, 1 = Y, 2 = Z).
     pub fn get_spatial_dim_index(&self, axis: usize) -> usize {
-        let meta = self
-            .plotted_dataset_metadata
-            .as_ref()
-            .or(self.active_dataset_metadata.as_ref());
+        let meta = self.effective_dataset_metadata();
         let var_idx = if self.plotted_dataset_metadata.is_some() {
             self.plotted_variable_idx
         } else {
             self.selected_variable_idx
         };
-        let configs = if !self.plotted_dim_config.is_empty() {
-            &self.plotted_dim_config
-        } else {
-            &self.dim_config
-        };
+        let configs = self.effective_dim_config();
         if let Some(meta) = meta
             && let Some(var) = meta.variables.get(var_idx)
         {
@@ -184,10 +171,7 @@ impl OctantApp {
     /// Resolves the metadata dimension name for spatial axis (0 = X, 1 = Y, 2 = Z).
     pub fn get_spatial_dim_name(&self, axis: usize) -> Option<String> {
         let idx = self.get_spatial_dim_index(axis);
-        let meta = self
-            .plotted_dataset_metadata
-            .as_ref()
-            .or(self.active_dataset_metadata.as_ref());
+        let meta = self.effective_dataset_metadata();
         let var_idx = if self.plotted_dataset_metadata.is_some() {
             self.plotted_variable_idx
         } else {
