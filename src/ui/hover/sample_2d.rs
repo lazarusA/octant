@@ -1,7 +1,6 @@
 //! 2D Viewport Transformation and Heatmap Cell Sampling.
 
 use crate::app::OctantApp;
-use crate::data::MatrixData;
 use egui::{Pos2, Rect};
 
 /// 2D Viewport Transformation Helper (Aspect-scaling, Zoom, Pan).
@@ -16,7 +15,7 @@ pub struct Transform2D {
 }
 
 impl Transform2D {
-    pub fn from_app(app: &OctantApp, rect: Rect, _matrix: &MatrixData) -> Self {
+    pub fn from_app(app: &OctantApp, rect: Rect) -> Self {
         let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio {
             let data_aspect = app.data_aspect_ratio_2d();
             let canvas_aspect = rect.width() / rect.height().max(1.0);

@@ -18,28 +18,36 @@ pub struct VolumeSampler<'a> {
 }
 
 impl<'a> VolumeSampler<'a> {
-    pub fn from_app(app: &'a OctantApp, matrix: &'a MatrixData) -> Self {
+    pub fn from_app(app: &'a OctantApp, matrix: Option<&'a MatrixData>) -> Option<Self> {
         let (shift_x, shift_y, shift_z) = app.get_volume_shifts();
         if let Some(v) = &app.volume_data {
-            Self {
-                width: v.width.max(1),
-                height: v.height.max(1),
-                depth: v.depth.max(1),
+            if v.width == 0 || v.height == 0 || v.depth == 0 || v.values.is_empty() {
+                return None;
+            }
+            Some(Self {
+                width: v.width,
+                height: v.height,
+                depth: v.depth,
                 values: &v.values,
                 shift_x: shift_x as usize,
                 shift_y: shift_y as usize,
                 shift_z: shift_z as usize,
+            })
+        } else if let Some(m) = matrix {
+            if m.width == 0 || m.height == 0 || m.values.is_empty() {
+                return None;
             }
-        } else {
-            Self {
-                width: matrix.width.max(1),
-                height: matrix.height.max(1),
+            Some(Self {
+                width: m.width,
+                height: m.height,
                 depth: 1,
-                values: &matrix.values,
+                values: &m.values,
                 shift_x: shift_x as usize,
                 shift_y: shift_y as usize,
                 shift_z: shift_z as usize,
-            }
+            })
+        } else {
+            None
         }
     }
 
@@ -55,6 +63,8 @@ impl<'a> VolumeSampler<'a> {
         let is_nan = val.is_nan() || val.abs() > 1e30;
         if is_nan {
             app.use_nan_color
+        } else if app.rgb_composite_mode {
+            (val.to_bits() & 0x00FF_FFFF) != 0
         } else {
             let in_low = app.use_lowclip || val >= app.color_range_min;
             let in_high = app.use_highclip || val <= app.color_range_max;
