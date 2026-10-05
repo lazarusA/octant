@@ -168,19 +168,19 @@ impl OctantApp {
             indices.truncate(lookahead);
         } else if self.is_playing {
             let max_lookahead = (current_chunk + lookahead).min(max_dataset_chunk);
-            indices.extend((current_chunk + 1)..=max_lookahead);
+            indices.extend(current_chunk..=max_lookahead);
             if self.loop_playback && current_chunk + lookahead >= max_dataset_chunk {
                 let wrap_end = lookahead.saturating_sub(1).min(max_dataset_chunk);
                 for c in 0..=wrap_end {
-                    if !indices.contains(&c) && c != current_chunk {
+                    if !indices.contains(&c) {
                         indices.push(c);
                     }
                 }
             }
-            indices.truncate(lookahead);
+            indices.truncate(lookahead + 1);
         } else {
             let max_paused = (current_chunk + lookahead.min(2)).min(max_dataset_chunk);
-            indices.extend((current_chunk + 1)..=max_paused);
+            indices.extend(current_chunk..=max_paused);
         }
         indices
     }
@@ -223,6 +223,7 @@ impl OctantApp {
 
             if !self.block_cache.contains(&req.cache_key())
                 && !self.block_prefetcher.request(req, &self.block_cache)
+                && self.block_prefetcher.active_worker_threads() >= params.max_concurrent
             {
                 break;
             }
