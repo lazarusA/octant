@@ -263,3 +263,87 @@ fn test_single_step_playback_past_cache_eviction() {
         r.1
     );
 }
+
+#[test]
+fn plotted_variable_stays_visible_while_inspecting_and_exploring_another_dataset() {
+    let mut app = OctantApp::default();
+    let store1 =
+        ProceduralBlockStore::open("procedural://volume4d").expect("open procedural store 1");
+    let meta1 = store1.inspect().expect("inspect procedural store 1");
+    app.selected_store_kind = StoreKind::ProceduralVolume4D;
+    app.store_target_input = "procedural://volume4d".to_string();
+    app.load_new_metadata(meta1);
+    app.show_hero = false;
+    app.active_plot_type = PlotType::Volume;
+    app.plot_selection();
+    drain(&mut app);
+
+    assert!(
+        app.volume_data.is_some(),
+        "initial volume data must be plotted"
+    );
+
+    // 1. User inspects/loads a second dataset metadata into the variables overlay:
+    let mut meta2 = octant::data::DatasetMetadata {
+        name: "second_dataset".to_string(),
+        ..Default::default()
+    };
+    meta2.variables.push(octant::data::VariableInfo {
+        name: "temperature_surface".to_string(),
+        data_type: "float32".to_string(),
+        shape: vec![20, 32, 32],
+        chunk_shape: vec![1, 32, 32],
+        dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
+        units: Some("degC".to_string()),
+        long_name: Some("Surface Temperature".to_string()),
+        temporal_resolution: None,
+        time_coverage_start: None,
+        time_coverage_end: None,
+        file_size: 20 * 32 * 32 * 4,
+        attributes: std::collections::HashMap::new(),
+    });
+    meta2.variables.push(octant::data::VariableInfo {
+        name: "salinity_surface".to_string(),
+        data_type: "float32".to_string(),
+        shape: vec![20, 32, 32],
+        chunk_shape: vec![1, 32, 32],
+        dimension_names: vec!["time".to_string(), "lat".to_string(), "lon".to_string()],
+        units: Some("PSU".to_string()),
+        long_name: Some("Surface Salinity".to_string()),
+        temporal_resolution: None,
+        time_coverage_start: None,
+        time_coverage_end: None,
+        file_size: 20 * 32 * 32 * 4,
+        attributes: std::collections::HashMap::new(),
+    });
+
+    app.inspect_active_store();
+    assert!(
+        app.volume_data.is_some(),
+        "plotted volume data must NOT be cleared during active store inspection"
+    );
+
+    app.load_new_metadata(meta2);
+    assert_eq!(app.selected_variable_idx, 0);
+    assert!(
+        app.volume_data.is_some(),
+        "plotted volume data must stay visible while browsing second dataset"
+    );
+
+    // 2. User explores other variables in the second dataset:
+    app.selected_variable_idx = 1;
+    assert!(
+        app.volume_data.is_some(),
+        "plotted volume data must stay visible while changing selected variable in overlay"
+    );
+
+    // 3. Playback of the plotted dataset still advances seamlessly:
+    app.is_playing = true;
+    for _ in 0..3 {
+        tick(&mut app);
+    }
+    assert!(
+        app.volume_data.is_some(),
+        "plotted volume data must continue animating while exploring other dataset"
+    );
+}

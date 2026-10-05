@@ -29,14 +29,6 @@ impl OctantApp {
         self.active_dataset_metadata = None;
         self.cached_variable_tree = None;
         self.variable_search.clear();
-        self.matrix_data = None;
-        self.renderer = None;
-        self.sphere_renderer = None;
-        self.surface_renderer = None;
-        self.line_renderer = None;
-        self.volume_data = None;
-        self.volume_renderer = None;
-        self.point_cloud_renderer = None;
         self.bump_metadata_generation();
     }
 

@@ -69,14 +69,13 @@ impl OctantApp {
         self.plotted_spatial_dims = crate::app::DimConfig::spatial_dims(&self.plotted_dim_config);
         self.plotted_plot_type = self.active_plot_type;
 
-        let cur_var = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info());
+        let cur_var = self.plotted_variable_info();
         let cur_name = cur_var.map(|v| v.name.as_str());
-        if self
-            .matrix_data
-            .as_ref()
-            .is_some_and(|m| cur_name.is_none_or(|n| !m.dataset_name.contains(n)))
+        if !self.is_exploring_unplotted_variable()
+            && self
+                .matrix_data
+                .as_ref()
+                .is_some_and(|m| cur_name.is_none_or(|n| !m.dataset_name.contains(n)))
         {
             self.matrix_data = None;
             self.renderer = None;
@@ -134,14 +133,13 @@ impl OctantApp {
         self.plotted_spatial_dims = crate::app::DimConfig::spatial_dims(&self.plotted_dim_config);
         self.plotted_plot_type = self.active_plot_type;
 
-        let cur_var = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info());
+        let cur_var = self.plotted_variable_info();
         let cur_name = cur_var.map(|v| v.name.as_str());
-        if self
-            .volume_data
-            .as_ref()
-            .is_some_and(|v| cur_name.is_none_or(|n| !v.dataset_name.contains(n)))
+        if !self.is_exploring_unplotted_variable()
+            && self
+                .volume_data
+                .as_ref()
+                .is_some_and(|v| cur_name.is_none_or(|n| !v.dataset_name.contains(n)))
         {
             self.volume_data = None;
             self.volume_renderer = None;
