@@ -2,6 +2,7 @@
 
 pub mod handles;
 pub mod load;
+pub mod pacing;
 pub mod prefetch;
 pub mod projection;
 pub mod projection_2d;
