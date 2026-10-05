@@ -7,12 +7,11 @@ use crate::data::{BlockRequest, DimensionSelection, SliceRequest};
 impl OctantApp {
     /// Prefetches the block window containing `step` asynchronously.
     pub fn prefetch_block_window_for_next_steps(&mut self, step: usize) {
-        let anim_dim = self.effective_animated_dim();
-        let var_info = self.effective_variable_info().cloned();
-        let store_handle = self.effective_store_handle();
-        let (Some(anim_dim), Some(var_info), Some(store_handle)) =
-            (anim_dim, var_info, store_handle)
-        else {
+        let (Some(anim_dim), Some(var_info), Some(store_handle)) = (
+            self.plotted_animated_dim,
+            self.plotted_variable_info().cloned(),
+            self.plotted_store_handle(),
+        ) else {
             return;
         };
 
@@ -58,7 +57,7 @@ impl OctantApp {
     /// Checks if `target_step` is resident in the block cache; loads or prefetches it.
     pub fn request_step_or_load(&mut self, target_step: usize) {
         let source_id = self.plotted_source_id();
-        let var_info = self.effective_variable_info().cloned();
+        let var_info = self.plotted_variable_info().cloned();
         let var_name = var_info.as_ref().map(|v| v.name.clone());
         let base_request = var_info.as_ref().map(|v| {
             crate::ui::variables_panel::build_slice_request_for_plotted(self, &v.name, &v.shape)
@@ -73,7 +72,7 @@ impl OctantApp {
                 &source_id,
                 &name,
                 selections,
-                self.effective_animated_dim(),
+                self.plotted_animated_dim,
                 target_step,
             )
         });
@@ -91,12 +90,11 @@ impl OctantApp {
         if !self.enable_prefetch {
             return;
         }
-        let anim_dim = self.effective_animated_dim();
-        let var_info = self.effective_variable_info().cloned();
-        let store_handle = self.effective_store_handle();
-        let (Some(anim_dim), Some(var_info), Some(store_handle)) =
-            (anim_dim, var_info, store_handle)
-        else {
+        let (Some(anim_dim), Some(var_info), Some(store_handle)) = (
+            self.plotted_animated_dim,
+            self.plotted_variable_info().cloned(),
+            self.plotted_store_handle(),
+        ) else {
             return;
         };
 
@@ -151,7 +149,7 @@ impl OctantApp {
         let current_chunk = self.current_timestep / cs;
         let max_dataset_chunk = full_extent.saturating_sub(1) / cs;
         let is_spatial = self
-            .effective_dim_config()
+            .plotted_dim_config
             .get(anim_dim)
             .is_some_and(|c| c.spatial != crate::app::SpatialRole::None);
 
@@ -170,7 +168,7 @@ impl OctantApp {
             indices.truncate(lookahead + 1);
         } else if is_spatial {
             let (r_start, r_end) = self
-                .effective_selected_dim_ranges()
+                .plotted_selected_dim_ranges
                 .get(anim_dim)
                 .copied()
                 .unwrap_or((0, full_extent.saturating_sub(1)));

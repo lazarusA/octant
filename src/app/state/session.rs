@@ -184,18 +184,12 @@ impl OctantApp {
         self.reset_variable_bounds();
     }
 
-    /// Returns VariableInfo for the active variable: plotted if present, falling back to selected.
-    #[inline]
-    pub fn effective_variable_info(&self) -> Option<&crate::data::VariableInfo> {
-        self.plotted_variable_info()
-            .or_else(|| self.selected_variable_info())
-    }
-
     /// Returns VariableInfo for the currently plotted variable, if available.
     pub fn plotted_variable_info(&self) -> Option<&crate::data::VariableInfo> {
         self.plotted_dataset_metadata
             .as_ref()
             .and_then(|m| m.variables.get(self.plotted_variable_idx))
+            .or_else(|| self.selected_variable_info())
     }
 
     /// Returns VariableInfo for the currently selected variable, if available.

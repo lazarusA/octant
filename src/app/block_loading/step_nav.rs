@@ -58,7 +58,7 @@ impl OctantApp {
             self.current_timestep = next_ts;
             self.load_selected_variable_block();
         }
-        if let Some(var) = self.effective_variable_info() {
+        if let Some(var) = self.plotted_variable_info() {
             let shape = var.shape.clone();
             self.prefetch_selected_animated_range(&shape);
         }
@@ -66,7 +66,7 @@ impl OctantApp {
 
     /// Whether the block cache holds step `step` of the plotted selection.
     fn plotted_step_resident(&self, step: usize) -> bool {
-        let Some(var) = self.effective_variable_info() else {
+        let Some(var) = self.plotted_variable_info() else {
             return false;
         };
         let request = crate::ui::variables_panel::build_slice_request_for_plotted(
@@ -76,17 +76,17 @@ impl OctantApp {
             &self.plotted_source_id(),
             &var.name,
             &request.selections,
-            self.effective_animated_dim(),
+            self.plotted_animated_dim,
             step,
         )
     }
 
     /// Full size of the currently animated dimension in the dataset.
     pub fn animated_dim_extent(&self) -> usize {
-        let Some(anim_dim) = self.effective_animated_dim() else {
+        let Some(anim_dim) = self.plotted_animated_dim else {
             return 1;
         };
-        self.effective_variable_info()
+        self.plotted_variable_info()
             .and_then(|v| v.shape.get(anim_dim))
             .copied()
             .unwrap_or(1) as usize
@@ -94,7 +94,7 @@ impl OctantApp {
 
     /// Returns true if an animated dimension is currently selected and plotted.
     pub fn has_animated_dimension(&self) -> bool {
-        self.effective_animated_dim().is_some()
+        self.plotted_animated_dim.is_some()
     }
 
     /// Returns the active height of the bottom bar in points.

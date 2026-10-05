@@ -63,11 +63,7 @@ impl OctantApp {
             return (w / max_dim, h / max_dim, d / max_dim);
         }
 
-        let sel_ranges = if !self.plotted_selected_dim_ranges.is_empty() {
-            &self.plotted_selected_dim_ranges
-        } else {
-            &self.selected_dim_ranges
-        };
+        let sel_ranges = &self.selected_dim_ranges;
 
         let x_idx = self.get_spatial_dim_index(0);
         let y_idx = self.get_spatial_dim_index(1);
@@ -76,14 +72,8 @@ impl OctantApp {
         let get_extent = |dim: usize| -> usize {
             if let Some(&(start, end)) = sel_ranges.get(dim) {
                 (end + 1).saturating_sub(start).max(1)
-            } else if let Some(meta) = self
-                .plotted_dataset_metadata
-                .as_ref()
-                .or(self.active_dataset_metadata.as_ref())
-                && let Some(var) = meta
-                    .variables
-                    .get(self.plotted_variable_idx)
-                    .or_else(|| meta.variables.get(self.selected_variable_idx))
+            } else if let Some(meta) = self.active_dataset_metadata.as_ref()
+                && let Some(var) = meta.variables.get(self.selected_variable_idx)
                 && let Some(&s) = var.shape.get(dim)
             {
                 (s as usize).max(1)

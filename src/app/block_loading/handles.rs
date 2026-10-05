@@ -73,10 +73,4 @@ impl OctantApp {
             self.plotted_store_kind,
         )
     }
-
-    /// Returns the open `StoreHandle` for the active dataset (plotted falling back to selected).
-    pub fn effective_store_handle(&self) -> Option<crate::data::StoreHandle> {
-        self.plotted_store_handle()
-            .or_else(|| self.selected_store_handle())
-    }
 }

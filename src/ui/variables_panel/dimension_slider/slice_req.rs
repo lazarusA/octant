@@ -14,7 +14,7 @@ pub fn build_slice_request_for_plotted(
         shape,
         app.rgb_composite_mode,
         app.channel_dim_index(),
-        app.effective_selected_dim_ranges(),
+        &app.plotted_selected_dim_ranges,
     )
 }
 

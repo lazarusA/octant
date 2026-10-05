@@ -149,7 +149,7 @@ fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Tim
             app.is_playing = !app.is_playing;
             app.last_step_time = web_time::Instant::now();
             if app.is_playing
-                && let Some(var) = app.effective_variable_info()
+                && let Some(var) = app.plotted_variable_info()
             {
                 let shape = var.shape.clone();
                 app.prefetch_selected_animated_range(&shape);
