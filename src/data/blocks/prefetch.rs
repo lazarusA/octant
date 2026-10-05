@@ -43,15 +43,13 @@ impl BlockPrefetcher {
     }
 
     pub fn with_max_concurrent_threads(max_concurrent_threads: usize) -> Self {
-        let max_threads = max_concurrent_threads.clamp(1, 64);
         let (tx, rx) = sync_channel(128);
-
         Self {
             tx,
             rx,
             pending: HashMap::new(),
             active_worker_threads: 0,
-            max_concurrent_threads: max_threads,
+            max_concurrent_threads: max_concurrent_threads.clamp(1, 64),
             completed_bytes: Arc::new(AtomicU64::new(0)),
             total_bytes: Arc::new(AtomicU64::new(0)),
             aborted: Arc::new(AtomicBool::new(false)),
@@ -61,16 +59,10 @@ impl BlockPrefetcher {
     /// Schedules one request.
     pub fn request(&mut self, request: BlockRequest, cache: &BlockCache) -> bool {
         let key = request.cache_key();
-
-        if cache.contains(&key) {
-            return false;
-        }
-
-        if self.pending.contains_key(&key) {
-            return false;
-        }
-
-        if self.active_worker_threads >= self.max_concurrent_threads {
+        if cache.contains(&key)
+            || self.pending.contains_key(&key)
+            || self.active_worker_threads >= self.max_concurrent_threads
+        {
             return false;
         }
 
@@ -80,15 +72,17 @@ impl BlockPrefetcher {
             .fetch_add(estimated_bytes, Ordering::Relaxed);
         self.active_worker_threads += 1;
 
-        let tx = self.tx.clone();
-        let completed_atomic = self.completed_bytes.clone();
-        let aborted_atomic = self.aborted.clone();
+        let (tx, completed, aborted) = (
+            self.tx.clone(),
+            self.completed_bytes.clone(),
+            self.aborted.clone(),
+        );
 
         #[cfg(not(target_arch = "wasm32"))]
         crate::utils::executor::TaskExecutor::spawn_background(move || {
             let mut on_progress = |chunk_bytes: u64| {
-                if !aborted_atomic.load(Ordering::Relaxed) {
-                    completed_atomic.fetch_add(chunk_bytes, Ordering::Relaxed);
+                if !aborted.load(Ordering::Relaxed) {
+                    completed.fetch_add(chunk_bytes, Ordering::Relaxed);
                 }
             };
             let result = BlockLoader::load_one_with_progress(&request, Some(&mut on_progress))
@@ -98,12 +92,10 @@ impl BlockPrefetcher {
 
         #[cfg(target_arch = "wasm32")]
         {
-            let tx = tx.clone();
-            let key = key.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 let mut on_progress = |chunk_bytes: u64| {
-                    if !aborted_atomic.load(Ordering::Relaxed) {
-                        completed_atomic.fetch_add(chunk_bytes, Ordering::Relaxed);
+                    if !aborted.load(Ordering::Relaxed) {
+                        completed.fetch_add(chunk_bytes, Ordering::Relaxed);
                     }
                 };
                 let result = match request.store.source().kind {
@@ -144,10 +136,20 @@ impl BlockPrefetcher {
 
     pub fn poll(&mut self) -> Vec<PrefetchResult> {
         let mut results = Vec::new();
-
         while let Ok(result) = self.rx.try_recv() {
             self.active_worker_threads = self.active_worker_threads.saturating_sub(1);
-            self.pending.remove(&result.key);
+            if let Some(est) = self.pending.remove(&result.key) {
+                let _ = self
+                    .total_bytes
+                    .try_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
+                        Some(v.saturating_sub(est))
+                    });
+                let _ =
+                    self.completed_bytes
+                        .try_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
+                            Some(v.saturating_sub(est))
+                        });
+            }
             results.push(result);
         }
 
@@ -155,7 +157,6 @@ impl BlockPrefetcher {
             self.completed_bytes.store(0, Ordering::Relaxed);
             self.total_bytes.store(0, Ordering::Relaxed);
         }
-
         results
     }
 
@@ -172,12 +173,9 @@ impl BlockPrefetcher {
     }
 
     pub fn total_bytes(&self) -> u64 {
-        let total = self.total_bytes.load(Ordering::Relaxed);
-        if total > 0 {
-            total
-        } else {
-            self.pending_bytes()
-        }
+        self.total_bytes
+            .load(Ordering::Relaxed)
+            .max(self.pending_bytes())
     }
 
     pub fn active_worker_threads(&self) -> usize {
@@ -209,28 +207,20 @@ impl BlockPrefetcher {
             if key.source_id != source_id || key.variable_name != variable_name {
                 return false;
             }
-
-            // Verify all non-animated dimension selections match
-            for (d, current_sel) in selections.iter().enumerate() {
-                if Some(d) == anim_dim {
-                    continue;
-                }
-                if key.selections.get(d) != Some(current_sel) {
-                    return false;
-                }
+            let non_anim_matches = selections
+                .iter()
+                .enumerate()
+                .filter(|&(d, _)| Some(d) != anim_dim)
+                .all(|(d, sel)| key.selections.get(d) == Some(sel));
+            if !non_anim_matches {
+                return false;
             }
-
-            // Check if animated dimension covers the timestep
-            if let Some(dim) = anim_dim {
-                if let Some(sel) = key.selections.get(dim) {
+            anim_dim
+                .and_then(|d| key.selections.get(d))
+                .is_none_or(|sel| {
                     let (start, end) = sel.bounds();
                     timestep >= start && timestep < end
-                } else {
-                    true
-                }
-            } else {
-                true
-            }
+                })
         })
     }
 
@@ -239,8 +229,7 @@ impl BlockPrefetcher {
         self.aborted.store(true, Ordering::Relaxed);
         self.aborted = Arc::new(AtomicBool::new(false));
         let (tx, rx) = sync_channel(self.max_concurrent_threads * 2);
-        self.tx = tx;
-        self.rx = rx;
+        (self.tx, self.rx) = (tx, rx);
         self.pending.clear();
         self.completed_bytes.store(0, Ordering::Relaxed);
         self.total_bytes.store(0, Ordering::Relaxed);

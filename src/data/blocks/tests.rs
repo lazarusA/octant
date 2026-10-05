@@ -129,3 +129,51 @@ fn test_block_cache_summary_and_clearing() {
     assert_eq!(cache.cached_count(), 1);
     assert_eq!(cache.summary_per_variable()[0].source_id, "dataset-b");
 }
+
+#[test]
+fn test_prefetcher_active_bytes_retire_on_drain() {
+    use crate::data::blocks::{BlockPrefetcher, BlockStore, BlockStoreError, ProgressCallback};
+    use crate::data::{DataSource, DataSourceKind, StoreHandle};
+    use std::sync::Arc;
+
+    struct DummyStore;
+    impl BlockStore for DummyStore {
+        fn backend_name(&self) -> &str {
+            "dummy"
+        }
+        fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
+            Ok(vec!["temperature".into()])
+        }
+        fn fetch_block_with_progress(
+            &self,
+            _request: &SliceRequest,
+            _on_progress: ProgressCallback,
+        ) -> Result<OctantBlock, BlockStoreError> {
+            Ok(test_block(0))
+        }
+    }
+
+    let mut prefetcher = BlockPrefetcher::new();
+    let cache = BlockCache::new(1024 * 1024);
+    let source = DataSource::new("dummy", DataSourceKind::Procedural, "dummy", "dummy");
+    let store_handle = StoreHandle::new(source, Arc::new(DummyStore));
+
+    let slice_1 = SliceRequest::new("temperature", vec![DimensionSelection::range(0, 10)]);
+    let req_1 = crate::data::BlockRequest::new(store_handle, slice_1);
+
+    assert!(prefetcher.request(req_1, &cache));
+    assert_eq!(prefetcher.pending_count(), 1);
+    assert_eq!(prefetcher.total_bytes(), 40); // 10 elements * 4 bytes
+    assert_eq!(prefetcher.pending_bytes(), 40);
+
+    // Draining without results still retains pending
+    let results = prefetcher.poll();
+    assert!(results.is_empty());
+    assert_eq!(prefetcher.total_bytes(), 40);
+
+    // Abort clears all pending and resets active bytes
+    prefetcher.abort();
+    assert_eq!(prefetcher.pending_count(), 0);
+    assert_eq!(prefetcher.total_bytes(), 0);
+    assert_eq!(prefetcher.completed_bytes(), 0);
+}
