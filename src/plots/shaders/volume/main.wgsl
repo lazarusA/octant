@@ -72,7 +72,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let back_position = in.frag_vert / scale_vec + vec3<f32>(0.5);
     let dir = normalize(back_position - eye_unit);
 
-    if (dot(dir, dir) < 0.000001 || dir.x != dir.x || dir.y != dir.y || dir.z != dir.z) {
+    if (dot(dir, dir) < 0.000001 || any(dir != dir)) {
         discard;
     }
 

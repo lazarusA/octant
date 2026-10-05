@@ -51,18 +51,16 @@ impl VolumeRenderer {
             cache.frame = Some(self.blit.create_frame(device, size));
         }
         let algorithm = (params.algorithm as usize).min(ALGORITHMS - 1);
-        let pipeline = cache.pipelines[algorithm]
-            .get_or_insert_with(|| {
-                pipeline::create_raymarch_pipeline(
-                    device,
-                    &self.module,
-                    &self.pipeline_layout,
-                    algorithm as u32,
-                )
-            })
-            .clone();
-        if let Some(frame) = &cache.frame {
-            self.raymarch(encoder, &pipeline, atlas, &frame.view);
+        if cache.pipelines[algorithm].is_none() {
+            cache.pipelines[algorithm] = Some(pipeline::create_raymarch_pipeline(
+                device,
+                &self.module,
+                &self.pipeline_layout,
+                algorithm as u32,
+            ));
+        }
+        if let (Some(pipeline), Some(frame)) = (&cache.pipelines[algorithm], &cache.frame) {
+            self.raymarch(encoder, pipeline, atlas, &frame.view);
         }
         cache.key = Some(key);
         true

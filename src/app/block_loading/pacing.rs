@@ -21,13 +21,18 @@ pub fn estimate_chunk_bytes(base_req: &SliceRequest, anim_dim: usize, cs: usize)
     elements.saturating_mul(4).max(1)
 }
 
+const MB: usize = 1024 * 1024;
+const CHUNK_SMALL_MB: usize = 2 * MB;
+const CHUNK_MEDIUM_MB: usize = 8 * MB;
+const CHUNK_LARGE_MB: usize = 32 * MB;
+
 /// Dynamically scales worker concurrency limit according to chunk footprint.
 pub fn adaptive_concurrency(chunk_bytes: usize, user_max_threads: usize) -> usize {
     let target = match chunk_bytes {
-        0..=2_097_152 => user_max_threads, // <= 2 MB: full thread pool
-        2_097_153..=8_388_608 => 6,        // 2 MB - 8 MB
-        8_388_609..=33_554_432 => 3,       // 8 MB - 32 MB
-        _ => 2,                            // > 32 MB: prioritize bandwidth
+        0..=CHUNK_SMALL_MB => user_max_threads, // <= 2 MB: full thread pool
+        c if c <= CHUNK_MEDIUM_MB => 6,         // 2 MB - 8 MB
+        c if c <= CHUNK_LARGE_MB => 3,          // 8 MB - 32 MB
+        _ => 2,                                 // > 32 MB: prioritize bandwidth
     };
     target.min(user_max_threads).max(1)
 }
