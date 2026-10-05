@@ -4,8 +4,7 @@ use crate::app::OctantApp;
 use crate::data::{BlockRequest, DimensionSelection, SliceRequest};
 
 impl OctantApp {
-    /// Prefetches the block window containing `step` asynchronously using `plotted_store_handle()`,
-    /// without modifying current UI, `matrix_data`, or `current_timestep` state.
+    /// Prefetches the block window containing `step` asynchronously.
     pub fn prefetch_block_window_for_next_steps(&mut self, step: usize) {
         let Some(metadata) = &self.plotted_dataset_metadata else {
             return;
@@ -19,7 +18,6 @@ impl OctantApp {
 
         let var_name = var_info.name.clone();
         let shape = var_info.shape.clone();
-
         let source_id = self.plotted_source_id();
 
         let Some(anim_dim) = self.plotted_animated_dim else {
@@ -58,7 +56,6 @@ impl OctantApp {
         }
 
         let slice_request = SliceRequest::new(&var_name, selections);
-
         let block_request = BlockRequest::new(store_handle, slice_request);
         self.active_block_key = Some(block_request.cache_key());
         self.pending_target_step = Some(step);
@@ -66,9 +63,7 @@ impl OctantApp {
             .request(block_request, &self.block_cache);
     }
 
-    /// Checks if `target_step` is resident in the block cache.
-    /// - If resident: updates `current_timestep` to `target_step` and projects data immediately.
-    /// - If not resident: keeps `current_timestep` on the current valid step and prefetches the block window containing `target_step`.
+    /// Checks if `target_step` is resident in the block cache; loads or prefetches it.
     pub fn request_step_or_load(&mut self, target_step: usize) {
         let source_id = self.plotted_source_id();
         let var_name = self.plotted_variable_info().map(|v| v.name.clone());
@@ -100,7 +95,7 @@ impl OctantApp {
         }
     }
 
-    /// Progressively prefetches all remaining block windows across the selected animated dimension range in the background.
+    /// Progressively prefetches lookahead block windows along the animated dimension.
     pub fn prefetch_selected_animated_range(&mut self, shape: &[u64]) {
         if !self.enable_prefetch {
             return;
@@ -114,22 +109,20 @@ impl OctantApp {
             return;
         }
 
-        let base_req = if let Some(req) = self.active_slice_request.clone() {
-            req
-        } else if let Some(var_info) = self.plotted_variable_info() {
-            crate::ui::variables_panel::build_slice_request_for_plotted(self, &var_info.name, shape)
-        } else {
+        let Some(var_info) = self.plotted_variable_info() else {
             return;
         };
+        let base_req = crate::ui::variables_panel::build_slice_request_for_plotted(
+            self,
+            &var_info.name,
+            shape,
+        );
 
         if anim_dim >= base_req.selections.len() {
             return;
         }
 
-        let chunk_shape = self
-            .plotted_variable_info()
-            .map(|v| v.chunk_shape.clone())
-            .unwrap_or_default();
+        let chunk_shape = var_info.chunk_shape.clone();
 
         let (_, _, window_step) = self.animated_window_bounds(
             self.current_timestep,
@@ -164,15 +157,30 @@ impl OctantApp {
         let current_chunk = self.current_timestep / cs;
         let max_dataset_chunk = full_extent.saturating_sub(1) / cs;
 
-        let chunk_bytes = base_req.estimated_elements().saturating_mul(4).max(1);
+        let mut single_chunk_req = base_req.clone();
+        single_chunk_req.selections[anim_dim] = DimensionSelection::Range { start: 0, end: cs };
+        let chunk_elements = single_chunk_req.estimated_elements();
+        let chunk_bytes = chunk_elements.saturating_mul(4).max(1);
         let max_cache_chunks = (self.block_cache.max_bytes() / chunk_bytes).max(1);
 
+        let lookahead_chunks =
+            (self.block_window_size / cs).clamp(1, max_cache_chunks.saturating_sub(1).max(1));
+
+        let is_spatial_dim = self
+            .plotted_dim_config
+            .get(anim_dim)
+            .or_else(|| self.dim_config.get(anim_dim))
+            .is_some_and(|c| c.spatial != crate::app::SpatialRole::None);
+
         let mut chunk_indices = Vec::new();
-        if self.is_playing {
-            let lookahead_chunks =
-                (self.block_window_size / cs).clamp(1, max_cache_chunks.saturating_sub(1).max(1));
+        if is_spatial_dim {
+            for c in (first_chunk..=last_chunk).filter(|&c| c != current_chunk) {
+                chunk_indices.push(c);
+            }
+            chunk_indices.truncate(max_cache_chunks);
+        } else if self.is_playing {
             let max_lookahead_chunk = (current_chunk + lookahead_chunks).min(max_dataset_chunk);
-            for c in current_chunk..=max_lookahead_chunk {
+            for c in (current_chunk + 1)..=max_lookahead_chunk {
                 chunk_indices.push(c);
             }
 
@@ -184,14 +192,13 @@ impl OctantApp {
                     }
                 }
             }
-            chunk_indices.truncate(max_cache_chunks);
+            chunk_indices.truncate(lookahead_chunks);
         } else {
-            chunk_indices.extend((first_chunk..=last_chunk).filter(|&c| c != current_chunk));
-            let next_chunk = (current_chunk + 1).min(max_dataset_chunk);
-            if next_chunk != current_chunk && !chunk_indices.contains(&next_chunk) {
-                chunk_indices.push(next_chunk);
+            let paused_lookahead = lookahead_chunks.min(2);
+            let max_paused_chunk = (current_chunk + paused_lookahead).min(max_dataset_chunk);
+            for c in (current_chunk + 1)..=max_paused_chunk {
+                chunk_indices.push(c);
             }
-            chunk_indices.truncate(max_cache_chunks);
         }
 
         for chunk_idx in chunk_indices {
