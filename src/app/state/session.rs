@@ -111,7 +111,11 @@ impl OctantApp {
 
     /// Returns the source_id string for the currently plotted store.
     pub fn plotted_source_id(&self) -> String {
-        StoreKind::make_source_id(self.plotted_store_kind, &self.plotted_store_target_input)
+        if !self.plotted_store_target_input.is_empty() {
+            StoreKind::make_source_id(self.plotted_store_kind, &self.plotted_store_target_input)
+        } else {
+            self.selected_source_id()
+        }
     }
 
     /// Returns the source_id string for the currently selected (UI active) store.
@@ -178,6 +182,13 @@ impl OctantApp {
             self.rgb_composite_mode = false;
         }
         self.reset_variable_bounds();
+    }
+
+    /// Returns VariableInfo for the active variable: plotted if present, falling back to selected.
+    #[inline]
+    pub fn effective_variable_info(&self) -> Option<&crate::data::VariableInfo> {
+        self.plotted_variable_info()
+            .or_else(|| self.selected_variable_info())
     }
 
     /// Returns VariableInfo for the currently plotted variable, if available.

@@ -7,14 +7,12 @@ use crate::data::{BlockRequest, DimensionSelection, SliceRequest};
 impl OctantApp {
     /// Prefetches the block window containing `step` asynchronously.
     pub fn prefetch_block_window_for_next_steps(&mut self, step: usize) {
-        let (Some(metadata), Some(store_handle), Some(anim_dim)) = (
-            &self.plotted_dataset_metadata,
-            self.plotted_store_handle(),
-            self.plotted_animated_dim,
-        ) else {
-            return;
-        };
-        let Some(var_info) = metadata.variables.get(self.plotted_variable_idx) else {
+        let anim_dim = self.effective_animated_dim();
+        let var_info = self.effective_variable_info().cloned();
+        let store_handle = self.effective_store_handle();
+        let (Some(anim_dim), Some(var_info), Some(store_handle)) =
+            (anim_dim, var_info, store_handle)
+        else {
             return;
         };
 
@@ -60,8 +58,9 @@ impl OctantApp {
     /// Checks if `target_step` is resident in the block cache; loads or prefetches it.
     pub fn request_step_or_load(&mut self, target_step: usize) {
         let source_id = self.plotted_source_id();
-        let var_name = self.plotted_variable_info().map(|v| v.name.clone());
-        let base_request = self.plotted_variable_info().map(|v| {
+        let var_info = self.effective_variable_info().cloned();
+        let var_name = var_info.as_ref().map(|v| v.name.clone());
+        let base_request = var_info.as_ref().map(|v| {
             crate::ui::variables_panel::build_slice_request_for_plotted(self, &v.name, &v.shape)
         });
         let selections = base_request
@@ -74,7 +73,7 @@ impl OctantApp {
                 &source_id,
                 &name,
                 selections,
-                self.plotted_animated_dim,
+                self.effective_animated_dim(),
                 target_step,
             )
         });
@@ -92,11 +91,12 @@ impl OctantApp {
         if !self.enable_prefetch {
             return;
         }
-        let (Some(anim_dim), Some(var_info), Some(store_handle)) = (
-            self.plotted_animated_dim,
-            self.plotted_variable_info(),
-            self.plotted_store_handle(),
-        ) else {
+        let anim_dim = self.effective_animated_dim();
+        let var_info = self.effective_variable_info().cloned();
+        let store_handle = self.effective_store_handle();
+        let (Some(anim_dim), Some(var_info), Some(store_handle)) =
+            (anim_dim, var_info, store_handle)
+        else {
             return;
         };
 
@@ -151,22 +151,12 @@ impl OctantApp {
         let current_chunk = self.current_timestep / cs;
         let max_dataset_chunk = full_extent.saturating_sub(1) / cs;
         let is_spatial = self
-            .plotted_dim_config
+            .effective_dim_config()
             .get(anim_dim)
-            .or_else(|| self.dim_config.get(anim_dim))
             .is_some_and(|c| c.spatial != crate::app::SpatialRole::None);
 
         let mut indices = Vec::new();
-        if is_spatial {
-            let (r_start, r_end) = self
-                .plotted_selected_dim_ranges
-                .get(anim_dim)
-                .copied()
-                .unwrap_or((0, full_extent.saturating_sub(1)));
-            let (first, last) = (r_start / cs, r_end.min(full_extent.saturating_sub(1)) / cs);
-            indices.extend((first..=last).filter(|&c| c != current_chunk));
-            indices.truncate(lookahead);
-        } else if self.is_playing {
+        if self.is_playing {
             let max_lookahead = (current_chunk + lookahead).min(max_dataset_chunk);
             indices.extend(current_chunk..=max_lookahead);
             if self.loop_playback && current_chunk + lookahead >= max_dataset_chunk {
@@ -178,6 +168,15 @@ impl OctantApp {
                 }
             }
             indices.truncate(lookahead + 1);
+        } else if is_spatial {
+            let (r_start, r_end) = self
+                .effective_selected_dim_ranges()
+                .get(anim_dim)
+                .copied()
+                .unwrap_or((0, full_extent.saturating_sub(1)));
+            let (first, last) = (r_start / cs, r_end.min(full_extent.saturating_sub(1)) / cs);
+            indices.extend((first..=last).filter(|&c| c != current_chunk));
+            indices.truncate(lookahead);
         } else {
             let max_paused = (current_chunk + lookahead.min(2)).min(max_dataset_chunk);
             indices.extend(current_chunk..=max_paused);
