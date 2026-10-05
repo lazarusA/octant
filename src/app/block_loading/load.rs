@@ -136,40 +136,6 @@ impl OctantApp {
 
                     self.block_cache.put(res.key, block.clone());
 
-                    // When cache eviction shifts the oldest resident slice forward, update slider start:
-                    if let Some(dim) = anim_dim
-                        && let Some(meta) = self
-                            .plotted_dataset_metadata
-                            .as_ref()
-                            .or(self.active_dataset_metadata.as_ref())
-                        && let Some(var) = meta
-                            .variables
-                            .get(self.plotted_variable_idx)
-                            .or_else(|| meta.variables.get(self.selected_variable_idx))
-                        && var.name == block.variable_name
-                    {
-                        let source_id = self.plotted_source_id();
-                        if let Some(min_t) = self
-                            .block_cache
-                            .min_resident_timestep(&source_id, &var.name, dim)
-                        {
-                            let sel_ranges = if !self.plotted_selected_dim_ranges.is_empty() {
-                                &mut self.plotted_selected_dim_ranges
-                            } else {
-                                &mut self.selected_dim_ranges
-                            };
-                            if dim < sel_ranges.len() {
-                                let current_start = sel_ranges[dim].0;
-                                if min_t > current_start
-                                    && self.block_cache.current_bytes()
-                                        >= self.block_cache.max_bytes()
-                                {
-                                    sel_ranges[dim].0 = min_t;
-                                }
-                            }
-                        }
-                    }
-
                     if is_active || (is_same_var && (covers_current || is_volume_or_point_cloud)) {
                         if is_active {
                             self.active_block_key = None;

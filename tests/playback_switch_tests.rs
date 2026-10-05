@@ -14,13 +14,20 @@ const NT: usize = 20;
 const N: usize = 32;
 
 fn drain(app: &mut OctantApp) {
-    let deadline = Instant::now() + Duration::from_secs(20);
+    let deadline = Instant::now() + Duration::from_secs(5);
     loop {
         app.poll_block_prefetch_results();
         if app.block_prefetcher.pending_count() == 0 {
             break;
         }
-        assert!(Instant::now() < deadline, "prefetcher did not finish");
+        if Instant::now() >= deadline {
+            eprintln!(
+                "drain timed out! pending_count = {}, is_playing = {}",
+                app.block_prefetcher.pending_count(),
+                app.is_playing
+            );
+            panic!("prefetcher did not finish");
+        }
         std::thread::sleep(Duration::from_millis(2));
     }
 }
@@ -163,5 +170,96 @@ fn switching_plot_type_while_playing_shows_the_new_layout() {
         app.current_timestep,
         (0, 31),
         "volume after the switch",
+    );
+}
+
+#[test]
+fn test_switch_from_volume_to_heatmap_cleans_and_updates_bounds() {
+    let mut app = OctantApp::default();
+    // 1. First plot a 2D dataset (random)
+    let store2d = ProceduralBlockStore::open("procedural://random").expect("open random");
+    let meta2d = store2d.inspect().expect("inspect random");
+    app.selected_store_kind = StoreKind::ProceduralRandom;
+    app.store_target_input = "procedural://random".to_string();
+    app.load_new_metadata(meta2d);
+    app.show_hero = false;
+    app.active_plot_type = PlotType::Heatmap;
+    app.plot_selection();
+    drain(&mut app);
+    assert!(app.matrix_data.is_some());
+    let rand_name = app.matrix_data.as_ref().unwrap().dataset_name.clone();
+
+    // 2. Now open procedural://volume4d and plot as Volume
+    let store4d = ProceduralBlockStore::open("procedural://volume4d").expect("open volume4d");
+    let meta4d = store4d.inspect().expect("inspect volume4d");
+    app.selected_store_kind = StoreKind::ProceduralVolume4D;
+    app.store_target_input = "procedural://volume4d".to_string();
+    app.load_new_metadata(meta4d);
+    app.active_plot_type = PlotType::Volume;
+    app.plot_selection();
+    drain(&mut app);
+    assert!(app.volume_data.is_some());
+    // Mismatched matrix_data from previous dataset must be cleared:
+    assert!(app.matrix_data.is_none());
+
+    // 3. User switches to Heatmap via switch_plot_type:
+    app.switch_plot_type(PlotType::Heatmap);
+    drain(&mut app);
+    assert!(app.matrix_data.is_some());
+    let new_name = app.matrix_data.as_ref().unwrap().dataset_name.clone();
+    assert_ne!(
+        new_name, rand_name,
+        "must display new variable, not stale cache"
+    );
+    assert!(new_name.contains("gaussian_wave_packet_4d"));
+
+    // 4. Reset color range must use the current variable, not stale data:
+    let prev_cmin = app.color_range_min;
+    let prev_cmax = app.color_range_max;
+    app.reset_color_range();
+    assert_eq!(app.color_range_min, prev_cmin);
+    assert_eq!(app.color_range_max, prev_cmax);
+}
+
+#[test]
+fn test_single_step_playback_past_cache_eviction() {
+    let mut app = OctantApp::default();
+    let store = ProceduralBlockStore::open("procedural://volume4d").expect("open procedural store");
+    let meta = store.inspect().expect("inspect procedural store");
+    app.selected_store_kind = StoreKind::ProceduralVolume4D;
+    app.store_target_input = "procedural://volume4d".to_string();
+    app.load_new_metadata(meta);
+    app.show_hero = false;
+    app.active_plot_type = PlotType::Volume;
+
+    // Small cache limit to trigger cache eviction quickly:
+    app.block_cache = octant::data::BlockCache::new(512 * 1024);
+
+    // Initial single time step selection: (0, 0)
+    app.selected_dim_ranges[0] = (0, 0);
+    app.dim_config[0].range = (0, 0);
+    app.plot_selection();
+    drain(&mut app);
+
+    assert_eq!(app.current_timestep, 0);
+    app.is_playing = true;
+
+    for _ in 0..15 {
+        tick(&mut app);
+    }
+
+    assert!(
+        app.current_timestep >= 6,
+        "playback must advance past initial single-step window into later steps, got step {}",
+        app.current_timestep
+    );
+
+    // Ensure range never inverted during eviction:
+    let r = app.plotted_selected_dim_ranges[0];
+    assert!(
+        r.0 <= r.1,
+        "range must never invert on eviction, got ({}, {})",
+        r.0,
+        r.1
     );
 }

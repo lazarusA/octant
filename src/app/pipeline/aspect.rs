@@ -63,34 +63,41 @@ impl OctantApp {
             return (w / max_dim, h / max_dim, d / max_dim);
         }
 
-        let (w, h, max_t) = self.matrix_data.as_ref().map_or((64, 64, 64), |m| {
-            (m.width as u32, m.height as u32, m.max_timesteps as u32)
-        });
-
-        let (shape_d, shape_h, shape_w) = if let Some(meta) = &self.active_dataset_metadata {
-            if let Some(v) = meta.variables.get(self.selected_variable_idx) {
-                if v.shape.len() >= 3 {
-                    (v.shape[0] as u32, v.shape[1] as u32, v.shape[2] as u32)
-                } else {
-                    (max_t, h, w)
-                }
-            } else {
-                (max_t, h, w)
-            }
+        let sel_ranges = if !self.plotted_selected_dim_ranges.is_empty() {
+            &self.plotted_selected_dim_ranges
         } else {
-            (max_t, h, w)
+            &self.selected_dim_ranges
         };
 
-        let width = shape_w.max(w);
-        let height = shape_h.max(h);
-        let depth = shape_d.max(max_t);
+        let x_idx = self.get_spatial_dim_index(0);
+        let y_idx = self.get_spatial_dim_index(1);
+        let z_idx = self.get_spatial_dim_index(2);
 
-        let max_spatial = (width.max(height)) as f32;
-        let aspect_x = (width as f32 * scale_x) / max_spatial;
-        let aspect_y = (height as f32 * scale_y) / max_spatial;
-        let aspect_z = ((depth as f32 * scale_z * z_mult) / max_spatial).clamp(0.05, 1.0);
+        let get_extent = |dim: usize| -> usize {
+            if let Some(&(start, end)) = sel_ranges.get(dim) {
+                (end + 1).saturating_sub(start).max(1)
+            } else if let Some(meta) = self
+                .plotted_dataset_metadata
+                .as_ref()
+                .or(self.active_dataset_metadata.as_ref())
+                && let Some(var) = meta
+                    .variables
+                    .get(self.plotted_variable_idx)
+                    .or_else(|| meta.variables.get(self.selected_variable_idx))
+                && let Some(&s) = var.shape.get(dim)
+            {
+                (s as usize).max(1)
+            } else {
+                64
+            }
+        };
 
-        (aspect_x, aspect_y, aspect_z)
+        let w = (get_extent(x_idx) as f32 * scale_x).max(1.0);
+        let h = (get_extent(y_idx) as f32 * scale_y).max(1.0);
+        let d = (get_extent(z_idx) as f32 * scale_z * z_mult).max(1.0);
+        let max_dim = w.max(h).max(d).max(1.0);
+
+        (w / max_dim, h / max_dim, d / max_dim)
     }
 
     /// Computes circular shift offsets (shift_x, shift_y, shift_z) along the animated spatial dimension.
@@ -144,14 +151,28 @@ impl OctantApp {
 
     /// Resolves the metadata dimension index for a given spatial axis (0 = X, 1 = Y, 2 = Z).
     pub fn get_spatial_dim_index(&self, axis: usize) -> usize {
-        if let Some(meta) = &self.plotted_dataset_metadata
-            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+        let meta = self
+            .plotted_dataset_metadata
+            .as_ref()
+            .or(self.active_dataset_metadata.as_ref());
+        let var_idx = if self.plotted_dataset_metadata.is_some() {
+            self.plotted_variable_idx
+        } else {
+            self.selected_variable_idx
+        };
+        let configs = if !self.plotted_dim_config.is_empty() {
+            &self.plotted_dim_config
+        } else {
+            &self.dim_config
+        };
+        if let Some(meta) = meta
+            && let Some(var) = meta.variables.get(var_idx)
         {
             let (x, y, z) = Self::resolve_spatial_axes(
                 var.shape.len(),
                 &var.dimension_names,
                 &var.dimension_names,
-                &self.plotted_dim_config,
+                configs,
             );
             match axis {
                 0 => x,
@@ -166,30 +187,17 @@ impl OctantApp {
     /// Resolves the metadata dimension name for spatial axis (0 = X, 1 = Y, 2 = Z).
     pub fn get_spatial_dim_name(&self, axis: usize) -> Option<String> {
         let idx = self.get_spatial_dim_index(axis);
-        self.plotted_dataset_metadata
+        let meta = self
+            .plotted_dataset_metadata
             .as_ref()
-            .and_then(|m| m.variables.get(self.plotted_variable_idx))
-            .and_then(|v| v.dimension_names.get(idx).cloned())
-    }
-
-    /// Returns a human-friendly label for the spatial axis (e.g., "Along X (lon)", "Along Z (depth)").
-    pub fn get_spatial_dim_label(&self, axis: usize) -> String {
-        let (name_opt, fallback) = match axis {
-            0 => (self.get_spatial_dim_name(0), "X / Longitude"),
-            1 => (self.get_spatial_dim_name(1), "Y / Latitude"),
-            _ => (self.get_spatial_dim_name(2), "Z / Depth"),
-        };
-
-        if let Some(name) = name_opt {
-            let axis_letter = match axis {
-                0 => "X",
-                1 => "Y",
-                _ => "Z",
-            };
-            format!("Along {} ({})", axis_letter, name)
+            .or(self.active_dataset_metadata.as_ref());
+        let var_idx = if self.plotted_dataset_metadata.is_some() {
+            self.plotted_variable_idx
         } else {
-            format!("Along {}", fallback)
-        }
+            self.selected_variable_idx
+        };
+        meta.and_then(|m| m.variables.get(var_idx))
+            .and_then(|v| v.dimension_names.get(idx).cloned())
     }
 
     /// Returns the effective original (width, height) of the active 2D data or pyramid.
@@ -227,71 +235,5 @@ impl OctantApp {
         } else {
             [1.0, 1.0]
         }
-    }
-
-    /// Resolves coordinate bounds, formatted title, and units/time context for a given dimension index.
-    pub fn resolve_axis_bounds_and_title(
-        &self,
-        dim_idx: usize,
-        fallback_name: &str,
-        fallback_len: usize,
-    ) -> ((f64, f64), String, Option<String>) {
-        let mut bounds = (0.0, fallback_len.saturating_sub(1).max(1) as f64);
-        let mut name = fallback_name.to_string();
-        let mut units = None;
-
-        if let Some(meta) = &self.plotted_dataset_metadata
-            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
-            && dim_idx < var.shape.len()
-        {
-            let dim_size = var
-                .shape
-                .get(dim_idx)
-                .copied()
-                .unwrap_or(fallback_len as u64) as usize;
-            let (start_p, end_p) = self
-                .plotted_selected_dim_ranges
-                .get(dim_idx)
-                .copied()
-                .unwrap_or((0, dim_size.saturating_sub(1)));
-            bounds = (start_p as f64, end_p as f64);
-
-            if let Some(dim_n) = var.dimension_names.get(dim_idx) {
-                name = dim_n.clone();
-                if let Some(coord_var) = meta.variables.iter().find(|v| {
-                    v.name.eq_ignore_ascii_case(dim_n)
-                        || v.name
-                            .trim_start_matches('/')
-                            .eq_ignore_ascii_case(dim_n.trim_start_matches('/'))
-                }) {
-                    units = coord_var
-                        .units
-                        .clone()
-                        .or_else(|| coord_var.attributes.get("units").cloned());
-                    if units.is_none() {
-                        units = coord_var.attributes.get("time_coverage_start").cloned();
-                    }
-                }
-                if units.is_none() {
-                    units = var
-                        .units
-                        .clone()
-                        .or_else(|| var.attributes.get("units").cloned())
-                        .or_else(|| var.attributes.get("time_coverage_start").cloned());
-                }
-                if let Some(coord_bounds) = meta.get_coord_bounds_for_var_range(
-                    Some(&var.name),
-                    dim_n,
-                    dim_size,
-                    (start_p, end_p),
-                ) {
-                    bounds = coord_bounds;
-                }
-            }
-        }
-
-        let title =
-            crate::data::coordinates::naming::format_dimension_axis_title(&name).into_owned();
-        (bounds, title, units)
     }
 }

@@ -15,12 +15,15 @@ impl OctantApp {
         let total_elements = data.width.saturating_mul(data.height);
 
         let var_key = format!(
-            "{}:{}",
+            "{}:{}:2d",
             self.plotted_store_target_input, self.plotted_variable_idx
         );
         let is_new_variable = self.current_plotted_var_key.as_ref() != Some(&var_key);
 
         if is_new_variable {
+            self.volume_data = None;
+            self.volume_renderer = None;
+            self.point_cloud_renderer = None;
             self.current_plotted_var_key = Some(var_key);
             self.global_data_min = data.min_val;
             self.global_data_max = data.max_val;
@@ -307,12 +310,17 @@ impl OctantApp {
         }
 
         let var_key = format!(
-            "{}:{}",
+            "{}:{}:3d",
             self.plotted_store_target_input, self.plotted_variable_idx
         );
         let is_new_variable = self.current_plotted_var_key.as_ref() != Some(&var_key);
 
         if is_new_variable {
+            self.matrix_data = None;
+            self.renderer = None;
+            self.sphere_renderer = None;
+            self.surface_renderer = None;
+            self.line_renderer = None;
             self.current_plotted_var_key = Some(var_key);
             if data.min_val.is_finite() {
                 self.global_data_min = data.min_val;

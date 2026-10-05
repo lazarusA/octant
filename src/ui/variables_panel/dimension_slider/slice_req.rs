@@ -21,11 +21,14 @@ pub fn build_slice_request_for_plotted(
                     end: dim_size,
                 };
             }
-            let (start, end) = app
+            let (mut start, mut end) = app
                 .plotted_selected_dim_ranges
                 .get(i)
                 .copied()
                 .unwrap_or((0, dim_size.saturating_sub(1)));
+            if start > end {
+                std::mem::swap(&mut start, &mut end);
+            }
             if start == end {
                 DimensionSelection::Index(start)
             } else {
@@ -57,11 +60,14 @@ pub fn build_slice_request(app: &OctantApp, var_name: &str, shape: &[u64]) -> Sl
                     end: dim_size,
                 };
             }
-            let (start, end) = app
+            let (mut start, mut end) = app
                 .selected_dim_ranges
                 .get(i)
                 .copied()
                 .unwrap_or((0, dim_size.saturating_sub(1)));
+            if start > end {
+                std::mem::swap(&mut start, &mut end);
+            }
             if start == end {
                 DimensionSelection::Index(start)
             } else {

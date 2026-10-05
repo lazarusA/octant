@@ -41,7 +41,7 @@ impl OctantApp {
                 self.load_selected_variable_block();
             }
             AppAction::SetPlotType(plot_type) => {
-                self.active_plot_type = plot_type;
+                self.switch_plot_type(plot_type);
             }
             AppAction::SetColormap(cmap) => {
                 self.active_colormap = cmap;

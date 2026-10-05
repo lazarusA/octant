@@ -35,3 +35,50 @@ impl PlottedVariableState {
         }
     }
 }
+
+impl OctantApp {
+    /// Adds a secondary dimensionally-compatible variable layer for multi-variable plotting.
+    pub fn add_plotted_layer(&mut self, layer: PlottedVariableState) -> Result<(), String> {
+        if let (Some(existing_meta), Some(new_meta)) =
+            (&self.plotted_dataset_metadata, &layer.dataset_metadata)
+        {
+            let existing_var = existing_meta.variables.get(self.plotted_variable_idx);
+            let new_var = new_meta.variables.get(layer.variable_idx);
+
+            if let (Some(v_a), Some(v_b)) = (existing_var, new_var) {
+                check_dimensional_compatibility(v_a, v_b)?;
+            }
+        }
+        self.multi_plotted_layers.push(layer);
+        Ok(())
+    }
+
+    /// Clears secondary multi-variable layers.
+    pub fn clear_plotted_layers(&mut self) {
+        self.multi_plotted_layers.clear();
+    }
+}
+
+/// Helper function to verify dimensional compatibility between two variables
+/// (matching rank, shapes, or spatial extent) for multi-layer plotting.
+pub fn check_dimensional_compatibility(
+    var_a: &crate::data::VariableInfo,
+    var_b: &crate::data::VariableInfo,
+) -> Result<(), String> {
+    if var_a.shape.len() != var_b.shape.len() {
+        return Err(format!(
+            "Rank mismatch: '{}' (rank {}) vs '{}' (rank {})",
+            var_a.name,
+            var_a.shape.len(),
+            var_b.name,
+            var_b.shape.len()
+        ));
+    }
+    if var_a.shape != var_b.shape {
+        return Err(format!(
+            "Shape mismatch: '{}' ({:?}) vs '{}' ({:?})",
+            var_a.name, var_a.shape, var_b.name, var_b.shape
+        ));
+    }
+    Ok(())
+}

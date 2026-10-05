@@ -164,17 +164,18 @@ impl OctantApp {
         let current_chunk = self.current_timestep / cs;
         let max_dataset_chunk = full_extent.saturating_sub(1) / cs;
 
+        let chunk_bytes = base_req.estimated_elements().saturating_mul(4).max(1);
+        let max_cache_chunks = (self.block_cache.max_bytes() / chunk_bytes).max(1);
+
         let mut chunk_indices = Vec::new();
         if self.is_playing {
-            // Sliding lookahead window during active animation playback:
-            let lookahead_chunks = (self.block_window_size / cs).max(1);
+            let lookahead_chunks =
+                (self.block_window_size / cs).clamp(1, max_cache_chunks.saturating_sub(1).max(1));
             let max_lookahead_chunk = (current_chunk + lookahead_chunks).min(max_dataset_chunk);
-            // The current chunk too: nothing else fetches it once it is evicted.
             for c in current_chunk..=max_lookahead_chunk {
                 chunk_indices.push(c);
             }
 
-            // If loop playback is active and approaching end of dataset, buffer starting wrap-around chunks:
             if self.loop_playback && current_chunk + lookahead_chunks >= max_dataset_chunk {
                 let wrap_end = lookahead_chunks.saturating_sub(1);
                 for c in 0..=wrap_end.min(max_dataset_chunk) {
@@ -183,11 +184,14 @@ impl OctantApp {
                     }
                 }
             }
+            chunk_indices.truncate(max_cache_chunks);
         } else {
-            // When paused / on initial load with a multi-chunk range selection:
-            // queue every other chunk of the user's range (also those before the
-            // current step) in parallel across Rayon workers:
             chunk_indices.extend((first_chunk..=last_chunk).filter(|&c| c != current_chunk));
+            let next_chunk = (current_chunk + 1).min(max_dataset_chunk);
+            if next_chunk != current_chunk && !chunk_indices.contains(&next_chunk) {
+                chunk_indices.push(next_chunk);
+            }
+            chunk_indices.truncate(max_cache_chunks);
         }
 
         for chunk_idx in chunk_indices {
