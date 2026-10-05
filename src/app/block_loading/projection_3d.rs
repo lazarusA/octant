@@ -200,20 +200,22 @@ impl OctantApp {
 
         let dest_x = (orig_x + local_x0).saturating_sub(req_x0);
         let dest_y = (orig_y + local_y0).saturating_sub(req_y0);
-        let dest_z = (orig_z + local_z0).saturating_sub(req_z0);
+        let raw_dest_z = (orig_z + local_z0).saturating_sub(req_z0);
+        let depth_max = self.volume_data.as_ref().map(|v| v.depth).unwrap_or(1);
+        let dest_z = raw_dest_z % depth_max.max(1);
 
         let mut bounds_opt = None;
         if let Some(vdata) = &mut self.volume_data {
             vdata.update_subvolume(
                 [dest_x, dest_y, dest_z],
-                [slab.width, slab.height, slab.depth],
+                [slab.width, slab.height, slab.depth.min(vdata.depth)],
                 &slab.values,
             );
 
             bounds_opt = Some((vdata.min_val, vdata.max_val));
         }
         // Uploaded before the next paint, to the renderer on screen only.
-        self.mark_volume_dirty(dest_z..dest_z + slab.depth);
+        self.mark_volume_dirty(dest_z..(dest_z + slab.depth).min(depth_max));
 
         if let Some((min_val, max_val)) = bounds_opt {
             self.sync_volume_color_bounds(min_val, max_val);

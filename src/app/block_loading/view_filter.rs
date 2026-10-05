@@ -39,7 +39,12 @@ impl OctantApp {
             .filter(|(dim, _)| *dim < block.rank())
             .all(|&(dim, req)| {
                 let (origin, len) = span(dim);
-                overlaps(origin, len, req)
+                if Some(dim) == anim_dim && anim_is_spatial {
+                    overlaps(origin, len, req)
+                        || (origin..origin + len).contains(&self.current_timestep)
+                } else {
+                    overlaps(origin, len, req)
+                }
             })
     }
 

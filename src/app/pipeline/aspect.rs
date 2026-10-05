@@ -128,13 +128,10 @@ impl OctantApp {
         };
 
         let origin = self
-            .active_slice_request
-            .as_ref()
-            .and_then(|req| req.selections.get(anim_dim))
-            .map(|sel| match sel {
-                crate::data::DimensionSelection::Range { start, .. } => *start,
-                crate::data::DimensionSelection::Index(idx) => *idx,
-            })
+            .plotted_selected_dim_ranges
+            .get(anim_dim)
+            .map(|r| r.0)
+            .or_else(|| self.selected_dim_ranges.get(anim_dim).map(|r| r.0))
             .unwrap_or(0);
 
         let local_step = (self.current_timestep.saturating_sub(origin)) as u32;

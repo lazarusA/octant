@@ -210,12 +210,21 @@ impl OctantApp {
             .copied()
             .unwrap_or((0, dim_len.saturating_sub(1)));
 
-        let local_start = req_start
-            .saturating_sub(block_orig)
-            .min(dim_len.saturating_sub(1));
-        let local_end = (req_end + 1)
-            .saturating_sub(block_orig)
-            .clamp(local_start + 1, dim_len);
+        let (local_start, local_end) = if crate::app::block_loading::view_filter::overlaps(
+            block_orig,
+            dim_len,
+            (req_start, req_end),
+        ) {
+            let s = req_start
+                .saturating_sub(block_orig)
+                .min(dim_len.saturating_sub(1));
+            let e = (req_end + 1)
+                .saturating_sub(block_orig)
+                .clamp(s + 1, dim_len);
+            (s, e)
+        } else {
+            (0, dim_len)
+        };
 
         ((req_start, req_end), (local_start, local_end))
     }
