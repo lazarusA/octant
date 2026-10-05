@@ -1,12 +1,24 @@
 //! Adaptive concurrency pacing and lookahead calculations for prefetching.
 
-use crate::data::{DimensionSelection, SliceRequest};
+use crate::data::SliceRequest;
 
-/// Calculates estimated bytes per chunk slice.
+/// Calculates estimated bytes per chunk slice without cloning or heap allocation.
 pub fn estimate_chunk_bytes(base_req: &SliceRequest, anim_dim: usize, cs: usize) -> usize {
-    let mut req = base_req.clone();
-    req.selections[anim_dim] = DimensionSelection::Range { start: 0, end: cs };
-    req.estimated_elements().saturating_mul(4).max(1)
+    let elements = base_req
+        .selections
+        .iter()
+        .enumerate()
+        .map(|(d, sel)| {
+            if d == anim_dim {
+                cs.max(1)
+            } else {
+                let (start, end) = sel.bounds();
+                end.saturating_sub(start).max(1)
+            }
+        })
+        .try_fold(1usize, |acc, count| acc.checked_mul(count))
+        .unwrap_or(usize::MAX);
+    elements.saturating_mul(4).max(1)
 }
 
 /// Dynamically scales worker concurrency limit according to chunk footprint.

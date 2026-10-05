@@ -77,11 +77,7 @@ impl OctantApp {
                 .as_ref()
                 .is_some_and(|m| cur_name.is_none_or(|n| !m.dataset_name.contains(n)))
         {
-            self.matrix_data = None;
-            self.renderer = None;
-            self.sphere_renderer = None;
-            self.surface_renderer = None;
-            self.line_renderer = None;
+            self.clear_2d_renderers();
         }
 
         self.lock_color_bounds = false;
@@ -141,11 +137,25 @@ impl OctantApp {
                 .as_ref()
                 .is_some_and(|v| cur_name.is_none_or(|n| !v.dataset_name.contains(n)))
         {
-            self.volume_data = None;
-            self.volume_renderer = None;
-            self.point_cloud_renderer = None;
+            self.clear_3d_renderers();
         }
 
         self.lock_color_bounds = false;
+    }
+
+    /// Invalidates and clears 2D data and pipeline renderers.
+    pub fn clear_2d_renderers(&mut self) {
+        self.matrix_data = None;
+        self.renderer = None;
+        self.sphere_renderer = None;
+        self.surface_renderer = None;
+        self.line_renderer = None;
+    }
+
+    /// Invalidates and clears 3D volumetric data and pipeline renderers.
+    pub fn clear_3d_renderers(&mut self) {
+        self.volume_data = None;
+        self.volume_renderer = None;
+        self.point_cloud_renderer = None;
     }
 }

@@ -160,15 +160,9 @@ impl OctantApp {
             let is_vol = self.plotted_plot_type == crate::plots::PlotType::Volume
                 || self.plotted_plot_type == crate::plots::PlotType::PointCloud;
             if is_vol {
-                self.matrix_data = None;
-                self.renderer = None;
-                self.sphere_renderer = None;
-                self.surface_renderer = None;
-                self.line_renderer = None;
+                self.clear_2d_renderers();
             } else {
-                self.volume_data = None;
-                self.volume_renderer = None;
-                self.point_cloud_renderer = None;
+                self.clear_3d_renderers();
             }
             if let Some(var_info) = self.plotted_variable_info().cloned() {
                 let rank = var_info.shape.len();

@@ -117,20 +117,13 @@ impl VolumeTextures {
             bytemuck::cast_slice(slice),
             w * 4,
         );
-        let stale = z.clone().any(|zi| {
+        let stale = (z.start..z.end).any(|zi| {
             self.invalid_per_plane
                 .get(zi)
                 .is_some_and(|c| c.load(Ordering::Relaxed) != 0)
         });
         if stale {
-            write_region(
-                queue,
-                &self.validity,
-                origin,
-                extent,
-                &vec![255; slice.len()],
-                w,
-            );
+            write_valid_planes(queue, &self.validity, self.dims, z.clone());
             self.set_invalid_counts(z.start, std::iter::repeat_n(0, z.len()));
         }
     }
@@ -153,10 +146,13 @@ impl VolumeTextures {
         for (zi, invalid) in (z0..).zip(counts) {
             if let Some(slot) = self.invalid_per_plane.get(zi) {
                 let old = slot.swap(invalid, Ordering::Relaxed);
-                self.invalid_total
-                    .fetch_add(u64::from(invalid), Ordering::Relaxed);
-                self.invalid_total
-                    .fetch_sub(u64::from(old), Ordering::Relaxed);
+                if invalid > old {
+                    self.invalid_total
+                        .fetch_add(u64::from(invalid - old), Ordering::Relaxed);
+                } else if old > invalid {
+                    self.invalid_total
+                        .fetch_sub(u64::from(old - invalid), Ordering::Relaxed);
+                }
             }
         }
     }
@@ -203,6 +199,36 @@ fn write_region(
         },
         extent,
     );
+}
+
+fn write_valid_planes(queue: &wgpu::Queue, texture: &wgpu::Texture, dims: Dims, z: Range<usize>) {
+    const CHUNK: usize = 65536;
+    static ONES: [u8; CHUNK] = [255u8; CHUNK];
+    let plane = dims.plane();
+    let (w, h) = (dims.w as u32, dims.h as u32);
+    let step = (CHUNK / plane.max(1)).max(1);
+    let mut z0 = z.start;
+    while z0 < z.end {
+        let z1 = (z0 + step).min(z.end);
+        let count = z1 - z0;
+        let voxels = count * plane;
+        let origin = wgpu::Origin3d {
+            x: 0,
+            y: 0,
+            z: z0 as u32,
+        };
+        let extent = wgpu::Extent3d {
+            width: w,
+            height: h,
+            depth_or_array_layers: count as u32,
+        };
+        if voxels <= CHUNK {
+            write_region(queue, texture, origin, extent, &ONES[..voxels], w);
+        } else {
+            write_region(queue, texture, origin, extent, &vec![255; voxels], w);
+        }
+        z0 = z1;
+    }
 }
 
 fn create_texture(
