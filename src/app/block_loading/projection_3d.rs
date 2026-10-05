@@ -25,7 +25,12 @@ impl OctantApp {
         compute_bounds: bool,
         c_dim: usize,
     ) {
-        let (nx, ny, nz) = compute_target_dims(block, z_dim, req_x, req_y, req_z);
+        let eff_z = if self.rgb_composite_mode && z_dim == c_dim {
+            usize::MAX
+        } else {
+            z_dim
+        };
+        let (nx, ny, nz) = compute_target_dims(block, eff_z, req_x, req_y, req_z);
         let ch_hash = compute_composite_hash(self);
         let target_desc = format!(
             "Vol:[{}] var={} ({nx}x{ny}x{nz}) xr={}..={} yr={}..={} zr={}..={} fx={:?} ch={ch_hash:016x}",

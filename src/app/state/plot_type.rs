@@ -29,9 +29,14 @@ impl OctantApp {
     }
 
     fn switch_from_3d_to_2d(&mut self) {
+        let channel_dim = if self.rgb_composite_mode {
+            self.channel_dim_index()
+        } else {
+            None
+        };
         for (z_idx, c) in self.dim_config.iter_mut().enumerate() {
             if c.spatial == SpatialRole::Z {
-                if c.animation == AnimationRole::Animated {
+                if c.animation == AnimationRole::Animated || Some(z_idx) == channel_dim {
                     c.spatial = SpatialRole::None;
                     c.active = true;
                 } else {
@@ -50,7 +55,7 @@ impl OctantApp {
         }
         for (z_idx, c) in self.plotted_dim_config.iter_mut().enumerate() {
             if c.spatial == SpatialRole::Z {
-                if c.animation == AnimationRole::Animated {
+                if c.animation == AnimationRole::Animated || Some(z_idx) == channel_dim {
                     c.spatial = SpatialRole::None;
                     c.active = true;
                 } else {
@@ -63,6 +68,28 @@ impl OctantApp {
                     c.active = false;
                     c.range = (current_z, current_z);
                 }
+            }
+        }
+        if let Some(ch_idx) = channel_dim {
+            let max_ch = self
+                .plotted_variable_info()
+                .or_else(|| self.selected_variable_info())
+                .and_then(|v| v.shape.get(ch_idx))
+                .map(|&s| (s as usize).saturating_sub(1))
+                .unwrap_or(0);
+            if ch_idx < self.dim_config.len() {
+                self.dim_config[ch_idx].range = (0, max_ch);
+                self.dim_config[ch_idx].active = true;
+            }
+            if ch_idx < self.plotted_dim_config.len() {
+                self.plotted_dim_config[ch_idx].range = (0, max_ch);
+                self.plotted_dim_config[ch_idx].active = true;
+            }
+            if ch_idx < self.selected_dim_ranges.len() {
+                self.selected_dim_ranges[ch_idx] = (0, max_ch);
+            }
+            if ch_idx < self.plotted_selected_dim_ranges.len() {
+                self.plotted_selected_dim_ranges[ch_idx] = (0, max_ch);
             }
         }
         self.spatial_dims = crate::app::DimConfig::spatial_dims(&self.dim_config);
@@ -84,18 +111,30 @@ impl OctantApp {
     }
 
     fn switch_from_2d_to_3d(&mut self) {
+        let channel_dim = if self.rgb_composite_mode {
+            self.channel_dim_index()
+        } else {
+            None
+        };
         let fallback_anim = if self.dim_config.len() >= 3 {
-            self.animated_dim
+            self.animated_dim.filter(|&d| Some(d) != channel_dim)
         } else {
             None
         };
         let z_idx_opt = self
             .dim_config
             .iter()
-            .position(|c| c.spatial == SpatialRole::Z && c.animation != AnimationRole::Animated)
+            .enumerate()
+            .position(|(i, c)| {
+                c.spatial == SpatialRole::Z
+                    && c.animation != AnimationRole::Animated
+                    && Some(i) != channel_dim
+            })
             .or_else(|| {
-                self.dim_config.iter().position(|c| {
-                    c.spatial == SpatialRole::None && c.animation != AnimationRole::Animated
+                self.dim_config.iter().enumerate().position(|(i, c)| {
+                    c.spatial == SpatialRole::None
+                        && c.animation != AnimationRole::Animated
+                        && Some(i) != channel_dim
                 })
             })
             .or(fallback_anim);

@@ -82,14 +82,14 @@ impl OctantApp {
         let fixed_indices = self.build_fixed_indices(block, &orig_dim_names, anim_dim);
         let (req_x, local_x_range) = self.get_dim_bounds(block, &orig_dim_names, x_dim);
         let (req_y, local_y_range) = self.get_dim_bounds(block, &orig_dim_names, y_dim);
-        let (req_z, local_z_range) = if z_dim < block.rank() {
-            self.get_dim_bounds(block, &orig_dim_names, z_dim)
-        } else {
-            ((0, 0), (0, 1))
-        };
-
         let compute_bounds = !self.lock_color_bounds;
         let c_dim = self.channel_dim_index().unwrap_or(0);
+        let (req_z, local_z_range) =
+            if z_dim < block.rank() && (!self.rgb_composite_mode || z_dim != c_dim) {
+                self.get_dim_bounds(block, &orig_dim_names, z_dim)
+            } else {
+                ((0, 0), (0, 1))
+            };
         let is_vol_allowed = crate::ui::variables_panel::is_volume_allowed_for_selection(self);
 
         if !is_vol_allowed
