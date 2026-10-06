@@ -72,7 +72,13 @@ impl Blit {
             ..Default::default()
         });
         Self {
-            pipeline: blit_pipeline(device, target_format, &layout),
+            pipeline: crate::plots::fullscreen::frame_pipeline(
+                device,
+                "Volume Blit Pipeline",
+                include_str!("../shaders/volume/blit.wgsl"),
+                &layout,
+                target_format,
+            ),
             layout,
             sampler,
         }
@@ -123,49 +129,4 @@ impl Blit {
         rpass.set_bind_group(0, frame, &[]);
         rpass.draw(0..3, 0..1);
     }
-}
-
-fn blit_pipeline(
-    device: &wgpu::Device,
-    target_format: wgpu::TextureFormat,
-    layout: &wgpu::BindGroupLayout,
-) -> wgpu::RenderPipeline {
-    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("Volume Blit Shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/volume/blit.wgsl").into()),
-    });
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("Volume Blit Pipeline Layout"),
-        bind_group_layouts: &[Some(layout)],
-        immediate_size: 0,
-    });
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Volume Blit Pipeline"),
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: &module,
-            entry_point: Some("vs_blit"),
-            buffers: &[],
-            compilation_options: Default::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &module,
-            entry_point: Some("fs_blit"),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: target_format,
-                blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-            compilation_options: Default::default(),
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        // egui's pass carries a depth attachment; the blit ignores it.
-        depth_stencil: Some(crate::plots::common::default_depth_stencil_state(
-            false,
-            wgpu::CompareFunction::Always,
-        )),
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
 }

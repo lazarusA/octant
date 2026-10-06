@@ -46,20 +46,7 @@ fn fs(@builtin(position) p: vec4<f32>) -> @location(0) vec4<f32> {
 }
 "#;
 
-pub(super) fn gpu() -> Option<(wgpu::Device, wgpu::Queue)> {
-    let rt = tokio::runtime::Runtime::new().ok()?;
-    rt.block_on(async {
-        let instance = wgpu::Instance::default();
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions::default())
-            .await
-            .ok()?;
-        adapter
-            .request_device(&wgpu::DeviceDescriptor::default())
-            .await
-            .ok()
-    })
-}
+pub(super) use crate::plots::test_gpu::device as gpu;
 
 fn probe_bind_group(
     device: &wgpu::Device,

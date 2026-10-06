@@ -54,13 +54,13 @@ impl OctantApp {
             if kind != active
                 && let Some(renderer) = renderer
             {
-                renderer.release_oit_frame();
+                renderer.oit.release();
             }
         }
         if active != PlotType::PointCloud
             && let Some(renderer) = &self.point_cloud_renderer
         {
-            renderer.release_oit_frame();
+            renderer.oit.release();
         }
     }
 

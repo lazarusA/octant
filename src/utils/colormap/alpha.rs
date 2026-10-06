@@ -9,7 +9,7 @@
 //! - stops `0:0, 0.2:1, 0.8:1, 1:0`: `position:alpha` pairs in increasing
 //!   position, blended linearly or held until the next stop (step).
 
-use super::lut::{LUT_SIZE, Lut};
+use super::lut::{LUT_SIZE, Lut, unit_to_u8};
 use std::fmt;
 
 /// Uniform `alpha_row` value when no opacity curve is active.
@@ -118,7 +118,7 @@ pub fn bake(curve: &AlphaCurve, interp: AlphaInterp) -> Box<Lut> {
             AlphaCurve::Values(v) => from_values(v, i, interp),
             AlphaCurve::Stops(s) => from_stops(s, i as f32 / (LUT_SIZE - 1) as f32, interp),
         };
-        slot[3] = (a * 255.0).round().clamp(0.0, 255.0) as u8;
+        slot[3] = unit_to_u8(a);
     }
     lut
 }

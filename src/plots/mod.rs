@@ -2,6 +2,7 @@ pub mod coastline;
 pub mod colormap_atlas;
 pub mod common;
 pub mod device;
+pub mod fullscreen;
 pub mod heatmap;
 pub mod line;
 pub mod mesh;
@@ -12,6 +13,8 @@ mod point_cloud_draw;
 mod point_cloud_types;
 pub mod sphere;
 pub mod surface;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+pub(crate) mod test_gpu;
 pub mod traits;
 pub mod volume;
 
@@ -109,55 +112,31 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn mesh_and_point_cloud_pipelines_validate() {
-        let Some(rt) = tokio::runtime::Runtime::new().ok() else {
+        let (Some((device, _queue)), Some(rt)) = (
+            super::test_gpu::device(),
+            tokio::runtime::Runtime::new().ok(),
+        ) else {
+            eprintln!("SKIPPED mesh_and_point_cloud_pipelines_validate: no GPU device");
             return;
         };
-        rt.block_on(async {
-            let instance = wgpu::Instance::default();
-            let Ok(adapter) = instance
-                .request_adapter(&wgpu::RequestAdapterOptions::default())
-                .await
-            else {
-                eprintln!("SKIPPED mesh_and_point_cloud_pipelines_validate: no GPU adapter");
-                return;
-            };
-            let Ok((device, _queue)) = adapter
-                .request_device(&wgpu::DeviceDescriptor::default())
-                .await
-            else {
-                eprintln!("SKIPPED mesh_and_point_cloud_pipelines_validate: no device");
-                return;
-            };
-            let format = wgpu::TextureFormat::Rgba8Unorm;
-            let data = [0.0f32; 4];
-            let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
-            let surface = super::SurfaceRenderer::new_surface(&device, format, &data, 2, 2);
-            let sphere = super::SphereRenderer::new_sphere(&device, format, &data, 2, 2);
-            let points = super::PointCloudRenderer::new(&device, format, &data, 2, 2);
-            // OIT pipelines are built on first use; build them here too.
-            for mesh in [&surface, &sphere] {
-                let _oit = super::oit::OitState::new(&device, format, |variant| {
-                    super::mesh_draw::mesh_pipeline(
-                        &device,
-                        &mesh.pipeline_layout,
-                        &mesh.shader,
-                        variant,
-                        None,
-                    )
-                });
-            }
+        let format = wgpu::TextureFormat::Rgba8Unorm;
+        let data = [0.0f32; 4];
+        let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let surface = super::SurfaceRenderer::new_surface(&device, format, &data, 2, 2);
+        let sphere = super::SphereRenderer::new_sphere(&device, format, &data, 2, 2);
+        let points = super::PointCloudRenderer::new(&device, format, &data, 2, 2);
+        // OIT pipelines are built on first use; build them here too.
+        for mesh in [&surface, &sphere] {
             let _oit = super::oit::OitState::new(&device, format, |variant| {
-                super::point_cloud_draw::point_cloud_pipeline(
-                    &device,
-                    &points.pipeline_layout,
-                    &points.shader,
-                    variant,
-                )
+                mesh.oit_pipeline(&device, variant)
             });
-            if let Some(error) = scope.pop().await {
-                panic!("pipeline validation failed: {error}");
-            }
+        }
+        let _oit = super::oit::OitState::new(&device, format, |variant| {
+            points.oit_pipeline(&device, variant)
         });
+        if let Some(error) = rt.block_on(scope.pop()) {
+            panic!("pipeline validation failed: {error}");
+        }
     }
 
     #[test]
@@ -183,7 +162,22 @@ mod tests {
                 "volume_manual_filter",
                 crate::plots::volume::pipeline::SHADER_MANUAL_FILTER,
             ),
-            ("volume_blit", include_str!("shaders/volume/blit.wgsl")),
+            (
+                "volume_blit",
+                concat!(
+                    include_str!("shaders/common/fullscreen.wgsl"),
+                    "\n",
+                    include_str!("shaders/volume/blit.wgsl")
+                ),
+            ),
+            (
+                "oit_composite",
+                concat!(
+                    include_str!("shaders/common/fullscreen.wgsl"),
+                    "\n",
+                    include_str!("shaders/oit/composite.wgsl")
+                ),
+            ),
             (
                 "line",
                 crate::assemble_plot_shader!(include_str!("shaders/line.wgsl")),

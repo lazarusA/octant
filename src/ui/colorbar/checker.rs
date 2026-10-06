@@ -27,6 +27,5 @@ pub fn paint_checker(painter: &Painter, rect: Rect, dark_mode: bool) {
 /// `color` with its alpha replaced by `alpha` in [0, 1].
 pub fn with_alpha(color: Color32, alpha: f32) -> Color32 {
     let [r, g, b, _] = color.to_array();
-    let a = (alpha.clamp(0.0, 1.0) * 255.0).round() as u8;
-    Color32::from_rgba_unmultiplied(r, g, b, a)
+    Color32::from_rgba_unmultiplied(r, g, b, crate::utils::colormap::lut::unit_to_u8(alpha))
 }

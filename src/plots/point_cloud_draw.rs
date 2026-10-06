@@ -1,48 +1,10 @@
-//! Point cloud pipelines, draw calls and the egui paint callback, with the
+//! Point cloud draw calls and the egui paint callback, with the
 //! transparency modes of [`Transparency`].
 
-use super::oit::{OitState, Transparency, Variant};
+use super::oit::{Transparency, Variant, build_pipeline};
 use super::point_cloud::{PointCloudRenderer, PointCloudUniformParams, PointCloudVertex};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
-
-/// Point billboard pipeline for one [`Variant`] (fragment entry, targets,
-/// depth writes).
-pub(super) fn point_cloud_pipeline(
-    device: &wgpu::Device,
-    layout: &wgpu::PipelineLayout,
-    shader: &wgpu::ShaderModule,
-    variant: &Variant<'_>,
-) -> wgpu::RenderPipeline {
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(variant.label),
-        layout: Some(layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
-            buffers: &[Some(PointCloudVertex::desc())],
-            compilation_options: Default::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some(variant.entry),
-            targets: variant.targets,
-            compilation_options: Default::default(),
-        }),
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::TriangleList,
-            cull_mode: None,
-            ..Default::default()
-        },
-        depth_stencil: Some(super::common::default_depth_stencil_state(
-            variant.depth_write,
-            wgpu::CompareFunction::LessEqual,
-        )),
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
-}
 
 impl PointCloudRenderer {
     /// Binds group 0 and the billboard template and draws every point.
@@ -57,34 +19,20 @@ impl PointCloudRenderer {
         );
     }
 
-    /// Draws the points into their OIT frame (pipelines built on first use).
-    fn render_oit(
+    /// The points' pipeline for an OIT [`Variant`].
+    pub(super) fn oit_pipeline(
         &self,
         device: &wgpu::Device,
-        encoder: &mut wgpu::CommandEncoder,
-        size: [u32; 2],
-        atlas: &wgpu::BindGroup,
-    ) {
-        let mut oit = self.oit.lock().unwrap_or_else(|p| p.into_inner());
-        let state = oit.get_or_insert_with(|| {
-            OitState::new(device, self.target_format, |variant| {
-                point_cloud_pipeline(device, &self.pipeline_layout, &self.shader, variant)
-            })
-        });
-        state.render(device, encoder, size, atlas, |pass| self.draw_points(pass));
-    }
-
-    /// Frees the OIT frame when this renderer draws without OIT.
-    pub(crate) fn release_oit_frame(&self) {
-        let mut oit = self.oit.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(state) = oit.as_mut() {
-            state.release_frame();
-        }
-    }
-
-    fn paint_oit(&self, rpass: &mut wgpu::RenderPass<'static>) -> bool {
-        let oit = self.oit.lock().unwrap_or_else(|p| p.into_inner());
-        oit.as_ref().is_some_and(|state| state.paint(rpass))
+        variant: &Variant<'_>,
+    ) -> wgpu::RenderPipeline {
+        build_pipeline(
+            device,
+            &self.pipeline_layout,
+            &self.shader,
+            &[Some(PointCloudVertex::desc())],
+            None,
+            variant,
+        )
     }
 }
 
@@ -113,9 +61,17 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
             && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)
         {
             let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
-            self.renderer.render_oit(device, encoder, size, atlas);
+            let renderer = &self.renderer;
+            renderer.oit.render(
+                device,
+                encoder,
+                size,
+                atlas,
+                |variant| renderer.oit_pipeline(device, variant),
+                |pass| renderer.draw_points(pass),
+            );
         } else if self.transparency != Transparency::Oit {
-            self.renderer.release_oit_frame();
+            self.renderer.oit.release();
         }
         Vec::new()
     }
@@ -131,7 +87,7 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         }
         let renderer = &self.renderer;
         let pipeline = match self.transparency {
-            Transparency::Oit if renderer.paint_oit(rpass) => return,
+            Transparency::Oit if renderer.oit.paint(rpass) => return,
             Transparency::Oit | Transparency::NoDepthWrite => &renderer.transparent_pipeline,
             Transparency::Off => &renderer.render_pipeline,
         };

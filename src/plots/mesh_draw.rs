@@ -1,49 +1,10 @@
-//! Mesh pipelines, draw calls and the egui paint callback, with the
+//! Mesh draw calls and the egui paint callback, with the
 //! transparency modes of [`Transparency`].
 
 use super::common::{Mesh3DUniformParams, MeshVertex3D};
 use super::mesh::Mesh3DRenderer;
-use super::oit::{OitState, Transparency, Variant};
+use super::oit::{Transparency, Variant, build_pipeline};
 use std::sync::Arc;
-
-/// Mesh pipeline for one [`Variant`] (fragment entry, targets, depth writes).
-pub(super) fn mesh_pipeline(
-    device: &wgpu::Device,
-    layout: &wgpu::PipelineLayout,
-    shader: &wgpu::ShaderModule,
-    variant: &Variant<'_>,
-    cull_mode: Option<wgpu::Face>,
-) -> wgpu::RenderPipeline {
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(variant.label),
-        layout: Some(layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
-            buffers: &[Some(MeshVertex3D::desc())],
-            compilation_options: Default::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some(variant.entry),
-            targets: variant.targets,
-            compilation_options: Default::default(),
-        }),
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::TriangleList,
-            cull_mode,
-            front_face: wgpu::FrontFace::Ccw,
-            ..Default::default()
-        },
-        depth_stencil: Some(super::common::default_depth_stencil_state(
-            variant.depth_write,
-            wgpu::CompareFunction::LessEqual,
-        )),
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
-}
 
 impl Mesh3DRenderer {
     /// Binds group 0 and the cube or quad template and draws every instance.
@@ -59,37 +20,20 @@ impl Mesh3DRenderer {
         pass.draw_indexed(0..count, 0, 0..self.num_instances);
     }
 
-    /// Draws the mesh into its OIT frame (pipelines built on first use).
-    fn render_oit(
+    /// The mesh's pipeline for an OIT [`Variant`] (no culling).
+    pub(super) fn oit_pipeline(
         &self,
         device: &wgpu::Device,
-        encoder: &mut wgpu::CommandEncoder,
-        size: [u32; 2],
-        atlas: &wgpu::BindGroup,
-        cubes: bool,
-    ) {
-        let mut oit = self.oit.lock().unwrap_or_else(|p| p.into_inner());
-        let state = oit.get_or_insert_with(|| {
-            OitState::new(device, self.target_format, |variant| {
-                mesh_pipeline(device, &self.pipeline_layout, &self.shader, variant, None)
-            })
-        });
-        state.render(device, encoder, size, atlas, |pass| {
-            self.draw_geometry(pass, cubes);
-        });
-    }
-
-    /// Frees the OIT frame when this renderer draws without OIT.
-    pub(crate) fn release_oit_frame(&self) {
-        let mut oit = self.oit.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(state) = oit.as_mut() {
-            state.release_frame();
-        }
-    }
-
-    fn paint_oit(&self, rpass: &mut wgpu::RenderPass<'static>) -> bool {
-        let oit = self.oit.lock().unwrap_or_else(|p| p.into_inner());
-        oit.as_ref().is_some_and(|state| state.paint(rpass))
+        variant: &Variant<'_>,
+    ) -> wgpu::RenderPipeline {
+        build_pipeline(
+            device,
+            &self.pipeline_layout,
+            &self.shader,
+            &[Some(MeshVertex3D::desc())],
+            None,
+            variant,
+        )
     }
 }
 
@@ -125,10 +69,17 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
             && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)
         {
             let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
-            self.renderer
-                .render_oit(device, encoder, size, atlas, self.cubes());
+            let (renderer, cubes) = (&self.renderer, self.cubes());
+            renderer.oit.render(
+                device,
+                encoder,
+                size,
+                atlas,
+                |variant| renderer.oit_pipeline(device, variant),
+                |pass| renderer.draw_geometry(pass, cubes),
+            );
         } else if self.transparency != Transparency::Oit {
-            self.renderer.release_oit_frame();
+            self.renderer.oit.release();
         }
         Vec::new()
     }
@@ -145,7 +96,7 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         let renderer = &self.renderer;
         let cubes = self.cubes();
         let pipeline = match (self.transparency, cubes) {
-            (Transparency::Oit, _) if renderer.paint_oit(rpass) => return,
+            (Transparency::Oit, _) if renderer.oit.paint(rpass) => return,
             (Transparency::Oit | Transparency::NoDepthWrite, _) => &renderer.transparent_pipeline,
             (Transparency::Off, true) => &renderer.voxel_pipeline,
             (Transparency::Off, false) => &renderer.render_pipeline,

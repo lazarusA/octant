@@ -1,10 +1,8 @@
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 use wgpu::util::DeviceExt;
 
-use super::oit::{OitState, Variant};
+use super::oit::{OitSlot, Variant, build_pipeline, egui_target};
 pub use super::point_cloud_draw::PointCloudCallback;
-use super::point_cloud_draw::point_cloud_pipeline;
 pub use super::point_cloud_types::{PointCloudUniformParams, PointCloudUniforms, PointCloudVertex};
 
 pub struct PointCloudRenderer {
@@ -21,8 +19,7 @@ pub struct PointCloudRenderer {
     /// Kept to build the OIT pipelines on first use.
     pub(super) shader: wgpu::ShaderModule,
     pub(super) pipeline_layout: wgpu::PipelineLayout,
-    pub(super) target_format: wgpu::TextureFormat,
-    pub(super) oit: Mutex<Option<OitState>>,
+    pub(crate) oit: OitSlot,
 }
 
 impl PointCloudRenderer {
@@ -129,19 +126,17 @@ impl PointCloudRenderer {
             immediate_size: 0,
         });
 
-        let egui_target = [Some(wgpu::ColorTargetState {
-            format: target_format,
-            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-            write_mask: wgpu::ColorWrites::ALL,
-        })];
+        let target = egui_target(target_format);
         let pipeline = |label, depth_write| {
-            let variant = Variant {
-                label,
-                entry: "fs_main",
-                targets: &egui_target,
-                depth_write,
-            };
-            point_cloud_pipeline(device, &pipeline_layout, &shader, &variant)
+            let variant = Variant::egui(label, &target, depth_write);
+            build_pipeline(
+                device,
+                &pipeline_layout,
+                &shader,
+                &[Some(PointCloudVertex::desc())],
+                None,
+                &variant,
+            )
         };
         let render_pipeline = pipeline("Point Cloud Render Pipeline", true);
         // Translucent colors: no depth writes, so no point hides the ones behind it.
@@ -159,8 +154,7 @@ impl PointCloudRenderer {
             instance_count: AtomicU32::new(instance_count),
             shader,
             pipeline_layout,
-            target_format,
-            oit: Mutex::new(None),
+            oit: OitSlot::new(target_format),
         }
     }
 

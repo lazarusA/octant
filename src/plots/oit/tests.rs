@@ -2,7 +2,7 @@
 //! result, translucent layers cover by 1 - Π(1 - α), and opaque layers hide
 //! what is behind them. Skipped (passes, with a message) without a GPU.
 
-use super::{OitState, Variant};
+use super::{OitState, Variant, build_pipeline};
 use eframe::egui_wgpu::CallbackResources;
 
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
@@ -49,20 +49,10 @@ fn fs_oit(in: VertexOutput) -> OitOutput {
 }
 "#;
 
+/// A device whose adapter can render OIT frames.
 fn gpu() -> Option<(wgpu::Device, wgpu::Queue)> {
-    let rt = tokio::runtime::Runtime::new().ok()?;
-    rt.block_on(async {
-        let adapter = wgpu::Instance::default()
-            .request_adapter(&wgpu::RequestAdapterOptions::default())
-            .await
-            .ok()?;
-        if !super::supported(&adapter) {
-            return None;
-        }
-        adapter
-            .request_device(&wgpu::DeviceDescriptor::default())
-            .await
-            .ok()
+    crate::plots::test_gpu::device_with(|adapter| {
+        super::supported(adapter).then_some(wgpu::Features::empty())
     })
 }
 
@@ -92,32 +82,8 @@ fn scene(device: &wgpu::Device, queue: &wgpu::Queue) -> Scene {
         bind_group_layouts: &[Some(&empty_layout), Some(&atlas_layout)],
         immediate_size: 0,
     });
-    let build = |variant: &Variant<'_>| {
-        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some(variant.label),
-            layout: Some(&layout),
-            vertex: wgpu::VertexState {
-                module: &module,
-                entry_point: Some("vs_main"),
-                buffers: &[],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &module,
-                entry_point: Some(variant.entry),
-                targets: variant.targets,
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: Some(crate::plots::common::default_depth_stencil_state(
-                variant.depth_write,
-                wgpu::CompareFunction::LessEqual,
-            )),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        })
-    };
+    let build =
+        |variant: &Variant<'_>| build_pipeline(device, &layout, &module, &[], None, variant);
     let mut resources = CallbackResources::default();
     crate::plots::colormap_atlas::prepare(device, queue, &mut resources);
     Scene {

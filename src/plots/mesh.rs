@@ -1,10 +1,8 @@
-use std::sync::Mutex;
 use wgpu::util::DeviceExt;
 
 use super::common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D};
 pub use super::mesh_draw::Mesh3DCallback;
-use super::mesh_draw::mesh_pipeline;
-use super::oit::{OitState, Variant};
+use super::oit::{OitSlot, Variant, build_pipeline, egui_target};
 
 pub struct Mesh3DRenderer {
     pub render_pipeline: wgpu::RenderPipeline,
@@ -26,8 +24,7 @@ pub struct Mesh3DRenderer {
     /// Kept to build the OIT pipelines on first use.
     pub(super) shader: wgpu::ShaderModule,
     pub(super) pipeline_layout: wgpu::PipelineLayout,
-    pub(super) target_format: wgpu::TextureFormat,
-    pub(super) oit: Mutex<Option<OitState>>,
+    pub(crate) oit: OitSlot,
 }
 
 impl Mesh3DRenderer {
@@ -140,19 +137,17 @@ impl Mesh3DRenderer {
             immediate_size: 0,
         });
 
-        let egui_target = [Some(wgpu::ColorTargetState {
-            format: target_format,
-            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-            write_mask: wgpu::ColorWrites::ALL,
-        })];
+        let target = egui_target(target_format);
         let pipeline = |label, cull_mode, depth_write| {
-            let variant = Variant {
-                label,
-                entry: "fs_main",
-                targets: &egui_target,
-                depth_write,
-            };
-            mesh_pipeline(device, &pipeline_layout, &shader, &variant, cull_mode)
+            let variant = Variant::egui(label, &target, depth_write);
+            build_pipeline(
+                device,
+                &pipeline_layout,
+                &shader,
+                &[Some(MeshVertex3D::desc())],
+                cull_mode,
+                &variant,
+            )
         };
         let render_pipeline = pipeline("Mesh 3D Render Pipeline", cull_mode, true);
         let voxel_pipeline = pipeline(
@@ -183,8 +178,7 @@ impl Mesh3DRenderer {
             height,
             shader,
             pipeline_layout,
-            target_format,
-            oit: Mutex::new(None),
+            oit: OitSlot::new(target_format),
         }
     }
 

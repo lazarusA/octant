@@ -11,18 +11,23 @@
 //!
 //! Needs blendable float targets and per-target blending ([`supported`]);
 //! without them plots fall back to [`Transparency::NoDepthWrite`].
+//!
+//! Not cached yet: unlike the volume's `FrameKey` frame, both passes and the
+//! composite rerun on every repaint (including pointer moves) while OIT is
+//! active. A cache keyed on the uniforms, a data upload version (meshes and
+//! point clouds have none yet), the colormap generation and the size would
+//! skip the passes when nothing changed.
 
 mod frame;
+mod pipeline;
 mod state;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests;
 
-pub use state::OitState;
+pub use pipeline::{ACCUMULATE, OPAQUE, Variant, build_pipeline, egui_target};
+pub use state::{OitSlot, OitState};
 
 use std::sync::OnceLock;
-use wgpu::{
-    BlendComponent, BlendFactor, BlendOperation, BlendState, ColorTargetState, ColorWrites,
-};
 
 pub const OPAQUE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 pub const ACCUM_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
@@ -41,63 +46,6 @@ pub enum Transparency {
     /// Weighted blended order-independent transparency.
     Oit,
 }
-
-/// Fragment entry point, color targets and depth writes of one pipeline.
-pub struct Variant<'a> {
-    pub label: &'a str,
-    pub entry: &'a str,
-    pub targets: &'a [Option<ColorTargetState>],
-    pub depth_write: bool,
-}
-
-const ADD: BlendComponent = BlendComponent {
-    src_factor: BlendFactor::One,
-    dst_factor: BlendFactor::One,
-    operation: BlendOperation::Add,
-};
-
-const REVEAL: BlendComponent = BlendComponent {
-    src_factor: BlendFactor::Zero,
-    dst_factor: BlendFactor::OneMinusSrc,
-    operation: BlendOperation::Add,
-};
-
-/// Opaque pass: nearly opaque fragments, replacing color and writing depth.
-pub const OPAQUE: Variant<'static> = Variant {
-    label: "OIT Opaque Pipeline",
-    entry: "fs_opaque",
-    targets: &[Some(ColorTargetState {
-        format: OPAQUE_FORMAT,
-        blend: None,
-        write_mask: ColorWrites::ALL,
-    })],
-    depth_write: true,
-};
-
-/// Translucent pass: additive color sum and multiplicative revealage.
-pub const ACCUMULATE: Variant<'static> = Variant {
-    label: "OIT Accumulate Pipeline",
-    entry: "fs_oit",
-    targets: &[
-        Some(ColorTargetState {
-            format: ACCUM_FORMAT,
-            blend: Some(BlendState {
-                color: ADD,
-                alpha: ADD,
-            }),
-            write_mask: ColorWrites::ALL,
-        }),
-        Some(ColorTargetState {
-            format: REVEAL_FORMAT,
-            blend: Some(BlendState {
-                color: REVEAL,
-                alpha: REVEAL,
-            }),
-            write_mask: ColorWrites::ALL,
-        }),
-    ],
-    depth_write: false,
-};
 
 /// Frame size in pixels of a plot viewport, rounded as
 /// `setup_viewport_and_scissor` rounds the viewport.

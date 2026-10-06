@@ -63,7 +63,13 @@ impl Compositor {
             entries: &[texture_entry(0), texture_entry(1), texture_entry(2)],
         });
         Self {
-            pipeline: composite_pipeline(device, target_format, &layout),
+            pipeline: crate::plots::fullscreen::frame_pipeline(
+                device,
+                "OIT Composite Pipeline",
+                include_str!("../shaders/oit/composite.wgsl"),
+                &layout,
+                target_format,
+            ),
             layout,
         }
     }
@@ -97,49 +103,4 @@ impl Compositor {
         rpass.set_bind_group(0, &frame.bind_group, &[]);
         rpass.draw(0..3, 0..1);
     }
-}
-
-fn composite_pipeline(
-    device: &wgpu::Device,
-    target_format: wgpu::TextureFormat,
-    layout: &wgpu::BindGroupLayout,
-) -> wgpu::RenderPipeline {
-    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("OIT Composite Shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/oit/composite.wgsl").into()),
-    });
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("OIT Composite Pipeline Layout"),
-        bind_group_layouts: &[Some(layout)],
-        immediate_size: 0,
-    });
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("OIT Composite Pipeline"),
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: &module,
-            entry_point: Some("vs_composite"),
-            buffers: &[],
-            compilation_options: Default::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &module,
-            entry_point: Some("fs_composite"),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: target_format,
-                blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-            compilation_options: Default::default(),
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        // egui's pass carries a depth attachment; the composite ignores it.
-        depth_stencil: Some(crate::plots::common::default_depth_stencil_state(
-            false,
-            wgpu::CompareFunction::Always,
-        )),
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
 }
