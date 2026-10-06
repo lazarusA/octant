@@ -40,12 +40,7 @@ impl VolumeTextures {
             VolumeEncoding::PackedRgb => wgpu::TextureFormat::Rgba8Unorm,
         };
         let value = create_texture(device, "Volume Values", dims, value_format);
-        let validity = create_texture(
-            device,
-            "Volume Validity",
-            dims,
-            wgpu::TextureFormat::R8Unorm,
-        );
+        let validity = create_texture(device, "Volume Validity", dims, wgpu::TextureFormat::R8Unorm);
         Some(Self {
             encoding,
             dims,
@@ -53,10 +48,7 @@ impl VolumeTextures {
             validity_view: validity.create_view(&wgpu::TextureViewDescriptor::default()),
             value,
             validity,
-            // Unwritten planes count as missing until their data arrives.
-            invalid_per_plane: (0..dims.d)
-                .map(|_| AtomicU32::new(dims.plane() as u32))
-                .collect(),
+            invalid_per_plane: (0..dims.d).map(|_| AtomicU32::new(dims.plane() as u32)).collect(),
             invalid_total: AtomicU64::new((dims.d * dims.plane()) as u64),
             version: AtomicU64::new(0),
         })
@@ -129,11 +121,7 @@ impl VolumeTextures {
     }
 
     fn region(&self, z: &Range<usize>) -> (wgpu::Origin3d, wgpu::Extent3d) {
-        let origin = wgpu::Origin3d {
-            x: 0,
-            y: 0,
-            z: z.start as u32,
-        };
+        let origin = wgpu::Origin3d { x: 0, y: 0, z: z.start as u32 };
         let extent = wgpu::Extent3d {
             width: self.dims.w as u32,
             height: self.dims.h as u32,
