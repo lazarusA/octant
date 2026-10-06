@@ -62,7 +62,25 @@ pub const PRESETS: [(&str, &str, AlphaInterp); 6] = [
 pub fn parse(text: &str) -> Result<Option<AlphaCurve>, AlphaError> {
     let mut values = Vec::new();
     let mut stops = Vec::new();
-    let tokens = text
+
+    // Normalize whitespace around ':' so "0.2 : 0.8" or "0.2: 0.8" becomes "0.2:0.8"
+    let mut normalized = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == ':' {
+            while normalized.ends_with(|w: char| w.is_whitespace()) {
+                normalized.pop();
+            }
+            normalized.push(':');
+            while chars.peek().is_some_and(|&p| p.is_whitespace()) {
+                chars.next();
+            }
+        } else {
+            normalized.push(c);
+        }
+    }
+
+    let tokens = normalized
         .split(|c: char| c == ',' || c == ';' || c.is_whitespace())
         .filter(|s| !s.is_empty());
     for token in tokens {

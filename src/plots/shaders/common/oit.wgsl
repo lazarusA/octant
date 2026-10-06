@@ -25,7 +25,8 @@ fn oit_accumulate(color: vec4<f32>, frag_z: f32) -> OitOutput {
     if (color.a >= OIT_OPAQUE_ALPHA) {
         discard;
     }
-    // View distance; plots span a few units around the camera distance.
+    // View distance inverted from linear depth: dist = (z_far * z_near) / (z_far - frag_z * (z_far - z_near))
+    // with z_near = 0.01 and z_far = 50.0 matching project_perspective (camera3d.wgsl).
     let dist = 0.5 / (50.0 - frag_z * 49.99);
     let weight = color.a * clamp(0.03 / (1e-5 + pow(dist / 10.0, 4.0)), 1e-2, 3e3);
     var out: OitOutput;

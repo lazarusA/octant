@@ -24,6 +24,14 @@ fn parses_values_stops_and_blank() {
         parse("0:0, 0.5:1"),
         Ok(Some(AlphaCurve::Stops(vec![[0.0, 0.0], [0.5, 1.0]])))
     );
+    assert_eq!(
+        parse("0 : 0,  0.5 : 1 , 1: 0"),
+        Ok(Some(AlphaCurve::Stops(vec![
+            [0.0, 0.0],
+            [0.5, 1.0],
+            [1.0, 0.0]
+        ])))
+    );
 }
 
 #[test]

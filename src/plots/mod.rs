@@ -9,6 +9,7 @@ mod mesh_draw;
 pub mod oit;
 pub mod point_cloud;
 mod point_cloud_draw;
+mod point_cloud_types;
 pub mod sphere;
 pub mod surface;
 pub mod traits;

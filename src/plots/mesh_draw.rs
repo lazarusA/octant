@@ -79,11 +79,9 @@ impl Mesh3DRenderer {
         });
     }
 
-    fn paint_oit(&self, rpass: &mut wgpu::RenderPass<'static>) {
+    fn paint_oit(&self, rpass: &mut wgpu::RenderPass<'static>) -> bool {
         let oit = self.oit.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(state) = oit.as_ref() {
-            state.paint(rpass);
-        }
+        oit.as_ref().is_some_and(|state| state.paint(rpass))
     }
 }
 
@@ -137,8 +135,8 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         let renderer = &self.renderer;
         let cubes = self.cubes();
         let pipeline = match (self.transparency, cubes) {
-            (Transparency::Oit, _) => return renderer.paint_oit(rpass),
-            (Transparency::NoDepthWrite, _) => &renderer.transparent_pipeline,
+            (Transparency::Oit, _) if renderer.paint_oit(rpass) => return,
+            (Transparency::Oit | Transparency::NoDepthWrite, _) => &renderer.transparent_pipeline,
             (Transparency::Off, true) => &renderer.voxel_pipeline,
             (Transparency::Off, false) => &renderer.render_pipeline,
         };
@@ -147,5 +145,38 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         }
         rpass.set_pipeline(pipeline);
         renderer.draw_geometry(rpass, cubes);
+    }
+}
+
+impl super::common::PlotRenderer for Mesh3DRenderer {
+    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
+        self.update_data(queue, values);
+    }
+}
+
+impl super::traits::PlotRenderer for Mesh3DRenderer {
+    fn update_data(&self, queue: &wgpu::Queue, data: &crate::data::RenderData) {
+        if let crate::data::RenderData::Matrix(m) = data {
+            self.update_data(queue, &m.values);
+        }
+    }
+
+    fn paint(
+        &self,
+        _ui: &mut egui::Ui,
+        _rect: egui::Rect,
+        _params: &super::traits::PlotRenderParams,
+    ) {
+        // Concrete painter dispatched via egui callback
+    }
+
+    fn inspect_hover(
+        &self,
+        _pointer_pos: egui::Pos2,
+        _rect: egui::Rect,
+        _data: &crate::data::RenderData,
+        _params: &super::traits::PlotRenderParams,
+    ) -> Option<super::traits::HoverSample> {
+        None
     }
 }

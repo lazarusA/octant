@@ -74,11 +74,9 @@ impl PointCloudRenderer {
         state.render(device, encoder, size, atlas, |pass| self.draw_points(pass));
     }
 
-    fn paint_oit(&self, rpass: &mut wgpu::RenderPass<'static>) {
+    fn paint_oit(&self, rpass: &mut wgpu::RenderPass<'static>) -> bool {
         let oit = self.oit.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(state) = oit.as_ref() {
-            state.paint(rpass);
-        }
+        oit.as_ref().is_some_and(|state| state.paint(rpass))
     }
 }
 
@@ -123,8 +121,8 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         }
         let renderer = &self.renderer;
         let pipeline = match self.transparency {
-            Transparency::Oit => return renderer.paint_oit(rpass),
-            Transparency::NoDepthWrite => &renderer.transparent_pipeline,
+            Transparency::Oit if renderer.paint_oit(rpass) => return,
+            Transparency::Oit | Transparency::NoDepthWrite => &renderer.transparent_pipeline,
             Transparency::Off => &renderer.render_pipeline,
         };
         if !super::colormap_atlas::bind(rpass, callback_resources) {

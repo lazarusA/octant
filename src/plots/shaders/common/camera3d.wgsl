@@ -57,6 +57,7 @@ fn project_perspective(
     let proj_x = (pos_rot.x * fov_scale) / aspect_ratio;
     let proj_y = pos_rot.y * fov_scale;
 
+    // Near and far clipping planes (must stay in sync with OIT depth inversion in oit.wgsl).
     let z_near = 0.01;
     let z_far = 50.0;
     let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));

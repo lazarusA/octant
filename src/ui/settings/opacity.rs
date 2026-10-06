@@ -4,8 +4,12 @@ use crate::utils::colormap::{AlphaInterp, alpha::PRESETS};
 
 /// Global opacity slider and the opacity curve over the data range.
 pub(crate) fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.add(egui::Slider::new(&mut app.color_opacity, 0.0..=1.0).text("Opacity"))
-        .on_hover_text("Opacity of colormapped values. NaN and clip colors keep their own alpha.");
+    let resp = ui
+        .add(egui::Slider::new(&mut app.color_opacity, 0.0..=1.0).text("Opacity"))
+        .on_hover_text("Opacity of colormapped values. NaN and clip colors keep their own alpha. Double-click to reset.");
+    if resp.double_clicked() {
+        app.color_opacity = 1.0;
+    }
 
     ui.add_space(4.0);
     let mut changed = false;
