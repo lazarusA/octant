@@ -1,7 +1,11 @@
 use bytemuck::{Pod, Zeroable};
-use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 use wgpu::util::DeviceExt;
+
+use super::oit::{OitState, Variant};
+pub use super::point_cloud_draw::PointCloudCallback;
+use super::point_cloud_draw::point_cloud_pipeline;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
@@ -45,6 +49,8 @@ pub struct PointCloudUniforms {
 
 pub struct PointCloudRenderer {
     pub render_pipeline: wgpu::RenderPipeline,
+    /// Translucent colors: no depth writes.
+    pub transparent_pipeline: wgpu::RenderPipeline,
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub index_count: u32,
@@ -52,6 +58,11 @@ pub struct PointCloudRenderer {
     pub data_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
     pub instance_count: AtomicU32,
+    /// Kept to build the OIT pipelines on first use.
+    pub(super) shader: wgpu::ShaderModule,
+    pub(super) pipeline_layout: wgpu::PipelineLayout,
+    pub(super) target_format: wgpu::TextureFormat,
+    pub(super) oit: Mutex<Option<OitState>>,
 }
 
 impl PointCloudRenderer {
@@ -158,41 +169,27 @@ impl PointCloudRenderer {
             immediate_size: 0,
         });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Point Cloud Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[Some(PointCloudVertex::desc())],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: target_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: None,
-                ..Default::default()
-            },
-            depth_stencil: Some(super::common::default_depth_stencil_state(
-                true,
-                wgpu::CompareFunction::LessEqual,
-            )),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        let egui_target = [Some(wgpu::ColorTargetState {
+            format: target_format,
+            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+            write_mask: wgpu::ColorWrites::ALL,
+        })];
+        let pipeline = |label, depth_write| {
+            let variant = Variant {
+                label,
+                entry: "fs_main",
+                targets: &egui_target,
+                depth_write,
+            };
+            point_cloud_pipeline(device, &pipeline_layout, &shader, &variant)
+        };
+        let render_pipeline = pipeline("Point Cloud Render Pipeline", true);
+        // Translucent colors: no depth writes, so no point hides the ones behind it.
+        let transparent_pipeline = pipeline("Point Cloud Transparent Render Pipeline", false);
 
         Self {
             render_pipeline,
+            transparent_pipeline,
             vertex_buffer,
             index_buffer,
             index_count: indices.len() as u32,
@@ -200,6 +197,10 @@ impl PointCloudRenderer {
             data_buffer,
             bind_group,
             instance_count: AtomicU32::new(instance_count),
+            shader,
+            pipeline_layout,
+            target_format,
+            oit: Mutex::new(None),
         }
     }
 
@@ -306,55 +307,5 @@ impl super::traits::PlotRenderer for PointCloudRenderer {
         _params: &super::traits::PlotRenderParams,
     ) -> Option<super::traits::HoverSample> {
         None
-    }
-}
-
-pub struct PointCloudCallback {
-    pub renderer: Arc<PointCloudRenderer>,
-    pub params: PointCloudUniformParams,
-    pub rect: egui::Rect,
-}
-
-impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
-    fn prepare(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        _screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
-        _encoder: &mut wgpu::CommandEncoder,
-        callback_resources: &mut eframe::egui_wgpu::CallbackResources,
-    ) -> Vec<wgpu::CommandBuffer> {
-        super::colormap_atlas::prepare(device, queue, callback_resources);
-        let mut params = self.params;
-        params.screen_aspect = super::common::compute_aspect_ratio(&self.rect);
-        self.renderer.update_uniforms(queue, &params);
-        Vec::new()
-    }
-
-    fn paint(
-        &self,
-        info: egui::PaintCallbackInfo,
-        rpass: &mut wgpu::RenderPass<'static>,
-        callback_resources: &eframe::egui_wgpu::CallbackResources,
-    ) {
-        if !super::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
-            return;
-        }
-        if !super::colormap_atlas::bind(rpass, callback_resources) {
-            return;
-        }
-
-        rpass.set_pipeline(&self.renderer.render_pipeline);
-        rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
-        rpass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-        rpass.set_index_buffer(
-            self.renderer.index_buffer.slice(..),
-            wgpu::IndexFormat::Uint16,
-        );
-        rpass.draw_indexed(
-            0..self.renderer.index_count,
-            0,
-            0..self.renderer.instance_count.load(Ordering::Relaxed),
-        );
     }
 }

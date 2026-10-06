@@ -67,6 +67,9 @@ pub struct OctantApp {
     /// Volume raymarching samples per voxel crossed by each ray.
     pub volume_quality: f32,
     pub volume_transparency: bool,
+    /// Surfaces, spheres and point clouds with translucent colors draw
+    /// without depth writes, so no part hides the parts behind it.
+    pub plot_transparency: bool,
     /// Lights transparent DVR samples by their gradient.
     pub volume_lighting: bool,
     /// The user is rotating or zooming the 3D view this frame: volumes render
@@ -262,6 +265,7 @@ impl Default for OctantApp {
             volume_opacity: 3.0,
             volume_quality: 1.0,
             volume_transparency: true,
+            plot_transparency: true,
             volume_lighting: false,
             view_interacting: false,
             volume_dirty: None,

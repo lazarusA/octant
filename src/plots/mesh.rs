@@ -1,11 +1,16 @@
-use std::sync::Arc;
+use std::sync::Mutex;
 use wgpu::util::DeviceExt;
 
 use super::common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D};
+pub use super::mesh_draw::Mesh3DCallback;
+use super::mesh_draw::mesh_pipeline;
+use super::oit::{OitState, Variant};
 
 pub struct Mesh3DRenderer {
     pub render_pipeline: wgpu::RenderPipeline,
     pub voxel_pipeline: wgpu::RenderPipeline,
+    /// Both modes with translucent colors: no culling, no depth writes.
+    pub transparent_pipeline: wgpu::RenderPipeline,
     pub quad_vertex_buffer: wgpu::Buffer,
     pub quad_index_buffer: wgpu::Buffer,
     pub cube_vertex_buffer: wgpu::Buffer,
@@ -18,6 +23,11 @@ pub struct Mesh3DRenderer {
     pub num_instances: u32,
     pub width: usize,
     pub height: usize,
+    /// Kept to build the OIT pipelines on first use.
+    pub(super) shader: wgpu::ShaderModule,
+    pub(super) pipeline_layout: wgpu::PipelineLayout,
+    pub(super) target_format: wgpu::TextureFormat,
+    pub(super) oit: Mutex<Option<OitState>>,
 }
 
 impl Mesh3DRenderer {
@@ -146,74 +156,30 @@ impl Mesh3DRenderer {
             immediate_size: 0,
         });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Mesh 3D Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[Some(MeshVertex3D::desc())],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: target_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode,
-                front_face: wgpu::FrontFace::Ccw,
-                ..Default::default()
-            },
-            depth_stencil: Some(super::common::default_depth_stencil_state(
-                true,
-                wgpu::CompareFunction::LessEqual,
-            )),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
-
+        let egui_target = [Some(wgpu::ColorTargetState {
+            format: target_format,
+            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+            write_mask: wgpu::ColorWrites::ALL,
+        })];
+        let pipeline = |label, cull_mode, depth_write| {
+            let variant = Variant {
+                label,
+                entry: "fs_main",
+                targets: &egui_target,
+                depth_write,
+            };
+            mesh_pipeline(device, &pipeline_layout, &shader, &variant, cull_mode)
+        };
+        let render_pipeline = pipeline("Mesh 3D Render Pipeline", cull_mode, true);
         // Dedicated pipeline for 3D Lego Cubes with hardware backface culling
-        let voxel_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Mesh 3D Voxel Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[Some(MeshVertex3D::desc())],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: target_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: Some(wgpu::Face::Back),
-                front_face: wgpu::FrontFace::Ccw,
-                ..Default::default()
-            },
-            depth_stencil: Some(super::common::default_depth_stencil_state(
-                true,
-                wgpu::CompareFunction::LessEqual,
-            )),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        let voxel_pipeline = pipeline(
+            "Mesh 3D Voxel Render Pipeline",
+            Some(wgpu::Face::Back),
+            true,
+        );
+        // Translucent colors: every face, without writing depth, so no face
+        // hides the ones behind it.
+        let transparent_pipeline = pipeline("Mesh 3D Transparent Render Pipeline", None, false);
 
         // 1. Instanced Unit Quad Template
         let (quad_vertices, quad_indices) = Self::build_unit_quad();
@@ -244,6 +210,7 @@ impl Mesh3DRenderer {
         Self {
             render_pipeline,
             voxel_pipeline,
+            transparent_pipeline,
             quad_vertex_buffer,
             quad_index_buffer,
             cube_vertex_buffer,
@@ -256,6 +223,10 @@ impl Mesh3DRenderer {
             num_instances,
             width,
             height,
+            shader,
+            pipeline_layout,
+            target_format,
+            oit: Mutex::new(None),
         }
     }
 
@@ -354,65 +325,5 @@ impl super::traits::PlotRenderer for Mesh3DRenderer {
         _params: &super::traits::PlotRenderParams,
     ) -> Option<super::traits::HoverSample> {
         None
-    }
-}
-
-pub struct Mesh3DCallback {
-    pub renderer: Arc<Mesh3DRenderer>,
-    pub params: Mesh3DUniformParams,
-    pub cube_mode_idx: u32,
-    pub rect: egui::Rect,
-}
-
-impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
-    fn prepare(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        _screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
-        _encoder: &mut wgpu::CommandEncoder,
-        callback_resources: &mut eframe::egui_wgpu::CallbackResources,
-    ) -> Vec<wgpu::CommandBuffer> {
-        super::colormap_atlas::prepare(device, queue, callback_resources);
-        let mut params = self.params;
-        params.aspect_ratio = super::common::compute_aspect_ratio(&self.rect);
-        self.renderer.update_uniforms(queue, &params);
-        Vec::new()
-    }
-
-    fn paint(
-        &self,
-        info: egui::PaintCallbackInfo,
-        rpass: &mut wgpu::RenderPass<'static>,
-        callback_resources: &eframe::egui_wgpu::CallbackResources,
-    ) {
-        if !super::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
-            return;
-        }
-        if !super::colormap_atlas::bind(rpass, callback_resources) {
-            return;
-        }
-
-        if self.params.mode == self.cube_mode_idx {
-            // Dedicated voxel cube pipeline with hardware backface culling
-            rpass.set_pipeline(&self.renderer.voxel_pipeline);
-            rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
-            rpass.set_vertex_buffer(0, self.renderer.cube_vertex_buffer.slice(..));
-            rpass.set_index_buffer(
-                self.renderer.cube_index_buffer.slice(..),
-                wgpu::IndexFormat::Uint32,
-            );
-            rpass.draw_indexed(0..36, 0, 0..self.renderer.num_instances);
-        } else {
-            // Surface / Smooth Quad Draw
-            rpass.set_pipeline(&self.renderer.render_pipeline);
-            rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
-            rpass.set_vertex_buffer(0, self.renderer.quad_vertex_buffer.slice(..));
-            rpass.set_index_buffer(
-                self.renderer.quad_index_buffer.slice(..),
-                wgpu::IndexFormat::Uint32,
-            );
-            rpass.draw_indexed(0..6, 0, 0..self.renderer.num_instances);
-        }
     }
 }

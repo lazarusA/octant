@@ -1,6 +1,7 @@
 //! Opacity curve editor state (not persisted) and its registration.
 
 use super::app_state::OctantApp;
+use crate::plots::oit::{self, Transparency};
 use crate::utils::colormap::{AlphaInterp, alpha, registry};
 
 /// Text of the opacity curve as typed, its interpolation and parse error.
@@ -39,5 +40,22 @@ impl OctantApp {
     /// Whether colormapped values may be drawn translucent.
     pub fn has_color_alpha(&self) -> bool {
         self.color_opacity < 1.0 || registry::alpha_row().is_some()
+    }
+
+    /// How 3D meshes and point clouds draw: order-independent transparency
+    /// with translucent colors when the device supports it, else without depth
+    /// writes; opaque colors keep depth writes, so near parts hide far ones.
+    pub fn transparency_mode(&self) -> Transparency {
+        if !self.plot_transparency || !self.has_color_alpha() {
+            Transparency::Off
+        } else if self
+            .wgpu_render_state
+            .as_ref()
+            .is_some_and(|rs| oit::supported(&rs.adapter))
+        {
+            Transparency::Oit
+        } else {
+            Transparency::NoDepthWrite
+        }
     }
 }

@@ -132,8 +132,8 @@ fn vs_main(
     return out;
 }
 
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+// Lit, colormapped fragment color (straight alpha).
+fn shade(in: VertexOutput) -> vec4<f32> {
     if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE) {
         let packed = u32(in.val);
         if ((packed & 0x00FFFFFFu) == 0u) {
@@ -148,4 +148,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     return eval_color;
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    return shade(in);
+}
+
+// Opaque and translucent passes of order-independent transparency.
+@fragment
+fn fs_opaque(in: VertexOutput) -> @location(0) vec4<f32> {
+    return oit_opaque(shade(in));
+}
+
+@fragment
+fn fs_oit(in: VertexOutput) -> OitOutput {
+    return oit_accumulate(shade(in), in.position.z);
 }

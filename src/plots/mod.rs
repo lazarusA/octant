@@ -5,7 +5,10 @@ pub mod device;
 pub mod heatmap;
 pub mod line;
 pub mod mesh;
+mod mesh_draw;
+pub mod oit;
 pub mod point_cloud;
+mod point_cloud_draw;
 pub mod sphere;
 pub mod surface;
 pub mod traits;
@@ -63,6 +66,8 @@ macro_rules! assemble_plot_shader {
             "\n",
             include_str!("shaders/common/lighting.wgsl"),
             "\n",
+            include_str!("shaders/common/oit.wgsl"),
+            "\n",
             $plot_shader
         )
     };
@@ -81,6 +86,8 @@ macro_rules! assemble_plot_with_coords_shader {
             "\n",
             include_str!("shaders/common/lighting.wgsl"),
             "\n",
+            include_str!("shaders/common/oit.wgsl"),
+            "\n",
             include_str!("shaders/common/healpix_scheme.wgsl"),
             "\n",
             include_str!("shaders/common/healpix_math.wgsl"),
@@ -96,6 +103,62 @@ macro_rules! assemble_plot_with_coords_shader {
 
 #[cfg(test)]
 mod tests {
+    /// Builds the 3D renderers (all their pipelines, including the transparent
+    /// ones) and fails on any wgpu validation error. Skipped without a GPU.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn mesh_and_point_cloud_pipelines_validate() {
+        let Some(rt) = tokio::runtime::Runtime::new().ok() else {
+            return;
+        };
+        rt.block_on(async {
+            let instance = wgpu::Instance::default();
+            let Ok(adapter) = instance
+                .request_adapter(&wgpu::RequestAdapterOptions::default())
+                .await
+            else {
+                eprintln!("SKIPPED mesh_and_point_cloud_pipelines_validate: no GPU adapter");
+                return;
+            };
+            let Ok((device, _queue)) = adapter
+                .request_device(&wgpu::DeviceDescriptor::default())
+                .await
+            else {
+                eprintln!("SKIPPED mesh_and_point_cloud_pipelines_validate: no device");
+                return;
+            };
+            let format = wgpu::TextureFormat::Rgba8Unorm;
+            let data = [0.0f32; 4];
+            let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
+            let surface = super::SurfaceRenderer::new_surface(&device, format, &data, 2, 2);
+            let sphere = super::SphereRenderer::new_sphere(&device, format, &data, 2, 2);
+            let points = super::PointCloudRenderer::new(&device, format, &data, 2, 2);
+            // OIT pipelines are built on first use; build them here too.
+            for mesh in [&surface, &sphere] {
+                let _oit = super::oit::OitState::new(&device, format, |variant| {
+                    super::mesh_draw::mesh_pipeline(
+                        &device,
+                        &mesh.pipeline_layout,
+                        &mesh.shader,
+                        variant,
+                        None,
+                    )
+                });
+            }
+            let _oit = super::oit::OitState::new(&device, format, |variant| {
+                super::point_cloud_draw::point_cloud_pipeline(
+                    &device,
+                    &points.pipeline_layout,
+                    &points.shader,
+                    variant,
+                )
+            });
+            if let Some(error) = scope.pop().await {
+                panic!("pipeline validation failed: {error}");
+            }
+        });
+    }
+
     #[test]
     fn test_all_plot_shaders_parse_cleanly() {
         let shaders = [

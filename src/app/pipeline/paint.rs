@@ -261,6 +261,7 @@ impl OctantApp {
                             params,
                             cube_mode_idx: 3,
                             rect: plot_rect,
+                            transparency: self.transparency_mode(),
                         },
                     );
                     ui.painter().add(callback);
@@ -281,6 +282,7 @@ impl OctantApp {
                             params,
                             cube_mode_idx: 2,
                             rect: plot_rect,
+                            transparency: self.transparency_mode(),
                         },
                     );
                     ui.painter().add(callback);
@@ -314,6 +316,7 @@ impl OctantApp {
                             renderer: point_cloud_renderer.clone(),
                             params,
                             rect: plot_rect,
+                            transparency: self.transparency_mode(),
                         },
                     );
                     ui.painter().add(callback);
