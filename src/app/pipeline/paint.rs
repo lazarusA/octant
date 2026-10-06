@@ -217,6 +217,7 @@ impl OctantApp {
     ) {
         self.poll_coastline_receiver();
         let canvas_plot_type = self.effective_canvas_plot_type();
+        self.release_idle_oit_frames(canvas_plot_type);
 
         match canvas_plot_type {
             crate::plots::PlotType::Line => {

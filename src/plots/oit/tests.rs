@@ -9,7 +9,8 @@ const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 const SIZE: u32 = 4;
 
 /// Full-viewport layers: half-transparent red at depth 0.3 and blue at 0.6,
-/// opaque green at 0.9, and half-transparent white at 0.95 (behind green).
+/// opaque green at 0.9, half-transparent white at 0.95 (behind green), and
+/// half-transparent mid gray at 0.2 (right in front of the camera).
 const SHADER: &str = r#"
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -18,7 +19,7 @@ struct VertexOutput {
 
 @vertex
 fn vs_main(@builtin(vertex_index) v: u32, @builtin(instance_index) i: u32) -> VertexOutput {
-    var depths = array<f32, 4>(0.3, 0.6, 0.9, 0.95);
+    var depths = array<f32, 5>(0.3, 0.6, 0.9, 0.95, 0.2);
     let xy = vec2<f32>(f32((v << 1u) & 2u), f32(v & 2u)) * 2.0 - 1.0;
     var out: VertexOutput;
     out.position = vec4<f32>(xy, depths[i], 1.0);
@@ -27,11 +28,12 @@ fn vs_main(@builtin(vertex_index) v: u32, @builtin(instance_index) i: u32) -> Ve
 }
 
 fn shade(in: VertexOutput) -> vec4<f32> {
-    var colors = array<vec4<f32>, 4>(
+    var colors = array<vec4<f32>, 5>(
         vec4<f32>(1.0, 0.0, 0.0, 0.5),
         vec4<f32>(0.0, 0.0, 1.0, 0.5),
         vec4<f32>(0.0, 1.0, 0.0, 1.0),
         vec4<f32>(1.0, 1.0, 1.0, 0.5),
+        vec4<f32>(0.5, 0.5, 0.5, 0.5),
     );
     return colors[in.layer];
 }
@@ -71,7 +73,11 @@ struct Scene {
 }
 
 fn scene(device: &wgpu::Device, queue: &wgpu::Queue) -> Scene {
-    let source = format!("{}\n{SHADER}", include_str!("../shaders/common/oit.wgsl"));
+    let source = format!(
+        "{}\n{}\n{SHADER}",
+        include_str!("../shaders/common/camera3d.wgsl"),
+        include_str!("../shaders/common/oit.wgsl")
+    );
     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("oit test"),
         source: wgpu::ShaderSource::Wgsl(source.into()),
@@ -261,6 +267,26 @@ fn oit_without_opaque_layers_keeps_coverage() {
     };
     let mut scene = scene(&device, &queue);
     // Red alone: premultiplied (0.5, 0, 0, 0.5).
-    let [r, g, b, a] = render(&device, &queue, &mut scene, &[0]);
+    let first = render(&device, &queue, &mut scene, &[0]);
+    let [r, g, b, a] = first;
     assert!(near(r, 127.5) && near(g, 0.0) && near(b, 0.0) && near(a, 127.5));
+    // A released frame is allocated again on the next render.
+    scene.state.release_frame();
+    assert_eq!(render(&device, &queue, &mut scene, &[0]), first);
+}
+
+#[test]
+fn oit_many_near_layers_do_not_overflow() {
+    let Some((device, queue)) = gpu() else {
+        eprintln!("SKIPPED oit_many_near_layers_do_not_overflow: no OIT-capable GPU");
+        return;
+    };
+    let mut scene = scene(&device, &queue);
+    // 200 mid-gray layers at the weight cap: an overflowed half-float sum
+    // would saturate color and alpha alike and turn the gray white.
+    let [r, g, b, a] = render(&device, &queue, &mut scene, &[4; 200]);
+    for (name, c) in [("red", r), ("green", g), ("blue", b)] {
+        assert!(near(c, 127.5), "{name} {c}");
+    }
+    assert!(near(a, 255.0), "alpha {a}");
 }

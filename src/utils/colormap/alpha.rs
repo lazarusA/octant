@@ -129,7 +129,10 @@ fn from_values(v: &[f32], i: usize, interp: AlphaInterp) -> f32 {
         return v.first().copied().unwrap_or(1.0);
     }
     if interp == AlphaInterp::Step {
-        return v[(i * n / LUT_SIZE).min(n - 1)];
+        // Bin by the texel's position `t = i / 255`, the scale samples use, so
+        // bin centers `(b + 0.5) / n` land inside bin `b` (exact up to 128 bins).
+        let t = i as f32 / (LUT_SIZE - 1) as f32;
+        return v[((t * n as f32) as usize).min(n - 1)];
     }
     let pos = i as f32 / (LUT_SIZE - 1) as f32 * (n - 1) as f32;
     let j = (pos.floor() as usize).min(n - 2);

@@ -31,7 +31,8 @@ fn fs_composite(in: CompositeOutput) -> @location(0) vec4<f32> {
     let dims = vec2<f32>(textureDimensions(opaque_tex));
     let p = vec2<i32>(clamp(in.uv * dims, vec2<f32>(0.0), dims - 1.0));
     let opaque = textureLoad(opaque_tex, p, 0);
-    let accum = textureLoad(accum_tex, p, 0);
+    // An overflowed half-float sum (infinity) is clamped so the average stays finite.
+    let accum = min(textureLoad(accum_tex, p, 0), vec4<f32>(65504.0));
     let reveal = textureLoad(reveal_tex, p, 0).r;
     let coverage = 1.0 - reveal;
     let average = accum.rgb / max(accum.a, 1e-5);

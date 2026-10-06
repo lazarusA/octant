@@ -74,6 +74,14 @@ impl PointCloudRenderer {
         state.render(device, encoder, size, atlas, |pass| self.draw_points(pass));
     }
 
+    /// Frees the OIT frame when this renderer draws without OIT.
+    pub(crate) fn release_oit_frame(&self) {
+        let mut oit = self.oit.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(state) = oit.as_mut() {
+            state.release_frame();
+        }
+    }
+
     fn paint_oit(&self, rpass: &mut wgpu::RenderPass<'static>) -> bool {
         let oit = self.oit.lock().unwrap_or_else(|p| p.into_inner());
         oit.as_ref().is_some_and(|state| state.paint(rpass))
@@ -106,6 +114,8 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
         {
             let size = super::oit::frame_size(&self.rect, screen_descriptor.pixels_per_point);
             self.renderer.render_oit(device, encoder, size, atlas);
+        } else if self.transparency != Transparency::Oit {
+            self.renderer.release_oit_frame();
         }
         Vec::new()
     }

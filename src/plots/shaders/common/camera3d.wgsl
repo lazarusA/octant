@@ -42,6 +42,11 @@ fn rotate_normal_yx(norm: vec3<f32>, rot_y: f32, rot_x: f32) -> vec3<f32> {
     ));
 }
 
+// Near and far planes of the 3D plot projections (`project_perspective`,
+// `point_cloud.wgsl`); `oit_accumulate` inverts depth with them.
+const CAMERA_Z_NEAR: f32 = 0.01;
+const CAMERA_Z_FAR: f32 = 50.0;
+
 /// Perspective projection transformation and linear depth calculation.
 fn project_perspective(
     pos_rot: vec3<f32>,
@@ -57,9 +62,8 @@ fn project_perspective(
     let proj_x = (pos_rot.x * fov_scale) / aspect_ratio;
     let proj_y = pos_rot.y * fov_scale;
 
-    // Near and far clipping planes (must stay in sync with OIT depth inversion in oit.wgsl).
-    let z_near = 0.01;
-    let z_far = 50.0;
+    let z_near = CAMERA_Z_NEAR;
+    let z_far = CAMERA_Z_FAR;
     let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
 
     return vec4<f32>(proj_x, proj_y, proj_z, dist_positive);

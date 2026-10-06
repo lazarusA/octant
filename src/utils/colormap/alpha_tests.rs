@@ -69,6 +69,24 @@ fn step_values_fill_equal_bins() {
 }
 
 #[test]
+fn step_values_match_many_category_centers() {
+    // Alternating alphas expose any blending with a neighboring bin.
+    for n in [64_usize, 100, 128] {
+        let text = (0..n)
+            .map(|b| if b % 2 == 0 { "0" } else { "1" })
+            .collect::<Vec<_>>()
+            .join(",");
+        let lut = baked(&text, AlphaInterp::Step);
+        for b in 0..n {
+            let t = (b as f32 + 0.5) / n as f32;
+            let want = (b % 2) as f32;
+            let got = sample_alpha(&lut, t);
+            assert!((got - want).abs() < 0.02, "{n} bins, bin {b}: {got}");
+        }
+    }
+}
+
+#[test]
 fn stops_blend_or_hold() {
     let text = "0.2:0, 0.4:1, 0.4:0.5, 1:0.5";
     let near = |a: f32, b: f32| (a - b).abs() < 1.5 / 255.0;

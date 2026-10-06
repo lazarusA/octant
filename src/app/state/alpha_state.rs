@@ -1,6 +1,7 @@
 //! Opacity curve editor state (not persisted) and its registration.
 
 use super::app_state::OctantApp;
+use crate::plots::PlotType;
 use crate::plots::oit::{self, Transparency};
 use crate::utils::colormap::{AlphaInterp, alpha, registry};
 
@@ -42,11 +43,33 @@ impl OctantApp {
         self.color_opacity < 1.0 || registry::alpha_row().is_some()
     }
 
+    /// Frees the OIT frames of the 3D renderers not drawn as `active`, whose
+    /// callbacks do not run to free them.
+    pub fn release_idle_oit_frames(&self, active: PlotType) {
+        let meshes = [
+            (PlotType::Sphere, &self.sphere_renderer),
+            (PlotType::Surface, &self.surface_renderer),
+        ];
+        for (kind, renderer) in meshes {
+            if kind != active
+                && let Some(renderer) = renderer
+            {
+                renderer.release_oit_frame();
+            }
+        }
+        if active != PlotType::PointCloud
+            && let Some(renderer) = &self.point_cloud_renderer
+        {
+            renderer.release_oit_frame();
+        }
+    }
+
     /// How 3D meshes and point clouds draw: order-independent transparency
     /// with translucent colors when the device supports it, else without depth
-    /// writes; opaque colors keep depth writes, so near parts hide far ones.
+    /// writes; opaque colors (including RGB composites, which ignore opacity)
+    /// keep depth writes, so near parts hide far ones.
     pub fn transparency_mode(&self) -> Transparency {
-        if !self.plot_transparency || !self.has_color_alpha() {
+        if !self.plot_transparency || self.rgb_composite_mode || !self.has_color_alpha() {
             Transparency::Off
         } else if self
             .wgpu_render_state

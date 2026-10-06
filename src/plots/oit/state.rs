@@ -99,6 +99,13 @@ impl OitState {
         }
     }
 
+    /// Frees the frame's targets (about 18 bytes per pixel) while OIT is not
+    /// used; the pipelines stay, and the next [`render`](Self::render)
+    /// allocates a new frame.
+    pub fn release_frame(&mut self) {
+        self.frame = None;
+    }
+
     /// Composites the last rendered frame into the current viewport. Returns
     /// `false` when no frame was rendered yet.
     pub fn paint(&self, rpass: &mut wgpu::RenderPass<'_>) -> bool {

@@ -124,8 +124,8 @@ fn vs_main(
     let proj_y = corner_pos.y * fov_scale;
 
     // Linear depth projection mapped to [0.0, 1.0] for hardware depth testing
-    let z_near = 0.01;
-    let z_far = 50.0;
+    let z_near = CAMERA_Z_NEAR;
+    let z_far = CAMERA_Z_FAR;
     let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
 
     out.position = vec4<f32>(proj_x, proj_y, proj_z, dist_positive);
