@@ -102,6 +102,27 @@ impl BlockCache {
         })
     }
 
+    /// Every resident block of `variable_name` whose selections match
+    /// `requested_selections` on all dimensions but `anim_dim` (cheap clones:
+    /// values are shared). No hit/miss accounting.
+    pub fn matching_blocks(
+        &self,
+        source_id: &str,
+        variable_name: &str,
+        requested_selections: &[DimensionSelection],
+        anim_dim: Option<usize>,
+    ) -> Vec<OctantBlock> {
+        self.entries
+            .iter()
+            .filter(|(key, _)| {
+                key.source_id == source_id
+                    && key.variable_name == variable_name
+                    && selections_match_except_anim(&key.selections, requested_selections, anim_dim)
+            })
+            .map(|(_, block)| block.clone())
+            .collect()
+    }
+
     /// Gets a block and marks it as recently used. Counts as a real cache
     /// access (updates hits/misses).
     pub fn get(&mut self, key: &BlockCacheKey) -> Option<OctantBlock> {

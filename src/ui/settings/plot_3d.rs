@@ -42,8 +42,17 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     });
 
     ui.separator();
-    ui.add(egui::Slider::new(&mut app.volume_step_count, 16..=256).text("Steps"));
+    ui.add(
+        egui::Slider::new(&mut app.volume_quality, 0.25..=2.0)
+            .text("Quality")
+            .logarithmic(true),
+    )
+    .on_hover_text("Samples per voxel along each ray");
     ui.checkbox(&mut app.volume_transparency, "Transparency");
+    if app.volume_algorithm == 0 && app.volume_transparency {
+        ui.checkbox(&mut app.volume_lighting, "Lighting")
+            .on_hover_text("Shade samples by their gradient so fronts and edges gain shape");
+    }
 
     if app.volume_algorithm == 0 || app.volume_algorithm >= 5 {
         ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("Density"));

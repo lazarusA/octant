@@ -66,11 +66,7 @@ fn resolve_line_profile_dim(
 ) -> (String, Option<usize>) {
     if let Some(v) = var {
         let (explicit_x, explicit_y, explicit_z) =
-            v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
-                &app.plotted_dim_config
-            } else {
-                &app.dim_config
-            });
+            v.resolve_spatial_dim_indices(app.effective_dim_config());
 
         let p_idx = match app.line_profile_dim_idx {
             0 => explicit_x.or_else(|| v.dimension_names.len().checked_sub(1)),
@@ -113,12 +109,7 @@ fn enrich_line_series_ortho_dim(
     l_count: usize,
 ) {
     if let Some(v) = var {
-        let (explicit_x, explicit_y, _) =
-            v.resolve_spatial_dim_indices(if !app.plotted_dim_config.is_empty() {
-                &app.plotted_dim_config
-            } else {
-                &app.dim_config
-            });
+        let (explicit_x, explicit_y, _) = v.resolve_spatial_dim_indices(app.effective_dim_config());
 
         let ortho_dim_idx = match app.line_profile_dim_idx {
             0 => explicit_y,

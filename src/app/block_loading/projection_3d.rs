@@ -25,7 +25,12 @@ impl OctantApp {
         compute_bounds: bool,
         c_dim: usize,
     ) {
-        let (nx, ny, nz) = compute_target_dims(block, z_dim, req_x, req_y, req_z);
+        let eff_z = if self.rgb_composite_mode && z_dim == c_dim {
+            usize::MAX
+        } else {
+            z_dim
+        };
+        let (nx, ny, nz) = compute_target_dims(block, eff_z, req_x, req_y, req_z);
         let ch_hash = compute_composite_hash(self);
         let target_desc = format!(
             "Vol:[{}] var={} ({nx}x{ny}x{nz}) xr={}..={} yr={}..={} zr={}..={} fx={:?} ch={ch_hash:016x}",
@@ -97,6 +102,17 @@ impl OctantApp {
         }
     }
 
+    /// Whether the GPU renderers are missing or encode the wrong format. Without
+    /// a GPU (headless) there are none to rebuild.
+    fn volume_renderers_stale(&self) -> bool {
+        self.wgpu_render_state.is_some()
+            && (self
+                .volume_renderer
+                .as_ref()
+                .is_none_or(|r| r.encoding() != self.volume_encoding())
+                || self.point_cloud_renderer.is_none())
+    }
+
     fn ensure_volume_allocated(&mut self, nx: usize, ny: usize, nz: usize, desc: &str) {
         let needs_realloc = match &self.volume_data {
             Some(ex) => {
@@ -104,13 +120,13 @@ impl OctantApp {
                     || ex.height != ny
                     || ex.depth != nz
                     || ex.dataset_name != desc
-                    || self.volume_renderer.is_none()
-                    || self.point_cloud_renderer.is_none()
+                    || self.volume_renderers_stale()
             }
             None => true,
         };
 
         if needs_realloc {
+            self.volume_allocations += 1;
             let initial_vdata = VolumeData::new(
                 nx,
                 ny,
@@ -189,26 +205,22 @@ impl OctantApp {
 
         let dest_x = (orig_x + local_x0).saturating_sub(req_x0);
         let dest_y = (orig_y + local_y0).saturating_sub(req_y0);
-        let dest_z = (orig_z + local_z0).saturating_sub(req_z0);
+        let raw_dest_z = (orig_z + local_z0).saturating_sub(req_z0);
+        let depth_max = self.volume_data.as_ref().map(|v| v.depth).unwrap_or(1);
+        let dest_z = raw_dest_z % depth_max.max(1);
 
         let mut bounds_opt = None;
         if let Some(vdata) = &mut self.volume_data {
             vdata.update_subvolume(
                 [dest_x, dest_y, dest_z],
-                [slab.width, slab.height, slab.depth],
+                [slab.width, slab.height, slab.depth.min(vdata.depth)],
                 &slab.values,
             );
 
-            if let Some(render_state) = &self.wgpu_render_state {
-                if let Some(r) = &self.volume_renderer {
-                    r.update_data(&render_state.queue, &vdata.values);
-                }
-                if let Some(r) = &self.point_cloud_renderer {
-                    r.update_data(&render_state.queue, &vdata.values);
-                }
-            }
             bounds_opt = Some((vdata.min_val, vdata.max_val));
         }
+        // Uploaded before the next paint, to the renderer on screen only.
+        self.mark_volume_dirty(dest_z..(dest_z + slab.depth).min(depth_max));
 
         if let Some((min_val, max_val)) = bounds_opt {
             self.sync_volume_color_bounds(min_val, max_val);

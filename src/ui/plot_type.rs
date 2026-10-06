@@ -90,7 +90,9 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     let surface_mb = (total_2d_elements as f64 * 4.0) / (1024.0 * 1024.0);
 
     // Safety fallback: revert to Heatmap only if the currently active plot lacks valid GPU data (and user is not staging an unplotted variable) or pyramid is on
+    let is_loading = app.active_block_key.is_some() || app.block_prefetcher.pending_count() > 0;
     if !is_exploring_new
+        && !is_loading
         && ((app.enable_pyramid_resampling && app.active_plot_type != PlotType::Heatmap)
             || ((app.active_plot_type == PlotType::Volume
                 || app.active_plot_type == PlotType::PointCloud)
@@ -166,10 +168,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
                 })
                 .inner;
             if clicked {
-                app.active_plot_type = plot_type;
-                if !app.is_exploring_unplotted_variable() {
-                    app.load_selected_variable_block();
-                }
+                app.switch_plot_type(plot_type);
             }
         } else {
             let reason = if !is_supported {

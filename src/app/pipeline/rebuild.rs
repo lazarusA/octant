@@ -15,12 +15,13 @@ impl OctantApp {
         let total_elements = data.width.saturating_mul(data.height);
 
         let var_key = format!(
-            "{}:{}",
+            "{}:{}:2d",
             self.plotted_store_target_input, self.plotted_variable_idx
         );
         let is_new_variable = self.current_plotted_var_key.as_ref() != Some(&var_key);
 
         if is_new_variable {
+            self.clear_3d_renderers();
             self.current_plotted_var_key = Some(var_key);
             self.global_data_min = data.min_val;
             self.global_data_max = data.max_val;
@@ -244,6 +245,15 @@ impl OctantApp {
         self.matrix_data = Some(data);
     }
 
+    /// How volume values reach the GPU: packed RGB in composite mode.
+    pub(crate) fn volume_encoding(&self) -> crate::plots::VolumeEncoding {
+        if self.rgb_composite_mode {
+            crate::plots::VolumeEncoding::PackedRgb
+        } else {
+            crate::plots::VolumeEncoding::Scalar
+        }
+    }
+
     /// Rebuilds or updates existing GPU buffers for 3D volume data.
     pub fn rebuild_pipeline_with_volume_data(&mut self, data: VolumeData) {
         if data.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
@@ -256,28 +266,31 @@ impl OctantApp {
             return;
         }
 
+        let mut upload_later = false;
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
+            let encoding = self.volume_encoding();
             let same_dimensions = self.volume_data.as_ref().is_some_and(|v| {
                 v.width == data.width && v.height == data.height && v.depth == data.depth
-            });
+            }) && self
+                .volume_renderer
+                .as_ref()
+                .is_some_and(|r| r.encoding() == encoding);
 
             if same_dimensions
                 && self.volume_renderer.is_some()
                 && self.point_cloud_renderer.is_some()
             {
-                if let Some(volume_renderer) = &self.volume_renderer {
-                    volume_renderer.update_data(&wgpu_render_state.queue, &data.values);
-                }
-                if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
-                    point_cloud_renderer.update_data(&wgpu_render_state.queue, &data.values);
-                }
+                // Uploaded before the next paint, to the renderer on screen.
+                upload_later = true;
             } else {
                 let volume_renderer = VolumeRenderer::new(
                     &wgpu_render_state.device,
+                    &wgpu_render_state.queue,
                     wgpu_render_state.target_format,
                     &data.values,
                     data.width as u32,
                     data.height as u32,
+                    encoding,
                 );
                 let point_cloud_renderer = PointCloudRenderer::new(
                     &wgpu_render_state.device,
@@ -286,18 +299,22 @@ impl OctantApp {
                     data.width as u32,
                     data.height as u32,
                 );
-                self.volume_renderer = Some(Arc::new(volume_renderer));
+                self.volume_renderer = volume_renderer.map(Arc::new);
                 self.point_cloud_renderer = Some(Arc::new(point_cloud_renderer));
+                // New renderers start from `data`: nothing is pending.
+                self.volume_dirty = None;
+                self.point_cloud_dirty = None;
             }
         }
 
         let var_key = format!(
-            "{}:{}",
+            "{}:{}:3d",
             self.plotted_store_target_input, self.plotted_variable_idx
         );
         let is_new_variable = self.current_plotted_var_key.as_ref() != Some(&var_key);
 
         if is_new_variable {
+            self.clear_2d_renderers();
             self.current_plotted_var_key = Some(var_key);
             if data.min_val.is_finite() {
                 self.global_data_min = data.min_val;
@@ -330,7 +347,11 @@ impl OctantApp {
             }
         }
 
+        let depth = data.depth;
         self.volume_data = Some(data);
+        if upload_later {
+            self.mark_volume_dirty(0..depth);
+        }
     }
 }
 

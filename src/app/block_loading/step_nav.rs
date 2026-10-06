@@ -25,17 +25,71 @@ impl OctantApp {
         }
     }
 
+    /// One playback step, called by the frame timer: moves to the next step
+    /// when its block is resident, and keeps the lookahead chunks queued.
+    /// While another variable is only selected, or a new plot's block is still
+    /// loading, it animates the plotted view (`with_plotted_selection`); the
+    /// new plot replaces it when its block arrives.
+    pub fn advance_playback(&mut self, now: web_time::Instant) {
+        let total_extent = self.animated_dim_extent();
+        if total_extent <= 1 {
+            self.is_playing = false;
+            return;
+        }
+        let next_ts = if self.current_timestep + 1 < total_extent {
+            self.current_timestep + 1
+        } else if self.loop_playback {
+            0
+        } else {
+            self.is_playing = false;
+            return;
+        };
+        self.last_step_time = now;
+        if self.staging_differs() {
+            self.with_plotted_selection(|app| app.play_step(next_ts));
+        } else {
+            self.play_step(next_ts);
+        }
+    }
+
+    /// Shows step `next_ts` when it is resident, then queues the lookahead.
+    fn play_step(&mut self, next_ts: usize) {
+        if self.plotted_step_resident(next_ts) {
+            self.current_timestep = next_ts;
+            self.load_selected_variable_block();
+        }
+        if let Some(var) = self.plotted_variable_info() {
+            let shape = var.shape.clone();
+            self.prefetch_selected_animated_range(&shape);
+        }
+    }
+
+    /// Whether the block cache holds step `step` of the plotted selection.
+    fn plotted_step_resident(&self, step: usize) -> bool {
+        let Some(var) = self.plotted_variable_info() else {
+            return false;
+        };
+        let request = crate::ui::variables_panel::build_slice_request_for_plotted(
+            self, &var.name, &var.shape,
+        );
+        self.block_cache.covers(
+            &self.plotted_source_id(),
+            &var.name,
+            &request.selections,
+            self.plotted_animated_dim,
+            step,
+        )
+    }
+
     /// Full size of the currently animated dimension in the dataset.
     pub fn animated_dim_extent(&self) -> usize {
         let Some(anim_dim) = self.plotted_animated_dim else {
             return 1;
         };
-        self.plotted_dataset_metadata
-            .as_ref()
-            .and_then(|meta| meta.variables.get(self.plotted_variable_idx))
+        self.plotted_variable_info()
             .and_then(|v| v.shape.get(anim_dim))
-            .map(|&s| s as usize)
-            .unwrap_or(1)
+            .copied()
+            .unwrap_or(1) as usize
     }
 
     /// Returns true if an animated dimension is currently selected and plotted.

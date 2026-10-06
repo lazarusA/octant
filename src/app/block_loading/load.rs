@@ -4,6 +4,20 @@ use crate::app::OctantApp;
 use crate::data::{BlockRequest, DimensionSelection, SliceRequest};
 
 impl OctantApp {
+    /// Plots the current slider selection (the Plot button): aborts pending
+    /// fetches, moves the step into the selected range of the animated axis so
+    /// a new selection never shows a step it excludes, and loads. Playback
+    /// loads with `load_selected_variable_block` and may run past that range.
+    pub fn plot_selection(&mut self) {
+        self.block_prefetcher.abort();
+        if let Some(anim_dim) = self.animated_dim
+            && let Some(&(start, end)) = self.selected_dim_ranges.get(anim_dim)
+        {
+            self.current_timestep = self.current_timestep.clamp(start, end.max(start));
+        }
+        self.load_selected_variable_block();
+    }
+
     /// Loads the block corresponding to the current animated step and selections.
     pub fn load_selected_variable_block(&mut self) {
         let Some(metadata) = &self.active_dataset_metadata else {
@@ -64,14 +78,7 @@ impl OctantApp {
             anim_dim,
             self.current_timestep,
         ) {
-            self.status_message = format!(
-                "Block cache HIT for '{}' ({} bytes resident)",
-                block.variable_name,
-                block.bytes_size()
-            );
-            self.sync_plotted_state_from_selected();
-            self.apply_block_projection(&block);
-            self.prefetch_selected_animated_range(&shape);
+            self.show_cached_block(&block, &slice_request.selections, anim_dim, &shape);
             return;
         }
 
@@ -81,23 +88,19 @@ impl OctantApp {
             return;
         };
 
+        let selections = slice_request.selections.clone();
         let block_request = BlockRequest::new(store_handle, slice_request);
         let key = block_request.cache_key();
 
         // 2. Exact Key Cache HIT
         if let Some(block) = self.block_cache.get(&key) {
-            self.status_message = format!(
-                "Block cache HIT for '{}' ({} bytes resident)",
-                block.variable_name,
-                block.bytes_size()
-            );
-            self.sync_plotted_state_from_selected();
-            self.apply_block_projection(&block);
-            self.prefetch_selected_animated_range(&shape);
+            self.show_cached_block(&block, &selections, anim_dim, &shape);
             return;
         }
 
         // 3. Cache MISS: dispatch async prefetch request for current chunk and launch background prefetching in parallel.
+        // Playback may move on meanwhile; the block is shown at this step.
+        self.pending_target_step = Some(self.current_timestep);
         self.status_message = format!("[block cache] Downloading window for '{}'...", var_name);
         self.block_prefetcher
             .request(block_request, &self.block_cache);
@@ -124,52 +127,21 @@ impl OctantApp {
                             self.current_timestep >= origin
                                 && self.current_timestep < origin + extent
                         });
+                    // Only blocks of the requested view: not of an older
+                    // selection, variable or plot layout.
+                    let is_same_var = is_same_var && self.key_matches_view(&res.key, anim_dim);
                     let is_volume_or_point_cloud = is_same_var
                         && (self.active_plot_type == crate::plots::PlotType::Volume
                             || self.active_plot_type == crate::plots::PlotType::PointCloud);
 
                     self.block_cache.put(res.key, block.clone());
 
-                    // When cache eviction shifts the oldest resident slice forward, update slider start:
-                    if let Some(dim) = anim_dim
-                        && let Some(meta) = self
-                            .plotted_dataset_metadata
-                            .as_ref()
-                            .or(self.active_dataset_metadata.as_ref())
-                        && let Some(var) = meta
-                            .variables
-                            .get(self.plotted_variable_idx)
-                            .or_else(|| meta.variables.get(self.selected_variable_idx))
-                        && var.name == block.variable_name
-                    {
-                        let source_id = self.plotted_source_id();
-                        if let Some(min_t) = self
-                            .block_cache
-                            .min_resident_timestep(&source_id, &var.name, dim)
-                        {
-                            let sel_ranges = if !self.plotted_selected_dim_ranges.is_empty() {
-                                &mut self.plotted_selected_dim_ranges
-                            } else {
-                                &mut self.selected_dim_ranges
-                            };
-                            if dim < sel_ranges.len() {
-                                let current_start = sel_ranges[dim].0;
-                                if min_t > current_start
-                                    && self.block_cache.current_bytes()
-                                        >= self.block_cache.max_bytes()
-                                {
-                                    sel_ranges[dim].0 = min_t;
-                                }
-                            }
-                        }
-                    }
-
                     if is_active || (is_same_var && (covers_current || is_volume_or_point_cloud)) {
                         if is_active {
                             self.active_block_key = None;
                             self.sync_plotted_state_from_selected();
                             if let Some(target) = self.pending_target_step.take()
-                                && let Some(dim) = anim_dim
+                                && let Some(dim) = self.plotted_animated_dim
                             {
                                 let origin = block.origin.get(dim).copied().unwrap_or(0);
                                 let extent = block.shape.get(dim).copied().unwrap_or(0);

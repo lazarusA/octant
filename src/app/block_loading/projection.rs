@@ -66,11 +66,7 @@ impl OctantApp {
 
     /// Projects a resident block into current 2D or 3D views.
     pub fn apply_block_projection(&mut self, block: &OctantBlock) {
-        let dim_configs = if !self.plotted_dim_config.is_empty() {
-            &self.plotted_dim_config
-        } else {
-            &self.dim_config
-        };
+        let dim_configs = self.effective_dim_config();
         let anim_dim = self
             .plotted_animated_dim
             .or_else(|| crate::app::DimConfig::animated_dim(dim_configs));
@@ -86,14 +82,14 @@ impl OctantApp {
         let fixed_indices = self.build_fixed_indices(block, &orig_dim_names, anim_dim);
         let (req_x, local_x_range) = self.get_dim_bounds(block, &orig_dim_names, x_dim);
         let (req_y, local_y_range) = self.get_dim_bounds(block, &orig_dim_names, y_dim);
-        let (req_z, local_z_range) = if z_dim < block.rank() {
-            self.get_dim_bounds(block, &orig_dim_names, z_dim)
-        } else {
-            ((0, 0), (0, 1))
-        };
-
         let compute_bounds = !self.lock_color_bounds;
         let c_dim = self.channel_dim_index().unwrap_or(0);
+        let (req_z, local_z_range) =
+            if z_dim < block.rank() && (!self.rgb_composite_mode || z_dim != c_dim) {
+                self.get_dim_bounds(block, &orig_dim_names, z_dim)
+            } else {
+                ((0, 0), (0, 1))
+            };
         let is_vol_allowed = crate::ui::variables_panel::is_volume_allowed_for_selection(self);
 
         if !is_vol_allowed
@@ -108,6 +104,10 @@ impl OctantApp {
             && is_vol_allowed;
 
         let is_3d_anim = anim_dim.is_some_and(|a| a == x_dim || a == y_dim || a == z_dim);
+        let axes = [(x_dim, req_x), (y_dim, req_y), (z_dim, req_z)];
+        if !self.block_in_view(block, anim_dim, is_3d_anim, axes) {
+            return;
+        }
 
         if is_3d_plot {
             self.apply_3d_volume_projection(
@@ -141,9 +141,7 @@ impl OctantApp {
     }
 
     fn resolve_orig_dim_names(&self, block: &OctantBlock) -> Vec<String> {
-        self.plotted_dataset_metadata
-            .as_ref()
-            .or(self.active_dataset_metadata.as_ref())
+        self.effective_dataset_metadata()
             .and_then(|meta| {
                 meta.variables
                     .get(self.plotted_variable_idx)
@@ -159,11 +157,7 @@ impl OctantApp {
         orig_dim_names: &[String],
         anim_dim: Option<usize>,
     ) -> Vec<usize> {
-        let sel_indices = if !self.plotted_selected_dim_indices.is_empty() {
-            &self.plotted_selected_dim_indices
-        } else {
-            &self.selected_dim_indices
-        };
+        let sel_indices = self.effective_selected_dim_indices();
 
         (0..block.rank())
             .map(|i| {
@@ -187,11 +181,7 @@ impl OctantApp {
         orig_dim_names: &[String],
         dim_idx: usize,
     ) -> ((usize, usize), (usize, usize)) {
-        let sel_ranges = if !self.plotted_selected_dim_ranges.is_empty() {
-            &self.plotted_selected_dim_ranges
-        } else {
-            &self.selected_dim_ranges
-        };
+        let sel_ranges = self.effective_selected_dim_ranges();
 
         let dim_len = block.shape.get(dim_idx).copied().unwrap_or(1);
         let block_orig = block.origin.get(dim_idx).copied().unwrap_or(0);
@@ -206,12 +196,21 @@ impl OctantApp {
             .copied()
             .unwrap_or((0, dim_len.saturating_sub(1)));
 
-        let local_start = req_start
-            .saturating_sub(block_orig)
-            .min(dim_len.saturating_sub(1));
-        let local_end = (req_end + 1)
-            .saturating_sub(block_orig)
-            .clamp(local_start + 1, dim_len);
+        let (local_start, local_end) = if crate::app::block_loading::view_filter::overlaps(
+            block_orig,
+            dim_len,
+            (req_start, req_end),
+        ) {
+            let s = req_start
+                .saturating_sub(block_orig)
+                .min(dim_len.saturating_sub(1));
+            let e = (req_end + 1)
+                .saturating_sub(block_orig)
+                .clamp(s + 1, dim_len);
+            (s, e)
+        } else {
+            (0, dim_len)
+        };
 
         ((req_start, req_end), (local_start, local_end))
     }

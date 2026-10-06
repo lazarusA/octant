@@ -6,6 +6,7 @@ pub mod colormap_state;
 pub mod dataset_activation;
 pub mod dimension_state;
 pub mod layer_state;
+pub mod plot_type;
 pub mod session;
 pub mod store_kind;
 

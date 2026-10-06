@@ -64,8 +64,21 @@ pub struct OctantApp {
     pub surface_displacement_strength: f32,
     pub surface_mode: u32,
     pub volume_opacity: f32,
-    pub volume_step_count: u32,
+    /// Volume raymarching samples per voxel crossed by each ray.
+    pub volume_quality: f32,
     pub volume_transparency: bool,
+    /// Lights transparent DVR samples by their gradient.
+    pub volume_lighting: bool,
+    /// The user is rotating or zooming the 3D view this frame: volumes render
+    /// at reduced resolution until it settles.
+    pub view_interacting: bool,
+    /// Z planes of `volume_data` not yet uploaded to the volume renderer.
+    pub volume_dirty: Option<std::ops::Range<usize>>,
+    /// Z planes of `volume_data` not yet uploaded to the point cloud renderer.
+    pub point_cloud_dirty: Option<std::ops::Range<usize>>,
+    /// Counts volume resets (new selections), so cache hits know when the
+    /// other resident blocks must be projected again.
+    pub volume_allocations: u64,
     pub volume_attenuation: f32,
     pub volume_algorithm: u32,
     pub volume_isovalue: f32,
@@ -245,8 +258,13 @@ impl Default for OctantApp {
             surface_displacement_strength: 0.3,
             surface_mode: 0,
             volume_opacity: 3.0,
-            volume_step_count: 64,
+            volume_quality: 1.0,
             volume_transparency: true,
+            volume_lighting: false,
+            view_interacting: false,
+            volume_dirty: None,
+            point_cloud_dirty: None,
+            volume_allocations: 0,
             volume_attenuation: 0.0,
             volume_algorithm: 0,
             volume_isovalue: 50.0,

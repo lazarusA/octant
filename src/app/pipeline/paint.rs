@@ -95,9 +95,7 @@ impl OctantApp {
             aspect_z: ctx.aspect_z,
             zoom: self.sphere_zoom,
             opacity_scale: self.volume_opacity,
-            step_count: self.volume_step_count,
-            width: ctx.width,
-            height: ctx.height,
+            quality: self.volume_quality,
             algorithm: self.volume_algorithm,
             isovalue: self.volume_isovalue,
             isorange: self.volume_isorange,
@@ -107,6 +105,7 @@ impl OctantApp {
             shift_y: ctx.shift_y,
             shift_z: ctx.shift_z,
             transparency: self.volume_transparency,
+            lighting: self.volume_lighting,
         }
     }
 
@@ -292,6 +291,9 @@ impl OctantApp {
                             renderer: volume_renderer.clone(),
                             params,
                             rect: plot_rect,
+                            // Half resolution while rotating or zooming; the
+                            // frame after the input stops renders in full.
+                            scale: if self.view_interacting { 0.5 } else { 1.0 },
                         },
                     );
                     ui.painter().add(callback);

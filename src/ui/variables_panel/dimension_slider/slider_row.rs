@@ -192,30 +192,46 @@ pub fn show_dimension_sliders(
 
                 app.selected_dim_ranges[i] = (start, end);
                 if is_animated {
-                    app.selected_dim_indices[i] = app.current_timestep.clamp(start, end);
+                    let max_idx = dim_size.saturating_sub(1);
+                    if app.is_playing || app.current_timestep > end || app.current_timestep < start
+                    {
+                        app.selected_dim_indices[i] = app.current_timestep.min(max_idx);
+                    } else {
+                        app.selected_dim_indices[i] = app.current_timestep.clamp(start, end);
+                    }
                 } else {
                     app.selected_dim_indices[i] = start;
                 }
                 app.dim_config[i].range = (start, end);
                 app.dim_config[i].index = app.selected_dim_indices[i];
             } else {
+                let max_index = dim_size.saturating_sub(1);
+                if is_animated
+                    && (app.is_playing || app.current_timestep != app.selected_dim_indices[i])
+                {
+                    app.selected_dim_indices[i] = app.current_timestep.min(max_index);
+                }
+                let mut changed = false;
                 ui.horizontal(|ui| {
                     ui.label("Index:");
                     // Slider fills the row up to a fixed-width value box,
                     // matching the range rows. The slider runs first so the box
                     // shows the dragged value on the same frame.
-                    let max_index = dim_size.saturating_sub(1);
                     let index = &mut app.selected_dim_indices[i];
                     let spacing = ui.spacing().item_spacing.x;
                     ui.spacing_mut().slider_width =
                         (ui.available_width() - VALUE_BOX_W - spacing).max(40.0);
-                    ui.add(egui::Slider::new(index, 0..=max_index).show_value(false));
+                    let s_resp = ui.add(egui::Slider::new(index, 0..=max_index).show_value(false));
                     let height = ui.spacing().interact_size.y;
-                    ui.add_sized(
+                    let v_resp = ui.add_sized(
                         [VALUE_BOX_W, height],
                         egui::DragValue::new(index).range(0..=max_index).speed(1),
                     );
+                    changed = s_resp.dragged() || v_resp.dragged() || s_resp.clicked();
                 });
+                if changed && is_animated {
+                    app.current_timestep = app.selected_dim_indices[i];
+                }
                 app.selected_dim_ranges[i] =
                     (app.selected_dim_indices[i], app.selected_dim_indices[i]);
                 app.dim_config[i].range = app.selected_dim_ranges[i];

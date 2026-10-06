@@ -1,6 +1,7 @@
 pub mod coastline;
 pub mod colormap_atlas;
 pub mod common;
+pub mod device;
 pub mod heatmap;
 pub mod line;
 pub mod mesh;
@@ -24,7 +25,7 @@ pub use point_cloud::{PointCloudCallback, PointCloudRenderer, PointCloudUniformP
 pub use sphere::{SphereCallback, SphereRenderer};
 pub use surface::{SurfaceCallback, SurfaceRenderer};
 pub use traits::{HoverSample, PlotRenderParams, PlotRenderer};
-pub use volume::{VolumeCallback, VolumeRenderer, VolumeUniformParams};
+pub use volume::{VolumeCallback, VolumeEncoding, VolumeRenderer, VolumeUniformParams};
 
 /// Supported visualization plot types in Octant Engine
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -111,9 +112,14 @@ mod tests {
                 crate::assemble_plot_with_coords_shader!(include_str!("shaders/heatmap.wgsl")),
             ),
             (
-                "volume",
-                crate::assemble_plot_shader!(include_str!("shaders/volume.wgsl")),
+                "volume_hardware_filter",
+                crate::plots::volume::pipeline::SHADER_HARDWARE_FILTER,
             ),
+            (
+                "volume_manual_filter",
+                crate::plots::volume::pipeline::SHADER_MANUAL_FILTER,
+            ),
+            ("volume_blit", include_str!("shaders/volume/blit.wgsl")),
             (
                 "line",
                 crate::assemble_plot_shader!(include_str!("shaders/line.wgsl")),

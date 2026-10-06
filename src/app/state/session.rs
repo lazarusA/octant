@@ -1,7 +1,6 @@
 //! Session lifecycle, view resets, color ranges, and plotted synchronization.
 
 use super::app_state::OctantApp;
-use super::layer_state::PlottedVariableState;
 use super::store_kind::StoreKind;
 
 impl OctantApp {
@@ -69,17 +68,34 @@ impl OctantApp {
         let is_3d = canvas_plot_type == crate::plots::PlotType::Volume
             || canvas_plot_type == crate::plots::PlotType::PointCloud;
 
-        if is_3d && let Some(vdata) = &self.volume_data {
+        let cur_var = self
+            .plotted_variable_info()
+            .or_else(|| self.selected_variable_info());
+        let cur_name = cur_var.map(|v| v.name.as_str());
+
+        let mdata_valid = self
+            .matrix_data
+            .as_ref()
+            .is_some_and(|m| cur_name.is_none_or(|n| m.dataset_name.contains(n)));
+        let vdata_valid = self
+            .volume_data
+            .as_ref()
+            .is_some_and(|v| cur_name.is_none_or(|n| v.dataset_name.contains(n)));
+
+        if is_3d
+            && vdata_valid
+            && let Some(vdata) = &self.volume_data
+        {
             self.color_range_min = vdata.min_val;
             self.color_range_max = vdata.max_val;
             self.volume_cmin = vdata.min_val;
             self.volume_cmax = vdata.max_val;
-        } else if let Some(mdata) = &self.matrix_data {
+        } else if mdata_valid && let Some(mdata) = &self.matrix_data {
             self.color_range_min = mdata.min_val;
             self.color_range_max = mdata.max_val;
             self.volume_cmin = mdata.min_val;
             self.volume_cmax = mdata.max_val;
-        } else if let Some(vdata) = &self.volume_data {
+        } else if vdata_valid && let Some(vdata) = &self.volume_data {
             self.color_range_min = vdata.min_val;
             self.color_range_max = vdata.max_val;
             self.volume_cmin = vdata.min_val;
@@ -93,31 +109,13 @@ impl OctantApp {
         self.lock_color_bounds = false;
     }
 
-    /// Placeholder method to add a secondary dimensionally-compatible variable layer
-    /// for multi-variable plotting (e.g., vector fields, RGB composites, dual-curves).
-    pub fn add_plotted_layer(&mut self, layer: PlottedVariableState) -> Result<(), String> {
-        if let (Some(existing_meta), Some(new_meta)) =
-            (&self.plotted_dataset_metadata, &layer.dataset_metadata)
-        {
-            let existing_var = existing_meta.variables.get(self.plotted_variable_idx);
-            let new_var = new_meta.variables.get(layer.variable_idx);
-
-            if let (Some(v_a), Some(v_b)) = (existing_var, new_var) {
-                check_dimensional_compatibility(v_a, v_b)?;
-            }
-        }
-        self.multi_plotted_layers.push(layer);
-        Ok(())
-    }
-
-    /// Clears secondary multi-variable layers.
-    pub fn clear_plotted_layers(&mut self) {
-        self.multi_plotted_layers.clear();
-    }
-
     /// Returns the source_id string for the currently plotted store.
     pub fn plotted_source_id(&self) -> String {
-        StoreKind::make_source_id(self.plotted_store_kind, &self.plotted_store_target_input)
+        if !self.plotted_store_target_input.is_empty() {
+            StoreKind::make_source_id(self.plotted_store_kind, &self.plotted_store_target_input)
+        } else {
+            self.selected_source_id()
+        }
     }
 
     /// Returns the source_id string for the currently selected (UI active) store.
@@ -146,37 +144,26 @@ impl OctantApp {
     /// Reverts current staged/selected UI configuration back to the plotted dataset and variable.
     pub fn revert_selected_state_to_plotted(&mut self) {
         if let Some(meta) = self.plotted_dataset_metadata.clone() {
-            self.selected_store_kind = self.plotted_store_kind;
-            self.store_target_input = self.plotted_store_target_input.clone();
             self.set_active_metadata(meta);
-            self.selected_variable_idx = self.plotted_variable_idx;
-            self.dim_config = self.plotted_dim_config.clone();
-            self.selected_dim_indices = self.plotted_selected_dim_indices.clone();
-            self.selected_dim_ranges = self.plotted_selected_dim_ranges.clone();
-            self.spatial_dims = self.plotted_spatial_dims.clone();
-            self.animated_dim = self.plotted_animated_dim;
-            self.active_plot_type = self.plotted_plot_type;
+            self.copy_plotted_to_selected();
         }
     }
 
     /// Synchronizes all plotted configuration fields from the current UI selection.
     pub fn sync_plotted_state_from_selected(&mut self) {
         let is_new_var = self.is_exploring_unplotted_variable();
-
-        self.plotted_store_kind = self.selected_store_kind;
-        self.plotted_store_target_input = self.store_target_input.clone();
-        self.plotted_dataset_metadata = self.active_dataset_metadata.clone();
-        self.plotted_variable_idx = self.selected_variable_idx;
-        self.plotted_dim_config = self.dim_config.clone();
-        self.plotted_selected_dim_indices = self.selected_dim_indices.clone();
-        self.plotted_selected_dim_ranges = self.selected_dim_ranges.clone();
-        self.plotted_spatial_dims = self.spatial_dims.clone();
-        self.plotted_animated_dim = self.animated_dim;
-        self.plotted_plot_type = self.active_plot_type;
+        self.copy_selected_to_plotted();
 
         if is_new_var {
             self.enable_pyramid_resampling = false;
             self.active_pyramid = None;
+            let is_vol = self.plotted_plot_type == crate::plots::PlotType::Volume
+                || self.plotted_plot_type == crate::plots::PlotType::PointCloud;
+            if is_vol {
+                self.clear_2d_renderers();
+            } else {
+                self.clear_3d_renderers();
+            }
             if let Some(var_info) = self.plotted_variable_info().cloned() {
                 let rank = var_info.shape.len();
                 crate::ui::variables_panel::dimension_slider::init_composite_defaults(
@@ -196,6 +183,7 @@ impl OctantApp {
         self.plotted_dataset_metadata
             .as_ref()
             .and_then(|m| m.variables.get(self.plotted_variable_idx))
+            .or_else(|| self.selected_variable_info())
     }
 
     /// Returns VariableInfo for the currently selected variable, if available.
@@ -220,28 +208,4 @@ impl OctantApp {
             .copied()
             .unwrap_or(1) as usize
     }
-}
-
-/// Helper function to verify dimensional compatibility between two variables
-/// (matching rank, shapes, or spatial extent) for multi-layer plotting.
-pub fn check_dimensional_compatibility(
-    var_a: &crate::data::VariableInfo,
-    var_b: &crate::data::VariableInfo,
-) -> Result<(), String> {
-    if var_a.shape.len() != var_b.shape.len() {
-        return Err(format!(
-            "Rank mismatch: '{}' (rank {}) vs '{}' (rank {})",
-            var_a.name,
-            var_a.shape.len(),
-            var_b.name,
-            var_b.shape.len()
-        ));
-    }
-    if var_a.shape != var_b.shape {
-        return Err(format!(
-            "Shape mismatch: '{}' ({:?}) vs '{}' ({:?})",
-            var_a.name, var_a.shape, var_b.name, var_b.shape
-        ));
-    }
-    Ok(())
 }

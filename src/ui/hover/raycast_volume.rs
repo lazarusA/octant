@@ -18,28 +18,36 @@ pub struct VolumeSampler<'a> {
 }
 
 impl<'a> VolumeSampler<'a> {
-    pub fn from_app(app: &'a OctantApp, matrix: &'a MatrixData) -> Self {
+    pub fn from_app(app: &'a OctantApp, matrix: Option<&'a MatrixData>) -> Option<Self> {
         let (shift_x, shift_y, shift_z) = app.get_volume_shifts();
         if let Some(v) = &app.volume_data {
-            Self {
-                width: v.width.max(1),
-                height: v.height.max(1),
-                depth: v.depth.max(1),
+            if v.width == 0 || v.height == 0 || v.depth == 0 || v.values.is_empty() {
+                return None;
+            }
+            Some(Self {
+                width: v.width,
+                height: v.height,
+                depth: v.depth,
                 values: &v.values,
                 shift_x: shift_x as usize,
                 shift_y: shift_y as usize,
                 shift_z: shift_z as usize,
+            })
+        } else if let Some(m) = matrix {
+            if m.width == 0 || m.height == 0 || m.values.is_empty() {
+                return None;
             }
-        } else {
-            Self {
-                width: matrix.width.max(1),
-                height: matrix.height.max(1),
+            Some(Self {
+                width: m.width,
+                height: m.height,
                 depth: 1,
-                values: &matrix.values,
+                values: &m.values,
                 shift_x: shift_x as usize,
                 shift_y: shift_y as usize,
                 shift_z: shift_z as usize,
-            }
+            })
+        } else {
+            None
         }
     }
 
@@ -55,6 +63,8 @@ impl<'a> VolumeSampler<'a> {
         let is_nan = val.is_nan() || val.abs() > 1e30;
         if is_nan {
             app.use_nan_color
+        } else if app.rgb_composite_mode {
+            (val.to_bits() & 0x00FF_FFFF) != 0
         } else {
             let in_low = app.use_lowclip || val >= app.color_range_min;
             let in_high = app.use_highclip || val <= app.color_range_max;
@@ -93,6 +103,14 @@ impl<'a> VolumeSampler<'a> {
         let mut min_intensity_hit = None;
         let mut max_val = -1e30_f32;
         let mut min_val = 1e30_f32;
+
+        let canvas_plot_type = app.effective_canvas_plot_type();
+        let is_mip =
+            is_half_scale && canvas_plot_type == PlotType::Volume && app.volume_algorithm == 1;
+        let is_minip =
+            is_half_scale && canvas_plot_type == PlotType::Volume && app.volume_algorithm == 2;
+        let is_label =
+            is_half_scale && canvas_plot_type == PlotType::Volume && app.volume_algorithm == 4;
 
         for i in 0..num_steps {
             let t = t_start + (i as f32 + 0.5) * dt;
@@ -137,11 +155,7 @@ impl<'a> VolumeSampler<'a> {
                 let raw_val = self.sample_cell(cx, cy, cz);
                 let is_nan = raw_val.is_nan() || raw_val.abs() > 1e30;
 
-                let canvas_plot_type = app.effective_canvas_plot_type();
-                if is_half_scale
-                    && canvas_plot_type == PlotType::Volume
-                    && app.volume_algorithm == 1
-                {
+                if is_mip {
                     // MIP mode
                     if !is_nan && raw_val > max_val {
                         let is_visible = app.use_highclip || raw_val <= app.color_range_max;
@@ -150,10 +164,7 @@ impl<'a> VolumeSampler<'a> {
                             max_intensity_hit = Some((cx, cy, cz, raw_val));
                         }
                     }
-                } else if is_half_scale
-                    && canvas_plot_type == PlotType::Volume
-                    && app.volume_algorithm == 2
-                {
+                } else if is_minip {
                     // MinIP mode
                     if !is_nan && raw_val < min_val {
                         let is_visible = app.use_lowclip || raw_val >= app.color_range_min;
@@ -162,10 +173,7 @@ impl<'a> VolumeSampler<'a> {
                             min_intensity_hit = Some((cx, cy, cz, raw_val));
                         }
                     }
-                } else if is_half_scale
-                    && canvas_plot_type == PlotType::Volume
-                    && app.volume_algorithm == 4
-                {
+                } else if is_label {
                     // Categorical Label Surface mode
                     if !is_nan && raw_val >= 0.5 {
                         hit_point = Some((cx, cy, cz, raw_val));
@@ -178,11 +186,9 @@ impl<'a> VolumeSampler<'a> {
             }
         }
 
-        let canvas_plot_type = app.effective_canvas_plot_type();
-        if is_half_scale && canvas_plot_type == PlotType::Volume && app.volume_algorithm == 1 {
+        if is_mip {
             max_intensity_hit.or(hit_point)
-        } else if is_half_scale && canvas_plot_type == PlotType::Volume && app.volume_algorithm == 2
-        {
+        } else if is_minip {
             min_intensity_hit.or(hit_point)
         } else {
             hit_point

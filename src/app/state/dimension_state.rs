@@ -91,3 +91,77 @@ impl DimConfig {
         list
     }
 }
+
+impl crate::app::OctantApp {
+    /// Returns the active dimension configs: plotted if present, falling back to selected.
+    #[inline]
+    pub fn effective_dim_config(&self) -> &[DimConfig] {
+        if !self.plotted_dim_config.is_empty() {
+            &self.plotted_dim_config
+        } else {
+            &self.dim_config
+        }
+    }
+
+    /// Returns the active dimension ranges: plotted if present, falling back to selected.
+    #[inline]
+    pub fn effective_selected_dim_ranges(&self) -> &[(usize, usize)] {
+        if !self.plotted_selected_dim_ranges.is_empty() {
+            &self.plotted_selected_dim_ranges
+        } else {
+            &self.selected_dim_ranges
+        }
+    }
+
+    /// Returns the active dimension indices: plotted if present, falling back to selected.
+    #[inline]
+    pub fn effective_selected_dim_indices(&self) -> &[usize] {
+        if !self.plotted_selected_dim_indices.is_empty() {
+            &self.plotted_selected_dim_indices
+        } else {
+            &self.selected_dim_indices
+        }
+    }
+
+    /// Returns the active animated dimension: plotted if present, falling back to selected.
+    #[inline]
+    pub fn effective_animated_dim(&self) -> Option<usize> {
+        self.plotted_animated_dim.or(self.animated_dim)
+    }
+
+    /// Returns the active dataset metadata: plotted if present, falling back to selected.
+    #[inline]
+    pub fn effective_dataset_metadata(&self) -> Option<&crate::data::DatasetMetadata> {
+        self.plotted_dataset_metadata
+            .as_ref()
+            .or(self.active_dataset_metadata.as_ref())
+    }
+
+    /// Copies all active staged selection fields into the plotted fields.
+    pub(crate) fn copy_selected_to_plotted(&mut self) {
+        self.plotted_store_kind = self.selected_store_kind;
+        self.plotted_store_target_input = self.store_target_input.clone();
+        self.plotted_dataset_metadata = self.active_dataset_metadata.clone();
+        self.plotted_variable_idx = self.selected_variable_idx;
+        self.plotted_dim_config = self.dim_config.clone();
+        self.plotted_selected_dim_indices = self.selected_dim_indices.clone();
+        self.plotted_selected_dim_ranges = self.selected_dim_ranges.clone();
+        self.plotted_spatial_dims = self.spatial_dims.clone();
+        self.plotted_animated_dim = self.animated_dim;
+        self.plotted_plot_type = self.active_plot_type;
+    }
+
+    /// Copies plotted fields back into the staged selection fields.
+    pub(crate) fn copy_plotted_to_selected(&mut self) {
+        self.selected_store_kind = self.plotted_store_kind;
+        self.store_target_input = self.plotted_store_target_input.clone();
+        self.active_dataset_metadata = self.plotted_dataset_metadata.clone();
+        self.selected_variable_idx = self.plotted_variable_idx;
+        self.dim_config = self.plotted_dim_config.clone();
+        self.selected_dim_indices = self.plotted_selected_dim_indices.clone();
+        self.selected_dim_ranges = self.plotted_selected_dim_ranges.clone();
+        self.spatial_dims = self.plotted_spatial_dims.clone();
+        self.animated_dim = self.plotted_animated_dim;
+        self.active_plot_type = self.plotted_plot_type;
+    }
+}
