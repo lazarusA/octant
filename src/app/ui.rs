@@ -71,7 +71,11 @@ impl eframe::App for OctantApp {
         self.poll_block_prefetch_results();
 
         // 2. Playback Animation Timer Loop
-        if self.is_playing {
+        let is_minimized = ctx.input(|i| {
+            i.viewport().minimized.unwrap_or(false) || i.viewport().occluded.unwrap_or(false)
+        });
+
+        if self.is_playing && !is_minimized {
             let now = web_time::Instant::now();
             let frame_dur = std::time::Duration::from_secs_f32(1.0 / self.playback_fps.max(1.0));
 
@@ -86,6 +90,9 @@ impl eframe::App for OctantApp {
                 std::time::Duration::from_millis(1)
             };
             ctx.request_repaint_after(next_wake);
+        } else if self.is_playing && is_minimized {
+            // When minimized or occluded, poll infrequently (500ms) without advancing playback or hammering the GPU.
+            ctx.request_repaint_after(std::time::Duration::from_millis(500));
         } else if self.block_prefetcher.pending_count() > 0 || self.metadata_rx.is_some() {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
