@@ -28,19 +28,25 @@ impl VolumeTextures {
         let max = device.limits().max_texture_dimension_3d as usize;
         if dims.w > max || dims.h > max || dims.d > max {
             log::error!(
-                "Volume {}x{}x{} exceeds the GPU 3D texture limit ({max} per axis)",
+                "Volume {}x{}x{} exceeds GPU 3D texture limit ({max})",
                 dims.w,
                 dims.h,
                 dims.d
             );
             return None;
         }
-        let value_format = match encoding {
+        let format = match encoding {
             VolumeEncoding::Scalar => wgpu::TextureFormat::R32Float,
             VolumeEncoding::PackedRgb => wgpu::TextureFormat::Rgba8Unorm,
         };
-        let value = create_texture(device, "Volume Values", dims, value_format);
-        let validity = create_texture(device, "Volume Validity", dims, wgpu::TextureFormat::R8Unorm);
+        let value = create_texture(device, "Volume Values", dims, format);
+        let validity = create_texture(
+            device,
+            "Volume Validity",
+            dims,
+            wgpu::TextureFormat::R8Unorm,
+        );
+        let plane = dims.plane();
         Some(Self {
             encoding,
             dims,
@@ -48,8 +54,8 @@ impl VolumeTextures {
             validity_view: validity.create_view(&wgpu::TextureViewDescriptor::default()),
             value,
             validity,
-            invalid_per_plane: (0..dims.d).map(|_| AtomicU32::new(dims.plane() as u32)).collect(),
-            invalid_total: AtomicU64::new((dims.d * dims.plane()) as u64),
+            invalid_per_plane: (0..dims.d).map(|_| AtomicU32::new(plane as u32)).collect(),
+            invalid_total: AtomicU64::new((dims.d * plane) as u64),
             version: AtomicU64::new(0),
         })
     }
@@ -121,26 +127,21 @@ impl VolumeTextures {
     }
 
     fn region(&self, z: &Range<usize>) -> (wgpu::Origin3d, wgpu::Extent3d) {
-        let origin = wgpu::Origin3d { x: 0, y: 0, z: z.start as u32 };
-        let extent = wgpu::Extent3d {
-            width: self.dims.w as u32,
-            height: self.dims.h as u32,
-            depth_or_array_layers: z.len() as u32,
-        };
-        (origin, extent)
+        region_3d(self.dims, z.clone())
     }
 
     fn set_invalid_counts(&self, z0: usize, counts: impl Iterator<Item = u32>) {
         for (zi, invalid) in (z0..).zip(counts) {
-            if let Some(slot) = self.invalid_per_plane.get(zi) {
-                let old = slot.swap(invalid, Ordering::Relaxed);
-                if invalid > old {
-                    self.invalid_total
-                        .fetch_add(u64::from(invalid - old), Ordering::Relaxed);
-                } else if old > invalid {
-                    self.invalid_total
-                        .fetch_sub(u64::from(old - invalid), Ordering::Relaxed);
-                }
+            let Some(slot) = self.invalid_per_plane.get(zi) else {
+                continue;
+            };
+            let old = slot.swap(invalid, Ordering::Relaxed);
+            if invalid > old {
+                self.invalid_total
+                    .fetch_add(u64::from(invalid - old), Ordering::Relaxed);
+            } else if old > invalid {
+                self.invalid_total
+                    .fetch_sub(u64::from(old - invalid), Ordering::Relaxed);
             }
         }
     }
@@ -164,6 +165,21 @@ impl VolumeTextures {
     }
 }
 
+fn region_3d(dims: Dims, z: Range<usize>) -> (wgpu::Origin3d, wgpu::Extent3d) {
+    (
+        wgpu::Origin3d {
+            x: 0,
+            y: 0,
+            z: z.start as u32,
+        },
+        wgpu::Extent3d {
+            width: dims.w as u32,
+            height: dims.h as u32,
+            depth_or_array_layers: z.len() as u32,
+        },
+    )
+}
+
 fn write_region(
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
@@ -172,49 +188,36 @@ fn write_region(
     bytes: &[u8],
     bytes_per_row: u32,
 ) {
-    queue.write_texture(
-        wgpu::TexelCopyTextureInfo {
-            texture,
-            mip_level: 0,
-            origin,
-            aspect: wgpu::TextureAspect::All,
-        },
-        bytes,
-        wgpu::TexelCopyBufferLayout {
-            offset: 0,
-            bytes_per_row: Some(bytes_per_row),
-            rows_per_image: Some(extent.height),
-        },
-        extent,
-    );
+    let layout = wgpu::TexelCopyBufferLayout {
+        offset: 0,
+        bytes_per_row: Some(bytes_per_row),
+        rows_per_image: Some(extent.height),
+    };
+    let tex = wgpu::TexelCopyTextureInfo {
+        texture,
+        mip_level: 0,
+        origin,
+        aspect: wgpu::TextureAspect::All,
+    };
+    queue.write_texture(tex, bytes, layout, extent);
 }
 
 fn write_valid_planes(queue: &wgpu::Queue, texture: &wgpu::Texture, dims: Dims, z: Range<usize>) {
     const CHUNK: usize = 65536;
     static ONES: [u8; CHUNK] = [255u8; CHUNK];
     let plane = dims.plane();
-    let (w, h) = (dims.w as u32, dims.h as u32);
     let step = (CHUNK / plane.max(1)).max(1);
     let mut z0 = z.start;
     while z0 < z.end {
         let z1 = (z0 + step).min(z.end);
-        let count = z1 - z0;
-        let voxels = count * plane;
-        let origin = wgpu::Origin3d {
-            x: 0,
-            y: 0,
-            z: z0 as u32,
-        };
-        let extent = wgpu::Extent3d {
-            width: w,
-            height: h,
-            depth_or_array_layers: count as u32,
-        };
-        if voxels <= CHUNK {
-            write_region(queue, texture, origin, extent, &ONES[..voxels], w);
+        let voxels = (z1 - z0) * plane;
+        let buf = if voxels <= CHUNK {
+            &ONES[..voxels]
         } else {
-            write_region(queue, texture, origin, extent, &vec![255; voxels], w);
-        }
+            &vec![255; voxels]
+        };
+        let (origin, extent) = region_3d(dims, z0..z1);
+        write_region(queue, texture, origin, extent, buf, dims.w as u32);
         z0 = z1;
     }
 }
@@ -225,13 +228,14 @@ fn create_texture(
     dims: Dims,
     format: wgpu::TextureFormat,
 ) -> wgpu::Texture {
+    let size = wgpu::Extent3d {
+        width: dims.w as u32,
+        height: dims.h as u32,
+        depth_or_array_layers: dims.d as u32,
+    };
     device.create_texture(&wgpu::TextureDescriptor {
         label: Some(label),
-        size: wgpu::Extent3d {
-            width: dims.w as u32,
-            height: dims.h as u32,
-            depth_or_array_layers: dims.d as u32,
-        },
+        size,
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D3,
