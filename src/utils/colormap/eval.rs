@@ -44,13 +44,17 @@ pub fn evaluate_color_cpu(val: f32, params: &PlotColorParams) -> Color32 {
     }
 }
 
-/// Samples the plot colormap at `t`, honoring the reversed and nearest flags.
+/// Samples the plot colormap at `t`, honoring the reversed and nearest flags,
+/// with the global opacity as alpha.
 fn sample(params: &PlotColorParams, t: f32) -> Color32 {
-    super::registry::sample_row(
+    let [r, g, b, _] = super::registry::sample_row(
         params.colormap,
         super::orient(t, params.reverse != 0),
         params.nearest != 0,
     )
+    .to_array();
+    let alpha = (params.opacity.clamp(0.0, 1.0) * 255.0).round() as u8;
+    Color32::from_rgba_unmultiplied(r, g, b, alpha)
 }
 
 fn rgba_to_color32(rgba: [f32; 4]) -> Color32 {

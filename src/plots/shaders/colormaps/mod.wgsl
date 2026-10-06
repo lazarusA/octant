@@ -14,7 +14,7 @@ struct ColorUniforms {
     reverse: u32,
     nearest: u32,
     fallback_colormap: u32,
-    _pad0: u32,
+    opacity: f32,
     _pad1: u32,
     _pad2: u32,
     nan_color: vec4<f32>,
@@ -139,13 +139,13 @@ fn evaluate_plot_color(val: f32, color: ColorUniforms) -> vec4<f32> {
 
     // 2. Values below cmin (Lowclip)
     if (val < color.cmin) {
-        let default_low = vec4<f32>(sample_plot_colormap(color, 0.0), 1.0);
+        let default_low = vec4<f32>(sample_plot_colormap(color, 0.0), color.opacity);
         return select(default_low, color.lowclip_color, color.use_lowclip == 1u);
     }
 
     // 3. Values above cmax (Highclip)
     if (val > color.cmax) {
-        let default_high = vec4<f32>(sample_plot_colormap(color, 1.0), 1.0);
+        let default_high = vec4<f32>(sample_plot_colormap(color, 1.0), color.opacity);
         return select(default_high, color.highclip_color, color.use_highclip == 1u);
     }
 
@@ -158,5 +158,5 @@ fn evaluate_plot_color(val: f32, color: ColorUniforms) -> vec4<f32> {
         scaled_val = (bin_idx + 0.5) / num_cats;
     }
 
-    return vec4<f32>(sample_plot_colormap(color, scaled_val), 1.0);
+    return vec4<f32>(sample_plot_colormap(color, scaled_val), color.opacity);
 }

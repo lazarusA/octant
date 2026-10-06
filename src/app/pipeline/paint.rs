@@ -84,7 +84,11 @@ impl OctantApp {
         &self,
         screen_aspect: f32,
     ) -> crate::plots::VolumeUniformParams {
-        let ctx = self.get_common_3d_spatial_context();
+        let mut ctx = self.get_common_3d_spatial_context();
+        // Classic modes (1-7) keep their original opacity.
+        if self.volume_algorithm != 0 {
+            ctx.color.opacity = 1.0;
+        }
 
         crate::plots::VolumeUniformParams {
             color: ctx.color,

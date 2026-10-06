@@ -34,7 +34,10 @@ pub struct PlotColorParams {
     /// Row drawn by colormap-only paths (per-line colors, indexed volumes) while
     /// `colormap` is `COLORMAP_RGB_COMPOSITE`.
     pub fallback_colormap: u32,
-    pub _pad: [u32; 3],
+    /// Global opacity in [0, 1] multiplying colormapped colors (not the NaN
+    /// or user clip colors, which carry their own alpha).
+    pub opacity: f32,
+    pub _pad: [u32; 2],
     pub nan_color: [f32; 4],
     pub lowclip_color: [f32; 4],
     pub highclip_color: [f32; 4],
@@ -56,7 +59,8 @@ impl Default for PlotColorParams {
             reverse: 0,
             nearest: 0,
             fallback_colormap: 0,
-            _pad: [0; 3],
+            opacity: 1.0,
+            _pad: [0; 2],
             nan_color: [0.0, 0.0, 0.0, 0.0],
             lowclip_color: [0.0, 0.0, 1.0, 1.0],
             highclip_color: [1.0, 0.0, 0.0, 1.0],

@@ -160,6 +160,8 @@ pub struct OctantApp {
     pub use_lowclip: bool,
     pub highclip_color: [f32; 4],
     pub use_highclip: bool,
+    /// Global opacity of colormapped colors, in [0, 1].
+    pub color_opacity: f32,
     pub lock_color_bounds: bool,
     pub color_range_min: f32,
     pub color_range_max: f32,
@@ -339,6 +341,7 @@ impl Default for OctantApp {
             use_lowclip: false,
             highclip_color: [1.0, 0.0, 0.0, 1.0],
             use_highclip: false,
+            color_opacity: 1.0,
             lock_color_bounds: false,
             color_range_min: 0.0,
             color_range_max: 100.0,

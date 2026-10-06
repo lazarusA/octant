@@ -71,7 +71,7 @@ fn dvr_sample(d: f32, step_world: f32) -> vec4<f32> {
         user = select(user, c.highclip_color, c.use_highclip == 1u);
     } else {
         let t = evaluate_scaled_norm(d, c.cmin, c.cmax, c.scale_type, c.scale_param);
-        user = vec4<f32>(evaluate_plot_color(d, c).rgb, dvr_opacity(t));
+        user = vec4<f32>(evaluate_plot_color(d, c).rgb, dvr_opacity(t) * c.opacity);
     }
     return vec4<f32>(user.rgb, corrected_alpha(user.a, step_world));
 }
