@@ -1,5 +1,6 @@
 //! Floating Interactive Colorbar Overlay Subsystem.
 
+pub mod checker;
 pub mod handles;
 pub mod ticks;
 
@@ -206,9 +207,12 @@ fn draw_categorical_colorbar(
         // Same bin centering as the plot shaders, so swatches match the plot.
         let bin = (norm_scaled.clamp(0.0, 0.999_999) * num_cats as f32).floor();
         let t = (bin + 0.5) / num_cats as f32;
-        let color = crate::utils::colormap::registry::sample(
-            effective_colormap,
-            crate::utils::colormap::orient(t, app.colormaps.reversed),
+        let color = checker::with_alpha(
+            crate::utils::colormap::registry::sample(
+                effective_colormap,
+                crate::utils::colormap::orient(t, app.colormaps.reversed),
+            ),
+            app.color_alpha_at(t),
         );
 
         let x_start = bar_rect.min.x + t_start * bar_rect.width();
@@ -238,6 +242,9 @@ fn draw_categorical_colorbar(
 
         mesh.indices
             .extend_from_slice(&[idx, idx + 1, idx + 2, idx + 1, idx + 3, idx + 2]);
+    }
+    if app.has_color_alpha() {
+        checker::paint_checker(ui.painter(), bar_rect, ui.visuals().dark_mode);
     }
     ui.painter().add(Shape::mesh(mesh));
 
@@ -320,9 +327,12 @@ fn draw_continuous_colorbar(
             app.active_scale_type,
             app.scale_param,
         );
-        let color = crate::utils::colormap::registry::sample(
-            effective_colormap,
-            crate::utils::colormap::orient(norm_scaled, app.colormaps.reversed),
+        let color = checker::with_alpha(
+            crate::utils::colormap::registry::sample(
+                effective_colormap,
+                crate::utils::colormap::orient(norm_scaled, app.colormaps.reversed),
+            ),
+            app.color_alpha_at(norm_scaled),
         );
 
         let x = bar_rect.min.x + t * bar_rect.width();
@@ -353,6 +363,9 @@ fn draw_continuous_colorbar(
         }
     }
 
+    if app.has_color_alpha() {
+        checker::paint_checker(ui.painter(), bar_rect, ui.visuals().dark_mode);
+    }
     ui.painter().add(Shape::mesh(mesh));
 
     ui.painter().rect_stroke(

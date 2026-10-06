@@ -4,6 +4,7 @@
 //! through [`lut::sample_lut`] and the GPU reads the same rows from the atlas texture
 //! uploaded by `crate::plots::colormap_atlas`.
 
+pub mod alpha;
 pub mod catalog;
 pub mod custom;
 pub mod eval;
@@ -14,12 +15,15 @@ pub mod registry;
 pub mod scale;
 
 #[cfg(test)]
+mod alpha_tests;
+#[cfg(test)]
 mod catalog_tests;
 #[cfg(test)]
 mod smooth_tests;
 #[cfg(test)]
 mod tests;
 
+pub use alpha::{AlphaCurve, AlphaInterp, NO_ALPHA_ROW};
 pub use catalog::{ColormapEntry, ColormapFamily, LICENSES_TEXT, builtin};
 pub use custom::{BlendSpace, CustomColormapSpec, Interpolation};
 pub use eval::evaluate_color_cpu;

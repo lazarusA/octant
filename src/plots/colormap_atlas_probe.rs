@@ -1,5 +1,6 @@
 //! Test-only GPU plumbing for the atlas parity test: renders WGSL
-//! `sample_plot_colormap` for given uniforms into a 256×1 target and reads it back.
+//! `sample_plot_colormap` (alpha: `plot_alpha`) for given uniforms into a
+//! 256×1 target and reads it back.
 
 use super::ColormapAtlas;
 use crate::plots::common::PlotColorParams;
@@ -41,7 +42,7 @@ fn fs(@builtin(position) p: vec4<f32>) -> @location(0) vec4<f32> {
     if (x < 8u) {
         t = bitcast<f32>(probe.special[x / 4u][x % 4u]);
     }
-    return vec4<f32>(sample_plot_colormap(probe.color, t), 1.0);
+    return vec4<f32>(sample_plot_colormap(probe.color, t), plot_alpha(probe.color, t));
 }
 "#;
 

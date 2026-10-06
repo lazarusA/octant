@@ -71,3 +71,51 @@ fn gpu_atlas_matches_cpu_sampling() {
         }
     }
 }
+
+#[test]
+fn gpu_alpha_curve_matches_cpu() {
+    use crate::utils::colormap::{AlphaInterp, alpha};
+    let _registry = crate::utils::colormap::registry::test_lock();
+    let Some((device, queue)) = gpu() else {
+        eprintln!("SKIPPED gpu_alpha_curve_matches_cpu: no GPU adapter, nothing was compared");
+        return;
+    };
+    for (text, interp) in [
+        ("0.1, 0.9, 0.2, 0.7", AlphaInterp::Linear),
+        ("0:1, 0.4:0, 0.6:1", AlphaInterp::Step),
+    ] {
+        let Ok(Some(curve)) = alpha::parse(text) else {
+            panic!("{text} should parse");
+        };
+        registry::set_alpha_curve(Some(alpha::bake(&curve, interp)));
+        let atlas = ColormapAtlas::new(&device, &queue);
+        // Reversed: the curve follows the data position, not the colormap.
+        let color = PlotColorParams {
+            opacity: 0.8,
+            alpha_row: registry::alpha_row().unwrap_or(u32::MAX),
+            ..params(registry::default_id(), true, false)
+        };
+        let pixels = render_row(&device, &queue, &atlas, &color);
+        registry::set_alpha_curve(None);
+        assert_eq!(pixels.len(), LUT_SIZE * 4, "readback failed");
+        for x in 0..LUT_SIZE {
+            let cpu = (0.8 * alpha_curve_at(&curve, interp, pixel_t(x)) * 255.0).round() as u8;
+            let gpu = pixels[x * 4 + 3];
+            assert!(
+                gpu.abs_diff(cpu) <= 1,
+                "{text} texel {x}: gpu {gpu} cpu {cpu}"
+            );
+        }
+    }
+}
+
+fn alpha_curve_at(
+    curve: &crate::utils::colormap::AlphaCurve,
+    interp: crate::utils::colormap::AlphaInterp,
+    t: f32,
+) -> f32 {
+    crate::utils::colormap::lut::sample_alpha(
+        &crate::utils::colormap::alpha::bake(curve, interp),
+        t,
+    )
+}

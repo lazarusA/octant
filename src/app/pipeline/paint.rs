@@ -88,6 +88,7 @@ impl OctantApp {
         // Classic modes (1-7) keep their original opacity.
         if self.volume_algorithm != 0 {
             ctx.color.opacity = 1.0;
+            ctx.color.alpha_row = crate::utils::colormap::NO_ALPHA_ROW;
         }
 
         crate::plots::VolumeUniformParams {

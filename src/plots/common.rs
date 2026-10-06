@@ -37,7 +37,9 @@ pub struct PlotColorParams {
     /// Global opacity in [0, 1] multiplying colormapped colors (not the NaN
     /// or user clip colors, which carry their own alpha).
     pub opacity: f32,
-    pub _pad: [u32; 2],
+    /// Atlas row of the opacity curve over the data position, or `NO_ALPHA_ROW`.
+    pub alpha_row: u32,
+    pub _pad: u32,
     pub nan_color: [f32; 4],
     pub lowclip_color: [f32; 4],
     pub highclip_color: [f32; 4],
@@ -60,7 +62,8 @@ impl Default for PlotColorParams {
             nearest: 0,
             fallback_colormap: 0,
             opacity: 1.0,
-            _pad: [0; 2],
+            alpha_row: crate::utils::colormap::NO_ALPHA_ROW,
+            _pad: 0,
             nan_color: [0.0, 0.0, 0.0, 0.0],
             lowclip_color: [0.0, 0.0, 1.0, 1.0],
             highclip_color: [1.0, 0.0, 0.0, 1.0],

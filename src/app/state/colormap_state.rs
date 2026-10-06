@@ -25,6 +25,8 @@ pub struct ColormapState {
     /// Raw stored preferences that could not be parsed, backed up on save.
     pub unreadable_prefs: Option<String>,
     pub picker: crate::ui::colormap::PickerState,
+    /// Opacity curve editor (not persisted).
+    pub alpha: super::alpha_state::AlphaCurveState,
 }
 
 /// Persisted colormap preferences (eframe storage). Only user-defined colormaps

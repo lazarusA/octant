@@ -91,3 +91,12 @@ pub fn sample_lut(lut: &Lut, t: f32, nearest: bool) -> Color32 {
     };
     Color32::from_rgb(ch(0), ch(1), ch(2))
 }
+
+/// Alpha of a LUT at `t` in [0, 1], blending two texels exactly like the
+/// alpha read of WGSL `plot_alpha`.
+pub fn sample_alpha(lut: &Lut, t: f32) -> f32 {
+    let x = if t.is_nan() { 0.0 } else { t.clamp(0.0, 1.0) } * (LUT_SIZE - 1) as f32;
+    let i0 = (x.floor() as usize).min(LUT_SIZE - 2);
+    let (a0, a1) = (f32::from(lut[i0][3]), f32::from(lut[i0 + 1][3]));
+    (a0 + (a1 - a0) * (x - i0 as f32)) / 255.0
+}
