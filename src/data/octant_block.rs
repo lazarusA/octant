@@ -34,6 +34,11 @@ pub struct OctantBlock {
 
     pub min_value: f32,
     pub max_value: f32,
+
+    /// Dimensions whose values run opposite to storage order: orientation flips the data
+    /// so north renders at the top and west on the left. Index `i` of such a dimension
+    /// holds stored index `len - 1 - i` of the block.
+    pub flipped_dims: Vec<String>,
 }
 
 impl OctantBlock {
@@ -71,6 +76,7 @@ impl OctantBlock {
             attributes,
             min_value,
             max_value,
+            flipped_dims: Vec::new(),
         }
     }
 

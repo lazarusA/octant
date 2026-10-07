@@ -38,6 +38,7 @@ fn create_rgb_block() -> OctantBlock {
         max_value: 255.0,
         coordinates: std::collections::HashMap::new(),
         attributes: std::collections::HashMap::new(),
+        flipped_dims: Vec::new(),
     }
 }
 

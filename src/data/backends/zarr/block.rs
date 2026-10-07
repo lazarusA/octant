@@ -173,7 +173,7 @@ pub fn fetch_block_from_cached_array(
         }
     }
 
-    let raw_values = check_and_orient_block_grid(
+    let (raw_values, flipped_dims) = check_and_orient_block_grid(
         raw_values,
         &mut block_shape,
         &mut dim_names,
@@ -182,7 +182,7 @@ pub fn fetch_block_from_cached_array(
         &mut coordinates,
     );
 
-    Ok(OctantBlock::new(
+    let mut block = OctantBlock::new(
         request.variable.clone(),
         block_shape,
         dim_names,
@@ -190,7 +190,9 @@ pub fn fetch_block_from_cached_array(
         raw_values,
         coordinates,
         attributes,
-    ))
+    );
+    block.flipped_dims = flipped_dims;
+    Ok(block)
 }
 
 /// Fetches an arbitrary-rank hyperslab described by `request` with progress reporting.

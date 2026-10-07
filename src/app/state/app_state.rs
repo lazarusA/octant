@@ -106,6 +106,9 @@ pub struct OctantApp {
     pub composite_channel_configs: Vec<crate::data::slicing::ChannelColorConfig>,
     /// Block window behind the plotted 2D composite, for raw per-channel hover values.
     pub composite_probe: Option<crate::data::slicing::CompositeProbe>,
+    /// Dimensions the plotted data runs opposite to storage order along
+    /// (`OctantBlock::flipped_dims`), so the hover can map screen indices back.
+    pub plotted_flipped_dims: Vec<String>,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
     // Block-cache & Prefetcher State
@@ -296,6 +299,7 @@ impl Default for OctantApp {
             rgb_composite_channels: [0, 1, 2],
             composite_channel_configs: Vec::new(),
             composite_probe: None,
+            plotted_flipped_dims: Vec::new(),
             wgpu_render_state: None,
 
             show_hero: true,

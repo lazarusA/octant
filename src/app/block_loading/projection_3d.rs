@@ -52,6 +52,7 @@ impl OctantApp {
         self.ensure_volume_allocated(nx, ny, nz, &target_desc);
         // Raw channel readouts only exist for 2D composites.
         self.composite_probe = None;
+        self.plotted_flipped_dims.clone_from(&block.flipped_dims);
 
         let slab_opt = if self.rgb_composite_mode
             && block.shape.len() >= 3

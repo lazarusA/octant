@@ -1,4 +1,4 @@
-use super::grid_flips::{axis_flips, reverse_flipped_coordinates};
+use super::grid_flips::{axis_flips, flipped_dims, reverse_flipped_coordinates};
 
 /// Function for checking axes order and orientation.
 ///
@@ -72,7 +72,9 @@ pub fn check_and_orient_axes_with_coords(
     (current_values, width, height)
 }
 
-/// Orients an N-dimensional block's 2D spatial grid slices and axes using `check_and_orient_axes_with_coords`.
+/// Orients an N-dimensional block's 2D spatial grid slices and axes using
+/// `check_and_orient_axes_with_coords`. Returns the oriented values and the dimensions they
+/// were reversed along (see [`flipped_dims`]); per-row coordinates are reversed with them.
 pub fn check_and_orient_block_grid(
     mut values: Vec<f32>,
     block_shape: &mut [usize],
@@ -80,10 +82,10 @@ pub fn check_and_orient_block_grid(
     origin: &mut [usize],
     attributes: &serde_json::Map<String, serde_json::Value>,
     coordinates: &mut std::collections::HashMap<String, Vec<f64>>,
-) -> Vec<f32> {
+) -> (Vec<f32>, Vec<String>) {
     let rank = block_shape.len();
     if rank < 2 {
-        return values;
+        return (values, Vec::new());
     }
 
     let lat_dim = dimension_names
@@ -156,10 +158,12 @@ pub fn check_and_orient_block_grid(
 
         values = final_values;
         // After the slices: they judge their flips from these coordinates.
-        reverse_flipped_coordinates(coordinates, dimension_names, block_shape, flips);
+        let flipped = flipped_dims(dimension_names, block_shape, flips);
+        reverse_flipped_coordinates(coordinates, dimension_names, block_shape, &flipped);
+        return (values, flipped);
     }
 
-    values
+    (values, Vec::new())
 }
 
 #[cfg(test)]

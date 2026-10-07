@@ -34,6 +34,7 @@ impl OctantApp {
             None
         };
 
+        self.plotted_flipped_dims.clone_from(&block.flipped_dims);
         self.composite_probe = mdata_opt.is_some().then(|| {
             crate::data::slicing::CompositeProbe::new(
                 block,

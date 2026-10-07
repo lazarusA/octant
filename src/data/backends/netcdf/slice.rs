@@ -188,7 +188,7 @@ impl BlockStore for NetCdfBlockStore {
                 .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
                 .collect();
 
-            let oriented_values = check_and_orient_block_grid(
+            let (oriented_values, flipped_dims) = check_and_orient_block_grid(
                 raw_values,
                 &mut block_shape,
                 &mut dim_names,
@@ -197,7 +197,7 @@ impl BlockStore for NetCdfBlockStore {
                 &mut coordinates,
             );
 
-            let block = OctantBlock::new(
+            let mut block = OctantBlock::new(
                 request.variable.clone(),
                 block_shape,
                 dim_names,
@@ -206,6 +206,7 @@ impl BlockStore for NetCdfBlockStore {
                 coordinates,
                 attributes,
             );
+            block.flipped_dims = flipped_dims;
 
             Ok(block)
         })

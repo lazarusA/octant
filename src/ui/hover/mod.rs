@@ -33,6 +33,8 @@ pub use sample_2d::Transform2D;
 #[cfg(test)]
 mod composite_tests;
 #[cfg(test)]
+mod flip_tests;
+#[cfg(test)]
 mod tests;
 
 use crate::app::OctantApp;

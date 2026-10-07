@@ -11,7 +11,7 @@ use zarrs::storage::store::MemoryStore;
 use super::block::{fetch_block_with_progress, window_coords};
 use crate::data::CoordValues;
 use crate::data::slice_request::SliceRequest;
-use crate::utils::grid_flips::reverse_flipped_coordinates;
+use crate::utils::grid_flips::{flipped_dims, reverse_flipped_coordinates};
 
 fn numbers(values: &[f64]) -> CoordValues {
     CoordValues::from_values(values.to_vec(), false).expect("numbers")
@@ -46,7 +46,9 @@ fn flipped_axes_reverse_only_their_per_row_coordinates() {
         ("lat".to_string(), vec![-60.0, -20.0, 0.0, 10.0, 50.0]),
         ("lon".to_string(), vec![0.0, 30.0]),
     ]);
-    reverse_flipped_coordinates(&mut coords, &dims, &[5, 4], (true, true));
+    let flipped = flipped_dims(&dims, &[5, 4], (true, true));
+    assert_eq!(flipped, dims, "rows (lat) and columns (lon) both flip");
+    reverse_flipped_coordinates(&mut coords, &dims, &[5, 4], &flipped);
     assert_eq!(coords["lat"], [50.0, 10.0, 0.0, -20.0, -60.0]);
     assert_eq!(
         coords["lon"],
@@ -95,5 +97,10 @@ fn uneven_south_to_north_rows_get_coordinates_in_data_order() {
         block.get(&[0, 0]),
         Some(16.0),
         "row 0 holds the northernmost data"
+    );
+    assert_eq!(
+        block.flipped_dims,
+        ["lat"],
+        "only the rows run opposite to storage"
     );
 }

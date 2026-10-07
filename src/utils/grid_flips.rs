@@ -72,34 +72,50 @@ pub fn axis_flips(
     (flip_y, flip_x)
 }
 
-/// Reverses the per-index coordinate vectors (one value per row or column) of the axes the
-/// data is flipped along, so that value `i` stays the coordinate of data row or column `i`.
+/// The dimensions a block's data is reversed along by its orientation: the row axis (second
+/// to last) when `flip_y`, the column axis (last) when `flip_x`, each only when longer than
+/// one index. Pass the names and shape after any transpose.
+pub fn flipped_dims(
+    dim_names: &[String],
+    block_shape: &[usize],
+    (flip_y, flip_x): (bool, bool),
+) -> Vec<String> {
+    let rank = dim_names.len().min(block_shape.len());
+    if rank < 2 {
+        return Vec::new();
+    }
+    [(flip_y, rank - 2), (flip_x, rank - 1)]
+        .into_iter()
+        .filter(|&(flipped, dim)| flipped && block_shape[dim] > 1)
+        .map(|(_, dim)| dim_names[dim].clone())
+        .collect()
+}
+
+/// Reverses the per-index coordinate vectors (one value per row or column) of the
+/// `flipped` dimensions, so that value `i` stays the coordinate of data row or column `i`.
 /// Two-value `[first, last]` vectors of longer axes describe only the extent and are kept.
 pub fn reverse_flipped_coordinates(
     coordinates: &mut HashMap<String, Vec<f64>>,
     dim_names: &[String],
     block_shape: &[usize],
-    (flip_y, flip_x): (bool, bool),
+    flipped: &[String],
 ) {
-    let axes = [(flip_y, ["lat", "y"]), (flip_x, ["lon", "x"])];
-    for (flipped, [part, exact]) in axes {
-        let Some(dim) = dim_names.iter().position(|d| {
-            let d = d.to_lowercase();
-            d.contains(part) || d == exact
-        }) else {
+    for name in flipped {
+        let Some(dim) = dim_names.iter().position(|d| d == name) else {
             continue;
         };
         let len = block_shape.get(dim).copied().unwrap_or(0);
-        if !flipped || len <= 2 {
+        if len <= 2 {
             continue;
         }
-        let name = &dim_names[dim];
-        let keys = [name.clone(), name.trim().to_lowercase()];
-        for (i, key) in keys.iter().enumerate() {
-            if i == 1 && key == name {
-                break;
-            }
-            if let Some(values) = coordinates.get_mut(key)
+        let clean = name.trim().to_lowercase();
+        let keys: &[&str] = if clean == *name {
+            &[name]
+        } else {
+            &[name, &clean]
+        };
+        for key in keys {
+            if let Some(values) = coordinates.get_mut(*key)
                 && values.len() == len
             {
                 values.reverse();

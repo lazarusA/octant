@@ -3,6 +3,7 @@ use crate::data::{CoordinateGrid, DatasetMetadata, MatrixData, VariableInfo};
 use crate::ui::hover::composite::composite_fields;
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
+    stored_offset,
 };
 use crate::ui::hover::entries::resolve_variable_units;
 use crate::ui::hover::field::HoverField;
@@ -116,8 +117,10 @@ fn resolve_2d_dim_entries(
         let (origin_x, full_x_len) = get_dimension_origin_and_full_len(app, Some(v), x_idx);
         let (origin_y, full_y_len) = get_dimension_origin_and_full_len(app, Some(v), y_idx);
 
-        let global_x = (origin_x + px).min(full_x_len.saturating_sub(1));
-        let global_y = (origin_y + py).min(full_y_len.saturating_sub(1));
+        let x_offset = stored_offset(app, &dim_x_name, px, orig_w);
+        let y_offset = stored_offset(app, &dim_y_name, py, orig_h);
+        let global_x = (origin_x + x_offset).min(full_x_len.saturating_sub(1));
+        let global_y = (origin_y + y_offset).min(full_y_len.saturating_sub(1));
 
         let loc_y = format_dimension_coord(
             meta,
