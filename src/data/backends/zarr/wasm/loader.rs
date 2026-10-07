@@ -133,7 +133,7 @@ impl WasmZarrBlockStore {
                         && coord_array.shape().len() == 1
                     {
                         let count = coord_array.shape().first().copied().unwrap_or(0);
-                        self.preload_boundary_chunks_1d(&target_name, count).await;
+                        self.preload_coordinate_chunks_1d(&target_name, count).await;
                         break;
                     }
                 }

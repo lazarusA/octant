@@ -11,6 +11,7 @@ use zarrs::metadata_ext::codec::blosc::{
 /// Normalizes Zarr v3 array metadata JSON so that non-standard and Python numcodecs
 /// representations conform to `zarrs` codec plugins with a valid pipeline order.
 pub fn normalize_v3_array_metadata(mut meta: Value) -> Value {
+    fill_v2_unicode_null(&mut meta);
     let typesize = meta
         .get("data_type")
         .and_then(|d| MetadataV3::deserialize(d).ok())
@@ -44,6 +45,21 @@ pub fn normalize_v3_array_metadata(mut meta: Value) -> Value {
     }
 
     meta
+}
+
+/// zarr-python 2 and xarray write `"fill_value": null` for NumPy unicode (`<U`, `>U`)
+/// arrays, which `zarrs` rejects; an empty string is the fill those writers mean.
+fn fill_v2_unicode_null(meta: &mut Value) {
+    let is_unicode = meta
+        .get("dtype")
+        .and_then(Value::as_str)
+        .is_some_and(|d| d.starts_with("<U") || d.starts_with(">U"));
+    if is_unicode
+        && meta.get("zarr_format").and_then(Value::as_u64) == Some(2)
+        && meta.get("fill_value").is_some_and(Value::is_null)
+    {
+        meta["fill_value"] = Value::from("");
+    }
 }
 
 /// Checks if a codec name represents an array-to-bytes transformation.

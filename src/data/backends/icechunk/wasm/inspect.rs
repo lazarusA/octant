@@ -159,7 +159,7 @@ pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, 
     for coord_name in &coord_candidates {
         if let Some(var_info) = variables.iter().find(|v| &v.name == coord_name) {
             let count = var_info.shape.first().copied().unwrap_or(0);
-            store.preload_boundary_chunks_1d(coord_name, count).await;
+            store.preload_coordinate_chunks_1d(coord_name, count).await;
         }
     }
 

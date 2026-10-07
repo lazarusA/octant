@@ -13,12 +13,7 @@ use super::metrics::{
 use super::roles::apply_role_change;
 
 /// Renders the complete dimension sliders section including capacity and bandwidth metrics.
-pub fn show_dimension_sliders(
-    app: &mut OctantApp,
-    ui: &mut Ui,
-    var_info: &VariableInfo,
-    _dim_coords: &std::collections::HashMap<String, Vec<String>>,
-) {
+pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &VariableInfo) {
     let rank = var_info.shape.len();
 
     if app.dim_config.len() != rank {

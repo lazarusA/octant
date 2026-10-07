@@ -53,9 +53,9 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                 .show(ui, |ui| {
                     ui.set_width(panel_w);
 
-                    let (var_info, dim_coords) = if let Some(meta) = &app.active_dataset_metadata {
+                    let var_info = if let Some(meta) = &app.active_dataset_metadata {
                         if let Some(v) = meta.variables.get(app.selected_variable_idx) {
-                            (v.clone(), meta.dimension_coordinates.clone())
+                            v.clone()
                         } else {
                             ui.label("No variable selected.");
                             return;
@@ -116,7 +116,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                     egui::CollapsingHeader::new("Dimension Sliders")
                         .default_open(true)
                         .show(ui, |ui| {
-                            show_dimension_sliders(app, ui, &var_info, &dim_coords);
+                            show_dimension_sliders(app, ui, &var_info);
                         });
                 });
         });

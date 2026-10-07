@@ -231,6 +231,10 @@ pub fn read_coord_values_scoped(
     if len == 0 {
         return None;
     }
+    // Text coordinates label every index; numeric ones only need their endpoints.
+    if crate::data::backends::zarr::strings::is_text_array(&array) {
+        return crate::data::backends::zarr::retrieve_array_as_strings(&array);
+    }
     if len == 1 {
         let subset_0 = ArraySubset::new_with_ranges(&[0..1]);
         let val =

@@ -25,7 +25,7 @@ When developing and reviewing code in this repository:
        - `geotiff/`: `reader.rs` (async COG header discovery & pooled range reader), `bands.rs` (band names from GDAL metadata, photometric layout & alpha extra samples, stored as `band` coordinates), `slice.rs`, `tests.rs`, `bands_tests.rs`, `mod.rs`.
        - `http/`: `fetch.rs`, `mod.rs` (Browser `window.fetch` and Desktop connection-pooled `get_http_client` range requests).
        - `coord_bounds/`: `cache.rs`, `candidates.rs`, `discover.rs`, `extract.rs`, `tests.rs`, `mod.rs` (Unified coordinate boundary resolution & global cache).
-       - `zarr/`: `block.rs`, `generic.rs`, `slice.rs`, `storage.rs`, `store.rs`, `zstd_shim.rs`, `wasm/` (`inspect.rs`, `loader.rs`, `preload.rs`, `store.rs`, `mod.rs`), `mod.rs`.
+       - `zarr/`: `block.rs`, `generic.rs`, `slice.rs`, `storage.rs`, `store.rs`, `strings.rs` (text coordinates `string` / `fixed_length_utf32` / `bytes` read as one label per index, at most `MAX_LABELS`; `coordinate_preload_ranges` makes the WASM preloads fetch every label chunk), `strings_tests.rs`, `zstd_shim.rs`, `wasm/` (`inspect.rs`, `loader.rs`, `preload.rs`, `store.rs`, `mod.rs`), `mod.rs`.
        - `icechunk/`: `native.rs`, `wasm/` (`discovery.rs`, `header.rs`, `inspect.rs`, `loader.rs`, `preload.rs`, `store.rs`, `tests.rs`, `mod.rs`), `mod.rs`.
        - `netcdf/`: `attrs.rs`, `coords.rs`, `desktop.rs`, `inspect.rs`, `slice.rs`, `wasm.rs`, `tests.rs`, `mod.rs`.
        - `procedural/`: `healpix.rs`, `healpix_meta.rs`, `inspect.rs`, `slice_2d.rs`, `slice_3d.rs`, `store.rs`, `tests.rs`, `mod.rs`.

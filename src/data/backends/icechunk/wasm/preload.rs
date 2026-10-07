@@ -11,6 +11,8 @@ use super::header::decompress_icechunk_file;
 use super::store::WasmIcechunkBlockStore;
 #[cfg(target_arch = "wasm32")]
 use crate::data::backends::http::{fetch_url_byte_range, fetch_url_bytes};
+#[cfg(target_arch = "wasm32")]
+use crate::data::backends::zarr::strings::coordinate_preload_ranges;
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
 #[cfg(target_arch = "wasm32")]
 use crate::utils::metadata::open_or_instantiate_array_normalized;
@@ -204,7 +206,7 @@ impl WasmIcechunkBlockStore {
                 ) && coord_array.shape().len() == 1
                 {
                     let count = coord_array.shape().first().copied().unwrap_or(0);
-                    self.preload_boundary_chunks_1d(&clean, count).await;
+                    self.preload_coordinate_chunks_1d(&clean, count).await;
                 }
             }
         }
@@ -212,18 +214,17 @@ impl WasmIcechunkBlockStore {
         Ok(())
     }
 
-    /// Preloads boundary chunks (start and end) for a 1D coordinate array.
+    /// Preloads the chunks a 1D coordinate needs: every label of a text coordinate, else its
+    /// first and last value.
     #[cfg(target_arch = "wasm32")]
     #[allow(clippy::single_range_in_vec_init)]
-    pub async fn preload_boundary_chunks_1d(&self, coord_name: &str, count: u64) {
-        if count == 0 {
-            return;
-        }
-        let subset_start = ArraySubset::new_with_ranges(&[0..1]);
-        let _ = Box::pin(self.preload_chunks_for_subset(coord_name, &subset_start, None)).await;
-        if count > 1 {
-            let subset_end = ArraySubset::new_with_ranges(&[(count - 1)..count]);
-            let _ = Box::pin(self.preload_chunks_for_subset(coord_name, &subset_end, None)).await;
+    pub async fn preload_coordinate_chunks_1d(&self, coord_name: &str, count: u64) {
+        let path = format!("/{}", coord_name.trim_start_matches('/'));
+        let store = self.inner.memory_store.clone();
+        let array = open_or_instantiate_array_normalized(store, &path).ok();
+        for range in coordinate_preload_ranges(array.as_ref(), count) {
+            let subset = ArraySubset::new_with_ranges(&[range]);
+            let _ = Box::pin(self.preload_chunks_for_subset(coord_name, &subset, None)).await;
         }
     }
 
@@ -238,5 +239,5 @@ impl WasmIcechunkBlockStore {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    pub async fn preload_boundary_chunks_1d(&self, _coord_name: &str, _count: u64) {}
+    pub async fn preload_coordinate_chunks_1d(&self, _coord_name: &str, _count: u64) {}
 }
