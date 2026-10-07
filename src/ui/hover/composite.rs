@@ -164,6 +164,7 @@ impl<'a> BandNames<'a> {
         let count = var.and_then(|v| v.shape.get(c_dim)).copied();
         let labels = meta
             .and_then(|m| m.get_dim_coords(var.map(|v| v.name.as_str()), dim))
+            .and_then(|c| c.labels())
             .filter(|l| count.is_some_and(|n| l.len() as u64 == n));
         Self { dim, labels }
     }

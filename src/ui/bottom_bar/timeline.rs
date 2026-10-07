@@ -72,8 +72,7 @@ impl Timeline {
         let var = meta.and_then(|m| m.variables.get(app.plotted_variable_idx));
         let dim = dim_name(app);
         let coords = meta.and_then(|m| m.get_dim_coords(var.map(|v| v.name.as_str()), dim));
-        let coord =
-            |pick: fn(&[String]) -> Option<&String>| coords.and_then(pick).map(String::as_str);
+        let label_at = |i: usize| coords.and_then(|c| c.label(i));
 
         let label = |step: usize, coord: Option<&str>| match coord.filter(|c| is_display_coord(c)) {
             Some(coord) => coord.to_owned(),
@@ -90,9 +89,12 @@ impl Timeline {
 
         let step = app.current_timestep;
         Self {
-            current: label(step, coords.and_then(|c| c.get(step)).map(String::as_str)),
-            start: label(0, coord(<[String]>::first)),
-            end: label(last_step, coord(<[String]>::last)),
+            current: label(step, label_at(step)),
+            start: label(0, label_at(0)),
+            end: label(
+                last_step,
+                coords.and_then(|c| c.label(c.len().checked_sub(1)?)),
+            ),
             step_size: var
                 .and_then(|v| v.temporal_resolution.clone())
                 .unwrap_or_else(|| "Step: 1".to_owned()),

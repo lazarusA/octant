@@ -8,14 +8,14 @@ use super::cache::{
     get_cached_coord_values_scoped, get_cached_coord_values_with_rank, parse_bounds_from_values,
 };
 use super::discover::discover_coord_array;
-use crate::data::VariableInfo;
+use crate::data::{CoordValues, VariableInfo};
 
 /// Fetches all dimension coordinate values for the specified dimension names across the store.
 pub fn fetch_all_dimension_coordinates(
     store: ReadableWritableListableStorage,
     dim_names: &[String],
     store_url_hint: Option<&str>,
-) -> HashMap<String, Vec<String>> {
+) -> HashMap<String, CoordValues> {
     let mut coords_map = HashMap::new();
     let url_hint = store_url_hint.unwrap_or("local");
     let total_dims = dim_names.len();
@@ -44,7 +44,7 @@ pub fn fetch_all_dimension_coordinates_for_variables(
     store: ReadableWritableListableStorage,
     variables: &[VariableInfo],
     store_url_hint: Option<&str>,
-) -> HashMap<String, Vec<String>> {
+) -> HashMap<String, CoordValues> {
     let mut coords_map = HashMap::new();
     let url_hint = store_url_hint.unwrap_or("local");
 
@@ -65,6 +65,9 @@ pub fn fetch_all_dimension_coordinates_for_variables(
         }
         if let Some(ch_str) = var.attributes.get("omero_channels") {
             let labels: Vec<String> = ch_str.split(',').map(|s| s.trim().to_string()).collect();
+            let Some(labels) = CoordValues::from_labels(labels) else {
+                continue;
+            };
             for name in &var.dimension_names {
                 if crate::data::coordinates::naming::is_channel_dim_name(name) {
                     let clean = name.trim().to_lowercase();
@@ -179,7 +182,7 @@ pub fn read_coord_values_scoped(
     known_groups: &[String],
     _dim_idx: usize,
     _total_dims: usize,
-) -> Option<Vec<String>> {
+) -> Option<CoordValues> {
     let clean = dim_name.trim().to_lowercase();
     let mut candidates = Vec::new();
     let mut add_candidate = |p: String| {
@@ -233,7 +236,8 @@ pub fn read_coord_values_scoped(
     }
     // Text coordinates label every index; numeric ones only need their endpoints.
     if crate::data::backends::zarr::strings::is_text_array(&array) {
-        return crate::data::backends::zarr::retrieve_array_as_strings(&array);
+        return crate::data::backends::zarr::retrieve_array_as_strings(&array)
+            .and_then(CoordValues::from_labels);
     }
     if len == 1 {
         let subset_0 = ArraySubset::new_with_ranges(&[0..1]);
@@ -241,7 +245,7 @@ pub fn read_coord_values_scoped(
             crate::data::backends::zarr::retrieve_array_subset_as_f32(&array, None, &subset_0)
                 .ok()
                 .and_then(|v| v.first().copied())?;
-        return Some(vec![val.to_string()]);
+        return CoordValues::from_values(vec![f64::from(val)], true);
     }
 
     // Retrieve boundary coordinates (first, last) for O(1) memory and instant resolution
@@ -258,5 +262,9 @@ pub fn read_coord_values_scoped(
             .ok()
             .and_then(|v| v.first().map(|&x| x as f64))?;
 
-    Some(vec![v_start.to_string(), v_end.to_string()])
+    Some(CoordValues::Endpoints {
+        first: v_start,
+        last: v_end,
+        len,
+    })
 }

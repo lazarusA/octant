@@ -7,7 +7,7 @@ use super::entries_2d::resolve_2d_plot_entries;
 use super::field::HoverField;
 use crate::app::{OctantApp, StoreKind};
 use crate::data::octant_block::OctantBlock;
-use crate::data::{DatasetMetadata, VariableInfo};
+use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 
 const BANDS: [&str; 4] = ["Blue", "Green", "Red", "NIR"];
 const SHAPE: [usize; 3] = [4, 2, 3];
@@ -35,12 +35,8 @@ fn block_with(attributes: HashMap<String, String>) -> OctantBlock {
 
 fn metadata(labels: Option<&[&str]>) -> DatasetMetadata {
     let dimension_coordinates = labels
-        .map(|l| {
-            HashMap::from([(
-                "band".to_string(),
-                l.iter().map(|s| s.to_string()).collect(),
-            )])
-        })
+        .and_then(|l| CoordValues::from_labels(l.iter().map(|s| s.to_string()).collect()))
+        .map(|band| HashMap::from([("band".to_string(), band)]))
         .unwrap_or_default();
     DatasetMetadata {
         name: "bands.tif".into(),

@@ -51,14 +51,12 @@ fn test_fetch_and_cache_dimension_coordinates() {
     let dim_names = vec!["lat".to_string(), "lon".to_string()];
     let coords = fetch_all_dimension_coordinates(store.clone(), &dim_names, Some("test_store"));
 
-    assert_eq!(
-        coords.get("lat"),
-        Some(&vec!["-90".to_string(), "90".to_string()])
-    );
-    assert_eq!(
-        coords.get("lon"),
-        Some(&vec!["0".to_string(), "360".to_string()])
-    );
+    let ends = |dim: &str| {
+        let c = coords.get(dim)?;
+        Some((c.len(), c.first_number()?, c.last_number()?))
+    };
+    assert_eq!(ends("lat"), Some((3, -90.0, 90.0)));
+    assert_eq!(ends("lon"), Some((3, 0.0, 360.0)));
 
     // Test bounds
     let lat_bounds = get_cached_coord_bounds(store.clone(), "test_store", "lat");

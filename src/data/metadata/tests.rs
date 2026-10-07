@@ -1,12 +1,17 @@
-use super::{dataset::DatasetMetadata, tree::VariableTreeGroup, variable::VariableInfo};
+use super::{
+    coord_values::CoordValues, dataset::DatasetMetadata, tree::VariableTreeGroup,
+    variable::VariableInfo,
+};
+
+fn numbers(values: &[f64]) -> CoordValues {
+    CoordValues::from_values(values.to_vec(), false).expect("coordinates")
+}
 
 #[test]
 fn test_coord_bounds_for_range_with_boundary_coords() {
     let mut meta = DatasetMetadata::default();
-    meta.dimension_coordinates.insert(
-        "lat".to_string(),
-        vec!["-90.0".to_string(), "90.0".to_string()],
-    );
+    meta.dimension_coordinates
+        .insert("lat".to_string(), numbers(&[-90.0, 90.0]));
 
     // 101 points from index 0 (-90) to index 100 (+90)
     let bounds_full = meta.get_coord_bounds_for_range("lat", 101, (0, 100));
@@ -22,10 +27,8 @@ fn test_coord_bounds_for_range_with_boundary_coords() {
 #[test]
 fn test_coord_bounds_for_range_with_descending_boundary_coords() {
     let mut meta = DatasetMetadata::default();
-    meta.dimension_coordinates.insert(
-        "lat".to_string(),
-        vec!["90.0".to_string(), "-90.0".to_string()],
-    );
+    meta.dimension_coordinates
+        .insert("lat".to_string(), numbers(&[90.0, -90.0]));
 
     // 101 points: index 0 is +90 (North), index 100 is -90 (South)
     // Range (0, 50) is Northern hemisphere [0..90]
@@ -40,15 +43,8 @@ fn test_coord_bounds_for_range_with_descending_boundary_coords() {
 #[test]
 fn test_coord_bounds_for_range_with_full_coords() {
     let mut meta = DatasetMetadata::default();
-    meta.dimension_coordinates.insert(
-        "lon".to_string(),
-        vec![
-            "0.0".to_string(),
-            "10.0".to_string(),
-            "25.0".to_string(),
-            "50.0".to_string(),
-        ],
-    );
+    meta.dimension_coordinates
+        .insert("lon".to_string(), numbers(&[0.0, 10.0, 25.0, 50.0]));
 
     let bounds_sub = meta.get_coord_bounds_for_range("lon", 4, (1, 3));
     assert_eq!(bounds_sub, Some((10.0, 50.0)));

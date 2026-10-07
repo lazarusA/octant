@@ -1,7 +1,7 @@
 //! Tooltip dimension coordinate formatting with physical units.
 
 use crate::data::coordinates::naming::{contains_ascii_case_insensitive, is_animated_time_name};
-use crate::data::{DatasetMetadata, VariableInfo};
+use crate::data::{CoordValue, CoordValues, DatasetMetadata, VariableInfo};
 use crate::ui::hover::field::HoverField;
 use crate::utils::units::{
     format_axis_value, format_cardinal_degrees, format_scalar_coordinate, is_cf_time_unit,
@@ -72,15 +72,6 @@ impl<'a> DimContext<'a> {
         }
     }
 
-    /// Position of `idx` along the dimension, from 0 (first) to 1 (last).
-    fn fraction(&self) -> f64 {
-        if self.total_len > 1 {
-            self.idx as f64 / (self.total_len - 1) as f64
-        } else {
-            0.0
-        }
-    }
-
     fn scalar(&self, val: f64) -> String {
         format_scalar_coordinate(self.name, val, self.units, self.time_start, self.is_time)
     }
@@ -121,41 +112,30 @@ fn from_metadata(
     var: Option<&VariableInfo>,
     ctx: &DimContext,
 ) -> Option<String> {
-    let var_name = var.map(|v| v.name.as_str());
-    if let Some(value) = meta
-        .get_dim_coords(var_name, ctx.name)
-        .and_then(|coords| from_coords(coords, ctx))
-    {
-        return Some(value);
-    }
-    let (min_b, max_b) = meta.get_coord_bounds_for_var(var_name, ctx.name)?;
-    Some(ctx.scalar(min_b + ctx.fraction() * (max_b - min_b)))
+    let coords = meta.get_dim_coords(var.map(|v| v.name.as_str()), ctx.name)?;
+    from_coords(coords, ctx)
 }
 
-/// Reads the coordinate at `ctx.idx`. A list whose length does not match the dimension is
-/// only trusted for its endpoints (dates or a numeric range), never for a label by index.
-fn from_coords(coords: &[String], ctx: &DimContext) -> Option<String> {
-    if coords.len() == ctx.total_len
-        && let Some(c) = coords.get(ctx.idx).map(|c| c.trim())
-        && !c.is_empty()
-    {
-        // Dates and labels never parse as numbers, so they are shown as stored.
-        return Some(
-            c.parse::<f64>()
-                .map_or_else(|_| c.to_string(), |v| ctx.scalar(v)),
-        );
-    }
-
-    if let [first, .., last] = coords {
-        let first_is_date = first.contains('-') || first.contains(':') || first.contains('T');
-        if ctx.is_time && first_is_date {
-            return Some(ctx.time(Some(first)));
-        }
-        if let (Ok(f_v), Ok(l_v)) = (first.parse::<f64>(), last.parse::<f64>()) {
-            return Some(ctx.scalar(f_v + ctx.fraction() * (l_v - f_v)));
+/// Reads the coordinate at `ctx.idx`. Values that do not match the dimension one to one
+/// are only trusted for their endpoints (a start date or a numeric range), never for a
+/// label by index.
+fn from_coords(coords: &CoordValues, ctx: &DimContext) -> Option<String> {
+    if coords.matches(ctx.total_len) {
+        match coords.get(ctx.idx)? {
+            CoordValue::Number(v) => return Some(ctx.scalar(v)),
+            CoordValue::Label(l) if !l.trim().is_empty() => return Some(l.trim().to_string()),
+            CoordValue::Label(_) => {}
         }
     }
-
+    if let Some(v) = coords.number_for(ctx.idx, ctx.total_len) {
+        return Some(ctx.scalar(v));
+    }
+    let first = coords.label(0).map(str::trim);
+    let first_is_date =
+        first.is_some_and(|f| f.contains('-') || f.contains(':') || f.contains('T'));
+    if ctx.is_time && first_is_date {
+        return Some(ctx.time(first));
+    }
     ctx.is_time.then(|| ctx.time(ctx.time_start))
 }
 
@@ -177,8 +157,13 @@ mod tests {
         DimContext::resolve(None, None, None, name, idx, total_len)
     }
 
-    fn coords(values: &[&str]) -> Vec<String> {
-        values.iter().map(|s| s.to_string()).collect()
+    fn numbers(values: &[f64]) -> CoordValues {
+        CoordValues::from_values(values.to_vec(), false).expect("numbers")
+    }
+
+    fn labels(values: &[&str]) -> CoordValues {
+        let labels = values.iter().map(|s| s.to_string()).collect();
+        CoordValues::from_labels(labels).expect("labels")
     }
 
     #[test]
@@ -201,7 +186,7 @@ mod tests {
 
     #[test]
     fn negative_coordinates_are_formatted_like_positive_ones() {
-        let lons = coords(&["-45.5", "45.5"]);
+        let lons = numbers(&[-45.5, 45.5]);
         assert_eq!(
             from_coords(&lons, &ctx("lon", 0, 2)).as_deref(),
             Some("45.50°W")
@@ -214,12 +199,12 @@ mod tests {
 
     #[test]
     fn labels_and_dates_are_shown_as_stored() {
-        let regions = coords(&["Europe", "Africa"]);
+        let regions = labels(&["Europe", "Africa"]);
         assert_eq!(
             from_coords(&regions, &ctx("region", 1, 2)).as_deref(),
             Some("Africa")
         );
-        let dates = coords(&[" 2024-01-15 ", "2024-01-16"]);
+        let dates = labels(&[" 2024-01-15 ", "2024-01-16"]);
         assert_eq!(
             from_coords(&dates, &ctx("day", 0, 2)).as_deref(),
             Some("2024-01-15")
@@ -229,11 +214,20 @@ mod tests {
     #[test]
     fn mismatched_label_list_is_not_read_by_index() {
         // Three labels for a ten-step dimension: none of them belongs to index 7.
-        let members = coords(&["r1", "r2", "r3"]);
+        let members = labels(&["r1", "r2", "r3"]);
         assert_eq!(from_coords(&members, &ctx("member", 7, 10)), None);
         // A numeric range with the wrong length still interpolates its endpoints.
-        let levels = coords(&["0", "90"]);
+        let levels = numbers(&[0.0, 90.0]);
         let mid = from_coords(&levels, &ctx("depth", 5, 10));
         assert_eq!(mid.as_deref(), Some("50.00 m"));
+    }
+
+    #[test]
+    fn uneven_levels_show_their_stored_value() {
+        let levels = numbers(&[1000.0, 925.0, 850.0, 700.0, 500.0, 300.0]);
+        assert!(matches!(levels, CoordValues::Values(_)));
+        let at = |i| from_coords(&levels, &ctx("depth", i, 6));
+        assert_eq!(at(2).as_deref(), Some("850.00 m"));
+        assert_eq!(at(5).as_deref(), Some("300.00 m"));
     }
 }

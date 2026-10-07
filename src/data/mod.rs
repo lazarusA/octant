@@ -53,7 +53,9 @@ pub use coordinates::{
 pub use dataset::{
     DataSource, DataSourceKind, Dataset, DatasetManager, SourceFactory, StoreHandle,
 };
-pub use metadata::{DatasetMetadata, VariableInfo, VariableTreeGroup};
+pub use metadata::{
+    CoordValue, CoordValues, DatasetMetadata, SpacingCheck, VariableInfo, VariableTreeGroup,
+};
 pub use octant_block::OctantBlock;
 pub use procedural::{
     KnownTruth4DParams, eval_known_truth_4d, generate_clenshaw_curtis_2d,

@@ -116,6 +116,7 @@ fn labelled_multiband_file_names_its_bands() {
     let expected = labels(&["Red", "Band 2", "Band 3", "NIR & edge"]);
     let band = meta
         .get_dim_coords(Some("raster"), "band")
+        .and_then(|c| c.labels())
         .map(<[String]>::to_vec);
     assert_eq!(band, expected);
 
@@ -152,6 +153,7 @@ fn unlabelled_bands_keep_the_index_and_rgba_bands_are_named() {
     let meta = inspect(rgba.build());
     let band = meta
         .get_dim_coords(Some("raster"), "band")
+        .and_then(|c| c.labels())
         .map(<[String]>::to_vec);
     assert_eq!(band, labels(&["Red", "Green", "Blue", "Alpha"]));
 }
@@ -187,6 +189,7 @@ fn expanded_palette_bands_are_rgb_but_the_index_band_is_not() {
     let meta = inspect(palette);
     let band = meta
         .get_dim_coords(Some("raster"), "band")
+        .and_then(|c| c.labels())
         .map(<[String]>::to_vec);
     assert_eq!(band, labels(&["Red", "Green", "Blue"]));
     let index = meta.variables.iter().find(|v| v.name == "band_1");

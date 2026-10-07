@@ -139,7 +139,10 @@ fn dimension_coordinates_keep_every_label_and_numeric_endpoints() {
     let dims = ["region", "station"].map(String::from);
     let coords = fetch_all_dimension_coordinates(store.clone(), &dims, Some("labels_store"));
     assert_eq!(
-        coords.get("region").cloned(),
+        coords
+            .get("region")
+            .and_then(|c| c.labels())
+            .map(<[String]>::to_vec),
         labels(&["Europe", "Africa", "Asia"])
     );
     assert_eq!(

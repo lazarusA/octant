@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use async_tiff::tags::{PhotometricInterpretation, SampleFormat};
 use async_tiff::{ImageFileDirectory, TIFF};
 
-use crate::data::metadata::{DatasetMetadata, VariableInfo};
+use crate::data::metadata::{CoordValues, DatasetMetadata, VariableInfo};
 
 use super::bands::{
     GdalItem, add_gdal_attributes, band_labels, default_band_name, parse_gdal_metadata,
@@ -33,7 +33,7 @@ fn inspect_single_ifd(
     ifd_idx: usize,
     ifd: &ImageFileDirectory,
     variables: &mut Vec<VariableInfo>,
-    dimension_coordinates: &mut HashMap<String, Vec<String>>,
+    dimension_coordinates: &mut HashMap<String, CoordValues>,
 ) {
     let prefix = if ifd_idx == 0 {
         String::new()
@@ -64,6 +64,7 @@ fn inspect_single_ifd(
         let labels = band_labels(ifd, &gdal, num_bands as usize, is_palette);
         geo_bounds.populate_dimension_coordinates(
             &raster_name,
+            (width as usize, height as usize),
             labels.as_deref(),
             dimension_coordinates,
         );
@@ -121,7 +122,7 @@ fn add_band_variables(
     gdal: &[GdalItem],
     geo_bounds: &GeoSpatialBounds,
     variables: &mut Vec<VariableInfo>,
-    dimension_coordinates: &mut HashMap<String, Vec<String>>,
+    dimension_coordinates: &mut HashMap<String, CoordValues>,
 ) {
     for band_idx in 0..samples {
         let var_name = if samples == 1 {
@@ -134,7 +135,8 @@ fn add_band_variables(
             format!("{prefix}band_{}", band_idx + 1)
         };
 
-        geo_bounds.populate_dimension_coordinates(&var_name, None, dimension_coordinates);
+        let size = (width as usize, height as usize);
+        geo_bounds.populate_dimension_coordinates(&var_name, size, None, dimension_coordinates);
         let band = band_idx as usize;
         let band_long_name = labels
             .and_then(|l| l.get(band))

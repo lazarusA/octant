@@ -5,16 +5,15 @@ use std::sync::{OnceLock, RwLock};
 use zarrs::storage::ReadableWritableListableStorage;
 
 use super::extract::read_coord_values_scoped;
+use crate::data::CoordValues;
 
 #[allow(clippy::type_complexity)]
-static COORD_VALUES_CACHE: OnceLock<RwLock<HashMap<String, Option<Vec<String>>>>> = OnceLock::new();
+static COORD_VALUES_CACHE: OnceLock<RwLock<HashMap<String, Option<CoordValues>>>> = OnceLock::new();
 
-/// Parses numerical `(f64, f64)` coordinate boundaries from a boundary slice pair.
+/// The first and last coordinate values, in storage order; `None` for labels.
 #[inline]
-pub(crate) fn parse_bounds_from_values(values: &[String]) -> Option<(f64, f64)> {
-    let first: f64 = values.first()?.parse().ok()?;
-    let last: f64 = values.last()?.parse().ok()?;
-    Some((first, last))
+pub(crate) fn parse_bounds_from_values(values: &CoordValues) -> Option<(f64, f64)> {
+    Some((values.first_number()?, values.last_number()?))
 }
 
 #[allow(clippy::single_range_in_vec_init)]
@@ -66,7 +65,7 @@ pub fn get_cached_coord_values_with_rank(
     dim_name: &str,
     dim_idx: usize,
     total_dims: usize,
-) -> Option<Vec<String>> {
+) -> Option<CoordValues> {
     get_cached_coord_values_scoped(store, store_url, dim_name, None, &[], dim_idx, total_dims)
 }
 
@@ -79,7 +78,7 @@ pub fn get_cached_coord_values_scoped(
     known_groups: &[String],
     dim_idx: usize,
     total_dims: usize,
-) -> Option<Vec<String>> {
+) -> Option<CoordValues> {
     let cache_lock = COORD_VALUES_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
     let clean_url = store_url.trim().to_lowercase();
     let clean_dim = dim_name.trim().to_lowercase();

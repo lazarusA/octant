@@ -8,10 +8,10 @@ use netcdf::{Extent, Extents};
 use super::attrs::{extract_global_attributes, extract_variable_attributes, var_type_to_string};
 use super::slice::read_variable_hyperslab_as_f32;
 use crate::data::blocks::BlockStoreError;
-use crate::data::metadata::{DatasetMetadata, VariableInfo};
+use crate::data::metadata::{CoordValues, DatasetMetadata, VariableInfo};
 
 /// Extracts 1D coordinate vectors or bounds from a NetCDF file.
-pub fn extract_dimension_coordinates(file: &netcdf::File) -> HashMap<String, Vec<String>> {
+pub fn extract_dimension_coordinates(file: &netcdf::File) -> HashMap<String, CoordValues> {
     let mut dimension_coordinates = HashMap::new();
 
     for var in file.variables() {
@@ -41,12 +41,13 @@ pub fn extract_dimension_coordinates(file: &netcdf::File) -> HashMap<String, Vec
                     stride: 1,
                 }]);
 
-                if let Ok(values) = read_variable_hyperslab_as_f32(&var, &extents) {
-                    let strings: Vec<String> = values.into_iter().map(|v| format!("{v}")).collect();
-
-                    dimension_coordinates.insert(clean.clone(), strings.clone());
+                if let Ok(values) = read_variable_hyperslab_as_f32(&var, &extents)
+                    && let Some(coords) =
+                        CoordValues::from_values(values.into_iter().map(f64::from).collect(), true)
+                {
+                    dimension_coordinates.insert(clean.clone(), coords.clone());
                     if clean != name {
-                        dimension_coordinates.insert(name.clone(), strings);
+                        dimension_coordinates.insert(name.clone(), coords);
                     }
                 }
             }

@@ -1,6 +1,8 @@
 //! Coordinate bounds and dimension extraction for GeoTIFF rasters.
 
 use async_tiff::ImageFileDirectory;
+
+use crate::data::CoordValues;
 use std::collections::HashMap;
 
 /// Spatial coordinate information extracted from an IFD.
@@ -11,6 +13,8 @@ pub struct GeoSpatialBounds {
     pub min_y: f64,
     pub max_y: f64,
     pub is_geographic: bool,
+    /// The bounds come from GeoTIFF tags; otherwise they are the pixel grid itself.
+    pub georeferenced: bool,
 }
 
 impl GeoSpatialBounds {
@@ -41,6 +45,7 @@ impl GeoSpatialBounds {
                 min_y: y0.min(y1),
                 max_y: y0.max(y1),
                 is_geographic,
+                georeferenced: true,
             };
         }
 
@@ -58,6 +63,7 @@ impl GeoSpatialBounds {
                 min_y: y0.min(y1),
                 max_y: y0.max(y1),
                 is_geographic,
+                georeferenced: true,
             };
         }
 
@@ -67,7 +73,34 @@ impl GeoSpatialBounds {
             min_y: 0.0,
             max_y: height,
             is_geographic: false,
+            georeferenced: false,
         }
+    }
+
+    /// The `(x, y)` coordinates of a `width x height` raster: georeferenced pixel centers
+    /// (rows from north to south), or pixel indices without georeferencing.
+    pub fn axes(&self, width: usize, height: usize) -> (CoordValues, CoordValues) {
+        if !self.georeferenced {
+            let index = |len| CoordValues::Regular {
+                start: 0.0,
+                step: 1.0,
+                len,
+            };
+            return (index(width), index(height));
+        }
+        let dx = (self.max_x - self.min_x) / width.max(1) as f64;
+        let dy = (self.max_y - self.min_y) / height.max(1) as f64;
+        let x = CoordValues::Regular {
+            start: self.min_x + 0.5 * dx,
+            step: dx,
+            len: width,
+        };
+        let y = CoordValues::Regular {
+            start: self.max_y - 0.5 * dy,
+            step: -dy,
+            len: height,
+        };
+        (x, y)
     }
 
     /// Generates dimension coordinate entries for `DatasetMetadata`, including the band
@@ -75,26 +108,26 @@ impl GeoSpatialBounds {
     pub fn populate_dimension_coordinates(
         &self,
         var_name: &str,
+        (width, height): (usize, usize),
         band_labels: Option<&[String]>,
-        coords: &mut HashMap<String, Vec<String>>,
+        coords: &mut HashMap<String, CoordValues>,
     ) {
-        if let Some(labels) = band_labels {
-            coords.insert("band".into(), labels.to_vec());
-            coords.insert(format!("{var_name}/band"), labels.to_vec());
+        // Unscoped keys keep the full-resolution image's axes; overviews only add scoped ones.
+        let mut insert = |name: &str, values: &CoordValues| {
+            coords
+                .entry(name.to_string())
+                .or_insert_with(|| values.clone());
+            coords.insert(format!("{var_name}/{name}"), values.clone());
+        };
+        if let Some(labels) = band_labels.and_then(|l| CoordValues::from_labels(l.to_vec())) {
+            insert("band", &labels);
         }
-        let (xc, yc) = (
-            vec![self.min_x.to_string(), self.max_x.to_string()],
-            vec![self.min_y.to_string(), self.max_y.to_string()],
-        );
-        coords.insert("x".into(), xc.clone());
-        coords.insert("y".into(), yc.clone());
-        coords.insert(format!("{var_name}/x"), xc.clone());
-        coords.insert(format!("{var_name}/y"), yc.clone());
+        let (xc, yc) = self.axes(width, height);
+        insert("x", &xc);
+        insert("y", &yc);
         if self.is_geographic {
-            coords.insert("lon".into(), xc.clone());
-            coords.insert("lat".into(), yc.clone());
-            coords.insert(format!("{var_name}/lon"), xc);
-            coords.insert(format!("{var_name}/lat"), yc);
+            insert("lon", &xc);
+            insert("lat", &yc);
         }
     }
 

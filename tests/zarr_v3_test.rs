@@ -357,7 +357,8 @@ fn test_local_zarr_v3_nested_only_no_root_variables() {
         "Should resolve 'lat' coordinate bounds from nested group"
     );
     let lat_bounds = metadata.dimension_coordinates.get("lat").unwrap();
-    assert_eq!(lat_bounds, &vec!["-30".to_string(), "30".to_string()]);
+    assert_eq!(lat_bounds.first_number(), Some(-30.0));
+    assert_eq!(lat_bounds.last_number(), Some(30.0));
     assert_eq!(metadata.get_coord_bounds("lat"), Some((-30.0, 30.0)));
 
     let tree = metadata.build_variable_tree();
