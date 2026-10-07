@@ -70,12 +70,18 @@ impl GeoSpatialBounds {
         }
     }
 
-    /// Generates dimension coordinate entries for `DatasetMetadata`.
+    /// Generates dimension coordinate entries for `DatasetMetadata`, including the band
+    /// names of a multi-band variable when it has them.
     pub fn populate_dimension_coordinates(
         &self,
         var_name: &str,
+        band_labels: Option<&[String]>,
         coords: &mut HashMap<String, Vec<String>>,
     ) {
+        if let Some(labels) = band_labels {
+            coords.insert("band".into(), labels.to_vec());
+            coords.insert(format!("{var_name}/band"), labels.to_vec());
+        }
         let (xc, yc) = (
             vec![self.min_x.to_string(), self.max_x.to_string()],
             vec![self.min_y.to_string(), self.max_y.to_string()],

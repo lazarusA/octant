@@ -7,6 +7,9 @@ use async_tiff::{ImageFileDirectory, TIFF};
 
 use crate::data::metadata::{DatasetMetadata, VariableInfo};
 
+use super::bands::{
+    GdalItem, add_gdal_attributes, band_labels, default_band_name, parse_gdal_metadata,
+};
 use super::coords::GeoSpatialBounds;
 
 /// Build `DatasetMetadata` from parsed `TIFF` structure.
@@ -43,7 +46,12 @@ fn inspect_single_ifd(
         ifd.samples_per_pixel() as u64,
     );
     let data_type_str = extract_data_type_name(ifd);
-    let attributes = extract_ifd_attributes(ifd);
+    let gdal = ifd
+        .gdal_metadata()
+        .map(parse_gdal_metadata)
+        .unwrap_or_default();
+    let mut attributes = extract_ifd_attributes(ifd);
+    add_gdal_attributes(&mut attributes, &gdal, None);
     let chunk_shape = extract_chunk_shape(ifd, width, height);
     let geo_bounds = GeoSpatialBounds::from_ifd(ifd);
     let is_palette = ifd.photometric_interpretation() == PhotometricInterpretation::RGBPalette
@@ -53,7 +61,12 @@ fn inspect_single_ifd(
 
     if num_bands > 1 {
         let raster_name = format!("{prefix}raster");
-        geo_bounds.populate_dimension_coordinates(&raster_name, dimension_coordinates);
+        let labels = band_labels(ifd, &gdal, num_bands as usize, is_palette);
+        geo_bounds.populate_dimension_coordinates(
+            &raster_name,
+            labels.as_deref(),
+            dimension_coordinates,
+        );
         variables.push(VariableInfo {
             name: raster_name,
             data_type: if is_palette {
@@ -78,6 +91,7 @@ fn inspect_single_ifd(
         });
     }
 
+    let sample_labels = band_labels(ifd, &gdal, samples as usize, false);
     add_band_variables(
         &prefix,
         samples,
@@ -85,8 +99,9 @@ fn inspect_single_ifd(
         height,
         &data_type_str,
         &chunk_shape,
-        is_cmyk,
+        sample_labels.as_deref(),
         &attributes,
+        &gdal,
         &geo_bounds,
         variables,
         dimension_coordinates,
@@ -101,8 +116,9 @@ fn add_band_variables(
     height: u64,
     data_type_str: &str,
     chunk_shape: &[u64],
-    is_cmyk: bool,
+    labels: Option<&[String]>,
     attributes: &HashMap<String, String>,
+    gdal: &[GdalItem],
     geo_bounds: &GeoSpatialBounds,
     variables: &mut Vec<VariableInfo>,
     dimension_coordinates: &mut HashMap<String, Vec<String>>,
@@ -118,19 +134,14 @@ fn add_band_variables(
             format!("{prefix}band_{}", band_idx + 1)
         };
 
-        geo_bounds.populate_dimension_coordinates(&var_name, dimension_coordinates);
-        let band_long_name = if is_cmyk {
-            match band_idx {
-                0 => "Cyan (C)",
-                1 => "Magenta (M)",
-                2 => "Yellow (Y)",
-                3 => "Black (K)",
-                _ => "Band",
-            }
-            .into()
-        } else {
-            format!("Band {}", band_idx + 1)
-        };
+        geo_bounds.populate_dimension_coordinates(&var_name, None, dimension_coordinates);
+        let band = band_idx as usize;
+        let band_long_name = labels
+            .and_then(|l| l.get(band))
+            .cloned()
+            .unwrap_or_else(|| default_band_name(band));
+        let mut band_attributes = attributes.clone();
+        add_gdal_attributes(&mut band_attributes, gdal, Some(band));
 
         variables.push(VariableInfo {
             name: var_name,
@@ -144,7 +155,7 @@ fn add_band_variables(
             time_coverage_start: None,
             time_coverage_end: None,
             temporal_resolution: None,
-            attributes: attributes.clone(),
+            attributes: band_attributes,
         });
     }
 }

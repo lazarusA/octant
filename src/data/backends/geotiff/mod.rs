@@ -1,5 +1,6 @@
 //! TIFF and Cloud-Optimized GeoTIFF (COG) storage backend.
 
+pub mod bands;
 pub mod blit;
 pub mod coords;
 pub mod decode;
@@ -10,6 +11,8 @@ pub mod slicing;
 pub mod store;
 pub mod wasm;
 
+#[cfg(test)]
+mod bands_tests;
 #[cfg(test)]
 pub mod test_utils;
 #[cfg(test)]
