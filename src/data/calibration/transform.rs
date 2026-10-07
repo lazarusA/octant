@@ -16,30 +16,29 @@ impl DataCalibration {
     /// Transforms a single numerical element according to CF convention masking and scaling rules.
     #[inline]
     pub fn transform(&self, val: f64) -> f32 {
+        self.transform_f64(val) as f32
+    }
+
+    /// [`Self::transform`] in full precision, for values such as coordinates that `f32`
+    /// cannot hold exactly (e.g. seconds since an epoch).
+    #[inline]
+    pub fn transform_f64(&self, val: f64) -> f64 {
         if let Some(fv) = self.fill_value
             && ((val - fv).abs() <= 1e-5 * fv.abs().max(1.0) || (val.is_nan() && fv.is_nan()))
         {
-            return f32::NAN;
+            return f64::NAN;
         }
         if let Some(vmin) = self.valid_min
             && val < vmin
         {
-            return f32::NAN;
+            return f64::NAN;
         }
         if let Some(vmax) = self.valid_max
             && val > vmax
         {
-            return f32::NAN;
+            return f64::NAN;
         }
-
-        let scale = self.scale_factor.unwrap_or(1.0);
-        let offset = self.add_offset.unwrap_or(0.0);
-
-        if self.scale_factor.is_some() || self.add_offset.is_some() {
-            (val * scale + offset) as f32
-        } else {
-            val as f32
-        }
+        val * self.scale_factor.unwrap_or(1.0) + self.add_offset.unwrap_or(0.0)
     }
 
     /// Transforms a slice of values in-place if any transformation is active.

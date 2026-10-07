@@ -1,5 +1,4 @@
-//! Text coordinate reading: v3 `string` / `fixed_length_utf32`, v2 `<U` / `|O`, the label
-//! cap, and the WASM preload ranges.
+//! Text coordinate reading: v3 `string` / `fixed_length_utf32`, v2 `<U` / `|O`, read whole.
 
 use std::sync::Arc;
 
@@ -8,7 +7,7 @@ use zarrs::metadata::v3::MetadataV3;
 use zarrs::storage::store::MemoryStore;
 use zarrs::storage::{StoreKey, WritableStorageTraits};
 
-use super::strings::{MAX_LABELS, coordinate_preload_ranges, retrieve_array_as_strings};
+use super::coords::retrieve_array_as_strings;
 use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates;
 use crate::utils::metadata::open_or_instantiate_array_normalized;
 
@@ -129,38 +128,17 @@ fn v2_numpy_unicode_and_object_labels_are_read() {
 }
 
 #[test]
-fn dimension_coordinates_keep_every_label_and_numeric_endpoints() {
+fn dimension_coordinates_keep_every_label() {
     let store = Arc::new(MemoryStore::new());
     v3_strings(&store, "/region", &["Europe", "Africa", "Asia"], 3);
-    let too_many: Vec<String> = (0..=MAX_LABELS).map(|i| format!("s{i}")).collect();
-    let too_many: Vec<&str> = too_many.iter().map(String::as_str).collect();
-    v3_strings(&store, "/station", &too_many, 1024);
+    let stations: Vec<String> = (0..5000).map(|i| format!("s{i}")).collect();
+    let stations: Vec<&str> = stations.iter().map(String::as_str).collect();
+    v3_strings(&store, "/station", &stations, 1024);
 
     let dims = ["region", "station"].map(String::from);
     let coords = fetch_all_dimension_coordinates(store.clone(), &dims, Some("labels_store"));
-    assert_eq!(
-        coords
-            .get("region")
-            .and_then(|c| c.labels())
-            .map(<[String]>::to_vec),
-        labels(&["Europe", "Africa", "Asia"])
-    );
-    assert_eq!(
-        coords.get("station"),
-        None,
-        "over the label cap stays unread"
-    );
-}
-
-#[test]
-#[allow(clippy::single_range_in_vec_init)]
-fn wasm_preload_fetches_all_labels_but_only_numeric_endpoints() {
-    let store = Arc::new(MemoryStore::new());
-    v3_strings(&store, "/region", &["Europe", "Africa", "Asia"], 1);
-    let labels = open(&store, "/region");
-    assert_eq!(coordinate_preload_ranges(Some(&labels), 3), [0..3]);
-    let none: Option<&Array<MemoryStore>> = None;
-    assert_eq!(coordinate_preload_ranges(none, 10), [0..1, 9..10]);
-    assert_eq!(coordinate_preload_ranges(none, 1), [0..1]);
-    assert!(coordinate_preload_ranges(none, 0).is_empty());
+    let label = |dim: &str, i: usize| coords.get(dim).and_then(|c| c.label(i));
+    assert_eq!(label("region", 1), Some("Africa"));
+    assert_eq!(coords.get("station").map(|c| c.len()), Some(5000));
+    assert_eq!(label("station", 4999), Some("s4999"));
 }

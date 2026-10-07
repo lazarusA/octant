@@ -1,7 +1,6 @@
 //! Coordinate range extraction and subset retrieval from storage arrays.
 
 use std::collections::HashMap;
-use zarrs::array::ArraySubset;
 use zarrs::storage::ReadableWritableListableStorage;
 
 use super::cache::{
@@ -229,42 +228,5 @@ pub fn read_coord_values_scoped(
     }
 
     let array = discover_coord_array(store, &candidates, aliases)?;
-
-    let len = array.shape().first().copied().unwrap_or(0) as usize;
-    if len == 0 {
-        return None;
-    }
-    // Text coordinates label every index; numeric ones only need their endpoints.
-    if crate::data::backends::zarr::strings::is_text_array(&array) {
-        return crate::data::backends::zarr::retrieve_array_as_strings(&array)
-            .and_then(CoordValues::from_labels);
-    }
-    if len == 1 {
-        let subset_0 = ArraySubset::new_with_ranges(&[0..1]);
-        let val =
-            crate::data::backends::zarr::retrieve_array_subset_as_f32(&array, None, &subset_0)
-                .ok()
-                .and_then(|v| v.first().copied())?;
-        return CoordValues::from_values(vec![f64::from(val)], true);
-    }
-
-    // Retrieve boundary coordinates (first, last) for O(1) memory and instant resolution
-    let subset_start = ArraySubset::new_with_ranges(&[0..1]);
-    let subset_end = ArraySubset::new_with_ranges(&[(len as u64 - 1)..len as u64]);
-
-    let v_start =
-        crate::data::backends::zarr::retrieve_array_subset_as_f32(&array, None, &subset_start)
-            .ok()
-            .and_then(|v| v.first().map(|&x| x as f64))?;
-
-    let v_end =
-        crate::data::backends::zarr::retrieve_array_subset_as_f32(&array, None, &subset_end)
-            .ok()
-            .and_then(|v| v.first().map(|&x| x as f64))?;
-
-    Some(CoordValues::Endpoints {
-        first: v_start,
-        last: v_end,
-        len,
-    })
+    crate::data::backends::zarr::read_coordinate(&array)
 }

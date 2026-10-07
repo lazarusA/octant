@@ -1,7 +1,6 @@
 //! Coordinate preloading and metadata finalization for WebAssembly Zarr.
 
 use super::WasmZarrBlockStore;
-use crate::data::backends::zarr::strings::coordinate_preload_ranges;
 use crate::data::{DatasetMetadata, VariableInfo};
 use crate::utils::metadata::open_or_instantiate_array_normalized;
 
@@ -68,15 +67,13 @@ impl WasmZarrBlockStore {
         }
     }
 
-    /// Preloads the chunks a 1D coordinate needs: every label of a text coordinate, else its
-    /// first and last value.
+    /// Preloads every chunk of a 1D coordinate, which is read whole (`zarr::coords`).
     #[allow(clippy::single_range_in_vec_init)]
     pub async fn preload_coordinate_chunks_1d(&self, coord_name: &str, count: u64) {
-        let path = format!("/{}", coord_name.trim_start_matches('/'));
-        let array = open_or_instantiate_array_normalized(self.memory_store.clone(), &path).ok();
-        for range in coordinate_preload_ranges(array.as_ref(), count) {
-            let subset = ArraySubset::new_with_ranges(&[range]);
-            let _ = Box::pin(self.preload_chunks_for_subset(coord_name, &subset, None)).await;
+        if count == 0 {
+            return;
         }
+        let subset = ArraySubset::new_with_ranges(&[0..count]);
+        let _ = Box::pin(self.preload_chunks_for_subset(coord_name, &subset, None)).await;
     }
 }

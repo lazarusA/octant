@@ -11,8 +11,6 @@ use super::header::decompress_icechunk_file;
 use super::store::WasmIcechunkBlockStore;
 #[cfg(target_arch = "wasm32")]
 use crate::data::backends::http::{fetch_url_byte_range, fetch_url_bytes};
-#[cfg(target_arch = "wasm32")]
-use crate::data::backends::zarr::strings::coordinate_preload_ranges;
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
 #[cfg(target_arch = "wasm32")]
 use crate::utils::metadata::open_or_instantiate_array_normalized;
@@ -214,18 +212,15 @@ impl WasmIcechunkBlockStore {
         Ok(())
     }
 
-    /// Preloads the chunks a 1D coordinate needs: every label of a text coordinate, else its
-    /// first and last value.
+    /// Preloads every chunk of a 1D coordinate, which is read whole (`zarr::coords`).
     #[cfg(target_arch = "wasm32")]
     #[allow(clippy::single_range_in_vec_init)]
     pub async fn preload_coordinate_chunks_1d(&self, coord_name: &str, count: u64) {
-        let path = format!("/{}", coord_name.trim_start_matches('/'));
-        let store = self.inner.memory_store.clone();
-        let array = open_or_instantiate_array_normalized(store, &path).ok();
-        for range in coordinate_preload_ranges(array.as_ref(), count) {
-            let subset = ArraySubset::new_with_ranges(&[range]);
-            let _ = Box::pin(self.preload_chunks_for_subset(coord_name, &subset, None)).await;
+        if count == 0 {
+            return;
         }
+        let subset = ArraySubset::new_with_ranges(&[0..count]);
+        let _ = Box::pin(self.preload_chunks_for_subset(coord_name, &subset, None)).await;
     }
 
     #[cfg(not(target_arch = "wasm32"))]
