@@ -1,3 +1,5 @@
+use super::grid_flips::{axis_flips, reverse_flipped_coordinates};
+
 /// Function for checking axes order and orientation.
 ///
 /// Accounts for:
@@ -46,43 +48,7 @@ pub fn check_and_orient_axes_with_coords(
         (raw_values, in_width, in_height)
     };
 
-    let mut flip_y = false;
-
-    if let Some(coords) = lat_coords {
-        if coords.len() >= 2 {
-            let first = coords.first().copied().unwrap_or(0.0);
-            let last = coords.last().copied().unwrap_or(0.0);
-            if first < last {
-                // Axis data ascends from South to North (Row 0 is South).
-                // Flip Y so North (+90) renders at top of screen (Row 0).
-                flip_y = true;
-            } else if first > last {
-                // Axis data descends from North to South (Row 0 is North).
-                // Row 0 is already at top of screen (North), do not flip Y.
-                flip_y = false;
-            }
-        }
-    } else if let Some(orientation) = attributes
-        .get("latitude_orientation")
-        .and_then(|v| v.as_str())
-    {
-        if orientation.to_lowercase() == "ascending" {
-            flip_y = true;
-        } else if orientation.to_lowercase() == "descending" {
-            flip_y = false;
-        }
-    } else if let Some(positive_attr) = attributes.get("positive").and_then(|v| v.as_str())
-        && positive_attr.to_lowercase() == "up"
-    {
-        flip_y = true;
-    } else {
-        let is_lat_dim = dim_names
-            .iter()
-            .any(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
-        if is_lat_dim {
-            flip_y = true;
-        }
-    }
+    let (flip_y, flip_x) = axis_flips(dim_names, attributes, lat_coords, lon_coords);
 
     if flip_y && height > 1 {
         for r in 0..(height / 2) {
@@ -92,26 +58,6 @@ pub fn check_and_orient_axes_with_coords(
                 current_values.swap(top_row_start + c, bot_row_start + c);
             }
         }
-    }
-
-    // 3. Determine X (Longitude) orientation directly from axis coordinate values or explicit metadata
-    let mut flip_x = false;
-
-    if let Some(coords) = lon_coords {
-        if coords.len() >= 2 {
-            let first = coords.first().copied().unwrap_or(0.0);
-            let last = coords.last().copied().unwrap_or(0.0);
-            if first > last {
-                // Axis data descends (East to West). Flip X so West renders on left.
-                flip_x = true;
-            }
-        }
-    } else if let Some(orientation) = attributes
-        .get("longitude_orientation")
-        .and_then(|v| v.as_str())
-        && orientation.to_lowercase() == "descending"
-    {
-        flip_x = true;
     }
 
     if flip_x && width > 1 {
@@ -133,7 +79,7 @@ pub fn check_and_orient_block_grid(
     dimension_names: &mut [String],
     origin: &mut [usize],
     attributes: &serde_json::Map<String, serde_json::Value>,
-    coordinates: &std::collections::HashMap<String, Vec<f64>>,
+    coordinates: &mut std::collections::HashMap<String, Vec<f64>>,
 ) -> Vec<f32> {
     let rank = block_shape.len();
     if rank < 2 {
@@ -173,11 +119,13 @@ pub fn check_and_orient_block_grid(
         })
         .map(|v| v.as_slice());
 
+    let flips = axis_flips(dimension_names, attributes, lat_coords, lon_coords);
     let in_height = block_shape[rank - 2];
     let in_width = block_shape[rank - 1];
     let slice_size = in_width * in_height;
+    let oriented = slice_size > 0 && values.len().is_multiple_of(slice_size);
 
-    if slice_size > 0 && values.len().is_multiple_of(slice_size) {
+    if oriented {
         let num_slices = values.len() / slice_size;
         let mut final_values = Vec::with_capacity(values.len());
         let mut final_width = in_width;
@@ -207,6 +155,8 @@ pub fn check_and_orient_block_grid(
         }
 
         values = final_values;
+        // After the slices: they judge their flips from these coordinates.
+        reverse_flipped_coordinates(coordinates, dimension_names, block_shape, flips);
     }
 
     values

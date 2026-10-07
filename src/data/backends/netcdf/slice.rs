@@ -180,7 +180,7 @@ impl BlockStore for NetCdfBlockStore {
             }
 
             let attributes = extract_variable_attributes(var);
-            let coordinates =
+            let mut coordinates =
                 super::coords::extract_sliced_coordinates(&file, &dim_names, &origin, &block_shape);
 
             let json_attrs: serde_json::Map<String, serde_json::Value> = attributes
@@ -194,7 +194,7 @@ impl BlockStore for NetCdfBlockStore {
                 &mut dim_names,
                 &mut origin,
                 &json_attrs,
-                &coordinates,
+                &mut coordinates,
             );
 
             let block = OctantBlock::new(

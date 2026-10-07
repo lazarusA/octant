@@ -7,7 +7,8 @@ use zarrs::storage::ReadableWritableListableStorage;
 
 use super::generic::{GenericZarrBlockStore, ZarrArrayHandle};
 use super::slice::retrieve_array_subset_as_f32;
-use crate::data::backends::coord_bounds::get_cached_coord_bounds_scoped;
+use crate::data::CoordValues;
+use crate::data::backends::coord_bounds::get_cached_coord_values_scoped;
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::{DimensionSelection, SliceRequest};
@@ -114,80 +115,60 @@ pub fn fetch_block_from_cached_array(
     let full_shape = array.shape();
     let mut coordinates: HashMap<String, Vec<f64>> = HashMap::new();
     let total_dims = dim_names.len();
-    for (i, name) in dim_names.iter().enumerate() {
-        if let Some((first, last)) = get_cached_coord_bounds_scoped(
+    let coord_values = |name: &str, dim_idx: usize| {
+        get_cached_coord_values_scoped(
             store.clone(),
             store_url,
             name,
             group_path,
             &[],
-            i,
+            dim_idx,
             total_dims,
-        ) {
-            let full_dim_len = full_shape.get(i).copied().unwrap_or(block_shape[i] as u64) as usize;
-            let start_idx = origin.get(i).copied().unwrap_or(0);
-            let end_idx = start_idx + block_shape.get(i).copied().unwrap_or(1);
-            let t_start = if full_dim_len > 1 {
-                start_idx as f64 / (full_dim_len - 1) as f64
-            } else {
-                0.0
-            };
-            let t_end = if full_dim_len > 1 {
-                (end_idx.saturating_sub(1)) as f64 / (full_dim_len - 1) as f64
-            } else {
-                1.0
-            };
-            let block_first = first + t_start * (last - first);
-            let block_last = first + t_end * (last - first);
-            coordinates.insert(name.clone(), vec![block_first, block_last]);
+        )
+    };
+    let window = |i: usize, coords: &CoordValues| {
+        let full_len = full_shape.get(i).copied().unwrap_or(block_shape[i] as u64) as usize;
+        let start = origin.get(i).copied().unwrap_or(0);
+        window_coords(
+            coords,
+            full_len,
+            start,
+            block_shape.get(i).copied().unwrap_or(1),
+        )
+    };
+    for (i, name) in dim_names.iter().enumerate() {
+        if let Some(values) = coord_values(name, i).and_then(|c| window(i, &c)) {
             let clean = name.trim().to_lowercase();
             if clean != *name {
-                coordinates.insert(clean, vec![block_first, block_last]);
+                coordinates.insert(clean, values.clone());
             }
+            coordinates.insert(name.clone(), values);
         }
     }
 
     // Fallback: If dim_names contain generic "dim_i" names, query spatial coordinate bounds for lat and lon
     if coordinates.is_empty() || dim_names.iter().any(|d| d.starts_with("dim_")) {
         for candidate in &["lat", "latitude", "y", "lon", "longitude", "x"] {
-            if let Some((first, last)) = get_cached_coord_bounds_scoped(
-                store.clone(),
-                store_url,
-                candidate,
-                group_path,
-                &[],
-                usize::MAX,
-                total_dims,
-            ) {
-                let is_x = crate::data::coordinates::naming::is_spatial_x_name(candidate);
-                let dim_i = dim_names.iter().position(|d| {
-                    if is_x {
-                        crate::data::coordinates::naming::is_spatial_x_name(d)
-                    } else {
-                        crate::data::coordinates::naming::is_spatial_y_name(d)
-                    }
-                });
-                if let Some(i) = dim_i {
-                    let full_dim_len =
-                        full_shape.get(i).copied().unwrap_or(block_shape[i] as u64) as usize;
-                    let start_idx = origin.get(i).copied().unwrap_or(0);
-                    let end_idx = start_idx + block_shape.get(i).copied().unwrap_or(1);
-                    let t_start = if full_dim_len > 1 {
-                        start_idx as f64 / (full_dim_len - 1) as f64
-                    } else {
-                        0.0
-                    };
-                    let t_end = if full_dim_len > 1 {
-                        (end_idx.saturating_sub(1)) as f64 / (full_dim_len - 1) as f64
-                    } else {
-                        1.0
-                    };
-                    let block_first = first + t_start * (last - first);
-                    let block_last = first + t_end * (last - first);
-                    coordinates.insert((*candidate).to_string(), vec![block_first, block_last]);
+            let Some(coords) = coord_values(candidate, usize::MAX) else {
+                continue;
+            };
+            let is_x = crate::data::coordinates::naming::is_spatial_x_name(candidate);
+            let dim_i = dim_names.iter().position(|d| {
+                if is_x {
+                    crate::data::coordinates::naming::is_spatial_x_name(d)
                 } else {
-                    coordinates.insert((*candidate).to_string(), vec![first, last]);
+                    crate::data::coordinates::naming::is_spatial_y_name(d)
                 }
+            });
+            let values = match dim_i {
+                Some(i) => window(i, &coords),
+                None => coords
+                    .first_number()
+                    .zip(coords.last_number())
+                    .map(|(first, last)| vec![first, last]),
+            };
+            if let Some(values) = values {
+                coordinates.insert((*candidate).to_string(), values);
             }
         }
     }
@@ -198,7 +179,7 @@ pub fn fetch_block_from_cached_array(
         &mut dim_names,
         &mut origin,
         array.attributes(),
-        &coordinates,
+        &mut coordinates,
     );
 
     Ok(OctantBlock::new(
@@ -229,4 +210,23 @@ pub fn fetch_block_with_progress(
         request,
         on_progress,
     )
+}
+
+/// Coordinates of the block window `start..start + count` along a dimension of `full_len`:
+/// every value of an uneven coordinate (so the plot grid places each row), else the
+/// window's exact first and last value.
+pub(crate) fn window_coords(
+    coords: &CoordValues,
+    full_len: usize,
+    start: usize,
+    count: usize,
+) -> Option<Vec<f64>> {
+    let end = start + count.max(1) - 1;
+    if matches!(coords, CoordValues::Values(_)) && coords.matches(full_len) {
+        return (start..=end).map(|i| coords.number(i)).collect();
+    }
+    Some(vec![
+        coords.number_for(start, full_len)?,
+        coords.number_for(end, full_len)?,
+    ])
 }

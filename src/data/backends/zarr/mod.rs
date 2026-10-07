@@ -1,6 +1,8 @@
 //! Zarr backend implementations and storage abstractions.
 
 pub mod block;
+#[cfg(test)]
+mod block_coords_tests;
 pub mod coords;
 #[cfg(test)]
 mod coords_numeric_tests;
