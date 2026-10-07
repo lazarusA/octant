@@ -1,6 +1,7 @@
 //! RGB, CMYK, and Multi-Channel overlay controls for 2D settings panel.
 
 use crate::app::OctantApp;
+use crate::ui::hover::composite::composite_kind;
 use crate::utils::stack_str;
 
 /// Render composite controls (Multi-Channel bioimaging overlay, CMYK, or standard 3-band RGB).
@@ -24,6 +25,16 @@ pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         "Composites 4-channel Cyan, Magenta, Yellow, Black (CMYK) into Truecolor RGB."
     } else {
         "Composites selected 3 channels into Truecolor RGB."
+    };
+
+    // Name the band combination once it is drawn, as the hover card does.
+    let mut label_buf = [0u8; 48];
+    let label = if app.rgb_composite_mode && !has_mc && !is_cmyk {
+        let meta = app.plotted_dataset_metadata.as_ref();
+        let kind = composite_kind(app, meta, app.plotted_variable_info());
+        stack_str(&mut label_buf, format_args!("{label} ({})", kind.label()))
+    } else {
+        label
     };
 
     let mut rgb_mode = app.rgb_composite_mode;

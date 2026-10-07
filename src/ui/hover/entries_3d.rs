@@ -3,6 +3,7 @@ use crate::data::{DatasetMetadata, VariableInfo};
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
 };
+use crate::ui::hover::entries_2d::composite_channel_dim;
 use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
 use crate::ui::hover::raycast_volume::VolumeSampler;
@@ -21,7 +22,7 @@ pub(crate) fn resolve_3d_dim_entries(
     let data_y = (hit_y + sampler.shift_y) % sampler.height;
     let data_z = (hit_z + sampler.shift_z) % sampler.depth;
 
-    let mut used_dims = HashSet::new();
+    let mut used_dims: HashSet<usize> = composite_channel_dim(app).into_iter().collect();
 
     if let Some(v) = var {
         let (explicit_x, explicit_y, explicit_z) =

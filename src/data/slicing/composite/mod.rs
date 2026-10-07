@@ -2,6 +2,7 @@
 
 pub mod cmyk;
 pub mod multichannel;
+pub mod probe;
 pub mod rgb;
 pub mod types;
 pub mod utils;
@@ -13,6 +14,7 @@ mod tests;
 
 pub use cmyk::slice_cmyk_composite;
 pub use multichannel::slice_multichannel_composite_nd;
+pub use probe::CompositeProbe;
 pub use rgb::{slice_rgb_composite, slice_rgb_composite_nd};
 pub use types::{ChannelColorConfig, DEFAULT_CHANNEL_COLORS, parse_hex_color};
 pub use utils::{

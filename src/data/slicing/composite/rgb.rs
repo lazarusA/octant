@@ -4,6 +4,7 @@ use crate::data::matrix_data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 
 use super::cmyk::slice_cmyk_composite;
+use super::probe::local_channel;
 use super::utils::{compute_channel_normalization, normalize_channel_value, pack_rgb};
 
 /// Slice an `OctantBlock` into a 24-bit TrueColor composite `MatrixData`.
@@ -144,11 +145,7 @@ fn extract_channel_plane(
     let ch = ch_opt?;
     let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
     let num_channels = block.shape.get(c_dim).copied().unwrap_or(1);
-    let local_ch = if ch >= c_start && ch < c_start + num_channels {
-        ch - c_start
-    } else {
-        ch.min(num_channels.saturating_sub(1))
-    };
+    let local_ch = local_channel(ch, c_start, num_channels);
     let mut fixed = fixed_indices.to_vec();
     if fixed.len() < block.shape.len() {
         fixed.resize(block.shape.len(), 0);

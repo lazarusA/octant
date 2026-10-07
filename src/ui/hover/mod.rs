@@ -2,6 +2,7 @@
 
 pub mod camera;
 pub mod card;
+pub mod composite;
 pub mod enrich;
 pub mod entries;
 pub mod entries_1d;
@@ -29,6 +30,8 @@ pub use raycast_volume::{VolumeSampler, volume_target_pos};
 pub use sample_1d::{draw_line_guidelines_and_reticle, sample_line_series, screen_to_norm_1d};
 pub use sample_2d::Transform2D;
 
+#[cfg(test)]
+mod composite_tests;
 #[cfg(test)]
 mod tests;
 
@@ -81,6 +84,9 @@ pub fn show_hover_tooltip(
         hit.point_3d,
     );
 
+    let composite = app
+        .rgb_composite_mode
+        .then(|| composite::composite_kind(app, meta, var));
     let canvas_plot_type = app.effective_canvas_plot_type();
     if canvas_plot_type == PlotType::Line {
         draw_line_guidelines_and_reticle(app, ctx, ui, rect, px, raw_val);
@@ -107,6 +113,7 @@ pub fn show_hover_tooltip(
         target_pos,
         canvas_plot_type,
         raw_val,
+        HoverValue::from_raw(raw_val, composite),
         var_name,
         var,
         units_str,
@@ -187,6 +194,7 @@ fn paint_hover_card(
     target_pos: Option<Pos2>,
     canvas_plot_type: PlotType,
     raw_val: f32,
+    value: HoverValue,
     var_name: &str,
     var: Option<&VariableInfo>,
     units: &str,
@@ -207,7 +215,7 @@ fn paint_hover_card(
         anchoring,
         &HoverCard {
             title,
-            value: HoverValue::from_raw(raw_val, app.rgb_composite_mode),
+            value,
             units,
             swatch,
             fields,

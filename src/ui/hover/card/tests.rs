@@ -6,6 +6,7 @@ use super::place::{
     EDGE_MARGIN, Side, TARGET_CLEARANCE, card_bounds, place_connected, place_connected_clear,
     place_following,
 };
+use crate::ui::hover::composite::CompositeKind;
 use crate::ui::hover::field::HoverField;
 use egui::{Rect, pos2, vec2};
 
@@ -35,19 +36,22 @@ fn values_format_compactly() {
 
 #[test]
 fn raw_samples_classify() {
-    assert_eq!(HoverValue::from_raw(f32::NAN, false), HoverValue::NoData);
-    assert_eq!(HoverValue::from_raw(f32::NAN, true), HoverValue::NoData);
-    let packed = (12 | (200 << 8) | (34 << 16)) as f32;
+    let false_color = Some(CompositeKind::FalseColor);
+    assert_eq!(HoverValue::from_raw(f32::NAN, None), HoverValue::NoData);
     assert_eq!(
-        HoverValue::from_raw(packed, true),
-        HoverValue::Rgb([12, 200, 34])
+        HoverValue::from_raw(f32::NAN, false_color),
+        HoverValue::NoData
     );
+    let packed = (12 | (200 << 8) | (34 << 16)) as f32;
+    let composite = HoverValue::from_raw(packed, false_color);
+    assert_eq!(composite, HoverValue::Composite(CompositeKind::FalseColor));
     assert_eq!(fmt(HoverValue::NoData), "No data");
-    assert_eq!(fmt(HoverValue::Rgb([12, 200, 34])), "12, 200, 34");
+    assert_eq!(fmt(composite), "False color");
     assert!(!HoverValue::NoData.shows_units());
+    assert!(!composite.shows_units());
     // Infinities are real values, not missing data.
     assert_eq!(
-        HoverValue::from_raw(f32::INFINITY, false),
+        HoverValue::from_raw(f32::INFINITY, None),
         HoverValue::Scalar(f32::INFINITY)
     );
     assert_eq!(fmt(HoverValue::Scalar(f32::NEG_INFINITY)), "-inf");

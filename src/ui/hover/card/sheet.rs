@@ -1,11 +1,12 @@
 //! Review sheet: `cargo test --lib hover_card_contact_sheet -- --ignored` writes
 //! `target/icon_sheets/hover_card.png` (dark theme top, light theme bottom). Each theme
 //! is four 380x300 pt canvases whose hover points send the card to a different corner,
-//! with scalar, no-data, and RGB values.
+//! with scalar, no-data, and band-composite values.
 
 use super::model::{HoverCard, HoverValue};
 use super::tests::sample_fields;
 use super::{Anchoring, show_card};
+use crate::ui::hover::composite::CompositeKind;
 use crate::ui::hover::field::HoverField;
 use crate::ui::test_render::{rasterize, sheet_dir, tessellate_pass, themes, to_image};
 use egui::{Color32, Id, LayerId, Order, Pos2, Rect, pos2, vec2};
@@ -55,7 +56,13 @@ fn hover_card_contact_sheet() {
                 &fields[..],
             );
             let nan = card(HoverValue::NoData, "sst", "K", &fields[1..]);
-            let rgb = card(HoverValue::Rgb([12, 200, 34]), "true_color", "", &[]);
+            let bands = [
+                HoverField::new("R", "NIR 0.312"),
+                HoverField::new("G", "Red 0.041"),
+                HoverField::new("B", "Green 0.063"),
+            ];
+            let false_color = HoverValue::Composite(CompositeKind::FalseColor);
+            let rgb = card(false_color, "Multi-band raster", "", &bands);
             // (quadrant origin, hover point within it, card)
             let scenes: [(Pos2, Pos2, &HoverCard); 4] = [
                 (pos2(0.0, 0.0), pos2(40.0, 40.0), &t2m),

@@ -34,6 +34,18 @@ impl OctantApp {
             None
         };
 
+        self.composite_probe = mdata_opt.is_some().then(|| {
+            crate::data::slicing::CompositeProbe::new(
+                block,
+                c_dim,
+                x_dim,
+                y_dim,
+                x_range,
+                y_range,
+                fixed_indices,
+            )
+        });
+
         let mdata_opt = mdata_opt.or_else(|| {
             block.slice_2d_with_ranges(
                 x_dim,
