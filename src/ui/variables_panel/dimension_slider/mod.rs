@@ -1,6 +1,9 @@
 //! Dimension slider controls, range configuration, and slice calculations.
 
 pub mod composite;
+mod coord_label;
+#[cfg(test)]
+mod coord_label_tests;
 pub mod defaults;
 pub mod defaults_clamp;
 pub mod defaults_dggs;
