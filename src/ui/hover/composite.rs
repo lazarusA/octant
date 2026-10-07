@@ -15,6 +15,8 @@ pub enum CompositeKind {
     FalseColor,
     /// Bands without names to tell the two apart.
     Rgb,
+    /// Cyan, magenta, yellow and black inks converted to RGB.
+    Cmyk,
     /// Several channels, each tinted with its own color and added up.
     Overlay,
 }
@@ -25,12 +27,14 @@ impl CompositeKind {
             Self::TrueColor => "True color",
             Self::FalseColor => "False color",
             Self::Rgb => "RGB composite",
+            Self::Cmyk => "CMYK",
             Self::Overlay => "Channel overlay",
         }
     }
 }
 
 const RGB_LETTERS: [&str; 3] = ["R", "G", "B"];
+const CMYK_LETTERS: [&str; 4] = ["C", "M", "Y", "K"];
 const TRUE_COLOR_BANDS: [&str; 3] = ["red", "green", "blue"];
 
 /// Names an RGB band mapping from its three band names (`None` for unnamed bands).
@@ -57,6 +61,9 @@ pub fn composite_kind(
 ) -> CompositeKind {
     if is_overlay(app) {
         return CompositeKind::Overlay;
+    }
+    if cmyk_bands(app).is_some() {
+        return CompositeKind::Cmyk;
     }
     let bands = BandNames::resolve(app, meta, var);
     classify_rgb(rgb_bands(app).map(|band| bands.real_name(band)))
@@ -88,12 +95,15 @@ pub fn composite_fields(
             .collect();
     }
     let bands = BandNames::resolve(app, meta, var);
-    RGB_LETTERS
-        .iter()
-        .zip(rgb_bands(app))
+    let channels: Vec<(&str, usize)> = match cmyk_bands(app) {
+        Some(inks) => CMYK_LETTERS.into_iter().zip(inks).collect(),
+        None => RGB_LETTERS.into_iter().zip(rgb_bands(app)).collect(),
+    };
+    channels
+        .into_iter()
         .map(|(letter, band)| {
             let value = format_raw(raw(band), units);
-            HoverField::new(*letter, format!("{} {value}", bands.name(band)))
+            HoverField::new(letter, format!("{} {value}", bands.name(band)))
         })
         .collect()
 }
@@ -101,6 +111,11 @@ pub fn composite_fields(
 /// Mirrors the projection's choice between the tinted overlay and the RGB band mapping.
 fn is_overlay(app: &OctantApp) -> bool {
     !app.is_geotiff() && !app.composite_channel_configs.is_empty()
+}
+
+/// The global C, M, Y and K bands when the plotted composite converts CMYK inks.
+fn cmyk_bands(app: &OctantApp) -> Option<[usize; 4]> {
+    app.composite_probe.as_ref()?.cmyk_channels()
 }
 
 /// The global bands drawn as R, G and B, clamped into the loaded block like the slicer.

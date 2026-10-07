@@ -3,7 +3,7 @@
 use crate::data::matrix_data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 
-use super::cmyk::slice_cmyk_composite;
+use super::cmyk::{blend_cmyk_planes, is_cmyk_block, slice_cmyk_composite};
 use super::probe::local_channel;
 use super::utils::{compute_channel_normalization, normalize_channel_value, pack_rgb};
 
@@ -16,21 +16,13 @@ pub fn slice_rgb_composite(
     if block.shape.len() < 3 {
         return None;
     }
-    let (num_bands, height, width) = (
-        block.shape[0],
+    let (height, width) = (
         block.shape[block.shape.len() - 2],
         block.shape[block.shape.len() - 1],
     );
     let plane_size = height.checked_mul(width)?;
 
-    let is_cmyk = num_bands >= 4
-        && block
-            .attributes
-            .get("photometric")
-            .or_else(|| block.attributes.get("color_space"))
-            .is_some_and(|s| s.eq_ignore_ascii_case("cmyk"));
-
-    if is_cmyk {
+    if is_cmyk_block(block, 0) {
         slice_cmyk_composite(block, width, height, plane_size, anim_extent)
     } else {
         let opt_channels = [Some(channels[0]), Some(channels[1]), Some(channels[2])];
@@ -77,6 +69,26 @@ pub fn slice_rgb_composite_nd(
     let width = x_range.1.saturating_sub(x_range.0).max(1);
     let height = y_range.1.saturating_sub(y_range.0).max(1);
     let plane_size = width.checked_mul(height)?;
+
+    // CMYK inks always map C, M, Y, K to the block's first four channels.
+    if is_cmyk_block(block, c_dim) {
+        let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
+        let plane = |k: usize| {
+            extract_channel_plane(
+                block,
+                c_dim,
+                x_dim,
+                y_dim,
+                x_range,
+                y_range,
+                fixed_indices,
+                Some(c_start + k),
+            )
+        };
+        let (c, m, y, k) = (plane(0)?, plane(1)?, plane(2)?, plane(3)?);
+        let planes = [c.as_slice(), &m, &y, &k];
+        return blend_cmyk_planes(planes, width, height, &block.variable_name, anim_extent);
+    }
 
     let r_plane = extract_channel_plane(
         block,

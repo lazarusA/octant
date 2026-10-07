@@ -14,6 +14,10 @@ const SHAPE: [usize; 3] = [4, 2, 3];
 
 /// Four bands of 2x3 pixels whose raw value encodes `band * 100 + y * 10 + x`.
 fn block() -> OctantBlock {
+    block_with(HashMap::new())
+}
+
+fn block_with(attributes: HashMap<String, String>) -> OctantBlock {
     let values: Vec<f32> = (0..4)
         .flat_map(|b| (0..2).flat_map(move |y| (0..3).map(move |x| (b * 100 + y * 10 + x) as f32)))
         .collect();
@@ -25,7 +29,7 @@ fn block() -> OctantBlock {
         vec![0, 0, 0],
         values,
         HashMap::new(),
-        HashMap::new(),
+        attributes,
     )
 }
 
@@ -136,4 +140,25 @@ fn composite_hover_lists_channels_instead_of_a_band_row() {
     assert_eq!(labels, ["R", "G", "B", "y", "x"]);
     assert_eq!(fields[0].value, format!("NIR {}", raw(3)));
     assert_eq!(fields[2].value, format!("Green {}", raw(1)));
+}
+
+#[test]
+fn cmyk_composite_is_named_and_lists_its_inks() {
+    let inks = ["Cyan", "Magenta", "Yellow", "Black"];
+    let mut app = composite_app(Some(&inks), [0, 1, 2]);
+    let cmyk = HashMap::from([("photometric".to_string(), "cmyk".to_string())]);
+    app.apply_2d_projection(&block_with(cmyk), 2, 1, (0, 3), (0, 2), &[0, 0, 0], true, 0);
+    assert_eq!(kind(&app), CompositeKind::Cmyk);
+
+    let meta = app.plotted_dataset_metadata.as_ref();
+    let var = meta.and_then(|m| m.variables.first());
+    assert_eq!(
+        composite_fields(&app, meta, var, "", (1, 0)),
+        [
+            HoverField::new("C", "Cyan 1"),
+            HoverField::new("M", "Magenta 101"),
+            HoverField::new("Y", "Yellow 201"),
+            HoverField::new("K", "Black 301"),
+        ]
+    );
 }

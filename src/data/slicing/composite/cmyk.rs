@@ -5,6 +5,16 @@ use crate::data::octant_block::OctantBlock;
 
 use super::utils::{compute_normalization_scale, linear_to_srgb, pack_rgb};
 
+/// Whether `block` holds CMYK inks along its channel dimension `c_dim`.
+pub fn is_cmyk_block(block: &OctantBlock, c_dim: usize) -> bool {
+    block.shape.get(c_dim).is_some_and(|&n| n >= 4)
+        && block
+            .attributes
+            .get("photometric")
+            .or_else(|| block.attributes.get("color_space"))
+            .is_some_and(|s| s.eq_ignore_ascii_case("cmyk"))
+}
+
 /// Slices a 4-channel CMYK `OctantBlock` into TrueColor RGB `MatrixData`.
 pub fn slice_cmyk_composite(
     block: &OctantBlock,
@@ -16,12 +26,24 @@ pub fn slice_cmyk_composite(
     if 4 * plane_size > block.values.len() {
         return None;
     }
-    let (c, m, y, k) = (
-        &block.values[0..plane_size],
-        &block.values[plane_size..2 * plane_size],
-        &block.values[2 * plane_size..3 * plane_size],
-        &block.values[3 * plane_size..4 * plane_size],
-    );
+    let plane = |k: usize| &block.values[k * plane_size..(k + 1) * plane_size];
+    let planes = [plane(0), plane(1), plane(2), plane(3)];
+    blend_cmyk_planes(planes, width, height, &block.variable_name, anim_extent)
+}
+
+/// Converts four `width * height` C, M, Y, K planes into a TrueColor RGB `MatrixData`,
+/// normalizing all inks by their shared range.
+pub fn blend_cmyk_planes(
+    [c, m, y, k]: [&[f32]; 4],
+    width: usize,
+    height: usize,
+    variable_name: &str,
+    anim_extent: usize,
+) -> Option<MatrixData> {
+    let plane_size = width.checked_mul(height)?;
+    if [c, m, y, k].iter().any(|p| p.len() < plane_size) {
+        return None;
+    }
     let (c_min, c_max) = crate::utils::compute_finite_min_max(c);
     let (m_min, m_max) = crate::utils::compute_finite_min_max(m);
     let (y_min, y_max) = crate::utils::compute_finite_min_max(y);
@@ -66,7 +88,7 @@ pub fn slice_cmyk_composite(
         values,
         0.0,
         16777215.0,
-        format!("{} (CMYK Composite)", block.variable_name),
+        format!("{variable_name} (CMYK Composite)"),
         anim_extent,
     ))
 }

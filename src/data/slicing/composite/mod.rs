@@ -10,6 +10,8 @@ pub mod volume_multichannel;
 pub mod volume_rgb;
 
 #[cfg(test)]
+mod cmyk_tests;
+#[cfg(test)]
 mod tests;
 
 pub use cmyk::slice_cmyk_composite;

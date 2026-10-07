@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use super::cmyk::is_cmyk_block;
 use crate::data::octant_block::OctantBlock;
 
 /// Local index of global channel `channel` in a block whose channel window starts at
@@ -23,6 +24,8 @@ pub struct CompositeProbe {
     strides: Vec<usize>,
     fixed: Vec<usize>,
     channel_start: usize,
+    /// The block holds CMYK inks, which the composite converts instead of mapping to RGB.
+    cmyk: bool,
     c_dim: usize,
     x_dim: usize,
     y_dim: usize,
@@ -48,12 +51,20 @@ impl CompositeProbe {
             strides: block.strides.clone(),
             fixed: fixed_indices.to_vec(),
             channel_start: block.origin.get(c_dim).copied().unwrap_or(0),
+            cmyk: is_cmyk_block(block, c_dim),
             c_dim,
             x_dim,
             y_dim,
             x_range,
             y_range,
         }
+    }
+
+    /// The global C, M, Y and K channels when the composite converts CMYK inks.
+    pub fn cmyk_channels(&self) -> Option<[usize; 4]> {
+        let start = self.channel_start;
+        self.cmyk
+            .then_some([start, start + 1, start + 2, start + 3])
     }
 
     /// The global channel an RGB composite actually draws when asked for `channel`.
