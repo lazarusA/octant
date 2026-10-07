@@ -68,3 +68,31 @@ fn nd_cmyk_composite_reads_only_the_requested_window() {
     let expected = slice_cmyk_composite(&cropped, 2, 1, 2, 1).expect("cropped composite");
     assert_eq!(window.values.to_vec(), expected.values.to_vec());
 }
+
+#[test]
+fn volume_composite_converts_cmyk_inks() {
+    let volume = |block: &OctantBlock| {
+        let channels = [Some(0), Some(1), Some(2)];
+        // A [band, y, x] raster plotted as a volume: the band axis is the channel, not Z.
+        super::slice_rgb_volume_composite_nd(
+            block,
+            0,
+            2,
+            1,
+            0,
+            (0, 3),
+            (0, 2),
+            (0, 4),
+            &[0, 0, 0],
+            channels,
+            "ink",
+        )
+        .expect("volume composite")
+    };
+    let block = ink_block(true);
+    let cmyk = volume(&block);
+    assert_eq!((cmyk.width, cmyk.height, cmyk.depth), (3, 2, 1));
+    let expected = slice_cmyk_composite(&block, 3, 2, 6, 1).expect("cmyk composite");
+    assert_eq!(cmyk.values.to_vec(), expected.values.to_vec());
+    assert_ne!(cmyk.values, volume(&ink_block(false)).values);
+}

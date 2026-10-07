@@ -113,9 +113,13 @@ fn is_overlay(app: &OctantApp) -> bool {
     !app.is_geotiff() && !app.composite_channel_configs.is_empty()
 }
 
-/// The global C, M, Y and K bands when the plotted composite converts CMYK inks.
+/// The global C, M, Y and K bands when the plotted composite converts CMYK inks: from the
+/// 2D composite's block, or for volumes, which keep no probe, from the dataset's tags.
 fn cmyk_bands(app: &OctantApp) -> Option<[usize; 4]> {
-    app.composite_probe.as_ref()?.cmyk_channels()
+    match app.composite_probe.as_ref() {
+        Some(probe) => probe.cmyk_channels(),
+        None => (app.is_cmyk() && app.num_bands() >= 4).then_some([0, 1, 2, 3]),
+    }
 }
 
 /// The global bands drawn as R, G and B, clamped into the loaded block like the slicer.

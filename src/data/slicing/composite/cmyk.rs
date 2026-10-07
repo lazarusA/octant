@@ -31,17 +31,30 @@ pub fn slice_cmyk_composite(
     blend_cmyk_planes(planes, width, height, &block.variable_name, anim_extent)
 }
 
-/// Converts four `width * height` C, M, Y, K planes into a TrueColor RGB `MatrixData`,
-/// normalizing all inks by their shared range.
+/// Converts four `width * height` C, M, Y, K planes into a TrueColor RGB `MatrixData`.
 pub fn blend_cmyk_planes(
-    [c, m, y, k]: [&[f32]; 4],
+    inks: [&[f32]; 4],
     width: usize,
     height: usize,
     variable_name: &str,
     anim_extent: usize,
 ) -> Option<MatrixData> {
-    let plane_size = width.checked_mul(height)?;
-    if [c, m, y, k].iter().any(|p| p.len() < plane_size) {
+    let values = blend_cmyk(inks, width.checked_mul(height)?)?;
+    Some(MatrixData::new(
+        width,
+        height,
+        values,
+        0.0,
+        16777215.0,
+        format!("{variable_name} (CMYK Composite)"),
+        anim_extent,
+    ))
+}
+
+/// Packs the first `len` samples of the C, M, Y, K inks into TrueColor RGB, normalizing
+/// all inks by their shared range; `None` when an ink is shorter than `len`.
+pub fn blend_cmyk([c, m, y, k]: [&[f32]; 4], len: usize) -> Option<Vec<f32>> {
+    if [c, m, y, k].iter().any(|p| p.len() < len) {
         return None;
     }
     let (c_min, c_max) = crate::utils::compute_finite_min_max(c);
@@ -54,9 +67,9 @@ pub fn blend_cmyk_planes(
     let is_i8_cmyk = (-128.0..0.0).contains(&g_min) && g_max <= 127.0;
 
     let (scale, offset) = compute_normalization_scale(g_min, g_max, is_i8_cmyk, 1.0);
-    let mut values = Vec::with_capacity(plane_size);
+    let mut values = Vec::with_capacity(len);
 
-    for i in 0..plane_size {
+    for i in 0..len {
         if c[i].is_nan() || m[i].is_nan() || y[i].is_nan() || k[i].is_nan() {
             values.push(f32::NAN);
         } else {
@@ -82,13 +95,5 @@ pub fn blend_cmyk_planes(
         }
     }
 
-    Some(MatrixData::new(
-        width,
-        height,
-        values,
-        0.0,
-        16777215.0,
-        format!("{variable_name} (CMYK Composite)"),
-        anim_extent,
-    ))
+    Some(values)
 }

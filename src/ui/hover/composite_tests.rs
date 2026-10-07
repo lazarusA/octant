@@ -162,3 +162,57 @@ fn cmyk_composite_is_named_and_lists_its_inks() {
         ]
     );
 }
+
+#[test]
+fn cmyk_volume_is_named_from_the_dataset_tags() {
+    let mut meta = metadata(None);
+    meta.variables[0]
+        .attributes
+        .insert("photometric".into(), "cmyk".into());
+    let app = OctantApp {
+        plotted_dataset_metadata: Some(meta),
+        plotted_store_kind: StoreKind::LocalGeoTiff,
+        rgb_composite_mode: true,
+        ..Default::default()
+    };
+    assert!(app.composite_probe.is_none(), "volumes keep no probe");
+    assert_eq!(kind(&app), CompositeKind::Cmyk);
+}
+
+#[test]
+fn cmyk_volume_projection_draws_converted_inks() {
+    let cmyk = HashMap::from([("photometric".to_string(), "cmyk".to_string())]);
+    let block = block_with(cmyk);
+    let mut app = OctantApp {
+        plotted_dataset_metadata: Some(metadata(None)),
+        plotted_store_kind: StoreKind::LocalGeoTiff,
+        active_plot_type: crate::plots::PlotType::Volume,
+        rgb_composite_mode: true,
+        ..Default::default()
+    };
+    // The band axis is the channel, so the raster becomes a one-voxel-deep volume.
+    let (req, local) = (((0, 2), (0, 1), (0, 0)), ((0, 3), (0, 2), (0, 1)));
+    app.apply_3d_volume_projection(
+        &block,
+        2,
+        1,
+        0,
+        req.0,
+        req.1,
+        req.2,
+        local.0,
+        local.1,
+        local.2,
+        &[0, 0, 0],
+        false,
+        true,
+        0,
+    );
+
+    let expected = crate::data::slicing::slice_cmyk_composite(&block, 3, 2, 6, 1);
+    let volume = app.volume_data.as_ref().expect("volume data");
+    assert_eq!(
+        volume.values,
+        expected.expect("cmyk composite").values.to_vec()
+    );
+}
