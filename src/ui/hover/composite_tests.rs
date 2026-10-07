@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use super::composite::{
-    CompositeKind, CompositeLabels, build_labels, classify_rgb, composite_fields,
+    CompositeKind, CompositeLabels, build_labels, composite_fields, composite_labels,
 };
 use super::entries_2d::resolve_2d_plot_entries;
 use super::field::HoverField;
@@ -78,19 +78,6 @@ fn kind(app: &OctantApp) -> CompositeKind {
 #[test]
 fn band_names_decide_true_and_false_color() {
     assert_eq!(
-        classify_rgb([Some("Red"), Some(" green "), Some("BLUE")]),
-        CompositeKind::TrueColor
-    );
-    assert_eq!(
-        classify_rgb([Some("NIR"), Some("Red"), Some("Green")]),
-        CompositeKind::FalseColor
-    );
-    assert_eq!(
-        classify_rgb([Some("Red"), None, Some("Blue")]),
-        CompositeKind::Rgb
-    );
-
-    assert_eq!(
         kind(&composite_app(Some(&BANDS), [2, 1, 0])),
         CompositeKind::TrueColor
     );
@@ -133,7 +120,7 @@ fn composite_hover_lists_channels_instead_of_a_band_row() {
         resolve_2d_plot_entries(&app, matrix, meta, var, 2.5 / 3.0, 1.5 / 2.0, None);
 
     assert!(!val.is_nan(), "composite pixel holds a packed color");
-    let names: Vec<_> = fields.iter().map(|f| f.label.as_str()).collect();
+    let names: Vec<_> = fields.iter().map(|f| &*f.label).collect();
     assert_eq!(
         names,
         ["y", "x"],
@@ -220,4 +207,19 @@ fn cmyk_volume_projection_draws_converted_inks() {
         volume.values,
         expected.expect("cmyk composite").values.to_vec()
     );
+}
+
+#[test]
+fn cached_labels_follow_newly_plotted_metadata() {
+    let mut app = composite_app(Some(&BANDS), [2, 1, 0]);
+    let ctx = egui::Context::default();
+    let cached = |app: &OctantApp| {
+        let meta = app.plotted_dataset_metadata.as_ref();
+        composite_labels(app, &ctx, meta, meta.and_then(|m| m.variables.first())).kind
+    };
+    assert_eq!(cached(&app), CompositeKind::TrueColor);
+    // A newly plotted dataset with the same variable names other bands.
+    app.plotted_dataset_metadata = Some(metadata(Some(&["NIR", "SWIR", "Red", "Blue"])));
+    app.plotted_metadata_generation += 1;
+    assert_eq!(cached(&app), CompositeKind::FalseColor);
 }

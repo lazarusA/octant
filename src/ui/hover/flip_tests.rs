@@ -63,7 +63,7 @@ fn hover_at(app: &OctantApp, ny: f32) -> (f32, String) {
     let (val, fields, _, _) = resolve_2d_plot_entries(app, matrix, meta, var, 0.1, ny, None);
     let lat = fields
         .iter()
-        .find(|f| f.label == "lat")
+        .find(|f| &*f.label == "lat")
         .map(|f| f.value.clone());
     (val, lat.unwrap_or_default())
 }

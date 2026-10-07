@@ -2,9 +2,11 @@
 
 use std::collections::HashMap;
 
-use async_tiff::tags::ExtraSamples;
+use async_tiff::tags::{Compression, ExtraSamples, PhotometricInterpretation};
 
-use super::bands::{GdalItem, add_gdal_attributes, parse_gdal_metadata, resolve_labels};
+use super::bands::{
+    GdalItem, add_gdal_attributes, layout_names, parse_gdal_metadata, resolve_labels,
+};
 use super::store::GeoTiffBlockStore;
 use super::test_utils::SyntheticTiffBuilder;
 use crate::data::blocks::BlockStore;
@@ -180,18 +182,34 @@ fn cmyk_bands_keep_their_ink_names() {
 #[test]
 fn expanded_palette_bands_are_rgb_but_the_index_band_is_not() {
     let ramp = vec![0u16; 256];
-    let palette = SyntheticTiffBuilder::new(2, 2)
+    let mut palette = SyntheticTiffBuilder::new(2, 2)
         .samples(1, 8)
         .photometric(3)
         .colormap(&ramp, &ramp, &ramp)
-        .striped_data(&[0u8; 4], 2)
-        .build();
-    let meta = inspect(palette);
+        .striped_data(&[0u8; 4], 2);
+    // The index sample's description names the index band, not the red channel.
+    palette.add_ascii(
+        GDAL_METADATA_TAG,
+        r#"<GDALMetadata><Item name="DESCRIPTION" sample="0" role="description">Land cover</Item></GDALMetadata>"#,
+    );
+    let meta = inspect(palette.build());
     let band = meta
         .get_dim_coords(Some("raster"), "band")
         .and_then(|c| c.labels())
         .map(<[String]>::to_vec);
     assert_eq!(band, labels(&["Red", "Green", "Blue"]));
     let index = meta.variables.iter().find(|v| v.name == "band_1");
-    assert_eq!(index.and_then(|v| v.long_name.as_deref()), Some("Band 1"));
+    assert_eq!(
+        index.and_then(|v| v.long_name.as_deref()),
+        Some("Land cover")
+    );
+}
+
+#[test]
+fn jpeg_ycbcr_bands_decode_to_rgb() {
+    let rgb = ["Red", "Green", "Blue"];
+    let ycbcr = PhotometricInterpretation::YCbCr;
+    assert_eq!(layout_names(ycbcr, Compression::JPEG, 3, false), rgb);
+    assert_eq!(layout_names(ycbcr, Compression::ModernJPEG, 3, false), rgb);
+    assert!(layout_names(ycbcr, Compression::None, 3, false).is_empty());
 }

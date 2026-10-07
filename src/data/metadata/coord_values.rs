@@ -58,6 +58,16 @@ impl CoordValues {
         !matches!(self, Self::Endpoints { .. })
     }
 
+    /// The same coordinate known only by its first and last number, for values that were
+    /// not all read; `None` for labels.
+    pub fn to_endpoints(&self) -> Option<Self> {
+        Some(Self::Endpoints {
+            first: self.first_number()?,
+            last: self.last_number()?,
+            len: self.len(),
+        })
+    }
+
     /// Whether these values describe a dimension of `dim_len` indices one to one.
     pub fn matches(&self, dim_len: usize) -> bool {
         self.is_exact() && self.len() == dim_len
@@ -110,7 +120,7 @@ impl CoordValues {
     /// the values match the dimension, else interpolated between the first and last.
     pub fn number_for(&self, i: usize, dim_len: usize) -> Option<f64> {
         if self.matches(dim_len) {
-            return self.number(i);
+            return self.number(i.min(dim_len.saturating_sub(1)));
         }
         let (first, last) = (self.first_number()?, self.last_number()?);
         Some(interpolate(
@@ -182,6 +192,10 @@ impl SpacingCheck {
         if self.f32_source {
             let magnitude = self.scale.max(value.abs());
             tolerance += magnitude * f64::from(f32::EPSILON) * 2.0;
+            // Rounding wider than a quarter step cannot tell even spacing apart.
+            if self.step != 0.0 {
+                tolerance = tolerance.min(self.step.abs() * 0.25);
+            }
         }
         (value - expected).abs() <= tolerance
     }

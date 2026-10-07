@@ -15,7 +15,7 @@ impl OctantApp {
         z_dim: usize,
         req_x0: usize,
         req_y0: usize,
-        req_z0: usize,
+        req_z: (usize, usize),
         local_x0: usize,
         local_y0: usize,
         local_z0: usize,
@@ -32,7 +32,10 @@ impl OctantApp {
         };
         let dest_x = dest(x_dim, local_x0, slab.width, req_x0, vol_w);
         let dest_y = dest(y_dim, local_y0, slab.height, req_y0, vol_h);
-        let raw_dest_z = dest(z_dim, local_z0, slab.depth, req_z0, depth_max);
+        // A flipped Z mirrors across the whole requested range, then wraps into the ring
+        // buffer, which may hold fewer planes than requested.
+        let req_z_len = req_z.1.saturating_sub(req_z.0).saturating_add(1);
+        let raw_dest_z = dest(z_dim, local_z0, slab.depth, req_z.0, req_z_len);
         let dest_z = raw_dest_z % depth_max.max(1);
 
         let mut bounds_opt = None;

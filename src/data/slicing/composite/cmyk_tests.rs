@@ -96,3 +96,19 @@ fn volume_composite_converts_cmyk_inks() {
     assert_eq!(cmyk.values.to_vec(), expected.values.to_vec());
     assert_ne!(cmyk.values, volume(&ink_block(false)).values);
 }
+
+#[test]
+fn either_tag_marks_cmyk_inks() {
+    use super::cmyk::{is_cmyk_attrs, is_cmyk_block};
+    let tags = |pairs: &[(&'static str, &'static str)]| {
+        let map: HashMap<&str, &str> = pairs.iter().copied().collect();
+        is_cmyk_attrs(|k| map.get(k).copied())
+    };
+    assert!(tags(&[("photometric", "rgb"), ("color_space", "CMYK")]));
+    assert!(tags(&[("long_name", "CMYK raster")]));
+    assert!(!tags(&[("photometric", "rgb")]));
+
+    let mut block = ink_block(false);
+    block.attributes.insert("color_space".into(), "cmyk".into());
+    assert!(is_cmyk_block(&block, 0));
+}

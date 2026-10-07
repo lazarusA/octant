@@ -5,19 +5,70 @@ use std::collections::HashMap;
 
 use crate::data::coordinates::naming::contains_ascii_case_insensitive;
 
+/// What orientation reads besides the block itself: the variable's attributes and the
+/// first and last coordinate of the whole latitude and longitude dimensions. Deciding the
+/// flips from the whole dimension, not from a block's window, flips every block of a
+/// variable alike, including edge blocks one row or column long.
+#[derive(Clone, Copy)]
+pub struct OrientHints<'a> {
+    pub attributes: &'a serde_json::Map<String, serde_json::Value>,
+    pub lat_extent: Option<(f64, f64)>,
+    pub lon_extent: Option<(f64, f64)>,
+}
+
+impl<'a> OrientHints<'a> {
+    /// Hints without dimension extents: flips are judged from the block's coordinates.
+    pub fn new(attributes: &'a serde_json::Map<String, serde_json::Value>) -> Self {
+        Self {
+            attributes,
+            lat_extent: None,
+            lon_extent: None,
+        }
+    }
+}
+
+/// Whether a dimension or coordinate name denotes latitude (`*lat*` or `y`).
+pub fn is_lat_name(name: &str) -> bool {
+    contains_ascii_case_insensitive(name, "lat") || name.eq_ignore_ascii_case("y")
+}
+
+/// Whether a dimension or coordinate name denotes longitude (`*lon*` or `x`).
+pub fn is_lon_name(name: &str) -> bool {
+    contains_ascii_case_insensitive(name, "lon") || name.eq_ignore_ascii_case("x")
+}
+
+/// Whether orientation applies to the last two dimensions: no latitude or longitude
+/// dimension comes before them (`(y, x, band)` is left as stored).
+pub fn spatial_dims_last(dim_names: &[String]) -> bool {
+    let head = dim_names.len().saturating_sub(2);
+    !dim_names[..head]
+        .iter()
+        .any(|d| is_lat_name(d) || is_lon_name(d))
+}
+
 /// `(flip_y, flip_x)`: rows flip when latitude ascends (row 0 south), columns when
-/// longitude descends (column 0 east), judged from the coordinates' first and last value,
-/// else from orientation attributes and dimension names.
+/// longitude descends (column 0 east), judged from the whole dimension's extent when
+/// known, else the block's coordinates, else orientation attributes and dimension names.
 pub fn axis_flips(
     dim_names: &[String],
-    attributes: &serde_json::Map<String, serde_json::Value>,
+    hints: OrientHints<'_>,
     lat_coords: Option<&[f64]>,
     lon_coords: Option<&[f64]>,
 ) -> (bool, bool) {
+    let lat = hints.lat_extent.or_else(|| lat_coords.map(ends));
+    let lon = hints.lon_extent.or_else(|| lon_coords.map(ends));
     (
-        lat_flip(dim_names, attributes, lat_coords),
-        lon_flip(attributes, lon_coords),
+        lat_flip(dim_names, hints.attributes, lat),
+        lon_flip(hints.attributes, lon),
     )
+}
+
+/// First and last of `coords`; equal ends (never flipping) for fewer than two values.
+fn ends(coords: &[f64]) -> (f64, f64) {
+    match (coords.first(), coords.last()) {
+        (Some(&f), Some(&l)) if coords.len() >= 2 => (f, l),
+        _ => (0.0, 0.0),
+    }
 }
 
 /// Rows flip when latitude ascends, so north renders at the top: from the coordinates, else
@@ -25,10 +76,10 @@ pub fn axis_flips(
 fn lat_flip(
     dim_names: &[String],
     attributes: &serde_json::Map<String, serde_json::Value>,
-    lat_coords: Option<&[f64]>,
+    lat: Option<(f64, f64)>,
 ) -> bool {
-    if let Some(coords) = lat_coords {
-        return matches!((coords.first(), coords.last()), (Some(f), Some(l)) if coords.len() >= 2 && f < l);
+    if let Some((first, last)) = lat {
+        return first < last;
     }
     let attr = |key: &str| attributes.get(key).and_then(|v| v.as_str());
     if let Some(orientation) = attr("latitude_orientation") {
@@ -37,21 +88,17 @@ fn lat_flip(
     if attr("positive").is_some_and(|p| p.eq_ignore_ascii_case("up")) {
         return true;
     }
-    dim_names
-        .iter()
-        .any(|d| contains_ascii_case_insensitive(d, "lat") || d.eq_ignore_ascii_case("y"))
+    dim_names.iter().any(|d| is_lat_name(d))
 }
 
 /// Columns flip when longitude descends, so west renders on the left: from the
 /// coordinates, else `longitude_orientation = "descending"`.
 fn lon_flip(
     attributes: &serde_json::Map<String, serde_json::Value>,
-    lon_coords: Option<&[f64]>,
+    lon: Option<(f64, f64)>,
 ) -> bool {
-    match lon_coords {
-        Some(coords) => {
-            matches!((coords.first(), coords.last()), (Some(f), Some(l)) if coords.len() >= 2 && f > l)
-        }
+    match lon {
+        Some((first, last)) => first > last,
         None => attributes
             .get("longitude_orientation")
             .and_then(|v| v.as_str())
@@ -59,36 +106,27 @@ fn lon_flip(
     }
 }
 
-/// Whether the spatial dimensions are stored lon-first (`(lon, lat)` or `(x, y)`), which
+/// Whether the last two dimensions are stored lon-first (`(lon, lat)` or `(x, y)`), which
 /// orientation transposes into `(lat, lon)`.
 pub fn needs_transpose(dim_names: &[String]) -> bool {
-    let mut spatial = dim_names
-        .iter()
-        .map(|d| d.to_lowercase())
-        .filter(|d| d.contains("lat") || d.contains("lon") || d == "y" || d == "x");
-    match (spatial.next(), spatial.next()) {
-        (Some(first), Some(second)) => {
-            (first.contains("lon") || first == "x") && (second.contains("lat") || second == "y")
-        }
+    match dim_names {
+        [.., first, second] => is_lon_name(first) && is_lat_name(second),
         _ => false,
     }
 }
 
 /// The dimensions a block's data is reversed along by its orientation: the row axis (second
-/// to last) when `flip_y`, the column axis (last) when `flip_x`, each only when longer than
-/// one index. Pass the names and shape after any transpose.
-pub fn flipped_dims(
-    dim_names: &[String],
-    block_shape: &[usize],
-    (flip_y, flip_x): (bool, bool),
-) -> Vec<String> {
-    let rank = dim_names.len().min(block_shape.len());
+/// to last) when `flip_y`, the column axis (last) when `flip_x`. A dimension one index long
+/// is listed too, so an edge block one row long is placed like the rest of its variable.
+/// Pass the names after any transpose.
+pub fn flipped_dims(dim_names: &[String], (flip_y, flip_x): (bool, bool)) -> Vec<String> {
+    let rank = dim_names.len();
     if rank < 2 {
         return Vec::new();
     }
     [(flip_y, rank - 2), (flip_x, rank - 1)]
         .into_iter()
-        .filter(|&(flipped, dim)| flipped && block_shape[dim] > 1)
+        .filter(|&(flipped, _)| flipped)
         .map(|(_, dim)| dim_names[dim].clone())
         .collect()
 }

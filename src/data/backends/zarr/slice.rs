@@ -80,12 +80,34 @@ fn decode_with<R: SubsetRetriever>(
         decode_typed!(i64)
     } else if dt.is::<UInt64DataType>() {
         decode_typed!(u64)
-    } else if dt.is::<BoolDataType>() {
+    } else {
+        decode_other(retriever, dt, calibration, subset)
+    }
+}
+
+/// Booleans as 0 or 1, half-precision floats widened, anything else read as `f32`.
+fn decode_other<R: SubsetRetriever>(
+    retriever: &R,
+    dt: &DataType,
+    calibration: &DataCalibration,
+    subset: &ArraySubset,
+) -> Result<Vec<f32>, BlockStoreError> {
+    let widen = |vals: Vec<f64>| -> Vec<f32> {
+        if calibration.has_transformation() {
+            vals.into_iter().map(|v| calibration.transform(v)).collect()
+        } else {
+            vals.into_iter().map(|v| v as f32).collect()
+        }
+    };
+    if dt.is::<BoolDataType>() {
         let vals: Vec<u8> = retriever.retrieve_subset(subset)?;
-        Ok(vals
-            .into_iter()
-            .map(|v| if v != 0 { 1.0 } else { 0.0 })
-            .collect())
+        Ok(vals.into_iter().map(|v| f32::from(v != 0)).collect())
+    } else if dt.is::<Float16DataType>() {
+        let vals: Vec<half::f16> = retriever.retrieve_subset(subset)?;
+        Ok(widen(vals.into_iter().map(f64::from).collect()))
+    } else if dt.is::<BFloat16DataType>() {
+        let vals: Vec<half::bf16> = retriever.retrieve_subset(subset)?;
+        Ok(widen(vals.into_iter().map(f64::from).collect()))
     } else {
         retriever.retrieve_subset(subset)
     }
@@ -138,6 +160,12 @@ pub fn retrieve_array_subset_as_f64<TStorage: ?Sized + ReadableStorageTraits + '
         widen!(u16)
     } else if dt.is::<UInt8DataType>() {
         widen!(u8)
+    } else if dt.is::<Float16DataType>() {
+        let vals: Vec<half::f16> = array.retrieve_subset(subset)?;
+        vals.into_iter().map(f64::from).collect()
+    } else if dt.is::<BFloat16DataType>() {
+        let vals: Vec<half::bf16> = array.retrieve_subset(subset)?;
+        vals.into_iter().map(f64::from).collect()
     } else {
         return Err("coordinate data type is not numeric".into());
     };

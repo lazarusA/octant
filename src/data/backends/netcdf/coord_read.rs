@@ -78,12 +78,17 @@ pub fn read_labels(var: &netcdf::Variable<'_>) -> Option<Vec<String>> {
         (NcVariableType::Char, [dim, strlen]) if strlen.len() > 0 => {
             let bytes = var.get_raw_values(..).ok()?;
             let rows = bytes.chunks(strlen.len()).take(dim.len());
-            rows.map(|row| clean_label(&String::from_utf8_lossy(row)))
+            rows.map(|row| clean_label(&String::from_utf8_lossy(c_text(row))))
                 .collect()
         }
         _ => return None,
     };
     (!labels.is_empty()).then_some(labels)
+}
+
+/// The text of a fixed-width C string: up to its first NUL, as padding or junk follows.
+fn c_text(row: &[u8]) -> &[u8] {
+    row.split(|&b| b == 0).next().unwrap_or_default()
 }
 
 /// Group paths from `group` up to the root: `a/b`, `a`, then `` (the root).

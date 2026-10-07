@@ -3,11 +3,9 @@
 use std::collections::HashMap;
 use zarrs::storage::ReadableWritableListableStorage;
 
-use super::cache::{
-    get_cached_coord_values_scoped, get_cached_coord_values_with_rank, parse_bounds_from_values,
-};
+use super::cache::{get_cached_coord_values_with_rank, parse_bounds_from_values};
 use super::discover::discover_coord_array;
-use crate::data::{CoordValues, VariableInfo};
+use crate::data::CoordValues;
 
 /// Fetches all dimension coordinate values for the specified dimension names across the store.
 pub fn fetch_all_dimension_coordinates(
@@ -31,103 +29,6 @@ pub fn fetch_all_dimension_coordinates(
             coords_map.insert(clean.clone(), values.clone());
             if clean != *name {
                 coords_map.insert(name.clone(), values);
-            }
-        }
-    }
-
-    coords_map
-}
-
-/// Fetches all dimension coordinate values aware of variable group paths and hierarchy.
-pub fn fetch_all_dimension_coordinates_for_variables(
-    store: ReadableWritableListableStorage,
-    variables: &[VariableInfo],
-    store_url_hint: Option<&str>,
-) -> HashMap<String, CoordValues> {
-    let mut coords_map = HashMap::new();
-    let url_hint = store_url_hint.unwrap_or("local");
-
-    // Collect all group prefixes from variables
-    let mut group_prefixes = Vec::new();
-    for var in variables {
-        if let Some(gp) = var.group_path() {
-            let mut curr = String::new();
-            for seg in gp.split('/') {
-                if !curr.is_empty() {
-                    curr.push('/');
-                }
-                curr.push_str(seg);
-                if !group_prefixes.contains(&curr) {
-                    group_prefixes.push(curr.clone());
-                }
-            }
-        }
-        if let Some(ch_str) = var.attributes.get("omero_channels") {
-            let labels: Vec<String> = ch_str.split(',').map(|s| s.trim().to_string()).collect();
-            let Some(labels) = CoordValues::from_labels(labels) else {
-                continue;
-            };
-            for name in &var.dimension_names {
-                if crate::data::coordinates::naming::is_channel_dim_name(name) {
-                    let clean = name.trim().to_lowercase();
-                    coords_map.insert(clean.clone(), labels.clone());
-                    if clean != *name {
-                        coords_map.insert(name.clone(), labels.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    for var in variables {
-        let group_path = var.group_path();
-        let total_dims = var.dimension_names.len();
-        for (i, name) in var.dimension_names.iter().enumerate() {
-            let clean = name.trim().to_lowercase();
-            if coords_map.contains_key(&clean) {
-                continue;
-            }
-
-            if let Some(values) = get_cached_coord_values_scoped(
-                store.clone(),
-                url_hint,
-                name,
-                group_path,
-                &group_prefixes,
-                i,
-                total_dims,
-            ) {
-                coords_map.insert(clean.clone(), values.clone());
-                if clean != *name {
-                    coords_map.insert(name.clone(), values.clone());
-                }
-                if let Some(gp) = group_path {
-                    let scoped_key = format!("{}/{}", gp.trim().to_lowercase(), clean);
-                    coords_map.insert(scoped_key, values);
-                }
-            }
-        }
-    }
-
-    // Also fallback to root dim names if any remain unresolved
-    for var in variables {
-        for (i, name) in var.dimension_names.iter().enumerate() {
-            let clean = name.trim().to_lowercase();
-            if !coords_map.contains_key(&clean)
-                && let Some(values) = get_cached_coord_values_scoped(
-                    store.clone(),
-                    url_hint,
-                    name,
-                    None,
-                    &group_prefixes,
-                    i,
-                    var.dimension_names.len(),
-                )
-            {
-                coords_map.insert(clean.clone(), values.clone());
-                if clean != *name {
-                    coords_map.insert(name.clone(), values);
-                }
             }
         }
     }

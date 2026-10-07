@@ -32,6 +32,8 @@ pub use sample_1d::{draw_line_guidelines_and_reticle, sample_line_series, screen
 pub use sample_2d::Transform2D;
 
 #[cfg(test)]
+mod composite_kind_tests;
+#[cfg(test)]
 mod composite_tests;
 #[cfg(test)]
 mod flip_tests;

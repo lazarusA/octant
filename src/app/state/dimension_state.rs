@@ -142,6 +142,7 @@ impl crate::app::OctantApp {
         self.plotted_store_kind = self.selected_store_kind;
         self.plotted_store_target_input = self.store_target_input.clone();
         self.plotted_dataset_metadata = self.active_dataset_metadata.clone();
+        self.plotted_metadata_generation = self.metadata_generation;
         self.plotted_variable_idx = self.selected_variable_idx;
         self.plotted_dim_config = self.dim_config.clone();
         self.plotted_selected_dim_indices = self.selected_dim_indices.clone();
@@ -156,6 +157,7 @@ impl crate::app::OctantApp {
         self.selected_store_kind = self.plotted_store_kind;
         self.store_target_input = self.plotted_store_target_input.clone();
         self.active_dataset_metadata = self.plotted_dataset_metadata.clone();
+        self.metadata_generation = self.plotted_metadata_generation;
         self.selected_variable_idx = self.plotted_variable_idx;
         self.dim_config = self.plotted_dim_config.clone();
         self.selected_dim_indices = self.plotted_selected_dim_indices.clone();

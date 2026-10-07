@@ -12,6 +12,7 @@ struct Staged {
     store_kind: StoreKind,
     target: String,
     metadata: Option<DatasetMetadata>,
+    generation: u64,
     variable: usize,
     dim_config: Vec<DimConfig>,
     indices: Vec<usize>,
@@ -31,6 +32,10 @@ impl Staged {
             target: replace(
                 &mut app.store_target_input,
                 app.plotted_store_target_input.clone(),
+            ),
+            generation: replace(
+                &mut app.metadata_generation,
+                app.plotted_metadata_generation,
             ),
             metadata: replace(
                 &mut app.active_dataset_metadata,
@@ -59,6 +64,7 @@ impl Staged {
         app.selected_store_kind = self.store_kind;
         app.store_target_input = self.target;
         app.active_dataset_metadata = self.metadata;
+        app.metadata_generation = self.generation;
         app.selected_variable_idx = self.variable;
         app.dim_config = self.dim_config;
         app.selected_dim_indices = self.indices;

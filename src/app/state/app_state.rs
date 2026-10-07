@@ -27,6 +27,8 @@ pub struct OctantApp {
     pub plotted_store_kind: StoreKind,
     pub plotted_store_target_input: String,
     pub plotted_dataset_metadata: Option<DatasetMetadata>,
+    /// `metadata_generation` of the metadata in `plotted_dataset_metadata`.
+    pub plotted_metadata_generation: u64,
     pub plotted_variable_idx: usize,
     pub plotted_dim_config: Vec<DimConfig>,
     pub plotted_selected_dim_indices: Vec<usize>,
@@ -233,6 +235,7 @@ impl Default for OctantApp {
             plotted_store_kind: StoreKind::RemoteZarr,
             plotted_store_target_input: "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string(),
             plotted_dataset_metadata: None,
+            plotted_metadata_generation: 0,
             plotted_variable_idx: 0,
             plotted_dim_config: Vec::new(),
             plotted_selected_dim_indices: Vec::new(),

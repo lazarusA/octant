@@ -3,6 +3,8 @@
 //! Provides read-only streaming of Icechunk datasets directly in web browsers without
 //! Tokio, MIO, or native socket dependencies.
 
+#[cfg(target_arch = "wasm32")]
+mod chunks;
 pub mod discovery;
 pub mod header;
 pub mod inspect;

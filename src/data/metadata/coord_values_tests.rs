@@ -97,3 +97,41 @@ fn labels_answer_by_index_and_have_no_numbers() {
     assert_eq!(regions.range_bounds(0, 1, 2), None);
     assert_eq!(CoordValues::from_labels(Vec::new()), None);
 }
+
+#[test]
+fn indices_past_the_end_read_the_last_value() {
+    let plev = numbers(&[1000.0, 850.0, 500.0], false);
+    assert_eq!(
+        plev.number_for(3, 3),
+        Some(500.0),
+        "an inclusive end of len"
+    );
+    assert_eq!(plev.range_bounds(0, 3, 3), Some((500.0, 1000.0)));
+}
+
+#[test]
+fn f32_rounding_never_hides_an_uneven_step() {
+    // Hours since 1900 near 1e6 in f32: rounding (about 0.24) exceeds a 0.1 step's quarter.
+    let start = 1_000_000.0;
+    let mut values: Vec<f64> = (0..5).map(|i| start + f64::from(i) * 0.1).collect();
+    values[2] += 0.04;
+    assert!(matches!(
+        CoordValues::from_values(values, true),
+        Some(CoordValues::Values(_))
+    ));
+}
+
+#[test]
+fn partly_read_values_keep_their_ends() {
+    let plev = numbers(&[1000.0, 850.0, 500.0], false);
+    assert_eq!(
+        plev.to_endpoints(),
+        Some(CoordValues::Endpoints {
+            first: 1000.0,
+            last: 500.0,
+            len: 3
+        })
+    );
+    let labels = CoordValues::from_labels(vec!["a".into()]).expect("labels");
+    assert_eq!(labels.to_endpoints(), None);
+}

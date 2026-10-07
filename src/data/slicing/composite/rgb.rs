@@ -58,17 +58,17 @@ pub fn slice_rgb_composite_nd(
     channels: [Option<usize>; 3],
     anim_extent: usize,
 ) -> Option<MatrixData> {
-    if block.shape.len() < 2 || c_dim >= block.shape.len() {
-        return None;
-    }
-    let num_channels = block.shape[c_dim];
-    if num_channels < 2 && channels[0].is_none() && channels[1].is_none() && channels[2].is_none() {
+    let num_channels = *block.shape.get(c_dim)?;
+    if block.shape.len() < 2 || (num_channels < 2 && channels.iter().all(Option::is_none)) {
         return None;
     }
 
+    let (x_range, y_range) = (
+        clamp_window(block, x_dim, x_range),
+        clamp_window(block, y_dim, y_range),
+    );
     let width = x_range.1.saturating_sub(x_range.0).max(1);
     let height = y_range.1.saturating_sub(y_range.0).max(1);
-    let plane_size = width.checked_mul(height)?;
 
     let plane = |ch: Option<usize>| {
         extract_channel_plane(
@@ -92,25 +92,40 @@ pub fn slice_rgb_composite_nd(
         return blend_cmyk_planes(planes, width, height, &block.variable_name, anim_extent);
     }
 
-    let [r_plane, g_plane, b_plane] = channels.map(plane);
+    let name = format!("{} (RGB Composite)", block.variable_name);
+    rgb_matrix(channels.map(plane), (width, height), name, anim_extent)
+}
+
+/// `range` along `dim` clamped into the block, keeping at least one index.
+fn clamp_window(block: &OctantBlock, dim: usize, (start, end): (usize, usize)) -> (usize, usize) {
+    let len = block.shape.get(dim).copied().unwrap_or(1).max(1);
+    let end = end.min(len);
+    (start.min(end.saturating_sub(1)), end)
+}
+
+/// The packed RGB matrix of three normalized channel planes (`None` channels stay dark).
+fn rgb_matrix(
+    [r_plane, g_plane, b_plane]: [Option<Vec<f32>>; 3],
+    (width, height): (usize, usize),
+    name: String,
+    anim_extent: usize,
+) -> Option<MatrixData> {
     let (r_p, r_scale, r_off, r_i8) = norm_plane_info(r_plane);
     let (g_p, g_scale, g_off, g_i8) = norm_plane_info(g_plane);
     let (b_p, b_scale, b_off, b_i8) = norm_plane_info(b_plane);
-
     let values = blend_rgb_pixels(
-        plane_size,
+        width.checked_mul(height)?,
         (r_p.as_deref(), r_scale, r_off, r_i8),
         (g_p.as_deref(), g_scale, g_off, g_i8),
         (b_p.as_deref(), b_scale, b_off, b_i8),
     );
-
     Some(MatrixData::new(
         width,
         height,
         values,
         0.0,
         16777215.0,
-        format!("{} (RGB Composite)", block.variable_name),
+        name,
         anim_extent,
     ))
 }

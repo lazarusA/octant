@@ -5,14 +5,20 @@ use crate::data::octant_block::OctantBlock;
 
 use super::utils::{compute_normalization_scale, linear_to_srgb, pack_rgb};
 
+/// Whether attributes, read through `get`, tag CMYK inks: a `photometric` or `color_space`
+/// of `cmyk`, or a `long_name` mentioning CMYK. The slicers and the app's labels both
+/// decide through this, so the plot and its readouts agree.
+pub fn is_cmyk_attrs<'a>(get: impl Fn(&str) -> Option<&'a str>) -> bool {
+    ["photometric", "color_space"]
+        .into_iter()
+        .any(|key| get(key).is_some_and(|v| v.trim().eq_ignore_ascii_case("cmyk")))
+        || get("long_name").is_some_and(|l| l.contains("CMYK"))
+}
+
 /// Whether `block` holds CMYK inks along its channel dimension `c_dim`.
 pub fn is_cmyk_block(block: &OctantBlock, c_dim: usize) -> bool {
     block.shape.get(c_dim).is_some_and(|&n| n >= 4)
-        && block
-            .attributes
-            .get("photometric")
-            .or_else(|| block.attributes.get("color_space"))
-            .is_some_and(|s| s.eq_ignore_ascii_case("cmyk"))
+        && is_cmyk_attrs(|key| block.attributes.get(key).map(String::as_str))
 }
 
 /// Slices a 4-channel CMYK `OctantBlock` into TrueColor RGB `MatrixData`.

@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use async_tiff::ImageFileDirectory;
-use async_tiff::tags::{ExtraSamples, PhotometricInterpretation};
+use async_tiff::tags::{Compression, ExtraSamples, PhotometricInterpretation};
 
 const RGB_NAMES: [&str; 3] = ["Red", "Green", "Blue"];
 const CMYK_NAMES: [&str; 4] = ["Cyan", "Magenta", "Yellow", "Black"];
@@ -64,18 +64,38 @@ pub fn band_labels(
     count: usize,
     expanded_palette: bool,
 ) -> Option<Vec<String>> {
-    let layout: &[&str] = match ifd.photometric_interpretation() {
-        PhotometricInterpretation::RGBPalette if expanded_palette => &RGB_NAMES,
-        PhotometricInterpretation::RGB if count >= RGB_NAMES.len() => &RGB_NAMES,
-        PhotometricInterpretation::CMYK if count >= CMYK_NAMES.len() => &CMYK_NAMES,
-        _ => &[],
-    };
-    // Extra samples describe stored samples, not the bands a palette expands into.
-    let extra = match ifd.extra_samples() {
-        Some(extra) if !expanded_palette => extra,
-        _ => &[],
+    let layout = layout_names(
+        ifd.photometric_interpretation(),
+        ifd.compression(),
+        count,
+        expanded_palette,
+    );
+    // Descriptions and extra samples describe the stored index sample, not the bands a
+    // palette expands into.
+    let (items, extra) = match ifd.extra_samples() {
+        _ if expanded_palette => (&[][..], &[][..]),
+        Some(extra) => (items, extra),
+        None => (items, &[][..]),
     };
     resolve_labels(items, layout, extra, count)
+}
+
+/// The channel names the photometric layout gives `count` bands: RGB for RGB rasters,
+/// expanded palettes and JPEG-compressed YCbCr (decoded to RGB), CMYK inks for CMYK.
+pub fn layout_names(
+    photometric: PhotometricInterpretation,
+    compression: Compression,
+    count: usize,
+    expanded_palette: bool,
+) -> &'static [&'static str] {
+    let jpeg = matches!(compression, Compression::JPEG | Compression::ModernJPEG);
+    match photometric {
+        PhotometricInterpretation::RGBPalette if expanded_palette => &RGB_NAMES,
+        PhotometricInterpretation::RGB if count >= RGB_NAMES.len() => &RGB_NAMES,
+        PhotometricInterpretation::YCbCr if jpeg && count >= RGB_NAMES.len() => &RGB_NAMES,
+        PhotometricInterpretation::CMYK if count >= CMYK_NAMES.len() => &CMYK_NAMES,
+        _ => &[],
+    }
 }
 
 /// Per band, the first name found: GDAL description, photometric layout, then alpha.

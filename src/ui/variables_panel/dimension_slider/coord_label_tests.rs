@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use super::coord_label::format_label;
+use super::coord_label::{cached_label, format_label};
 use crate::app::OctantApp;
 use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 
@@ -60,5 +60,29 @@ fn dimensions_without_coordinates_show_nothing() {
         format_label(&app, &var, 5, (0, 0)),
         None,
         "unknown dimension"
+    );
+}
+
+#[test]
+fn a_new_dataset_with_the_same_variable_gets_its_own_label() {
+    let depth = |levels: Vec<f64>| CoordValues::from_values(levels, false).expect("depth");
+    let (mut app, var) = app_with(Some((
+        "depth",
+        depth(vec![0.0, 10.0, 25.0, 50.0, 100.0, 200.0]),
+    )));
+    let ctx = egui::Context::default();
+    let label = |app: &OctantApp| cached_label(app, &ctx, &var, 0, (3, 3));
+    assert_eq!(label(&app).as_deref(), Some("50.00 m"));
+
+    let mut next = app.active_dataset_metadata.clone().unwrap_or_default();
+    next.dimension_coordinates.insert(
+        "depth".into(),
+        depth(vec![0.0, 5.0, 10.0, 15.0, 20.0, 25.0]),
+    );
+    app.set_active_metadata(next);
+    assert_eq!(
+        label(&app).as_deref(),
+        Some("15.00 m"),
+        "not the previous dataset's"
     );
 }

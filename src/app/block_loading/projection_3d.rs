@@ -102,7 +102,7 @@ impl OctantApp {
                 z_dim,
                 req_x.0,
                 req_y.0,
-                req_z.0,
+                req_z,
                 local_x_range.0,
                 local_y_range.0,
                 local_z_range.0,

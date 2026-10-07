@@ -82,7 +82,7 @@ fn evicted_stores_read_their_coordinates_again() {
     lat.store_array_subset(&all, &[0.0f64, 1.0])
         .expect("lat values");
     let read = || {
-        get_cached_coord_values_with_rank(store.clone(), "Evict_Store/", "lat", 0, 1)
+        get_cached_coord_values_with_rank(store.clone(), " evict_store/", "lat", 0, 1)
             .and_then(|c| c.last_number())
     };
     assert_eq!(read(), Some(1.0));
@@ -92,4 +92,68 @@ fn evicted_stores_read_their_coordinates_again() {
     assert_eq!(read(), Some(1.0), "served from the cache");
     evict_coord_values(Some("evict_store"));
     assert_eq!(read(), Some(5.0), "read again after eviction");
+}
+
+/// Writes a 1D float64 array of `values` at `path`.
+fn axis(store: &Arc<MemoryStore>, path: &str, values: &[f64]) {
+    let dt =
+        DataType::from_metadata(&zarrs::metadata::v3::MetadataV3::new("float64")).expect("float64");
+    let len = values.len() as u64;
+    let a = ArrayBuilder::new(vec![len], vec![len], dt, FillValue::from(f64::NAN))
+        .build(store.clone(), path)
+        .expect("build axis");
+    a.store_metadata().expect("axis metadata");
+    a.store_array_subset(&ArraySubset::new_with_shape(vec![len]), values)
+        .expect("axis values");
+}
+
+#[test]
+fn grouped_variables_read_their_own_groups_coordinates() {
+    use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
+    use crate::data::{DatasetMetadata, VariableInfo};
+
+    let store = Arc::new(MemoryStore::new());
+    axis(&store, "/a/lat", &[-10.0, 0.0, 10.0]);
+    axis(&store, "/b/lat", &[-40.0, -20.0, 0.0, 20.0, 40.0]);
+    let var = |name: &str, len: u64| VariableInfo {
+        name: name.into(),
+        shape: vec![len],
+        dimension_names: vec!["lat".into()],
+        ..Default::default()
+    };
+    let variables = vec![var("a/temp", 3), var("b/temp", 5)];
+    let meta = DatasetMetadata {
+        dimension_coordinates: fetch_all_dimension_coordinates_for_variables(
+            store,
+            &variables,
+            Some("grouped_store"),
+        ),
+        variables,
+        ..Default::default()
+    };
+    let last = |var: &str| {
+        meta.get_dim_coords(Some(var), "lat")
+            .and_then(|c| c.last_number())
+    };
+    assert_eq!(last("a/temp"), Some(10.0));
+    assert_eq!(last("b/temp"), Some(40.0), "not group a's latitude");
+}
+
+#[test]
+fn scoped_lookups_read_their_group_before_any_cached_one() {
+    use crate::data::backends::coord_bounds::get_cached_coord_values_scoped;
+
+    let store = Arc::new(MemoryStore::new());
+    axis(&store, "/a/lat", &[1.0, 2.0]);
+    axis(&store, "/b/lat", &[5.0, 6.0, 7.0]);
+    let read = |scope: Option<&str>| {
+        get_cached_coord_values_scoped(store.clone(), "scoped_store", "lat", scope, &[], 0, 1)
+            .and_then(|c| c.last_number())
+    };
+    assert_eq!(read(Some("a")), Some(2.0));
+    assert_eq!(
+        read(Some("/b/")),
+        Some(7.0),
+        "slashes trimmed, group b read"
+    );
 }

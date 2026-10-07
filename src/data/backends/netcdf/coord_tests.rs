@@ -154,3 +154,67 @@ fn coordinates_shared_by_groups_resolve_in_path_order() {
         "scoped keys keep their own"
     );
 }
+
+#[test]
+fn char_labels_end_at_their_first_nul() {
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("coord_nul");
+    let meta = inspect(&nc, |f| {
+        f.add_dimension("station", 2).expect("station");
+        f.add_dimension("strlen", 8).expect("strlen");
+        let rows = char_rows(&["abc\0xy", "Jena"], 8);
+        put(f, "station", &["station", "strlen"], &rows);
+    });
+    let label = |i| {
+        meta.get_dim_coords(None, "station")
+            .and_then(|c| c.label(i))
+    };
+    assert_eq!((label(0), label(1)), (Some("abc"), Some("Jena")));
+}
+
+#[test]
+fn labels_named_after_their_dimension_win_over_auxiliary_ones() {
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("coord_label_order");
+    let meta = inspect(&nc, |f| {
+        f.add_dimension("station", 2).expect("station");
+        f.add_dimension("strlen", 8).expect("strlen");
+        // The auxiliary description comes first in the file.
+        let desc = char_rows(&["north", "south"], 8);
+        put(f, "station_desc", &["station", "strlen"], &desc);
+        put(
+            f,
+            "station",
+            &["station", "strlen"],
+            &char_rows(&["Jena", "Mauna"], 8),
+        );
+        let mut data = f.add_variable::<f32>("co2", &["station"]).expect("co2");
+        data.put_values(&[410.0f32, 415.0], ..).expect("co2 values");
+        data.put_attribute("coordinates", "station_desc")
+            .expect("coordinates");
+    });
+    let label = meta
+        .get_dim_coords(None, "station")
+        .and_then(|c| c.label(1));
+    assert_eq!(label, Some("Mauna"));
+}
+
+#[test]
+fn path_qualified_auxiliary_coordinates_are_found() {
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("coord_aux_path");
+    let meta = inspect(&nc, |f| {
+        f.add_dimension("station", 2).expect("station");
+        f.add_dimension("strlen", 8).expect("strlen");
+        let names = char_rows(&["Jena", "Mauna"], 8);
+        put(f, "station_name", &["station", "strlen"], &names);
+        let mut data = f.add_variable::<f32>("co2", &["station"]).expect("co2");
+        data.put_values(&[410.0f32, 415.0], ..).expect("co2 values");
+        data.put_attribute("coordinates", "/station_name")
+            .expect("coordinates");
+    });
+    let label = meta
+        .get_dim_coords(None, "station")
+        .and_then(|c| c.label(0));
+    assert_eq!(label, Some("Jena"));
+}

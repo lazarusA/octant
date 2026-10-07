@@ -8,9 +8,10 @@ use zarrs::array::{ArrayBuilder, ArraySubset, DataType, FillValue};
 use zarrs::metadata::v3::MetadataV3;
 use zarrs::storage::store::MemoryStore;
 
-use super::block::{fetch_block_with_progress, window_coords};
+use super::block::fetch_block_with_progress;
+use super::block_coords::window_coords;
 use crate::data::CoordValues;
-use crate::data::slice_request::SliceRequest;
+use crate::data::slice_request::{DimensionSelection, SliceRequest};
 use crate::utils::grid_flips::{flipped_dims, reverse_flipped_coordinates};
 
 fn numbers(values: &[f64]) -> CoordValues {
@@ -46,7 +47,7 @@ fn flipped_axes_reverse_their_coordinates_and_extents() {
         ("lat".to_string(), vec![-60.0, -20.0, 0.0, 10.0, 50.0]),
         ("lon".to_string(), vec![0.0, 30.0]),
     ]);
-    let flipped = flipped_dims(&dims, &[5, 4], (true, true));
+    let flipped = flipped_dims(&dims, (true, true));
     assert_eq!(flipped, dims, "rows (lat) and columns (lon) both flip");
     reverse_flipped_coordinates(&mut coords, &dims, &[5, 4], &flipped);
     assert_eq!(coords["lat"], [50.0, 10.0, 0.0, -20.0, -60.0]);
@@ -85,8 +86,9 @@ fn a_partial_selection_of_a_flipped_extent_gets_its_own_coordinates() {
     );
 }
 
-#[test]
-fn uneven_south_to_north_rows_get_coordinates_in_data_order() {
+/// A store with root `lat` and `lon` axes and a `t2m` array over dimensions `dims` whose
+/// value at row `r`, column `c` is `r * lon.len() + c`.
+fn store_with(lat: &[f64], lon: &[f64], dims: [&str; 2]) -> Arc<MemoryStore> {
     let store = Arc::new(MemoryStore::new());
     let f64_dt = DataType::from_metadata(&MetadataV3::new("float64")).expect("float64");
     let axis = |name: &str, values: &[f64]| {
@@ -103,18 +105,33 @@ fn uneven_south_to_north_rows_get_coordinates_in_data_order() {
         a.store_array_subset(&ArraySubset::new_with_shape(vec![len]), values)
             .expect("axis values");
     };
-    axis("lat", &[-60.0, -20.0, 0.0, 10.0, 50.0]);
-    axis("lon", &[0.0, 10.0, 20.0, 30.0]);
+    axis("lat", lat);
+    axis("lon", lon);
 
+    let shape = vec![lat.len() as u64, lon.len() as u64];
     let f32_dt = DataType::from_metadata(&MetadataV3::new("float32")).expect("float32");
-    let mut builder = ArrayBuilder::new(vec![5, 4], vec![5, 4], f32_dt, FillValue::from(f32::NAN));
-    builder.dimension_names(Some(["lat", "lon"]));
+    let mut builder = ArrayBuilder::new(
+        shape.clone(),
+        shape.clone(),
+        f32_dt,
+        FillValue::from(f32::NAN),
+    );
+    builder.dimension_names(Some(dims));
     let t2m = builder.build(store.clone(), "/t2m").expect("build t2m");
     t2m.store_metadata().expect("t2m metadata");
-    let values: Vec<f32> = (0..20u8).map(f32::from).collect();
-    t2m.store_array_subset(&ArraySubset::new_with_shape(vec![5, 4]), &values)
+    let values: Vec<f32> = (0..lat.len() * lon.len()).map(|v| v as f32).collect();
+    t2m.store_array_subset(&ArraySubset::new_with_shape(shape), &values)
         .expect("t2m values");
+    store
+}
 
+#[test]
+fn uneven_south_to_north_rows_get_coordinates_in_data_order() {
+    let store = store_with(
+        &[-60.0, -20.0, 0.0, 10.0, 50.0],
+        &[0.0, 10.0, 20.0, 30.0],
+        ["lat", "lon"],
+    );
     let request = SliceRequest::full_range("t2m", &[5, 4]);
     let block = fetch_block_with_progress(store, "block_coords_store", &request, None)
         .expect("fetch block");
@@ -131,4 +148,66 @@ fn uneven_south_to_north_rows_get_coordinates_in_data_order() {
         ["lat"],
         "only the rows run opposite to storage"
     );
+}
+
+#[test]
+fn a_one_row_edge_block_flips_with_its_whole_latitude() {
+    let store = store_with(
+        &[-40.0, -20.0, 0.0, 20.0, 40.0],
+        &[0.0, 10.0],
+        ["lat", "lon"],
+    );
+    let request = SliceRequest::new(
+        "t2m",
+        vec![
+            DimensionSelection::range(4, 5),
+            DimensionSelection::range(0, 2),
+        ],
+    );
+    let block =
+        fetch_block_with_progress(store, "edge_block_store", &request, None).expect("fetch block");
+    assert_eq!(
+        block.flipped_dims,
+        ["lat"],
+        "decided from the whole latitude"
+    );
+    assert_eq!(block.shape, [1, 2]);
+}
+
+#[test]
+fn generic_dimensions_flip_with_the_spatial_coordinates_they_hold() {
+    let store = store_with(&[-10.0, 0.0, 10.0], &[0.0, 10.0], ["dim_0", "dim_1"]);
+    let request = SliceRequest::full_range("t2m", &[3, 2]);
+    let block = fetch_block_with_progress(store, "generic_dims_store", &request, None)
+        .expect("fetch block");
+    assert_eq!(block.flipped_dims, ["dim_0"]);
+    assert_eq!(
+        block.coordinates["dim_0"],
+        [10.0, -10.0],
+        "reversed with the rows"
+    );
+    assert_eq!(
+        block.get(&[0, 0]),
+        Some(4.0),
+        "row 0 holds the northernmost data"
+    );
+}
+
+#[test]
+fn string_attributes_reach_blocks_without_json_quotes() {
+    let store = Arc::new(MemoryStore::new());
+    let dt = DataType::from_metadata(&MetadataV3::new("float32")).expect("float32");
+    let mut builder = ArrayBuilder::new(vec![4, 1, 1], vec![4, 1, 1], dt, FillValue::from(0.0f32));
+    builder.dimension_names(Some(["band", "y", "x"]));
+    let mut attrs = serde_json::Map::new();
+    attrs.insert("color_space".into(), "cmyk".into());
+    builder.attributes(attrs);
+    let ink = builder.build(store.clone(), "/ink").expect("build ink");
+    ink.store_metadata().expect("ink metadata");
+    let request = SliceRequest::full_range("ink", &[4, 1, 1]);
+    let block = fetch_block_with_progress(store, "ink_store", &request, None).expect("fetch");
+    assert_eq!(block.attributes["color_space"], "cmyk");
+    assert!(crate::data::slicing::composite::cmyk::is_cmyk_block(
+        &block, 0
+    ));
 }

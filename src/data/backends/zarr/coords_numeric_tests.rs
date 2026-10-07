@@ -129,3 +129,37 @@ fn a_corrupt_middle_chunk_falls_back_to_the_endpoints() {
         })
     );
 }
+
+#[test]
+fn long_axes_of_small_chunks_keep_every_value_across_spans() {
+    // 200 one-value chunks: spans of 64 after the first; the spacing breaks in the third.
+    let mut time: Vec<f64> = (0..200).map(f64::from).collect();
+    time[150] = 150.5;
+    let (_store, a) = f64_axis("time", &time, 1);
+    let read = read_coordinate(&a).expect("read time");
+    assert_eq!(read.len(), 200);
+    assert_eq!(read.number(149), Some(149.0));
+    assert_eq!(read.number(150), Some(150.5));
+    assert_eq!(read.number(199), Some(199.0));
+}
+
+#[test]
+fn float16_axes_are_read() {
+    let store = Arc::new(MemoryStore::new());
+    let dt = DataType::from_metadata(&MetadataV3::new("float16")).expect("float16");
+    let a = ArrayBuilder::new(vec![4], vec![2], dt, FillValue::from(half::f16::ZERO))
+        .build(store.clone(), "/level")
+        .expect("build level");
+    a.store_metadata().expect("level metadata");
+    let values = [0.5, 1.0, 1.5, 2.0].map(half::f16::from_f64);
+    a.store_array_subset(&ArraySubset::new_with_shape(vec![4]), &values)
+        .expect("level values");
+    assert_eq!(
+        read_coordinate(&a),
+        Some(CoordValues::Regular {
+            start: 0.5,
+            step: 0.5,
+            len: 4
+        })
+    );
+}

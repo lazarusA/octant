@@ -23,6 +23,11 @@ impl OctantBlock {
     /// `dim`: mirrored for flipped dimensions, unchanged otherwise.
     pub fn oriented_range(&self, dim: usize, (start, end): (usize, usize)) -> (usize, usize) {
         let len = self.shape.get(dim).copied().unwrap_or(0);
+        // Dimensions outside the block (a volume without Z) pass `(0, 1)` through.
+        debug_assert!(
+            dim >= self.shape.len() || (start <= end && end <= len),
+            "range {start}..{end} outside {len}"
+        );
         if self.is_flipped(dim) && start <= end && end <= len {
             (len - end, len - start)
         } else {
@@ -40,9 +45,13 @@ pub fn slab_destination(
     (block_origin, local_start, slab_len): (usize, usize, usize),
     (request_start, volume_len): (usize, usize),
 ) -> usize {
-    let stored_start = block_origin + local_start;
+    let stored_start = block_origin.saturating_add(local_start);
     if flipped {
-        volume_len.saturating_sub((stored_start + slab_len).saturating_sub(request_start))
+        volume_len.saturating_sub(
+            stored_start
+                .saturating_add(slab_len)
+                .saturating_sub(request_start),
+        )
     } else {
         stored_start.saturating_sub(request_start)
     }

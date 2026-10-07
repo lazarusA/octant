@@ -94,13 +94,16 @@ fn resolve_2d_dim_entries(
         used_dims.insert(x_idx);
         used_dims.insert(y_idx);
 
-        let dim_y_name = explicit_y
-            .and_then(|i| v.dimension_names.get(i))
+        // The plotted dimensions' own names, so flipped ones map back to stored rows.
+        let dim_y_name = v
+            .dimension_names
+            .get(y_idx)
             .cloned()
             .unwrap_or_else(|| "y".to_string());
 
-        let dim_x_name = explicit_x
-            .and_then(|i| v.dimension_names.get(i))
+        let dim_x_name = v
+            .dimension_names
+            .get(x_idx)
             .cloned()
             .unwrap_or_else(|| "x".to_string());
 

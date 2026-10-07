@@ -54,7 +54,7 @@ fn uneven_south_to_north_netcdf_rows_hover_with_their_own_latitude() {
     );
     let lat = fields
         .iter()
-        .find(|f| f.label == "lat")
+        .find(|f| &*f.label == "lat")
         .map(|f| f.value.as_str());
     assert_eq!((val, lat), (6.0, Some("50.00°N")));
 }
@@ -78,4 +78,54 @@ fn grouped_blocks_find_coordinates_up_their_group_chain() {
         .get_dim_coords(Some("g1/t2m"), "lon")
         .and_then(|c| c.number(1));
     assert_eq!(lon, Some(110.0));
+}
+
+#[test]
+fn a_one_row_netcdf_edge_block_flips_with_its_whole_latitude() {
+    use crate::data::blocks::BlockStore;
+    use crate::data::slice_request::{DimensionSelection, SliceRequest};
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("coord_edge_block");
+    let store = grid_file(&nc);
+    let request = SliceRequest::new(
+        "t2m",
+        vec![
+            DimensionSelection::range(3, 4),
+            DimensionSelection::range(0, 2),
+        ],
+    );
+    let block = store.fetch_block(&request).expect("block");
+    assert_eq!(
+        block.flipped_dims,
+        ["lat"],
+        "decided from the whole latitude"
+    );
+    assert_eq!(block.shape, [1, 2]);
+}
+
+#[test]
+fn a_text_coordinate_in_the_group_hides_the_roots_numbers() {
+    use crate::data::blocks::BlockStore;
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("coord_group_text");
+    let _ = inspect(&nc, |f| {
+        f.add_dimension("lat", 2).expect("lat");
+        f.add_dimension("lon", 2).expect("lon");
+        put(f, "lat", &["lat"], &[10.0f64, 0.0]);
+        put(f, "lon", &["lon"], &[0.0f64, 10.0]);
+        let mut g = f.add_group("g").expect("g");
+        let mut lon = g.add_string_variable("lon", &["lon"]).expect("g/lon");
+        for (i, name) in ["west", "east"].iter().enumerate() {
+            lon.put_string(name, [i]).expect("lon label");
+        }
+        put(f, "g/t2m", &["lat", "lon"], &[0.0f32, 1.0, 2.0, 3.0]);
+    });
+    let store = super::desktop::NetCdfBlockStore::open_local(nc.path()).expect("open");
+    let request = crate::data::slice_request::SliceRequest::full_range("g/t2m", &[2, 2]);
+    let block = store.fetch_block(&request).expect("block");
+    assert_eq!(block.coordinates["lat"], [10.0, 0.0]);
+    assert!(
+        !block.coordinates.contains_key("lon"),
+        "the group's labels, not the root's numbers"
+    );
 }

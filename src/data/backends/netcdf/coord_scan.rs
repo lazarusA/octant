@@ -76,10 +76,11 @@ fn scan_variables<'f>(
         let name = var.name();
         // Only text variables that label a dimension are read.
         if let Some(dim) = text_dimension(&var) {
-            if (name == dim || aux.contains(&name))
+            let own = name == dim;
+            if (own || aux.contains(&name))
                 && let Some(values) = read_labels(&var)
             {
-                labels.push((dim, values));
+                labels.push((own, dim, values));
             }
             continue;
         }
@@ -92,7 +93,9 @@ fn scan_variables<'f>(
             insert(&mut coords, &name, values);
         }
     }
-    for (dim, values) in labels {
+    // A variable named after its dimension labels it before auxiliary ones.
+    labels.sort_by_key(|(own, _, _)| !own);
+    for (_, dim, values) in labels {
         let keeps_numbers = coords.get(&dim).is_some_and(|c| !is_index(c));
         if !keeps_numbers && let Some(values) = CoordValues::from_labels(values) {
             insert(&mut coords, &dim, values);
@@ -114,12 +117,15 @@ fn resolve<'a>(
     })
 }
 
-/// Variables listed in any `coordinates` attribute (CF auxiliary coordinates).
+/// Variables listed in any `coordinates` attribute (CF auxiliary coordinates), by name:
+/// path-qualified entries (`/group/name`, `../name`) give their last segment.
 fn auxiliary_names(variables: &[VariableInfo]) -> HashSet<String> {
     variables
         .iter()
         .filter_map(|v| v.attributes.get("coordinates"))
         .flat_map(|list| list.split_whitespace())
+        .filter_map(|entry| entry.rsplit('/').next())
+        .filter(|name| !name.is_empty())
         .map(str::to_string)
         .collect()
 }

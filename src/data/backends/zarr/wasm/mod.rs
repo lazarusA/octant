@@ -16,6 +16,8 @@ pub mod preload;
 pub mod store;
 
 pub use inspect::inspect_wasm_remote_zarr;
+#[cfg(target_arch = "wasm32")]
+pub(crate) use loader::CONCURRENT_FETCHES;
 pub use loader::load_one_wasm_with_progress;
 
 #[cfg(target_arch = "wasm32")]

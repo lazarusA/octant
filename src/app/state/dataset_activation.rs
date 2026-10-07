@@ -158,14 +158,10 @@ impl OctantApp {
             return false;
         };
 
-        var.attributes
-            .get("photometric")
-            .is_some_and(|p| p.eq_ignore_ascii_case("cmyk"))
-            || var
-                .attributes
-                .get("color_space")
-                .is_some_and(|cs| cs.eq_ignore_ascii_case("cmyk"))
-            || var.long_name.as_deref().is_some_and(|l| l.contains("CMYK"))
+        crate::data::slicing::composite::cmyk::is_cmyk_attrs(|key| match key {
+            "long_name" => var.long_name.as_deref(),
+            _ => var.attributes.get(key).map(String::as_str),
+        })
     }
 
     /// Returns true if the currently plotted variable represents an OME-Zarr / bioimaging dataset with OMERO channels.

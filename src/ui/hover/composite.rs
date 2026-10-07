@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::app::OctantApp;
 use crate::data::slicing::CompositeProbe;
 use crate::data::{DatasetMetadata, VariableInfo};
-use crate::ui::hover::composite_bands::BandNames;
+use crate::ui::hover::composite_bands::{BandNames, is_non_visible, visible_color};
 use crate::ui::hover::field::HoverField;
 
 /// A band combination, named the way GIS tools name them.
@@ -39,21 +39,23 @@ impl CompositeKind {
 
 const RGB_LETTERS: [&str; 3] = ["R", "G", "B"];
 const CMYK_LETTERS: [&str; 4] = ["C", "M", "Y", "K"];
-const TRUE_COLOR_BANDS: [&str; 3] = ["red", "green", "blue"];
-
-/// Names an RGB band mapping from its three band names (`None` for unnamed bands).
+/// Names an RGB band mapping from its three band names (`None` for unnamed bands): true
+/// color when red, green and blue bands land on R, G and B; false color when a band outside
+/// the visible range or a color in another slot is drawn; otherwise just an RGB composite,
+/// e.g. for band codes like `B04` that name no color.
 pub fn classify_rgb(names: [Option<&str>; 3]) -> CompositeKind {
     let [Some(r), Some(g), Some(b)] = names else {
         return CompositeKind::Rgb;
     };
-    let is_true = [r, g, b]
-        .iter()
-        .zip(TRUE_COLOR_BANDS)
-        .all(|(name, band)| name.trim().eq_ignore_ascii_case(band));
-    if is_true {
-        CompositeKind::TrueColor
-    } else {
+    let colors = [r, g, b].map(visible_color);
+    if colors == [Some(0), Some(1), Some(2)] {
+        return CompositeKind::TrueColor;
+    }
+    let misplaced = (0..3).any(|slot| colors[slot].is_some_and(|c| c != slot));
+    if misplaced || [r, g, b].into_iter().any(is_non_visible) {
         CompositeKind::FalseColor
+    } else {
+        CompositeKind::Rgb
     }
 }
 
@@ -61,7 +63,7 @@ pub fn classify_rgb(names: [Option<&str>; 3]) -> CompositeKind {
 /// band it reads, and the band's name for band mappings.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompositeChannel {
-    pub label: String,
+    pub label: Arc<str>,
     pub band: usize,
     pub band_name: Option<String>,
 }
@@ -83,8 +85,9 @@ pub fn composite_labels(
 ) -> Arc<CompositeLabels> {
     let mut hasher = DefaultHasher::new();
     app.plotted_store_target_input.hash(&mut hasher);
-    meta.map(std::ptr::from_ref).hash(&mut hasher);
-    var.map(|v| (&v.name, &v.shape)).hash(&mut hasher);
+    (meta.is_some(), app.plotted_metadata_generation).hash(&mut hasher);
+    var.map(|v| (&v.name, &v.shape, &v.dimension_names))
+        .hash(&mut hasher);
     (is_overlay(app), cmyk_bands(app), rgb_bands(app)).hash(&mut hasher);
     for c in &app.composite_channel_configs {
         (c.index, &c.name, c.visible).hash(&mut hasher);
@@ -112,8 +115,8 @@ pub fn build_labels(
         let channels = app.composite_channel_configs.iter().filter(|c| c.visible);
         let channels = channels.map(|c| CompositeChannel {
             label: match c.name.trim() {
-                "" => format!("Channel {}", c.index + 1),
-                name => name.to_string(),
+                "" => format!("Channel {}", c.index + 1).into(),
+                name => name.into(),
             },
             band: c.index,
             band_name: None,
@@ -125,7 +128,7 @@ pub fn build_labels(
     }
     let names = BandNames::resolve(app, meta, var);
     let band = |(letter, band): (&str, usize)| CompositeChannel {
-        label: letter.to_string(),
+        label: letter.into(),
         band,
         band_name: Some(names.name(band)),
     };
@@ -158,12 +161,13 @@ pub fn composite_fields(
         .channels
         .iter()
         .map(|c| {
-            let value = format_raw(raw(c.band), units);
-            let value = match &c.band_name {
-                Some(name) => format!("{name} {value}"),
-                None => value,
-            };
-            HoverField::new(c.label.as_str(), value)
+            let mut value = String::with_capacity(32);
+            if let Some(name) = &c.band_name {
+                value.push_str(name);
+                value.push(' ');
+            }
+            write_raw(&mut value, raw(c.band), units);
+            HoverField::new(Arc::clone(&c.label), value)
         })
         .collect()
 }
@@ -192,16 +196,17 @@ fn rgb_bands(app: &OctantApp) -> [usize; 3] {
     app.rgb_composite_channels.map(resolve)
 }
 
-fn format_raw(raw: Option<f32>, units: &str) -> String {
+/// Appends a channel's raw value (with `units`), or "No data", to `out`.
+fn write_raw(out: &mut String, raw: Option<f32>, units: &str) {
     let Some(value) = raw else {
-        return "No data".to_string();
+        out.push_str("No data");
+        return;
     };
     let mut buf = [0u8; 32];
-    let text = crate::ui::hover::card::HoverValue::from_raw(value, None).format(&mut buf);
-    if units.is_empty() || value.is_nan() {
-        text.to_string()
-    } else {
-        format!("{text} {units}")
+    out.push_str(crate::ui::hover::card::HoverValue::from_raw(value, None).format(&mut buf));
+    if !units.is_empty() && !value.is_nan() {
+        out.push(' ');
+        out.push_str(units);
     }
 }
 
