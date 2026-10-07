@@ -1,9 +1,13 @@
 //! Hover readout of a composite: its name, and the band behind each color channel with the
 //! band's raw value at the hovered pixel.
 
+use std::hash::{DefaultHasher, Hash, Hasher};
+use std::sync::Arc;
+
 use crate::app::OctantApp;
 use crate::data::slicing::CompositeProbe;
 use crate::data::{DatasetMetadata, VariableInfo};
+use crate::ui::hover::composite_bands::BandNames;
 use crate::ui::hover::field::HoverField;
 
 /// A band combination, named the way GIS tools name them.
@@ -53,57 +57,113 @@ pub fn classify_rgb(names: [Option<&str>; 3]) -> CompositeKind {
     }
 }
 
-/// The composite the plot draws, as the hover card and settings name it.
-pub fn composite_kind(
+/// One composite channel: its row label (`R`, `C`, or an overlay channel's name), the global
+/// band it reads, and the band's name for band mappings.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompositeChannel {
+    pub label: String,
+    pub band: usize,
+    pub band_name: Option<String>,
+}
+
+/// The composite the plot draws: its name and channels, resolved once per plot.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompositeLabels {
+    pub kind: CompositeKind,
+    pub channels: Vec<CompositeChannel>,
+}
+
+/// [`build_labels`], cached in egui temp memory until the dataset, variable or channel
+/// mapping changes, so the hover and settings do no lookups or formatting per frame.
+pub fn composite_labels(
+    app: &OctantApp,
+    ctx: &egui::Context,
+    meta: Option<&DatasetMetadata>,
+    var: Option<&VariableInfo>,
+) -> Arc<CompositeLabels> {
+    let mut hasher = DefaultHasher::new();
+    app.plotted_store_target_input.hash(&mut hasher);
+    meta.map(std::ptr::from_ref).hash(&mut hasher);
+    var.map(|v| (&v.name, &v.shape)).hash(&mut hasher);
+    (is_overlay(app), cmyk_bands(app), rgb_bands(app)).hash(&mut hasher);
+    for c in &app.composite_channel_configs {
+        (c.index, &c.name, c.visible).hash(&mut hasher);
+    }
+    let key = hasher.finish();
+    let id = egui::Id::new("composite_labels");
+    if let Some((cached_key, labels)) = ctx.data(|d| d.get_temp::<(u64, Arc<CompositeLabels>)>(id))
+        && cached_key == key
+    {
+        return labels;
+    }
+    let labels = Arc::new(build_labels(app, meta, var));
+    ctx.data_mut(|d| d.insert_temp(id, (key, Arc::clone(&labels))));
+    labels
+}
+
+/// The composite's name and channels: visible overlay channels, the C, M, Y, K inks, or the
+/// bands drawn as R, G and B.
+pub fn build_labels(
     app: &OctantApp,
     meta: Option<&DatasetMetadata>,
     var: Option<&VariableInfo>,
-) -> CompositeKind {
+) -> CompositeLabels {
     if is_overlay(app) {
-        return CompositeKind::Overlay;
+        let channels = app.composite_channel_configs.iter().filter(|c| c.visible);
+        let channels = channels.map(|c| CompositeChannel {
+            label: match c.name.trim() {
+                "" => format!("Channel {}", c.index + 1),
+                name => name.to_string(),
+            },
+            band: c.index,
+            band_name: None,
+        });
+        return CompositeLabels {
+            kind: CompositeKind::Overlay,
+            channels: channels.collect(),
+        };
     }
-    if cmyk_bands(app).is_some() {
-        return CompositeKind::Cmyk;
+    let names = BandNames::resolve(app, meta, var);
+    let band = |(letter, band): (&str, usize)| CompositeChannel {
+        label: letter.to_string(),
+        band,
+        band_name: Some(names.name(band)),
+    };
+    match cmyk_bands(app) {
+        Some(inks) => CompositeLabels {
+            kind: CompositeKind::Cmyk,
+            channels: CMYK_LETTERS.into_iter().zip(inks).map(band).collect(),
+        },
+        None => {
+            let bands = rgb_bands(app);
+            CompositeLabels {
+                kind: classify_rgb(bands.map(|b| names.real_name(b))),
+                channels: RGB_LETTERS.into_iter().zip(bands).map(band).collect(),
+            }
+        }
     }
-    let bands = BandNames::resolve(app, meta, var);
-    classify_rgb(rgb_bands(app).map(|band| bands.real_name(band)))
 }
 
 /// One row per composite channel at composite pixel `(px, py)`: `R  NIR 0.312` for band
 /// mappings, `DAPI  1234` for overlays.
 pub fn composite_fields(
     app: &OctantApp,
-    meta: Option<&DatasetMetadata>,
-    var: Option<&VariableInfo>,
+    labels: &CompositeLabels,
     units: &str,
     (px, py): (usize, usize),
 ) -> Vec<HoverField> {
     let probe = app.composite_probe.as_ref();
     let raw = |band: usize| probe.and_then(|p| p.sample(band, px, py));
-    if is_overlay(app) {
-        return app
-            .composite_channel_configs
-            .iter()
-            .filter(|c| c.visible)
-            .map(|c| {
-                let name = match c.name.trim() {
-                    "" => format!("Channel {}", c.index + 1),
-                    name => name.to_string(),
-                };
-                HoverField::new(name, format_raw(raw(c.index), units))
-            })
-            .collect();
-    }
-    let bands = BandNames::resolve(app, meta, var);
-    let channels: Vec<(&str, usize)> = match cmyk_bands(app) {
-        Some(inks) => CMYK_LETTERS.into_iter().zip(inks).collect(),
-        None => RGB_LETTERS.into_iter().zip(rgb_bands(app)).collect(),
-    };
-    channels
-        .into_iter()
-        .map(|(letter, band)| {
-            let value = format_raw(raw(band), units);
-            HoverField::new(letter, format!("{} {value}", bands.name(band)))
+    labels
+        .channels
+        .iter()
+        .map(|c| {
+            let value = format_raw(raw(c.band), units);
+            let value = match &c.band_name {
+                Some(name) => format!("{name} {value}"),
+                None => value,
+            };
+            HoverField::new(c.label.as_str(), value)
         })
         .collect()
 }
@@ -145,48 +205,25 @@ fn format_raw(raw: Option<f32>, units: &str) -> String {
     }
 }
 
-/// Labels of the channel dimension, when the dataset stores one per band.
-struct BandNames<'a> {
-    dim: &'a str,
-    labels: Option<&'a [String]>,
-}
-
-impl<'a> BandNames<'a> {
-    fn resolve(
-        app: &OctantApp,
-        meta: Option<&'a DatasetMetadata>,
-        var: Option<&'a VariableInfo>,
-    ) -> Self {
-        let c_dim = app.channel_dim_index().unwrap_or(0);
-        let dim = var
-            .and_then(|v| v.dimension_names.get(c_dim))
-            .map_or("band", String::as_str);
-        let count = var.and_then(|v| v.shape.get(c_dim)).copied();
-        let labels = meta
-            .and_then(|m| m.get_dim_coords(var.map(|v| v.name.as_str()), dim))
-            .and_then(|c| c.labels())
-            .filter(|l| count.is_some_and(|n| l.len() as u64 == n));
-        Self { dim, labels }
+/// The composite's name, after prepending one row per channel (its band and raw value at
+/// `pixel`) to `entries` for flat 2D composites; `None` without a composite.
+pub fn composite_rows(
+    app: &OctantApp,
+    ctx: &egui::Context,
+    meta: Option<&DatasetMetadata>,
+    var: Option<&VariableInfo>,
+    units: &str,
+    pixel: Option<(usize, usize)>,
+    entries: &mut Vec<HoverField>,
+) -> Option<CompositeKind> {
+    if !app.rgb_composite_mode {
+        return None;
     }
-
-    /// The stored name of `band`, ignoring generated `Band N` placeholders.
-    fn real_name(&self, band: usize) -> Option<&'a str> {
-        let name = self.labels?.get(band)?.trim();
-        let placeholder = name
-            .strip_prefix("Band ")
-            .is_some_and(|n| n.parse::<usize>().is_ok());
-        (!name.is_empty() && !placeholder).then_some(name)
+    let labels = composite_labels(app, ctx, meta, var);
+    if let Some(pixel) = pixel
+        && app.composite_probe.is_some()
+    {
+        entries.splice(0..0, composite_fields(app, &labels, units, pixel));
     }
-
-    /// The name shown for `band`: its label, else the dimension name and 1-based index.
-    fn name(&self, band: usize) -> String {
-        match self.labels.and_then(|l| l.get(band)).map(|n| n.trim()) {
-            Some(name) if !name.is_empty() => name.to_string(),
-            _ => {
-                let mut chars = self.dim.chars();
-                let first = chars.next().map(|c| c.to_ascii_uppercase());
-                format!("{}{} {}", first.unwrap_or('B'), chars.as_str(), band + 1)
-            }
-        }
-    }
+    Some(labels.kind)
 }

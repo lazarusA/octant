@@ -63,46 +63,54 @@ pub fn retrieve_array_as_strings<TStorage: ?Sized + ReadableStorageTraits + 'sta
     Some(labels.iter().map(|l| clean_label(l)).collect())
 }
 
-/// Streams the chunks of a 1D numeric array through a [`SpacingCheck`]: nothing is kept
-/// while the values stay evenly spaced, and the values are collected from the first one
-/// that breaks the spacing (earlier ones are regenerated from start and step).
+/// Reads a 1D numeric array chunk by chunk. The last chunk is decoded first, for the last
+/// value the spacing check needs, and reused when the stream reaches it. A chunk that fails
+/// to decode leaves the endpoints.
 fn read_numbers<TStorage: ?Sized + ReadableStorageTraits + 'static>(
     array: &Array<TStorage>,
 ) -> Option<CoordValues> {
-    let len = *array.shape().first()?;
+    let len = usize::try_from(*array.shape().first()?).ok()?;
     let chunk_count = *array.chunk_grid_shape().first()?;
     let chunk = |c: u64| {
         let subset = array.chunk_subset_bounded(&[c]).ok()?;
         retrieve_array_subset_as_f64(array, &subset).ok()
     };
     let mut head = Some(chunk(0)?);
-    let values0 = head.as_deref()?;
-    let first = *values0.first()?;
-    let last = if chunk_count > 1 {
-        #[allow(clippy::single_range_in_vec_init)]
-        let tail = ArraySubset::new_with_ranges(&[len - 1..len]);
-        *retrieve_array_subset_as_f64(array, &tail).ok()?.first()?
+    let mut tail = if chunk_count > 1 {
+        Some(chunk(chunk_count - 1)?)
     } else {
-        *values0.last()?
+        None
     };
-    let len = usize::try_from(len).ok()?;
+    let first = *head.as_deref()?.first()?;
+    let last = *tail.as_deref().or(head.as_deref())?.last()?;
     let dt = array.data_type();
     let mut check = SpacingCheck::new(first, len, last);
     check.f32_source = dt.is::<Float32DataType>() || dt.is::<Float16DataType>();
 
+    let chunks = (0..chunk_count).map(|c| match c {
+        0 => head.take(),
+        c if c + 1 == chunk_count => tail.take(),
+        c => chunk(c),
+    });
+    Some(stream(check, chunks).unwrap_or(CoordValues::Endpoints { first, last, len }))
+}
+
+/// Streams chunk values through `check`: nothing is kept while they stay evenly spaced,
+/// and every value is kept from the first one that breaks the spacing (earlier ones are
+/// regenerated from start and step). `None` when a chunk failed to decode.
+fn stream(
+    check: SpacingCheck,
+    chunks: impl Iterator<Item = Option<Vec<f64>>>,
+) -> Option<CoordValues> {
     let mut uneven: Option<Vec<f64>> = None;
     let mut index = 0usize;
-    for c in 0..chunk_count {
-        let values = if c == 0 { head.take() } else { chunk(c) };
-        let Some(values) = values else {
-            return Some(CoordValues::Endpoints { first, last, len });
-        };
-        for v in values {
+    for values in chunks {
+        for v in values? {
             match uneven.as_mut() {
                 Some(out) => out.push(v),
                 None if check.fits(index, v) => {}
                 None => {
-                    let mut out = Vec::with_capacity(len);
+                    let mut out = Vec::with_capacity(check.len);
                     out.extend((0..index).map(|i| check.expected(i)));
                     out.push(v);
                     uneven = Some(out);

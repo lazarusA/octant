@@ -30,6 +30,10 @@ fn stored_ranges_mirror_only_along_flipped_dimensions() {
     assert_eq!(b.oriented_range(0, (0, 10)), (0, 10));
     assert_eq!(b.oriented_range(1, (1, 3)), (1, 3));
     assert_eq!(block(&[]).oriented_range(0, (2, 5)), (2, 5));
+    // A fixed index along a flipped dimension reads the mirrored row.
+    assert_eq!(b.oriented_index(0, 0), 9);
+    assert_eq!(b.oriented_index(0, 9), 0);
+    assert_eq!(b.oriented_index(1, 2), 2);
 }
 
 #[test]
@@ -69,4 +73,40 @@ fn square_lon_first_grids_swap_their_names_and_origins() {
     );
     // Row j (lat), column i (lon) now holds the stored (lon i, lat j) value.
     assert_eq!(out, [0.0, 3.0, 6.0, 1.0, 4.0, 7.0, 2.0, 5.0, 8.0]);
+}
+
+#[test]
+fn rows_and_columns_flip_together_with_an_odd_row_count() {
+    // 3 rows (lat ascending) x 2 columns (lon descending), two time slices.
+    let values: Vec<f32> = (0..12u8).map(f32::from).collect();
+    let mut shape = vec![2, 3, 2];
+    let mut dims = ["time", "lat", "lon"].map(String::from).to_vec();
+    let mut origin = vec![0, 0, 0];
+    let mut coords = HashMap::from([
+        ("lat".to_string(), vec![-10.0, 0.0, 10.0]),
+        ("lon".to_string(), vec![20.0, 10.0]),
+    ]);
+    let attrs = serde_json::Map::new();
+    let (out, flipped) = check_and_orient_block_grid(
+        values,
+        &mut shape,
+        &mut dims,
+        &mut origin,
+        &attrs,
+        &mut coords,
+    );
+    assert_eq!(flipped, ["lat", "lon"]);
+    let first_slice = [5.0, 4.0, 3.0, 2.0, 1.0, 0.0];
+    assert_eq!(
+        out[..6],
+        first_slice,
+        "north first, west first, middle row reversed only"
+    );
+    assert_eq!(
+        out[6..],
+        first_slice.map(|v| v + 6.0),
+        "every slice the same way"
+    );
+    assert_eq!(coords["lat"], [10.0, 0.0, -10.0]);
+    assert_eq!(coords["lon"], [10.0, 20.0]);
 }

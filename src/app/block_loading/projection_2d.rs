@@ -17,6 +17,8 @@ impl OctantApp {
         compute_bounds: bool,
         c_dim: usize,
     ) {
+        self.plotted_flipped_dims.clone_from(&block.flipped_dims);
+        self.composite_probe = None;
         let mdata_opt = if self.rgb_composite_mode
             && block.shape.len() >= 2
             && block.shape.get(c_dim).copied().unwrap_or(0) >= 1
@@ -33,19 +35,6 @@ impl OctantApp {
         } else {
             None
         };
-
-        self.plotted_flipped_dims.clone_from(&block.flipped_dims);
-        self.composite_probe = mdata_opt.is_some().then(|| {
-            crate::data::slicing::CompositeProbe::new(
-                block,
-                c_dim,
-                x_dim,
-                y_dim,
-                x_range,
-                y_range,
-                fixed_indices,
-            )
-        });
 
         let mdata_opt = mdata_opt.or_else(|| {
             block.slice_2d_with_ranges(
@@ -65,9 +54,11 @@ impl OctantApp {
         }
     }
 
+    /// Slices the composite and, when it succeeds, records the block window behind it for
+    /// the hover's raw channel values.
     #[allow(clippy::too_many_arguments)]
     fn slice_2d_composite_data(
-        &self,
+        &mut self,
         block: &OctantBlock,
         c_dim: usize,
         x_dim: usize,
@@ -76,7 +67,7 @@ impl OctantApp {
         y_range: (usize, usize),
         fixed_indices: &[usize],
     ) -> Option<crate::data::matrix_data::MatrixData> {
-        if !self.is_geotiff() && !self.composite_channel_configs.is_empty() {
+        let matrix = if !self.is_geotiff() && !self.composite_channel_configs.is_empty() {
             crate::data::slicing::slice_multichannel_composite_nd(
                 block,
                 c_dim,
@@ -89,11 +80,7 @@ impl OctantApp {
                 self.animated_dim_extent(),
             )
         } else {
-            let opt_channels = [
-                Some(self.rgb_composite_channels[0]),
-                Some(self.rgb_composite_channels[1]),
-                Some(self.rgb_composite_channels[2]),
-            ];
+            let opt_channels = self.rgb_composite_channels.map(Some);
             crate::data::slicing::slice_rgb_composite_nd(
                 block,
                 c_dim,
@@ -105,6 +92,16 @@ impl OctantApp {
                 opt_channels,
                 self.animated_dim_extent(),
             )
-        }
+        }?;
+        self.composite_probe = Some(crate::data::slicing::CompositeProbe::new(
+            block,
+            c_dim,
+            x_dim,
+            y_dim,
+            x_range,
+            y_range,
+            fixed_indices,
+        ));
+        Some(matrix)
     }
 }

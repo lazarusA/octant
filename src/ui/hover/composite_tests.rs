@@ -2,7 +2,9 @@
 
 use std::collections::HashMap;
 
-use super::composite::{CompositeKind, classify_rgb, composite_fields, composite_kind};
+use super::composite::{
+    CompositeKind, CompositeLabels, build_labels, classify_rgb, composite_fields,
+};
 use super::entries_2d::resolve_2d_plot_entries;
 use super::field::HoverField;
 use crate::app::{OctantApp, StoreKind};
@@ -64,9 +66,13 @@ fn composite_app(labels: Option<&[&str]>, channels: [usize; 3]) -> OctantApp {
     app
 }
 
-fn kind(app: &OctantApp) -> CompositeKind {
+fn labels(app: &OctantApp) -> CompositeLabels {
     let meta = app.plotted_dataset_metadata.as_ref();
-    composite_kind(app, meta, meta.and_then(|m| m.variables.first()))
+    build_labels(app, meta, meta.and_then(|m| m.variables.first()))
+}
+
+fn kind(app: &OctantApp) -> CompositeKind {
+    labels(app).kind
 }
 
 #[test]
@@ -104,10 +110,8 @@ fn band_names_decide_true_and_false_color() {
 #[test]
 fn channel_rows_show_each_band_and_its_raw_value() {
     let app = composite_app(Some(&BANDS), [3, 2, 1]);
-    let meta = app.plotted_dataset_metadata.as_ref();
-    let var = meta.and_then(|m| m.variables.first());
     assert_eq!(
-        composite_fields(&app, meta, var, "", (2, 1)),
+        composite_fields(&app, &labels(&app), "", (2, 1)),
         [
             HoverField::new("R", "NIR 312"),
             HoverField::new("G", "Red 212"),
@@ -115,9 +119,7 @@ fn channel_rows_show_each_band_and_its_raw_value() {
         ]
     );
     let unnamed = composite_app(None, [3, 2, 1]);
-    let meta = unnamed.plotted_dataset_metadata.as_ref();
-    let var = meta.and_then(|m| m.variables.first());
-    let fields = composite_fields(&unnamed, meta, var, "m", (0, 0));
+    let fields = composite_fields(&unnamed, &labels(&unnamed), "m", (0, 0));
     assert_eq!(fields[0], HoverField::new("R", "Band 4 300 m"));
 }
 
@@ -131,11 +133,20 @@ fn composite_hover_lists_channels_instead_of_a_band_row() {
         resolve_2d_plot_entries(&app, matrix, meta, var, 2.5 / 3.0, 1.5 / 2.0, None);
 
     assert!(!val.is_nan(), "composite pixel holds a packed color");
+    let names: Vec<_> = fields.iter().map(|f| f.label.as_str()).collect();
+    assert_eq!(
+        names,
+        ["y", "x"],
+        "no band row: the composite mixes every band"
+    );
+    // The tooltip prepends one row per channel at the hovered pixel.
     let raw = |band: usize| band * 100 + py * 10 + px;
-    let labels: Vec<_> = fields.iter().map(|f| f.label.as_str()).collect();
-    assert_eq!(labels, ["R", "G", "B", "y", "x"]);
-    assert_eq!(fields[0].value, format!("NIR {}", raw(3)));
-    assert_eq!(fields[2].value, format!("Green {}", raw(1)));
+    let channels = composite_fields(&app, &labels(&app), "", (px, py));
+    assert_eq!(channels[0], HoverField::new("R", format!("NIR {}", raw(3))));
+    assert_eq!(
+        channels[2],
+        HoverField::new("B", format!("Green {}", raw(1)))
+    );
 }
 
 #[test]
@@ -146,10 +157,8 @@ fn cmyk_composite_is_named_and_lists_its_inks() {
     app.apply_2d_projection(&block_with(cmyk), 2, 1, (0, 3), (0, 2), &[0, 0, 0], true, 0);
     assert_eq!(kind(&app), CompositeKind::Cmyk);
 
-    let meta = app.plotted_dataset_metadata.as_ref();
-    let var = meta.and_then(|m| m.variables.first());
     assert_eq!(
-        composite_fields(&app, meta, var, "", (1, 0)),
+        composite_fields(&app, &labels(&app), "", (1, 0)),
         [
             HoverField::new("C", "Cyan 1"),
             HoverField::new("M", "Magenta 101"),

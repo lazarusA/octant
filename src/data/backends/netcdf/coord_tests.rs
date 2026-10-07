@@ -132,3 +132,25 @@ fn grouped_variables_resolve_coordinates_up_their_group_chain() {
     let root_lat = meta.get_dim_coords(None, "lat").expect("root lat");
     assert_eq!(root_lat.len(), 2);
 }
+
+#[test]
+fn coordinates_shared_by_groups_resolve_in_path_order() {
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("coord_group_order");
+    let meta = inspect(&nc, |f| {
+        for (group, step) in [("model_b", 3.0f64), ("model_a", 1.0)] {
+            let mut g = f.add_group(group).expect("group");
+            g.add_dimension("time", 2).expect("time");
+            put(f, &format!("{group}/time"), &["time"], &[0.0, step]);
+        }
+    });
+    // No root time: the unscoped key takes the first group by path, on every run.
+    let time = meta.get_dim_coords(None, "time").expect("time");
+    assert_eq!(time.number(1), Some(1.0));
+    let b = meta.get_dim_coords(Some("model_b/time"), "time");
+    assert_eq!(
+        b.and_then(|c| c.number(1)),
+        Some(3.0),
+        "scoped keys keep their own"
+    );
+}

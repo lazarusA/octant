@@ -3,6 +3,8 @@
 
 use std::collections::HashMap;
 
+use crate::data::coordinates::naming::contains_ascii_case_insensitive;
+
 /// `(flip_y, flip_x)`: rows flip when latitude ascends (row 0 south), columns when
 /// longitude descends (column 0 east), judged from the coordinates' first and last value,
 /// else from orientation attributes and dimension names.
@@ -12,64 +14,49 @@ pub fn axis_flips(
     lat_coords: Option<&[f64]>,
     lon_coords: Option<&[f64]>,
 ) -> (bool, bool) {
-    let mut flip_y = false;
+    (
+        lat_flip(dim_names, attributes, lat_coords),
+        lon_flip(attributes, lon_coords),
+    )
+}
 
+/// Rows flip when latitude ascends, so north renders at the top: from the coordinates, else
+/// `latitude_orientation`, else `positive = "up"`, else whenever a latitude dimension exists.
+fn lat_flip(
+    dim_names: &[String],
+    attributes: &serde_json::Map<String, serde_json::Value>,
+    lat_coords: Option<&[f64]>,
+) -> bool {
     if let Some(coords) = lat_coords {
-        if coords.len() >= 2 {
-            let first = coords.first().copied().unwrap_or(0.0);
-            let last = coords.last().copied().unwrap_or(0.0);
-            if first < last {
-                // Axis data ascends from South to North (Row 0 is South).
-                // Flip Y so North (+90) renders at top of screen (Row 0).
-                flip_y = true;
-            } else if first > last {
-                // Axis data descends from North to South (Row 0 is North).
-                // Row 0 is already at top of screen (North), do not flip Y.
-                flip_y = false;
-            }
-        }
-    } else if let Some(orientation) = attributes
-        .get("latitude_orientation")
-        .and_then(|v| v.as_str())
-    {
-        if orientation.to_lowercase() == "ascending" {
-            flip_y = true;
-        } else if orientation.to_lowercase() == "descending" {
-            flip_y = false;
-        }
-    } else if let Some(positive_attr) = attributes.get("positive").and_then(|v| v.as_str())
-        && positive_attr.to_lowercase() == "up"
-    {
-        flip_y = true;
-    } else {
-        let is_lat_dim = dim_names
-            .iter()
-            .any(|d| d.to_lowercase().contains("lat") || d.to_lowercase() == "y");
-        if is_lat_dim {
-            flip_y = true;
-        }
+        return matches!((coords.first(), coords.last()), (Some(f), Some(l)) if coords.len() >= 2 && f < l);
     }
-
-    let mut flip_x = false;
-
-    if let Some(coords) = lon_coords {
-        if coords.len() >= 2 {
-            let first = coords.first().copied().unwrap_or(0.0);
-            let last = coords.last().copied().unwrap_or(0.0);
-            if first > last {
-                // Axis data descends (East to West). Flip X so West renders on left.
-                flip_x = true;
-            }
-        }
-    } else if let Some(orientation) = attributes
-        .get("longitude_orientation")
-        .and_then(|v| v.as_str())
-        && orientation.to_lowercase() == "descending"
-    {
-        flip_x = true;
+    let attr = |key: &str| attributes.get(key).and_then(|v| v.as_str());
+    if let Some(orientation) = attr("latitude_orientation") {
+        return orientation.eq_ignore_ascii_case("ascending");
     }
+    if attr("positive").is_some_and(|p| p.eq_ignore_ascii_case("up")) {
+        return true;
+    }
+    dim_names
+        .iter()
+        .any(|d| contains_ascii_case_insensitive(d, "lat") || d.eq_ignore_ascii_case("y"))
+}
 
-    (flip_y, flip_x)
+/// Columns flip when longitude descends, so west renders on the left: from the
+/// coordinates, else `longitude_orientation = "descending"`.
+fn lon_flip(
+    attributes: &serde_json::Map<String, serde_json::Value>,
+    lon_coords: Option<&[f64]>,
+) -> bool {
+    match lon_coords {
+        Some(coords) => {
+            matches!((coords.first(), coords.last()), (Some(f), Some(l)) if coords.len() >= 2 && f > l)
+        }
+        None => attributes
+            .get("longitude_orientation")
+            .and_then(|v| v.as_str())
+            .is_some_and(|o| o.eq_ignore_ascii_case("descending")),
+    }
 }
 
 /// Whether the spatial dimensions are stored lon-first (`(lon, lat)` or `(x, y)`), which
@@ -106,9 +93,10 @@ pub fn flipped_dims(
         .collect()
 }
 
-/// Reverses the per-index coordinate vectors (one value per row or column) of the
-/// `flipped` dimensions, so that value `i` stays the coordinate of data row or column `i`.
-/// Two-value `[first, last]` vectors of longer axes describe only the extent and are kept.
+/// Reverses the coordinate vectors of the `flipped` dimensions so they follow the data:
+/// per-index vectors (one value per row or column) keep value `i` on data row or column
+/// `i`, and two-value `[first, last]` extents swap ends, so interpolating them at oriented
+/// indices gives the right coordinates.
 pub fn reverse_flipped_coordinates(
     coordinates: &mut HashMap<String, Vec<f64>>,
     dim_names: &[String],
@@ -120,7 +108,7 @@ pub fn reverse_flipped_coordinates(
             continue;
         };
         let len = block_shape.get(dim).copied().unwrap_or(0);
-        if len <= 2 {
+        if len <= 1 {
             continue;
         }
         let clean = name.trim().to_lowercase();
@@ -131,7 +119,7 @@ pub fn reverse_flipped_coordinates(
         };
         for key in keys {
             if let Some(values) = coordinates.get_mut(*key)
-                && values.len() == len
+                && (values.len() == len || values.len() == 2)
             {
                 values.reverse();
             }

@@ -1,11 +1,9 @@
 use crate::app::OctantApp;
 use crate::data::{CoordinateGrid, DatasetMetadata, MatrixData, VariableInfo};
-use crate::ui::hover::composite::composite_fields;
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
     stored_offset,
 };
-use crate::ui::hover::entries::resolve_variable_units;
 use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
 use crate::utils::units::format_cardinal_degrees;
@@ -42,7 +40,7 @@ pub(crate) fn resolve_2d_plot_entries(
 
     // A composite mixes every channel, so no single band is selected.
     let mut used_dims: HashSet<usize> = composite_channel_dim(app).into_iter().collect();
-    let mut entries = resolve_2d_dim_entries(
+    let entries = resolve_2d_dim_entries(
         app,
         meta,
         var,
@@ -53,11 +51,6 @@ pub(crate) fn resolve_2d_plot_entries(
         geo_coords,
         &mut used_dims,
     );
-    if app.rgb_composite_mode {
-        let units = resolve_variable_units(var);
-        let channels = composite_fields(app, meta, var, units, (px, py));
-        entries.splice(0..0, channels);
-    }
 
     (val, entries, px, py)
 }

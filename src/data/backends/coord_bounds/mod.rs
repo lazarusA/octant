@@ -8,8 +8,9 @@ pub mod extract;
 mod tests;
 
 pub use cache::{
-    get_cached_coord_bounds, get_cached_coord_bounds_scoped, get_cached_coord_bounds_with_rank,
-    get_cached_coord_values_scoped, get_cached_coord_values_with_rank,
+    evict_coord_values, get_cached_coord_bounds, get_cached_coord_bounds_scoped,
+    get_cached_coord_bounds_with_rank, get_cached_coord_values_scoped,
+    get_cached_coord_values_with_rank,
 };
 pub use candidates::collect_coordinate_candidates;
 pub use extract::{

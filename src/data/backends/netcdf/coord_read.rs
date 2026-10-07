@@ -58,14 +58,23 @@ pub fn read_number_coordinate(var: &netcdf::Variable<'_>) -> Option<CoordValues>
     CoordValues::from_values(values, f32_source)
 }
 
-/// The labels of a text coordinate and the dimension they label: one per element of a 1D
-/// `NC_STRING` variable, or one per row of an `NC_CHAR` variable shaped `(dim, strlen)`.
-pub fn read_label_coordinate(var: &netcdf::Variable<'_>) -> Option<(String, Vec<String>)> {
-    let dims = var.dimensions();
-    let labels = match (var.vartype(), dims) {
+/// The dimension a text variable would label, from its metadata alone: a 1D `NC_STRING`
+/// variable, or an `NC_CHAR` variable shaped `(dim, strlen)`. `None` for anything else.
+pub fn text_dimension(var: &netcdf::Variable<'_>) -> Option<String> {
+    match (var.vartype(), var.dimensions()) {
+        (NcVariableType::String, [dim]) => Some(dim.name()),
+        (NcVariableType::Char, [dim, strlen]) if strlen.len() > 0 => Some(dim.name()),
+        _ => None,
+    }
+}
+
+/// The labels of a text variable [`text_dimension`] accepts: one per `NC_STRING` element
+/// or per `NC_CHAR` row.
+pub fn read_labels(var: &netcdf::Variable<'_>) -> Option<Vec<String>> {
+    let labels: Vec<String> = match (var.vartype(), var.dimensions()) {
         (NcVariableType::String, [dim]) => (0..dim.len())
             .map(|i| var.get_string([i]).ok().map(|s| clean_label(&s)))
-            .collect::<Option<Vec<_>>>()?,
+            .collect::<Option<_>>()?,
         (NcVariableType::Char, [dim, strlen]) if strlen.len() > 0 => {
             let bytes = var.get_raw_values(..).ok()?;
             let rows = bytes.chunks(strlen.len()).take(dim.len());
@@ -74,8 +83,7 @@ pub fn read_label_coordinate(var: &netcdf::Variable<'_>) -> Option<(String, Vec<
         }
         _ => return None,
     };
-    let dim = dims.first()?.name();
-    (!labels.is_empty()).then_some((dim, labels))
+    (!labels.is_empty()).then_some(labels)
 }
 
 /// Group paths from `group` up to the root: `a/b`, `a`, then `` (the root).

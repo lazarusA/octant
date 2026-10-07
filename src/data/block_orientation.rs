@@ -11,6 +11,14 @@ impl OctantBlock {
             .is_some_and(|name| self.flipped_dims.contains(name))
     }
 
+    /// The block-local index holding stored-order local index `index` along `dim`.
+    pub fn oriented_index(&self, dim: usize, index: usize) -> usize {
+        match self.shape.get(dim).and_then(|len| len.checked_sub(1)) {
+            Some(last) if self.is_flipped(dim) => last - index.min(last),
+            _ => index,
+        }
+    }
+
     /// The block-local range `start..end` that holds stored-order local range `range` along
     /// `dim`: mirrored for flipped dimensions, unchanged otherwise.
     pub fn oriented_range(&self, dim: usize, (start, end): (usize, usize)) -> (usize, usize) {

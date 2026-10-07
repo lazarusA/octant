@@ -70,57 +70,29 @@ pub fn slice_rgb_composite_nd(
     let height = y_range.1.saturating_sub(y_range.0).max(1);
     let plane_size = width.checked_mul(height)?;
 
+    let plane = |ch: Option<usize>| {
+        extract_channel_plane(
+            block,
+            c_dim,
+            x_dim,
+            y_dim,
+            x_range,
+            y_range,
+            fixed_indices,
+            ch,
+        )
+    };
+
     // CMYK inks always map C, M, Y, K to the block's first four channels.
     if is_cmyk_block(block, c_dim) {
         let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
-        let plane = |k: usize| {
-            extract_channel_plane(
-                block,
-                c_dim,
-                x_dim,
-                y_dim,
-                x_range,
-                y_range,
-                fixed_indices,
-                Some(c_start + k),
-            )
-        };
-        let (c, m, y, k) = (plane(0)?, plane(1)?, plane(2)?, plane(3)?);
+        let ink = |k: usize| plane(Some(c_start + k));
+        let (c, m, y, k) = (ink(0)?, ink(1)?, ink(2)?, ink(3)?);
         let planes = [c.as_slice(), &m, &y, &k];
         return blend_cmyk_planes(planes, width, height, &block.variable_name, anim_extent);
     }
 
-    let r_plane = extract_channel_plane(
-        block,
-        c_dim,
-        x_dim,
-        y_dim,
-        x_range,
-        y_range,
-        fixed_indices,
-        channels[0],
-    );
-    let g_plane = extract_channel_plane(
-        block,
-        c_dim,
-        x_dim,
-        y_dim,
-        x_range,
-        y_range,
-        fixed_indices,
-        channels[1],
-    );
-    let b_plane = extract_channel_plane(
-        block,
-        c_dim,
-        x_dim,
-        y_dim,
-        x_range,
-        y_range,
-        fixed_indices,
-        channels[2],
-    );
-
+    let [r_plane, g_plane, b_plane] = channels.map(plane);
     let (r_p, r_scale, r_off, r_i8) = norm_plane_info(r_plane);
     let (g_p, g_scale, g_off, g_i8) = norm_plane_info(g_plane);
     let (b_p, b_scale, b_off, b_i8) = norm_plane_info(b_plane);

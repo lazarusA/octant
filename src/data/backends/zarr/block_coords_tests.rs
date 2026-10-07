@@ -40,7 +40,7 @@ fn windows_of_uneven_axes_keep_every_value() {
 }
 
 #[test]
-fn flipped_axes_reverse_only_their_per_row_coordinates() {
+fn flipped_axes_reverse_their_coordinates_and_extents() {
     let dims = ["lat", "lon"].map(String::from);
     let mut coords = HashMap::from([
         ("lat".to_string(), vec![-60.0, -20.0, 0.0, 10.0, 50.0]),
@@ -50,10 +50,38 @@ fn flipped_axes_reverse_only_their_per_row_coordinates() {
     assert_eq!(flipped, dims, "rows (lat) and columns (lon) both flip");
     reverse_flipped_coordinates(&mut coords, &dims, &[5, 4], &flipped);
     assert_eq!(coords["lat"], [50.0, 10.0, 0.0, -20.0, -60.0]);
+    assert_eq!(coords["lon"], [30.0, 0.0], "an extent swaps its ends");
+}
+
+#[test]
+fn a_partial_selection_of_a_flipped_extent_gets_its_own_coordinates() {
+    // Regular ascending lat stored as its extent; the user selects stored rows 0..10.
+    let dims = ["lat", "lon"].map(String::from);
+    let shape = [181, 4];
+    let mut coords = HashMap::from([("lat".to_string(), vec![-90.0, 90.0])]);
+    reverse_flipped_coordinates(&mut coords, &dims, &shape, &["lat".to_string()]);
+    let mut block = crate::data::OctantBlock::new(
+        "v".into(),
+        shape.to_vec(),
+        dims.to_vec(),
+        vec![0, 0],
+        vec![0.0; 181 * 4],
+        coords,
+        HashMap::new(),
+    );
+    block.flipped_dims = vec!["lat".into()];
+    let rows = block.oriented_range(0, (0, 10));
+    let lat = crate::data::slicing::coords::extract_sliced_coords_for_dim(
+        &block.coordinates,
+        &block.dimension_names,
+        &block.shape,
+        0,
+        rows,
+    );
     assert_eq!(
-        coords["lon"],
-        [0.0, 30.0],
-        "an extent of a longer axis stays as is"
+        lat,
+        Some(vec![-81.0, -90.0]),
+        "north first, still in the south"
     );
 }
 

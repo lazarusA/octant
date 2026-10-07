@@ -1,7 +1,7 @@
 //! RGB, CMYK, and Multi-Channel overlay controls for 2D settings panel.
 
 use crate::app::OctantApp;
-use crate::ui::hover::composite::composite_kind;
+use crate::ui::hover::composite::composite_labels;
 use crate::utils::stack_str;
 
 /// Render composite controls (Multi-Channel bioimaging overlay, CMYK, or standard 3-band RGB).
@@ -11,27 +11,13 @@ pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     let is_tiff = app.is_geotiff();
     let has_mc = !app.composite_channel_configs.is_empty() && !is_tiff;
 
-    let label = if has_mc {
-        "Multi-Channel Overlay"
-    } else if is_cmyk {
-        "CMYK Composite"
-    } else {
-        "RGB Composite"
-    };
-
-    let tooltip = if has_mc {
-        "Overlays multiple channels additively, each rendered with its unique color tint."
-    } else if is_cmyk {
-        "Composites 4-channel Cyan, Magenta, Yellow, Black (CMYK) into Truecolor RGB."
-    } else {
-        "Composites selected 3 channels into Truecolor RGB."
-    };
+    let (label, tooltip) = toggle_text(has_mc, is_cmyk);
 
     // Name the band combination once it is drawn, as the hover card does.
     let mut label_buf = [0u8; 48];
     let label = if app.rgb_composite_mode && !has_mc && !is_cmyk {
         let meta = app.plotted_dataset_metadata.as_ref();
-        let kind = composite_kind(app, meta, app.plotted_variable_info());
+        let kind = composite_labels(app, ui.ctx(), meta, app.plotted_variable_info()).kind;
         stack_str(&mut label_buf, format_args!("{label} ({})", kind.label()))
     } else {
         label
@@ -59,6 +45,26 @@ pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         } else {
             show_standard_rgb_controls(app, ui);
         }
+    }
+}
+
+/// The composite checkbox's label and tooltip for the mode the dataset supports.
+fn toggle_text(has_mc: bool, is_cmyk: bool) -> (&'static str, &'static str) {
+    if has_mc {
+        (
+            "Multi-Channel Overlay",
+            "Overlays multiple channels additively, each rendered with its unique color tint.",
+        )
+    } else if is_cmyk {
+        (
+            "CMYK Composite",
+            "Composites 4-channel Cyan, Magenta, Yellow, Black (CMYK) into Truecolor RGB.",
+        )
+    } else {
+        (
+            "RGB Composite",
+            "Composites selected 3 channels into Truecolor RGB.",
+        )
     }
 }
 

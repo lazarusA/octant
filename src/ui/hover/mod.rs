@@ -3,6 +3,7 @@
 pub mod camera;
 pub mod card;
 pub mod composite;
+mod composite_bands;
 pub mod enrich;
 pub mod entries;
 pub mod entries_1d;
@@ -74,7 +75,7 @@ pub fn show_hover_tooltip(
     };
 
     let (meta, var, var_name, units_str) = resolve_hover_target_info(app);
-    let (raw_val, dim_entries, px, py) = resolve_cell_value_and_dim_entries(
+    let (raw_val, mut dim_entries, px, py) = resolve_cell_value_and_dim_entries(
         app,
         matrix,
         meta,
@@ -86,10 +87,11 @@ pub fn show_hover_tooltip(
         hit.point_3d,
     );
 
-    let composite = app
-        .rgb_composite_mode
-        .then(|| composite::composite_kind(app, meta, var));
     let canvas_plot_type = app.effective_canvas_plot_type();
+    let flat = hit.point_3d.is_none() && canvas_plot_type != PlotType::Line;
+    let pixel = flat.then_some((px, py));
+    let composite =
+        composite::composite_rows(app, ctx, meta, var, units_str, pixel, &mut dim_entries);
     if canvas_plot_type == PlotType::Line {
         draw_line_guidelines_and_reticle(app, ctx, ui, rect, px, raw_val);
     }

@@ -31,15 +31,10 @@ fn cached_label(
     dim: usize,
     range: (usize, usize),
 ) -> Option<Arc<str>> {
+    // The loaded metadata, not the editable URL field: typing there must not refresh this.
+    let meta = app.active_dataset_metadata.as_ref().map(std::ptr::from_ref);
     let mut hasher = DefaultHasher::new();
-    (
-        app.store_target_input.as_str(),
-        var.name.as_str(),
-        &var.shape,
-        dim,
-        range,
-    )
-        .hash(&mut hasher);
+    (meta, var.name.as_str(), &var.shape, dim, range).hash(&mut hasher);
     let key = hasher.finish();
     let id = egui::Id::new(("dim_coord_label", dim));
     let cached = ui.ctx().data(|d| d.get_temp::<(u64, Option<Arc<str>>)>(id));
@@ -66,7 +61,12 @@ pub(super) fn format_label(
     let name = var.dimension_names.get(dim)?;
     meta.get_dim_coords(Some(&var.name), name)?;
     let len = usize::try_from(*var.shape.get(dim)?).ok()?;
-    let target = Some(app.store_target_input.as_str());
+    // Date hints come from the plotted target when the panel shows the plotted dataset.
+    let target = app
+        .plotted_dataset_metadata
+        .as_ref()
+        .filter(|plotted| plotted.name == meta.name)
+        .map(|_| app.plotted_store_target_input.as_str());
     let value =
         |i: usize| format_dimension_coord(Some(meta), Some(var), target, name, i, len, None).value;
     Some(if start == end {

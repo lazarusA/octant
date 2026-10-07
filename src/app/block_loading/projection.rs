@@ -170,7 +170,8 @@ impl OctantApp {
                 } else {
                     sel_indices.get(orig_idx).copied().unwrap_or(0)
                 };
-                idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0))
+                let local = idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0));
+                block.oriented_index(i, local)
             })
             .collect()
     }

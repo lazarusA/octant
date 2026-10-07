@@ -65,3 +65,31 @@ fn test_fetch_and_cache_dimension_coordinates() {
     let lon_bounds = get_cached_coord_bounds(store.clone(), "test_store", "lon");
     assert_eq!(lon_bounds, Some((0.0, 360.0)));
 }
+
+#[test]
+fn evicted_stores_read_their_coordinates_again() {
+    use crate::data::backends::coord_bounds::{
+        evict_coord_values, get_cached_coord_values_with_rank,
+    };
+    let store = Arc::new(MemoryStore::new());
+    let dt =
+        DataType::from_metadata(&zarrs::metadata::v3::MetadataV3::new("float64")).expect("float64");
+    let lat = ArrayBuilder::new(vec![2], vec![2], dt, FillValue::from(f64::NAN))
+        .build(store.clone(), "/lat")
+        .expect("build lat");
+    lat.store_metadata().expect("lat metadata");
+    let all = ArraySubset::new_with_shape(vec![2]);
+    lat.store_array_subset(&all, &[0.0f64, 1.0])
+        .expect("lat values");
+    let read = || {
+        get_cached_coord_values_with_rank(store.clone(), "Evict_Store/", "lat", 0, 1)
+            .and_then(|c| c.last_number())
+    };
+    assert_eq!(read(), Some(1.0));
+
+    lat.store_array_subset(&all, &[0.0f64, 5.0])
+        .expect("new lat values");
+    assert_eq!(read(), Some(1.0), "served from the cache");
+    evict_coord_values(Some("evict_store"));
+    assert_eq!(read(), Some(5.0), "read again after eviction");
+}

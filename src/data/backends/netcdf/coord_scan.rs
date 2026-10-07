@@ -3,9 +3,11 @@
 //! `coordinates` attribute. Variables in groups resolve their dimensions from their own
 //! group up to the root.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
-use super::coord_read::{group_ancestors, group_of, read_label_coordinate, read_number_coordinate};
+use super::coord_read::{
+    group_ancestors, group_of, read_labels, read_number_coordinate, text_dimension,
+};
 use crate::data::coordinates::naming::{is_spatial_x_name, is_spatial_y_name, is_spatial_z_name};
 use crate::data::metadata::{CoordValues, VariableInfo};
 
@@ -14,13 +16,14 @@ type GroupCoords = HashMap<String, CoordValues>;
 
 /// Every dimension coordinate of `file`. Root coordinates are keyed by name; each variable
 /// also gets `{variable}/{dimension}` keys for the coordinates its group chain provides,
-/// and grouped coordinates fill unscoped keys still free.
+/// and grouped coordinates fill unscoped keys still free, in group path order.
 pub fn extract_dimension_coordinates(
     file: &netcdf::File,
     variables: &[VariableInfo],
 ) -> HashMap<String, CoordValues> {
     let aux = auxiliary_names(variables);
-    let mut groups: HashMap<String, GroupCoords> = HashMap::new();
+    // Sorted by path, so unscoped keys shared by several groups resolve the same way every run.
+    let mut groups: BTreeMap<String, GroupCoords> = BTreeMap::new();
     groups.insert(String::new(), scan_variables(file.variables(), &aux));
     if let Ok(subgroups) = file.groups() {
         for group in subgroups {
@@ -52,7 +55,7 @@ fn scan_group(
     group: &netcdf::Group<'_>,
     path: &str,
     aux: &HashSet<String>,
-    groups: &mut HashMap<String, GroupCoords>,
+    groups: &mut BTreeMap<String, GroupCoords>,
 ) {
     groups.insert(path.to_string(), scan_variables(group.variables(), aux));
     for sub in group.groups() {
@@ -71,8 +74,11 @@ fn scan_variables<'f>(
     let mut labels = Vec::new();
     for var in vars {
         let name = var.name();
-        if let Some((dim, values)) = read_label_coordinate(&var) {
-            if name == dim || aux.contains(&name) {
+        // Only text variables that label a dimension are read.
+        if let Some(dim) = text_dimension(&var) {
+            if (name == dim || aux.contains(&name))
+                && let Some(values) = read_labels(&var)
+            {
                 labels.push((dim, values));
             }
             continue;
@@ -97,7 +103,7 @@ fn scan_variables<'f>(
 
 /// The coordinate of `dim` for a variable in `group`, searched from it up to the root.
 fn resolve<'a>(
-    groups: &'a HashMap<String, GroupCoords>,
+    groups: &'a BTreeMap<String, GroupCoords>,
     group: &str,
     dim: &str,
 ) -> Option<&'a CoordValues> {

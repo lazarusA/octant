@@ -10,6 +10,27 @@ use crate::data::CoordValues;
 #[allow(clippy::type_complexity)]
 static COORD_VALUES_CACHE: OnceLock<RwLock<HashMap<String, Option<CoordValues>>>> = OnceLock::new();
 
+/// Drops the cached coordinates of the store at `store_url` (all stores for `None`), so a
+/// closed dataset's coordinates do not stay in memory for the rest of the session.
+pub fn evict_coord_values(store_url: Option<&str>) {
+    let Some(lock) = COORD_VALUES_CACHE.get() else {
+        return;
+    };
+    let mut cache = lock.write().unwrap_or_else(|p| p.into_inner());
+    match store_url {
+        Some(url) => {
+            let prefix = format!("{}:", cache_url(url));
+            cache.retain(|key, _| !key.starts_with(&prefix));
+        }
+        None => cache.clear(),
+    }
+}
+
+/// The store part of cache keys: case- and trailing-slash-insensitive.
+fn cache_url(store_url: &str) -> String {
+    store_url.trim().trim_end_matches('/').to_lowercase()
+}
+
 /// The first and last coordinate values, in storage order; `None` for labels.
 #[inline]
 pub(crate) fn parse_bounds_from_values(values: &CoordValues) -> Option<(f64, f64)> {
@@ -80,7 +101,7 @@ pub fn get_cached_coord_values_scoped(
     total_dims: usize,
 ) -> Option<CoordValues> {
     let cache_lock = COORD_VALUES_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
-    let clean_url = store_url.trim().to_lowercase();
+    let clean_url = cache_url(store_url);
     let clean_dim = dim_name.trim().to_lowercase();
     let exact_key = format!("{}:{}:{}", clean_url, group_scope.unwrap_or(""), clean_dim);
 

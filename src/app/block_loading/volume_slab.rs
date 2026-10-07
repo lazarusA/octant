@@ -21,24 +21,18 @@ impl OctantApp {
         local_z0: usize,
         slab: VolumeData,
     ) {
-        let orig_x = block.origin.get(x_dim).copied().unwrap_or(0);
-        let orig_y = block.origin.get(y_dim).copied().unwrap_or(0);
-        let orig_z = if z_dim < block.rank() {
-            block.origin.get(z_dim).copied().unwrap_or(0)
-        } else {
-            0
-        };
-
         let (vol_w, vol_h, depth_max) = self
             .volume_data
             .as_ref()
             .map_or((1, 1, 1), |v| (v.width, v.height, v.depth));
-        let dest = |dim: usize, origin: usize, local: usize, len: usize, req: usize, vol: usize| {
+        // A dimension outside the block (no Z) has origin 0.
+        let dest = |dim: usize, local: usize, len: usize, req: usize, vol: usize| {
+            let origin = block.origin.get(dim).copied().unwrap_or(0);
             slab_destination(block.is_flipped(dim), (origin, local, len), (req, vol))
         };
-        let dest_x = dest(x_dim, orig_x, local_x0, slab.width, req_x0, vol_w);
-        let dest_y = dest(y_dim, orig_y, local_y0, slab.height, req_y0, vol_h);
-        let raw_dest_z = dest(z_dim, orig_z, local_z0, slab.depth, req_z0, depth_max);
+        let dest_x = dest(x_dim, local_x0, slab.width, req_x0, vol_w);
+        let dest_y = dest(y_dim, local_y0, slab.height, req_y0, vol_h);
+        let raw_dest_z = dest(z_dim, local_z0, slab.depth, req_z0, depth_max);
         let dest_z = raw_dest_z % depth_max.max(1);
 
         let mut bounds_opt = None;
