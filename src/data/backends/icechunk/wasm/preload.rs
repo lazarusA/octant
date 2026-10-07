@@ -10,8 +10,7 @@ use crate::data::blocks::{BlockStoreError, ProgressCallback};
 use crate::utils::metadata::open_or_instantiate_array_normalized;
 
 impl WasmIcechunkBlockStore {
-    /// Preloads chunks required for a slice request by querying Icechunk manifests, then
-    /// the 1D coordinates of the array's dimensions.
+    /// Preloads chunks required for a slice request by querying Icechunk manifests.
     #[cfg(target_arch = "wasm32")]
     pub async fn preload_chunks_for_subset(
         &self,
@@ -27,23 +26,23 @@ impl WasmIcechunkBlockStore {
         .map_err(|e| format!("Failed to open array '{clean_var}': {e}"))?;
         self.fetch_missing_chunks(&array, clean_var, subset, &mut on_progress)
             .await?;
-        if array.shape().len() > 1 {
-            for dim in crate::utils::resolve_array_dimension_names(&array) {
-                let clean = dim.trim().trim_start_matches('/').to_string();
-                if let Ok(coord_array) = open_or_instantiate_array_normalized(
-                    self.inner.memory_store.clone(),
-                    &format!("/{clean}"),
-                ) && coord_array.shape().len() == 1
-                {
-                    let count = coord_array.shape().first().copied().unwrap_or(0);
-                    let state = self.preload_coordinate_chunks_1d(&clean, count).await;
-                    if state != CoordPreload::Complete {
-                        log::warn!("[WASM Icechunk] Coordinate '{clean}' {state:?}");
-                    }
-                }
+        Ok(())
+    }
+
+    /// Preloads the coordinate arrays a block for `request` reads (those of its
+    /// range-selected dimensions), so its coordinates decode from memory.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn preload_block_coordinates(
+        &self,
+        request: &crate::data::slice_request::SliceRequest,
+    ) {
+        use crate::data::backends::zarr::wasm::coord_paths::block_coordinate_arrays;
+        for (path, len) in block_coordinate_arrays(&self.inner.memory_store, request) {
+            let state = self.preload_coordinate_chunks_1d(&path, len).await;
+            if state != CoordPreload::Complete {
+                log::warn!("[WASM Icechunk] Coordinate '{path}' {state:?}");
             }
         }
-        Ok(())
     }
 
     /// Preloads every chunk of a 1D coordinate, which is read whole (`zarr::coords`): the
@@ -68,6 +67,31 @@ impl WasmIcechunkBlockStore {
             Ok(()) => CoordPreload::Complete,
             Err(_) => CoordPreload::Partial,
         }
+    }
+
+    /// Fetches the coordinate arrays of `variable`'s dimensions (spatial first, at the root
+    /// or in its group) and reads them, keyed like `DatasetMetadata::dimension_coordinates`.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn load_variable_coordinates(
+        &self,
+        variable: &crate::data::VariableInfo,
+    ) -> std::collections::HashMap<String, crate::data::CoordValues> {
+        use crate::data::backends::coord_bounds as cb;
+        use crate::data::backends::zarr::wasm::coord_paths::variable_coordinate_arrays;
+        let mut incomplete = Vec::new();
+        for (path, len) in variable_coordinate_arrays(&self.inner.memory_store, variable) {
+            let state = self.preload_coordinate_chunks_1d(&path, len).await;
+            if state != CoordPreload::Complete {
+                incomplete.push((path, state));
+            }
+        }
+        let mut coords = cb::fetch_all_dimension_coordinates_for_variables(
+            self.inner.memory_store.clone(),
+            std::slice::from_ref(variable),
+            Some(&self.base_url),
+        );
+        cb::settle_preloaded_coordinates(&mut coords, &incomplete);
+        coords
     }
 
     #[cfg(not(target_arch = "wasm32"))]

@@ -54,6 +54,7 @@ impl OctantApp {
     pub fn remove_dataset(&mut self, dataset_id: &str) {
         if let Some(removed) = self.dataset_manager.remove(dataset_id) {
             crate::data::backends::coord_bounds::evict_coord_values(Some(&removed.source.uri));
+            self.coordinate_loader.forget(&removed.id);
             let is_active = self.active_dataset_metadata.as_ref().is_some_and(|_| {
                 self.store_target_input == removed.source.uri || dataset_id == removed.id
             });
@@ -68,6 +69,7 @@ impl OctantApp {
     pub fn clear_all_datasets(&mut self) {
         self.dataset_manager.clear();
         crate::data::backends::coord_bounds::evict_coord_values(None);
+        self.coordinate_loader = crate::data::blocks::CoordinateLoader::default();
         self.clear_active_metadata();
         self.status_message = "Cleared all datasets from Dataset Manager".to_string();
     }

@@ -2,10 +2,12 @@
 
 use super::generic::GenericZarrBlockStore;
 use super::storage;
-use crate::data::DatasetMetadata;
+use std::collections::HashMap;
+
 use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
+use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 use zarrs::storage::ReadableWritableListableStorage;
 
 pub struct ZarrBlockStore {
@@ -45,6 +47,13 @@ impl BlockStore for ZarrBlockStore {
 
     fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError> {
         self.inner.inspect()
+    }
+
+    fn variable_coordinates(
+        &self,
+        variable: &VariableInfo,
+    ) -> Result<HashMap<String, CoordValues>, BlockStoreError> {
+        self.inner.variable_coordinates(variable)
     }
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {

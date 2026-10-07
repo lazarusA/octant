@@ -1,15 +1,17 @@
 //! Resolving and downloading the chunks of an Icechunk array subset in the browser:
-//! manifests are fetched once, then chunks are fetched concurrently.
+//! only the manifests covering the missing chunks are fetched (once), then the chunks,
+//! concurrently.
 
 use std::sync::Arc;
 
 use futures::StreamExt;
-use icechunk_format::manifest::{ChunkPayload, Manifest, ManifestRef};
+use icechunk_format::manifest::{ChunkPayload, Manifest, ManifestExtents, ManifestRef};
 use icechunk_format::{ChunkIndices, NodeTag, ObjectId};
 use zarrs::array::{Array, ArraySubset};
 use zarrs::storage::ReadableStorageTraits;
 
 use super::header::decompress_icechunk_file;
+use super::manifests::manifests_for;
 use super::store::WasmIcechunkBlockStore;
 use crate::data::backends::http::{fetch_url_byte_range, fetch_url_bytes};
 use crate::data::backends::zarr::wasm::CONCURRENT_FETCHES;
@@ -29,10 +31,14 @@ impl WasmIcechunkBlockStore {
         subset: &ArraySubset,
         on_progress: &mut ProgressCallback<'_>,
     ) -> Result<(), BlockStoreError> {
-        let (node_id, refs) = self.manifest_refs(clean_var)?;
-        let manifests = self.load_manifests(&refs).await?;
-        let (node_id, manifests) = (&node_id, &manifests);
         let missing = self.missing_chunks(array, subset);
+        if missing.is_empty() {
+            return Ok(());
+        }
+        let (node_id, refs) = self.manifest_refs(clean_var)?;
+        let indices: Vec<ChunkIndices> = missing.iter().map(|(_, i)| i.clone()).collect();
+        let manifests = self.load_manifests(&manifests_for(&refs, &indices)).await?;
+        let (node_id, manifests) = (&node_id, &manifests);
         let mut fetches = futures::stream::iter(missing)
             .map(|(key, indices)| async move {
                 let bytes = fetch_chunk(manifests, node_id, &indices, &self.base_url).await;
@@ -70,42 +76,49 @@ impl WasmIcechunkBlockStore {
         Ok((info.node_id.clone(), info.manifests.clone()))
     }
 
-    /// The manifests of `refs`, newest (last appended) first, fetched once and cached.
+    /// The manifests of `refs` (in their order) with the extents they cover, fetched
+    /// concurrently once and cached.
     async fn load_manifests(
         &self,
-        refs: &[ManifestRef],
-    ) -> Result<Vec<Arc<Manifest>>, BlockStoreError> {
-        let mut manifests = Vec::with_capacity(refs.len());
-        for man_ref in refs.iter().rev() {
-            let id = man_ref.object_id.to_string();
-            let cached = self
-                .cached_manifests
-                .read()
-                .unwrap_or_else(|p| p.into_inner())
-                .get(&id)
-                .cloned();
-            let manifest = match cached {
-                Some(m) => m,
-                None => {
-                    let url = format!("{}/manifests/{id}", self.base_url);
-                    log::info!("[WASM Icechunk] Fetching manifest: {url}");
-                    let raw = fetch_url_bytes(&url)
-                        .await
-                        .map_err(|e| format!("Failed fetching manifest '{url}': {e}"))?;
-                    let (_spec, decompressed) = decompress_icechunk_file(&raw)?;
-                    let decoded = Manifest::from_buffer(decompressed)
-                        .map_err(|e| format!("Failed parsing Icechunk manifest '{id}': {e:?}"))?;
-                    let m = Arc::new(decoded);
-                    self.cached_manifests
-                        .write()
-                        .unwrap_or_else(|p| p.into_inner())
-                        .insert(id, m.clone());
-                    m
-                }
-            };
-            manifests.push(manifest);
+        refs: &[&ManifestRef],
+    ) -> Result<Vec<(ManifestExtents, Arc<Manifest>)>, BlockStoreError> {
+        let loaded: Vec<_> = futures::stream::iter(refs.iter().copied())
+            .map(|r| async move { (r.extents.clone(), self.load_manifest(r).await) })
+            .buffered(CONCURRENT_FETCHES)
+            .collect()
+            .await;
+        loaded
+            .into_iter()
+            .map(|(extents, manifest)| Ok((extents, manifest?)))
+            .collect()
+    }
+
+    /// The manifest `man_ref` points to, from the cache or fetched and decoded.
+    async fn load_manifest(&self, man_ref: &ManifestRef) -> Result<Arc<Manifest>, BlockStoreError> {
+        let id = man_ref.object_id.to_string();
+        let cached = self
+            .cached_manifests
+            .read()
+            .unwrap_or_else(|p| p.into_inner())
+            .get(&id)
+            .cloned();
+        if let Some(m) = cached {
+            return Ok(m);
         }
-        Ok(manifests)
+        let url = format!("{}/manifests/{id}", self.base_url);
+        log::info!("[WASM Icechunk] Fetching manifest: {url}");
+        let raw = fetch_url_bytes(&url)
+            .await
+            .map_err(|e| format!("Failed fetching manifest '{url}': {e}"))?;
+        let (_spec, decompressed) = decompress_icechunk_file(&raw)?;
+        let decoded = Manifest::from_buffer(decompressed)
+            .map_err(|e| format!("Failed parsing Icechunk manifest '{id}': {e:?}"))?;
+        let m = Arc::new(decoded);
+        self.cached_manifests
+            .write()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert(id, m.clone());
+        Ok(m)
     }
 
     /// Store keys and chunk indices of the chunks of `subset` not yet in memory.
@@ -129,15 +142,18 @@ impl WasmIcechunkBlockStore {
     }
 }
 
-/// The bytes of the chunk at `indices`, from the newest manifest that lists it; `None` for
-/// sparse chunks.
+/// The bytes of the chunk at `indices`, from the newest manifest covering and listing it;
+/// `None` for sparse chunks.
 async fn fetch_chunk(
-    manifests: &[Arc<Manifest>],
+    manifests: &[(ManifestExtents, Arc<Manifest>)],
     node_id: &NodeId,
     indices: &ChunkIndices,
     base_url: &str,
 ) -> Result<Option<Vec<u8>>, BlockStoreError> {
-    for manifest in manifests {
+    let covering = manifests
+        .iter()
+        .filter(|(extents, _)| extents.contains(&indices.0));
+    for (_, manifest) in covering {
         let (url, offset, length) = match manifest.get_chunk_payload(node_id, indices) {
             Ok(ChunkPayload::Virtual(v)) => (s3_to_https(v.location.url()), v.offset, v.length),
             Ok(ChunkPayload::Ref(r)) => (format!("{base_url}/chunks/{}", r.id), r.offset, r.length),

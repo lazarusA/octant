@@ -55,6 +55,10 @@ impl OctantApp {
         self.store_target_input = self.store_target_input.trim().to_string();
         let target_input = self.store_target_input.clone();
 
+        // Fresh metadata holds no coordinates: its variables are read again when chosen.
+        self.coordinate_loader
+            .forget(&StoreKind::make_source_id(store_kind, &target_input));
+
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
         self.metadata_rx = Some(rx);
 

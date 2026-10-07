@@ -119,11 +119,12 @@ fn show_tree(
     tree_ctx.newly_selected_idx
 }
 
-/// Select variable `idx`: reset its colorbar label and dimension defaults and
-/// open its controls.
+/// Select variable `idx`: reset its colorbar label and dimension defaults, open its
+/// controls and read its coordinates in the background.
 fn apply_selection(app: &mut OctantApp, idx: usize) {
     app.selected_variable_idx = idx;
     app.reset_colorbar_label();
+    app.request_variable_coordinates(idx);
     let var_info = app
         .active_dataset_metadata
         .as_ref()

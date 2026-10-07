@@ -351,12 +351,21 @@ fn test_local_zarr_v3_nested_only_no_root_variables() {
         "Should discover 3 nested variables"
     );
 
-    // Verify group-scoped coordinate resolution for nested lat
-    assert!(
-        metadata.dimension_coordinates.contains_key("lat"),
-        "Should resolve 'lat' coordinate bounds from nested group"
-    );
-    let lat_bounds = metadata.dimension_coordinates.get("lat").unwrap();
+    // Inspect reads metadata alone; a variable's coordinates are read on demand, from its
+    // own group.
+    assert!(metadata.dimension_coordinates.is_empty());
+    let wind = metadata
+        .variables
+        .iter()
+        .find(|v| v.name.ends_with("u_wind"))
+        .expect("u_wind");
+    let mut metadata = metadata.clone();
+    metadata.dimension_coordinates = block_store
+        .variable_coordinates(wind)
+        .expect("variable coordinates");
+    let lat_bounds = metadata
+        .get_dim_coords(Some(&wind.name), "lat")
+        .expect("scoped lat");
     assert_eq!(lat_bounds.first_number(), Some(-30.0));
     assert_eq!(lat_bounds.last_number(), Some(30.0));
     assert_eq!(metadata.get_coord_bounds("lat"), Some((-30.0, 30.0)));

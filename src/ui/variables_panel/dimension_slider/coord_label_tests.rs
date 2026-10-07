@@ -86,3 +86,27 @@ fn a_new_dataset_with_the_same_variable_gets_its_own_label() {
         "not the previous dataset's"
     );
 }
+
+#[test]
+fn coordinates_arriving_later_replace_the_index() {
+    let (mut app, var) = app_with(None);
+    let ctx = egui::Context::default();
+    assert_eq!(cached_label(&app, &ctx, &var, 0, (3, 3)), None);
+
+    let levels = vec![0.0, 10.0, 25.0, 50.0, 100.0, 200.0];
+    let depth = CoordValues::from_values(levels, false).expect("depth");
+    // Another dataset's coordinates leave this one alone.
+    app.merge_variable_coordinates("other", HashMap::from([("depth".into(), depth.clone())]));
+    assert_eq!(cached_label(&app, &ctx, &var, 0, (3, 3)), None);
+
+    let source = app.selected_source_id();
+    app.merge_variable_coordinates(&source, HashMap::from([("depth".into(), depth)]));
+    assert_eq!(
+        cached_label(&app, &ctx, &var, 0, (3, 3)).as_deref(),
+        Some("50.00 m")
+    );
+    assert!(
+        app.plotted_dataset_metadata.is_none(),
+        "nothing plotted to update"
+    );
+}

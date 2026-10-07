@@ -85,7 +85,8 @@ pub fn composite_labels(
 ) -> Arc<CompositeLabels> {
     let mut hasher = DefaultHasher::new();
     app.plotted_store_target_input.hash(&mut hasher);
-    (meta.is_some(), app.plotted_metadata_generation).hash(&mut hasher);
+    let generations = (app.plotted_metadata_generation, app.coordinates_revision);
+    (meta.is_some(), generations).hash(&mut hasher);
     var.map(|v| (&v.name, &v.shape, &v.dimension_names))
         .hash(&mut hasher);
     (is_overlay(app), cmyk_bands(app), rgb_bands(app)).hash(&mut hasher);

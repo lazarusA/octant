@@ -17,8 +17,9 @@ pub(super) struct Timeline {
     pub last_step: usize,
 }
 
-/// Everything the labels depend on. Hashing the store target and the plotted
-/// metadata's generation detects a newly loaded dataset without allocating.
+/// Everything the labels depend on. Hashing the store target, the plotted
+/// metadata's generation and the coordinates revision detects a newly loaded
+/// dataset or newly read coordinates without allocating.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct TimelineKey {
     variable: usize,
@@ -32,7 +33,7 @@ impl TimelineKey {
     fn from_app(app: &OctantApp) -> Self {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         app.plotted_store_target_input.hash(&mut hasher);
-        app.plotted_metadata_generation.hash(&mut hasher);
+        (app.plotted_metadata_generation, app.coordinates_revision).hash(&mut hasher);
         Self {
             variable: app.plotted_variable_idx,
             animated_dim: app.plotted_animated_dim,

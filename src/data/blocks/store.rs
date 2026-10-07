@@ -8,9 +8,11 @@
 //! which is exactly what a `BlockStore` implementation *is*, so it would be
 //! circular for the trait to take one.
 
+use std::collections::HashMap;
 use std::error::Error;
 
 use super::request::BlockResult;
+use crate::data::metadata::{CoordValues, VariableInfo};
 use crate::data::{octant_block::OctantBlock, slice_request::SliceRequest};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -51,6 +53,16 @@ pub trait BlockStore: Send + Sync {
             variables: var_infos,
             dimension_coordinates: std::collections::HashMap::new(),
         })
+    }
+
+    /// The coordinates of `variable`'s dimensions, keyed like
+    /// `DatasetMetadata::dimension_coordinates`, for stores whose [`inspect`](Self::inspect)
+    /// leaves them out so datasets open with metadata alone. Empty when inspect has them.
+    fn variable_coordinates(
+        &self,
+        _variable: &VariableInfo,
+    ) -> Result<HashMap<String, CoordValues>, BlockStoreError> {
+        Ok(HashMap::new())
     }
 
     /// Load one arbitrary N-dimensional block.
@@ -104,6 +116,16 @@ pub trait BlockStore {
             variables: var_infos,
             dimension_coordinates: std::collections::HashMap::new(),
         })
+    }
+
+    /// The coordinates of `variable`'s dimensions, keyed like
+    /// `DatasetMetadata::dimension_coordinates`, for stores whose [`inspect`](Self::inspect)
+    /// leaves them out so datasets open with metadata alone. Empty when inspect has them.
+    fn variable_coordinates(
+        &self,
+        _variable: &VariableInfo,
+    ) -> Result<HashMap<String, CoordValues>, BlockStoreError> {
+        Ok(HashMap::new())
     }
 
     /// Load one arbitrary N-dimensional block.

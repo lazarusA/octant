@@ -211,3 +211,34 @@ fn string_attributes_reach_blocks_without_json_quotes() {
         &block, 0
     ));
 }
+
+#[test]
+fn fixed_index_dimensions_read_no_coordinates() {
+    let store = store_with(&[-10.0, 0.0, 10.0], &[0.0, 10.0], ["lat", "lon"]);
+    let f64_dt = DataType::from_metadata(&MetadataV3::new("float64")).expect("float64");
+    let time = ArrayBuilder::new(vec![3], vec![3], f64_dt, FillValue::from(f64::NAN))
+        .build(store.clone(), "/time")
+        .expect("build time");
+    time.store_metadata().expect("time metadata");
+    let dt = DataType::from_metadata(&MetadataV3::new("float32")).expect("float32");
+    let (shape, chunk) = (vec![3, 3, 2], vec![1, 3, 2]);
+    let mut builder = ArrayBuilder::new(shape, chunk, dt, FillValue::from(0.0f32));
+    builder.dimension_names(Some(["time", "lat", "lon"]));
+    let tas = builder.build(store.clone(), "/tas").expect("build tas");
+    tas.store_metadata().expect("tas metadata");
+
+    let at_step = |time: DimensionSelection| {
+        let sels = vec![
+            time,
+            DimensionSelection::range(0, 3),
+            DimensionSelection::range(0, 2),
+        ];
+        let request = SliceRequest::new("tas", sels);
+        fetch_block_with_progress(store.clone(), "fixed_dims_store", &request, None).expect("fetch")
+    };
+    // A fixed step reads no time axis; a range of steps does.
+    let block = at_step(DimensionSelection::index(1));
+    assert!(!block.coordinates.contains_key("time") && block.coordinates.contains_key("lat"));
+    let block = at_step(DimensionSelection::range(0, 3));
+    assert!(block.coordinates.contains_key("time"));
+}

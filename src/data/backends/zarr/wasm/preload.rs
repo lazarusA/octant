@@ -1,28 +1,23 @@
-//! Coordinate preloading and metadata finalization for WebAssembly Zarr.
+//! Metadata finalization and per-variable coordinate preloading for WebAssembly Zarr.
+
+use std::collections::HashMap;
 
 use super::WasmZarrBlockStore;
-use crate::data::backends::coord_bounds::{CoordPreload, settle_preloaded_coordinates};
-use crate::data::{DatasetMetadata, VariableInfo};
-use crate::utils::metadata::open_or_instantiate_array_normalized;
+use crate::data::backends::coord_bounds::{
+    CoordPreload, fetch_all_dimension_coordinates_for_variables, settle_preloaded_coordinates,
+};
+use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 
 use zarrs::array::ArraySubset;
 
 impl WasmZarrBlockStore {
-    /// Finalizes metadata by preloading coordinates, resolving dimension coordinates, and caching dataset metadata.
+    /// Finalizes and caches dataset metadata. Coordinates are left out, so the dataset opens
+    /// with its metadata alone; they are read per variable ([`Self::load_variable_coordinates`]).
     pub async fn finalize_metadata(
         &self,
         variables: Vec<VariableInfo>,
         clean_url: &str,
     ) -> DatasetMetadata {
-        let preloads = self.preload_coordinate_variables(&variables).await;
-        let mut dimension_coordinates =
-            crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables(
-                self.memory_store.clone(),
-                &variables,
-                Some(clean_url),
-            );
-        settle_preloaded_coordinates(&mut dimension_coordinates, &preloads);
-
         let dataset_name = clean_url
             .split('/')
             .next_back()
@@ -33,7 +28,7 @@ impl WasmZarrBlockStore {
             name: dataset_name,
             store_type: "zarr".to_string(),
             variables,
-            dimension_coordinates,
+            dimension_coordinates: HashMap::new(),
         };
 
         let mut guard = self.metadata.write().unwrap_or_else(|p| p.into_inner());
@@ -41,40 +36,28 @@ impl WasmZarrBlockStore {
         dataset_metadata
     }
 
-    /// Preloads every chunk of the 1D coordinate arrays (e.g. lat, lon, time, depth) of the
-    /// dataset variables, at the root and in each variable's group. Returns the arrays whose
-    /// chunks did not all arrive.
-    pub async fn preload_coordinate_variables(
+    /// Fetches the coordinate arrays of `variable`'s dimensions (spatial first, at the root
+    /// or in its group) and reads them, keyed like `DatasetMetadata::dimension_coordinates`.
+    pub async fn load_variable_coordinates(
         &self,
-        variables: &[VariableInfo],
-    ) -> Vec<(String, CoordPreload)> {
-        let coord_candidates =
-            crate::data::backends::coord_bounds::collect_coordinate_candidates(variables);
+        variable: &VariableInfo,
+    ) -> HashMap<String, CoordValues> {
         let mut incomplete = Vec::new();
-        for coord_name in &coord_candidates {
-            let clean = coord_name.trim().trim_start_matches('/').to_string();
-            let mut paths_to_try = vec![format!("/{clean}")];
-            for gp in variables.iter().filter_map(VariableInfo::group_path) {
-                let path = format!("/{gp}/{clean}");
-                if !paths_to_try.contains(&path) {
-                    paths_to_try.push(path);
-                }
-            }
-            for cp in paths_to_try {
-                let target_name = cp.trim_start_matches('/').to_string();
-                if let Ok(coord_array) =
-                    open_or_instantiate_array_normalized(self.memory_store.clone(), &cp)
-                    && coord_array.shape().len() == 1
-                {
-                    let count = coord_array.shape().first().copied().unwrap_or(0);
-                    let state = self.preload_coordinate_chunks_1d(&target_name, count).await;
-                    if state != CoordPreload::Complete {
-                        incomplete.push((target_name, state));
-                    }
-                }
+        for (path, len) in
+            super::coord_paths::variable_coordinate_arrays(&self.memory_store, variable)
+        {
+            let state = self.preload_coordinate_chunks_1d(&path, len).await;
+            if state != CoordPreload::Complete {
+                incomplete.push((path, state));
             }
         }
-        incomplete
+        let mut coords = fetch_all_dimension_coordinates_for_variables(
+            self.memory_store.clone(),
+            std::slice::from_ref(variable),
+            Some(&self.base_url),
+        );
+        settle_preloaded_coordinates(&mut coords, &incomplete);
+        coords
     }
 
     /// Preloads every chunk of a 1D coordinate, which is read whole (`zarr::coords`): the

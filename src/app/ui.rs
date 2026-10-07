@@ -67,8 +67,9 @@ impl eframe::App for OctantApp {
             self.metadata_rx = None;
         }
 
-        // 1. Drain completed block-cache prefetch results.
+        // 1. Drain completed block-cache prefetch results and arrived coordinates.
         self.poll_block_prefetch_results();
+        self.poll_coordinate_results();
 
         // 2. Playback Animation Timer Loop
         let is_minimized = ctx.input(|i| {
@@ -93,7 +94,10 @@ impl eframe::App for OctantApp {
         } else if self.is_playing && is_minimized {
             // When minimized or occluded, poll infrequently (500ms) without advancing playback or hammering the GPU.
             ctx.request_repaint_after(std::time::Duration::from_millis(500));
-        } else if self.block_prefetcher.pending_count() > 0 || self.metadata_rx.is_some() {
+        } else if self.block_prefetcher.pending_count() > 0
+            || self.coordinate_loader.pending_count() > 0
+            || self.metadata_rx.is_some()
+        {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 

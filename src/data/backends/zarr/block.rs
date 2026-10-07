@@ -127,6 +127,7 @@ pub fn fetch_block_from_cached_array(
         full_shape,
         origin: &origin,
         block_shape: &block_shape,
+        selections: &request.selections,
     };
     let mut coords = block_coordinates(&store, store_url, &request.variable, &window);
     let hints = OrientHints {

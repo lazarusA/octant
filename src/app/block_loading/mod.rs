@@ -1,5 +1,6 @@
 //! Loading path through `DatasetManager`/`BlockCache`/`BlockPrefetcher`.
 
+pub mod coordinates;
 pub mod handles;
 pub mod load;
 pub mod pacing;

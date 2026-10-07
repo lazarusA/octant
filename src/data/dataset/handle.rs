@@ -3,12 +3,13 @@
 //! The UI selects a DataSource first. StoreHandle then opens the appropriate
 //! backend and can be used for one or many variables from that source.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::source::DataSource;
 use crate::data::{
     blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback},
-    metadata::DatasetMetadata,
+    metadata::{CoordValues, DatasetMetadata, VariableInfo},
     octant_block::OctantBlock,
     slice_request::SliceRequest,
 };
@@ -42,6 +43,14 @@ impl StoreHandle {
 
     pub fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError> {
         self.backend.inspect()
+    }
+
+    /// The coordinates of `variable`'s dimensions; see `BlockStore::variable_coordinates`.
+    pub fn variable_coordinates(
+        &self,
+        variable: &VariableInfo,
+    ) -> Result<HashMap<String, CoordValues>, BlockStoreError> {
+        self.backend.variable_coordinates(variable)
     }
 
     pub fn fetch(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {

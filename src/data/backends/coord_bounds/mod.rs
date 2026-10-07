@@ -14,7 +14,9 @@ pub use cache::{
     get_cached_coord_bounds_with_rank, get_cached_coord_values_scoped,
     get_cached_coord_values_with_rank,
 };
-pub use candidates::collect_coordinate_candidates;
+pub use candidates::{
+    block_coordinate_candidates, collect_coordinate_candidates, variable_coordinate_candidates,
+};
 pub use extract::{
     fetch_all_dimension_coordinates, read_coord_bounds, read_coord_bounds_scoped,
     read_coord_bounds_with_rank, read_coord_values_scoped,

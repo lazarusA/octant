@@ -8,6 +8,7 @@ use zarrs::storage::ReadableWritableListableStorage;
 use crate::data::CoordValues;
 use crate::data::backends::coord_bounds::get_cached_coord_values_scoped;
 use crate::data::coordinates::naming::{is_spatial_x_name, is_spatial_y_name};
+use crate::data::slice_request::DimensionSelection;
 use crate::utils::grid_flips::{is_lat_name, is_lon_name};
 
 /// A block's window along every dimension of its array.
@@ -16,9 +17,19 @@ pub(super) struct BlockWindow<'a> {
     pub full_shape: &'a [u64],
     pub origin: &'a [usize],
     pub block_shape: &'a [usize],
+    pub selections: &'a [DimensionSelection],
 }
 
 impl BlockWindow<'_> {
+    /// Whether dimension `i` is selected as a range (its coordinates follow the block),
+    /// not as a fixed index (read from the dataset's coordinates instead).
+    fn ranged(&self, i: usize) -> bool {
+        matches!(
+            self.selections.get(i),
+            Some(DimensionSelection::Range { .. })
+        )
+    }
+
     /// The full length of dimension `i`.
     fn full_len(&self, i: usize) -> usize {
         self.full_shape
@@ -76,8 +87,8 @@ impl BlockCoords {
     }
 }
 
-/// Reads the window coordinates of every dimension of a block of array `variable`, from its
-/// group up, falling back to the store's spatial coordinates for generic (`dim_N`)
+/// Reads the window coordinates of the range-selected dimensions of a block of array
+/// `variable`, from its group up, falling back to the store's spatial coordinates for generic (`dim_N`)
 /// dimension names.
 pub(super) fn block_coordinates(
     store: &ReadableWritableListableStorage,
@@ -100,6 +111,9 @@ pub(super) fn block_coordinates(
     };
     let mut out = BlockCoords::default();
     for (i, name) in window.dim_names.iter().enumerate() {
+        if !window.ranged(i) {
+            continue;
+        }
         let Some(coords) = coord_values(name, i) else {
             continue;
         };
@@ -108,7 +122,10 @@ pub(super) fn block_coordinates(
             out.insert(name, values);
         }
     }
-    if out.coordinates.is_empty() || window.dim_names.iter().any(|d| d.starts_with("dim_")) {
+    let ranged = |i: &usize| window.ranged(*i);
+    let ranged_dims = || (0..window.dim_names.len()).filter(ranged);
+    let generic = ranged_dims().any(|i| window.dim_names[i].starts_with("dim_"));
+    if generic || (out.coordinates.is_empty() && ranged_dims().next().is_some()) {
         add_spatial_fallback(&mut out, window, |name| coord_values(name, usize::MAX));
     }
     out

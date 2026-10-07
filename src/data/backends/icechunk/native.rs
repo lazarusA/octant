@@ -4,11 +4,11 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::sync::{Arc, OnceLock, RwLock};
 
-use crate::data::DatasetMetadata;
 use crate::data::backends::zarr::GenericZarrBlockStore;
 use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
+use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 use crate::utils::executor::{TokioBlockOn, get_shared_tokio_rt};
 use crate::utils::remote::{
     build_icechunk_s3_options, parse_remote_storage_url, register_standard_virtual_chunk_containers,
@@ -130,6 +130,13 @@ impl BlockStore for IcechunkBlockStore {
 
     fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError> {
         self.inner.inspect()
+    }
+
+    fn variable_coordinates(
+        &self,
+        variable: &VariableInfo,
+    ) -> Result<HashMap<String, CoordValues>, BlockStoreError> {
+        self.inner.variable_coordinates(variable)
     }
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {

@@ -10,6 +10,7 @@ use crate::data::blocks::BlockStoreError;
 use zarrs::storage::store::MemoryStore;
 use zarrs::storage::{ReadableWritableListableStorage, StoreKey, WritableStorageTraits};
 
+pub mod coord_paths;
 pub mod inspect;
 pub mod loader;
 pub mod preload;

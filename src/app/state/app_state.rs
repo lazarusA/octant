@@ -117,6 +117,10 @@ pub struct OctantApp {
     pub dataset_manager: crate::data::DatasetManager,
     pub block_cache: crate::data::BlockCache,
     pub block_prefetcher: crate::data::BlockPrefetcher,
+    /// Reads a variable's coordinates in the background when it is chosen.
+    pub coordinate_loader: crate::data::blocks::CoordinateLoader,
+    /// Incremented whenever coordinates arrive; keys caches built from them.
+    pub coordinates_revision: u64,
     pub active_block_key: Option<crate::data::BlockCacheKey>,
     pub pending_target_step: Option<usize>,
     pub max_cache_mb: usize,
@@ -311,6 +315,8 @@ impl Default for OctantApp {
             dataset_manager: crate::data::DatasetManager::new(),
             block_cache: crate::data::BlockCache::new(default_cache_mb * 1024 * 1024),
             block_prefetcher: crate::data::BlockPrefetcher::new(),
+            coordinate_loader: crate::data::blocks::CoordinateLoader::default(),
+            coordinates_revision: 0,
             active_block_key: None,
             pending_target_step: None,
             max_cache_mb: default_cache_mb,

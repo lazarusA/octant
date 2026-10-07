@@ -13,8 +13,7 @@ use zarrs::array::ArraySubset;
 pub(crate) const CONCURRENT_FETCHES: usize = 64;
 
 impl WasmZarrBlockStore {
-    /// Computes and fetches all required chunk files for an array slice into memory, then
-    /// the 1D coordinates of the array's dimensions.
+    /// Computes and fetches all required chunk files for an array slice into memory.
     pub async fn preload_chunks_for_subset(
         &self,
         var_name: &str,
@@ -34,9 +33,6 @@ impl WasmZarrBlockStore {
                 missing.len()
             );
             self.fetch_chunks(&missing, &mut on_progress).await?;
-        }
-        if array.shape().len() > 1 {
-            self.preload_dimension_coordinates(&array, clean_var).await;
         }
         Ok(())
     }
@@ -98,35 +94,17 @@ impl WasmZarrBlockStore {
         Ok(())
     }
 
-    /// Preloads the 1D coordinate arrays (e.g. lat, lon, time, cell_ids) named after the
-    /// dimensions of `array`, at the root or in its group, for spatial bounds and axes.
-    async fn preload_dimension_coordinates<
-        S: ?Sized + zarrs::storage::ReadableStorageTraits + 'static,
-    >(
+    /// Preloads the coordinate arrays a block for `request` reads (those of its
+    /// range-selected dimensions), so its coordinates decode from memory.
+    pub async fn preload_block_coordinates(
         &self,
-        array: &zarrs::array::Array<S>,
-        clean_var: &str,
+        request: &crate::data::slice_request::SliceRequest,
     ) {
-        let group_prefix = clean_var.rfind('/').map(|idx| &clean_var[..idx]);
-        for dim in crate::utils::resolve_array_dimension_names(array) {
-            let clean = dim.trim().trim_start_matches('/').to_string();
-            let mut paths = vec![format!("/{clean}")];
-            if let Some(gp) = group_prefix {
-                paths.push(format!("/{gp}/{clean}"));
-            }
-            for coord_path in paths {
-                let target_name = coord_path.trim_start_matches('/').to_string();
-                if let Ok(coord_array) =
-                    open_or_instantiate_array_normalized(self.memory_store.clone(), &coord_path)
-                    && coord_array.shape().len() == 1
-                {
-                    let count = coord_array.shape().first().copied().unwrap_or(0);
-                    let state = self.preload_coordinate_chunks_1d(&target_name, count).await;
-                    if state != CoordPreload::Complete {
-                        log::warn!("[WASM Zarr] Coordinate '{target_name}' {state:?}");
-                    }
-                    break;
-                }
+        for (path, len) in super::coord_paths::block_coordinate_arrays(&self.memory_store, request)
+        {
+            let state = self.preload_coordinate_chunks_1d(&path, len).await;
+            if state != CoordPreload::Complete {
+                log::warn!("[WASM Zarr] Coordinate '{path}' {state:?}");
             }
         }
     }
@@ -201,6 +179,8 @@ pub async fn load_one_wasm_with_progress(
         );
         return Err(e);
     }
+
+    store.preload_block_coordinates(&request.slice).await;
 
     // Now decode the slice synchronously from in-memory chunks
     match store.fetch_block_with_progress(&request.slice, None) {

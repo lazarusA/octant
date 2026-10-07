@@ -37,13 +37,17 @@ fn plotted_grid(store_url: &str, lat: &[f64]) -> OctantApp {
     let all = ArraySubset::new_with_shape(vec![5, 4]);
     t2m.store_array_subset(&all, &values).expect("t2m values");
 
-    let meta = GenericZarrBlockStore::new(store.clone(), store_url, "zarr", "Zarr")
-        .inspect()
-        .expect("inspect");
+    let zarr = GenericZarrBlockStore::new(store.clone(), store_url, "zarr", "Zarr");
+    let mut meta = zarr.inspect().expect("inspect");
     let idx = meta
         .variables
         .iter()
         .position(|v| v.name.trim_matches('/') == "t2m");
+    // Plotting reads the variable's coordinates, which then join its metadata.
+    let var = idx
+        .and_then(|i| meta.variables.get(i))
+        .expect("t2m variable");
+    meta.dimension_coordinates = zarr.variable_coordinates(var).expect("coordinates");
     let request = SliceRequest::full_range("t2m", &[5, 4]);
     let block = fetch_block_with_progress(store, store_url, &request, None).expect("block");
     let mut app = OctantApp {
