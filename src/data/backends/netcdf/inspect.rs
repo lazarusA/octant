@@ -3,59 +3,10 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use netcdf::{Extent, Extents};
-
 use super::attrs::{extract_global_attributes, extract_variable_attributes, var_type_to_string};
-use super::slice::read_variable_hyperslab_as_f32;
+use super::coord_scan::extract_dimension_coordinates;
 use crate::data::blocks::BlockStoreError;
-use crate::data::metadata::{CoordValues, DatasetMetadata, VariableInfo};
-
-/// Extracts 1D coordinate vectors or bounds from a NetCDF file.
-pub fn extract_dimension_coordinates(file: &netcdf::File) -> HashMap<String, CoordValues> {
-    let mut dimension_coordinates = HashMap::new();
-
-    for var in file.variables() {
-        let dims = var.dimensions();
-        let name = var.name();
-        let clean = name.trim().to_lowercase();
-
-        if dims.len() == 1 {
-            let dim_len = dims[0].len();
-            if dim_len == 0 {
-                continue;
-            }
-
-            let is_coord_var = dims[0].name() == name
-                || crate::data::coordinates::naming::is_spatial_x_name(&clean)
-                || crate::data::coordinates::naming::is_spatial_y_name(&clean)
-                || crate::data::coordinates::naming::is_spatial_z_name(&clean)
-                || clean == "time"
-                || clean == "depth"
-                || clean == "lev"
-                || clean == "level";
-
-            if is_coord_var {
-                let extents = Extents::from(vec![Extent::SliceCount {
-                    start: 0,
-                    count: dim_len,
-                    stride: 1,
-                }]);
-
-                if let Ok(values) = read_variable_hyperslab_as_f32(&var, &extents)
-                    && let Some(coords) =
-                        CoordValues::from_values(values.into_iter().map(f64::from).collect(), true)
-                {
-                    dimension_coordinates.insert(clean.clone(), coords.clone());
-                    if clean != name {
-                        dimension_coordinates.insert(name.clone(), coords);
-                    }
-                }
-            }
-        }
-    }
-
-    dimension_coordinates
-}
+use crate::data::metadata::{DatasetMetadata, VariableInfo};
 
 pub fn collect_group_variables(
     group: &netcdf::Group,
@@ -194,7 +145,7 @@ pub fn inspect_netcdf_file(file_path: &str) -> Result<DatasetMetadata, BlockStor
         }
     }
 
-    let dimension_coordinates = extract_dimension_coordinates(&file);
+    let dimension_coordinates = extract_dimension_coordinates(&file, &variables);
 
     let dataset_name = global_attrs
         .get("title")

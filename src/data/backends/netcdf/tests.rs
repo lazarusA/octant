@@ -6,6 +6,7 @@ use crate::data::slice_request::SliceRequest;
 
 #[test]
 fn test_create_and_read_netcdf() {
+    let _lock = super::test_support::netcdf_lock();
     let temp_dir = std::env::temp_dir();
     let test_file = temp_dir.join(format!(
         "octant_test_data_{}_{:?}.nc",
@@ -96,6 +97,7 @@ fn test_create_and_read_netcdf() {
 
 #[test]
 fn test_netcdf_scale_offset_and_fill() {
+    let _lock = super::test_support::netcdf_lock();
     let temp_dir = std::env::temp_dir();
     let test_file = temp_dir.join(format!(
         "octant_test_scale_fill_{}_{:?}.nc",
@@ -138,6 +140,7 @@ fn test_netcdf_scale_offset_and_fill() {
 
 #[test]
 fn test_netcdf_1d_variable_loading() {
+    let _lock = super::test_support::netcdf_lock();
     let temp_dir = std::env::temp_dir();
     let test_file = temp_dir.join(format!(
         "octant_test_1d_var_{}_{:?}.nc",

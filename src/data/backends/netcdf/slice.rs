@@ -180,8 +180,13 @@ impl BlockStore for NetCdfBlockStore {
             }
 
             let attributes = extract_variable_attributes(var);
-            let mut coordinates =
-                super::coords::extract_sliced_coordinates(&file, &dim_names, &origin, &block_shape);
+            let mut coordinates = super::coords::extract_sliced_coordinates(
+                &file,
+                &request.variable,
+                &dim_names,
+                &origin,
+                &block_shape,
+            );
 
             let json_attrs: serde_json::Map<String, serde_json::Value> = attributes
                 .iter()

@@ -5,6 +5,10 @@
 #[cfg(not(target_arch = "wasm32"))]
 pub mod attrs;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod coord_read;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod coord_scan;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod coords;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
@@ -15,6 +19,15 @@ pub mod slice;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 
+#[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
+mod coord_block_tests;
+#[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
+mod coord_tests;
+#[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
+mod test_support;
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]
 mod tests;
