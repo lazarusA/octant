@@ -1,26 +1,23 @@
-//! Coordinate preloading and metadata finalization for WebAssembly Zarr.
+//! Metadata finalization and per-variable coordinate preloading for WebAssembly Zarr.
+
+use std::collections::HashMap;
 
 use super::WasmZarrBlockStore;
-use crate::data::{DatasetMetadata, VariableInfo};
-use crate::utils::metadata::open_or_instantiate_array_normalized;
+use crate::data::backends::coord_bounds::{
+    CoordPreload, fetch_all_dimension_coordinates_for_variables, settle_preloaded_coordinates,
+};
+use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 
 use zarrs::array::ArraySubset;
 
 impl WasmZarrBlockStore {
-    /// Finalizes metadata by preloading coordinates, resolving dimension coordinates, and caching dataset metadata.
+    /// Finalizes and caches dataset metadata. Coordinates are left out, so the dataset opens
+    /// with its metadata alone; they are read per variable ([`Self::load_variable_coordinates`]).
     pub async fn finalize_metadata(
         &self,
         variables: Vec<VariableInfo>,
         clean_url: &str,
     ) -> DatasetMetadata {
-        self.preload_coordinate_variables(&variables).await;
-        let dimension_coordinates =
-            crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables(
-                self.memory_store.clone(),
-                &variables,
-                Some(clean_url),
-            );
-
         let dataset_name = clean_url
             .split('/')
             .next_back()
@@ -31,7 +28,7 @@ impl WasmZarrBlockStore {
             name: dataset_name,
             store_type: "zarr".to_string(),
             variables,
-            dimension_coordinates,
+            dimension_coordinates: HashMap::new(),
         };
 
         let mut guard = self.metadata.write().unwrap_or_else(|p| p.into_inner());
@@ -39,45 +36,54 @@ impl WasmZarrBlockStore {
         dataset_metadata
     }
 
-    /// Preloads boundary chunks for 1D coordinate arrays (e.g. lat, lon, time, depth) associated with the dataset variables.
-    pub async fn preload_coordinate_variables(&self, variables: &[VariableInfo]) {
-        let coord_candidates =
-            crate::data::backends::coord_bounds::collect_coordinate_candidates(variables);
-
-        for coord_name in &coord_candidates {
-            let clean = coord_name.trim().trim_start_matches('/').to_string();
-            let mut paths_to_try = vec![format!("/{clean}")];
-            for var in variables {
-                if let Some(gp) = var.group_path() {
-                    paths_to_try.push(format!("/{gp}/{clean}"));
-                }
-            }
-
-            for cp in paths_to_try {
-                let target_name = cp.trim_start_matches('/').to_string();
-                if let Ok(coord_array) =
-                    open_or_instantiate_array_normalized(self.memory_store.clone(), &cp)
-                    && coord_array.shape().len() == 1
-                {
-                    let count = coord_array.shape().first().copied().unwrap_or(0);
-                    self.preload_boundary_chunks_1d(&target_name, count).await;
-                    break;
-                }
+    /// Fetches the coordinate arrays of `variable`'s dimensions (spatial first, at the root
+    /// or in its group) and reads them, keyed like `DatasetMetadata::dimension_coordinates`.
+    pub async fn load_variable_coordinates(
+        &self,
+        variable: &VariableInfo,
+    ) -> HashMap<String, CoordValues> {
+        let mut incomplete = Vec::new();
+        for (path, len) in
+            super::coord_paths::variable_coordinate_arrays(&self.memory_store, variable)
+        {
+            let state = self.preload_coordinate_chunks_1d(&path, len).await;
+            if state != CoordPreload::Complete {
+                incomplete.push((path, state));
             }
         }
+        let mut coords = fetch_all_dimension_coordinates_for_variables(
+            self.memory_store.clone(),
+            std::slice::from_ref(variable),
+            Some(&self.base_url),
+        );
+        settle_preloaded_coordinates(&mut coords, &incomplete);
+        coords
     }
 
-    /// Preloads boundary chunks (start and end) for a 1D coordinate array.
+    /// Preloads every chunk of a 1D coordinate, which is read whole (`zarr::coords`): the
+    /// first and last chunks first, as the endpoints, then the rest.
     #[allow(clippy::single_range_in_vec_init)]
-    pub async fn preload_boundary_chunks_1d(&self, coord_name: &str, count: u64) {
-        if count == 0 {
-            return;
+    pub async fn preload_coordinate_chunks_1d(&self, coord_name: &str, count: u64) -> CoordPreload {
+        let Some(last) = count.checked_sub(1) else {
+            return CoordPreload::Complete;
+        };
+        for ends in [0..1, last..count] {
+            let subset = ArraySubset::new_with_ranges(&[ends]);
+            if Box::pin(self.preload_chunks_for_subset(coord_name, &subset, None))
+                .await
+                .is_err()
+            {
+                log::error!("[WASM Zarr] Coordinate '{coord_name}' endpoints failed to load");
+                return CoordPreload::Failed;
+            }
         }
-        let subset_start = ArraySubset::new_with_ranges(&[0..1]);
-        let _ = Box::pin(self.preload_chunks_for_subset(coord_name, &subset_start, None)).await;
-        if count > 1 {
-            let subset_end = ArraySubset::new_with_ranges(&[(count - 1)..count]);
-            let _ = Box::pin(self.preload_chunks_for_subset(coord_name, &subset_end, None)).await;
+        let subset = ArraySubset::new_with_ranges(&[0..count]);
+        match Box::pin(self.preload_chunks_for_subset(coord_name, &subset, None)).await {
+            Ok(()) => CoordPreload::Complete,
+            Err(e) => {
+                log::error!("[WASM Zarr] Coordinate '{coord_name}' partly loaded: {e}");
+                CoordPreload::Partial
+            }
         }
     }
 }

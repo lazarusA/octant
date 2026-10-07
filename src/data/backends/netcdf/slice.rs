@@ -13,6 +13,7 @@ use crate::data::metadata::DatasetMetadata;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 use crate::utils::grid::check_and_orient_block_grid;
+use crate::utils::grid_flips::OrientHints;
 
 /// Read raw numeric values from a NetCDF variable, convert to `f32`, and apply scale/offset/fill masking.
 pub fn read_variable_hyperslab_as_f32(
@@ -130,84 +131,13 @@ impl BlockStore for NetCdfBlockStore {
             .map_err(|e| format!("Failed to open NetCDF file '{}': {e}", self.file_path))?;
 
         with_netcdf_variable(&file, &request.variable, |var| {
-            let dims = var.dimensions();
-            let rank = dims.len();
-
-            if request.selections.len() != rank {
-                return Err(format!(
-                    "fetch_block: selection has {} dimension(s) but '{}' has rank {}",
-                    request.selections.len(),
-                    request.variable,
-                    rank
-                )
-                .into());
-            }
-
-            let mut extents_vec = Vec::with_capacity(rank);
-            let mut block_shape = Vec::with_capacity(rank);
-            let mut origin = Vec::with_capacity(rank);
-            let mut dim_names = Vec::with_capacity(rank);
-
-            for (i, sel) in request.selections.iter().enumerate() {
-                let dim_len = dims[i].len();
-                let dim_name = dims[i].name();
-                dim_names.push(dim_name);
-
-                let (start, end) = sel.bounds();
-                let start = start.min(dim_len.saturating_sub(1));
-                let end = end.max(start + 1).min(dim_len);
-                let count = end.saturating_sub(start).max(1);
-
-                extents_vec.push(Extent::SliceCount {
-                    start,
-                    count,
-                    stride: 1,
-                });
-                block_shape.push(count);
-                origin.push(start);
-            }
-
-            let extents = Extents::from(extents_vec);
+            let (extents, window) = selection_window(var, request)?;
             let raw_values = read_variable_hyperslab_as_f32(var, &extents)?;
-
-            let bytes_read = raw_values
-                .len()
-                .checked_mul(std::mem::size_of::<f32>())
-                .unwrap_or(0) as u64;
-
             if let Some(ref mut cb) = on_progress {
-                cb(bytes_read);
+                let bytes = raw_values.len().saturating_mul(std::mem::size_of::<f32>());
+                cb(bytes as u64);
             }
-
-            let attributes = extract_variable_attributes(var);
-            let coordinates =
-                super::coords::extract_sliced_coordinates(&file, &dim_names, &origin, &block_shape);
-
-            let json_attrs: serde_json::Map<String, serde_json::Value> = attributes
-                .iter()
-                .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
-                .collect();
-
-            let oriented_values = check_and_orient_block_grid(
-                raw_values,
-                &mut block_shape,
-                &mut dim_names,
-                &mut origin,
-                &json_attrs,
-                &coordinates,
-            );
-
-            let block = OctantBlock::new(
-                request.variable.clone(),
-                block_shape,
-                dim_names,
-                origin,
-                Arc::from(oriented_values.into_boxed_slice()),
-                coordinates,
-                attributes,
-            );
-
-            Ok(block)
+            Ok(oriented_block(&file, request, var, raw_values, window))
         })
     }
 
@@ -221,4 +151,97 @@ impl BlockStore for NetCdfBlockStore {
 
         Ok(BlockResult::new(blocks?))
     }
+}
+
+/// The dimension names, origin and shape of a block window.
+struct BlockWindow {
+    dim_names: Vec<String>,
+    origin: Vec<usize>,
+    shape: Vec<usize>,
+}
+
+/// The extents `request` reads from `var`, clamped to its dimensions, and their window.
+fn selection_window(
+    var: &netcdf::Variable<'_>,
+    request: &SliceRequest,
+) -> Result<(Extents, BlockWindow), BlockStoreError> {
+    let dims = var.dimensions();
+    if request.selections.len() != dims.len() {
+        return Err(format!(
+            "fetch_block: selection has {} dimension(s) but '{}' has rank {}",
+            request.selections.len(),
+            request.variable,
+            dims.len()
+        )
+        .into());
+    }
+    let mut extents = Vec::with_capacity(dims.len());
+    let mut window = BlockWindow {
+        dim_names: Vec::with_capacity(dims.len()),
+        origin: Vec::with_capacity(dims.len()),
+        shape: Vec::with_capacity(dims.len()),
+    };
+    for (dim, sel) in dims.iter().zip(&request.selections) {
+        let dim_len = dim.len();
+        let (start, end) = sel.bounds();
+        let start = start.min(dim_len.saturating_sub(1));
+        let end = end.max(start.saturating_add(1)).min(dim_len);
+        let count = end.saturating_sub(start).max(1);
+        extents.push(Extent::SliceCount {
+            start,
+            count,
+            stride: 1,
+        });
+        window.dim_names.push(dim.name());
+        window.origin.push(start);
+        window.shape.push(count);
+    }
+    Ok((Extents::from(extents), window))
+}
+
+/// The block of `raw_values` read from `var` over `window`, with its window coordinates,
+/// oriented north-up and west-left.
+fn oriented_block(
+    file: &netcdf::File,
+    request: &SliceRequest,
+    var: &netcdf::Variable<'_>,
+    raw_values: Vec<f32>,
+    mut window: BlockWindow,
+) -> OctantBlock {
+    let attributes = extract_variable_attributes(var);
+    let mut coords = super::coords::extract_sliced_coordinates(
+        file,
+        &request.variable,
+        &window.dim_names,
+        &window.origin,
+        &window.shape,
+    );
+    let json_attrs: serde_json::Map<String, serde_json::Value> = attributes
+        .iter()
+        .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+        .collect();
+    let hints = OrientHints {
+        attributes: &json_attrs,
+        lat_extent: coords.lat_extent,
+        lon_extent: coords.lon_extent,
+    };
+    let (oriented_values, flipped_dims) = check_and_orient_block_grid(
+        raw_values,
+        &mut window.shape,
+        &mut window.dim_names,
+        &mut window.origin,
+        hints,
+        &mut coords.coordinates,
+    );
+    let mut block = OctantBlock::new(
+        request.variable.clone(),
+        window.shape,
+        window.dim_names,
+        window.origin,
+        Arc::from(oriented_values.into_boxed_slice()),
+        coords.coordinates,
+        attributes,
+    );
+    block.flipped_dims = flipped_dims;
+    block
 }

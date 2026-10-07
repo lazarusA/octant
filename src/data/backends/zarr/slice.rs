@@ -80,12 +80,34 @@ fn decode_with<R: SubsetRetriever>(
         decode_typed!(i64)
     } else if dt.is::<UInt64DataType>() {
         decode_typed!(u64)
-    } else if dt.is::<BoolDataType>() {
+    } else {
+        decode_other(retriever, dt, calibration, subset)
+    }
+}
+
+/// Booleans as 0 or 1, half-precision floats widened, anything else read as `f32`.
+fn decode_other<R: SubsetRetriever>(
+    retriever: &R,
+    dt: &DataType,
+    calibration: &DataCalibration,
+    subset: &ArraySubset,
+) -> Result<Vec<f32>, BlockStoreError> {
+    let widen = |vals: Vec<f64>| -> Vec<f32> {
+        if calibration.has_transformation() {
+            vals.into_iter().map(|v| calibration.transform(v)).collect()
+        } else {
+            vals.into_iter().map(|v| v as f32).collect()
+        }
+    };
+    if dt.is::<BoolDataType>() {
         let vals: Vec<u8> = retriever.retrieve_subset(subset)?;
-        Ok(vals
-            .into_iter()
-            .map(|v| if v != 0 { 1.0 } else { 0.0 })
-            .collect())
+        Ok(vals.into_iter().map(|v| f32::from(v != 0)).collect())
+    } else if dt.is::<Float16DataType>() {
+        let vals: Vec<half::f16> = retriever.retrieve_subset(subset)?;
+        Ok(widen(vals.into_iter().map(f64::from).collect()))
+    } else if dt.is::<BFloat16DataType>() {
+        let vals: Vec<half::bf16> = retriever.retrieve_subset(subset)?;
+        Ok(widen(vals.into_iter().map(f64::from).collect()))
     } else {
         retriever.retrieve_subset(subset)
     }
@@ -103,4 +125,55 @@ pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + '
         Some(c) => decode_with(c, dt, &calibration, subset),
         None => decode_with(array, dt, &calibration, subset),
     }
+}
+
+/// Reads an array subset as `f64`, applying CF scale, offset and masking, for coordinates
+/// that need more precision than `f32`. Fails for non-numeric data types.
+pub fn retrieve_array_subset_as_f64<TStorage: ?Sized + ReadableStorageTraits + 'static>(
+    array: &Array<TStorage>,
+    subset: &ArraySubset,
+) -> Result<Vec<f64>, BlockStoreError> {
+    let dt = array.data_type();
+    macro_rules! widen {
+        ($t:ty) => {{
+            let vals: Vec<$t> = array.retrieve_subset(subset)?;
+            vals.into_iter().map(|v| v as f64).collect::<Vec<f64>>()
+        }};
+    }
+    let mut values = if dt.is::<Float64DataType>() {
+        array.retrieve_subset::<Vec<f64>>(subset)?
+    } else if dt.is::<Float32DataType>() {
+        widen!(f32)
+    } else if dt.is::<Int64DataType>() {
+        widen!(i64)
+    } else if dt.is::<Int32DataType>() {
+        widen!(i32)
+    } else if dt.is::<Int16DataType>() {
+        widen!(i16)
+    } else if dt.is::<Int8DataType>() {
+        widen!(i8)
+    } else if dt.is::<UInt64DataType>() {
+        widen!(u64)
+    } else if dt.is::<UInt32DataType>() {
+        widen!(u32)
+    } else if dt.is::<UInt16DataType>() {
+        widen!(u16)
+    } else if dt.is::<UInt8DataType>() {
+        widen!(u8)
+    } else if dt.is::<Float16DataType>() {
+        let vals: Vec<half::f16> = array.retrieve_subset(subset)?;
+        vals.into_iter().map(f64::from).collect()
+    } else if dt.is::<BFloat16DataType>() {
+        let vals: Vec<half::bf16> = array.retrieve_subset(subset)?;
+        vals.into_iter().map(f64::from).collect()
+    } else {
+        return Err("coordinate data type is not numeric".into());
+    };
+    let calibration = DataCalibration::from_json_map(array.attributes());
+    if calibration.has_transformation() {
+        for v in &mut values {
+            *v = calibration.transform_f64(*v);
+        }
+    }
+    Ok(values)
 }

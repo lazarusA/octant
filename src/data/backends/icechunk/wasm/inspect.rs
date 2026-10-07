@@ -152,24 +152,7 @@ pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, 
         .write()
         .unwrap_or_else(|p| p.into_inner()) = manifest_map;
 
-    // Preload 1D coordinate arrays to populate dimension_coordinates
-    let coord_candidates =
-        crate::data::backends::coord_bounds::collect_coordinate_candidates(&variables);
-
-    for coord_name in &coord_candidates {
-        if let Some(var_info) = variables.iter().find(|v| &v.name == coord_name) {
-            let count = var_info.shape.first().copied().unwrap_or(0);
-            store.preload_boundary_chunks_1d(coord_name, count).await;
-        }
-    }
-
-    let dimension_coordinates =
-        crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables(
-            store.inner.memory_store.clone(),
-            &variables,
-            Some(clean_url),
-        );
-
+    // Coordinates are read per variable on demand, so the dataset opens with metadata alone.
     let dataset_name = clean_url
         .split('/')
         .next_back()
@@ -180,7 +163,7 @@ pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, 
         name: dataset_name,
         store_type: "icechunk".to_string(),
         variables,
-        dimension_coordinates,
+        dimension_coordinates: HashMap::new(),
     };
 
     *store

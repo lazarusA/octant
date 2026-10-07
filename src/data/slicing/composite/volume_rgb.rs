@@ -3,6 +3,8 @@
 use crate::data::octant_block::OctantBlock;
 use crate::data::volume_data::VolumeData;
 
+use super::cmyk::{blend_cmyk, is_cmyk_block};
+use super::probe::local_channel;
 use super::utils::{compute_channel_normalization, normalize_channel_value, pack_rgb};
 
 /// Slices an N-dimensional `OctantBlock` with a channel dimension into TrueColor RGB `VolumeData`.
@@ -38,54 +40,38 @@ pub fn slice_rgb_volume_composite_nd(
         1
     };
     let total_voxels = nx.checked_mul(ny)?.checked_mul(nz)?;
+    let channel_vol = |ch: Option<usize>| {
+        extract_channel_vol(
+            block,
+            c_dim,
+            x_dim,
+            y_dim,
+            eff_z_dim,
+            x_range,
+            y_range,
+            z_range,
+            fixed_indices,
+            ch,
+        )
+    };
 
-    let r_vol = extract_channel_vol(
-        block,
-        c_dim,
-        x_dim,
-        y_dim,
-        eff_z_dim,
-        x_range,
-        y_range,
-        z_range,
-        fixed_indices,
-        channels[0],
-    );
-    let g_vol = extract_channel_vol(
-        block,
-        c_dim,
-        x_dim,
-        y_dim,
-        eff_z_dim,
-        x_range,
-        y_range,
-        z_range,
-        fixed_indices,
-        channels[1],
-    );
-    let b_vol = extract_channel_vol(
-        block,
-        c_dim,
-        x_dim,
-        y_dim,
-        eff_z_dim,
-        x_range,
-        y_range,
-        z_range,
-        fixed_indices,
-        channels[2],
-    );
-
-    let (r_v, r_scale, r_off, r_i8) = norm_volume_info(r_vol);
-    let (g_v, g_scale, g_off, g_i8) = norm_volume_info(g_vol);
-    let (b_v, b_scale, b_off, b_i8) = norm_volume_info(b_vol);
-
-    let values = blend_rgb_voxels(
-        total_voxels,
-        (r_v.as_deref(), r_scale, r_off, r_i8),
-        (g_v.as_deref(), g_scale, g_off, g_i8),
-        (b_v.as_deref(), b_scale, b_off, b_i8),
-    );
+    // CMYK inks always map C, M, Y, K to the block's first four channels.
+    let values = if is_cmyk_block(block, c_dim) {
+        let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
+        let ink = |k: usize| channel_vol(Some(c_start + k));
+        let (c, m, y, k) = (ink(0)?, ink(1)?, ink(2)?, ink(3)?);
+        blend_cmyk([&c, &m, &y, &k], total_voxels)?
+    } else {
+        let (r_v, r_scale, r_off, r_i8) = norm_volume_info(channel_vol(channels[0]));
+        let (g_v, g_scale, g_off, g_i8) = norm_volume_info(channel_vol(channels[1]));
+        let (b_v, b_scale, b_off, b_i8) = norm_volume_info(channel_vol(channels[2]));
+        blend_rgb_voxels(
+            total_voxels,
+            (r_v.as_deref(), r_scale, r_off, r_i8),
+            (g_v.as_deref(), g_scale, g_off, g_i8),
+            (b_v.as_deref(), b_scale, b_off, b_i8),
+        )
+    };
 
     Some(VolumeData::new(
         nx,
@@ -114,11 +100,7 @@ fn extract_channel_vol(
     let ch = ch_opt?;
     let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
     let num_channels = block.shape.get(c_dim).copied().unwrap_or(1);
-    let local_ch = if ch >= c_start && ch < c_start + num_channels {
-        ch - c_start
-    } else {
-        ch.min(num_channels.saturating_sub(1))
-    };
+    let local_ch = local_channel(ch, c_start, num_channels);
     let mut fixed = fixed_indices.to_vec();
     if fixed.len() < block.shape.len() {
         fixed.resize(block.shape.len(), 0);

@@ -50,7 +50,16 @@ impl OctantApp {
         );
 
         self.ensure_volume_allocated(nx, ny, nz, &target_desc);
+        // Raw channel readouts only exist for 2D composites.
+        self.composite_probe = None;
+        self.plotted_flipped_dims.clone_from(&block.flipped_dims);
 
+        // Slices read the block in its oriented (flipped) order.
+        let oriented = (
+            block.oriented_range(x_dim, local_x_range),
+            block.oriented_range(y_dim, local_y_range),
+            block.oriented_range(z_dim, local_z_range),
+        );
         let slab_opt = if self.rgb_composite_mode
             && block.shape.len() >= 3
             && block.shape.get(c_dim).copied().unwrap_or(0) >= 1
@@ -61,9 +70,9 @@ impl OctantApp {
                 x_dim,
                 y_dim,
                 z_dim,
-                local_x_range,
-                local_y_range,
-                local_z_range,
+                oriented.0,
+                oriented.1,
+                oriented.2,
                 fixed_indices,
                 &target_desc,
             )
@@ -76,9 +85,9 @@ impl OctantApp {
                 x_dim,
                 y_dim,
                 z_dim,
-                local_x_range,
-                local_y_range,
-                local_z_range,
+                oriented.0,
+                oriented.1,
+                oriented.2,
                 fixed_indices,
                 &target_desc,
                 compute_bounds,
@@ -93,7 +102,7 @@ impl OctantApp {
                 z_dim,
                 req_x.0,
                 req_y.0,
-                req_z.0,
+                req_z,
                 local_x_range.0,
                 local_y_range.0,
                 local_z_range.0,
@@ -177,72 +186,6 @@ impl OctantApp {
             crate::data::slicing::slice_rgb_volume_composite_nd(
                 block, c_dim, x_dim, y_dim, z_dim, x_rng, y_rng, z_rng, fixed, opt_ch, desc,
             )
-        }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn commit_volume_slab(
-        &mut self,
-        block: &OctantBlock,
-        x_dim: usize,
-        y_dim: usize,
-        z_dim: usize,
-        req_x0: usize,
-        req_y0: usize,
-        req_z0: usize,
-        local_x0: usize,
-        local_y0: usize,
-        local_z0: usize,
-        slab: VolumeData,
-    ) {
-        let orig_x = block.origin.get(x_dim).copied().unwrap_or(0);
-        let orig_y = block.origin.get(y_dim).copied().unwrap_or(0);
-        let orig_z = if z_dim < block.rank() {
-            block.origin.get(z_dim).copied().unwrap_or(0)
-        } else {
-            0
-        };
-
-        let dest_x = (orig_x + local_x0).saturating_sub(req_x0);
-        let dest_y = (orig_y + local_y0).saturating_sub(req_y0);
-        let raw_dest_z = (orig_z + local_z0).saturating_sub(req_z0);
-        let depth_max = self.volume_data.as_ref().map(|v| v.depth).unwrap_or(1);
-        let dest_z = raw_dest_z % depth_max.max(1);
-
-        let mut bounds_opt = None;
-        if let Some(vdata) = &mut self.volume_data {
-            vdata.update_subvolume(
-                [dest_x, dest_y, dest_z],
-                [slab.width, slab.height, slab.depth.min(vdata.depth)],
-                &slab.values,
-            );
-
-            bounds_opt = Some((vdata.min_val, vdata.max_val));
-        }
-        // Uploaded before the next paint, to the renderer on screen only.
-        self.mark_volume_dirty(dest_z..(dest_z + slab.depth).min(depth_max));
-
-        if let Some((min_val, max_val)) = bounds_opt {
-            self.sync_volume_color_bounds(min_val, max_val);
-        }
-    }
-
-    fn sync_volume_color_bounds(&mut self, min_val: f32, max_val: f32) {
-        if !self.lock_color_bounds {
-            if min_val.is_finite() {
-                self.volume_cmin = min_val;
-                self.color_range_min = min_val;
-            }
-            if max_val.is_finite() {
-                self.volume_cmax = max_val;
-                self.color_range_max = max_val;
-            }
-        }
-        if min_val.is_finite() {
-            self.global_data_min = self.global_data_min.min(min_val);
-        }
-        if max_val.is_finite() {
-            self.global_data_max = self.global_data_max.max(max_val);
         }
     }
 }

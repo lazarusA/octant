@@ -1,5 +1,6 @@
 //! Hover card content: title, headline value, and coordinate rows.
 
+use crate::ui::hover::composite::CompositeKind;
 use crate::ui::hover::field::HoverField;
 use crate::utils::stack_str::stack_str;
 use egui::Color32;
@@ -8,23 +9,19 @@ use egui::Color32;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum HoverValue {
     Scalar(f32),
-    Rgb([u8; 3]),
+    /// A composite pixel: the card names the band combination instead of a number.
+    Composite(CompositeKind),
     NoData,
 }
 
 impl HoverValue {
-    /// Classifies a raw sample; RGB composites pack channels as `r | g << 8 | b << 16`.
-    /// Only NaN is missing data: infinities are real values and display as `inf`.
-    pub fn from_raw(raw: f32, is_rgb: bool) -> Self {
+    /// Classifies a raw sample; a composite pixel (packed display color) is named by
+    /// `composite`. Only NaN is missing data: infinities are real values and display as `inf`.
+    pub fn from_raw(raw: f32, composite: Option<CompositeKind>) -> Self {
         if raw.is_nan() {
             Self::NoData
-        } else if is_rgb {
-            let packed = raw.max(0.0) as u32;
-            Self::Rgb([
-                (packed & 0xFF) as u8,
-                ((packed >> 8) & 0xFF) as u8,
-                ((packed >> 16) & 0xFF) as u8,
-            ])
+        } else if let Some(kind) = composite {
+            Self::Composite(kind)
         } else {
             Self::Scalar(raw)
         }
@@ -34,7 +31,7 @@ impl HoverValue {
     pub fn format<'a>(&self, buf: &'a mut [u8; 32]) -> &'a str {
         match *self {
             Self::NoData => "No data",
-            Self::Rgb([r, g, b]) => stack_str(buf, format_args!("{r}, {g}, {b}")),
+            Self::Composite(kind) => kind.label(),
             Self::Scalar(v) => format_scalar(buf, v),
         }
     }

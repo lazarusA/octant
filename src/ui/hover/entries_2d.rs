@@ -2,6 +2,7 @@ use crate::app::OctantApp;
 use crate::data::{CoordinateGrid, DatasetMetadata, MatrixData, VariableInfo};
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
+    stored_offset,
 };
 use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
@@ -37,7 +38,8 @@ pub(crate) fn resolve_2d_plot_entries(
         matrix.values.get(idx).copied().unwrap_or(f32::NAN)
     };
 
-    let mut used_dims = HashSet::new();
+    // A composite mixes every channel, so no single band is selected.
+    let mut used_dims: HashSet<usize> = composite_channel_dim(app).into_iter().collect();
     let entries = resolve_2d_dim_entries(
         app,
         meta,
@@ -51,6 +53,13 @@ pub(crate) fn resolve_2d_plot_entries(
     );
 
     (val, entries, px, py)
+}
+
+/// The channel dimension a composite plot mixes, which the hover lists per channel instead.
+pub(crate) fn composite_channel_dim(app: &OctantApp) -> Option<usize> {
+    app.rgb_composite_mode
+        .then(|| app.channel_dim_index())
+        .flatten()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -85,13 +94,16 @@ fn resolve_2d_dim_entries(
         used_dims.insert(x_idx);
         used_dims.insert(y_idx);
 
-        let dim_y_name = explicit_y
-            .and_then(|i| v.dimension_names.get(i))
+        // The plotted dimensions' own names, so flipped ones map back to stored rows.
+        let dim_y_name = v
+            .dimension_names
+            .get(y_idx)
             .cloned()
             .unwrap_or_else(|| "y".to_string());
 
-        let dim_x_name = explicit_x
-            .and_then(|i| v.dimension_names.get(i))
+        let dim_x_name = v
+            .dimension_names
+            .get(x_idx)
             .cloned()
             .unwrap_or_else(|| "x".to_string());
 
@@ -101,8 +113,10 @@ fn resolve_2d_dim_entries(
         let (origin_x, full_x_len) = get_dimension_origin_and_full_len(app, Some(v), x_idx);
         let (origin_y, full_y_len) = get_dimension_origin_and_full_len(app, Some(v), y_idx);
 
-        let global_x = (origin_x + px).min(full_x_len.saturating_sub(1));
-        let global_y = (origin_y + py).min(full_y_len.saturating_sub(1));
+        let x_offset = stored_offset(app, &dim_x_name, px, orig_w);
+        let y_offset = stored_offset(app, &dim_y_name, py, orig_h);
+        let global_x = (origin_x + x_offset).min(full_x_len.saturating_sub(1));
+        let global_y = (origin_y + y_offset).min(full_y_len.saturating_sub(1));
 
         let loc_y = format_dimension_coord(
             meta,

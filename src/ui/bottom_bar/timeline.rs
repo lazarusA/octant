@@ -17,8 +17,9 @@ pub(super) struct Timeline {
     pub last_step: usize,
 }
 
-/// Everything the labels depend on. Hashing the store target and the
-/// metadata address detects a newly loaded dataset without allocating.
+/// Everything the labels depend on. Hashing the store target, the plotted
+/// metadata's generation and the coordinates revision detects a newly loaded
+/// dataset or newly read coordinates without allocating.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct TimelineKey {
     variable: usize,
@@ -32,12 +33,7 @@ impl TimelineKey {
     fn from_app(app: &OctantApp) -> Self {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         app.plotted_store_target_input.hash(&mut hasher);
-        std::ptr::hash(
-            app.plotted_dataset_metadata
-                .as_ref()
-                .map_or(std::ptr::null(), |m| m as *const _),
-            &mut hasher,
-        );
+        (app.plotted_metadata_generation, app.coordinates_revision).hash(&mut hasher);
         Self {
             variable: app.plotted_variable_idx,
             animated_dim: app.plotted_animated_dim,
@@ -71,9 +67,11 @@ impl Timeline {
         let meta = app.plotted_dataset_metadata.as_ref();
         let var = meta.and_then(|m| m.variables.get(app.plotted_variable_idx));
         let dim = dim_name(app);
-        let coords = meta.and_then(|m| m.get_dim_coords(var.map(|v| v.name.as_str()), dim));
-        let coord =
-            |pick: fn(&[String]) -> Option<&String>| coords.and_then(pick).map(String::as_str);
+        // Labels are read by index only when there is one per step.
+        let coords = meta
+            .and_then(|m| m.get_dim_coords(var.map(|v| v.name.as_str()), dim))
+            .filter(|c| c.matches(max_steps));
+        let label_at = |i: usize| coords.and_then(|c| c.label(i));
 
         let label = |step: usize, coord: Option<&str>| match coord.filter(|c| is_display_coord(c)) {
             Some(coord) => coord.to_owned(),
@@ -90,9 +88,9 @@ impl Timeline {
 
         let step = app.current_timestep;
         Self {
-            current: label(step, coords.and_then(|c| c.get(step)).map(String::as_str)),
-            start: label(0, coord(<[String]>::first)),
-            end: label(last_step, coord(<[String]>::last)),
+            current: label(step, label_at(step)),
+            start: label(0, label_at(0)),
+            end: label(last_step, label_at(last_step)),
             step_size: var
                 .and_then(|v| v.temporal_resolution.clone())
                 .unwrap_or_else(|| "Step: 1".to_owned()),

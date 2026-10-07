@@ -2,6 +2,7 @@ use crate::app::OctantApp;
 use crate::data::{DatasetMetadata, VariableInfo};
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
+    stored_offset,
 };
 use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
@@ -30,7 +31,8 @@ pub(crate) fn resolve_line_plot_entries(
     } else {
         (0, prof_len)
     };
-    let global_sample = (origin_prof + sample_idx).min(full_prof_len.saturating_sub(1));
+    let sample_offset = stored_offset(app, &dim_name, sample_idx, prof_len);
+    let global_sample = (origin_prof + sample_offset).min(full_prof_len.saturating_sub(1));
 
     let loc_str = format_dimension_coord(
         meta,
@@ -122,7 +124,8 @@ fn enrich_line_series_ortho_dim(
         {
             let (origin_ortho, full_ortho_len) =
                 get_dimension_origin_and_full_len(app, Some(v), o_idx);
-            let global_ortho = (origin_ortho + best_line_idx).min(full_ortho_len.saturating_sub(1));
+            let line_offset = stored_offset(app, ortho_name, best_line_idx, l_count);
+            let global_ortho = (origin_ortho + line_offset).min(full_ortho_len.saturating_sub(1));
             let ortho_str = format_dimension_coord(
                 meta,
                 Some(v),

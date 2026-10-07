@@ -3,6 +3,7 @@ pub mod diagnostics;
 pub mod error;
 pub mod executor;
 pub mod grid;
+pub mod grid_flips;
 pub mod math;
 pub mod metadata;
 pub mod path;

@@ -1,5 +1,7 @@
 use super::layout::{BottomBarItem, COLLAPSE_ORDER, ITEM_COUNT, LEFT_ITEMS, RIGHT_ITEMS};
-use super::timeline::is_display_coord;
+use super::timeline::{Timeline, is_display_coord};
+use crate::app::OctantApp;
+use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 
 #[test]
 fn test_left_and_right_cover_every_item_once() {
@@ -47,4 +49,39 @@ fn test_display_coord_keeps_dates_and_formats_all_numbers() {
     assert!(!is_display_coord("42.5"));
     assert!(!is_display_coord("7"));
     assert!(!is_display_coord("   "));
+}
+
+/// An app animating a 3-step `region` dimension labelled by `labels`.
+fn regions_app(labels: &[&str]) -> OctantApp {
+    let var = VariableInfo {
+        name: "pop".into(),
+        shape: vec![3],
+        dimension_names: vec!["region".into()],
+        ..Default::default()
+    };
+    let regions = CoordValues::from_labels(labels.iter().map(|s| s.to_string()).collect());
+    let meta = DatasetMetadata {
+        variables: vec![var],
+        dimension_coordinates: regions
+            .map(|r| std::collections::HashMap::from([("region".to_string(), r)]))
+            .unwrap_or_default(),
+        ..Default::default()
+    };
+    OctantApp {
+        plotted_dataset_metadata: Some(meta),
+        plotted_animated_dim: Some(0),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn timeline_reads_labels_only_when_there_is_one_per_step() {
+    let ctx = egui::Context::default();
+    let full = Timeline::cached(&regions_app(&["north", "south", "east"]), &ctx);
+    assert_eq!((full.start.as_str(), full.end.as_str()), ("north", "east"));
+
+    let ctx = egui::Context::default();
+    let short = Timeline::cached(&regions_app(&["north", "south"]), &ctx);
+    assert_ne!(short.end, "south", "two labels do not name three steps");
+    assert_ne!(short.start, "north");
 }

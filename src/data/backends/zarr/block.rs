@@ -5,13 +5,104 @@ use zarrs::array::ArraySubset;
 use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 use zarrs::storage::ReadableWritableListableStorage;
 
+use super::block_coords::{BlockWindow, block_coordinates};
 use super::generic::{GenericZarrBlockStore, ZarrArrayHandle};
 use super::slice::retrieve_array_subset_as_f32;
-use crate::data::backends::coord_bounds::get_cached_coord_bounds_scoped;
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::{DimensionSelection, SliceRequest};
 use crate::utils::grid::check_and_orient_block_grid;
+use crate::utils::grid_flips::OrientHints;
+use crate::utils::metadata::attr_string;
+
+/// The clamped `(origin, shape)` window of every dimension selected by `request`.
+fn selection_window(
+    request: &SliceRequest,
+    shape: &[u64],
+) -> Result<(Vec<usize>, Vec<usize>), BlockStoreError> {
+    if request.selections.len() != shape.len() {
+        return Err(format!(
+            "fetch_block: selection has {} dimension(s) but '{}' has rank {}",
+            request.selections.len(),
+            request.variable,
+            shape.len()
+        )
+        .into());
+    }
+    let mut origin = Vec::with_capacity(shape.len());
+    let mut block_shape = Vec::with_capacity(shape.len());
+    for (sel, &dim_len) in request.selections.iter().zip(shape) {
+        let dim_len = usize::try_from(dim_len).unwrap_or(usize::MAX);
+        let (start, end) = match sel {
+            DimensionSelection::Index(idx) => (*idx, idx.saturating_add(1)),
+            DimensionSelection::Range { start, end } => (*start, *end),
+        };
+        let start = start.min(dim_len.saturating_sub(1));
+        let end = end.max(start.saturating_add(1)).min(dim_len);
+        origin.push(start);
+        block_shape.push(end - start);
+    }
+    Ok((origin, block_shape))
+}
+
+/// The array's attributes as text, plus those of its ancestor groups (e.g. DGGS
+/// conventions) when the array has no `dggs` attribute of its own.
+fn inherited_attributes(
+    array: &ZarrArrayHandle,
+    store: &ReadableWritableListableStorage,
+    variable: &str,
+) -> HashMap<String, String> {
+    let mut attributes: HashMap<String, String> = array
+        .attributes()
+        .iter()
+        .map(|(k, v)| (k.clone(), attr_string(v)))
+        .collect();
+    if attributes.contains_key("dggs") {
+        return attributes;
+    }
+    for ancestor in crate::utils::path::ancestor_paths(variable) {
+        let p = if ancestor.is_empty() {
+            "/".to_string()
+        } else {
+            format!("/{ancestor}")
+        };
+        if let Ok(grp) = zarrs::group::Group::open(store.clone(), &p) {
+            for (k, v) in grp.attributes() {
+                attributes
+                    .entry(k.clone())
+                    .or_insert_with(|| attr_string(v));
+            }
+            if attributes.contains_key("dggs") {
+                break;
+            }
+        }
+    }
+    attributes
+}
+
+/// The values of the window `origin..origin + shape` of `array`, through `cache`.
+fn read_window(
+    array: &ZarrArrayHandle,
+    cache: &ChunkCacheDecodedLruSizeLimit,
+    variable: &str,
+    (origin, shape): (&[usize], &[usize]),
+) -> Result<Vec<f32>, BlockStoreError> {
+    let ranges: Vec<_> = origin
+        .iter()
+        .zip(shape)
+        .map(|(&start, &len)| start as u64..(start + len) as u64)
+        .collect();
+    let subset = ArraySubset::new_with_ranges(&ranges);
+    log::debug!(
+        "[ZarrBlock] Fetching '{variable}' subset {:?} (elements = {})",
+        subset.to_ranges(),
+        subset.num_elements(),
+    );
+    retrieve_array_subset_as_f32(array, Some(cache), &subset).map_err(|e| {
+        log::error!("[ZarrBlock] Failed to retrieve array subset for '{variable}': {e:?}");
+        BlockStoreError::from(e.to_string())
+    })
+}
 
 /// Fetches an arbitrary-rank hyperslab from an already-opened `ZarrArrayHandle` through a chunk cache.
 pub fn fetch_block_from_cached_array(
@@ -22,194 +113,47 @@ pub fn fetch_block_from_cached_array(
     request: &SliceRequest,
     mut on_progress: ProgressCallback,
 ) -> Result<OctantBlock, BlockStoreError> {
-    let shape = array.shape();
-    let rank = shape.len();
-
-    if request.selections.len() != rank {
-        return Err(format!(
-            "fetch_block: selection has {} dimension(s) but '{}' has rank {}",
-            request.selections.len(),
-            request.variable,
-            rank
-        )
-        .into());
-    }
-
-    let mut dim_names = crate::utils::resolve_array_dimension_names(array);
-    let mut ranges: Vec<std::ops::Range<u64>> = Vec::with_capacity(rank);
-
-    let mut block_shape = Vec::with_capacity(rank);
-    let mut origin = Vec::with_capacity(rank);
-
-    for (i, sel) in request.selections.iter().enumerate() {
-        let dim_len = shape[i] as usize;
-        let (start, end) = match sel {
-            DimensionSelection::Index(idx) => (*idx, idx.saturating_add(1)),
-            DimensionSelection::Range { start, end } => (*start, *end),
-        };
-        let start = start.min(dim_len.saturating_sub(1));
-        let end = end.max(start + 1).min(dim_len);
-
-        ranges.push(start as u64..end as u64);
-        block_shape.push(end - start);
-        origin.push(start);
-    }
-
-    let subset = ArraySubset::new_with_ranges(&ranges);
-    log::debug!(
-        "[ZarrBlock] Fetching '{}' subset {:?} (elements = {}) from '{}'",
-        request.variable,
-        subset.to_ranges(),
-        subset.num_elements(),
-        store_url
-    );
-
-    let raw_values = match retrieve_array_subset_as_f32(array, Some(cache), &subset) {
-        Ok(vals) => vals,
-        Err(e) => {
-            log::error!(
-                "[ZarrBlock] Failed to retrieve array subset for '{}': {:?}",
-                request.variable,
-                e
-            );
-            return Err(e.to_string().into());
-        }
-    };
-    let bytes_read = (raw_values.len() * std::mem::size_of::<f32>()) as u64;
-
-    if let Some(ref mut cb) = on_progress {
-        cb(bytes_read);
-    }
-
-    let mut attributes: HashMap<String, String> = array
-        .attributes()
-        .iter()
-        .map(|(k, v)| (k.clone(), v.to_string()))
-        .collect();
-
-    let group_path = request
-        .variable
-        .rfind('/')
-        .map(|idx| &request.variable[..idx]);
-
-    // Inherit ancestor group attributes (e.g. DGGS conventions) if not present on array
-    if !attributes.contains_key("dggs") {
-        for ancestor in crate::utils::path::ancestor_paths(&request.variable) {
-            let p = if ancestor.is_empty() {
-                "/".to_string()
-            } else {
-                format!("/{ancestor}")
-            };
-            if let Ok(grp) = zarrs::group::Group::open(store.clone(), &p) {
-                for (k, v) in grp.attributes() {
-                    attributes.entry(k.clone()).or_insert_with(|| v.to_string());
-                }
-                if attributes.contains_key("dggs") {
-                    break;
-                }
-            }
-        }
-    }
-
     let full_shape = array.shape();
-    let mut coordinates: HashMap<String, Vec<f64>> = HashMap::new();
-    let total_dims = dim_names.len();
-    for (i, name) in dim_names.iter().enumerate() {
-        if let Some((first, last)) = get_cached_coord_bounds_scoped(
-            store.clone(),
-            store_url,
-            name,
-            group_path,
-            &[],
-            i,
-            total_dims,
-        ) {
-            let full_dim_len = full_shape.get(i).copied().unwrap_or(block_shape[i] as u64) as usize;
-            let start_idx = origin.get(i).copied().unwrap_or(0);
-            let end_idx = start_idx + block_shape.get(i).copied().unwrap_or(1);
-            let t_start = if full_dim_len > 1 {
-                start_idx as f64 / (full_dim_len - 1) as f64
-            } else {
-                0.0
-            };
-            let t_end = if full_dim_len > 1 {
-                (end_idx.saturating_sub(1)) as f64 / (full_dim_len - 1) as f64
-            } else {
-                1.0
-            };
-            let block_first = first + t_start * (last - first);
-            let block_last = first + t_end * (last - first);
-            coordinates.insert(name.clone(), vec![block_first, block_last]);
-            let clean = name.trim().to_lowercase();
-            if clean != *name {
-                coordinates.insert(clean, vec![block_first, block_last]);
-            }
-        }
+    let (mut origin, mut block_shape) = selection_window(request, full_shape)?;
+    let raw_values = read_window(array, cache, &request.variable, (&origin, &block_shape))?;
+    if let Some(ref mut cb) = on_progress {
+        cb((raw_values.len() * std::mem::size_of::<f32>()) as u64);
     }
 
-    // Fallback: If dim_names contain generic "dim_i" names, query spatial coordinate bounds for lat and lon
-    if coordinates.is_empty() || dim_names.iter().any(|d| d.starts_with("dim_")) {
-        for candidate in &["lat", "latitude", "y", "lon", "longitude", "x"] {
-            if let Some((first, last)) = get_cached_coord_bounds_scoped(
-                store.clone(),
-                store_url,
-                candidate,
-                group_path,
-                &[],
-                usize::MAX,
-                total_dims,
-            ) {
-                let is_x = crate::data::coordinates::naming::is_spatial_x_name(candidate);
-                let dim_i = dim_names.iter().position(|d| {
-                    if is_x {
-                        crate::data::coordinates::naming::is_spatial_x_name(d)
-                    } else {
-                        crate::data::coordinates::naming::is_spatial_y_name(d)
-                    }
-                });
-                if let Some(i) = dim_i {
-                    let full_dim_len =
-                        full_shape.get(i).copied().unwrap_or(block_shape[i] as u64) as usize;
-                    let start_idx = origin.get(i).copied().unwrap_or(0);
-                    let end_idx = start_idx + block_shape.get(i).copied().unwrap_or(1);
-                    let t_start = if full_dim_len > 1 {
-                        start_idx as f64 / (full_dim_len - 1) as f64
-                    } else {
-                        0.0
-                    };
-                    let t_end = if full_dim_len > 1 {
-                        (end_idx.saturating_sub(1)) as f64 / (full_dim_len - 1) as f64
-                    } else {
-                        1.0
-                    };
-                    let block_first = first + t_start * (last - first);
-                    let block_last = first + t_end * (last - first);
-                    coordinates.insert((*candidate).to_string(), vec![block_first, block_last]);
-                } else {
-                    coordinates.insert((*candidate).to_string(), vec![first, last]);
-                }
-            }
-        }
-    }
-
-    let raw_values = check_and_orient_block_grid(
+    let attributes = inherited_attributes(array, &store, &request.variable);
+    let mut dim_names = crate::utils::resolve_array_dimension_names(array);
+    let window = BlockWindow {
+        dim_names: &dim_names,
+        full_shape,
+        origin: &origin,
+        block_shape: &block_shape,
+        selections: &request.selections,
+    };
+    let mut coords = block_coordinates(&store, store_url, &request.variable, &window);
+    let hints = OrientHints {
+        attributes: array.attributes(),
+        lat_extent: coords.lat_extent,
+        lon_extent: coords.lon_extent,
+    };
+    let (raw_values, flipped_dims) = check_and_orient_block_grid(
         raw_values,
         &mut block_shape,
         &mut dim_names,
         &mut origin,
-        array.attributes(),
-        &coordinates,
+        hints,
+        &mut coords.coordinates,
     );
-
-    Ok(OctantBlock::new(
+    let mut block = OctantBlock::new(
         request.variable.clone(),
         block_shape,
         dim_names,
         origin,
         raw_values,
-        coordinates,
+        coords.coordinates,
         attributes,
-    ))
+    );
+    block.flipped_dims = flipped_dims;
+    Ok(block)
 }
 
 /// Fetches an arbitrary-rank hyperslab described by `request` with progress reporting.

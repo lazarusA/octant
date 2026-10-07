@@ -186,3 +186,16 @@ fn test_ruzstd_codec_decompress() {
         .expect("RuzstdCodec decompression should succeed");
     assert_eq!(decompressed.as_ref(), original);
 }
+
+#[test]
+fn v2_unicode_null_fill_becomes_empty_string() {
+    let v2 = |dtype: &str, fill: serde_json::Value| {
+        let meta = serde_json::json!({"zarr_format": 2, "dtype": dtype, "fill_value": fill});
+        normalize_v3_array_metadata(meta)["fill_value"].clone()
+    };
+    assert_eq!(v2("<U6", serde_json::Value::Null), "");
+    assert_eq!(v2(">U2", serde_json::Value::Null), "");
+    assert_eq!(v2("<U6", "x".into()), "x");
+    // Numeric arrays keep their missing fill value.
+    assert!(v2("<f4", serde_json::Value::Null).is_null());
+}

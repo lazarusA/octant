@@ -20,6 +20,8 @@ impl OctantApp {
 
     /// Loads the block corresponding to the current animated step and selections.
     pub fn load_selected_variable_block(&mut self) {
+        // A plotted variable needs its coordinates for axes, sliders and the hover.
+        self.request_variable_coordinates(self.selected_variable_idx);
         let Some(metadata) = &self.active_dataset_metadata else {
             self.status_message = "No dataset metadata loaded.".to_string();
             return;

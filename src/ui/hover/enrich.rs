@@ -32,6 +32,17 @@ pub fn get_dimension_origin_and_full_len(
     (origin, full_len)
 }
 
+/// The offset into the plotted window of `len` indices along `dim_name` that holds what
+/// screen index `i` shows: blocks flip axes so north is up and west is left, which
+/// reverses those dimensions relative to storage.
+pub fn stored_offset(app: &OctantApp, dim_name: &str, i: usize, len: usize) -> usize {
+    let flipped = app.plotted_flipped_dims.iter().any(|d| d == dim_name);
+    match len.checked_sub(1) {
+        Some(last) if flipped => last - i.min(last),
+        _ => i,
+    }
+}
+
 /// Appends/prepends the Animated dimension value and all Collapsed dimension values to entries.
 pub fn enrich_entries_with_animated_and_collapsed_dims(
     app: &OctantApp,

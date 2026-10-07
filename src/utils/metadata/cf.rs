@@ -2,6 +2,14 @@
 
 use std::collections::HashMap;
 
+/// An attribute value as text: strings without their JSON quotes, anything else as JSON.
+pub fn attr_string(value: &serde_json::Value) -> String {
+    match value.as_str() {
+        Some(s) => s.to_string(),
+        None => value.to_string(),
+    }
+}
+
 /// Common CF convention metadata and dimensions parsed from attributes map / metadata.
 #[derive(Debug, Clone, Default)]
 pub struct ParsedCfAttributes {
@@ -29,11 +37,7 @@ impl ParsedCfAttributes {
         let mut array_dimensions = None;
 
         for (k, v_json) in iter {
-            let val_str = if let Some(s) = v_json.as_str() {
-                s.to_string()
-            } else {
-                v_json.to_string()
-            };
+            let val_str = attr_string(v_json);
             attributes.insert(k.clone(), val_str.clone());
 
             match k.as_str() {

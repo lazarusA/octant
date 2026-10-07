@@ -27,6 +27,8 @@ pub struct OctantApp {
     pub plotted_store_kind: StoreKind,
     pub plotted_store_target_input: String,
     pub plotted_dataset_metadata: Option<DatasetMetadata>,
+    /// `metadata_generation` of the metadata in `plotted_dataset_metadata`.
+    pub plotted_metadata_generation: u64,
     pub plotted_variable_idx: usize,
     pub plotted_dim_config: Vec<DimConfig>,
     pub plotted_selected_dim_indices: Vec<usize>,
@@ -104,12 +106,21 @@ pub struct OctantApp {
     pub rgb_composite_mode: bool,
     pub rgb_composite_channels: [usize; 3],
     pub composite_channel_configs: Vec<crate::data::slicing::ChannelColorConfig>,
+    /// Block window behind the plotted 2D composite, for raw per-channel hover values.
+    pub composite_probe: Option<crate::data::slicing::CompositeProbe>,
+    /// Dimensions the plotted data runs opposite to storage order along
+    /// (`OctantBlock::flipped_dims`), so the hover can map screen indices back.
+    pub plotted_flipped_dims: Vec<String>,
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
 
     // Block-cache & Prefetcher State
     pub dataset_manager: crate::data::DatasetManager,
     pub block_cache: crate::data::BlockCache,
     pub block_prefetcher: crate::data::BlockPrefetcher,
+    /// Reads a variable's coordinates in the background when it is chosen.
+    pub coordinate_loader: crate::data::blocks::CoordinateLoader,
+    /// Incremented whenever coordinates arrive; keys caches built from them.
+    pub coordinates_revision: u64,
     pub active_block_key: Option<crate::data::BlockCacheKey>,
     pub pending_target_step: Option<usize>,
     pub max_cache_mb: usize,
@@ -228,6 +239,7 @@ impl Default for OctantApp {
             plotted_store_kind: StoreKind::RemoteZarr,
             plotted_store_target_input: "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string(),
             plotted_dataset_metadata: None,
+            plotted_metadata_generation: 0,
             plotted_variable_idx: 0,
             plotted_dim_config: Vec::new(),
             plotted_selected_dim_indices: Vec::new(),
@@ -293,6 +305,8 @@ impl Default for OctantApp {
             rgb_composite_mode: false,
             rgb_composite_channels: [0, 1, 2],
             composite_channel_configs: Vec::new(),
+            composite_probe: None,
+            plotted_flipped_dims: Vec::new(),
             wgpu_render_state: None,
 
             show_hero: true,
@@ -301,6 +315,8 @@ impl Default for OctantApp {
             dataset_manager: crate::data::DatasetManager::new(),
             block_cache: crate::data::BlockCache::new(default_cache_mb * 1024 * 1024),
             block_prefetcher: crate::data::BlockPrefetcher::new(),
+            coordinate_loader: crate::data::blocks::CoordinateLoader::default(),
+            coordinates_revision: 0,
             active_block_key: None,
             pending_target_step: None,
             max_cache_mb: default_cache_mb,

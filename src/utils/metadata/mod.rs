@@ -15,8 +15,8 @@ pub use array_open::{
     resolve_array_dimension_names, variable_info_from_array,
 };
 pub use cf::{
-    ParsedCfAttributes, default_dimension_names_for_rank, find_first_attr, merge_parent_attributes,
-    resolve_ancestor_attributes,
+    ParsedCfAttributes, attr_string, default_dimension_names_for_rank, find_first_attr,
+    merge_parent_attributes, resolve_ancestor_attributes,
 };
 pub use discovery::{discover_arrays_via_http_metadata, extract_store_variables};
 pub use node_info::{

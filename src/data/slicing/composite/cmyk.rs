@@ -5,6 +5,22 @@ use crate::data::octant_block::OctantBlock;
 
 use super::utils::{compute_normalization_scale, linear_to_srgb, pack_rgb};
 
+/// Whether attributes, read through `get`, tag CMYK inks: a `photometric` or `color_space`
+/// of `cmyk`, or a `long_name` mentioning CMYK. The slicers and the app's labels both
+/// decide through this, so the plot and its readouts agree.
+pub fn is_cmyk_attrs<'a>(get: impl Fn(&str) -> Option<&'a str>) -> bool {
+    ["photometric", "color_space"]
+        .into_iter()
+        .any(|key| get(key).is_some_and(|v| v.trim().eq_ignore_ascii_case("cmyk")))
+        || get("long_name").is_some_and(|l| l.contains("CMYK"))
+}
+
+/// Whether `block` holds CMYK inks along its channel dimension `c_dim`.
+pub fn is_cmyk_block(block: &OctantBlock, c_dim: usize) -> bool {
+    block.shape.get(c_dim).is_some_and(|&n| n >= 4)
+        && is_cmyk_attrs(|key| block.attributes.get(key).map(String::as_str))
+}
+
 /// Slices a 4-channel CMYK `OctantBlock` into TrueColor RGB `MatrixData`.
 pub fn slice_cmyk_composite(
     block: &OctantBlock,
@@ -16,12 +32,37 @@ pub fn slice_cmyk_composite(
     if 4 * plane_size > block.values.len() {
         return None;
     }
-    let (c, m, y, k) = (
-        &block.values[0..plane_size],
-        &block.values[plane_size..2 * plane_size],
-        &block.values[2 * plane_size..3 * plane_size],
-        &block.values[3 * plane_size..4 * plane_size],
-    );
+    let plane = |k: usize| &block.values[k * plane_size..(k + 1) * plane_size];
+    let planes = [plane(0), plane(1), plane(2), plane(3)];
+    blend_cmyk_planes(planes, width, height, &block.variable_name, anim_extent)
+}
+
+/// Converts four `width * height` C, M, Y, K planes into a TrueColor RGB `MatrixData`.
+pub fn blend_cmyk_planes(
+    inks: [&[f32]; 4],
+    width: usize,
+    height: usize,
+    variable_name: &str,
+    anim_extent: usize,
+) -> Option<MatrixData> {
+    let values = blend_cmyk(inks, width.checked_mul(height)?)?;
+    Some(MatrixData::new(
+        width,
+        height,
+        values,
+        0.0,
+        16777215.0,
+        format!("{variable_name} (CMYK Composite)"),
+        anim_extent,
+    ))
+}
+
+/// Packs the first `len` samples of the C, M, Y, K inks into TrueColor RGB, normalizing
+/// all inks by their shared range; `None` when an ink is shorter than `len`.
+pub fn blend_cmyk([c, m, y, k]: [&[f32]; 4], len: usize) -> Option<Vec<f32>> {
+    if [c, m, y, k].iter().any(|p| p.len() < len) {
+        return None;
+    }
     let (c_min, c_max) = crate::utils::compute_finite_min_max(c);
     let (m_min, m_max) = crate::utils::compute_finite_min_max(m);
     let (y_min, y_max) = crate::utils::compute_finite_min_max(y);
@@ -32,9 +73,9 @@ pub fn slice_cmyk_composite(
     let is_i8_cmyk = (-128.0..0.0).contains(&g_min) && g_max <= 127.0;
 
     let (scale, offset) = compute_normalization_scale(g_min, g_max, is_i8_cmyk, 1.0);
-    let mut values = Vec::with_capacity(plane_size);
+    let mut values = Vec::with_capacity(len);
 
-    for i in 0..plane_size {
+    for i in 0..len {
         if c[i].is_nan() || m[i].is_nan() || y[i].is_nan() || k[i].is_nan() {
             values.push(f32::NAN);
         } else {
@@ -60,13 +101,5 @@ pub fn slice_cmyk_composite(
         }
     }
 
-    Some(MatrixData::new(
-        width,
-        height,
-        values,
-        0.0,
-        16777215.0,
-        format!("{} (CMYK Composite)", block.variable_name),
-        anim_extent,
-    ))
+    Some(values)
 }

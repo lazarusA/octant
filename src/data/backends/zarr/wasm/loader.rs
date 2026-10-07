@@ -1,15 +1,19 @@
 //! Async chunk preloading and progress reporting for WebAssembly Zarr.
 
 use super::WasmZarrBlockStore;
+use crate::data::backends::coord_bounds::CoordPreload;
 use crate::data::backends::http::fetch_url_bytes;
 use crate::data::blocks::{BlockRequest, BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
 use crate::utils::metadata::open_or_instantiate_array_normalized;
+use futures::StreamExt;
 use zarrs::array::ArraySubset;
+
+/// Chunk requests kept in flight while preloading.
+pub(crate) const CONCURRENT_FETCHES: usize = 64;
 
 impl WasmZarrBlockStore {
     /// Computes and fetches all required chunk files for an array slice into memory.
-    #[allow(clippy::single_range_in_vec_init)]
     pub async fn preload_chunks_for_subset(
         &self,
         var_name: &str,
@@ -17,130 +21,92 @@ impl WasmZarrBlockStore {
         mut on_progress: ProgressCallback<'_>,
     ) -> Result<(), BlockStoreError> {
         let clean_var = var_name.trim_matches('/');
-        let var_path = format!("/{clean_var}");
-
-        let array = open_or_instantiate_array_normalized(self.memory_store.clone(), &var_path)
-            .map_err(|e| format!("Failed to open array '{clean_var}': {e}"))?;
-
-        let rank = array.shape().len();
-        let zero_idx = vec![0u64; rank];
-
-        let chunk_dims = array
-            .chunk_shape(&zero_idx)
-            .map_err(|e| format!("Failed to get chunk shape: {e}"))?;
-
-        // Calculate chunk index ranges per dimension
-        let mut chunk_ranges = Vec::with_capacity(rank);
-        for (i, dim_len) in chunk_dims.iter().enumerate() {
-            let c_len = dim_len.get();
-            let sel_start = subset.start()[i];
-            let sel_shape = subset.shape()[i];
-            let sel_end = sel_start + sel_shape;
-
-            let c_start = sel_start / c_len;
-            let c_end = (sel_end.saturating_sub(1) / c_len) + 1;
-            chunk_ranges.push(c_start..c_end);
-        }
-
-        // 1. Collect all missing chunk keys that need to be fetched
-        let mut missing_chunks: Vec<(String, String)> = Vec::new();
-        let mut current = chunk_ranges.iter().map(|r| r.start).collect::<Vec<u64>>();
-        loop {
-            let chunk_rel_key = array.chunk_key(&current);
-            let store_key_str = chunk_rel_key.as_str().to_string();
-
-            let full_chunk_key = if clean_var.is_empty()
-                || clean_var == "data"
-                || store_key_str.starts_with(clean_var)
-            {
-                store_key_str
-            } else {
-                format!("{clean_var}/{store_key_str}")
-            };
-
-            if !self.has_key(&full_chunk_key) {
-                let chunk_url = format!("{}/{}", self.base_url, full_chunk_key);
-                missing_chunks.push((full_chunk_key, chunk_url));
-            }
-
-            // Advance chunk indices
-            let mut carry = true;
-            for i in (0..rank).rev() {
-                current[i] += 1;
-                if current[i] < chunk_ranges[i].end {
-                    carry = false;
-                    break;
-                }
-                current[i] = chunk_ranges[i].start;
-            }
-            if carry {
-                break;
-            }
-        }
-
-        // 2. Concurrently download chunks in parallel batches
-        if !missing_chunks.is_empty() {
+        let array = open_or_instantiate_array_normalized(
+            self.memory_store.clone(),
+            &format!("/{clean_var}"),
+        )
+        .map_err(|e| format!("Failed to open array '{clean_var}': {e}"))?;
+        let missing = self.missing_chunks(&array, clean_var, subset);
+        if !missing.is_empty() {
             log::info!(
-                "[WASM Zarr] Preloading {} chunk(s) concurrently for '{}'",
-                missing_chunks.len(),
-                clean_var
+                "[WASM Zarr] Preloading {} chunk(s) concurrently for '{clean_var}'",
+                missing.len()
             );
-            const CONCURRENT_BATCH_SIZE: usize = 32;
-            for batch in missing_chunks.chunks(CONCURRENT_BATCH_SIZE) {
-                let futures_batch: Vec<_> = batch
-                    .iter()
-                    .map(|(key, url)| async move { (key, url, fetch_url_bytes(url).await) })
-                    .collect();
-
-                let results = futures::future::join_all(futures_batch).await;
-                for (key, url, res) in results {
-                    match res {
-                        Ok(chunk_bytes) => {
-                            let bytes_len = chunk_bytes.len() as u64;
-                            self.insert_key_bytes(key, &chunk_bytes)?;
-                            if let Some(ref mut cb) = on_progress {
-                                cb(bytes_len);
-                            }
-                        }
-                        Err(err) if err.contains("HTTP 404") => {
-                            log::warn!(
-                                "[WASM Zarr] Chunk not found (HTTP 404 / sparse chunk): {url}"
-                            );
-                        }
-                        Err(err) => {
-                            log::error!("[WASM Zarr] Failed to fetch chunk '{url}': {err}");
-                            return Err(format!("Failed to fetch chunk '{url}': {err}").into());
-                        }
-                    }
-                }
-            }
+            self.fetch_chunks(&missing, &mut on_progress).await?;
         }
-
-        // Preload associated 1D coordinate arrays (e.g. lat, lon, time, cell_ids) for spatial bounds & axes
-        if rank > 1 {
-            let dim_names = crate::utils::resolve_array_dimension_names(&array);
-            let group_prefix = clean_var.rfind('/').map(|idx| &clean_var[..idx]);
-            for dim in dim_names {
-                let clean = dim.trim().trim_start_matches('/').to_string();
-                let mut paths = vec![format!("/{clean}")];
-                if let Some(gp) = group_prefix {
-                    paths.push(format!("/{gp}/{clean}"));
-                }
-                for coord_path in paths {
-                    let target_name = coord_path.trim_start_matches('/').to_string();
-                    if let Ok(coord_array) =
-                        open_or_instantiate_array_normalized(self.memory_store.clone(), &coord_path)
-                        && coord_array.shape().len() == 1
-                    {
-                        let count = coord_array.shape().first().copied().unwrap_or(0);
-                        self.preload_boundary_chunks_1d(&target_name, count).await;
-                        break;
-                    }
-                }
-            }
-        }
-
         Ok(())
+    }
+
+    /// Store keys and URLs of the chunks of `subset` not yet in memory.
+    fn missing_chunks<S: ?Sized + zarrs::storage::ReadableStorageTraits + 'static>(
+        &self,
+        array: &zarrs::array::Array<S>,
+        clean_var: &str,
+        subset: &ArraySubset,
+    ) -> Vec<(String, String)> {
+        let Ok(Some(chunks)) = array.chunks_in_array_subset(subset) else {
+            return Vec::new();
+        };
+        chunks
+            .indices()
+            .into_iter()
+            .filter_map(|indices| {
+                let key = array.chunk_key(&indices).as_str().to_string();
+                let key =
+                    if clean_var.is_empty() || clean_var == "data" || key.starts_with(clean_var) {
+                        key
+                    } else {
+                        format!("{clean_var}/{key}")
+                    };
+                let url = format!("{}/{}", self.base_url, key);
+                (!self.has_key(&key)).then_some((key, url))
+            })
+            .collect()
+    }
+
+    /// Downloads `missing` `(key, url)` chunks with [`CONCURRENT_FETCHES`] requests in
+    /// flight. A chunk the server does not have (HTTP 404) is sparse; other errors fail.
+    async fn fetch_chunks(
+        &self,
+        missing: &[(String, String)],
+        on_progress: &mut ProgressCallback<'_>,
+    ) -> Result<(), BlockStoreError> {
+        let mut fetches = futures::stream::iter(missing)
+            .map(|(key, url)| async move { (key, url, fetch_url_bytes(url).await) })
+            .buffer_unordered(CONCURRENT_FETCHES);
+        while let Some((key, url, res)) = fetches.next().await {
+            match res {
+                Ok(chunk_bytes) => {
+                    self.insert_key_bytes(key, &chunk_bytes)?;
+                    if let Some(cb) = on_progress.as_mut() {
+                        cb(chunk_bytes.len() as u64);
+                    }
+                }
+                Err(err) if err.contains("HTTP 404") => {
+                    log::warn!("[WASM Zarr] Chunk not found (HTTP 404 / sparse chunk): {url}");
+                }
+                Err(err) => {
+                    log::error!("[WASM Zarr] Failed to fetch chunk '{url}': {err}");
+                    return Err(format!("Failed to fetch chunk '{url}': {err}").into());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Preloads the coordinate arrays a block for `request` reads (those of its
+    /// range-selected dimensions), so its coordinates decode from memory.
+    pub async fn preload_block_coordinates(
+        &self,
+        request: &crate::data::slice_request::SliceRequest,
+    ) {
+        for (path, len) in super::coord_paths::block_coordinate_arrays(&self.memory_store, request)
+        {
+            let state = self.preload_coordinate_chunks_1d(&path, len).await;
+            if state != CoordPreload::Complete {
+                log::warn!("[WASM Zarr] Coordinate '{path}' {state:?}");
+            }
+        }
     }
 }
 
@@ -213,6 +179,8 @@ pub async fn load_one_wasm_with_progress(
         );
         return Err(e);
     }
+
+    store.preload_block_coordinates(&request.slice).await;
 
     // Now decode the slice synchronously from in-memory chunks
     match store.fetch_block_with_progress(&request.slice, None) {

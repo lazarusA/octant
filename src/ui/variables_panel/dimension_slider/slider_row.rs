@@ -6,6 +6,7 @@ use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 use crate::utils::format_byte_size;
 use egui::{RichText, Ui};
 
+use super::coord_label::show_coord_label;
 use super::double_slider::{VALUE_BOX_W, double_slider_with_inputs};
 use super::metrics::{
     calculate_download_sizes, calculate_selected_2d_elements, calculate_selected_volume_elements,
@@ -13,12 +14,7 @@ use super::metrics::{
 use super::roles::apply_role_change;
 
 /// Renders the complete dimension sliders section including capacity and bandwidth metrics.
-pub fn show_dimension_sliders(
-    app: &mut OctantApp,
-    ui: &mut Ui,
-    var_info: &VariableInfo,
-    _dim_coords: &std::collections::HashMap<String, Vec<String>>,
-) {
+pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &VariableInfo) {
     let rank = var_info.shape.len();
 
     if app.dim_config.len() != rank {
@@ -204,6 +200,7 @@ pub fn show_dimension_sliders(
                 }
                 app.dim_config[i].range = (start, end);
                 app.dim_config[i].index = app.selected_dim_indices[i];
+                show_coord_label(app, ui, var_info, i, (start, end));
             } else {
                 let max_index = dim_size.saturating_sub(1);
                 if is_animated
@@ -236,6 +233,7 @@ pub fn show_dimension_sliders(
                     (app.selected_dim_indices[i], app.selected_dim_indices[i]);
                 app.dim_config[i].range = app.selected_dim_ranges[i];
                 app.dim_config[i].index = app.selected_dim_indices[i];
+                show_coord_label(app, ui, var_info, i, app.selected_dim_ranges[i]);
             }
         });
 

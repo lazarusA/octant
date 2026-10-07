@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use super::healpix_meta::build_healpix_metadata;
 use crate::data::blocks::BlockStoreError;
-use crate::data::metadata::{DatasetMetadata, VariableInfo};
+use crate::data::metadata::{CoordValues, DatasetMetadata, VariableInfo};
 use crate::data::procedural::{
     generate_clenshaw_curtis_coords, generate_gaussian_coords, generate_stepped_resolution_coords,
     generate_stretched_regional_coords,
@@ -124,93 +124,57 @@ pub fn inspect_procedural(uri: &str) -> Result<DatasetMetadata, BlockStoreError>
     };
 
     let mut dim_coords = HashMap::new();
+    let mut insert = |key: &str, values: &CoordValues| {
+        dim_coords.insert(key.to_string(), values.clone());
+    };
+    let regular = |start: f64, step: f64, len: usize| CoordValues::Regular { start, step, len };
+    let time = regular(0.0, 1.0, 20);
+    let depth = regular(0.0, 1000.0 / 31.0, 32);
+    let lat = regular(90.0, -180.0 / 31.0, 32);
+    let lon = regular(-180.0, 360.0 / 31.0, 32);
+    let xy = regular(0.0, 1.0, 64);
 
+    for (dim, values) in [("time", &time), ("depth", &depth)] {
+        insert(&format!("gaussian_wave_packet_4d/{dim}"), values);
+        insert(dim, values);
+    }
+    insert("gaussian_wave_packet_4d/lat", &lat);
+    insert("gaussian_wave_packet_4d/lon", &lon);
+    for dim in ["y", "x"] {
+        insert(&format!("procedural_matrix_2d/{dim}"), &xy);
+        insert(dim, &xy);
+    }
     if is_4d {
-        let t_coords: Vec<String> = (0..20).map(|t| format!("{t}")).collect();
-        let z_coords: Vec<String> = (0..32)
-            .map(|z| format!("{:.1}", z as f64 * (1000.0 / 31.0)))
-            .collect();
-        let lat_coords: Vec<String> = (0..32)
-            .map(|j| format!("{:.3}", 90.0 - j as f64 * (180.0 / 31.0)))
-            .collect();
-        let lon_coords: Vec<String> = (0..32)
-            .map(|i| format!("{:.3}", -180.0 + i as f64 * (360.0 / 31.0)))
-            .collect();
-        let xy_coords: Vec<String> = (0..64).map(|i| format!("{i}")).collect();
-
-        dim_coords.insert("gaussian_wave_packet_4d/time".to_string(), t_coords.clone());
-        dim_coords.insert(
-            "gaussian_wave_packet_4d/depth".to_string(),
-            z_coords.clone(),
-        );
-        dim_coords.insert(
-            "gaussian_wave_packet_4d/lat".to_string(),
-            lat_coords.clone(),
-        );
-        dim_coords.insert(
-            "gaussian_wave_packet_4d/lon".to_string(),
-            lon_coords.clone(),
-        );
-        dim_coords.insert("procedural_matrix_2d/y".to_string(), xy_coords.clone());
-        dim_coords.insert("procedural_matrix_2d/x".to_string(), xy_coords.clone());
-
-        dim_coords.insert("time".to_string(), t_coords);
-        dim_coords.insert("depth".to_string(), z_coords);
-        dim_coords.insert("lat".to_string(), lat_coords);
-        dim_coords.insert("lon".to_string(), lon_coords);
-        dim_coords.insert("y".to_string(), xy_coords.clone());
-        dim_coords.insert("x".to_string(), xy_coords);
+        insert("lat", &lat);
+        insert("lon", &lon);
     } else {
-        let (clenshaw_x, clenshaw_y) = generate_clenshaw_curtis_coords(128, 64);
-        let (gauss_x, gauss_y) = generate_gaussian_coords(128, 64);
-        let (stretched_x, stretched_y) = generate_stretched_regional_coords(48, 32);
-        let (stepped_x, stepped_y) = generate_stepped_resolution_coords(64, 32);
-
-        let clenshaw_x_str: Vec<String> = clenshaw_x.iter().map(|v| format!("{v:.3}")).collect();
-        let clenshaw_y_str: Vec<String> = clenshaw_y.iter().map(|v| format!("{v:.3}")).collect();
-        let gauss_x_str: Vec<String> = gauss_x.iter().map(|v| format!("{v:.3}")).collect();
-        let gauss_y_str: Vec<String> = gauss_y.iter().map(|v| format!("{v:.3}")).collect();
-        let stretched_x_str: Vec<String> = stretched_x.iter().map(|v| format!("{v:.3}")).collect();
-        let stretched_y_str: Vec<String> = stretched_y.iter().map(|v| format!("{v:.3}")).collect();
-        let stepped_x_str: Vec<String> = stepped_x.iter().map(|v| format!("{v:.3}")).collect();
-        let stepped_y_str: Vec<String> = stepped_y.iter().map(|v| format!("{v:.3}")).collect();
-
-        let t_coords: Vec<String> = (0..20).map(|t| format!("{t}")).collect();
-        let z_coords: Vec<String> = (0..32)
-            .map(|z| format!("{:.1}", z as f64 * (1000.0 / 31.0)))
-            .collect();
-        let lat_coords_32: Vec<String> = (0..32)
-            .map(|j| format!("{:.3}", 90.0 - j as f64 * (180.0 / 31.0)))
-            .collect();
-        let lon_coords_32: Vec<String> = (0..32)
-            .map(|i| format!("{:.3}", -180.0 + i as f64 * (360.0 / 31.0)))
-            .collect();
-        let xy_coords: Vec<String> = (0..64).map(|i| format!("{i}")).collect();
-
-        dim_coords.insert("clenshaw_curtis_2d/lon".to_string(), clenshaw_x_str.clone());
-        dim_coords.insert("clenshaw_curtis_2d/lat".to_string(), clenshaw_y_str.clone());
-        dim_coords.insert("gaussian_grid_2d/lon".to_string(), gauss_x_str);
-        dim_coords.insert("gaussian_grid_2d/lat".to_string(), gauss_y_str);
-        dim_coords.insert("stretched_regional_2d/lon".to_string(), stretched_x_str);
-        dim_coords.insert("stretched_regional_2d/lat".to_string(), stretched_y_str);
-        dim_coords.insert("stepped_resolution_2d/lon".to_string(), stepped_x_str);
-        dim_coords.insert("stepped_resolution_2d/lat".to_string(), stepped_y_str);
-        dim_coords.insert("gaussian_wave_packet_4d/time".to_string(), t_coords.clone());
-        dim_coords.insert(
-            "gaussian_wave_packet_4d/depth".to_string(),
-            z_coords.clone(),
-        );
-        dim_coords.insert("gaussian_wave_packet_4d/lat".to_string(), lat_coords_32);
-        dim_coords.insert("gaussian_wave_packet_4d/lon".to_string(), lon_coords_32);
-        dim_coords.insert("procedural_matrix_2d/y".to_string(), xy_coords.clone());
-        dim_coords.insert("procedural_matrix_2d/x".to_string(), xy_coords.clone());
-
-        dim_coords.insert("lon".to_string(), clenshaw_x_str);
-        dim_coords.insert("lat".to_string(), clenshaw_y_str);
-        dim_coords.insert("time".to_string(), t_coords);
-        dim_coords.insert("depth".to_string(), z_coords);
-        dim_coords.insert("y".to_string(), xy_coords.clone());
-        dim_coords.insert("x".to_string(), xy_coords);
+        let grids = [
+            (
+                "clenshaw_curtis_2d",
+                generate_clenshaw_curtis_coords(128, 64),
+            ),
+            ("gaussian_grid_2d", generate_gaussian_coords(128, 64)),
+            (
+                "stretched_regional_2d",
+                generate_stretched_regional_coords(48, 32),
+            ),
+            (
+                "stepped_resolution_2d",
+                generate_stepped_resolution_coords(64, 32),
+            ),
+        ];
+        for (var, (x, y)) in grids {
+            for (dim, values) in [("lon", x), ("lat", y)] {
+                let Some(values) = CoordValues::from_values(values, false) else {
+                    continue;
+                };
+                // The unscoped axes are the Clenshaw-Curtis grid's.
+                if var == "clenshaw_curtis_2d" {
+                    insert(dim, &values);
+                }
+                insert(&format!("{var}/{dim}"), &values);
+            }
+        }
     }
 
     Ok(DatasetMetadata {

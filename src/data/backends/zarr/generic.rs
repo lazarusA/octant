@@ -4,10 +4,11 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use super::block::fetch_block_from_cached_array;
-use crate::data::DatasetMetadata;
+use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
 use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
+use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 use zarrs::array::Array;
 use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 use zarrs::group::Group;
@@ -183,26 +184,28 @@ impl BlockStore for GenericZarrBlockStore {
             crate::utils::extract_store_variables_consolidated(self.storage.clone(), base_url)
                 .map_err(|e| e.to_string())?;
 
-        let dimension_coordinates =
-            crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables(
-                self.storage.clone(),
-                &variables,
-                Some(base_url),
-            );
-
         let default_name = format!("{}_store", self.backend_name);
-        let dataset_name = base_url
-            .split('/')
-            .next_back()
-            .unwrap_or(&default_name)
-            .to_string();
-
+        let dataset_name = base_url.split('/').next_back().unwrap_or(&default_name);
         Ok(DatasetMetadata {
-            name: dataset_name,
+            name: dataset_name.to_string(),
             store_type: self.store_type_label.to_string(),
             variables,
-            dimension_coordinates,
+            // Read per variable (`variable_coordinates`): datasets open with metadata alone.
+            dimension_coordinates: HashMap::new(),
         })
+    }
+
+    fn variable_coordinates(
+        &self,
+        variable: &VariableInfo,
+    ) -> Result<HashMap<String, CoordValues>, BlockStoreError> {
+        let url = Some(self.source_url.trim_end_matches('/'));
+        let var = std::slice::from_ref(variable);
+        Ok(fetch_all_dimension_coordinates_for_variables(
+            self.storage.clone(),
+            var,
+            url,
+        ))
     }
 
     fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {

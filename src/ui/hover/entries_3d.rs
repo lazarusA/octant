@@ -2,7 +2,9 @@ use crate::app::OctantApp;
 use crate::data::{DatasetMetadata, VariableInfo};
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
+    stored_offset,
 };
+use crate::ui::hover::entries_2d::composite_channel_dim;
 use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
 use crate::ui::hover::raycast_volume::VolumeSampler;
@@ -21,7 +23,7 @@ pub(crate) fn resolve_3d_dim_entries(
     let data_y = (hit_y + sampler.shift_y) % sampler.height;
     let data_z = (hit_z + sampler.shift_z) % sampler.depth;
 
-    let mut used_dims = HashSet::new();
+    let mut used_dims: HashSet<usize> = composite_channel_dim(app).into_iter().collect();
 
     if let Some(v) = var {
         let (explicit_x, explicit_y, explicit_z) =
@@ -53,8 +55,10 @@ pub(crate) fn resolve_3d_dim_entries(
         let (origin_x, full_x_len) = get_dimension_origin_and_full_len(app, Some(v), x_idx);
         let (origin_y, full_y_len) = get_dimension_origin_and_full_len(app, Some(v), y_idx);
 
-        let global_x = (origin_x + data_x).min(full_x_len.saturating_sub(1));
-        let global_y = (origin_y + data_y).min(full_y_len.saturating_sub(1));
+        let x_offset = stored_offset(app, &dim_x_name, data_x, sampler.width);
+        let y_offset = stored_offset(app, &dim_y_name, data_y, sampler.height);
+        let global_x = (origin_x + x_offset).min(full_x_len.saturating_sub(1));
+        let global_y = (origin_y + y_offset).min(full_y_len.saturating_sub(1));
 
         let loc_y = format_dimension_coord(
             meta,
@@ -83,7 +87,8 @@ pub(crate) fn resolve_3d_dim_entries(
                 used_dims.insert(zi);
             }
             let (origin_z, full_z_len) = get_dimension_origin_and_full_len(app, Some(v), z_dim);
-            let global_z = (origin_z + data_z).min(full_z_len.saturating_sub(1));
+            let z_offset = stored_offset(app, &dim_z_name, data_z, sampler.depth);
+            let global_z = (origin_z + z_offset).min(full_z_len.saturating_sub(1));
 
             let loc_z = format_dimension_coord(
                 meta,

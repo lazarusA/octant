@@ -62,6 +62,8 @@ pub async fn load_one_icechunk_wasm_with_progress(
         return Err(e);
     }
 
+    store.preload_block_coordinates(&request.slice).await;
+
     // Decode slice synchronously from in-memory chunks
     match store.fetch_block_with_progress(&request.slice, None) {
         Ok(block) => {

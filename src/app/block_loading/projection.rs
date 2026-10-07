@@ -131,8 +131,8 @@ impl OctantApp {
                 block,
                 x_dim,
                 y_dim,
-                local_x_range,
-                local_y_range,
+                block.oriented_range(x_dim, local_x_range),
+                block.oriented_range(y_dim, local_y_range),
                 &fixed_indices,
                 compute_bounds,
                 c_dim,
@@ -170,7 +170,8 @@ impl OctantApp {
                 } else {
                     sel_indices.get(orig_idx).copied().unwrap_or(0)
                 };
-                idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0))
+                let local = idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0));
+                block.oriented_index(i, local)
             })
             .collect()
     }

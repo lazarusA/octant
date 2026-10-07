@@ -3,7 +3,8 @@
 use crate::data::matrix_data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 
-use super::cmyk::slice_cmyk_composite;
+use super::cmyk::{blend_cmyk_planes, is_cmyk_block, slice_cmyk_composite};
+use super::probe::local_channel;
 use super::utils::{compute_channel_normalization, normalize_channel_value, pack_rgb};
 
 /// Slice an `OctantBlock` into a 24-bit TrueColor composite `MatrixData`.
@@ -15,21 +16,13 @@ pub fn slice_rgb_composite(
     if block.shape.len() < 3 {
         return None;
     }
-    let (num_bands, height, width) = (
-        block.shape[0],
+    let (height, width) = (
         block.shape[block.shape.len() - 2],
         block.shape[block.shape.len() - 1],
     );
     let plane_size = height.checked_mul(width)?;
 
-    let is_cmyk = num_bands >= 4
-        && block
-            .attributes
-            .get("photometric")
-            .or_else(|| block.attributes.get("color_space"))
-            .is_some_and(|s| s.eq_ignore_ascii_case("cmyk"));
-
-    if is_cmyk {
+    if is_cmyk_block(block, 0) {
         slice_cmyk_composite(block, width, height, plane_size, anim_extent)
     } else {
         let opt_channels = [Some(channels[0]), Some(channels[1]), Some(channels[2])];
@@ -65,67 +58,74 @@ pub fn slice_rgb_composite_nd(
     channels: [Option<usize>; 3],
     anim_extent: usize,
 ) -> Option<MatrixData> {
-    if block.shape.len() < 2 || c_dim >= block.shape.len() {
-        return None;
-    }
-    let num_channels = block.shape[c_dim];
-    if num_channels < 2 && channels[0].is_none() && channels[1].is_none() && channels[2].is_none() {
+    let num_channels = *block.shape.get(c_dim)?;
+    if block.shape.len() < 2 || (num_channels < 2 && channels.iter().all(Option::is_none)) {
         return None;
     }
 
+    let (x_range, y_range) = (
+        clamp_window(block, x_dim, x_range),
+        clamp_window(block, y_dim, y_range),
+    );
     let width = x_range.1.saturating_sub(x_range.0).max(1);
     let height = y_range.1.saturating_sub(y_range.0).max(1);
-    let plane_size = width.checked_mul(height)?;
 
-    let r_plane = extract_channel_plane(
-        block,
-        c_dim,
-        x_dim,
-        y_dim,
-        x_range,
-        y_range,
-        fixed_indices,
-        channels[0],
-    );
-    let g_plane = extract_channel_plane(
-        block,
-        c_dim,
-        x_dim,
-        y_dim,
-        x_range,
-        y_range,
-        fixed_indices,
-        channels[1],
-    );
-    let b_plane = extract_channel_plane(
-        block,
-        c_dim,
-        x_dim,
-        y_dim,
-        x_range,
-        y_range,
-        fixed_indices,
-        channels[2],
-    );
+    let plane = |ch: Option<usize>| {
+        extract_channel_plane(
+            block,
+            c_dim,
+            x_dim,
+            y_dim,
+            x_range,
+            y_range,
+            fixed_indices,
+            ch,
+        )
+    };
 
+    // CMYK inks always map C, M, Y, K to the block's first four channels.
+    if is_cmyk_block(block, c_dim) {
+        let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
+        let ink = |k: usize| plane(Some(c_start + k));
+        let (c, m, y, k) = (ink(0)?, ink(1)?, ink(2)?, ink(3)?);
+        let planes = [c.as_slice(), &m, &y, &k];
+        return blend_cmyk_planes(planes, width, height, &block.variable_name, anim_extent);
+    }
+
+    let name = format!("{} (RGB Composite)", block.variable_name);
+    rgb_matrix(channels.map(plane), (width, height), name, anim_extent)
+}
+
+/// `range` along `dim` clamped into the block, keeping at least one index.
+fn clamp_window(block: &OctantBlock, dim: usize, (start, end): (usize, usize)) -> (usize, usize) {
+    let len = block.shape.get(dim).copied().unwrap_or(1).max(1);
+    let end = end.min(len);
+    (start.min(end.saturating_sub(1)), end)
+}
+
+/// The packed RGB matrix of three normalized channel planes (`None` channels stay dark).
+fn rgb_matrix(
+    [r_plane, g_plane, b_plane]: [Option<Vec<f32>>; 3],
+    (width, height): (usize, usize),
+    name: String,
+    anim_extent: usize,
+) -> Option<MatrixData> {
     let (r_p, r_scale, r_off, r_i8) = norm_plane_info(r_plane);
     let (g_p, g_scale, g_off, g_i8) = norm_plane_info(g_plane);
     let (b_p, b_scale, b_off, b_i8) = norm_plane_info(b_plane);
-
     let values = blend_rgb_pixels(
-        plane_size,
+        width.checked_mul(height)?,
         (r_p.as_deref(), r_scale, r_off, r_i8),
         (g_p.as_deref(), g_scale, g_off, g_i8),
         (b_p.as_deref(), b_scale, b_off, b_i8),
     );
-
     Some(MatrixData::new(
         width,
         height,
         values,
         0.0,
         16777215.0,
-        format!("{} (RGB Composite)", block.variable_name),
+        name,
         anim_extent,
     ))
 }
@@ -144,11 +144,7 @@ fn extract_channel_plane(
     let ch = ch_opt?;
     let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
     let num_channels = block.shape.get(c_dim).copied().unwrap_or(1);
-    let local_ch = if ch >= c_start && ch < c_start + num_channels {
-        ch - c_start
-    } else {
-        ch.min(num_channels.saturating_sub(1))
-    };
+    let local_ch = local_channel(ch, c_start, num_channels);
     let mut fixed = fixed_indices.to_vec();
     if fixed.len() < block.shape.len() {
         fixed.resize(block.shape.len(), 0);
