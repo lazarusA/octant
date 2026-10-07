@@ -67,6 +67,9 @@ pub struct OctantApp {
     /// Volume raymarching samples per voxel crossed by each ray.
     pub volume_quality: f32,
     pub volume_transparency: bool,
+    /// Surfaces, spheres and point clouds with translucent colors draw
+    /// without depth writes, so no part hides the parts behind it.
+    pub plot_transparency: bool,
     /// Lights transparent DVR samples by their gradient.
     pub volume_lighting: bool,
     /// The user is rotating or zooming the 3D view this frame: volumes render
@@ -160,6 +163,8 @@ pub struct OctantApp {
     pub use_lowclip: bool,
     pub highclip_color: [f32; 4],
     pub use_highclip: bool,
+    /// Global opacity of colormapped colors, in [0, 1].
+    pub color_opacity: f32,
     pub lock_color_bounds: bool,
     pub color_range_min: f32,
     pub color_range_max: f32,
@@ -260,6 +265,7 @@ impl Default for OctantApp {
             volume_opacity: 3.0,
             volume_quality: 1.0,
             volume_transparency: true,
+            plot_transparency: true,
             volume_lighting: false,
             view_interacting: false,
             volume_dirty: None,
@@ -339,6 +345,7 @@ impl Default for OctantApp {
             use_lowclip: false,
             highclip_color: [1.0, 0.0, 0.0, 1.0],
             use_highclip: false,
+            color_opacity: 1.0,
             lock_color_bounds: false,
             color_range_min: 0.0,
             color_range_max: 100.0,

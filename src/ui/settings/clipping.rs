@@ -13,6 +13,10 @@ pub(crate) fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
     ui.separator();
     ui.add_space(4.0);
+    crate::ui::settings::opacity::show_opacity_controls(app, ui);
+    ui.add_space(4.0);
+    ui.separator();
+    ui.add_space(4.0);
     show_scale_type_controls(app, ui);
     ui.add_space(4.0);
     ui.separator();

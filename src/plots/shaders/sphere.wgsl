@@ -134,8 +134,8 @@ fn vs_main(
     return out;
 }
 
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+// Lit, colormapped fragment color (straight alpha).
+fn shade(in: VertexOutput) -> vec4<f32> {
     let eval_color = evaluate_plot_color(in.val, uniforms.color);
 
     if (eval_color.a < 0.01) {
@@ -149,4 +149,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let lighting = evaluate_directional_lighting(geom_normal, vec3<f32>(0.5, 0.7, 0.9), 0.35, 0.65);
     return vec4<f32>(eval_color.rgb * lighting, eval_color.a);
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    return shade(in);
+}
+
+// Opaque and translucent passes of order-independent transparency.
+@fragment
+fn fs_opaque(in: VertexOutput) -> @location(0) vec4<f32> {
+    return oit_opaque(shade(in));
+}
+
+@fragment
+fn fs_oit(in: VertexOutput) -> OitOutput {
+    return oit_accumulate(shade(in), in.position.z);
 }

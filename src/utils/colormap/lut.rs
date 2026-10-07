@@ -66,6 +66,12 @@ fn mix_u8(a: [u8; 3], b: [u8; 3], f: f32) -> [u8; 3] {
     })
 }
 
+/// A value in [0, 1] as an 8-bit channel (clamped, rounded).
+#[inline]
+pub fn unit_to_u8(v: f32) -> u8 {
+    (v.clamp(0.0, 1.0) * 255.0).round() as u8
+}
+
 /// Flips the colormap parameter when the map is shown reversed.
 #[inline]
 pub fn orient(t: f32, reversed: bool) -> f32 {
@@ -90,4 +96,13 @@ pub fn sample_lut(lut: &Lut, t: f32, nearest: bool) -> Color32 {
         (a + (b - a) * f).round().clamp(0.0, 255.0) as u8
     };
     Color32::from_rgb(ch(0), ch(1), ch(2))
+}
+
+/// Alpha of a LUT at `t` in [0, 1], blending two texels exactly like the
+/// alpha read of WGSL `plot_alpha`.
+pub fn sample_alpha(lut: &Lut, t: f32) -> f32 {
+    let x = if t.is_nan() { 0.0 } else { t.clamp(0.0, 1.0) } * (LUT_SIZE - 1) as f32;
+    let i0 = (x.floor() as usize).min(LUT_SIZE - 2);
+    let (a0, a1) = (f32::from(lut[i0][3]), f32::from(lut[i0 + 1][3]));
+    (a0 + (a1 - a0) * (x - i0 as f32)) / 255.0
 }

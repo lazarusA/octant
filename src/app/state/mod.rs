@@ -1,6 +1,7 @@
 //! Top-level application state, dimension configurations, multi-layer plotting, and session management.
 
 pub mod active_dataset;
+pub mod alpha_state;
 pub mod app_state;
 pub mod colormap_state;
 pub mod dataset_activation;

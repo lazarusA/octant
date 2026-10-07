@@ -143,3 +143,25 @@ fn unknown_rows_sample_the_default_colormap() {
         registry::sample(default, 0.3)
     );
 }
+
+#[test]
+fn opacity_scales_colormap_alpha_only() {
+    let params = PlotColorParams {
+        colormap: registry::default_id(),
+        cmin: 0.0,
+        cmax: 1.0,
+        use_nan_color: 1,
+        nan_color: [1.0, 0.0, 0.0, 1.0],
+        opacity: 0.5,
+        ..Default::default()
+    };
+    let c = evaluate_color_cpu(0.3, &params);
+    assert_eq!(c.a(), 128);
+    let rgb = registry::sample(params.colormap, 0.3).to_array();
+    assert_eq!(
+        c,
+        egui::Color32::from_rgba_unmultiplied(rgb[0], rgb[1], rgb[2], 128)
+    );
+    // User NaN color keeps its own alpha.
+    assert_eq!(evaluate_color_cpu(f32::NAN, &params).a(), 255);
+}

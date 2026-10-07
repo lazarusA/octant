@@ -1,11 +1,14 @@
-use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
 use super::common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D};
+pub use super::mesh_draw::Mesh3DCallback;
+use super::oit::{OitSlot, Variant, build_pipeline, egui_target};
 
 pub struct Mesh3DRenderer {
     pub render_pipeline: wgpu::RenderPipeline,
     pub voxel_pipeline: wgpu::RenderPipeline,
+    /// Both modes with translucent colors: no culling, no depth writes.
+    pub transparent_pipeline: wgpu::RenderPipeline,
     pub quad_vertex_buffer: wgpu::Buffer,
     pub quad_index_buffer: wgpu::Buffer,
     pub cube_vertex_buffer: wgpu::Buffer,
@@ -18,6 +21,10 @@ pub struct Mesh3DRenderer {
     pub num_instances: u32,
     pub width: usize,
     pub height: usize,
+    /// Kept to build the OIT pipelines on first use.
+    pub(super) shader: wgpu::ShaderModule,
+    pub(super) pipeline_layout: wgpu::PipelineLayout,
+    pub(crate) oit: OitSlot,
 }
 
 impl Mesh3DRenderer {
@@ -91,24 +98,8 @@ impl Mesh3DRenderer {
             matrix_data,
         );
 
-        let dummy_coords = [0.0f32; 4];
-        let mut padded_coords_x = coord_x
-            .filter(|s| !s.is_empty())
-            .unwrap_or(&dummy_coords)
-            .to_vec();
-        let min_coord_x_capacity = width.max(128);
-        if padded_coords_x.len() < min_coord_x_capacity {
-            padded_coords_x.resize(min_coord_x_capacity, 0.0);
-        }
-
-        let mut padded_coords_y = coord_y
-            .filter(|s| !s.is_empty())
-            .unwrap_or(&dummy_coords)
-            .to_vec();
-        let min_coord_y_capacity = height.max(128);
-        if padded_coords_y.len() < min_coord_y_capacity {
-            padded_coords_y.resize(min_coord_y_capacity, 0.0);
-        }
+        let padded_coords_x = pad_coord_buffer(coord_x, width.max(128));
+        let padded_coords_y = pad_coord_buffer(coord_y, height.max(128));
 
         let coord_x_buffer = super::common::create_storage_buffer(
             device,
@@ -146,104 +137,33 @@ impl Mesh3DRenderer {
             immediate_size: 0,
         });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Mesh 3D Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[Some(MeshVertex3D::desc())],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: target_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
+        let target = egui_target(target_format);
+        let pipeline = |label, cull_mode, depth_write| {
+            let variant = Variant::egui(label, &target, depth_write);
+            build_pipeline(
+                device,
+                &pipeline_layout,
+                &shader,
+                &[Some(MeshVertex3D::desc())],
                 cull_mode,
-                front_face: wgpu::FrontFace::Ccw,
-                ..Default::default()
-            },
-            depth_stencil: Some(super::common::default_depth_stencil_state(
-                true,
-                wgpu::CompareFunction::LessEqual,
-            )),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+                &variant,
+            )
+        };
+        let render_pipeline = pipeline("Mesh 3D Render Pipeline", cull_mode, true);
+        let voxel_pipeline = pipeline(
+            "Mesh 3D Voxel Render Pipeline",
+            Some(wgpu::Face::Back),
+            true,
+        );
+        let transparent_pipeline = pipeline("Mesh 3D Transparent Render Pipeline", None, false);
 
-        // Dedicated pipeline for 3D Lego Cubes with hardware backface culling
-        let voxel_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Mesh 3D Voxel Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[Some(MeshVertex3D::desc())],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: target_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: Some(wgpu::Face::Back),
-                front_face: wgpu::FrontFace::Ccw,
-                ..Default::default()
-            },
-            depth_stencil: Some(super::common::default_depth_stencil_state(
-                true,
-                wgpu::CompareFunction::LessEqual,
-            )),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
-
-        // 1. Instanced Unit Quad Template
-        let (quad_vertices, quad_indices) = Self::build_unit_quad();
-        let quad_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Mesh 3D Unit Quad Vertex Buffer"),
-            contents: bytemuck::cast_slice(&quad_vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let quad_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Mesh 3D Unit Quad Index Buffer"),
-            contents: bytemuck::cast_slice(&quad_indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
-        // 2. Unit Cube Template for GPU Instanced 3D Lego Cubes
-        let (cube_vertices, cube_indices) = Self::build_unit_cube();
-        let cube_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Mesh 3D Unit Cube Vertex Buffer"),
-            contents: bytemuck::cast_slice(&cube_vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let cube_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Mesh 3D Unit Cube Index Buffer"),
-            contents: bytemuck::cast_slice(&cube_indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
+        let (quad_vertex_buffer, quad_index_buffer, cube_vertex_buffer, cube_index_buffer) =
+            create_template_buffers(device);
 
         Self {
             render_pipeline,
             voxel_pipeline,
+            transparent_pipeline,
             quad_vertex_buffer,
             quad_index_buffer,
             cube_vertex_buffer,
@@ -256,6 +176,9 @@ impl Mesh3DRenderer {
             num_instances,
             width,
             height,
+            shader,
+            pipeline_layout,
+            oit: OitSlot::new(target_format),
         }
     }
 
@@ -306,113 +229,59 @@ impl Mesh3DRenderer {
             "Mesh3DRenderer::update_data",
         );
     }
+}
 
-    fn build_unit_quad() -> (Vec<MeshVertex3D>, Vec<u32>) {
+fn pad_coord_buffer(coord: Option<&[f32]>, min_capacity: usize) -> Vec<f32> {
+    let dummy = [0.0f32; 4];
+    let mut padded = coord.filter(|s| !s.is_empty()).unwrap_or(&dummy).to_vec();
+    if padded.len() < min_capacity {
+        padded.resize(min_capacity, 0.0);
+    }
+    padded
+}
+
+fn create_template_buffers(
+    device: &wgpu::Device,
+) -> (wgpu::Buffer, wgpu::Buffer, wgpu::Buffer, wgpu::Buffer) {
+    let (quad_verts, quad_idx) =
         super::common::build_unit_quad_mesh(|position, uv, normal| MeshVertex3D {
             position,
             uv,
             normal,
-        })
-    }
-
-    fn build_unit_cube() -> (Vec<MeshVertex3D>, Vec<u32>) {
+        });
+    let (cube_verts, cube_idx) =
         super::common::build_unit_cube_mesh(|position, uv, normal| MeshVertex3D {
             position,
             uv,
             normal,
+        });
+    let buf = |label, contents, usage| {
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(label),
+            contents,
+            usage,
         })
-    }
-}
-
-impl super::common::PlotRenderer for Mesh3DRenderer {
-    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
-        self.update_data(queue, values);
-    }
-}
-
-impl super::traits::PlotRenderer for Mesh3DRenderer {
-    fn update_data(&self, queue: &wgpu::Queue, data: &crate::data::RenderData) {
-        if let crate::data::RenderData::Matrix(m) = data {
-            self.update_data(queue, &m.values);
-        }
-    }
-
-    fn paint(
-        &self,
-        _ui: &mut egui::Ui,
-        _rect: egui::Rect,
-        _params: &super::traits::PlotRenderParams,
-    ) {
-        // Concrete painter dispatched via egui callback
-    }
-
-    fn inspect_hover(
-        &self,
-        _pointer_pos: egui::Pos2,
-        _rect: egui::Rect,
-        _data: &crate::data::RenderData,
-        _params: &super::traits::PlotRenderParams,
-    ) -> Option<super::traits::HoverSample> {
-        None
-    }
-}
-
-pub struct Mesh3DCallback {
-    pub renderer: Arc<Mesh3DRenderer>,
-    pub params: Mesh3DUniformParams,
-    pub cube_mode_idx: u32,
-    pub rect: egui::Rect,
-}
-
-impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
-    fn prepare(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        _screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
-        _encoder: &mut wgpu::CommandEncoder,
-        callback_resources: &mut eframe::egui_wgpu::CallbackResources,
-    ) -> Vec<wgpu::CommandBuffer> {
-        super::colormap_atlas::prepare(device, queue, callback_resources);
-        let mut params = self.params;
-        params.aspect_ratio = super::common::compute_aspect_ratio(&self.rect);
-        self.renderer.update_uniforms(queue, &params);
-        Vec::new()
-    }
-
-    fn paint(
-        &self,
-        info: egui::PaintCallbackInfo,
-        rpass: &mut wgpu::RenderPass<'static>,
-        callback_resources: &eframe::egui_wgpu::CallbackResources,
-    ) {
-        if !super::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
-            return;
-        }
-        if !super::colormap_atlas::bind(rpass, callback_resources) {
-            return;
-        }
-
-        if self.params.mode == self.cube_mode_idx {
-            // Dedicated voxel cube pipeline with hardware backface culling
-            rpass.set_pipeline(&self.renderer.voxel_pipeline);
-            rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
-            rpass.set_vertex_buffer(0, self.renderer.cube_vertex_buffer.slice(..));
-            rpass.set_index_buffer(
-                self.renderer.cube_index_buffer.slice(..),
-                wgpu::IndexFormat::Uint32,
-            );
-            rpass.draw_indexed(0..36, 0, 0..self.renderer.num_instances);
-        } else {
-            // Surface / Smooth Quad Draw
-            rpass.set_pipeline(&self.renderer.render_pipeline);
-            rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
-            rpass.set_vertex_buffer(0, self.renderer.quad_vertex_buffer.slice(..));
-            rpass.set_index_buffer(
-                self.renderer.quad_index_buffer.slice(..),
-                wgpu::IndexFormat::Uint32,
-            );
-            rpass.draw_indexed(0..6, 0, 0..self.renderer.num_instances);
-        }
-    }
+    };
+    (
+        buf(
+            "Mesh 3D Quad VBO",
+            bytemuck::cast_slice(&quad_verts),
+            wgpu::BufferUsages::VERTEX,
+        ),
+        buf(
+            "Mesh 3D Quad IBO",
+            bytemuck::cast_slice(&quad_idx),
+            wgpu::BufferUsages::INDEX,
+        ),
+        buf(
+            "Mesh 3D Cube VBO",
+            bytemuck::cast_slice(&cube_verts),
+            wgpu::BufferUsages::VERTEX,
+        ),
+        buf(
+            "Mesh 3D Cube IBO",
+            bytemuck::cast_slice(&cube_idx),
+            wgpu::BufferUsages::INDEX,
+        ),
+    )
 }

@@ -3,13 +3,14 @@
 //! A colormap id is a row index: `0..builtin_len` are bundled maps, then custom
 //! maps in insertion order. The id is also the row of the GPU atlas. After those
 //! [`len`] rows come the smooth twins of short categorical palettes, built-in
-//! first then custom (see [`smooth_variant`]), for [`rows`] rows in total.
+//! first then custom (see [`smooth_variant`]), then the opacity curve row when
+//! one is set ([`set_alpha_curve`]), for [`rows`] rows in total.
 //! [`generation`] changes whenever rows change so GPU and UI caches can refresh.
 
 use super::catalog::{ColormapEntry, builtin};
-use super::lut::{Lut, sample_lut};
+use super::lut::{Lut, sample_alpha, sample_lut};
 use egui::Color32;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{LazyLock, RwLock, RwLockReadGuard};
 
 /// Uniform `colormap` value for direct RGB composite (truecolor) rendering.
@@ -44,6 +45,9 @@ static GENERATION: AtomicU64 = AtomicU64::new(1);
 static CUSTOM_LEN: AtomicUsize = AtomicUsize::new(0);
 /// Number of custom maps with a smooth twin, kept in sync the same way.
 static CUSTOM_TWINS: AtomicUsize = AtomicUsize::new(0);
+/// Opacity curve baked by `alpha::bake`, uploaded as the last atlas row.
+static ALPHA: RwLock<Option<Box<Lut>>> = RwLock::new(None);
+static HAS_ALPHA: AtomicBool = AtomicBool::new(false);
 
 fn custom() -> RwLockReadGuard<'static, Custom> {
     CUSTOM.read().unwrap_or_else(|p| p.into_inner())
@@ -77,10 +81,37 @@ pub fn with_entry<R>(id: u32, f: impl FnOnce(&ColormapEntry) -> R) -> Option<R> 
     custom().maps.get(idx - maps.len()).map(f)
 }
 
-/// Atlas rows: every colormap, then the built-in smooth twins, then the twins
-/// of custom maps.
-pub fn rows() -> usize {
+/// Colormap rows: every colormap, then the built-in smooth twins, then the
+/// twins of custom maps.
+fn colormap_rows() -> usize {
     len() + builtin_twins() + CUSTOM_TWINS.load(Ordering::Acquire)
+}
+
+/// Atlas rows: the colormap rows, then the opacity curve row if one is set.
+pub fn rows() -> usize {
+    colormap_rows() + usize::from(HAS_ALPHA.load(Ordering::Acquire))
+}
+
+/// Sets or clears the opacity curve row.
+pub fn set_alpha_curve(lut: Option<Box<Lut>>) {
+    let mut alpha = ALPHA.write().unwrap_or_else(|p| p.into_inner());
+    HAS_ALPHA.store(lut.is_some(), Ordering::Release);
+    *alpha = lut;
+    GENERATION.fetch_add(1, Ordering::AcqRel);
+}
+
+/// Atlas row of the opacity curve, if one is set.
+pub fn alpha_row() -> Option<u32> {
+    HAS_ALPHA
+        .load(Ordering::Acquire)
+        .then(|| u32::try_from(colormap_rows()).ok())
+        .flatten()
+}
+
+/// Opacity curve at data position `t`; 1 without a curve.
+pub fn curve_alpha(t: f32) -> f32 {
+    let alpha = ALPHA.read().unwrap_or_else(|p| p.into_inner());
+    alpha.as_deref().map_or(1.0, |lut| sample_alpha(lut, t))
 }
 
 /// Visits every atlas row in order (see [`rows`]).
@@ -90,7 +121,8 @@ pub fn for_each_lut(mut f: impl FnMut(u32, &Lut)) {
     let luts = entries()
         .map(|e| &*e.lut)
         .chain(entries().filter_map(|e| e.smooth.as_deref()));
-    for (row, lut) in luts.enumerate() {
+    let alpha = ALPHA.read().unwrap_or_else(|p| p.into_inner());
+    for (row, lut) in luts.chain(alpha.as_deref()).enumerate() {
         f(u32::try_from(row).unwrap_or(u32::MAX), lut);
     }
 }
@@ -152,9 +184,9 @@ pub fn is_stepped(row: u32) -> bool {
     (row as usize) < len() && with_entry(row, |e| e.kind.is_discrete()).unwrap_or(false)
 }
 
-/// Whether `row` is an atlas row (a colormap or a smooth twin).
+/// Whether `row` is a colormap or smooth twin row (not the opacity curve).
 pub fn is_row(row: u32) -> bool {
-    (row as usize) < rows()
+    (row as usize) < colormap_rows()
 }
 
 /// Samples atlas row `id` (a colormap or a smooth twin) at `t` in [0, 1];

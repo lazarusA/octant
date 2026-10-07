@@ -22,6 +22,17 @@ pub(crate) fn show_plot_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         PlotType::Heatmap => show_heatmap_options(app, ui),
     }
 
+    if matches!(
+        canvas_plot_type,
+        PlotType::Sphere | PlotType::Surface | PlotType::PointCloud
+    ) {
+        ui.checkbox(&mut app.plot_transparency, "Transparency")
+            .on_hover_text(
+                "With translucent colors (Opacity or Alpha curve), draw every layer \
+                 instead of letting the nearest one hide those behind it.",
+            );
+    }
+
     if is_3d_mode {
         show_3d_view_controls(app, ui);
     }

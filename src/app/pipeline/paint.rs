@@ -84,7 +84,12 @@ impl OctantApp {
         &self,
         screen_aspect: f32,
     ) -> crate::plots::VolumeUniformParams {
-        let ctx = self.get_common_3d_spatial_context();
+        let mut ctx = self.get_common_3d_spatial_context();
+        // Classic modes (1-7) keep their original opacity.
+        if self.volume_algorithm != 0 {
+            ctx.color.opacity = 1.0;
+            ctx.color.alpha_row = crate::utils::colormap::NO_ALPHA_ROW;
+        }
 
         crate::plots::VolumeUniformParams {
             color: ctx.color,
@@ -212,6 +217,7 @@ impl OctantApp {
     ) {
         self.poll_coastline_receiver();
         let canvas_plot_type = self.effective_canvas_plot_type();
+        self.release_idle_oit_frames(canvas_plot_type);
 
         match canvas_plot_type {
             crate::plots::PlotType::Line => {
@@ -256,6 +262,7 @@ impl OctantApp {
                             params,
                             cube_mode_idx: 3,
                             rect: plot_rect,
+                            transparency: self.transparency_mode(),
                         },
                     );
                     ui.painter().add(callback);
@@ -276,6 +283,7 @@ impl OctantApp {
                             params,
                             cube_mode_idx: 2,
                             rect: plot_rect,
+                            transparency: self.transparency_mode(),
                         },
                     );
                     ui.painter().add(callback);
@@ -309,6 +317,7 @@ impl OctantApp {
                             renderer: point_cloud_renderer.clone(),
                             params,
                             rect: plot_rect,
+                            transparency: self.transparency_mode(),
                         },
                     );
                     ui.painter().add(callback);
