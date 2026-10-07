@@ -11,4 +11,5 @@ pub mod projection_hash;
 pub mod staging;
 pub mod step_nav;
 pub mod view_filter;
+pub mod volume_slab;
 pub mod volume_upload;

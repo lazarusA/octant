@@ -1,4 +1,7 @@
 pub mod backends;
+pub mod block_orientation;
+#[cfg(test)]
+mod block_orientation_tests;
 pub mod blocks;
 pub mod calibration;
 pub mod codecs;

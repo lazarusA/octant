@@ -72,6 +72,21 @@ pub fn axis_flips(
     (flip_y, flip_x)
 }
 
+/// Whether the spatial dimensions are stored lon-first (`(lon, lat)` or `(x, y)`), which
+/// orientation transposes into `(lat, lon)`.
+pub fn needs_transpose(dim_names: &[String]) -> bool {
+    let mut spatial = dim_names
+        .iter()
+        .map(|d| d.to_lowercase())
+        .filter(|d| d.contains("lat") || d.contains("lon") || d == "y" || d == "x");
+    match (spatial.next(), spatial.next()) {
+        (Some(first), Some(second)) => {
+            (first.contains("lon") || first == "x") && (second.contains("lat") || second == "y")
+        }
+        _ => false,
+    }
+}
+
 /// The dimensions a block's data is reversed along by its orientation: the row axis (second
 /// to last) when `flip_y`, the column axis (last) when `flip_x`, each only when longer than
 /// one index. Pass the names and shape after any transpose.

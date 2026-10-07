@@ -97,3 +97,74 @@ fn stored_offset_reverses_only_flipped_dimensions() {
     assert_eq!(stored_offset(&app, "lat", 9, 5), 0, "out of range clamps");
     assert_eq!(stored_offset(&app, "lat", 0, 0), 0);
 }
+
+/// A `(lat, lon)` block of stored lat rows `origin..origin + rows`, oriented north-up: its
+/// row `k` holds stored row `origin + rows - 1 - k`, valued `stored_lat * 10 + lon`.
+fn flipped_block(origin: usize, rows: usize, cols: usize) -> crate::data::OctantBlock {
+    let values: Vec<f32> = (0..rows)
+        .flat_map(|k| {
+            let stored = origin + rows - 1 - k;
+            (0..cols).map(move |c| (stored * 10 + c) as f32)
+        })
+        .collect();
+    let dims = ["lat", "lon"].map(String::from).to_vec();
+    let mut block = crate::data::OctantBlock::new(
+        "t2m".into(),
+        vec![rows, cols],
+        dims,
+        vec![origin, 0],
+        values,
+        std::collections::HashMap::new(),
+        std::collections::HashMap::new(),
+    );
+    block.flipped_dims = vec!["lat".into()];
+    block
+}
+
+#[test]
+fn a_view_inside_a_larger_flipped_block_shows_its_own_rows() {
+    // Stored lat rows 2..5 out of a 10-row cached block, north first.
+    let block = flipped_block(0, 10, 2);
+    let rows = block.oriented_range(0, (2, 5));
+    let mut app = OctantApp::default();
+    app.apply_2d_projection(&block, 1, 0, (0, 2), rows, &[0, 0], true, 0);
+    let matrix = app.matrix_data.as_ref().expect("matrix");
+    let first_column: Vec<f32> = matrix.values.iter().step_by(2).copied().collect();
+    assert_eq!(first_column, [40.0, 30.0, 20.0]);
+}
+
+#[test]
+fn a_volume_from_two_flipped_blocks_runs_north_to_south_throughout() {
+    let mut app = OctantApp {
+        active_plot_type: crate::plots::PlotType::Volume,
+        ..Default::default()
+    };
+    // Both 5-row blocks feed one 10-row volume requested over stored rows 0..=9.
+    for origin in [0, 5] {
+        let block = flipped_block(origin, 5, 2);
+        let (req, local) = (((0, 1), (0, 9), (0, 0)), ((0, 2), (0, 5), (0, 1)));
+        app.apply_3d_volume_projection(
+            &block,
+            1,
+            0,
+            usize::MAX,
+            req.0,
+            req.1,
+            req.2,
+            local.0,
+            local.1,
+            local.2,
+            &[0, 0],
+            true,
+            true,
+            0,
+        );
+    }
+    let volume = app.volume_data.as_ref().expect("volume");
+    assert_eq!((volume.width, volume.height), (2, 10));
+    let first_column: Vec<f32> = volume.values.iter().step_by(2).copied().collect();
+    let north_to_south: Vec<f32> = (0..10).rev().map(|lat| (lat * 10) as f32).collect();
+    assert_eq!(first_column, north_to_south);
+    // The 3D hover reverses the whole volume height, matching this layout.
+    assert_eq!(stored_offset(&app, "lat", 0, 10), 9);
+}

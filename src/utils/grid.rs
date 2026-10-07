@@ -1,4 +1,4 @@
-use super::grid_flips::{axis_flips, flipped_dims, reverse_flipped_coordinates};
+use super::grid_flips::{axis_flips, flipped_dims, needs_transpose, reverse_flipped_coordinates};
 
 /// Function for checking axes order and orientation.
 ///
@@ -21,20 +21,7 @@ pub fn check_and_orient_axes_with_coords(
     }
 
     // 1. Determine if dimensions are ordered (X, Y) / (lon, lat) instead of (Y, X) / (lat, lon)
-    let spatial_dims: Vec<String> = dim_names
-        .iter()
-        .map(|d| d.to_lowercase())
-        .filter(|d| d.contains("lat") || d.contains("lon") || d == "y" || d == "x")
-        .collect();
-
-    let mut needs_transpose = false;
-    if spatial_dims.len() >= 2 {
-        let first = &spatial_dims[0];
-        let second = &spatial_dims[1];
-        if (first.contains("lon") || first == "x") && (second.contains("lat") || second == "y") {
-            needs_transpose = true;
-        }
-    }
+    let needs_transpose = needs_transpose(dim_names);
 
     let (mut current_values, width, height) = if needs_transpose {
         let mut transposed = vec![0.0f32; in_width * in_height];
@@ -122,6 +109,7 @@ pub fn check_and_orient_block_grid(
         .map(|v| v.as_slice());
 
     let flips = axis_flips(dimension_names, attributes, lat_coords, lon_coords);
+    let transposed = needs_transpose(dimension_names);
     let in_height = block_shape[rank - 2];
     let in_width = block_shape[rank - 1];
     let slice_size = in_width * in_height;
@@ -149,7 +137,8 @@ pub fn check_and_orient_block_grid(
             final_values.extend(slice_oriented);
         }
 
-        if final_width != in_width || final_height != in_height {
+        // Decided by the transpose itself: a square grid keeps its shape when transposed.
+        if transposed {
             block_shape[rank - 2] = final_height;
             block_shape[rank - 1] = final_width;
             origin.swap(rank - 2, rank - 1);
