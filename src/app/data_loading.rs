@@ -77,10 +77,6 @@ impl OctantApp {
                     .map_err(|e| e.to_string())
             });
 
-            if let Err(err) = &res {
-                log::error!("Store inspect failed for '{target_input}': {err}");
-            }
-
             let _ = tx.send(res);
         });
 
@@ -137,10 +133,6 @@ impl OctantApp {
                         }
                     }
                     .await;
-
-                if let Err(err) = &res {
-                    log::error!("Store inspect failed for '{target_clone}': {err}");
-                }
 
                 let _ = tx.send(res);
             });

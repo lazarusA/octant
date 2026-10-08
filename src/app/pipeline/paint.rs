@@ -208,7 +208,11 @@ impl OctantApp {
                     log::info!("Coastline hot-swapped to {:?}", lod);
                 }
                 Err(e) => {
-                    log::warn!("Async coastline fetch failed: {e}");
+                    self.notify(
+                        crate::ui::toast::Severity::Warning,
+                        "Coastlines unavailable",
+                        &e.to_string(),
+                    );
                 }
             }
         }

@@ -21,6 +21,7 @@ pub mod status;
 pub mod store;
 #[cfg(test)]
 pub(crate) mod test_render;
+pub mod toast;
 pub mod toolbar;
 pub mod top_bar;
 pub mod variables_overlay;

@@ -266,11 +266,16 @@ impl OctantApp {
     /// Rebuilds or updates existing GPU buffers for 3D volume data.
     pub fn rebuild_pipeline_with_volume_data(&mut self, data: VolumeData) {
         if data.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
-            log::error!(
+            let detail = format!(
                 "Volume data buffer size ({} elements / {} bytes) exceeds maximum GPU storage buffer limit ({})",
                 data.values.len(),
                 data.values.len() * 4,
                 crate::plots::common::MAX_GPU_STORAGE_BUFFER_BYTES
+            );
+            self.notify(
+                crate::ui::toast::Severity::Error,
+                "Volume too large for the GPU",
+                &detail,
             );
             return;
         }

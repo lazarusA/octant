@@ -31,7 +31,14 @@ impl OctantApp {
         for result in self.coordinate_loader.poll() {
             match result.coords {
                 Ok(coords) => self.merge_variable_coordinates(&result.source_id, coords),
-                Err(e) => log::warn!("Coordinates of '{}' failed to load: {e}", result.variable),
+                Err(e) => self.notify(
+                    crate::ui::toast::Severity::Warning,
+                    "Coordinates unavailable",
+                    &format!(
+                        "Coordinates of '{}' failed to load ({e}); axes show indices",
+                        result.variable
+                    ),
+                ),
             }
         }
     }

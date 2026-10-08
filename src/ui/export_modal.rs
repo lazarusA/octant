@@ -1,6 +1,6 @@
 use crate::app::OctantApp;
 use crate::export::{ExportFormat, ExportTarget};
-use crate::ui::icons::{Icon, IconSize, UiIconExt};
+use crate::ui::icons::{Icon, UiIconExt};
 use std::path::PathBuf;
 
 /// Shows the floating modal dialog for saving and exporting the canvas/figure.
@@ -141,97 +141,5 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
 
     if should_close || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
         app.show_export_modal = false;
-    }
-}
-
-/// Shows the floating success toast notification with a "Reveal in Finder/Folder" action button.
-pub fn show_export_toast(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
-    if let Some(ref toast) = app.export_toast {
-        let elapsed = toast.timestamp.elapsed().as_secs_f32();
-        if elapsed > 6.0 {
-            app.export_toast = None;
-            return;
-        }
-
-        // Fade out smoothly during the last second
-        let alpha = if elapsed > 5.0 {
-            ((6.0 - elapsed) * 240.0).clamp(0.0, 240.0) as u8
-        } else {
-            240
-        };
-
-        let mut dismiss = false;
-        let mut reveal = false;
-        let file_path = toast.file_path.clone();
-        let filename = toast.filename.clone();
-
-        let toast_pos = egui::pos2(
-            (canvas_rect.right() - 340.0).max(canvas_rect.left() + 10.0),
-            (canvas_rect.bottom() - 56.0).max(canvas_rect.top() + 10.0),
-        );
-
-        egui::Area::new(egui::Id::new("octant_export_toast_area"))
-            .fixed_pos(toast_pos)
-            .order(egui::Order::Foreground)
-            .show(ctx, |ui| {
-                let dark_mode = ui.visuals().dark_mode;
-                let bg_color = if dark_mode {
-                    egui::Color32::from_black_alpha(alpha)
-                } else {
-                    egui::Color32::from_rgba_unmultiplied(245, 248, 255, alpha)
-                };
-                let border_color = crate::ui::icons::IconTone::Accent.color(ui.visuals());
-                let text_title_color = if dark_mode {
-                    egui::Color32::WHITE
-                } else {
-                    egui::Color32::BLACK
-                };
-
-                egui::Frame::popup(ui.style())
-                    .fill(bg_color)
-                    .stroke(egui::Stroke::new(1.0, border_color))
-                    .inner_margin(egui::Margin::symmetric(10, 8))
-                    .corner_radius(6.0)
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.icon(Icon::Snapshot, IconSize::Sm);
-                            ui.label(
-                                egui::RichText::new("Saved")
-                                    .strong()
-                                    .color(text_title_color),
-                            );
-                            ui.label(egui::RichText::new(&filename).small().color(border_color));
-
-                            #[cfg(target_os = "macos")]
-                            let reveal_label = "Reveal in Finder";
-                            #[cfg(not(target_os = "macos"))]
-                            let reveal_label = "Open Folder";
-
-                            if ui
-                                .icon_button(Icon::FolderOpen, reveal_label)
-                                .on_hover_ui(|ui| {
-                                    ui.label(format!("Show in folder:\n{}", file_path.display()));
-                                })
-                                .clicked()
-                            {
-                                reveal = true;
-                                dismiss = true;
-                            }
-
-                            if ui.close_button("Dismiss").clicked() {
-                                dismiss = true;
-                            }
-                        });
-                    });
-            });
-
-        if reveal {
-            crate::export::reveal_in_file_manager(&file_path);
-        }
-        if dismiss {
-            app.export_toast = None;
-        }
-
-        ctx.request_repaint();
     }
 }

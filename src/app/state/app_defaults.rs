@@ -100,7 +100,7 @@ impl Default for OctantApp {
             roi_crop_box: crate::export::RoiCropBox::default(),
             pending_export: None,
             export_flash_timer: None,
-            export_toast: None,
+            toasts: crate::ui::toast::Toasts::default(),
 
             show_coastlines: false,
             coastline_color: None,

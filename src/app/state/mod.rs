@@ -7,6 +7,7 @@ pub mod app_state;
 pub mod colormap_state;
 pub mod dataset_activation;
 pub mod dimension_state;
+mod notifications;
 pub mod plot_type;
 pub mod session;
 pub mod store_kind;

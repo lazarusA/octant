@@ -117,7 +117,8 @@ pub struct OctantApp {
     pub roi_crop_box: crate::export::RoiCropBox,
     pub pending_export: Option<crate::export::PendingExportRequest>,
     pub export_flash_timer: Option<web_time::Instant>,
-    pub export_toast: Option<crate::export::ExportToastNotification>,
+    /// Warnings, errors and results shown over the canvas.
+    pub toasts: crate::ui::toast::Toasts,
 
     // Coastline Overlay
     /// Whether to render the coastline overlay on geographic plot types.

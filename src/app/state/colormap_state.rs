@@ -51,7 +51,11 @@ impl OctantApp {
         };
         let Some(prefs) = eframe::get_value::<ColormapPrefs>(storage, STORAGE_KEY) else {
             if let Some(raw) = storage.get_string(STORAGE_KEY) {
-                log::warn!("Unreadable colormap preferences; backed up under `{UNREADABLE_KEY}`");
+                self.notify(
+                    crate::ui::toast::Severity::Warning,
+                    "Colormap preferences unreadable",
+                    &format!("Backed up under `{UNREADABLE_KEY}`"),
+                );
                 self.colormaps.unreadable_prefs = Some(raw);
             }
             return;
@@ -62,7 +66,11 @@ impl OctantApp {
                     self.register_custom(spec, entry);
                 }
                 Err(e) => {
-                    log::warn!("Stored custom colormap `{}` does not build: {e}", spec.name);
+                    self.notify(
+                        crate::ui::toast::Severity::Warning,
+                        "Custom colormap not loaded",
+                        &format!("`{}` does not build: {e}", spec.name),
+                    );
                     // A map that builds wins over a broken one with the same name.
                     if !self.has_custom_name(&spec.name) {
                         self.colormaps.unloaded.push(spec);
@@ -193,7 +201,11 @@ fn back_up_unreadable(storage: &mut dyn eframe::Storage, raw: &str) {
             }
         }
     }
-    log::warn!("All {MAX_UNREADABLE_BACKUPS} colormap preference backups are in use");
+    crate::ui::toast::report(
+        crate::ui::toast::Severity::Warning,
+        "Colormap preferences not backed up",
+        &format!("All {MAX_UNREADABLE_BACKUPS} colormap preference backups are in use"),
+    );
 }
 
 #[cfg(test)]
