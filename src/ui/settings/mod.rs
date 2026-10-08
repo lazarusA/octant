@@ -8,9 +8,15 @@ mod plot_2d;
 mod plot_3d;
 mod plot_options;
 mod resampling;
+mod scale;
+mod support;
+#[cfg(test)]
+mod support_tests;
+mod view;
 
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, UiIconExt};
+use support::{PlotState, Support};
 
 /// Anchored to the left edge of the canvas area, just below the top bar.
 /// Stores its own width so Variable Controls can position to the right without overlap.
@@ -60,11 +66,52 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
     app.settings_overlay_width = area_resp.response.rect.width();
 }
 
-/// Plot options, clipping bounds and export preferences, separated by rules.
+/// The plot's own options, then color, transparency, overlays, resolution,
+/// view and export sections. Sections and settings the plot has no use for
+/// are left out (`support`).
 fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
-    plot_options::show_plot_options(app, ui);
-    ui.separator();
-    clipping::show_clipping_bounds(app, ui);
+    let support = PlotState::of(app).support();
+    let plot_type = app.effective_canvas_plot_type();
+    ui.label(egui::RichText::new(plot_type.display_name()).small().weak());
+    plot_options::show_plot_options(app, ui, plot_type);
+    section(ui, "Color");
+    clipping::show_color_settings(app, ui, &support);
+    section(ui, "Transparency");
+    opacity::show_transparency_settings(app, ui, &support);
+    if support.coastlines != Support::No {
+        section(ui, "Overlays");
+        coastline::show_coastline_controls(app, ui);
+    }
+    if support.aggregation != Support::No {
+        section(ui, "Resolution");
+        gated(ui, support.aggregation, |ui| {
+            resampling::show_resampling_controls(app, ui);
+        });
+    }
+    section(ui, "View");
+    view::show_view_controls(app, ui, &support);
     ui.separator();
     export::show_export_preferences(app, ui);
+}
+
+/// A rule and a muted title opening a settings section.
+fn section(ui: &mut egui::Ui, title: &str) {
+    ui.add_space(4.0);
+    ui.separator();
+    ui.label(egui::RichText::new(title).small().weak());
+}
+
+/// Draws `add` when the setting applies, a muted note naming the setting that
+/// overrides it, or nothing when the plot has no use for it.
+fn gated(ui: &mut egui::Ui, support: Support, add: impl FnOnce(&mut egui::Ui)) {
+    match support {
+        Support::Yes => add(ui),
+        Support::Overridden(reason) => note(ui, reason),
+        Support::No => {}
+    }
+}
+
+/// A muted, wrapped line explaining why settings are left out.
+fn note(ui: &mut egui::Ui, text: &str) {
+    ui.add(egui::Label::new(egui::RichText::new(text).small().weak()).wrap());
 }

@@ -1,9 +1,47 @@
+use super::gated;
+use super::support::{OptionSupport, Support};
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 use crate::utils::colormap::{AlphaInterp, alpha::PRESETS};
 
+/// Opacity and the alpha curve, then the toggle that draws translucent
+/// meshes, point clouds or volumes, each where the plot honors it.
+pub(crate) fn show_transparency_settings(
+    app: &mut OctantApp,
+    ui: &mut egui::Ui,
+    support: &OptionSupport,
+) {
+    gated(ui, support.opacity, |ui| show_opacity_controls(app, ui));
+    if support.transparency != Support::No {
+        transparency_toggle(ui, &mut app.plot_transparency, support.transparency).on_hover_text(
+            "With translucent colors (Opacity or Alpha curve), draw every layer \
+                 instead of letting the nearest one hide those behind it.",
+        );
+    }
+    if support.volume_transparency != Support::No {
+        transparency_toggle(
+            ui,
+            &mut app.volume_transparency,
+            support.volume_transparency,
+        );
+        if app.volume_algorithm == 0 && app.volume_transparency {
+            ui.checkbox(&mut app.volume_lighting, "Lighting")
+                .on_hover_text("Shade samples by their gradient so fronts and edges gain shape");
+        }
+    }
+}
+
+/// The Transparency checkbox, disabled with the reason when overridden.
+fn transparency_toggle(ui: &mut egui::Ui, value: &mut bool, support: Support) -> egui::Response {
+    let response = ui.add_enabled(support.is_yes(), egui::Checkbox::new(value, "Transparency"));
+    match support.reason() {
+        Some(reason) => response.on_disabled_hover_text(reason),
+        None => response,
+    }
+}
+
 /// Global opacity slider and the opacity curve over the data range.
-pub(crate) fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
+fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     let resp = ui
         .add(egui::Slider::new(&mut app.layers.base.color.opacity, 0.0..=1.0).text("Opacity"))
         .on_hover_text("Opacity of colormapped values. NaN and clip colors keep their own alpha. Double-click to reset.");
