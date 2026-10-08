@@ -1,6 +1,7 @@
-//! Writing a block's 3D slab into the plotted volume, mirrored along flipped dimensions.
+//! Writing a block's 3D slab into a layer's volume, mirrored along flipped dimensions.
 
 use crate::app::OctantApp;
+use crate::app::layers::LayerId;
 use crate::data::block_orientation::slab_destination;
 use crate::data::octant_block::OctantBlock;
 use crate::data::volume_data::VolumeData;
@@ -9,6 +10,7 @@ impl OctantApp {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn commit_volume_slab(
         &mut self,
+        id: LayerId,
         block: &OctantBlock,
         x_dim: usize,
         y_dim: usize,
@@ -21,9 +23,10 @@ impl OctantApp {
         local_z0: usize,
         slab: VolumeData,
     ) {
-        let (vol_w, vol_h, depth_max) = self
-            .layers
-            .base
+        let Some(layer) = self.layers.get_mut(id) else {
+            return;
+        };
+        let (vol_w, vol_h, depth_max) = layer
             .data
             .volume
             .as_ref()
@@ -42,7 +45,7 @@ impl OctantApp {
         let dest_z = raw_dest_z % depth_max.max(1);
 
         let mut bounds_opt = None;
-        if let Some(vdata) = &mut self.layers.base.data.volume {
+        if let Some(vdata) = &mut layer.data.volume {
             vdata.update_subvolume(
                 [dest_x, dest_y, dest_z],
                 [slab.width, slab.height, slab.depth.min(vdata.depth)],
@@ -52,29 +55,12 @@ impl OctantApp {
             bounds_opt = Some((vdata.min_val, vdata.max_val));
         }
         // Uploaded before the next paint, to the renderer on screen only.
-        self.mark_volume_dirty(dest_z..(dest_z + slab.depth).min(depth_max));
+        layer
+            .renderers
+            .mark_volume_dirty(dest_z..(dest_z + slab.depth).min(depth_max));
 
         if let Some((min_val, max_val)) = bounds_opt {
-            self.sync_volume_color_bounds(min_val, max_val);
-        }
-    }
-
-    fn sync_volume_color_bounds(&mut self, min_val: f32, max_val: f32) {
-        if !self.layers.base.color.lock_bounds {
-            if min_val.is_finite() {
-                self.layers.base.color.volume_cmin = min_val;
-                self.layers.base.color.range_min = min_val;
-            }
-            if max_val.is_finite() {
-                self.layers.base.color.volume_cmax = max_val;
-                self.layers.base.color.range_max = max_val;
-            }
-        }
-        if min_val.is_finite() {
-            self.layers.base.color.global_min = self.layers.base.color.global_min.min(min_val);
-        }
-        if max_val.is_finite() {
-            self.layers.base.color.global_max = self.layers.base.color.global_max.max(max_val);
+            layer.color.follow_extent(min_val, max_val);
         }
     }
 }

@@ -77,7 +77,7 @@ fn test_2d_rgb_volume_slicing_produces_1depth_truecolor_volume() {
     app.selected.plot_type = PlotType::Volume;
     let block = create_rgb_block();
 
-    app.apply_block_projection(&block);
+    app.apply_block_projection(octant::app::layers::LayerId::BASE, &block);
 
     assert!(
         app.layers.base.data.volume.is_some(),
@@ -122,7 +122,7 @@ fn test_rgb_composite_transitions_across_all_plot_types() {
 
     for &plot_type in &plot_sequence {
         app.switch_plot_type(plot_type);
-        app.apply_block_projection(&block);
+        app.apply_block_projection(octant::app::layers::LayerId::BASE, &block);
 
         // Verify channel dimension was NOT destroyed
         let ch_idx = app

@@ -3,17 +3,21 @@
 //! plot shown on the canvas.
 
 mod data;
+mod id;
 mod layer;
 mod load;
 mod renderers;
 mod selection;
 mod source;
 mod stack;
+#[cfg(test)]
+mod stack_tests;
 mod style;
 #[cfg(test)]
 mod style_tests;
 
 pub use data::LayerData;
+pub use id::LayerId;
 pub use layer::Layer;
 pub use load::LoadState;
 pub use renderers::LayerRenderers;

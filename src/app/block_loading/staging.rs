@@ -3,7 +3,7 @@
 //! is shown until the staged plot's data arrives.
 
 use crate::app::OctantApp;
-use crate::app::layers::{LoadState, VariableSelection};
+use crate::app::layers::{LayerId, LoadState, VariableSelection};
 use crate::data::BlockCacheKey;
 use std::mem::replace;
 
@@ -50,15 +50,18 @@ impl OctantApp {
         request_pending || self.is_exploring_unplotted_variable()
     }
 
-    /// Whether a block with cache key `key` belongs to the latest requested view
-    /// (any step): blocks of an older selection, variable or plot layout must
-    /// not be projected into it.
-    pub(crate) fn key_matches_view(&self, key: &BlockCacheKey, anim_dim: Option<usize>) -> bool {
+    /// Whether a block with cache key `key` belongs to layer `id`'s latest
+    /// requested view (any step): blocks of an older selection, variable or
+    /// plot layout must not be projected into it.
+    pub(crate) fn key_matches_view(
+        &self,
+        id: LayerId,
+        key: &BlockCacheKey,
+        anim_dim: Option<usize>,
+    ) -> bool {
         self.layers
-            .base
-            .load
-            .slice_request
-            .as_ref()
+            .get(id)
+            .and_then(|layer| layer.load.slice_request.as_ref())
             .is_some_and(|req| {
                 key.variable_name == req.variable
                     && crate::data::blocks::key::selections_match_except_anim(

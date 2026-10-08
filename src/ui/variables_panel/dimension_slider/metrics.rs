@@ -1,7 +1,7 @@
 //! Capacity calculations, byte counts, and volume rendering validation.
 
-use crate::app::{DimConfig, OctantApp};
-use crate::data::VariableInfo;
+use crate::app::{DimConfig, OctantApp, VariableSelection};
+use crate::data::{VariableInfo, VolumeData};
 
 /// Computes the maximum steps along the animated dimension that fit within GPU limits.
 pub fn calculate_max_animated_steps(
@@ -39,29 +39,31 @@ pub fn calculate_download_sizes(
 
 /// Calculates the total 3D volume elements from active dimensions.
 pub fn calculate_selected_volume_elements(app: &OctantApp) -> usize {
-    let Some(metadata) = &app.selected.metadata else {
-        return 0;
-    };
-    let Some(var_info) = metadata.variables.get(app.selected.variable_idx) else {
+    selection_volume_elements(&app.selected)
+}
+
+/// The 3D volume elements `selection` reads over its active dimensions.
+fn selection_volume_elements(selection: &VariableSelection) -> usize {
+    let Some(var_info) = selection.variable_info() else {
         return 0;
     };
 
     let active_dims: Vec<bool> = (0..var_info.shape.len())
         .map(|i| {
-            app.selected
+            selection
                 .dim_config
                 .get(i)
                 .map(|c| c.active)
                 .unwrap_or(false)
-                || app.selected.spatial_dims.contains(&i)
-                || app.selected.animated_dim == Some(i)
+                || selection.spatial_dims.contains(&i)
+                || selection.animated_dim == Some(i)
         })
         .collect();
 
     crate::utils::math::calculate_volume_elements(
         &var_info.shape,
         &active_dims,
-        &app.selected.dim_ranges,
+        &selection.dim_ranges,
     )
 }
 
@@ -92,23 +94,28 @@ pub fn calculate_selected_2d_elements(app: &OctantApp) -> usize {
 
 /// Checks if 3D Volume / Point Cloud rendering is allowed under GPU storage limits.
 pub fn is_volume_allowed_for_selection(app: &OctantApp) -> bool {
+    is_volume_allowed(&app.selected, app.layers.base.data.volume.as_ref())
+}
+
+/// Whether `selection` can draw as a volume or point cloud next to a layer's
+/// current `volume`, within GPU storage limits.
+pub fn is_volume_allowed(selection: &VariableSelection, volume: Option<&VolumeData>) -> bool {
     // Discrete global grids (HEALPix) do not support 3D Volume or PointCloud raycasting
-    if app
-        .selected
+    if selection
         .dim_config
         .iter()
         .any(|c| c.spatial == crate::app::SpatialRole::Grid)
     {
         return false;
     }
-    let elements = calculate_selected_volume_elements(app);
-    if elements == 0 && app.selected.metadata.is_some() {
+    let elements = selection_volume_elements(selection);
+    if elements == 0 && selection.metadata.is_some() {
         return false;
     }
     if elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
         return false;
     }
-    if let Some(vdata) = &app.layers.base.data.volume
+    if let Some(vdata) = volume
         && vdata.values.len() > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
     {
         return false;

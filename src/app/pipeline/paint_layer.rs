@@ -24,33 +24,8 @@ impl OctantApp {
         let Some(render_state) = &self.wgpu_render_state else {
             return;
         };
-        let layer = &mut self.layers.base;
-        let Some(renderer) = &layer.renderers.heatmap else {
-            return;
-        };
-        if layer.data.pyramid.is_none() {
-            return;
-        }
-        let (visible_u, visible_v) = crate::data::ViewportResampler::compute_visible_data_bounds(
-            view.pan,
-            view.zoom,
-            view.aspect_scale,
-        );
-        let (orig_w, orig_h) = layer.data.dimensions_2d();
-        let (target_w, target_h) =
-            crate::data::ViewportResampler::compute_target_resolution(orig_w, orig_h, 2048);
-        if let Some(tile) = layer
-            .data
-            .resampler
-            .resample_if_needed(visible_u, visible_v, target_w, target_h)
-        {
-            renderer.update_data_and_dimensions(
-                &render_state.queue,
-                &tile.data.values,
-                tile.data.width,
-                tile.data.height,
-                tile.tile_bounds,
-            );
+        for layer in self.layers.iter_mut() {
+            refresh_layer_tile(layer, &render_state.queue, view);
         }
     }
 
@@ -75,7 +50,7 @@ impl OctantApp {
         let Some(line_renderer) = &layer.renderers.line else {
             return;
         };
-        let color_params = self.get_color_params();
+        let color_params = self.get_color_params(layer);
         let (profile_values, profile_length, line_count) = self.get_line_profile_payload();
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.canvas_rect,
@@ -118,7 +93,7 @@ impl OctantApp {
             return;
         };
         let aspect_ratio = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
-        let params = self.get_mesh_3d_uniform_params(mode, displacement, aspect_ratio);
+        let params = self.get_mesh_3d_uniform_params(layer, mode, displacement, aspect_ratio);
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.plot_rect,
             crate::plots::Mesh3DCallback {
@@ -126,7 +101,7 @@ impl OctantApp {
                 params,
                 cube_mode_idx,
                 rect: view.plot_rect,
-                transparency: self.transparency_mode(),
+                transparency: self.transparency_mode(layer),
             },
         );
         ui.painter().add(callback);
@@ -137,7 +112,7 @@ impl OctantApp {
             return;
         };
         let screen_aspect = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
-        let params = self.get_volume_uniform_params(screen_aspect);
+        let params = self.get_volume_uniform_params(layer, screen_aspect);
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.plot_rect,
             crate::plots::VolumeCallback {
@@ -157,14 +132,14 @@ impl OctantApp {
             return;
         };
         let screen_aspect = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
-        let params = self.get_point_cloud_uniform_params(screen_aspect);
+        let params = self.get_point_cloud_uniform_params(layer, screen_aspect);
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.plot_rect,
             crate::plots::PointCloudCallback {
                 renderer: point_cloud_renderer.clone(),
                 params,
                 rect: view.plot_rect,
-                transparency: self.transparency_mode(),
+                transparency: self.transparency_mode(layer),
             },
         );
         ui.painter().add(callback);
@@ -183,7 +158,7 @@ impl OctantApp {
             view.canvas_rect,
             crate::plots::MatrixCallback {
                 renderer: renderer.clone(),
-                color_params: self.get_color_params(),
+                color_params: self.get_color_params(layer),
                 rect: view.canvas_rect,
                 pan: view.pan,
                 zoom: view.zoom,
@@ -192,5 +167,36 @@ impl OctantApp {
             },
         );
         ui.painter().add(callback);
+    }
+}
+
+/// Resamples `layer`'s pyramid, when it has one, to the visible window.
+fn refresh_layer_tile(layer: &mut Layer, queue: &wgpu::Queue, view: &CanvasView) {
+    let Some(renderer) = &layer.renderers.heatmap else {
+        return;
+    };
+    if layer.data.pyramid.is_none() {
+        return;
+    }
+    let (visible_u, visible_v) = crate::data::ViewportResampler::compute_visible_data_bounds(
+        view.pan,
+        view.zoom,
+        view.aspect_scale,
+    );
+    let (orig_w, orig_h) = layer.data.dimensions_2d();
+    let (target_w, target_h) =
+        crate::data::ViewportResampler::compute_target_resolution(orig_w, orig_h, 2048);
+    if let Some(tile) = layer
+        .data
+        .resampler
+        .resample_if_needed(visible_u, visible_v, target_w, target_h)
+    {
+        renderer.update_data_and_dimensions(
+            queue,
+            &tile.data.values,
+            tile.data.width,
+            tile.data.height,
+            tile.tile_bounds,
+        );
     }
 }

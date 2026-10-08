@@ -70,6 +70,42 @@ impl ColorStyle {
         }
     }
 
+    /// Starts the data extent and range over at a new variable's `min`..`max`
+    /// (non-finite ends, as in an empty volume, keep the old ones) and unlocks
+    /// the range.
+    pub fn reset_to_extent(&mut self, min: f32, max: f32) {
+        if min.is_finite() {
+            self.global_min = min;
+            self.range_min = min;
+            self.volume_cmin = min;
+        }
+        if max.is_finite() {
+            self.global_max = max;
+            self.range_max = max;
+            self.volume_cmax = max;
+        }
+        self.lock_bounds = false;
+    }
+
+    /// Widens the data extent seen so far by another step's `min`..`max`, and
+    /// moves the range there unless it is locked. Non-finite ends are skipped.
+    pub fn follow_extent(&mut self, min: f32, max: f32) {
+        if min.is_finite() {
+            self.global_min = self.global_min.min(min);
+            if !self.lock_bounds {
+                self.range_min = min;
+                self.volume_cmin = min;
+            }
+        }
+        if max.is_finite() {
+            self.global_max = self.global_max.max(max);
+            if !self.lock_bounds {
+                self.range_max = max;
+                self.volume_cmax = max;
+            }
+        }
+    }
+
     /// The shader color uniforms drawing atlas row `shown` (the colormap after
     /// preview and smoothing), `reversed`, as an RGB composite when `composite`;
     /// `matrix` counts categories for categorical colors.

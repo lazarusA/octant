@@ -57,7 +57,17 @@ fn plotted_grid(store_url: &str, lat: &[f64]) -> OctantApp {
         variable_idx: idx.expect("t2m variable"),
         ..Default::default()
     };
-    app.apply_2d_projection(&block, 1, 0, (0, 4), (0, 5), &[0, 0], true, 0);
+    app.apply_2d_projection(
+        crate::app::layers::LayerId::BASE,
+        &block,
+        1,
+        0,
+        (0, 4),
+        (0, 5),
+        &[0, 0],
+        true,
+        0,
+    );
     app
 }
 
@@ -131,7 +141,17 @@ fn a_view_inside_a_larger_flipped_block_shows_its_own_rows() {
     let block = flipped_block(0, 10, 2);
     let rows = block.oriented_range(0, (2, 5));
     let mut app = OctantApp::default();
-    app.apply_2d_projection(&block, 1, 0, (0, 2), rows, &[0, 0], true, 0);
+    app.apply_2d_projection(
+        crate::app::layers::LayerId::BASE,
+        &block,
+        1,
+        0,
+        (0, 2),
+        rows,
+        &[0, 0],
+        true,
+        0,
+    );
     let matrix = app.layers.base.data.matrix.as_ref().expect("matrix");
     let first_column: Vec<f32> = matrix.values.iter().step_by(2).copied().collect();
     assert_eq!(first_column, [40.0, 30.0, 20.0]);
@@ -151,6 +171,7 @@ fn a_volume_from_two_flipped_blocks_runs_north_to_south_throughout() {
         let block = flipped_block(origin, 5, 2);
         let (req, local) = (((0, 1), (0, 9), (0, 0)), ((0, 2), (0, 5), (0, 1)));
         app.apply_3d_volume_projection(
+            crate::app::layers::LayerId::BASE,
             &block,
             1,
             0,

@@ -2,13 +2,23 @@
 //! blocks after a new selection.
 
 use crate::app::OctantApp;
-use crate::data::DimensionSelection;
+use crate::app::layers::{Layer, LayerId};
 use crate::data::octant_block::OctantBlock;
+use crate::data::{BlockCacheKey, DimensionSelection};
+use crate::plots::PlotType;
 
 /// Whether a block spanning `origin..origin + len` overlaps the inclusive
 /// requested range `req`.
 pub fn overlaps(origin: usize, len: usize, req: (usize, usize)) -> bool {
     origin <= req.1 && origin + len > req.0
+}
+
+/// Whether `block` holds index `step` along dimension `dim` (none when the
+/// block has no such dimension).
+pub fn covers_step(block: &OctantBlock, dim: usize, step: usize) -> bool {
+    let origin = block.origin.get(dim).copied().unwrap_or(0);
+    let extent = block.shape.get(dim).copied().unwrap_or(0);
+    (origin..origin + extent).contains(&step)
 }
 
 impl OctantApp {
@@ -48,6 +58,31 @@ impl OctantApp {
             })
     }
 
+    /// The layer whose latest requested view `block` (cache key `key`, not the
+    /// request itself) belongs to: same variable and selection, and either the
+    /// current step or a volume, which every block of the range builds.
+    pub(crate) fn layer_showing_block(
+        &self,
+        key: &BlockCacheKey,
+        block: &OctantBlock,
+    ) -> Option<LayerId> {
+        self.layers.iter().map(Layer::id).find(|&id| {
+            let is_same_var = self
+                .layer_variable_info(id)
+                .is_some_and(|v| v.name == block.variable_name);
+            let anim_dim = self.layer_animated_dim(id);
+            if !is_same_var || !self.key_matches_view(id, key, anim_dim) {
+                return false;
+            }
+            let covers_current =
+                anim_dim.is_some_and(|dim| covers_step(block, dim, self.current_timestep));
+            let is_volume = self.layer_selections(id).is_some_and(|(_, staged)| {
+                matches!(staged.plot_type, PlotType::Volume | PlotType::PointCloud)
+            });
+            covers_current || is_volume
+        })
+    }
+
     /// Plots resident `block` for the selection (`selections`, any step along
     /// `anim_dim`): syncs the plotted state, projects it (and the other blocks
     /// of a reset volume) and queues the rest of the animated range.
@@ -66,7 +101,7 @@ impl OctantApp {
         self.layers.base.load.pending_target_step = None;
         self.sync_plotted_state_from_selected();
         let allocations = self.layers.base.data.volume_allocations;
-        self.apply_block_projection(block);
+        self.apply_block_projection(LayerId::BASE, block);
         let source_id = self.selected_source_id();
         self.project_cached_volume_blocks(
             &source_id,
@@ -105,7 +140,7 @@ impl OctantApp {
             .block_cache
             .matching_blocks(source_id, var_name, selections, anim_dim);
         for block in &blocks {
-            self.apply_block_projection(block);
+            self.apply_block_projection(LayerId::BASE, block);
         }
     }
 }

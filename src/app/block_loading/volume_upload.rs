@@ -6,27 +6,8 @@
 use crate::app::OctantApp;
 use crate::app::layers::Layer;
 use crate::plots::PlotType;
-use std::ops::Range;
-
-fn union(pending: Option<Range<usize>>, z: Range<usize>) -> Option<Range<usize>> {
-    Some(match pending {
-        Some(p) => p.start.min(z.start)..p.end.max(z.end),
-        None => z,
-    })
-}
 
 impl OctantApp {
-    /// Marks Z planes `z` of the plotted volume as changed for both 3D renderers.
-    pub(crate) fn mark_volume_dirty(&mut self, z: Range<usize>) {
-        if z.is_empty() {
-            return;
-        }
-        self.layers.base.renderers.volume_dirty =
-            union(self.layers.base.renderers.volume_dirty.take(), z.clone());
-        self.layers.base.renderers.point_cloud_dirty =
-            union(self.layers.base.renderers.point_cloud_dirty.take(), z);
-    }
-
     /// Uploads the planes changed since the last upload to the renderer the
     /// active plot shows. Call once per frame before painting.
     pub fn flush_volume_uploads(&mut self) {

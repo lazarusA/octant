@@ -2,14 +2,16 @@
 
 use super::projection_hash::{compute_composite_hash, compute_target_dims};
 use crate::app::OctantApp;
+use crate::app::layers::{Layer, LayerId};
 use crate::data::octant_block::OctantBlock;
 use crate::data::volume_data::VolumeData;
 
 impl OctantApp {
-    /// Projects a 3D scalar or composite block subvolume onto the 3D render pipelines.
+    /// Projects a 3D scalar or composite block subvolume onto layer `id`'s 3D render pipelines.
     #[allow(clippy::too_many_arguments)]
     pub fn apply_3d_volume_projection(
         &mut self,
+        id: LayerId,
         block: &OctantBlock,
         x_dim: usize,
         y_dim: usize,
@@ -25,16 +27,20 @@ impl OctantApp {
         compute_bounds: bool,
         c_dim: usize,
     ) {
-        let eff_z = if self.layers.base.composite.enabled && z_dim == c_dim {
+        let Some(layer) = self.layers.get(id) else {
+            return;
+        };
+        let composite = layer.composite.enabled;
+        let eff_z = if composite && z_dim == c_dim {
             usize::MAX
         } else {
             z_dim
         };
         let (nx, ny, nz) = compute_target_dims(block, eff_z, req_x, req_y, req_z);
-        let ch_hash = compute_composite_hash(self);
+        let ch_hash = compute_composite_hash(&layer.composite, self.layer_is_geotiff(id));
         let target_desc = format!(
             "Vol:[{}] var={} ({nx}x{ny}x{nz}) xr={}..={} yr={}..={} zr={}..={} fx={:?} ch={ch_hash:016x}",
-            self.plotted().store_target,
+            layer.selection().store_target,
             block.variable_name,
             req_x.0,
             req_x.1,
@@ -49,14 +55,13 @@ impl OctantApp {
             },
         );
 
-        self.ensure_volume_allocated(nx, ny, nz, &target_desc);
+        self.ensure_volume_allocated(id, nx, ny, nz, &target_desc);
+        let Some(layer) = self.layers.get_mut(id) else {
+            return;
+        };
         // Raw channel readouts only exist for 2D composites.
-        self.layers.base.data.composite_probe = None;
-        self.layers
-            .base
-            .data
-            .flipped_dims
-            .clone_from(&block.flipped_dims);
+        layer.data.composite_probe = None;
+        layer.data.flipped_dims.clone_from(&block.flipped_dims);
 
         // Slices read the block in its oriented (flipped) order.
         let oriented = (
@@ -64,11 +69,12 @@ impl OctantApp {
             block.oriented_range(y_dim, local_y_range),
             block.oriented_range(z_dim, local_z_range),
         );
-        let slab_opt = if self.layers.base.composite.enabled
+        let slab_opt = if composite
             && block.shape.len() >= 3
             && block.shape.get(c_dim).copied().unwrap_or(0) >= 1
         {
             self.slice_3d_composite_volume(
+                id,
                 block,
                 c_dim,
                 x_dim,
@@ -100,6 +106,7 @@ impl OctantApp {
 
         if let Some(slab) = slab_opt {
             self.commit_volume_slab(
+                id,
                 block,
                 x_dim,
                 y_dim,
@@ -115,34 +122,42 @@ impl OctantApp {
         }
     }
 
-    /// Whether the GPU renderers are missing or encode the wrong format. Without
-    /// a GPU (headless) there are none to rebuild.
-    fn volume_renderers_stale(&self) -> bool {
+    /// Whether `layer`'s GPU renderers are missing or encode the wrong format.
+    /// Without a GPU (headless) there are none to rebuild.
+    fn volume_renderers_stale(&self, layer: &Layer) -> bool {
         self.wgpu_render_state.is_some()
-            && (self
-                .layers
-                .base
+            && (layer
                 .renderers
                 .volume
                 .as_ref()
-                .is_none_or(|r| r.encoding() != self.volume_encoding())
-                || self.layers.base.renderers.point_cloud.is_none())
+                .is_none_or(|r| r.encoding() != layer.volume_encoding())
+                || layer.renderers.point_cloud.is_none())
     }
 
-    fn ensure_volume_allocated(&mut self, nx: usize, ny: usize, nz: usize, desc: &str) {
-        let needs_realloc = match &self.layers.base.data.volume {
+    fn ensure_volume_allocated(
+        &mut self,
+        id: LayerId,
+        nx: usize,
+        ny: usize,
+        nz: usize,
+        desc: &str,
+    ) {
+        let Some(layer) = self.layers.get(id) else {
+            return;
+        };
+        let needs_realloc = match &layer.data.volume {
             Some(ex) => {
                 ex.width != nx
                     || ex.height != ny
                     || ex.depth != nz
                     || ex.dataset_name != desc
-                    || self.volume_renderers_stale()
+                    || self.volume_renderers_stale(layer)
             }
             None => true,
         };
 
-        if needs_realloc {
-            self.layers.base.data.volume_allocations += 1;
+        if needs_realloc && let Some(layer) = self.layers.get_mut(id) {
+            layer.data.volume_allocations += 1;
             let initial_vdata = VolumeData::new(
                 nx,
                 ny,
@@ -152,13 +167,14 @@ impl OctantApp {
                 f32::NAN,
                 desc.to_string(),
             );
-            self.rebuild_pipeline_with_volume_data(initial_vdata);
+            self.rebuild_pipeline_with_volume_data(id, initial_vdata);
         }
     }
 
     #[allow(clippy::too_many_arguments)]
     fn slice_3d_composite_volume(
         &self,
+        id: LayerId,
         block: &OctantBlock,
         c_dim: usize,
         x_dim: usize,
@@ -170,7 +186,8 @@ impl OctantApp {
         fixed: &[usize],
         desc: &str,
     ) -> Option<VolumeData> {
-        if !self.is_geotiff() && !self.layers.base.composite.channel_configs.is_empty() {
+        let composite = &self.layers.get(id)?.composite;
+        if !self.layer_is_geotiff(id) && !composite.channel_configs.is_empty() {
             crate::data::slicing::slice_multichannel_volume_composite_nd(
                 block,
                 c_dim,
@@ -181,15 +198,11 @@ impl OctantApp {
                 y_rng,
                 z_rng,
                 fixed,
-                &self.layers.base.composite.channel_configs,
+                &composite.channel_configs,
                 desc,
             )
         } else {
-            let opt_ch = [
-                Some(self.layers.base.composite.rgb_channels[0]),
-                Some(self.layers.base.composite.rgb_channels[1]),
-                Some(self.layers.base.composite.rgb_channels[2]),
-            ];
+            let opt_ch = composite.rgb_channels.map(Some);
             crate::data::slicing::slice_rgb_volume_composite_nd(
                 block, c_dim, x_dim, y_dim, z_dim, x_rng, y_rng, z_rng, fixed, opt_ch, desc,
             )

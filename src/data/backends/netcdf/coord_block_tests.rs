@@ -46,7 +46,17 @@ fn uneven_south_to_north_netcdf_rows_hover_with_their_own_latitude() {
         variable_idx: idx,
         ..Default::default()
     };
-    app.apply_2d_projection(&block, 1, 0, (0, 2), (0, 4), &[0, 0], true, 0);
+    app.apply_2d_projection(
+        crate::app::layers::LayerId::BASE,
+        &block,
+        1,
+        0,
+        (0, 2),
+        (0, 4),
+        &[0, 0],
+        true,
+        0,
+    );
     let meta = app.plotted().metadata.as_ref();
     let var = meta.and_then(|m| m.variables.get(idx));
     let matrix = app.layers.base.data.matrix.as_ref().expect("matrix");

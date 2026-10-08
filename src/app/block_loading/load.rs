@@ -1,6 +1,8 @@
 //! Primary variable block loading, prefetch polling, and fetch abort controls.
 
 use crate::app::OctantApp;
+use crate::app::layers::LayerId;
+use crate::data::octant_block::OctantBlock;
 use crate::data::{BlockRequest, DimensionSelection, SliceRequest};
 
 impl OctantApp {
@@ -116,53 +118,18 @@ impl OctantApp {
         for res in completed {
             match res.result {
                 Ok(block) => {
-                    let is_active = self.layers.find_by_key(&res.key).is_some();
-                    let is_same_var = self
-                        .plotted_variable_info()
-                        .or_else(|| self.selected_variable_info())
-                        .is_some_and(|v| v.name == block.variable_name);
-                    let anim_dim = self.plotted().animated_dim.or(self.selected.animated_dim);
-                    let covers_current = is_same_var
-                        && anim_dim.is_some_and(|dim| {
-                            let origin = block.origin.get(dim).copied().unwrap_or(0);
-                            let extent = block.shape.get(dim).copied().unwrap_or(0);
-                            self.current_timestep >= origin
-                                && self.current_timestep < origin + extent
-                        });
-                    // Only blocks of the requested view: not of an older
-                    // selection, variable or plot layout.
-                    let is_same_var = is_same_var && self.key_matches_view(&res.key, anim_dim);
-                    let is_volume_or_point_cloud = is_same_var
-                        && (self.selected.plot_type == crate::plots::PlotType::Volume
-                            || self.selected.plot_type == crate::plots::PlotType::PointCloud);
+                    let requested = self.layers.find_by_key(&res.key);
+                    let shown_in = requested.or_else(|| self.layer_showing_block(&res.key, &block));
 
                     self.block_cache.put(res.key, block.clone());
 
-                    if is_active || (is_same_var && (covers_current || is_volume_or_point_cloud)) {
-                        if is_active {
-                            self.layers.base.load.block_key = None;
-                            self.sync_plotted_state_from_selected();
-                            if let Some(target) = self.layers.base.load.pending_target_step.take()
-                                && let Some(dim) = self.plotted().animated_dim
-                            {
-                                let origin = block.origin.get(dim).copied().unwrap_or(0);
-                                let extent = block.shape.get(dim).copied().unwrap_or(0);
-                                if target >= origin && target < origin + extent {
-                                    self.current_timestep = target;
-                                    let sel_indices = if !self.plotted().dim_indices.is_empty() {
-                                        &mut self.layers.base.selection_mut().dim_indices
-                                    } else {
-                                        &mut self.selected.dim_indices
-                                    };
-                                    if dim < sel_indices.len() {
-                                        sel_indices[dim] = target;
-                                    }
-                                }
-                            }
+                    if let Some(id) = shown_in {
+                        if requested.is_some() {
+                            self.accept_requested_block(id, &block);
                         }
                         self.status_message =
                             format!("[block cache] Loaded '{}'", block.variable_name);
-                        self.apply_block_projection(&block);
+                        self.apply_block_projection(id, &block);
                     }
                 }
                 Err(e) => {
@@ -179,6 +146,39 @@ impl OctantApp {
         {
             let shape = var.shape.clone();
             self.prefetch_selected_animated_range(&shape);
+        }
+    }
+
+    /// Settles layer `id`'s request for `block`: the base layer's staged
+    /// selection becomes the plotted one, and the view moves to the step the
+    /// request was made at.
+    fn accept_requested_block(&mut self, id: LayerId, block: &OctantBlock) {
+        if let Some(layer) = self.layers.get_mut(id) {
+            layer.load.block_key = None;
+        }
+        if id == LayerId::BASE {
+            self.sync_plotted_state_from_selected();
+        }
+        let Some(layer) = self.layers.get_mut(id) else {
+            return;
+        };
+        let Some(target) = layer.load.pending_target_step.take() else {
+            return;
+        };
+        let Some(dim) = layer.selection().animated_dim else {
+            return;
+        };
+        if !super::view_filter::covers_step(block, dim, target) {
+            return;
+        }
+        self.current_timestep = target;
+        let selection = if !layer.selection().dim_indices.is_empty() {
+            Some(layer.selection_mut())
+        } else {
+            self.staged_selection_mut(id)
+        };
+        if let Some(index) = selection.and_then(|s| s.dim_indices.get_mut(dim)) {
+            *index = target;
         }
     }
 

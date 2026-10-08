@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use crate::app::OctantApp;
+use crate::app::layers::Layer;
 use crate::plots::PlotType;
 
 #[derive(Clone, Copy)]
@@ -46,17 +47,15 @@ impl OctantApp {
         }
     }
 
-    /// Resolves active (width, height) for 3D Volume and PointCloud shaders.
-    pub fn get_volume_dimensions(&self) -> (u32, u32) {
-        self.layers
-            .base
+    /// Resolves `layer`'s (width, height) for 3D Volume and PointCloud shaders.
+    pub fn get_volume_dimensions(layer: &Layer) -> (u32, u32) {
+        layer
             .data
             .volume
             .as_ref()
             .map(|v| (v.width as u32, v.height as u32))
             .unwrap_or_else(|| {
-                self.layers
-                    .base
+                layer
                     .data
                     .matrix
                     .as_ref()
@@ -64,13 +63,14 @@ impl OctantApp {
             })
     }
 
-    /// Extracts common 3D spatial dimensions, aspect ratios, shifts, and color uniforms.
+    /// Extracts `layer`'s 3D dimensions and color uniforms, with the canvas's
+    /// aspect ratios and shifts.
     #[inline]
-    fn get_common_3d_spatial_context(&self) -> Common3DSpatialContext {
-        let (width, height) = self.get_volume_dimensions();
+    fn get_common_3d_spatial_context(&self, layer: &Layer) -> Common3DSpatialContext {
+        let (width, height) = Self::get_volume_dimensions(layer);
         let (aspect_x, aspect_y, aspect_z) = self.get_3d_aspect_ratio();
         let (shift_x, shift_y, shift_z) = self.get_volume_shifts();
-        let color = self.get_color_params();
+        let color = self.get_color_params(layer);
 
         Common3DSpatialContext {
             width,
@@ -85,12 +85,13 @@ impl OctantApp {
         }
     }
 
-    /// Assembles VolumeUniformParams for 3D volume raymarching.
+    /// Assembles `layer`'s VolumeUniformParams for 3D volume raymarching.
     pub fn get_volume_uniform_params(
         &self,
+        layer: &Layer,
         screen_aspect: f32,
     ) -> crate::plots::VolumeUniformParams {
-        let mut ctx = self.get_common_3d_spatial_context();
+        let mut ctx = self.get_common_3d_spatial_context(layer);
         // Classic modes (1-7) keep their original opacity.
         if self.volume_algorithm != 0 {
             ctx.color.opacity = 1.0;
@@ -120,12 +121,13 @@ impl OctantApp {
         }
     }
 
-    /// Assembles PointCloudUniformParams for 3D point cloud billboard rendering.
+    /// Assembles `layer`'s PointCloudUniformParams for 3D point cloud billboard rendering.
     pub fn get_point_cloud_uniform_params(
         &self,
+        layer: &Layer,
         screen_aspect: f32,
     ) -> crate::plots::PointCloudUniformParams {
-        let ctx = self.get_common_3d_spatial_context();
+        let ctx = self.get_common_3d_spatial_context(layer);
 
         crate::plots::PointCloudUniformParams {
             color: ctx.color,
@@ -145,16 +147,15 @@ impl OctantApp {
         }
     }
 
-    /// Assembles Mesh3DUniformParams for Sphere and Surface heightfields (zero allocation).
+    /// Assembles `layer`'s Mesh3DUniformParams for Sphere and Surface heightfields (zero allocation).
     pub fn get_mesh_3d_uniform_params(
         &self,
+        layer: &Layer,
         mode: u32,
         displacement_strength: f32,
         aspect_ratio: f32,
     ) -> crate::plots::Mesh3DUniformParams {
-        let (coord_mode, has_reference_globe, lon_bounds, lat_bounds) = self
-            .layers
-            .base
+        let (coord_mode, has_reference_globe, lon_bounds, lat_bounds) = layer
             .data
             .matrix
             .as_ref()
@@ -174,7 +175,7 @@ impl OctantApp {
             ));
 
         crate::plots::Mesh3DUniformParams {
-            color: self.get_color_params(),
+            color: self.get_color_params(layer),
             rotation_y: self.sphere_rotation_y,
             rotation_x: self.sphere_rotation_x,
             aspect_ratio,
@@ -300,7 +301,9 @@ impl OctantApp {
                     PlotType::Sphere => (self.sphere_mode, 1, self.sphere_displacement_strength),
                     _ => (self.surface_mode, 0, self.surface_displacement_strength),
                 };
+                // Coastlines follow the base layer's grid.
                 let mesh_params = self.get_mesh_3d_uniform_params(
+                    &self.layers.base,
                     mode,
                     displacement_strength,
                     crate::plots::common::compute_aspect_ratio(&plot_rect),

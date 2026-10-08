@@ -169,9 +169,7 @@ impl OctantApp {
 
     /// Returns VariableInfo for the currently plotted variable, if available.
     pub fn plotted_variable_info(&self) -> Option<&crate::data::VariableInfo> {
-        self.plotted()
-            .variable_info()
-            .or_else(|| self.selected_variable_info())
+        self.layer_variable_info(crate::app::layers::LayerId::BASE)
     }
 
     /// Returns VariableInfo for the currently selected variable, if available.

@@ -1,11 +1,14 @@
 //! One plotted layer: its source, data, renderers and style.
 
 use super::{
-    ColorStyle, CompositeStyle, LayerData, LayerRenderers, LoadState, Source, VariableSelection,
+    ColorStyle, CompositeStyle, LayerData, LayerId, LayerRenderers, LoadState, Source,
+    VariableSelection,
 };
+use crate::plots::VolumeEncoding;
 
-#[derive(Default)]
 pub struct Layer {
+    /// Given by the `LayerStack`; read with `id()`.
+    id: LayerId,
     pub source: Source,
     pub data: LayerData,
     pub renderers: LayerRenderers,
@@ -15,12 +18,38 @@ pub struct Layer {
 }
 
 impl Layer {
+    /// A layer drawn from `source`, with default data, renderers and style.
+    pub(super) fn new(id: LayerId, source: Source) -> Self {
+        Self {
+            id,
+            source,
+            data: LayerData::default(),
+            renderers: LayerRenderers::default(),
+            color: ColorStyle::default(),
+            composite: CompositeStyle::default(),
+            load: LoadState::default(),
+        }
+    }
+
+    pub fn id(&self) -> LayerId {
+        self.id
+    }
+
     pub fn selection(&self) -> &VariableSelection {
         self.source.selection()
     }
 
     pub fn selection_mut(&mut self) -> &mut VariableSelection {
         self.source.selection_mut()
+    }
+
+    /// How volume values reach the GPU: packed RGB in composite mode.
+    pub fn volume_encoding(&self) -> VolumeEncoding {
+        if self.composite.enabled {
+            VolumeEncoding::PackedRgb
+        } else {
+            VolumeEncoding::Scalar
+        }
     }
 
     /// Invalidates the 2D data and its renderers.

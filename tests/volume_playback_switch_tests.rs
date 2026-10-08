@@ -106,7 +106,7 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
         std::collections::HashMap::new(),
     );
     app.plot_selection();
-    app.apply_block_projection(&initial_block);
+    app.apply_block_projection(octant::app::layers::LayerId::BASE, &initial_block);
 
     assert!(
         app.layers.base.data.volume.is_some(),
@@ -128,7 +128,7 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
         std::collections::HashMap::new(),
         std::collections::HashMap::new(),
     );
-    app.apply_block_projection(&step10_block);
+    app.apply_block_projection(octant::app::layers::LayerId::BASE, &step10_block);
     assert!(
         app.layers.base.data.matrix.is_some(),
         "matrix data should be present for Heatmap"
@@ -137,7 +137,7 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
     app.switch_plot_type(PlotType::Volume);
     assert_eq!(app.selected.plot_type, PlotType::Volume);
 
-    app.apply_block_projection(&step10_block);
+    app.apply_block_projection(octant::app::layers::LayerId::BASE, &step10_block);
 
     let vdata = app
         .layers

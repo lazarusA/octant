@@ -1,6 +1,7 @@
 //! Color parameter resolution and bounds resetting for visualization shaders.
 
 use crate::app::OctantApp;
+use crate::app::layers::Layer;
 use crate::plots::common::PlotColorParams;
 
 impl OctantApp {
@@ -9,14 +10,13 @@ impl OctantApp {
         self.layers.base.color.reset_bounds();
     }
 
-    /// Assembles the complete `PlotColorParams` uniform bundle for the plotted layer.
-    pub fn get_color_params(&self) -> PlotColorParams {
-        let base = &self.layers.base;
-        base.color.params(
-            self.effective_colormap(),
+    /// Assembles the complete `PlotColorParams` uniform bundle for `layer`.
+    pub fn get_color_params(&self, layer: &Layer) -> PlotColorParams {
+        layer.color.params(
+            self.layer_colormap(layer),
             self.colormaps.reversed,
-            base.composite.enabled,
-            base.data.matrix.as_ref(),
+            layer.composite.enabled,
+            layer.data.matrix.as_ref(),
         )
     }
 }

@@ -64,7 +64,17 @@ fn composite_app(labels: Option<&[&str]>, channels: [usize; 3]) -> OctantApp {
         store_kind: StoreKind::LocalGeoTiff,
         ..Default::default()
     };
-    app.apply_2d_projection(&block(), 2, 1, (0, 3), (0, 2), &[0, 0, 0], true, 0);
+    app.apply_2d_projection(
+        crate::app::layers::LayerId::BASE,
+        &block(),
+        2,
+        1,
+        (0, 3),
+        (0, 2),
+        &[0, 0, 0],
+        true,
+        0,
+    );
     app
 }
 
@@ -149,7 +159,17 @@ fn cmyk_composite_is_named_and_lists_its_inks() {
     let inks = ["Cyan", "Magenta", "Yellow", "Black"];
     let mut app = composite_app(Some(&inks), [0, 1, 2]);
     let cmyk = HashMap::from([("photometric".to_string(), "cmyk".to_string())]);
-    app.apply_2d_projection(&block_with(cmyk), 2, 1, (0, 3), (0, 2), &[0, 0, 0], true, 0);
+    app.apply_2d_projection(
+        crate::app::layers::LayerId::BASE,
+        &block_with(cmyk),
+        2,
+        1,
+        (0, 3),
+        (0, 2),
+        &[0, 0, 0],
+        true,
+        0,
+    );
     assert_eq!(kind(&app), CompositeKind::Cmyk);
 
     assert_eq!(
@@ -203,6 +223,7 @@ fn cmyk_volume_projection_draws_converted_inks() {
     // The band axis is the channel, so the raster becomes a one-voxel-deep volume.
     let (req, local) = (((0, 2), (0, 1), (0, 0)), ((0, 3), (0, 2), (0, 1)));
     app.apply_3d_volume_projection(
+        crate::app::layers::LayerId::BASE,
         &block,
         2,
         1,
