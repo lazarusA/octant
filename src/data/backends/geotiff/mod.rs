@@ -4,6 +4,7 @@ pub mod bands;
 pub mod blit;
 pub mod coords;
 pub mod decode;
+mod ifd_check;
 pub mod inspect;
 pub mod palette;
 pub mod reader;
@@ -15,6 +16,8 @@ pub mod wasm;
 mod axes_tests;
 #[cfg(test)]
 mod bands_tests;
+#[cfg(test)]
+mod ifd_check_tests;
 #[cfg(test)]
 pub mod test_utils;
 #[cfg(test)]

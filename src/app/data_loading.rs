@@ -68,12 +68,14 @@ impl OctantApp {
             let source_id = StoreKind::make_source_id(store_kind, &target_input);
             let source = crate::data::DataSource::new(&source_id, kind, &target_input, "Store");
 
-            let res = crate::data::SourceFactory::open(source)
-                .and_then(|handle| {
-                    let meta = handle.inspect()?;
-                    Ok((meta, handle))
-                })
-                .map_err(|e| e.to_string());
+            let res = crate::utils::executor::catch_panic(|| {
+                crate::data::SourceFactory::open(source)
+                    .and_then(|handle| {
+                        let meta = handle.inspect()?;
+                        Ok((meta, handle))
+                    })
+                    .map_err(|e| e.to_string())
+            });
 
             if let Err(err) = &res {
                 log::error!("Store inspect failed for '{target_input}': {err}");

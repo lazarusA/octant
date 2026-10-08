@@ -51,7 +51,10 @@ impl OctantApp {
         // Auto-open through SourceFactory if not yet in dataset_manager
         let kind = kind.to_data_source_kind();
         let source = crate::data::DataSource::new(source_id, kind, target_input, "Store");
-        crate::data::SourceFactory::open(source).ok()
+        crate::utils::executor::catch_panic(|| {
+            crate::data::SourceFactory::open(source).map_err(|e| e.to_string())
+        })
+        .ok()
     }
 
     /// Returns the open `StoreHandle` for the currently selected (target) dataset from `dataset_manager`.

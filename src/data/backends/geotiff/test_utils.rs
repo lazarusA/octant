@@ -50,6 +50,12 @@ impl SyntheticTiffBuilder {
         self
     }
 
+    /// Drops tag `tag`, for files that omit a required one.
+    pub fn without(mut self, tag: u16) -> Self {
+        self.entries.remove(&tag);
+        self
+    }
+
     pub fn compression(mut self, comp: u16) -> Self {
         self.add_short(259, comp);
         self

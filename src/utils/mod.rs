@@ -2,6 +2,8 @@ pub mod colormap;
 pub mod diagnostics;
 pub mod error;
 pub mod executor;
+#[cfg(test)]
+mod executor_tests;
 pub mod grid;
 pub mod grid_flips;
 pub mod math;
