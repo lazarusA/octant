@@ -12,12 +12,15 @@ use egui::{Color32, Mesh, Pos2, Rect, Shape, Vec2, epaint::Vertex};
 
 /// Renders the floating glassmorphic colorbar overlay panel.
 pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
-    if !app.show_colorbar || app.rgb_composite_mode {
+    if !app.show_colorbar || app.layers.base.composite.enabled {
         return;
     }
 
     let effective_colormap = app.effective_colormap();
-    let (min_val, max_val) = (app.color_range_min, app.color_range_max);
+    let (min_val, max_val) = (
+        app.layers.base.color.range_min,
+        app.layers.base.color.range_max,
+    );
 
     let default_label = app.default_colorbar_label();
     let mut current_label = app.colorbar_label();
@@ -85,9 +88,10 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                             if resp.changed() {
                                 if current_label.trim().is_empty() || current_label == default_label
                                 {
-                                    app.custom_colorbar_label = None;
+                                    app.layers.base.color.custom_label = None;
                                 } else {
-                                    app.custom_colorbar_label = Some(current_label.clone());
+                                    app.layers.base.color.custom_label =
+                                        Some(current_label.clone());
                                 }
                             }
                         });
@@ -105,10 +109,13 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                         let canvas_plot_type = app.effective_canvas_plot_type();
                         let is_3d = canvas_plot_type == crate::plots::PlotType::Volume
                             || canvas_plot_type == crate::plots::PlotType::PointCloud;
-                        let is_categorical_active = !is_3d && app.is_categorical;
+                        let is_categorical_active = !is_3d && app.layers.base.color.categorical;
 
                         let unique_vals = if is_categorical_active {
-                            app.matrix_data
+                            app.layers
+                                .base
+                                .data
+                                .matrix
                                 .as_ref()
                                 .and_then(|m| m.detect_unique_values())
                         } else {
@@ -151,8 +158,8 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context) {
                                 norm_x,
                                 min_val,
                                 max_val,
-                                app.active_scale_type,
-                                app.scale_param,
+                                app.layers.base.color.scale_type,
+                                app.layers.base.color.scale_param,
                             );
                             response.on_hover_text(format!(
                                 "Val: {}",
@@ -201,8 +208,8 @@ fn draw_categorical_colorbar(
             val,
             min_val,
             max_val,
-            app.active_scale_type,
-            app.scale_param,
+            app.layers.base.color.scale_type,
+            app.layers.base.color.scale_param,
         );
         // Same bin centering as the plot shaders, so swatches match the plot.
         let bin = (norm_scaled.clamp(0.0, 0.999_999) * num_cats as f32).floor();
@@ -317,15 +324,15 @@ fn draw_continuous_colorbar(
             t,
             min_val,
             max_val,
-            app.active_scale_type,
-            app.scale_param,
+            app.layers.base.color.scale_type,
+            app.layers.base.color.scale_param,
         );
         let norm_scaled = crate::utils::colormap::apply_color_scale_cpu(
             raw_val,
             min_val,
             max_val,
-            app.active_scale_type,
-            app.scale_param,
+            app.layers.base.color.scale_type,
+            app.layers.base.color.scale_param,
         );
         let color = checker::with_alpha(
             crate::utils::colormap::registry::sample(
@@ -375,7 +382,12 @@ fn draw_continuous_colorbar(
         egui::StrokeKind::Middle,
     );
 
-    let ticks = generate_colorbar_ticks(min_val, max_val, app.active_scale_type, app.scale_param);
+    let ticks = generate_colorbar_ticks(
+        min_val,
+        max_val,
+        app.layers.base.color.scale_type,
+        app.layers.base.color.scale_param,
+    );
 
     for tick in ticks {
         let x = bar_rect.min.x + tick.t_pos * bar_rect.width();
@@ -449,13 +461,13 @@ mod tests {
         assert_eq!(app.colorbar_label(), "Scalar Field");
         assert_eq!(app.default_colorbar_label(), "Scalar Field");
 
-        app.custom_colorbar_label = Some("Surface Temp (Celsius)".to_string());
+        app.layers.base.color.custom_label = Some("Surface Temp (Celsius)".to_string());
         assert_eq!(app.colorbar_label(), "Surface Temp (Celsius)");
         assert_eq!(app.default_colorbar_label(), "Scalar Field");
 
         app.reset_colorbar_label();
         assert_eq!(app.colorbar_label(), "Scalar Field");
-        assert!(app.custom_colorbar_label.is_none());
+        assert!(app.layers.base.color.custom_label.is_none());
 
         let mut attrs = HashMap::new();
         attrs.insert("units".to_string(), "degK".to_string());
@@ -479,13 +491,13 @@ mod tests {
             variables: vec![var],
             dimension_coordinates: HashMap::new(),
         };
-        app.plotted_dataset_metadata = Some(meta);
-        app.plotted_variable_idx = 0;
+        app.layers.base.selection_mut().metadata = Some(meta);
+        app.layers.base.selection_mut().variable_idx = 0;
 
         assert_eq!(app.default_colorbar_label(), "air_temp (degK)");
         assert_eq!(app.colorbar_label(), "air_temp (degK)");
 
-        app.custom_colorbar_label = Some("Custom Temp".to_string());
+        app.layers.base.color.custom_label = Some("Custom Temp".to_string());
         assert_eq!(app.colorbar_label(), "Custom Temp");
         assert_eq!(app.default_colorbar_label(), "air_temp (degK)");
 
@@ -506,19 +518,19 @@ mod tests {
             "test_ds".to_string(),
             1,
         );
-        app.matrix_data = Some(mdata);
+        app.layers.base.data.matrix = Some(mdata);
 
-        app.color_range_min = 20.0;
-        app.color_range_max = 50.0;
-        app.lock_color_bounds = true;
+        app.layers.base.color.range_min = 20.0;
+        app.layers.base.color.range_max = 50.0;
+        app.layers.base.color.lock_bounds = true;
 
         app.reset_color_range();
 
-        assert_eq!(app.color_range_min, 12.0);
-        assert_eq!(app.color_range_max, 88.0);
-        assert_eq!(app.volume_cmin, 12.0);
-        assert_eq!(app.volume_cmax, 88.0);
-        assert!(!app.lock_color_bounds);
+        assert_eq!(app.layers.base.color.range_min, 12.0);
+        assert_eq!(app.layers.base.color.range_max, 88.0);
+        assert_eq!(app.layers.base.color.volume_cmin, 12.0);
+        assert_eq!(app.layers.base.color.volume_cmax, 88.0);
+        assert!(!app.layers.base.color.lock_bounds);
     }
 
     #[test]

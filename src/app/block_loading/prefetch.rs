@@ -8,7 +8,7 @@ impl OctantApp {
     /// Prefetches the block window containing `step` asynchronously.
     pub fn prefetch_block_window_for_next_steps(&mut self, step: usize) {
         let (Some(anim_dim), Some(var_info), Some(store_handle)) = (
-            self.plotted_animated_dim,
+            self.plotted().animated_dim,
             self.plotted_variable_info().cloned(),
             self.plotted_store_handle(),
         ) else {
@@ -49,8 +49,8 @@ impl OctantApp {
         }
 
         let req = BlockRequest::new(store_handle, SliceRequest::new(&var_name, selections));
-        self.active_block_key = Some(req.cache_key());
-        self.pending_target_step = Some(step);
+        self.layers.base.load.block_key = Some(req.cache_key());
+        self.layers.base.load.pending_target_step = Some(step);
         self.block_prefetcher.request(req, &self.block_cache);
     }
 
@@ -72,7 +72,7 @@ impl OctantApp {
                 &source_id,
                 &name,
                 selections,
-                self.plotted_animated_dim,
+                self.plotted().animated_dim,
                 target_step,
             )
         });
@@ -91,7 +91,7 @@ impl OctantApp {
             return;
         }
         let (Some(anim_dim), Some(var_info), Some(store_handle)) = (
-            self.plotted_animated_dim,
+            self.plotted().animated_dim,
             self.plotted_variable_info().cloned(),
             self.plotted_store_handle(),
         ) else {
@@ -149,7 +149,8 @@ impl OctantApp {
         let current_chunk = self.current_timestep / cs;
         let max_dataset_chunk = full_extent.saturating_sub(1) / cs;
         let is_spatial = self
-            .plotted_dim_config
+            .plotted()
+            .dim_config
             .get(anim_dim)
             .is_some_and(|c| c.spatial != crate::app::SpatialRole::None);
 
@@ -168,7 +169,8 @@ impl OctantApp {
             indices.truncate(lookahead + 1);
         } else if is_spatial {
             let (r_start, r_end) = self
-                .plotted_selected_dim_ranges
+                .plotted()
+                .dim_ranges
                 .get(anim_dim)
                 .copied()
                 .unwrap_or((0, full_extent.saturating_sub(1)));

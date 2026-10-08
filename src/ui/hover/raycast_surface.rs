@@ -10,8 +10,8 @@ use egui::Pos2;
 pub fn get_normalized_surface_height(app: &OctantApp, val: f32) -> f32 {
     crate::utils::math::compute_normalized_surface_height(
         val,
-        app.color_range_min,
-        app.color_range_max,
+        app.layers.base.color.range_min,
+        app.layers.base.color.range_max,
         app.surface_mode,
         app.surface_displacement_strength,
     )

@@ -1,6 +1,7 @@
 use super::layout::{BottomBarItem, COLLAPSE_ORDER, ITEM_COUNT, LEFT_ITEMS, RIGHT_ITEMS};
 use super::timeline::{Timeline, is_display_coord};
 use crate::app::OctantApp;
+use crate::app::VariableSelection;
 use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 
 #[test]
@@ -67,11 +68,13 @@ fn regions_app(labels: &[&str]) -> OctantApp {
             .unwrap_or_default(),
         ..Default::default()
     };
-    OctantApp {
-        plotted_dataset_metadata: Some(meta),
-        plotted_animated_dim: Some(0),
+    let mut app = OctantApp::default();
+    *app.layers.base.selection_mut() = VariableSelection {
+        metadata: Some(meta),
+        animated_dim: Some(0),
         ..Default::default()
-    }
+    };
+    app
 }
 
 #[test]

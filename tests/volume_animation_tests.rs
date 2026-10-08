@@ -23,16 +23,16 @@ fn test_init_dimension_defaults_2d_dataset() {
     octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
 
     // Lon should be X (dim 1)
-    assert_eq!(app.dim_config[1].spatial, SpatialRole::X);
+    assert_eq!(app.selected.dim_config[1].spatial, SpatialRole::X);
     // Lat should be Y (dim 0)
-    assert_eq!(app.dim_config[0].spatial, SpatialRole::Y);
+    assert_eq!(app.selected.dim_config[0].spatial, SpatialRole::Y);
     // Neither dimension should be Animated
-    assert_eq!(app.dim_config[0].animation, AnimationRole::None);
-    assert_eq!(app.dim_config[1].animation, AnimationRole::None);
-    assert_eq!(app.animated_dim, None);
+    assert_eq!(app.selected.dim_config[0].animation, AnimationRole::None);
+    assert_eq!(app.selected.dim_config[1].animation, AnimationRole::None);
+    assert_eq!(app.selected.animated_dim, None);
 
     // spatial_dims should contain 2 dimensions in X, Y order: [1, 0]
-    assert_eq!(app.spatial_dims, vec![1, 0]);
+    assert_eq!(app.selected.spatial_dims, vec![1, 0]);
 }
 
 #[test]
@@ -56,16 +56,19 @@ fn test_init_dimension_defaults_3d_dataset() {
     octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
 
     // Lon should be X (dim 2)
-    assert_eq!(app.dim_config[2].spatial, SpatialRole::X);
+    assert_eq!(app.selected.dim_config[2].spatial, SpatialRole::X);
     // Lat should be Y (dim 1)
-    assert_eq!(app.dim_config[1].spatial, SpatialRole::Y);
+    assert_eq!(app.selected.dim_config[1].spatial, SpatialRole::Y);
     // Time should be Z (dim 0) and Animated
-    assert_eq!(app.dim_config[0].spatial, SpatialRole::Z);
-    assert_eq!(app.dim_config[0].animation, AnimationRole::Animated);
-    assert_eq!(app.animated_dim, Some(0));
+    assert_eq!(app.selected.dim_config[0].spatial, SpatialRole::Z);
+    assert_eq!(
+        app.selected.dim_config[0].animation,
+        AnimationRole::Animated
+    );
+    assert_eq!(app.selected.animated_dim, Some(0));
 
     // spatial_dims should contain 3 dimensions in X, Y, Z order: [2, 1, 0]
-    assert_eq!(app.spatial_dims, vec![2, 1, 0]);
+    assert_eq!(app.selected.spatial_dims, vec![2, 1, 0]);
 }
 
 #[test]
@@ -94,20 +97,23 @@ fn test_init_dimension_defaults_4d_dataset() {
     octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
 
     // Lon -> X (dim 3), Lat -> Y (dim 2), Depth -> Z (dim 1), Time -> Animated (dim 0)
-    assert_eq!(app.dim_config[3].spatial, SpatialRole::X);
-    assert_eq!(app.dim_config[2].spatial, SpatialRole::Y);
-    assert_eq!(app.dim_config[1].spatial, SpatialRole::Z);
-    assert_eq!(app.dim_config[0].animation, AnimationRole::Animated);
-    assert_eq!(app.animated_dim, Some(0));
+    assert_eq!(app.selected.dim_config[3].spatial, SpatialRole::X);
+    assert_eq!(app.selected.dim_config[2].spatial, SpatialRole::Y);
+    assert_eq!(app.selected.dim_config[1].spatial, SpatialRole::Z);
+    assert_eq!(
+        app.selected.dim_config[0].animation,
+        AnimationRole::Animated
+    );
+    assert_eq!(app.selected.animated_dim, Some(0));
 
     // spatial_dims in X, Y, Z order: [3, 2, 1]
-    assert_eq!(app.spatial_dims, vec![3, 2, 1]);
+    assert_eq!(app.selected.spatial_dims, vec![3, 2, 1]);
 }
 
 #[test]
 fn test_get_volume_shifts_for_spatial_dimensions() {
     let mut app = OctantApp::default();
-    app.volume_data = Some(VolumeData::new(
+    app.layers.base.data.volume = Some(VolumeData::new(
         10,
         20,
         30,
@@ -118,7 +124,7 @@ fn test_get_volume_shifts_for_spatial_dimensions() {
     ));
 
     // Case 1: Z is animated (dim 0)
-    app.plotted_dim_config = vec![
+    app.layers.base.selection_mut().dim_config = vec![
         octant::app::DimConfig {
             spatial: SpatialRole::Z,
             animation: AnimationRole::Animated,
@@ -138,7 +144,7 @@ fn test_get_volume_shifts_for_spatial_dimensions() {
             ..Default::default()
         },
     ];
-    app.plotted_animated_dim = Some(0);
+    app.layers.base.selection_mut().animated_dim = Some(0);
 
     app.current_timestep = 5;
     assert_eq!(app.get_volume_shifts(), (0, 0, 5));
@@ -147,9 +153,9 @@ fn test_get_volume_shifts_for_spatial_dimensions() {
     assert_eq!(app.get_volume_shifts(), (0, 0, 5));
 
     // Case 2: X is animated (dim 2)
-    app.plotted_dim_config[0].animation = AnimationRole::None;
-    app.plotted_dim_config[2].animation = AnimationRole::Animated;
-    app.plotted_animated_dim = Some(2);
+    app.layers.base.selection_mut().dim_config[0].animation = AnimationRole::None;
+    app.layers.base.selection_mut().dim_config[2].animation = AnimationRole::Animated;
+    app.layers.base.selection_mut().animated_dim = Some(2);
 
     app.current_timestep = 4;
     assert_eq!(app.get_volume_shifts(), (4, 0, 0));
@@ -158,9 +164,9 @@ fn test_get_volume_shifts_for_spatial_dimensions() {
     assert_eq!(app.get_volume_shifts(), (4, 0, 0));
 
     // Case 3: Y is animated (dim 1)
-    app.plotted_dim_config[2].animation = AnimationRole::None;
-    app.plotted_dim_config[1].animation = AnimationRole::Animated;
-    app.plotted_animated_dim = Some(1);
+    app.layers.base.selection_mut().dim_config[2].animation = AnimationRole::None;
+    app.layers.base.selection_mut().dim_config[1].animation = AnimationRole::Animated;
+    app.layers.base.selection_mut().animated_dim = Some(1);
 
     app.current_timestep = 7;
     assert_eq!(app.get_volume_shifts(), (0, 7, 0));
@@ -205,7 +211,7 @@ fn test_line_profile_along_z_and_xyz() {
     // Total 24 floats with values 0.0..24.0
     // Index = z * 6 + y * 2 + x
     let values: Vec<f32> = (0..24).map(|v| v as f32).collect();
-    app.volume_data = Some(VolumeData::new(
+    app.layers.base.data.volume = Some(VolumeData::new(
         2,
         3,
         4,
@@ -232,10 +238,10 @@ fn test_line_profile_along_z_and_xyz() {
     assert_eq!(count_p1, 1);
     assert_eq!(payload_p1, vec![1.0, 7.0, 13.0, 19.0]);
 
-    // 3. Along X (dim 0) - extracted from matrix_data (timestep slice)
+    // 3. Along X (dim 0) - extracted from the layer's matrix (timestep slice)
     app.line_profile_dim_idx = 0;
     app.line_profile_slice_idx = 0;
-    app.matrix_data = Some(octant::data::MatrixData::new(
+    app.layers.base.data.matrix = Some(octant::data::MatrixData::new(
         2,
         3,
         vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
@@ -250,8 +256,8 @@ fn test_line_profile_along_z_and_xyz() {
     assert_eq!(count_x, 1);
     assert_eq!(payload_x, vec![10.0, 20.0]);
 
-    // Timestep advances -> new matrix_data slice
-    app.matrix_data = Some(octant::data::MatrixData::new(
+    // Timestep advances -> new matrix slice
+    app.layers.base.data.matrix = Some(octant::data::MatrixData::new(
         2,
         3,
         vec![100.0, 200.0, 300.0, 400.0, 500.0, 600.0],
@@ -428,15 +434,15 @@ fn test_selected_volume_elements_and_limit() {
         file_size: 50 * 1000 * 1000 * 4,
         attributes: HashMap::new(),
     };
-    app.active_dataset_metadata = Some(DatasetMetadata {
+    app.selected.metadata = Some(DatasetMetadata {
         name: "test_ds".to_string(),
         store_type: "zarr".to_string(),
         variables: vec![var_info.clone()],
         dimension_coordinates: HashMap::new(),
     });
-    app.selected_variable_idx = 0;
-    app.selected_dim_ranges = vec![(0, 49), (0, 999), (0, 999)];
-    app.dim_config = vec![
+    app.selected.variable_idx = 0;
+    app.selected.dim_ranges = vec![(0, 49), (0, 999), (0, 999)];
+    app.selected.dim_config = vec![
         octant::app::DimConfig {
             active: true,
             spatial: SpatialRole::Z,
@@ -463,7 +469,7 @@ fn test_selected_volume_elements_and_limit() {
     assert!(!is_volume_allowed_for_selection(&app));
 
     // Reducing Z range to 10 slices: 10 * 1000 * 1000 = 10,000,000 floats (40 MB) <= 128 MB
-    app.selected_dim_ranges[0] = (0, 9);
+    app.selected.dim_ranges[0] = (0, 9);
     let elements_small = calculate_selected_volume_elements(&app);
     assert_eq!(elements_small, 10_000_000);
     assert!(is_volume_allowed_for_selection(&app));
@@ -606,7 +612,7 @@ fn test_volume_animation_timeline_progression() {
     let block = generate_known_truth_4d_block("animated_salinity", nt, nz, ny, nx);
 
     // Setup dimension configs: dim 0 = Animated, dim 1 = Z, dim 2 = Y, dim 3 = X
-    app.dim_config = vec![
+    app.selected.dim_config = vec![
         octant::app::DimConfig {
             spatial: SpatialRole::None,
             animation: AnimationRole::Animated,
@@ -632,21 +638,24 @@ fn test_volume_animation_timeline_progression() {
             ..Default::default()
         },
     ];
-    app.animated_dim = Some(0);
-    app.spatial_dims = vec![3, 2, 1]; // X, Y, Z
-    app.selected_dim_indices = vec![0, 0, 0, 0];
-    app.active_plot_type = octant::plots::PlotType::Volume;
+    app.selected.animated_dim = Some(0);
+    app.selected.spatial_dims = vec![3, 2, 1]; // X, Y, Z
+    app.selected.dim_indices = vec![0, 0, 0, 0];
+    app.selected.plot_type = octant::plots::PlotType::Volume;
     app.sync_plotted_state_from_selected();
 
     // Simulate stepping through all timesteps in OctantApp
     for step in 0..nt {
         app.current_timestep = step;
-        app.selected_dim_indices[0] = step;
+        app.selected.dim_indices[0] = step;
         app.sync_plotted_state_from_selected();
         app.apply_block_projection(&block);
 
         let vdata = app
-            .volume_data
+            .layers
+            .base
+            .data
+            .volume
             .as_ref()
             .expect("VolumeData should be populated");
         assert_eq!(vdata.width, nx);
@@ -726,7 +735,7 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
     let (nt, nz, ny, nx) = (5, 6, 8, 10);
     let block = generate_known_truth_4d_block("pulse_4d", nt, nz, ny, nx);
 
-    app.dim_config = vec![
+    app.selected.dim_config = vec![
         octant::app::DimConfig {
             spatial: SpatialRole::None,
             animation: AnimationRole::Animated,
@@ -752,51 +761,51 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
             ..Default::default()
         },
     ];
-    app.animated_dim = Some(0);
-    app.spatial_dims = vec![3, 2, 1];
-    app.selected_dim_indices = vec![0, 0, 0, 0];
-    app.active_plot_type = octant::plots::PlotType::Volume;
+    app.selected.animated_dim = Some(0);
+    app.selected.spatial_dims = vec![3, 2, 1];
+    app.selected.dim_indices = vec![0, 0, 0, 0];
+    app.selected.plot_type = octant::plots::PlotType::Volume;
     app.sync_plotted_state_from_selected();
 
-    // 1. Dynamic Mode (!lock_color_bounds): color_range_min and max dynamically adapt to each 3D step
-    app.lock_color_bounds = false;
+    // 1. Dynamic Mode (!lock_bounds): range_min and range_max dynamically adapt to each 3D step
+    app.layers.base.color.lock_bounds = false;
 
     for step in 0..nt {
         app.current_timestep = step;
-        app.plotted_selected_dim_indices[0] = step;
+        app.layers.base.selection_mut().dim_indices[0] = step;
         app.apply_block_projection(&block);
 
-        let vdata = app.volume_data.as_ref().unwrap();
-        assert_eq!(app.color_range_min, vdata.min_val);
-        assert_eq!(app.color_range_max, vdata.max_val);
-        assert_eq!(app.volume_cmin, vdata.min_val);
-        assert_eq!(app.volume_cmax, vdata.max_val);
+        let vdata = app.layers.base.data.volume.as_ref().unwrap();
+        assert_eq!(app.layers.base.color.range_min, vdata.min_val);
+        assert_eq!(app.layers.base.color.range_max, vdata.max_val);
+        assert_eq!(app.layers.base.color.volume_cmin, vdata.min_val);
+        assert_eq!(app.layers.base.color.volume_cmax, vdata.max_val);
     }
 
-    // 2. Locked Mode (lock_color_bounds = true): bounds remain fixed
-    app.color_range_min = 10.0;
-    app.color_range_max = 80.0;
-    app.volume_cmin = 10.0;
-    app.volume_cmax = 80.0;
-    app.lock_color_bounds = true;
+    // 2. Locked Mode (lock_bounds = true): bounds remain fixed
+    app.layers.base.color.range_min = 10.0;
+    app.layers.base.color.range_max = 80.0;
+    app.layers.base.color.volume_cmin = 10.0;
+    app.layers.base.color.volume_cmax = 80.0;
+    app.layers.base.color.lock_bounds = true;
 
     for step in 0..nt {
         app.current_timestep = step;
-        app.plotted_selected_dim_indices[0] = step;
+        app.layers.base.selection_mut().dim_indices[0] = step;
         app.apply_block_projection(&block);
 
-        assert_eq!(app.color_range_min, 10.0);
-        assert_eq!(app.color_range_max, 80.0);
-        assert_eq!(app.volume_cmin, 10.0);
-        assert_eq!(app.volume_cmax, 80.0);
+        assert_eq!(app.layers.base.color.range_min, 10.0);
+        assert_eq!(app.layers.base.color.range_max, 80.0);
+        assert_eq!(app.layers.base.color.volume_cmin, 10.0);
+        assert_eq!(app.layers.base.color.volume_cmax, 80.0);
     }
 
     // 3. Reset Bounds: unlocks and resets to active 3D volume min/max
     app.reset_color_range();
-    assert!(!app.lock_color_bounds);
-    let vdata = app.volume_data.as_ref().unwrap();
-    assert_eq!(app.color_range_min, vdata.min_val);
-    assert_eq!(app.color_range_max, vdata.max_val);
+    assert!(!app.layers.base.color.lock_bounds);
+    let vdata = app.layers.base.data.volume.as_ref().unwrap();
+    assert_eq!(app.layers.base.color.range_min, vdata.min_val);
+    assert_eq!(app.layers.base.color.range_max, vdata.max_val);
 }
 
 #[test]
@@ -918,14 +927,14 @@ fn test_2d_and_3d_selected_elements_and_limits() {
         variables: vec![var_info.clone()],
         dimension_coordinates: HashMap::new(),
     };
-    app.active_dataset_metadata = Some(metadata);
-    app.selected_variable_idx = 0;
+    app.selected.metadata = Some(metadata);
+    app.selected.variable_idx = 0;
 
     octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
 
     // Sub-range selection for X and Y in sliders: 100x100
-    app.selected_dim_ranges[2] = (10, 109); // span 100
-    app.selected_dim_ranges[1] = (20, 119); // span 100
+    app.selected.dim_ranges[2] = (10, 109); // span 100
+    app.selected.dim_ranges[1] = (20, 119); // span 100
 
     let elements_2d = octant::ui::variables_panel::calculate_selected_2d_elements(&app);
     assert_eq!(elements_2d, 100 * 100);

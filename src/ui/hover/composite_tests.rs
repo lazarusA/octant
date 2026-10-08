@@ -1,5 +1,6 @@
 //! Composite hover readout: band combination names and per-channel raw values.
 
+use crate::app::VariableSelection;
 use std::collections::HashMap;
 
 use super::composite::{
@@ -55,11 +56,12 @@ fn metadata(labels: Option<&[&str]>) -> DatasetMetadata {
 
 /// An app showing `block()` as an RGB composite of `channels`.
 fn composite_app(labels: Option<&[&str]>, channels: [usize; 3]) -> OctantApp {
-    let mut app = OctantApp {
-        plotted_dataset_metadata: Some(metadata(labels)),
-        plotted_store_kind: StoreKind::LocalGeoTiff,
-        rgb_composite_mode: true,
-        rgb_composite_channels: channels,
+    let mut app = OctantApp::default();
+    app.layers.base.composite.enabled = true;
+    app.layers.base.composite.rgb_channels = channels;
+    *app.layers.base.selection_mut() = VariableSelection {
+        metadata: Some(metadata(labels)),
+        store_kind: StoreKind::LocalGeoTiff,
         ..Default::default()
     };
     app.apply_2d_projection(&block(), 2, 1, (0, 3), (0, 2), &[0, 0, 0], true, 0);
@@ -67,7 +69,7 @@ fn composite_app(labels: Option<&[&str]>, channels: [usize; 3]) -> OctantApp {
 }
 
 fn labels(app: &OctantApp) -> CompositeLabels {
-    let meta = app.plotted_dataset_metadata.as_ref();
+    let meta = app.plotted().metadata.as_ref();
     build_labels(app, meta, meta.and_then(|m| m.variables.first()))
 }
 
@@ -113,9 +115,15 @@ fn channel_rows_show_each_band_and_its_raw_value() {
 #[test]
 fn composite_hover_lists_channels_instead_of_a_band_row() {
     let app = composite_app(Some(&BANDS), [3, 2, 1]);
-    let meta = app.plotted_dataset_metadata.as_ref();
+    let meta = app.plotted().metadata.as_ref();
     let var = meta.and_then(|m| m.variables.first());
-    let matrix = app.matrix_data.as_ref().expect("composite matrix");
+    let matrix = app
+        .layers
+        .base
+        .data
+        .matrix
+        .as_ref()
+        .expect("composite matrix");
     let (val, fields, px, py) =
         resolve_2d_plot_entries(&app, matrix, meta, var, 2.5 / 3.0, 1.5 / 2.0, None);
 
@@ -161,13 +169,17 @@ fn cmyk_volume_is_named_from_the_dataset_tags() {
     meta.variables[0]
         .attributes
         .insert("photometric".into(), "cmyk".into());
-    let app = OctantApp {
-        plotted_dataset_metadata: Some(meta),
-        plotted_store_kind: StoreKind::LocalGeoTiff,
-        rgb_composite_mode: true,
+    let mut app = OctantApp::default();
+    app.layers.base.composite.enabled = true;
+    *app.layers.base.selection_mut() = VariableSelection {
+        metadata: Some(meta),
+        store_kind: StoreKind::LocalGeoTiff,
         ..Default::default()
     };
-    assert!(app.composite_probe.is_none(), "volumes keep no probe");
+    assert!(
+        app.layers.base.data.composite_probe.is_none(),
+        "volumes keep no probe"
+    );
     assert_eq!(kind(&app), CompositeKind::Cmyk);
 }
 
@@ -176,10 +188,16 @@ fn cmyk_volume_projection_draws_converted_inks() {
     let cmyk = HashMap::from([("photometric".to_string(), "cmyk".to_string())]);
     let block = block_with(cmyk);
     let mut app = OctantApp {
-        plotted_dataset_metadata: Some(metadata(None)),
-        plotted_store_kind: StoreKind::LocalGeoTiff,
-        active_plot_type: crate::plots::PlotType::Volume,
-        rgb_composite_mode: true,
+        selected: VariableSelection {
+            plot_type: crate::plots::PlotType::Volume,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    app.layers.base.composite.enabled = true;
+    *app.layers.base.selection_mut() = VariableSelection {
+        metadata: Some(metadata(None)),
+        store_kind: StoreKind::LocalGeoTiff,
         ..Default::default()
     };
     // The band axis is the channel, so the raster becomes a one-voxel-deep volume.
@@ -202,7 +220,7 @@ fn cmyk_volume_projection_draws_converted_inks() {
     );
 
     let expected = crate::data::slicing::slice_cmyk_composite(&block, 3, 2, 6, 1);
-    let volume = app.volume_data.as_ref().expect("volume data");
+    let volume = app.layers.base.data.volume.as_ref().expect("volume data");
     assert_eq!(
         volume.values,
         expected.expect("cmyk composite").values.to_vec()
@@ -214,12 +232,13 @@ fn cached_labels_follow_newly_plotted_metadata() {
     let mut app = composite_app(Some(&BANDS), [2, 1, 0]);
     let ctx = egui::Context::default();
     let cached = |app: &OctantApp| {
-        let meta = app.plotted_dataset_metadata.as_ref();
+        let meta = app.plotted().metadata.as_ref();
         composite_labels(app, &ctx, meta, meta.and_then(|m| m.variables.first())).kind
     };
     assert_eq!(cached(&app), CompositeKind::TrueColor);
     // A newly plotted dataset with the same variable names other bands.
-    app.plotted_dataset_metadata = Some(metadata(Some(&["NIR", "SWIR", "Red", "Blue"])));
-    app.plotted_metadata_generation += 1;
+    let plotted = app.layers.base.selection_mut();
+    plotted.metadata = Some(metadata(Some(&["NIR", "SWIR", "Red", "Blue"])));
+    plotted.metadata_generation += 1;
     assert_eq!(cached(&app), CompositeKind::FalseColor);
 }

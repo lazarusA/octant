@@ -30,11 +30,11 @@ fn create_volume_app() -> OctantApp {
     let mut app = OctantApp::default();
     let store = ProceduralBlockStore::open("procedural://volume4d").expect("open procedural store");
     let meta = store.inspect().expect("inspect procedural store");
-    app.selected_store_kind = StoreKind::ProceduralVolume4D;
-    app.store_target_input = "procedural://volume4d".to_string();
+    app.selected.store_kind = StoreKind::ProceduralVolume4D;
+    app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
     app.show_hero = false;
-    app.active_plot_type = PlotType::Volume;
+    app.selected.plot_type = PlotType::Volume;
     app
 }
 
@@ -55,7 +55,7 @@ fn test_playing_volume_then_changing_to_heatmap_continues_time_stepping() {
     app.switch_plot_type(PlotType::Heatmap);
     drain(&mut app);
 
-    assert_eq!(app.active_plot_type, PlotType::Heatmap);
+    assert_eq!(app.selected.plot_type, PlotType::Heatmap);
     assert!(app.is_playing, "playback should remain active");
 
     // Advance playback for several frames:
@@ -69,7 +69,7 @@ fn test_playing_volume_then_changing_to_heatmap_continues_time_stepping() {
         app.current_timestep
     );
     assert!(
-        app.matrix_data.is_some(),
+        app.layers.base.data.matrix.is_some(),
         "2D matrix data must be present for heatmap"
     );
 }
@@ -79,9 +79,9 @@ fn test_volume_aspect_ratio_stable_with_incoming_slices() {
     let mut app = create_volume_app();
 
     // Set slider ranges and z-scale:
-    app.selected_dim_ranges[1] = (0, 15); // depth: 16 slices
-    app.selected_dim_ranges[2] = (0, 31); // height: 32
-    app.selected_dim_ranges[3] = (0, 31); // width: 32
+    app.selected.dim_ranges[1] = (0, 15); // depth: 16 slices
+    app.selected.dim_ranges[2] = (0, 31); // height: 32
+    app.selected.dim_ranges[3] = (0, 31); // width: 32
     app.volume_z_scale = 1.5;
 
     let initial_aspect = app.get_3d_aspect_ratio();
@@ -95,7 +95,7 @@ fn test_volume_aspect_ratio_stable_with_incoming_slices() {
         "aspect ratio before and after initial volume allocation must match"
     );
 
-    let allocations_before = app.volume_allocations;
+    let allocations_before = app.layers.base.data.volume_allocations;
 
     // Advance playback with incoming slices:
     app.is_playing = true;
@@ -109,7 +109,7 @@ fn test_volume_aspect_ratio_stable_with_incoming_slices() {
     }
 
     assert_eq!(
-        app.volume_allocations, allocations_before,
+        app.layers.base.data.volume_allocations, allocations_before,
         "volume should not be reallocated when incoming slices update the subvolume"
     );
 }
@@ -139,36 +139,51 @@ fn test_3d_time_lat_lon_defaults_and_plot_switch() {
     // lat: spatial: Y
     // lon: spatial: X
     assert_eq!(
-        app.dim_config[0].animation,
+        app.selected.dim_config[0].animation,
         octant::app::AnimationRole::Animated
     );
-    assert_eq!(app.dim_config[0].spatial, octant::app::SpatialRole::Z);
-    assert_eq!(app.dim_config[1].spatial, octant::app::SpatialRole::Y);
-    assert_eq!(app.dim_config[2].spatial, octant::app::SpatialRole::X);
+    assert_eq!(
+        app.selected.dim_config[0].spatial,
+        octant::app::SpatialRole::Z
+    );
+    assert_eq!(
+        app.selected.dim_config[1].spatial,
+        octant::app::SpatialRole::Y
+    );
+    assert_eq!(
+        app.selected.dim_config[2].spatial,
+        octant::app::SpatialRole::X
+    );
 
     // Set animated range to (0, 9):
-    app.selected_dim_ranges[0] = (0, 9);
-    app.dim_config[0].range = (0, 9);
+    app.selected.dim_ranges[0] = (0, 9);
+    app.selected.dim_config[0].range = (0, 9);
 
     // Switch to Volume:
     app.switch_plot_type(PlotType::Volume);
-    assert_eq!(app.active_plot_type, PlotType::Volume);
+    assert_eq!(app.selected.plot_type, PlotType::Volume);
     // time becomes spatial Z for Volume, while staying Animated:
-    assert_eq!(app.dim_config[0].spatial, octant::app::SpatialRole::Z);
     assert_eq!(
-        app.dim_config[0].animation,
+        app.selected.dim_config[0].spatial,
+        octant::app::SpatialRole::Z
+    );
+    assert_eq!(
+        app.selected.dim_config[0].animation,
         octant::app::AnimationRole::Animated
     );
 
     // Switch from Volume back to Heatmap:
     app.switch_plot_type(PlotType::Heatmap);
-    assert_eq!(app.active_plot_type, PlotType::Heatmap);
+    assert_eq!(app.selected.plot_type, PlotType::Heatmap);
     // time must return to spatial None, active true, animation Animated:
-    assert_eq!(app.dim_config[0].spatial, octant::app::SpatialRole::None);
     assert_eq!(
-        app.dim_config[0].animation,
+        app.selected.dim_config[0].spatial,
+        octant::app::SpatialRole::None
+    );
+    assert_eq!(
+        app.selected.dim_config[0].animation,
         octant::app::AnimationRole::Animated
     );
-    assert!(app.dim_config[0].active);
-    assert_eq!(app.dim_config[0].range, (0, 9));
+    assert!(app.selected.dim_config[0].active);
+    assert_eq!(app.selected.dim_config[0].range, (0, 9));
 }

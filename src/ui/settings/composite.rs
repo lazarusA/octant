@@ -9,31 +9,31 @@ pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.separator();
     let is_cmyk = app.is_cmyk();
     let is_tiff = app.is_geotiff();
-    let has_mc = !app.composite_channel_configs.is_empty() && !is_tiff;
+    let has_mc = !app.layers.base.composite.channel_configs.is_empty() && !is_tiff;
 
     let (label, tooltip) = toggle_text(has_mc, is_cmyk);
 
     // Name the band combination once it is drawn, as the hover card does.
     let mut label_buf = [0u8; 48];
-    let label = if app.rgb_composite_mode && !has_mc && !is_cmyk {
-        let meta = app.plotted_dataset_metadata.as_ref();
+    let label = if app.layers.base.composite.enabled && !has_mc && !is_cmyk {
+        let meta = app.plotted().metadata.as_ref();
         let kind = composite_labels(app, ui.ctx(), meta, app.plotted_variable_info()).kind;
         stack_str(&mut label_buf, format_args!("{label} ({})", kind.label()))
     } else {
         label
     };
 
-    let mut rgb_mode = app.rgb_composite_mode;
+    let mut rgb_mode = app.layers.base.composite.enabled;
     if ui
         .checkbox(&mut rgb_mode, label)
         .on_hover_text(tooltip)
         .changed()
     {
-        app.rgb_composite_mode = rgb_mode;
+        app.layers.base.composite.enabled = rgb_mode;
         app.load_selected_variable_block();
     }
 
-    if app.rgb_composite_mode {
+    if app.layers.base.composite.enabled {
         if has_mc {
             show_multichannel_controls(app, ui);
         } else if is_cmyk {
@@ -81,13 +81,13 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Channels:").small().strong());
         if ui.small_button("All").clicked() {
-            for cfg in &mut app.composite_channel_configs {
+            for cfg in &mut app.layers.base.composite.channel_configs {
                 cfg.visible = true;
             }
             changed = true;
         }
         if ui.small_button("None").clicked() {
-            for cfg in &mut app.composite_channel_configs {
+            for cfg in &mut app.layers.base.composite.channel_configs {
                 cfg.visible = false;
             }
             changed = true;
@@ -102,7 +102,7 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .num_columns(3)
                 .spacing([6.0, 3.0])
                 .show(ui, |ui| {
-                    for cfg in &mut app.composite_channel_configs {
+                    for cfg in &mut app.layers.base.composite.channel_configs {
                         if ui.checkbox(&mut cfg.visible, "").changed() {
                             changed = true;
                         }
@@ -162,7 +162,12 @@ fn show_standard_rgb_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     let min_b = c_start.min(num_b.saturating_sub(1));
     let max_b = c_end.min(num_b.saturating_sub(1)).max(min_b);
 
-    let mut selected = app.rgb_composite_channels.map(|b| b.clamp(min_b, max_b));
+    let mut selected = app
+        .layers
+        .base
+        .composite
+        .rgb_channels
+        .map(|b| b.clamp(min_b, max_b));
     let names = app
         .plotted_variable_info()
         .and_then(|v| v.attributes.get("omero_channels"))
@@ -182,8 +187,8 @@ fn show_standard_rgb_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
     }
 
-    if selected != app.rgb_composite_channels {
-        app.rgb_composite_channels = selected;
+    if selected != app.layers.base.composite.rgb_channels {
+        app.layers.base.composite.rgb_channels = selected;
         app.load_selected_variable_block();
     }
 }

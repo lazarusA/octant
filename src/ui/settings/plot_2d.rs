@@ -60,13 +60,25 @@ pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 fn show_line_profile_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let has_z_dim = app.volume_data.as_ref().is_some_and(|v| v.depth > 1);
-    let profile_controls = app.matrix_data.as_ref().map_or((false, 0usize), |matrix| {
-        (
-            matrix.width > 1 || matrix.height > 1 || has_z_dim,
-            matrix.width.max(matrix.height),
-        )
-    });
+    let has_z_dim = app
+        .layers
+        .base
+        .data
+        .volume
+        .as_ref()
+        .is_some_and(|v| v.depth > 1);
+    let profile_controls = app
+        .layers
+        .base
+        .data
+        .matrix
+        .as_ref()
+        .map_or((false, 0usize), |matrix| {
+            (
+                matrix.width > 1 || matrix.height > 1 || has_z_dim,
+                matrix.width.max(matrix.height),
+            )
+        });
 
     if !profile_controls.0 {
         return;
@@ -127,15 +139,24 @@ fn show_line_profile_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
 fn show_line_profile_slider(app: &mut OctantApp, ui: &mut egui::Ui, has_z_dim: bool) {
     let max_idx = match app.line_profile_dim_idx {
         2 if has_z_dim => app
-            .volume_data
+            .layers
+            .base
+            .data
+            .volume
             .as_ref()
             .map_or(0, |v| (v.width * v.height).saturating_sub(1)),
         1 => app
-            .matrix_data
+            .layers
+            .base
+            .data
+            .matrix
             .as_ref()
             .map_or(0, |matrix| matrix.width.saturating_sub(1)),
         _ => app
-            .matrix_data
+            .layers
+            .base
+            .data
+            .matrix
             .as_ref()
             .map_or(0, |matrix| matrix.height.saturating_sub(1)),
     };
@@ -162,10 +183,10 @@ pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .clicked().then(|| app.show_hover_card = !app.show_hover_card);
     });
 
-    if app.has_rgb_bands() || !app.composite_channel_configs.is_empty() {
+    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
         super::composite::show_composite_controls(app, ui);
-    } else if app.rgb_composite_mode {
-        app.rgb_composite_mode = false;
+    } else if app.layers.base.composite.enabled {
+        app.layers.base.composite.enabled = false;
     }
 
     show_coastline_controls(app, ui);

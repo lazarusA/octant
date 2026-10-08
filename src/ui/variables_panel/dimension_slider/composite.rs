@@ -5,8 +5,8 @@ use crate::data::VariableInfo;
 
 /// Initialize multi-channel composite configurations and defaults for a variable.
 pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo, rank: usize) {
-    app.rgb_composite_channels = [0, 1, 2];
-    app.composite_channel_configs.clear();
+    app.layers.base.composite.rgb_channels = [0, 1, 2];
+    app.layers.base.composite.channel_configs.clear();
 
     let is_tiff = app.is_geotiff();
 
@@ -27,7 +27,8 @@ pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo, ran
         if let Some(c_idx) = c_idx_opt {
             let num_ch = var_info.shape.get(c_idx).copied().unwrap_or(0) as usize;
             if num_ch >= 2 {
-                app.composite_channel_configs = extract_channel_configs(var_info, num_ch);
+                app.layers.base.composite.channel_configs =
+                    extract_channel_configs(var_info, num_ch);
             }
         }
     }
@@ -35,10 +36,10 @@ pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo, ran
     let num_bands = var_info.shape.first().copied().unwrap_or(0) as usize;
 
     if is_tiff && rank >= 3 && num_bands >= 3 {
-        app.rgb_composite_mode = true;
-        app.rgb_composite_channels = [0, 1, 2];
+        app.layers.base.composite.enabled = true;
+        app.layers.base.composite.rgb_channels = [0, 1, 2];
     } else {
-        app.rgb_composite_mode = !app.composite_channel_configs.is_empty();
+        app.layers.base.composite.enabled = !app.layers.base.composite.channel_configs.is_empty();
     }
 }
 

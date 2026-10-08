@@ -17,12 +17,12 @@ use super::roles::apply_role_change;
 pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &VariableInfo) {
     let rank = var_info.shape.len();
 
-    if app.dim_config.len() != rank {
+    if app.selected.dim_config.len() != rank {
         super::defaults::init_variable_dimension_defaults(app, var_info);
     }
 
     let (requested_bytes, total_bytes) =
-        calculate_download_sizes(var_info, &app.dim_config, &app.selected_dim_ranges);
+        calculate_download_sizes(var_info, &app.selected.dim_config, &app.selected.dim_ranges);
 
     let requested_cells: u64 = if rank > 0 {
         var_info
@@ -30,8 +30,8 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
             .iter()
             .enumerate()
             .map(|(i, &s)| {
-                if app.dim_config.get(i).is_some_and(|c| c.active) {
-                    if let Some(&(start, end)) = app.selected_dim_ranges.get(i) {
+                if app.selected.dim_config.get(i).is_some_and(|c| c.active) {
+                    if let Some(&(start, end)) = app.selected.dim_ranges.get(i) {
                         (end.saturating_sub(start) + 1).min(s as usize) as u64
                     } else {
                         s
@@ -124,13 +124,13 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
             .map(|s| s.as_str())
             .unwrap_or("dim");
 
-        let is_animated = app.dim_config[i].animation == AnimationRole::Animated;
+        let is_animated = app.selected.dim_config[i].animation == AnimationRole::Animated;
 
         ui.group(|ui| {
             // Fill the panel width so every dimension box lines up.
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
-                ui.checkbox(&mut app.dim_config[i].active, "");
+                ui.checkbox(&mut app.selected.dim_config[i].active, "");
 
                 ui.label(
                     RichText::new(format!("{} ({})", dim_name, dim_size))
@@ -140,8 +140,8 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
 
                 // Role selects pinned to the right edge. Right-to-left order:
                 // the animation select is added first so it ends up rightmost.
-                let mut spatial = app.dim_config[i].spatial;
-                let mut anim = app.dim_config[i].animation;
+                let mut spatial = app.selected.dim_config[i].spatial;
+                let mut anim = app.selected.dim_config[i].animation;
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     egui::ComboBox::from_id_salt(("anim_role", i))
                         .selected_text(match anim {
@@ -175,8 +175,8 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
 
             ui.add_space(4.0);
 
-            if app.dim_config[i].active {
-                let (mut start, mut end) = app.selected_dim_ranges[i];
+            if app.selected.dim_config[i].active {
+                let (mut start, mut end) = app.selected.dim_ranges[i];
                 double_slider_with_inputs(
                     ui,
                     dim_name,
@@ -186,27 +186,27 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                     dim_size.saturating_sub(1),
                 );
 
-                app.selected_dim_ranges[i] = (start, end);
+                app.selected.dim_ranges[i] = (start, end);
                 if is_animated {
                     let max_idx = dim_size.saturating_sub(1);
                     if app.is_playing || app.current_timestep > end || app.current_timestep < start
                     {
-                        app.selected_dim_indices[i] = app.current_timestep.min(max_idx);
+                        app.selected.dim_indices[i] = app.current_timestep.min(max_idx);
                     } else {
-                        app.selected_dim_indices[i] = app.current_timestep.clamp(start, end);
+                        app.selected.dim_indices[i] = app.current_timestep.clamp(start, end);
                     }
                 } else {
-                    app.selected_dim_indices[i] = start;
+                    app.selected.dim_indices[i] = start;
                 }
-                app.dim_config[i].range = (start, end);
-                app.dim_config[i].index = app.selected_dim_indices[i];
+                app.selected.dim_config[i].range = (start, end);
+                app.selected.dim_config[i].index = app.selected.dim_indices[i];
                 show_coord_label(app, ui, var_info, i, (start, end));
             } else {
                 let max_index = dim_size.saturating_sub(1);
                 if is_animated
-                    && (app.is_playing || app.current_timestep != app.selected_dim_indices[i])
+                    && (app.is_playing || app.current_timestep != app.selected.dim_indices[i])
                 {
-                    app.selected_dim_indices[i] = app.current_timestep.min(max_index);
+                    app.selected.dim_indices[i] = app.current_timestep.min(max_index);
                 }
                 let mut changed = false;
                 ui.horizontal(|ui| {
@@ -214,7 +214,7 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                     // Slider fills the row up to a fixed-width value box,
                     // matching the range rows. The slider runs first so the box
                     // shows the dragged value on the same frame.
-                    let index = &mut app.selected_dim_indices[i];
+                    let index = &mut app.selected.dim_indices[i];
                     let spacing = ui.spacing().item_spacing.x;
                     ui.spacing_mut().slider_width =
                         (ui.available_width() - VALUE_BOX_W - spacing).max(40.0);
@@ -227,13 +227,13 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                     changed = s_resp.dragged() || v_resp.dragged() || s_resp.clicked();
                 });
                 if changed && is_animated {
-                    app.current_timestep = app.selected_dim_indices[i];
+                    app.current_timestep = app.selected.dim_indices[i];
                 }
-                app.selected_dim_ranges[i] =
-                    (app.selected_dim_indices[i], app.selected_dim_indices[i]);
-                app.dim_config[i].range = app.selected_dim_ranges[i];
-                app.dim_config[i].index = app.selected_dim_indices[i];
-                show_coord_label(app, ui, var_info, i, app.selected_dim_ranges[i]);
+                app.selected.dim_ranges[i] =
+                    (app.selected.dim_indices[i], app.selected.dim_indices[i]);
+                app.selected.dim_config[i].range = app.selected.dim_ranges[i];
+                app.selected.dim_config[i].index = app.selected.dim_indices[i];
+                show_coord_label(app, ui, var_info, i, app.selected.dim_ranges[i]);
             }
         });
 

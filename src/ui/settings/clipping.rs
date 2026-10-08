@@ -28,7 +28,7 @@ fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.label(egui::RichText::new("Colorbar Label").strong());
     let default_label = app.default_colorbar_label();
     let mut label_buf = app.colorbar_label();
-    let has_custom_label = app.custom_colorbar_label.is_some();
+    let has_custom_label = app.layers.base.color.custom_label.is_some();
 
     ui.horizontal(|ui| {
         let resp = ui.add(
@@ -38,9 +38,9 @@ fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         );
         if resp.changed() {
             if label_buf.trim().is_empty() || label_buf == default_label {
-                app.custom_colorbar_label = None;
+                app.layers.base.color.custom_label = None;
             } else {
-                app.custom_colorbar_label = Some(label_buf);
+                app.layers.base.color.custom_label = Some(label_buf);
             }
         }
 
@@ -56,12 +56,14 @@ fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let range_speed = ((app.color_range_max - app.color_range_min).abs() / 100.0).max(1e-4);
+    let range_speed = ((app.layers.base.color.range_max - app.layers.base.color.range_min).abs()
+        / 100.0)
+        .max(1e-4);
 
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Color Range").strong());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.toggle_value(&mut app.is_categorical, "Categorical")
+            ui.toggle_value(&mut app.layers.base.color.categorical, "Categorical")
                 .on_hover_text("Discrete colorbar (auto-detects unique values or 10 equal bins).");
         });
     });
@@ -72,7 +74,7 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.label("Min:");
         if ui
             .add(
-                egui::DragValue::new(&mut app.color_range_min)
+                egui::DragValue::new(&mut app.layers.base.color.range_min)
                     .speed(range_speed)
                     .custom_formatter(|val, _| {
                         crate::ui::colorbar::format_scientific_tick(val as f32)
@@ -81,14 +83,14 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             )
             .changed()
         {
-            app.volume_cmin = app.color_range_min;
-            app.lock_color_bounds = true;
+            app.layers.base.color.volume_cmin = app.layers.base.color.range_min;
+            app.layers.base.color.lock_bounds = true;
         }
 
         ui.label("Max:");
         if ui
             .add(
-                egui::DragValue::new(&mut app.color_range_max)
+                egui::DragValue::new(&mut app.layers.base.color.range_max)
                     .speed(range_speed)
                     .custom_formatter(|val, _| {
                         crate::ui::colorbar::format_scientific_tick(val as f32)
@@ -97,11 +99,11 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             )
             .changed()
         {
-            app.volume_cmax = app.color_range_max;
-            app.lock_color_bounds = true;
+            app.layers.base.color.volume_cmax = app.layers.base.color.range_max;
+            app.layers.base.color.lock_bounds = true;
         }
 
-        let lock_icon = if app.lock_color_bounds {
+        let lock_icon = if app.layers.base.color.lock_bounds {
             Icon::Lock
         } else {
             Icon::Unlock
@@ -111,7 +113,7 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             .on_hover_text("Lock min/max so color mapping stays fixed across timesteps.")
             .clicked()
         {
-            app.lock_color_bounds = !app.lock_color_bounds;
+            app.layers.base.color.lock_bounds = !app.layers.base.color.lock_bounds;
         }
 
         if ui
@@ -123,7 +125,7 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
     });
 
-    if (app.custom_colorbar_label.is_some() || app.lock_color_bounds)
+    if (app.layers.base.color.custom_label.is_some() || app.layers.base.color.lock_bounds)
         && ui
             .icon_button(Icon::Reset, "Reset All Colorbar Defaults")
             .on_hover_text("Reset both colorbar label and range to default values")
@@ -136,13 +138,13 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
 
 fn show_clipping_color_pickers(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
-        ui.checkbox(&mut app.use_nan_color, "NaN Color")
+        ui.checkbox(&mut app.layers.base.color.use_nan_color, "NaN Color")
             .on_hover_text("If unchecked, NaN/Inf values render transparently.");
-        if app.use_nan_color {
+        if app.layers.base.color.use_nan_color {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 crate::ui::color_picker::ShapeColorPicker::new(
                     "settings_nan_color_picker",
-                    &mut app.nan_color,
+                    &mut app.layers.base.color.nan_color,
                     crate::ui::color_picker::ColorShape::Rect(3.0),
                 )
                 .size(egui::vec2(18.0, 16.0))
@@ -155,13 +157,13 @@ fn show_clipping_color_pickers(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        ui.checkbox(&mut app.use_lowclip, "Low Clip")
+        ui.checkbox(&mut app.layers.base.color.use_lowclip, "Low Clip")
             .on_hover_text("Values < cmin clipped to this color.");
-        if app.use_lowclip {
+        if app.layers.base.color.use_lowclip {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 crate::ui::color_picker::ShapeColorPicker::new(
                     "settings_lowclip_color_picker",
-                    &mut app.lowclip_color,
+                    &mut app.layers.base.color.lowclip_color,
                     crate::ui::color_picker::ColorShape::LeftTriangle,
                 )
                 .size(egui::vec2(18.0, 16.0))
@@ -174,13 +176,13 @@ fn show_clipping_color_pickers(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        ui.checkbox(&mut app.use_highclip, "High Clip")
+        ui.checkbox(&mut app.layers.base.color.use_highclip, "High Clip")
             .on_hover_text("Values > cmax clipped to this color.");
-        if app.use_highclip {
+        if app.layers.base.color.use_highclip {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 crate::ui::color_picker::ShapeColorPicker::new(
                     "settings_highclip_color_picker",
-                    &mut app.highclip_color,
+                    &mut app.layers.base.color.highclip_color,
                     crate::ui::color_picker::ColorShape::RightTriangle,
                 )
                 .size(egui::vec2(18.0, 16.0))
@@ -193,15 +195,16 @@ fn show_clipping_color_pickers(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 fn show_scale_type_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let is_valid_log = app.color_range_min >= -1e-15 && app.color_range_max > 0.0;
-    if !is_valid_log && app.active_scale_type == 1 {
-        app.active_scale_type = 0;
+    let is_valid_log =
+        app.layers.base.color.range_min >= -1e-15 && app.layers.base.color.range_max > 0.0;
+    if !is_valid_log && app.layers.base.color.scale_type == 1 {
+        app.layers.base.color.scale_type = 0;
     }
 
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Scale").strong());
         egui::ComboBox::from_id_salt("settings_color_scale_dropdown")
-            .selected_text(match app.active_scale_type {
+            .selected_text(match app.layers.base.color.scale_type {
                 1 => "Logarithmic",
                 2 => "Symlog",
                 3 => "Sqrt",
@@ -209,27 +212,30 @@ fn show_scale_type_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                 _ => "Linear",
             })
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut app.active_scale_type, 0, "Linear");
+                ui.selectable_value(&mut app.layers.base.color.scale_type, 0, "Linear");
                 ui.add_enabled_ui(is_valid_log, |ui| {
-                    ui.selectable_value(&mut app.active_scale_type, 1, "Logarithmic")
+                    ui.selectable_value(&mut app.layers.base.color.scale_type, 1, "Logarithmic")
                         .on_hover_text(if is_valid_log {
                             "Log scale (non-negative data)"
                         } else {
                             "Disabled: requires min >= 0. Use Symlog for negative data."
                         });
                 });
-                ui.selectable_value(&mut app.active_scale_type, 2, "Symlog");
-                ui.selectable_value(&mut app.active_scale_type, 3, "Sqrt");
-                ui.selectable_value(&mut app.active_scale_type, 4, "Exponential");
+                ui.selectable_value(&mut app.layers.base.color.scale_type, 2, "Symlog");
+                ui.selectable_value(&mut app.layers.base.color.scale_type, 3, "Sqrt");
+                ui.selectable_value(&mut app.layers.base.color.scale_type, 4, "Exponential");
             });
     });
 
-    if app.active_scale_type == 1 || app.active_scale_type == 2 || app.active_scale_type == 4 {
+    if app.layers.base.color.scale_type == 1
+        || app.layers.base.color.scale_type == 2
+        || app.layers.base.color.scale_type == 4
+    {
         ui.add_space(2.0);
         ui.horizontal(|ui| {
             ui.label("Param:");
             ui.add(
-                egui::DragValue::new(&mut app.scale_param)
+                egui::DragValue::new(&mut app.layers.base.color.scale_param)
                     .speed(0.01)
                     .range(0.0001..=100.0),
             );

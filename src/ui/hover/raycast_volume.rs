@@ -20,7 +20,7 @@ pub struct VolumeSampler<'a> {
 impl<'a> VolumeSampler<'a> {
     pub fn from_app(app: &'a OctantApp, matrix: Option<&'a MatrixData>) -> Option<Self> {
         let (shift_x, shift_y, shift_z) = app.get_volume_shifts();
-        if let Some(v) = &app.volume_data {
+        if let Some(v) = &app.layers.base.data.volume {
             if v.width == 0 || v.height == 0 || v.depth == 0 || v.values.is_empty() {
                 return None;
             }
@@ -62,12 +62,14 @@ impl<'a> VolumeSampler<'a> {
     pub fn is_visible(&self, app: &OctantApp, val: f32) -> bool {
         let is_nan = val.is_nan() || val.abs() > 1e30;
         if is_nan {
-            app.use_nan_color
-        } else if app.rgb_composite_mode {
+            app.layers.base.color.use_nan_color
+        } else if app.layers.base.composite.enabled {
             (val.to_bits() & 0x00FF_FFFF) != 0
         } else {
-            let in_low = app.use_lowclip || val >= app.color_range_min;
-            let in_high = app.use_highclip || val <= app.color_range_max;
+            let in_low =
+                app.layers.base.color.use_lowclip || val >= app.layers.base.color.range_min;
+            let in_high =
+                app.layers.base.color.use_highclip || val <= app.layers.base.color.range_max;
             in_low && in_high
         }
     }
@@ -158,7 +160,8 @@ impl<'a> VolumeSampler<'a> {
                 if is_mip {
                     // MIP mode
                     if !is_nan && raw_val > max_val {
-                        let is_visible = app.use_highclip || raw_val <= app.color_range_max;
+                        let is_visible = app.layers.base.color.use_highclip
+                            || raw_val <= app.layers.base.color.range_max;
                         if is_visible {
                             max_val = raw_val;
                             max_intensity_hit = Some((cx, cy, cz, raw_val));
@@ -167,7 +170,8 @@ impl<'a> VolumeSampler<'a> {
                 } else if is_minip {
                     // MinIP mode
                     if !is_nan && raw_val < min_val {
-                        let is_visible = app.use_lowclip || raw_val >= app.color_range_min;
+                        let is_visible = app.layers.base.color.use_lowclip
+                            || raw_val >= app.layers.base.color.range_min;
                         if is_visible {
                             min_val = raw_val;
                             min_intensity_hit = Some((cx, cy, cz, raw_val));

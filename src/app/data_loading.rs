@@ -4,7 +4,7 @@ use super::state::StoreKind;
 impl OctantApp {
     pub fn get_line_profile_payload(&self) -> (Vec<f32>, u32, u32) {
         if self.line_profile_dim_idx == 2
-            && let Some(vdata) = &self.volume_data
+            && let Some(vdata) = &self.layers.base.data.volume
             && vdata.depth > 1
         {
             if self.line_plot_all_series {
@@ -23,7 +23,7 @@ impl OctantApp {
                     1,
                 )
             }
-        } else if let Some(matrix) = &self.matrix_data {
+        } else if let Some(matrix) = &self.layers.base.data.matrix {
             if self.line_plot_all_series {
                 matrix.extract_all_lines_payload(self.line_profile_dim_idx)
             } else {
@@ -49,11 +49,11 @@ impl OctantApp {
     pub fn inspect_active_store(&mut self) {
         self.is_loading = true;
         self.clear_active_metadata();
-        self.status_message = format!("Inspecting {:?} metadata...", self.selected_store_kind);
+        self.status_message = format!("Inspecting {:?} metadata...", self.selected.store_kind);
 
-        let store_kind = self.selected_store_kind;
-        self.store_target_input = self.store_target_input.trim().to_string();
-        let target_input = self.store_target_input.clone();
+        let store_kind = self.selected.store_kind;
+        self.selected.store_target = self.selected.store_target.trim().to_string();
+        let target_input = self.selected.store_target.clone();
 
         // Fresh metadata holds no coordinates: its variables are read again when chosen.
         self.coordinate_loader
@@ -153,18 +153,18 @@ impl OctantApp {
             return;
         }
 
-        self.selected_store_kind =
-            StoreKind::resolve_with_inferred(explicit_kind, trimmed, self.selected_store_kind);
+        self.selected.store_kind =
+            StoreKind::resolve_with_inferred(explicit_kind, trimmed, self.selected.store_kind);
 
         if self.try_activate_dataset(trimmed) {
-            if let Some(meta) = &self.active_dataset_metadata {
+            if let Some(meta) = &self.selected.metadata {
                 self.hero_state.source_label = meta.name.clone();
             }
             self.hero_state.loaded = true;
             self.hero_state.loading = false;
         } else {
             self.hero_state.begin_submit(trimmed);
-            self.store_target_input = trimmed.to_string();
+            self.selected.store_target = trimmed.to_string();
             self.inspect_active_store();
         }
     }

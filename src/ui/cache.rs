@@ -19,7 +19,10 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
 
         let block_bytes = app.block_cache.current_bytes();
         let pyramid_bytes = app
-            .active_pyramid
+            .layers
+            .base
+            .data
+            .pyramid
             .as_ref()
             .map(|p| p.bytes_size())
             .unwrap_or(0);
@@ -156,7 +159,7 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
             .clicked()
         {
             app.block_cache.clear();
-            app.active_pyramid = None;
+            app.layers.base.data.pyramid = None;
             ui.close();
         }
     });

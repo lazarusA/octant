@@ -63,7 +63,7 @@ pub(crate) fn resolve_3d_dim_entries(
         let loc_y = format_dimension_coord(
             meta,
             Some(v),
-            Some(&app.plotted_store_target_input),
+            Some(&app.plotted().store_target),
             &dim_y_name,
             global_y,
             full_y_len,
@@ -72,7 +72,7 @@ pub(crate) fn resolve_3d_dim_entries(
         let loc_x = format_dimension_coord(
             meta,
             Some(v),
-            Some(&app.plotted_store_target_input),
+            Some(&app.plotted().store_target),
             &dim_x_name,
             global_x,
             full_x_len,
@@ -93,7 +93,7 @@ pub(crate) fn resolve_3d_dim_entries(
             let loc_z = format_dimension_coord(
                 meta,
                 Some(v),
-                Some(&app.plotted_store_target_input),
+                Some(&app.plotted().store_target),
                 &dim_z_name,
                 global_z,
                 full_z_len,

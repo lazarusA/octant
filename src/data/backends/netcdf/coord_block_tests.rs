@@ -40,15 +40,16 @@ fn uneven_south_to_north_netcdf_rows_hover_with_their_own_latitude() {
         .iter()
         .position(|v| v.name == "t2m")
         .expect("t2m");
-    let mut app = crate::app::OctantApp {
-        plotted_dataset_metadata: Some(meta),
-        plotted_variable_idx: idx,
+    let mut app = crate::app::OctantApp::default();
+    *app.layers.base.selection_mut() = crate::app::VariableSelection {
+        metadata: Some(meta),
+        variable_idx: idx,
         ..Default::default()
     };
     app.apply_2d_projection(&block, 1, 0, (0, 2), (0, 4), &[0, 0], true, 0);
-    let meta = app.plotted_dataset_metadata.as_ref();
+    let meta = app.plotted().metadata.as_ref();
     let var = meta.and_then(|m| m.variables.get(idx));
-    let matrix = app.matrix_data.as_ref().expect("matrix");
+    let matrix = app.layers.base.data.matrix.as_ref().expect("matrix");
     let (val, fields, _, _) = crate::ui::hover::entries_2d::resolve_2d_plot_entries(
         &app, matrix, meta, var, 0.2, 0.05, None,
     );

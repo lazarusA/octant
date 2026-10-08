@@ -5,7 +5,7 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     let prev_resampling = app.enable_pyramid_resampling;
     let prev_op = app.pyramid_aggregation_op;
 
-    let is_oversized = app.matrix_data.as_ref().is_some_and(|m| {
+    let is_oversized = app.layers.base.data.matrix.as_ref().is_some_and(|m| {
         m.width * m.height > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
     });
 
@@ -65,11 +65,11 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 
     if (app.enable_pyramid_resampling != prev_resampling || app.pyramid_aggregation_op != prev_op)
-        && let Some(mdata) = &app.matrix_data
+        && let Some(mdata) = &app.layers.base.data.matrix
     {
         if app.enable_pyramid_resampling {
-            if app.active_plot_type != PlotType::Heatmap {
-                app.active_plot_type = PlotType::Heatmap;
+            if app.selected.plot_type != PlotType::Heatmap {
+                app.selected.plot_type = PlotType::Heatmap;
             }
             if mdata.height > 1 {
                 let pyramid = std::sync::Arc::new(crate::data::MatrixPyramid::new(
@@ -80,12 +80,16 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                     app.pyramid_aggregation_op,
                     512,
                 ));
-                app.resampler.set_pyramid(Some(pyramid.clone()));
-                app.active_pyramid = Some(pyramid);
+                app.layers
+                    .base
+                    .data
+                    .resampler
+                    .set_pyramid(Some(pyramid.clone()));
+                app.layers.base.data.pyramid = Some(pyramid);
             }
         } else {
-            app.active_pyramid = None;
-            app.resampler.set_pyramid(None);
+            app.layers.base.data.pyramid = None;
+            app.layers.base.data.resampler.set_pyramid(None);
         }
     }
 }

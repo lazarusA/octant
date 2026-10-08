@@ -64,7 +64,10 @@ pub fn show_hover_tooltip(
     }
 
     let matrix = app
-        .matrix_data
+        .layers
+        .base
+        .data
+        .matrix
         .as_ref()
         .filter(|m| m.width > 0 && m.height > 0 && !m.values.is_empty());
     let sampler = VolumeSampler::from_app(app, matrix);
@@ -155,19 +158,23 @@ fn resolve_hover_target_info(
     app: &OctantApp,
 ) -> (Option<&DatasetMetadata>, Option<&VariableInfo>, &str, &str) {
     let meta = app
-        .plotted_dataset_metadata
+        .plotted()
+        .metadata
         .as_ref()
-        .or(app.active_dataset_metadata.as_ref());
+        .or(app.selected.metadata.as_ref());
 
     let var = meta.and_then(|m| {
         m.variables
-            .get(app.plotted_variable_idx)
-            .or_else(|| m.variables.get(app.selected_variable_idx))
+            .get(app.plotted().variable_idx)
+            .or_else(|| m.variables.get(app.selected.variable_idx))
             .or_else(|| m.variables.first())
     });
 
     let default_name = app
-        .volume_data
+        .layers
+        .base
+        .data
+        .volume
         .as_ref()
         .map(|v| v.dataset_name.as_str())
         .unwrap_or("variable");

@@ -59,8 +59,8 @@ impl OctantApp {
         let source_id = self.selected_source_id();
         self.resolve_store_handle(
             &source_id,
-            &self.store_target_input,
-            self.selected_store_kind,
+            &self.selected.store_target,
+            self.selected.store_kind,
         )
     }
 
@@ -69,8 +69,8 @@ impl OctantApp {
         let source_id = self.plotted_source_id();
         self.resolve_store_handle(
             &source_id,
-            &self.plotted_store_target_input,
-            self.plotted_store_kind,
+            &self.plotted().store_target,
+            self.plotted().store_kind,
         )
     }
 }

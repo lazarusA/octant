@@ -9,7 +9,7 @@ impl OctantApp {
     /// new load, so per-dataset caches and focus reset.
     pub fn set_active_metadata(&mut self, meta: DatasetMetadata) {
         self.cached_variable_tree = Some(meta.build_variable_tree());
-        self.active_dataset_metadata = Some(meta);
+        self.selected.metadata = Some(meta);
         self.bump_metadata_generation();
     }
 
@@ -21,19 +21,19 @@ impl OctantApp {
             crate::ui::variables_panel::init_variable_dimension_defaults(self, &var_info);
         }
         self.set_active_metadata(meta);
-        self.selected_variable_idx = 0;
+        self.selected.variable_idx = 0;
     }
 
     /// Drop the active dataset (loading, failed, removed or cleared).
     pub fn clear_active_metadata(&mut self) {
-        self.active_dataset_metadata = None;
+        self.selected.metadata = None;
         self.cached_variable_tree = None;
         self.variable_search.clear();
         self.bump_metadata_generation();
     }
 
     fn bump_metadata_generation(&mut self) {
-        self.metadata_generation = self.metadata_generation.wrapping_add(1);
+        self.selected.metadata_generation = self.selected.metadata_generation.wrapping_add(1);
         self.cached_search = None;
     }
 }

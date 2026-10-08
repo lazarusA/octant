@@ -11,7 +11,8 @@ impl OctantApp {
     /// once per variable.
     pub fn request_variable_coordinates(&mut self, idx: usize) {
         let Some(variable) = self
-            .active_dataset_metadata
+            .selected
+            .metadata
             .as_ref()
             .and_then(|m| m.variables.get(idx))
             .cloned()
@@ -53,10 +54,10 @@ impl OctantApp {
             .and_then(|d| d.metadata.as_mut());
         let copies = [
             selected
-                .then_some(self.active_dataset_metadata.as_mut())
+                .then_some(self.selected.metadata.as_mut())
                 .flatten(),
             plotted
-                .then_some(self.plotted_dataset_metadata.as_mut())
+                .then_some(self.layers.base.selection_mut().metadata.as_mut())
                 .flatten(),
             stored,
         ];

@@ -103,7 +103,8 @@ fn search_jump(ui: &egui::Ui, search: &egui::Response) -> Option<SearchJump> {
 /// Identity of the dataset listed in the overlay (its load counter), `None`
 /// while none is loaded.
 fn dataset_key(app: &OctantApp) -> Option<egui::Id> {
-    app.active_dataset_metadata
+    app.selected
+        .metadata
         .as_ref()
-        .map(|_| egui::Id::new(("variables_dataset", app.metadata_generation)))
+        .map(|_| egui::Id::new(("variables_dataset", app.selected.metadata_generation)))
 }

@@ -20,21 +20,21 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
             .unwrap_or("");
 
         if !x_assigned && crate::data::coordinates::naming::is_spatial_x_name(dim_name) {
-            app.dim_config[i].spatial = SpatialRole::X;
+            app.selected.dim_config[i].spatial = SpatialRole::X;
             x_assigned = true;
         } else if !y_assigned && crate::data::coordinates::naming::is_spatial_y_name(dim_name) {
-            app.dim_config[i].spatial = SpatialRole::Y;
+            app.selected.dim_config[i].spatial = SpatialRole::Y;
             y_assigned = true;
         } else if !z_assigned && crate::data::coordinates::naming::is_spatial_z_name(dim_name) {
-            app.dim_config[i].spatial = SpatialRole::Z;
+            app.selected.dim_config[i].spatial = SpatialRole::Z;
             z_assigned = true;
         }
         if rank >= 3
             && !anim_assigned
             && crate::data::coordinates::naming::is_animated_time_name(dim_name)
         {
-            app.dim_config[i].animation = AnimationRole::Animated;
-            app.animated_dim = Some(i);
+            app.selected.dim_config[i].animation = AnimationRole::Animated;
+            app.selected.animated_dim = Some(i);
             anim_assigned = true;
         }
     }
@@ -49,17 +49,17 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
         if crate::data::coordinates::naming::is_channel_dim_name(dim_name) {
             continue;
         }
-        if app.dim_config[i].spatial == SpatialRole::None
-            && app.dim_config[i].animation == AnimationRole::None
+        if app.selected.dim_config[i].spatial == SpatialRole::None
+            && app.selected.dim_config[i].animation == AnimationRole::None
         {
             if !y_assigned {
-                app.dim_config[i].spatial = SpatialRole::Y;
+                app.selected.dim_config[i].spatial = SpatialRole::Y;
                 y_assigned = true;
             } else if !x_assigned {
-                app.dim_config[i].spatial = SpatialRole::X;
+                app.selected.dim_config[i].spatial = SpatialRole::X;
                 x_assigned = true;
             } else if !z_assigned && rank >= 3 {
-                app.dim_config[i].spatial = SpatialRole::Z;
+                app.selected.dim_config[i].spatial = SpatialRole::Z;
                 z_assigned = true;
             }
         }
@@ -76,8 +76,8 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
             if crate::data::coordinates::naming::is_channel_dim_name(dim_name) {
                 continue;
             }
-            if app.dim_config[i].spatial == SpatialRole::None {
-                app.dim_config[i].spatial = SpatialRole::Z;
+            if app.selected.dim_config[i].spatial == SpatialRole::None {
+                app.selected.dim_config[i].spatial = SpatialRole::Z;
                 break;
             }
         }
@@ -87,11 +87,11 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
     if rank >= 4
         && !anim_assigned
         && let Some(unassigned) = (0..rank).find(|&i| {
-            app.dim_config[i].spatial == SpatialRole::None
-                && app.dim_config[i].animation == AnimationRole::None
+            app.selected.dim_config[i].spatial == SpatialRole::None
+                && app.selected.dim_config[i].animation == AnimationRole::None
         })
     {
-        app.dim_config[unassigned].animation = AnimationRole::Animated;
-        app.animated_dim = Some(unassigned);
+        app.selected.dim_config[unassigned].animation = AnimationRole::Animated;
+        app.selected.animated_dim = Some(unassigned);
     }
 }

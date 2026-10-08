@@ -28,9 +28,9 @@ impl OctantApp {
             }
             AppAction::SelectVariable(idx) => {
                 self.show_hero = false;
-                self.selected_variable_idx = idx;
+                self.selected.variable_idx = idx;
                 self.request_variable_coordinates(idx);
-                if let Some(meta) = self.active_dataset_metadata.clone()
+                if let Some(meta) = self.selected.metadata.clone()
                     && let Some(var_info) = meta.variables.get(idx).cloned()
                 {
                     crate::ui::variables_panel::init_variable_dimension_defaults(self, &var_info);
@@ -45,7 +45,7 @@ impl OctantApp {
                 self.switch_plot_type(plot_type);
             }
             AppAction::SetColormap(cmap) => {
-                self.active_colormap = cmap;
+                self.layers.base.color.colormap = cmap;
             }
             AppAction::SetLineProfileDim(dim_idx) => {
                 self.line_profile_dim_idx = dim_idx;
@@ -59,8 +59,8 @@ impl OctantApp {
             AppAction::TogglePlayback => {
                 self.is_playing = !self.is_playing;
                 if self.is_playing
-                    && let Some(meta) = &self.plotted_dataset_metadata
-                    && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+                    && let Some(meta) = &self.plotted().metadata
+                    && let Some(var) = meta.variables.get(self.plotted().variable_idx)
                 {
                     let shape = var.shape.clone();
                     self.prefetch_selected_animated_range(&shape);
@@ -68,8 +68,8 @@ impl OctantApp {
             }
 
             AppAction::UpdateColorBounds { min, max } => {
-                self.color_range_min = min;
-                self.color_range_max = max;
+                self.layers.base.color.range_min = min;
+                self.layers.base.color.range_max = max;
             }
         }
     }

@@ -19,7 +19,7 @@ pub(crate) fn resolve_2d_plot_entries(
     norm_y: f32,
     geo_coords: Option<(f32, f32)>,
 ) -> (f32, Vec<HoverField>, usize, usize) {
-    let (orig_w, orig_h) = if let Some(pyr) = &app.active_pyramid {
+    let (orig_w, orig_h) = if let Some(pyr) = &app.layers.base.data.pyramid {
         (pyr.original_width, pyr.original_height)
     } else {
         (matrix.width, matrix.height)
@@ -28,7 +28,7 @@ pub(crate) fn resolve_2d_plot_entries(
         .grid
         .find_cell_from_norm(norm_x, norm_y, orig_w, orig_h);
 
-    let val = if let Some(pyr) = &app.active_pyramid
+    let val = if let Some(pyr) = &app.layers.base.data.pyramid
         && let Some(base_lvl) = pyr.levels.first()
     {
         let idx = py * orig_w + px;
@@ -57,7 +57,10 @@ pub(crate) fn resolve_2d_plot_entries(
 
 /// The channel dimension a composite plot mixes, which the hover lists per channel instead.
 pub(crate) fn composite_channel_dim(app: &OctantApp) -> Option<usize> {
-    app.rgb_composite_mode
+    app.layers
+        .base
+        .composite
+        .enabled
         .then(|| app.channel_dim_index())
         .flatten()
 }
@@ -75,7 +78,10 @@ fn resolve_2d_dim_entries(
     used_dims: &mut HashSet<usize>,
 ) -> Vec<HoverField> {
     if let CoordinateGrid::Healpix { nside, .. } = &app
-        .matrix_data
+        .layers
+        .base
+        .data
+        .matrix
         .as_ref()
         .map(|m| &m.grid)
         .unwrap_or(&CoordinateGrid::GlobalRegular)
@@ -121,7 +127,7 @@ fn resolve_2d_dim_entries(
         let loc_y = format_dimension_coord(
             meta,
             Some(v),
-            Some(&app.plotted_store_target_input),
+            Some(&app.plotted().store_target),
             &dim_y_name,
             global_y,
             full_y_len,
@@ -130,7 +136,7 @@ fn resolve_2d_dim_entries(
         let loc_x = format_dimension_coord(
             meta,
             Some(v),
-            Some(&app.plotted_store_target_input),
+            Some(&app.plotted().store_target),
             &dim_x_name,
             global_x,
             full_x_len,
@@ -163,7 +169,10 @@ fn resolve_healpix_dim_entries(
 ) -> Vec<HoverField> {
     let (ring, _) = crate::data::coordinates::healpix::pix2ring(nside, px);
     let (cell_lon_rad, cell_lat_rad) = app
-        .matrix_data
+        .layers
+        .base
+        .data
+        .matrix
         .as_ref()
         .map(|m| m.grid.cell_center_lon_lat_rad(px, py, orig_w, orig_h))
         .unwrap_or((0.0, 0.0));

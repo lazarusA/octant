@@ -63,9 +63,9 @@ impl OctantApp {
             block.variable_name,
             block.bytes_size()
         );
-        self.pending_target_step = None;
+        self.layers.base.load.pending_target_step = None;
         self.sync_plotted_state_from_selected();
-        let allocations = self.volume_allocations;
+        let allocations = self.layers.base.data.volume_allocations;
         self.apply_block_projection(block);
         let source_id = self.selected_source_id();
         self.project_cached_volume_blocks(
@@ -91,11 +91,11 @@ impl OctantApp {
         anim_dim: Option<usize>,
         since: u64,
     ) {
-        if self.volume_allocations == since {
+        if self.layers.base.data.volume_allocations == since {
             return;
         }
         let is_volume = matches!(
-            self.active_plot_type,
+            self.selected.plot_type,
             crate::plots::PlotType::Volume | crate::plots::PlotType::PointCloud
         );
         if !is_volume {

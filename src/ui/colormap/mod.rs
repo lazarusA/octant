@@ -81,7 +81,7 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
     app.colormaps.picker.swatches.ensure(ui.ctx());
 
     show_active_row(app, ui);
-    if registry::smooth_variant(app.active_colormap).is_some() {
+    if registry::smooth_variant(app.layers.base.color.colormap).is_some() {
         ui.checkbox(&mut app.colormaps.smooth, "Smooth")
             .on_hover_text("Blend this palette's colors into a continuous gradient (Oklab)");
     }
@@ -117,7 +117,7 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
 
 /// Active colormap swatch, its (elided) name and the reverse toggle.
 fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let id = app.active_colormap;
+    let id = app.layers.base.color.colormap;
     ui.horizontal(|ui| {
         let (rect, swatch_response) =
             ui.allocate_exact_size(egui::vec2(ACTIVE_SWATCH_WIDTH, 14.0), egui::Sense::hover());
@@ -160,10 +160,10 @@ fn show_colorbar_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
 /// Makes `id` the active colormap, leaving RGB composite mode if needed.
 pub fn select_colormap(app: &mut OctantApp, id: u32) {
-    if app.rgb_composite_mode {
-        app.rgb_composite_mode = false;
+    if app.layers.base.composite.enabled {
+        app.layers.base.composite.enabled = false;
         app.load_selected_variable_block();
     }
-    app.active_colormap = id;
+    app.layers.base.color.colormap = id;
     app.preview_colormap = None;
 }

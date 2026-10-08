@@ -16,29 +16,30 @@ impl OctantApp {
 
         let var_key = format!(
             "{}:{}:2d",
-            self.plotted_store_target_input, self.plotted_variable_idx
+            self.plotted().store_target,
+            self.plotted().variable_idx
         );
-        let is_new_variable = self.current_plotted_var_key.as_ref() != Some(&var_key);
+        let is_new_variable = self.layers.base.data.var_key.as_ref() != Some(&var_key);
 
         if is_new_variable {
-            self.clear_3d_renderers();
-            self.current_plotted_var_key = Some(var_key);
-            self.global_data_min = data.min_val;
-            self.global_data_max = data.max_val;
-            self.color_range_min = data.min_val;
-            self.color_range_max = data.max_val;
-            self.volume_cmin = data.min_val;
-            self.volume_cmax = data.max_val;
-            self.lock_color_bounds = false;
+            self.layers.base.clear_3d();
+            self.layers.base.data.var_key = Some(var_key);
+            self.layers.base.color.global_min = data.min_val;
+            self.layers.base.color.global_max = data.max_val;
+            self.layers.base.color.range_min = data.min_val;
+            self.layers.base.color.range_max = data.max_val;
+            self.layers.base.color.volume_cmin = data.min_val;
+            self.layers.base.color.volume_cmax = data.max_val;
+            self.layers.base.color.lock_bounds = false;
         } else {
-            self.global_data_min = self.global_data_min.min(data.min_val);
-            self.global_data_max = self.global_data_max.max(data.max_val);
+            self.layers.base.color.global_min = self.layers.base.color.global_min.min(data.min_val);
+            self.layers.base.color.global_max = self.layers.base.color.global_max.max(data.max_val);
 
-            if !self.lock_color_bounds {
-                self.color_range_min = data.min_val;
-                self.color_range_max = data.max_val;
-                self.volume_cmin = data.min_val;
-                self.volume_cmax = data.max_val;
+            if !self.layers.base.color.lock_bounds {
+                self.layers.base.color.range_min = data.min_val;
+                self.layers.base.color.range_max = data.max_val;
+                self.layers.base.color.volume_cmin = data.min_val;
+                self.layers.base.color.volume_cmax = data.max_val;
             }
         }
 
@@ -53,7 +54,7 @@ impl OctantApp {
             self.line_profile_slice_idx = 0;
         }
 
-        let is_rgb_composite = self.rgb_composite_mode
+        let is_rgb_composite = self.layers.base.composite.enabled
             || data.dataset_name.contains("RGB Composite")
             || data.dataset_name.contains("CMYK Composite");
 
@@ -69,8 +70,12 @@ impl OctantApp {
                 self.pyramid_aggregation_op,
                 512,
             ));
-            self.resampler.set_pyramid(Some(pyramid.clone()));
-            self.active_pyramid = Some(pyramid.clone());
+            self.layers
+                .base
+                .data
+                .resampler
+                .set_pyramid(Some(pyramid.clone()));
+            self.layers.base.data.pyramid = Some(pyramid.clone());
 
             let aspect_scale = [1.0f32, 1.0f32];
             let ((u_min, u_max), (v_min, v_max)) =
@@ -87,32 +92,36 @@ impl OctantApp {
             );
             pyramid.sample_viewport((u_min, u_max), (v_min, v_max), (target_w, target_h))
         } else {
-            self.active_pyramid = None;
-            self.resampler.set_pyramid(None);
+            self.layers.base.data.pyramid = None;
+            self.layers.base.data.resampler.set_pyramid(None);
             data.clone()
         };
 
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
             let same_grid = self
-                .matrix_data
+                .layers
+                .base
+                .data
+                .matrix
                 .as_ref()
                 .is_some_and(|m| m.grid.same_geometry(&effective_data.grid));
             let same_dimensions = !is_new_variable
                 && same_grid
-                && self.matrix_data.as_ref().is_some_and(|m| {
+                && self.layers.base.data.matrix.as_ref().is_some_and(|m| {
                     m.width == effective_data.width && m.height == effective_data.height
                 });
             let can_have_3d_surface =
                 total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS;
             let surface_renderers_ready = !can_have_3d_surface
-                || (self.sphere_renderer.is_some() && self.surface_renderer.is_some());
+                || (self.layers.base.renderers.sphere.is_some()
+                    && self.layers.base.renderers.surface.is_some());
 
             if same_dimensions
-                && self.renderer.is_some()
-                && self.line_renderer.is_some()
+                && self.layers.base.renderers.heatmap.is_some()
+                && self.layers.base.renderers.line.is_some()
                 && surface_renderers_ready
             {
-                if let Some(renderer) = &self.renderer {
+                if let Some(renderer) = &self.layers.base.renderers.heatmap {
                     if let (Some(cx), Some(cy)) = (
                         effective_data.grid.coords_x(),
                         effective_data.grid.coords_y(),
@@ -121,7 +130,7 @@ impl OctantApp {
                     }
                     renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
                 }
-                if let Some(sphere_renderer) = &self.sphere_renderer {
+                if let Some(sphere_renderer) = &self.layers.base.renderers.sphere {
                     if let (Some(cx), Some(cy)) = (
                         effective_data.grid.coords_x(),
                         effective_data.grid.coords_y(),
@@ -130,7 +139,7 @@ impl OctantApp {
                     }
                     sphere_renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
                 }
-                if let Some(surface_renderer) = &self.surface_renderer {
+                if let Some(surface_renderer) = &self.layers.base.renderers.surface {
                     if let (Some(cx), Some(cy)) = (
                         effective_data.grid.coords_x(),
                         effective_data.grid.coords_y(),
@@ -149,7 +158,7 @@ impl OctantApp {
                     coastline_renderer
                         .update_data(&wgpu_render_state.queue, &effective_data.values);
                 }
-                if let Some(line_renderer) = &self.line_renderer {
+                if let Some(line_renderer) = &self.layers.base.renderers.line {
                     line_renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
                 }
             } else {
@@ -171,8 +180,8 @@ impl OctantApp {
                     effective_data.width,
                     effective_data.height,
                 );
-                self.renderer = Some(Arc::new(renderer));
-                self.line_renderer = Some(Arc::new(line_renderer));
+                self.layers.base.renderers.heatmap = Some(Arc::new(renderer));
+                self.layers.base.renderers.line = Some(Arc::new(line_renderer));
 
                 if total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
                     let coord_x = effective_data.grid.coords_x();
@@ -207,22 +216,22 @@ impl OctantApp {
                         coord_x,
                         coord_y,
                     );
-                    self.sphere_renderer = Some(Arc::new(sphere_renderer));
-                    self.surface_renderer = Some(Arc::new(surface_renderer));
+                    self.layers.base.renderers.sphere = Some(Arc::new(sphere_renderer));
+                    self.layers.base.renderers.surface = Some(Arc::new(surface_renderer));
                     self.coastline_3d_renderer = Some(Arc::new(coastline_3d_renderer));
                 } else {
-                    self.sphere_renderer = None;
-                    self.surface_renderer = None;
+                    self.layers.base.renderers.sphere = None;
+                    self.layers.base.renderers.surface = None;
                     self.coastline_3d_renderer = None;
                 }
 
                 if data.height == 1 {
                     if data.grid.is_healpix() {
-                        if self.active_plot_type == PlotType::Line {
-                            self.active_plot_type = PlotType::Heatmap;
+                        if self.selected.plot_type == PlotType::Line {
+                            self.selected.plot_type = PlotType::Heatmap;
                         }
                     } else {
-                        self.active_plot_type = PlotType::Line;
+                        self.selected.plot_type = PlotType::Line;
                     }
                 }
             }
@@ -242,12 +251,12 @@ impl OctantApp {
             self.coastline_current_lod = crate::plots::CoastlineLod::Lod110m;
         }
 
-        self.matrix_data = Some(data);
+        self.layers.base.data.matrix = Some(data);
     }
 
     /// How volume values reach the GPU: packed RGB in composite mode.
     pub(crate) fn volume_encoding(&self) -> crate::plots::VolumeEncoding {
-        if self.rgb_composite_mode {
+        if self.layers.base.composite.enabled {
             crate::plots::VolumeEncoding::PackedRgb
         } else {
             crate::plots::VolumeEncoding::Scalar
@@ -269,16 +278,19 @@ impl OctantApp {
         let mut upload_later = false;
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
             let encoding = self.volume_encoding();
-            let same_dimensions = self.volume_data.as_ref().is_some_and(|v| {
+            let same_dimensions = self.layers.base.data.volume.as_ref().is_some_and(|v| {
                 v.width == data.width && v.height == data.height && v.depth == data.depth
             }) && self
-                .volume_renderer
+                .layers
+                .base
+                .renderers
+                .volume
                 .as_ref()
                 .is_some_and(|r| r.encoding() == encoding);
 
             if same_dimensions
-                && self.volume_renderer.is_some()
-                && self.point_cloud_renderer.is_some()
+                && self.layers.base.renderers.volume.is_some()
+                && self.layers.base.renderers.point_cloud.is_some()
             {
                 // Uploaded before the next paint, to the renderer on screen.
                 upload_later = true;
@@ -299,56 +311,59 @@ impl OctantApp {
                     data.width as u32,
                     data.height as u32,
                 );
-                self.volume_renderer = volume_renderer.map(Arc::new);
-                self.point_cloud_renderer = Some(Arc::new(point_cloud_renderer));
+                self.layers.base.renderers.volume = volume_renderer.map(Arc::new);
+                self.layers.base.renderers.point_cloud = Some(Arc::new(point_cloud_renderer));
                 // New renderers start from `data`: nothing is pending.
-                self.volume_dirty = None;
-                self.point_cloud_dirty = None;
+                self.layers.base.renderers.volume_dirty = None;
+                self.layers.base.renderers.point_cloud_dirty = None;
             }
         }
 
         let var_key = format!(
             "{}:{}:3d",
-            self.plotted_store_target_input, self.plotted_variable_idx
+            self.plotted().store_target,
+            self.plotted().variable_idx
         );
-        let is_new_variable = self.current_plotted_var_key.as_ref() != Some(&var_key);
+        let is_new_variable = self.layers.base.data.var_key.as_ref() != Some(&var_key);
 
         if is_new_variable {
-            self.clear_2d_renderers();
-            self.current_plotted_var_key = Some(var_key);
+            self.layers.base.clear_2d();
+            self.layers.base.data.var_key = Some(var_key);
             if data.min_val.is_finite() {
-                self.global_data_min = data.min_val;
-                self.volume_cmin = data.min_val;
-                self.color_range_min = data.min_val;
+                self.layers.base.color.global_min = data.min_val;
+                self.layers.base.color.volume_cmin = data.min_val;
+                self.layers.base.color.range_min = data.min_val;
             }
             if data.max_val.is_finite() {
-                self.global_data_max = data.max_val;
-                self.volume_cmax = data.max_val;
-                self.color_range_max = data.max_val;
+                self.layers.base.color.global_max = data.max_val;
+                self.layers.base.color.volume_cmax = data.max_val;
+                self.layers.base.color.range_max = data.max_val;
             }
-            self.lock_color_bounds = false;
+            self.layers.base.color.lock_bounds = false;
         } else {
             if data.min_val.is_finite() {
-                self.global_data_min = self.global_data_min.min(data.min_val);
+                self.layers.base.color.global_min =
+                    self.layers.base.color.global_min.min(data.min_val);
             }
             if data.max_val.is_finite() {
-                self.global_data_max = self.global_data_max.max(data.max_val);
+                self.layers.base.color.global_max =
+                    self.layers.base.color.global_max.max(data.max_val);
             }
 
-            if !self.lock_color_bounds {
+            if !self.layers.base.color.lock_bounds {
                 if data.min_val.is_finite() {
-                    self.volume_cmin = data.min_val;
-                    self.color_range_min = data.min_val;
+                    self.layers.base.color.volume_cmin = data.min_val;
+                    self.layers.base.color.range_min = data.min_val;
                 }
                 if data.max_val.is_finite() {
-                    self.volume_cmax = data.max_val;
-                    self.color_range_max = data.max_val;
+                    self.layers.base.color.volume_cmax = data.max_val;
+                    self.layers.base.color.range_max = data.max_val;
                 }
             }
         }
 
         let depth = data.depth;
-        self.volume_data = Some(data);
+        self.layers.base.data.volume = Some(data);
         if upload_later {
             self.mark_volume_dirty(0..depth);
         }

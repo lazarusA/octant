@@ -9,11 +9,11 @@ use crate::data::VariableInfo;
 /// Initializes default dimension roles (spatial X, Y, Z and animation) for a selected variable.
 pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
     let rank = var_info.shape.len();
-    app.dim_config = vec![DimConfig::default(); rank];
-    app.selected_dim_indices = vec![0; rank];
-    app.selected_dim_ranges.clear();
-    app.spatial_dims.clear();
-    app.animated_dim = None;
+    app.selected.dim_config = vec![DimConfig::default(); rank];
+    app.selected.dim_indices = vec![0; rank];
+    app.selected.dim_ranges.clear();
+    app.selected.spatial_dims.clear();
+    app.selected.animated_dim = None;
 
     init_initial_ranges(app, var_info, rank);
 
@@ -65,7 +65,7 @@ fn init_initial_ranges(app: &mut OctantApp, var_info: &VariableInfo, rank: usize
         } else {
             dim_size.saturating_sub(1)
         };
-        app.selected_dim_ranges.push((0, range_end));
+        app.selected.dim_ranges.push((0, range_end));
     }
 }
 
@@ -81,17 +81,17 @@ fn init_rank1_defaults(
         .unwrap_or("");
     let is_grid = dggs_opt.as_ref().is_some_and(|d| d.matches_dim(dim_name))
         || crate::data::coordinates::naming::is_healpix_dim_name(dim_name);
-    app.dim_config[0].spatial = if is_grid {
+    app.selected.dim_config[0].spatial = if is_grid {
         SpatialRole::Grid
     } else {
         SpatialRole::X
     };
     let dim_size = var_info.shape[0] as usize;
     let max_selectable = dim_size.min(crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS);
-    app.selected_dim_ranges[0] = (0, max_selectable.saturating_sub(1));
-    app.dim_config[0].active = true;
-    app.dim_config[0].range = app.selected_dim_ranges[0];
-    app.spatial_dims.push(0);
+    app.selected.dim_ranges[0] = (0, max_selectable.saturating_sub(1));
+    app.selected.dim_config[0].active = true;
+    app.selected.dim_config[0].range = app.selected.dim_ranges[0];
+    app.selected.spatial_dims.push(0);
 }
 
 fn apply_omero_default_z(app: &mut OctantApp, var_info: &VariableInfo, rank: usize) {
@@ -108,9 +108,9 @@ fn apply_omero_default_z(app: &mut OctantApp, var_info: &VariableInfo, rank: usi
     {
         let dim_max = var_info.shape[z_idx].saturating_sub(1) as usize;
         let clamped_dz = dz.min(dim_max);
-        app.selected_dim_indices[z_idx] = clamped_dz;
-        app.selected_dim_ranges[z_idx] = (clamped_dz, clamped_dz);
-        app.dim_config[z_idx].range = (clamped_dz, clamped_dz);
+        app.selected.dim_indices[z_idx] = clamped_dz;
+        app.selected.dim_ranges[z_idx] = (clamped_dz, clamped_dz);
+        app.selected.dim_config[z_idx].range = (clamped_dz, clamped_dz);
     }
 }
 
@@ -124,25 +124,26 @@ fn finalize_active_configs(app: &mut OctantApp, var_info: &VariableInfo, rank: u
         let is_channel = crate::data::coordinates::naming::is_channel_dim_name(dim_name);
         let dim_size = var_info.shape[i] as usize;
 
-        if app.dim_config[i].spatial != SpatialRole::None {
-            app.spatial_dims.push(i);
-            app.dim_config[i].active = true;
+        if app.selected.dim_config[i].spatial != SpatialRole::None {
+            app.selected.spatial_dims.push(i);
+            app.selected.dim_config[i].active = true;
         }
-        if app.dim_config[i].animation == AnimationRole::Animated {
-            app.dim_config[i].active = true;
+        if app.selected.dim_config[i].animation == AnimationRole::Animated {
+            app.selected.dim_config[i].active = true;
         }
         if is_channel && dim_size >= 2 {
-            app.dim_config[i].active = true;
+            app.selected.dim_config[i].active = true;
         }
-        if let Some(&r) = app.selected_dim_ranges.get(i) {
-            app.dim_config[i].range = r;
+        if let Some(&r) = app.selected.dim_ranges.get(i) {
+            app.selected.dim_config[i].range = r;
         }
     }
 }
 
 fn sort_spatial_dims(app: &mut OctantApp) {
-    app.spatial_dims
-        .sort_by_key(|&d| match app.dim_config[d].spatial {
+    app.selected
+        .spatial_dims
+        .sort_by_key(|&d| match app.selected.dim_config[d].spatial {
             SpatialRole::Grid => 0,
             SpatialRole::X => 1,
             SpatialRole::Y => 2,

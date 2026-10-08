@@ -155,7 +155,7 @@ Modular UI components integrated with `OctantApp`.
 
 ## 🔮 Future Architectural Roadmap: Multi-Variable Plotting
 
-- **Multi-Layer Rendering Pipeline**: The strict separation between transient exploration state (`active_dataset_metadata`, `dim_config`) and active plotted state (`plotted_dataset_metadata`, `plotted_dim_config`, `plotted_selected_dim_ranges`, etc.) is designed to easily expand into a `Vec<PlottedVariableState>` or multi-layer pipeline.
+- **Multi-Layer Rendering Pipeline**: The UI's staged selection (`OctantApp::selected`, a `VariableSelection`) is kept apart from what is plotted, which lives in a `LayerStack` ([`src/app/layers/`](https://github.com/lazarusA/octant/tree/main/src/app/layers)): each `Layer` owns its source and selection, data, renderers, color style and pending request. Today the stack holds only the base layer; overlays, derived sources (`Source` variants) and per-layer routing extend it without changing the base path.
 - **Dimensional Compatibility Verification**: Variables across the same or different datasets with matching spatial ranks, shape dimensions, or spatial grid coordinates can be validated for dimensional compatibility and combined into:
   - Vector field overlays (e.g., $u$ and $v$ wind/current velocity components).
   - Multi-channel RGB/false-color composite layers.

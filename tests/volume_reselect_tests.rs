@@ -16,11 +16,11 @@ fn new_volume_app() -> OctantApp {
     let mut app = OctantApp::default();
     let store = ProceduralBlockStore::open("procedural://volume4d").expect("open procedural store");
     let meta = store.inspect().expect("inspect procedural store");
-    app.selected_store_kind = StoreKind::ProceduralVolume4D;
-    app.store_target_input = "procedural://volume4d".to_string();
+    app.selected.store_kind = StoreKind::ProceduralVolume4D;
+    app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
     app.show_hero = false;
-    app.active_plot_type = PlotType::Volume;
+    app.selected.plot_type = PlotType::Volume;
     app
 }
 
@@ -41,13 +41,13 @@ fn press_plot(app: &mut OctantApp) {
 
 /// Sets the slider range of `dim` the way `slider_row.rs` does.
 fn set_range(app: &mut OctantApp, dim: usize, range: (usize, usize)) {
-    app.selected_dim_ranges[dim] = range;
-    app.dim_config[dim].range = range;
+    app.selected.dim_ranges[dim] = range;
+    app.selected.dim_config[dim].range = range;
 }
 
 /// Checks the volume against the analytic field for `ranges` (z, y, x) at `t`.
 fn assert_volume_matches(app: &OctantApp, t: usize, ranges: [(usize, usize); 3], label: &str) {
-    let vdata = app.volume_data.as_ref().expect("volume data");
+    let vdata = app.layers.base.data.volume.as_ref().expect("volume data");
     let [(z0, z1), (y0, y1), (x0, x1)] = ranges;
     let (nz, ny, nx) = (z1 - z0 + 1, y1 - y0 + 1, x1 - x0 + 1);
     assert_eq!(
@@ -76,14 +76,16 @@ fn assert_volume_matches(app: &OctantApp, t: usize, ranges: [(usize, usize); 3],
         }
     }
     assert!(
-        app.volume_cmin.is_finite() && app.volume_cmax.is_finite(),
+        app.layers.base.color.volume_cmin.is_finite()
+            && app.layers.base.color.volume_cmax.is_finite(),
         "{label}: color range not finite"
     );
     assert!(
-        app.volume_cmin >= vdata.min_val - 1e-5 && app.volume_cmax <= vdata.max_val + 1e-5,
+        app.layers.base.color.volume_cmin >= vdata.min_val - 1e-5
+            && app.layers.base.color.volume_cmax <= vdata.max_val + 1e-5,
         "{label}: color range {}..{} outside data {}..{}",
-        app.volume_cmin,
-        app.volume_cmax,
+        app.layers.base.color.volume_cmin,
+        app.layers.base.color.volume_cmax,
         vdata.min_val,
         vdata.max_val
     );
@@ -93,7 +95,7 @@ fn assert_volume_matches(app: &OctantApp, t: usize, ranges: [(usize, usize); 3],
 fn volume_replot_with_smaller_then_larger_spatial_ranges() {
     let mut app = new_volume_app();
     // dims: time(0, animated), depth(1, Z), lat(2, Y), lon(3, X)
-    assert_eq!(app.animated_dim, Some(0));
+    assert_eq!(app.selected.animated_dim, Some(0));
 
     press_plot(&mut app);
     assert_volume_matches(&app, 0, [(0, 31), (0, 31), (0, 31)], "first plot");
@@ -140,11 +142,11 @@ fn new_depth_animated_app(chunk: u64) -> OctantApp {
     let store = ProceduralBlockStore::open("procedural://volume4d").expect("open procedural store");
     let mut meta = store.inspect().expect("inspect procedural store");
     meta.variables[0].chunk_shape = vec![1, chunk, 32, 32];
-    app.selected_store_kind = StoreKind::ProceduralVolume4D;
-    app.store_target_input = "procedural://volume4d".to_string();
+    app.selected.store_kind = StoreKind::ProceduralVolume4D;
+    app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
     app.show_hero = false;
-    app.active_plot_type = PlotType::Volume;
+    app.selected.plot_type = PlotType::Volume;
     let role = |spatial, animation, range| DimConfig {
         spatial,
         animation,
@@ -152,17 +154,17 @@ fn new_depth_animated_app(chunk: u64) -> OctantApp {
         index: 0,
         range,
     };
-    app.dim_config = vec![
+    app.selected.dim_config = vec![
         DimConfig::default(),
         role(SpatialRole::Z, AnimationRole::Animated, (0, 31)),
         role(SpatialRole::Y, AnimationRole::None, (0, 31)),
         role(SpatialRole::X, AnimationRole::None, (0, 31)),
     ];
-    app.dim_config[0].active = false;
-    app.animated_dim = Some(1);
-    app.spatial_dims = vec![3, 2, 1];
-    app.selected_dim_indices = vec![0; 4];
-    app.selected_dim_ranges = vec![(0, 0), (0, 31), (0, 31), (0, 31)];
+    app.selected.dim_config[0].active = false;
+    app.selected.animated_dim = Some(1);
+    app.selected.spatial_dims = vec![3, 2, 1];
+    app.selected.dim_indices = vec![0; 4];
+    app.selected.dim_ranges = vec![(0, 0), (0, 31), (0, 31), (0, 31)];
     app.current_timestep = 0;
     app
 }

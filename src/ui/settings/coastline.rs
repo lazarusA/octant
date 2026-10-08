@@ -1,7 +1,7 @@
 use crate::app::OctantApp;
 
 pub(crate) fn show_coastline_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
-    if app.is_ome_dataset() || !app.composite_channel_configs.is_empty() {
+    if app.is_ome_dataset() || !app.layers.base.composite.channel_configs.is_empty() {
         return;
     }
     ui.add_space(2.0);

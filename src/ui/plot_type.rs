@@ -16,8 +16,8 @@ pub fn plot_type_icon(plot_type: PlotType) -> Icon {
 }
 
 pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
-    let current_icon = plot_type_icon(app.active_plot_type);
-    let current_label = app.active_plot_type.display_name();
+    let current_icon = plot_type_icon(app.selected.plot_type);
+    let current_label = app.selected.plot_type.display_name();
     let button_response = ui.add(
         ToolbarButton::new(current_icon, current_label)
             .compact(compact)
@@ -45,6 +45,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
         (false, false, 0.0)
     };
     let is_discrete_grid = app
+        .selected
         .dim_config
         .iter()
         .any(|c| c.spatial == crate::app::SpatialRole::Grid);
@@ -63,7 +64,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
             ),
             "HEALPix / Discrete",
         )
-    } else if let Some(m) = &app.matrix_data
+    } else if let Some(m) = &app.layers.base.data.matrix
         && target_var.map(|v| &v.name) == app.plotted_variable_info().map(|p| &p.name)
     {
         (Some(m.grid.supported_plot_types()), m.grid.name())
@@ -90,19 +91,20 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     let surface_mb = (total_2d_elements as f64 * 4.0) / (1024.0 * 1024.0);
 
     // Safety fallback: revert to Heatmap only if the currently active plot lacks valid GPU data (and user is not staging an unplotted variable) or pyramid is on
-    let is_loading = app.active_block_key.is_some() || app.block_prefetcher.pending_count() > 0;
+    let is_loading =
+        app.layers.base.load.block_key.is_some() || app.block_prefetcher.pending_count() > 0;
     if !is_exploring_new
         && !is_loading
-        && ((app.enable_pyramid_resampling && app.active_plot_type != PlotType::Heatmap)
-            || ((app.active_plot_type == PlotType::Volume
-                || app.active_plot_type == PlotType::PointCloud)
-                && app.volume_data.is_none())
-            || ((app.active_plot_type == PlotType::Sphere
-                || app.active_plot_type == PlotType::Surface)
-                && app.sphere_renderer.is_none()
-                && app.matrix_data.is_none()))
+        && ((app.enable_pyramid_resampling && app.selected.plot_type != PlotType::Heatmap)
+            || ((app.selected.plot_type == PlotType::Volume
+                || app.selected.plot_type == PlotType::PointCloud)
+                && app.layers.base.data.volume.is_none())
+            || ((app.selected.plot_type == PlotType::Sphere
+                || app.selected.plot_type == PlotType::Surface)
+                && app.layers.base.renderers.sphere.is_none()
+                && app.layers.base.data.matrix.is_none()))
     {
-        app.active_plot_type = PlotType::Heatmap;
+        app.selected.plot_type = PlotType::Heatmap;
     }
 
     ui.set_min_width(220.0);
@@ -158,7 +160,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     for (plot_type, icon, label, enabled) in plot_items {
         let is_supported = supported_plots.is_none_or(|plots| plots.contains(&plot_type));
         let is_enabled = enabled && is_supported;
-        let is_selected = app.active_plot_type == plot_type;
+        let is_selected = app.selected.plot_type == plot_type;
 
         if is_enabled {
             let clicked = ui

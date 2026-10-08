@@ -37,8 +37,8 @@ pub fn sample_line_series(
     }
     .min(prof_len.saturating_sub(1));
 
-    let cmin = app.color_range_min;
-    let cmax = app.color_range_max;
+    let cmin = app.layers.base.color.range_min;
+    let cmax = app.layers.base.color.range_max;
     let range = (cmax - cmin).max(1e-6);
 
     let mut best_line_idx = 0usize;
@@ -96,8 +96,8 @@ pub fn draw_line_guidelines_and_reticle(
     let ndc_x = (norm_x_step * 2.0 - 1.0) * zoom + gpu_pan_x;
     let screen_dot_x = rect.min.x + (ndc_x + 1.0) * 0.5 * rect.width();
 
-    let cmin = app.color_range_min;
-    let cmax = app.color_range_max;
+    let cmin = app.layers.base.color.range_min;
+    let cmax = app.layers.base.color.range_max;
     let range = (cmax - cmin).max(1e-6);
 
     let norm_y_val = if !raw_val.is_nan() && raw_val.is_finite() {

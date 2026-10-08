@@ -8,17 +8,17 @@ use crate::data::octant_block::OctantBlock;
 /// Computes the 64-bit deterministic hash of active composite channels and windows.
 pub fn compute_composite_hash(app: &OctantApp) -> u64 {
     let mut hasher = DefaultHasher::new();
-    app.rgb_composite_mode.hash(&mut hasher);
-    if app.rgb_composite_mode {
-        if !app.is_geotiff() && !app.composite_channel_configs.is_empty() {
-            for c in &app.composite_channel_configs {
+    app.layers.base.composite.enabled.hash(&mut hasher);
+    if app.layers.base.composite.enabled {
+        if !app.is_geotiff() && !app.layers.base.composite.channel_configs.is_empty() {
+            for c in &app.layers.base.composite.channel_configs {
                 (c.index, c.visible, c.color_rgb).hash(&mut hasher);
                 if let Some((s, e)) = c.window {
                     (s.to_bits(), e.to_bits()).hash(&mut hasher);
                 }
             }
         } else {
-            app.rgb_composite_channels.hash(&mut hasher);
+            app.layers.base.composite.rgb_channels.hash(&mut hasher);
         }
     }
     hasher.finish()

@@ -14,8 +14,8 @@ impl OctantApp {
         let mut name = fallback_name.to_string();
         let mut units = None;
 
-        if let Some(meta) = &self.plotted_dataset_metadata
-            && let Some(var) = meta.variables.get(self.plotted_variable_idx)
+        if let Some(meta) = &self.plotted().metadata
+            && let Some(var) = meta.variables.get(self.plotted().variable_idx)
             && dim_idx < var.shape.len()
         {
             let dim_size = var
@@ -24,7 +24,8 @@ impl OctantApp {
                 .copied()
                 .unwrap_or(fallback_len as u64) as usize;
             let (start_p, end_p) = self
-                .plotted_selected_dim_ranges
+                .plotted()
+                .dim_ranges
                 .get(dim_idx)
                 .copied()
                 .unwrap_or((0, dim_size.saturating_sub(1)));

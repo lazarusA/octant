@@ -55,7 +55,7 @@ impl OctantApp {
 
         let z_mult = self.volume_z_scale.clamp(0.01, 50.0);
 
-        if let Some(vdata) = &self.volume_data {
+        if let Some(vdata) = &self.layers.base.data.volume {
             let w = vdata.width as f32 * scale_x;
             let h = vdata.height as f32 * scale_y;
             let d = vdata.depth as f32 * scale_z * z_mult;
@@ -63,7 +63,7 @@ impl OctantApp {
             return (w / max_dim, h / max_dim, d / max_dim);
         }
 
-        let sel_ranges = &self.selected_dim_ranges;
+        let sel_ranges = &self.selected.dim_ranges;
 
         let x_idx = self.get_spatial_dim_index(0);
         let y_idx = self.get_spatial_dim_index(1);
@@ -72,8 +72,8 @@ impl OctantApp {
         let get_extent = |dim: usize| -> usize {
             if let Some(&(start, end)) = sel_ranges.get(dim) {
                 (end + 1).saturating_sub(start).max(1)
-            } else if let Some(meta) = self.active_dataset_metadata.as_ref()
-                && let Some(var) = meta.variables.get(self.selected_variable_idx)
+            } else if let Some(meta) = self.selected.metadata.as_ref()
+                && let Some(var) = meta.variables.get(self.selected.variable_idx)
                 && let Some(&s) = var.shape.get(dim)
             {
                 (s as usize).max(1)
@@ -102,7 +102,7 @@ impl OctantApp {
             .map(|c| c.spatial)
             .unwrap_or(crate::app::SpatialRole::None);
 
-        let (width, height, depth) = if let Some(vdata) = &self.volume_data {
+        let (width, height, depth) = if let Some(vdata) = &self.layers.base.data.volume {
             (
                 vdata.width.max(1) as u32,
                 vdata.height.max(1) as u32,
@@ -133,10 +133,10 @@ impl OctantApp {
     /// Resolves the metadata dimension index for a given spatial axis (0 = X, 1 = Y, 2 = Z).
     pub fn get_spatial_dim_index(&self, axis: usize) -> usize {
         let meta = self.effective_dataset_metadata();
-        let var_idx = if self.plotted_dataset_metadata.is_some() {
-            self.plotted_variable_idx
+        let var_idx = if self.plotted().metadata.is_some() {
+            self.plotted().variable_idx
         } else {
-            self.selected_variable_idx
+            self.selected.variable_idx
         };
         let configs = self.effective_dim_config();
         if let Some(meta) = meta
@@ -162,10 +162,10 @@ impl OctantApp {
     pub fn get_spatial_dim_name(&self, axis: usize) -> Option<String> {
         let idx = self.get_spatial_dim_index(axis);
         let meta = self.effective_dataset_metadata();
-        let var_idx = if self.plotted_dataset_metadata.is_some() {
-            self.plotted_variable_idx
+        let var_idx = if self.plotted().metadata.is_some() {
+            self.plotted().variable_idx
         } else {
-            self.selected_variable_idx
+            self.selected.variable_idx
         };
         meta.and_then(|m| m.variables.get(var_idx))
             .and_then(|v| v.dimension_names.get(idx).cloned())
@@ -173,18 +173,12 @@ impl OctantApp {
 
     /// Returns the effective original (width, height) of the active 2D data or pyramid.
     pub fn active_data_dimensions_2d(&self) -> (usize, usize) {
-        if let Some(pyr) = &self.active_pyramid {
-            (pyr.original_width, pyr.original_height)
-        } else if let Some(m) = &self.matrix_data {
-            (m.width, m.height)
-        } else {
-            (1024, 1024)
-        }
+        self.layers.base.data.dimensions_2d()
     }
 
     /// Returns the aspect ratio (width / height) of the active 2D dataset.
     pub fn data_aspect_ratio_2d(&self) -> f32 {
-        if let Some(m) = &self.matrix_data
+        if let Some(m) = &self.layers.base.data.matrix
             && m.grid.is_healpix()
         {
             return 2.0;
@@ -195,7 +189,7 @@ impl OctantApp {
 
     /// Computes data aspect scaling factors [scale_x, scale_y] to preserve proportional aspect framing.
     pub fn compute_aspect_scale(&self, canvas_size: egui::Vec2) -> [f32; 2] {
-        if self.enforce_data_aspect_ratio && self.matrix_data.is_some() {
+        if self.enforce_data_aspect_ratio && self.layers.base.data.matrix.is_some() {
             let data_aspect = self.data_aspect_ratio_2d();
             let canvas_aspect = canvas_size.x / canvas_size.y.max(1.0);
             if canvas_aspect > data_aspect {

@@ -16,8 +16,8 @@ pub fn draw_end_range_inputs(
     let input_h = 18.0;
     let drag_speed = ((max_val - min_val).abs() / 100.0).max(1e-4);
 
-    let mut new_min = app.color_range_min;
-    let mut new_max = app.color_range_max;
+    let mut new_min = app.layers.base.color.range_min;
+    let mut new_max = app.layers.base.color.range_max;
 
     let min_rect = Rect::from_center_size(
         Pos2::new(bar_rect.min.x, bar_rect.max.y + 6.0 + input_h / 2.0),
@@ -48,15 +48,15 @@ pub fn draw_end_range_inputs(
         )
         .on_hover_text("Upper end range (Max). Drag to adjust or click to type.");
 
-    if min_resp.changed() || new_min != app.color_range_min {
-        app.color_range_min = new_min;
-        app.volume_cmin = new_min;
-        app.lock_color_bounds = true;
+    if min_resp.changed() || new_min != app.layers.base.color.range_min {
+        app.layers.base.color.range_min = new_min;
+        app.layers.base.color.volume_cmin = new_min;
+        app.layers.base.color.lock_bounds = true;
     }
-    if max_resp.changed() || new_max != app.color_range_max {
-        app.color_range_max = new_max;
-        app.volume_cmax = new_max;
-        app.lock_color_bounds = true;
+    if max_resp.changed() || new_max != app.layers.base.color.range_max {
+        app.layers.base.color.range_max = new_max;
+        app.layers.base.color.volume_cmax = new_max;
+        app.layers.base.color.lock_bounds = true;
     }
 }
 
@@ -64,7 +64,7 @@ pub fn draw_end_range_inputs(
 pub fn draw_clip_triangles(app: &mut OctantApp, ui: &mut Ui, bar_rect: Rect) {
     let tri_w = 12.0_f32;
 
-    if app.use_lowclip {
+    if app.layers.base.color.use_lowclip {
         let low_tri_rect = Rect::from_min_max(
             Pos2::new(bar_rect.min.x - tri_w, bar_rect.min.y),
             Pos2::new(bar_rect.min.x, bar_rect.max.y),
@@ -72,7 +72,7 @@ pub fn draw_clip_triangles(app: &mut OctantApp, ui: &mut Ui, bar_rect: Rect) {
 
         crate::ui::color_picker::ShapeColorPicker::new(
             "colorbar_lowclip_picker",
-            &mut app.lowclip_color,
+            &mut app.layers.base.color.lowclip_color,
             crate::ui::color_picker::ColorShape::LeftTriangle,
         )
         .title("Low Clip Color (< Min)")
@@ -80,7 +80,7 @@ pub fn draw_clip_triangles(app: &mut OctantApp, ui: &mut Ui, bar_rect: Rect) {
         .show_at(ui, low_tri_rect);
     }
 
-    if app.use_highclip {
+    if app.layers.base.color.use_highclip {
         let high_tri_rect = Rect::from_min_max(
             Pos2::new(bar_rect.max.x, bar_rect.min.y),
             Pos2::new(bar_rect.max.x + tri_w, bar_rect.max.y),
@@ -88,7 +88,7 @@ pub fn draw_clip_triangles(app: &mut OctantApp, ui: &mut Ui, bar_rect: Rect) {
 
         crate::ui::color_picker::ShapeColorPicker::new(
             "colorbar_highclip_picker",
-            &mut app.highclip_color,
+            &mut app.layers.base.color.highclip_color,
             crate::ui::color_picker::ColorShape::RightTriangle,
         )
         .title("High Clip Color (> Max)")
