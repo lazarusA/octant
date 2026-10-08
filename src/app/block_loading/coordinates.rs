@@ -34,7 +34,7 @@ impl OctantApp {
                 Err(e) => self.notify(
                     crate::ui::toast::Severity::Warning,
                     "Coordinates unavailable",
-                    &format!(
+                    format!(
                         "Coordinates of '{}' failed to load ({e}); axes show indices",
                         result.variable
                     ),

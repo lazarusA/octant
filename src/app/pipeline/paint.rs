@@ -211,7 +211,7 @@ impl OctantApp {
                     self.notify(
                         crate::ui::toast::Severity::Warning,
                         "Coastlines unavailable",
-                        &e.to_string(),
+                        e.to_string(),
                     );
                 }
             }

@@ -46,10 +46,11 @@ pub fn show(
                 }
             }
         });
+    // Hover flags are by position, so the clock runs before any removal.
+    toasts.tick(now, &hovered);
     if let Some(id) = dismissed {
         toasts.dismiss(id);
     }
-    toasts.tick(now, &hovered);
     match toasts.next_repaint() {
         Some(wait) if wait.is_zero() => ctx.request_repaint(),
         Some(wait) => ctx.request_repaint_after(wait),

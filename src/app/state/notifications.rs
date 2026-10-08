@@ -5,7 +5,7 @@ use crate::ui::toast::{Notice, Severity};
 
 impl OctantApp {
     /// Shows a toast with `title` and `detail` (may be empty), and logs it.
-    pub fn notify(&mut self, severity: Severity, title: &str, detail: &str) {
+    pub fn notify(&mut self, severity: Severity, title: &str, detail: impl Into<String>) {
         self.push_notice(Notice::new(severity, title, detail));
     }
 

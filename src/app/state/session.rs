@@ -178,20 +178,4 @@ impl OctantApp {
     pub fn selected_variable_info(&self) -> Option<&crate::data::VariableInfo> {
         self.selected.variable_info()
     }
-
-    /// Returns the chunk size along `dim` for the currently plotted variable (defaults to 1).
-    pub fn plotted_chunk_size(&self, dim: usize) -> usize {
-        self.plotted_variable_info()
-            .and_then(|v| v.chunk_shape.get(dim))
-            .copied()
-            .unwrap_or(1) as usize
-    }
-
-    /// Returns the total extent along `dim` for the currently plotted variable (defaults to 1).
-    pub fn plotted_dim_size(&self, dim: usize) -> usize {
-        self.plotted_variable_info()
-            .and_then(|v| v.shape.get(dim))
-            .copied()
-            .unwrap_or(1) as usize
-    }
 }

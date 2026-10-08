@@ -30,7 +30,7 @@ impl VolumeTextures {
             crate::ui::toast::report(
                 crate::ui::toast::Severity::Error,
                 "Volume too large for the GPU",
-                &format!(
+                format!(
                     "Volume {}x{}x{} exceeds GPU 3D texture limit ({max})",
                     dims.w, dims.h, dims.d
                 ),
@@ -79,7 +79,7 @@ impl VolumeTextures {
             crate::ui::toast::report(
                 crate::ui::toast::Severity::Warning,
                 "Volume upload skipped",
-                &format!("{} values for a {w}x{h}x{d} texture", values.len()),
+                format!("{} values for a {w}x{h}x{d} texture", values.len()),
             );
             return;
         }

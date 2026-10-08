@@ -11,8 +11,9 @@ const MAX_PENDING: usize = 32;
 static PENDING: Mutex<Vec<Notice>> = Mutex::new(Vec::new());
 
 /// Shows a toast from anywhere (and logs it). `detail` may be empty.
-pub fn report(severity: Severity, title: &str, detail: &str) {
-    severity.log(title, detail);
+pub fn report(severity: Severity, title: &str, detail: impl Into<String>) {
+    let detail = detail.into();
+    severity.log(title, &detail);
     let mut pending = PENDING.lock().unwrap_or_else(|p| p.into_inner());
     if pending.len() >= MAX_PENDING {
         pending.remove(0);

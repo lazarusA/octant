@@ -246,7 +246,7 @@ pub fn safe_write_buffer<T: bytemuck::Pod>(
         crate::ui::toast::report(
             crate::ui::toast::Severity::Warning,
             "Data too large for the GPU buffer",
-            &format!(
+            format!(
                 "{label}: data size ({copy_bytes} bytes) exceeds GPU buffer capacity ({} bytes), skipping write",
                 buffer.size()
             ),
@@ -268,7 +268,7 @@ pub fn safe_write_buffer_range<T: bytemuck::Pod>(
         crate::ui::toast::report(
             crate::ui::toast::Severity::Warning,
             "Data too large for the GPU buffer",
-            &format!(
+            format!(
                 "{label}: range at element {offset} (+{} elements) exceeds GPU buffer capacity ({} bytes), skipping write",
                 data.len(),
                 buffer.size()

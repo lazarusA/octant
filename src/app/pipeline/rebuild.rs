@@ -275,7 +275,7 @@ impl OctantApp {
             self.notify(
                 crate::ui::toast::Severity::Error,
                 "Volume too large for the GPU",
-                &detail,
+                detail,
             );
             return;
         }

@@ -52,7 +52,7 @@ static BUILTIN: LazyLock<BuiltinCatalog> = LazyLock::new(|| match format::decode
         crate::ui::toast::report(
             crate::ui::toast::Severity::Error,
             "Bundled colormaps unreadable",
-            &format!("{e}; falling back to grayscale"),
+            format!("{e}; falling back to grayscale"),
         );
         BuiltinCatalog::fallback()
     }

@@ -156,7 +156,7 @@ impl eframe::App for OctantApp {
                         self.notify(
                             Severity::Warning,
                             "Unsupported file",
-                            &format!("{err}: {path_str}"),
+                            format!("{err}: {path_str}"),
                         );
                     }
                 }
@@ -630,7 +630,7 @@ impl OctantApp {
                 } else if let Some(ref path) = req.output_path {
                     if let Err(e) = crate::export::save_exported_file(&data, path) {
                         self.status_message = format!("Export error: {}", e);
-                        self.notify(Severity::Error, "Export failed", &e.to_string());
+                        self.notify(Severity::Error, "Export failed", e.to_string());
                     } else {
                         let filename = path
                             .file_name()
@@ -649,7 +649,7 @@ impl OctantApp {
                 self.notify(
                     Severity::Error,
                     "Export failed",
-                    &format!("Encoding error: {err}"),
+                    format!("Encoding error: {err}"),
                 );
             }
         }
