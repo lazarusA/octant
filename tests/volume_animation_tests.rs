@@ -779,15 +779,11 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
         let vdata = app.layers.base.data.volume.as_ref().unwrap();
         assert_eq!(app.layers.base.color.range_min, vdata.min_val);
         assert_eq!(app.layers.base.color.range_max, vdata.max_val);
-        assert_eq!(app.layers.base.color.volume_cmin, vdata.min_val);
-        assert_eq!(app.layers.base.color.volume_cmax, vdata.max_val);
     }
 
     // 2. Locked Mode (lock_bounds = true): bounds remain fixed
     app.layers.base.color.range_min = 10.0;
     app.layers.base.color.range_max = 80.0;
-    app.layers.base.color.volume_cmin = 10.0;
-    app.layers.base.color.volume_cmax = 80.0;
     app.layers.base.color.lock_bounds = true;
 
     for step in 0..nt {
@@ -797,8 +793,6 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
 
         assert_eq!(app.layers.base.color.range_min, 10.0);
         assert_eq!(app.layers.base.color.range_max, 80.0);
-        assert_eq!(app.layers.base.color.volume_cmin, 10.0);
-        assert_eq!(app.layers.base.color.volume_cmax, 80.0);
     }
 
     // 3. Reset Bounds: unlocks and resets to active 3D volume min/max

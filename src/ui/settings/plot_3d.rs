@@ -62,20 +62,6 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.add(egui::Slider::new(&mut app.volume_attenuation, 0.0..=5.0).text("Attenuation"));
     }
 
-    if app.volume_algorithm <= 3 {
-        ui.separator();
-        if app.volume_algorithm != 1 {
-            ui.add(
-                egui::Slider::new(&mut app.layers.base.color.volume_cmin, 0.0..=100.0)
-                    .text("Min Clip"),
-            );
-        }
-        ui.add(
-            egui::Slider::new(&mut app.layers.base.color.volume_cmax, 0.0..=100.0)
-                .text("Max Range"),
-        );
-    }
-
     ui.separator();
     ui.add(
         egui::Slider::new(&mut app.volume_z_scale, 0.05..=10.0)

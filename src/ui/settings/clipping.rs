@@ -1,4 +1,5 @@
 use crate::app::OctantApp;
+use crate::plots::PlotType;
 use crate::ui::icons::{Icon, UiIconExt};
 use crate::ui::settings::resampling::show_resampling_controls;
 
@@ -18,10 +19,13 @@ pub(crate) fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.separator();
     ui.add_space(4.0);
     show_scale_type_controls(app, ui);
-    ui.add_space(4.0);
-    ui.separator();
-    ui.add_space(4.0);
-    show_resampling_controls(app, ui);
+    // The pyramid is resampled and drawn only by the heatmap.
+    if app.effective_canvas_plot_type() == PlotType::Heatmap {
+        ui.add_space(4.0);
+        ui.separator();
+        ui.add_space(4.0);
+        show_resampling_controls(app, ui);
+    }
 }
 
 fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -83,7 +87,6 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             )
             .changed()
         {
-            app.layers.base.color.volume_cmin = app.layers.base.color.range_min;
             app.layers.base.color.lock_bounds = true;
         }
 
@@ -99,7 +102,6 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             )
             .changed()
         {
-            app.layers.base.color.volume_cmax = app.layers.base.color.range_max;
             app.layers.base.color.lock_bounds = true;
         }
 

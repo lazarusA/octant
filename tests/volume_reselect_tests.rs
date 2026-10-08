@@ -69,16 +69,15 @@ fn assert_volume_matches(app: &OctantApp, t: usize, ranges: [(usize, usize); 3],
         }
     }
     assert!(
-        app.layers.base.color.volume_cmin.is_finite()
-            && app.layers.base.color.volume_cmax.is_finite(),
+        app.layers.base.color.range_min.is_finite() && app.layers.base.color.range_max.is_finite(),
         "{label}: color range not finite"
     );
     assert!(
-        app.layers.base.color.volume_cmin >= vdata.min_val - 1e-5
-            && app.layers.base.color.volume_cmax <= vdata.max_val + 1e-5,
+        app.layers.base.color.range_min >= vdata.min_val - 1e-5
+            && app.layers.base.color.range_max <= vdata.max_val + 1e-5,
         "{label}: color range {}..{} outside data {}..{}",
-        app.layers.base.color.volume_cmin,
-        app.layers.base.color.volume_cmax,
+        app.layers.base.color.range_min,
+        app.layers.base.color.range_max,
         vdata.min_val,
         vdata.max_val
     );

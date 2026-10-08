@@ -1,5 +1,4 @@
 use crate::app::OctantApp;
-use crate::plots::PlotType;
 
 pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     let prev_resampling = app.enable_pyramid_resampling;
@@ -68,9 +67,6 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         && let Some(mdata) = &app.layers.base.data.matrix
     {
         if app.enable_pyramid_resampling {
-            if app.selected.plot_type != PlotType::Heatmap {
-                app.selected.plot_type = PlotType::Heatmap;
-            }
             if mdata.height > 1 {
                 let pyramid = std::sync::Arc::new(crate::data::MatrixPyramid::new(
                     &mdata.values,
