@@ -2,6 +2,8 @@
 //! loading path, headless, against the offline procedural 4D store: every
 //! played step must show that step's slice.
 
+mod common;
+use common::drain;
 use std::time::{Duration, Instant};
 
 use octant::app::{OctantApp, StoreKind};
@@ -11,33 +13,21 @@ use octant::plots::PlotType;
 const NT: usize = 20;
 const N: usize = 32;
 
-fn drain(app: &mut OctantApp) {
-    let deadline = Instant::now() + Duration::from_secs(20);
-    loop {
-        app.poll_block_prefetch_results();
-        if app.block_prefetcher.pending_count() == 0 {
-            break;
-        }
-        assert!(Instant::now() < deadline, "prefetcher did not finish");
-        std::thread::sleep(Duration::from_millis(2));
-    }
-}
-
 fn app_with(plot: PlotType) -> OctantApp {
     let mut app = OctantApp::default();
     let store = ProceduralBlockStore::open("procedural://volume4d").expect("open procedural store");
     let meta = store.inspect().expect("inspect procedural store");
-    app.selected_store_kind = StoreKind::ProceduralVolume4D;
-    app.store_target_input = "procedural://volume4d".to_string();
+    app.selected.store_kind = StoreKind::ProceduralVolume4D;
+    app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
     app.show_hero = false;
-    app.active_plot_type = plot;
+    app.selected.plot_type = plot;
     app
 }
 
 /// The 2D slice shown for step `t` (dims: time, depth, lat, lon) at depth `z`.
 fn assert_slice(app: &OctantApp, t: usize, z: usize, label: &str) {
-    let m = app.matrix_data.as_ref().expect("matrix data");
+    let m = app.layers.base.data.matrix.as_ref().expect("matrix data");
     assert_eq!((m.width, m.height), (N, N), "{label}: slice dims");
     for y in 0..N {
         for x in 0..N {
@@ -53,8 +43,8 @@ fn assert_slice(app: &OctantApp, t: usize, z: usize, label: &str) {
 
 fn play(plot: PlotType) {
     let mut app = app_with(plot);
-    assert_eq!(app.animated_dim, Some(0));
-    let z = app.selected_dim_indices[1];
+    assert_eq!(app.selected.animated_dim, Some(0));
+    let z = app.selected.dim_indices[1];
     app.plot_selection();
     drain(&mut app);
     assert_slice(&app, 0, z, "first plot");
@@ -89,9 +79,9 @@ fn play_past_window(plot: PlotType, cache_blocks: usize) {
     // Room for `cache_blocks` per-step slabs (each 32^3 f32 values).
     app.block_cache
         .set_max_bytes(cache_blocks * N * N * N * 4 + 1024);
-    let z = app.selected_dim_indices[1];
-    app.selected_dim_ranges[0] = (0, 3);
-    app.dim_config[0].range = (0, 3);
+    let z = app.selected.dim_indices[1];
+    app.selected.dim_ranges[0] = (0, 3);
+    app.selected.dim_config[0].range = (0, 3);
     app.plot_selection();
     drain(&mut app);
     app.is_playing = true;
@@ -102,8 +92,8 @@ fn play_past_window(plot: PlotType, cache_blocks: usize) {
         }
         app.advance_playback(Instant::now());
         // What the open variables panel writes every frame (`slider_row.rs`).
-        app.selected_dim_indices[0] = app.current_timestep.clamp(0, 3);
-        app.dim_config[0].index = app.selected_dim_indices[0];
+        app.selected.dim_indices[0] = app.current_timestep.clamp(0, 3);
+        app.selected.dim_config[0].index = app.selected.dim_indices[0];
         for _ in 0..5 {
             app.poll_block_prefetch_results();
             std::thread::sleep(Duration::from_millis(1));

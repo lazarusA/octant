@@ -32,34 +32,17 @@ impl OctantApp {
 
     /// Returns the default automatic label for the active plotted variable (including unit if available).
     pub fn default_colorbar_label(&self) -> String {
-        if let Some(meta) = &self.plotted_dataset_metadata {
-            meta.variables
-                .get(self.plotted_variable_idx)
-                .map(|v| {
-                    if let Some(unit) = v.attributes.get("units").or(v.units.as_ref()) {
-                        format!("{} ({})", v.name, unit)
-                    } else {
-                        v.name.clone()
-                    }
-                })
-                .unwrap_or_else(|| "Scalar Field".to_string())
-        } else {
-            "Scalar Field".to_string()
-        }
+        self.layers.base.default_colorbar_label()
     }
 
     /// Returns the effective colorbar label (custom overridden label if set, otherwise default).
     pub fn colorbar_label(&self) -> String {
-        if let Some(ref custom) = self.custom_colorbar_label {
-            custom.clone()
-        } else {
-            self.default_colorbar_label()
-        }
+        self.layers.base.colorbar_label()
     }
 
     /// Resets custom colorbar label back to default.
     pub fn reset_colorbar_label(&mut self) {
-        self.custom_colorbar_label = None;
+        self.layers.base.color.custom_label = None;
     }
 
     /// Resets color range min and max to the current dataset/matrix slice bounds and unlocks bounds.
@@ -74,45 +57,51 @@ impl OctantApp {
         let cur_name = cur_var.map(|v| v.name.as_str());
 
         let mdata_valid = self
-            .matrix_data
+            .layers
+            .base
+            .data
+            .matrix
             .as_ref()
             .is_some_and(|m| cur_name.is_none_or(|n| m.dataset_name.contains(n)));
         let vdata_valid = self
-            .volume_data
+            .layers
+            .base
+            .data
+            .volume
             .as_ref()
             .is_some_and(|v| cur_name.is_none_or(|n| v.dataset_name.contains(n)));
 
         if is_3d
             && vdata_valid
-            && let Some(vdata) = &self.volume_data
+            && let Some(vdata) = &self.layers.base.data.volume
         {
-            self.color_range_min = vdata.min_val;
-            self.color_range_max = vdata.max_val;
-            self.volume_cmin = vdata.min_val;
-            self.volume_cmax = vdata.max_val;
-        } else if mdata_valid && let Some(mdata) = &self.matrix_data {
-            self.color_range_min = mdata.min_val;
-            self.color_range_max = mdata.max_val;
-            self.volume_cmin = mdata.min_val;
-            self.volume_cmax = mdata.max_val;
-        } else if vdata_valid && let Some(vdata) = &self.volume_data {
-            self.color_range_min = vdata.min_val;
-            self.color_range_max = vdata.max_val;
-            self.volume_cmin = vdata.min_val;
-            self.volume_cmax = vdata.max_val;
+            self.layers.base.color.range_min = vdata.min_val;
+            self.layers.base.color.range_max = vdata.max_val;
+            self.layers.base.color.volume_cmin = vdata.min_val;
+            self.layers.base.color.volume_cmax = vdata.max_val;
+        } else if mdata_valid && let Some(mdata) = &self.layers.base.data.matrix {
+            self.layers.base.color.range_min = mdata.min_val;
+            self.layers.base.color.range_max = mdata.max_val;
+            self.layers.base.color.volume_cmin = mdata.min_val;
+            self.layers.base.color.volume_cmax = mdata.max_val;
+        } else if vdata_valid && let Some(vdata) = &self.layers.base.data.volume {
+            self.layers.base.color.range_min = vdata.min_val;
+            self.layers.base.color.range_max = vdata.max_val;
+            self.layers.base.color.volume_cmin = vdata.min_val;
+            self.layers.base.color.volume_cmax = vdata.max_val;
         } else {
-            self.color_range_min = 0.0;
-            self.color_range_max = 100.0;
-            self.volume_cmin = 0.0;
-            self.volume_cmax = 100.0;
+            self.layers.base.color.range_min = 0.0;
+            self.layers.base.color.range_max = 100.0;
+            self.layers.base.color.volume_cmin = 0.0;
+            self.layers.base.color.volume_cmax = 100.0;
         }
-        self.lock_color_bounds = false;
+        self.layers.base.color.lock_bounds = false;
     }
 
     /// Returns the source_id string for the currently plotted store.
     pub fn plotted_source_id(&self) -> String {
-        if !self.plotted_store_target_input.is_empty() {
-            StoreKind::make_source_id(self.plotted_store_kind, &self.plotted_store_target_input)
+        if !self.plotted().store_target.is_empty() {
+            StoreKind::make_source_id(self.plotted().store_kind, &self.plotted().store_target)
         } else {
             self.selected_source_id()
         }
@@ -120,30 +109,30 @@ impl OctantApp {
 
     /// Returns the source_id string for the currently selected (UI active) store.
     pub fn selected_source_id(&self) -> String {
-        StoreKind::make_source_id(self.selected_store_kind, &self.store_target_input)
+        StoreKind::make_source_id(self.selected.store_kind, &self.selected.store_target)
     }
 
     /// Returns the effective plot type that is currently plotted and rendered on canvas.
     #[inline]
     pub fn effective_canvas_plot_type(&self) -> crate::plots::PlotType {
-        if self.plotted_dataset_metadata.is_some() {
-            self.plotted_plot_type
+        if self.plotted().metadata.is_some() {
+            self.plotted().plot_type
         } else {
-            self.active_plot_type
+            self.selected.plot_type
         }
     }
 
     /// Returns true if the user is currently browsing/configuring a variable or dataset that has not been plotted yet.
     #[inline]
     pub fn is_exploring_unplotted_variable(&self) -> bool {
-        self.plotted_dataset_metadata.is_none()
-            || self.plotted_variable_idx != self.selected_variable_idx
-            || self.plotted_store_target_input != self.store_target_input
+        self.plotted().metadata.is_none()
+            || self.plotted().variable_idx != self.selected.variable_idx
+            || self.plotted().store_target != self.selected.store_target
     }
 
     /// Reverts current staged/selected UI configuration back to the plotted dataset and variable.
     pub fn revert_selected_state_to_plotted(&mut self) {
-        if let Some(meta) = self.plotted_dataset_metadata.clone() {
+        if let Some(meta) = self.plotted().metadata.clone() {
             self.set_active_metadata(meta);
             self.copy_plotted_to_selected();
         }
@@ -156,13 +145,13 @@ impl OctantApp {
 
         if is_new_var {
             self.enable_pyramid_resampling = false;
-            self.active_pyramid = None;
-            let is_vol = self.plotted_plot_type == crate::plots::PlotType::Volume
-                || self.plotted_plot_type == crate::plots::PlotType::PointCloud;
+            self.layers.base.data.pyramid = None;
+            let is_vol = self.plotted().plot_type == crate::plots::PlotType::Volume
+                || self.plotted().plot_type == crate::plots::PlotType::PointCloud;
             if is_vol {
-                self.clear_2d_renderers();
+                self.layers.base.clear_2d();
             } else {
-                self.clear_3d_renderers();
+                self.layers.base.clear_3d();
             }
             if let Some(var_info) = self.plotted_variable_info().cloned() {
                 let rank = var_info.shape.len();
@@ -173,39 +162,20 @@ impl OctantApp {
         }
 
         if !self.has_rgb_bands() {
-            self.rgb_composite_mode = false;
+            self.layers.base.composite.enabled = false;
         }
         self.reset_variable_bounds();
     }
 
     /// Returns VariableInfo for the currently plotted variable, if available.
     pub fn plotted_variable_info(&self) -> Option<&crate::data::VariableInfo> {
-        self.plotted_dataset_metadata
-            .as_ref()
-            .and_then(|m| m.variables.get(self.plotted_variable_idx))
+        self.plotted()
+            .variable_info()
             .or_else(|| self.selected_variable_info())
     }
 
     /// Returns VariableInfo for the currently selected variable, if available.
     pub fn selected_variable_info(&self) -> Option<&crate::data::VariableInfo> {
-        self.active_dataset_metadata
-            .as_ref()
-            .and_then(|m| m.variables.get(self.selected_variable_idx))
-    }
-
-    /// Returns the chunk size along `dim` for the currently plotted variable (defaults to 1).
-    pub fn plotted_chunk_size(&self, dim: usize) -> usize {
-        self.plotted_variable_info()
-            .and_then(|v| v.chunk_shape.get(dim))
-            .copied()
-            .unwrap_or(1) as usize
-    }
-
-    /// Returns the total extent along `dim` for the currently plotted variable (defaults to 1).
-    pub fn plotted_dim_size(&self, dim: usize) -> usize {
-        self.plotted_variable_info()
-            .and_then(|v| v.shape.get(dim))
-            .copied()
-            .unwrap_or(1) as usize
+        self.selected.variable_info()
     }
 }

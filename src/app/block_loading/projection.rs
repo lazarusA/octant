@@ -1,5 +1,6 @@
 //! Spatial axis resolution and block projection dispatch onto 2D and 3D pipelines.
 
+use super::block_axes;
 use crate::app::OctantApp;
 use crate::data::octant_block::OctantBlock;
 
@@ -68,7 +69,8 @@ impl OctantApp {
     pub fn apply_block_projection(&mut self, block: &OctantBlock) {
         let dim_configs = self.effective_dim_config();
         let anim_dim = self
-            .plotted_animated_dim
+            .plotted()
+            .animated_dim
             .or_else(|| crate::app::DimConfig::animated_dim(dim_configs));
         let orig_dim_names = self.resolve_orig_dim_names(block);
 
@@ -79,28 +81,35 @@ impl OctantApp {
             dim_configs,
         );
 
-        let fixed_indices = self.build_fixed_indices(block, &orig_dim_names, anim_dim);
-        let (req_x, local_x_range) = self.get_dim_bounds(block, &orig_dim_names, x_dim);
-        let (req_y, local_y_range) = self.get_dim_bounds(block, &orig_dim_names, y_dim);
-        let compute_bounds = !self.lock_color_bounds;
+        let fixed_indices = block_axes::fixed_indices(
+            block,
+            &orig_dim_names,
+            anim_dim,
+            self.effective_selected_dim_indices(),
+            self.current_timestep,
+        );
+        let ranges = self.effective_selected_dim_ranges();
+        let (req_x, local_x_range) = block_axes::dim_bounds(block, &orig_dim_names, x_dim, ranges);
+        let (req_y, local_y_range) = block_axes::dim_bounds(block, &orig_dim_names, y_dim, ranges);
+        let compute_bounds = !self.layers.base.color.lock_bounds;
         let c_dim = self.channel_dim_index().unwrap_or(0);
         let (req_z, local_z_range) =
-            if z_dim < block.rank() && (!self.rgb_composite_mode || z_dim != c_dim) {
-                self.get_dim_bounds(block, &orig_dim_names, z_dim)
+            if z_dim < block.rank() && (!self.layers.base.composite.enabled || z_dim != c_dim) {
+                block_axes::dim_bounds(block, &orig_dim_names, z_dim, ranges)
             } else {
                 ((0, 0), (0, 1))
             };
         let is_vol_allowed = crate::ui::variables_panel::is_volume_allowed_for_selection(self);
 
         if !is_vol_allowed
-            && (self.active_plot_type == crate::plots::PlotType::Volume
-                || self.active_plot_type == crate::plots::PlotType::PointCloud)
+            && (self.selected.plot_type == crate::plots::PlotType::Volume
+                || self.selected.plot_type == crate::plots::PlotType::PointCloud)
         {
-            self.active_plot_type = crate::plots::PlotType::Heatmap;
+            self.selected.plot_type = crate::plots::PlotType::Heatmap;
         }
 
-        let is_3d_plot = (self.active_plot_type == crate::plots::PlotType::Volume
-            || self.active_plot_type == crate::plots::PlotType::PointCloud)
+        let is_3d_plot = (self.selected.plot_type == crate::plots::PlotType::Volume
+            || self.selected.plot_type == crate::plots::PlotType::PointCloud)
             && is_vol_allowed;
 
         let is_3d_anim = anim_dim.is_some_and(|a| a == x_dim || a == y_dim || a == z_dim);
@@ -144,75 +153,10 @@ impl OctantApp {
         self.effective_dataset_metadata()
             .and_then(|meta| {
                 meta.variables
-                    .get(self.plotted_variable_idx)
-                    .or_else(|| meta.variables.get(self.selected_variable_idx))
+                    .get(self.plotted().variable_idx)
+                    .or_else(|| meta.variables.get(self.selected.variable_idx))
             })
             .map(|v| v.dimension_names.clone())
             .unwrap_or_else(|| block.dimension_names.clone())
-    }
-
-    fn build_fixed_indices(
-        &self,
-        block: &OctantBlock,
-        orig_dim_names: &[String],
-        anim_dim: Option<usize>,
-    ) -> Vec<usize> {
-        let sel_indices = self.effective_selected_dim_indices();
-
-        (0..block.rank())
-            .map(|i| {
-                let name = block.dimension_names.get(i);
-                let orig_idx = name
-                    .and_then(|n| orig_dim_names.iter().position(|o| o == n))
-                    .unwrap_or(i);
-                let idx = if Some(orig_idx) == anim_dim {
-                    self.current_timestep
-                } else {
-                    sel_indices.get(orig_idx).copied().unwrap_or(0)
-                };
-                let local = idx.saturating_sub(block.origin.get(i).copied().unwrap_or(0));
-                block.oriented_index(i, local)
-            })
-            .collect()
-    }
-
-    fn get_dim_bounds(
-        &self,
-        block: &OctantBlock,
-        orig_dim_names: &[String],
-        dim_idx: usize,
-    ) -> ((usize, usize), (usize, usize)) {
-        let sel_ranges = self.effective_selected_dim_ranges();
-
-        let dim_len = block.shape.get(dim_idx).copied().unwrap_or(1);
-        let block_orig = block.origin.get(dim_idx).copied().unwrap_or(0);
-        let orig_idx = block
-            .dimension_names
-            .get(dim_idx)
-            .and_then(|n| orig_dim_names.iter().position(|o| o == n))
-            .unwrap_or(dim_idx);
-
-        let (req_start, req_end) = sel_ranges
-            .get(orig_idx)
-            .copied()
-            .unwrap_or((0, dim_len.saturating_sub(1)));
-
-        let (local_start, local_end) = if crate::app::block_loading::view_filter::overlaps(
-            block_orig,
-            dim_len,
-            (req_start, req_end),
-        ) {
-            let s = req_start
-                .saturating_sub(block_orig)
-                .min(dim_len.saturating_sub(1));
-            let e = (req_end + 1)
-                .saturating_sub(block_orig)
-                .clamp(s + 1, dim_len);
-            (s, e)
-        } else {
-            (0, dim_len)
-        };
-
-        ((req_start, req_end), (local_start, local_end))
     }
 }

@@ -85,8 +85,10 @@ impl BlockPrefetcher {
                     completed.fetch_add(chunk_bytes, Ordering::Relaxed);
                 }
             };
-            let result = BlockLoader::load_one_with_progress(&request, Some(&mut on_progress))
-                .map_err(|error| error.to_string());
+            let result = crate::utils::executor::catch_panic(|| {
+                BlockLoader::load_one_with_progress(&request, Some(&mut on_progress))
+                    .map_err(|error| error.to_string())
+            });
             let _ = tx.send(PrefetchResult { key, result });
         });
 

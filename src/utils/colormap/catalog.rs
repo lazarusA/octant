@@ -49,7 +49,11 @@ pub struct BuiltinCatalog {
 static BUILTIN: LazyLock<BuiltinCatalog> = LazyLock::new(|| match format::decode(CATALOG_BYTES) {
     Ok(records) => BuiltinCatalog::from_records(records),
     Err(e) => {
-        log::error!("Failed to decode bundled colormaps: {e}; falling back to grayscale");
+        crate::ui::toast::report(
+            crate::ui::toast::Severity::Error,
+            "Bundled colormaps unreadable",
+            format!("{e}; falling back to grayscale"),
+        );
         BuiltinCatalog::fallback()
     }
 });

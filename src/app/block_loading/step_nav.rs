@@ -76,14 +76,14 @@ impl OctantApp {
             &self.plotted_source_id(),
             &var.name,
             &request.selections,
-            self.plotted_animated_dim,
+            self.plotted().animated_dim,
             step,
         )
     }
 
     /// Full size of the currently animated dimension in the dataset.
     pub fn animated_dim_extent(&self) -> usize {
-        let Some(anim_dim) = self.plotted_animated_dim else {
+        let Some(anim_dim) = self.plotted().animated_dim else {
             return 1;
         };
         self.plotted_variable_info()
@@ -94,7 +94,7 @@ impl OctantApp {
 
     /// Returns true if an animated dimension is currently selected and plotted.
     pub fn has_animated_dimension(&self) -> bool {
-        self.plotted_animated_dim.is_some()
+        self.plotted().animated_dim.is_some()
     }
 
     /// Returns the active height of the bottom bar in points.

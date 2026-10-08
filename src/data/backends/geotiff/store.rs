@@ -112,11 +112,10 @@ impl GeoTiffBlockStore {
         reader: Arc<dyn AsyncFileReader>,
     ) -> Result<Self, BlockStoreError> {
         let cached = ReadaheadMetadataCache::new(reader.clone());
-        let mut meta_reader = TiffMetadataReader::try_open(&cached)
+        let meta_reader = TiffMetadataReader::try_open(&cached)
             .await
             .map_err(|e| format!("Failed to read TIFF header for '{name}': {e}"))?;
-        let ifds = meta_reader
-            .read_all_ifds(&cached)
+        let ifds = super::ifd_check::read_checked_ifds(&meta_reader, &cached)
             .await
             .map_err(|e| format!("Failed to read IFD metadata for '{name}': {e}"))?;
         if ifds.is_empty() {

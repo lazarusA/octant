@@ -84,13 +84,13 @@ pub fn composite_labels(
     var: Option<&VariableInfo>,
 ) -> Arc<CompositeLabels> {
     let mut hasher = DefaultHasher::new();
-    app.plotted_store_target_input.hash(&mut hasher);
-    let generations = (app.plotted_metadata_generation, app.coordinates_revision);
+    app.plotted().store_target.hash(&mut hasher);
+    let generations = (app.plotted().metadata_generation, app.coordinates_revision);
     (meta.is_some(), generations).hash(&mut hasher);
     var.map(|v| (&v.name, &v.shape, &v.dimension_names))
         .hash(&mut hasher);
     (is_overlay(app), cmyk_bands(app), rgb_bands(app)).hash(&mut hasher);
-    for c in &app.composite_channel_configs {
+    for c in &app.layers.base.composite.channel_configs {
         (c.index, &c.name, c.visible).hash(&mut hasher);
     }
     let key = hasher.finish();
@@ -113,7 +113,13 @@ pub fn build_labels(
     var: Option<&VariableInfo>,
 ) -> CompositeLabels {
     if is_overlay(app) {
-        let channels = app.composite_channel_configs.iter().filter(|c| c.visible);
+        let channels = app
+            .layers
+            .base
+            .composite
+            .channel_configs
+            .iter()
+            .filter(|c| c.visible);
         let channels = channels.map(|c| CompositeChannel {
             label: match c.name.trim() {
                 "" => format!("Channel {}", c.index + 1).into(),
@@ -156,7 +162,7 @@ pub fn composite_fields(
     units: &str,
     (px, py): (usize, usize),
 ) -> Vec<HoverField> {
-    let probe = app.composite_probe.as_ref();
+    let probe = app.layers.base.data.composite_probe.as_ref();
     let raw = |band: usize| probe.and_then(|p| p.sample(band, px, py));
     labels
         .channels
@@ -175,13 +181,13 @@ pub fn composite_fields(
 
 /// Mirrors the projection's choice between the tinted overlay and the RGB band mapping.
 fn is_overlay(app: &OctantApp) -> bool {
-    !app.is_geotiff() && !app.composite_channel_configs.is_empty()
+    !app.is_geotiff() && !app.layers.base.composite.channel_configs.is_empty()
 }
 
 /// The global C, M, Y and K bands when the plotted composite converts CMYK inks: from the
 /// 2D composite's block, or for volumes, which keep no probe, from the dataset's tags.
 fn cmyk_bands(app: &OctantApp) -> Option<[usize; 4]> {
-    match app.composite_probe.as_ref() {
+    match app.layers.base.data.composite_probe.as_ref() {
         Some(probe) => probe.cmyk_channels(),
         None => (app.is_cmyk() && app.num_bands() >= 4).then_some([0, 1, 2, 3]),
     }
@@ -190,11 +196,14 @@ fn cmyk_bands(app: &OctantApp) -> Option<[usize; 4]> {
 /// The global bands drawn as R, G and B, clamped into the loaded block like the slicer.
 fn rgb_bands(app: &OctantApp) -> [usize; 3] {
     let resolve = |band: usize| {
-        app.composite_probe
+        app.layers
+            .base
+            .data
+            .composite_probe
             .as_ref()
             .map_or(band, |p: &CompositeProbe| p.resolve_channel(band))
     };
-    app.rgb_composite_channels.map(resolve)
+    app.layers.base.composite.rgb_channels.map(resolve)
 }
 
 /// Appends a channel's raw value (with `units`), or "No data", to `out`.
@@ -222,12 +231,12 @@ pub fn composite_rows(
     pixel: Option<(usize, usize)>,
     entries: &mut Vec<HoverField>,
 ) -> Option<CompositeKind> {
-    if !app.rgb_composite_mode {
+    if !app.layers.base.composite.enabled {
         return None;
     }
     let labels = composite_labels(app, ctx, meta, var);
     if let Some(pixel) = pixel
-        && app.composite_probe.is_some()
+        && app.layers.base.data.composite_probe.is_some()
     {
         entries.splice(0..0, composite_fields(app, &labels, units, pixel));
     }

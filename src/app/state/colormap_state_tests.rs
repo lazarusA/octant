@@ -43,7 +43,7 @@ fn only_custom_colormaps_survive_a_restart() {
     let Ok(custom_id) = app.add_custom_colormap(spec("persist_test_map", "black, white")) else {
         panic!("valid spec rejected");
     };
-    app.active_colormap = custom_id;
+    app.layers.base.color.colormap = custom_id;
     app.colormaps.reversed = true;
 
     let mut storage = MemoryStorage::default();
@@ -51,7 +51,7 @@ fn only_custom_colormaps_survive_a_restart() {
 
     let mut restarted = OctantApp::default();
     restarted.load_colormap_prefs(Some(&storage));
-    assert_eq!(restarted.active_colormap, registry::default_id());
+    assert_eq!(restarted.layers.base.color.colormap, registry::default_id());
     assert!(!restarted.colormaps.reversed);
     assert!(has_custom(&restarted, "persist_test_map"));
     registry::remove_custom("custom:persist_test_map");
@@ -66,7 +66,7 @@ fn older_prefs_with_a_saved_selection_are_ignored() {
     );
     let mut app = OctantApp::default();
     app.load_colormap_prefs(Some(&storage));
-    assert_eq!(app.active_colormap, registry::default_id());
+    assert_eq!(app.layers.base.color.colormap, registry::default_id());
     assert!(!app.colormaps.reversed);
     assert!(has_custom(&app, "legacy_test_map"));
     registry::remove_custom("custom:legacy_test_map");
@@ -207,14 +207,14 @@ fn smooth_toggle_switches_to_the_twin_only_when_one_exists() {
     let _registry = registry::test_lock();
     let mut app = OctantApp::default();
     let set1 = registry::find("colorbrewer:Set1").unwrap_or(0);
-    app.active_colormap = set1;
+    app.layers.base.color.colormap = set1;
     assert_eq!(app.effective_colormap(), set1);
     app.colormaps.smooth = true;
     assert_eq!(
         Some(app.effective_colormap()),
         registry::smooth_variant(set1)
     );
-    app.active_colormap = registry::default_id();
+    app.layers.base.color.colormap = registry::default_id();
     assert_eq!(
         app.effective_colormap(),
         registry::default_id(),
@@ -228,7 +228,7 @@ fn hidden_smooth_toggle_does_not_change_the_preview() {
     let _registry = registry::test_lock();
     let mut app = OctantApp::default();
     let set1 = registry::find("colorbrewer:Set1").unwrap_or(0);
-    app.active_colormap = registry::default_id();
+    app.layers.base.color.colormap = registry::default_id();
     app.colormaps.smooth = true;
     app.preview_colormap = Some(set1);
     assert_eq!(app.effective_colormap(), set1);

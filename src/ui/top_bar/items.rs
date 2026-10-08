@@ -15,7 +15,7 @@ fn label(item: TopBarItem, app: &OctantApp) -> &'static str {
         TopBarItem::Dataset => "Dataset",
         TopBarItem::Variables => "Variables",
         TopBarItem::Dimensions => "Dimensions",
-        TopBarItem::PlotType => app.active_plot_type.display_name(),
+        TopBarItem::PlotType => app.selected.plot_type.display_name(),
         TopBarItem::Colormap => "Colormap",
         TopBarItem::Settings => "Settings",
         TopBarItem::Status => "",

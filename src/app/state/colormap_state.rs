@@ -10,7 +10,7 @@ pub(super) const STORAGE_KEY: &str = "octant.colormaps";
 pub(super) const UNREADABLE_KEY: &str = "octant.colormaps.unreadable";
 const MAX_UNREADABLE_BACKUPS: usize = 8;
 
-/// Colormap state beyond the active id (which stays on `OctantApp::active_colormap`).
+/// Colormap state beyond the active id (which lives in the plotted layer's `ColorStyle::colormap`).
 #[derive(Default)]
 pub struct ColormapState {
     /// Samples the active colormap from its end.
@@ -51,7 +51,11 @@ impl OctantApp {
         };
         let Some(prefs) = eframe::get_value::<ColormapPrefs>(storage, STORAGE_KEY) else {
             if let Some(raw) = storage.get_string(STORAGE_KEY) {
-                log::warn!("Unreadable colormap preferences; backed up under `{UNREADABLE_KEY}`");
+                self.notify(
+                    crate::ui::toast::Severity::Warning,
+                    "Colormap preferences unreadable",
+                    format!("Backed up under `{UNREADABLE_KEY}`"),
+                );
                 self.colormaps.unreadable_prefs = Some(raw);
             }
             return;
@@ -62,7 +66,11 @@ impl OctantApp {
                     self.register_custom(spec, entry);
                 }
                 Err(e) => {
-                    log::warn!("Stored custom colormap `{}` does not build: {e}", spec.name);
+                    self.notify(
+                        crate::ui::toast::Severity::Warning,
+                        "Custom colormap not loaded",
+                        format!("`{}` does not build: {e}", spec.name),
+                    );
                     // A map that builds wins over a broken one with the same name.
                     if !self.has_custom_name(&spec.name) {
                         self.colormaps.unloaded.push(spec);
@@ -90,13 +98,18 @@ impl OctantApp {
     /// Atlas row actually drawn: the previewed or active colormap, or its smooth
     /// twin when "Smooth" is on and the palette has one.
     pub fn effective_colormap(&self) -> u32 {
-        self.shown_colormap(self.preview_colormap.unwrap_or(self.active_colormap))
+        self.shown_colormap(
+            self.preview_colormap
+                .unwrap_or(self.layers.base.color.colormap),
+        )
     }
 
     /// Atlas row drawn for colormap `id`: its smooth twin when "Smooth" is on.
     /// The toggle only shows (and so only applies) while the active map has a twin.
     pub fn shown_colormap(&self, id: u32) -> u32 {
-        if self.colormaps.smooth && registry::smooth_variant(self.active_colormap).is_some() {
+        if self.colormaps.smooth
+            && registry::smooth_variant(self.layers.base.color.colormap).is_some()
+        {
             registry::smooth_variant(id).unwrap_or(id)
         } else {
             id
@@ -159,11 +172,12 @@ impl OctantApp {
     /// Removes a custom colormap, keeping the active selection on the same map
     /// (or the default when the active map itself was removed).
     pub fn remove_custom_colormap(&mut self, key: &str) {
-        let active_key = registry::key_of(self.active_colormap);
+        let active_key = registry::key_of(self.layers.base.color.colormap);
         registry::remove_custom(key);
         self.colormaps.custom.retain(|s| !s.has_key(key));
         self.colormaps.unloaded.retain(|s| !s.has_key(key));
-        self.active_colormap = registry::find(&active_key).unwrap_or_else(registry::default_id);
+        self.layers.base.color.colormap =
+            registry::find(&active_key).unwrap_or_else(registry::default_id);
         self.preview_colormap = None;
         // Ids after the removed row shifted, so a remembered hover is stale.
         self.colormaps.picker.last_hovered = None;
@@ -187,7 +201,11 @@ fn back_up_unreadable(storage: &mut dyn eframe::Storage, raw: &str) {
             }
         }
     }
-    log::warn!("All {MAX_UNREADABLE_BACKUPS} colormap preference backups are in use");
+    crate::ui::toast::report(
+        crate::ui::toast::Severity::Warning,
+        "Colormap preferences not backed up",
+        format!("All {MAX_UNREADABLE_BACKUPS} colormap preference backups are in use"),
+    );
 }
 
 #[cfg(test)]

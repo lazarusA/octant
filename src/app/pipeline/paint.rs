@@ -23,22 +23,22 @@ impl OctantApp {
     pub fn update_active_2d_renderer_data(&self, queue: &wgpu::Queue, values: &[f32]) {
         match self.effective_canvas_plot_type() {
             PlotType::Heatmap => {
-                if let Some(renderer) = &self.renderer {
+                if let Some(renderer) = &self.layers.base.renderers.heatmap {
                     renderer.update_data(queue, values);
                 }
             }
             PlotType::Sphere => {
-                if let Some(sphere_renderer) = &self.sphere_renderer {
+                if let Some(sphere_renderer) = &self.layers.base.renderers.sphere {
                     sphere_renderer.update_data(queue, values);
                 }
             }
             PlotType::Surface => {
-                if let Some(surface_renderer) = &self.surface_renderer {
+                if let Some(surface_renderer) = &self.layers.base.renderers.surface {
                     surface_renderer.update_data(queue, values);
                 }
             }
             PlotType::Line => {
-                if let Some(line_renderer) = &self.line_renderer {
+                if let Some(line_renderer) = &self.layers.base.renderers.line {
                     line_renderer.update_data(queue, values);
                 }
             }
@@ -48,11 +48,17 @@ impl OctantApp {
 
     /// Resolves active (width, height) for 3D Volume and PointCloud shaders.
     pub fn get_volume_dimensions(&self) -> (u32, u32) {
-        self.volume_data
+        self.layers
+            .base
+            .data
+            .volume
             .as_ref()
             .map(|v| (v.width as u32, v.height as u32))
             .unwrap_or_else(|| {
-                self.matrix_data
+                self.layers
+                    .base
+                    .data
+                    .matrix
                     .as_ref()
                     .map_or((64, 64), |m| (m.width as u32, m.height as u32))
             })
@@ -147,7 +153,10 @@ impl OctantApp {
         aspect_ratio: f32,
     ) -> crate::plots::Mesh3DUniformParams {
         let (coord_mode, has_reference_globe, lon_bounds, lat_bounds) = self
-            .matrix_data
+            .layers
+            .base
+            .data
+            .matrix
             .as_ref()
             .map(|m| {
                 (
@@ -199,7 +208,11 @@ impl OctantApp {
                     log::info!("Coastline hot-swapped to {:?}", lod);
                 }
                 Err(e) => {
-                    log::warn!("Async coastline fetch failed: {e}");
+                    self.notify(
+                        crate::ui::toast::Severity::Warning,
+                        "Coastlines unavailable",
+                        e.to_string(),
+                    );
                 }
             }
         }
@@ -219,163 +232,16 @@ impl OctantApp {
         let canvas_plot_type = self.effective_canvas_plot_type();
         self.release_idle_oit_frames(canvas_plot_type);
 
-        match canvas_plot_type {
-            crate::plots::PlotType::Line => {
-                if let Some(line_renderer) = &self.line_renderer {
-                    let color_params = self.get_color_params();
-                    let (profile_values, profile_length, line_count) =
-                        self.get_line_profile_payload();
-                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                        canvas_rect,
-                        crate::plots::LineCallback {
-                            renderer: line_renderer.clone(),
-                            color_params,
-                            line_color: self.line_color,
-                            use_custom_color: self.line_use_custom_color,
-                            show_lines: self.line_show_lines,
-                            show_points: self.line_show_points,
-                            point_size: self.line_point_size,
-                            rect: canvas_rect,
-                            profile_values,
-                            profile_length,
-                            line_count,
-                            line_mode: if self.line_plot_all_series { 1 } else { 0 },
-                            pan: gpu_pan,
-                            zoom: gpu_zoom,
-                        },
-                    );
-                    ui.painter().add(callback);
-                }
-            }
-            crate::plots::PlotType::Sphere => {
-                if let Some(sphere_renderer) = &self.sphere_renderer {
-                    let aspect_ratio = crate::plots::common::compute_aspect_ratio(&plot_rect);
-                    let params = self.get_mesh_3d_uniform_params(
-                        self.sphere_mode,
-                        self.sphere_displacement_strength,
-                        aspect_ratio,
-                    );
-                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                        plot_rect,
-                        crate::plots::Mesh3DCallback {
-                            renderer: sphere_renderer.clone(),
-                            params,
-                            cube_mode_idx: 3,
-                            rect: plot_rect,
-                            transparency: self.transparency_mode(),
-                        },
-                    );
-                    ui.painter().add(callback);
-                }
-            }
-            crate::plots::PlotType::Surface => {
-                if let Some(surface_renderer) = &self.surface_renderer {
-                    let aspect_ratio = crate::plots::common::compute_aspect_ratio(&plot_rect);
-                    let params = self.get_mesh_3d_uniform_params(
-                        self.surface_mode,
-                        self.surface_displacement_strength,
-                        aspect_ratio,
-                    );
-                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                        plot_rect,
-                        crate::plots::Mesh3DCallback {
-                            renderer: surface_renderer.clone(),
-                            params,
-                            cube_mode_idx: 2,
-                            rect: plot_rect,
-                            transparency: self.transparency_mode(),
-                        },
-                    );
-                    ui.painter().add(callback);
-                }
-            }
-            crate::plots::PlotType::Volume => {
-                if let Some(volume_renderer) = &self.volume_renderer {
-                    let screen_aspect = crate::plots::common::compute_aspect_ratio(&plot_rect);
-                    let params = self.get_volume_uniform_params(screen_aspect);
-                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                        plot_rect,
-                        crate::plots::VolumeCallback {
-                            renderer: volume_renderer.clone(),
-                            params,
-                            rect: plot_rect,
-                            // Half resolution while rotating or zooming; the
-                            // frame after the input stops renders in full.
-                            scale: if self.view_interacting { 0.5 } else { 1.0 },
-                        },
-                    );
-                    ui.painter().add(callback);
-                }
-            }
-            crate::plots::PlotType::PointCloud => {
-                if let Some(point_cloud_renderer) = &self.point_cloud_renderer {
-                    let screen_aspect = crate::plots::common::compute_aspect_ratio(&plot_rect);
-                    let params = self.get_point_cloud_uniform_params(screen_aspect);
-                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                        plot_rect,
-                        crate::plots::PointCloudCallback {
-                            renderer: point_cloud_renderer.clone(),
-                            params,
-                            rect: plot_rect,
-                            transparency: self.transparency_mode(),
-                        },
-                    );
-                    ui.painter().add(callback);
-                }
-            }
-            _ => {
-                if let Some(renderer) = &self.renderer {
-                    if self.active_pyramid.is_some()
-                        && canvas_plot_type == crate::plots::PlotType::Heatmap
-                    {
-                        let ((u_min, u_max), (v_min, v_max)) =
-                            crate::data::ViewportResampler::compute_visible_data_bounds(
-                                gpu_pan,
-                                gpu_zoom,
-                                gpu_aspect_scale,
-                            );
-                        let (orig_w, orig_h) = self.active_data_dimensions_2d();
-                        let (target_w, target_h) =
-                            crate::data::ViewportResampler::compute_target_resolution(
-                                orig_w, orig_h, 2048,
-                            );
-
-                        if let Some(tile) = self.resampler.resample_if_needed(
-                            (u_min, u_max),
-                            (v_min, v_max),
-                            target_w,
-                            target_h,
-                        ) && let Some(wgpu_render_state) = &self.wgpu_render_state
-                        {
-                            renderer.update_data_and_dimensions(
-                                &wgpu_render_state.queue,
-                                &tile.data.values,
-                                tile.data.width,
-                                tile.data.height,
-                                tile.tile_bounds,
-                            );
-                        }
-                    }
-
-                    let coord_mode = self
-                        .matrix_data
-                        .as_ref()
-                        .map_or(0, |m| m.grid.render_coord_mode());
-                    let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-                        canvas_rect,
-                        crate::plots::MatrixCallback {
-                            renderer: renderer.clone(),
-                            color_params: self.get_color_params(),
-                            rect: canvas_rect,
-                            pan: gpu_pan,
-                            zoom: gpu_zoom,
-                            aspect_scale: gpu_aspect_scale,
-                            coord_mode,
-                        },
-                    );
-                    ui.painter().add(callback);
-                }
-            }
+        let view = super::paint_layer::CanvasView {
+            canvas_rect,
+            plot_rect,
+            pan: gpu_pan,
+            zoom: gpu_zoom,
+            aspect_scale: gpu_aspect_scale,
+        };
+        self.refresh_resampled_tiles(canvas_plot_type, &view);
+        for layer in self.layers.iter() {
+            self.paint_layer(ui, layer, canvas_plot_type, &view);
         }
 
         // --- Coastline overlay ---
@@ -397,7 +263,10 @@ impl OctantApp {
                 // Extract dataset geographic bounds from the active grid so the
                 // shader can project coastline lon/lat into the dataset's domain.
                 let (lon_min, lon_max, lat_min, lat_max) = self
-                    .matrix_data
+                    .layers
+                    .base
+                    .data
+                    .matrix
                     .as_ref()
                     .map(|m| crate::plots::dataset_geo_bounds(&m.grid))
                     .unwrap_or((-180.0, 180.0, 90.0, -90.0));

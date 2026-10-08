@@ -33,8 +33,8 @@ impl OctantApp {
                 StoreKind::from_data_source_kind(&dataset.source.kind),
             );
             let meta = dataset.metadata.clone();
-            self.store_target_input = uri;
-            self.selected_store_kind = kind;
+            self.selected.store_target = uri;
+            self.selected.store_kind = kind;
             if let Some(meta) = meta {
                 self.status_message = format!(
                     "Activated dataset '{}' (Found {} variables)",
@@ -55,8 +55,8 @@ impl OctantApp {
         if let Some(removed) = self.dataset_manager.remove(dataset_id) {
             crate::data::backends::coord_bounds::evict_coord_values(Some(&removed.source.uri));
             self.coordinate_loader.forget(&removed.id);
-            let is_active = self.active_dataset_metadata.as_ref().is_some_and(|_| {
-                self.store_target_input == removed.source.uri || dataset_id == removed.id
+            let is_active = self.selected.metadata.as_ref().is_some_and(|_| {
+                self.selected.store_target == removed.source.uri || dataset_id == removed.id
             });
             if is_active {
                 self.clear_active_metadata();
@@ -129,20 +129,12 @@ impl OctantApp {
 
     /// Return the dimension index corresponding to channels/bands for the currently plotted variable.
     pub fn channel_dim_index(&self) -> Option<usize> {
-        let var = self.plotted_variable_info()?;
-        var.dimension_names
-            .iter()
-            .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
-            .or(if var.shape.len() >= 3 { Some(0) } else { None })
+        channel_dim(self.plotted_variable_info()?)
     }
 
     /// Return the dimension index corresponding to channels/bands for the currently selected variable.
     pub fn selected_channel_dim_index(&self) -> Option<usize> {
-        let var = self.selected_variable_info()?;
-        var.dimension_names
-            .iter()
-            .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
-            .or(if var.shape.len() >= 3 { Some(0) } else { None })
+        channel_dim(self.selected_variable_info()?)
     }
 
     /// Return the total number of bands/channels for the currently plotted variable, if multi-band.
@@ -176,28 +168,28 @@ impl OctantApp {
 
     /// Returns true if the active dataset represents a GeoTIFF.
     pub fn is_geotiff(&self) -> bool {
-        if self.plotted_dataset_metadata.is_some() {
-            return self.plotted_store_kind == StoreKind::LocalGeoTiff
-                || self.plotted_store_kind == StoreKind::RemoteGeoTiff;
+        if self.plotted().metadata.is_some() {
+            return self.plotted().store_kind == StoreKind::LocalGeoTiff
+                || self.plotted().store_kind == StoreKind::RemoteGeoTiff;
         }
 
-        self.selected_store_kind == StoreKind::LocalGeoTiff
-            || self.selected_store_kind == StoreKind::RemoteGeoTiff
+        self.selected.store_kind == StoreKind::LocalGeoTiff
+            || self.selected.store_kind == StoreKind::RemoteGeoTiff
     }
 
     /// Returns the effective `(start, end)` selected range for a given dimension index.
     pub fn get_effective_dim_range(&self, dim_idx: usize) -> (usize, usize) {
-        let (configs, ranges, indices) = if !self.plotted_dim_config.is_empty() {
+        let (configs, ranges, indices) = if !self.plotted().dim_config.is_empty() {
             (
-                &self.plotted_dim_config,
-                &self.plotted_selected_dim_ranges,
-                &self.plotted_selected_dim_indices,
+                &self.plotted().dim_config,
+                &self.plotted().dim_ranges,
+                &self.plotted().dim_indices,
             )
         } else {
             (
-                &self.dim_config,
-                &self.selected_dim_ranges,
-                &self.selected_dim_indices,
+                &self.selected.dim_config,
+                &self.selected.dim_ranges,
+                &self.selected.dim_indices,
             )
         };
         if let Some(cfg) = configs.get(dim_idx) {
@@ -211,4 +203,13 @@ impl OctantApp {
             ranges.get(dim_idx).copied().unwrap_or((0, usize::MAX))
         }
     }
+}
+
+/// The channel/band dimension of `var`: one named like a channel, else the
+/// first of a variable with 3 or more dimensions.
+fn channel_dim(var: &crate::data::VariableInfo) -> Option<usize> {
+    var.dimension_names
+        .iter()
+        .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
+        .or(if var.shape.len() >= 3 { Some(0) } else { None })
 }

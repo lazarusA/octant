@@ -35,32 +35,19 @@ impl OctantApp {
         } else {
             1.0
         };
-        self.color_opacity.clamp(0.0, 1.0) * curve
+        self.layers.base.color.opacity.clamp(0.0, 1.0) * curve
     }
 
     /// Whether colormapped values may be drawn translucent.
     pub fn has_color_alpha(&self) -> bool {
-        self.color_opacity < 1.0 || registry::alpha_row().is_some()
+        self.layers.base.color.opacity < 1.0 || registry::alpha_row().is_some()
     }
 
     /// Frees the OIT frames of the 3D renderers not drawn as `active`, whose
     /// callbacks do not run to free them.
     pub fn release_idle_oit_frames(&self, active: PlotType) {
-        let meshes = [
-            (PlotType::Sphere, &self.sphere_renderer),
-            (PlotType::Surface, &self.surface_renderer),
-        ];
-        for (kind, renderer) in meshes {
-            if kind != active
-                && let Some(renderer) = renderer
-            {
-                renderer.oit.release();
-            }
-        }
-        if active != PlotType::PointCloud
-            && let Some(renderer) = &self.point_cloud_renderer
-        {
-            renderer.oit.release();
+        for layer in self.layers.iter() {
+            layer.renderers.release_idle_oit_frames(active);
         }
     }
 
@@ -69,7 +56,8 @@ impl OctantApp {
     /// writes; opaque colors (including RGB composites, which ignore opacity)
     /// keep depth writes, so near parts hide far ones.
     pub fn transparency_mode(&self) -> Transparency {
-        if !self.plot_transparency || self.rgb_composite_mode || !self.has_color_alpha() {
+        if !self.plot_transparency || self.layers.base.composite.enabled || !self.has_color_alpha()
+        {
             Transparency::Off
         } else if self
             .wgpu_render_state

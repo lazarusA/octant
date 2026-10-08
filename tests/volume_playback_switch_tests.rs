@@ -2,25 +2,13 @@
 //! switching to 2D/Heatmap, advancing playback past the initial selection,
 //! and switching back to Volume.
 
-use std::time::{Duration, Instant};
+mod common;
+use common::drain;
+use std::time::Instant;
 
 use octant::app::{OctantApp, StoreKind};
 use octant::data::{BlockStore, OctantBlock, backends::ProceduralBlockStore};
 use octant::plots::PlotType;
-
-fn drain(app: &mut OctantApp) {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    loop {
-        app.poll_block_prefetch_results();
-        if app.block_prefetcher.pending_count() == 0 {
-            break;
-        }
-        if Instant::now() >= deadline {
-            panic!("prefetcher did not finish");
-        }
-        std::thread::sleep(Duration::from_millis(2));
-    }
-}
 
 fn tick(app: &mut OctantApp) {
     app.advance_playback(Instant::now());
@@ -31,24 +19,24 @@ fn create_volume_app() -> OctantApp {
     let mut app = OctantApp::default();
     let store = ProceduralBlockStore::open("procedural://volume4d").expect("open procedural store");
     let meta = store.inspect().expect("inspect procedural store");
-    app.selected_store_kind = StoreKind::ProceduralVolume4D;
-    app.store_target_input = "procedural://volume4d".to_string();
+    app.selected.store_kind = StoreKind::ProceduralVolume4D;
+    app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
     app.show_hero = false;
-    app.active_plot_type = PlotType::Volume;
+    app.selected.plot_type = PlotType::Volume;
     app
 }
 
 #[test]
 fn test_playing_volume_switch_to_heatmap_play_past_selection_and_switch_back_to_volume() {
     let mut app = create_volume_app();
-    app.selected_dim_ranges[0] = (0, 3);
-    app.dim_config[0].range = (0, 3);
+    app.selected.dim_ranges[0] = (0, 3);
+    app.selected.dim_config[0].range = (0, 3);
     app.plot_selection();
     drain(&mut app);
 
     assert!(
-        app.volume_data.is_some(),
+        app.layers.base.data.volume.is_some(),
         "volume data should be present initially"
     );
 
@@ -60,7 +48,7 @@ fn test_playing_volume_switch_to_heatmap_play_past_selection_and_switch_back_to_
 
     app.switch_plot_type(PlotType::Heatmap);
     drain(&mut app);
-    assert_eq!(app.active_plot_type, PlotType::Heatmap);
+    assert_eq!(app.selected.plot_type, PlotType::Heatmap);
 
     for _ in 0..8 {
         tick(&mut app);
@@ -71,14 +59,14 @@ fn test_playing_volume_switch_to_heatmap_play_past_selection_and_switch_back_to_
         app.current_timestep
     );
     assert!(
-        app.matrix_data.is_some(),
+        app.layers.base.data.matrix.is_some(),
         "2D matrix data should be present for Heatmap"
     );
 
     app.switch_plot_type(PlotType::Volume);
     drain(&mut app);
-    assert_eq!(app.active_plot_type, PlotType::Volume);
-    assert!(app.volume_data.is_some());
+    assert_eq!(app.selected.plot_type, PlotType::Volume);
+    assert!(app.layers.base.data.volume.is_some());
 }
 
 #[test]
@@ -101,11 +89,11 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
     });
     app.load_new_metadata(meta);
 
-    app.active_plot_type = PlotType::Volume;
-    app.dim_config[0].spatial = octant::app::SpatialRole::Z;
-    app.dim_config[0].animation = octant::app::AnimationRole::Animated;
-    app.dim_config[0].range = (0, 3);
-    app.selected_dim_ranges[0] = (0, 3);
+    app.selected.plot_type = PlotType::Volume;
+    app.selected.dim_config[0].spatial = octant::app::SpatialRole::Z;
+    app.selected.dim_config[0].animation = octant::app::AnimationRole::Animated;
+    app.selected.dim_config[0].range = (0, 3);
+    app.selected.dim_ranges[0] = (0, 3);
 
     let initial_values = vec![100.0f32; 4 * 32 * 32];
     let initial_block = OctantBlock::new(
@@ -120,11 +108,14 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
     app.plot_selection();
     app.apply_block_projection(&initial_block);
 
-    assert!(app.volume_data.is_some(), "volume data should be present");
-    assert_eq!(app.volume_data.as_ref().unwrap().depth, 4);
+    assert!(
+        app.layers.base.data.volume.is_some(),
+        "volume data should be present"
+    );
+    assert_eq!(app.layers.base.data.volume.as_ref().unwrap().depth, 4);
 
     app.switch_plot_type(PlotType::Heatmap);
-    assert_eq!(app.active_plot_type, PlotType::Heatmap);
+    assert_eq!(app.selected.plot_type, PlotType::Heatmap);
 
     app.current_timestep = 10;
     let step10_values = vec![200.0f32; 32 * 32];
@@ -139,17 +130,20 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
     );
     app.apply_block_projection(&step10_block);
     assert!(
-        app.matrix_data.is_some(),
+        app.layers.base.data.matrix.is_some(),
         "matrix data should be present for Heatmap"
     );
 
     app.switch_plot_type(PlotType::Volume);
-    assert_eq!(app.active_plot_type, PlotType::Volume);
+    assert_eq!(app.selected.plot_type, PlotType::Volume);
 
     app.apply_block_projection(&step10_block);
 
     let vdata = app
-        .volume_data
+        .layers
+        .base
+        .data
+        .volume
         .as_ref()
         .expect("volume data must be present when returning to Volume");
     assert_eq!(vdata.depth, 4);

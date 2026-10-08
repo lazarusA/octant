@@ -65,9 +65,15 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     if app.volume_algorithm <= 3 {
         ui.separator();
         if app.volume_algorithm != 1 {
-            ui.add(egui::Slider::new(&mut app.volume_cmin, 0.0..=100.0).text("Min Clip"));
+            ui.add(
+                egui::Slider::new(&mut app.layers.base.color.volume_cmin, 0.0..=100.0)
+                    .text("Min Clip"),
+            );
         }
-        ui.add(egui::Slider::new(&mut app.volume_cmax, 0.0..=100.0).text("Max Range"));
+        ui.add(
+            egui::Slider::new(&mut app.layers.base.color.volume_cmax, 0.0..=100.0)
+                .text("Max Range"),
+        );
     }
 
     ui.separator();
@@ -77,7 +83,7 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .logarithmic(true),
     );
 
-    if app.has_rgb_bands() || !app.composite_channel_configs.is_empty() {
+    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
         super::composite::show_composite_controls(app, ui);
     }
 }
@@ -102,7 +108,7 @@ pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.add(egui::Slider::new(&mut app.sphere_displacement_strength, 0.0..=5.0).text("Height"));
     }
 
-    if app.has_rgb_bands() || !app.composite_channel_configs.is_empty() {
+    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
         super::composite::show_composite_controls(app, ui);
     }
 
@@ -127,7 +133,7 @@ pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.separator();
     ui.add(egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0).text("Height"));
 
-    if app.has_rgb_bands() || !app.composite_channel_configs.is_empty() {
+    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
         super::composite::show_composite_controls(app, ui);
     }
 
@@ -143,7 +149,7 @@ pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .logarithmic(true),
     );
 
-    if app.has_rgb_bands() || !app.composite_channel_configs.is_empty() {
+    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
         super::composite::show_composite_controls(app, ui);
     }
 }

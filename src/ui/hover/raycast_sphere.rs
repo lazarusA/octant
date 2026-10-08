@@ -10,8 +10,8 @@ pub fn get_normalized_radial_dr(app: &OctantApp, val: f32) -> f32 {
     if val.is_nan() || !val.is_finite() || app.sphere_mode == 0 {
         return 0.0;
     }
-    let cmin = app.color_range_min;
-    let cmax = app.color_range_max;
+    let cmin = app.layers.base.color.range_min;
+    let cmax = app.layers.base.color.range_max;
     let range = (cmax - cmin).max(1e-6);
     let disp = app.sphere_displacement_strength;
 

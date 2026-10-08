@@ -153,10 +153,80 @@ Modular UI components integrated with `OctantApp`.
 
 ---
 
-## 🔮 Future Architectural Roadmap: Multi-Variable Plotting
+## 🔮 Roadmap: Layers, Overlays, Operations & Multi-Scale (TODO)
 
-- **Multi-Layer Rendering Pipeline**: The strict separation between transient exploration state (`active_dataset_metadata`, `dim_config`) and active plotted state (`plotted_dataset_metadata`, `plotted_dim_config`, `plotted_selected_dim_ranges`, etc.) is designed to easily expand into a `Vec<PlottedVariableState>` or multi-layer pipeline.
-- **Dimensional Compatibility Verification**: Variables across the same or different datasets with matching spatial ranks, shape dimensions, or spatial grid coordinates can be validated for dimensional compatibility and combined into:
-  - Vector field overlays (e.g., $u$ and $v$ wind/current velocity components).
-  - Multi-channel RGB/false-color composite layers.
-  - Dual-curve line plots and multi-variable volumetric renderings.
+### Where we stand
+
+- **Done (behavior unchanged):** plotted state lives in a `LayerStack` ([`src/app/layers/`](https://github.com/lazarusA/octant/tree/main/src/app/layers)). The UI's staged selection is `OctantApp::selected` (a `VariableSelection`); Plot copies it to the base layer, read through `OctantApp::plotted()`. Each `Layer` owns its `Source` (only `Source::Variable` so far), `LayerData`, `LayerRenderers`, `ColorStyle`, `CompositeStyle` and `LoadState`. Painting, OIT release and volume uploads loop over `LayerStack::iter`/`iter_mut`, arriving blocks find their layer with `find_by_key`, `ColorStyle::params` builds the shader color uniforms, `block_axes` places a selection inside a block, and `VariableSelection::slice_request` builds requests. All of these are pure or per layer.
+- **Still tied to the base layer** (the first work of the overlay phase):
+  - `apply_block_projection`, `apply_2d_projection`/`apply_3d_volume_projection` and the pipeline rebuild (`rebuild.rs`) write `self.layers.base` and read app-level state. They must take a `&mut Layer` (plus the shared cache and view) instead.
+  - `get_color_params`, `get_mesh_3d_uniform_params`, `get_volume_uniform_params` and `get_point_cloud_uniform_params` read the base layer. `paint_layer` already receives the layer, so pass it through to these.
+  - `poll_block_prefetch_results` treats every block of the plotted variable as the base layer's.
+  - Hover, colorbar, axis labels and export read the base layer only.
+  - There is no `LayerId` yet. Add one, stable and counted in `LayerStack`, when overlays need UI ids and request routing; put it in egui salts and the per-plot caches (hover, composite labels) next to `metadata_generation`.
+- **Decisions taken:** the plot type is part of the selection, and the canvas type is the base layer's. Colormap reversal stays in `ColormapState`; move it into `ColorStyle` when overlays need their own. Settings for each plot type (`sphere_mode`, `volume_*`, `line_*`) stay on the app until overlays of those plot types exist.
+
+### Model to grow into
+
+```rust
+enum Source {
+    Variable(VariableSelection),                              // exists
+    Channel  { source, dim, index },                          // u/v or bands of one variable
+    Derived  { expr: Expr, inputs: Vec<SourceId>, target },   // var3 = f(var1, var2)
+    Reduce   { source, dim, op },                             // time mean, anomaly base
+    Mosaic   { members },                                     // nested global + regional datasets
+}
+// Each layer then gets a style: Scalar (ColorStyle), Rgb (CompositeStyle),
+// Vectors { u, v, glyph, color_by }, Bivariate { x, y, lut, ranges }
+```
+
+Sources produce arrays aligned to a grid; layers draw one or more sources in a style. Every source variant carries a `VariableSelection` for the dimensions it is shown on.
+
+### TODO, in order
+
+1. **Same-grid overlays.**
+   - Push more layers onto `LayerStack`, routed by `LayerId` and `find_by_key`.
+   - Make projection and rebuild per layer (see "Still tied to the base layer").
+   - Draw overlays after the base and before coastlines, with their own `ColorStyle`, opacity and visibility. NaN must draw transparent.
+   - UI:
+     - "Add as overlay" on variable rows.
+     - A layer list in the docked panel: visible, opacity, colormap, reorder, remove (`ui.close_button`).
+     - Stacked colorbars.
+     - One hover section per layer.
+   - Classify compatibility (`SameGrid`, `Geo { bbox }`, `IndexOnly`, `Incompatible`) in a new alignment module. This replaces the deleted shape-equality check.
+2. **Overlays across datasets (regional on global).**
+   - Place an overlay with the heatmap's `tile_bounds`: the overlay's lon/lat bounding box normalized into the base layer's lon/lat frame, as coastlines already do with `dataset_geo_bounds`.
+   - Normalize longitude conventions (0–360 vs −180–180), and split quads that cross the antimeridian.
+   - The pyramid resampler also writes `tile_bounds`, so combine the two, or give overlays no pyramid at first.
+   - Match time and level by coordinate value (nearest within a tolerance, using `CoordValues`), not by index. Show a "nearest" note when they differ.
+   - Allow regular and 1D-irregular overlays first. Curvilinear and HEALPix work only as the base until the shader handles them.
+   - The view frame is the base layer's; a "fit all layers" option can come later.
+   - Sphere and surface overlays: a second mesh renderer using its own lon/lat bounds (`has_reference_globe`), a small radial offset, and OIT.
+3. **Operations (`Source::Derived`).**
+   - Compute on the CPU from each step's projected 2D slices; the result is a `MatrixData` that every renderer already draws.
+   - Same grid: element by element. Mixed grids: regrid onto a chosen target grid (nearest or bilinear over lon/lat).
+   - Cache results in an LRU keyed by the input block keys, the expression's hash and each source's `metadata_generation`.
+   - Write our own small AST, evaluated one whole array per node, with NaN propagating (+ − × ÷, comparisons, where/mask, abs, sqrt, log, hypot, atan2, clamp). Start with a fixed menu of operations, then free-form text.
+   - Derive units for the simple cases, warn when + or − mixes units, and reject cycles.
+   - `Source::Reduce` (time mean, anomalies) loads the animated range; it comes later.
+4. **Bivariate maps.** Look each cell up in a 2D color table on the CPU and draw the result through the existing RGB composite path (`COLORMAP_RGB_COMPOSITE`). Its legend is a 2D square. A GPU version (two data buffers plus a dedicated 2D lookup texture, not more colormap-atlas rows) can follow.
+5. **Vector fields (u, v).**
+   - Magnitude and direction need nothing new: they are derived sources (`hypot`, `atan2` with a cyclic colormap).
+   - Arrows: a new `VectorRenderer` that instances arrows on the GPU and pulls `u`/`v` from storage buffers (as the AGENTS.md rules require for grid data), sampled at a stride that follows the zoom.
+   - Streamlines: CPU line meshes, which the rules allow.
+   - Mind screen-y vs north, block flips (`flipped_dims`), tangent frames on the sphere, and grid-relative components on rotated or curvilinear grids.
+   - Dense textures and animated particles come last.
+6. **Multi-scale exploration.**
+   - Give `Source::Variable` an optional `ScaleLevels` ladder:
+     - OME-NGFF multiscales: today each level is listed as its own variable; group them instead.
+     - GeoTIFF overviews: today each overview is listed as its own variable; group them instead.
+     - Zarr and Icechunk multiscale groups.
+     - Keep `MatrixPyramid` as the fallback for data already in memory.
+   - Widen `slice_request` into a view request (visible bounding box, pixels, step). It picks the coarsest level with at least one cell per pixel and a chunk-aligned window.
+   - Refine progressively: a coarse backdrop for the whole area plus a fine viewport tile, both layers of the same source.
+   - Request only after the view settles (`view_interacting`). Play back at the coarse level and refine when paused.
+   - Base the color range on a stable reference (the coarsest level's or `valid_min`/`valid_max`), not on the current tile.
+   - Label operations computed from coarser data with their level, and offer an "exact" mode.
+   - Categorical data needs levels built with the mode, not the mean.
+   - Then add `Source::Mosaic` for nested datasets.
+7. **Later:** volume overlays (same grid only, as texture channels), line plots with several series and a second y-axis, and saving and restoring sessions (serialize sources and layers).

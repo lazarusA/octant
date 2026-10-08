@@ -141,7 +141,10 @@ fn test_healpix_slider_auto_init_and_axes() {
         .expect("temp variable");
 
     let mut app = OctantApp {
-        active_plot_type: octant::plots::PlotType::Sphere,
+        selected: octant::app::VariableSelection {
+            plot_type: octant::plots::PlotType::Sphere,
+            ..Default::default()
+        },
         ..Default::default()
     };
     init_variable_dimension_defaults(&mut app, temp_var);
@@ -149,17 +152,20 @@ fn test_healpix_slider_auto_init_and_axes() {
     // Dim 0 = "time" -> Animated
     // Dim 1 = "layer" -> Z
     // Dim 2 = "cell" -> Grid
-    assert_eq!(app.dim_config[0].animation, AnimationRole::Animated);
-    assert_eq!(app.dim_config[1].spatial, SpatialRole::Z);
-    assert_eq!(app.dim_config[2].spatial, SpatialRole::Grid);
+    assert_eq!(
+        app.selected.dim_config[0].animation,
+        AnimationRole::Animated
+    );
+    assert_eq!(app.selected.dim_config[1].spatial, SpatialRole::Z);
+    assert_eq!(app.selected.dim_config[2].spatial, SpatialRole::Grid);
     // Preserves currently active plot type until user explicitly plots data
-    assert_eq!(app.active_plot_type, octant::plots::PlotType::Sphere);
+    assert_eq!(app.selected.plot_type, octant::plots::PlotType::Sphere);
 
     let (x_dim, y_dim, z_dim) = OctantApp::resolve_spatial_axes(
         temp_var.shape.len(),
         &temp_var.dimension_names,
         &temp_var.dimension_names,
-        &app.dim_config,
+        &app.selected.dim_config,
     );
     assert_eq!(x_dim, 2);
     assert_eq!(y_dim, 2);

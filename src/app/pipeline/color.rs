@@ -6,60 +6,17 @@ use crate::plots::common::PlotColorParams;
 impl OctantApp {
     /// Resets global and local colormap normalization limits.
     pub fn reset_variable_bounds(&mut self) {
-        if !self.lock_color_bounds {
-            self.global_data_min = f32::MAX;
-            self.global_data_max = f32::MIN;
-        }
+        self.layers.base.color.reset_bounds();
     }
 
-    /// Assembles the complete `PlotColorParams` uniform bundle from current application state.
+    /// Assembles the complete `PlotColorParams` uniform bundle for the plotted layer.
     pub fn get_color_params(&self) -> PlotColorParams {
-        use crate::utils::colormap::{COLORMAP_RGB_COMPOSITE, NO_ALPHA_ROW, registry};
-        // Ids that are no atlas row (e.g. a stale selection) draw the default,
-        // so the GPU never reads a padding row the CPU would not.
-        let row = Some(self.effective_colormap())
-            .filter(|&id| registry::is_row(id))
-            .unwrap_or_else(registry::default_id);
-        let effective_colormap = if self.rgb_composite_mode {
-            COLORMAP_RGB_COMPOSITE
-        } else {
-            row
-        };
-
-        let (is_cat, num_cats) = if self.is_categorical {
-            if let Some(mdata) = &self.matrix_data {
-                if let Some(unique) = mdata.detect_unique_values() {
-                    (1, unique.len() as u32)
-                } else {
-                    (1, 10)
-                }
-            } else {
-                (1, 10)
-            }
-        } else {
-            (0, 10)
-        };
-
-        PlotColorParams {
-            colormap: effective_colormap,
-            cmin: self.color_range_min,
-            cmax: self.color_range_max,
-            use_nan_color: if self.use_nan_color { 1 } else { 0 },
-            use_lowclip: if self.use_lowclip { 1 } else { 0 },
-            use_highclip: if self.use_highclip { 1 } else { 0 },
-            scale_type: self.active_scale_type,
-            scale_param: self.scale_param,
-            is_categorical: is_cat,
-            num_categories: num_cats,
-            reverse: u32::from(self.colormaps.reversed),
-            nearest: u32::from(registry::is_stepped(row)),
-            fallback_colormap: row,
-            opacity: self.color_opacity.clamp(0.0, 1.0),
-            alpha_row: registry::alpha_row().unwrap_or(NO_ALPHA_ROW),
-            _pad: 0,
-            nan_color: self.nan_color,
-            lowclip_color: self.lowclip_color,
-            highclip_color: self.highclip_color,
-        }
+        let base = &self.layers.base;
+        base.color.params(
+            self.effective_colormap(),
+            self.colormaps.reversed,
+            base.composite.enabled,
+            base.data.matrix.as_ref(),
+        )
     }
 }

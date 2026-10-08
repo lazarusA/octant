@@ -243,9 +243,13 @@ pub fn safe_write_buffer<T: bytemuck::Pod>(
         queue.write_buffer(buffer, 0, bytemuck::cast_slice(data));
         true
     } else {
-        log::warn!(
-            "{label}: data size ({copy_bytes} bytes) exceeds GPU buffer capacity ({} bytes), skipping write",
-            buffer.size()
+        crate::ui::toast::report(
+            crate::ui::toast::Severity::Warning,
+            "Data too large for the GPU buffer",
+            format!(
+                "{label}: data size ({copy_bytes} bytes) exceeds GPU buffer capacity ({} bytes), skipping write",
+                buffer.size()
+            ),
         );
         false
     }
@@ -261,10 +265,14 @@ pub fn safe_write_buffer_range<T: bytemuck::Pod>(
     label: &str,
 ) -> bool {
     let Some((start, end)) = buffer_range_bytes::<T>(offset, data.len(), buffer.size()) else {
-        log::warn!(
-            "{label}: range at element {offset} (+{} elements) exceeds GPU buffer capacity ({} bytes), skipping write",
-            data.len(),
-            buffer.size()
+        crate::ui::toast::report(
+            crate::ui::toast::Severity::Warning,
+            "Data too large for the GPU buffer",
+            format!(
+                "{label}: range at element {offset} (+{} elements) exceeds GPU buffer capacity ({} bytes), skipping write",
+                data.len(),
+                buffer.size()
+            ),
         );
         return false;
     };

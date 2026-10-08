@@ -21,7 +21,7 @@ const PANEL_MIN_W: f32 = 220.0;
 
 /// Positioned to the right of the Settings overlay using the previous frame's settings width.
 pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
-    if !app.show_variable_controls || app.active_dataset_metadata.is_none() {
+    if !app.show_variable_controls || app.selected.metadata.is_none() {
         return;
     }
 
@@ -53,8 +53,8 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                 .show(ui, |ui| {
                     ui.set_width(panel_w);
 
-                    let var_info = if let Some(meta) = &app.active_dataset_metadata {
-                        if let Some(v) = meta.variables.get(app.selected_variable_idx) {
+                    let var_info = if let Some(meta) = &app.selected.metadata {
+                        if let Some(v) = meta.variables.get(app.selected.variable_idx) {
                             v.clone()
                         } else {
                             ui.label("No variable selected.");
@@ -81,7 +81,8 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                             var_info.name.clone()
                         };
                         ui.label(egui::RichText::new(display_name).strong());
-                        let plot_icon = crate::ui::plot_type::plot_type_icon(app.active_plot_type);
+                        let plot_icon =
+                            crate::ui::plot_type::plot_type_icon(app.selected.plot_type);
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui.close_button("Close Dimension Panel").clicked() {
                                 should_close = true;

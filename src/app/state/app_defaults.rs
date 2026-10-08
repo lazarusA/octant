@@ -1,0 +1,116 @@
+//! `OctantApp` defaults: the state of a fresh launch.
+
+use super::app_state::OctantApp;
+use crate::app::layers::LayerStack;
+use crate::app::layers::VariableSelection;
+
+impl Default for OctantApp {
+    fn default() -> Self {
+        let default_cache_mb = 1024; // Default 1GB cache size limit
+
+        Self {
+            selected: VariableSelection::default(),
+            cached_variable_tree: None,
+            cached_search: None,
+            layers: LayerStack::default(),
+            current_timestep: 0,
+            preview_colormap: None,
+            colormaps: super::ColormapState::default(),
+            status_message: "Ready. Select store and click Inspect Store Metadata.".to_string(),
+            is_loading: false,
+            sphere_rotation_y: 0.0,
+            sphere_rotation_x: 0.25,
+            sphere_auto_rotate: false,
+            sphere_zoom: 2.5,
+            sphere_displacement_strength: 0.3,
+            sphere_mode: 0,
+            surface_displacement_strength: 0.3,
+            surface_mode: 0,
+            volume_opacity: 3.0,
+            volume_quality: 1.0,
+            volume_transparency: true,
+            plot_transparency: true,
+            volume_lighting: false,
+            view_interacting: false,
+            volume_attenuation: 0.0,
+            volume_algorithm: 0,
+            volume_isovalue: 50.0,
+            volume_isorange: 5.0,
+            volume_z_scale: 1.0,
+            point_cloud_size: 0.02,
+            line_profile_dim_idx: 0,
+            line_profile_slice_idx: 0,
+            line_plot_all_series: false,
+            line_color: [0.2, 0.65, 1.0, 1.0],
+            line_use_custom_color: true,
+            line_show_lines: true,
+            line_show_points: false,
+            line_point_size: 6.0,
+            show_colorbar: true,
+            colorbar_transparency: 0.0,
+            wgpu_render_state: None,
+
+            show_hero: true,
+            hero_state: crate::ui::hero::HeroState::default(),
+
+            dataset_manager: crate::data::DatasetManager::new(),
+            block_cache: crate::data::BlockCache::new(default_cache_mb * 1024 * 1024),
+            block_prefetcher: crate::data::BlockPrefetcher::new(),
+            coordinate_loader: crate::data::blocks::CoordinateLoader::default(),
+            coordinates_revision: 0,
+            max_cache_mb: default_cache_mb,
+            block_window_size: 32,
+            prefetch_threads: 16,
+
+            metadata_rx: None,
+            is_playing: false,
+            playback_fps: 15.0,
+            loop_playback: true,
+            enable_prefetch: true,
+            last_step_time: web_time::Instant::now(),
+
+            show_catalog_window: false,
+            show_about_window: false,
+            show_icon_gallery_window: false,
+            catalog_search_query: String::new(),
+            catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
+
+            show_left_panel: false,
+            show_variables_overlay: false,
+            show_settings_panel: false,
+            show_variable_controls: false,
+            show_bottom_bar: true,
+            show_hover_card: true,
+            settings_overlay_width: 0.0,
+            variables_overlay_width: 340.0,
+            variable_search: String::new(),
+
+            theme_preference: egui::ThemePreference::System,
+            enforce_data_aspect_ratio: true,
+
+            heatmap_zoom: 1.0,
+            heatmap_pan: egui::Vec2::ZERO,
+            line_zoom: 1.0,
+            line_pan: egui::Vec2::ZERO,
+            enable_pyramid_resampling: false,
+            pyramid_aggregation_op: crate::data::AggregationOp::default(),
+            export_settings: crate::export::ExportSettings::default(),
+            show_export_modal: false,
+            show_crop_overlay: false,
+            roi_crop_box: crate::export::RoiCropBox::default(),
+            pending_export: None,
+            export_flash_timer: None,
+            toasts: crate::ui::toast::Toasts::default(),
+
+            show_coastlines: false,
+            coastline_color: None,
+            coastline_renderer: None,
+            coastline_3d_renderer: None,
+            coastline_current_lod: crate::plots::CoastlineLod::Lod110m,
+            coastline_rx: None,
+            coastline_is_loading: false,
+            coastline_crop_to_data_domain: true,
+            coastline_line_width: 1.0,
+        }
+    }
+}

@@ -3,6 +3,7 @@
 #[cfg(not(target_arch = "wasm32"))]
 use std::collections::HashMap;
 
+#[cfg(not(target_arch = "wasm32"))]
 use super::url::ParsedStorageUrl;
 
 #[cfg(not(target_arch = "wasm32"))]

@@ -21,7 +21,7 @@ const PAD_RIGHT: f32 = 6.0;
 const GAP: f32 = 8.0;
 
 pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
-    let active = app.active_colormap;
+    let active = app.layers.base.color.colormap;
     let reversed = app.colormaps.reversed;
     let super::PickerState {
         filter,

@@ -4,4 +4,5 @@ pub mod aspect;
 pub mod axis_info;
 pub mod color;
 pub mod paint;
+pub mod paint_layer;
 pub mod rebuild;

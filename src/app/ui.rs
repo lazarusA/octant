@@ -1,4 +1,5 @@
 use crate::plots::PlotType;
+use crate::ui::toast::{Notice, Severity, ToastAction};
 use crate::utils::apply_zoom_pan_at_point;
 
 use super::OctantApp;
@@ -18,6 +19,9 @@ impl eframe::App for OctantApp {
         // Reset hover preview at start of frame
         self.preview_colormap = None;
 
+        // Notices reported by renderers, backends and background threads.
+        self.drain_reported_notices();
+
         // 0. Poll completed background metadata inspection
         let mut metadata_done = false;
         if let Some(rx) = &self.metadata_rx {
@@ -29,6 +33,7 @@ impl eframe::App for OctantApp {
                         if metadata.variables.is_empty() {
                             self.status_message =
                                 format!("No variables discovered in '{}'", metadata.name);
+                            self.notify(Severity::Warning, "No variables found", &metadata.name);
                         } else {
                             self.status_message = format!(
                                 "Inspected '{}' (Found {} variables)",
@@ -57,6 +62,7 @@ impl eframe::App for OctantApp {
                         self.hero_state.loaded = false;
                         self.clear_active_metadata();
                         self.status_message = format!("Store inspect error: {}", err);
+                        self.notify(Severity::Error, "Couldn't open dataset", &err);
                     }
                 }
             } else {
@@ -101,8 +107,9 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
-        let is_hero_active =
-            (self.matrix_data.is_none() && self.volume_data.is_none()) || self.show_hero;
+        let is_hero_active = (self.layers.base.data.matrix.is_none()
+            && self.layers.base.data.volume.is_none())
+            || self.show_hero;
 
         // Keyboard Shortcuts for Figure Export & Crop Tool
         if ui.input_mut(|i| {
@@ -140,13 +147,17 @@ impl eframe::App for OctantApp {
                     Ok(_) => {
                         crate::ui::drop_zone::clear_drop_zone_warning(&ctx);
                         self.hero_state.input = path_str.clone();
-                        self.store_target_input = path_str.clone();
+                        self.selected.store_target = path_str.clone();
                         self.submit_or_activate_source(&path_str, None);
                     }
                     Err(err) => {
                         self.status_message = format!("{err}: '{path_str}'");
                         crate::ui::drop_zone::trigger_drop_zone_warning(&ctx);
-                        log::warn!("{err}: {path_str}");
+                        self.notify(
+                            Severity::Warning,
+                            "Unsupported file",
+                            format!("{err}: {path_str}"),
+                        );
                     }
                 }
             }
@@ -178,6 +189,7 @@ impl eframe::App for OctantApp {
         crate::ui::variables_overlay::show_variables_overlay(self, &ctx, canvas_rect);
         crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
         crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
+        crate::ui::toast::show_toasts(self, &ctx, canvas_rect);
 
         // 4. Drawing Canvas Area with Aspect Data Ratio
         {
@@ -359,13 +371,19 @@ impl eframe::App for OctantApp {
             );
 
             // Draw Dynamic Plot Axis Lines, Ticks, and Axis Titles
-            if !is_3d_canvas_plot && let Some(matrix) = &self.matrix_data {
+            if !is_3d_canvas_plot && let Some(matrix) = &self.layers.base.data.matrix {
                 let (x_dom, y_dom, x_label, y_label, x_units, y_units) =
                     if canvas_plot_type == PlotType::Line {
-                        let y_min = self.color_range_min as f64;
-                        let y_max = self.color_range_max as f64;
+                        let y_min = self.layers.base.color.range_min as f64;
+                        let y_max = self.layers.base.color.range_max as f64;
                         let profile_len = match self.line_profile_dim_idx {
-                            2 => self.volume_data.as_ref().map_or(matrix.width, |v| v.depth),
+                            2 => self
+                                .layers
+                                .base
+                                .data
+                                .volume
+                                .as_ref()
+                                .map_or(matrix.width, |v| v.depth),
                             1 => matrix.height,
                             _ => matrix.width,
                         };
@@ -397,7 +415,7 @@ impl eframe::App for OctantApp {
                         );
 
                         (x_bounds, (y_min, y_max), x_title, y_name, x_units, None)
-                    } else if let Some(m) = &self.matrix_data
+                    } else if let Some(m) = &self.layers.base.data.matrix
                         && m.grid.is_healpix()
                     {
                         let x_bounds = (-180.0, 180.0);
@@ -536,9 +554,6 @@ impl eframe::App for OctantApp {
                 );
                 ctx.request_repaint();
             }
-
-            // Render floating Save Figure Toast with "Reveal in Finder / Folder" action
-            crate::ui::export_modal::show_export_toast(self, &ctx, canvas_rect);
         }
     }
 }
@@ -615,22 +630,27 @@ impl OctantApp {
                 } else if let Some(ref path) = req.output_path {
                     if let Err(e) = crate::export::save_exported_file(&data, path) {
                         self.status_message = format!("Export error: {}", e);
+                        self.notify(Severity::Error, "Export failed", e.to_string());
                     } else {
                         let filename = path
                             .file_name()
                             .map(|s| s.to_string_lossy().to_string())
                             .unwrap_or_else(|| "figure".to_string());
                         self.status_message = format!("Saved figure to {}", path.display());
-                        self.export_toast = Some(crate::export::ExportToastNotification {
-                            file_path: path.clone(),
-                            filename,
-                            timestamp: web_time::Instant::now(),
-                        });
+                        self.push_notice(
+                            Notice::new(Severity::Success, "Saved", filename)
+                                .with_action(ToastAction::RevealFile(path.clone())),
+                        );
                     }
                 }
             }
             Err(err) => {
                 self.status_message = format!("Encoding error: {}", err);
+                self.notify(
+                    Severity::Error,
+                    "Export failed",
+                    format!("Encoding error: {err}"),
+                );
             }
         }
     }

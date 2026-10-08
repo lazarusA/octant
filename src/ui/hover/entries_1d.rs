@@ -37,7 +37,7 @@ pub(crate) fn resolve_line_plot_entries(
     let loc_str = format_dimension_coord(
         meta,
         var,
-        Some(&app.plotted_store_target_input),
+        Some(&app.plotted().store_target),
         &dim_name,
         global_sample,
         full_prof_len,
@@ -129,7 +129,7 @@ fn enrich_line_series_ortho_dim(
             let ortho_str = format_dimension_coord(
                 meta,
                 Some(v),
-                Some(&app.plotted_store_target_input),
+                Some(&app.plotted().store_target),
                 ortho_name,
                 global_ortho,
                 full_ortho_len,

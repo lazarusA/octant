@@ -265,14 +265,6 @@ pub fn save_exported_file(data: &[u8], path: &Path) -> Result<(), String> {
     std::fs::write(path, data).map_err(|e| format!("Failed to write export file: {}", e))
 }
 
-/// Notification payload for a successful figure export.
-#[derive(Clone, Debug)]
-pub struct ExportToastNotification {
-    pub file_path: PathBuf,
-    pub filename: String,
-    pub timestamp: web_time::Instant,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

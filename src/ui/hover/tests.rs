@@ -1,27 +1,31 @@
 use super::*;
 use crate::app::OctantApp;
+use crate::app::VariableSelection;
 use crate::data::VolumeData;
 use crate::plots::PlotType;
 use egui::{Pos2, Rect, pos2};
 
 fn create_test_app_with_volume() -> OctantApp {
-    OctantApp {
-        active_plot_type: PlotType::Volume,
-        matrix_data: None,
-        volume_data: Some(VolumeData {
-            dataset_name: "test_volume".to_string(),
-            values: vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0],
-            width: 2,
-            height: 2,
-            depth: 2,
-            min_val: 10.0,
-            max_val: 80.0,
-        }),
-        color_range_min: 10.0,
-        color_range_max: 80.0,
+    let mut app = OctantApp {
+        selected: VariableSelection {
+            plot_type: PlotType::Volume,
+            ..Default::default()
+        },
         show_hover_card: true,
         ..Default::default()
-    }
+    };
+    app.layers.base.color.range_min = 10.0;
+    app.layers.base.color.range_max = 80.0;
+    app.layers.base.data.volume = Some(VolumeData {
+        dataset_name: "test_volume".to_string(),
+        values: vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0],
+        width: 2,
+        height: 2,
+        depth: 2,
+        min_val: 10.0,
+        max_val: 80.0,
+    });
+    app
 }
 
 #[test]
@@ -71,7 +75,7 @@ fn test_volume_hover_hit_coordinates_resolved() {
 #[test]
 fn test_point_cloud_hover_hit_coordinates_resolved() {
     let mut app = create_test_app_with_volume();
-    app.active_plot_type = PlotType::PointCloud;
+    app.selected.plot_type = PlotType::PointCloud;
     let rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(800.0, 600.0));
     let hover_pos = pos2(400.0, 300.0);
     let sampler = VolumeSampler::from_app(&app, None);

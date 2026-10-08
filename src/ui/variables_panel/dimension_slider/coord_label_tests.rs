@@ -1,6 +1,7 @@
 //! Slider coordinate labels: one value for an index, both ends for a range, none without
 //! coordinates.
 
+use crate::app::VariableSelection;
 use std::collections::HashMap;
 
 use super::coord_label::{cached_label, format_label};
@@ -23,7 +24,10 @@ fn app_with(coords: Option<(&str, CoordValues)>) -> (OctantApp, VariableInfo) {
         ..Default::default()
     };
     let app = OctantApp {
-        active_dataset_metadata: Some(meta),
+        selected: VariableSelection {
+            metadata: Some(meta),
+            ..Default::default()
+        },
         ..Default::default()
     };
     (app, var)
@@ -74,7 +78,7 @@ fn a_new_dataset_with_the_same_variable_gets_its_own_label() {
     let label = |app: &OctantApp| cached_label(app, &ctx, &var, 0, (3, 3));
     assert_eq!(label(&app).as_deref(), Some("50.00 m"));
 
-    let mut next = app.active_dataset_metadata.clone().unwrap_or_default();
+    let mut next = app.selected.metadata.clone().unwrap_or_default();
     next.dimension_coordinates.insert(
         "depth".into(),
         depth(vec![0.0, 5.0, 10.0, 15.0, 20.0, 25.0]),
@@ -106,7 +110,7 @@ fn coordinates_arriving_later_replace_the_index() {
         Some("50.00 m")
     );
     assert!(
-        app.plotted_dataset_metadata.is_none(),
+        app.plotted().metadata.is_none(),
         "nothing plotted to update"
     );
 }

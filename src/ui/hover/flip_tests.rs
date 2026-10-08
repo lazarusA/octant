@@ -1,6 +1,7 @@
 //! Hover coordinates on blocks that orientation flipped: the screen row maps back to the
 //! stored index before the coordinate is read.
 
+use crate::app::VariableSelection;
 use std::sync::Arc;
 
 use zarrs::array::{ArrayBuilder, ArraySubset, DataType, FillValue};
@@ -50,9 +51,10 @@ fn plotted_grid(store_url: &str, lat: &[f64]) -> OctantApp {
     meta.dimension_coordinates = zarr.variable_coordinates(var).expect("coordinates");
     let request = SliceRequest::full_range("t2m", &[5, 4]);
     let block = fetch_block_with_progress(store, store_url, &request, None).expect("block");
-    let mut app = OctantApp {
-        plotted_dataset_metadata: Some(meta),
-        plotted_variable_idx: idx.expect("t2m variable"),
+    let mut app = OctantApp::default();
+    *app.layers.base.selection_mut() = VariableSelection {
+        metadata: Some(meta),
+        variable_idx: idx.expect("t2m variable"),
         ..Default::default()
     };
     app.apply_2d_projection(&block, 1, 0, (0, 4), (0, 5), &[0, 0], true, 0);
@@ -61,9 +63,9 @@ fn plotted_grid(store_url: &str, lat: &[f64]) -> OctantApp {
 
 /// `(value, lat label)` hovered at the vertical screen position `ny` (0 = top).
 fn hover_at(app: &OctantApp, ny: f32) -> (f32, String) {
-    let meta = app.plotted_dataset_metadata.as_ref();
-    let var = meta.and_then(|m| m.variables.get(app.plotted_variable_idx));
-    let matrix = app.matrix_data.as_ref().expect("matrix");
+    let meta = app.plotted().metadata.as_ref();
+    let var = meta.and_then(|m| m.variables.get(app.plotted().variable_idx));
+    let matrix = app.layers.base.data.matrix.as_ref().expect("matrix");
     let (val, fields, _, _) = resolve_2d_plot_entries(app, matrix, meta, var, 0.1, ny, None);
     let lat = fields
         .iter()
@@ -75,7 +77,7 @@ fn hover_at(app: &OctantApp, ny: f32) -> (f32, String) {
 #[test]
 fn south_to_north_rows_hover_with_their_own_latitude() {
     let app = plotted_grid("flip_ascending", &[-60.0, -20.0, 0.0, 10.0, 50.0]);
-    assert_eq!(app.plotted_flipped_dims, ["lat"]);
+    assert_eq!(app.layers.base.data.flipped_dims, ["lat"]);
     // North renders at the top: the top row holds the last stored row (values 16..20).
     assert_eq!(hover_at(&app, 0.05), (16.0, "50.00°N".to_string()));
     assert_eq!(hover_at(&app, 0.95), (0.0, "60.00°S".to_string()));
@@ -84,17 +86,15 @@ fn south_to_north_rows_hover_with_their_own_latitude() {
 #[test]
 fn north_to_south_rows_are_not_remapped() {
     let app = plotted_grid("flip_descending", &[50.0, 10.0, 0.0, -20.0, -60.0]);
-    assert!(app.plotted_flipped_dims.is_empty());
+    assert!(app.layers.base.data.flipped_dims.is_empty());
     assert_eq!(hover_at(&app, 0.05), (0.0, "50.00°N".to_string()));
     assert_eq!(hover_at(&app, 0.95), (16.0, "60.00°S".to_string()));
 }
 
 #[test]
 fn stored_offset_reverses_only_flipped_dimensions() {
-    let app = OctantApp {
-        plotted_flipped_dims: vec!["lat".into()],
-        ..Default::default()
-    };
+    let mut app = OctantApp::default();
+    app.layers.base.data.flipped_dims = vec!["lat".into()];
     assert_eq!(stored_offset(&app, "lat", 0, 5), 4);
     assert_eq!(stored_offset(&app, "lat", 4, 5), 0);
     assert_eq!(stored_offset(&app, "lon", 1, 4), 1);
@@ -132,7 +132,7 @@ fn a_view_inside_a_larger_flipped_block_shows_its_own_rows() {
     let rows = block.oriented_range(0, (2, 5));
     let mut app = OctantApp::default();
     app.apply_2d_projection(&block, 1, 0, (0, 2), rows, &[0, 0], true, 0);
-    let matrix = app.matrix_data.as_ref().expect("matrix");
+    let matrix = app.layers.base.data.matrix.as_ref().expect("matrix");
     let first_column: Vec<f32> = matrix.values.iter().step_by(2).copied().collect();
     assert_eq!(first_column, [40.0, 30.0, 20.0]);
 }
@@ -140,7 +140,10 @@ fn a_view_inside_a_larger_flipped_block_shows_its_own_rows() {
 #[test]
 fn a_volume_from_two_flipped_blocks_runs_north_to_south_throughout() {
     let mut app = OctantApp {
-        active_plot_type: crate::plots::PlotType::Volume,
+        selected: VariableSelection {
+            plot_type: crate::plots::PlotType::Volume,
+            ..Default::default()
+        },
         ..Default::default()
     };
     // Both 5-row blocks feed one 10-row volume requested over stored rows 0..=9.
@@ -164,7 +167,7 @@ fn a_volume_from_two_flipped_blocks_runs_north_to_south_throughout() {
             0,
         );
     }
-    let volume = app.volume_data.as_ref().expect("volume");
+    let volume = app.layers.base.data.volume.as_ref().expect("volume");
     assert_eq!((volume.width, volume.height), (2, 10));
     let first_column: Vec<f32> = volume.values.iter().step_by(2).copied().collect();
     let north_to_south: Vec<f32> = (0..10).rev().map(|lat| (lat * 10) as f32).collect();

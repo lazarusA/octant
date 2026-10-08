@@ -27,11 +27,13 @@ impl VolumeTextures {
     pub fn new(device: &wgpu::Device, dims: Dims, encoding: VolumeEncoding) -> Option<Self> {
         let max = device.limits().max_texture_dimension_3d as usize;
         if dims.w > max || dims.h > max || dims.d > max {
-            log::error!(
-                "Volume {}x{}x{} exceeds GPU 3D texture limit ({max})",
-                dims.w,
-                dims.h,
-                dims.d
+            crate::ui::toast::report(
+                crate::ui::toast::Severity::Error,
+                "Volume too large for the GPU",
+                format!(
+                    "Volume {}x{}x{} exceeds GPU 3D texture limit ({max})",
+                    dims.w, dims.h, dims.d
+                ),
             );
             return None;
         }
@@ -74,9 +76,10 @@ impl VolumeTextures {
     pub fn upload_planes(&self, queue: &wgpu::Queue, values: &[f32], z: Range<usize>) {
         let Dims { w, h, d } = self.dims;
         if values.len() != w * h * d {
-            log::warn!(
-                "Volume upload skipped: {} values for a {w}x{h}x{d} texture",
-                values.len()
+            crate::ui::toast::report(
+                crate::ui::toast::Severity::Warning,
+                "Volume upload skipped",
+                format!("{} values for a {w}x{h}x{d} texture", values.len()),
             );
             return;
         }

@@ -35,7 +35,7 @@ pub(super) fn cached_label(
     // refresh this. The plotted target gives date hints, so it is part of the key too.
     let mut hasher = DefaultHasher::new();
     let target = date_target(app).unwrap_or_default();
-    let generation = (app.metadata_generation, app.coordinates_revision);
+    let generation = (app.selected.metadata_generation, app.coordinates_revision);
     (
         generation,
         target,
@@ -66,7 +66,7 @@ pub(super) fn format_label(
     dim: usize,
     (start, end): (usize, usize),
 ) -> Option<String> {
-    let meta = app.active_dataset_metadata.as_ref()?;
+    let meta = app.selected.metadata.as_ref()?;
     let name = var.dimension_names.get(dim)?;
     meta.get_dim_coords(Some(&var.name), name)?;
     let len = usize::try_from(*var.shape.get(dim)?).ok()?;
@@ -82,9 +82,10 @@ pub(super) fn format_label(
 
 /// Date hints come from the plotted target when the panel shows the plotted dataset.
 fn date_target(app: &OctantApp) -> Option<&str> {
-    let meta = app.active_dataset_metadata.as_ref()?;
-    app.plotted_dataset_metadata
+    let meta = app.selected.metadata.as_ref()?;
+    app.plotted()
+        .metadata
         .as_ref()
         .filter(|plotted| plotted.name == meta.name)
-        .map(|_| app.plotted_store_target_input.as_str())
+        .map(|_| app.plotted().store_target.as_str())
 }

@@ -18,18 +18,14 @@ pub(super) fn show_list(
         show_loading(ui);
         return;
     }
-    let Some(var_count) = app
-        .active_dataset_metadata
-        .as_ref()
-        .map(|m| m.variables.len())
-    else {
+    let Some(var_count) = app.selected.metadata.as_ref().map(|m| m.variables.len()) else {
         if empty_state(
             ui,
             "No store metadata loaded yet.",
             "Fetch / Load Store Metadata",
         ) {
-            let target = app.store_target_input.clone();
-            app.submit_or_activate_source(&target, Some(app.selected_store_kind));
+            let target = app.selected.store_target.clone();
+            app.submit_or_activate_source(&target, Some(app.selected.store_kind));
         }
         return;
     };
@@ -77,14 +73,14 @@ fn show_tree(
     search_id: egui::Id,
     jump: Option<SearchJump>,
 ) -> Option<usize> {
-    let metadata = app.active_dataset_metadata.as_ref()?;
+    let metadata = app.selected.metadata.as_ref()?;
     let tree = app
         .cached_variable_tree
         .get_or_insert_with(|| metadata.build_variable_tree());
     let query = app.variable_search.trim();
     let search_active = !query.is_empty();
     let root = if search_active {
-        let generation = app.metadata_generation;
+        let generation = app.selected.metadata_generation;
         search::filtered(
             &mut app.cached_search,
             generation,
@@ -109,7 +105,7 @@ fn show_tree(
 
     let mut tree_ctx = VariableTreeContext {
         variables: &metadata.variables,
-        selected_idx: app.selected_variable_idx,
+        selected_idx: app.selected.variable_idx,
         search_active,
         newly_selected_idx: None,
         search_id,
@@ -122,11 +118,12 @@ fn show_tree(
 /// Select variable `idx`: reset its colorbar label and dimension defaults, open its
 /// controls and read its coordinates in the background.
 fn apply_selection(app: &mut OctantApp, idx: usize) {
-    app.selected_variable_idx = idx;
+    app.selected.variable_idx = idx;
     app.reset_colorbar_label();
     app.request_variable_coordinates(idx);
     let var_info = app
-        .active_dataset_metadata
+        .selected
+        .metadata
         .as_ref()
         .and_then(|meta| meta.variables.get(idx).cloned());
     if let Some(var_info) = var_info {

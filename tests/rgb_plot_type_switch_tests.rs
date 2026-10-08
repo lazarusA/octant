@@ -66,21 +66,24 @@ fn setup_rgb_app() -> OctantApp {
 
     app.load_new_metadata(meta);
     app.show_hero = false;
-    app.rgb_composite_mode = true;
-    app.rgb_composite_channels = [0, 1, 2];
+    app.layers.base.composite.enabled = true;
+    app.layers.base.composite.rgb_channels = [0, 1, 2];
     app
 }
 
 #[test]
 fn test_2d_rgb_volume_slicing_produces_1depth_truecolor_volume() {
     let mut app = setup_rgb_app();
-    app.active_plot_type = PlotType::Volume;
+    app.selected.plot_type = PlotType::Volume;
     let block = create_rgb_block();
 
     app.apply_block_projection(&block);
 
-    assert!(app.volume_data.is_some(), "Volume data must be allocated");
-    let vdata = app.volume_data.as_ref().unwrap();
+    assert!(
+        app.layers.base.data.volume.is_some(),
+        "Volume data must be allocated"
+    );
+    let vdata = app.layers.base.data.volume.as_ref().unwrap();
     assert_eq!(vdata.width, 8);
     assert_eq!(vdata.height, 8);
     assert_eq!(
@@ -127,17 +130,17 @@ fn test_rgb_composite_transitions_across_all_plot_types() {
             .expect("Channel dimension must exist");
         assert_eq!(ch_idx, 0, "Band dimension must be Dim 0");
         assert_ne!(
-            app.dim_config[ch_idx].spatial,
+            app.selected.dim_config[ch_idx].spatial,
             SpatialRole::Z,
             "Channel dimension must never be converted to SpatialRole::Z in RGB mode"
         );
         assert_eq!(
-            app.dim_config[ch_idx].range,
+            app.selected.dim_config[ch_idx].range,
             (0, 2),
             "Channel range must cover all 3 bands (0..=2) after switching to {plot_type:?}"
         );
         assert!(
-            app.rgb_composite_mode,
+            app.layers.base.composite.enabled,
             "RGB composite mode must remain enabled across plot transitions"
         );
 
@@ -145,10 +148,10 @@ fn test_rgb_composite_transitions_across_all_plot_types() {
         match plot_type {
             PlotType::Heatmap | PlotType::Sphere | PlotType::Surface | PlotType::Line => {
                 assert!(
-                    app.matrix_data.is_some(),
+                    app.layers.base.data.matrix.is_some(),
                     "Matrix data must be present for {plot_type:?}"
                 );
-                let mdata = app.matrix_data.as_ref().unwrap();
+                let mdata = app.layers.base.data.matrix.as_ref().unwrap();
                 let packed = mdata.values[0] as u32;
                 let r = packed & 0xFF;
                 let g = (packed >> 8) & 0xFF;
@@ -160,10 +163,10 @@ fn test_rgb_composite_transitions_across_all_plot_types() {
             }
             PlotType::Volume | PlotType::PointCloud => {
                 assert!(
-                    app.volume_data.is_some(),
+                    app.layers.base.data.volume.is_some(),
                     "Volume data must be present for {plot_type:?}"
                 );
-                let vdata = app.volume_data.as_ref().unwrap();
+                let vdata = app.layers.base.data.volume.as_ref().unwrap();
                 assert_eq!(vdata.depth, 1);
                 let packed = vdata.values[0] as u32;
                 let r = packed & 0xFF;

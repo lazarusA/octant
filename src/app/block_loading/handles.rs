@@ -51,7 +51,10 @@ impl OctantApp {
         // Auto-open through SourceFactory if not yet in dataset_manager
         let kind = kind.to_data_source_kind();
         let source = crate::data::DataSource::new(source_id, kind, target_input, "Store");
-        crate::data::SourceFactory::open(source).ok()
+        crate::utils::executor::catch_panic(|| {
+            crate::data::SourceFactory::open(source).map_err(|e| e.to_string())
+        })
+        .ok()
     }
 
     /// Returns the open `StoreHandle` for the currently selected (target) dataset from `dataset_manager`.
@@ -59,8 +62,8 @@ impl OctantApp {
         let source_id = self.selected_source_id();
         self.resolve_store_handle(
             &source_id,
-            &self.store_target_input,
-            self.selected_store_kind,
+            &self.selected.store_target,
+            self.selected.store_kind,
         )
     }
 
@@ -69,8 +72,8 @@ impl OctantApp {
         let source_id = self.plotted_source_id();
         self.resolve_store_handle(
             &source_id,
-            &self.plotted_store_target_input,
-            self.plotted_store_kind,
+            &self.plotted().store_target,
+            self.plotted().store_kind,
         )
     }
 }

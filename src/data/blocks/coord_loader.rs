@@ -49,9 +49,11 @@ impl CoordinateLoader {
 
         #[cfg(not(target_arch = "wasm32"))]
         crate::utils::executor::TaskExecutor::spawn_background(move || {
-            let coords = store
-                .variable_coordinates(&variable)
-                .map_err(|e| e.to_string());
+            let coords = crate::utils::executor::catch_panic(|| {
+                store
+                    .variable_coordinates(&variable)
+                    .map_err(|e| e.to_string())
+            });
             let _ = tx.send(CoordResult {
                 source_id,
                 variable: variable.name,

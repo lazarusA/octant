@@ -100,7 +100,7 @@ fn load_button(ui: &mut egui::Ui) -> bool {
 fn submit_intake(app: &mut OctantApp) {
     let typed = app.hero_state.input.trim();
     let target = if typed.is_empty() {
-        app.store_target_input.clone()
+        app.selected.store_target.clone()
     } else {
         typed.to_owned()
     };

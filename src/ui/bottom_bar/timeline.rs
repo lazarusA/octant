@@ -32,11 +32,11 @@ struct TimelineKey {
 impl TimelineKey {
     fn from_app(app: &OctantApp) -> Self {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        app.plotted_store_target_input.hash(&mut hasher);
-        (app.plotted_metadata_generation, app.coordinates_revision).hash(&mut hasher);
+        app.plotted().store_target.hash(&mut hasher);
+        (app.plotted().metadata_generation, app.coordinates_revision).hash(&mut hasher);
         Self {
-            variable: app.plotted_variable_idx,
-            animated_dim: app.plotted_animated_dim,
+            variable: app.plotted().variable_idx,
+            animated_dim: app.plotted().animated_dim,
             step: app.current_timestep,
             extent: app.animated_dim_extent(),
             dataset: hasher.finish(),
@@ -64,8 +64,8 @@ impl Timeline {
     fn from_app(app: &OctantApp) -> Self {
         let max_steps = app.animated_dim_extent();
         let last_step = max_steps.saturating_sub(1);
-        let meta = app.plotted_dataset_metadata.as_ref();
-        let var = meta.and_then(|m| m.variables.get(app.plotted_variable_idx));
+        let meta = app.plotted().metadata.as_ref();
+        let var = meta.and_then(|m| m.variables.get(app.plotted().variable_idx));
         let dim = dim_name(app);
         // Labels are read by index only when there is one per step.
         let coords = meta
@@ -82,7 +82,7 @@ impl Timeline {
                 var.and_then(|v| v.units.as_deref()),
                 var.and_then(|v| v.time_coverage_start.as_deref()),
                 var.and_then(|v| v.temporal_resolution.as_deref()),
-                Some(&app.plotted_store_target_input),
+                Some(&app.plotted().store_target),
             ),
         };
 
@@ -102,10 +102,14 @@ impl Timeline {
 
 /// Name of the plotted animated dimension, or `"step"` without metadata.
 pub(super) fn dim_name(app: &OctantApp) -> &str {
-    app.plotted_dataset_metadata
+    app.plotted()
+        .metadata
         .as_ref()
-        .and_then(|m| m.variables.get(app.plotted_variable_idx))
-        .and_then(|v| v.dimension_names.get(app.plotted_animated_dim.unwrap_or(0)))
+        .and_then(|m| m.variables.get(app.plotted().variable_idx))
+        .and_then(|v| {
+            v.dimension_names
+                .get(app.plotted().animated_dim.unwrap_or(0))
+        })
         .map_or("step", String::as_str)
 }
 

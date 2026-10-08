@@ -3,7 +3,7 @@
 
 use crate::data::{VariableInfo, VariableTreeGroup};
 
-/// Filtered tree for one `(metadata_generation, query)`; `tree` is `None`
+/// Filtered tree for one `(selected.metadata_generation, query)`; `tree` is `None`
 /// when nothing matches.
 pub struct SearchCache {
     generation: u64,

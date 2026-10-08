@@ -21,7 +21,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.add_space(4.0);
                 ui.separator();
 
-                let mut selected = app.selected_store_kind;
+                let mut selected = app.selected.store_kind;
                 egui::ComboBox::from_id_salt("left_store_kind_select")
                     .selected_text(match selected {
                         StoreKind::RemoteZarr => "Remote Zarr",
@@ -47,29 +47,29 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                         ui.selectable_value(&mut selected, StoreKind::ProceduralRandom, "2D Procedural Matrix (Test)");
                     });
 
-                if selected != app.selected_store_kind {
-                    app.selected_store_kind = selected;
-                    match app.selected_store_kind {
+                if selected != app.selected.store_kind {
+                    app.selected.store_kind = selected;
+                    match app.selected.store_kind {
                         StoreKind::RemoteZarr => {
-                            app.store_target_input = "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string();
+                            app.selected.store_target = "https://s3.bgc-jena.mpg.de:9000/esdl-esdc-v3.0.2/esdc-16d-2.5deg-46x72x1440-3.0.2.zarr".to_string();
                         }
                         StoreKind::LocalZarr => {
-                            app.store_target_input = "./data/sample_dataset.zarr".to_string();
+                            app.selected.store_target = "./data/sample_dataset.zarr".to_string();
                         }
                         StoreKind::RemoteIcechunk => {
-                            app.store_target_input = "https://s3.amazonaws.com/icechunk-demo/repository".to_string();
+                            app.selected.store_target = "https://s3.amazonaws.com/icechunk-demo/repository".to_string();
                         }
                         StoreKind::LocalIcechunk => {
-                            app.store_target_input = "./data/icechunk_repo".to_string();
+                            app.selected.store_target = "./data/icechunk_repo".to_string();
                         }
                         StoreKind::RemoteGeoTiff => {
-                            app.store_target_input = "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/36/Q/WD/2020/7/S2A_36QWD_20200701_0_L2A/TCI.tif".to_string();
+                            app.selected.store_target = "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/36/Q/WD/2020/7/S2A_36QWD_20200701_0_L2A/TCI.tif".to_string();
                         }
                         StoreKind::LocalGeoTiff => {
-                            app.store_target_input = "./data/sample.tif".to_string();
+                            app.selected.store_target = "./data/sample.tif".to_string();
                         }
                         StoreKind::LocalNetCdf => {
-                            app.store_target_input = "./data/sample.nc".to_string();
+                            app.selected.store_target = "./data/sample.nc".to_string();
                         }
                         StoreKind::ProceduralVolume4D => {
                             app.submit_or_activate_source("procedural://volume4d", Some(StoreKind::ProceduralVolume4D));
@@ -82,10 +82,10 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
 
                 ui.add_space(6.0);
                 ui.label(egui::RichText::new("Target URL / Path").strong());
-                let res = ui.text_edit_singleline(&mut app.store_target_input);
+                let res = ui.text_edit_singleline(&mut app.selected.store_target);
                 if res.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                    let target = app.store_target_input.clone();
-                    app.submit_or_activate_source(&target, Some(app.selected_store_kind));
+                    let target = app.selected.store_target.clone();
+                    app.submit_or_activate_source(&target, Some(app.selected.store_kind));
                 }
 
                 ui.add_space(6.0);
@@ -100,8 +100,8 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                     })
                     .clicked()
                 {
-                    let target = app.store_target_input.clone();
-                    app.submit_or_activate_source(&target, Some(app.selected_store_kind));
+                    let target = app.selected.store_target.clone();
+                    app.submit_or_activate_source(&target, Some(app.selected.store_kind));
                 }
 
                 ui.add_space(8.0);
@@ -110,7 +110,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.add_space(6.0);
                 ui.separator();
                 ui.collapsing("About this store", |ui| {
-                    if let Some(metadata) = &app.active_dataset_metadata {
+                    if let Some(metadata) = &app.selected.metadata {
                         ui.label(format!("Provider: {}", metadata.store_type));
                         ui.label(format!("Dataset: {}", metadata.name));
                         ui.label(format!("Variables: {}", metadata.variables.len()));
@@ -148,7 +148,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                             .auto_shrink([false, false])
                             .show(ui, |ui| {
                                 for d in app.dataset_manager.iter() {
-                                    let is_active = app.store_target_input == d.source.uri;
+                                    let is_active = app.selected.store_target == d.source.uri;
                                     let icon = match d.source.kind {
                                         crate::data::DataSourceKind::RemoteZarr => Icon::Globe,
                                         crate::data::DataSourceKind::LocalZarr => Icon::Folder,

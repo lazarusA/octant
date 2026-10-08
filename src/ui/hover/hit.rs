@@ -121,7 +121,7 @@ fn hit_2d_grid(
     };
     let (nx, ny) = transform_2d.screen_to_norm(hover_pos);
     let is_inside = rect.contains(hover_pos);
-    let (orig_w, orig_h) = if let Some(pyr) = &app.active_pyramid {
+    let (orig_w, orig_h) = if let Some(pyr) = &app.layers.base.data.pyramid {
         (pyr.original_width, pyr.original_height)
     } else {
         (matrix.width, matrix.height)
@@ -195,7 +195,7 @@ pub fn resolve_target_screen_pos(
         }
         PlotType::Heatmap => {
             let matrix = matrix?;
-            let (orig_w, orig_h) = if let Some(pyr) = &app.active_pyramid {
+            let (orig_w, orig_h) = if let Some(pyr) = &app.layers.base.data.pyramid {
                 (pyr.original_width, pyr.original_height)
             } else {
                 (matrix.width, matrix.height)

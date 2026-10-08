@@ -14,7 +14,7 @@ pub fn get_dimension_origin_and_full_len(
 ) -> (usize, usize) {
     let full_len = var.and_then(|v| v.shape.get(dim_idx)).copied().unwrap_or(1) as usize;
 
-    let origin = if let Some(req) = &app.active_slice_request
+    let origin = if let Some(req) = &app.layers.base.load.slice_request
         && let Some(sel) = req.selections.get(dim_idx)
     {
         match sel {
@@ -22,9 +22,10 @@ pub fn get_dimension_origin_and_full_len(
             DimensionSelection::Index(idx) => *idx,
         }
     } else {
-        app.plotted_selected_dim_ranges
+        app.plotted()
+            .dim_ranges
             .get(dim_idx)
-            .or_else(|| app.selected_dim_ranges.get(dim_idx))
+            .or_else(|| app.selected.dim_ranges.get(dim_idx))
             .map(|(start, _)| *start)
             .unwrap_or(0)
     };
@@ -36,7 +37,13 @@ pub fn get_dimension_origin_and_full_len(
 /// screen index `i` shows: blocks flip axes so north is up and west is left, which
 /// reverses those dimensions relative to storage.
 pub fn stored_offset(app: &OctantApp, dim_name: &str, i: usize, len: usize) -> usize {
-    let flipped = app.plotted_flipped_dims.iter().any(|d| d == dim_name);
+    let flipped = app
+        .layers
+        .base
+        .data
+        .flipped_dims
+        .iter()
+        .any(|d| d == dim_name);
     match len.checked_sub(1) {
         Some(last) if flipped => last - i.min(last),
         _ => i,
@@ -84,7 +91,7 @@ pub fn enrich_entries_with_animated_and_collapsed_dims(
         let loc_anim = format_dimension_coord(
             meta,
             Some(v),
-            Some(&app.plotted_store_target_input),
+            Some(&app.plotted().store_target),
             dim_name,
             app.current_timestep.min(total_steps.saturating_sub(1)),
             total_steps,
@@ -99,9 +106,10 @@ pub fn enrich_entries_with_animated_and_collapsed_dims(
     for d in 0..v.dimension_names.len() {
         if !used_dims.contains(&d) {
             let sel_idx = app
-                .plotted_selected_dim_indices
+                .plotted()
+                .dim_indices
                 .get(d)
-                .or_else(|| app.selected_dim_indices.get(d))
+                .or_else(|| app.selected.dim_indices.get(d))
                 .copied()
                 .unwrap_or(0);
             let total_len = v.shape.get(d).copied().unwrap_or(1) as usize;
@@ -109,7 +117,7 @@ pub fn enrich_entries_with_animated_and_collapsed_dims(
             let loc_collapsed = format_dimension_coord(
                 meta,
                 Some(v),
-                Some(&app.plotted_store_target_input),
+                Some(&app.plotted().store_target),
                 dim_name,
                 sel_idx.min(total_len.saturating_sub(1)),
                 total_len,

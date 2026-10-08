@@ -31,6 +31,23 @@ pub fn get_shared_tokio_rt() -> Arc<tokio::runtime::Runtime> {
         .clone()
 }
 
+/// Runs `f`, turning a panic into an error: a backend, codec or decoder that
+/// panics on a file it cannot read (an unsupported format, a malformed
+/// header) then fails like any other load, and the error reaches the UI,
+/// instead of a background thread panicking and aborting the app. Panics
+/// still print through the panic hook; under `panic = "abort"` (the browser)
+/// nothing can be caught, so readers must also reject such files up front.
+pub fn catch_panic<T>(f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or_else(|payload| {
+        let message = payload
+            .downcast_ref::<&str>()
+            .map(|s| (*s).to_string())
+            .or_else(|| payload.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "unknown panic".to_string());
+        Err(format!("unreadable or unsupported data: {message}"))
+    })
+}
+
 /// Helper struct for spawning background worker tasks.
 pub struct TaskExecutor;
 

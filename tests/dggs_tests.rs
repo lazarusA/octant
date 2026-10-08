@@ -131,8 +131,8 @@ fn test_dimension_slider_defaults_with_dggs_custom_dim_name() {
     init_variable_dimension_defaults(&mut app, &var_info);
 
     // Dimension 0 ("time") should be animated, Dimension 1 ("my_custom_cells") should be SpatialRole::Grid
-    assert_eq!(app.dim_config[1].spatial, SpatialRole::Grid);
-    assert_eq!(app.spatial_dims, vec![1]);
+    assert_eq!(app.selected.dim_config[1].spatial, SpatialRole::Grid);
+    assert_eq!(app.selected.spatial_dims, vec![1]);
 }
 
 #[test]
