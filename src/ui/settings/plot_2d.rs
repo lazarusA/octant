@@ -1,5 +1,4 @@
 use crate::app::OctantApp;
-use crate::ui::settings::coastline::show_coastline_controls;
 
 pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
@@ -11,17 +10,6 @@ pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         if !app.line_show_lines && !app.line_show_points {
             app.line_show_lines = true;
         }
-
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.selectable_label(app.show_hover_card, "Hover Card")
-                .on_hover_text(if app.show_hover_card {
-                    "Hide hover card"
-                } else {
-                    "Show hover card"
-                })
-                .clicked()
-                .then(|| app.show_hover_card = !app.show_hover_card);
-        });
     });
 
     if app.line_show_points {
@@ -175,19 +163,6 @@ fn show_line_profile_slider(app: &mut OctantApp, ui: &mut egui::Ui, has_z_dim: b
 
 pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add_space(2.0);
-    ui.horizontal(|ui| {
-        ui.checkbox(&mut app.enforce_data_aspect_ratio, "Aspect Ratio")
-            .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
-        ui.selectable_label(app.show_hover_card, "Hover Card")
-            .on_hover_text(if app.show_hover_card { "Hide hover card" } else { "Show hover card" })
-            .clicked().then(|| app.show_hover_card = !app.show_hover_card);
-    });
-
-    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
-        super::composite::show_composite_controls(app, ui);
-    } else if app.layers.base.composite.enabled {
-        app.layers.base.composite.enabled = false;
-    }
-
-    show_coastline_controls(app, ui);
+    ui.checkbox(&mut app.enforce_data_aspect_ratio, "Aspect Ratio")
+        .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
 }

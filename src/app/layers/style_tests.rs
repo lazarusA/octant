@@ -87,7 +87,6 @@ fn reset_to_extent_starts_over_and_keeps_old_ends_for_non_finite_ones() {
     style.reset_to_extent(-1.0, 4.0);
     assert_eq!((style.global_min, style.global_max), (-1.0, 4.0));
     assert_eq!((style.range_min, style.range_max), (-1.0, 4.0));
-    assert_eq!((style.volume_cmin, style.volume_cmax), (-1.0, 4.0));
     assert!(!style.lock_bounds, "a new variable unlocks the range");
 
     style.reset_to_extent(f32::NAN, 9.0);

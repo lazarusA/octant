@@ -2,7 +2,7 @@ use crate::app::OctantApp;
 use crate::ui::icons::{Icon, UiIconExt};
 
 pub(crate) fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
-    egui::CollapsingHeader::new("Figure Export Defaults")
+    egui::CollapsingHeader::new("Export")
         .default_open(false)
         .show(ui, |ui| {
             ui.horizontal(|ui| {

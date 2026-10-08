@@ -1,5 +1,4 @@
 use crate::app::OctantApp;
-use crate::ui::settings::coastline::show_coastline_controls;
 
 pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
@@ -48,11 +47,6 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .logarithmic(true),
     )
     .on_hover_text("Samples per voxel along each ray");
-    ui.checkbox(&mut app.volume_transparency, "Transparency");
-    if app.volume_algorithm == 0 && app.volume_transparency {
-        ui.checkbox(&mut app.volume_lighting, "Lighting")
-            .on_hover_text("Shade samples by their gradient so fronts and edges gain shape");
-    }
 
     if app.volume_algorithm == 0 || app.volume_algorithm >= 5 {
         ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("Density"));
@@ -62,30 +56,12 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.add(egui::Slider::new(&mut app.volume_attenuation, 0.0..=5.0).text("Attenuation"));
     }
 
-    if app.volume_algorithm <= 3 {
-        ui.separator();
-        if app.volume_algorithm != 1 {
-            ui.add(
-                egui::Slider::new(&mut app.layers.base.color.volume_cmin, 0.0..=100.0)
-                    .text("Min Clip"),
-            );
-        }
-        ui.add(
-            egui::Slider::new(&mut app.layers.base.color.volume_cmax, 0.0..=100.0)
-                .text("Max Range"),
-        );
-    }
-
     ui.separator();
     ui.add(
         egui::Slider::new(&mut app.volume_z_scale, 0.05..=10.0)
             .text("Z-Scale")
             .logarithmic(true),
     );
-
-    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
-        super::composite::show_composite_controls(app, ui);
-    }
 }
 
 pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -107,12 +83,6 @@ pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.separator();
         ui.add(egui::Slider::new(&mut app.sphere_displacement_strength, 0.0..=5.0).text("Height"));
     }
-
-    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
-        super::composite::show_composite_controls(app, ui);
-    }
-
-    show_coastline_controls(app, ui);
 }
 
 pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -132,12 +102,6 @@ pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     ui.separator();
     ui.add(egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0).text("Height"));
-
-    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
-        super::composite::show_composite_controls(app, ui);
-    }
-
-    show_coastline_controls(app, ui);
 }
 
 pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -148,8 +112,4 @@ pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .text("Z-Scale")
             .logarithmic(true),
     );
-
-    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
-        super::composite::show_composite_controls(app, ui);
-    }
 }

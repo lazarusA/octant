@@ -33,8 +33,6 @@ impl OctantApp {
             layer.color.global_max = data.max_val;
             layer.color.range_min = data.min_val;
             layer.color.range_max = data.max_val;
-            layer.color.volume_cmin = data.min_val;
-            layer.color.volume_cmax = data.max_val;
             layer.color.lock_bounds = false;
         } else {
             layer.color.global_min = layer.color.global_min.min(data.min_val);
@@ -43,8 +41,6 @@ impl OctantApp {
             if !layer.color.lock_bounds {
                 layer.color.range_min = data.min_val;
                 layer.color.range_max = data.max_val;
-                layer.color.volume_cmin = data.min_val;
-                layer.color.volume_cmax = data.max_val;
             }
         }
 

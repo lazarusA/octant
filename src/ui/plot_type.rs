@@ -82,6 +82,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     };
 
     let is_volume_allowed = is_3d_available
+        && !target_pyramid_disabled
         && (is_size_allowed || vol_mb == 0.0)
         && supported_plots
             .is_none_or(|plots| plots.contains(&PlotType::Volume) && !is_discrete_grid);
@@ -176,7 +177,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
             let reason = if !is_supported {
                 format!("Unsupported for {} grid", grid_name)
             } else if pyramid_disabled {
-                "Disabled: 2D Pyramid Resampling active".to_string()
+                "Disabled: 2D Aggregation is on".to_string()
             } else if (plot_type == PlotType::Volume || plot_type == PlotType::PointCloud)
                 && !is_3d_available
             {

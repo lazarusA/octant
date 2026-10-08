@@ -50,12 +50,10 @@ pub fn draw_end_range_inputs(
 
     if min_resp.changed() || new_min != app.layers.base.color.range_min {
         app.layers.base.color.range_min = new_min;
-        app.layers.base.color.volume_cmin = new_min;
         app.layers.base.color.lock_bounds = true;
     }
     if max_resp.changed() || new_max != app.layers.base.color.range_max {
         app.layers.base.color.range_max = new_max;
-        app.layers.base.color.volume_cmax = new_max;
         app.layers.base.color.lock_bounds = true;
     }
 }

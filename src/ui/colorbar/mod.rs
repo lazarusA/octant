@@ -528,8 +528,6 @@ mod tests {
 
         assert_eq!(app.layers.base.color.range_min, 12.0);
         assert_eq!(app.layers.base.color.range_max, 88.0);
-        assert_eq!(app.layers.base.color.volume_cmin, 12.0);
-        assert_eq!(app.layers.base.color.volume_cmax, 88.0);
         assert!(!app.layers.base.color.lock_bounds);
     }
 

@@ -1,27 +1,28 @@
+use super::gated;
+use super::scale::show_scale_type_controls;
+use super::support::OptionSupport;
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, UiIconExt};
-use crate::ui::settings::resampling::show_resampling_controls;
 
-pub(crate) fn show_clipping_bounds(app: &mut OctantApp, ui: &mut egui::Ui) {
+/// Colorbar label, color range, scale and the NaN and clip colors, as far as
+/// the plot honors them.
+pub(crate) fn show_color_settings(app: &mut OctantApp, ui: &mut egui::Ui, support: &OptionSupport) {
     show_colorbar_label_controls(app, ui);
     ui.add_space(4.0);
-    show_color_range_controls(app, ui);
+    // An overridden range overrides the whole mapping: one note says why.
+    let mapped = support.color_mapping.is_yes();
+    gated(ui, support.color_range, |ui| {
+        show_color_range_controls(app, ui, mapped);
+        ui.add_space(4.0);
+        gated(ui, support.color_mapping, |ui| {
+            show_scale_type_controls(app, ui)
+        });
+    });
     ui.add_space(4.0);
-    ui.separator();
-    ui.add_space(4.0);
-    show_clipping_color_pickers(app, ui);
-    ui.add_space(4.0);
-    ui.separator();
-    ui.add_space(4.0);
-    crate::ui::settings::opacity::show_opacity_controls(app, ui);
-    ui.add_space(4.0);
-    ui.separator();
-    ui.add_space(4.0);
-    show_scale_type_controls(app, ui);
-    ui.add_space(4.0);
-    ui.separator();
-    ui.add_space(4.0);
-    show_resampling_controls(app, ui);
+    gated(ui, support.nan_color, |ui| show_nan_color_picker(app, ui));
+    if mapped {
+        show_clip_color_pickers(app, ui);
+    }
 }
 
 fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -55,13 +56,18 @@ fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     });
 }
 
-fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
+/// Min and max inputs with lock and reset; the Categorical toggle when the
+/// colormap is `mapped`.
+fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui, mapped: bool) {
     let range_speed = ((app.layers.base.color.range_max - app.layers.base.color.range_min).abs()
         / 100.0)
         .max(1e-4);
 
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Color Range").strong());
+        if !mapped {
+            return;
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.toggle_value(&mut app.layers.base.color.categorical, "Categorical")
                 .on_hover_text("Discrete colorbar (auto-detects unique values or 10 equal bins).");
@@ -83,7 +89,6 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             )
             .changed()
         {
-            app.layers.base.color.volume_cmin = app.layers.base.color.range_min;
             app.layers.base.color.lock_bounds = true;
         }
 
@@ -99,7 +104,6 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             )
             .changed()
         {
-            app.layers.base.color.volume_cmax = app.layers.base.color.range_max;
             app.layers.base.color.lock_bounds = true;
         }
 
@@ -136,7 +140,7 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 }
 
-fn show_clipping_color_pickers(app: &mut OctantApp, ui: &mut egui::Ui) {
+fn show_nan_color_picker(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.checkbox(&mut app.layers.base.color.use_nan_color, "NaN Color")
             .on_hover_text("If unchecked, NaN/Inf values render transparently.");
@@ -154,7 +158,9 @@ fn show_clipping_color_pickers(app: &mut OctantApp, ui: &mut egui::Ui) {
             });
         }
     });
+}
 
+fn show_clip_color_pickers(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         ui.checkbox(&mut app.layers.base.color.use_lowclip, "Low Clip")
@@ -192,53 +198,4 @@ fn show_clipping_color_pickers(app: &mut OctantApp, ui: &mut egui::Ui) {
             });
         }
     });
-}
-
-fn show_scale_type_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let is_valid_log =
-        app.layers.base.color.range_min >= -1e-15 && app.layers.base.color.range_max > 0.0;
-    if !is_valid_log && app.layers.base.color.scale_type == 1 {
-        app.layers.base.color.scale_type = 0;
-    }
-
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("Scale").strong());
-        egui::ComboBox::from_id_salt("settings_color_scale_dropdown")
-            .selected_text(match app.layers.base.color.scale_type {
-                1 => "Logarithmic",
-                2 => "Symlog",
-                3 => "Sqrt",
-                4 => "Exponential",
-                _ => "Linear",
-            })
-            .show_ui(ui, |ui| {
-                ui.selectable_value(&mut app.layers.base.color.scale_type, 0, "Linear");
-                ui.add_enabled_ui(is_valid_log, |ui| {
-                    ui.selectable_value(&mut app.layers.base.color.scale_type, 1, "Logarithmic")
-                        .on_hover_text(if is_valid_log {
-                            "Log scale (non-negative data)"
-                        } else {
-                            "Disabled: requires min >= 0. Use Symlog for negative data."
-                        });
-                });
-                ui.selectable_value(&mut app.layers.base.color.scale_type, 2, "Symlog");
-                ui.selectable_value(&mut app.layers.base.color.scale_type, 3, "Sqrt");
-                ui.selectable_value(&mut app.layers.base.color.scale_type, 4, "Exponential");
-            });
-    });
-
-    if app.layers.base.color.scale_type == 1
-        || app.layers.base.color.scale_type == 2
-        || app.layers.base.color.scale_type == 4
-    {
-        ui.add_space(2.0);
-        ui.horizontal(|ui| {
-            ui.label("Param:");
-            ui.add(
-                egui::DragValue::new(&mut app.layers.base.color.scale_param)
-                    .speed(0.01)
-                    .range(0.0001..=100.0),
-            );
-        });
-    }
 }

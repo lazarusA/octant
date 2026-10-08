@@ -28,8 +28,6 @@ pub struct ColorStyle {
     pub scale_param: f32,
     pub categorical: bool,
     pub custom_label: Option<String>,
-    pub volume_cmin: f32,
-    pub volume_cmax: f32,
 }
 
 impl Default for ColorStyle {
@@ -55,8 +53,6 @@ impl Default for ColorStyle {
             scale_param: shader.scale_param,
             categorical: false,
             custom_label: None,
-            volume_cmin: 5.0,
-            volume_cmax: 100.0,
         }
     }
 }
@@ -77,12 +73,10 @@ impl ColorStyle {
         if min.is_finite() {
             self.global_min = min;
             self.range_min = min;
-            self.volume_cmin = min;
         }
         if max.is_finite() {
             self.global_max = max;
             self.range_max = max;
-            self.volume_cmax = max;
         }
         self.lock_bounds = false;
     }
@@ -94,14 +88,12 @@ impl ColorStyle {
             self.global_min = self.global_min.min(min);
             if !self.lock_bounds {
                 self.range_min = min;
-                self.volume_cmin = min;
             }
         }
         if max.is_finite() {
             self.global_max = self.global_max.max(max);
             if !self.lock_bounds {
                 self.range_max = max;
-                self.volume_cmax = max;
             }
         }
     }

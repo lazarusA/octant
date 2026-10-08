@@ -77,23 +77,15 @@ impl OctantApp {
         {
             self.layers.base.color.range_min = vdata.min_val;
             self.layers.base.color.range_max = vdata.max_val;
-            self.layers.base.color.volume_cmin = vdata.min_val;
-            self.layers.base.color.volume_cmax = vdata.max_val;
         } else if mdata_valid && let Some(mdata) = &self.layers.base.data.matrix {
             self.layers.base.color.range_min = mdata.min_val;
             self.layers.base.color.range_max = mdata.max_val;
-            self.layers.base.color.volume_cmin = mdata.min_val;
-            self.layers.base.color.volume_cmax = mdata.max_val;
         } else if vdata_valid && let Some(vdata) = &self.layers.base.data.volume {
             self.layers.base.color.range_min = vdata.min_val;
             self.layers.base.color.range_max = vdata.max_val;
-            self.layers.base.color.volume_cmin = vdata.min_val;
-            self.layers.base.color.volume_cmax = vdata.max_val;
         } else {
             self.layers.base.color.range_min = 0.0;
             self.layers.base.color.range_max = 100.0;
-            self.layers.base.color.volume_cmin = 0.0;
-            self.layers.base.color.volume_cmax = 100.0;
         }
         self.layers.base.color.lock_bounds = false;
     }

@@ -57,6 +57,22 @@ impl PlotType {
             PlotType::PointCloud => "Point Cloud",
         }
     }
+
+    /// Whether the coastline overlay is drawn over this plot type.
+    pub fn draws_coastlines(&self) -> bool {
+        matches!(
+            self,
+            PlotType::Heatmap | PlotType::Surface | PlotType::Sphere
+        )
+    }
+
+    /// Whether the plot is drawn in 3D, with an orbiting camera.
+    pub fn is_3d(&self) -> bool {
+        matches!(
+            self,
+            PlotType::Sphere | PlotType::Surface | PlotType::Volume | PlotType::PointCloud
+        )
+    }
 }
 
 /// Assembles a base plot WGSL shader by prepending the colormap atlas sampler and shared 3D camera utilities.
