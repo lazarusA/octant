@@ -87,10 +87,12 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
 /// resolution, view and export sections. Sections and settings the plot has no use for
 /// are left out (`support`).
 fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let support = PlotState::of(app).support();
     let plot_type = app.effective_canvas_plot_type();
     ui.label(egui::RichText::new(plot_type.display_name()).small().weak());
     plot_options::show_plot_options(app, ui, plot_type);
+    // After the plot options, which may switch the volume algorithm or the
+    // composite this frame.
+    let support = PlotState::of(app).support();
     ui.add_space(4.0);
     ui.separator();
     egui::CollapsingHeader::new("Color")

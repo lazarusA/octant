@@ -11,7 +11,12 @@ pub(crate) fn show_transparency_settings(
     ui: &mut egui::Ui,
     support: &OptionSupport,
 ) {
-    gated(ui, support.opacity, |ui| show_opacity_controls(app, ui));
+    // The color mapping's note above already names an override they share.
+    let opacity = match support.opacity.reason() {
+        Some(reason) if support.color_mapping.reason() == Some(reason) => Support::No,
+        _ => support.opacity,
+    };
+    gated(ui, opacity, |ui| show_opacity_controls(app, ui));
     if support.transparency != Support::No {
         transparency_toggle(ui, &mut app.plot_transparency, support.transparency).on_hover_text(
             "With translucent colors (Opacity or Alpha curve), draw every layer \

@@ -165,10 +165,4 @@ pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add_space(2.0);
     ui.checkbox(&mut app.enforce_data_aspect_ratio, "Aspect Ratio")
         .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
-
-    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
-        super::composite::show_composite_controls(app, ui);
-    } else if app.layers.base.composite.enabled {
-        app.layers.base.composite.enabled = false;
-    }
 }

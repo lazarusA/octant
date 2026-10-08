@@ -172,11 +172,12 @@ fn aggregation_is_heatmap_only() {
         };
         assert_eq!(state(plot_type).support().aggregation, expected);
     }
+    // Composites skip the pyramid, but it must stay possible to turn it off.
     let composite = PlotState {
         composite: true,
         ..state(PlotType::Heatmap)
     };
-    assert!(overridden(composite.support().aggregation));
+    assert_eq!(composite.support().aggregation, Support::Yes);
 }
 
 #[test]

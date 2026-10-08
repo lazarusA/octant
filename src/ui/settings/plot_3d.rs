@@ -62,10 +62,6 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .text("Z-Scale")
             .logarithmic(true),
     );
-
-    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
-        super::composite::show_composite_controls(app, ui);
-    }
 }
 
 pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -87,10 +83,6 @@ pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.separator();
         ui.add(egui::Slider::new(&mut app.sphere_displacement_strength, 0.0..=5.0).text("Height"));
     }
-
-    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
-        super::composite::show_composite_controls(app, ui);
-    }
 }
 
 pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -110,10 +102,6 @@ pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     ui.separator();
     ui.add(egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0).text("Height"));
-
-    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
-        super::composite::show_composite_controls(app, ui);
-    }
 }
 
 pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -124,8 +112,4 @@ pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             .text("Z-Scale")
             .logarithmic(true),
     );
-
-    if app.has_rgb_bands() || !app.layers.base.composite.channel_configs.is_empty() {
-        super::composite::show_composite_controls(app, ui);
-    }
 }

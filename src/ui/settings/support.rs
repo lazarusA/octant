@@ -20,7 +20,6 @@ const NOT_TRANSLUCENT: &str = "Takes effect with Opacity below 1 or an alpha cur
 const COMPOSITE_OPAQUE: &str = "Composites are drawn opaque.";
 const LABEL_OPAQUE: &str = "Label surfaces are always drawn opaque.";
 const ALWAYS_BLENDS: &str = "This algorithm always blends along the ray.";
-const COMPOSITE_FULL_RES: &str = "Composites are drawn at full resolution.";
 
 /// Whether a setting changes the current plot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -106,7 +105,9 @@ impl PlotState {
             transparency: self.transparency(),
             volume_transparency: self.volume_transparency(),
             coastlines: support_if(self.geographic && self.plot_type.draws_coastlines()),
-            aggregation: self.aggregation(),
+            // Composites skip the pyramid, but the toggle stays reachable:
+            // while it is on, the plot type menu keeps to the heatmap.
+            aggregation: support_if(self.plot_type == PlotType::Heatmap),
             camera: support_if(self.plot_type.is_3d()),
         }
     }
@@ -158,7 +159,7 @@ impl PlotState {
 
     fn opacity(&self) -> Support {
         if self.composite {
-            Support::Overridden(COMPOSITE_OPAQUE)
+            Support::Overridden(COMPOSITE)
         } else if self.plot_type == PlotType::Volume && self.volume_algorithm != VOLUME_DVR {
             Support::Overridden(CLASSIC_OPAQUE)
         } else {
@@ -189,16 +190,6 @@ impl PlotState {
             VOLUME_LABEL_SURFACE => Support::Overridden(LABEL_OPAQUE),
             VOLUME_ADDITIVE_RGBA | VOLUME_INDEXED_RGBA => Support::Overridden(ALWAYS_BLENDS),
             _ => Support::Yes,
-        }
-    }
-
-    fn aggregation(&self) -> Support {
-        if self.plot_type != PlotType::Heatmap {
-            Support::No
-        } else if self.composite {
-            Support::Overridden(COMPOSITE_FULL_RES)
-        } else {
-            Support::Yes
         }
     }
 }

@@ -1,6 +1,6 @@
+use super::gated;
 use super::scale::show_scale_type_controls;
-use super::support::{OptionSupport, Support};
-use super::{gated, note};
+use super::support::OptionSupport;
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, UiIconExt};
 
@@ -11,17 +11,13 @@ pub(crate) fn show_color_settings(app: &mut OctantApp, ui: &mut egui::Ui, suppor
     ui.add_space(4.0);
     // An overridden range overrides the whole mapping: one note says why.
     let mapped = support.color_mapping.is_yes();
-    match support.color_range {
-        Support::Yes => {
-            show_color_range_controls(app, ui, mapped);
-            ui.add_space(4.0);
-            gated(ui, support.color_mapping, |ui| {
-                show_scale_type_controls(app, ui)
-            });
-        }
-        Support::Overridden(reason) => note(ui, reason),
-        Support::No => {}
-    }
+    gated(ui, support.color_range, |ui| {
+        show_color_range_controls(app, ui, mapped);
+        ui.add_space(4.0);
+        gated(ui, support.color_mapping, |ui| {
+            show_scale_type_controls(app, ui)
+        });
+    });
     ui.add_space(4.0);
     gated(ui, support.nan_color, |ui| show_nan_color_picker(app, ui));
     if mapped {

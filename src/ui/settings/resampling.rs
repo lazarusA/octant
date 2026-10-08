@@ -67,6 +67,8 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         && let Some(mdata) = &app.layers.base.data.matrix
     {
         if app.enable_pyramid_resampling {
+            // Aggregation is heatmap only; keep a staged plot type in line.
+            app.selected.plot_type = crate::plots::PlotType::Heatmap;
             if mdata.height > 1 {
                 let pyramid = std::sync::Arc::new(crate::data::MatrixPyramid::new(
                     &mdata.values,
