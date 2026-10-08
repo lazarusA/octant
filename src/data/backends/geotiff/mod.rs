@@ -19,6 +19,8 @@ mod bands_tests;
 #[cfg(test)]
 mod ifd_check_tests;
 #[cfg(test)]
+mod ifd_parity_tests;
+#[cfg(test)]
 pub mod test_utils;
 #[cfg(test)]
 pub mod tests;

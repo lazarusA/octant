@@ -2,6 +2,8 @@
 //! loading path, headless, against the offline procedural 4D store: every
 //! played step must show that step's slice.
 
+mod common;
+use common::drain;
 use std::time::{Duration, Instant};
 
 use octant::app::{OctantApp, StoreKind};
@@ -10,18 +12,6 @@ use octant::plots::PlotType;
 
 const NT: usize = 20;
 const N: usize = 32;
-
-fn drain(app: &mut OctantApp) {
-    let deadline = Instant::now() + Duration::from_secs(20);
-    loop {
-        app.poll_block_prefetch_results();
-        if app.block_prefetcher.pending_count() == 0 {
-            break;
-        }
-        assert!(Instant::now() < deadline, "prefetcher did not finish");
-        std::thread::sleep(Duration::from_millis(2));
-    }
-}
 
 fn app_with(plot: PlotType) -> OctantApp {
     let mut app = OctantApp::default();

@@ -4,6 +4,8 @@
 //! `advance_playback` (the frame timer's step) headlessly against the offline
 //! procedural 4D store.
 
+mod common;
+use common::drain;
 use std::time::{Duration, Instant};
 
 use octant::app::{OctantApp, StoreKind};
@@ -12,25 +14,6 @@ use octant::plots::PlotType;
 
 const NT: usize = 20;
 const N: usize = 32;
-
-fn drain(app: &mut OctantApp) {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    loop {
-        app.poll_block_prefetch_results();
-        if app.block_prefetcher.pending_count() == 0 {
-            break;
-        }
-        if Instant::now() >= deadline {
-            eprintln!(
-                "drain timed out! pending_count = {}, is_playing = {}",
-                app.block_prefetcher.pending_count(),
-                app.is_playing
-            );
-            panic!("prefetcher did not finish");
-        }
-        std::thread::sleep(Duration::from_millis(2));
-    }
-}
 
 /// A plotted 4D volume played to step 3, with every step resident.
 fn playing(plot: PlotType) -> OctantApp {

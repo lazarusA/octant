@@ -2,25 +2,13 @@
 //! switching to 2D/Heatmap, advancing playback past the initial selection,
 //! and switching back to Volume.
 
-use std::time::{Duration, Instant};
+mod common;
+use common::drain;
+use std::time::Instant;
 
 use octant::app::{OctantApp, StoreKind};
 use octant::data::{BlockStore, OctantBlock, backends::ProceduralBlockStore};
 use octant::plots::PlotType;
-
-fn drain(app: &mut OctantApp) {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    loop {
-        app.poll_block_prefetch_results();
-        if app.block_prefetcher.pending_count() == 0 {
-            break;
-        }
-        if Instant::now() >= deadline {
-            panic!("prefetcher did not finish");
-        }
-        std::thread::sleep(Duration::from_millis(2));
-    }
-}
 
 fn tick(app: &mut OctantApp) {
     app.advance_playback(Instant::now());

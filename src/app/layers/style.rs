@@ -33,23 +33,26 @@ pub struct ColorStyle {
 }
 
 impl Default for ColorStyle {
+    /// The shader defaults (`PlotColorParams::default`): range, clip and NaN
+    /// colors, scale; with every clip color off.
     fn default() -> Self {
+        let shader = PlotColorParams::default();
         Self {
             colormap: registry::default_id(),
-            range_min: 0.0,
-            range_max: 100.0,
+            range_min: shader.cmin,
+            range_max: shader.cmax,
             lock_bounds: false,
             global_min: f32::INFINITY,
             global_max: f32::NEG_INFINITY,
-            nan_color: [0.0, 0.0, 0.0, 0.0],
+            nan_color: shader.nan_color,
             use_nan_color: false,
-            lowclip_color: [0.0, 0.0, 1.0, 1.0],
+            lowclip_color: shader.lowclip_color,
             use_lowclip: false,
-            highclip_color: [1.0, 0.0, 0.0, 1.0],
+            highclip_color: shader.highclip_color,
             use_highclip: false,
-            opacity: 1.0,
-            scale_type: 0,
-            scale_param: 1.0,
+            opacity: shader.opacity,
+            scale_type: shader.scale_type,
+            scale_param: shader.scale_param,
             categorical: false,
             custom_label: None,
             volume_cmin: 5.0,

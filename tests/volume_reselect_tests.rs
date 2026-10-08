@@ -3,7 +3,8 @@
 //! the async prefetcher and `poll_block_prefetch_results`) headlessly against
 //! the offline procedural 4D store.
 
-use std::time::{Duration, Instant};
+mod common;
+use common::drain;
 
 use octant::app::{OctantApp, StoreKind};
 use octant::data::{BlockStore, backends::ProceduralBlockStore};
@@ -28,15 +29,7 @@ fn new_volume_app() -> OctantApp {
 /// the prefetcher the way the frame loop does.
 fn press_plot(app: &mut OctantApp) {
     app.plot_selection();
-    let deadline = Instant::now() + Duration::from_secs(20);
-    loop {
-        app.poll_block_prefetch_results();
-        if app.block_prefetcher.pending_count() == 0 {
-            break;
-        }
-        assert!(Instant::now() < deadline, "prefetcher did not finish");
-        std::thread::sleep(Duration::from_millis(2));
-    }
+    drain(app);
 }
 
 /// Sets the slider range of `dim` the way `slider_row.rs` does.
@@ -224,15 +217,7 @@ fn depth_animated_volume_plot_with_step_past_the_range() {
 fn play_to(app: &mut OctantApp, t: usize) {
     app.current_timestep = t;
     app.load_selected_variable_block();
-    let deadline = Instant::now() + Duration::from_secs(20);
-    loop {
-        app.poll_block_prefetch_results();
-        if app.block_prefetcher.pending_count() == 0 {
-            break;
-        }
-        assert!(Instant::now() < deadline, "prefetcher did not finish");
-        std::thread::sleep(Duration::from_millis(2));
-    }
+    drain(app);
 }
 
 #[test]

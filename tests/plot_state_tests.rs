@@ -3,23 +3,12 @@
 //! GPU color uniforms follow it. Drives the Plot button headlessly against the
 //! offline procedural 4D store.
 
-use std::time::{Duration, Instant};
+mod common;
+use common::drain;
 
 use octant::app::{OctantApp, StoreKind};
 use octant::data::{BlockStore, backends::ProceduralBlockStore};
 use octant::plots::PlotType;
-
-fn drain(app: &mut OctantApp) {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    loop {
-        app.poll_block_prefetch_results();
-        if app.block_prefetcher.pending_count() == 0 {
-            break;
-        }
-        assert!(Instant::now() < deadline, "prefetcher did not finish");
-        std::thread::sleep(Duration::from_millis(2));
-    }
-}
 
 fn plotted_heatmap() -> OctantApp {
     let mut app = OctantApp::default();

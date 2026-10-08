@@ -12,9 +12,10 @@ use async_tiff::metadata::{ImageFileDirectoryReader, MetadataFetch, TiffMetadata
 use async_tiff::reader::Endianness;
 use async_tiff::tags::{PhotometricInterpretation, Tag};
 
-/// GeoKey ids `async-tiff` knows (its crate-private `GeoKeyTag`); it skips
-/// the others without reading their values.
-const KNOWN_GEO_KEYS: [u16; 45] = [
+/// GeoKey ids `async-tiff` knows (its crate-private `GeoKeyTag`); it skips the
+/// others without reading their values. `ifd_parity_tests` checks the list
+/// against the crate.
+pub(super) const KNOWN_GEO_KEYS: [u16; 45] = [
     1024, 1025, 1026, 2048, 2049, 2050, 2051, 2052, 2053, 2054, 2055, 2056, 2057, 2058, 2059, 2060,
     2061, 3072, 3073, 3074, 3075, 3076, 3077, 3078, 3079, 3080, 3081, 3082, 3083, 3084, 3085, 3086,
     3087, 3088, 3089, 3090, 3091, 3092, 3093, 3094, 3095, 4096, 4097, 4098, 4099,
