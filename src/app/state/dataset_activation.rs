@@ -2,6 +2,7 @@
 
 use super::app_state::OctantApp;
 use super::store_kind::StoreKind;
+use crate::app::layers::LayerId;
 
 impl OctantApp {
     /// Checks if a dataset matching `target` (by URI, ID, or display name) is already in `dataset_manager`.
@@ -129,7 +130,12 @@ impl OctantApp {
 
     /// Return the dimension index corresponding to channels/bands for the currently plotted variable.
     pub fn channel_dim_index(&self) -> Option<usize> {
-        channel_dim(self.plotted_variable_info()?)
+        self.layer_channel_dim(LayerId::BASE)
+    }
+
+    /// The channels/bands dimension of layer `id`'s variable.
+    pub fn layer_channel_dim(&self, id: LayerId) -> Option<usize> {
+        channel_dim(self.layer_variable_info(id)?)
     }
 
     /// Return the dimension index corresponding to channels/bands for the currently selected variable.
@@ -168,13 +174,23 @@ impl OctantApp {
 
     /// Returns true if the active dataset represents a GeoTIFF.
     pub fn is_geotiff(&self) -> bool {
-        if self.plotted().metadata.is_some() {
-            return self.plotted().store_kind == StoreKind::LocalGeoTiff
-                || self.plotted().store_kind == StoreKind::RemoteGeoTiff;
-        }
+        self.layer_is_geotiff(LayerId::BASE)
+    }
 
-        self.selected.store_kind == StoreKind::LocalGeoTiff
-            || self.selected.store_kind == StoreKind::RemoteGeoTiff
+    /// Whether layer `id` shows (or, before its first plot, stages) a GeoTIFF.
+    pub fn layer_is_geotiff(&self, id: LayerId) -> bool {
+        let Some((shown, staged)) = self.layer_selections(id) else {
+            return false;
+        };
+        let selection = if shown.metadata.is_some() {
+            shown
+        } else {
+            staged
+        };
+        matches!(
+            selection.store_kind,
+            StoreKind::LocalGeoTiff | StoreKind::RemoteGeoTiff
+        )
     }
 
     /// Returns the effective `(start, end)` selected range for a given dimension index.

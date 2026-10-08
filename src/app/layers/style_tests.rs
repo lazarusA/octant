@@ -77,3 +77,37 @@ fn reset_bounds_keeps_a_locked_extent() {
     style.reset_bounds();
     assert_eq!((style.global_min, style.global_max), (f32::MAX, f32::MIN));
 }
+
+#[test]
+fn reset_to_extent_starts_over_and_keeps_old_ends_for_non_finite_ones() {
+    let mut style = ColorStyle {
+        lock_bounds: true,
+        ..Default::default()
+    };
+    style.reset_to_extent(-1.0, 4.0);
+    assert_eq!((style.global_min, style.global_max), (-1.0, 4.0));
+    assert_eq!((style.range_min, style.range_max), (-1.0, 4.0));
+    assert_eq!((style.volume_cmin, style.volume_cmax), (-1.0, 4.0));
+    assert!(!style.lock_bounds, "a new variable unlocks the range");
+
+    style.reset_to_extent(f32::NAN, 9.0);
+    assert_eq!((style.range_min, style.range_max), (-1.0, 9.0));
+}
+
+#[test]
+fn follow_extent_widens_the_seen_extent_and_moves_an_unlocked_range() {
+    let mut style = ColorStyle::default();
+    style.reset_to_extent(0.0, 10.0);
+    style.follow_extent(2.0, 12.0);
+    assert_eq!((style.global_min, style.global_max), (0.0, 12.0));
+    assert_eq!((style.range_min, style.range_max), (2.0, 12.0));
+
+    style.lock_bounds = true;
+    style.follow_extent(-5.0, f32::NAN);
+    assert_eq!((style.global_min, style.global_max), (-5.0, 12.0));
+    assert_eq!(
+        (style.range_min, style.range_max),
+        (2.0, 12.0),
+        "a locked range stays"
+    );
+}

@@ -83,10 +83,15 @@ impl OctantApp {
 
     /// Full size of the currently animated dimension in the dataset.
     pub fn animated_dim_extent(&self) -> usize {
-        let Some(anim_dim) = self.plotted().animated_dim else {
+        self.layer_animated_dim_extent(crate::app::layers::LayerId::BASE)
+    }
+
+    /// Full size of layer `id`'s animated dimension, or 1 without one.
+    pub fn layer_animated_dim_extent(&self, id: crate::app::layers::LayerId) -> usize {
+        let Some(anim_dim) = self.layers.get(id).and_then(|l| l.selection().animated_dim) else {
             return 1;
         };
-        self.plotted_variable_info()
+        self.layer_variable_info(id)
             .and_then(|v| v.shape.get(anim_dim))
             .copied()
             .unwrap_or(1) as usize

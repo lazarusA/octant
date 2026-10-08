@@ -157,13 +157,12 @@ Modular UI components integrated with `OctantApp`.
 
 ### Where we stand
 
-- **Done (behavior unchanged):** plotted state lives in a `LayerStack` ([`src/app/layers/`](https://github.com/lazarusA/octant/tree/main/src/app/layers)). The UI's staged selection is `OctantApp::selected` (a `VariableSelection`); Plot copies it to the base layer, read through `OctantApp::plotted()`. Each `Layer` owns its `Source` (only `Source::Variable` so far), `LayerData`, `LayerRenderers`, `ColorStyle`, `CompositeStyle` and `LoadState`. Painting, OIT release and volume uploads loop over `LayerStack::iter`/`iter_mut`, arriving blocks find their layer with `find_by_key`, `ColorStyle::params` builds the shader color uniforms, `block_axes` places a selection inside a block, and `VariableSelection::slice_request` builds requests. All of these are pure or per layer.
-- **Still tied to the base layer** (the first work of the overlay phase):
-  - `apply_block_projection`, `apply_2d_projection`/`apply_3d_volume_projection` and the pipeline rebuild (`rebuild.rs`) write `self.layers.base` and read app-level state. They must take a `&mut Layer` (plus the shared cache and view) instead.
-  - `get_color_params`, `get_mesh_3d_uniform_params`, `get_volume_uniform_params` and `get_point_cloud_uniform_params` read the base layer. `paint_layer` already receives the layer, so pass it through to these.
-  - `poll_block_prefetch_results` treats every block of the plotted variable as the base layer's.
-  - Hover, colorbar, axis labels and export read the base layer only.
-  - There is no `LayerId` yet. Add one, stable and counted in `LayerStack`, when overlays need UI ids and request routing; put it in egui salts and the per-plot caches (hover, composite labels) next to `metadata_generation`.
+- **Done (behavior unchanged):** plotted state lives in a `LayerStack` ([`src/app/layers/`](https://github.com/lazarusA/octant/tree/main/src/app/layers)). The UI's staged selection is `OctantApp::selected` (a `VariableSelection`); Plot copies it to the base layer, read through `OctantApp::plotted()`. Each `Layer` has a read-only `LayerId` given by the stack (`LayerId::BASE` for the base layer) and owns its `Source` (only `Source::Variable` so far), `LayerData`, `LayerRenderers`, `ColorStyle`, `CompositeStyle` and `LoadState`. Painting, OIT release, volume uploads and pyramid tile resampling loop over `LayerStack::iter`/`iter_mut`, and `ColorStyle::params` builds the shader color uniforms. `block_axes` places a selection inside a block, and `VariableSelection::slice_request` builds requests. All of these are pure or work per layer.
+- **Done: projection and paint per layer.** `apply_block_projection`, `apply_2d_projection`/`apply_3d_volume_projection`, `commit_volume_slab` and both pipeline rebuilds take a `LayerId` and write only that layer (`LayerStack::get`/`get_mut`). Coastline meshes and the line plot settings follow the base layer only. They read the layer's selection through `layer_selections` (`None` once the layer is gone): the base layer falls back to the staged `selected` until its first plot, as the `effective_*` helpers (now `layer_*(LayerId::BASE)`) always did, and other layers stage their own. `poll_block_prefetch_results` sends a requested block to the layer whose request it is (`find_by_key` returns its id) and any other block to the layer whose view it belongs to (`layer_showing_block`). `get_color_params`, `transparency_mode` and the mesh, volume and point cloud uniform getters take the `&Layer` they draw; the colormap picker's preview applies to the base layer only (`layer_colormap`). Volume data extents go through `ColorStyle::reset_to_extent`/`follow_extent` (which skip non-finite ends; the 2D rebuild still writes its extent inline, NaN included), and dirty volume planes through `LayerRenderers::mark_volume_dirty`.
+- **Still tied to the base layer** (the next work of the overlay phase):
+  - Requests: `load_selected_variable_block`, the cache-hit path (`show_cached_block`, `project_cached_volume_blocks`), prefetching and playback start from the staged selection and serve the base layer.
+  - Hover, colorbar, axis labels, aspect ratios and volume shifts, and export read the base layer only (the view frame is the base layer's).
+  - `LayerStack::push` adds an overlay under a new `LayerId` (the stack hands out every id; `LayerId` has no `Default`), and every per-layer loop already includes overlays, but nothing pushes one yet. When the UI does, put the id in egui salts and the per-plot caches (hover, composite labels) next to `metadata_generation`.
 - **Decisions taken:** the plot type is part of the selection, and the canvas type is the base layer's. Colormap reversal stays in `ColormapState`; move it into `ColorStyle` when overlays need their own. Settings for each plot type (`sphere_mode`, `volume_*`, `line_*`) stay on the app until overlays of those plot types exist.
 
 ### Model to grow into
@@ -185,8 +184,7 @@ Sources produce arrays aligned to a grid; layers draw one or more sources in a s
 ### TODO, in order
 
 1. **Same-grid overlays.**
-   - Push more layers onto `LayerStack`, routed by `LayerId` and `find_by_key`.
-   - Make projection and rebuild per layer (see "Still tied to the base layer").
+   - Push more layers onto `LayerStack`, routed by `LayerId` and `find_by_key`, and request their blocks (see "Still tied to the base layer").
    - Draw overlays after the base and before coastlines, with their own `ColorStyle`, opacity and visibility. NaN must draw transparent.
    - UI:
      - "Add as overlay" on variable rows.

@@ -95,7 +95,7 @@ fn a_replot_of_the_same_variable_keeps_a_locked_range() {
         ),
         (-5.0, 5.0)
     );
-    let params = app.get_color_params();
+    let params = app.get_color_params(&app.layers.base);
     assert_eq!((params.cmin, params.cmax), (-5.0, 5.0), "uniforms follow");
 }
 

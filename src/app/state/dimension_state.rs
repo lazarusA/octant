@@ -1,5 +1,8 @@
 //! Dimension configuration and role metadata.
 
+use crate::app::VariableSelection;
+use crate::app::layers::{Layer, LayerId};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpatialRole {
     None,
@@ -93,49 +96,100 @@ impl DimConfig {
 }
 
 impl crate::app::OctantApp {
+    /// Layer `id`'s selection and the staged one it falls back to while it is
+    /// empty: the base layer's is `selected` (the UI stages the next plot
+    /// there), any other layer stages its own. `None` once the layer is gone.
+    pub(crate) fn layer_selections(
+        &self,
+        id: LayerId,
+    ) -> Option<(&VariableSelection, &VariableSelection)> {
+        let layer = self.layers.get(id)?;
+        let staged = if id == LayerId::BASE {
+            &self.selected
+        } else {
+            layer.selection()
+        };
+        Some((layer.selection(), staged))
+    }
+
+    /// The selection the UI stages for layer `id`, mutably.
+    pub(crate) fn staged_selection_mut(&mut self, id: LayerId) -> Option<&mut VariableSelection> {
+        if id == LayerId::BASE {
+            Some(&mut self.selected)
+        } else {
+            self.layers.get_mut(id).map(Layer::selection_mut)
+        }
+    }
+
+    /// Layer `id`'s `field`, or its staged one while the shown one is empty;
+    /// empty once the layer is gone.
+    fn shown_or_staged<T>(&self, id: LayerId, field: fn(&VariableSelection) -> &[T]) -> &[T] {
+        let Some((shown, staged)) = self.layer_selections(id) else {
+            return &[];
+        };
+        let values = field(shown);
+        if values.is_empty() {
+            field(staged)
+        } else {
+            values
+        }
+    }
+
+    /// Layer `id`'s dimension configs, falling back to its staged ones.
+    pub fn layer_dim_config(&self, id: LayerId) -> &[DimConfig] {
+        self.shown_or_staged(id, |s| &s.dim_config)
+    }
+
+    /// Layer `id`'s dimension ranges, falling back to its staged ones.
+    pub fn layer_dim_ranges(&self, id: LayerId) -> &[(usize, usize)] {
+        self.shown_or_staged(id, |s| &s.dim_ranges)
+    }
+
+    /// Layer `id`'s dimension indices, falling back to its staged ones.
+    pub fn layer_dim_indices(&self, id: LayerId) -> &[usize] {
+        self.shown_or_staged(id, |s| &s.dim_indices)
+    }
+
+    /// Layer `id`'s animated dimension, falling back to its staged one.
+    pub fn layer_animated_dim(&self, id: LayerId) -> Option<usize> {
+        let (shown, staged) = self.layer_selections(id)?;
+        shown.animated_dim.or(staged.animated_dim)
+    }
+
+    /// Layer `id`'s dataset metadata, falling back to its staged one.
+    pub fn layer_dataset_metadata(&self, id: LayerId) -> Option<&crate::data::DatasetMetadata> {
+        let (shown, staged) = self.layer_selections(id)?;
+        shown.metadata.as_ref().or(staged.metadata.as_ref())
+    }
+
+    /// Layer `id`'s variable, falling back to its staged one.
+    pub fn layer_variable_info(&self, id: LayerId) -> Option<&crate::data::VariableInfo> {
+        let (shown, staged) = self.layer_selections(id)?;
+        shown.variable_info().or_else(|| staged.variable_info())
+    }
+
     /// Returns the active dimension configs: plotted if present, falling back to selected.
     #[inline]
     pub fn effective_dim_config(&self) -> &[DimConfig] {
-        if !self.plotted().dim_config.is_empty() {
-            &self.plotted().dim_config
-        } else {
-            &self.selected.dim_config
-        }
+        self.layer_dim_config(LayerId::BASE)
     }
 
     /// Returns the active dimension ranges: plotted if present, falling back to selected.
     #[inline]
     pub fn effective_selected_dim_ranges(&self) -> &[(usize, usize)] {
-        if !self.plotted().dim_ranges.is_empty() {
-            &self.plotted().dim_ranges
-        } else {
-            &self.selected.dim_ranges
-        }
-    }
-
-    /// Returns the active dimension indices: plotted if present, falling back to selected.
-    #[inline]
-    pub fn effective_selected_dim_indices(&self) -> &[usize] {
-        if !self.plotted().dim_indices.is_empty() {
-            &self.plotted().dim_indices
-        } else {
-            &self.selected.dim_indices
-        }
+        self.layer_dim_ranges(LayerId::BASE)
     }
 
     /// Returns the active animated dimension: plotted if present, falling back to selected.
     #[inline]
     pub fn effective_animated_dim(&self) -> Option<usize> {
-        self.plotted().animated_dim.or(self.selected.animated_dim)
+        self.layer_animated_dim(LayerId::BASE)
     }
 
     /// Returns the active dataset metadata: plotted if present, falling back to selected.
     #[inline]
     pub fn effective_dataset_metadata(&self) -> Option<&crate::data::DatasetMetadata> {
-        self.plotted()
-            .metadata
-            .as_ref()
-            .or(self.selected.metadata.as_ref())
+        self.layer_dataset_metadata(LayerId::BASE)
     }
 
     /// The selection shown on the canvas (the base layer's).

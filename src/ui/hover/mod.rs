@@ -193,7 +193,7 @@ fn resolve_hover_color(app: &OctantApp, canvas_plot_type: PlotType, raw_val: f32
             (app.line_color[3] * 255.0).clamp(0.0, 255.0) as u8,
         )
     } else {
-        let color_params = app.get_color_params();
+        let color_params = app.get_color_params(&app.layers.base);
         evaluate_color_cpu(raw_val, &color_params)
     }
 }

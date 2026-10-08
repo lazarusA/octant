@@ -2,23 +2,24 @@
 
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use crate::app::OctantApp;
+use crate::app::layers::CompositeStyle;
 use crate::data::octant_block::OctantBlock;
 
-/// Computes the 64-bit deterministic hash of active composite channels and windows.
-pub fn compute_composite_hash(app: &OctantApp) -> u64 {
+/// Computes the 64-bit deterministic hash of a layer's active composite channels and
+/// windows (`is_geotiff`: the layer's GeoTIFF bands always map to RGB).
+pub fn compute_composite_hash(composite: &CompositeStyle, is_geotiff: bool) -> u64 {
     let mut hasher = DefaultHasher::new();
-    app.layers.base.composite.enabled.hash(&mut hasher);
-    if app.layers.base.composite.enabled {
-        if !app.is_geotiff() && !app.layers.base.composite.channel_configs.is_empty() {
-            for c in &app.layers.base.composite.channel_configs {
+    composite.enabled.hash(&mut hasher);
+    if composite.enabled {
+        if !is_geotiff && !composite.channel_configs.is_empty() {
+            for c in &composite.channel_configs {
                 (c.index, c.visible, c.color_rgb).hash(&mut hasher);
                 if let Some((s, e)) = c.window {
                     (s.to_bits(), e.to_bits()).hash(&mut hasher);
                 }
             }
         } else {
-            app.layers.base.composite.rgb_channels.hash(&mut hasher);
+            composite.rgb_channels.hash(&mut hasher);
         }
     }
     hasher.finish()

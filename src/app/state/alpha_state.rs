@@ -1,6 +1,7 @@
 //! Opacity curve editor state (not persisted) and its registration.
 
 use super::app_state::OctantApp;
+use crate::app::layers::Layer;
 use crate::plots::PlotType;
 use crate::plots::oit::{self, Transparency};
 use crate::utils::colormap::{AlphaInterp, alpha, registry};
@@ -40,7 +41,7 @@ impl OctantApp {
 
     /// Whether colormapped values may be drawn translucent.
     pub fn has_color_alpha(&self) -> bool {
-        self.layers.base.color.opacity < 1.0 || registry::alpha_row().is_some()
+        layer_has_color_alpha(&self.layers.base)
     }
 
     /// Frees the OIT frames of the 3D renderers not drawn as `active`, whose
@@ -51,13 +52,12 @@ impl OctantApp {
         }
     }
 
-    /// How 3D meshes and point clouds draw: order-independent transparency
+    /// How `layer`'s 3D meshes and point clouds draw: order-independent transparency
     /// with translucent colors when the device supports it, else without depth
     /// writes; opaque colors (including RGB composites, which ignore opacity)
     /// keep depth writes, so near parts hide far ones.
-    pub fn transparency_mode(&self) -> Transparency {
-        if !self.plot_transparency || self.layers.base.composite.enabled || !self.has_color_alpha()
-        {
+    pub fn transparency_mode(&self, layer: &Layer) -> Transparency {
+        if !self.plot_transparency || layer.composite.enabled || !layer_has_color_alpha(layer) {
             Transparency::Off
         } else if self
             .wgpu_render_state
@@ -69,4 +69,9 @@ impl OctantApp {
             Transparency::NoDepthWrite
         }
     }
+}
+
+/// Whether `layer`'s colormapped values may be drawn translucent.
+fn layer_has_color_alpha(layer: &Layer) -> bool {
+    layer.color.opacity < 1.0 || registry::alpha_row().is_some()
 }

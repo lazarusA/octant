@@ -1,5 +1,6 @@
 //! The GPU renderers a layer draws with, one per plot type, built on first use.
 
+use std::ops::Range;
 use std::sync::Arc;
 
 use crate::plots::{
@@ -16,12 +17,21 @@ pub struct LayerRenderers {
     pub volume: Option<Arc<VolumeRenderer>>,
     pub point_cloud: Option<Arc<PointCloudRenderer>>,
     /// Z planes of the layer's volume not yet uploaded to the volume renderer.
-    pub volume_dirty: Option<std::ops::Range<usize>>,
+    pub volume_dirty: Option<Range<usize>>,
     /// Z planes of the layer's volume not yet uploaded to the point cloud renderer.
-    pub point_cloud_dirty: Option<std::ops::Range<usize>>,
+    pub point_cloud_dirty: Option<Range<usize>>,
 }
 
 impl LayerRenderers {
+    /// Marks Z planes `z` of the layer's volume as changed for both 3D renderers.
+    pub fn mark_volume_dirty(&mut self, z: Range<usize>) {
+        if z.is_empty() {
+            return;
+        }
+        self.volume_dirty = union(self.volume_dirty.take(), z.clone());
+        self.point_cloud_dirty = union(self.point_cloud_dirty.take(), z);
+    }
+
     /// Frees the OIT frames of 3D renderers not on screen (`active` is the
     /// plot type drawn this frame).
     pub fn release_idle_oit_frames(&self, active: PlotType) {
@@ -42,4 +52,11 @@ impl LayerRenderers {
             renderer.oit.release();
         }
     }
+}
+
+fn union(pending: Option<Range<usize>>, z: Range<usize>) -> Option<Range<usize>> {
+    Some(match pending {
+        Some(p) => p.start.min(z.start)..p.end.max(z.end),
+        None => z,
+    })
 }

@@ -1,3 +1,4 @@
+use octant::app::layers::LayerId;
 use octant::app::{AnimationRole, OctantApp, SpatialRole};
 use octant::data::{OctantBlock, VariableInfo, VolumeData};
 use std::collections::HashMap;
@@ -649,7 +650,7 @@ fn test_volume_animation_timeline_progression() {
         app.current_timestep = step;
         app.selected.dim_indices[0] = step;
         app.sync_plotted_state_from_selected();
-        app.apply_block_projection(&block);
+        app.apply_block_projection(LayerId::BASE, &block);
 
         let vdata = app
             .layers
@@ -773,7 +774,7 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
     for step in 0..nt {
         app.current_timestep = step;
         app.layers.base.selection_mut().dim_indices[0] = step;
-        app.apply_block_projection(&block);
+        app.apply_block_projection(LayerId::BASE, &block);
 
         let vdata = app.layers.base.data.volume.as_ref().unwrap();
         assert_eq!(app.layers.base.color.range_min, vdata.min_val);
@@ -792,7 +793,7 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
     for step in 0..nt {
         app.current_timestep = step;
         app.layers.base.selection_mut().dim_indices[0] = step;
-        app.apply_block_projection(&block);
+        app.apply_block_projection(LayerId::BASE, &block);
 
         assert_eq!(app.layers.base.color.range_min, 10.0);
         assert_eq!(app.layers.base.color.range_max, 80.0);

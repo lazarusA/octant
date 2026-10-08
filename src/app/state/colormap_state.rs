@@ -98,10 +98,15 @@ impl OctantApp {
     /// Atlas row actually drawn: the previewed or active colormap, or its smooth
     /// twin when "Smooth" is on and the palette has one.
     pub fn effective_colormap(&self) -> u32 {
-        self.shown_colormap(
-            self.preview_colormap
-                .unwrap_or(self.layers.base.color.colormap),
-        )
+        self.layer_colormap(&self.layers.base)
+    }
+
+    /// Atlas row `layer` draws; the picker previews on the base layer.
+    pub fn layer_colormap(&self, layer: &crate::app::layers::Layer) -> u32 {
+        let preview = self
+            .preview_colormap
+            .filter(|_| layer.id() == crate::app::layers::LayerId::BASE);
+        self.shown_colormap(preview.unwrap_or(layer.color.colormap))
     }
 
     /// Atlas row drawn for colormap `id`: its smooth twin when "Smooth" is on.

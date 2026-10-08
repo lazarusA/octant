@@ -2,7 +2,9 @@
 
 use super::block_axes;
 use crate::app::OctantApp;
+use crate::app::layers::LayerId;
 use crate::data::octant_block::OctantBlock;
+use crate::plots::PlotType;
 
 impl OctantApp {
     /// Resolves the 3D spatial axis indices `(x_dim, y_dim, z_dim)` for block projections,
@@ -65,14 +67,19 @@ impl OctantApp {
         (x_dim, y_dim, z_dim)
     }
 
-    /// Projects a resident block into current 2D or 3D views.
-    pub fn apply_block_projection(&mut self, block: &OctantBlock) {
-        let dim_configs = self.effective_dim_config();
-        let anim_dim = self
-            .plotted()
+    /// Projects a resident block into layer `id`'s 2D or 3D view.
+    pub fn apply_block_projection(&mut self, id: LayerId, block: &OctantBlock) {
+        let Some(layer) = self.layers.get(id) else {
+            return;
+        };
+        let compute_bounds = !layer.color.lock_bounds;
+        let composite = layer.composite.enabled;
+        let dim_configs = self.layer_dim_config(id);
+        let anim_dim = layer
+            .selection()
             .animated_dim
             .or_else(|| crate::app::DimConfig::animated_dim(dim_configs));
-        let orig_dim_names = self.resolve_orig_dim_names(block);
+        let orig_dim_names = self.resolve_orig_dim_names(id, block);
 
         let (x_dim, y_dim, z_dim) = Self::resolve_spatial_axes(
             block.rank(),
@@ -85,32 +92,33 @@ impl OctantApp {
             block,
             &orig_dim_names,
             anim_dim,
-            self.effective_selected_dim_indices(),
+            self.layer_dim_indices(id),
             self.current_timestep,
         );
-        let ranges = self.effective_selected_dim_ranges();
+        let ranges = self.layer_dim_ranges(id);
         let (req_x, local_x_range) = block_axes::dim_bounds(block, &orig_dim_names, x_dim, ranges);
         let (req_y, local_y_range) = block_axes::dim_bounds(block, &orig_dim_names, y_dim, ranges);
-        let compute_bounds = !self.layers.base.color.lock_bounds;
-        let c_dim = self.channel_dim_index().unwrap_or(0);
-        let (req_z, local_z_range) =
-            if z_dim < block.rank() && (!self.layers.base.composite.enabled || z_dim != c_dim) {
-                block_axes::dim_bounds(block, &orig_dim_names, z_dim, ranges)
-            } else {
-                ((0, 0), (0, 1))
-            };
-        let is_vol_allowed = crate::ui::variables_panel::is_volume_allowed_for_selection(self);
+        let c_dim = self.layer_channel_dim(id).unwrap_or(0);
+        let (req_z, local_z_range) = if z_dim < block.rank() && (!composite || z_dim != c_dim) {
+            block_axes::dim_bounds(block, &orig_dim_names, z_dim, ranges)
+        } else {
+            ((0, 0), (0, 1))
+        };
+        let Some((_, staged)) = self.layer_selections(id) else {
+            return;
+        };
+        let is_vol_allowed =
+            crate::ui::variables_panel::is_volume_allowed(staged, layer.data.volume.as_ref());
+        let is_3d_type = matches!(staged.plot_type, PlotType::Volume | PlotType::PointCloud);
 
         if !is_vol_allowed
-            && (self.selected.plot_type == crate::plots::PlotType::Volume
-                || self.selected.plot_type == crate::plots::PlotType::PointCloud)
+            && is_3d_type
+            && let Some(staged) = self.staged_selection_mut(id)
         {
-            self.selected.plot_type = crate::plots::PlotType::Heatmap;
+            staged.plot_type = PlotType::Heatmap;
         }
 
-        let is_3d_plot = (self.selected.plot_type == crate::plots::PlotType::Volume
-            || self.selected.plot_type == crate::plots::PlotType::PointCloud)
-            && is_vol_allowed;
+        let is_3d_plot = is_3d_type && is_vol_allowed;
 
         let is_3d_anim = anim_dim.is_some_and(|a| a == x_dim || a == y_dim || a == z_dim);
         let axes = [(x_dim, req_x), (y_dim, req_y), (z_dim, req_z)];
@@ -120,6 +128,7 @@ impl OctantApp {
 
         if is_3d_plot {
             self.apply_3d_volume_projection(
+                id,
                 block,
                 x_dim,
                 y_dim,
@@ -137,6 +146,7 @@ impl OctantApp {
             );
         } else {
             self.apply_2d_projection(
+                id,
                 block,
                 x_dim,
                 y_dim,
@@ -149,12 +159,14 @@ impl OctantApp {
         }
     }
 
-    fn resolve_orig_dim_names(&self, block: &OctantBlock) -> Vec<String> {
-        self.effective_dataset_metadata()
-            .and_then(|meta| {
+    /// Layer `id`'s variable's dimension names, or the block's.
+    fn resolve_orig_dim_names(&self, id: LayerId, block: &OctantBlock) -> Vec<String> {
+        self.layer_selections(id)
+            .zip(self.layer_dataset_metadata(id))
+            .and_then(|((shown, staged), meta)| {
                 meta.variables
-                    .get(self.plotted().variable_idx)
-                    .or_else(|| meta.variables.get(self.selected.variable_idx))
+                    .get(shown.variable_idx)
+                    .or_else(|| meta.variables.get(staged.variable_idx))
             })
             .map(|v| v.dimension_names.clone())
             .unwrap_or_else(|| block.dimension_names.clone())
