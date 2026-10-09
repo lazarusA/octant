@@ -148,6 +148,7 @@ impl OctantApp {
             self.layers.base.composite.enabled = false;
         }
         self.reset_variable_bounds();
+        self.sync_overlays_to_base();
     }
 
     /// Returns VariableInfo for the currently plotted variable, if available.

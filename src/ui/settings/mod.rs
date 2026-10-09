@@ -2,6 +2,7 @@ mod clipping;
 mod coastline;
 pub(crate) mod composite;
 mod export;
+mod layers;
 mod opacity;
 #[cfg(test)]
 mod panel_tests;
@@ -104,6 +105,7 @@ fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
             ui.separator();
             opacity::show_transparency_settings(app, ui, &support);
         });
+    layers::show_layer_list(app, ui);
     if support.coastlines != Support::No {
         section(ui, "Overlays");
         coastline::show_coastline_controls(app, ui);

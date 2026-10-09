@@ -94,5 +94,6 @@ impl OctantApp {
                 .extend(coords.iter().map(|(k, v)| (k.clone(), v.clone())));
         }
         self.coordinates_revision = self.coordinates_revision.wrapping_add(1);
+        self.refresh_alignments();
     }
 }

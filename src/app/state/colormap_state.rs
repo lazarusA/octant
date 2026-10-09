@@ -1,6 +1,7 @@
 //! Colormap selection state and user-defined colormaps (the only persisted part).
 
 use super::app_state::OctantApp;
+use crate::app::layers::{ColorStyle, Layer, LayerId};
 use crate::utils::colormap::{ColormapEntry, CustomColormapSpec, registry};
 use serde::{Deserialize, Serialize};
 
@@ -13,10 +14,6 @@ const MAX_UNREADABLE_BACKUPS: usize = 8;
 /// Colormap state beyond the active id (which lives in the plotted layer's `ColorStyle::colormap`).
 #[derive(Default)]
 pub struct ColormapState {
-    /// Samples the active colormap from its end.
-    pub reversed: bool,
-    /// Uses the smooth twin of a short categorical palette (not persisted).
-    pub smooth: bool,
     /// User-defined colormaps, registered in `utils::colormap::registry`.
     pub custom: Vec<CustomColormapSpec>,
     /// Stored specs that no longer build (e.g. after a color parser change); not
@@ -25,12 +22,15 @@ pub struct ColormapState {
     /// Raw stored preferences that could not be parsed, backed up on save.
     pub unreadable_prefs: Option<String>,
     pub picker: crate::ui::colormap::PickerState,
+    /// The overlay the colormap picker edits; `None` for the base layer
+    /// (the toolbar's picker).
+    pub target: Option<crate::app::layers::LayerId>,
     /// Opacity curve editor (not persisted).
     pub alpha: super::alpha_state::AlphaCurveState,
 }
 
 /// Persisted colormap preferences (eframe storage). Only user-defined colormaps
-/// are kept; the active colormap and the reversed toggle reset on every launch.
+/// are kept; each layer's colormap and its reversed and smooth toggles reset on every launch.
 #[derive(Deserialize, Default)]
 #[serde(default)]
 struct ColormapPrefs {
@@ -95,30 +95,47 @@ impl OctantApp {
         eframe::set_value(storage, STORAGE_KEY, &prefs);
     }
 
-    /// Atlas row actually drawn: the previewed or active colormap, or its smooth
-    /// twin when "Smooth" is on and the palette has one.
+    /// Atlas row the base layer draws: the previewed or active colormap, or
+    /// its smooth twin when "Smooth" is on and the palette has one.
     pub fn effective_colormap(&self) -> u32 {
         self.layer_colormap(&self.layers.base)
     }
 
-    /// Atlas row `layer` draws; the picker previews on the base layer.
-    pub fn layer_colormap(&self, layer: &crate::app::layers::Layer) -> u32 {
+    /// Atlas row `layer` draws; the picker previews on the layer it edits.
+    pub fn layer_colormap(&self, layer: &Layer) -> u32 {
         let preview = self
             .preview_colormap
-            .filter(|_| layer.id() == crate::app::layers::LayerId::BASE);
-        self.shown_colormap(preview.unwrap_or(layer.color.colormap))
+            .filter(|_| layer.id() == self.picker_layer());
+        layer
+            .color
+            .shown_row(preview.unwrap_or(layer.color.colormap))
     }
 
-    /// Atlas row drawn for colormap `id`: its smooth twin when "Smooth" is on.
-    /// The toggle only shows (and so only applies) while the active map has a twin.
+    /// Atlas row drawn for colormap `id` with the picked layer's style.
     pub fn shown_colormap(&self, id: u32) -> u32 {
-        if self.colormaps.smooth
-            && registry::smooth_variant(self.layers.base.color.colormap).is_some()
-        {
-            registry::smooth_variant(id).unwrap_or(id)
-        } else {
-            id
-        }
+        self.picker_style().shown_row(id)
+    }
+
+    /// The layer the colormap picker edits: its target overlay while that
+    /// exists, else the base layer.
+    pub fn picker_layer(&self) -> LayerId {
+        self.colormaps
+            .target
+            .filter(|&id| self.layers.get(id).is_some())
+            .unwrap_or(LayerId::BASE)
+    }
+
+    /// The color style the colormap picker edits.
+    pub fn picker_style(&self) -> &ColorStyle {
+        self.layers
+            .get(self.picker_layer())
+            .map_or(&self.layers.base.color, |l| &l.color)
+    }
+
+    /// The color style the colormap picker edits, mutably.
+    pub fn picker_style_mut(&mut self) -> &mut ColorStyle {
+        let id = self.picker_layer();
+        &mut self.layers.get_or_base_mut(id).color
     }
 
     /// Whether a saved custom map (built or not) is named `name` (trimmed).
@@ -174,15 +191,20 @@ impl OctantApp {
         }
     }
 
-    /// Removes a custom colormap, keeping the active selection on the same map
-    /// (or the default when the active map itself was removed).
+    /// Removes a custom colormap, keeping every layer on the same map (or the
+    /// default when its map itself was removed).
     pub fn remove_custom_colormap(&mut self, key: &str) {
-        let active_key = registry::key_of(self.layers.base.color.colormap);
+        let active_keys: Vec<String> = self
+            .layers
+            .iter()
+            .map(|l| registry::key_of(l.color.colormap))
+            .collect();
         registry::remove_custom(key);
         self.colormaps.custom.retain(|s| !s.has_key(key));
         self.colormaps.unloaded.retain(|s| !s.has_key(key));
-        self.layers.base.color.colormap =
-            registry::find(&active_key).unwrap_or_else(registry::default_id);
+        for (layer, active_key) in self.layers.iter_mut().zip(&active_keys) {
+            layer.color.colormap = registry::find(active_key).unwrap_or_else(registry::default_id);
+        }
         self.preview_colormap = None;
         // Ids after the removed row shifted, so a remembered hover is stale.
         self.colormaps.picker.last_hovered = None;

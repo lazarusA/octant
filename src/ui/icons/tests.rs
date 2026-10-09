@@ -18,7 +18,7 @@ fn test_all_icons_unique_and_non_empty() {
             "Category for '{name}' cannot be empty"
         );
     }
-    assert_eq!(Icon::ALL.len(), 48, "Expected 48 total procedural icons");
+    assert_eq!(Icon::ALL.len(), 52, "Expected 52 total procedural icons");
 }
 
 #[test]

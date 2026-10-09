@@ -64,6 +64,8 @@ pub(super) fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool
             selected_idx: usize::MAX,
             search_active,
             newly_selected_idx: None,
+            can_overlay: false,
+            newly_overlaid_idx: None,
             search_id: search.id,
             search_jump: jump,
         };

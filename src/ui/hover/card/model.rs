@@ -48,6 +48,8 @@ pub struct HoverCard<'a> {
     pub value: HoverValue,
     pub units: &'a str,
     pub swatch: Color32,
+    /// Each drawn overlay's reading at the same cell, topmost first.
+    pub layers: &'a [super::LayerValue<'a>],
     pub fields: &'a [HoverField],
 }
 

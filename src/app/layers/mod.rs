@@ -2,6 +2,9 @@
 //! its data, renderers, style and pending request, held in a `LayerStack` whose base layer is the
 //! plot shown on the canvas.
 
+mod alignment;
+#[cfg(test)]
+mod alignment_tests;
 mod data;
 mod id;
 mod layer;
@@ -16,6 +19,7 @@ mod style;
 #[cfg(test)]
 mod style_tests;
 
+pub use alignment::{Alignment, classify, overlay_selection};
 pub use data::LayerData;
 pub use id::LayerId;
 pub use layer::Layer;

@@ -30,6 +30,32 @@ impl LayerStack {
         id
     }
 
+    /// Removes overlay `id` (the base layer stays); whether it existed.
+    pub fn remove(&mut self, id: LayerId) -> bool {
+        let before = self.overlays.len();
+        self.overlays.retain(|layer| layer.id() != id);
+        self.overlays.len() != before
+    }
+
+    /// Moves overlay `id` one place up (drawn later, on top) or down (drawn
+    /// earlier); the base layer always draws first. Whether it moved.
+    pub fn move_overlay(&mut self, id: LayerId, up: bool) -> bool {
+        let Some(i) = self.overlays.iter().position(|l| l.id() == id) else {
+            return false;
+        };
+        let j = if up { i + 1 } else { i.wrapping_sub(1) };
+        if j >= self.overlays.len() {
+            return false;
+        }
+        self.overlays.swap(i, j);
+        true
+    }
+
+    /// The overlays in drawing order.
+    pub fn overlays(&self) -> &[Layer] {
+        &self.overlays
+    }
+
     /// Every layer in drawing order.
     pub fn iter(&self) -> impl Iterator<Item = &Layer> {
         std::iter::once(&self.base).chain(&self.overlays)
@@ -53,6 +79,14 @@ impl LayerStack {
     /// The layer `id`, while it exists.
     pub fn get(&self, id: LayerId) -> Option<&Layer> {
         self.iter().find(|layer| layer.id() == id)
+    }
+
+    /// Overlay `id` mutably, or the base layer when there is no such overlay.
+    pub fn get_or_base_mut(&mut self, id: LayerId) -> &mut Layer {
+        match self.overlays.iter_mut().find(|layer| layer.id() == id) {
+            Some(layer) => layer,
+            None => &mut self.base,
+        }
     }
 
     /// The layer `id`, mutably, while it exists.

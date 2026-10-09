@@ -1,8 +1,9 @@
 //! Review sheet: `cargo test --lib hover_card_contact_sheet -- --ignored` writes
 //! `target/icon_sheets/hover_card.png` (dark theme top, light theme bottom). Each theme
 //! is four 380x300 pt canvases whose hover points send the card to a different corner,
-//! with scalar, no-data, and band-composite values.
+//! with scalar (one with overlay rows), no-data, and band-composite values.
 
+use super::LayerValue;
 use super::model::{HoverCard, HoverValue};
 use super::tests::sample_fields;
 use super::{Anchoring, show_card};
@@ -35,8 +36,36 @@ fn card<'a>(
         value,
         units,
         swatch: Color32::from_rgb(230, 120, 60),
+        layers: &[],
         fields,
     }
+}
+
+/// One row per channel of a false-color composite.
+fn band_fields() -> [HoverField; 3] {
+    [
+        HoverField::new("R", "NIR 0.312"),
+        HoverField::new("G", "Red 0.041"),
+        HoverField::new("B", "Green 0.063"),
+    ]
+}
+
+/// Two overlay readings under the headline: a value and no data.
+fn overlay_rows() -> [LayerValue<'static>; 2] {
+    [
+        LayerValue {
+            name: "sst",
+            value: HoverValue::Scalar(285.1),
+            units: "K",
+            swatch: Color32::from_rgb(60, 140, 220),
+        },
+        LayerValue {
+            name: "precipitation_amount",
+            value: HoverValue::NoData,
+            units: "kg m-2",
+            swatch: Color32::TRANSPARENT,
+        },
+    ]
 }
 
 #[test]
@@ -55,18 +84,19 @@ fn hover_card_contact_sheet() {
                 "K",
                 &fields[..],
             );
+            let overlays = overlay_rows();
+            let layered = HoverCard {
+                layers: &overlays,
+                ..t2m
+            };
             let nan = card(HoverValue::NoData, "sst", "K", &fields[1..]);
-            let bands = [
-                HoverField::new("R", "NIR 0.312"),
-                HoverField::new("G", "Red 0.041"),
-                HoverField::new("B", "Green 0.063"),
-            ];
+            let bands = band_fields();
             let false_color = HoverValue::Composite(CompositeKind::FalseColor);
             let rgb = card(false_color, "Multi-band raster", "", &bands);
             // (quadrant origin, hover point within it, card)
             let scenes: [(Pos2, Pos2, &HoverCard); 4] = [
                 (pos2(0.0, 0.0), pos2(40.0, 40.0), &t2m),
-                (pos2(QUADRANT.x, 0.0), pos2(340.0, 260.0), &t2m),
+                (pos2(QUADRANT.x, 0.0), pos2(340.0, 260.0), &layered),
                 (pos2(0.0, QUADRANT.y), pos2(330.0, 50.0), &nan),
                 (pos2(QUADRANT.x, QUADRANT.y), pos2(60.0, 250.0), &rgb),
             ];

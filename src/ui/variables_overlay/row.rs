@@ -71,6 +71,7 @@ struct RowColors {
 }
 
 /// Paint a row allocated by [`allocate_row`] and describe it for accessibility.
+/// Labels end `trailing` points before the right edge (room for a button).
 pub fn paint_row(
     ui: &Ui,
     resp: &Response,
@@ -78,6 +79,7 @@ pub fn paint_row(
     label: &str,
     detail: &str,
     selected: bool,
+    trailing: f32,
 ) {
     // Built lazily: egui only calls this when accessibility output is wanted,
     // so idle frames don't allocate the label.
@@ -95,7 +97,9 @@ pub fn paint_row(
     }
     let colors = paint_background(ui, resp, selected);
     let x = paint_icons(ui, resp.rect, kind, colors);
-    paint_labels(ui, resp.rect, x, label, detail, colors);
+    let mut labels = resp.rect;
+    labels.max.x -= trailing;
+    paint_labels(ui, labels, x, label, detail, colors);
 }
 
 /// Selection fill, or hover/focus fill, plus the focus ring; returns the

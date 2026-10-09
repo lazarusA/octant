@@ -39,8 +39,12 @@ pub(super) fn show_list(
         }
         return;
     }
-    if let Some(idx) = show_tree(ui, app, search_id, jump) {
-        apply_selection(app, idx);
+    match show_tree(ui, app, search_id, jump) {
+        Some(RowPick::Select(idx)) => apply_selection(app, idx),
+        Some(RowPick::Overlay(idx)) => {
+            app.add_overlay(idx);
+        }
+        None => {}
     }
 }
 
@@ -66,13 +70,20 @@ fn empty_state(ui: &mut egui::Ui, message: &str, action: &str) -> bool {
     .inner
 }
 
+/// A variable picked in the tree this frame.
+enum RowPick {
+    Select(usize),
+    Overlay(usize),
+}
+
 /// Draw the tree, or the search's no-match note; returns a newly picked variable.
 fn show_tree(
     ui: &mut egui::Ui,
     app: &mut OctantApp,
     search_id: egui::Id,
     jump: Option<SearchJump>,
-) -> Option<usize> {
+) -> Option<RowPick> {
+    let can_overlay = app.overlay_unavailable().is_none();
     let metadata = app.selected.metadata.as_ref()?;
     let tree = app
         .cached_variable_tree
@@ -95,11 +106,7 @@ fn show_tree(
     };
 
     let Some(root) = root else {
-        ui.vertical_centered(|ui| {
-            ui.add_space(10.0);
-            ui.label(egui::RichText::new(format!("No variables matching '{query}'")).italics());
-            ui.add_space(10.0);
-        });
+        no_match(ui, query);
         return None;
     };
 
@@ -108,11 +115,25 @@ fn show_tree(
         selected_idx: app.selected.variable_idx,
         search_active,
         newly_selected_idx: None,
+        can_overlay,
+        newly_overlaid_idx: None,
         search_id,
         search_jump: jump,
     };
     render_tree_group(ui, root, &mut tree_ctx);
-    tree_ctx.newly_selected_idx
+    tree_ctx
+        .newly_overlaid_idx
+        .map(RowPick::Overlay)
+        .or(tree_ctx.newly_selected_idx.map(RowPick::Select))
+}
+
+/// The search's no-match note.
+fn no_match(ui: &mut egui::Ui, query: &str) {
+    ui.vertical_centered(|ui| {
+        ui.add_space(10.0);
+        ui.label(egui::RichText::new(format!("No variables matching '{query}'")).italics());
+        ui.add_space(10.0);
+    });
 }
 
 /// Select variable `idx`: reset its colorbar label and dimension defaults, open its

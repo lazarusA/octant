@@ -28,20 +28,9 @@ impl OctantApp {
         }
     }
 
-    /// Alpha of colormapped values at data position `t` (global opacity times
-    /// the curve), as the plots draw it.
-    pub fn color_alpha_at(&self, t: f32) -> f32 {
-        let curve = if registry::alpha_row().is_some() {
-            registry::curve_alpha(t)
-        } else {
-            1.0
-        };
-        self.layers.base.color.opacity.clamp(0.0, 1.0) * curve
-    }
-
-    /// Whether colormapped values may be drawn translucent.
+    /// Whether the base layer's colormapped values may be drawn translucent.
     pub fn has_color_alpha(&self) -> bool {
-        layer_has_color_alpha(&self.layers.base)
+        self.layers.base.color.is_translucent()
     }
 
     /// Frees the OIT frames of the 3D renderers not drawn as `active`, whose
@@ -57,7 +46,7 @@ impl OctantApp {
     /// writes; opaque colors (including RGB composites, which ignore opacity)
     /// keep depth writes, so near parts hide far ones.
     pub fn transparency_mode(&self, layer: &Layer) -> Transparency {
-        if !self.plot_transparency || layer.composite.enabled || !layer_has_color_alpha(layer) {
+        if !self.plot_transparency || layer.composite.enabled || !layer.color.is_translucent() {
             Transparency::Off
         } else if self
             .wgpu_render_state
@@ -69,9 +58,4 @@ impl OctantApp {
             Transparency::NoDepthWrite
         }
     }
-}
-
-/// Whether `layer`'s colormapped values may be drawn translucent.
-fn layer_has_color_alpha(layer: &Layer) -> bool {
-    layer.color.opacity < 1.0 || registry::alpha_row().is_some()
 }

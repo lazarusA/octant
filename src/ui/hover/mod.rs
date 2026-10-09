@@ -12,6 +12,7 @@ pub mod entries_3d;
 pub mod field;
 pub mod format;
 pub mod hit;
+pub mod overlays;
 pub mod raycast_sphere;
 pub mod raycast_surface;
 pub mod raycast_volume;
@@ -41,10 +42,11 @@ mod flip_tests;
 mod tests;
 
 use crate::app::OctantApp;
+use crate::app::overlays::MAX_OVERLAYS;
 use crate::data::{DatasetMetadata, MatrixData, VariableInfo};
 use crate::plots::PlotType;
 use crate::utils::colormap::evaluate_color_cpu;
-use card::{Anchoring, HoverCard, HoverValue};
+use card::{Anchoring, HoverCard, HoverValue, LayerValue};
 use egui::{Color32, Pos2, Rect};
 use entries::{resolve_cell_value_and_dim_entries, resolve_variable_units};
 
@@ -126,6 +128,7 @@ pub fn show_hover_tooltip(
         var_name,
         var,
         units_str,
+        pixel,
         &dim_entries,
     );
 }
@@ -211,8 +214,18 @@ fn paint_hover_card(
     var_name: &str,
     var: Option<&VariableInfo>,
     units: &str,
+    pixel: Option<(usize, usize)>,
     fields: &[HoverField],
 ) {
+    // Overlays share the heatmap's grid, so the hovered cell reads them too.
+    let mut layers = [LayerValue::EMPTY; MAX_OVERLAYS];
+    let count = match pixel {
+        Some(cell) if canvas_plot_type == PlotType::Heatmap => {
+            overlays::overlay_values(app, cell, &mut layers)
+        }
+        _ => 0,
+    };
+    let layers = layers.get(..count).unwrap_or_default();
     let title = HoverCard::title_for(var_name, var.and_then(|v| v.long_name.as_deref()));
     let swatch = resolve_hover_color(app, canvas_plot_type, raw_val);
     let anchoring = if canvas_plot_type == PlotType::Line {
@@ -231,6 +244,7 @@ fn paint_hover_card(
             value,
             units,
             swatch,
+            layers,
             fields,
         },
     );

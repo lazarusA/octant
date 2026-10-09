@@ -9,6 +9,10 @@ use crate::utils::colormap::{COLORMAP_RGB_COMPOSITE, NO_ALPHA_ROW, registry};
 pub struct ColorStyle {
     /// Row id in `utils::colormap::registry` (and the GPU colormap atlas).
     pub colormap: u32,
+    /// Samples the colormap from its end.
+    pub reversed: bool,
+    /// Draws the smooth twin of a short categorical palette.
+    pub smooth: bool,
     pub range_min: f32,
     pub range_max: f32,
     /// Keeps the range while new data arrives.
@@ -37,6 +41,8 @@ impl Default for ColorStyle {
         let shader = PlotColorParams::default();
         Self {
             colormap: registry::default_id(),
+            reversed: false,
+            smooth: false,
             range_min: shader.cmin,
             range_max: shader.cmax,
             lock_bounds: false,
@@ -98,13 +104,39 @@ impl ColorStyle {
         }
     }
 
+    /// Alpha of colormapped values at data position `t`: the opacity times
+    /// the opacity curve, as the plots draw it.
+    pub fn alpha_at(&self, t: f32) -> f32 {
+        let curve = if registry::alpha_row().is_some() {
+            registry::curve_alpha(t)
+        } else {
+            1.0
+        };
+        self.opacity.clamp(0.0, 1.0) * curve
+    }
+
+    /// Whether colormapped values may be drawn translucent.
+    pub fn is_translucent(&self) -> bool {
+        self.opacity < 1.0 || registry::alpha_row().is_some()
+    }
+
+    /// The colormap row drawn for colormap `id` with this style: its smooth
+    /// twin when `smooth` is on and the style's own colormap has one (the
+    /// toggle only shows, so only applies, then).
+    pub fn shown_row(&self, id: u32) -> u32 {
+        if self.smooth && registry::smooth_variant(self.colormap).is_some() {
+            registry::smooth_variant(id).unwrap_or(id)
+        } else {
+            id
+        }
+    }
+
     /// The shader color uniforms drawing atlas row `shown` (the colormap after
-    /// preview and smoothing), `reversed`, as an RGB composite when `composite`;
-    /// `matrix` counts categories for categorical colors.
+    /// preview and smoothing), as an RGB composite when `composite`; `matrix`
+    /// counts categories for categorical colors.
     pub fn params(
         &self,
         shown: u32,
-        reversed: bool,
         composite: bool,
         matrix: Option<&MatrixData>,
     ) -> PlotColorParams {
@@ -131,7 +163,7 @@ impl ColorStyle {
             scale_param: self.scale_param,
             is_categorical: u32::from(self.categorical),
             num_categories: if self.categorical { num_categories } else { 10 },
-            reverse: u32::from(reversed),
+            reverse: u32::from(self.reversed),
             nearest: u32::from(registry::is_stepped(row)),
             fallback_colormap: row,
             opacity: self.opacity.clamp(0.0, 1.0),

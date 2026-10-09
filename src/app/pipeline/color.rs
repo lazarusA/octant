@@ -14,7 +14,6 @@ impl OctantApp {
     pub fn get_color_params(&self, layer: &Layer) -> PlotColorParams {
         layer.color.params(
             self.layer_colormap(layer),
-            self.colormaps.reversed,
             layer.composite.enabled,
             layer.data.matrix.as_ref(),
         )

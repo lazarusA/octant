@@ -1,7 +1,7 @@
 //! One plotted layer: its source, data, renderers and style.
 
 use super::{
-    ColorStyle, CompositeStyle, LayerData, LayerId, LayerRenderers, LoadState, Source,
+    Alignment, ColorStyle, CompositeStyle, LayerData, LayerId, LayerRenderers, LoadState, Source,
     VariableSelection,
 };
 use crate::plots::VolumeEncoding;
@@ -15,6 +15,10 @@ pub struct Layer {
     pub color: ColorStyle,
     pub composite: CompositeStyle,
     pub load: LoadState,
+    /// Drawn on the canvas (the layer list's eye toggle).
+    pub visible: bool,
+    /// How the layer lines up with the base layer; the base is `SameGrid`.
+    pub alignment: Alignment,
 }
 
 impl Layer {
@@ -28,11 +32,19 @@ impl Layer {
             color: ColorStyle::default(),
             composite: CompositeStyle::default(),
             load: LoadState::default(),
+            visible: true,
+            alignment: Alignment::SameGrid,
         }
     }
 
     pub fn id(&self) -> LayerId {
         self.id
+    }
+
+    /// Whether the layer draws on the canvas: visible, and lined up with the
+    /// base layer.
+    pub fn is_drawn(&self) -> bool {
+        self.visible && self.alignment.is_drawn()
     }
 
     pub fn selection(&self) -> &VariableSelection {

@@ -13,6 +13,7 @@ pub mod swatch;
 mod tests;
 
 use crate::app::OctantApp;
+use crate::app::layers::LayerId;
 use crate::ui::icons::{Icon, ToolbarButton, UiIconExt};
 use crate::utils::colormap::registry;
 
@@ -35,6 +36,7 @@ const POPUP_WIDTH: f32 = 300.0;
 const POPUP_MARGIN: f32 = 16.0;
 const MIN_POPUP_HEIGHT: f32 = 160.0;
 const ACTIVE_SWATCH_WIDTH: f32 = 120.0;
+const LAYER_SWATCH_WIDTH: f32 = 72.0;
 
 pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
     let button_response = ui.add(
@@ -42,6 +44,10 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool)
             .compact(compact)
             .owns_popup(),
     );
+    if button_response.clicked() {
+        // The toolbar's picker edits the base layer.
+        app.colormaps.target = None;
+    }
     // Pinned below the button: egui otherwise re-picks the side every frame from
     // the content size, so expanding the editor would jump the panel right or up.
     // The height is capped to the space below the button and scrolls instead.
@@ -49,6 +55,41 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool)
     let max_height =
         (viewport.max.y - button_response.rect.max.y - POPUP_MARGIN).max(MIN_POPUP_HEIGHT);
     egui::Popup::from_toggle_button_response(&button_response)
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+        .align(egui::RectAlign::BOTTOM_START)
+        .align_alternatives(&[])
+        .show(|ui| {
+            panel_scroll_area(max_height)
+                .show(ui, |ui| render_colormap_contents(app, ui, max_height));
+        });
+}
+
+/// Swatch button showing layer `id`'s colormap; it opens the picker on that
+/// layer (`ColormapState::target`).
+pub fn show_layer_colormap_button(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
+    let Some(style) = app.layers.get(id).map(|l| &l.color) else {
+        return;
+    };
+    let (shown, reversed) = (style.shown_row(style.colormap), style.reversed);
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(LAYER_SWATCH_WIDTH, 14.0), egui::Sense::click());
+    app.colormaps.picker.swatches.ensure(ui.ctx());
+    app.colormaps
+        .picker
+        .swatches
+        .paint(ui, rect, shown, reversed);
+    if response.hovered() {
+        let stroke = ui.visuals().widgets.hovered.fg_stroke;
+        ui.painter()
+            .rect_stroke(rect, 2.0, stroke, egui::StrokeKind::Outside);
+    }
+    let response = response.on_hover_text("Colormap");
+    if response.clicked() {
+        app.colormaps.target = Some(id);
+    }
+    let viewport = ui.ctx().input(|i| i.viewport_rect());
+    let max_height = (viewport.max.y - response.rect.max.y - POPUP_MARGIN).max(MIN_POPUP_HEIGHT);
+    egui::Popup::from_toggle_button_response(&response)
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
         .align(egui::RectAlign::BOTTOM_START)
         .align_alternatives(&[])
@@ -81,8 +122,8 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
     app.colormaps.picker.swatches.ensure(ui.ctx());
 
     show_active_row(app, ui);
-    if registry::smooth_variant(app.layers.base.color.colormap).is_some() {
-        ui.checkbox(&mut app.colormaps.smooth, "Smooth")
+    if registry::smooth_variant(app.picker_style().colormap).is_some() {
+        ui.checkbox(&mut app.picker_style_mut().smooth, "Smooth")
             .on_hover_text("Blend this palette's colors into a continuous gradient (Oklab)");
     }
     ui.separator();
@@ -117,7 +158,8 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
 
 /// Active colormap swatch, its (elided) name and the reverse toggle.
 fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let id = app.layers.base.color.colormap;
+    let id = app.picker_style().colormap;
+    let reversed = app.picker_style().reversed;
     ui.horizontal(|ui| {
         let (rect, swatch_response) =
             ui.allocate_exact_size(egui::vec2(ACTIVE_SWATCH_WIDTH, 14.0), egui::Sense::hover());
@@ -125,9 +167,9 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
         app.colormaps
             .picker
             .swatches
-            .paint(ui, rect, shown, app.colormaps.reversed);
+            .paint(ui, rect, shown, reversed);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.checkbox(&mut app.colormaps.reversed, "Reversed");
+            ui.checkbox(&mut app.picker_style_mut().reversed, "Reversed");
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 let font_size = egui::TextStyle::Body.resolve(ui.style()).size;
                 let max_width = ui.available_width();
@@ -158,12 +200,15 @@ fn show_colorbar_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 }
 
-/// Makes `id` the active colormap, leaving RGB composite mode if needed.
+/// Makes `id` the picked layer's colormap, leaving RGB composite mode if needed.
 pub fn select_colormap(app: &mut OctantApp, id: u32) {
-    if app.layers.base.composite.enabled {
-        app.layers.base.composite.enabled = false;
-        app.load_selected_variable_block();
+    let layer = app.picker_layer();
+    if let Some(l) = app.layers.get_mut(layer)
+        && l.composite.enabled
+    {
+        l.composite.enabled = false;
+        app.load_layer_block(layer);
     }
-    app.layers.base.color.colormap = id;
+    app.picker_style_mut().colormap = id;
     app.preview_colormap = None;
 }
