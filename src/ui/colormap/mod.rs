@@ -36,7 +36,6 @@ const POPUP_WIDTH: f32 = 300.0;
 const POPUP_MARGIN: f32 = 16.0;
 const MIN_POPUP_HEIGHT: f32 = 160.0;
 const ACTIVE_SWATCH_WIDTH: f32 = 120.0;
-const LAYER_SWATCH_WIDTH: f32 = 72.0;
 
 pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
     let button_response = ui.add(
@@ -64,15 +63,15 @@ pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool)
         });
 }
 
-/// Swatch button showing layer `id`'s colormap; it opens the picker on that
-/// layer (`ColormapState::target`).
+/// Swatch button showing layer `id`'s colormap across the available width;
+/// it opens the picker on that layer (`ColormapState::target`).
 pub fn show_layer_colormap_button(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     let Some(style) = app.layers.get(id).map(|l| &l.color) else {
         return;
     };
     let (shown, reversed) = (style.shown_row(style.colormap), style.reversed);
     let (rect, response) =
-        ui.allocate_exact_size(egui::vec2(LAYER_SWATCH_WIDTH, 14.0), egui::Sense::click());
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), 14.0), egui::Sense::click());
     app.colormaps.picker.swatches.ensure(ui.ctx());
     app.colormaps
         .picker
