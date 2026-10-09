@@ -166,7 +166,7 @@ impl ColorStyle {
             .filter(|&id| registry::is_row(id))
             .unwrap_or_else(registry::default_id);
         let num_categories = matrix
-            .and_then(MatrixData::detect_unique_values)
+            .and_then(MatrixData::unique_values)
             .map_or(10, |unique| unique.len() as u32);
         PlotColorParams {
             colormap: if composite {

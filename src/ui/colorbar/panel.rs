@@ -190,11 +190,7 @@ fn paint_bar(
         colormap: app.layer_colormap(layer),
     };
     if !is_3d && style.categorical {
-        let unique = layer
-            .data
-            .matrix
-            .as_ref()
-            .and_then(|m| m.detect_unique_values());
+        let unique = layer.data.matrix.as_ref().and_then(|m| m.unique_values());
         bars::draw_categorical(ui, axis, &bar, unique, colors);
     } else {
         bars::draw_continuous(ui, axis, &bar, colors);

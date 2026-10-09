@@ -147,8 +147,10 @@ impl MatrixData {
         }
     }
 
-    /// Returns pre-cached unique values in O(1) constant time per frame without allocations.
-    pub fn detect_unique_values(&self) -> Option<&[f32]> {
+    /// The categories found by `compute_unique_values` when the matrix was
+    /// built. A plain field read, so per-frame code (colorbars, color
+    /// params) may call it every frame: nothing is scanned or allocated.
+    pub fn unique_values(&self) -> Option<&[f32]> {
         self.unique_values.as_deref()
     }
 
