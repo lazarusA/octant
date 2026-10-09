@@ -190,3 +190,22 @@ fn camera_controls_are_for_3d_plots() {
         );
     }
 }
+
+#[test]
+fn an_overlay_menu_follows_its_own_heatmap_layer() {
+    let mut app = crate::app::OctantApp::default();
+    app.selected.plot_type = PlotType::Volume;
+    let id = app.layers.push(crate::app::layers::Source::default());
+    let overlay = PlotState::of_layer(&app, id);
+    assert_eq!(overlay.plot_type, PlotType::Heatmap);
+    assert!(!overlay.translucent);
+    if let Some(layer) = app.layers.get_mut(id) {
+        layer.color.opacity = 0.5;
+    }
+    assert!(PlotState::of_layer(&app, id).translucent);
+    assert!(!PlotState::of_layer(&app, crate::app::layers::LayerId::BASE).translucent);
+    assert_eq!(
+        PlotState::of_layer(&app, crate::app::layers::LayerId::BASE).plot_type,
+        PlotType::Volume
+    );
+}

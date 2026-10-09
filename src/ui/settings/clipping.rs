@@ -2,35 +2,47 @@ use super::gated;
 use super::scale::show_scale_type_controls;
 use super::support::OptionSupport;
 use crate::app::OctantApp;
+use crate::app::layers::{ColorStyle, LayerId};
+use crate::ui::color_picker::{ColorShape, ShapeColorPicker};
 use crate::ui::icons::{Icon, UiIconExt};
 
-/// Colorbar label, color range, scale and the NaN and clip colors, as far as
-/// the plot honors them.
-pub(crate) fn show_color_settings(app: &mut OctantApp, ui: &mut egui::Ui, support: &OptionSupport) {
-    show_colorbar_label_controls(app, ui);
+/// Layer `id`'s colorbar label, color range, scale and the NaN and clip
+/// colors, as far as its plot honors them.
+pub(crate) fn show_color_settings(
+    app: &mut OctantApp,
+    ui: &mut egui::Ui,
+    id: LayerId,
+    support: &OptionSupport,
+) {
+    show_colorbar_label_controls(app, ui, id);
     ui.add_space(4.0);
     // An overridden range overrides the whole mapping: one note says why.
     let mapped = support.color_mapping.is_yes();
     gated(ui, support.color_range, |ui| {
-        show_color_range_controls(app, ui, mapped);
+        show_color_range_controls(app, ui, id, mapped);
         ui.add_space(4.0);
         gated(ui, support.color_mapping, |ui| {
-            show_scale_type_controls(app, ui)
+            show_scale_type_controls(ui, &mut app.layers.get_or_base_mut(id).color, id)
         });
     });
     ui.add_space(4.0);
-    gated(ui, support.nan_color, |ui| show_nan_color_picker(app, ui));
+    let color = &mut app.layers.get_or_base_mut(id).color;
+    gated(ui, support.nan_color, |ui| {
+        show_nan_color_picker(ui, color, id)
+    });
     if mapped {
-        show_clip_color_pickers(app, ui);
+        show_clip_color_pickers(ui, color, id);
     }
 }
 
-fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
+fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     ui.label(egui::RichText::new("Colorbar Label").strong());
-    let default_label = app.default_colorbar_label();
-    let mut label_buf = app.colorbar_label();
-    let has_custom_label = app.layers.base.color.custom_label.is_some();
-
+    let Some(layer) = app.layers.get(id) else {
+        return;
+    };
+    let default_label = layer.default_colorbar_label();
+    let mut label_buf = layer.colorbar_label();
+    let color = &mut app.layers.get_or_base_mut(id).color;
     ui.horizontal(|ui| {
         let resp = ui.add(
             egui::TextEdit::singleline(&mut label_buf)
@@ -38,76 +50,39 @@ fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .desired_width(170.0),
         );
         if resp.changed() {
-            if label_buf.trim().is_empty() || label_buf == default_label {
-                app.layers.base.color.custom_label = None;
-            } else {
-                app.layers.base.color.custom_label = Some(label_buf);
-            }
+            let custom = !label_buf.trim().is_empty() && label_buf != default_label;
+            color.custom_label = custom.then_some(label_buf);
         }
-
-        if has_custom_label
+        if color.custom_label.is_some()
             && ui
                 .icon_button(Icon::Reset, "")
                 .on_hover_text("Reset colorbar label to default")
                 .clicked()
         {
-            app.reset_colorbar_label();
+            color.custom_label = None;
         }
     });
 }
 
 /// Min and max inputs with lock and reset; the Categorical toggle when the
 /// colormap is `mapped`.
-fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui, mapped: bool) {
-    let range_speed = ((app.layers.base.color.range_max - app.layers.base.color.range_min).abs()
-        / 100.0)
-        .max(1e-4);
-
+fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId, mapped: bool) {
+    let color = &mut app.layers.get_or_base_mut(id).color;
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Color Range").strong());
         if !mapped {
             return;
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.toggle_value(&mut app.layers.base.color.categorical, "Categorical")
+            ui.toggle_value(&mut color.categorical, "Categorical")
                 .on_hover_text("Discrete colorbar (auto-detects unique values or 10 equal bins).");
         });
     });
-
     ui.add_space(2.0);
-
+    let mut reset_range = false;
     ui.horizontal(|ui| {
-        ui.label("Min:");
-        if ui
-            .add(
-                egui::DragValue::new(&mut app.layers.base.color.range_min)
-                    .speed(range_speed)
-                    .custom_formatter(|val, _| {
-                        crate::ui::colorbar::format_scientific_tick(val as f32)
-                    })
-                    .custom_parser(|s| s.trim().parse::<f64>().ok()),
-            )
-            .changed()
-        {
-            app.layers.base.color.lock_bounds = true;
-        }
-
-        ui.label("Max:");
-        if ui
-            .add(
-                egui::DragValue::new(&mut app.layers.base.color.range_max)
-                    .speed(range_speed)
-                    .custom_formatter(|val, _| {
-                        crate::ui::colorbar::format_scientific_tick(val as f32)
-                    })
-                    .custom_parser(|s| s.trim().parse::<f64>().ok()),
-            )
-            .changed()
-        {
-            app.layers.base.color.lock_bounds = true;
-        }
-
-        let lock_icon = if app.layers.base.color.lock_bounds {
+        range_inputs(ui, color);
+        let lock_icon = if color.lock_bounds {
             Icon::Lock
         } else {
             Icon::Unlock
@@ -117,85 +92,99 @@ fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui, mapped: boo
             .on_hover_text("Lock min/max so color mapping stays fixed across timesteps.")
             .clicked()
         {
-            app.layers.base.color.lock_bounds = !app.layers.base.color.lock_bounds;
+            color.lock_bounds = !color.lock_bounds;
         }
-
-        if ui
+        reset_range = ui
             .icon_button(Icon::Reset, "")
             .on_hover_text("Reset bounds to current slice/dataset min and max defaults")
-            .clicked()
-        {
-            app.reset_color_range();
-        }
+            .clicked();
     });
-
-    if (app.layers.base.color.custom_label.is_some() || app.layers.base.color.lock_bounds)
+    if (color.custom_label.is_some() || color.lock_bounds)
         && ui
             .icon_button(Icon::Reset, "Reset All Colorbar Defaults")
             .on_hover_text("Reset both colorbar label and range to default values")
             .clicked()
     {
-        app.reset_colorbar_label();
-        app.reset_color_range();
+        color.custom_label = None;
+        reset_range = true;
+    }
+    if reset_range {
+        app.reset_layer_color_range(id);
     }
 }
 
-fn show_nan_color_picker(app: &mut OctantApp, ui: &mut egui::Ui) {
+/// The Min and Max inputs; editing either locks the range.
+fn range_inputs(ui: &mut egui::Ui, color: &mut ColorStyle) {
+    let speed = ((color.range_max - color.range_min).abs() / 100.0).max(1e-4);
+    for (label, value) in [
+        ("Min:", &mut color.range_min),
+        ("Max:", &mut color.range_max),
+    ] {
+        ui.label(label);
+        let input = egui::DragValue::new(value)
+            .speed(speed)
+            .custom_formatter(|val, _| crate::ui::colorbar::format_scientific_tick(val as f32))
+            .custom_parser(|s| s.trim().parse::<f64>().ok());
+        if ui.add(input).changed() {
+            color.lock_bounds = true;
+        }
+    }
+}
+
+fn show_nan_color_picker(ui: &mut egui::Ui, color: &mut ColorStyle, id: LayerId) {
     ui.horizontal(|ui| {
-        ui.checkbox(&mut app.layers.base.color.use_nan_color, "NaN Color")
+        ui.checkbox(&mut color.use_nan_color, "NaN Color")
             .on_hover_text("If unchecked, NaN/Inf values render transparently.");
-        if app.layers.base.color.use_nan_color {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                crate::ui::color_picker::ShapeColorPicker::new(
-                    "settings_nan_color_picker",
-                    &mut app.layers.base.color.nan_color,
-                    crate::ui::color_picker::ColorShape::Rect(3.0),
-                )
-                .size(egui::vec2(18.0, 16.0))
-                .tooltip("NaN color. Click to select color.")
-                .anchor_offset(egui::vec2(-240.0, -100.0))
-                .show(ui);
-            });
+        if color.use_nan_color {
+            let picker = ShapeColorPicker::new(
+                ("settings_nan_color_picker", id),
+                &mut color.nan_color,
+                ColorShape::Rect(3.0),
+            );
+            show_picker(ui, picker, "NaN color. Click to select color.");
         }
     });
 }
 
-fn show_clip_color_pickers(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        ui.checkbox(&mut app.layers.base.color.use_lowclip, "Low Clip")
-            .on_hover_text("Values < cmin clipped to this color.");
-        if app.layers.base.color.use_lowclip {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                crate::ui::color_picker::ShapeColorPicker::new(
-                    "settings_lowclip_color_picker",
-                    &mut app.layers.base.color.lowclip_color,
-                    crate::ui::color_picker::ColorShape::LeftTriangle,
-                )
-                .size(egui::vec2(18.0, 16.0))
-                .tooltip("Low Clip color (< Min). Click to select color.")
-                .anchor_offset(egui::vec2(-240.0, -100.0))
-                .show(ui);
-            });
-        }
-    });
+fn show_clip_color_pickers(ui: &mut egui::Ui, color: &mut ColorStyle, id: LayerId) {
+    let clips = [
+        (
+            "Low Clip",
+            "Values < cmin clipped to this color.",
+            &mut color.use_lowclip,
+            &mut color.lowclip_color,
+            ColorShape::LeftTriangle,
+            "Low Clip color (< Min). Click to select color.",
+        ),
+        (
+            "High Clip",
+            "Values > cmax clipped to this color.",
+            &mut color.use_highclip,
+            &mut color.highclip_color,
+            ColorShape::RightTriangle,
+            "High Clip color (> Max). Click to select color.",
+        ),
+    ];
+    for (label, hover, enabled, rgba, shape, tooltip) in clips {
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.checkbox(enabled, label).on_hover_text(hover);
+            if *enabled {
+                let picker =
+                    ShapeColorPicker::new(("settings_clip_picker", label, id), rgba, shape);
+                show_picker(ui, picker, tooltip);
+            }
+        });
+    }
+}
 
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        ui.checkbox(&mut app.layers.base.color.use_highclip, "High Clip")
-            .on_hover_text("Values > cmax clipped to this color.");
-        if app.layers.base.color.use_highclip {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                crate::ui::color_picker::ShapeColorPicker::new(
-                    "settings_highclip_color_picker",
-                    &mut app.layers.base.color.highclip_color,
-                    crate::ui::color_picker::ColorShape::RightTriangle,
-                )
-                .size(egui::vec2(18.0, 16.0))
-                .tooltip("High Clip color (> Max). Click to select color.")
-                .anchor_offset(egui::vec2(-240.0, -100.0))
-                .show(ui);
-            });
-        }
+/// A small color swatch picker at the row's right end.
+fn show_picker(ui: &mut egui::Ui, picker: ShapeColorPicker<'_>, tooltip: &str) {
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        picker
+            .size(egui::vec2(18.0, 16.0))
+            .tooltip(tooltip)
+            .anchor_offset(egui::vec2(-240.0, -100.0))
+            .show(ui);
     });
 }

@@ -25,8 +25,6 @@ pub struct ColormapState {
     /// The overlay the colormap picker edits; `None` for the base layer
     /// (the toolbar's picker).
     pub target: Option<crate::app::layers::LayerId>,
-    /// Opacity curve editor (not persisted).
-    pub alpha: super::alpha_state::AlphaCurveState,
 }
 
 /// Persisted colormap preferences (eframe storage). Only user-defined colormaps

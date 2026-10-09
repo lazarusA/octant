@@ -136,3 +136,52 @@ fn the_hover_reads_each_drawn_overlay_at_the_base_cell() {
         crate::ui::hover::card::HoverValue::from_raw(expected.unwrap_or(f32::NAN), None)
     );
 }
+
+#[test]
+fn an_overlay_opacity_curve_is_its_own_until_removed() {
+    let _registry = registry::test_lock();
+    let (mut app, meta) = plotted_app();
+    let id = app.add_overlay(index_of(&meta, "sst")).expect("overlay");
+    let key = id.key();
+    if let Some(layer) = app.layers.get_mut(id) {
+        layer.color.alpha.text = "0, 1".to_string();
+    }
+    app.apply_alpha_curve(id);
+
+    let overlay = app.layers.get(id).expect("overlay");
+    let row = overlay.color.alpha_row();
+    assert!(row.is_some(), "the overlay has a curve row");
+    assert_eq!(app.get_color_params(overlay).alpha_row, row.unwrap_or(0));
+    assert_eq!(app.layers.base.color.alpha_row(), None, "the base has none");
+    assert!(!app.layers.base.color.is_translucent());
+
+    app.remove_overlay(id);
+    assert_eq!(registry::alpha_row(key), None, "its row is freed");
+}
+
+#[test]
+fn an_overlay_color_range_resets_to_its_own_data() {
+    let (mut app, meta) = plotted_app();
+    let id = app.add_overlay(index_of(&meta, "sst")).expect("overlay");
+    let base_range = (
+        app.layers.base.color.range_min,
+        app.layers.base.color.range_max,
+    );
+    let Some(layer) = app.layers.get_mut(id) else {
+        panic!("overlay");
+    };
+    let extent = layer.data.matrix.as_ref().map(|m| (m.min_val, m.max_val));
+    (layer.color.range_min, layer.color.range_max) = (-5.0, 5.0);
+    layer.color.lock_bounds = true;
+
+    app.reset_layer_color_range(id);
+    let color = &app.layers.get(id).expect("overlay").color;
+    assert_eq!(Some((color.range_min, color.range_max)), extent);
+    assert!(!color.lock_bounds);
+    let base = &app.layers.base.color;
+    assert_eq!(
+        (base.range_min, base.range_max),
+        base_range,
+        "the base keeps its range"
+    );
+}

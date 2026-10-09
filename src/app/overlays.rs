@@ -55,9 +55,14 @@ impl OctantApp {
         Some(id)
     }
 
-    /// Removes overlay `id` and the colormap picker's hold on it.
+    /// Removes overlay `id`, its opacity curve row and the colormap picker's
+    /// hold on it.
     pub fn remove_overlay(&mut self, id: LayerId) {
-        if self.layers.remove(id) && self.colormaps.target == Some(id) {
+        if !self.layers.remove(id) {
+            return;
+        }
+        crate::utils::colormap::registry::set_alpha_curve(id.key(), None);
+        if self.colormaps.target == Some(id) {
             self.colormaps.target = None;
         }
     }

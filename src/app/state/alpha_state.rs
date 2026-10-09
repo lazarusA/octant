@@ -1,28 +1,22 @@
-//! Opacity curve editor state (not persisted) and its registration.
+//! Registering each layer's opacity curve, and how translucent layers draw.
 
 use super::app_state::OctantApp;
-use crate::app::layers::Layer;
+use crate::app::layers::{Layer, LayerId};
 use crate::plots::PlotType;
 use crate::plots::oit::{self, Transparency};
-use crate::utils::colormap::{AlphaInterp, alpha, registry};
-
-/// Text of the opacity curve as typed, its interpolation and parse error.
-#[derive(Default)]
-pub struct AlphaCurveState {
-    pub text: String,
-    pub interp: AlphaInterp,
-    pub error: Option<String>,
-}
+use crate::utils::colormap::{alpha, registry};
 
 impl OctantApp {
-    /// Parses the curve text and registers (or clears) the curve row. On a
-    /// parse error the previous curve stays active.
-    pub fn apply_alpha_curve(&mut self) {
-        let state = &mut self.colormaps.alpha;
+    /// Parses layer `id`'s curve text and registers (or clears) its curve
+    /// row. On a parse error the previous curve stays active.
+    pub fn apply_alpha_curve(&mut self, id: LayerId) {
+        let color = &mut self.layers.get_or_base_mut(id).color;
+        let key = color.alpha_key();
+        let state = &mut color.alpha;
         match alpha::parse(&state.text) {
             Ok(curve) => {
                 state.error = None;
-                registry::set_alpha_curve(curve.map(|c| alpha::bake(&c, state.interp)));
+                registry::set_alpha_curve(key, curve.map(|c| alpha::bake(&c, state.interp)));
             }
             Err(e) => state.error = Some(e.to_string()),
         }

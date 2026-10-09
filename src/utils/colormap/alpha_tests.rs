@@ -122,17 +122,52 @@ fn full_lut_passes_through() {
 fn registry_holds_the_curve_as_last_row() {
     let _lock = registry::test_lock();
     let before = registry::rows();
-    registry::set_alpha_curve(Some(baked("0, 1", AlphaInterp::Linear)));
-    let row = registry::alpha_row();
+    registry::set_alpha_curve(0, Some(baked("0, 1", AlphaInterp::Linear)));
+    let row = registry::alpha_row(0);
     assert_eq!(registry::rows(), before + 1);
     assert_eq!(row, u32::try_from(before).ok());
     assert!(row.is_some_and(|r| !registry::is_row(r)));
     let mut last = None;
     registry::for_each_lut(|id, lut| last = Some((id, lut[0][3], lut[255][3])));
     assert_eq!(last, row.map(|r| (r, 0, 255)));
-    assert!((registry::curve_alpha(0.5) - 0.5).abs() < 1.0 / 255.0);
-    registry::set_alpha_curve(None);
+    assert!((registry::curve_alpha(0, 0.5) - 0.5).abs() < 1.0 / 255.0);
+    registry::set_alpha_curve(0, None);
     assert_eq!(registry::rows(), before);
-    assert_eq!(registry::alpha_row(), None);
-    assert_eq!(registry::curve_alpha(0.5), 1.0);
+    assert_eq!(registry::alpha_row(0), None);
+    assert_eq!(registry::curve_alpha(0, 0.5), 1.0);
+}
+
+#[test]
+fn each_key_has_its_own_curve_row_in_key_order() {
+    let _lock = registry::test_lock();
+    let before = registry::rows();
+    registry::set_alpha_curve(7, Some(baked("1, 0", AlphaInterp::Linear)));
+    registry::set_alpha_curve(3, Some(baked("0, 1", AlphaInterp::Linear)));
+    assert_eq!(registry::rows(), before + 2);
+    assert_eq!(registry::alpha_row(3), u32::try_from(before).ok());
+    assert_eq!(registry::alpha_row(7), u32::try_from(before + 1).ok());
+    assert!(registry::curve_alpha(3, 0.9) > 0.8);
+    assert!(registry::curve_alpha(7, 0.9) < 0.2);
+    let Some(row) = registry::alpha_row(7) else {
+        panic!("key 7 has a curve");
+    };
+    assert_eq!(
+        registry::row_curve_alpha(row, 0.9),
+        registry::curve_alpha(7, 0.9)
+    );
+
+    let generation = registry::generation();
+    registry::set_alpha_curve(3, None);
+    assert!(
+        registry::generation() > generation,
+        "removing a curve bumps the generation"
+    );
+    assert_eq!(registry::alpha_row(3), None);
+    assert_eq!(
+        registry::alpha_row(7),
+        u32::try_from(before).ok(),
+        "rows close up"
+    );
+    registry::set_alpha_curve(7, None);
+    assert_eq!(registry::rows(), before);
 }

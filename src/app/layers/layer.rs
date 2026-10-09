@@ -29,7 +29,10 @@ impl Layer {
             source,
             data: LayerData::default(),
             renderers: LayerRenderers::default(),
-            color: ColorStyle::default(),
+            color: ColorStyle {
+                alpha_key: id.key(),
+                ..ColorStyle::default()
+            },
             composite: CompositeStyle::default(),
             load: LoadState::default(),
             visible: true,

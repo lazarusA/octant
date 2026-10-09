@@ -10,6 +10,11 @@ impl LayerId {
     /// The base layer, which always exists and decides the canvas.
     pub const BASE: Self = Self(0);
 
+    /// The id as a number, unique among the stack's layers (e.g. a registry key).
+    pub fn key(self) -> u32 {
+        self.0
+    }
+
     /// The id handed out after this one.
     pub(super) fn next(self) -> Self {
         Self(self.0.wrapping_add(1))

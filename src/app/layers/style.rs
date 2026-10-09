@@ -2,7 +2,15 @@
 
 use crate::data::matrix_data::MatrixData;
 use crate::plots::common::PlotColorParams;
-use crate::utils::colormap::{COLORMAP_RGB_COMPOSITE, NO_ALPHA_ROW, registry};
+use crate::utils::colormap::{AlphaInterp, COLORMAP_RGB_COMPOSITE, NO_ALPHA_ROW, registry};
+
+/// Text of an opacity curve as typed, its interpolation and parse error.
+#[derive(Debug, Clone, Default)]
+pub struct AlphaCurveState {
+    pub text: String,
+    pub interp: AlphaInterp,
+    pub error: Option<String>,
+}
 
 /// Colormapping of a scalar layer.
 #[derive(Debug, Clone)]
@@ -32,6 +40,11 @@ pub struct ColorStyle {
     pub scale_param: f32,
     pub categorical: bool,
     pub custom_label: Option<String>,
+    /// The opacity curve editor; the baked curve lives in the colormap
+    /// registry under `alpha_key`.
+    pub alpha: AlphaCurveState,
+    /// The layer's curve key in the registry (its `LayerId`), set by `Layer::new`.
+    pub(super) alpha_key: u32,
 }
 
 impl Default for ColorStyle {
@@ -59,6 +72,8 @@ impl Default for ColorStyle {
             scale_param: shader.scale_param,
             categorical: false,
             custom_label: None,
+            alpha: AlphaCurveState::default(),
+            alpha_key: 0,
         }
     }
 }
@@ -107,17 +122,22 @@ impl ColorStyle {
     /// Alpha of colormapped values at data position `t`: the opacity times
     /// the opacity curve, as the plots draw it.
     pub fn alpha_at(&self, t: f32) -> f32 {
-        let curve = if registry::alpha_row().is_some() {
-            registry::curve_alpha(t)
-        } else {
-            1.0
-        };
-        self.opacity.clamp(0.0, 1.0) * curve
+        self.opacity.clamp(0.0, 1.0) * registry::curve_alpha(self.alpha_key, t)
     }
 
     /// Whether colormapped values may be drawn translucent.
     pub fn is_translucent(&self) -> bool {
-        self.opacity < 1.0 || registry::alpha_row().is_some()
+        self.opacity < 1.0 || self.alpha_row().is_some()
+    }
+
+    /// The atlas row of this style's opacity curve, if it has one.
+    pub fn alpha_row(&self) -> Option<u32> {
+        registry::alpha_row(self.alpha_key)
+    }
+
+    /// The registry key of this style's opacity curve.
+    pub fn alpha_key(&self) -> u32 {
+        self.alpha_key
     }
 
     /// The colormap row drawn for colormap `id` with this style: its smooth
@@ -167,7 +187,7 @@ impl ColorStyle {
             nearest: u32::from(registry::is_stepped(row)),
             fallback_colormap: row,
             opacity: self.opacity.clamp(0.0, 1.0),
-            alpha_row: registry::alpha_row().unwrap_or(NO_ALPHA_ROW),
+            alpha_row: self.alpha_row().unwrap_or(NO_ALPHA_ROW),
             _pad: 0,
             nan_color: self.nan_color,
             lowclip_color: self.lowclip_color,

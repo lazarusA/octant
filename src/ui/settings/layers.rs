@@ -80,6 +80,10 @@ fn overlay_row(
             .on_hover_text("Opacity");
         }
     });
+    egui::CollapsingHeader::new("Color")
+        .id_salt(("layer_color_menu", id))
+        .default_open(false)
+        .show(ui, |ui| super::show_color_menu(app, ui, id));
     action
 }
 
