@@ -94,6 +94,11 @@ impl<'a> ToolbarButton<'a> {
         self
     }
 
+    /// Side of a compact (icon-only) button with a `size` glyph.
+    pub const fn side(size: IconSize) -> f32 {
+        size.px() + PAD * 2.0
+    }
+
     /// Width this button will occupy, without allocating it. Uses the same
     /// layout as drawing, so measured and drawn widths always agree.
     pub fn width(&self, ui: &Ui) -> f32 {
@@ -102,7 +107,7 @@ impl<'a> ToolbarButton<'a> {
 
     /// Button size and, when the label is shown, its galley.
     fn layout(&self, ui: &Ui) -> (egui::Vec2, Option<Arc<Galley>>) {
-        let side = self.icon_size.px() + PAD * 2.0;
+        let side = Self::side(self.icon_size);
         let galley = (!self.compact && !self.label.is_empty()).then(|| {
             WidgetText::from(self.label).into_galley(
                 ui,

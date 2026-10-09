@@ -15,7 +15,7 @@ pub enum Slot {
 }
 
 /// The order overlays fill the canvas edges in.
-pub const OVERLAY_SLOTS: [Slot; 4] = [Slot::Top, Slot::Right, Slot::Left, Slot::Bottom(1)];
+const OVERLAY_SLOTS: [Slot; 4] = [Slot::Top, Slot::Right, Slot::Left, Slot::Bottom(1)];
 
 impl Slot {
     /// The first slot of `OVERLAY_SLOTS` that no slot of `taken` holds; when

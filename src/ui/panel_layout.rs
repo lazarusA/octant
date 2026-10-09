@@ -45,9 +45,9 @@ impl PanelPositions {
     }
 }
 
-/// The docked top-left corner after the docked panels `widths` before it.
-pub fn docked_origin(canvas: Rect, widths: &[f32]) -> Pos2 {
-    let x: f32 = widths.iter().map(|w| w + GAP).sum();
+/// The docked top-left corner after docked panels as wide as `widths`.
+fn docked_origin(canvas: Rect, widths: impl Iterator<Item = f32>) -> Pos2 {
+    let x: f32 = widths.map(|w| w + GAP).sum();
     canvas.left_top() + Vec2::new(GAP + x, GAP)
 }
 
@@ -73,15 +73,15 @@ pub fn origin(app: &OctantApp, panel: Panel, canvas: Rect) -> Pos2 {
         Panel::Settings => &[Panel::Variables],
         Panel::Dimensions => &[Panel::Variables, Panel::Settings],
     };
-    let mut widths = [0.0; 2];
-    let mut n = 0;
-    for &p in before {
-        if let Some(w) = docked_width(app, p) {
-            widths[n] = w;
-            n += 1;
-        }
-    }
-    docked_origin(canvas, &widths[..n])
+    let widths = before.iter().filter_map(|&p| docked_width(app, p));
+    docked_origin(canvas, widths)
+}
+
+/// Height left for a panel's body from the cursor of `ui` down to the
+/// canvas bottom, past the gap and the popup frame's bottom margin.
+pub fn room_below(ui: &egui::Ui, canvas: Rect) -> f32 {
+    let bottom_margin = GAP + f32::from(ui.style().spacing.menu_margin.bottom);
+    canvas.bottom() - bottom_margin - ui.cursor().top()
 }
 
 /// Applies `panel`'s grip `action`, its area at `rect` on `canvas`.

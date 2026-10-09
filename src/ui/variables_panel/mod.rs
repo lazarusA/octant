@@ -15,7 +15,7 @@ pub use info::show_variable_info;
 
 use crate::app::OctantApp;
 use crate::ui::drag_grip::{self, GripAction};
-use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, PanelHeader, ToolbarButton, UiIconExt};
 use crate::ui::panel_layout::{self, Panel};
 
 /// Width of the Dimensions panel's content; every dimension box fills it.
@@ -51,9 +51,9 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         ui.label("No variable selected.");
                         return;
                     };
-                    let (close, moved) = header_row(ui, &var_info);
-                    grip = moved;
-                    if close {
+                    let header = header_row(ui, &var_info);
+                    grip = header.grip;
+                    if header.close {
                         app.show_variable_controls = false;
                         if !app.show_variables_overlay {
                             app.revert_selected_state_to_plotted();
@@ -77,9 +77,8 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 }
 
 /// The header's first row: the variable's name, expanding to its details,
-/// the drag grip and the close button. Whether the close button was clicked,
-/// and what the grip asked for.
-fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> (bool, GripAction) {
+/// the drag grip and the close button, and what those two asked for.
+fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> PanelHeader {
     let header_id = ui.make_persistent_id(("var_info_header", &var_info.name));
     let mut close = false;
     let mut grip = GripAction::None;
@@ -99,7 +98,7 @@ fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> (bool,
             });
         })
         .body(|ui| show_variable_info(ui, var_info));
-    (close, grip)
+    PanelHeader { close, grip }
 }
 
 /// The header's second row, right-aligned: the "Add Overlay" toggle

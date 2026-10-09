@@ -11,7 +11,7 @@ const INPUT: Vec2 = Vec2::new(60.0, 18.0);
 /// Length of a clip triangle along the bar.
 const TRI: f32 = 12.0;
 /// Gap between a vertical bar's end and its range input, past the triangle.
-pub const VERTICAL_END_GAP: f32 = TRI + 4.0;
+const VERTICAL_END_GAP: f32 = TRI + 4.0;
 /// Room a vertical bar needs at each end for its triangle and range input.
 pub const VERTICAL_END_ROOM: f32 = VERTICAL_END_GAP + INPUT.y + 2.0;
 

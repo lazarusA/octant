@@ -55,9 +55,9 @@ pub fn show(app: &mut OctantApp, ctx: &egui::Context, id: LayerId, canvas: Rect)
                 .fill(fill)
                 .stroke(stroke)
                 .shadow(shadow)
-                .inner_margin(egui::Margin::symmetric(layout::MARGIN_X as i8, 8))
+                .inner_margin(egui::Margin::symmetric(layout::MARGIN_X, 8))
                 .show(ui, |ui| {
-                    ui.set_width(width - 2.0 * layout::MARGIN_X);
+                    ui.set_width(width - 2.0 * f32::from(layout::MARGIN_X));
                     match orientation {
                         BarOrientation::Horizontal => ui.vertical_centered(|ui| {
                             title_row(app, ui, id, TITLE_SIDE);

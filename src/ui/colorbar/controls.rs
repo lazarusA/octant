@@ -8,8 +8,8 @@ use crate::ui::drag_grip;
 use crate::ui::icons::{Icon, IconSize, ToolbarButton};
 use egui::{Align2, Rect, Vec2};
 
-/// Side of a control: an `Xs` glyph in a `ToolbarButton`'s padding.
-pub const CONTROL: f32 = IconSize::Xs.px() + 6.0;
+/// Side of a control: a compact `ToolbarButton` with an `Xs` glyph.
+pub const CONTROL: f32 = ToolbarButton::side(IconSize::Xs);
 /// Inset of the controls from the panel's top-right corner.
 const INSET: f32 = 4.0;
 

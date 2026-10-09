@@ -58,9 +58,8 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
                     })
                     .body(|ui| {
                         // Scroll the body rather than run past the canvas bottom.
-                        let bottom_margin = 8.0 + f32::from(ui.style().spacing.menu_margin.bottom);
-                        let max_height = (canvas_rect.bottom() - bottom_margin - ui.cursor().top())
-                            .max(MIN_BODY_HEIGHT);
+                        let max_height =
+                            panel_layout::room_below(ui, canvas_rect).max(MIN_BODY_HEIGHT);
                         // The area lends its last-frame size; open up to the
                         // canvas so the body can grow when a section expands.
                         ui.set_max_height(max_height);

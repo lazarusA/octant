@@ -23,8 +23,6 @@ use crate::ui::key_focus;
 use crate::ui::panel_layout::{self, Panel};
 use nav::SearchJump;
 
-/// Height of the panel around its list: margins, header and search row.
-const LIST_CHROME_H: f32 = 110.0;
 /// Shortest list, however low the panel sits.
 const MIN_LIST_HEIGHT: f32 = 120.0;
 
@@ -40,13 +38,8 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
     let screen_size = ctx.input(|i| i.viewport_rect().size());
     let width = (screen_size.x * 0.28).clamp(280.0, 520.0);
+    let list_height = (screen_size.y * 0.65).clamp(250.0, 750.0);
     let origin = panel_layout::origin(app, Panel::Variables, canvas_rect);
-    // Scroll the list rather than run past the canvas bottom.
-    let room = canvas_rect.bottom() - origin.y - LIST_CHROME_H;
-    let max_height = (screen_size.y * 0.65)
-        .clamp(250.0, 750.0)
-        .min(room)
-        .max(MIN_LIST_HEIGHT);
     app.variables_overlay_width = width;
 
     let mut header = None;
@@ -57,7 +50,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
         .show(ctx, |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.set_width(width);
-                header = show_panel(ui, app, max_height);
+                header = show_panel(ui, app, list_height, canvas_rect);
             });
         });
     let rect = area_resp.response.rect;
@@ -70,9 +63,15 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
     }
 }
 
-/// Collapsible "Variables" header with the search field and list; returns
-/// what the header's close button and grip asked for.
-fn show_panel(ui: &mut egui::Ui, app: &mut OctantApp, max_height: f32) -> Option<PanelHeader> {
+/// Collapsible "Variables" header with the search field and list (at most
+/// `list_height` tall, shorter rather than past the bottom of `canvas`);
+/// returns what the header's close button and grip asked for.
+fn show_panel(
+    ui: &mut egui::Ui,
+    app: &mut OctantApp,
+    list_height: f32,
+    canvas: egui::Rect,
+) -> Option<PanelHeader> {
     let header_id = ui.make_persistent_id("variables_overlay_header");
     let mut header = None;
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)
@@ -86,6 +85,9 @@ fn show_panel(ui: &mut egui::Ui, app: &mut OctantApp, max_height: f32) -> Option
                 search.request_focus();
             }
             let jump = search_jump(ui, &search);
+            let max_height = list_height
+                .min(panel_layout::room_below(ui, canvas))
+                .max(MIN_LIST_HEIGHT);
             egui::ScrollArea::vertical()
                 .max_height(max_height)
                 .min_scrolled_height(max_height)

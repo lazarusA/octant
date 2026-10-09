@@ -11,7 +11,7 @@ pub const EDGE_GAP: f32 = 8.0;
 /// Distance between stacked bottom panels.
 pub const PANEL_STEP: f32 = 84.0;
 /// Horizontal margin inside a panel's frame.
-pub const MARGIN_X: f32 = 12.0;
+pub const MARGIN_X: i8 = 12;
 /// Width of a vertical panel.
 const VERTICAL_W: f32 = 124.0;
 /// Longest vertical bar; shorter on small canvases.
