@@ -52,33 +52,14 @@ impl OctantApp {
         }
     }
 
-    /// Shows step `next_ts` when it is resident, then queues the lookahead.
+    /// Shows step `next_ts` when the base layer holds it (with the animated
+    /// overlays), then queues every layer's lookahead.
     fn play_step(&mut self, next_ts: usize) {
-        if self.plotted_step_resident(next_ts) {
+        if self.layer_step_resident(crate::app::layers::LayerId::BASE, next_ts) {
             self.current_timestep = next_ts;
-            self.load_selected_variable_block();
+            self.load_step_blocks();
         }
-        if let Some(var) = self.plotted_variable_info() {
-            let shape = var.shape.clone();
-            self.prefetch_selected_animated_range(&shape);
-        }
-    }
-
-    /// Whether the block cache holds step `step` of the plotted selection.
-    fn plotted_step_resident(&self, step: usize) -> bool {
-        let Some(var) = self.plotted_variable_info() else {
-            return false;
-        };
-        let request = crate::ui::variables_panel::build_slice_request_for_plotted(
-            self, &var.name, &var.shape,
-        );
-        self.block_cache.covers(
-            &self.plotted_source_id(),
-            &var.name,
-            &request.selections,
-            self.plotted().animated_dim,
-            step,
-        )
+        self.prefetch_animated_ranges();
     }
 
     /// Full size of the currently animated dimension in the dataset.

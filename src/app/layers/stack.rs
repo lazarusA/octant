@@ -40,6 +40,16 @@ impl LayerStack {
         std::iter::once(&mut self.base).chain(&mut self.overlays)
     }
 
+    /// Every layer's id in drawing order, for loops that change the app.
+    pub fn ids(&self) -> Vec<LayerId> {
+        self.iter().map(Layer::id).collect()
+    }
+
+    /// The overlays' ids in drawing order.
+    pub fn overlay_ids(&self) -> Vec<LayerId> {
+        self.overlays.iter().map(Layer::id).collect()
+    }
+
     /// The layer `id`, while it exists.
     pub fn get(&self, id: LayerId) -> Option<&Layer> {
         self.iter().find(|layer| layer.id() == id)

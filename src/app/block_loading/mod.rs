@@ -5,6 +5,9 @@ pub(crate) mod block_axes;
 mod block_axes_tests;
 pub mod coordinates;
 pub mod handles;
+#[cfg(test)]
+mod layer_load_tests;
+pub(crate) mod layer_request;
 pub mod load;
 pub mod pacing;
 pub mod prefetch;

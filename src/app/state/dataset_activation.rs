@@ -138,11 +138,6 @@ impl OctantApp {
         channel_dim(self.layer_variable_info(id)?)
     }
 
-    /// Return the dimension index corresponding to channels/bands for the currently selected variable.
-    pub fn selected_channel_dim_index(&self) -> Option<usize> {
-        channel_dim(self.selected_variable_info()?)
-    }
-
     /// Return the total number of bands/channels for the currently plotted variable, if multi-band.
     pub fn num_bands(&self) -> usize {
         let Some(var) = self.plotted_variable_info() else {
@@ -223,7 +218,7 @@ impl OctantApp {
 
 /// The channel/band dimension of `var`: one named like a channel, else the
 /// first of a variable with 3 or more dimensions.
-fn channel_dim(var: &crate::data::VariableInfo) -> Option<usize> {
+pub(crate) fn channel_dim(var: &crate::data::VariableInfo) -> Option<usize> {
     var.dimension_names
         .iter()
         .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))

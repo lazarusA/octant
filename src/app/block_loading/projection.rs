@@ -93,7 +93,7 @@ impl OctantApp {
             &orig_dim_names,
             anim_dim,
             self.layer_dim_indices(id),
-            self.current_timestep,
+            self.layer_step(id),
         );
         let ranges = self.layer_dim_ranges(id);
         let (req_x, local_x_range) = block_axes::dim_bounds(block, &orig_dim_names, x_dim, ranges);
@@ -122,7 +122,7 @@ impl OctantApp {
 
         let is_3d_anim = anim_dim.is_some_and(|a| a == x_dim || a == y_dim || a == z_dim);
         let axes = [(x_dim, req_x), (y_dim, req_y), (z_dim, req_z)];
-        if !self.block_in_view(block, anim_dim, is_3d_anim, axes) {
+        if !self.block_in_view(id, block, anim_dim, is_3d_anim, axes) {
             return;
         }
 
