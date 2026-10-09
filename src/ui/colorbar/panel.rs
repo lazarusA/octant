@@ -23,13 +23,12 @@ const VERTICAL_BAR_X: f32 = 30.0;
 /// Room each side of a horizontal panel's title for the controls.
 const TITLE_SIDE: f32 = 44.0;
 
-/// Draws layer `id`'s colorbar panel on `canvas`; `left_inset` keeps the
-/// Left slot clear of the panels docked on the canvas's left.
-pub fn show(app: &mut OctantApp, ctx: &egui::Context, id: LayerId, canvas: Rect, left_inset: f32) {
+/// Draws layer `id`'s colorbar panel on `canvas`.
+pub fn show(app: &mut OctantApp, ctx: &egui::Context, id: LayerId, canvas: Rect) {
     let Some(placement) = app.layers.get(id).map(|l| l.colorbar) else {
         return;
     };
-    let (point, pivot) = layout::position(&placement, canvas, left_inset);
+    let (point, pivot) = layout::position(&placement, canvas);
     let orientation = placement.orientation;
     let width = layout::panel_width(orientation, canvas);
     let bar_len = layout::bar_length(orientation, width, canvas);
@@ -47,7 +46,7 @@ pub fn show(app: &mut OctantApp, ctx: &egui::Context, id: LayerId, canvas: Rect,
     shadow.color = shadow.color.linear_multiply(alpha_mult);
 
     egui::Area::new(egui::Id::new(super::salt("octant_colorbar_overlay", id)))
-        .order(egui::Order::Foreground)
+        .order(egui::Order::Middle)
         .pivot(pivot)
         .fixed_pos(point)
         .constrain_to(canvas)

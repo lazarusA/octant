@@ -2,11 +2,11 @@
 //! corner while the pointer is over the panel (or the grip is held), and
 //! never during export.
 
-use super::layout;
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::ui::drag_grip;
 use crate::ui::icons::{Icon, IconSize, ToolbarButton};
-use egui::{Align2, CursorIcon, Rect, Sense, Vec2};
+use egui::{Align2, Rect, Vec2};
 
 /// Side of a control: an `Xs` glyph in a `ToolbarButton`'s padding.
 pub const CONTROL: f32 = IconSize::Xs.px() + 6.0;
@@ -40,12 +40,7 @@ pub fn show(
         return;
     }
     let [grip_rect, flip_rect] = rects(panel);
-    let grip = ToolbarButton::new(Icon::Grip, "Move")
-        .compact(true)
-        .icon_size(IconSize::Xs)
-        .sense(Sense::click_and_drag())
-        .hover("Drag to move; double-click to reset");
-    let grip = ui.put(grip_rect, grip);
+    let grip = ui.put(grip_rect, drag_grip::button(IconSize::Xs));
     let flip = ToolbarButton::new(Icon::Orientation, "Flip orientation")
         .compact(true)
         .icon_size(IconSize::Xs);
@@ -53,21 +48,12 @@ pub fn show(
     // Held from the press on, so a fast drag leaving the panel keeps its grip.
     let held = grip.dragged() || grip.is_pointer_button_down_on();
     ui.data_mut(|d| d.insert_temp(dragging_key, held));
-
-    if grip.dragged() {
-        ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
-    } else if grip.hovered() {
-        ui.ctx().set_cursor_icon(CursorIcon::Grab);
-    }
+    let action = drag_grip::action(&grip);
     let Some(placement) = app.layers.get_mut(id).map(|l| &mut l.colorbar) else {
         return;
     };
-    if grip.double_clicked() {
-        placement.pos = None;
-    } else if grip.dragged() {
-        let point = pivot.pos_in_rect(&panel) + grip.drag_delta();
-        placement.pos = Some(layout::to_fraction(point, canvas));
-    }
+    let at = pivot.pos_in_rect(&panel);
+    placement.pos = drag_grip::apply(placement.pos, action, at, canvas);
     if flip.clicked() {
         placement.orientation = placement.orientation.flipped();
     }

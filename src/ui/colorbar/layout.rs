@@ -1,9 +1,10 @@
 //! Where colorbar panels sit on the canvas: each slot's pivot and point, the
-//! panel and bar sizes per orientation, and dragged positions kept as
-//! fractions of the canvas.
+//! panel and bar sizes per orientation, and dragged positions (canvas
+//! fractions, `drag_grip`).
 
 use crate::app::layers::{BarOrientation, ColorbarPlacement, Slot};
-use egui::{Align2, Pos2, Rect, Vec2};
+use crate::ui::drag_grip;
+use egui::{Align2, Pos2, Rect};
 
 /// Gap between a panel and the canvas edge.
 pub const EDGE_GAP: f32 = 8.0;
@@ -18,9 +19,8 @@ const VERTICAL_BAR_MAX: f32 = 220.0;
 /// Shortest bar of either orientation.
 const BAR_MIN: f32 = 80.0;
 
-/// The pivot of `slot`'s panel and where it sits on `canvas`. `left_inset`
-/// keeps the Left slot clear of the panels docked on the canvas's left.
-pub fn anchor(slot: Slot, canvas: Rect, left_inset: f32) -> (Pos2, Align2) {
+/// The pivot of `slot`'s panel and where it sits on `canvas`.
+pub fn anchor(slot: Slot, canvas: Rect) -> (Pos2, Align2) {
     let center = canvas.center();
     match slot {
         Slot::Bottom(n) => {
@@ -35,32 +35,20 @@ pub fn anchor(slot: Slot, canvas: Rect, left_inset: f32) -> (Pos2, Align2) {
             Pos2::new(canvas.right() - EDGE_GAP, center.y),
             Align2::RIGHT_CENTER,
         ),
-        Slot::Left => {
-            let x = (canvas.left() + EDGE_GAP + left_inset).min(center.x);
-            (Pos2::new(x, center.y), Align2::LEFT_CENTER)
-        }
+        Slot::Left => (
+            Pos2::new(canvas.left() + EDGE_GAP, center.y),
+            Align2::LEFT_CENTER,
+        ),
     }
 }
 
 /// Where `placement`'s panel sits: its dragged position, else its slot's.
-pub fn position(placement: &ColorbarPlacement, canvas: Rect, left_inset: f32) -> (Pos2, Align2) {
-    let (slot_point, pivot) = anchor(placement.slot, canvas, left_inset);
+pub fn position(placement: &ColorbarPlacement, canvas: Rect) -> (Pos2, Align2) {
+    let (slot_point, pivot) = anchor(placement.slot, canvas);
     let point = placement
         .pos
-        .map_or(slot_point, |f| from_fraction(f, canvas));
+        .map_or(slot_point, |f| drag_grip::from_fraction(f, canvas));
     (point, pivot)
-}
-
-/// `point` as a fraction of `canvas`, clamped into it.
-pub fn to_fraction(point: Pos2, canvas: Rect) -> Pos2 {
-    let size = canvas.size().max(Vec2::splat(1.0));
-    let f = (point - canvas.min) / size;
-    Pos2::new(f.x.clamp(0.0, 1.0), f.y.clamp(0.0, 1.0))
-}
-
-/// The point at fraction `f` of `canvas`.
-pub fn from_fraction(f: Pos2, canvas: Rect) -> Pos2 {
-    canvas.min + f.to_vec2() * canvas.size()
 }
 
 /// Outer width of a panel in `orientation` on `canvas`.

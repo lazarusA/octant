@@ -24,6 +24,6 @@ pub mod style;
 mod tests;
 
 pub use button::{TOOLBAR_ITEM_HEIGHT, ToolbarButton};
-pub use ext::UiIconExt;
+pub use ext::{PanelHeader, UiIconExt};
 pub use meta::Icon;
 pub use style::{ICON_GAP, IconSize, IconTone};

@@ -105,6 +105,8 @@ pub struct OctantApp {
     pub show_bottom_bar: bool,
     pub show_hover_card: bool,
     pub settings_overlay_width: f32, // tracks prev-frame width to position Variable Controls to the right
+    /// Dragged places of the Variables, Settings and Dimensions panels.
+    pub panel_positions: crate::ui::panel_layout::PanelPositions,
     pub theme_preference: egui::ThemePreference,
     pub enforce_data_aspect_ratio: bool,
 

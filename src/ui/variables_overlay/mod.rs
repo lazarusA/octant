@@ -18,9 +18,15 @@ mod tests;
 pub use search::SearchCache;
 
 use crate::app::OctantApp;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::{Icon, PanelHeader, UiIconExt};
 use crate::ui::key_focus;
+use crate::ui::panel_layout::{self, Panel};
 use nav::SearchJump;
+
+/// Height of the panel around its list: margins, header and search row.
+const LIST_CHROME_H: f32 = 110.0;
+/// Shortest list, however low the panel sits.
+const MIN_LIST_HEIGHT: f32 = 120.0;
 
 pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
     let shown = app
@@ -34,32 +40,44 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
     let screen_size = ctx.input(|i| i.viewport_rect().size());
     let width = (screen_size.x * 0.28).clamp(280.0, 520.0);
-    let max_height = (screen_size.y * 0.65).clamp(250.0, 750.0);
+    let origin = panel_layout::origin(app, Panel::Variables, canvas_rect);
+    // Scroll the list rather than run past the canvas bottom.
+    let room = canvas_rect.bottom() - origin.y - LIST_CHROME_H;
+    let max_height = (screen_size.y * 0.65)
+        .clamp(250.0, 750.0)
+        .min(room)
+        .max(MIN_LIST_HEIGHT);
     app.variables_overlay_width = width;
 
-    let origin = canvas_rect.left_top() + egui::vec2(8.0, 8.0);
+    let mut header = None;
     let area_resp = egui::Area::new(egui::Id::new("octant_variables_area"))
         .fixed_pos(origin)
+        .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.set_width(width);
-                if show_panel(ui, app, max_height) {
-                    close(app);
-                }
+                header = show_panel(ui, app, max_height);
             });
         });
-    app.variables_overlay_width = area_resp.response.rect.width();
+    let rect = area_resp.response.rect;
+    app.variables_overlay_width = rect.width();
+    if let Some(header) = header {
+        panel_layout::apply_grip(app, Panel::Variables, header.grip, rect, canvas_rect);
+        if header.close {
+            close(app);
+        }
+    }
 }
 
 /// Collapsible "Variables" header with the search field and list; returns
-/// `true` when the close button was clicked.
-fn show_panel(ui: &mut egui::Ui, app: &mut OctantApp, max_height: f32) -> bool {
+/// what the header's close button and grip asked for.
+fn show_panel(ui: &mut egui::Ui, app: &mut OctantApp, max_height: f32) -> Option<PanelHeader> {
     let header_id = ui.make_persistent_id("variables_overlay_header");
-    let mut should_close = false;
+    let mut header = None;
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)
         .show_header(ui, |ui| {
-            should_close = ui.panel_header(Icon::Variables, "Variables", "Close Variables Window");
+            header = Some(ui.panel_header(Icon::Variables, "Variables", "Close Variables Window"));
         })
         .body(|ui| {
             let search =
@@ -74,7 +92,7 @@ fn show_panel(ui: &mut egui::Ui, app: &mut OctantApp, max_height: f32) -> bool {
                 .auto_shrink([false, false])
                 .show(ui, |ui| body::show_list(ui, app, search.id, jump));
         });
-    should_close
+    header
 }
 
 /// Hide the overlay; with the controls panel also closed, drop the unplotted

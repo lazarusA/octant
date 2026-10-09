@@ -4,13 +4,14 @@
 use super::axis::BarAxis;
 use super::layout::{self, EDGE_GAP, PANEL_STEP};
 use crate::app::layers::{BarOrientation, ColorbarPlacement, Slot};
+use crate::ui::drag_grip;
 use egui::{Align2, Pos2, Rect, pos2};
 
 const CANVAS: Rect = Rect::from_min_max(pos2(100.0, 50.0), pos2(1100.0, 850.0));
 
 #[test]
 fn slots_anchor_on_their_canvas_edge() {
-    let at = |slot| layout::anchor(slot, CANVAS, 0.0);
+    let at = |slot| layout::anchor(slot, CANVAS);
     let bottom = CANVAS.bottom() - EDGE_GAP;
     assert_eq!(
         at(Slot::Bottom(0)),
@@ -27,19 +28,11 @@ fn slots_anchor_on_their_canvas_edge() {
 }
 
 #[test]
-fn the_left_slot_clears_docked_panels_up_to_the_canvas_center() {
-    let (point, _) = layout::anchor(Slot::Left, CANVAS, 300.0);
-    assert_eq!(point.x, CANVAS.left() + EDGE_GAP + 300.0);
-    let (point, _) = layout::anchor(Slot::Left, CANVAS, 5000.0);
-    assert_eq!(point.x, CANVAS.center().x);
-}
-
-#[test]
 fn dragged_panels_keep_their_place_as_a_canvas_fraction() {
     let mut placement = ColorbarPlacement::at(Slot::Right);
     let point = pos2(350.0, 250.0);
-    placement.pos = Some(layout::to_fraction(point, CANVAS));
-    let (at, pivot) = layout::position(&placement, CANVAS, 0.0);
+    placement.pos = Some(drag_grip::to_fraction(point, CANVAS));
+    let (at, pivot) = layout::position(&placement, CANVAS);
     assert!((at - point).length() < 1e-3);
     assert_eq!(
         pivot,
@@ -48,10 +41,10 @@ fn dragged_panels_keep_their_place_as_a_canvas_fraction() {
     );
 
     let resized = Rect::from_min_max(CANVAS.min, pos2(2100.0, 1650.0));
-    let (at, _) = layout::position(&placement, resized, 0.0);
+    let (at, _) = layout::position(&placement, resized);
     assert!((at - pos2(600.0, 450.0)).length() < 1e-3);
 
-    let outside = layout::to_fraction(pos2(-500.0, 5000.0), CANVAS);
+    let outside = drag_grip::to_fraction(pos2(-500.0, 5000.0), CANVAS);
     assert_eq!(outside, Pos2::new(0.0, 1.0), "fractions stay on the canvas");
 }
 

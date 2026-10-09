@@ -14,40 +14,32 @@ pub use dimension_slider::{
 pub use info::show_variable_info;
 
 use crate::app::OctantApp;
+use crate::ui::drag_grip::{self, GripAction};
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
+use crate::ui::panel_layout::{self, Panel};
 
 /// Width of the Dimensions panel's content; every dimension box fills it.
 const PANEL_MAX_W: f32 = 340.0;
 /// Narrowest the panel gets when the canvas leaves little room.
 const PANEL_MIN_W: f32 = 220.0;
 
-/// Positioned to the right of the Settings overlay using the previous frame's settings width.
+/// Docked after the Variables and Settings panels (`panel_layout`), or where its grip dragged it.
 pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
     if !app.show_variable_controls || app.selected.metadata.is_none() {
         return;
     }
 
-    let x_offset =
-        8.0 + if app.show_variables_overlay && app.variables_overlay_width > 0.0 {
-            app.variables_overlay_width + 16.0
-        } else {
-            0.0
-        } + if app.show_settings_panel && app.settings_overlay_width > 0.0 {
-            app.settings_overlay_width + 16.0
-        } else {
-            0.0
-        };
+    let origin = panel_layout::origin(app, Panel::Dimensions, canvas_rect);
 
     // Fixed width, shrinking only when the canvas would otherwise clip it.
     // The 24 px covers the popup frame margins and the gap to the canvas edge.
-    let room = canvas_rect.width() - x_offset - 24.0;
+    let room = canvas_rect.right() - origin.x - 24.0;
     let panel_w = PANEL_MAX_W.min(room).max(PANEL_MIN_W);
 
-    egui::Area::new(egui::Id::new("octant_variables_panel"))
-        .fixed_pos(egui::pos2(
-            canvas_rect.left() + x_offset,
-            canvas_rect.top() + 8.0,
-        ))
+    let mut grip = GripAction::None;
+    let area_resp = egui::Area::new(egui::Id::new("octant_variables_panel"))
+        .fixed_pos(origin)
+        .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
             egui::Frame::popup(ui.style())
@@ -59,7 +51,9 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         ui.label("No variable selected.");
                         return;
                     };
-                    if header_row(ui, &var_info) {
+                    let (close, moved) = header_row(ui, &var_info);
+                    grip = moved;
+                    if close {
                         app.show_variable_controls = false;
                         if !app.show_variables_overlay {
                             app.revert_selected_state_to_plotted();
@@ -78,13 +72,17 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                         });
                 });
         });
+    let rect = area_resp.response.rect;
+    panel_layout::apply_grip(app, Panel::Dimensions, grip, rect, canvas_rect);
 }
 
 /// The header's first row: the variable's name, expanding to its details,
-/// and the close button. Whether the close button was clicked.
-fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> bool {
+/// the drag grip and the close button. Whether the close button was clicked,
+/// and what the grip asked for.
+fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> (bool, GripAction) {
     let header_id = ui.make_persistent_id(("var_info_header", &var_info.name));
     let mut close = false;
+    let mut grip = GripAction::None;
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, false)
         .show_header(ui, |ui| {
             ui.icon(Icon::VariableDoc, IconSize::Sm);
@@ -94,13 +92,14 @@ fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> bool {
             };
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 close = ui.close_button("Close Dimension Panel").clicked();
+                grip = drag_grip::action(&ui.add(drag_grip::button(IconSize::Sm)));
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     ui.add(egui::Label::new(egui::RichText::new(name).strong()).truncate());
                 });
             });
         })
         .body(|ui| show_variable_info(ui, var_info));
-    close
+    (close, grip)
 }
 
 /// The header's second row, right-aligned: the "Add Overlay" toggle

@@ -29,7 +29,6 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas: e
     if !app.show_colorbar {
         return;
     }
-    let inset = left_inset(app);
     for i in 0..=app.layers.overlays().len() {
         let layer = match i {
             0 => Some(&app.layers.base),
@@ -41,21 +40,8 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas: e
         else {
             continue;
         };
-        panel::show(app, ctx, id, canvas, inset);
+        panel::show(app, ctx, id, canvas);
     }
-}
-
-/// Width of the panels docked on the canvas's left (variables, settings).
-fn left_inset(app: &OctantApp) -> f32 {
-    let docked = |shown: bool, width: f32| {
-        if shown && width > 0.0 {
-            width + 16.0
-        } else {
-            0.0
-        }
-    };
-    docked(app.show_variables_overlay, app.variables_overlay_width)
-        + docked(app.show_settings_panel, app.settings_overlay_width)
 }
 
 /// Egui id salt of layer `id`'s colorbar widgets.

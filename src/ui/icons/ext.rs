@@ -1,9 +1,15 @@
 //! `egui::Ui` helpers for drawing icons, framed icon buttons, the standard
-//! close button and the search field.
+//! close button, panel headers and the search field.
 
 use super::style::{ICON_GAP, IconSize, IconTone};
 use super::{Icon, ToolbarButton};
 use egui::{Color32, Rect, Response, Sense, Ui, WidgetText, pos2, vec2};
+
+/// What a panel header's buttons asked for this frame.
+pub struct PanelHeader {
+    pub close: bool,
+    pub grip: crate::ui::drag_grip::GripAction,
+}
 
 /// Helper extension trait for easy rendering in egui UIs.
 pub trait UiIconExt {
@@ -25,9 +31,9 @@ pub trait UiIconExt {
     /// buttons in the top-right corner of their panel or window.
     fn close_button(&mut self, hover: &str) -> Response;
 
-    /// Panel title row: `Sm` icon, bold `title`, and a close button pinned to
-    /// the top-right. Returns `true` when the close button was clicked.
-    fn panel_header(&mut self, icon: Icon, title: &str, close_hover: &str) -> bool;
+    /// Panel title row: `Sm` icon, bold `title`, then a close button pinned
+    /// to the top-right with the panel's drag grip left of it.
+    fn panel_header(&mut self, icon: Icon, title: &str, close_hover: &str) -> PanelHeader;
 
     /// Search row: `Search` icon, a single-line field and, while `text` is
     /// non-empty, a clear button. The field fills the row unless `width` is
@@ -82,11 +88,16 @@ impl UiIconExt for Ui {
         self.add(close_button_widget(hover))
     }
 
-    fn panel_header(&mut self, icon: Icon, title: &str, close_hover: &str) -> bool {
+    fn panel_header(&mut self, icon: Icon, title: &str, close_hover: &str) -> PanelHeader {
         self.icon(icon, IconSize::Sm);
         self.label(egui::RichText::new(title).strong());
         self.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.close_button(close_hover).clicked()
+            let close = ui.close_button(close_hover).clicked();
+            let grip = ui.add(crate::ui::drag_grip::button(IconSize::Sm));
+            PanelHeader {
+                close,
+                grip: crate::ui::drag_grip::action(&grip),
+            }
         })
         .inner
     }
