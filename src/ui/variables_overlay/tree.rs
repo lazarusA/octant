@@ -1,6 +1,6 @@
 use super::item::{MAX_ITEMS_PER_LEVEL, render_variable_list, truncation_note};
 use super::nav::{self, NodeKey, SearchJump, folder_state, row_id};
-use super::row::{RowKind, allocate_row, paint_row};
+use super::row::{RowKind, Trailing, allocate_row, paint_row};
 use crate::data::{VariableInfo, VariableTreeGroup};
 use crate::utils::stack_str;
 
@@ -89,7 +89,7 @@ fn render_folder(
     let kind = RowKind::Folder {
         open: state.is_open(),
     };
-    paint_row(ui, &resp, kind, name, detail, false, 0.0);
+    paint_row(ui, &resp, kind, name, detail, false, Trailing::default());
 
     state.show_body_indented(&resp, ui, add_body);
 }

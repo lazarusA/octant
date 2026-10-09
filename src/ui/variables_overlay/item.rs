@@ -1,24 +1,42 @@
 use super::nav::{NodeKey, row_id};
-use super::row::{RowKind, allocate_row, paint_row};
+use super::row::{RowKind, Trailing, allocate_row, paint_row};
 use super::tree::VariableTreeContext;
 use crate::data::VariableInfo;
-use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
 pub const MAX_ITEMS_PER_LEVEL: usize = 100;
-/// Room the "Add as overlay" button takes at a row's right end.
-const OVERLAY_BUTTON: f32 = 24.0;
+/// Side of the "Add as overlay" button.
+const OVERLAY_BUTTON: f32 = 20.0;
+/// Space between the button and the row's right edge.
+const OVERLAY_PAD: f32 = 8.0;
+/// Room the button and its padding leave free at the row's right end.
+const OVERLAY_ROOM: f32 = OVERLAY_BUTTON + OVERLAY_PAD + 4.0;
 
-/// The "Add as overlay" button at the right end of `row`.
-fn overlay_button(ui: &mut egui::Ui, row: egui::Rect) -> egui::Response {
+/// The "Add as overlay" button's square at the right end of `row`.
+fn overlay_button_rect(row: egui::Rect) -> egui::Rect {
     let side = row.height().min(OVERLAY_BUTTON);
-    let rect = egui::Rect::from_center_size(
-        egui::pos2(row.right() - OVERLAY_BUTTON * 0.5, row.center().y),
-        egui::vec2(side, side),
-    );
-    let button = ToolbarButton::new(Icon::Layers, "Add as overlay")
-        .compact(true)
-        .icon_size(IconSize::Sm);
-    ui.put(rect, button)
+    let center = egui::pos2(row.right() - OVERLAY_PAD - side * 0.5, row.center().y);
+    egui::Rect::from_center_size(center, egui::vec2(side, side))
+}
+
+/// The "Add as overlay" button in `rect`, under `id`: an accent tint and
+/// icon while hovered, independent of the row's own highlight.
+fn overlay_button(ui: &mut egui::Ui, rect: egui::Rect, id: egui::Id) -> egui::Response {
+    let response = ui
+        .interact(rect, id, egui::Sense::click())
+        .on_hover_cursor(egui::CursorIcon::PointingHand);
+    let visuals = ui.visuals();
+    let tone = if response.hovered() {
+        let fill = IconTone::Accent.themed_tint(visuals, 40, 32);
+        let radius = visuals.widgets.hovered.corner_radius;
+        ui.painter().rect_filled(rect, radius, fill);
+        IconTone::Accent
+    } else {
+        IconTone::Default
+    };
+    let icon = egui::Rect::from_center_size(rect.center(), egui::Vec2::splat(IconSize::Sm.px()));
+    Icon::Layers.paint(ui.painter(), icon, tone.color(visuals), visuals.dark_mode);
+    response.on_hover_text("Add as overlay")
 }
 
 pub fn render_variable_list(
@@ -59,10 +77,15 @@ fn render_variable_row(
     let is_selected = ctx.selected_idx == idx;
     let units = var_info.units.as_deref().unwrap_or("");
 
-    let resp = allocate_row(ui, row_id(NodeKey::Variable(idx), ctx.search_active));
-    // Over the button the row itself is not hovered, so test the pointer.
+    let id = row_id(NodeKey::Variable(idx), ctx.search_active);
+    let resp = allocate_row(ui, id);
+    // Shown while the pointer is anywhere on the row, button included.
     let offer_overlay = ctx.can_overlay && ui.rect_contains_pointer(resp.rect);
-    let trailing = if offer_overlay { OVERLAY_BUTTON } else { 0.0 };
+    let button = overlay_button_rect(resp.rect);
+    let trailing = Trailing {
+        width: if offer_overlay { OVERLAY_ROOM } else { 0.0 },
+        hovered: offer_overlay && ui.rect_contains_pointer(button),
+    };
     paint_row(
         ui,
         &resp,
@@ -72,7 +95,7 @@ fn render_variable_row(
         is_selected,
         trailing,
     );
-    if offer_overlay && overlay_button(ui, resp.rect).clicked() {
+    if offer_overlay && overlay_button(ui, button, id.with("overlay")).clicked() {
         ctx.newly_overlaid_idx = Some(idx);
     }
     let clicked = resp.clicked();
