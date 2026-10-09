@@ -181,12 +181,7 @@ impl eframe::App for OctantApp {
 
         // Overlays anchor relative to the remaining canvas rect
         let canvas_rect = ui.available_rect_before_wrap();
-        if !is_hero_active {
-            crate::ui::colorbar::show_colorbar_overlay(self, &ctx, canvas_rect);
-        }
-        crate::ui::variables_overlay::show_variables_overlay(self, &ctx, canvas_rect);
-        crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
-        crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);
+        self.show_floating_panels(&ctx, canvas_rect, !is_hero_active);
         crate::ui::toast::show_toasts(self, &ctx, canvas_rect);
 
         // 4. Drawing Canvas Area with Aspect Data Ratio

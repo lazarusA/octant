@@ -9,11 +9,15 @@
 //! - `overlays`: adding, removing and aligning overlays over the base layer.
 //! - `pipeline`: GPU pipeline (re)build from `MatrixData`, color params,
 //!   3D aspect ratio.
+//! - `floating`: the floating panels and colorbars over the canvas.
 //! - `ui`: the `eframe::App` per-frame update/paint loop.
 
 mod actions;
 mod block_loading;
 mod data_loading;
+mod floating;
+#[cfg(test)]
+mod floating_tests;
 pub mod layers;
 #[cfg(test)]
 mod overlay_composite_tests;
