@@ -39,7 +39,7 @@ impl OctantApp {
             }
             AppAction::SetTimestep(step) => {
                 self.current_timestep = step;
-                self.load_selected_variable_block();
+                self.load_step_blocks();
             }
             AppAction::SetPlotType(plot_type) => {
                 self.switch_plot_type(plot_type);
@@ -58,12 +58,8 @@ impl OctantApp {
             }
             AppAction::TogglePlayback => {
                 self.is_playing = !self.is_playing;
-                if self.is_playing
-                    && let Some(meta) = &self.plotted().metadata
-                    && let Some(var) = meta.variables.get(self.plotted().variable_idx)
-                {
-                    let shape = var.shape.clone();
-                    self.prefetch_selected_animated_range(&shape);
+                if self.is_playing {
+                    self.prefetch_animated_ranges();
                 }
             }
 

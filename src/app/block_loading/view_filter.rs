@@ -22,17 +22,19 @@ pub fn covers_step(block: &OctantBlock, dim: usize, step: usize) -> bool {
 }
 
 impl OctantApp {
-    /// Whether `block` holds data of the current view: it overlaps the requested
-    /// range on every spatial axis (`axes`: block dim and inclusive request),
-    /// and covers the current step unless the animated axis is itself spatial
-    /// (then the blocks along it together make up the volume).
+    /// Whether `block` holds data of layer `id`'s current view: it overlaps the
+    /// requested range on every spatial axis (`axes`: block dim and inclusive
+    /// request), and covers the layer's step unless the animated axis is itself
+    /// spatial (then the blocks along it together make up the volume).
     pub(crate) fn block_in_view(
         &self,
+        id: LayerId,
         block: &OctantBlock,
         anim_dim: Option<usize>,
         anim_is_spatial: bool,
         axes: [(usize, (usize, usize)); 3],
     ) -> bool {
+        let step = self.layer_step(id);
         let span = |dim: usize| {
             let origin = block.origin.get(dim).copied().unwrap_or(0);
             (origin, block.shape.get(dim).copied().unwrap_or(1))
@@ -41,7 +43,7 @@ impl OctantApp {
             && dim < block.rank()
         {
             let (origin, len) = span(dim);
-            if !(origin..origin + len).contains(&self.current_timestep) {
+            if !(origin..origin + len).contains(&step) {
                 return false;
             }
         }
@@ -50,8 +52,7 @@ impl OctantApp {
             .all(|&(dim, req)| {
                 let (origin, len) = span(dim);
                 if Some(dim) == anim_dim && anim_is_spatial {
-                    overlaps(origin, len, req)
-                        || (origin..origin + len).contains(&self.current_timestep)
+                    overlaps(origin, len, req) || (origin..origin + len).contains(&step)
                 } else {
                     overlaps(origin, len, req)
                 }
@@ -75,7 +76,7 @@ impl OctantApp {
                 return false;
             }
             let covers_current =
-                anim_dim.is_some_and(|dim| covers_step(block, dim, self.current_timestep));
+                anim_dim.is_some_and(|dim| covers_step(block, dim, self.layer_step(id)));
             let is_volume = self.layer_selections(id).is_some_and(|(_, staged)| {
                 matches!(staged.plot_type, PlotType::Volume | PlotType::PointCloud)
             });
@@ -83,56 +84,66 @@ impl OctantApp {
         })
     }
 
-    /// Plots resident `block` for the selection (`selections`, any step along
-    /// `anim_dim`): syncs the plotted state, projects it (and the other blocks
-    /// of a reset volume) and queues the rest of the animated range.
+    /// Plots resident `block` in layer `id` for its selection of dataset
+    /// `source_id` (`selections`, any step along `anim_dim`): syncs the base
+    /// layer's plotted state, projects it (and the other blocks of a reset
+    /// volume) and queues the rest of the animated range.
     pub(crate) fn show_cached_block(
         &mut self,
+        id: LayerId,
+        source_id: &str,
         block: &OctantBlock,
         selections: &[DimensionSelection],
         anim_dim: Option<usize>,
-        shape: &[u64],
     ) {
         self.status_message = format!(
             "Block cache HIT for '{}' ({} bytes resident)",
             block.variable_name,
             block.bytes_size()
         );
-        self.layers.base.load.pending_target_step = None;
-        self.sync_plotted_state_from_selected();
-        let allocations = self.layers.base.data.volume_allocations;
-        self.apply_block_projection(LayerId::BASE, block);
-        let source_id = self.selected_source_id();
+        let Some(layer) = self.layers.get_mut(id) else {
+            return;
+        };
+        layer.load.pending_target_step = None;
+        if id == LayerId::BASE {
+            self.sync_plotted_state_from_selected();
+        }
+        let since = self.layers.get(id).map_or(0, |l| l.data.volume_allocations);
+        self.apply_block_projection(id, block);
         self.project_cached_volume_blocks(
-            &source_id,
+            id,
+            source_id,
             &block.variable_name,
             selections,
             anim_dim,
-            allocations,
+            since,
         );
-        self.prefetch_selected_animated_range(shape);
+        self.prefetch_layer_animated_range(id);
     }
 
-    /// Projects every cached block of the plotted selection after the volume
+    /// Projects every cached block of layer `id`'s selection after its volume
     /// was reset (`volume_allocations` moved past `since`, a new selection): a
     /// volume can be built from several resident blocks (along an animated
     /// spatial axis), and a cache hit only delivers the one covering the
     /// current step. Playback steps keep the volume and skip this.
     pub(crate) fn project_cached_volume_blocks(
         &mut self,
+        id: LayerId,
         source_id: &str,
         var_name: &str,
         selections: &[DimensionSelection],
         anim_dim: Option<usize>,
         since: u64,
     ) {
-        if self.layers.base.data.volume_allocations == since {
+        let Some(layer) = self.layers.get(id) else {
+            return;
+        };
+        if layer.data.volume_allocations == since {
             return;
         }
-        let is_volume = matches!(
-            self.selected.plot_type,
-            crate::plots::PlotType::Volume | crate::plots::PlotType::PointCloud
-        );
+        let is_volume = self.layer_selections(id).is_some_and(|(_, staged)| {
+            matches!(staged.plot_type, PlotType::Volume | PlotType::PointCloud)
+        });
         if !is_volume {
             return;
         }
@@ -140,7 +151,7 @@ impl OctantApp {
             .block_cache
             .matching_blocks(source_id, var_name, selections, anim_dim);
         for block in &blocks {
-            self.apply_block_projection(LayerId::BASE, block);
+            self.apply_block_projection(id, block);
         }
     }
 }

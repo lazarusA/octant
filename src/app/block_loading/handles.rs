@@ -56,24 +56,4 @@ impl OctantApp {
         })
         .ok()
     }
-
-    /// Returns the open `StoreHandle` for the currently selected (target) dataset from `dataset_manager`.
-    pub fn selected_store_handle(&self) -> Option<crate::data::StoreHandle> {
-        let source_id = self.selected_source_id();
-        self.resolve_store_handle(
-            &source_id,
-            &self.selected.store_target,
-            self.selected.store_kind,
-        )
-    }
-
-    /// Returns the open `StoreHandle` for the currently plotted dataset from `dataset_manager`.
-    pub fn plotted_store_handle(&self) -> Option<crate::data::StoreHandle> {
-        let source_id = self.plotted_source_id();
-        self.resolve_store_handle(
-            &source_id,
-            &self.plotted().store_target,
-            self.plotted().store_kind,
-        )
-    }
 }

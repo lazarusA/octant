@@ -90,15 +90,6 @@ impl OctantApp {
         self.layers.base.color.lock_bounds = false;
     }
 
-    /// Returns the source_id string for the currently plotted store.
-    pub fn plotted_source_id(&self) -> String {
-        if !self.plotted().store_target.is_empty() {
-            StoreKind::make_source_id(self.plotted().store_kind, &self.plotted().store_target)
-        } else {
-            self.selected_source_id()
-        }
-    }
-
     /// Returns the source_id string for the currently selected (UI active) store.
     pub fn selected_source_id(&self) -> String {
         StoreKind::make_source_id(self.selected.store_kind, &self.selected.store_target)

@@ -57,6 +57,7 @@ pub struct PrefetchDispatchParams<'a> {
     pub max_concurrent: usize,
     pub base_req: &'a SliceRequest,
     pub store_handle: &'a crate::data::StoreHandle,
+    pub source_id: &'a str,
 }
 
 #[cfg(test)]
