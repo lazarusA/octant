@@ -5,59 +5,36 @@ use super::show_variable_controls;
 use crate::app::OctantApp;
 use crate::app::test_support::{make_resident, memory_app, selection_of};
 use crate::data::SliceRequest;
-use egui::{Event, PointerButton, Pos2, RawInput, Rect, pos2};
+use crate::ui::test_input::Harness;
+use egui::epaint::ClippedShape;
+use egui::{Pos2, Rect, Ui, pos2};
 
 const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1200.0, 900.0));
 
-/// Runs one frame with `events`; returns the center of the painted text
-/// `label`, if any.
-fn run_frame(
-    app: &mut OctantApp,
-    ctx: &egui::Context,
-    events: Vec<Event>,
-    label: &str,
-) -> Option<Pos2> {
-    let input = RawInput {
-        screen_rect: Some(SCREEN),
-        events,
-        ..Default::default()
-    };
-    let mut output = ctx.run_ui(input, |ui| show_variable_controls(app, ui.ctx(), SCREEN));
-    output.textures_delta.clear();
-    output
-        .shapes
-        .iter()
-        .find_map(|clipped| match &clipped.shape {
-            egui::Shape::Text(text) if text.galley.text() == label => {
-                Some(text.pos + text.galley.size() * 0.5)
-            }
-            _ => None,
-        })
+/// One frame of `app`'s Dimensions panel.
+fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
+    |ui| show_variable_controls(app, ui.ctx(), SCREEN)
+}
+
+/// The center of the painted text `label` in `shapes`, if any.
+fn text_center(shapes: &[ClippedShape], label: &str) -> Option<Pos2> {
+    shapes.iter().find_map(|clipped| match &clipped.shape {
+        egui::Shape::Text(text) if text.galley.text() == label => {
+            Some(text.pos + text.galley.size() * 0.5)
+        }
+        _ => None,
+    })
 }
 
 /// Clicks the painted text `label` of the panel; whether it was found.
 fn click(app: &mut OctantApp, label: &str) -> bool {
-    let ctx = egui::Context::default();
-    let mut at = None;
-    for _ in 0..3 {
-        at = run_frame(app, &ctx, Vec::new(), label);
-    }
-    let Some(pos) = at else {
+    let mut h = Harness::new(SCREEN);
+    let shapes = h.settle(3, &mut run(app));
+    let Some(pos) = text_center(&shapes, label) else {
         return false;
     };
-    let press = |pressed| Event::PointerButton {
-        pos,
-        button: PointerButton::Primary,
-        pressed,
-        modifiers: Default::default(),
-    };
-    run_frame(
-        app,
-        &ctx,
-        vec![Event::PointerMoved(pos), press(true)],
-        label,
-    );
-    run_frame(app, &ctx, vec![press(false)], label);
+    h.pointer(pos, Some(true), &mut run(app));
+    h.pointer(pos, Some(false), &mut run(app));
     true
 }
 

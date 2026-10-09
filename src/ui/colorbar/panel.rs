@@ -33,47 +33,59 @@ pub fn show(app: &mut OctantApp, ctx: &egui::Context, id: LayerId, canvas: Rect)
     let width = layout::panel_width(orientation, canvas);
     let bar_len = layout::bar_length(orientation, width, canvas);
 
-    let style = ctx.style_of(ctx.theme());
-    let alpha_mult = (1.0 - app.colorbar_transparency).clamp(0.0, 1.0);
-    let fill = style.visuals.window_fill.linear_multiply(alpha_mult);
-    let stroke_color = style
-        .visuals
-        .window_stroke
-        .color
-        .linear_multiply(alpha_mult);
-    let stroke = egui::Stroke::new(style.visuals.window_stroke.width, stroke_color);
-    let mut shadow = style.visuals.window_shadow;
-    shadow.color = shadow.color.linear_multiply(alpha_mult);
-
+    let frame = panel_frame(ctx, app.colorbar_transparency);
     egui::Area::new(egui::Id::new(super::salt("octant_colorbar_overlay", id)))
         .order(egui::Order::Middle)
         .pivot(pivot)
         .fixed_pos(point)
         .constrain_to(canvas)
         .show(ctx, |ui| {
-            let frame = egui::Frame::window(ui.style())
-                .fill(fill)
-                .stroke(stroke)
-                .shadow(shadow)
-                .inner_margin(egui::Margin::symmetric(layout::MARGIN_X, 8))
-                .show(ui, |ui| {
-                    ui.set_width(width - 2.0 * f32::from(layout::MARGIN_X));
-                    match orientation {
-                        BarOrientation::Horizontal => ui.vertical_centered(|ui| {
-                            title_row(app, ui, id, TITLE_SIDE);
-                            ui.add_space(3.0);
-                            horizontal_bar(app, ui, id, bar_len);
-                        }),
-                        BarOrientation::Vertical => ui.vertical(|ui| {
-                            // Room for the controls above the title.
-                            ui.add_space(controls::CONTROL);
-                            title_row(app, ui, id, 0.0);
-                            vertical_bar(app, ui, id, bar_len);
-                        }),
-                    };
-                });
-            controls::show(app, ui, id, frame.response.rect, (pivot, canvas));
+            let shown = frame.show(ui, |ui| {
+                ui.set_width(width - 2.0 * f32::from(layout::MARGIN_X));
+                contents(app, ui, id, orientation, bar_len);
+            });
+            controls::show(app, ui, id, shown.response.rect, (pivot, canvas));
         });
+}
+
+/// The window frame of a colorbar panel, its fill, outline and shadow
+/// faded by the colorbar `transparency`.
+fn panel_frame(ctx: &egui::Context, transparency: f32) -> egui::Frame {
+    let style = ctx.style_of(ctx.theme());
+    let visuals = &style.visuals;
+    let alpha = (1.0 - transparency).clamp(0.0, 1.0);
+    let stroke_color = visuals.window_stroke.color.linear_multiply(alpha);
+    let mut shadow = visuals.window_shadow;
+    shadow.color = shadow.color.linear_multiply(alpha);
+    egui::Frame::window(&style)
+        .fill(visuals.window_fill.linear_multiply(alpha))
+        .stroke(egui::Stroke::new(visuals.window_stroke.width, stroke_color))
+        .shadow(shadow)
+        .inner_margin(egui::Margin::symmetric(layout::MARGIN_X, 8))
+}
+
+/// The title over a horizontal bar `bar_len` long, or the controls' room,
+/// the title and a vertical bar.
+fn contents(
+    app: &mut OctantApp,
+    ui: &mut egui::Ui,
+    id: LayerId,
+    orientation: BarOrientation,
+    bar_len: f32,
+) {
+    match orientation {
+        BarOrientation::Horizontal => ui.vertical_centered(|ui| {
+            title_row(app, ui, id, TITLE_SIDE);
+            ui.add_space(3.0);
+            horizontal_bar(app, ui, id, bar_len);
+        }),
+        BarOrientation::Vertical => ui.vertical(|ui| {
+            // Room for the controls above the title.
+            ui.add_space(controls::CONTROL);
+            title_row(app, ui, id, 0.0);
+            vertical_bar(app, ui, id, bar_len);
+        }),
+    };
 }
 
 /// The editable title: the custom label, or the variable name and units;

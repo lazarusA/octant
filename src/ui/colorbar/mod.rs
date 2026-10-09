@@ -13,6 +13,8 @@ pub mod handles;
 mod layout;
 #[cfg(test)]
 mod layout_tests;
+#[cfg(test)]
+mod order_tests;
 mod panel;
 #[cfg(test)]
 mod tests;

@@ -6,73 +6,11 @@ use super::controls;
 use super::show_colorbar_overlay;
 use crate::app::OctantApp;
 use crate::app::layers::{BarOrientation, LayerId};
-use egui::{Event, PointerButton, Pos2, RawInput, Rect, Vec2, pos2};
+use crate::ui::test_input::Harness;
+use egui::epaint::ClippedShape;
+use egui::{Rect, Ui, Vec2, pos2};
 
 const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1200.0, 900.0));
-
-struct Harness {
-    ctx: egui::Context,
-    time: f64,
-}
-
-impl Harness {
-    /// A harness that has laid the colorbar out over a few frames.
-    fn new(app: &mut OctantApp) -> Self {
-        let mut h = Self {
-            ctx: egui::Context::default(),
-            time: 0.0,
-        };
-        for _ in 0..3 {
-            h.frame(app, Vec::new());
-        }
-        h
-    }
-
-    /// Runs one frame with `events`; how many circles were painted (the
-    /// grip's dots).
-    fn frame(&mut self, app: &mut OctantApp, events: Vec<Event>) -> usize {
-        self.time += 1.0 / 60.0;
-        let input = RawInput {
-            screen_rect: Some(SCREEN),
-            time: Some(self.time),
-            events,
-            ..Default::default()
-        };
-        let mut output = self
-            .ctx
-            .run_ui(input, |ui| show_colorbar_overlay(app, ui.ctx(), SCREEN));
-        output.textures_delta.clear();
-        output
-            .shapes
-            .iter()
-            .filter(|c| matches!(c.shape, egui::Shape::Circle(_)))
-            .count()
-    }
-
-    /// The base layer's colorbar panel.
-    fn panel(&self) -> Rect {
-        let id = egui::Id::new(("octant_colorbar_overlay", LayerId::BASE));
-        self.ctx
-            .memory(|m| m.area_rect(id))
-            .expect("the base colorbar is shown")
-    }
-
-    fn press(&mut self, app: &mut OctantApp, pos: Pos2, pressed: bool) {
-        let event = Event::PointerButton {
-            pos,
-            button: PointerButton::Primary,
-            pressed,
-            modifiers: Default::default(),
-        };
-        self.frame(app, vec![Event::PointerMoved(pos), event]);
-    }
-
-    fn click(&mut self, app: &mut OctantApp, pos: Pos2) {
-        self.frame(app, vec![Event::PointerMoved(pos)]);
-        self.press(app, pos, true);
-        self.press(app, pos, false);
-    }
-}
 
 fn app() -> OctantApp {
     OctantApp {
@@ -81,22 +19,45 @@ fn app() -> OctantApp {
     }
 }
 
+/// One frame of `app`'s colorbars.
+fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
+    |ui| show_colorbar_overlay(app, ui.ctx(), SCREEN)
+}
+
+/// A harness that has laid the colorbar out over a few frames.
+fn harness(app: &mut OctantApp) -> Harness {
+    let mut h = Harness::new(SCREEN);
+    h.settle(3, &mut run(app));
+    h
+}
+
+/// The base layer's colorbar panel.
+fn panel(h: &Harness) -> Rect {
+    h.area(egui::Id::new(("octant_colorbar_overlay", LayerId::BASE)))
+}
+
+/// How many circles `shapes` holds (the grip's dots).
+fn circles(shapes: &[ClippedShape]) -> usize {
+    shapes
+        .iter()
+        .filter(|c| matches!(c.shape, egui::Shape::Circle(_)))
+        .count()
+}
+
 #[test]
 fn controls_show_only_while_the_panel_is_hovered() {
     let mut app = app();
-    let mut h = Harness::new(&mut app);
-    assert_eq!(
-        h.frame(&mut app, vec![Event::PointerMoved(pos2(5.0, 5.0))]),
-        0
-    );
-    let inside = h.panel().center();
-    assert!(h.frame(&mut app, vec![Event::PointerMoved(inside)]) >= 6);
+    let mut h = harness(&mut app);
+    let away = h.pointer(pos2(5.0, 5.0), None, &mut run(&mut app));
+    assert_eq!(circles(&away), 0);
+    let inside = h.pointer(panel(&h).center(), None, &mut run(&mut app));
+    assert!(circles(&inside) >= 6);
 }
 
 #[test]
 fn controls_hide_during_export() {
     let mut app = app();
-    let mut h = Harness::new(&mut app);
+    let mut h = harness(&mut app);
     app.pending_export = Some(crate::export::PendingExportRequest {
         format: Default::default(),
         target: Default::default(),
@@ -107,51 +68,41 @@ fn controls_hide_during_export() {
         canvas_rect_in_points: Rect::NOTHING,
         pixels_per_point: 1.0,
     });
-    let inside = h.panel().center();
-    assert_eq!(h.frame(&mut app, vec![Event::PointerMoved(inside)]), 0);
+    let inside = h.pointer(panel(&h).center(), None, &mut run(&mut app));
+    assert_eq!(circles(&inside), 0);
 }
 
 #[test]
 fn dragging_the_grip_moves_the_panel_and_double_click_resets_it() {
     let mut app = app();
-    let mut h = Harness::new(&mut app);
-    let before = h.panel();
+    let mut h = harness(&mut app);
+    let before = panel(&h);
     let [grip, _] = controls::rects(before);
-    let start = grip.center();
-    h.frame(&mut app, vec![Event::PointerMoved(start)]);
-    h.press(&mut app, start, true);
     let delta = Vec2::new(-200.0, -300.0);
-    for step in 1..=10 {
-        let at = start + delta * (step as f32 / 10.0);
-        h.frame(&mut app, vec![Event::PointerMoved(at)]);
-    }
-    h.press(&mut app, start + delta, false);
-    h.frame(&mut app, Vec::new());
+    h.drag(grip.center(), delta, &mut run(&mut app));
 
     assert!(app.layers.base.colorbar.pos.is_some());
-    let moved = h.panel().center_bottom() - before.center_bottom();
+    let moved = panel(&h).center_bottom() - before.center_bottom();
     assert!((moved - delta).length() < 12.0, "moved by {moved:?}");
 
-    let [grip, _] = controls::rects(h.panel());
-    h.click(&mut app, grip.center());
-    h.click(&mut app, grip.center());
+    let [grip, _] = controls::rects(panel(&h));
+    h.click(grip.center(), &mut run(&mut app));
+    h.click(grip.center(), &mut run(&mut app));
     assert_eq!(app.layers.base.colorbar.pos, None);
 }
 
 #[test]
 fn the_flip_turns_the_bar() {
     let mut app = app();
-    let mut h = Harness::new(&mut app);
-    let [_, flip] = controls::rects(h.panel());
-    h.click(&mut app, flip.center());
+    let mut h = harness(&mut app);
+    let [_, flip] = controls::rects(panel(&h));
+    h.click(flip.center(), &mut run(&mut app));
     assert_eq!(
         app.layers.base.colorbar.orientation,
         BarOrientation::Vertical
     );
-    for _ in 0..3 {
-        h.frame(&mut app, Vec::new());
-    }
-    let panel = h.panel();
+    h.settle(3, &mut run(&mut app));
+    let panel = panel(&h);
     assert!(panel.height() > panel.width(), "vertical panel: {panel:?}");
     assert!(SCREEN.contains_rect(panel));
 }

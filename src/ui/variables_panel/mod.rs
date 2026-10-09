@@ -14,8 +14,9 @@ pub use dimension_slider::{
 pub use info::show_variable_info;
 
 use crate::app::OctantApp;
-use crate::ui::drag_grip::{self, GripAction};
-use crate::ui::icons::{Icon, IconSize, IconTone, PanelHeader, ToolbarButton, UiIconExt};
+use crate::ui::drag_grip::GripAction;
+use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
+use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
 
 /// Width of the Dimensions panel's content; every dimension box fills it.
@@ -46,42 +47,46 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                 .stroke(egui::Stroke::NONE)
                 .show(ui, |ui| {
                     ui.set_width(panel_w);
-
-                    let Some(var_info) = app.selected.variable_info().cloned() else {
-                        ui.label("No variable selected.");
-                        return;
-                    };
-                    let header = header_row(ui, &var_info);
-                    grip = header.grip;
-                    if header.close {
-                        app.show_variable_controls = false;
-                        if !app.show_variables_overlay {
-                            app.revert_selected_state_to_plotted();
-                        }
-                    }
-                    if plot_row(app, ui) {
-                        app.plot_from_panel();
-                    }
-
-                    ui.add_space(4.0);
-
-                    egui::CollapsingHeader::new("Dimension Sliders")
-                        .default_open(true)
-                        .show(ui, |ui| {
-                            show_dimension_sliders(app, ui, &var_info);
-                        });
+                    grip = show_panel(app, ui);
                 });
         });
     let rect = area_resp.response.rect;
     panel_layout::apply_grip(app, Panel::Dimensions, grip, rect, canvas_rect);
 }
 
+/// The staged variable's header, Plot Data row and dimension sliders; what
+/// the header's grip asked for.
+fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> GripAction {
+    let Some(var_info) = app.selected.variable_info().cloned() else {
+        ui.label("No variable selected.");
+        return GripAction::None;
+    };
+    let header = header_row(ui, &var_info);
+    if header.close {
+        app.show_variable_controls = false;
+        if !app.show_variables_overlay {
+            app.revert_selected_state_to_plotted();
+        }
+    }
+    if plot_row(app, ui) {
+        app.plot_from_panel();
+    }
+
+    ui.add_space(4.0);
+
+    egui::CollapsingHeader::new("Dimension Sliders")
+        .default_open(true)
+        .show(ui, |ui| {
+            show_dimension_sliders(app, ui, &var_info);
+        });
+    header.grip
+}
+
 /// The header's first row: the variable's name, expanding to its details,
 /// the drag grip and the close button, and what those two asked for.
 fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> PanelHeader {
     let header_id = ui.make_persistent_id(("var_info_header", &var_info.name));
-    let mut close = false;
-    let mut grip = GripAction::None;
+    let mut header = PanelHeader::default();
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, false)
         .show_header(ui, |ui| {
             ui.icon(Icon::VariableDoc, IconSize::Sm);
@@ -90,15 +95,14 @@ fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> PanelH
                 None => var_info.name.clone(),
             };
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                close = ui.close_button("Close Dimension Panel").clicked();
-                grip = drag_grip::action(&ui.add(drag_grip::button(IconSize::Sm)));
+                header = panel_header::buttons(ui, "Close Dimension Panel");
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     ui.add(egui::Label::new(egui::RichText::new(name).strong()).truncate());
                 });
             });
         })
         .body(|ui| show_variable_info(ui, var_info));
-    PanelHeader { close, grip }
+    header
 }
 
 /// The header's second row, right-aligned: the "Add Overlay" toggle

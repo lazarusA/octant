@@ -18,8 +18,9 @@ mod tests;
 pub use search::SearchCache;
 
 use crate::app::OctantApp;
-use crate::ui::icons::{Icon, PanelHeader, UiIconExt};
+use crate::ui::icons::{Icon, UiIconExt};
 use crate::ui::key_focus;
+use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
 use nav::SearchJump;
 
@@ -76,7 +77,12 @@ fn show_panel(
     let mut header = None;
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)
         .show_header(ui, |ui| {
-            header = Some(ui.panel_header(Icon::Variables, "Variables", "Close Variables Window"));
+            header = Some(panel_header::show(
+                ui,
+                Icon::Variables,
+                "Variables",
+                "Close Variables Window",
+            ));
         })
         .body(|ui| {
             let search =

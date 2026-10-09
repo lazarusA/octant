@@ -19,6 +19,7 @@ pub mod key_focus;
 pub mod layer_label;
 #[cfg(test)]
 mod layer_label_tests;
+pub mod panel_header;
 pub mod panel_layout;
 #[cfg(test)]
 mod panel_layout_tests;
@@ -26,6 +27,8 @@ pub mod plot_type;
 pub mod settings;
 pub mod status;
 pub mod store;
+#[cfg(test)]
+pub(crate) mod test_input;
 #[cfg(test)]
 pub(crate) mod test_render;
 pub mod toast;
