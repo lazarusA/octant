@@ -5,6 +5,7 @@
 mod alignment;
 #[cfg(test)]
 mod alignment_tests;
+mod colorbar;
 mod data;
 mod id;
 mod layer;
@@ -21,6 +22,7 @@ mod style_tests;
 mod window;
 
 pub use alignment::{Alignment, classify};
+pub use colorbar::{BarOrientation, ColorbarPlacement, Slot};
 pub use data::LayerData;
 pub use id::LayerId;
 pub use layer::{LABEL_BUF, Layer};

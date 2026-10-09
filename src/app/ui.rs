@@ -170,13 +170,8 @@ impl eframe::App for OctantApp {
             crate::ui::store::show_left_panel(self, ui);
         }
 
-        if !is_hero_active {
-            if self.has_animated_dimension() {
-                crate::ui::bottom_bar::show_bottom_bar(self, ui);
-            }
-            if self.show_colorbar {
-                crate::ui::colorbar::show_colorbar_overlay(self, &ctx);
-            }
+        if !is_hero_active && self.has_animated_dimension() {
+            crate::ui::bottom_bar::show_bottom_bar(self, ui);
         }
 
         crate::ui::catalog::show_catalog_window(self, &ctx);
@@ -186,6 +181,9 @@ impl eframe::App for OctantApp {
 
         // Overlays anchor relative to the remaining canvas rect
         let canvas_rect = ui.available_rect_before_wrap();
+        if !is_hero_active {
+            crate::ui::colorbar::show_colorbar_overlay(self, &ctx, canvas_rect);
+        }
         crate::ui::variables_overlay::show_variables_overlay(self, &ctx, canvas_rect);
         crate::ui::settings::show_settings_window(self, &ctx, canvas_rect);
         crate::ui::variables_panel::show_variable_controls(self, &ctx, canvas_rect);

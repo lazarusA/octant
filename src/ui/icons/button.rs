@@ -30,6 +30,7 @@ pub struct ToolbarButton<'a> {
     owns_popup: bool,
     toggled: bool,
     icon_size: IconSize,
+    sense: Sense,
 }
 
 impl<'a> ToolbarButton<'a> {
@@ -43,6 +44,7 @@ impl<'a> ToolbarButton<'a> {
             owns_popup: false,
             toggled: false,
             icon_size: IconSize::Md,
+            sense: Sense::click(),
         }
     }
 
@@ -82,6 +84,13 @@ impl<'a> ToolbarButton<'a> {
     /// `Md`, giving the 24 px toolbar height.
     pub fn icon_size(mut self, size: IconSize) -> Self {
         self.icon_size = size;
+        self
+    }
+
+    /// What the button responds to; defaults to clicks. A drag handle senses
+    /// `Sense::click_and_drag()`.
+    pub fn sense(mut self, sense: Sense) -> Self {
+        self.sense = sense;
         self
     }
 
@@ -156,7 +165,7 @@ impl<'a> ToolbarButton<'a> {
 impl Widget for ToolbarButton<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let (size, galley) = self.layout(ui);
-        let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+        let (rect, response) = ui.allocate_exact_size(size, self.sense);
 
         if ui.is_rect_visible(rect) {
             self.paint_frame(ui, rect, &response);

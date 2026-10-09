@@ -1,7 +1,7 @@
 //! The plotted layers, drawn in order. The base layer always exists and
 //! decides the canvas (plot type, axes, colorbar, hover); overlays draw over it.
 
-use super::{Layer, LayerId, Source};
+use super::{Layer, LayerId, Slot, Source};
 use crate::data::BlockCacheKey;
 
 pub struct LayerStack {
@@ -14,7 +14,7 @@ pub struct LayerStack {
 impl Default for LayerStack {
     fn default() -> Self {
         Self {
-            base: Layer::new(LayerId::BASE, Source::default()),
+            base: Layer::new(LayerId::BASE, Source::default(), Slot::Bottom(0)),
             overlays: Vec::new(),
             next_id: LayerId::BASE.next(),
         }
@@ -22,11 +22,14 @@ impl Default for LayerStack {
 }
 
 impl LayerStack {
-    /// Adds an overlay drawn from `source` on top of the others, under a new id.
+    /// Adds an overlay drawn from `source` on top of the others, under a new
+    /// id, its colorbar in the first free slot.
     pub fn push(&mut self, source: Source) -> LayerId {
         let id = self.next_id;
         self.next_id = id.next();
-        self.overlays.push(Layer::new(id, source));
+        let taken: Vec<Slot> = self.iter().map(|layer| layer.colorbar.slot).collect();
+        let slot = Slot::first_free(&taken);
+        self.overlays.push(Layer::new(id, source, slot));
         id
     }
 

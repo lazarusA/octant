@@ -1,4 +1,5 @@
-//! Single-glyph marks: check, cross, warning, info, bullet, chevrons and eyes.
+//! Single-glyph marks: check, cross, warning, info, bullet, chevrons, eyes,
+//! the drag grip and the orientation flip.
 
 use super::canvas::{IconCanvas, Weight, key};
 use egui::{Color32, Stroke};
@@ -88,4 +89,29 @@ pub fn draw_eye(c: &IconCanvas) {
 pub fn draw_eye_off(c: &IconCanvas) {
     eye(c);
     c.path_round(&[(4.0, 20.0), (20.0, 4.0)], c.stroke(Weight::Bold));
+}
+
+/// Grip: a 2x3 grid of dots, the handle that drags a panel (8x14 keyline).
+pub fn draw_grip(c: &IconCanvas) {
+    for x in [8.0, 16.0] {
+        for y in [5.0, 12.0, 19.0] {
+            c.dot((x, y), 1.9, c.color);
+        }
+    }
+}
+
+/// Orientation: a horizontal bar turning into a vertical one along a
+/// quarter-turn arrow (18x18 keyline).
+pub fn draw_orientation(c: &IconCanvas) {
+    use std::f32::consts::PI;
+    let s = c.stroke(Weight::Base);
+    let fill = if c.compact() {
+        Color32::TRANSPARENT
+    } else {
+        c.body()
+    };
+    c.rrect((key::SQ_MIN, 16.0), (13.0, key::SQ_MAX), 1.0, fill, s);
+    c.rrect((16.0, key::SQ_MIN), (key::SQ_MAX, 13.0), 1.0, fill, s);
+    c.curve(c.arc((11.5, 11.5), (6.5, 6.5), PI, 1.5 * PI), s);
+    c.path_round(&[(9.5, 2.8), (11.7, 5.0), (9.5, 7.2)], s);
 }
