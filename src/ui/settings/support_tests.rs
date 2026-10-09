@@ -209,3 +209,19 @@ fn an_overlay_menu_follows_its_own_heatmap_layer() {
         PlotType::Volume
     );
 }
+
+#[test]
+fn volumes_and_point_clouds_hide_the_categorical_toggle() {
+    for plot_type in ALL_TYPES {
+        let expected = if matches!(plot_type, PlotType::Volume | PlotType::PointCloud) {
+            Support::No
+        } else {
+            Support::Yes
+        };
+        assert_eq!(
+            state(plot_type).support().categorical,
+            expected,
+            "{plot_type:?}"
+        );
+    }
+}

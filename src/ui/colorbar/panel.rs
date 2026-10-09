@@ -9,7 +9,6 @@ use super::ticks::{ScientificTick, TICK_BUF};
 use super::{controls, layout};
 use crate::app::OctantApp;
 use crate::app::layers::{BarOrientation, LayerId};
-use crate::plots::PlotType;
 use crate::ui::layer_label::LabelEditor;
 use crate::utils::colormap::unscale_norm_to_value;
 use egui::{Pos2, Rect, Vec2};
@@ -164,8 +163,8 @@ fn bar_row(
     }
 }
 
-/// Paints layer `id`'s bar on `axis`: categorical swatches on 2D plots set
-/// to categorical, else a gradient. Returns the value under `hover`.
+/// Paints layer `id`'s bar on `axis`: categorical swatches when the layer is
+/// set to categorical and its plot draws categories, else a gradient. Returns the value under `hover`.
 fn paint_bar(
     app: &OctantApp,
     ui: &egui::Ui,
@@ -173,10 +172,6 @@ fn paint_bar(
     axis: BarAxis,
     hover: Option<Pos2>,
 ) -> Option<f32> {
-    let is_3d = matches!(
-        app.effective_canvas_plot_type(),
-        PlotType::Volume | PlotType::PointCloud
-    );
     let layer = app.layers.get(id)?;
     let visuals = ui.visuals();
     let colors = BarColors {
@@ -189,7 +184,7 @@ fn paint_bar(
         color: style,
         colormap: app.layer_colormap(layer),
     };
-    if !is_3d && style.categorical {
+    if style.categorical && app.effective_canvas_plot_type().draws_categories() {
         let unique = layer.data.matrix.as_ref().and_then(|m| m.unique_values());
         bars::draw_categorical(ui, axis, &bar, unique, colors);
     } else {

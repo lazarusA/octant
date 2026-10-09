@@ -65,8 +65,10 @@ pub(crate) struct PlotState {
 pub(crate) struct OptionSupport {
     /// Color range min and max (also the line plot's value axis).
     pub color_range: Support,
-    /// Scale, categorical colors, and the low and high clip colors.
+    /// Scale and the low and high clip colors.
     pub color_mapping: Support,
+    /// The Categorical toggle (`PlotType::draws_categories`).
+    pub categorical: Support,
     pub nan_color: Support,
     /// Opacity and the alpha curve.
     pub opacity: Support,
@@ -121,6 +123,7 @@ impl PlotState {
         OptionSupport {
             color_range: self.color_range(),
             color_mapping: self.color_mapping(),
+            categorical: self.categorical(),
             nan_color: self.nan_color(),
             opacity: self.opacity(),
             transparency: self.transparency(),
@@ -151,6 +154,14 @@ impl PlotState {
         match self.color_range() {
             Support::Yes => self.line_override().unwrap_or(Support::Yes),
             other => other,
+        }
+    }
+
+    fn categorical(&self) -> Support {
+        if self.plot_type.draws_categories() {
+            self.color_mapping()
+        } else {
+            Support::No
         }
     }
 
