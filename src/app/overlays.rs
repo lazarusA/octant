@@ -25,10 +25,27 @@ impl OctantApp {
         None
     }
 
+    /// Why variable `var_idx` of the staged dataset can't be added as an
+    /// overlay: any reason none can, or it already is a layer (the plot or an
+    /// overlay; each variable overlays once). `None` when it can.
+    pub fn overlay_unavailable_for(&self, var_idx: usize) -> Option<&'static str> {
+        self.overlay_unavailable().or_else(|| {
+            let staged = &self.selected;
+            let shown = self.layers.iter().any(|layer| {
+                let s = layer.selection();
+                s.variable_idx == var_idx
+                    && s.store_kind == staged.store_kind
+                    && s.store_target == staged.store_target
+                    && s.metadata.is_some()
+            });
+            shown.then_some("Already a layer of the plot")
+        })
+    }
+
     /// Adds variable `var_idx` of the staged dataset as an overlay reading the
     /// base layer's window, and loads it. Tells the user when it can't be.
     pub fn add_overlay(&mut self, var_idx: usize) -> Option<LayerId> {
-        if let Some(reason) = self.overlay_unavailable() {
+        if let Some(reason) = self.overlay_unavailable_for(var_idx) {
             self.notify(Severity::Warning, "Can't add overlay", reason);
             return None;
         }
@@ -59,18 +76,19 @@ impl OctantApp {
         Some(id)
     }
 
-    /// The Dimensions panel's Plot button: adds the staged variable as an
-    /// overlay while `plot_as_overlay` is on (then turns it off, so a second
-    /// click doesn't add it again), else plots it in place of the base layer.
+    /// The Dimensions panel's Plot Data button: while its Add Overlay toggle
+    /// is on, adds the staged variable as an overlay and turns the toggle off;
+    /// otherwise plots the staged selection in place of the base layer and
+    /// opens the settings.
     pub fn plot_from_panel(&mut self) {
         if self.plot_as_overlay {
             self.plot_as_overlay = false;
             self.add_overlay(self.selected.variable_idx);
-        } else {
-            self.show_hero = false;
-            self.plot_selection();
-            self.open_only_settings_panel();
+            return;
         }
+        self.show_hero = false;
+        self.plot_selection();
+        self.open_only_settings_panel();
     }
 
     /// Removes overlay `id`, its opacity curve row and the colormap picker's

@@ -103,33 +103,34 @@ fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> bool {
     close
 }
 
-/// The header's second row, right-aligned: the overlay toggle, then the Plot
-/// button, which reads "Add Overlay" while the toggle is on. Whether it was
-/// clicked.
+/// The header's second row, right-aligned: the "Add Overlay" toggle
+/// (highlighted while on; disabled with the reason while the staged variable
+/// can't be overlaid), then "Plot Data", which adds the variable as an
+/// overlay while the toggle is on. Whether Plot Data was clicked.
 fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
-    let unavailable = app.overlay_unavailable();
+    let unavailable = app.overlay_unavailable_for(app.selected.variable_idx);
     if unavailable.is_some() {
         app.plot_as_overlay = false;
     }
-    let (icon, text) = if app.plot_as_overlay {
-        (Icon::Layers, "Add Overlay")
-    } else {
-        let plot_icon = crate::ui::plot_type::plot_type_icon(app.selected.plot_type);
-        (plot_icon, "Plot Data")
-    };
+    let plot_icon = crate::ui::plot_type::plot_type_icon(app.selected.plot_type);
     let mut plot = false;
     // One row tall: a bare right-to-left layout would take the panel's height.
     let row = egui::vec2(ui.available_width(), ui.spacing().interact_size.y);
     let layout = egui::Layout::right_to_left(egui::Align::Center);
     ui.allocate_ui_with_layout(row, layout, |ui| {
+        let hover = if app.plot_as_overlay {
+            "Fetch this variable and add it as an overlay over the plot"
+        } else {
+            "Fetch this variable and plot it"
+        };
         plot = ui
-            .outlined_icon_button(icon, text, IconTone::Default)
+            .outlined_icon_button(plot_icon, "Plot Data", IconTone::Default)
+            .on_hover_text(hover)
             .clicked();
-        let toggle = ToolbarButton::new(Icon::Layers, "Overlay")
-            .compact(true)
+        let toggle = ToolbarButton::new(Icon::Layers, "Add Overlay")
             .icon_size(IconSize::Sm)
             .toggled(app.plot_as_overlay)
-            .hover("Add this variable as an overlay over the plot");
+            .hover("Plot Data adds this variable as an overlay while on");
         let response = ui.add_enabled(unavailable.is_none(), toggle);
         let response = match unavailable {
             Some(reason) => response.on_disabled_hover_text(reason),

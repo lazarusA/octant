@@ -1,30 +1,137 @@
-//! The Dimensions panel header: its overlay toggle turns itself off while no
-//! overlay can be added.
+//! The Dimensions panel header: the Add Overlay toggle, then Plot Data, adds
+//! the staged variable as an overlay once; the toggle stays off while it can't.
 
 use super::show_variable_controls;
 use crate::app::OctantApp;
-use crate::app::test_support::{memory_app, selection_of};
-use egui::{RawInput, Rect, pos2};
+use crate::app::test_support::{make_resident, memory_app, selection_of};
+use crate::data::SliceRequest;
+use egui::{Event, PointerButton, Pos2, RawInput, Rect, pos2};
 
 const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1200.0, 900.0));
 
-fn run_frame(ctx: &egui::Context, app: &mut OctantApp) {
+/// Runs one frame with `events`; returns the center of the painted text
+/// `label`, if any.
+fn run_frame(
+    app: &mut OctantApp,
+    ctx: &egui::Context,
+    events: Vec<Event>,
+    label: &str,
+) -> Option<Pos2> {
     let input = RawInput {
         screen_rect: Some(SCREEN),
+        events,
         ..Default::default()
     };
     let mut output = ctx.run_ui(input, |ui| show_variable_controls(app, ui.ctx(), SCREEN));
     output.textures_delta.clear();
+    output
+        .shapes
+        .iter()
+        .find_map(|clipped| match &clipped.shape {
+            egui::Shape::Text(text) if text.galley.text() == label => {
+                Some(text.pos + text.galley.size() * 0.5)
+            }
+            _ => None,
+        })
+}
+
+/// Clicks the painted text `label` of the panel; whether it was found.
+fn click(app: &mut OctantApp, label: &str) -> bool {
+    let ctx = egui::Context::default();
+    let mut at = None;
+    for _ in 0..3 {
+        at = run_frame(app, &ctx, Vec::new(), label);
+    }
+    let Some(pos) = at else {
+        return false;
+    };
+    let press = |pressed| Event::PointerButton {
+        pos,
+        button: PointerButton::Primary,
+        pressed,
+        modifiers: Default::default(),
+    };
+    run_frame(
+        app,
+        &ctx,
+        vec![Event::PointerMoved(pos), press(true)],
+        label,
+    );
+    run_frame(app, &ctx, vec![press(false)], label);
+    true
+}
+
+/// `t2m` plotted from resident blocks, `sst` resident and staged in the panel.
+fn plotted_with_sst_staged() -> OctantApp {
+    let (mut app, meta) = memory_app();
+    for name in ["t2m", "sst"] {
+        make_resident(&mut app, &SliceRequest::full_range(name, &[3, 5, 4]));
+    }
+    let base = selection_of(&mut app, &meta, "t2m");
+    *app.layers.base.selection_mut() = base.clone();
+    app.selected = base;
+    app.load_selected_variable_block();
+    app.selected = selection_of(&mut app, &meta, "sst");
+    app.show_variable_controls = true;
+    app
 }
 
 #[test]
-fn the_overlay_toggle_is_off_while_nothing_is_plotted() {
+fn add_overlay_then_plot_data_adds_the_overlay() {
+    let mut app = plotted_with_sst_staged();
+    let base_var = app.plotted().variable_idx;
+
+    assert!(click(&mut app, "Add Overlay"), "the toggle is shown");
+    assert!(app.plot_as_overlay, "the toggle is on");
+    assert!(app.layers.overlays().is_empty(), "nothing is added yet");
+
+    assert!(click(&mut app, "Plot Data"));
+    assert_eq!(app.layers.overlays().len(), 1, "added as an overlay");
+    assert!(!app.plot_as_overlay, "the toggle turns off");
+    assert_eq!(app.plotted().variable_idx, base_var, "the plot stays");
+}
+
+#[test]
+fn add_overlay_toggles_off_again() {
+    let mut app = plotted_with_sst_staged();
+    click(&mut app, "Add Overlay");
+    click(&mut app, "Add Overlay");
+    assert!(!app.plot_as_overlay);
+}
+
+#[test]
+fn a_variable_overlays_only_once() {
+    let mut app = plotted_with_sst_staged();
+    app.plot_as_overlay = true;
+    app.plot_from_panel();
+    assert_eq!(app.layers.overlays().len(), 1);
+
+    assert!(
+        app.overlay_unavailable_for(app.selected.variable_idx)
+            .is_some()
+    );
+    click(&mut app, "Add Overlay");
+    assert!(!app.plot_as_overlay, "the toggle is disabled for it");
+    app.plot_as_overlay = true;
+    assert!(app.add_overlay(app.selected.variable_idx).is_none());
+    assert_eq!(app.layers.overlays().len(), 1);
+
+    let base_var = app.plotted().variable_idx;
+    assert!(
+        app.overlay_unavailable_for(base_var).is_some(),
+        "nor the plot's own"
+    );
+}
+
+#[test]
+fn add_overlay_stays_off_while_nothing_is_plotted() {
     let (mut app, meta) = memory_app();
     app.selected = selection_of(&mut app, &meta, "t2m");
     app.show_variable_controls = true;
-    app.plot_as_overlay = true;
-    let ctx = egui::Context::default();
-    run_frame(&ctx, &mut app);
-    assert!(app.overlay_unavailable().is_some());
-    assert!(!app.plot_as_overlay, "nothing to overlay yet");
+    assert!(
+        click(&mut app, "Add Overlay"),
+        "the toggle is shown, disabled"
+    );
+    assert!(!app.plot_as_overlay);
+    assert!(app.layers.overlays().is_empty());
 }

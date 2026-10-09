@@ -55,10 +55,12 @@ fn no_overlay_is_added_without_a_plotted_heatmap() {
 #[test]
 fn at_most_max_overlays_are_added() {
     let (mut app, meta) = plotted_app();
-    for _ in 0..MAX_OVERLAYS {
-        assert!(app.add_overlay(index_of(&meta, "sst")).is_some());
+    assert!(app.add_overlay(index_of(&meta, "sst")).is_some());
+    for _ in 1..MAX_OVERLAYS {
+        app.layers.push(crate::app::layers::Source::default());
     }
-    assert_eq!(app.add_overlay(index_of(&meta, "sst")), None);
+    assert!(app.overlay_unavailable().is_some(), "the stack is full");
+    assert_eq!(app.add_overlay(index_of(&meta, "elev")), None);
     assert_eq!(app.layers.overlays().len(), MAX_OVERLAYS);
 }
 
@@ -121,7 +123,7 @@ fn the_picker_edits_its_target_overlay_until_it_is_removed() {
 fn the_hover_reads_each_drawn_overlay_at_the_base_cell() {
     let (mut app, meta) = plotted_app();
     let id = app.add_overlay(index_of(&meta, "sst")).expect("overlay");
-    let hidden = app.add_overlay(index_of(&meta, "t2m")).expect("overlay");
+    let hidden = app.add_overlay(index_of(&meta, "elev")).expect("overlay");
     if let Some(layer) = app.layers.get_mut(hidden) {
         layer.visible = false;
     }
@@ -183,29 +185,5 @@ fn an_overlay_color_range_resets_to_its_own_data() {
         (base.range_min, base.range_max),
         base_range,
         "the base keeps its range"
-    );
-}
-
-#[test]
-fn the_panel_plot_button_adds_an_overlay_once_while_toggled() {
-    let (mut app, meta) = plotted_app();
-    let base_var = app.plotted().variable_idx;
-    app.selected.variable_idx = index_of(&meta, "sst");
-    app.plot_as_overlay = true;
-
-    app.plot_from_panel();
-    assert_eq!(app.layers.overlays().len(), 1, "added as an overlay");
-    assert!(!app.plot_as_overlay, "the toggle turns off after adding");
-    assert_eq!(
-        app.plotted().variable_idx,
-        base_var,
-        "the base keeps its plot"
-    );
-
-    app.plot_from_panel();
-    assert_eq!(
-        app.layers.overlays().len(),
-        1,
-        "a second click plots instead"
     );
 }
