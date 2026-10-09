@@ -6,8 +6,8 @@ pub mod info;
 pub use dimension_slider::{
     calculate_download_sizes, calculate_max_animated_steps, calculate_selected_2d_elements,
     calculate_selected_volume_elements, double_slider_with_inputs, format_byte_size,
-    init_variable_dimension_defaults, is_volume_allowed, is_volume_allowed_for_selection,
-    show_dimension_sliders,
+    init_layer_composite_defaults, init_variable_dimension_defaults, is_volume_allowed,
+    is_volume_allowed_for_selection, show_dimension_sliders,
 };
 pub use info::show_variable_info;
 

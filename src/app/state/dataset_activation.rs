@@ -116,16 +116,18 @@ impl OctantApp {
         self.request_canvas_export(out_path, false);
     }
 
-    /// Check if the currently plotted dataset/variable has 2 or more bands/channels available for RGB composition.
+    /// Whether the plotted variable has 2 or more bands for an RGB composite.
     pub fn has_rgb_bands(&self) -> bool {
-        let Some(var) = self.plotted_variable_info() else {
+        self.layer_has_rgb_bands(LayerId::BASE)
+    }
+
+    /// Whether layer `id`'s variable has 2 or more bands for an RGB composite.
+    pub fn layer_has_rgb_bands(&self, id: LayerId) -> bool {
+        let Some(var) = self.layer_variable_info(id) else {
             return false;
         };
-        if var.shape.len() < 2 {
-            return false;
-        }
-        let c_idx = self.channel_dim_index().unwrap_or(0);
-        var.shape.get(c_idx).copied().unwrap_or(0) >= 2
+        let c_idx = self.layer_channel_dim(id).unwrap_or(0);
+        var.shape.len() >= 2 && var.shape.get(c_idx).copied().unwrap_or(0) >= 2
     }
 
     /// Return the dimension index corresponding to channels/bands for the currently plotted variable.
@@ -138,21 +140,30 @@ impl OctantApp {
         channel_dim(self.layer_variable_info(id)?)
     }
 
-    /// Return the total number of bands/channels for the currently plotted variable, if multi-band.
+    /// The number of bands of the plotted variable (3 without one).
     pub fn num_bands(&self) -> usize {
-        let Some(var) = self.plotted_variable_info() else {
+        self.layer_num_bands(LayerId::BASE)
+    }
+
+    /// The number of bands of layer `id`'s variable (3 without one).
+    pub fn layer_num_bands(&self, id: LayerId) -> usize {
+        let Some(var) = self.layer_variable_info(id) else {
             return 3;
         };
-        let c_idx = self.channel_dim_index().unwrap_or(0);
+        let c_idx = self.layer_channel_dim(id).unwrap_or(0);
         var.shape.get(c_idx).copied().unwrap_or(3) as usize
     }
 
-    /// Returns true if the currently plotted variable represents a CMYK color space dataset.
+    /// Whether the plotted variable holds CMYK inks.
     pub fn is_cmyk(&self) -> bool {
-        let Some(var) = self.plotted_variable_info() else {
+        self.layer_is_cmyk(LayerId::BASE)
+    }
+
+    /// Whether layer `id`'s variable holds CMYK inks.
+    pub fn layer_is_cmyk(&self, id: LayerId) -> bool {
+        let Some(var) = self.layer_variable_info(id) else {
             return false;
         };
-
         crate::data::slicing::composite::cmyk::is_cmyk_attrs(|key| match key {
             "long_name" => var.long_name.as_deref(),
             _ => var.attributes.get(key).map(String::as_str),
@@ -188,30 +199,25 @@ impl OctantApp {
         )
     }
 
-    /// Returns the effective `(start, end)` selected range for a given dimension index.
+    /// The plotted `(start, end)` selection of dimension `dim_idx`.
     pub fn get_effective_dim_range(&self, dim_idx: usize) -> (usize, usize) {
-        let (configs, ranges, indices) = if !self.plotted().dim_config.is_empty() {
-            (
-                &self.plotted().dim_config,
-                &self.plotted().dim_ranges,
-                &self.plotted().dim_indices,
-            )
-        } else {
-            (
-                &self.selected.dim_config,
-                &self.selected.dim_ranges,
-                &self.selected.dim_indices,
-            )
-        };
-        if let Some(cfg) = configs.get(dim_idx) {
-            if cfg.active {
-                ranges.get(dim_idx).copied().unwrap_or((0, usize::MAX))
-            } else {
-                let idx = indices.get(dim_idx).copied().unwrap_or(0);
+        self.layer_dim_range(LayerId::BASE, dim_idx)
+    }
+
+    /// Layer `id`'s `(start, end)` selection of dimension `dim_idx`: its
+    /// range while expanded, else its single index.
+    pub fn layer_dim_range(&self, id: LayerId, dim_idx: usize) -> (usize, usize) {
+        let range = self.layer_dim_ranges(id).get(dim_idx).copied();
+        match self.layer_dim_config(id).get(dim_idx) {
+            Some(cfg) if !cfg.active => {
+                let idx = self
+                    .layer_dim_indices(id)
+                    .get(dim_idx)
+                    .copied()
+                    .unwrap_or(0);
                 (idx, idx)
             }
-        } else {
-            ranges.get(dim_idx).copied().unwrap_or((0, usize::MAX))
+            _ => range.unwrap_or((0, usize::MAX)),
         }
     }
 }

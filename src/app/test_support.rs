@@ -35,11 +35,19 @@ fn write_array(store: &Arc<MemoryStore>, name: &str, dims: &[&str], shape: &[u64
     array.store_array_subset(&all, &values).expect("values");
 }
 
-/// An app whose dataset manager holds an in-memory store: `elev(lat, lon)` (5x4) and
-/// `t2m`, `sst(time, lat, lon)` (3x5x4, one step per chunk). Nothing is plotted.
+/// An app whose dataset manager holds an in-memory store: `elev(lat, lon)` (5x4),
+/// `t2m`, `sst(time, lat, lon)` (3x5x4, one step per chunk) and `rgb(band, lat,
+/// lon)` (3x5x4). Nothing is plotted.
 pub(crate) fn memory_app() -> (OctantApp, DatasetMetadata) {
     let store = Arc::new(MemoryStore::new());
     write_array(&store, "elev", &["lat", "lon"], &[5, 4], &[5, 4]);
+    write_array(
+        &store,
+        "rgb",
+        &["band", "lat", "lon"],
+        &[3, 5, 4],
+        &[3, 5, 4],
+    );
     for name in ["t2m", "sst"] {
         write_array(
             &store,

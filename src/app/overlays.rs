@@ -46,10 +46,14 @@ impl OctantApp {
             );
             return None;
         }
+        let var = selection.variable_info().cloned();
         let id = self.layers.push(Source::Variable(selection));
         if let Some(layer) = self.layers.get_mut(id) {
             layer.alignment = alignment;
             layer.color.opacity = OVERLAY_OPACITY;
+        }
+        if let Some(var) = var {
+            crate::ui::variables_panel::init_layer_composite_defaults(self, id, &var);
         }
         self.load_layer_block(id);
         Some(id)

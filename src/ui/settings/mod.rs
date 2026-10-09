@@ -1,6 +1,7 @@
 mod clipping;
 mod coastline;
 pub(crate) mod composite;
+mod composite_rgb;
 mod export;
 mod layers;
 mod opacity;
@@ -85,8 +86,8 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
     app.settings_overlay_width = area_resp.response.rect.width();
 }
 
-/// The plot's own options, then color (with transparency), overlays,
-/// resolution, view and export sections. Sections and settings the plot has no use for
+/// The plot's own options, then the Layers menu (each layer's composite and
+/// Color menu), overlays, resolution, view and export sections. Sections and settings the plot has no use for
 /// are left out (`support`).
 fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
     let plot_type = app.effective_canvas_plot_type();
@@ -97,11 +98,7 @@ fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
     let support = PlotState::of(app).support();
     ui.add_space(4.0);
     ui.separator();
-    egui::CollapsingHeader::new("Color")
-        .id_salt("settings_color_section")
-        .default_open(false)
-        .show(ui, |ui| show_color_menu(app, ui, LayerId::BASE));
-    layers::show_layer_list(app, ui);
+    layers::show_layers_menu(app, ui);
     if support.coastlines != Support::No {
         section(ui, "Overlays");
         coastline::show_coastline_controls(app, ui);

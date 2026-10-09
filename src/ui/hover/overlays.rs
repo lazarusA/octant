@@ -5,6 +5,7 @@ use crate::app::OctantApp;
 use crate::app::layers::Layer;
 use crate::app::overlays::MAX_OVERLAYS;
 use crate::ui::hover::card::{HoverValue, LayerValue};
+use crate::ui::hover::composite::CompositeKind;
 use crate::ui::hover::entries::resolve_variable_units;
 use crate::utils::colormap::evaluate_color_cpu;
 
@@ -23,13 +24,27 @@ pub fn overlay_values<'a>(
         let var = layer.selection().variable_info();
         *slot = LayerValue {
             name: var.map_or("overlay", |v| v.leaf_name()),
-            value: HoverValue::from_raw(raw, None),
+            value: HoverValue::from_raw(raw, composite_kind(app, layer)),
             units: resolve_variable_units(var),
             swatch: evaluate_color_cpu(raw, &app.get_color_params(layer)),
         };
         count += 1;
     }
     count
+}
+
+/// The kind of `layer`'s composite, while one is drawn: a channel overlay,
+/// CMYK inks or bands drawn as RGB.
+fn composite_kind(app: &OctantApp, layer: &Layer) -> Option<CompositeKind> {
+    let id = layer.id();
+    let kind = if !layer.composite.channel_configs.is_empty() && !app.layer_is_geotiff(id) {
+        CompositeKind::Overlay
+    } else if app.layer_is_cmyk(id) {
+        CompositeKind::Cmyk
+    } else {
+        CompositeKind::Rgb
+    };
+    layer.composite.enabled.then_some(kind)
 }
 
 /// `layer`'s value at cell `(px, py)` of its full-resolution grid, NaN when

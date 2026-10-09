@@ -15,6 +15,8 @@ mod actions;
 mod block_loading;
 mod data_loading;
 pub mod layers;
+#[cfg(test)]
+mod overlay_composite_tests;
 pub mod overlays;
 #[cfg(test)]
 mod overlays_tests;
