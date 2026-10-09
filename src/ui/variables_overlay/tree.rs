@@ -1,6 +1,6 @@
 use super::item::{MAX_ITEMS_PER_LEVEL, render_variable_list, truncation_note};
 use super::nav::{self, NodeKey, SearchJump, folder_state, row_id};
-use super::row::{RowKind, Trailing, allocate_row, paint_row};
+use super::row::{RowKind, allocate_row, paint_row};
 use crate::data::{VariableInfo, VariableTreeGroup};
 use crate::utils::stack_str;
 
@@ -9,10 +9,6 @@ pub struct VariableTreeContext<'a> {
     pub selected_idx: usize,
     pub search_active: bool,
     pub newly_selected_idx: Option<usize>,
-    /// Variable rows offer "Add as overlay" (`OctantApp::overlay_unavailable`).
-    pub can_overlay: bool,
-    /// Variable whose "Add as overlay" button was clicked this frame.
-    pub newly_overlaid_idx: Option<usize>,
     /// Search field to return focus to from the first row or on Escape.
     pub search_id: egui::Id,
     /// Pending focus jump requested by a key in the search field.
@@ -89,7 +85,7 @@ fn render_folder(
     let kind = RowKind::Folder {
         open: state.is_open(),
     };
-    paint_row(ui, &resp, kind, name, detail, false, Trailing::default());
+    paint_row(ui, &resp, kind, name, detail, false);
 
     state.show_body_indented(&resp, ui, add_body);
 }

@@ -94,6 +94,9 @@ pub struct OctantApp {
     pub show_variables_overlay: bool,
     pub show_settings_panel: bool,
     pub show_variable_controls: bool,
+    /// The Dimensions panel's Plot button adds the staged variable as an
+    /// overlay instead of replacing the plot (off again after each add).
+    pub plot_as_overlay: bool,
     pub variables_overlay_width: f32,
     pub variable_search: String,
     pub show_bottom_bar: bool,

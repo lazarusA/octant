@@ -185,3 +185,27 @@ fn an_overlay_color_range_resets_to_its_own_data() {
         "the base keeps its range"
     );
 }
+
+#[test]
+fn the_panel_plot_button_adds_an_overlay_once_while_toggled() {
+    let (mut app, meta) = plotted_app();
+    let base_var = app.plotted().variable_idx;
+    app.selected.variable_idx = index_of(&meta, "sst");
+    app.plot_as_overlay = true;
+
+    app.plot_from_panel();
+    assert_eq!(app.layers.overlays().len(), 1, "added as an overlay");
+    assert!(!app.plot_as_overlay, "the toggle turns off after adding");
+    assert_eq!(
+        app.plotted().variable_idx,
+        base_var,
+        "the base keeps its plot"
+    );
+
+    app.plot_from_panel();
+    assert_eq!(
+        app.layers.overlays().len(),
+        1,
+        "a second click plots instead"
+    );
+}

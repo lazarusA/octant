@@ -70,16 +70,7 @@ struct RowColors {
     chevron: Color32,
 }
 
-/// A button at a row's right end: the room its labels leave free, and whether
-/// the pointer is on it (the button then shows the hover, not the row).
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Trailing {
-    pub width: f32,
-    pub hovered: bool,
-}
-
 /// Paint a row allocated by [`allocate_row`] and describe it for accessibility.
-/// Labels end `trailing.width` points before the right edge.
 pub fn paint_row(
     ui: &Ui,
     resp: &Response,
@@ -87,7 +78,6 @@ pub fn paint_row(
     label: &str,
     detail: &str,
     selected: bool,
-    trailing: Trailing,
 ) {
     // Built lazily: egui only calls this when accessibility output is wanted,
     // so idle frames don't allocate the label.
@@ -103,19 +93,17 @@ pub fn paint_row(
     if !ui.is_rect_visible(resp.rect) {
         return;
     }
-    let colors = paint_background(ui, resp, selected, trailing.hovered);
+    let colors = paint_background(ui, resp, selected);
     let x = paint_icons(ui, resp.rect, kind, colors);
-    let mut labels = resp.rect;
-    labels.max.x -= trailing.width;
-    paint_labels(ui, labels, x, label, detail, colors);
+    paint_labels(ui, resp.rect, x, label, detail, colors);
 }
 
 /// Selection fill, or hover/focus fill, plus the focus ring; returns the
-/// colors for the row's content. A hovered trailing button takes the hover.
-fn paint_background(ui: &Ui, resp: &Response, selected: bool, button_hovered: bool) -> RowColors {
+/// colors for the row's content.
+fn paint_background(ui: &Ui, resp: &Response, selected: bool) -> RowColors {
     let visuals = ui.visuals();
     let radius = visuals.widgets.hovered.corner_radius;
-    let hot = (resp.hovered() && !button_hovered) || resp.has_focus();
+    let hot = resp.hovered() || resp.has_focus();
     if selected {
         ui.painter()
             .rect_filled(resp.rect, radius, visuals.selection.bg_fill);

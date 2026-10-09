@@ -59,6 +59,20 @@ impl OctantApp {
         Some(id)
     }
 
+    /// The Dimensions panel's Plot button: adds the staged variable as an
+    /// overlay while `plot_as_overlay` is on (then turns it off, so a second
+    /// click doesn't add it again), else plots it in place of the base layer.
+    pub fn plot_from_panel(&mut self) {
+        if self.plot_as_overlay {
+            self.plot_as_overlay = false;
+            self.add_overlay(self.selected.variable_idx);
+        } else {
+            self.show_hero = false;
+            self.plot_selection();
+            self.open_only_settings_panel();
+        }
+    }
+
     /// Removes overlay `id`, its opacity curve row and the colormap picker's
     /// hold on it.
     pub fn remove_overlay(&mut self, id: LayerId) {
