@@ -37,3 +37,25 @@ fn dirty_volume_planes_merge_for_both_renderers() {
     assert_eq!(renderers.volume_dirty, Some(1..6));
     assert_eq!(renderers.point_cloud_dirty, Some(1..6));
 }
+
+#[test]
+fn overlay_colorbars_fill_top_right_left_then_bottom_and_reuse_freed_slots() {
+    use super::{BarOrientation, Slot};
+    let mut stack = LayerStack::default();
+    assert_eq!(stack.base.colorbar.slot, Slot::Bottom(0));
+    let ids: Vec<LayerId> = (0..4).map(|_| stack.push(Source::default())).collect();
+    let slot_of = |stack: &LayerStack, id| stack.get(id).map(|l| l.colorbar.slot);
+    let slots: Vec<_> = ids.iter().map(|&id| slot_of(&stack, id)).collect();
+    let expected = [Slot::Top, Slot::Right, Slot::Left, Slot::Bottom(1)];
+    assert_eq!(slots, expected.map(Some));
+    let side = stack.get(ids[1]).map(|l| l.colorbar.orientation);
+    assert_eq!(side, Some(BarOrientation::Vertical));
+    let top = stack.get(ids[0]).map(|l| l.colorbar.orientation);
+    assert_eq!(top, Some(BarOrientation::Horizontal));
+
+    assert!(stack.remove(ids[1]));
+    let again = stack.push(Source::default());
+    assert_eq!(slot_of(&stack, again), Some(Slot::Right));
+    let fifth = stack.push(Source::default());
+    assert_eq!(slot_of(&stack, fifth), Some(Slot::Bottom(2)));
+}

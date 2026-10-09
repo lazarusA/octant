@@ -20,7 +20,9 @@ mod view;
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::icons::Icon;
+use crate::ui::panel_header::{self, PanelHeader};
+use crate::ui::panel_layout::{self, Panel};
 use support::{PlotState, Support};
 
 /// Shortest the scrolled settings body gets on a very short canvas.
@@ -34,56 +36,52 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
         return;
     }
 
-    let x_offset = if app.show_variables_overlay && app.variables_overlay_width > 0.0 {
-        app.variables_overlay_width + 16.0
-    } else {
-        8.0
-    };
-
-    let mut should_close = false;
+    let origin = panel_layout::origin(app, Panel::Settings, canvas_rect);
+    let mut header = None;
     let area_resp = egui::Area::new(egui::Id::new("octant_settings_area"))
-        .fixed_pos(egui::pos2(
-            canvas_rect.left() + x_offset,
-            canvas_rect.top() + 8.0,
-        ))
+        .fixed_pos(origin)
+        .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
             egui::Frame::popup(ui.style())
                 .stroke(egui::Stroke::NONE)
-                .show(ui, |ui| {
-                    ui.set_max_width(280.0);
-                    let header_id = ui.make_persistent_id("settings_panel_header");
-                    egui::collapsing_header::CollapsingState::load_with_default_open(
-                        ui.ctx(),
-                        header_id,
-                        true,
-                    )
-                    .show_header(ui, |ui| {
-                        should_close =
-                            ui.panel_header(Icon::Settings, "Settings", "Close Settings");
-                    })
-                    .body(|ui| {
-                        // Scroll the body rather than run past the canvas bottom.
-                        let bottom_margin = 8.0 + f32::from(ui.style().spacing.menu_margin.bottom);
-                        let max_height = (canvas_rect.bottom() - bottom_margin - ui.cursor().top())
-                            .max(MIN_BODY_HEIGHT);
-                        // The area lends its last-frame size; open up to the
-                        // canvas so the body can grow when a section expands.
-                        ui.set_max_height(max_height);
-                        egui::ScrollArea::vertical()
-                            .id_salt("settings_panel_scroll")
-                            .max_height(max_height)
-                            .show(ui, |ui| show_settings_body(app, ui));
-                    });
-                });
+                .show(ui, |ui| header = show_panel(app, ui, canvas_rect));
         });
 
-    if should_close {
-        app.show_settings_panel = false;
-    }
-
     // Store width for next frame so Variable Controls can position to the right.
-    app.settings_overlay_width = area_resp.response.rect.width();
+    let rect = area_resp.response.rect;
+    app.settings_overlay_width = rect.width();
+    if let Some(header) = header {
+        panel_layout::apply_grip(app, Panel::Settings, header.grip, rect, canvas_rect);
+        if header.close {
+            app.show_settings_panel = false;
+        }
+    }
+}
+
+/// The collapsible "Settings" header over the scrolled body, which stops
+/// short of the bottom of `canvas`; what the header's buttons asked for.
+fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Option<PanelHeader> {
+    ui.set_max_width(280.0);
+    let header_id = ui.make_persistent_id("settings_panel_header");
+    let mut header = None;
+    egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)
+        .show_header(ui, |ui| {
+            let title = panel_header::show(ui, Icon::Settings, "Settings", "Close Settings");
+            header = Some(title);
+        })
+        .body(|ui| {
+            // Scroll the body rather than run past the canvas bottom.
+            let max_height = panel_layout::room_below(ui, canvas).max(MIN_BODY_HEIGHT);
+            // The area lends its last-frame size; open up to the canvas so the
+            // body can grow when a section expands.
+            ui.set_max_height(max_height);
+            egui::ScrollArea::vertical()
+                .id_salt("settings_panel_scroll")
+                .max_height(max_height)
+                .show(ui, |ui| show_settings_body(app, ui));
+        });
+    header
 }
 
 /// The plot's own options, then the Layers menu (each layer's composite and

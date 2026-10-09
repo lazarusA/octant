@@ -30,6 +30,7 @@ pub struct ToolbarButton<'a> {
     owns_popup: bool,
     toggled: bool,
     icon_size: IconSize,
+    sense: Sense,
 }
 
 impl<'a> ToolbarButton<'a> {
@@ -43,6 +44,7 @@ impl<'a> ToolbarButton<'a> {
             owns_popup: false,
             toggled: false,
             icon_size: IconSize::Md,
+            sense: Sense::click(),
         }
     }
 
@@ -85,6 +87,18 @@ impl<'a> ToolbarButton<'a> {
         self
     }
 
+    /// What the button responds to; defaults to clicks. A drag handle senses
+    /// `Sense::click_and_drag()`.
+    pub fn sense(mut self, sense: Sense) -> Self {
+        self.sense = sense;
+        self
+    }
+
+    /// Side of a compact (icon-only) button with a `size` glyph.
+    pub const fn side(size: IconSize) -> f32 {
+        size.px() + PAD * 2.0
+    }
+
     /// Width this button will occupy, without allocating it. Uses the same
     /// layout as drawing, so measured and drawn widths always agree.
     pub fn width(&self, ui: &Ui) -> f32 {
@@ -93,7 +107,7 @@ impl<'a> ToolbarButton<'a> {
 
     /// Button size and, when the label is shown, its galley.
     fn layout(&self, ui: &Ui) -> (egui::Vec2, Option<Arc<Galley>>) {
-        let side = self.icon_size.px() + PAD * 2.0;
+        let side = Self::side(self.icon_size);
         let galley = (!self.compact && !self.label.is_empty()).then(|| {
             WidgetText::from(self.label).into_galley(
                 ui,
@@ -156,7 +170,7 @@ impl<'a> ToolbarButton<'a> {
 impl Widget for ToolbarButton<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let (size, galley) = self.layout(ui);
-        let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+        let (rect, response) = ui.allocate_exact_size(size, self.sense);
 
         if ui.is_rect_visible(rect) {
             self.paint_frame(ui, rect, &response);

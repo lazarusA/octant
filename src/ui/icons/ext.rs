@@ -25,10 +25,6 @@ pub trait UiIconExt {
     /// buttons in the top-right corner of their panel or window.
     fn close_button(&mut self, hover: &str) -> Response;
 
-    /// Panel title row: `Sm` icon, bold `title`, and a close button pinned to
-    /// the top-right. Returns `true` when the close button was clicked.
-    fn panel_header(&mut self, icon: Icon, title: &str, close_hover: &str) -> bool;
-
     /// Search row: `Search` icon, a single-line field and, while `text` is
     /// non-empty, a clear button. The field fills the row unless `width` is
     /// given. Returns `true` when the text changed (typed or cleared).
@@ -80,15 +76,6 @@ impl UiIconExt for Ui {
 
     fn close_button(&mut self, hover: &str) -> Response {
         self.add(close_button_widget(hover))
-    }
-
-    fn panel_header(&mut self, icon: Icon, title: &str, close_hover: &str) -> bool {
-        self.icon(icon, IconSize::Sm);
-        self.label(egui::RichText::new(title).strong());
-        self.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.close_button(close_hover).clicked()
-        })
-        .inner
     }
 
     fn search_field(&mut self, text: &mut String, hint: &str, width: Option<f32>) -> bool {

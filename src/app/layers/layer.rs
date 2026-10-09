@@ -1,8 +1,8 @@
 //! One plotted layer: its source, data, renderers and style.
 
 use super::{
-    Alignment, ColorStyle, CompositeStyle, LayerData, LayerId, LayerRenderers, LoadState, Source,
-    VariableSelection,
+    Alignment, ColorStyle, ColorbarPlacement, CompositeStyle, LayerData, LayerId, LayerRenderers,
+    LoadState, Slot, Source, VariableSelection,
 };
 use crate::plots::VolumeEncoding;
 
@@ -19,11 +19,14 @@ pub struct Layer {
     pub visible: bool,
     /// How the layer lines up with the base layer; the base is `SameGrid`.
     pub alignment: Alignment,
+    /// Where the layer's colorbar sits on the canvas.
+    pub colorbar: ColorbarPlacement,
 }
 
 impl Layer {
     /// A layer drawn from `source`, with default data, renderers and style.
-    pub(super) fn new(id: LayerId, source: Source) -> Self {
+    /// Its colorbar starts in `slot`.
+    pub(super) fn new(id: LayerId, source: Source, slot: Slot) -> Self {
         Self {
             id,
             source,
@@ -37,6 +40,7 @@ impl Layer {
             load: LoadState::default(),
             visible: true,
             alignment: Alignment::SameGrid,
+            colorbar: ColorbarPlacement::at(slot),
         }
     }
 

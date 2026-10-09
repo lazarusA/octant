@@ -84,6 +84,7 @@ impl Default for OctantApp {
             show_bottom_bar: true,
             show_hover_card: true,
             settings_overlay_width: 0.0,
+            panel_positions: Default::default(),
             variables_overlay_width: 340.0,
             variable_search: String::new(),
 
