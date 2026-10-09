@@ -110,37 +110,43 @@ fn enrich_line_series_ortho_dim(
     best_line_idx: usize,
     l_count: usize,
 ) {
-    if let Some(v) = var {
-        let (explicit_x, explicit_y, _) = v.resolve_spatial_dim_indices(app.effective_dim_config());
+    let (field, dim) = series_field(app, meta, var, best_line_idx, l_count);
+    entries.insert(0, field);
+    used_dims.extend(dim);
+}
 
-        let ortho_dim_idx = match app.line_profile_dim_idx {
+/// Where series line `line` of `count` sits: the coordinate of the dimension
+/// the lines run across (with that dimension's index), else the line's index.
+pub(crate) fn series_field(
+    app: &OctantApp,
+    meta: Option<&DatasetMetadata>,
+    var: Option<&VariableInfo>,
+    line: usize,
+    count: usize,
+) -> (HoverField, Option<usize>) {
+    let ortho = var.and_then(|v| {
+        let (explicit_x, explicit_y, _) = v.resolve_spatial_dim_indices(app.effective_dim_config());
+        let idx = match app.line_profile_dim_idx {
             0 => explicit_y,
             1 => explicit_x,
             _ => None,
-        };
-
-        if let Some(o_idx) = ortho_dim_idx
-            && let Some(ortho_name) = v.dimension_names.get(o_idx)
-        {
-            let (origin_ortho, full_ortho_len) =
-                get_dimension_origin_and_full_len(app, Some(v), o_idx);
-            let line_offset = stored_offset(app, ortho_name, best_line_idx, l_count);
-            let global_ortho = (origin_ortho + line_offset).min(full_ortho_len.saturating_sub(1));
-            let ortho_str = format_dimension_coord(
-                meta,
-                Some(v),
-                Some(&app.plotted().store_target),
-                ortho_name,
-                global_ortho,
-                full_ortho_len,
-                None,
-            );
-            entries.insert(0, ortho_str);
-            used_dims.insert(o_idx);
-        } else {
-            entries.insert(0, HoverField::index_of("series", best_line_idx, l_count));
-        }
-    } else {
-        entries.insert(0, HoverField::index_of("series", best_line_idx, l_count));
-    }
+        }?;
+        Some((v, idx, v.dimension_names.get(idx)?))
+    });
+    let Some((v, o_idx, ortho_name)) = ortho else {
+        return (HoverField::index_of("series", line, count), None);
+    };
+    let (origin_ortho, full_ortho_len) = get_dimension_origin_and_full_len(app, Some(v), o_idx);
+    let line_offset = stored_offset(app, ortho_name, line, count);
+    let global_ortho = (origin_ortho + line_offset).min(full_ortho_len.saturating_sub(1));
+    let field = format_dimension_coord(
+        meta,
+        Some(v),
+        Some(&app.plotted().store_target),
+        ortho_name,
+        global_ortho,
+        full_ortho_len,
+        None,
+    );
+    (field, Some(o_idx))
 }

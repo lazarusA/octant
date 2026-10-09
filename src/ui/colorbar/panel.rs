@@ -6,7 +6,7 @@ use super::axis::BarAxis;
 use super::bars::{self, BarColors, BarStyle};
 use super::handles::{VERTICAL_END_ROOM, draw_clip_triangles, draw_end_range_inputs};
 use super::ticks::{ScientificTick, TICK_BUF};
-use super::{controls, layout};
+use super::{controls, layout, series};
 use crate::app::OctantApp;
 use crate::app::layers::{BarOrientation, LayerId};
 use crate::ui::layer_label::LabelEditor;
@@ -148,6 +148,10 @@ fn bar_row(
     axis: BarAxis,
     response: egui::Response,
 ) {
+    if id == LayerId::BASE && app.line_series_colored() {
+        series_bar_row(app, ui, axis, response);
+        return;
+    }
     let hover = paint_bar(app, ui, id, axis, response.hover_pos());
     let Some(layer) = app.layers.get_mut(id) else {
         return;
@@ -160,6 +164,21 @@ fn bar_row(
         let text =
             crate::utils::stack_str(&mut buf, format_args!("Val: {}", ScientificTick(value)));
         response.on_hover_text(text);
+    }
+}
+
+/// The series bar of a line plot colored by series: no range inputs or clip
+/// triangles (the colors follow the lines, not the values), and the hovered
+/// line's coordinate as tooltip.
+fn series_bar_row(app: &OctantApp, ui: &egui::Ui, axis: BarAxis, response: egui::Response) {
+    let colors = BarColors {
+        border: ui.visuals().widgets.noninteractive.fg_stroke.color,
+        strong_text: ui.visuals().strong_text_color(),
+        text: ui.visuals().text_color(),
+    };
+    series::draw(app, ui, axis, app.layer_colormap(&app.layers.base), colors);
+    if let Some(pos) = response.hover_pos() {
+        response.on_hover_text(series::hover_text(app, axis.t_at(pos)));
     }
 }
 

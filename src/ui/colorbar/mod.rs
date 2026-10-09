@@ -16,6 +16,7 @@ mod layout_tests;
 #[cfg(test)]
 mod order_tests;
 mod panel;
+mod series;
 #[cfg(test)]
 mod tests;
 pub mod ticks;
@@ -28,7 +29,8 @@ use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 
 /// Shows a colorbar on `canvas` for the base layer and each drawn overlay,
-/// unless the layer is an RGB composite (it has no colormap).
+/// unless the layer is an RGB composite (it has no colormap) or the base
+/// layer is a line plot in its custom color.
 pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas: egui::Rect) {
     if !app.show_colorbar {
         return;
@@ -38,8 +40,9 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas: e
             0 => Some(&app.layers.base),
             n => app.layers.overlays().get(n - 1),
         };
+        let custom_line = i == 0 && app.line_custom_colored();
         let Some(id) = layer
-            .filter(|l| l.is_drawn() && !l.composite.enabled)
+            .filter(|l| l.is_drawn() && !l.composite.enabled && !custom_line)
             .map(|l| l.id())
         else {
             continue;

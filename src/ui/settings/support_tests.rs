@@ -225,3 +225,20 @@ fn volumes_and_point_clouds_hide_the_categorical_toggle() {
         );
     }
 }
+
+#[test]
+fn line_series_colors_keep_the_categorical_toggle() {
+    let line = |line_custom_color, line_all_series| {
+        PlotState {
+            line_custom_color,
+            line_all_series,
+            ..state(PlotType::Line)
+        }
+        .support()
+        .categorical
+    };
+    assert_eq!(line(false, false), Support::Yes, "by value");
+    assert_eq!(line(false, true), Support::Yes, "one color per line");
+    assert!(overridden(line(true, false)), "custom color");
+    assert!(overridden(line(true, true)), "custom color");
+}

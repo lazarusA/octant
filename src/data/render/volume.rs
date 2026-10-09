@@ -145,35 +145,19 @@ impl VolumeData {
         profile
     }
 
-    /// Extracts all valid finite rays along Z (depth) flattened into a contiguous payload.
-    /// Returns `(payload, profile_length, valid_lines_count)`.
+    /// Extracts every ray along Z (depth) flattened into a contiguous payload, all-missing
+    /// rays included (they draw nothing), so line `y * width + x` is pixel `(x, y)`.
+    /// Returns `(payload, profile_length, line_count)`.
     pub fn extract_all_z_lines_payload(&self) -> (Vec<f32>, u32, u32) {
         let (nx, ny, nz) = (self.width, self.height, self.depth);
         let num_pixels = nx * ny;
         let mut payload = Vec::with_capacity(num_pixels * nz);
-        let mut valid_lines = 0u32;
-        for y in 0..ny {
-            for x in 0..nx {
-                let mut has_valid = false;
-                for z in 0..nz {
-                    let idx = z * (nx * ny) + y * nx + x;
-                    if let Some(&v) = self.values.get(idx)
-                        && !v.is_nan()
-                        && v.is_finite()
-                    {
-                        has_valid = true;
-                        break;
-                    }
-                }
-                if has_valid {
-                    valid_lines += 1;
-                    for z in 0..nz {
-                        let idx = z * (nx * ny) + y * nx + x;
-                        payload.push(self.values.get(idx).copied().unwrap_or(f32::NAN));
-                    }
-                }
+        for pixel in 0..num_pixels {
+            for z in 0..nz {
+                let idx = z * num_pixels + pixel;
+                payload.push(self.values.get(idx).copied().unwrap_or(f32::NAN));
             }
         }
-        (payload, nz as u32, valid_lines)
+        (payload, nz as u32, num_pixels as u32)
     }
 }

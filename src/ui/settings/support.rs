@@ -67,7 +67,8 @@ pub(crate) struct OptionSupport {
     pub color_range: Support,
     /// Scale and the low and high clip colors.
     pub color_mapping: Support,
-    /// The Categorical toggle (`PlotType::draws_categories`).
+    /// The Categorical toggle (`PlotType::draws_categories`; one color per
+    /// line on a line plot colored by series).
     pub categorical: Support,
     pub nan_color: Support,
     /// Opacity and the alpha curve.
@@ -157,11 +158,18 @@ impl PlotState {
         }
     }
 
+    /// Categorical colors bin values, or on a line plot colored by series,
+    /// give each line its own color.
     fn categorical(&self) -> Support {
-        if self.plot_type.draws_categories() {
-            self.color_mapping()
-        } else {
+        if !self.plot_type.draws_categories() {
             Support::No
+        } else if self.plot_type == PlotType::Line
+            && self.line_all_series
+            && !self.line_custom_color
+        {
+            Support::Yes
+        } else {
+            self.color_mapping()
         }
     }
 

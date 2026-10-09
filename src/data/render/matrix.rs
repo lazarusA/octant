@@ -191,50 +191,27 @@ impl MatrixData {
         }
     }
 
-    /// Extracts all valid finite line profiles along dimension axis flattened into a contiguous payload.
-    /// Returns `(payload, profile_length, valid_lines_count)`.
+    /// Extracts every line profile along dimension axis flattened into a contiguous payload,
+    /// all-missing lines included (they draw nothing), so line `i` is row or column `i`.
+    /// Returns `(payload, profile_length, line_count)`.
     pub fn extract_all_lines_payload(&self, dim_axis: usize) -> (Vec<f32>, u32, u32) {
         if dim_axis == 0 {
-            let profile_length = self.width;
-            let line_count = self.height;
-            let mut payload = Vec::with_capacity(profile_length * line_count);
-            let mut valid_lines = 0u32;
-            for row in 0..line_count {
-                let start = row * profile_length;
-                let end = (start + profile_length).min(self.values.len());
-                let row_slice = &self.values[start..end];
-                if row_slice.iter().any(|v| !v.is_nan() && v.is_finite()) {
-                    valid_lines += 1;
-                    payload.extend_from_slice(row_slice);
-                }
-            }
-            (payload, profile_length as u32, valid_lines)
+            // Rows are already contiguous.
+            let len = (self.width * self.height).min(self.values.len());
+            (
+                self.values[..len].to_vec(),
+                self.width as u32,
+                self.height as u32,
+            )
         } else {
-            let profile_length = self.height;
-            let line_count = self.width;
-            let mut payload = Vec::with_capacity(profile_length * line_count);
-            let mut valid_lines = 0u32;
-            for col in 0..line_count {
-                let mut has_valid = false;
-                for row in 0..profile_length {
+            let mut payload = Vec::with_capacity(self.width * self.height);
+            for col in 0..self.width {
+                for row in 0..self.height {
                     let idx = row * self.width + col;
-                    if let Some(&v) = self.values.get(idx)
-                        && !v.is_nan()
-                        && v.is_finite()
-                    {
-                        has_valid = true;
-                        break;
-                    }
-                }
-                if has_valid {
-                    valid_lines += 1;
-                    for row in 0..profile_length {
-                        let idx = row * self.width + col;
-                        payload.push(self.values.get(idx).copied().unwrap_or(f32::NAN));
-                    }
+                    payload.push(self.values.get(idx).copied().unwrap_or(f32::NAN));
                 }
             }
-            (payload, profile_length as u32, valid_lines)
+            (payload, self.height as u32, self.width as u32)
         }
     }
 }

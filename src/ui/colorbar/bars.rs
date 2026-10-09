@@ -115,7 +115,7 @@ pub fn draw_continuous(ui: &egui::Ui, axis: BarAxis, bar: &BarStyle<'_>, colors:
 
 /// Adds `quad` (its two corners at the start, then the two at the end),
 /// colored `start` to `end`.
-fn push_quad(mesh: &mut Mesh, quad: [Pos2; 4], [start, end]: [Color32; 2]) {
+pub(super) fn push_quad(mesh: &mut Mesh, quad: [Pos2; 4], [start, end]: [Color32; 2]) {
     let idx = mesh.vertices.len() as u32;
     let colors = [start, start, end, end];
     mesh.vertices
@@ -143,7 +143,13 @@ fn paint_bar(ui: &egui::Ui, bar_rect: Rect, bar: &BarStyle<'_>, mesh: Mesh, bord
 }
 
 /// A major tick across the bar's outer edge at `t`, with `label` past it.
-fn major_tick(ui: &egui::Ui, axis: BarAxis, t: f32, label: Option<&str>, color: Color32) {
+pub(super) fn major_tick(
+    ui: &egui::Ui,
+    axis: BarAxis,
+    t: f32,
+    label: Option<&str>,
+    color: Color32,
+) {
     const OUT: f32 = 5.5;
     haloed_line(
         ui,
