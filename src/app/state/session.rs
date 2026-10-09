@@ -61,7 +61,9 @@ impl OctantApp {
                 crate::plots::PlotType::Volume | crate::plots::PlotType::PointCloud
             );
         let cur_name = self.layer_variable_info(id).map(|v| v.name.clone());
-        let layer = self.layers.get_or_base_mut(id);
+        let Some(layer) = self.layers.get_mut(id) else {
+            return;
+        };
         let of_var = |name: &str| cur_name.as_deref().is_none_or(|n| name.contains(n));
         let matrix = layer
             .data
@@ -133,9 +135,8 @@ impl OctantApp {
                 self.layers.base.clear_3d();
             }
             if let Some(var_info) = self.plotted_variable_info().cloned() {
-                let rank = var_info.shape.len();
                 crate::ui::variables_panel::dimension_slider::init_composite_defaults(
-                    self, &var_info, rank,
+                    self, &var_info,
                 );
             }
         }

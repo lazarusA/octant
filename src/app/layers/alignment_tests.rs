@@ -145,3 +145,20 @@ fn only_heatmaps_align() {
     base.plot_type = crate::plots::PlotType::Volume;
     assert_eq!(classify(&base, &overlay), Alignment::Incompatible);
 }
+
+#[test]
+fn coordinates_match_whatever_the_dimension_names_case() {
+    let base = base_of(&dataset("a", &grid_coords()));
+    let mut upper = dataset(
+        "b",
+        &[
+            ("LAT", grid_coords()[0].1.clone()),
+            ("LON", grid_coords()[1].1.clone()),
+        ],
+    );
+    if let Some(meta) = upper.metadata.as_mut() {
+        meta.variables[1] = var("sst", &["time", "LAT", "LON"], &[3, 5, 4]);
+    }
+    let overlay = overlay_selection(&base, &upper, 1).expect("overlay");
+    assert_eq!(classify(&base, &overlay), Alignment::SameGrid);
+}

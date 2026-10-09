@@ -94,8 +94,9 @@ fn the_picker_edits_its_target_overlay_until_it_is_removed() {
 
     app.colormaps.target = Some(id);
     assert_eq!(app.picker_layer(), id);
-    app.picker_style_mut().colormap = set1;
-    app.picker_style_mut().reversed = true;
+    let style = app.picker_style_mut().expect("picked layer");
+    style.colormap = set1;
+    style.reversed = true;
     let overlay = app.layers.get(id).expect("overlay");
     assert_eq!(
         (overlay.color.colormap, overlay.color.reversed),

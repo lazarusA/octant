@@ -15,6 +15,9 @@ pub mod hover;
 pub use hover as hover_tooltip;
 pub mod icons;
 pub mod key_focus;
+pub mod layer_label;
+#[cfg(test)]
+mod layer_label_tests;
 pub mod plot_type;
 pub mod settings;
 pub mod status;

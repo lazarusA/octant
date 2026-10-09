@@ -217,15 +217,8 @@ fn paint_hover_card(
     pixel: Option<(usize, usize)>,
     fields: &[HoverField],
 ) {
-    // Overlays share the heatmap's grid, so the hovered cell reads them too.
-    let mut layers = [LayerValue::EMPTY; MAX_OVERLAYS];
-    let count = match pixel {
-        Some(cell) if canvas_plot_type == PlotType::Heatmap => {
-            overlays::overlay_values(app, cell, &mut layers)
-        }
-        _ => 0,
-    };
-    let layers = layers.get(..count).unwrap_or_default();
+    let mut rows = [LayerValue::EMPTY; MAX_OVERLAYS];
+    let layers = overlays::hover_rows(app, canvas_plot_type, pixel, &mut rows);
     let title = HoverCard::title_for(var_name, var.and_then(|v| v.long_name.as_deref()));
     let swatch = resolve_hover_color(app, canvas_plot_type, raw_val);
     let anchoring = if canvas_plot_type == PlotType::Line {

@@ -1,6 +1,6 @@
 //! The Layers menu: one entry per layer, topmost overlay first and the base
 //! layer last. Each has its header (visibility, order and remove for
-//! overlays), colormap and opacity, composite channels and its own Color menu.
+//! overlays), colormap, composite channels and its own Color menu.
 
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId};
@@ -45,9 +45,8 @@ fn show_layer_entries(app: &mut OctantApp, ui: &mut egui::Ui) {
     });
     match action {
         Some(RowAction::ToggleVisible(id)) => {
-            if let Some(layer) = app.layers.get_mut(id) {
-                layer.visible = !layer.visible;
-            }
+            let visible = app.layers.get(id).is_some_and(|l| l.visible);
+            app.set_layer_visible(id, !visible);
         }
         Some(RowAction::Move(id, up)) => {
             app.layers.move_overlay(id, up);
@@ -84,17 +83,10 @@ fn overlay_header(
     action
 }
 
-/// Layer `id`'s colormap and opacity, composite channels and Color menu.
+/// Layer `id`'s colormap, composite channels and Color menu (which holds
+/// its opacity).
 fn layer_body(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
-    ui.horizontal(|ui| {
-        crate::ui::colormap::show_layer_colormap_button(app, ui, id);
-        let opacity = &mut app.layers.get_or_base_mut(id).color.opacity;
-        ui.add(
-            egui::Slider::new(opacity, 0.0..=1.0)
-                .custom_formatter(|n, _| format!("{:.0}%", n * 100.0)),
-        )
-        .on_hover_text("Opacity");
-    });
+    crate::ui::colormap::show_layer_colormap_button(app, ui, id);
     // A line plot draws one band: no composite.
     let line = id == LayerId::BASE && app.effective_canvas_plot_type() == PlotType::Line;
     if !line {

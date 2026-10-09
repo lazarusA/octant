@@ -1,5 +1,4 @@
-//! How an overlay lines up with the base layer's grid, and the overlay
-//! selection that reads the base layer's window of another variable.
+//! How an overlay lines up with the base layer's grid.
 
 use super::VariableSelection;
 use crate::app::DimConfig;
@@ -98,9 +97,14 @@ fn axis_match(
         return AxisMatch::Differs;
     }
     let len = len.unwrap_or(0) as usize;
+    // The overlay's coordinates are keyed by its own spelling of the name.
+    let overlay_name = overlay_var
+        .dimension_names
+        .get(odim)
+        .map_or(name.as_str(), String::as_str);
     match (
         dim_coords(base, base_var, name),
-        dim_coords(overlay, overlay_var, name),
+        dim_coords(overlay, overlay_var, overlay_name),
     ) {
         (Some(a), Some(b)) if coords_match(a, b, len) => AxisMatch::Same,
         (Some(_), Some(_)) => AxisMatch::Differs,
@@ -168,61 +172,8 @@ fn same_dataset(a: &VariableSelection, b: &VariableSelection) -> bool {
 }
 
 /// The dimension of `var` named `name` (ASCII case-insensitive).
-fn dim_named(var: &VariableInfo, name: &str) -> Option<usize> {
+pub(super) fn dim_named(var: &VariableInfo, name: &str) -> Option<usize> {
     var.dimension_names
         .iter()
         .position(|n| n.eq_ignore_ascii_case(name))
-}
-
-/// The selection of variable `var_idx` of `dataset` (a staged selection) that
-/// reads the `base` layer's window: dimensions named like the base's take its
-/// roles, ranges and indices (clamped to the variable), others one index.
-pub fn overlay_selection(
-    base: &VariableSelection,
-    dataset: &VariableSelection,
-    var_idx: usize,
-) -> Option<VariableSelection> {
-    let meta = dataset.metadata.as_ref()?;
-    let var = meta.variables.get(var_idx)?;
-    let base_var = base.variable_info()?;
-    let rank = var.shape.len();
-    let mut selection = VariableSelection {
-        store_kind: dataset.store_kind,
-        store_target: dataset.store_target.clone(),
-        metadata: Some(meta.clone()),
-        metadata_generation: dataset.metadata_generation,
-        variable_idx: var_idx,
-        dim_config: vec![DimConfig::default(); rank],
-        dim_indices: vec![0; rank],
-        dim_ranges: vec![(0, 0); rank],
-        spatial_dims: Vec::new(),
-        animated_dim: None,
-        plot_type: PlotType::Heatmap,
-    };
-    for (i, name) in var.dimension_names.iter().enumerate() {
-        let last = var
-            .shape
-            .get(i)
-            .map_or(0, |&n| (n as usize).saturating_sub(1));
-        let Some(b) = dim_named(base_var, name) else {
-            continue;
-        };
-        let clamp = |(s, e): (usize, usize)| (s.min(last), e.min(last));
-        if let Some(config) = base.dim_config.get(b) {
-            selection.dim_config[i] = DimConfig {
-                range: clamp(config.range),
-                index: config.index.min(last),
-                ..*config
-            };
-        }
-        if let Some(&index) = base.dim_indices.get(b) {
-            selection.dim_indices[i] = index.min(last);
-        }
-        if let Some(&range) = base.dim_ranges.get(b) {
-            selection.dim_ranges[i] = clamp(range);
-        }
-    }
-    selection.spatial_dims = DimConfig::spatial_dims(&selection.dim_config);
-    selection.animated_dim = DimConfig::animated_dim(&selection.dim_config);
-    Some(selection)
 }

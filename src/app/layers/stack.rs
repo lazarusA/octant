@@ -71,6 +71,15 @@ impl LayerStack {
         self.iter().map(Layer::id).collect()
     }
 
+    /// The ids of the layers drawn on the canvas (`Layer::is_drawn`), in
+    /// drawing order: hidden or unaligned overlays load and prefetch nothing.
+    pub fn drawn_ids(&self) -> Vec<LayerId> {
+        self.iter()
+            .filter(|layer| layer.is_drawn())
+            .map(Layer::id)
+            .collect()
+    }
+
     /// The overlays' ids in drawing order.
     pub fn overlay_ids(&self) -> Vec<LayerId> {
         self.overlays.iter().map(Layer::id).collect()
@@ -81,12 +90,10 @@ impl LayerStack {
         self.iter().find(|layer| layer.id() == id)
     }
 
-    /// Overlay `id` mutably, or the base layer when there is no such overlay.
-    pub fn get_or_base_mut(&mut self, id: LayerId) -> &mut Layer {
-        match self.overlays.iter_mut().find(|layer| layer.id() == id) {
-            Some(layer) => layer,
-            None => &mut self.base,
-        }
+    /// The base layer and overlay `id` (mutably) together, while it exists.
+    pub fn base_and_overlay_mut(&mut self, id: LayerId) -> Option<(&Layer, &mut Layer)> {
+        let overlay = self.overlays.iter_mut().find(|layer| layer.id() == id)?;
+        Some((&self.base, overlay))
     }
 
     /// The layer `id`, mutably, while it exists.

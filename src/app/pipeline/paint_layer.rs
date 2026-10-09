@@ -24,7 +24,7 @@ impl OctantApp {
         let Some(render_state) = &self.wgpu_render_state else {
             return;
         };
-        for layer in self.layers.iter_mut() {
+        for layer in self.layers.iter_mut().filter(|l| l.is_drawn()) {
             refresh_layer_tile(layer, &render_state.queue, view);
         }
     }

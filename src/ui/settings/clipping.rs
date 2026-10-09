@@ -5,6 +5,7 @@ use crate::app::OctantApp;
 use crate::app::layers::{ColorStyle, LayerId};
 use crate::ui::color_picker::{ColorShape, ShapeColorPicker};
 use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::layer_label::LabelEditor;
 
 /// Layer `id`'s colorbar label, color range, scale and the NaN and clip
 /// colors, as far as its plot honors them.
@@ -22,11 +23,16 @@ pub(crate) fn show_color_settings(
         show_color_range_controls(app, ui, id, mapped);
         ui.add_space(4.0);
         gated(ui, support.color_mapping, |ui| {
-            show_scale_type_controls(ui, &mut app.layers.get_or_base_mut(id).color, id)
+            if let Some(layer) = app.layers.get_mut(id) {
+                show_scale_type_controls(ui, &mut layer.color, id);
+            }
         });
     });
     ui.add_space(4.0);
-    let color = &mut app.layers.get_or_base_mut(id).color;
+    let Some(layer) = app.layers.get_mut(id) else {
+        return;
+    };
+    let color = &mut layer.color;
     gated(ui, support.nan_color, |ui| {
         show_nan_color_picker(ui, color, id)
     });
@@ -40,34 +46,35 @@ fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: Laye
     let Some(layer) = app.layers.get(id) else {
         return;
     };
-    let default_label = layer.default_colorbar_label();
-    let mut label_buf = layer.colorbar_label();
-    let color = &mut app.layers.get_or_base_mut(id).color;
+    let editor = LabelEditor {
+        id: egui::Id::new(("settings_colorbar_label", id)),
+        width: 170.0,
+        framed: true,
+    };
+    let mut edited = None;
     ui.horizontal(|ui| {
-        let resp = ui.add(
-            egui::TextEdit::singleline(&mut label_buf)
-                .hint_text(&default_label)
-                .desired_width(170.0),
-        );
-        if resp.changed() {
-            let custom = !label_buf.trim().is_empty() && label_buf != default_label;
-            color.custom_label = custom.then_some(label_buf);
-        }
-        if color.custom_label.is_some()
+        edited = editor.show(ui, layer);
+        if layer.color.custom_label.is_some()
             && ui
                 .icon_button(Icon::Reset, "")
                 .on_hover_text("Reset colorbar label to default")
                 .clicked()
         {
-            color.custom_label = None;
+            edited = Some(None);
         }
     });
+    if let (Some(custom), Some(layer)) = (edited, app.layers.get_mut(id)) {
+        layer.color.custom_label = custom;
+    }
 }
 
 /// Min and max inputs with lock and reset; the Categorical toggle when the
 /// colormap is `mapped`.
 fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId, mapped: bool) {
-    let color = &mut app.layers.get_or_base_mut(id).color;
+    let Some(layer) = app.layers.get_mut(id) else {
+        return;
+    };
+    let color = &mut layer.color;
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Color Range").strong());
         if !mapped {

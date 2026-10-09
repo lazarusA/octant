@@ -10,7 +10,10 @@ impl OctantApp {
     /// Parses layer `id`'s curve text and registers (or clears) its curve
     /// row. On a parse error the previous curve stays active.
     pub fn apply_alpha_curve(&mut self, id: LayerId) {
-        let color = &mut self.layers.get_or_base_mut(id).color;
+        let Some(layer) = self.layers.get_mut(id) else {
+            return;
+        };
+        let color = &mut layer.color;
         let key = color.alpha_key();
         let state = &mut color.alpha;
         match alpha::parse(&state.text) {

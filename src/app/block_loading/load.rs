@@ -32,11 +32,11 @@ impl OctantApp {
         self.load_animated_overlay_blocks();
     }
 
-    /// Loads the block of every overlay with an animated dimension at the
-    /// current step (the others don't change with it).
+    /// Loads the block of every drawn overlay with an animated dimension at
+    /// the current step (the others don't change with it).
     pub(crate) fn load_animated_overlay_blocks(&mut self) {
-        for id in self.layers.overlay_ids() {
-            if self.layer_animated_dim(id).is_some() {
+        for id in self.layers.drawn_ids() {
+            if id != LayerId::BASE && self.layer_animated_dim(id).is_some() {
                 self.load_layer_block(id);
             }
         }

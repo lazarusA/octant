@@ -12,37 +12,16 @@ pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui, id
         return;
     };
     if !app.layer_has_rgb_bands(id) && layer.composite.channel_configs.is_empty() {
-        app.layers.get_or_base_mut(id).composite.enabled = false;
+        if let Some(layer) = app.layers.get_mut(id) {
+            layer.composite.enabled = false;
+        }
         return;
     }
     let is_cmyk = app.layer_is_cmyk(id);
     let is_tiff = app.layer_is_geotiff(id);
     let has_mc = !layer.composite.channel_configs.is_empty() && !is_tiff;
 
-    let (label, tooltip) = toggle_text(has_mc, is_cmyk);
-
-    // Name the band combination once it is drawn, as the hover card does.
-    let mut label_buf = [0u8; 48];
-    // The band names cache follows the base layer (the hover card's).
-    let enabled = layer.composite.enabled;
-    let label = if enabled && !has_mc && !is_cmyk && id == LayerId::BASE {
-        let meta = app.plotted().metadata.as_ref();
-        let kind = composite_labels(app, ui.ctx(), meta, app.plotted_variable_info()).kind;
-        stack_str(&mut label_buf, format_args!("{label} ({})", kind.label()))
-    } else {
-        label
-    };
-
-    let mut rgb_mode = enabled;
-    if ui
-        .checkbox(&mut rgb_mode, label)
-        .on_hover_text(tooltip)
-        .changed()
-    {
-        app.layers.get_or_base_mut(id).composite.enabled = rgb_mode;
-        app.load_layer_block(id);
-    }
-
+    let rgb_mode = composite_toggle(app, ui, id, has_mc, is_cmyk);
     if rgb_mode {
         if has_mc {
             show_multichannel_controls(app, ui, id);
@@ -56,6 +35,41 @@ pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui, id
             super::composite_rgb::show_standard_rgb_controls(app, ui, id);
         }
     }
+}
+
+/// Layer `id`'s composite checkbox, named for its mode (and, on the base
+/// layer, its band combination); reloads the layer when toggled. Whether the
+/// composite is on.
+fn composite_toggle(
+    app: &mut OctantApp,
+    ui: &mut egui::Ui,
+    id: LayerId,
+    has_mc: bool,
+    is_cmyk: bool,
+) -> bool {
+    let enabled = app.layers.get(id).is_some_and(|l| l.composite.enabled);
+    let (label, tooltip) = toggle_text(has_mc, is_cmyk);
+    // The band names cache follows the base layer (the hover card's).
+    let mut label_buf = [0u8; 48];
+    let label = if enabled && !has_mc && !is_cmyk && id == LayerId::BASE {
+        let meta = app.plotted().metadata.as_ref();
+        let kind = composite_labels(app, ui.ctx(), meta, app.plotted_variable_info()).kind;
+        stack_str(&mut label_buf, format_args!("{label} ({})", kind.label()))
+    } else {
+        label
+    };
+    let mut rgb_mode = enabled;
+    if ui
+        .checkbox(&mut rgb_mode, label)
+        .on_hover_text(tooltip)
+        .changed()
+    {
+        if let Some(layer) = app.layers.get_mut(id) {
+            layer.composite.enabled = rgb_mode;
+        }
+        app.load_layer_block(id);
+    }
+    rgb_mode
 }
 
 /// The composite checkbox's label and tooltip for the mode the dataset supports.
@@ -87,24 +101,20 @@ pub(super) fn get_selected_channel_range(app: &OctantApp, id: LayerId) -> (usize
 }
 
 fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
-    let composite = &mut app.layers.get_or_base_mut(id).composite;
+    let Some(layer) = app.layers.get_mut(id) else {
+        return;
+    };
+    let configs = &mut layer.composite.channel_configs;
     let mut changed = false;
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Channels:").small().strong());
-        if ui.small_button("All").clicked() {
-            for cfg in &mut composite.channel_configs {
-                cfg.visible = true;
+        for (label, visible) in [("All", true), ("None", false)] {
+            if ui.small_button(label).clicked() {
+                configs.iter_mut().for_each(|cfg| cfg.visible = visible);
+                changed = true;
             }
-            changed = true;
-        }
-        if ui.small_button("None").clicked() {
-            for cfg in &mut composite.channel_configs {
-                cfg.visible = false;
-            }
-            changed = true;
         }
     });
-
     egui::ScrollArea::vertical()
         .max_height(100.0)
         .auto_shrink([false, true])
@@ -113,43 +123,43 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerI
                 .num_columns(3)
                 .spacing([6.0, 3.0])
                 .show(ui, |ui| {
-                    for cfg in &mut composite.channel_configs {
-                        if ui.checkbox(&mut cfg.visible, "").changed() {
-                            changed = true;
-                        }
-                        let mut color_f32 = [
-                            cfg.color_rgb[0] as f32 / 255.0,
-                            cfg.color_rgb[1] as f32 / 255.0,
-                            cfg.color_rgb[2] as f32 / 255.0,
-                            1.0,
-                        ];
-                        let initial_f32 = color_f32;
-                        crate::ui::color_picker::ShapeColorPicker::new(
-                            ("mc_color_picker", id, cfg.index),
-                            &mut color_f32,
-                            crate::ui::color_picker::ColorShape::Circle,
-                        )
-                        .size(egui::vec2(14.0, 14.0))
-                        .tooltip("Click to customize channel tint color")
-                        .show(ui);
-
-                        if color_f32 != initial_f32 {
-                            cfg.color_rgb = [
-                                (color_f32[0] * 255.0).round().clamp(0.0, 255.0) as u8,
-                                (color_f32[1] * 255.0).round().clamp(0.0, 255.0) as u8,
-                                (color_f32[2] * 255.0).round().clamp(0.0, 255.0) as u8,
-                            ];
-                            changed = true;
-                        }
-
-                        let label_text = format!("{}: {}", cfg.index + 1, cfg.name);
-                        ui.label(egui::RichText::new(label_text).small());
+                    for cfg in configs.iter_mut() {
+                        changed |= channel_row(ui, cfg, id);
                         ui.end_row();
                     }
                 });
         });
-
     if changed {
         app.load_layer_block(id);
     }
+}
+
+/// One channel of layer `id`'s multi-channel overlay: visibility, tint and
+/// "N: name". Whether the channel changed.
+fn channel_row(
+    ui: &mut egui::Ui,
+    cfg: &mut crate::data::slicing::ChannelColorConfig,
+    id: LayerId,
+) -> bool {
+    let mut changed = ui.checkbox(&mut cfg.visible, "").changed();
+    let [r, g, b] = cfg.color_rgb.map(|c| c as f32 / 255.0);
+    let mut color = [r, g, b, 1.0];
+    let initial = color;
+    crate::ui::color_picker::ShapeColorPicker::new(
+        ("mc_color_picker", id, cfg.index),
+        &mut color,
+        crate::ui::color_picker::ColorShape::Circle,
+    )
+    .size(egui::vec2(14.0, 14.0))
+    .tooltip("Click to customize channel tint color")
+    .show(ui);
+    if color != initial {
+        let to_u8 = |c: f32| (c * 255.0).round().clamp(0.0, 255.0) as u8;
+        cfg.color_rgb = [to_u8(color[0]), to_u8(color[1]), to_u8(color[2])];
+        changed = true;
+    }
+    let mut buf = [0u8; 96];
+    let label = stack_str(&mut buf, format_args!("{}: {}", cfg.index + 1, cfg.name));
+    ui.label(egui::RichText::new(label).small());
+    changed
 }

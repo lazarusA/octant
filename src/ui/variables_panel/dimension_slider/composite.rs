@@ -5,7 +5,7 @@ use crate::app::layers::LayerId;
 use crate::data::VariableInfo;
 
 /// Initialize the base layer's composite defaults for a variable.
-pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo, _rank: usize) {
+pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
     init_layer_composite_defaults(app, LayerId::BASE, var_info);
 }
 
@@ -31,7 +31,10 @@ pub fn init_layer_composite_defaults(app: &mut OctantApp, id: LayerId, var_info:
             .unwrap_or_default()
     };
     let num_bands = var_info.shape.first().copied().unwrap_or(0) as usize;
-    let composite = &mut app.layers.get_or_base_mut(id).composite;
+    let Some(layer) = app.layers.get_mut(id) else {
+        return;
+    };
+    let composite = &mut layer.composite;
     composite.rgb_channels = [0, 1, 2];
     composite.enabled = (is_tiff && rank >= 3 && num_bands >= 3) || !configs.is_empty();
     composite.channel_configs = configs;

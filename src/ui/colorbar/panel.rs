@@ -7,6 +7,8 @@ use super::ticks::format_scientific_tick;
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::plots::PlotType;
+use crate::ui::layer_label::LabelEditor;
+use crate::utils::colormap::unscale_norm_to_value;
 use egui::{Pos2, Rect, Vec2};
 
 /// Height a panel takes in the stack, its gap to the next included.
@@ -85,24 +87,21 @@ fn title_row(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     let Some(layer) = app.layers.get(id) else {
         return;
     };
-    let default_label = layer.default_colorbar_label();
-    let mut label = layer.colorbar_label();
+    let mut edited = None;
     ui.horizontal(|ui| {
         let avail = ui.available_width();
-        let text_w = (avail - 40.0).clamp(60.0, 320.0);
-        ui.add_space(((avail - text_w) / 2.0).max(0.0));
-        let edit = egui::TextEdit::singleline(&mut label)
-            .hint_text(&default_label)
-            .font(egui::TextStyle::Body)
-            .horizontal_align(egui::Align::Center)
-            .desired_width(text_w)
-            .frame(egui::Frame::NONE);
-        let response = ui.add(edit).on_hover_text("Colorbar title. Click to edit.");
-        if response.changed() {
-            let custom = (!label.trim().is_empty() && label != default_label).then_some(label);
-            app.layers.get_or_base_mut(id).color.custom_label = custom;
-        }
+        let width = (avail - 40.0).clamp(60.0, 320.0);
+        ui.add_space(((avail - width) / 2.0).max(0.0));
+        let editor = LabelEditor {
+            id: egui::Id::new(super::salt("colorbar_title", id)),
+            width,
+            framed: false,
+        };
+        edited = editor.show(ui, layer);
     });
+    if let (Some(custom), Some(layer)) = (edited, app.layers.get_mut(id)) {
+        layer.color.custom_label = custom;
+    }
 }
 
 /// The bar with its ticks, clip triangles, range inputs and value tooltip.
@@ -111,24 +110,44 @@ fn bar_row(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId, width: f32) {
     let (widget_rect, response) =
         ui.allocate_exact_size(Vec2::new(bar_w, 38.0), egui::Sense::hover());
     let bar_rect = Rect::from_min_size(widget_rect.min, Vec2::new(bar_w, 13.0));
+    let hover = paint_bar(app, ui, id, bar_rect, response.hover_pos());
+    let Some(layer) = app.layers.get_mut(id) else {
+        return;
+    };
+    let color = &mut layer.color;
+    draw_clip_triangles(ui, bar_rect, color, id);
+    draw_end_range_inputs(ui, bar_rect, color);
+    if let Some(value) = hover {
+        response.on_hover_text(format!("Val: {}", format_scientific_tick(value)));
+    }
+}
+
+/// Paints layer `id`'s bar in `bar_rect`: categorical swatches on 2D plots
+/// set to categorical, else a gradient. Returns the value under `hover`.
+fn paint_bar(
+    app: &OctantApp,
+    ui: &egui::Ui,
+    id: LayerId,
+    bar_rect: Rect,
+    hover: Option<Pos2>,
+) -> Option<f32> {
     let is_3d = matches!(
         app.effective_canvas_plot_type(),
         PlotType::Volume | PlotType::PointCloud
     );
-    let Some(layer) = app.layers.get(id) else {
-        return;
-    };
+    let layer = app.layers.get(id)?;
     let visuals = ui.visuals();
     let colors = BarColors {
         border: visuals.widgets.noninteractive.fg_stroke.color,
         strong_text: visuals.strong_text_color(),
         text: visuals.text_color(),
     };
+    let style = &layer.color;
     let bar = BarStyle {
-        color: &layer.color,
+        color: style,
         colormap: app.layer_colormap(layer),
     };
-    if !is_3d && layer.color.categorical {
+    if !is_3d && style.categorical {
         let unique = layer
             .data
             .matrix
@@ -138,21 +157,8 @@ fn bar_row(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId, width: f32) {
     } else {
         bars::draw_continuous(ui, bar_rect, &bar, colors);
     }
-    let style = &layer.color;
-    let hover = response.hover_pos().map(|pos| {
-        let t = ((pos.x - bar_rect.min.x) / bar_rect.width()).clamp(0.0, 1.0);
-        crate::utils::colormap::unscale_norm_to_value(
-            t,
-            style.range_min,
-            style.range_max,
-            style.scale_type,
-            style.scale_param,
-        )
-    });
-    let color = &mut app.layers.get_or_base_mut(id).color;
-    draw_clip_triangles(ui, bar_rect, color, id);
-    draw_end_range_inputs(ui, bar_rect, color);
-    if let Some(value) = hover {
-        response.on_hover_text(format!("Val: {}", format_scientific_tick(value)));
-    }
+    let t = ((hover?.x - bar_rect.min.x) / bar_rect.width()).clamp(0.0, 1.0);
+    let (min, max) = (style.range_min, style.range_max);
+    let value = unscale_norm_to_value(t, min, max, style.scale_type, style.scale_param);
+    Some(value)
 }

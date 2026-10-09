@@ -2,12 +2,23 @@
 //! layer's grid and window as the base plot changes.
 
 use crate::app::OctantApp;
-use crate::app::layers::{LayerId, Source, VariableSelection, classify, overlay_selection};
+use crate::app::layers::{
+    Alignment, LayerId, Source, classify, follow_base_window, overlay_selection,
+};
 use crate::ui::toast::Severity;
 use crate::utils::colormap::registry;
 
+/// The overlay limit as a literal, so its message can name it.
+macro_rules! max_overlays {
+    () => {
+        4
+    };
+}
+
 /// Most overlays drawn over the base layer (the hover card has a row each).
-pub const MAX_OVERLAYS: usize = 4;
+pub const MAX_OVERLAYS: usize = max_overlays!();
+/// Why no further overlay can be added once [`MAX_OVERLAYS`] exist.
+const STACK_FULL: &str = concat!("At most ", max_overlays!(), " overlays");
 /// Opacity a new overlay starts at, so the base shows through.
 const OVERLAY_OPACITY: f32 = 0.75;
 /// Colormaps new overlays take, in order: perceptually uniform sequential
@@ -33,7 +44,7 @@ impl OctantApp {
             return Some("Overlays draw over heatmaps");
         }
         if self.layers.overlays().len() >= MAX_OVERLAYS {
-            return Some("At most 4 overlays");
+            return Some(STACK_FULL);
         }
         None
     }
@@ -63,17 +74,16 @@ impl OctantApp {
             return None;
         }
         let selection = overlay_selection(self.plotted(), &self.selected, var_idx)?;
-        let name = selection
-            .variable_info()
-            .map(|v| v.name.clone())
-            .unwrap_or_default();
+        let name = selection.variable_info().map_or("", |v| v.name.as_str());
         let alignment = classify(self.plotted(), &selection);
-        if let Some(reason) = alignment.reason() {
-            self.notify(
-                Severity::Warning,
-                "Can't add overlay",
-                format!("'{name}': {reason}"),
-            );
+        // Another grid or none at all can't be drawn; an overlay whose
+        // coordinates haven't arrived yet is added and drawn once they match.
+        if let Some(reason) = alignment
+            .reason()
+            .filter(|_| alignment != Alignment::IndexOnly)
+        {
+            let detail = format!("'{name}': {reason}");
+            self.notify(Severity::Warning, "Can't add overlay", detail);
             return None;
         }
         let var = selection.variable_info().cloned();
@@ -87,7 +97,11 @@ impl OctantApp {
         if let Some(var) = var {
             crate::ui::variables_panel::init_layer_composite_defaults(self, id, &var);
         }
-        self.load_layer_block(id);
+        if alignment.is_drawn() {
+            self.load_layer_block(id);
+        } else {
+            self.request_layer_coordinates(id);
+        }
         Some(id)
     }
 
@@ -125,76 +139,63 @@ impl OctantApp {
     }
 
     /// Removes overlay `id`, its opacity curve row and the colormap picker's
-    /// hold on it.
+    /// hold on it (its target and any preview aimed at it).
     pub fn remove_overlay(&mut self, id: LayerId) {
         if !self.layers.remove(id) {
             return;
         }
-        crate::utils::colormap::registry::set_alpha_curve(id.key(), None);
+        registry::set_alpha_curve(id.key(), None);
         if self.colormaps.target == Some(id) {
             self.colormaps.target = None;
+            self.preview_colormap = None;
         }
     }
 
-    /// Re-derives every overlay's window from the base layer's (after the
-    /// base plot changed), reloading those whose window moved, then updates
-    /// their alignment. The animated index alone (a playback step) reloads
-    /// nothing: `load_step_blocks` does that.
-    pub(crate) fn sync_overlays_to_base(&mut self) {
-        for id in self.layers.overlay_ids() {
-            let Some(layer) = self.layers.get(id) else {
-                continue;
-            };
-            let current = layer.selection();
-            let Some(next) = overlay_selection(self.plotted(), current, current.variable_idx)
-            else {
-                continue;
-            };
-            if !window_differs(current, &next) {
-                continue;
-            }
-            if let Some(layer) = self.layers.get_mut(id) {
-                *layer.selection_mut() = next;
-                layer.clear_2d();
-            }
+    /// Shows or hides overlay `id`; a layer shown again loads the current
+    /// step, which hidden layers skip.
+    pub fn set_layer_visible(&mut self, id: LayerId, visible: bool) {
+        let Some(layer) = self.layers.get_mut(id) else {
+            return;
+        };
+        layer.visible = visible;
+        if layer.is_drawn() {
             self.load_layer_block(id);
         }
-        self.refresh_alignments();
+    }
+
+    /// Gives every overlay the base layer's window again (after the base plot
+    /// changed) and classifies it; those whose window moved reload when drawn.
+    /// The animated index alone (a playback step) reloads nothing:
+    /// `load_step_blocks` does that.
+    pub(crate) fn sync_overlays_to_base(&mut self) {
+        for id in self.layers.overlay_ids() {
+            let Some((base, layer)) = self.layers.base_and_overlay_mut(id) else {
+                continue;
+            };
+            let moved = follow_base_window(base.selection(), layer.selection_mut());
+            layer.alignment = classify(base.selection(), layer.selection());
+            if moved {
+                layer.clear_2d();
+                if layer.is_drawn() {
+                    self.load_layer_block(id);
+                }
+            }
+        }
     }
 
     /// Classifies every overlay against the base layer again (its plot or the
-    /// coordinates of either side changed).
+    /// coordinates of either side changed); an overlay drawn from now on
+    /// loads its block.
     pub(crate) fn refresh_alignments(&mut self) {
         for id in self.layers.overlay_ids() {
-            let Some(layer) = self.layers.get(id) else {
+            let Some((base, layer)) = self.layers.base_and_overlay_mut(id) else {
                 continue;
             };
-            let alignment = classify(self.layers.base.selection(), layer.selection());
-            if let Some(layer) = self.layers.get_mut(id) {
-                layer.alignment = alignment;
+            let was_drawn = layer.is_drawn();
+            layer.alignment = classify(base.selection(), layer.selection());
+            if layer.is_drawn() && !was_drawn {
+                self.load_layer_block(id);
             }
         }
     }
-}
-
-/// Whether `next` reads another window than `current`: other roles, ranges,
-/// or fixed indices (the animated one aside).
-fn window_differs(current: &VariableSelection, next: &VariableSelection) -> bool {
-    let roles = |s: &VariableSelection| {
-        s.dim_config
-            .iter()
-            .map(|c| (c.spatial, c.animation, c.active))
-            .collect::<Vec<_>>()
-    };
-    let fixed = |s: &VariableSelection| {
-        s.dim_indices
-            .iter()
-            .enumerate()
-            .filter(|&(i, _)| Some(i) != s.animated_dim)
-            .map(|(_, &index)| index)
-            .collect::<Vec<_>>()
-    };
-    current.dim_ranges != next.dim_ranges
-        || roles(current) != roles(next)
-        || fixed(current) != fixed(next)
 }

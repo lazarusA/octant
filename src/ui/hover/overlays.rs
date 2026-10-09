@@ -4,6 +4,7 @@
 use crate::app::OctantApp;
 use crate::app::layers::Layer;
 use crate::app::overlays::MAX_OVERLAYS;
+use crate::plots::PlotType;
 use crate::ui::hover::card::{HoverValue, LayerValue};
 use crate::ui::hover::composite::CompositeKind;
 use crate::ui::hover::entries::resolve_variable_units;
@@ -31,6 +32,22 @@ pub fn overlay_values<'a>(
         count += 1;
     }
     count
+}
+
+/// The overlay rows of the hover card, written into `out`: each drawn
+/// overlay's reading at heatmap cell `pixel`, since overlays share the
+/// heatmap's grid; none on other plots.
+pub fn hover_rows<'a, 'o>(
+    app: &'a OctantApp,
+    plot_type: PlotType,
+    pixel: Option<(usize, usize)>,
+    out: &'o mut [LayerValue<'a>; MAX_OVERLAYS],
+) -> &'o [LayerValue<'a>] {
+    let count = match pixel {
+        Some(cell) if plot_type == PlotType::Heatmap => overlay_values(app, cell, out),
+        _ => 0,
+    };
+    out.get(..count).unwrap_or_default()
 }
 
 /// The kind of `layer`'s composite, while one is drawn: a channel overlay,

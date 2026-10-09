@@ -44,7 +44,7 @@ fn fallback_categories(min: f32, max: f32) -> [f32; 10] {
 /// Draws `bar`'s categories (`unique_vals`, else ten even bins) as swatches
 /// with a tick and label at each center.
 pub fn draw_categorical(
-    ui: &mut egui::Ui,
+    ui: &egui::Ui,
     bar_rect: Rect,
     bar: &BarStyle<'_>,
     unique_vals: Option<&[f32]>,
@@ -78,7 +78,7 @@ pub fn draw_categorical(
 }
 
 /// Draws `bar`'s colormap as a gradient over its scale, with ticks.
-pub fn draw_continuous(ui: &mut egui::Ui, bar_rect: Rect, bar: &BarStyle<'_>, colors: BarColors) {
+pub fn draw_continuous(ui: &egui::Ui, bar_rect: Rect, bar: &BarStyle<'_>, colors: BarColors) {
     const SEGMENTS: usize = 128;
     let c = bar.color;
     let x_at = |t: f32| bar_rect.min.x + t * bar_rect.width();

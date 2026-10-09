@@ -39,6 +39,14 @@ fn write_array(store: &Arc<MemoryStore>, name: &str, dims: &[&str], shape: &[u64
 /// `t2m`, `sst(time, lat, lon)` (3x5x4, one step per chunk) and `rgb(band, lat,
 /// lon)` (3x5x4). Nothing is plotted.
 pub(crate) fn memory_app() -> (OctantApp, DatasetMetadata) {
+    let mut app = OctantApp::default();
+    let meta = add_memory_dataset(&mut app, TARGET);
+    (app, meta)
+}
+
+/// Registers another in-memory store holding the same arrays (and no
+/// coordinates) under `target`; returns its metadata.
+pub(crate) fn add_memory_dataset(app: &mut OctantApp, target: &str) -> DatasetMetadata {
     let store = Arc::new(MemoryStore::new());
     write_array(&store, "elev", &["lat", "lon"], &[5, 4], &[5, 4]);
     write_array(
@@ -58,16 +66,15 @@ pub(crate) fn memory_app() -> (OctantApp, DatasetMetadata) {
         );
     }
 
-    let zarr = GenericZarrBlockStore::new(store, TARGET, "zarr", "Zarr");
+    let zarr = GenericZarrBlockStore::new(store, target, "zarr", "Zarr");
     let meta = zarr.inspect().expect("inspect");
-    let mut app = OctantApp::default();
-    let source_id = StoreKind::make_source_id(StoreKind::RemoteZarr, TARGET);
+    let source_id = StoreKind::make_source_id(StoreKind::RemoteZarr, target);
     let kind = StoreKind::RemoteZarr.to_data_source_kind();
-    let source = DataSource::new(&source_id, kind, TARGET, "Store");
+    let source = DataSource::new(&source_id, kind, target, "Store");
     let handle = StoreHandle::new(source.clone(), Arc::new(zarr));
     app.dataset_manager
         .add(Dataset::new(&source_id, source, handle));
-    (app, meta)
+    meta
 }
 
 /// `name`'s selection with default dimension roles, animated along `time` when it has one.

@@ -130,10 +130,11 @@ impl OctantApp {
             .map_or(&self.layers.base.color, |l| &l.color)
     }
 
-    /// The color style the colormap picker edits, mutably.
-    pub fn picker_style_mut(&mut self) -> &mut ColorStyle {
+    /// The color style the colormap picker edits, mutably (`picker_layer`
+    /// always names a layer that exists).
+    pub fn picker_style_mut(&mut self) -> Option<&mut ColorStyle> {
         let id = self.picker_layer();
-        &mut self.layers.get_or_base_mut(id).color
+        self.layers.get_mut(id).map(|layer| &mut layer.color)
     }
 
     /// Whether a saved custom map (built or not) is named `name` (trimmed).

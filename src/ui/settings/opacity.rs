@@ -1,7 +1,7 @@
 use super::gated;
 use super::support::{OptionSupport, Support};
 use crate::app::OctantApp;
-use crate::app::layers::LayerId;
+use crate::app::layers::{AlphaCurveState, LayerId};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 use crate::utils::colormap::{AlphaInterp, alpha::PRESETS};
 
@@ -53,7 +53,10 @@ fn transparency_toggle(ui: &mut egui::Ui, value: &mut bool, support: Support) ->
 
 /// Layer `id`'s opacity slider and its opacity curve over the data range.
 fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
-    let color = &mut app.layers.get_or_base_mut(id).color;
+    let Some(layer) = app.layers.get_mut(id) else {
+        return;
+    };
+    let color = &mut layer.color;
     let resp = ui
         .add(egui::Slider::new(&mut color.opacity, 0.0..=1.0).text("Opacity"))
         .on_hover_text("Opacity of colormapped values. NaN and clip colors keep their own alpha. Double-click to reset.");
@@ -62,6 +65,32 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     }
     ui.add_space(4.0);
     let curve = &mut color.alpha;
+    let mut changed = curve_header(ui, curve);
+    let edit = egui::TextEdit::singleline(&mut curve.text)
+        .hint_text("0.1, 0.4, 0.3  or  0:0, 0.5:1, 1:0")
+        .desired_width(f32::INFINITY);
+    changed |= ui
+        .add(edit)
+        .on_hover_text(
+            "Alpha over the colorbar, from its start to its end. Values are evenly \
+             spaced (Step: one equal bin each); position:alpha stops are placed \
+             along the bar. Empty for none.",
+        )
+        .changed();
+    if let Some(error) = &curve.error {
+        ui.horizontal(|ui| {
+            ui.icon_toned(Icon::Warning, IconSize::Sm, IconTone::Error);
+            ui.small(error.as_str());
+        });
+    }
+    if changed {
+        app.apply_alpha_curve(id);
+    }
+}
+
+/// The alpha curve's title row: clear, presets, and step or linear
+/// interpolation. Whether the curve changed.
+fn curve_header(ui: &mut egui::Ui, curve: &mut AlphaCurveState) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
         ui.label("Alpha curve");
@@ -88,24 +117,5 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
             }
         });
     });
-    let edit = egui::TextEdit::singleline(&mut curve.text)
-        .hint_text("0.1, 0.4, 0.3  or  0:0, 0.5:1, 1:0")
-        .desired_width(f32::INFINITY);
-    changed |= ui
-        .add(edit)
-        .on_hover_text(
-            "Alpha over the colorbar, from its start to its end. Values are evenly \
-             spaced (Step: one equal bin each); position:alpha stops are placed \
-             along the bar. Empty for none.",
-        )
-        .changed();
-    if let Some(error) = &curve.error {
-        ui.horizontal(|ui| {
-            ui.icon_toned(Icon::Warning, IconSize::Sm, IconTone::Error);
-            ui.small(error.as_str());
-        });
-    }
-    if changed {
-        app.apply_alpha_curve(id);
-    }
+    changed
 }

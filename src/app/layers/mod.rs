@@ -18,14 +18,16 @@ mod stack_tests;
 mod style;
 #[cfg(test)]
 mod style_tests;
+mod window;
 
-pub use alignment::{Alignment, classify, overlay_selection};
+pub use alignment::{Alignment, classify};
 pub use data::LayerData;
 pub use id::LayerId;
-pub use layer::Layer;
+pub use layer::{LABEL_BUF, Layer};
 pub use load::LoadState;
 pub use renderers::LayerRenderers;
 pub use selection::VariableSelection;
 pub use source::Source;
 pub use stack::LayerStack;
-pub use style::{ColorStyle, CompositeStyle};
+pub use style::{AlphaCurveState, ColorStyle, CompositeStyle};
+pub use window::{follow_base_window, overlay_selection};

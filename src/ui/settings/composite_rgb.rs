@@ -55,7 +55,10 @@ pub(super) fn show_standard_rgb_controls(app: &mut OctantApp, ui: &mut egui::Ui,
         }
     }
 
-    let composite = &mut app.layers.get_or_base_mut(id).composite;
+    let Some(layer) = app.layers.get_mut(id) else {
+        return;
+    };
+    let composite = &mut layer.composite;
     if selected != composite.rgb_channels {
         composite.rgb_channels = selected;
         app.load_layer_block(id);

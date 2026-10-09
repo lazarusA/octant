@@ -22,6 +22,9 @@ impl OctantApp {
         } else if !was_3d && is_3d {
             self.switch_from_2d_to_3d();
         }
+        // Those switches change the base layer's plot type in place: overlays
+        // follow it now, not when its block arrives.
+        self.refresh_alignments();
 
         if !self.is_exploring_unplotted_variable() {
             self.load_selected_variable_block();

@@ -122,8 +122,10 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
     app.colormaps.picker.swatches.ensure(ui.ctx());
 
     show_active_row(app, ui);
-    if registry::smooth_variant(app.picker_style().colormap).is_some() {
-        ui.checkbox(&mut app.picker_style_mut().smooth, "Smooth")
+    if registry::smooth_variant(app.picker_style().colormap).is_some()
+        && let Some(style) = app.picker_style_mut()
+    {
+        ui.checkbox(&mut style.smooth, "Smooth")
             .on_hover_text("Blend this palette's colors into a continuous gradient (Oklab)");
     }
     ui.separator();
@@ -169,7 +171,9 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
             .swatches
             .paint(ui, rect, shown, reversed);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.checkbox(&mut app.picker_style_mut().reversed, "Reversed");
+            if let Some(style) = app.picker_style_mut() {
+                ui.checkbox(&mut style.reversed, "Reversed");
+            }
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 let font_size = egui::TextStyle::Body.resolve(ui.style()).size;
                 let max_width = ui.available_width();
@@ -209,6 +213,8 @@ pub fn select_colormap(app: &mut OctantApp, id: u32) {
         l.composite.enabled = false;
         app.load_layer_block(layer);
     }
-    app.picker_style_mut().colormap = id;
+    if let Some(style) = app.picker_style_mut() {
+        style.colormap = id;
+    }
     app.preview_colormap = None;
 }
