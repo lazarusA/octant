@@ -97,6 +97,9 @@ pub struct OctantApp {
     /// The Dimensions panel's Add Overlay toggle: its Plot Data button adds the
     /// staged variable as an overlay (off again after each add).
     pub plot_as_overlay: bool,
+    /// Opens the Settings' Layers menu on the next frame (after a plot or an
+    /// added overlay).
+    pub reveal_layers_menu: bool,
     pub variables_overlay_width: f32,
     pub variable_search: String,
     pub show_bottom_bar: bool,

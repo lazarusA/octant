@@ -80,6 +80,7 @@ impl Default for OctantApp {
             show_settings_panel: false,
             show_variable_controls: false,
             plot_as_overlay: false,
+            reveal_layers_menu: false,
             show_bottom_bar: true,
             show_hover_card: true,
             settings_overlay_width: 0.0,

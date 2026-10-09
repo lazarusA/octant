@@ -4,11 +4,24 @@
 use crate::app::OctantApp;
 use crate::app::layers::{LayerId, Source, VariableSelection, classify, overlay_selection};
 use crate::ui::toast::Severity;
+use crate::utils::colormap::registry;
 
 /// Most overlays drawn over the base layer (the hover card has a row each).
 pub const MAX_OVERLAYS: usize = 4;
 /// Opacity a new overlay starts at, so the base shows through.
 const OVERLAY_OPACITY: f32 = 0.75;
+/// Colormaps new overlays take, in order: perceptually uniform sequential
+/// maps in hue families apart from the default viridis and from each other.
+pub const OVERLAY_COLORMAPS: [&str; 8] = [
+    "matplotlib:magma",
+    "cmocean:ice",
+    "cmocean:algae",
+    "cmocean:amp",
+    "scientific:lajolla",
+    "cmocean:haline",
+    "scientific:oslo",
+    "cmocean:matter",
+];
 
 impl OctantApp {
     /// Why no overlay can be added right now; `None` when one can.
@@ -65,9 +78,11 @@ impl OctantApp {
         }
         let var = selection.variable_info().cloned();
         let id = self.layers.push(Source::Variable(selection));
+        let colormap = self.next_overlay_colormap();
         if let Some(layer) = self.layers.get_mut(id) {
             layer.alignment = alignment;
             layer.color.opacity = OVERLAY_OPACITY;
+            layer.color.colormap = colormap;
         }
         if let Some(var) = var {
             crate::ui::variables_panel::init_layer_composite_defaults(self, id, &var);
@@ -76,11 +91,29 @@ impl OctantApp {
         Some(id)
     }
 
+    /// The colormap a new overlay takes: the first of [`OVERLAY_COLORMAPS`]
+    /// no layer draws yet, cycling by the overlay count once all are taken.
+    fn next_overlay_colormap(&self) -> u32 {
+        let ids = OVERLAY_COLORMAPS
+            .iter()
+            .filter_map(|key| registry::find(key));
+        let mut unused = ids
+            .clone()
+            .filter(|&id| self.layers.iter().all(|l| l.color.colormap != id));
+        let fallback = ids
+            .cycle()
+            .nth(self.layers.overlays().len())
+            .unwrap_or_else(registry::default_id);
+        unused.next().unwrap_or(fallback)
+    }
+
     /// The Dimensions panel's Plot Data button: while its Add Overlay toggle
     /// is on, adds the staged variable as an overlay and turns the toggle off;
     /// otherwise plots the staged selection in place of the base layer and
     /// opens the settings.
     pub fn plot_from_panel(&mut self) {
+        // The Layers menu shows what was plotted or added.
+        self.reveal_layers_menu = true;
         if self.plot_as_overlay {
             self.plot_as_overlay = false;
             self.add_overlay(self.selected.variable_idx);

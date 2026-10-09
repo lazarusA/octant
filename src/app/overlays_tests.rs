@@ -187,3 +187,42 @@ fn an_overlay_color_range_resets_to_its_own_data() {
         "the base keeps its range"
     );
 }
+
+#[test]
+fn every_overlay_colormap_is_a_sequential_map() {
+    use crate::app::overlays::OVERLAY_COLORMAPS;
+    for key in OVERLAY_COLORMAPS {
+        let id = registry::find(key).unwrap_or_else(|| panic!("{key} is in the catalog"));
+        let kind = registry::with_entry(id, |e| e.kind);
+        assert_eq!(
+            kind,
+            Some(crate::utils::colormap::ColormapKind::Sequential),
+            "{key}"
+        );
+    }
+}
+
+#[test]
+fn new_overlays_take_unused_colormaps_of_the_set() {
+    use crate::app::overlays::OVERLAY_COLORMAPS;
+    let _registry = registry::test_lock();
+    let (mut app, meta) = plotted_app();
+    let base = app.layers.base.color.colormap;
+    let first = app.add_overlay(index_of(&meta, "sst")).expect("overlay");
+    let second = app.add_overlay(index_of(&meta, "elev")).expect("overlay");
+    let colormap = |app: &OctantApp, id| app.layers.get(id).map(|l| l.color.colormap);
+    assert_eq!(colormap(&app, first), registry::find(OVERLAY_COLORMAPS[0]));
+    assert_eq!(colormap(&app, second), registry::find(OVERLAY_COLORMAPS[1]));
+    assert_eq!(
+        app.layers.base.color.colormap, base,
+        "the base keeps its colormap"
+    );
+
+    app.remove_overlay(first);
+    let again = app.add_overlay(index_of(&meta, "sst")).expect("overlay");
+    assert_eq!(
+        colormap(&app, again),
+        registry::find(OVERLAY_COLORMAPS[0]),
+        "freed maps are reused"
+    );
+}

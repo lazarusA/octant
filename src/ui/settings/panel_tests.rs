@@ -65,3 +65,12 @@ fn panel_stops_at_the_canvas_bottom() {
     );
     assert!(height <= canvas.height() - 8.0, "panel {height} overflows");
 }
+
+#[test]
+fn a_plot_reveals_the_layers_menu_once() {
+    let mut app = app(PlotType::Heatmap);
+    app.plot_from_panel();
+    assert!(app.reveal_layers_menu, "plotting asks for the Layers menu");
+    settled_height(&egui::Context::default(), &mut app, SCREEN);
+    assert!(!app.reveal_layers_menu, "the settings panel opened it");
+}
