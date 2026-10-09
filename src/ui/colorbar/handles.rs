@@ -1,23 +1,19 @@
 //! Interactive Drag handles and min/max clip triangle widgets.
 
 use super::ticks::format_scientific_tick;
-use crate::app::OctantApp;
+use crate::app::layers::{ColorStyle, LayerId};
 use egui::{Pos2, Rect, Ui, Vec2};
 
-/// Renders min/max drag value input boxes centered directly under the colorbar ends.
-pub fn draw_end_range_inputs(
-    app: &mut OctantApp,
-    ui: &mut Ui,
-    bar_rect: Rect,
-    min_val: f32,
-    max_val: f32,
-) {
+/// Renders min/max drag value input boxes centered directly under the
+/// colorbar ends, editing `color`'s range (and locking it).
+pub fn draw_end_range_inputs(ui: &mut Ui, bar_rect: Rect, color: &mut ColorStyle) {
+    let (min_val, max_val) = (color.range_min, color.range_max);
     let input_w = 60.0;
     let input_h = 18.0;
     let drag_speed = ((max_val - min_val).abs() / 100.0).max(1e-4);
 
-    let mut new_min = app.layers.base.color.range_min;
-    let mut new_max = app.layers.base.color.range_max;
+    let mut new_min = color.range_min;
+    let mut new_max = color.range_max;
 
     let min_rect = Rect::from_center_size(
         Pos2::new(bar_rect.min.x, bar_rect.max.y + 6.0 + input_h / 2.0),
@@ -48,29 +44,30 @@ pub fn draw_end_range_inputs(
         )
         .on_hover_text("Upper end range (Max). Drag to adjust or click to type.");
 
-    if min_resp.changed() || new_min != app.layers.base.color.range_min {
-        app.layers.base.color.range_min = new_min;
-        app.layers.base.color.lock_bounds = true;
+    if min_resp.changed() || new_min != color.range_min {
+        color.range_min = new_min;
+        color.lock_bounds = true;
     }
-    if max_resp.changed() || new_max != app.layers.base.color.range_max {
-        app.layers.base.color.range_max = new_max;
-        app.layers.base.color.lock_bounds = true;
+    if max_resp.changed() || new_max != color.range_max {
+        color.range_max = new_max;
+        color.lock_bounds = true;
     }
 }
 
-/// Renders low-clip and high-clip colored triangle widgets on colorbar ends when enabled.
-pub fn draw_clip_triangles(app: &mut OctantApp, ui: &mut Ui, bar_rect: Rect) {
+/// Renders `color`'s low-clip and high-clip triangles on the ends of layer
+/// `id`'s colorbar when enabled.
+pub fn draw_clip_triangles(ui: &mut Ui, bar_rect: Rect, color: &mut ColorStyle, id: LayerId) {
     let tri_w = 12.0_f32;
 
-    if app.layers.base.color.use_lowclip {
+    if color.use_lowclip {
         let low_tri_rect = Rect::from_min_max(
             Pos2::new(bar_rect.min.x - tri_w, bar_rect.min.y),
             Pos2::new(bar_rect.min.x, bar_rect.max.y),
         );
 
         crate::ui::color_picker::ShapeColorPicker::new(
-            "colorbar_lowclip_picker",
-            &mut app.layers.base.color.lowclip_color,
+            ("colorbar_lowclip_picker", id),
+            &mut color.lowclip_color,
             crate::ui::color_picker::ColorShape::LeftTriangle,
         )
         .title("Low Clip Color (< Min)")
@@ -78,15 +75,15 @@ pub fn draw_clip_triangles(app: &mut OctantApp, ui: &mut Ui, bar_rect: Rect) {
         .show_at(ui, low_tri_rect);
     }
 
-    if app.layers.base.color.use_highclip {
+    if color.use_highclip {
         let high_tri_rect = Rect::from_min_max(
             Pos2::new(bar_rect.max.x, bar_rect.min.y),
             Pos2::new(bar_rect.max.x + tri_w, bar_rect.max.y),
         );
 
         crate::ui::color_picker::ShapeColorPicker::new(
-            "colorbar_highclip_picker",
-            &mut app.layers.base.color.highclip_color,
+            ("colorbar_highclip_picker", id),
+            &mut color.highclip_color,
             crate::ui::color_picker::ColorShape::RightTriangle,
         )
         .title("High Clip Color (> Max)")

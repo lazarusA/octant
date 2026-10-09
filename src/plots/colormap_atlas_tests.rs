@@ -87,16 +87,16 @@ fn gpu_alpha_curve_matches_cpu() {
         let Ok(Some(curve)) = alpha::parse(text) else {
             panic!("{text} should parse");
         };
-        registry::set_alpha_curve(Some(alpha::bake(&curve, interp)));
+        registry::set_alpha_curve(0, Some(alpha::bake(&curve, interp)));
         let atlas = ColormapAtlas::new(&device, &queue);
         // Reversed: the curve follows the data position, not the colormap.
         let color = PlotColorParams {
             opacity: 0.8,
-            alpha_row: registry::alpha_row().unwrap_or(u32::MAX),
+            alpha_row: registry::alpha_row(0).unwrap_or(u32::MAX),
             ..params(registry::default_id(), true, false)
         };
         let pixels = render_row(&device, &queue, &atlas, &color);
-        registry::set_alpha_curve(None);
+        registry::set_alpha_curve(0, None);
         assert_eq!(pixels.len(), LUT_SIZE * 4, "readback failed");
         for x in 0..LUT_SIZE {
             let cpu = (0.8 * alpha_curve_at(&curve, interp, pixel_t(x)) * 255.0).round() as u8;

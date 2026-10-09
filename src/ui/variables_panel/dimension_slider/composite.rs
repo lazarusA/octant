@@ -1,46 +1,43 @@
 //! Multi-channel composite default initialization and OMERO attribute extraction.
 
 use crate::app::OctantApp;
+use crate::app::layers::LayerId;
 use crate::data::VariableInfo;
 
-/// Initialize multi-channel composite configurations and defaults for a variable.
-pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo, rank: usize) {
-    app.layers.base.composite.rgb_channels = [0, 1, 2];
-    app.layers.base.composite.channel_configs.clear();
+/// Initialize the base layer's composite defaults for a variable.
+pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
+    init_layer_composite_defaults(app, LayerId::BASE, var_info);
+}
 
-    let is_tiff = app.is_geotiff();
-
+/// Initializes layer `id`'s composite for `var_info`: OMERO channel configs
+/// for a channel dimension (multi-channel overlay), RGB on for a 3+ band
+/// GeoTIFF, otherwise off.
+pub fn init_layer_composite_defaults(app: &mut OctantApp, id: LayerId, var_info: &VariableInfo) {
+    let rank = var_info.shape.len();
+    let is_tiff = app.layer_is_geotiff(id);
     let has_omero = var_info.attributes.contains_key("omero_channels")
         || var_info.attributes.contains_key("omero_colors");
-
-    if !is_tiff {
-        let c_idx_opt = var_info
+    let configs = if is_tiff {
+        Vec::new()
+    } else {
+        var_info
             .dimension_names
             .iter()
             .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
-            .or(if has_omero && rank >= 3 {
-                Some(0)
-            } else {
-                None
-            });
-
-        if let Some(c_idx) = c_idx_opt {
-            let num_ch = var_info.shape.get(c_idx).copied().unwrap_or(0) as usize;
-            if num_ch >= 2 {
-                app.layers.base.composite.channel_configs =
-                    extract_channel_configs(var_info, num_ch);
-            }
-        }
-    }
-
+            .or((has_omero && rank >= 3).then_some(0))
+            .map(|c| var_info.shape.get(c).copied().unwrap_or(0) as usize)
+            .filter(|&channels| channels >= 2)
+            .map(|channels| extract_channel_configs(var_info, channels))
+            .unwrap_or_default()
+    };
     let num_bands = var_info.shape.first().copied().unwrap_or(0) as usize;
-
-    if is_tiff && rank >= 3 && num_bands >= 3 {
-        app.layers.base.composite.enabled = true;
-        app.layers.base.composite.rgb_channels = [0, 1, 2];
-    } else {
-        app.layers.base.composite.enabled = !app.layers.base.composite.channel_configs.is_empty();
-    }
+    let Some(layer) = app.layers.get_mut(id) else {
+        return;
+    };
+    let composite = &mut layer.composite;
+    composite.rgb_channels = [0, 1, 2];
+    composite.enabled = (is_tiff && rank >= 3 && num_bands >= 3) || !configs.is_empty();
+    composite.channel_configs = configs;
 }
 
 fn extract_channel_configs(

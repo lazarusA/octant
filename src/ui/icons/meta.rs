@@ -44,6 +44,7 @@ define_icons! {
     ],
     "Plot Types & Colormaps" => [
         PlotPlane, PlotLine, PlotSurface, PlotGlobe, PlotVolume, PlotPointCloud, Colormap,
+        Layers,
     ],
     "Data Store & Files" => [
         Dataset, Folder, FolderOpen, VariableDoc, Icechunk, Catalog, Save, Snapshot, DropTray,
@@ -51,6 +52,6 @@ define_icons! {
     ],
     "Tools & Status Badges" => [
         Scissors, Check, Cross, Lock, Unlock, Bolt, Hourglass, Warning, Info, Bullet,
-        ChevronRight, ChevronDown,
+        ChevronRight, ChevronDown, ChevronUp, Eye, EyeOff,
     ],
 }

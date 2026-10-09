@@ -20,6 +20,7 @@ fn t2m<'a>(fields: &'a [HoverField], units: &'a str) -> HoverCard<'a> {
         value: HoverValue::Scalar(287.43),
         units,
         swatch: Color32::RED,
+        layers: &[],
         fields,
     }
 }

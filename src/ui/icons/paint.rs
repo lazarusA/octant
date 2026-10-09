@@ -42,6 +42,7 @@ impl Icon {
             Icon::PlotVolume => plots::draw_plot_volume(c),
             Icon::PlotPointCloud => plots::draw_plot_point_cloud(c),
             Icon::Colormap => palette::draw_colormap(c),
+            Icon::Layers => palette::draw_layers(c),
 
             // Store & Files
             Icon::Dataset => files::draw_dataset(c),
@@ -70,6 +71,9 @@ impl Icon {
             Icon::Bullet => marks::draw_bullet(c),
             Icon::ChevronRight => marks::draw_chevron_right(c),
             Icon::ChevronDown => marks::draw_chevron_down(c),
+            Icon::ChevronUp => marks::draw_chevron_up(c),
+            Icon::Eye => marks::draw_eye(c),
+            Icon::EyeOff => marks::draw_eye_off(c),
         }
     }
 }

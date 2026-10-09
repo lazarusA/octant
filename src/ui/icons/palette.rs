@@ -97,3 +97,10 @@ fn draw_brush(c: &IconCanvas, paint: Color32) {
     ];
     c.fill_pts(bristles, paint);
 }
+
+/// Layers: a sheet seen from above with a second one stacked below (18x14 keyline).
+pub fn draw_layers(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    c.diamond((key::C, 9.0), 9.0, 4.5, c.body(), s);
+    c.path_round(&[(3.0, 13.5), (key::C, 18.0), (21.0, 13.5)], s);
+}

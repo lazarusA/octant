@@ -56,7 +56,7 @@ fn sample(params: &PlotColorParams, t: f32) -> Color32 {
     let curve = if params.alpha_row == super::NO_ALPHA_ROW {
         1.0
     } else {
-        super::registry::curve_alpha(t)
+        super::registry::row_curve_alpha(params.alpha_row, t)
     };
     let alpha = super::lut::unit_to_u8(params.opacity.clamp(0.0, 1.0) * curve);
     Color32::from_rgba_unmultiplied(r, g, b, alpha)

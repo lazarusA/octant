@@ -159,11 +159,14 @@ Modular UI components integrated with `OctantApp`.
 
 - **Done (behavior unchanged):** plotted state lives in a `LayerStack` ([`src/app/layers/`](https://github.com/lazarusA/octant/tree/main/src/app/layers)). The UI's staged selection is `OctantApp::selected` (a `VariableSelection`); Plot copies it to the base layer, read through `OctantApp::plotted()`. Each `Layer` has a read-only `LayerId` given by the stack (`LayerId::BASE` for the base layer) and owns its `Source` (only `Source::Variable` so far), `LayerData`, `LayerRenderers`, `ColorStyle`, `CompositeStyle` and `LoadState`. Painting, OIT release, volume uploads and pyramid tile resampling loop over `LayerStack::iter`/`iter_mut`, and `ColorStyle::params` builds the shader color uniforms. `block_axes` places a selection inside a block, and `VariableSelection::slice_request` builds requests. All of these are pure or work per layer.
 - **Done: projection and paint per layer.** `apply_block_projection`, `apply_2d_projection`/`apply_3d_volume_projection`, `commit_volume_slab` and both pipeline rebuilds take a `LayerId` and write only that layer (`LayerStack::get`/`get_mut`). Coastline meshes and the line plot settings follow the base layer only. They read the layer's selection through `layer_selections` (`None` once the layer is gone): the base layer falls back to the staged `selected` until its first plot, as the `effective_*` helpers (now `layer_*(LayerId::BASE)`) always did, and other layers stage their own. `poll_block_prefetch_results` sends a requested block to the layer whose request it is (`find_by_key` returns its id) and any other block to the layer whose view it belongs to (`layer_showing_block`). `get_color_params`, `transparency_mode` and the mesh, volume and point cloud uniform getters take the `&Layer` they draw; the colormap picker's preview applies to the base layer only (`layer_colormap`). Volume data extents go through `ColorStyle::reset_to_extent`/`follow_extent` (which skip non-finite ends; the 2D rebuild still writes its extent inline, NaN included), and dirty volume planes through `LayerRenderers::mark_volume_dirty`.
-- **Done: requests per layer.** `load_layer_block(id)` loads a layer's block from its staged selection (`load_selected_variable_block` is the base layer's), through `LayerRequest` ([`layer_request.rs`](https://github.com/lazarusA/octant/blob/main/src/app/block_loading/layer_request.rs): `staged_layer_request`/`shown_layer_request`, store resolved only on fetch by `request_store`). The cache-hit path (`show_cached_block`, `project_cached_volume_blocks`), step windows (`prefetch_layer_window`), lookahead (`prefetch_layer_animated_range`, `prefetch_animated_ranges` for all) and coordinates (`request_layer_coordinates`; arriving coordinates merge into every layer of their dataset) take a `LayerId`. The current step is shared: only the base layer moves it, and an overlay shows `layer_step`, the step clamped into its own extent (requests and projection both use it). Playback, step navigation and `SetTimestep` follow the base layer's residency, then load the animated overlays (`load_step_blocks`); a base block that arrives for a new step reloads them too. Overlays don't yet match steps by coordinate value (TODO 2).
-- **Still tied to the base layer** (the next work of the overlay phase):
-  - Hover, colorbar, axis labels, aspect ratios and volume shifts, and export read the base layer only (the view frame is the base layer's).
-  - `LayerStack::push` adds an overlay under a new `LayerId` (the stack hands out every id; `LayerId` has no `Default`), and every per-layer loop already includes overlays, but nothing pushes one yet. When the UI does, put the id in egui salts and the per-plot caches (hover, composite labels) next to `metadata_generation`.
-- **Decisions taken:** the plot type is part of the selection, and the canvas type is the base layer's. Colormap reversal stays in `ColormapState`; move it into `ColorStyle` when overlays need their own. Settings for each plot type (`sphere_mode`, `volume_*`, `line_*`) stay on the app until overlays of those plot types exist.
+- **Done: requests per layer.** `load_layer_block(id)` loads a layer's block from its staged selection (`load_selected_variable_block` is the base layer's), through `LayerRequest` ([`layer_request.rs`](https://github.com/lazarusA/octant/blob/main/src/app/block_loading/layer_request.rs): `staged_layer_request`/`shown_layer_request`, store resolved only on fetch by `request_store`). The cache-hit path (`show_cached_block`, `project_cached_volume_blocks`), step windows (`prefetch_layer_window`), lookahead (`prefetch_layer_animated_range`, `prefetch_animated_ranges` for all) and coordinates (`request_layer_coordinates`; arriving coordinates merge into every layer of their dataset) take a `LayerId`. The current step is shared: only the base layer moves it, and an overlay shows `layer_step`, the step clamped into its own extent (requests and projection both use it). Playback, step navigation and `SetTimestep` follow the base layer's residency, then load the animated overlays (`load_step_blocks`); a base block that arrives for a new step reloads them too. Overlays don't yet match steps by coordinate value (TODO 3).
+- **Done: same-grid overlays (TODO 1).**
+  - [`alignment.rs`](https://github.com/lazarusA/octant/blob/main/src/app/layers/alignment.rs) classifies an overlay against the base heatmap: `SameGrid` (same X/Y dimension names, sizes, window and coordinates, or the same dataset), `Geo { lon, lat }` (on another longitude/latitude grid), `IndexOnly` (same shape, no coordinates to compare) or `Incompatible`. Only `SameGrid` draws. `overlay_selection` builds an overlay's selection by giving its dimensions the base's roles, ranges and indices by name.
+  - [`overlays.rs`](https://github.com/lazarusA/octant/blob/main/src/app/overlays.rs): `add_overlay` (at most `MAX_OVERLAYS` = 4, over a plotted heatmap, starting at 75% opacity with the first unused colormap of the curated `OVERLAY_COLORMAPS`: magma, cmocean ice, algae, amp, scientific lajolla, cmocean haline, scientific oslo, cmocean matter; refusals become toasts), `remove_overlay`, `sync_overlays_to_base` (from `sync_plotted_state_from_selected`: overlays follow a new base window in place, `follow_base_window`, without cloning metadata, and reload only when it moved, not on a playback step; an overlay whose coordinates are still on their way is added undrawn and loads once aligned) and `refresh_alignments` (also when coordinates arrive). `Layer::visible` and `Layer::alignment` decide `Layer::is_drawn`; painting, colorbars and hover rows skip layers that aren't drawn. `LayerStack::remove`, `move_overlay`, `base_and_overlay_mut` and `drawn_ids` manage the stack; only drawn layers load, prefetch and resample.
+  - `ColorStyle` holds each layer's colormap, `reversed` and `smooth`, `alpha_at`/`is_translucent`. The colormap picker edits `ColormapState::target` (`picker_layer`, `picker_style(_mut)`; `None` is the base layer, which the toolbar's picker edits) and previews on that layer.
+  - UI: in the Dimensions panel's second header row, turning on the "Add Overlay" toggle makes "Plot Data" fetch the variable as an overlay (the toggle turns off after each add; each variable overlays once, and the toggle is disabled with the reason while it can't); a Layers menu in Settings listing every layer, base included (overlays: eye toggle, move up/down, `ui.close_button` remove, alignment note; every layer: colormap swatch opening the picker on it, opacity, its own RGB composite controls and Color menu; a new overlay gets composite defaults for its own variable, and its hover row names its composite); one colorbar per drawn layer stacked upward from the base's (`colorbar/panel.rs`, ids salted by `LayerId`); one hover row per drawn overlay under the headline value (`hover/overlays.rs`, `hover/card/layers.rs`, read at the base cell since overlays share the grid).
+- **Still tied to the base layer:** axis labels, aspect ratios, volume shifts and export (the view frame is the base layer's). The composite label cache keys on the plotted selection only, since overlays draw no composites yet.
+- **Decisions taken:** the plot type is part of the selection, and the canvas type is the base layer's; overlays are heatmaps over a heatmap base. Each layer has its own Color menu: its `ColorStyle` holds the colormap, reversal, smoothing, range, scale, NaN and clip colors, label, opacity and opacity curve (one registry row per layer, freed on removal); the 3D transparency toggles and the colorbar visibility stay app-wide. Settings for each plot type (`sphere_mode`, `volume_*`, `line_*`) stay on the app until overlays of those plot types exist.
 
 ### Model to grow into
 
@@ -183,16 +186,24 @@ Sources produce arrays aligned to a grid; layers draw one or more sources in a s
 
 ### TODO, in order
 
-1. **Same-grid overlays.**
-   - Push more layers onto `LayerStack` (requests, routing and prefetching already work per layer).
-   - Draw overlays after the base and before coastlines, with their own `ColorStyle`, opacity and visibility. NaN must draw transparent.
-   - UI:
-     - "Add as overlay" on variable rows.
-     - A layer list in the docked panel: visible, opacity, colormap, reorder, remove (`ui.close_button`).
-     - Stacked colorbars.
-     - One hover section per layer.
-   - Classify compatibility (`SameGrid`, `Geo { bbox }`, `IndexOnly`, `Incompatible`) in a new alignment module. This replaces the deleted shape-equality check.
-2. **Overlays across datasets (regional on global).**
+1. ~~**Same-grid overlays.**~~ Done (see "Where we stand").
+2. **Overlays for every plot type** (line, surface, sphere, volume, point cloud; today overlays are heatmaps over a heatmap).
+   - **Rule first:** an overlay takes the canvas plot type (the base layer's). Mixed types (a point cloud over a volume) come later. Each type then needs:
+     - **Line:** several series in one plot. `get_line_profile_payload` builds one payload from the base layer and `paint_line` draws one `LineCallback` per layer, so give the line renderer a series per drawn layer (its colormap's mid color or a series color), a legend, and a second y-axis when units differ.
+     - **Surface and sphere:** one mesh per layer from its own `MatrixData`. Same grid: draw at the base's geometry with a small radial or height offset per layer to avoid z-fighting, and let the opacity curve and OIT make them translucent.
+     - **Volume:** several raymarched volumes on one canvas do not composite (each blits a full frame). Same grid: upload overlays as extra channels of the base's 3D textures and raymarch them together in one pass, each channel with its own colormap row, opacity and curve.
+     - **Point cloud:** one point set per layer in the same OIT frame.
+   - **What the current state needs to adapt:**
+     - `alignment::classify` and `overlay_selection` require and force `PlotType::Heatmap`: classify against the canvas plot type, keep the overlay's plot type equal to the base's, and add the Z dimension to the axes that must match for 3D types.
+     - `overlay_unavailable` refuses non-heatmap canvases; it becomes per type as each type gains support (one place to lift).
+     - `sync_overlays_to_base` must re-derive overlays when the base's plot type changes (`switch_plot_type`), not only its window, and reload them through the 2D or 3D projection.
+     - Projection is already per layer (`apply_block_projection` picks 2D or 3D from the layer's staged plot type; volumes go through `commit_volume_slab` and `LayerRenderers::mark_volume_dirty`), and `LayerRenderers` already holds every renderer per layer. `flush_volume_uploads` sends each layer's dirty planes to its own renderer.
+     - Plot-type settings live on the app (`sphere_mode`, `surface_*`, `volume_*`, `line_*`, displacement strength): keep them app-wide for geometry and camera, but move what styles a layer (point size, line color, volume density and algorithm per layer) into a per-layer plot style, shown in that layer's entry of the Layers menu.
+     - Transparency: OIT state is per renderer (`OitSlot`), so two translucent meshes or point clouds composite separately and in the wrong order. Share one OIT frame per canvas: every drawn layer accumulates into it, then one composite.
+     - Hover: 3D hits (`raycast_surface`, `raycast_sphere`, `raycast_volume`, `VolumeSampler`) read the base layer. With same-grid overlays, sample each overlay at the hit's grid cell or voxel (as `overlay_values` does for heatmaps) and show its row; line plots show one row per series at the hovered index.
+     - Colorbars already stack per layer; composites (RGB volumes) keep none. The 3D aspect ratio and volume shifts (`pipeline/aspect.rs`) stay the base's, since overlays share its grid.
+3. **Overlays across datasets (regional on global).**
+   - Draw `Alignment::Geo` overlays (their extent is already classified) and `IndexOnly` ones on request.
    - Place an overlay with the heatmap's `tile_bounds`: the overlay's lon/lat bounding box normalized into the base layer's lon/lat frame, as coastlines already do with `dataset_geo_bounds`.
    - Normalize longitude conventions (0–360 vs −180–180), and split quads that cross the antimeridian.
    - The pyramid resampler also writes `tile_bounds`, so combine the two, or give overlays no pyramid at first.
@@ -200,21 +211,21 @@ Sources produce arrays aligned to a grid; layers draw one or more sources in a s
    - Allow regular and 1D-irregular overlays first. Curvilinear and HEALPix work only as the base until the shader handles them.
    - The view frame is the base layer's; a "fit all layers" option can come later.
    - Sphere and surface overlays: a second mesh renderer using its own lon/lat bounds (`has_reference_globe`), a small radial offset, and OIT.
-3. **Operations (`Source::Derived`).**
+4. **Operations (`Source::Derived`).**
    - Compute on the CPU from each step's projected 2D slices; the result is a `MatrixData` that every renderer already draws.
    - Same grid: element by element. Mixed grids: regrid onto a chosen target grid (nearest or bilinear over lon/lat).
    - Cache results in an LRU keyed by the input block keys, the expression's hash and each source's `metadata_generation`.
    - Write our own small AST, evaluated one whole array per node, with NaN propagating (+ − × ÷, comparisons, where/mask, abs, sqrt, log, hypot, atan2, clamp). Start with a fixed menu of operations, then free-form text.
    - Derive units for the simple cases, warn when + or − mixes units, and reject cycles.
    - `Source::Reduce` (time mean, anomalies) loads the animated range; it comes later.
-4. **Bivariate maps.** Look each cell up in a 2D color table on the CPU and draw the result through the existing RGB composite path (`COLORMAP_RGB_COMPOSITE`). Its legend is a 2D square. A GPU version (two data buffers plus a dedicated 2D lookup texture, not more colormap-atlas rows) can follow.
-5. **Vector fields (u, v).**
+5. **Bivariate maps.** Look each cell up in a 2D color table on the CPU and draw the result through the existing RGB composite path (`COLORMAP_RGB_COMPOSITE`). Its legend is a 2D square. A GPU version (two data buffers plus a dedicated 2D lookup texture, not more colormap-atlas rows) can follow.
+6. **Vector fields (u, v).**
    - Magnitude and direction need nothing new: they are derived sources (`hypot`, `atan2` with a cyclic colormap).
    - Arrows: a new `VectorRenderer` that instances arrows on the GPU and pulls `u`/`v` from storage buffers (as the AGENTS.md rules require for grid data), sampled at a stride that follows the zoom.
    - Streamlines: CPU line meshes, which the rules allow.
    - Mind screen-y vs north, block flips (`flipped_dims`), tangent frames on the sphere, and grid-relative components on rotated or curvilinear grids.
    - Dense textures and animated particles come last.
-6. **Multi-scale exploration.**
+7. **Multi-scale exploration.**
    - Give `Source::Variable` an optional `ScaleLevels` ladder:
      - OME-NGFF multiscales: today each level is listed as its own variable; group them instead.
      - GeoTIFF overviews: today each overview is listed as its own variable; group them instead.
@@ -227,4 +238,4 @@ Sources produce arrays aligned to a grid; layers draw one or more sources in a s
    - Label operations computed from coarser data with their level, and offer an "exact" mode.
    - Categorical data needs levels built with the mode, not the mean.
    - Then add `Source::Mosaic` for nested datasets.
-7. **Later:** volume overlays (same grid only, as texture channels), line plots with several series and a second y-axis, and saving and restoring sessions (serialize sources and layers).
+8. **Later:** mixed plot types per canvas (an overlay of another type than the base), and saving and restoring sessions (serialize sources and layers).

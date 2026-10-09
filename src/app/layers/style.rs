@@ -2,13 +2,25 @@
 
 use crate::data::matrix_data::MatrixData;
 use crate::plots::common::PlotColorParams;
-use crate::utils::colormap::{COLORMAP_RGB_COMPOSITE, NO_ALPHA_ROW, registry};
+use crate::utils::colormap::{AlphaInterp, COLORMAP_RGB_COMPOSITE, NO_ALPHA_ROW, registry};
+
+/// Text of an opacity curve as typed, its interpolation and parse error.
+#[derive(Debug, Clone, Default)]
+pub struct AlphaCurveState {
+    pub text: String,
+    pub interp: AlphaInterp,
+    pub error: Option<String>,
+}
 
 /// Colormapping of a scalar layer.
 #[derive(Debug, Clone)]
 pub struct ColorStyle {
     /// Row id in `utils::colormap::registry` (and the GPU colormap atlas).
     pub colormap: u32,
+    /// Samples the colormap from its end.
+    pub reversed: bool,
+    /// Draws the smooth twin of a short categorical palette.
+    pub smooth: bool,
     pub range_min: f32,
     pub range_max: f32,
     /// Keeps the range while new data arrives.
@@ -28,6 +40,11 @@ pub struct ColorStyle {
     pub scale_param: f32,
     pub categorical: bool,
     pub custom_label: Option<String>,
+    /// The opacity curve editor; the baked curve lives in the colormap
+    /// registry under `alpha_key`.
+    pub alpha: AlphaCurveState,
+    /// The layer's curve key in the registry (its `LayerId`), set by `Layer::new`.
+    pub(super) alpha_key: u32,
 }
 
 impl Default for ColorStyle {
@@ -37,6 +54,8 @@ impl Default for ColorStyle {
         let shader = PlotColorParams::default();
         Self {
             colormap: registry::default_id(),
+            reversed: false,
+            smooth: false,
             range_min: shader.cmin,
             range_max: shader.cmax,
             lock_bounds: false,
@@ -53,6 +72,8 @@ impl Default for ColorStyle {
             scale_param: shader.scale_param,
             categorical: false,
             custom_label: None,
+            alpha: AlphaCurveState::default(),
+            alpha_key: 0,
         }
     }
 }
@@ -98,13 +119,44 @@ impl ColorStyle {
         }
     }
 
+    /// Alpha of colormapped values at data position `t`: the opacity times
+    /// the opacity curve, as the plots draw it.
+    pub fn alpha_at(&self, t: f32) -> f32 {
+        self.opacity.clamp(0.0, 1.0) * registry::curve_alpha(self.alpha_key, t)
+    }
+
+    /// Whether colormapped values may be drawn translucent.
+    pub fn is_translucent(&self) -> bool {
+        self.opacity < 1.0 || self.alpha_row().is_some()
+    }
+
+    /// The atlas row of this style's opacity curve, if it has one.
+    pub fn alpha_row(&self) -> Option<u32> {
+        registry::alpha_row(self.alpha_key)
+    }
+
+    /// The registry key of this style's opacity curve.
+    pub fn alpha_key(&self) -> u32 {
+        self.alpha_key
+    }
+
+    /// The colormap row drawn for colormap `id` with this style: its smooth
+    /// twin when `smooth` is on and the style's own colormap has one (the
+    /// toggle only shows, so only applies, then).
+    pub fn shown_row(&self, id: u32) -> u32 {
+        if self.smooth && registry::smooth_variant(self.colormap).is_some() {
+            registry::smooth_variant(id).unwrap_or(id)
+        } else {
+            id
+        }
+    }
+
     /// The shader color uniforms drawing atlas row `shown` (the colormap after
-    /// preview and smoothing), `reversed`, as an RGB composite when `composite`;
-    /// `matrix` counts categories for categorical colors.
+    /// preview and smoothing), as an RGB composite when `composite`; `matrix`
+    /// counts categories for categorical colors.
     pub fn params(
         &self,
         shown: u32,
-        reversed: bool,
         composite: bool,
         matrix: Option<&MatrixData>,
     ) -> PlotColorParams {
@@ -131,11 +183,11 @@ impl ColorStyle {
             scale_param: self.scale_param,
             is_categorical: u32::from(self.categorical),
             num_categories: if self.categorical { num_categories } else { 10 },
-            reverse: u32::from(reversed),
+            reverse: u32::from(self.reversed),
             nearest: u32::from(registry::is_stepped(row)),
             fallback_colormap: row,
             opacity: self.opacity.clamp(0.0, 1.0),
-            alpha_row: registry::alpha_row().unwrap_or(NO_ALPHA_ROW),
+            alpha_row: self.alpha_row().unwrap_or(NO_ALPHA_ROW),
             _pad: 0,
             nan_color: self.nan_color,
             lowclip_color: self.lowclip_color,

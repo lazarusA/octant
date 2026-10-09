@@ -1,4 +1,4 @@
-//! Single-glyph marks: check, cross, warning, info, bullet and chevrons.
+//! Single-glyph marks: check, cross, warning, info, bullet, chevrons and eyes.
 
 use super::canvas::{IconCanvas, Weight, key};
 use egui::{Color32, Stroke};
@@ -53,4 +53,39 @@ pub fn draw_chevron_down(c: &IconCanvas) {
         &[(5.0, 9.0), (12.0, 16.0), (19.0, 9.0)],
         c.stroke(Weight::Bold),
     );
+}
+
+/// ChevronUp: bold up-pointing chevron with round caps (14x7 keyline).
+pub fn draw_chevron_up(c: &IconCanvas) {
+    c.path_round(
+        &[(5.0, 15.0), (12.0, 8.0), (19.0, 15.0)],
+        c.stroke(Weight::Bold),
+    );
+}
+
+/// Eye outline: an almond of two lid arcs, with the iris (20x12 keyline).
+fn eye(c: &IconCanvas) {
+    use std::f32::consts::PI;
+    let s = c.stroke(Weight::Base);
+    let lids = (10.0, 6.0);
+    let mut outline = c.arc((key::C, key::C), lids, PI, 2.0 * PI);
+    outline.extend(c.arc((key::C, key::C), lids, 0.0, PI).into_iter().skip(1));
+    c.curve_closed(outline, s);
+    if c.compact() {
+        c.dot((key::C, key::C), 2.6, c.color);
+    } else {
+        c.circle((key::C, key::C), 3.0, Color32::TRANSPARENT, s);
+        c.dot((key::C, key::C), 1.2, c.color);
+    }
+}
+
+/// Eye: shown (20x12 keyline).
+pub fn draw_eye(c: &IconCanvas) {
+    eye(c);
+}
+
+/// EyeOff: the eye struck through (20x18 keyline).
+pub fn draw_eye_off(c: &IconCanvas) {
+    eye(c);
+    c.path_round(&[(4.0, 20.0), (20.0, 4.0)], c.stroke(Weight::Bold));
 }

@@ -2,6 +2,7 @@
 //! single tooltip layer so the leader always meets the card edge.
 
 pub mod flow;
+pub mod layers;
 pub mod layout;
 #[cfg(test)]
 mod layout_tests;
@@ -14,6 +15,7 @@ mod sheet;
 #[cfg(test)]
 mod tests;
 
+pub use layers::LayerValue;
 pub use model::{HoverCard, HoverValue};
 
 use egui::{Id, LayerId, Order, Pos2, Rect};

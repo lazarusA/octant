@@ -19,9 +19,10 @@ fn params_carry_the_range_clips_and_clamped_opacity() {
         opacity: 1.5,
         scale_type: 2,
         scale_param: 3.0,
+        reversed: true,
         ..Default::default()
     };
-    let p = style.params(registry::default_id(), true, false, None);
+    let p = style.params(registry::default_id(), false, None);
     assert_eq!((p.cmin, p.cmax), (-2.0, 7.0));
     assert_eq!((p.use_lowclip, p.use_highclip, p.use_nan_color), (1, 0, 0));
     assert_eq!((p.scale_type, p.scale_param), (2, 3.0));
@@ -34,7 +35,7 @@ fn params_carry_the_range_clips_and_clamped_opacity() {
 fn composites_draw_rgb_and_keep_the_row_as_fallback() {
     let _registry = registry::test_lock();
     let row = registry::default_id();
-    let p = ColorStyle::default().params(row, false, true, None);
+    let p = ColorStyle::default().params(row, true, None);
     assert_eq!(p.colormap, COLORMAP_RGB_COMPOSITE);
     assert_eq!(p.fallback_colormap, row);
 }
@@ -42,7 +43,7 @@ fn composites_draw_rgb_and_keep_the_row_as_fallback() {
 #[test]
 fn a_row_outside_the_atlas_draws_the_default() {
     let _registry = registry::test_lock();
-    let p = ColorStyle::default().params(u32::MAX - 1, false, false, None);
+    let p = ColorStyle::default().params(u32::MAX - 1, false, None);
     assert_eq!(p.colormap, registry::default_id());
     assert_eq!(p.fallback_colormap, registry::default_id());
 }
@@ -55,11 +56,11 @@ fn categorical_colors_count_the_distinct_values() {
         categorical: true,
         ..Default::default()
     };
-    let p = style.params(registry::default_id(), false, false, Some(&matrix));
+    let p = style.params(registry::default_id(), false, Some(&matrix));
     assert_eq!((p.is_categorical, p.num_categories), (1, 3));
-    let p = style.params(registry::default_id(), false, false, None);
+    let p = style.params(registry::default_id(), false, None);
     assert_eq!((p.is_categorical, p.num_categories), (1, 10), "no data");
-    let p = ColorStyle::default().params(registry::default_id(), false, false, Some(&matrix));
+    let p = ColorStyle::default().params(registry::default_id(), false, Some(&matrix));
     assert_eq!((p.is_categorical, p.num_categories), (0, 10), "continuous");
 }
 

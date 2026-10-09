@@ -2,6 +2,7 @@
 
 use super::app_state::OctantApp;
 use super::store_kind::StoreKind;
+use crate::app::layers::LayerId;
 
 impl OctantApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -45,49 +46,46 @@ impl OctantApp {
         self.layers.base.color.custom_label = None;
     }
 
-    /// Resets color range min and max to the current dataset/matrix slice bounds and unlocks bounds.
+    /// Resets the base layer's color range to its data extent and unlocks it.
     pub fn reset_color_range(&mut self) {
-        let canvas_plot_type = self.effective_canvas_plot_type();
-        let is_3d = canvas_plot_type == crate::plots::PlotType::Volume
-            || canvas_plot_type == crate::plots::PlotType::PointCloud;
+        self.reset_layer_color_range(LayerId::BASE);
+    }
 
-        let cur_var = self
-            .plotted_variable_info()
-            .or_else(|| self.selected_variable_info());
-        let cur_name = cur_var.map(|v| v.name.as_str());
-
-        let mdata_valid = self
-            .layers
-            .base
+    /// Resets layer `id`'s color range min and max to its current slice or
+    /// volume extent (0..100 without data of its variable) and unlocks it.
+    pub fn reset_layer_color_range(&mut self, id: LayerId) {
+        // Only the base layer can be a 3D plot; overlays are heatmaps.
+        let is_3d = id == LayerId::BASE
+            && matches!(
+                self.effective_canvas_plot_type(),
+                crate::plots::PlotType::Volume | crate::plots::PlotType::PointCloud
+            );
+        let cur_name = self.layer_variable_info(id).map(|v| v.name.clone());
+        let Some(layer) = self.layers.get_mut(id) else {
+            return;
+        };
+        let of_var = |name: &str| cur_name.as_deref().is_none_or(|n| name.contains(n));
+        let matrix = layer
             .data
             .matrix
             .as_ref()
-            .is_some_and(|m| cur_name.is_none_or(|n| m.dataset_name.contains(n)));
-        let vdata_valid = self
-            .layers
-            .base
+            .filter(|m| of_var(&m.dataset_name))
+            .map(|m| (m.min_val, m.max_val));
+        let volume = layer
             .data
             .volume
             .as_ref()
-            .is_some_and(|v| cur_name.is_none_or(|n| v.dataset_name.contains(n)));
-
-        if is_3d
-            && vdata_valid
-            && let Some(vdata) = &self.layers.base.data.volume
-        {
-            self.layers.base.color.range_min = vdata.min_val;
-            self.layers.base.color.range_max = vdata.max_val;
-        } else if mdata_valid && let Some(mdata) = &self.layers.base.data.matrix {
-            self.layers.base.color.range_min = mdata.min_val;
-            self.layers.base.color.range_max = mdata.max_val;
-        } else if vdata_valid && let Some(vdata) = &self.layers.base.data.volume {
-            self.layers.base.color.range_min = vdata.min_val;
-            self.layers.base.color.range_max = vdata.max_val;
+            .filter(|v| of_var(&v.dataset_name))
+            .map(|v| (v.min_val, v.max_val));
+        let extent = if is_3d {
+            volume.or(matrix)
         } else {
-            self.layers.base.color.range_min = 0.0;
-            self.layers.base.color.range_max = 100.0;
-        }
-        self.layers.base.color.lock_bounds = false;
+            matrix.or(volume)
+        };
+        let (min, max) = extent.unwrap_or((0.0, 100.0));
+        layer.color.range_min = min;
+        layer.color.range_max = max;
+        layer.color.lock_bounds = false;
     }
 
     /// Returns the source_id string for the currently selected (UI active) store.
@@ -137,9 +135,8 @@ impl OctantApp {
                 self.layers.base.clear_3d();
             }
             if let Some(var_info) = self.plotted_variable_info().cloned() {
-                let rank = var_info.shape.len();
                 crate::ui::variables_panel::dimension_slider::init_composite_defaults(
-                    self, &var_info, rank,
+                    self, &var_info,
                 );
             }
         }
@@ -148,6 +145,7 @@ impl OctantApp {
             self.layers.base.composite.enabled = false;
         }
         self.reset_variable_bounds();
+        self.sync_overlays_to_base();
     }
 
     /// Returns VariableInfo for the currently plotted variable, if available.

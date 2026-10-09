@@ -6,6 +6,7 @@
 
 pub mod alpha;
 pub mod catalog;
+mod curve_rows;
 pub mod custom;
 pub mod eval;
 pub mod format;

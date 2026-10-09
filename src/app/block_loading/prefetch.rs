@@ -47,22 +47,22 @@ impl OctantApp {
     }
 
     /// Shows `target_step` when the base layer holds it (loading the animated
-    /// overlays at it too), else prefetches every layer's window there.
+    /// overlays at it too), else prefetches every drawn layer's window there.
     pub fn request_step_or_load(&mut self, target_step: usize) {
         if self.layer_step_resident(LayerId::BASE, target_step) {
             self.current_timestep = target_step;
             self.load_step_blocks();
         } else {
-            for id in self.layers.ids() {
+            for id in self.layers.drawn_ids() {
                 self.prefetch_layer_window(id, target_step);
             }
         }
     }
 
-    /// Progressively prefetches lookahead block windows along every layer's
-    /// animated dimension.
+    /// Progressively prefetches lookahead block windows along every drawn
+    /// layer's animated dimension.
     pub fn prefetch_animated_ranges(&mut self) {
-        for id in self.layers.ids() {
+        for id in self.layers.drawn_ids() {
             self.prefetch_layer_animated_range(id);
         }
     }

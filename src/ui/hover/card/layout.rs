@@ -1,6 +1,7 @@
 //! Card typography, spacing, and the one-pass layout that sizes and feeds the painter.
 
 use crate::ui::hover::card::flow::FieldRows;
+use crate::ui::hover::card::layers::LayerRows;
 use crate::ui::hover::card::model::{HoverCard, HoverValue};
 use egui::text::{LayoutJob, TextWrapping};
 use egui::{Color32, FontId, Galley, Painter, Vec2, Visuals, vec2};
@@ -65,6 +66,8 @@ pub struct CardLayout {
     pub units: Option<Arc<Galley>>,
     /// Height of the value row (the taller of the value text and the color chip).
     pub value_h: f32,
+    /// Overlay readings under the headline value.
+    pub layers: LayerRows,
     pub fields: FieldRows,
 }
 
@@ -82,11 +85,17 @@ impl CardLayout {
         );
         let (value, units) =
             value_galleys(painter, visuals, card, value, max_inner - CHIP - CHIP_GAP);
+        let layers = LayerRows::layout(painter, visuals, card.layers, max_inner);
         let fields = FieldRows::layout(painter, visuals, card.fields, max_inner);
 
         let units_w = units.as_ref().map_or(0.0, |u| UNITS_GAP + u.size().x);
         let value_w = CHIP + CHIP_GAP + value.size().x + units_w;
-        let content_w = title.size().x.max(value_w).max(fields.width);
+        let content_w = title
+            .size()
+            .x
+            .max(value_w)
+            .max(layers.width)
+            .max(fields.width);
         // Round up so painted text never truncates by a sub-pixel.
         let width = (content_w + 2.0 * PAD.x).ceil().clamp(MIN_WIDTH, MAX_WIDTH);
 
@@ -96,7 +105,12 @@ impl CardLayout {
         } else {
             2.0 * SECTION_GAP + 1.0 + fields.height()
         };
-        let height = 2.0 * PAD.y + title.size().y + TITLE_GAP + value_h + fields_h;
+        let layers_h = if layers.count == 0 {
+            0.0
+        } else {
+            SECTION_GAP + layers.height()
+        };
+        let height = 2.0 * PAD.y + title.size().y + TITLE_GAP + value_h + layers_h + fields_h;
 
         Self {
             size: vec2(width, height.ceil()),
@@ -104,6 +118,7 @@ impl CardLayout {
             value,
             units,
             value_h,
+            layers,
             fields,
         }
     }

@@ -30,6 +30,32 @@ impl LayerStack {
         id
     }
 
+    /// Removes overlay `id` (the base layer stays); whether it existed.
+    pub fn remove(&mut self, id: LayerId) -> bool {
+        let before = self.overlays.len();
+        self.overlays.retain(|layer| layer.id() != id);
+        self.overlays.len() != before
+    }
+
+    /// Moves overlay `id` one place up (drawn later, on top) or down (drawn
+    /// earlier); the base layer always draws first. Whether it moved.
+    pub fn move_overlay(&mut self, id: LayerId, up: bool) -> bool {
+        let Some(i) = self.overlays.iter().position(|l| l.id() == id) else {
+            return false;
+        };
+        let j = if up { i + 1 } else { i.wrapping_sub(1) };
+        if j >= self.overlays.len() {
+            return false;
+        }
+        self.overlays.swap(i, j);
+        true
+    }
+
+    /// The overlays in drawing order.
+    pub fn overlays(&self) -> &[Layer] {
+        &self.overlays
+    }
+
     /// Every layer in drawing order.
     pub fn iter(&self) -> impl Iterator<Item = &Layer> {
         std::iter::once(&self.base).chain(&self.overlays)
@@ -45,6 +71,15 @@ impl LayerStack {
         self.iter().map(Layer::id).collect()
     }
 
+    /// The ids of the layers drawn on the canvas (`Layer::is_drawn`), in
+    /// drawing order: hidden or unaligned overlays load and prefetch nothing.
+    pub fn drawn_ids(&self) -> Vec<LayerId> {
+        self.iter()
+            .filter(|layer| layer.is_drawn())
+            .map(Layer::id)
+            .collect()
+    }
+
     /// The overlays' ids in drawing order.
     pub fn overlay_ids(&self) -> Vec<LayerId> {
         self.overlays.iter().map(Layer::id).collect()
@@ -53,6 +88,12 @@ impl LayerStack {
     /// The layer `id`, while it exists.
     pub fn get(&self, id: LayerId) -> Option<&Layer> {
         self.iter().find(|layer| layer.id() == id)
+    }
+
+    /// The base layer and overlay `id` (mutably) together, while it exists.
+    pub fn base_and_overlay_mut(&mut self, id: LayerId) -> Option<(&Layer, &mut Layer)> {
+        let overlay = self.overlays.iter_mut().find(|layer| layer.id() == id)?;
+        Some((&self.base, overlay))
     }
 
     /// The layer `id`, mutably, while it exists.

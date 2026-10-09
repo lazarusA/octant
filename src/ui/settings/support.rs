@@ -82,6 +82,27 @@ pub(crate) struct OptionSupport {
 }
 
 impl PlotState {
+    /// The state of layer `id`'s plot: the canvas plot for the base layer, a
+    /// plain heatmap for an overlay.
+    pub(crate) fn of_layer(app: &OctantApp, id: crate::app::layers::LayerId) -> Self {
+        let Some(layer) = app
+            .layers
+            .get(id)
+            .filter(|_| id != crate::app::layers::LayerId::BASE)
+        else {
+            return Self::of(app);
+        };
+        Self {
+            plot_type: PlotType::Heatmap,
+            volume_algorithm: app.volume_algorithm,
+            composite: layer.composite.enabled,
+            line_custom_color: false,
+            line_all_series: false,
+            translucent: layer.color.is_translucent(),
+            geographic: false,
+        }
+    }
+
     /// The state of the plot on `app`'s canvas.
     pub(crate) fn of(app: &OctantApp) -> Self {
         let base = &app.layers.base;

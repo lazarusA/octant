@@ -1,0 +1,80 @@
+//! Each drawn overlay's reading at the hovered cell of the base layer's grid,
+//! for the hover card's layer rows.
+
+use crate::app::OctantApp;
+use crate::app::layers::Layer;
+use crate::app::overlays::MAX_OVERLAYS;
+use crate::plots::PlotType;
+use crate::ui::hover::card::{HoverValue, LayerValue};
+use crate::ui::hover::composite::CompositeKind;
+use crate::ui::hover::entries::resolve_variable_units;
+use crate::utils::colormap::evaluate_color_cpu;
+
+/// Fills `out` with each drawn overlay's value at base cell `cell`, topmost
+/// first; returns how many it wrote. Overlays share the base grid
+/// (`Alignment::SameGrid`), so the cell indexes them alike.
+pub fn overlay_values<'a>(
+    app: &'a OctantApp,
+    cell: (usize, usize),
+    out: &mut [LayerValue<'a>; MAX_OVERLAYS],
+) -> usize {
+    let drawn = app.layers.overlays().iter().rev().filter(|l| l.is_drawn());
+    let mut count = 0;
+    for (slot, layer) in out.iter_mut().zip(drawn) {
+        let raw = cell_value(layer, cell);
+        let var = layer.selection().variable_info();
+        *slot = LayerValue {
+            name: var.map_or("overlay", |v| v.leaf_name()),
+            value: HoverValue::from_raw(raw, composite_kind(app, layer)),
+            units: resolve_variable_units(var),
+            swatch: evaluate_color_cpu(raw, &app.get_color_params(layer)),
+        };
+        count += 1;
+    }
+    count
+}
+
+/// The overlay rows of the hover card, written into `out`: each drawn
+/// overlay's reading at heatmap cell `pixel`, since overlays share the
+/// heatmap's grid; none on other plots.
+pub fn hover_rows<'a, 'o>(
+    app: &'a OctantApp,
+    plot_type: PlotType,
+    pixel: Option<(usize, usize)>,
+    out: &'o mut [LayerValue<'a>; MAX_OVERLAYS],
+) -> &'o [LayerValue<'a>] {
+    let count = match pixel {
+        Some(cell) if plot_type == PlotType::Heatmap => overlay_values(app, cell, out),
+        _ => 0,
+    };
+    out.get(..count).unwrap_or_default()
+}
+
+/// The kind of `layer`'s composite, while one is drawn: a channel overlay,
+/// CMYK inks or bands drawn as RGB.
+fn composite_kind(app: &OctantApp, layer: &Layer) -> Option<CompositeKind> {
+    let id = layer.id();
+    let kind = if !layer.composite.channel_configs.is_empty() && !app.layer_is_geotiff(id) {
+        CompositeKind::Overlay
+    } else if app.layer_is_cmyk(id) {
+        CompositeKind::Cmyk
+    } else {
+        CompositeKind::Rgb
+    };
+    layer.composite.enabled.then_some(kind)
+}
+
+/// `layer`'s value at cell `(px, py)` of its full-resolution grid, NaN when
+/// it has no data there.
+fn cell_value(layer: &Layer, (px, py): (usize, usize)) -> f32 {
+    let data = &layer.data;
+    let value = match (&data.pyramid, &data.matrix) {
+        (Some(pyramid), _) => pyramid
+            .levels
+            .first()
+            .and_then(|level| level.values.get(py * pyramid.original_width + px)),
+        (None, Some(matrix)) if px < matrix.width => matrix.values.get(py * matrix.width + px),
+        _ => None,
+    };
+    value.copied().unwrap_or(f32::NAN)
+}

@@ -1,4 +1,4 @@
-//! Card surface, headline value with color chip, and the coordinate section.
+//! Card surface, headline value with color chip, overlay rows, and the coordinate section.
 
 use crate::ui::hover::card::layout::{
     CHIP, CHIP_GAP, CORNER_RADIUS, CardLayout, PAD, SECTION_GAP, TITLE_GAP, UNITS_GAP, muted_color,
@@ -26,9 +26,16 @@ pub fn paint_card(
 
     let value_y = origin.y + layout.title.size().y + TITLE_GAP;
     paint_value_row(painter, visuals, card, layout, pos2(origin.x, value_y));
+    let mut bottom = value_y + layout.value_h;
+    if layout.layers.count > 0 {
+        let layers_origin = pos2(origin.x, bottom + SECTION_GAP);
+        let right = rect.right() - PAD.x;
+        layout.layers.paint(painter, visuals, layers_origin, right);
+        bottom = layers_origin.y + layout.layers.height();
+    }
 
     if layout.fields.rows > 0 {
-        let divider_y = value_y + layout.value_h + SECTION_GAP + 0.5;
+        let divider_y = bottom + SECTION_GAP + 0.5;
         painter.hline(
             rect.x_range().shrink(PAD.x),
             divider_y,
@@ -89,7 +96,14 @@ fn paint_value_row(
     }
 }
 
-fn paint_chip(painter: &Painter, visuals: &Visuals, rect: Rect, color: Color32, no_data: bool) {
+/// A rounded color chip, or a slashed empty one for no data.
+pub(super) fn paint_chip(
+    painter: &Painter,
+    visuals: &Visuals,
+    rect: Rect,
+    color: Color32,
+    no_data: bool,
+) {
     let border = Stroke::new(1.0, visuals.widgets.noninteractive.bg_stroke.color);
     if no_data {
         painter.rect_filled(rect, 3, visuals.faint_bg_color);
