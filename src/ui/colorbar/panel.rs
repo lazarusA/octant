@@ -5,7 +5,7 @@
 use super::axis::BarAxis;
 use super::bars::{self, BarColors, BarStyle};
 use super::handles::{VERTICAL_END_ROOM, draw_clip_triangles, draw_end_range_inputs};
-use super::ticks::format_scientific_tick;
+use super::ticks::{ScientificTick, TICK_BUF};
 use super::{controls, layout};
 use crate::app::OctantApp;
 use crate::app::layers::{BarOrientation, LayerId};
@@ -157,7 +157,10 @@ fn bar_row(
     draw_clip_triangles(ui, axis, color, id);
     draw_end_range_inputs(ui, axis, color);
     if let Some(value) = hover {
-        response.on_hover_text(format!("Val: {}", format_scientific_tick(value)));
+        let mut buf = [0u8; TICK_BUF + 5];
+        let text =
+            crate::utils::stack_str(&mut buf, format_args!("Val: {}", ScientificTick(value)));
+        response.on_hover_text(text);
     }
 }
 

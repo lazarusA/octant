@@ -1,10 +1,66 @@
 //! Colorbar tick generation and scientific notation formatting.
 
+#[derive(Clone, Copy)]
 pub struct ColorbarTick {
     pub t_pos: f32,
     pub val: f32,
     pub is_major: bool,
-    pub label: Option<String>,
+    /// Whether the tick shows its value (`ScientificTick(val)`), formatted
+    /// when drawn.
+    pub labeled: bool,
+}
+
+impl ColorbarTick {
+    const EMPTY: Self = Self {
+        t_pos: 0.0,
+        val: 0.0,
+        is_major: false,
+        labeled: false,
+    };
+}
+
+/// Enough ticks for any finite `f32` log range: 86 decades of one major and
+/// eight minor ticks, plus both ends.
+pub const MAX_TICKS: usize = 800;
+
+/// A bar's ticks in a stack array, so drawing them allocates nothing.
+pub struct ColorbarTicks {
+    ticks: [ColorbarTick; MAX_TICKS],
+    len: usize,
+}
+
+impl ColorbarTicks {
+    fn new() -> Self {
+        Self {
+            ticks: [ColorbarTick::EMPTY; MAX_TICKS],
+            len: 0,
+        }
+    }
+
+    fn push(&mut self, tick: ColorbarTick) {
+        if let Some(slot) = self.ticks.get_mut(self.len) {
+            *slot = tick;
+            self.len += 1;
+        }
+    }
+
+    fn sort(&mut self) {
+        self.ticks[..self.len].sort_unstable_by(|a, b| a.t_pos.total_cmp(&b.t_pos));
+    }
+}
+
+impl std::ops::Deref for ColorbarTicks {
+    type Target = [ColorbarTick];
+
+    fn deref(&self) -> &[ColorbarTick] {
+        &self.ticks[..self.len]
+    }
+}
+
+impl std::ops::DerefMut for ColorbarTicks {
+    fn deref_mut(&mut self) -> &mut [ColorbarTick] {
+        &mut self.ticks[..self.len]
+    }
 }
 
 /// Generates linear or logarithmic ticks and subdivisions across [min_val, max_val].
@@ -13,8 +69,8 @@ pub fn generate_colorbar_ticks(
     max_val: f32,
     scale_type: u32,
     scale_param: f32,
-) -> Vec<ColorbarTick> {
-    let mut ticks = Vec::new();
+) -> ColorbarTicks {
+    let mut ticks = ColorbarTicks::new();
 
     if scale_type == 1 {
         // Logarithmic scale major (powers of 10) & minor (2..9 subdivisions per decade)
@@ -49,7 +105,7 @@ pub fn generate_colorbar_ticks(
                         t_pos,
                         val: base,
                         is_major: true,
-                        label: Some(format_scientific_tick(base)),
+                        labeled: true,
                     });
                 }
 
@@ -63,7 +119,7 @@ pub fn generate_colorbar_ticks(
                             t_pos,
                             val: m_val,
                             is_major: false,
-                            label: None,
+                            labeled: false,
                         });
                     }
                 }
@@ -75,7 +131,7 @@ pub fn generate_colorbar_ticks(
                     t_pos: 0.0,
                     val: safe_min,
                     is_major: true,
-                    label: Some(format_scientific_tick(safe_min)),
+                    labeled: true,
                 });
             }
             if !ticks.iter().any(|t| (t.t_pos - 1.0).abs() < 0.02) {
@@ -83,11 +139,11 @@ pub fn generate_colorbar_ticks(
                     t_pos: 1.0,
                     val: safe_max,
                     is_major: true,
-                    label: Some(format_scientific_tick(safe_max)),
+                    labeled: true,
                 });
             }
 
-            ticks.sort_by(|a, b| a.t_pos.total_cmp(&b.t_pos));
+            ticks.sort();
             return ticks;
         }
     }
@@ -106,7 +162,7 @@ pub fn generate_colorbar_ticks(
             t_pos: t_maj,
             val,
             is_major: true,
-            label: Some(format_scientific_tick(val)),
+            labeled: true,
         });
     }
 
@@ -126,24 +182,24 @@ pub fn generate_colorbar_ticks(
                 t_pos: t_min,
                 val,
                 is_major: false,
-                label: None,
+                labeled: false,
             });
         }
     }
 
-    ticks.sort_by(|a, b| a.t_pos.total_cmp(&b.t_pos));
+    ticks.sort();
 
     // De-cluttering collision pass
     let min_label_spacing = 0.08;
     let mut last_labeled_t: Option<f32> = None;
 
     for tick in ticks.iter_mut() {
-        if tick.is_major && tick.label.is_some() {
+        if tick.is_major && tick.labeled {
             if let Some(last_t) = last_labeled_t {
                 if (tick.t_pos - last_t).abs() < min_label_spacing
                     && (1.0 - tick.t_pos).abs() > 0.01
                 {
-                    tick.label = None;
+                    tick.labeled = false;
                 } else {
                     last_labeled_t = Some(tick.t_pos);
                 }
@@ -156,4 +212,4 @@ pub fn generate_colorbar_ticks(
     ticks
 }
 
-pub use crate::utils::math::format_scientific_tick;
+pub use crate::utils::math::{ScientificTick, TICK_BUF, format_scientific_tick};

@@ -1,5 +1,5 @@
-//! The layer label editor keeps no text while idle, and commits an edit
-//! when the field loses focus.
+//! The layer label editor keeps no text while idle, applies each change as
+//! it is typed, and drops its text when the field loses focus.
 
 use super::layer_label::LabelEditor;
 use crate::app::layers::{Layer, LayerStack};
@@ -65,7 +65,14 @@ fn an_edit_commits_when_enter_ends_it() {
     );
     frame(&ctx, &stack.base, vec![press(at, false)]);
     frame(&ctx, &stack.base, Vec::new());
-    frame(&ctx, &stack.base, vec![Event::Text(" (K)".to_string())]);
+    let (typed, _) = frame(&ctx, &stack.base, vec![Event::Text(" (K)".to_string())]);
+    assert_eq!(
+        typed,
+        Some(Some("Scalar Field (K)".to_string())),
+        "typing applies the label before Enter"
+    );
+    let (idle, _) = frame(&ctx, &stack.base, Vec::new());
+    assert_eq!(idle, None, "an unchanged frame applies nothing");
     let enter = Event::Key {
         key: Key::Enter,
         physical_key: None,

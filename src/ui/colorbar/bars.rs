@@ -3,7 +3,7 @@
 
 use super::axis::BarAxis;
 use super::checker;
-use super::ticks::{format_scientific_tick, generate_colorbar_ticks};
+use super::ticks::{ScientificTick, TICK_BUF, generate_colorbar_ticks};
 use crate::app::layers::ColorStyle;
 use crate::utils::colormap::{apply_color_scale_cpu, orient, registry, unscale_norm_to_value};
 use egui::{Color32, Mesh, Pos2, Rect, Shape, Stroke, epaint::Vertex};
@@ -71,8 +71,10 @@ pub fn draw_categorical(
     }
     for (i, &val) in cats.iter().enumerate() {
         let t = (i as f32 + 0.5) / n;
-        let label = (t > 0.12 && t < 0.88).then(|| format_scientific_tick(val));
-        major_tick(ui, axis, t, label.as_deref(), colors.strong_text);
+        let mut buf = [0u8; TICK_BUF];
+        let label = (t > 0.12 && t < 0.88)
+            .then(|| crate::utils::stack_str(&mut buf, format_args!("{}", ScientificTick(val))));
+        major_tick(ui, axis, t, label, colors.strong_text);
     }
 }
 
@@ -94,12 +96,15 @@ pub fn draw_continuous(ui: &egui::Ui, axis: BarAxis, bar: &BarStyle<'_>, colors:
     paint_bar(ui, axis.rect, bar, mesh, colors.border);
 
     let ticks = generate_colorbar_ticks(c.range_min, c.range_max, c.scale_type, c.scale_param);
-    for tick in ticks {
+    for tick in ticks.iter() {
         let t = tick.t_pos;
         if tick.is_major {
             let grid = Stroke::new(1.0, Color32::from_black_alpha(80));
             ui.painter().line_segment(axis.across(t), grid);
-            let label = tick.label.as_deref().filter(|_| t > 0.12 && t < 0.88);
+            let mut buf = [0u8; TICK_BUF];
+            let label = (tick.labeled && t > 0.12 && t < 0.88).then(|| {
+                crate::utils::stack_str(&mut buf, format_args!("{}", ScientificTick(tick.val)))
+            });
             major_tick(ui, axis, t, label, colors.strong_text);
         } else {
             let ends = [axis.edge(t, -3.0), axis.edge(t, 3.5)];
