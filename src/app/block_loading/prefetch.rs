@@ -50,7 +50,7 @@ impl OctantApp {
     /// overlays at it too), else prefetches every drawn layer's window there.
     pub fn request_step_or_load(&mut self, target_step: usize) {
         if self.layer_step_resident(LayerId::BASE, target_step) {
-            self.current_timestep = target_step;
+            self.playback.current_timestep = target_step;
             self.load_step_blocks();
         } else {
             for id in self.layers.drawn_ids() {
@@ -70,7 +70,7 @@ impl OctantApp {
     /// Progressively prefetches lookahead block windows along layer `id`'s
     /// animated dimension.
     pub(crate) fn prefetch_layer_animated_range(&mut self, id: LayerId) {
-        if !self.enable_prefetch {
+        if !self.playback.enable_prefetch {
             return;
         }
         let Some(layer_request) = self.shown_layer_request(id) else {
@@ -89,7 +89,7 @@ impl OctantApp {
         };
 
         let (_, _, window_step) = self.animated_window_bounds(
-            self.current_timestep,
+            self.playback.current_timestep,
             full_extent,
             anim_dim,
             &var_info.chunk_shape,
@@ -139,10 +139,10 @@ impl OctantApp {
             .is_some_and(|c| c.spatial != crate::app::SpatialRole::None);
 
         let mut indices = Vec::new();
-        if self.is_playing {
+        if self.playback.is_playing {
             let max_lookahead = (current_chunk + lookahead).min(max_dataset_chunk);
             indices.extend(current_chunk..=max_lookahead);
-            if self.loop_playback && current_chunk + lookahead >= max_dataset_chunk {
+            if self.playback.loop_playback && current_chunk + lookahead >= max_dataset_chunk {
                 let wrap_end = lookahead.saturating_sub(1).min(max_dataset_chunk);
                 for c in 0..=wrap_end {
                     if !indices.contains(&c) {

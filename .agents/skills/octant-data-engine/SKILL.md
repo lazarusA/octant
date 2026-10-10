@@ -38,11 +38,13 @@ Coordinates Subsystem (src/data/coordinates/)
             │
             ▼
 Blocks Engine (src/data/blocks/)
-├── store.rs        (BlockStore trait: backend_name, variables, inspect, fetch_block)
+├── store.rs        (BlockStore trait: backend_name, variables, inspect, variable_coordinates, fetch_block)
 ├── loader.rs       (Async block loader workers for native & wasm runtimes)
+├── coord_loader.rs (CoordinateLoader: async background coordinate loader)
 ├── prefetch.rs     (BlockPrefetcher lookahead pool over bounded channels)
 ├── cache.rs        (LRU memory cache of resident OctantBlocks)
-└── key.rs          (BlockKey hashing URI, variable, and hyperslab ranges)
+├── key.rs          (BlockKey hashing URI, variable, and hyperslab ranges)
+└── summary.rs      (BlockSummary)
             │
             ▼
 OctantBlock (src/data/octant_block.rs)
@@ -67,6 +69,8 @@ MatrixData / VolumeData (f32 renderable GPU payload in src/data/matrix_data.rs)
 Every backend submodule is strictly modularized into single-responsibility files (< 250 LOC per file):
 - **`geotiff/`**:
   - `reader.rs`: Async Cloud-Optimized GeoTIFF (COG) / TIFF header reader, IFD directory discovery, and pooled HTTP range fetching.
+  - `bands.rs`: Band descriptions, photometric layout (RGB, expanded palettes, CMYK), alpha channels, and band coordinates.
+  - `coords.rs`: `GeoSpatialBounds` from tie points/`ModelTransformation`, pixel centers (`compute_x_coords`/`compute_y_coords`).
   - `slice.rs`: GeoTIFF tile hyperslab extraction, RGB/single-band rendering buffer extraction, and coordinate bounding box calculation.
   - `tests.rs`: COG header parsing, tile index arithmetic, and coordinate spatial bounds tests.
   - `mod.rs`: `GeoTiffBlockStore` implementation of the `BlockStore` trait.
@@ -113,12 +117,15 @@ Every backend submodule is strictly modularized into single-responsibility files
       fn backend_name(&self) -> &str;
       fn variables(&self) -> Result<Vec<String>, BlockStoreError>;
       fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError>;
+      fn variable_coordinates(&self, variable: &VariableInfo) -> Result<HashMap<String, CoordValues>, BlockStoreError>;
       fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError>;
       fn fetch_block_with_progress(&self, request: &SliceRequest, on_progress: ProgressCallback) -> Result<OctantBlock, BlockStoreError>;
       fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError>;
   }
   ```
+  *Note*: Opening datasets reads metadata only; a variable's coordinates are read when it is chosen or plotted via `variable_coordinates` or background `CoordinateLoader`.
 - `cache.rs`: Memory-bounded LRU cache storing `OctantBlock`s.
+- `coord_loader.rs`: Background `CoordinateLoader` fetching a variable's coordinates once per dataset and variable.
 - `prefetch.rs`: Bounded background prefetching along animation dimensions using `sync_channel`.
 
 ### 5. Data Slicing Subsystem (`src/data/slicing/`)

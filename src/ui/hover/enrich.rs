@@ -98,7 +98,9 @@ pub fn enrich_entries_with_animated_and_collapsed_dims(
             Some(v),
             Some(&app.plotted().store_target),
             dim_name,
-            app.current_timestep.min(total_steps.saturating_sub(1)),
+            app.playback
+                .current_timestep
+                .min(total_steps.saturating_sub(1)),
             total_steps,
             None,
         );

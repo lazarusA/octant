@@ -21,20 +21,20 @@ fn the_payload_key_follows_the_data_and_its_layout() {
     app.layers.base.data.touch_matrix();
     let touched = app.line_payload_key();
     assert_ne!(touched, key, "the data changed");
-    app.line_profile_slice_idx = 1;
+    app.plot_configs.line.profile_slice_idx = 1;
     let last = app.line_payload_key();
     assert_ne!(last, touched, "another line picked");
-    app.line_profile_slice_idx = 5;
+    app.plot_configs.line.profile_slice_idx = 5;
     assert_eq!(
         app.line_payload_key(),
         last,
         "past the last line: the same line"
     );
-    app.line_plot_all_series = true;
+    app.plot_configs.line.all_series = true;
     let all = app.line_payload_key();
-    app.line_profile_slice_idx = 0;
+    app.plot_configs.line.profile_slice_idx = 0;
     assert_eq!(app.line_payload_key(), all, "every line drawn: no pick");
-    app.line_profile_dim_idx = 1;
+    app.plot_configs.line.profile_dim_idx = 1;
     assert_ne!(app.line_payload_key(), all, "lines along another axis");
 }
 
@@ -50,7 +50,7 @@ fn volume_changes_leave_matrix_lines_alone() {
         rows,
         "lines along X read the matrix"
     );
-    app.line_profile_dim_idx = 2;
+    app.plot_configs.line.profile_dim_idx = 2;
     let rays = app.line_payload_key();
     app.layers.base.data.touch_volume();
     assert_ne!(app.line_payload_key(), rays, "rays along Z read the volume");
@@ -63,10 +63,10 @@ fn matrix_and_volume_lines_of_one_layout_keep_apart() {
     let volume = VolumeData::new(2, 1, 2, vec![1.0; 4], 1.0, 1.0, "v".to_string());
     app.layers.base.data.matrix = Some(matrix);
     app.layers.base.data.volume = Some(volume);
-    app.line_profile_dim_idx = 1;
+    app.plot_configs.line.profile_dim_idx = 1;
     let (_, columns) = app.line_layout();
     let columns_key = app.line_payload_key();
-    app.line_profile_dim_idx = 2;
+    app.plot_configs.line.profile_dim_idx = 2;
     assert_eq!(app.line_layout().1, columns, "the same layout");
     assert_ne!(app.line_payload_key(), columns_key, "read from other data");
 }

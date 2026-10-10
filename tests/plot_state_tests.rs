@@ -17,7 +17,7 @@ fn plotted_heatmap() -> OctantApp {
     app.selected.store_kind = StoreKind::ProceduralVolume4D;
     app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Heatmap;
     app.plot_selection();
     drain(&mut app);
@@ -82,7 +82,7 @@ fn a_replot_of_the_same_variable_keeps_a_locked_range() {
     app.layers.base.color.range_max = 5.0;
 
     let anim = app.selected.animated_dim.expect("animated dimension");
-    app.current_timestep = 7;
+    app.playback.current_timestep = 7;
     app.selected.dim_indices[anim] = 7;
     app.plot_selection();
     drain(&mut app);

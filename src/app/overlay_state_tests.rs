@@ -97,7 +97,7 @@ fn hidden_overlays_skip_steps_and_load_when_shown() {
         .get(id)
         .and_then(|l| l.load.slice_request.clone());
 
-    app.current_timestep = 2;
+    app.playback.current_timestep = 2;
     app.load_step_blocks();
     let after = app
         .layers

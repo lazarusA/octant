@@ -24,10 +24,10 @@ const MAX_WIDTH: f32 = 720.0;
 
 /// Render the About Octant modal dialog window.
 pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
-    if app.show_icon_gallery_window {
-        app.show_about_window = true;
+    if app.layout.show_icon_gallery_window {
+        app.layout.show_about_window = true;
     }
-    if !app.show_about_window {
+    if !app.layout.show_about_window {
         return;
     }
 
@@ -35,9 +35,9 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     let mut active_tab: AboutTab = ctx
         .data(|d| d.get_temp(storage_id))
         .unwrap_or(AboutTab::About);
-    if app.show_icon_gallery_window {
+    if app.layout.show_icon_gallery_window {
         active_tab = AboutTab::Icons;
-        app.show_icon_gallery_window = false;
+        app.layout.show_icon_gallery_window = false;
     }
 
     let (default_size, min_size, max_size) = window_sizes(active_tab, ctx.viewport_rect().size());
@@ -64,7 +64,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
 
     ctx.data_mut(|d| d.insert_temp(storage_id, active_tab));
     let rect = response.map(|r| r.response.rect);
-    app.show_about_window = open && !dismissed(ctx, rect);
+    app.layout.show_about_window = open && !dismissed(ctx, rect);
 }
 
 /// Default, minimum and maximum window size. Both tabs share one width so
@@ -132,8 +132,8 @@ fn dismissed(ctx: &egui::Context, rect: Option<egui::Rect>) -> bool {
 }
 
 pub fn show_icon_gallery_window(app: &mut OctantApp, ctx: &egui::Context) {
-    if app.show_icon_gallery_window {
-        app.show_about_window = true;
+    if app.layout.show_icon_gallery_window {
+        app.layout.show_about_window = true;
         show_about_window(app, ctx);
     }
 }

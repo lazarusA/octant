@@ -21,7 +21,7 @@ fn create_volume_app() -> OctantApp {
     app.selected.store_kind = StoreKind::ProceduralVolume4D;
     app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Volume;
     app
 }
@@ -32,11 +32,11 @@ fn test_playing_volume_then_changing_to_heatmap_continues_time_stepping() {
     app.plot_selection();
     drain(&mut app);
 
-    app.is_playing = true;
+    app.playback.is_playing = true;
     for _ in 0..3 {
         tick(&mut app);
     }
-    let step_before_switch = app.current_timestep;
+    let step_before_switch = app.playback.current_timestep;
     assert!(step_before_switch >= 2);
 
     // Switch from Volume to Heatmap while playing:
@@ -44,7 +44,7 @@ fn test_playing_volume_then_changing_to_heatmap_continues_time_stepping() {
     drain(&mut app);
 
     assert_eq!(app.selected.plot_type, PlotType::Heatmap);
-    assert!(app.is_playing, "playback should remain active");
+    assert!(app.playback.is_playing, "playback should remain active");
 
     // Advance playback for several frames:
     for _ in 0..5 {
@@ -52,9 +52,9 @@ fn test_playing_volume_then_changing_to_heatmap_continues_time_stepping() {
     }
 
     assert!(
-        app.current_timestep > step_before_switch,
+        app.playback.current_timestep > step_before_switch,
         "time stepping must continue advancing after switching to Heatmap (was {step_before_switch}, now {})",
-        app.current_timestep
+        app.playback.current_timestep
     );
     assert!(
         app.layers.base.data.matrix.is_some(),
@@ -70,7 +70,7 @@ fn test_volume_aspect_ratio_stable_with_incoming_slices() {
     app.selected.dim_ranges[1] = (0, 15); // depth: 16 slices
     app.selected.dim_ranges[2] = (0, 31); // height: 32
     app.selected.dim_ranges[3] = (0, 31); // width: 32
-    app.volume_z_scale = 1.5;
+    app.plot_configs.volume.z_scale = 1.5;
 
     let initial_aspect = app.get_3d_aspect_ratio();
 
@@ -86,7 +86,7 @@ fn test_volume_aspect_ratio_stable_with_incoming_slices() {
     let allocations_before = app.layers.base.data.volume_allocations;
 
     // Advance playback with incoming slices:
-    app.is_playing = true;
+    app.playback.is_playing = true;
     for _ in 0..10 {
         tick(&mut app);
         let current_aspect = app.get_3d_aspect_ratio();

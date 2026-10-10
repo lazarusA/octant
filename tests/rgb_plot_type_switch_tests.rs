@@ -65,7 +65,7 @@ fn setup_rgb_app() -> OctantApp {
     });
 
     app.load_new_metadata(meta);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.layers.base.composite.enabled = true;
     app.layers.base.composite.rgb_channels = [0, 1, 2];
     app

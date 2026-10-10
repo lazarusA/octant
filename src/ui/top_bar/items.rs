@@ -25,7 +25,7 @@ fn label(item: TopBarItem, app: &OctantApp) -> &'static str {
 }
 
 fn is_dark(app: &OctantApp) -> bool {
-    app.theme_preference == egui::ThemePreference::Dark
+    app.layout.theme_preference == egui::ThemePreference::Dark
 }
 
 fn theme_icon_label(app: &OctantApp) -> (Icon, &'static str) {
@@ -83,10 +83,10 @@ fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
             .on_hover_cursor(egui::CursorIcon::PointingHand)
             .on_hover_text("Toggle Hero / Landing View (right-click for About)");
     if icon_resp.clicked() {
-        app.show_hero = !app.show_hero;
+        app.layout.show_hero = !app.layout.show_hero;
     }
     if icon_resp.secondary_clicked() {
-        app.show_about_window = !app.show_about_window;
+        app.layout.show_about_window = !app.layout.show_about_window;
     }
 
     if !compact {
@@ -95,7 +95,7 @@ fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
             .on_hover_cursor(egui::CursorIcon::PointingHand)
             .on_hover_text("About Octant");
         if label_resp.clicked() {
-            app.show_about_window = !app.show_about_window;
+            app.layout.show_about_window = !app.layout.show_about_window;
         }
     }
     ui.separator();
@@ -113,7 +113,7 @@ pub(super) fn show_item(item: TopBarItem, compact: bool, app: &mut OctantApp, ui
                 .add(button(Icon::Variables, item, app, compact))
                 .clicked()
             {
-                app.show_variables_overlay = !app.show_variables_overlay;
+                app.layout.show_variables_overlay = !app.layout.show_variables_overlay;
                 revert_if_panels_closed(app);
             }
         }
@@ -121,7 +121,7 @@ pub(super) fn show_item(item: TopBarItem, compact: bool, app: &mut OctantApp, ui
             let btn = button(Icon::Dimensions, item, app, compact)
                 .hover("Toggle Variable Controls Panel");
             if ui.add(btn).clicked() {
-                app.show_variable_controls = !app.show_variable_controls;
+                app.layout.show_variable_controls = !app.layout.show_variable_controls;
                 revert_if_panels_closed(app);
             }
         }
@@ -129,7 +129,7 @@ pub(super) fn show_item(item: TopBarItem, compact: bool, app: &mut OctantApp, ui
         TopBarItem::Colormap => colormap::show_colormap_menu(app, ui, compact),
         TopBarItem::Settings => {
             if ui.add(button(Icon::Settings, item, app, compact)).clicked() {
-                app.show_settings_panel = !app.show_settings_panel;
+                app.layout.show_settings_panel = !app.layout.show_settings_panel;
             }
         }
         TopBarItem::Cache => cache::show_cache_menu(app, ui, compact),
@@ -146,15 +146,15 @@ fn button(icon: Icon, item: TopBarItem, app: &OctantApp, compact: bool) -> Toolb
 /// Whether the panel or overlay toggled by a panel button is currently shown.
 fn is_panel_open(item: TopBarItem, app: &OctantApp) -> bool {
     match item {
-        TopBarItem::Variables => app.show_variables_overlay,
-        TopBarItem::Dimensions => app.show_variable_controls,
-        TopBarItem::Settings => app.show_settings_panel,
+        TopBarItem::Variables => app.layout.show_variables_overlay,
+        TopBarItem::Dimensions => app.layout.show_variable_controls,
+        TopBarItem::Settings => app.layout.show_settings_panel,
         _ => false,
     }
 }
 
 fn revert_if_panels_closed(app: &mut OctantApp) {
-    if !app.show_variables_overlay && !app.show_variable_controls {
+    if !app.layout.show_variables_overlay && !app.layout.show_variable_controls {
         app.revert_selected_state_to_plotted();
     }
 }
@@ -169,11 +169,11 @@ fn show_theme_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
     };
     let btn = ToolbarButton::new(icon, text).compact(compact).hover(hover);
     if ui.add(btn).clicked() {
-        app.theme_preference = if dark {
+        app.layout.theme_preference = if dark {
             egui::ThemePreference::Light
         } else {
             egui::ThemePreference::Dark
         };
-        ui.ctx().set_theme(app.theme_preference);
+        ui.ctx().set_theme(app.layout.theme_preference);
     }
 }

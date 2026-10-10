@@ -23,18 +23,18 @@ fn playing(plot: PlotType) -> OctantApp {
     app.selected.store_kind = StoreKind::ProceduralVolume4D;
     app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.selected.plot_type = plot;
     app.plot_selection();
     drain(&mut app);
-    app.is_playing = true;
+    app.playback.is_playing = true;
     for _ in 0..20 {
-        if app.current_timestep == 3 {
+        if app.playback.current_timestep == 3 {
             break;
         }
         tick(&mut app);
     }
-    assert_eq!(app.current_timestep, 3, "playback reaches step 3");
+    assert_eq!(app.playback.current_timestep, 3, "playback reaches step 3");
     app
 }
 
@@ -76,16 +76,23 @@ fn a_new_plot_replaces_playback_at_its_step() {
         app.selected.dim_config[dim].range = (4, 19);
     }
     app.plot_selection();
-    let step = app.current_timestep;
+    let step = app.playback.current_timestep;
     // The plotted box keeps playing while the new one loads (no polls yet).
     app.advance_playback(Instant::now());
-    assert_eq!(app.current_timestep, step + 1, "playback continues");
+    assert_eq!(
+        app.playback.current_timestep,
+        step + 1,
+        "playback continues"
+    );
     assert_volume(&app, step + 1, (0, 31), "old box while loading");
     drain(&mut app);
-    assert_eq!(app.current_timestep, step, "the new plot shows its step");
+    assert_eq!(
+        app.playback.current_timestep, step,
+        "the new plot shows its step"
+    );
     assert_volume(&app, step, (4, 19), "new box");
     tick(&mut app);
-    assert_eq!(app.current_timestep, step + 1, "and plays on");
+    assert_eq!(app.playback.current_timestep, step + 1, "and plays on");
     assert_volume(&app, step + 1, (4, 19), "new box playing");
 }
 
@@ -101,7 +108,7 @@ fn playback_continues_while_another_variable_is_selected() {
     for _ in 0..3 {
         tick(&mut app);
     }
-    assert_eq!(app.current_timestep, 6, "playback continues");
+    assert_eq!(app.playback.current_timestep, 6, "playback continues");
     assert_eq!(
         app.plotted().variable_idx,
         plotted,
@@ -123,14 +130,14 @@ fn switching_plot_type_while_playing_shows_the_new_layout() {
     app.selected.store_kind = StoreKind::ProceduralVolume4D;
     app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Heatmap;
     app.selected.dim_ranges[1] = (5, 5);
     app.selected.dim_config[1].range = (5, 5);
     app.selected.dim_indices[1] = 5;
     app.plot_selection();
     drain(&mut app);
-    app.is_playing = true;
+    app.playback.is_playing = true;
     for _ in 0..3 {
         frame(&mut app);
     }
@@ -146,7 +153,7 @@ fn switching_plot_type_while_playing_shows_the_new_layout() {
     assert_eq!(app.plotted().plot_type, PlotType::Volume);
     assert_volume(
         &app,
-        app.current_timestep,
+        app.playback.current_timestep,
         (0, 31),
         "volume after the switch",
     );
@@ -161,7 +168,7 @@ fn test_switch_from_volume_to_heatmap_cleans_and_updates_bounds() {
     app.selected.store_kind = StoreKind::ProceduralRandom;
     app.selected.store_target = "procedural://random".to_string();
     app.load_new_metadata(meta2d);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Heatmap;
     app.plot_selection();
     drain(&mut app);
@@ -224,7 +231,7 @@ fn test_single_step_playback_past_cache_eviction() {
     app.selected.store_kind = StoreKind::ProceduralVolume4D;
     app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Volume;
 
     // Small cache limit to trigger cache eviction quickly:
@@ -236,17 +243,17 @@ fn test_single_step_playback_past_cache_eviction() {
     app.plot_selection();
     drain(&mut app);
 
-    assert_eq!(app.current_timestep, 0);
-    app.is_playing = true;
+    assert_eq!(app.playback.current_timestep, 0);
+    app.playback.is_playing = true;
 
     for _ in 0..15 {
         tick(&mut app);
     }
 
     assert!(
-        app.current_timestep >= 6,
+        app.playback.current_timestep >= 6,
         "playback must advance past initial single-step window into later steps, got step {}",
-        app.current_timestep
+        app.playback.current_timestep
     );
 
     // Ensure range never inverted during eviction:
@@ -268,7 +275,7 @@ fn plotted_variable_stays_visible_while_inspecting_and_exploring_another_dataset
     app.selected.store_kind = StoreKind::ProceduralVolume4D;
     app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta1);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Volume;
     app.plot_selection();
     drain(&mut app);
@@ -333,7 +340,7 @@ fn plotted_variable_stays_visible_while_inspecting_and_exploring_another_dataset
     );
 
     // 3. Playback of the plotted dataset still advances seamlessly:
-    app.is_playing = true;
+    app.playback.is_playing = true;
     for _ in 0..3 {
         tick(&mut app);
     }

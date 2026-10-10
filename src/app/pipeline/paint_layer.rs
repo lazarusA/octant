@@ -57,14 +57,18 @@ impl OctantApp {
             crate::plots::LineCallback {
                 renderer: line_renderer.clone(),
                 color_params,
-                line_color: self.line_color,
-                use_custom_color: self.line_use_custom_color,
-                show_lines: self.line_show_lines,
-                show_points: self.line_show_points,
-                point_size: self.line_point_size,
+                line_color: self.plot_configs.line.line_color,
+                use_custom_color: self.plot_configs.line.use_custom_color,
+                show_lines: self.plot_configs.line.show_lines,
+                show_points: self.plot_configs.line.show_points,
+                point_size: self.plot_configs.line.point_size,
                 rect: view.canvas_rect,
                 shape,
-                line_mode: if self.line_plot_all_series { 1 } else { 0 },
+                line_mode: if self.plot_configs.line.all_series {
+                    1
+                } else {
+                    0
+                },
                 pan: view.pan,
                 zoom: view.zoom,
             },
@@ -76,14 +80,14 @@ impl OctantApp {
         let (renderer, mode, displacement, cube_mode_idx) = match plot_type {
             PlotType::Sphere => (
                 &layer.renderers.sphere,
-                self.sphere_mode,
-                self.sphere_displacement_strength,
+                self.plot_configs.mesh.sphere_mode,
+                self.plot_configs.mesh.sphere_displacement,
                 3,
             ),
             _ => (
                 &layer.renderers.surface,
-                self.surface_mode,
-                self.surface_displacement_strength,
+                self.plot_configs.mesh.surface_mode,
+                self.plot_configs.mesh.surface_displacement,
                 2,
             ),
         };
@@ -119,7 +123,7 @@ impl OctantApp {
                 rect: view.plot_rect,
                 // Half resolution while rotating or zooming; the
                 // frame after the input stops renders in full.
-                scale: if self.view_interacting { 0.5 } else { 1.0 },
+                scale: if self.nav.view_interacting { 0.5 } else { 1.0 },
             },
         );
         ui.painter().add(callback);

@@ -16,7 +16,7 @@ pub fn drain(app: &mut OctantApp) {
         assert!(
             Instant::now() < deadline,
             "prefetcher did not finish: {pending} pending, playing = {}",
-            app.is_playing
+            app.playback.is_playing
         );
         std::thread::sleep(Duration::from_millis(2));
     }

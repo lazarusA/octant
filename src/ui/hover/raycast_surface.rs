@@ -12,8 +12,8 @@ pub fn get_normalized_surface_height(app: &OctantApp, val: f32) -> f32 {
         val,
         app.layers.base.color.range_min,
         app.layers.base.color.range_max,
-        app.surface_mode,
-        app.surface_displacement_strength,
+        app.plot_configs.mesh.surface_mode,
+        app.plot_configs.mesh.surface_displacement,
     )
 }
 
@@ -60,7 +60,11 @@ pub fn raycast_surface(
         .copied()
         .unwrap_or(f32::NAN);
     let h = get_normalized_surface_height(app, cell_val);
-    let target_h = if app.surface_mode == 2 { h.max(0.0) } else { h };
+    let target_h = if app.plot_configs.mesh.surface_mode == 2 {
+        h.max(0.0)
+    } else {
+        h
+    };
 
     let t_ref = (target_h - world_ray.origin[1]) / world_ray.dir[1];
     if t_ref > 0.0 {
@@ -109,7 +113,7 @@ pub fn surface_target_pos(
 ) -> Option<Pos2> {
     let data_aspect = matrix.grid.data_aspect_ratio(matrix.width, matrix.height);
     let height = get_normalized_surface_height(app, raw_val);
-    let world_y = if app.surface_mode == 2 {
+    let world_y = if app.plot_configs.mesh.surface_mode == 2 {
         height.max(0.0) // Lego cube top face
     } else {
         height

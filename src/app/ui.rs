@@ -1,6 +1,4 @@
-use crate::plots::PlotType;
-use crate::ui::toast::{Notice, Severity, ToastAction};
-use crate::utils::apply_zoom_pan_at_point;
+use crate::ui::toast::Severity;
 
 use super::OctantApp;
 
@@ -41,10 +39,10 @@ impl eframe::App for OctantApp {
                                 metadata.variables.len()
                             );
                         }
-                        self.hero_state.loading = false;
-                        self.hero_state.loaded = true;
-                        self.hero_state.source_label = metadata.name.clone();
-                        self.show_variables_overlay = true;
+                        self.layout.hero_state.loading = false;
+                        self.layout.hero_state.loaded = true;
+                        self.layout.hero_state.source_label = metadata.name.clone();
+                        self.layout.show_variables_overlay = true;
 
                         let source_id = self.selected_source_id();
                         let mut dataset = crate::data::Dataset::new(
@@ -58,8 +56,8 @@ impl eframe::App for OctantApp {
                         self.load_new_metadata(metadata);
                     }
                     Err(err) => {
-                        self.hero_state.loading = false;
-                        self.hero_state.loaded = false;
+                        self.layout.hero_state.loading = false;
+                        self.layout.hero_state.loaded = false;
                         self.clear_active_metadata();
                         self.status_message = format!("Store inspect error: {}", err);
                         self.notify(Severity::Error, "Couldn't open dataset", &err);
@@ -82,22 +80,23 @@ impl eframe::App for OctantApp {
             i.viewport().minimized.unwrap_or(false) || i.viewport().occluded.unwrap_or(false)
         });
 
-        if self.is_playing && !is_minimized {
+        if self.playback.is_playing && !is_minimized {
             let now = web_time::Instant::now();
-            let frame_dur = std::time::Duration::from_secs_f32(1.0 / self.playback_fps.max(1.0));
+            let frame_dur =
+                std::time::Duration::from_secs_f32(1.0 / self.playback.playback_fps.max(1.0));
 
-            if now.duration_since(self.last_step_time) >= frame_dur {
+            if now.duration_since(self.playback.last_step_time) >= frame_dur {
                 self.advance_playback(now);
             }
 
-            let elapsed = now.duration_since(self.last_step_time);
+            let elapsed = now.duration_since(self.playback.last_step_time);
             let next_wake = if elapsed < frame_dur {
                 frame_dur - elapsed
             } else {
                 std::time::Duration::from_millis(1)
             };
             ctx.request_repaint_after(next_wake);
-        } else if self.is_playing && is_minimized {
+        } else if self.playback.is_playing && is_minimized {
             // When minimized or occluded, poll infrequently (500ms) without advancing playback or hammering the GPU.
             ctx.request_repaint_after(std::time::Duration::from_millis(500));
         } else if self.block_prefetcher.pending_count() > 0
@@ -109,7 +108,7 @@ impl eframe::App for OctantApp {
 
         let is_hero_active = (self.layers.base.data.matrix.is_none()
             && self.layers.base.data.volume.is_none())
-            || self.show_hero;
+            || self.layout.show_hero;
 
         // Keyboard Shortcuts for Figure Export & Crop Tool
         if ui.input_mut(|i| {
@@ -146,7 +145,7 @@ impl eframe::App for OctantApp {
                 match crate::utils::infer_store_kind_from_target(&path_str) {
                     Ok(_) => {
                         crate::ui::drop_zone::clear_drop_zone_warning(&ctx);
-                        self.hero_state.input = path_str.clone();
+                        self.layout.hero_state.input = path_str.clone();
                         self.selected.store_target = path_str.clone();
                         self.submit_or_activate_source(&path_str, None);
                     }
@@ -166,7 +165,7 @@ impl eframe::App for OctantApp {
         // 3. Render panels (each consumes space from the remaining area)
         crate::ui::top_bar::show_top_bar(self, ui);
 
-        if self.show_left_panel {
+        if self.layout.show_left_panel {
             crate::ui::store::show_left_panel(self, ui);
         }
 
@@ -185,477 +184,6 @@ impl eframe::App for OctantApp {
         crate::ui::toast::show_toasts(self, &ctx, canvas_rect);
 
         // 4. Drawing Canvas Area with Aspect Data Ratio
-        {
-            let canvas_rect = ui.available_rect_before_wrap();
-
-            if let Some(ref mut req) = self.pending_export
-                && req.canvas_rect_in_points == egui::Rect::NOTHING
-            {
-                req.canvas_rect_in_points = canvas_rect;
-                req.pixels_per_point = ctx.pixels_per_point();
-                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
-                ctx.request_repaint();
-            }
-
-            // When no dataset is plotted or hero landing view is active, render the clean hero page
-            if is_hero_active {
-                let canvas_bg = ui.visuals().panel_fill;
-                ui.painter().rect_filled(canvas_rect, 0.0, canvas_bg);
-                crate::ui::hero::show_hero_landing(self, ui);
-                return;
-            }
-
-            let response = ui.allocate_rect(canvas_rect, egui::Sense::drag());
-
-            let canvas_bg = ui.style().visuals.panel_fill;
-            ui.painter().rect_filled(canvas_rect, 0.0, canvas_bg);
-
-            // 3D plots expand to full container width & height, using shader aspect projection to maintain 3D proportions
-            let canvas_plot_type = self.effective_canvas_plot_type();
-            let is_3d_canvas_plot = canvas_plot_type == PlotType::Sphere
-                || canvas_plot_type == PlotType::Surface
-                || canvas_plot_type == PlotType::Volume
-                || canvas_plot_type == PlotType::PointCloud;
-
-            // Handle Zoom & Pan Interactions
-            self.view_interacting = false;
-            if is_3d_canvas_plot {
-                if response.double_clicked() {
-                    self.sphere_rotation_x = 0.25;
-                    self.sphere_rotation_y = 0.0;
-                    self.sphere_zoom = 2.5;
-                    ui.ctx().request_repaint();
-                }
-
-                if response.dragged() {
-                    self.view_interacting = true;
-                    let delta = response.drag_delta();
-                    self.sphere_rotation_y += delta.x * 0.008;
-                    self.sphere_rotation_x = (self.sphere_rotation_x + delta.y * 0.008).clamp(
-                        -std::f32::consts::FRAC_PI_2 + 0.05,
-                        std::f32::consts::FRAC_PI_2 - 0.05,
-                    );
-                }
-
-                if response.hovered() {
-                    let scroll = ui.input(|i| i.smooth_scroll_delta.y);
-                    if scroll != 0.0 {
-                        let min_zoom = if canvas_plot_type == PlotType::Sphere {
-                            1.1
-                        } else {
-                            0.2
-                        };
-                        self.sphere_zoom = (self.sphere_zoom - scroll * 0.003).clamp(min_zoom, 8.0);
-                        self.view_interacting = true;
-                        ui.ctx().request_repaint();
-                    }
-                }
-            } else {
-                // 2D Flatmap Heatmap & 1D Line Plot zoom & pan interaction
-                if response.double_clicked() {
-                    match canvas_plot_type {
-                        PlotType::Heatmap => self.reset_heatmap_view(),
-                        PlotType::Line => self.reset_line_view(),
-                        _ => {}
-                    }
-                }
-
-                if response.dragged() {
-                    let delta = response.drag_delta();
-                    match canvas_plot_type {
-                        PlotType::Heatmap => self.heatmap_pan += delta,
-                        PlotType::Line => self.line_pan += delta,
-                        _ => {}
-                    }
-                }
-
-                if response.hovered() {
-                    let scroll = ui.input(|i| i.smooth_scroll_delta.y);
-                    if scroll != 0.0 {
-                        let mouse_pos = response.hover_pos().unwrap_or(canvas_rect.center());
-                        let center = canvas_rect.center();
-
-                        match canvas_plot_type {
-                            PlotType::Heatmap => {
-                                let (zoom, pan) = apply_zoom_pan_at_point(
-                                    self.heatmap_zoom,
-                                    self.heatmap_pan,
-                                    mouse_pos,
-                                    center,
-                                    scroll,
-                                    0.1,
-                                    50.0,
-                                );
-                                self.heatmap_zoom = zoom;
-                                self.heatmap_pan = pan;
-                            }
-                            PlotType::Line => {
-                                let (zoom, pan) = apply_zoom_pan_at_point(
-                                    self.line_zoom,
-                                    self.line_pan,
-                                    mouse_pos,
-                                    center,
-                                    scroll,
-                                    0.1,
-                                    50.0,
-                                );
-                                self.line_zoom = zoom;
-                                self.line_pan = pan;
-                            }
-                            _ => {}
-                        }
-                        ui.ctx().request_repaint();
-                    }
-                }
-            }
-
-            if self.view_interacting {
-                // Smoothed scrolling can end without another frame: schedule
-                // one so the settled view renders at full resolution.
-                ui.ctx()
-                    .request_repaint_after(std::time::Duration::from_millis(120));
-            }
-
-            if self.sphere_auto_rotate && is_3d_canvas_plot {
-                self.sphere_rotation_y += ui.ctx().input(|i| i.stable_dt).min(0.1) * 0.15;
-                ui.ctx().request_repaint();
-            }
-
-            // Compute screen-space transformed plot rect and GPU pan/zoom uniforms
-            let gpu_aspect_scale = self.compute_aspect_scale(canvas_rect.size());
-            let (transformed_plot_rect, gpu_pan, gpu_zoom) = if is_3d_canvas_plot {
-                (canvas_rect, [0.0, 0.0], 1.0)
-            } else if canvas_plot_type == PlotType::Line {
-                let zoom = self.line_zoom;
-                let pan = self.line_pan;
-                let scaled_size = canvas_rect.size() * zoom;
-                let scaled_center = canvas_rect.center() + pan;
-                let rect = egui::Rect::from_center_size(scaled_center, scaled_size);
-                let gpu_pan_x = pan.x / (0.5 * canvas_rect.width().max(1.0));
-                let gpu_pan_y = -pan.y / (0.5 * canvas_rect.height().max(1.0));
-                (rect, [gpu_pan_x, gpu_pan_y], zoom)
-            } else {
-                let [aspect_scale_x, aspect_scale_y] = gpu_aspect_scale;
-                let zoom = self.heatmap_zoom;
-                let pan = self.heatmap_pan;
-                let plot_w = canvas_rect.width() * aspect_scale_x * zoom;
-                let plot_h = canvas_rect.height() * aspect_scale_y * zoom;
-                let scaled_center = canvas_rect.center() + pan;
-                let rect = egui::Rect::from_center_size(scaled_center, egui::vec2(plot_w, plot_h));
-
-                let gpu_pan_x = pan.x / (0.5 * canvas_rect.width().max(1.0));
-                let gpu_pan_y = -pan.y / (0.5 * canvas_rect.height().max(1.0));
-                (rect, [gpu_pan_x, gpu_pan_y], zoom)
-            };
-
-            let plot_rect = transformed_plot_rect;
-
-            // Volume planes changed since the last frame reach the shown renderer.
-            self.flush_volume_uploads();
-
-            // Dispatch active plot GPU rendering callback
-            self.paint_active_plot(
-                ui,
-                canvas_rect,
-                plot_rect,
-                gpu_pan,
-                gpu_zoom,
-                gpu_aspect_scale,
-            );
-
-            // Draw Dynamic Plot Axis Lines, Ticks, and Axis Titles
-            if !is_3d_canvas_plot && let Some(matrix) = &self.layers.base.data.matrix {
-                let (x_dom, y_dom, x_label, y_label, x_units, y_units) =
-                    if canvas_plot_type == PlotType::Line {
-                        let y_min = self.layers.base.color.range_min as f64;
-                        let y_max = self.layers.base.color.range_max as f64;
-                        let profile_len = match self.line_profile_dim_idx {
-                            2 => self
-                                .layers
-                                .base
-                                .data
-                                .volume
-                                .as_ref()
-                                .map_or(matrix.width, |v| v.depth),
-                            1 => matrix.height,
-                            _ => matrix.width,
-                        };
-
-                        let y_name = self
-                            .plotted_variable_info()
-                            .map(|var| {
-                                if let Some(u) = &var.units {
-                                    format!("{} [{u}]", var.name)
-                                } else if let Some(u) = var.attributes.get("units") {
-                                    format!("{} [{u}]", var.name)
-                                } else {
-                                    var.name.clone()
-                                }
-                            })
-                            .unwrap_or_else(|| "Data Value".to_string());
-
-                        let target_dim_idx = self.get_spatial_dim_index(self.line_profile_dim_idx);
-                        let fallback_dim_name = match self.line_profile_dim_idx {
-                            2 => "z",
-                            1 => "y",
-                            _ => "x",
-                        };
-
-                        let (x_bounds, x_title, x_units) = self.resolve_axis_bounds_and_title(
-                            target_dim_idx,
-                            fallback_dim_name,
-                            profile_len,
-                        );
-
-                        (x_bounds, (y_min, y_max), x_title, y_name, x_units, None)
-                    } else if let Some(m) = &self.layers.base.data.matrix
-                        && m.grid.is_healpix()
-                    {
-                        let x_bounds = (-180.0, 180.0);
-                        let y_bounds = (-90.0, 90.0);
-                        let x_title = "Longitude (°)".to_string();
-                        let y_title = "Latitude (°)".to_string();
-                        (x_bounds, y_bounds, x_title, y_title, None, None)
-                    } else {
-                        let (orig_w, orig_h) = self.active_data_dimensions_2d();
-                        let x_dim = self.get_spatial_dim_index(0);
-                        let y_dim = self.get_spatial_dim_index(1);
-
-                        let (x_bounds, x_title, x_units) =
-                            self.resolve_axis_bounds_and_title(x_dim, "X", orig_w);
-                        let (y_bounds, y_title, y_units) =
-                            self.resolve_axis_bounds_and_title(y_dim, "Y", orig_h);
-
-                        (x_bounds, y_bounds, x_title, y_title, x_units, y_units)
-                    };
-
-                let options = crate::ui::axes::PlotAxisOptions {
-                    x_domain: x_dom,
-                    y_domain: y_dom,
-                    x_title: &x_label,
-                    y_title: &y_label,
-                    x_units: x_units.as_deref(),
-                    y_units: y_units.as_deref(),
-                };
-
-                crate::ui::axes::draw_plot_axes(ui, canvas_rect, plot_rect, &options);
-            }
-
-            // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle (suppressed during export capture)
-            if self.pending_export.is_none() {
-                crate::ui::hover_tooltip::show_hover_tooltip(
-                    self,
-                    &ctx,
-                    ui,
-                    &response,
-                    canvas_rect,
-                );
-            }
-
-            // Camera subtle capture flash overlay (confined to ROI guides if active, shown after capture)
-            if let Some(flash_start) = self.export_flash_timer {
-                let elapsed = flash_start.elapsed().as_secs_f32();
-                let duration = 0.32;
-                if elapsed < duration {
-                    let progress = (elapsed / duration).clamp(0.0, 1.0);
-                    let alpha = ((1.0 - progress) * 120.0) as u8;
-                    let flash_rect = if self.show_crop_overlay {
-                        egui::Rect::from_min_max(
-                            egui::pos2(
-                                canvas_rect.left() + self.roi_crop_box.u_min * canvas_rect.width(),
-                                canvas_rect.top() + self.roi_crop_box.v_min * canvas_rect.height(),
-                            ),
-                            egui::pos2(
-                                canvas_rect.left() + self.roi_crop_box.u_max * canvas_rect.width(),
-                                canvas_rect.top() + self.roi_crop_box.v_max * canvas_rect.height(),
-                            ),
-                        )
-                    } else {
-                        canvas_rect
-                    };
-
-                    ui.painter().rect_filled(
-                        flash_rect,
-                        0.0,
-                        egui::Color32::from_white_alpha(alpha),
-                    );
-                    ui.painter().rect_stroke(
-                        flash_rect,
-                        0.0,
-                        egui::Stroke::new(
-                            2.0,
-                            egui::Color32::from_rgba_unmultiplied(
-                                100,
-                                220,
-                                255,
-                                ((alpha as f32) * 1.5).min(255.0) as u8,
-                            ),
-                        ),
-                        egui::StrokeKind::Inside,
-                    );
-                    ctx.request_repaint();
-                } else {
-                    self.export_flash_timer = None;
-                }
-            }
-
-            // Render interactive Region of Interest (ROI) Guiding Lines & Crop Tool (suppressed during export capture)
-            if self.show_crop_overlay
-                && self.pending_export.is_none()
-                && let Some(crate::ui::crop_overlay::CropOverlayAction::Save) =
-                    crate::ui::crop_overlay::show_crop_overlay(
-                        ui,
-                        canvas_rect,
-                        &mut self.roi_crop_box,
-                        &mut self.show_crop_overlay,
-                    )
-            {
-                self.quick_save_canvas();
-            }
-
-            // Render Canvas Drag & Drop hover cue when dragging files over an active plot
-            let is_drag_hovering = ctx.input(|i| !i.raw.hovered_files.is_empty());
-            if is_drag_hovering && self.pending_export.is_none() {
-                let is_dark = ui.visuals().dark_mode;
-                let stroke_color = if is_dark {
-                    egui::Color32::from_rgb(0, 190, 255)
-                } else {
-                    egui::Color32::from_rgb(0, 125, 220)
-                };
-                let fill_color = if is_dark {
-                    egui::Color32::from_rgba_unmultiplied(0, 190, 255, 24)
-                } else {
-                    egui::Color32::from_rgba_unmultiplied(0, 125, 220, 18)
-                };
-
-                let overlay_rect = canvas_rect.shrink(12.0);
-                ui.painter().rect(
-                    overlay_rect,
-                    10.0,
-                    fill_color,
-                    egui::Stroke::new(2.0, stroke_color),
-                    egui::StrokeKind::Inside,
-                );
-
-                let badge_pos = overlay_rect.center();
-                ui.painter().text(
-                    badge_pos,
-                    egui::Align2::CENTER_CENTER,
-                    "Drop dataset to visualize (.nc, .h5, .zarr, .icechunk, .tif)",
-                    egui::FontId::proportional(15.0),
-                    stroke_color,
-                );
-                ctx.request_repaint();
-            }
-        }
-    }
-}
-
-impl OctantApp {
-    /// Processes in-flight export and screenshot events dispatched by the frame lifecycle.
-    fn process_pending_export(&mut self, ctx: &egui::Context) {
-        let Some(req) = self.pending_export.take() else {
-            return;
-        };
-
-        if req.canvas_rect_in_points == egui::Rect::NOTHING {
-            self.pending_export = Some(req);
-            return;
-        }
-
-        let screenshot = ctx.input(|i| {
-            i.raw.events.iter().find_map(|e| match e {
-                egui::Event::Screenshot { image, .. } => Some(image.clone()),
-                _ => None,
-            })
-        });
-
-        let Some(image) = screenshot else {
-            self.pending_export = Some(req);
-            ctx.request_repaint();
-            return;
-        };
-
-        self.export_flash_timer = Some(web_time::Instant::now());
-        let (crop_x, crop_y, crop_w, crop_h) =
-            req.compute_crop_rect(image.width() as u32, image.height() as u32);
-        let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
-
-        let (cropped_rgba, final_w, final_h) = crate::export::crop_rgba_buffer(
-            &rgba,
-            image.width() as u32,
-            image.height() as u32,
-            crop_x,
-            crop_y,
-            crop_w,
-            crop_h,
-        );
-
-        let var_name = self
-            .plotted_variable_info()
-            .map(|v| v.name.as_str())
-            .unwrap_or("plot");
-        let title = format!("Octant - {}", var_name);
-
-        match crate::export::encode_figure(
-            &cropped_rgba,
-            final_w,
-            final_h,
-            req.format,
-            req.jpeg_quality,
-            &title,
-            var_name,
-        ) {
-            Ok(data) => {
-                if req.copy_to_clipboard {
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                            let img_data = arboard::ImageData {
-                                width: final_w as usize,
-                                height: final_h as usize,
-                                bytes: std::borrow::Cow::Borrowed(&cropped_rgba),
-                            };
-                            let _ = clipboard.set_image(img_data);
-                        }
-                    }
-                    self.status_message = "Copied figure to clipboard".to_string();
-                } else if let Some(ref path) = req.output_path {
-                    if let Err(e) = crate::export::save_exported_file(&data, path) {
-                        self.status_message = format!("Export error: {}", e);
-                        self.notify(Severity::Error, "Export failed", e.to_string());
-                    } else {
-                        let filename = path
-                            .file_name()
-                            .map(|s| s.to_string_lossy().to_string())
-                            .unwrap_or_else(|| "figure".to_string());
-                        self.status_message = format!("Saved figure to {}", path.display());
-                        self.push_notice(
-                            Notice::new(Severity::Success, "Saved", filename)
-                                .with_action(ToastAction::RevealFile(path.clone())),
-                        );
-                    }
-                }
-            }
-            Err(err) => {
-                self.status_message = format!("Encoding error: {}", err);
-                self.notify(
-                    Severity::Error,
-                    "Export failed",
-                    format!("Encoding error: {err}"),
-                );
-            }
-        }
-    }
-
-    /// Opens the Settings panel and closes Store, Variables, Controls, and Catalog.
-    pub fn open_only_settings_panel(&mut self) {
-        self.show_settings_panel = true;
-        self.show_left_panel = false;
-        self.show_variables_overlay = false;
-        self.show_variable_controls = false;
-        self.show_catalog_window = false;
-        self.show_about_window = false;
-        self.show_icon_gallery_window = false;
+        super::canvas::render_canvas(self, ui, canvas_rect);
     }
 }

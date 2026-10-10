@@ -43,7 +43,10 @@ impl OctantApp {
     /// writes; opaque colors (including RGB composites, which ignore opacity)
     /// keep depth writes, so near parts hide far ones.
     pub fn transparency_mode(&self, layer: &Layer) -> Transparency {
-        if !self.plot_transparency || layer.composite.enabled || !layer.color.is_translucent() {
+        if !self.plot_configs.plot_transparency
+            || layer.composite.enabled
+            || !layer.color.is_translucent()
+        {
             Transparency::Off
         } else if self
             .wgpu_render_state

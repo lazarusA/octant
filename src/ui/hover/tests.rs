@@ -11,9 +11,9 @@ fn create_test_app_with_volume() -> OctantApp {
             plot_type: PlotType::Volume,
             ..Default::default()
         },
-        show_hover_card: true,
         ..Default::default()
     };
+    app.layout.show_hover_card = true;
     app.layers.base.color.range_min = 10.0;
     app.layers.base.color.range_max = 80.0;
     app.layers.base.data.volume = Some(VolumeData {

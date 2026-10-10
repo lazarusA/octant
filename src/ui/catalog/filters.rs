@@ -17,7 +17,7 @@ pub fn render_search_and_filters(
     let procedural_count = PROCEDURAL_CATALOG.len();
 
     ui.search_field(
-        &mut app.catalog_search_query,
+        &mut app.layout.catalog_search_query,
         "Filter by name, description, or URL...",
         None,
     );
@@ -41,22 +41,22 @@ pub fn render_search_and_filters(
         let mut buf_proc = [0u8; 32];
 
         ui.selectable_value(
-            &mut app.catalog_category_filter,
+            &mut app.layout.catalog_category_filter,
             CatalogCategoryFilter::All,
             stack_str(&mut buf_all, format_args!("All ({total_count})")),
         );
         ui.selectable_value(
-            &mut app.catalog_category_filter,
+            &mut app.layout.catalog_category_filter,
             CatalogCategoryFilter::Zarr,
             stack_str(&mut buf_zarr, format_args!("Zarr ({zarr_count})")),
         );
         ui.selectable_value(
-            &mut app.catalog_category_filter,
+            &mut app.layout.catalog_category_filter,
             CatalogCategoryFilter::Icechunk,
             stack_str(&mut buf_ice, format_args!("Icechunk ({icechunk_count})")),
         );
         ui.selectable_value(
-            &mut app.catalog_category_filter,
+            &mut app.layout.catalog_category_filter,
             CatalogCategoryFilter::GeoTiff,
             stack_str(
                 &mut buf_geo,
@@ -64,7 +64,7 @@ pub fn render_search_and_filters(
             ),
         );
         ui.selectable_value(
-            &mut app.catalog_category_filter,
+            &mut app.layout.catalog_category_filter,
             CatalogCategoryFilter::Procedural,
             stack_str(
                 &mut buf_proc,

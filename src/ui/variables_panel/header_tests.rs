@@ -49,7 +49,7 @@ fn plotted_with_sst_staged() -> OctantApp {
     app.selected = base;
     app.load_selected_variable_block();
     app.selected = selection_of(&mut app, &meta, "sst");
-    app.show_variable_controls = true;
+    app.layout.show_variable_controls = true;
     app
 }
 
@@ -59,12 +59,12 @@ fn add_overlay_then_plot_data_adds_the_overlay() {
     let base_var = app.plotted().variable_idx;
 
     assert!(click(&mut app, "Add Overlay"), "the toggle is shown");
-    assert!(app.plot_as_overlay, "the toggle is on");
+    assert!(app.layout.plot_as_overlay, "the toggle is on");
     assert!(app.layers.overlays().is_empty(), "nothing is added yet");
 
     assert!(click(&mut app, "Plot Data"));
     assert_eq!(app.layers.overlays().len(), 1, "added as an overlay");
-    assert!(!app.plot_as_overlay, "the toggle turns off");
+    assert!(!app.layout.plot_as_overlay, "the toggle turns off");
     assert_eq!(app.plotted().variable_idx, base_var, "the plot stays");
 }
 
@@ -73,13 +73,13 @@ fn add_overlay_toggles_off_again() {
     let mut app = plotted_with_sst_staged();
     click(&mut app, "Add Overlay");
     click(&mut app, "Add Overlay");
-    assert!(!app.plot_as_overlay);
+    assert!(!app.layout.plot_as_overlay);
 }
 
 #[test]
 fn a_variable_overlays_only_once() {
     let mut app = plotted_with_sst_staged();
-    app.plot_as_overlay = true;
+    app.layout.plot_as_overlay = true;
     app.plot_from_panel();
     assert_eq!(app.layers.overlays().len(), 1);
 
@@ -88,8 +88,8 @@ fn a_variable_overlays_only_once() {
             .is_some()
     );
     click(&mut app, "Add Overlay");
-    assert!(!app.plot_as_overlay, "the toggle is disabled for it");
-    app.plot_as_overlay = true;
+    assert!(!app.layout.plot_as_overlay, "the toggle is disabled for it");
+    app.layout.plot_as_overlay = true;
     assert!(app.add_overlay(app.selected.variable_idx).is_none());
     assert_eq!(app.layers.overlays().len(), 1);
 
@@ -104,11 +104,11 @@ fn a_variable_overlays_only_once() {
 fn add_overlay_stays_off_while_nothing_is_plotted() {
     let (mut app, meta) = memory_app();
     app.selected = selection_of(&mut app, &meta, "t2m");
-    app.show_variable_controls = true;
+    app.layout.show_variable_controls = true;
     assert!(
         click(&mut app, "Add Overlay"),
         "the toggle is shown, disabled"
     );
-    assert!(!app.plot_as_overlay);
+    assert!(!app.layout.plot_as_overlay);
     assert!(app.layers.overlays().is_empty());
 }

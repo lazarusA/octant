@@ -7,13 +7,13 @@ use egui::Pos2;
 
 /// Computes normalized radial displacement on the 3D sphere matching sphere.wgsl
 pub fn get_normalized_radial_dr(app: &OctantApp, val: f32) -> f32 {
-    if val.is_nan() || !val.is_finite() || app.sphere_mode == 0 {
+    if val.is_nan() || !val.is_finite() || app.plot_configs.mesh.sphere_mode == 0 {
         return 0.0;
     }
     let cmin = app.layers.base.color.range_min;
     let cmax = app.layers.base.color.range_max;
     let range = (cmax - cmin).max(1e-6);
-    let disp = app.sphere_displacement_strength;
+    let disp = app.plot_configs.mesh.sphere_displacement;
 
     if cmin < 0.0 && cmax > 0.0 {
         let max_abs = cmin.abs().max(cmax.abs());
@@ -38,8 +38,8 @@ pub fn raycast_sphere(
     let dy = view_ray.dir[1];
     let dz = view_ray.dir[2];
 
-    let max_r = if app.sphere_mode > 0 {
-        1.0 + 0.4 * app.sphere_displacement_strength
+    let max_r = if app.plot_configs.mesh.sphere_mode > 0 {
+        1.0 + 0.4 * app.plot_configs.mesh.sphere_displacement
     } else {
         1.0
     };
@@ -78,7 +78,7 @@ pub fn raycast_sphere(
     let mut lat_rad = (pos_3d_y / r).clamp(-1.0, 1.0).asin();
     let mut lon_rad = pos_3d_x.atan2(pos_3d_z);
 
-    if app.sphere_mode > 0
+    if app.plot_configs.mesh.sphere_mode > 0
         && let Some((init_px, init_py)) =
             matrix
                 .grid

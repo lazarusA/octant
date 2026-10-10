@@ -7,8 +7,8 @@ impl OctantApp {
     pub fn step_prev(&mut self) {
         let max_steps = self.animated_dim_extent();
         if max_steps > 0 {
-            let prev_step = if self.current_timestep > 0 {
-                self.current_timestep - 1
+            let prev_step = if self.playback.current_timestep > 0 {
+                self.playback.current_timestep - 1
             } else {
                 max_steps - 1
             };
@@ -20,7 +20,7 @@ impl OctantApp {
     pub fn step_next(&mut self) {
         let max_steps = self.animated_dim_extent();
         if max_steps > 0 {
-            let next_step = (self.current_timestep + 1) % max_steps;
+            let next_step = (self.playback.current_timestep + 1) % max_steps;
             self.request_step_or_load(next_step);
         }
     }
@@ -33,18 +33,18 @@ impl OctantApp {
     pub fn advance_playback(&mut self, now: web_time::Instant) {
         let total_extent = self.animated_dim_extent();
         if total_extent <= 1 {
-            self.is_playing = false;
+            self.playback.is_playing = false;
             return;
         }
-        let next_ts = if self.current_timestep + 1 < total_extent {
-            self.current_timestep + 1
-        } else if self.loop_playback {
+        let next_ts = if self.playback.current_timestep + 1 < total_extent {
+            self.playback.current_timestep + 1
+        } else if self.playback.loop_playback {
             0
         } else {
-            self.is_playing = false;
+            self.playback.is_playing = false;
             return;
         };
-        self.last_step_time = now;
+        self.playback.last_step_time = now;
         if self.staging_differs() {
             self.with_plotted_selection(|app| app.play_step(next_ts));
         } else {
@@ -56,7 +56,7 @@ impl OctantApp {
     /// overlays), then queues every layer's lookahead.
     fn play_step(&mut self, next_ts: usize) {
         if self.layer_step_resident(crate::app::layers::LayerId::BASE, next_ts) {
-            self.current_timestep = next_ts;
+            self.playback.current_timestep = next_ts;
             self.load_step_blocks();
         }
         self.prefetch_animated_ranges();

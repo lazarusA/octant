@@ -17,7 +17,7 @@ use crate::ui::brand::Wordmark;
 /// Render the clean, centered Hero Landing page.
 pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
     let now = Instant::now();
-    let (filled, extra_rot, extra_scale) = app.hero_state.update_animation(now);
+    let (filled, extra_rot, extra_scale) = app.layout.hero_state.update_animation(now);
 
     // Keep animating smoothly at 60 FPS while wandering or loading.
     ui.ctx().request_repaint_after(Duration::from_millis(16));
@@ -71,7 +71,7 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                 let octant_resp =
                     draw_octant_widget(ui, octant_size, filled, extra_rot, extra_scale);
                 if octant_resp.on_hover_text("Click to hop octant").clicked() {
-                    app.hero_state.start_hop(Duration::from_millis(350));
+                    app.layout.hero_state.start_hop(Duration::from_millis(350));
                     wants_focus = true;
                 }
 
@@ -95,9 +95,9 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.add_space(space(gap::HINT_CHIPS));
                 sample_slash_chips_row(ui, app);
 
-                if app.is_loading || app.hero_state.loading {
-                    let label = if !app.hero_state.source_label.is_empty() {
-                        format!("loading: {}", app.hero_state.source_label)
+                if app.is_loading || app.layout.hero_state.loading {
+                    let label = if !app.layout.hero_state.source_label.is_empty() {
+                        format!("loading: {}", app.layout.hero_state.source_label)
                     } else {
                         "loading...".to_string()
                     };
@@ -109,8 +109,10 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                         &label,
                         ui.visuals().text_color(),
                     );
-                } else if app.hero_state.loaded && !app.hero_state.source_label.is_empty() {
-                    let label = format!("loaded: {}", app.hero_state.source_label);
+                } else if app.layout.hero_state.loaded
+                    && !app.layout.hero_state.source_label.is_empty()
+                {
+                    let label = format!("loaded: {}", app.layout.hero_state.source_label);
                     ui.add_space(space(gap::CHIPS_STATUS));
                     render_status_pill(
                         ui,

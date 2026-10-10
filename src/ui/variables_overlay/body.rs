@@ -77,7 +77,7 @@ fn show_tree(
     let tree = app
         .cached_variable_tree
         .get_or_insert_with(|| metadata.build_variable_tree());
-    let query = app.variable_search.trim();
+    let query = app.layout.variable_search.trim();
     let search_active = !query.is_empty();
     let root = if search_active {
         let generation = app.selected.metadata_generation;
@@ -128,6 +128,6 @@ fn apply_selection(app: &mut OctantApp, idx: usize) {
         .and_then(|meta| meta.variables.get(idx).cloned());
     if let Some(var_info) = var_info {
         crate::ui::variables_panel::init_variable_dimension_defaults(app, &var_info);
-        app.show_variable_controls = true;
+        app.layout.show_variable_controls = true;
     }
 }

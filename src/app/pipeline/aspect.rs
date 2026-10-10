@@ -53,7 +53,7 @@ impl OctantApp {
             }
         }
 
-        let z_mult = self.volume_z_scale.clamp(0.01, 50.0);
+        let z_mult = self.plot_configs.volume.z_scale.clamp(0.01, 50.0);
 
         if let Some(vdata) = &self.layers.base.data.volume {
             let w = vdata.width as f32 * scale_x;
@@ -118,7 +118,7 @@ impl OctantApp {
             .map(|r| r.0)
             .unwrap_or(0);
 
-        let local_step = (self.current_timestep.saturating_sub(origin)) as u32;
+        let local_step = (self.playback.current_timestep.saturating_sub(origin)) as u32;
 
         match spatial_role {
             crate::app::SpatialRole::X | crate::app::SpatialRole::Grid => {
@@ -189,7 +189,7 @@ impl OctantApp {
 
     /// Computes data aspect scaling factors [scale_x, scale_y] to preserve proportional aspect framing.
     pub fn compute_aspect_scale(&self, canvas_size: egui::Vec2) -> [f32; 2] {
-        if self.enforce_data_aspect_ratio && self.layers.base.data.matrix.is_some() {
+        if self.layout.enforce_data_aspect_ratio && self.layers.base.data.matrix.is_some() {
             let data_aspect = self.data_aspect_ratio_2d();
             let canvas_aspect = canvas_size.x / canvas_size.y.max(1.0);
             if canvas_aspect > data_aspect {

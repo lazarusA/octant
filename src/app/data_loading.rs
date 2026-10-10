@@ -108,12 +108,12 @@ impl OctantApp {
 
         if self.try_activate_dataset(trimmed) {
             if let Some(meta) = &self.selected.metadata {
-                self.hero_state.source_label = meta.name.clone();
+                self.layout.hero_state.source_label = meta.name.clone();
             }
-            self.hero_state.loaded = true;
-            self.hero_state.loading = false;
+            self.layout.hero_state.loaded = true;
+            self.layout.hero_state.loading = false;
         } else {
-            self.hero_state.begin_submit(trimmed);
+            self.layout.hero_state.begin_submit(trimmed);
             self.selected.store_target = trimmed.to_string();
             self.inspect_active_store();
         }

@@ -27,9 +27,17 @@ All plot renderers implement `PlotRenderer` to allow polymorphic data and unifor
 pub trait PlotRenderer: Send + Sync {
     fn update_data(&self, queue: &wgpu::Queue, data: &RenderData);
     fn paint(&self, ui: &mut egui::Ui, rect: egui::Rect, params: &PlotRenderParams);
-    fn inspect_hover(&self, norm_pos: [f32; 2], rect: egui::Rect) -> Option<HoverSample>;
+    fn inspect_hover(
+        &self,
+        pointer_pos: egui::Pos2,
+        rect: egui::Rect,
+        data: &RenderData,
+        params: &PlotRenderParams,
+    ) -> Option<HoverSample>;
 }
 ```
+
+Every `PlotRenderer` in `src/plots/` is paired with a corresponding `PlotController` in `src/app/controllers/` (`controller_for(plot_type)`), separating GPU draw calls from UI input handling, uniform uploads, and data arrival hooks.
 
 ## Adding New 3D Geometries (Hexagons, Prisms, Custom Meshes)
 
@@ -69,6 +77,7 @@ To add a new 3D geometry shape (such as Hexagonal columns, icosahedra, or discre
    ```
 2. Register `PlotType::<NewGeom>` in `src/plots/mod.rs`.
 3. Add a dispatch match arm in `OctantApp::paint_active_plot()` in `src/app/pipeline/paint.rs`.
+4. Implement `PlotController` in `src/app/controllers/<geom>.rs` (or map to an existing controller) and register it in `src/app/controllers/mod.rs` `controller_for()` for UI interaction, uniform calculation, and data load lifecycle hooks.
 
 ## Best Practices & Invariants
 

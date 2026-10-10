@@ -107,12 +107,15 @@ impl<'a> VolumeSampler<'a> {
         let mut min_val = 1e30_f32;
 
         let canvas_plot_type = app.effective_canvas_plot_type();
-        let is_mip =
-            is_half_scale && canvas_plot_type == PlotType::Volume && app.volume_algorithm == 1;
-        let is_minip =
-            is_half_scale && canvas_plot_type == PlotType::Volume && app.volume_algorithm == 2;
-        let is_label =
-            is_half_scale && canvas_plot_type == PlotType::Volume && app.volume_algorithm == 4;
+        let is_mip = is_half_scale
+            && canvas_plot_type == PlotType::Volume
+            && app.plot_configs.volume.algorithm == 1;
+        let is_minip = is_half_scale
+            && canvas_plot_type == PlotType::Volume
+            && app.plot_configs.volume.algorithm == 2;
+        let is_label = is_half_scale
+            && canvas_plot_type == PlotType::Volume
+            && app.plot_configs.volume.algorithm == 4;
 
         for i in 0..num_steps {
             let t = t_start + (i as f32 + 0.5) * dt;

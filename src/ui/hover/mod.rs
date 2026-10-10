@@ -61,7 +61,7 @@ pub fn show_hover_tooltip(
     let Some(hover_pos) = response.hover_pos() else {
         return;
     };
-    if !app.show_hover_card {
+    if !app.layout.show_hover_card {
         return;
     }
 
@@ -194,7 +194,7 @@ fn resolve_hover_color(app: &OctantApp, raw_val: f32, line: usize) -> Color32 {
     if app.line_series_colored() && raw_val.is_finite() {
         app.line_series_color(line)
     } else if app.line_custom_colored() {
-        crate::utils::colormap::eval::rgba_to_color32(app.line_color)
+        crate::utils::colormap::eval::rgba_to_color32(app.plot_configs.line.line_color)
     } else {
         let color_params = app.get_color_params(&app.layers.base);
         evaluate_color_cpu(raw_val, &color_params)

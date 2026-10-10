@@ -13,10 +13,9 @@ use egui::{Rect, Ui, Vec2, pos2};
 const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1200.0, 900.0));
 
 fn app() -> OctantApp {
-    OctantApp {
-        show_colorbar: true,
-        ..Default::default()
-    }
+    let mut app = OctantApp::default();
+    app.layout.show_colorbar = true;
+    app
 }
 
 /// One frame of `app`'s colorbars.

@@ -44,8 +44,8 @@ impl OctantApp {
         let plot_type = self.effective_canvas_plot_type();
         LineColoring::for_plot(
             plot_type,
-            self.line_use_custom_color,
-            self.line_plot_all_series,
+            self.plot_configs.line.use_custom_color,
+            self.plot_configs.line.all_series,
         )
     }
 

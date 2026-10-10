@@ -16,7 +16,7 @@ pub struct Transform2D {
 
 impl Transform2D {
     pub fn from_app(app: &OctantApp, rect: Rect) -> Self {
-        let (aspect_scale_x, aspect_scale_y) = if app.enforce_data_aspect_ratio {
+        let (aspect_scale_x, aspect_scale_y) = if app.layout.enforce_data_aspect_ratio {
             let data_aspect = app.data_aspect_ratio_2d();
             let canvas_aspect = rect.width() / rect.height().max(1.0);
             if canvas_aspect > data_aspect {
@@ -28,8 +28,8 @@ impl Transform2D {
             (1.0, 1.0)
         };
 
-        let zoom = app.heatmap_zoom;
-        let pan = app.heatmap_pan;
+        let zoom = app.nav.heatmap_zoom;
+        let pan = app.nav.heatmap_pan;
         let gpu_pan_x = pan.x / (0.5 * rect.width().max(1.0));
         let gpu_pan_y = -pan.y / (0.5 * rect.height().max(1.0));
 

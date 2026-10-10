@@ -25,14 +25,14 @@ pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
         .show(ui, |ui| {
             ui.set_width(inner_w);
             ui.horizontal(|ui| {
-                let has_input = !app.hero_state.input.trim().is_empty();
+                let has_input = !app.layout.hero_state.input.trim().is_empty();
                 let right_reserve = if has_input { 60.0 } else { 34.0 };
                 let desired_w = (ui.available_width() - right_reserve).max(30.0);
 
                 // The field's own margin narrows the visible text area.
                 let hint_text = intake_hint(ui, desired_w - 2.0 * f32::from(EDIT_MARGIN_X));
 
-                let edit = egui::TextEdit::singleline(&mut app.hero_state.input)
+                let edit = egui::TextEdit::singleline(&mut app.layout.hero_state.input)
                     .id(super::focus::intake_id())
                     .hint_text(hint_text)
                     .font(egui::FontId::monospace(BODY_FONT))
@@ -48,7 +48,7 @@ pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                     response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
                 if has_input && ui.close_button("Clear input").clicked() {
-                    app.hero_state.input.clear();
+                    app.layout.hero_state.input.clear();
                 }
 
                 if load_button(ui) || enter_pressed {
@@ -98,7 +98,7 @@ fn load_button(ui: &mut egui::Ui) -> bool {
 
 /// Load the typed source, or the current store target when the field is empty.
 fn submit_intake(app: &mut OctantApp) {
-    let typed = app.hero_state.input.trim();
+    let typed = app.layout.hero_state.input.trim();
     let target = if typed.is_empty() {
         app.selected.store_target.clone()
     } else {

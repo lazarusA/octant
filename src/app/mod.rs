@@ -14,7 +14,10 @@
 
 mod actions;
 mod block_loading;
+pub mod canvas;
+pub mod controllers;
 mod data_loading;
+mod export_lifecycle;
 mod floating;
 #[cfg(test)]
 mod floating_tests;

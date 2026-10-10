@@ -2,8 +2,9 @@
 name: octant-ui-egui
 description: >-
   Immediate-mode GUI development in Octant using egui and eframe. Covers AppAction
-  event dispatching, dimension sliders, colormap palettes, and animation timelines.
-  Use when modifying src/ui/ or src/app/ui.rs.
+  event dispatching, dimension sliders, colormap palettes, canvas interactions,
+  plot controllers, and animation timelines. Use when modifying src/ui/, src/app/canvas/,
+  src/app/controllers/, src/app/state/, or src/app/ui.rs.
 ---
 
 # Octant egui UI Skill
@@ -12,8 +13,25 @@ This skill guides development of the user interface in Octant using `egui` and `
 
 ## Key Patterns
 
-### 1. Modular Subsystem Architecture (`src/ui/`, `src/export/`)
-UI and export files are decomposed into focused submodules (< 250 lines per file):
+### 1. Modular Subsystem Architecture (`src/ui/`, `src/export/`, `src/app/`)
+UI and application files are decomposed into focused submodules (< 250 lines per file):
+- **Canvas Engine (`src/app/canvas/`)**:
+  - `viewport.rs`: Viewport dimensions, rect allocation, and aspect-ratio uniform calculations (`compute_viewport_uniforms`).
+  - `interactions.rs`: User drag, pan, zoom, click, orbit input events (`handle_canvas_interactions`).
+  - `axes.rs`: Coordinate grid lines, ticks, labels, and boundary rulers (`draw_canvas_axes`).
+  - `overlays.rs`: Interactive canvas crop bounding box, reticles, hover indicator pins (`draw_canvas_overlays`).
+  - `mod.rs`: Central viewport entry point `render_canvas(app, ui, canvas_rect)`.
+- **Plot Controllers Subsystem (`src/app/controllers/`)**:
+  - `traits.rs`: `PlotController` trait defining UI input handling (`handle_input`), selection changes (`on_staged_selection_change`), data load arrival hooks (`on_data_loaded`), and GPU uniform uploads (`update_uniforms`).
+  - Concrete controllers: `HeatmapController`, `LineController`, `VolumeController`, `MeshController`, `PointCloudController`.
+  - `mod.rs`: `controller_for(plot_type) -> &'static dyn PlotController` singleton dispatcher.
+- **Modular App State (`src/app/state/`)**:
+  - `navigation.rs` (`app.nav`): 2D pan/zoom, 3D camera orbit/zoom, `view_interacting`.
+  - `playback.rs` (`app.playback`): Animation timer, FPS, looping, `current_timestep`.
+  - `plot_configs.rs` (`app.plot_configs`): Plot options, `plot_transparency`, DVR raymarching parameters, line settings.
+  - `ui_layout.rs` (`app.layout`): Layout flags (`panel_positions`, `plot_as_overlay`, `reveal_layers_menu`, modal dialogs).
+- **Export Lifecycle (`src/app/export_lifecycle.rs`)**:
+  - `process_pending_export`: Processes in-flight raster/vector figure captures, ensuring UI overlays and tooltips are suppressed during capture passes.
 - **About Modal (`src/ui/about/`)**:
   - `types.rs`: `AboutTab` variants and tab constants.
   - `overview.rs`: Architecture overview and subsystem capabilities.
@@ -58,10 +76,12 @@ UI and export files are decomposed into focused submodules (< 250 lines per file
   - `vector.rs`: SVG and ISO 32000 PDF document generators.
   - `clipboard.rs`: Platform-native file manager reveal (`open -R`, `xdg-open`, `explorer.exe`).
 
-### 2. `AppAction` Event Dispatching (`src/app/actions.rs`)
-- Do not mutate complex state deep inside nested UI widget closures.
-- Emit an `AppAction` (e.g. `AppAction::SelectVariable(name)`, `AppAction::TogglePlayback`, `AppAction::SetColormap(map)`).
-- Handle mutations centrally in `OctantApp::apply_action` or `update` to keep data flow unidirectional and debuggable.
+### 2. Event Dispatching & Controller Coordination
+- **Global Actions (`src/app/actions.rs`)**:
+  - Emit an `AppAction` (e.g. `AppAction::SelectVariable(name)`, `AppAction::TogglePlayback`, `AppAction::SetColormap(map)`).
+  - Handle mutations centrally in `OctantApp::apply_action` to keep data flow unidirectional and debuggable.
+- **Plot-Specific Interactions (`src/app/controllers/`)**:
+  - Delegate plot-specific pointer interaction, coordinate probing, and uniform updates to `controller_for(plot_type)`.
 
 ### 3. Zero-Allocation UI Invariants & Performance
 - **Tuple Salts**: Pass tuple literals directly into ID salts to avoid heap strings:
@@ -73,9 +93,9 @@ UI and export files are decomposed into focused submodules (< 250 lines per file
   // Avoid: Allocates a String every single frame
   egui::ComboBox::from_id_salt(format!("spatial_role_{}", dim_idx))
   ```
-- **Canvas Ticks (`src/ui/axes.rs`)**:
+- **Canvas Ticks (`src/ui/axes.rs`, `src/app/canvas/axes.rs`)**:
   - Never allocate `Vec<TickMark>` or `String`s per frame.
-  - Use `[TickMark; 7]` stack arrays with an internal fixed stack buffer (`[u8; 32]`) and in-place `write!` cursor formatting.
+  - Use stack arrays with an internal fixed stack buffer (`[u8; 32]`) and in-place `write!` cursor formatting.
 - **Dimension & Coordinate Checks (`src/utils/coordinates.rs`)**:
   - Use zero-allocation ASCII search (`is_spatial_x_name`, `is_spatial_y_name`, `is_spatial_z_name`, `is_animated_time_name`) without lowercasing or cloning `String`s.
 - **Borrow FontId**: Pass `&FontId` to helper rendering functions instead of cloning `FontId`.
@@ -91,10 +111,10 @@ UI and export files are decomposed into focused submodules (< 250 lines per file
 
 ### 6. Smooth Animations & Timers
 - Track elapsed delta time (`ctx.input(|i| i.stable_dt)`).
-- Request continuous repaints only when playing animations or waiting for background prefetch (`ctx.request_repaint()`).
+- Request continuous repaints only when playing animations (`app.playback.is_playing`) or waiting for background prefetch (`ctx.request_repaint()`).
 
 ### 7. Canvas Paint Dispatch & Viewport Math
-- In `src/app/ui.rs`, canvas rendering delegates to `self.paint_active_plot(...)` in `src/app/pipeline/paint.rs`.
+- In `src/app/ui.rs`, canvas rendering delegates to `crate::app::canvas::render_canvas(self, ui, canvas_rect)`, which coordinates viewport allocation, pointer interactions, background rendering via `paint_active_plot(...)` in `src/app/pipeline/paint.rs`, axes, overlays, and colorbars.
 - Use `crate::utils::apply_zoom_pan_at_point(...)` from `src/utils/math.rs` for cursor-centered zoom and pan offsets.
 - Dynamic 2D aspect ratios are resolved using `self.compute_aspect_scale(canvas_rect.size())` and `self.active_data_dimensions_2d()`.
 
@@ -104,7 +124,8 @@ UI and export files are decomposed into focused submodules (< 250 lines per file
   - ISO 32000 PDF with strictly 20-byte cross-reference (`xref`) table entries (`{:010} 00000 n \r\n`).
   - Expand `~` to `$HOME/Downloads` via `resolve_export_path`.
 - **Capture Cleanliness**:
-  - Suppress interactive overlays (crop handles, grid lines, hover reticles) during the single screenshot pass (`if self.pending_export.is_none()`).
+  - Suppress interactive overlays (crop handles, grid lines, hover reticles) during the single screenshot pass (`if app.pending_export.is_none()`).
+  - Managed centrally in `src/app/export_lifecycle.rs` (`self.process_pending_export(&ctx)`).
 - **Flash Overlay**:
   - Flash timers start *after* screenshot readback finishes to prevent capturing flash luminance into exported files.
 

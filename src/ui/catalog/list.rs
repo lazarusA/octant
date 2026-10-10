@@ -9,8 +9,8 @@ pub fn render_entries_list(
     is_mobile: bool,
     should_close: &mut bool,
 ) {
-    let query = app.catalog_search_query.trim();
-    let entries = get_catalog_entries(app.catalog_category_filter);
+    let query = app.layout.catalog_search_query.trim();
+    let entries = get_catalog_entries(app.layout.catalog_category_filter);
 
     let is_match = |e: &&crate::catalog::CatalogEntry| -> bool {
         if query.is_empty() {
@@ -35,7 +35,7 @@ pub fn render_entries_list(
             ui.label(egui::RichText::new("No datasets found matching your search.").strong());
             ui.add_space(8.0);
             if ui.button("Clear Search").clicked() {
-                app.catalog_search_query.clear();
+                app.layout.catalog_search_query.clear();
             }
         });
         return;

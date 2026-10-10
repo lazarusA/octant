@@ -50,9 +50,9 @@ impl OctantApp {
         }
 
         if is_base && data.height == 1 {
-            self.line_plot_all_series = false;
-            self.line_profile_dim_idx = 0;
-            self.line_profile_slice_idx = 0;
+            self.plot_configs.line.all_series = false;
+            self.plot_configs.line.profile_dim_idx = 0;
+            self.plot_configs.line.profile_slice_idx = 0;
         }
 
         let is_rgb_composite = layer.composite.enabled
@@ -77,8 +77,8 @@ impl OctantApp {
             let aspect_scale = [1.0f32, 1.0f32];
             let ((u_min, u_max), (v_min, v_max)) =
                 crate::data::ViewportResampler::compute_visible_data_bounds(
-                    [self.heatmap_pan.x, self.heatmap_pan.y],
-                    self.heatmap_zoom,
+                    [self.nav.heatmap_pan.x, self.nav.heatmap_pan.y],
+                    self.nav.heatmap_zoom,
                     aspect_scale,
                 );
 

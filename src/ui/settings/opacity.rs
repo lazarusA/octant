@@ -24,7 +24,12 @@ pub(crate) fn show_transparency_settings(
         return;
     }
     if support.transparency != Support::No {
-        transparency_toggle(ui, &mut app.plot_transparency, support.transparency).on_hover_text(
+        transparency_toggle(
+            ui,
+            &mut app.plot_configs.plot_transparency,
+            support.transparency,
+        )
+        .on_hover_text(
             "With translucent colors (Opacity or Alpha curve), draw every layer \
                  instead of letting the nearest one hide those behind it.",
         );
@@ -32,11 +37,11 @@ pub(crate) fn show_transparency_settings(
     if support.volume_transparency != Support::No {
         transparency_toggle(
             ui,
-            &mut app.volume_transparency,
+            &mut app.plot_configs.volume.transparency,
             support.volume_transparency,
         );
-        if app.volume_algorithm == 0 && app.volume_transparency {
-            ui.checkbox(&mut app.volume_lighting, "Lighting")
+        if app.plot_configs.volume.algorithm == 0 && app.plot_configs.volume.transparency {
+            ui.checkbox(&mut app.plot_configs.volume.lighting, "Lighting")
                 .on_hover_text("Shade samples by their gradient so fronts and edges gain shape");
         }
     }

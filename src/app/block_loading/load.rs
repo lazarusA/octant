@@ -15,7 +15,8 @@ impl OctantApp {
         if let Some(anim_dim) = self.selected.animated_dim
             && let Some(&(start, end)) = self.selected.dim_ranges.get(anim_dim)
         {
-            self.current_timestep = self.current_timestep.clamp(start, end.max(start));
+            self.playback.current_timestep =
+                self.playback.current_timestep.clamp(start, end.max(start));
         }
         self.load_selected_variable_block();
     }
@@ -189,7 +190,7 @@ impl OctantApp {
         // Only the base layer moves the shared step; an overlay may have
         // clamped its own request into a shorter extent.
         if id == LayerId::BASE {
-            self.current_timestep = target;
+            self.playback.current_timestep = target;
         }
         let selection = if !layer.selection().dim_indices.is_empty() {
             Some(layer.selection_mut())
@@ -205,7 +206,7 @@ impl OctantApp {
     /// Aborts all ongoing data transfers and prefetch worker threads.
     pub fn abort_current_fetch(&mut self) {
         self.block_prefetcher.abort();
-        self.is_playing = false;
+        self.playback.is_playing = false;
         for layer in self.layers.iter_mut() {
             layer.load.pending_target_step = None;
         }

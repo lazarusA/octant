@@ -30,8 +30,8 @@ cargo clippy --all-targets -- -D warnings
 Octant has unit tests and integration tests in `tests/`.
 
 ```bash
-# Run all tests
-cargo test
+# Run all unit and integration tests
+cargo test --tests
 
 # Run a specific integration test file
 cargo test --test volume_animation_tests
@@ -43,6 +43,8 @@ cargo test --test pyramid_tests
 # Run tests with output printed
 cargo test -- --nocapture
 ```
+
+*Note*: For C-library/FFI test suites (e.g. NetCDF), tests serialize file creation with static mutex test locks to prevent concurrent non-reentrant IO collisions.
 
 ## 3. Running Octant Locally
 
@@ -62,18 +64,25 @@ RUST_LOG=octant=trace cargo run
 cargo run --release
 ```
 
-## 4. WebAssembly Checks
+## 4. WebAssembly & Web Builds
 
-Octant supports WASM builds. When modifying dependencies or async runtimes, ensure WASM target compiles:
+Octant supports browser execution via WASM and WebGPU/WebGL2:
 
 ```bash
 # Check WASM32 compilation
 cargo check --target wasm32-unknown-unknown
+
+# Build for Web using Trunk
+trunk build
+trunk build --release
+
+# Validate brotli-compressed WASM bundle size against .github/wasm-size-budget
+scripts/check_wasm_size.sh
 ```
 
 ## 5. Pre-Commit Checklist
 
 - [ ] `cargo fmt --all -- --check` passes cleanly.
 - [ ] `cargo clippy --all-targets -- -D warnings` has zero warnings.
-- [ ] `cargo test` passes all tests.
+- [ ] `cargo test --tests` passes all tests.
 - [ ] Checked for accidental `.clone()` or unwrap() calls in hot rendering / data paths.

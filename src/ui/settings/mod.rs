@@ -31,8 +31,8 @@ const MIN_BODY_HEIGHT: f32 = 120.0;
 /// Anchored to the left edge of the canvas area, just below the top bar.
 /// Stores its own width so Variable Controls can position to the right without overlap.
 pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
-    if !app.show_settings_panel {
-        app.settings_overlay_width = 0.0;
+    if !app.layout.show_settings_panel {
+        app.layout.settings_overlay_width = 0.0;
         return;
     }
 
@@ -50,11 +50,11 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
 
     // Store width for next frame so Variable Controls can position to the right.
     let rect = area_resp.response.rect;
-    app.settings_overlay_width = rect.width();
+    app.layout.settings_overlay_width = rect.width();
     if let Some(header) = header {
         panel_layout::apply_grip(app, Panel::Settings, header.grip, rect, canvas_rect);
         if header.close {
-            app.show_settings_panel = false;
+            app.layout.show_settings_panel = false;
         }
     }
 }

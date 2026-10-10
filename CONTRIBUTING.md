@@ -19,6 +19,14 @@ However, all AI-generated or AI-assisted contributions must adhere to the follow
 
 ## Development Guidelines
 
-1. **Format & Lint**: Ensure code is formatted with `cargo fmt` and passes `cargo clippy`.
-2. **Verification**: Verify that the project compiles and tests pass locally (`cargo test`).
+1. **Format & Lint**: Ensure code is formatted with `cargo fmt --all -- --check` and passes `cargo clippy --all-targets -- -D warnings`.
+2. **Verification**: Verify that the project compiles and tests pass locally (`cargo test --tests`).
 3. **Pull Requests**: Open a PR with a clear summary of the changes and motivation behind them.
+
+## Extending Octant (New Plot Types & Storage Formats)
+
+Octant features a decoupled component architecture designed for straightforward extensibility:
+
+- **Adding a New Visualization (e.g. Hexagonal DGGS, Vector Quiver, Custom Meshes)**: Follow the [4-Step Plug-in Pattern in ARCHITECTURE.md](ARCHITECTURE.md#62-4-step-plug-in-pattern-for-adding-any-new-plot-type).
+- **Adding a Storage Backend (e.g. HDF5, GeoParquet, Cloud Stores)**: Follow [Adding a New Storage Backend in ARCHITECTURE.md](ARCHITECTURE.md#61-adding-a-new-storage-backend-eg-hdf5-geoparquet-cloud-stores).
+- **Complex & Non-Grid Workflows (Lagrangian Trajectories, Streamlines)**: See [Non-Grid Workflows in ARCHITECTURE.md](ARCHITECTURE.md#63-supporting-complex--non-grid-workflows-lagrangian-trajectories-streamlines--particle-tracks).
