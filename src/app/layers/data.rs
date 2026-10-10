@@ -22,9 +22,17 @@ pub struct LayerData {
     /// `store:variable:2d|3d` of the data last built, to tell a new variable
     /// from another step of the same one.
     pub var_key: Option<String>,
+    /// Bumped (`touch`) whenever `matrix` or `volume` change, so caches of
+    /// data derived from them (the line plot's GPU payload) know to rebuild.
+    pub version: u64,
 }
 
 impl LayerData {
+    /// Records that `matrix` or `volume` changed.
+    pub fn touch(&mut self) {
+        self.version = self.version.wrapping_add(1);
+    }
+
     /// Full-resolution `(width, height)` of the 2D data (before any pyramid
     /// resampling), or 1024 x 1024 when there is none.
     pub fn dimensions_2d(&self) -> (usize, usize) {

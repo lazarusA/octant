@@ -40,7 +40,18 @@ pub struct LineUniformParams {
     pub zoom: f32,
 }
 
-use std::sync::RwLock;
+use std::sync::{Mutex, RwLock};
+
+/// What a line payload holds: each drawn line's index (`u32` bits), then its
+/// `profile_length` samples.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LineShape {
+    pub profile_length: u32,
+    /// Lines in the payload.
+    pub drawn_lines: u32,
+    /// Lines in the plot, drawn or not (the series the colors spread over).
+    pub line_count: u32,
+}
 
 pub struct LineRenderer {
     render_pipeline: wgpu::RenderPipeline,
@@ -49,6 +60,9 @@ pub struct LineRenderer {
     uniform_buffer: wgpu::Buffer,
     gpu_resources: RwLock<LineGpuResources>,
     data_len: AtomicU32,
+    /// The key and shape of the payload in the data buffer; `None` until one
+    /// is uploaded, or after a raw `update_data` overwrote it.
+    payload: Mutex<Option<(u64, LineShape)>>,
 }
 
 struct LineGpuResources {
@@ -203,7 +217,34 @@ impl LineRenderer {
                 bind_group,
             }),
             data_len: AtomicU32::new(safe_data.len() as u32),
+            payload: Mutex::new(None),
         }
+    }
+
+    /// The shape of the payload for `key`, when that is what the buffer holds.
+    pub fn payload_shape(&self, key: u64) -> Option<LineShape> {
+        let guard = self.payload.lock().unwrap_or_else(|p| p.into_inner());
+        guard
+            .filter(|&(held, _)| held == key)
+            .map(|(_, shape)| shape)
+    }
+
+    /// Uploads `values`, a payload of `shape`, as the one for `key`.
+    pub fn upload_payload(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        key: u64,
+        values: &[f32],
+        shape: LineShape,
+    ) {
+        self.update_data_with_device(device, queue, values);
+        *self.payload.lock().unwrap_or_else(|p| p.into_inner()) = Some((key, shape));
+    }
+
+    /// Forgets the uploaded payload after its buffer was overwritten.
+    fn forget_payload(&self) {
+        *self.payload.lock().unwrap_or_else(|p| p.into_inner()) = None;
     }
 
     pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &LineUniformParams) {
@@ -227,7 +268,7 @@ impl LineRenderer {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
-    pub fn update_data_with_device(
+    fn update_data_with_device(
         &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -275,10 +316,13 @@ impl LineRenderer {
             .store(matrix_data.len() as u32, Ordering::Relaxed);
     }
 
+    /// Writes raw values into the data buffer; the next paint uploads its
+    /// payload again.
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
         if matrix_data.is_empty() {
             return;
         }
+        self.forget_payload();
 
         if let Ok(guard) = self.gpu_resources.read()
             && super::common::safe_write_buffer(
@@ -336,13 +380,8 @@ pub struct LineCallback {
     pub show_points: bool,
     pub point_size: f32,
     pub rect: egui::Rect,
-    /// Each drawn line's index (`u32` bits), then its `profile_length` samples.
-    pub profile_values: Vec<f32>,
-    pub profile_length: u32,
-    /// Lines in `profile_values`.
-    pub drawn_lines: u32,
-    /// Lines in the plot, drawn or not (the series the colors spread over).
-    pub line_count: u32,
+    /// The payload uploaded to the renderer (`LineRenderer::upload_payload`).
+    pub shape: LineShape,
     pub line_mode: u32,
     pub pan: [f32; 2],
     pub zoom: f32,
@@ -358,10 +397,6 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         super::colormap_atlas::prepare(device, queue, callback_resources);
-        if !self.profile_values.is_empty() {
-            self.renderer
-                .update_data_with_device(device, queue, &self.profile_values);
-        }
         let screen_aspect = self.rect.width() / self.rect.height().max(1.0);
         self.renderer.update_uniforms(
             queue,
@@ -374,8 +409,8 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
                 point_size: self.point_size,
                 screen_aspect,
                 viewport_padding: [0.0, 0.0],
-                profile_length: self.profile_length,
-                line_count: self.line_count,
+                profile_length: self.shape.profile_length,
+                line_count: self.shape.line_count,
                 line_mode: self.line_mode,
                 pan: self.pan,
                 zoom: self.zoom,
@@ -402,17 +437,21 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         };
         rpass.set_bind_group(0, &guard.bind_group, &[]);
 
-        let line_count = self.drawn_lines;
-        if line_count > 0 && !self.profile_values.is_empty() {
+        let LineShape {
+            profile_length,
+            drawn_lines: line_count,
+            ..
+        } = self.shape;
+        if line_count > 0 {
             // A single sample has no segment: only its point shows.
-            if self.show_lines && self.profile_length >= 2 {
+            if self.show_lines && profile_length >= 2 {
                 rpass.set_pipeline(&self.renderer.render_pipeline);
-                rpass.draw(0..self.profile_length, 0..line_count);
+                rpass.draw(0..profile_length, 0..line_count);
             }
             if self.show_points {
                 // One point per sample: the shader splits instances by the
                 // uniform `profile_length` (at least 1).
-                let points = self.profile_length.max(1) * line_count;
+                let points = profile_length.max(1) * line_count;
                 rpass.set_pipeline(&self.renderer.scatter_pipeline);
                 rpass.draw(0..6, 0..points);
             }

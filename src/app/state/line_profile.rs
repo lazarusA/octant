@@ -1,8 +1,12 @@
 //! Where a line plot's lines live in the base layer's data: one `LineLayout`
 //! read by the GPU payload, the hover and the series colorbar, so they agree
-//! on which line is which without building the payload.
+//! on which line is which without building the payload. The payload is built
+//! and uploaded only when its key (`line_payload_key`) changes.
+
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use super::app_state::OctantApp;
+use crate::plots::{LineRenderer, LineShape};
 
 /// `line_count` lines of `profile_length` samples: sample `s` of line `l` is
 /// `values[first + l * line_stride + s * sample_stride]` (NaN past the end).
@@ -43,11 +47,7 @@ impl LineLayout {
 /// bits of a `u32`) followed by its `profile_length` samples.
 pub struct LinePayload {
     pub values: Vec<f32>,
-    pub profile_length: u32,
-    /// Lines in `values`.
-    pub drawn_lines: u32,
-    /// Lines in the plot, with or without data (`LineLayout::line_count`).
-    pub line_count: u32,
+    pub shape: LineShape,
 }
 
 impl OctantApp {
@@ -89,16 +89,66 @@ impl OctantApp {
         }
         LinePayload {
             values: payload,
-            profile_length: len as u32,
-            drawn_lines: drawn,
-            line_count: layout.line_count as u32,
+            shape: LineShape {
+                profile_length: len as u32,
+                drawn_lines: drawn,
+                line_count: layout.line_count as u32,
+            },
         }
+    }
+
+    /// Identifies the payload `line_payload` builds: the base layer's data
+    /// version and the choices that lay its lines out.
+    pub fn line_payload_key(&self) -> u64 {
+        let pick = (!self.line_plot_all_series).then_some(self.line_profile_slice_idx);
+        let mut hasher = DefaultHasher::new();
+        (
+            self.layers.base.data.version,
+            self.line_profile_dim_idx,
+            pick,
+        )
+            .hash(&mut hasher);
+        hasher.finish()
+    }
+
+    /// The shape of the payload `renderer` draws, building and uploading it
+    /// first only when the data or its layout changed since the last upload.
+    pub fn upload_line_payload(&self, renderer: &LineRenderer) -> LineShape {
+        let key = self.line_payload_key();
+        if let Some(shape) = renderer.payload_shape(key) {
+            return shape;
+        }
+        let payload = self.line_payload();
+        if let Some(state) = &self.wgpu_render_state {
+            let (device, queue) = (&state.device, &state.queue);
+            renderer.upload_payload(device, queue, key, &payload.values, payload.shape);
+        }
+        payload.shape
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::LineLayout;
+    use crate::app::OctantApp;
+
+    #[test]
+    fn the_payload_key_follows_the_data_and_its_layout() {
+        let mut app = OctantApp::default();
+        let key = app.line_payload_key();
+        assert_eq!(app.line_payload_key(), key, "nothing changed");
+        app.layers.base.data.touch();
+        let touched = app.line_payload_key();
+        assert_ne!(touched, key, "the data changed");
+        app.line_profile_slice_idx += 1;
+        assert_ne!(app.line_payload_key(), touched, "another line picked");
+        app.line_plot_all_series = true;
+        let all = app.line_payload_key();
+        app.line_profile_slice_idx += 1;
+        assert_eq!(app.line_payload_key(), all, "every line drawn: no pick");
+        app.line_profile_dim_idx = 1;
+        assert_ne!(app.line_payload_key(), all, "lines along another axis");
+    }
 
     const VALUES: [f32; 6] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
 

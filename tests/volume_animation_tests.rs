@@ -229,14 +229,21 @@ fn test_line_profile_along_z_and_xyz() {
 
     // Each drawn line is its index (as `u32` bits) followed by its samples.
     let p = app.line_payload();
-    assert_eq!((p.profile_length, p.drawn_lines, p.line_count), (4, 1, 1));
+    assert_eq!(
+        (
+            p.shape.profile_length,
+            p.shape.drawn_lines,
+            p.shape.line_count
+        ),
+        (4, 1, 1)
+    );
     assert_eq!(p.values[0].to_bits(), 0);
     assert_eq!(p.values[1..], [0.0, 6.0, 12.0, 18.0]);
 
     // 2. Along Z single profile at pixel 1 (x=1, y=0)
     app.line_profile_slice_idx = 1;
     let p = app.line_payload();
-    assert_eq!((p.profile_length, p.drawn_lines), (4, 1));
+    assert_eq!((p.shape.profile_length, p.shape.drawn_lines), (4, 1));
     assert_eq!(p.values[1..], [1.0, 7.0, 13.0, 19.0]);
 
     // 3. Along X (dim 0) - extracted from the layer's matrix (timestep slice)
@@ -253,7 +260,7 @@ fn test_line_profile_along_z_and_xyz() {
     ));
 
     let p = app.line_payload();
-    assert_eq!((p.profile_length, p.drawn_lines), (2, 1));
+    assert_eq!((p.shape.profile_length, p.shape.drawn_lines), (2, 1));
     assert_eq!(p.values[1..], [10.0, 20.0]);
 
     // Timestep advances -> new matrix slice
@@ -267,7 +274,7 @@ fn test_line_profile_along_z_and_xyz() {
         1,
     ));
     let p = app.line_payload();
-    assert_eq!((p.profile_length, p.drawn_lines), (2, 1));
+    assert_eq!((p.shape.profile_length, p.shape.drawn_lines), (2, 1));
     assert_eq!(p.values[1..], [100.0, 200.0]);
 }
 
@@ -288,7 +295,14 @@ fn all_lines_series_skip_empty_lines_but_keep_their_index() {
         1,
     ));
     let p = app.line_payload();
-    assert_eq!((p.profile_length, p.drawn_lines, p.line_count), (2, 2, 3));
+    assert_eq!(
+        (
+            p.shape.profile_length,
+            p.shape.drawn_lines,
+            p.shape.line_count
+        ),
+        (2, 2, 3)
+    );
     assert_eq!(p.values[0].to_bits(), 0);
     assert_eq!(p.values[1..3], [1.0, 2.0]);
     assert_eq!(p.values[3].to_bits(), 2, "row 1 has no data: row 2 follows");

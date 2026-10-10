@@ -26,7 +26,7 @@ pub use coastline::{
 };
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
-pub use line::{LineCallback, LineRenderer};
+pub use line::{LineCallback, LineRenderer, LineShape};
 pub use mesh::{Mesh3DCallback, Mesh3DRenderer};
 pub use point_cloud::{PointCloudCallback, PointCloudRenderer, PointCloudUniformParams};
 pub use sphere::{SphereCallback, SphereRenderer};
@@ -160,6 +160,31 @@ mod tests {
         if let Some(error) = rt.block_on(scope.pop()) {
             panic!("pipeline validation failed: {error}");
         }
+    }
+
+    /// The line renderer reports the payload it holds only for the key it
+    /// was uploaded with, and forgets it after a raw write. Skipped without a GPU.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn line_renderer_tracks_its_uploaded_payload() {
+        let Some((device, queue)) = super::test_gpu::device() else {
+            eprintln!("SKIPPED line_renderer_tracks_its_uploaded_payload: no GPU device");
+            return;
+        };
+        let format = wgpu::TextureFormat::Rgba8Unorm;
+        let renderer = super::LineRenderer::new(&device, format, &[0.0; 4], 2, 2);
+        assert_eq!(renderer.payload_shape(7), None, "nothing uploaded yet");
+        let shape = super::LineShape {
+            profile_length: 2,
+            drawn_lines: 1,
+            line_count: 2,
+        };
+        let payload = [f32::from_bits(1), 3.0, 4.0];
+        renderer.upload_payload(&device, &queue, 7, &payload, shape);
+        assert_eq!(renderer.payload_shape(7), Some(shape));
+        assert_eq!(renderer.payload_shape(8), None, "another key");
+        renderer.update_data(&queue, &[1.0, 2.0]);
+        assert_eq!(renderer.payload_shape(7), None, "overwritten");
     }
 
     #[test]

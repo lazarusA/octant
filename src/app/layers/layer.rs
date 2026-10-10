@@ -74,6 +74,7 @@ impl Layer {
     /// Invalidates the 2D data and its renderers.
     pub fn clear_2d(&mut self) {
         self.data.matrix = None;
+        self.data.touch();
         self.renderers.heatmap = None;
         self.renderers.sphere = None;
         self.renderers.surface = None;
@@ -83,6 +84,7 @@ impl Layer {
     /// Invalidates the 3D volume and its renderers.
     pub fn clear_3d(&mut self) {
         self.data.volume = None;
+        self.data.touch();
         self.renderers.volume = None;
         self.renderers.point_cloud = None;
     }
