@@ -323,21 +323,59 @@ Pure GPU graphics pipelines live in `src/plots/`, while interaction handling, na
 
 ## 6. Guidelines for Extending Octant
 
-### Adding a New Storage Backend (e.g. HDF5 or Cloud-Optimized Formats)
+### 6.1 Adding a New Storage Backend (e.g. HDF5, GeoParquet, Cloud Stores)
 1. Create `src/data/backends/your_backend/`.
 2. Implement the [`BlockStore`](https://github.com/lazarusA/octant/blob/main/src/data/blocks/store.rs) trait:
    - `backend_name(&self) -> &str`
-   - `inspect(&self) -> Result<DatasetMetadata, BlockStoreError>`
+   - `inspect(&self) -> Result<DatasetMetadata, BlockStoreError>` (Metadata-only inspection)
+   - `variable_coordinates(&self, variable: &VariableInfo) -> Result<HashMap<String, CoordValues>, BlockStoreError>` (Lazy dimension coordinate retrieval)
    - `fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError>`
-   - `variable_coordinates(&self, var_name: &str) -> Result<Vec<(String, CoordValues)>, BlockStoreError>`
-3. Add the variant to `DataSourceKind` in `src/data/dataset/source.rs` and wire it in `src/data/dataset/factory.rs`.
+   - `fetch_block_with_progress(&self, request: &SliceRequest, on_progress: ProgressCallback) -> Result<OctantBlock, BlockStoreError>`
+3. Wire the source detection in `src/utils/store.rs` and `src/app/data_loading.rs`.
 
-### Adding a New Plot Type or Renderer
-1. Add the enum variant to `PlotType` in `src/plots/mod.rs`.
-2. Create `src/plots/your_plot/` implementing the WGPU rendering pipeline (`PlotRenderer` trait).
-3. Create `src/app/controllers/your_plot.rs` implementing `PlotController` for camera navigation, view reset, and capabilities.
-4. If the plot has custom settings, add a typed config struct to `PlotConfigs` in `src/app/state/plot_configs.rs`.
-5. Wire into `LayerRenderers` (`src/app/layers/renderers.rs`) and `src/app/pipeline/paint_layer.rs`.
+### 6.2 4-Step Plug-in Pattern for Adding Any New Plot Type
+Octant's decoupled architecture ensures that adding a new visualization type never requires modifying the central immediate-mode UI loop (`src/app/ui.rs`), the canvas engine (`src/app/canvas/`), or the export lifecycle (`src/app/export_lifecycle.rs`). Every plot type follows a strict 4-step plug-in contract:
+
+```text
+Step 1: Configuration & Variant
+  ├── Add typed configuration struct to src/app/state/plot_configs.rs (e.g., TrajectoryConfig)
+  └── Register variant in PlotType enum (src/plots/mod.rs)
+
+Step 2: GPU Pipeline & Renderer (src/plots/)
+  ├── Implement PlotRenderer trait in src/plots/your_plot.rs:
+  │   ├── update_data(&self, queue, data: &RenderData) -> GPU buffer allocations
+  │   ├── paint(&self, ui, rect, params: &PlotRenderParams) -> Submit egui-wgpu callback
+  │   └── inspect_hover(&self, pointer_pos, rect, data, params) -> Option<HoverSample>
+  └── Write WGSL shader in src/plots/shaders/your_plot.wgsl
+
+Step 3: Plot Controller & Event Management (src/app/controllers/)
+  ├── Implement PlotController trait in src/app/controllers/your_plot.rs:
+  │   ├── handle_input(&self, app, response) -> Custom gesture, drag, or hover picking
+  │   ├── on_staged_selection_change(&self, app) -> Dimension validation
+  │   ├── on_data_loaded(&self, app, layer_id) -> Translation into GPU buffers
+  │   └── update_uniforms(&self, app, layer_id) -> Prep PlotRenderParams from PlotConfigs
+  └── Register in controller_for(plot_type) singleton dispatcher (src/app/controllers/mod.rs)
+
+Step 4: Pipeline Paint Callback Wiring
+  └── Add match arm in src/app/pipeline/paint_layer.rs and LayerRenderers (src/app/layers/renderers.rs)
+```
+
+### 6.3 Supporting Complex & Non-Grid Workflows (Lagrangian Trajectories, Streamlines & Particle Tracks)
+Non-Eulerian data (such as ocean drifter trajectories, atmospheric weather balloons, aircraft flight paths, and Lagrangian particle advection) differs fundamentally from regular hyperslab tensors. Octant accommodates these workflows seamlessly through its decoupled state and controller model:
+
+1. **Non-Grid Coordinate Trajectory Ingestion**:
+   - Trajectory records represent sequences of 4D/5D tuples $(x_t, y_t, z_t, v_t)$ evolving over time.
+   - In `PlotController::on_data_loaded`, arriving block records or sparse tables are decoded directly into path vertices or GPU instance buffers.
+2. **GPU Vertex Pulling & Analytical Ribbons**:
+   - In accordance with Octant's zero-allocation GPU rendering guidelines, do not generate polygonal tube meshes on the CPU.
+   - Pass trajectory nodes as a GPU storage buffer (`@group(0) @binding(1) var<storage, read> path_nodes: array<PathPoint>;`).
+   - Synthesize camera-facing 3D ribbon strips or billboard arrows directly inside the WGSL vertex shader (`vs_main`).
+3. **Temporal Scrubbing & Track History**:
+   - Trajectory paths synchronize with global animation using [`PlaybackState`](https://github.com/lazarusA/octant/blob/main/src/app/state/playback.rs) (`app.playback.current_timestep` and `app.playback.last_step_time`).
+   - The trajectory controller can render the entire track history with a leading marker or filter path segments up to the current timestamp.
+4. **Interactive Picking & Path Inspection**:
+   - Custom pointer selection, waypoint inspection, or nearest-point Euclidean distance tests live inside `PlotController::handle_input` and `PlotRenderer::inspect_hover`.
+   - Camera auto-tracking (centering the viewport on an active particle) manipulates [`NavigationState`](https://github.com/lazarusA/octant/blob/main/src/app/state/navigation.rs) (`app.nav`) cleanly without borrow conflicts.
 
 ---
 
@@ -352,7 +390,14 @@ Pure GPU graphics pipelines live in `src/plots/`, while interaction handling, na
 - **Done: Modular State & Canvas Engine**: Decomposed app states (`NavigationState`, `PlaybackState`, `PlotConfigs`, `UiLayoutState`), decoupled canvas engine (`src/app/canvas/`), and polymorphic plot controllers (`src/app/controllers/`).
 
 ### Next Roadmap Objectives
-1. **Multi-Plot Overlays**: Extend overlays beyond heatmaps to 3D volumes (multi-channel texture raymarching) and surfaces.
-2. **Cross-Dataset Geographic Overlays**: Render `Alignment::Geo` overlays with normalized longitude conventions and bounding box placement.
-3. **Derived Sources & Operations (`Source::Derived`)**: CPU/GPU algebraic expressions across variables (e.g., wind speed from $u$ and $v$).
-4. **Multi-Scale Viewport Level-of-Detail**: Progressive multiscale loading for large-scale OME-NGFF and GeoTIFF overviews.
+1. **Multi-Plot Overlays**:
+   - Extend overlays beyond heatmaps to 3D volumes (multi-channel texture raymarching) and surfaces.
+2. **Cross-Dataset Geographic Overlays**:
+   - Render `Alignment::Geo` overlays with normalized longitude conventions and bounding box placement.
+3. **Multi-Scale Viewport Level-of-Detail**:
+   - Progressive multiscale loading for large-scale OME-NGFF and GeoTIFF overviews.
+4. **Derived Sources & Operations (`Source::Derived`)**:
+   - CPU/GPU algebraic expressions and vector field synthesis across variables (e.g. wind speed magnitude $\sqrt{u^2 + v^2}$ or vorticity $\nabla \times \vec{v}$).
+5. **Lagrangian Trajectory & Vector Streamline Subsystem**:
+   - Generalize `Source` in `src/app/layers/source.rs` from `Source::Variable(VariableSelection)` to `Source::Trajectory(TrajectorySelection)`.
+   - Implement `TrajectoryRenderer` and `TrajectoryController` with GPU vertex pulling for high-performance particle paths.
