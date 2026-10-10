@@ -221,25 +221,19 @@ impl LineRenderer {
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
+}
 
-    /// The `PlotRenderer` traits' raw values do not fit the payload layout
-    /// (`payload.rs`): they only make the next paint upload the payload again.
-    pub fn update_data(&self, _queue: &wgpu::Queue, _matrix_data: &[f32]) {
+// The `PlotRenderer` traits' raw values do not fit the payload layout
+// (`payload.rs`): they only make the next paint upload the payload again.
+impl super::common::PlotRenderer for LineRenderer {
+    fn update_data(&self, _queue: &wgpu::Queue, _values: &[f32]) {
         self.payload.forget();
     }
 }
 
-impl super::common::PlotRenderer for LineRenderer {
-    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
-        self.update_data(queue, values);
-    }
-}
-
 impl super::traits::PlotRenderer for LineRenderer {
-    fn update_data(&self, queue: &wgpu::Queue, data: &crate::data::RenderData) {
-        if let crate::data::RenderData::Matrix(m) = data {
-            self.update_data(queue, &m.values);
-        }
+    fn update_data(&self, _queue: &wgpu::Queue, _data: &crate::data::RenderData) {
+        self.payload.forget();
     }
 
     fn paint(
@@ -342,7 +336,7 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
             if self.show_points {
                 // One point per sample: the shader splits instances by the
                 // uniform `profile_length` (at least 1).
-                let points = profile_length.max(1) * line_count;
+                let points = profile_length.max(1).saturating_mul(line_count);
                 rpass.set_pipeline(&self.renderer.scatter_pipeline);
                 rpass.draw(0..6, 0..points);
             }

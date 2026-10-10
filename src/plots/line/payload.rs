@@ -44,9 +44,15 @@ impl PayloadSlot {
         held.filter(|&(k, _)| k == key).map(|(_, shape)| shape)
     }
 
-    /// Records that the buffer holds the payload for `key`.
+    /// Records that the buffer holds the payload for `key`, which clears
+    /// any refusal: a payload refused again after one fit is reported again.
     pub(super) fn hold(&self, key: u64, shape: LineShape) {
-        self.with(|h| h.payload = Some((key, shape)));
+        self.with(|h| {
+            *h = Held {
+                payload: Some((key, shape)),
+                refused: None,
+            }
+        });
     }
 
     /// Records that the buffer holds no payload.
@@ -198,6 +204,9 @@ mod tests {
         assert!(!slot.refuse(5, 40), "the same layout does not report again");
         assert!(slot.refuses(5) && !slot.refuses(4));
         assert!(slot.refuse(6, 60), "another layout reports");
+        slot.hold(7, SHAPE);
+        assert!(!slot.refuses(6), "an upload clears the refusal");
+        assert!(slot.refuse(6, 60), "refused again after one fit: reported");
     }
 
     /// The renderer reports the payload it holds only for the key it was
@@ -215,7 +224,7 @@ mod tests {
         renderer.upload_payload(&device, &queue, 7, &payload, SHAPE);
         assert_eq!(renderer.payload_shape(7), Some(SHAPE));
         assert_eq!(renderer.payload_shape(8), None, "another key");
-        renderer.update_data(&queue, &[1.0, 2.0]);
+        crate::plots::common::PlotRenderer::update_data(&renderer, &queue, &[1.0, 2.0]);
         assert_eq!(renderer.payload_shape(7), None, "overwritten");
         assert_eq!(LineRenderer::payload_limit(&device) % 4, 0, "whole words");
     }

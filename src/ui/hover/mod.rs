@@ -194,8 +194,7 @@ fn resolve_hover_color(app: &OctantApp, raw_val: f32, line: usize) -> Color32 {
     if app.line_series_colored() && raw_val.is_finite() {
         app.line_series_color(line)
     } else if app.line_custom_colored() {
-        let [r, g, b, a] = app.line_color.map(|c| (c * 255.0).clamp(0.0, 255.0) as u8);
-        Color32::from_rgba_unmultiplied(r, g, b, a)
+        crate::utils::colormap::eval::rgba_to_color32(app.line_color)
     } else {
         let color_params = app.get_color_params(&app.layers.base);
         evaluate_color_cpu(raw_val, &color_params)

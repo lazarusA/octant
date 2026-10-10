@@ -184,9 +184,7 @@ impl OctantApp {
         let Some(state) = self.wgpu_render_state.as_ref() else {
             return LineShape::default();
         };
-        if layer.id() != LayerId::BASE {
-            return LineShape::default();
-        }
+        debug_assert_eq!(layer.id(), LayerId::BASE, "only the base layer draws lines");
         let (values, layout, version) = self.line_source();
         let key = payload_key(layout, version);
         if let Some(shape) = renderer.payload_shape(key) {

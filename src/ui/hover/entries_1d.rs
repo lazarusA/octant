@@ -1,4 +1,4 @@
-use crate::app::OctantApp;
+use crate::app::{OctantApp, SpatialRole};
 use crate::data::{DatasetMetadata, VariableInfo};
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, flipped_offset,
@@ -69,16 +69,19 @@ fn resolve_line_profile_dim(
 }
 
 /// The dimensions of `v` along X, Y and Z in a line plot: their explicit
-/// roles, else the last, the second-to-last and the first other dimension.
-/// The profile and the series dimension both read them, so they agree.
+/// roles, else the last, the second-to-last and the first dimension not
+/// already taken, so no two axes share a dimension. A grid dimension stands
+/// for both X and Y, so a grid has no Y. The profile and the series
+/// dimension both read them, so they agree.
 fn line_axes(app: &OctantApp, v: &VariableInfo) -> [Option<usize>; 3] {
-    let (x, y, z) = v.resolve_spatial_dim_indices(app.effective_dim_config());
+    let config = app.effective_dim_config();
+    let (x, y, z) = v.resolve_spatial_dim_indices(config);
+    let grid = config.iter().any(|c| c.spatial == SpatialRole::Grid);
     let n = v.dimension_names.len();
-    let (x, y) = (
-        x.or_else(|| n.checked_sub(1)),
-        y.or_else(|| n.checked_sub(2)),
-    );
-    let z = z.or_else(|| (0..n).find(|&i| Some(i) != x && Some(i) != y));
+    let free = |taken: [Option<usize>; 2]| move |i: &usize| !taken.contains(&Some(*i));
+    let x = x.or_else(|| (0..n).rev().find(free([y, z])));
+    let y = y.or_else(|| (0..n).rev().filter(|_| !grid).find(free([x, z])));
+    let z = z.or_else(|| (0..n).find(free([x, y])));
     [x, y, z]
 }
 
@@ -116,11 +119,13 @@ pub(crate) fn series_dim<'a>(
 ) -> Option<SeriesDim<'a>> {
     let v = var?;
     let [x, y, _] = line_axes(app, v);
-    let index = match app.line_profile_dim_idx {
-        0 => y,
-        1 => x,
-        _ => None,
-    }?;
+    let (index, profile) = match app.line_profile_dim_idx {
+        0 => (y, x),
+        1 => (x, y),
+        _ => (None, None),
+    };
+    // Lines run across a dimension other than the one they run along.
+    let index = index.filter(|&i| Some(i) != profile)?;
     let name = v.dimension_names.get(index)?;
     let (origin, len) = get_dimension_origin_and_full_len(app, var, index);
     let flipped = is_flipped(app, name);
@@ -150,4 +155,59 @@ pub(crate) fn series_field(
     let target = Some(app.plotted().store_target.as_str());
     let field = format_dimension_coord(meta, Some(v), target, dim.name, global, dim.len, None);
     (field, Some(dim.index))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{line_axes, series_dim};
+    use crate::app::{DimConfig, OctantApp, SpatialRole};
+    use crate::data::VariableInfo;
+
+    fn var(dims: &[&str]) -> VariableInfo {
+        VariableInfo {
+            dimension_names: dims.iter().map(|d| d.to_string()).collect(),
+            shape: vec![4; dims.len()],
+            ..Default::default()
+        }
+    }
+
+    fn app_with_roles(roles: &[SpatialRole]) -> OctantApp {
+        let mut app = OctantApp::default();
+        app.selected.dim_config = roles
+            .iter()
+            .map(|&spatial| DimConfig {
+                spatial,
+                ..Default::default()
+            })
+            .collect();
+        app
+    }
+
+    #[test]
+    fn fallback_axes_never_share_a_dimension() {
+        let app = app_with_roles(&[SpatialRole::None, SpatialRole::X, SpatialRole::None]);
+        let v = var(&["a", "b", "c"]);
+        assert_eq!(line_axes(&app, &v), [Some(1), Some(2), Some(0)]);
+        let app = OctantApp::default();
+        assert_eq!(line_axes(&app, &v), [Some(2), Some(1), Some(0)], "no roles");
+    }
+
+    #[test]
+    fn a_grid_has_no_series_dimension_along_y() {
+        let mut app = app_with_roles(&[SpatialRole::Grid, SpatialRole::None]);
+        let v = var(&["cell", "level"]);
+        assert_eq!(line_axes(&app, &v)[1], None);
+        app.line_profile_dim_idx = 0;
+        assert!(series_dim(&app, Some(&v)).is_none(), "lines along the grid");
+    }
+
+    #[test]
+    fn series_lines_run_across_the_other_axis_without_roles() {
+        let mut app = OctantApp::default();
+        let v = var(&["a", "b"]);
+        app.line_profile_dim_idx = 0;
+        assert_eq!(series_dim(&app, Some(&v)).map(|d| d.index), Some(0));
+        app.line_profile_dim_idx = 1;
+        assert_eq!(series_dim(&app, Some(&v)).map(|d| d.index), Some(1));
+    }
 }
