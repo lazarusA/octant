@@ -12,12 +12,15 @@ pub mod entries_3d;
 pub mod field;
 pub mod format;
 pub mod hit;
+mod hit_cache;
+mod march;
 pub mod overlays;
 pub mod raycast_sphere;
 pub mod raycast_surface;
 pub mod raycast_volume;
 pub mod sample_1d;
 pub mod sample_2d;
+mod smooth;
 
 pub use camera::{Camera3D, Ray3D, intersect_aabb};
 pub use enrich::{
@@ -26,8 +29,8 @@ pub use enrich::{
 pub use field::HoverField;
 pub use format::format_dimension_coord;
 pub use hit::{HitResult, resolve_hit_coordinates, resolve_target_screen_pos};
-pub use raycast_sphere::{get_normalized_radial_dr, raycast_sphere, sphere_target_pos};
-pub use raycast_surface::{get_normalized_surface_height, raycast_surface, surface_target_pos};
+pub use raycast_sphere::{raycast_sphere, sphere_target_pos};
+pub use raycast_surface::{raycast_surface, surface_target_pos};
 pub use raycast_volume::{VolumeSampler, volume_target_pos};
 pub use sample_1d::{draw_line_guidelines_and_reticle, sample_line_series, screen_to_norm_1d};
 pub use sample_2d::Transform2D;
@@ -39,11 +42,15 @@ mod composite_tests;
 #[cfg(test)]
 mod flip_tests;
 #[cfg(test)]
+mod raycast_edge_tests;
+#[cfg(test)]
+mod raycast_tests;
+#[cfg(test)]
 mod tests;
 
 use crate::app::OctantApp;
 use crate::app::overlays::MAX_OVERLAYS;
-use crate::data::{DatasetMetadata, MatrixData, VariableInfo};
+use crate::data::{DatasetMetadata, VariableInfo};
 use crate::plots::PlotType;
 use crate::utils::colormap::evaluate_color_cpu;
 use card::{Anchoring, HoverCard, HoverValue, LayerValue};
@@ -77,7 +84,9 @@ pub fn show_hover_tooltip(
         return;
     }
 
-    let Some((camera, hit)) = resolve_hit(app, matrix, sampler.as_ref(), rect, hover_pos) else {
+    let Some((camera, hit)) =
+        hit_cache::resolve_hit(app, ctx, matrix, sampler.as_ref(), rect, hover_pos)
+    else {
         return;
     };
 
@@ -112,7 +121,6 @@ pub fn show_hover_tooltip(
         &transform_2d,
         px,
         py,
-        raw_val,
         hit.point_3d,
     );
 
@@ -131,30 +139,6 @@ pub fn show_hover_tooltip(
         pixel,
         &dim_entries,
     );
-}
-
-fn resolve_hit(
-    app: &OctantApp,
-    matrix: Option<&MatrixData>,
-    sampler: Option<&VolumeSampler>,
-    rect: Rect,
-    hover_pos: Pos2,
-) -> Option<(Camera3D, HitResult)> {
-    let camera = Camera3D::from_app(app, rect);
-    let transform_2d = Transform2D::from_app(app, rect);
-    let hit = resolve_hit_coordinates(
-        app,
-        matrix,
-        &camera,
-        sampler,
-        &transform_2d,
-        rect,
-        hover_pos,
-    );
-    if !hit.is_valid {
-        return None;
-    }
-    Some((camera, hit))
 }
 
 fn resolve_hover_target_info(

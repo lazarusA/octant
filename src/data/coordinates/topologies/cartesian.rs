@@ -108,9 +108,13 @@ impl GridTopology for CartesianTopology {
                 let u = ((query_lon - lon_min) / span_lon).clamp(0.0, 1.0);
                 let v = ((lat_max - lat_rad) / span_lat).clamp(0.0, 1.0);
 
-                let px = ((u * w as f32).floor() as usize).min(w.saturating_sub(1));
-                let py = ((v * h as f32).floor() as usize).min(h.saturating_sub(1));
-                Some((px, py))
+                // Cell centers lie at `px / (w - 1)` of the bounds
+                // (`cell_center_lon_lat_rad`); pick the nearest one.
+                let nearest = |t: f32, n: usize| {
+                    let last = n.saturating_sub(1);
+                    ((t * last as f32).round() as usize).min(last)
+                };
+                Some((nearest(u, w), nearest(v, h)))
             }
         }
     }

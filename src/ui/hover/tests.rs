@@ -145,7 +145,6 @@ fn test_volume_target_pos_and_entries_without_matrix_data() {
         &transform_2d,
         px,
         py,
-        raw_val,
         hit.point_3d,
     );
 
