@@ -82,7 +82,8 @@ impl Mesh3DRenderer {
             has_reference_globe: 0,
             lon_bounds: [-std::f32::consts::PI, std::f32::consts::PI],
             lat_bounds: [-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2],
-            _pad: [0; 2],
+            flip_height: 0,
+            _pad: 0,
             color: super::common::PlotColorParams::default(),
         };
 
@@ -196,7 +197,8 @@ impl Mesh3DRenderer {
             has_reference_globe: if params.has_reference_globe { 1 } else { 0 },
             lon_bounds: params.lon_bounds,
             lat_bounds: params.lat_bounds,
-            _pad: [0; 2],
+            flip_height: u32::from(params.flip_height),
+            _pad: 0,
             color: params.color,
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));

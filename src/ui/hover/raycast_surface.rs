@@ -3,15 +3,26 @@
 use crate::app::OctantApp;
 use crate::data::MatrixData;
 use crate::ui::hover::camera::Camera3D;
+use crate::utils::height::HeightScale;
 use egui::Pos2;
+
+/// How the base layer's values map to heights on the sphere or the surface.
+pub fn height_scale(app: &OctantApp, sphere: bool) -> HeightScale {
+    let base = &app.layers.base;
+    HeightScale {
+        cmin: base.color.range_min,
+        cmax: base.color.range_max,
+        composite: base.composite.enabled,
+        flip: app.plot_configs.mesh.heights(sphere).2,
+    }
+}
 
 /// Computes normalized surface height on the 3D surface mesh matching surface.wgsl
 #[inline]
 pub fn get_normalized_surface_height(app: &OctantApp, val: f32) -> f32 {
-    crate::utils::math::compute_normalized_surface_height(
+    crate::utils::height::surface_height(
         val,
-        app.layers.base.color.range_min,
-        app.layers.base.color.range_max,
+        &height_scale(app, false),
         app.plot_configs.mesh.surface_mode,
         app.plot_configs.mesh.surface_displacement,
     )

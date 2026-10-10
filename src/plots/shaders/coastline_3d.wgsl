@@ -16,7 +16,8 @@ struct Coastline3DUniforms {
     color: vec4<f32>,
     _pad_color: vec2<u32>,
     color_range: vec2<f32>,
-    _pad: vec2<u32>,
+    flip_height: u32,
+    composite: u32,
     _pad_tail: vec2<u32>,
 };
 
@@ -35,22 +36,18 @@ struct VertexOutput {
     @location(1) uv: vec2<f32>,
 };
 
-fn normalized_height(value: f32) -> f32 {
-    if (value != value) {
-        return 0.0;
-    }
-    let cmin = coastline_uniforms.color_range.x;
-    let cmax = coastline_uniforms.color_range.y;
-    let range = max(cmax - cmin, 1e-6);
-    if (cmin < 0.0 && cmax > 0.0) {
-        let max_abs = max(abs(cmin), abs(cmax));
-        return clamp(value / max_abs, -1.0, 1.0);
-    }
-    return clamp((value - cmin) / range, 0.0, 1.0);
+fn coastline_height(value: f32) -> f32 {
+    return normalized_height(
+        value,
+        coastline_uniforms.color_range.x,
+        coastline_uniforms.color_range.y,
+        coastline_uniforms.composite == 1u,
+        coastline_uniforms.flip_height == 1u,
+    );
 }
 
 fn surface_height(value: f32) -> f32 {
-    let normalized = normalized_height(value);
+    let normalized = coastline_height(value);
     if (coastline_uniforms.plot_mode == 1u) {
         return normalized * 0.6 * coastline_uniforms.displacement_strength;
     }
@@ -58,7 +55,7 @@ fn surface_height(value: f32) -> f32 {
 }
 
 fn radial_height(value: f32) -> f32 {
-    return normalized_height(value) * 0.4 * coastline_uniforms.displacement_strength;
+    return coastline_height(value) * 0.4 * coastline_uniforms.displacement_strength;
 }
 
 fn invalid_vertex() -> VertexOutput {

@@ -104,7 +104,10 @@ pub struct Coastline3DUniforms {
     pub color: [f32; 4],
     pub _pad_color: [u32; 2],
     pub color_range: [f32; 2],
-    pub _pad: [u32; 2],
+    /// 1 when heights are flipped (`utils::height::HeightScale::flip`).
+    pub flip_height: u32,
+    /// 1 when heights come from RGB composite colors.
+    pub composite: u32,
     pub _pad_tail: [u32; 2],
 }
 
@@ -124,6 +127,8 @@ pub struct Coastline3DParams {
     pub lat_bounds: [f32; 2],
     pub color: [f32; 4],
     pub color_range: [f32; 2],
+    pub flip_height: bool,
+    pub composite: bool,
 }
 
 // ---------------------------------------------------------------------------

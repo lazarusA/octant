@@ -77,25 +77,17 @@ impl OctantApp {
     }
 
     fn paint_mesh(&self, ui: &egui::Ui, layer: &Layer, plot_type: PlotType, view: &CanvasView) {
-        let (renderer, mode, displacement, cube_mode_idx) = match plot_type {
-            PlotType::Sphere => (
-                &layer.renderers.sphere,
-                self.plot_configs.mesh.sphere_mode,
-                self.plot_configs.mesh.sphere_displacement,
-                3,
-            ),
-            _ => (
-                &layer.renderers.surface,
-                self.plot_configs.mesh.surface_mode,
-                self.plot_configs.mesh.surface_displacement,
-                2,
-            ),
+        let sphere = plot_type == PlotType::Sphere;
+        let (renderer, cube_mode_idx) = if sphere {
+            (&layer.renderers.sphere, 3)
+        } else {
+            (&layer.renderers.surface, 2)
         };
         let Some(renderer) = renderer else {
             return;
         };
         let aspect_ratio = crate::plots::common::compute_aspect_ratio(&view.plot_rect);
-        let params = self.get_mesh_3d_uniform_params(layer, mode, displacement, aspect_ratio);
+        let params = self.get_mesh_3d_uniform_params(layer, sphere, aspect_ratio);
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.plot_rect,
             crate::plots::Mesh3DCallback {

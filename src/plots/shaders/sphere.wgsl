@@ -11,7 +11,8 @@ struct Uniforms {
     has_reference_globe: u32,
     lon_bounds: vec2<f32>,
     lat_bounds: vec2<f32>,
-    _pad: vec2<u32>,
+    flip_height: u32,
+    _pad: u32,
     color: ColorUniforms,
 };
 
@@ -33,20 +34,20 @@ struct VertexOutput {
     @location(1) val: f32,
     @location(2) normal: vec3<f32>,
     @location(3) world_pos: vec3<f32>,
+    // RGB composite color, interpolated per channel: the packed value in
+    // `val` must never be blended between vertices.
+    @location(4) rgb: vec3<f32>,
 };
 
 fn get_normalized_radial_dr(val: f32) -> f32 {
-    let cmin = uniforms.color.cmin;
-    let cmax = uniforms.color.cmax;
-    let range = max(cmax - cmin, 1e-6);
-
-    if (cmin < 0.0 && cmax > 0.0) {
-        let max_abs = max(abs(cmin), abs(cmax));
-        return clamp(val / max_abs, -1.0, 1.0) * 0.4 * uniforms.displacement_strength;
-    } else {
-        let norm_val = clamp((val - cmin) / range, 0.0, 1.0);
-        return norm_val * 0.4 * uniforms.displacement_strength;
-    }
+    let h = normalized_height(
+        val,
+        uniforms.color.cmin,
+        uniforms.color.cmax,
+        uniforms.color.colormap == COLORMAP_RGB_COMPOSITE,
+        uniforms.flip_height == 1u,
+    );
+    return h * 0.4 * uniforms.displacement_strength;
 }
 
 @vertex
@@ -128,6 +129,7 @@ fn vs_main(
     out.position = project_perspective(pos_rot, uniforms.aspect_ratio, uniforms.zoom, 1.6, 1.1);
     out.uv = model.uv;
     out.val = raw_val;
+    out.rgb = unpack_composite_rgb(raw_val);
     out.normal = norm_rot;
     out.world_pos = pos_rot;
 
@@ -136,7 +138,10 @@ fn vs_main(
 
 // Lit, colormapped fragment color (straight alpha).
 fn shade(in: VertexOutput) -> vec4<f32> {
-    let eval_color = evaluate_plot_color(in.val, uniforms.color);
+    var eval_color = evaluate_plot_color(in.val, uniforms.color);
+    if (uniforms.color.colormap == COLORMAP_RGB_COMPOSITE && eval_color.a > 0.0) {
+        eval_color = vec4<f32>(in.rgb, eval_color.a);
+    }
 
     if (eval_color.a < 0.01) {
         discard;

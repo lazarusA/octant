@@ -10,18 +10,8 @@ pub fn get_normalized_radial_dr(app: &OctantApp, val: f32) -> f32 {
     if val.is_nan() || !val.is_finite() || app.plot_configs.mesh.sphere_mode == 0 {
         return 0.0;
     }
-    let cmin = app.layers.base.color.range_min;
-    let cmax = app.layers.base.color.range_max;
-    let range = (cmax - cmin).max(1e-6);
     let disp = app.plot_configs.mesh.sphere_displacement;
-
-    if cmin < 0.0 && cmax > 0.0 {
-        let max_abs = cmin.abs().max(cmax.abs());
-        (val / max_abs).clamp(-1.0, 1.0) * 0.4 * disp
-    } else {
-        let norm_val = ((val - cmin) / range).clamp(0.0, 1.0);
-        norm_val * 0.4 * disp
-    }
+    super::raycast_surface::height_scale(app, true).normalized(val) * 0.4 * disp
 }
 
 /// Raycasts against the 3D unit sphere/terrain globe.
@@ -39,7 +29,13 @@ pub fn raycast_sphere(
     let dz = view_ray.dir[2];
 
     let max_r = if app.plot_configs.mesh.sphere_mode > 0 {
-        1.0 + 0.4 * app.plot_configs.mesh.sphere_displacement
+        // A flipped range spanning zero rises up to twice as high.
+        let top = if app.plot_configs.mesh.sphere_flip_height {
+            2.0
+        } else {
+            1.0
+        };
+        1.0 + 0.4 * top * app.plot_configs.mesh.sphere_displacement
     } else {
         1.0
     };
