@@ -1,241 +1,358 @@
 # Octant Architecture Overview
 
-Octant is a high-performance interactive visualization application for N-dimensional datasets (Zarr, Icechunk, NetCDF, etc.) built in Rust using [`eframe`/`egui`](https://github.com/emilk/egui) for the GUI and native [`wgpu`](https://github.com/gfx-rs/wgpu) for GPU rendering pipelines.
+Octant is a high-performance interactive visualization application for N-dimensional datasets (Zarr, Icechunk, NetCDF and GeoTIFF) built in Rust (Rust 2024 edition) using [`eframe`/`egui`](https://github.com/emilk/egui) for the immediate-mode GUI and native [`wgpu`](https://github.com/gfx-rs/wgpu) for GPU rendering pipelines.
 
 Repository: [https://github.com/lazarusA/octant](https://github.com/lazarusA/octant)
 
 ---
 
-## 🏗 High-Level Architecture & Data Flow
+## 1. High-Level Architecture & End-to-End Data Flow
 
-```
-                               ┌────────────────────────────────┐
-                               │   Store / Dataset Selection    │
-                               └───────────────┬────────────────┘
-                                               │
-                                               v
-                               ┌────────────────────────────────┐
-                               │        DatasetManager          │
-                               │  (StoreHandle & DataSources)   │
-                               └───────────────┬────────────────┘
-                                               │
-                                               v
-┌───────────────────────────────┐     ┌─────────────────────────┐
-│        BlockPrefetcher        │ ──► │       BlockCache        │
-│   (Background Thread Pool)    │     │   (LRU Memory Cache)    │
-└───────────────────────────────┘     └────────────┬────────────┘
-                                                   │
-                                                   v
-                                      ┌─────────────────────────┐
-                                      │       OctantBlock       │
-                                      │ (Resident N-D Hyperslab)│
-                                      └────────────┬────────────┘
-                                                   │
-                                                   v
-                                      ┌─────────────────────────┐
-                                      │       MatrixData        │
-                                      │(2D/3D Renderable Payload)│
-                                      └────────────┬────────────┘
-                                                   │
-                                                   v
-                                      ┌─────────────────────────┐
-                                      │      WGPU Renderers     │
-                                      │(Matrix, Volume, Sphere) │
-                                      └─────────────────────────┘
+The diagram below presents the core subsystems of Octant and how data flows from storage formats into GPU shaders, canvas interaction, and presentation.
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                   Storage & Ingestion Subsystem (src/data/backends/)             │
+│  ├── POSIX Local Files       ├── HTTP / S3 Range Requests                        │
+│  ├── Zarr v2 / v3 Arrays     ├── Icechunk Snapshot Datasets                      │
+│  ├── NetCDF-3 / NetCDF-4     └── GeoTIFF / Cloud-Optimized GeoTIFF (COG)         │
+└────────────────────────────────────────┬─────────────────────────────────────────┘
+                                         │ BlockStore trait (inspect, fetch_block, coords)
+                                         ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                        N-D Data Engine Subsystem (src/data/)                     │
+│  ├── BlockStore Trait        (inspect metadata, variable coordinates, fetch)     │
+│  ├── CoordinateLoader        (Background async coordinate axis streaming)        │
+│  ├── BlockPrefetcher         (Background thread pool for predictive fetch)      │
+│  ├── BlockCache              (LRU in-memory cache of resident OctantBlocks)      │
+│  ├── CoordBoundsCache        (Global coordinate domain bounds cache)             │
+│  ├── OctantBlock             (Resident N-D tensor slice with Arc<[f32]> storage) │
+│  └── Grid & Axis Orientation (Flips North-up, West-left, transposes lon/lat)     │
+└────────────────────────────────────────┬─────────────────────────────────────────┘
+                                         │ OctantBlock (Oriented resident tensor)
+                                         ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│             Layers & Slicing Subsystem (src/data/slicing/ & src/app/layers/)     │
+│  ├── Slicing Routines        (1D profiles, 2D planar hyperslabs, 3D volumes)     │
+│  ├── Compositing             (RGB / CMYK multi-channel composite blending)       │
+│  ├── LayerStack              (Base Layer + multi-variable Overlay alignment)     │
+│  ├── LayerData               (MatrixData, VolumeData, LineLayout)                │
+│  └── ColorStyle              (Colormap row index, dynamic/locked range, opacity) │
+└──────────────────┬─────────────────────────────────────────────┬─────────────────┘
+                   │ LayerData (tensors & geometry)              │ ColorStyle & LUT
+                   ▼                                             ▼
+┌──────────────────────────────────────────────┐ ┌─────────────────────────────────┐
+│     GPU Rendering Subsystem (src/plots/)     │ │ Shared Colormap Atlas @group(1) │
+│  ├── Heatmap / Flatmap Matrix Pipeline       │ │ (256×K RGBA8 texture shared by  │
+│  ├── 1D Multi-Series Line Plot Pipeline      │ │  all pipelines & CPU sampling)  │
+│  ├── 3D Displaced Mesh (Surface & Sphere)    │ └────────────────┬────────────────┘
+│  ├── 3D Raymarched Volume (DVR trilinear)    │                  │
+│  ├── 3D Point Cloud Billboard Pipeline       │                  │
+│  ├── Coastline Vector Boundary Overlays      │                  │
+│  └── Order-Independent Transparency (OIT)    │◄─────────────────┘
+└──────────────────────┬───────────────────────┘
+                       │ Render callbacks & offscreen frames
+                       ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│             Presentation & Canvas Subsystems (src/app/canvas/ & src/ui/)         │
+│  ├── Canvas Engine           (src/app/canvas/: viewport, axes, gestures, overlay)│
+│  ├── Plot Controllers        (src/app/controllers/: polymorphic plot navigation) │
+│  ├── Immediate-Mode UI       (src/ui/: top bar, bottom timeline, panels, modals) │
+│  ├── Hover Inspector         (src/ui/hover/: cell sampling, raycasts, reticle)   │
+│  └── Figure Export           (src/export/: PNG, WebP P3, SVG, PDF, clipboard)    │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📁 Directory Structure & Key Modules
+## 2. Low-Level Pipeline Lifecycle & Execution Sequence
+
+The breakdown below traces the exact types, asynchronous channels, LRU caches, memory representations, uniform layouts, and GPU passes that power Octant's frame cycle.
+
+```text
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        Detailed Frame Lifecycle & Data Flow                            │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+
+Phase 1: Store Discovery & Async Inspection
+│
+├── 1. User submits path/URI or Drag-and-Drop file
+│   └── SourceFactory::open(source) -> StoreHandle
+├── 2. Background channel inspection (std::sync::mpsc)
+│   └── BlockStore::inspect() -> DatasetMetadata (dimensions, variables, attributes)
+└── 3. Background coordinate loading
+    ├── CoordinateLoader::request_variable_coordinates(var)
+    └── BlockStore::variable_coordinates() -> CoordValues (Regular, Values, Labels)
+        └── coordinates_revision bumped on arrival
+
+Phase 2: Hyperslab Request & LRU Block Cache
+│
+├── 1. Staged VariableSelection (roles, slice ranges, animation step)
+├── 2. Cache key lookup: BlockCache::get(BlockKey)
+│   ├── Cache Hit: Returns Arc<OctantBlock> immediately
+│   └── Cache Miss:
+│       ├── BlockPrefetcher::request_block(SliceRequest)
+│       ├── Background worker reads BlockStore::fetch_block() -> OctantBlock
+│       └── Inserted into LRU BlockCache (evicts least recently used blocks)
+└── 3. Grid & Axis Orientation
+    └── check_and_orient_block_grid(OctantBlock, OrientHints)
+        ├── Transposes lon-first blocks (lon, lat) -> (lat, lon)
+        └── Reverses coordinates for North-up and West-left display
+
+Phase 3: Slicing & LayerStack Compositing
+│
+├── 1. Hyperslab extraction from oriented block:
+│   ├── 2D Heatmap / Flatmap -> MatrixData (width, height, Arc<[f32]>, GridTopology)
+│   ├── 3D Volume -> VolumeData (width, height, depth, validity mask)
+│   └── 1D Line Plot -> LineLayout::lines() (strided multi-series sample buffer)
+├── 2. LayerStack synchronization:
+│   └── Syncs base layer & overlay layers (SameGrid, Geo, IndexOnly alignments)
+└── 3. Color styling:
+    └── ColorStyle resolves colormap atlas row, data bounds (min/max), and opacity curve
+
+Phase 4: GPU Uniform Assembly & Render Execution
+│
+├── 1. Colormap Atlas update:
+│   └── colormap_atlas::prepare() uploads dirty rows to shared 256×K RGBA8 texture
+├── 2. Viewport calculation (src/app/canvas/viewport.rs):
+│   └── Computes aspect scaling, pan/zoom uniforms, and screen-space plot rect
+├── 3. Render pass execution (src/plots/):
+│   ├── 2D Heatmap / 1D Line: Direct WGPU paint callback with transformed uniforms
+│   ├── 3D Volume DVR: Screen-aligned raymarching with trilinear filtering & jitter
+│   └── 3D Mesh / Point Cloud with OIT:
+│       ├── Pass 1 (fs_opaque): Writes depth for opaque texels (alpha >= 0.995)
+│       ├── Pass 2 (fs_oit): Accumulates weighted color (Rgba16Float) + revealage (R16Float)
+│       └── Pass 3: Fullscreen composite blit into egui canvas rect
+└── 4. Coastline geographic vector overlay projected into dataset domain
+
+Phase 5: Canvas Compositor, Inspection & Export
+│
+├── 1. Dynamic plot axes & ticks rendered with coordinate-aware formatting
+├── 2. Floating colorbar panels rendered per active layer
+├── 3. Hover sampling & reticle crosshair (cell extraction or 3D volume raycast)
+├── 4. Interactive ROI crop overlay and camera capture flash
+└── 5. Export engine: figures encoded to PNG, WebP (Display P3), SVG, PDF, or clipboard
+```
+
+---
+
+## 3. Directory Structure & Key Subsystems
 
 ```
 src/
-├── app/                  # Application state, event loop, and data orchestration
-├── data/                 # N-dimensional data system, caching, and backends
-│   └── backends/         # Format-specific storage backends (Zarr, Icechunk)
-├── plots/                # WGPU renderers, shaders, and 3D pipelines
-├── ui/                   # egui GUI panels, overlays, and controls
-├── utils/                # Grid orientation, coordinate discovery, and metadata
-└── catalog/              # Pre-configured dataset catalog entries
+├── app/                  # Application state, orchestration, and paint dispatch
+│   ├── block_loading/    # Hyperslab requests, async coordination, projection
+│   ├── canvas/           # Decoupled canvas engine: viewport, interactions, axes, overlays
+│   ├── controllers/      # Per-plot-type controllers (Line, Volume, Heatmap, Mesh, PointCloud)
+│   ├── layers/           # LayerStack, Layer, alignment, styles, sources
+│   ├── pipeline/         # GPU pipeline rebuilds, aspect ratio math, uniform assembly
+│   ├── state/            # Decomposed states: NavigationState, PlaybackState, PlotConfigs, UiLayoutState
+│   ├── actions.rs        # AppAction event-driven state mutation
+│   ├── data_loading.rs   # Store inspection delegation
+│   ├── export_lifecycle.rs # In-flight figure export and screenshot processing
+│   ├── floating.rs       # Floating overlay panels and colorbars
+│   ├── overlays.rs       # Multi-layer overlay alignment and lifecycle
+│   └── ui.rs             # eframe::App immediate-mode main loop (< 190 lines)
+├── data/                 # Format-agnostic N-D data system & storage engine
+│   ├── backends/         # Storage backends: geotiff, zarr, icechunk, netcdf, procedural
+│   ├── blocks/           # LRU BlockCache, BlockPrefetcher, CoordinateLoader, BlockStore trait
+│   ├── calibration/      # NetCDF scale_factor, add_offset calibration
+│   ├── codecs/           # Pure-Rust Blosc and Zstandard codec plugins for zarrs
+│   ├── coordinates/      # Topology, coordinate ordering, DGGS, HEALPix, regular axes
+│   ├── dataset/          # DatasetManager, StoreHandle, DataSource factory
+│   ├── metadata/         # DatasetMetadata, VariableInfo, CoordValues (Regular/Values/Labels)
+│   ├── procedural/       # Synthetic HEALPix spherical and 3D datasets
+│   ├── render/           # MatrixData, VolumeData, downsampled MatrixPyramid
+│   ├── slicing/          # 1D/2D/3D hyperslab extraction, RGB/CMYK composites
+│   └── octant_block.rs   # In-memory resident N-D hyperslab representation
+├── plots/                # WGPU renderers, WGSL shaders, and graphics pipelines
+│   ├── coastline/        # Coastline 2D & 3D vector boundary overlays
+│   ├── line/             # 1D line payload generation and multi-series curves
+│   ├── oit/              # Weighted-blended order-independent transparency passes
+│   ├── volume/           # 3D DVR raymarching, 8-tap filter, jitter, lighting, textures
+│   ├── colormap_atlas.rs # Shared 256×K RGBA8 texture atlas bound at @group(1)
+│   ├── heatmap.rs        # 2D heatmap matrix renderer
+│   ├── mesh.rs           # 3D displaced mesh renderer (Surface & Sphere)
+│   ├── point_cloud.rs    # 3D billboarded point cloud renderer
+│   └── traits.rs         # PlotRenderer polymorphic trait and HoverSample
+├── ui/                   # egui GUI panels, widgets, and canvas overlays
+│   ├── about/            # About modal and virtualized license viewer
+│   ├── bottom_bar/       # Animation playback timeline, step sliders, status badges
+│   ├── catalog/          # Dataset catalog modal with category filters
+│   ├── colorbar/         # Multi-layer colorbar panels, tick formatting, series bar
+│   ├── colormap/         # Colormap picker, custom colorgrad editor, swatch atlas
+│   ├── hover/            # Canvas crosshairs, value inspection, multi-layer rows
+│   ├── settings/         # Rendering controls, clipping, layer stack manager
+│   ├── store/            # Left panel for store selection, URI inputs, cache stats
+│   ├── top_bar/          # Navigation header with responsive priority collapse
+│   ├── variables_panel/  # Dimension role selectors (X, Y, Z, Anim), range sliders
+│   └── axes.rs           # Dynamic plot axes, grid lines, and tick generators
+├── utils/                # Colormaps, coordinate discovery, math, and diagnostics
+│   ├── colormap/         # LUT evaluation, colormap catalog, opacity alpha curves
+│   ├── grid.rs           # Axis flipping and orientation logic
+│   └── grid_flips.rs     # Spatial dimension reorientation hints
+├── export/               # Figure export engine: PNG, WebP (Display P3), SVG, PDF, clipboard
+└── catalog/              # Static built-in dataset definitions (GeoTIFF, Zarr, Icechunk)
 ```
 
 ---
 
-### 1. [`src/app/`](https://github.com/lazarusA/octant/tree/main/src/app) — Application State & Orchestration
+## 4. Modular Design Principles & Human Maintainability
 
-The `app` module manages main event loops, UI state, background tasks, and player controls.
+Octant's architecture follows strict separation of concerns, high cohesion, and the Open-Closed Principle (OCP). Each file is constrained to `< 250 lines` and each function to `< 50 lines`.
 
-- **[`state.rs`](https://github.com/lazarusA/octant/blob/main/src/app/state.rs)** & **[`mod.rs`](https://github.com/lazarusA/octant/blob/main/src/app/mod.rs)**: Defines `OctantApp`, holding global app state (selected store kind, target URI, active dataset metadata, dimension role configurations, colormaps, plot types, playback controls, `DatasetManager`, `BlockCache`, and `BlockPrefetcher`).
-- **[`ui.rs`](https://github.com/lazarusA/octant/blob/main/src/app/ui.rs)**: Main `eframe::App::ui` entry point. Polling background prefetch results, timer animation loops, panel layouts, dynamic aspect ratio canvas allocation, and hover tooltip rendering.
-- **[`data_loading.rs`](https://github.com/lazarusA/octant/blob/main/src/app/data_loading.rs)**: Non-blocking background metadata inspection (`inspect_active_store`).
-- **[`block_loading.rs`](https://github.com/lazarusA/octant/blob/main/src/app/block_loading.rs)**: N-dimensional block loading (`load_selected_variable_block`), windowed hyperslab boundary calculations along animated dimensions, axis re-orientation via grid coordinates, and draining prefetcher results.
-- **[`actions.rs`](https://github.com/lazarusA/octant/blob/main/src/app/actions.rs)**: `AppAction` event dispatch system for clean state mutation.
+### The 4 Modular Pillars
 
----
+```text
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                           Architectural Pillars in Octant                        │
+└──────────────────────────────────────────────────────────────────────────────────┘
 
-### 2. [`src/data/`](https://github.com/lazarusA/octant/tree/main/src/data) — Data System, Caching, and Backends
+  1. State Decomposition (src/app/state/)
+     ├── NavigationState: Camera orbit, 2D pan/zoom, resets, interaction flags
+     ├── PlaybackState: Timestep navigation, FPS, playback loop, timers
+     ├── PlotConfigs: Typed configs (Line, Volume, Mesh, PointCloud)
+     └── UiLayoutState: Panel visibility toggles, search, layout widths
 
-The `data` module provides a format-agnostic abstraction for loading, caching, and projecting N-dimensional hyperslabs into renderable payloads.
+  2. Decoupled Canvas Engine (src/app/canvas/)
+     ├── viewport.rs: Aspect ratio scaling, screen-space rect calculation
+     ├── interactions.rs: Gesture dispatching delegating to PlotController
+     ├── axes.rs: Coordinate tick generation, domain resolution, title placement
+     ├── overlays.rs: Capture flash, interactive ROI crop tool, drag cue
+     └── mod.rs: Single-point canvas coordinator (< 90 lines)
 
-- **[`metadata.rs`](https://github.com/lazarusA/octant/blob/main/src/data/metadata.rs)**: Defines `DatasetMetadata` and `VariableInfo` for store inspection, variable discovery, shapes, dimensions, and `.zattrs` attributes.
-- **[`octant_block.rs`](https://github.com/lazarusA/octant/blob/main/src/data/octant_block.rs)**: Resident in-memory representation of an N-dimensional block (`OctantBlock`).
-  - Format-agnostic representation of arbitrary rank $N$.
-  - Row-major stride indexing with fast element lookup (`get()`).
-  - Projections: 2D slice (`slice_2d()`) into `MatrixData` and 3D volume (`volume()`).
-- **[`block_store.rs`](https://github.com/lazarusA/octant/blob/main/src/data/block_store.rs)**: `BlockStore` trait defining unified backend capabilities (`backend_name`, `variables`, `inspect`, `fetch_block`, `fetch_blocks`).
-- **[`store_handle.rs`](https://github.com/lazarusA/octant/blob/main/src/data/store_handle.rs)**: Thread-safe `StoreHandle` wrapping a `DataSource` and `Arc<dyn BlockStore>`.
-- **[`dataset.rs`](https://github.com/lazarusA/octant/blob/main/src/data/dataset.rs)** & **[`dataset_manager.rs`](https://github.com/lazarusA/octant/blob/main/src/data/dataset_manager.rs)**: `DatasetManager` holds open `Dataset` instances keyed by unique `source_id`, preventing duplicate storage handle creation and preserving metadata for instant UI reactivation.
-- **[`block_cache.rs`](https://github.com/lazarusA/octant/blob/main/src/data/block_cache.rs)**: LRU memory cache (`BlockCache`) for resident `OctantBlock` hyperslabs keyed by `BlockCacheKey`.
-- **[`block_prefetch.rs`](https://github.com/lazarusA/octant/blob/main/src/data/block_prefetch.rs)**: Non-blocking background worker thread pool (`BlockPrefetcher`) for windowed lookahead prefetching along animated dimensions.
-- **[`slice_request.rs`](https://github.com/lazarusA/octant/blob/main/src/data/slice_request.rs)** & **[`block_request.rs`](https://github.com/lazarusA/octant/blob/main/src/data/block_request.rs)**: Hyperslab selection specifications (`DimensionSelection::Range` vs `Index`) and block request batches.
-- **[`matrix_data.rs`](https://github.com/lazarusA/octant/blob/main/src/data/matrix_data.rs)**: Standardized 2D/3D matrix data payload passed directly to GPU renderers.
-- **[`source_factory.rs`](https://github.com/lazarusA/octant/blob/main/src/data/source_factory.rs)**: `SourceFactory::open(source)` initializing backend `StoreHandle` instances based on `DataSourceKind`.
+  3. Polymorphic Plot Controllers (src/app/controllers/)
+     ├── PlotController trait: View reset, navigation math, capabilities
+     ├── Singletons: HeatmapController, LineController, VolumeController, etc.
+     └── controller_for(): Zero-allocation O(1) controller lookup
 
-#### Storage Backends ([`src/data/backends/`](https://github.com/lazarusA/octant/tree/main/src/data/backends))
-- **[`backends/zarr.rs`](https://github.com/lazarusA/octant/blob/main/src/data/backends/zarr.rs)**: `ZarrBlockStore` implementing `BlockStore` for local Zarr directories and remote HTTP/S3 Zarr endpoints.
-- **[`backends/icechunk.rs`](https://github.com/lazarusA/octant/blob/main/src/data/backends/icechunk.rs)**: `IcechunkBlockStore` implementing `BlockStore` for Icechunk transactional stores.
-- **[`backends/zarr_block.rs`](https://github.com/lazarusA/octant/blob/main/src/data/backends/zarr_block.rs)**: Zarr array hyperslab extraction logic.
-- **[`backends/zarr_storage.rs`](https://github.com/lazarusA/octant/blob/main/src/data/backends/zarr_storage.rs)** & **[`backends/icechunk_storage.rs`](https://github.com/lazarusA/octant/blob/main/src/data/backends/icechunk_storage.rs)**: Synchronous storage handle builders (`build_sync_store`, `open_local_storage`, `build_sync_icechunk_store`).
+  4. Isolated Frame Lifecycle (src/app/export_lifecycle.rs & actions.rs)
+     ├── export_lifecycle.rs: In-flight figure encoding and screenshot captures
+     └── actions.rs: Event-driven AppAction dispatching
+```
 
----
+### Why Feature Additions Touch Only 1–3 Files
 
-### 3. [`src/plots/`](https://github.com/lazarusA/octant/tree/main/src/plots) — WGPU Rendering Engine
-
-Custom WGPU rendering pipelines for high-performance GPU visualization.
-
-- **[`plot_type.rs`](https://github.com/lazarusA/octant/blob/main/src/plots/plot_type.rs)**: `PlotType` enum (`Matrix`, `Line`, `Sphere`, `Surface`, `Volume`, `PointCloud`).
-- **[`matrix.rs`](https://github.com/lazarusA/octant/blob/main/src/plots/matrix.rs)**: 2D Heatmap matrix visualization with custom shaders, colormap sampling, NaN color masking, and clipping.
-- **[`line.rs`](https://github.com/lazarusA/octant/blob/main/src/plots/line.rs)**: 1D Line profile renderer.
-- **[`sphere.rs`](https://github.com/lazarusA/octant/blob/main/src/plots/sphere.rs)**: 3D Global spherical projection (equirectangular mapping with dynamic height displacement).
-- **[`surface.rs`](https://github.com/lazarusA/octant/blob/main/src/plots/surface.rs)**: 3D Mesh surface plot with elevation displacement.
-- **[`volume.rs`](https://github.com/lazarusA/octant/blob/main/src/plots/volume.rs)**: 3D Volumetric raymarching and isosurface extraction pipeline.
-- **[`point_cloud.rs`](https://github.com/lazarusA/octant/blob/main/src/plots/point_cloud.rs)**: 3D Point cloud scatter plot.
+By decoupling presentation, navigation, and configuration from the top-level application struct, changes are strictly localized:
+- **Adding a new plot type**: Implement `PlotRenderer` in `src/plots/`, implement `PlotController` in `src/app/controllers/`, and add its typed config to `PlotConfigs`.
+- **Modifying camera navigation or gestures**: Update the specific controller in `src/app/controllers/` without touching `ui.rs`, rendering pipelines, or other plot types.
+- **Adjusting viewport scaling or axes**: Handled entirely inside `src/app/canvas/viewport.rs` or `src/app/canvas/axes.rs`.
 
 ---
 
-### 4. [`src/ui/`](https://github.com/lazarusA/octant/tree/main/src/ui) — GUI Overlays & Panels (`egui`)
+## 5. Core Architectural Subsystems
 
-Modular UI components integrated with `OctantApp`.
+```text
+                    ┌────────────────────────────────────────────────────────┐
+                    │                   Subsystem Architecture               │
+                    └────────────────────────────────────────────────────────┘
 
-- **[`store.rs`](https://github.com/lazarusA/octant/blob/main/src/ui/store.rs)**: Left collapsible panel. Store selection, URI input, active **Dataset Manager** list with instant dataset reactivation, and RAM cache statistics.
-- **[`variables.rs`](https://github.com/lazarusA/octant/blob/main/src/ui/variables.rs)**: Floating variable overlay listing variables in the active store.
-- **[`variables_panel.rs`](https://github.com/lazarusA/octant/blob/main/src/ui/variables_panel.rs)**: Controls panel for mapping dimensions to spatial roles ($X, Y, Z$) or Animation, double-slider hyperslab range selection, and variable metadata inspection.
-- **[`top_bar.rs`](https://github.com/lazarusA/octant/blob/main/src/ui/top_bar.rs)**: Header navigation bar with plot type selectors, colormap dropdowns, catalog overlay triggers, and cache settings.
-- **[`bottom_bar.rs`](https://github.com/lazarusA/octant/blob/main/src/ui/bottom_bar.rs)**: Animation playback controls, step sliders, timeline date bounds, and non-blocking status badges.
-- **[`colorbar.rs`](https://github.com/lazarusA/octant/blob/main/src/ui/colorbar.rs)**: Overlay displaying active colormaps, data ranges, NaN colors, and clipping bounds.
-- **[`hover_tooltip.rs`](https://github.com/lazarusA/octant/blob/main/src/ui/hover_tooltip.rs)**: Crosshair canvas reticle and mouse hover value inspector.
-- **[`catalog.rs`](https://github.com/lazarusA/octant/blob/main/src/ui/catalog.rs)**: Sample dataset catalog overlay.
+     ┌───────────────────────────────────────────────────────────────────────────────┐
+     │                       App State Subsystems (src/app/state/)                   │
+     │  - NavigationState (camera orbit, pan, zoom, gestures)                        │
+     │  - PlaybackState (animation step, fps, loop, timer)                           │
+     │  - UiLayoutState (overlay toggles, panel positions, search, theme)            │
+     │  - PlotConfigs (typed LinePlotConfig, VolumePlotConfig, MeshPlotConfig, etc.) │
+     │  - LayerStack (Base + Overlays)                                               │
+     └──────────────────────────────────────┬────────────────────────────────────────┘
+                                            │ Dispatches to active
+                                            v
+     ┌───────────────────────────────────────────────────────────────────────────────┐
+     │            Polymorphic Plot Controllers (src/app/controllers/)                │
+     │                                                                               │
+     │  pub trait PlotController: Send + Sync {                                      │
+     │      fn plot_type(&self) -> PlotType;                                         │
+     │      fn is_3d(&self) -> bool;                                                 │
+     │      fn reset_view(&self, nav: &mut NavigationState);                         │
+     │      fn handle_drag(&self, nav: &mut NavigationState, delta: Vec2);           │
+     │      fn handle_scroll(&self, nav: &mut NavigationState, scroll: f32, ...);    │
+     │      fn draws_coastlines(&self) -> bool;                                      │
+     │      fn draws_categories(&self) -> bool;                                      │
+     │  }                                                                            │
+     └──────────────────────────────────────┬────────────────────────────────────────┘
+                                            │
+               ┌────────────────────────────┼───────────────────────────┐
+               v                            v                           v
+     ┌───────────────────┐        ┌───────────────────┐       ┌───────────────────┐
+     │ HeatmapController │        │  LineController   │       │ VolumeController  │
+     │ (src/app/         │        │ (src/app/         │       │ (src/app/         │
+     │  controllers/     │        │  controllers/     │       │  controllers/     │
+     │  heatmap.rs)      │        │  line.rs)         │       │  volume.rs)       │
+     └───────────────────┘        └───────────────────┘       └───────────────────┘
+               │                            │                           │
+               └────────────────────────────┼───────────────────────────┘
+                                            v
+     ┌───────────────────────────────────────────────────────────────────────────────┐
+     │                 Decoupled Canvas Subsystem (src/app/canvas/)                  │
+     │  - viewport.rs: compute_viewport_uniforms (aspect scaling, rect transforms)   │
+     │  - interactions.rs: handle_canvas_interactions (delegates to PlotController)  │
+     │  - axes.rs: draw_canvas_axes (2D / 1D axis labels and ticks)                  │
+     │  - overlays.rs: draw_canvas_overlays (capture flash, crop frame, drag cue)    │
+     │  - mod.rs: render_canvas entrypoint (< 90 lines)                              │
+     └───────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Detailed Subsystem Responsibilities
+
+#### 1. Componentized App States (`src/app/state/`)
+The fields of `OctantApp` are decomposed into cohesive sub-states:
+- `NavigationState`: 2D `heatmap_pan`, `heatmap_zoom`, `line_pan`, `line_zoom`, 3D `sphere_rotation_x/y`, `sphere_zoom`.
+- `PlaybackState`: `is_playing`, `playback_fps`, `loop_playback`, `last_step_time`, `current_timestep`.
+- `UiLayoutState`: `show_left_panel`, `show_variables_overlay`, `show_settings_panel`, `panel_positions`, search query.
+- `PlotConfigs`: Holds typed configuration structs (`LinePlotConfig`, `VolumePlotConfig`, `MeshPlotConfig`, `PointCloudPlotConfig`) instead of loose primitive fields.
+
+#### 2. Plot Controllers (`src/app/controllers/`)
+Pure GPU graphics pipelines live in `src/plots/`, while interaction handling, navigation math, and plot capabilities live in `src/app/controllers/`:
+- `src/app/controllers/traits.rs`: Defines the `PlotController` trait.
+- `src/app/controllers/heatmap.rs`: Encapsulates 2D flatmap planar drag and zoom.
+- `src/app/controllers/line.rs`: Encapsulates 1D profile drag and zoom.
+- `src/app/controllers/volume.rs`: Encapsulates 3D raymarching orbit and zoom.
+- `src/app/controllers/mesh.rs`: Encapsulates Surface and Sphere 3D mesh orbit and zoom.
+- `src/app/controllers/point_cloud.rs`: Encapsulates 3D point cloud orbit and zoom.
+- `src/app/controllers/mod.rs`: Singleton dispatcher `controller_for(plot_type) -> &'static dyn PlotController`.
+
+#### 3. Decoupled Canvas Engine (`src/app/canvas/`)
+`src/app/ui.rs` is reduced from 660+ lines to under 190 lines, with canvas orchestration separated into focused submodules (< 120 lines each):
+- `src/app/canvas/viewport.rs`: Viewport dimensions, canvas rect computation, GPU aspect ratio scaling.
+- `src/app/canvas/interactions.rs`: Mouse drag, wheel zoom, double-click reset, delegating to `PlotController`.
+- `src/app/canvas/axes.rs`: Computes plot rect scaling, axis domains, and renders ticks/titles.
+- `src/app/canvas/overlays.rs`: Capture flash, interactive ROI crop overlay, drag-and-drop cue.
+- `src/app/canvas/mod.rs`: `render_canvas` entrypoint.
 
 ---
 
-### 5. [`src/utils/`](https://github.com/lazarusA/octant/tree/main/src/utils) — Grid, Coordinates & Utilities
+## 6. Guidelines for Extending Octant
 
-- **[`coordinates.rs`](https://github.com/lazarusA/octant/blob/main/src/utils/coordinates.rs)**: Rank-aware spatial coordinate candidate discovery (`get_cached_coord_bounds_with_rank`), searching latitude ($Y$, `rank - 2`) and longitude ($X$, `rank - 1`) coordinate arrays.
-- **[`grid.rs`](https://github.com/lazarusA/octant/blob/main/src/utils/grid.rs)**: Grid orientation and axis flipping (`check_and_orient_axes_with_coords`) to ensure North-up and East-right spatial alignment.
-- **[`metadata.rs`](https://github.com/lazarusA/octant/blob/main/src/utils/metadata.rs)**: Consolidated Zarr/Icechunk store variable and group attribute extractor.
-
----
-
-## 🚀 Guidelines for Extending Octant
-
-### Adding a New Storage Backend (e.g. NetCDF or GeoTIFF)
-1. Create `src/data/backends/your_backend.rs`.
-2. Implement the [`BlockStore`](https://github.com/lazarusA/octant/blob/main/src/data/block_store.rs) trait:
+### Adding a New Storage Backend (e.g. HDF5 or Cloud-Optimized Formats)
+1. Create `src/data/backends/your_backend/`.
+2. Implement the [`BlockStore`](https://github.com/lazarusA/octant/blob/main/src/data/blocks/store.rs) trait:
    - `backend_name(&self) -> &str`
    - `inspect(&self) -> Result<DatasetMetadata, BlockStoreError>`
    - `fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError>`
-3. Add the new variant to `DataSourceKind` in [`data_source.rs`](https://github.com/lazarusA/octant/blob/main/src/data/data_source.rs) and wire it in [`SourceFactory::open`](https://github.com/lazarusA/octant/blob/main/src/data/source_factory.rs).
+   - `variable_coordinates(&self, var_name: &str) -> Result<Vec<(String, CoordValues)>, BlockStoreError>`
+3. Add the variant to `DataSourceKind` in `src/data/dataset/source.rs` and wire it in `src/data/dataset/factory.rs`.
 
 ### Adding a New Plot Type or Renderer
-1. Add a new enum variant to `PlotType` in [`plot_type.rs`](https://github.com/lazarusA/octant/blob/main/src/plots/plot_type.rs).
-2. Create `src/plots/your_renderer.rs` implementing a WGPU rendering pipeline.
-3. Instantiate the renderer in `OctantApp::new` and dispatch rendering in [`src/app/ui.rs`](https://github.com/lazarusA/octant/blob/main/src/app/ui.rs).
+1. Add the enum variant to `PlotType` in `src/plots/mod.rs`.
+2. Create `src/plots/your_plot/` implementing the WGPU rendering pipeline (`PlotRenderer` trait).
+3. Create `src/app/controllers/your_plot.rs` implementing `PlotController` for camera navigation, view reset, and capabilities.
+4. If the plot has custom settings, add a typed config struct to `PlotConfigs` in `src/app/state/plot_configs.rs`.
+5. Wire into `LayerRenderers` (`src/app/layers/renderers.rs`) and `src/app/pipeline/paint_layer.rs`.
 
 ---
 
-## 🔮 Roadmap: Layers, Overlays, Operations & Multi-Scale (TODO)
+## 7. Layer & Multi-Scale Roadmap Status
 
-### Where we stand
+### Current Status
+- **Done: Plotted State in `LayerStack`**: Staged UI selection lives in `selected: VariableSelection`; Plot copies it to the base layer.
+- **Done: Same-Grid Overlays**: `alignment.rs` classifies overlays against the base layer (`SameGrid`, `Geo`, `IndexOnly`, `Incompatible`). Overlays render via `LayerStack` with individual opacity, colormaps, and colorbars.
+- **Done: 1D Line Profiles & Multi-Series**: Multi-series line plots (`All Lines Series`) with custom series colorbars and strided hover sampling.
+- **Done: Shared Colormap Atlas**: 256×K RGBA8 texture atlas shared across CPU evaluation and all GPU pipelines at `@group(1)`.
+- **Done: Order-Independent Transparency (OIT)**: Weighted blended transparency for overlapping meshes and translucent point clouds.
+- **Done: Modular State & Canvas Engine**: Decomposed app states (`NavigationState`, `PlaybackState`, `PlotConfigs`, `UiLayoutState`), decoupled canvas engine (`src/app/canvas/`), and polymorphic plot controllers (`src/app/controllers/`).
 
-- **Done (behavior unchanged):** plotted state lives in a `LayerStack` ([`src/app/layers/`](https://github.com/lazarusA/octant/tree/main/src/app/layers)). The UI's staged selection is `OctantApp::selected` (a `VariableSelection`); Plot copies it to the base layer, read through `OctantApp::plotted()`. Each `Layer` has a read-only `LayerId` given by the stack (`LayerId::BASE` for the base layer) and owns its `Source` (only `Source::Variable` so far), `LayerData`, `LayerRenderers`, `ColorStyle`, `CompositeStyle` and `LoadState`. Painting, OIT release, volume uploads and pyramid tile resampling loop over `LayerStack::iter`/`iter_mut`, and `ColorStyle::params` builds the shader color uniforms. `block_axes` places a selection inside a block, and `VariableSelection::slice_request` builds requests. All of these are pure or work per layer.
-- **Done: projection and paint per layer.** `apply_block_projection`, `apply_2d_projection`/`apply_3d_volume_projection`, `commit_volume_slab` and both pipeline rebuilds take a `LayerId` and write only that layer (`LayerStack::get`/`get_mut`). Coastline meshes and the line plot settings follow the base layer only. They read the layer's selection through `layer_selections` (`None` once the layer is gone): the base layer falls back to the staged `selected` until its first plot, as the `effective_*` helpers (now `layer_*(LayerId::BASE)`) always did, and other layers stage their own. `poll_block_prefetch_results` sends a requested block to the layer whose request it is (`find_by_key` returns its id) and any other block to the layer whose view it belongs to (`layer_showing_block`). `get_color_params`, `transparency_mode` and the mesh, volume and point cloud uniform getters take the `&Layer` they draw; the colormap picker's preview applies to the base layer only (`layer_colormap`). Volume data extents go through `ColorStyle::reset_to_extent`/`follow_extent` (which skip non-finite ends; the 2D rebuild still writes its extent inline, NaN included), and dirty volume planes through `LayerRenderers::mark_volume_dirty`.
-- **Done: requests per layer.** `load_layer_block(id)` loads a layer's block from its staged selection (`load_selected_variable_block` is the base layer's), through `LayerRequest` ([`layer_request.rs`](https://github.com/lazarusA/octant/blob/main/src/app/block_loading/layer_request.rs): `staged_layer_request`/`shown_layer_request`, store resolved only on fetch by `request_store`). The cache-hit path (`show_cached_block`, `project_cached_volume_blocks`), step windows (`prefetch_layer_window`), lookahead (`prefetch_layer_animated_range`, `prefetch_animated_ranges` for all) and coordinates (`request_layer_coordinates`; arriving coordinates merge into every layer of their dataset) take a `LayerId`. The current step is shared: only the base layer moves it, and an overlay shows `layer_step`, the step clamped into its own extent (requests and projection both use it). Playback, step navigation and `SetTimestep` follow the base layer's residency, then load the animated overlays (`load_step_blocks`); a base block that arrives for a new step reloads them too. Overlays don't yet match steps by coordinate value (TODO 3).
-- **Done: same-grid overlays (TODO 1).**
-  - [`alignment.rs`](https://github.com/lazarusA/octant/blob/main/src/app/layers/alignment.rs) classifies an overlay against the base heatmap: `SameGrid` (same X/Y dimension names, sizes, window and coordinates, or the same dataset), `Geo { lon, lat }` (on another longitude/latitude grid), `IndexOnly` (same shape, no coordinates to compare) or `Incompatible`. Only `SameGrid` draws. `overlay_selection` builds an overlay's selection by giving its dimensions the base's roles, ranges and indices by name.
-  - [`overlays.rs`](https://github.com/lazarusA/octant/blob/main/src/app/overlays.rs): `add_overlay` (at most `MAX_OVERLAYS` = 4, over a plotted heatmap, starting at 75% opacity with the first unused colormap of the curated `OVERLAY_COLORMAPS`: magma, cmocean ice, algae, amp, scientific lajolla, cmocean haline, scientific oslo, cmocean matter; refusals become toasts), `remove_overlay`, `sync_overlays_to_base` (from `sync_plotted_state_from_selected`: overlays follow a new base window in place, `follow_base_window`, without cloning metadata, and reload only when it moved, not on a playback step; an overlay whose coordinates are still on their way is added undrawn and loads once aligned) and `refresh_alignments` (also when coordinates arrive). `Layer::visible` and `Layer::alignment` decide `Layer::is_drawn`; painting, colorbars and hover rows skip layers that aren't drawn. `LayerStack::remove`, `move_overlay`, `base_and_overlay_mut` and `drawn_ids` manage the stack; only drawn layers load, prefetch and resample.
-  - `ColorStyle` holds each layer's colormap, `reversed` and `smooth`, `alpha_at`/`is_translucent`. The colormap picker edits `ColormapState::target` (`picker_layer`, `picker_style(_mut)`; `None` is the base layer, which the toolbar's picker edits) and previews on that layer.
-  - UI: in the Dimensions panel's second header row, turning on the "Add Overlay" toggle makes "Plot Data" fetch the variable as an overlay (the toggle turns off after each add; each variable overlays once, and the toggle is disabled with the reason while it can't); a Layers menu in Settings listing every layer, base included (overlays: eye toggle, move up/down, `ui.close_button` remove, alignment note; every layer: colormap swatch opening the picker on it, opacity, its own RGB composite controls and Color menu; a new overlay gets composite defaults for its own variable, and its hover row names its composite); one colorbar per drawn layer stacked upward from the base's (`colorbar/panel.rs`, ids salted by `LayerId`); one hover row per drawn overlay under the headline value (`hover/overlays.rs`, `hover/card/layers.rs`, read at the base cell since overlays share the grid).
-- **Still tied to the base layer:** axis labels, aspect ratios, volume shifts and export (the view frame is the base layer's). The composite label cache keys on the plotted selection only, since overlays draw no composites yet.
-- **Decisions taken:** the plot type is part of the selection, and the canvas type is the base layer's; overlays are heatmaps over a heatmap base. Each layer has its own Color menu: its `ColorStyle` holds the colormap, reversal, smoothing, range, scale, NaN and clip colors, label, opacity and opacity curve (one registry row per layer, freed on removal); the 3D transparency toggles and the colorbar visibility stay app-wide. Settings for each plot type (`sphere_mode`, `volume_*`, `line_*`) stay on the app until overlays of those plot types exist.
-
-### Model to grow into
-
-```rust
-enum Source {
-    Variable(VariableSelection),                              // exists
-    Channel  { source, dim, index },                          // u/v or bands of one variable
-    Derived  { expr: Expr, inputs: Vec<SourceId>, target },   // var3 = f(var1, var2)
-    Reduce   { source, dim, op },                             // time mean, anomaly base
-    Mosaic   { members },                                     // nested global + regional datasets
-}
-// Each layer then gets a style: Scalar (ColorStyle), Rgb (CompositeStyle),
-// Vectors { u, v, glyph, color_by }, Bivariate { x, y, lut, ranges }
-```
-
-Sources produce arrays aligned to a grid; layers draw one or more sources in a style. Every source variant carries a `VariableSelection` for the dimensions it is shown on.
-
-### TODO, in order
-
-1. ~~**Same-grid overlays.**~~ Done (see "Where we stand").
-2. **Overlays for every plot type** (line, surface, sphere, volume, point cloud; today overlays are heatmaps over a heatmap).
-   - **Rule first:** an overlay takes the canvas plot type (the base layer's). Mixed types (a point cloud over a volume) come later. Each type then needs:
-     - **Line:** several series in one plot. `get_line_profile_payload` builds one payload from the base layer and `paint_line` draws one `LineCallback` per layer, so give the line renderer a series per drawn layer (its colormap's mid color or a series color), a legend, and a second y-axis when units differ.
-     - **Surface and sphere:** one mesh per layer from its own `MatrixData`. Same grid: draw at the base's geometry with a small radial or height offset per layer to avoid z-fighting, and let the opacity curve and OIT make them translucent.
-     - **Volume:** several raymarched volumes on one canvas do not composite (each blits a full frame). Same grid: upload overlays as extra channels of the base's 3D textures and raymarch them together in one pass, each channel with its own colormap row, opacity and curve.
-     - **Point cloud:** one point set per layer in the same OIT frame.
-   - **What the current state needs to adapt:**
-     - `alignment::classify` and `overlay_selection` require and force `PlotType::Heatmap`: classify against the canvas plot type, keep the overlay's plot type equal to the base's, and add the Z dimension to the axes that must match for 3D types.
-     - `overlay_unavailable` refuses non-heatmap canvases; it becomes per type as each type gains support (one place to lift).
-     - `sync_overlays_to_base` must re-derive overlays when the base's plot type changes (`switch_plot_type`), not only its window, and reload them through the 2D or 3D projection.
-     - Projection is already per layer (`apply_block_projection` picks 2D or 3D from the layer's staged plot type; volumes go through `commit_volume_slab` and `LayerRenderers::mark_volume_dirty`), and `LayerRenderers` already holds every renderer per layer. `flush_volume_uploads` sends each layer's dirty planes to its own renderer.
-     - Plot-type settings live on the app (`sphere_mode`, `surface_*`, `volume_*`, `line_*`, displacement strength): keep them app-wide for geometry and camera, but move what styles a layer (point size, line color, volume density and algorithm per layer) into a per-layer plot style, shown in that layer's entry of the Layers menu.
-     - Transparency: OIT state is per renderer (`OitSlot`), so two translucent meshes or point clouds composite separately and in the wrong order. Share one OIT frame per canvas: every drawn layer accumulates into it, then one composite.
-     - Hover: 3D hits (`raycast_surface`, `raycast_sphere`, `raycast_volume`, `VolumeSampler`) read the base layer. With same-grid overlays, sample each overlay at the hit's grid cell or voxel (as `overlay_values` does for heatmaps) and show its row; line plots show one row per series at the hovered index.
-     - Colorbars already stack per layer; composites (RGB volumes) keep none. The 3D aspect ratio and volume shifts (`pipeline/aspect.rs`) stay the base's, since overlays share its grid.
-3. **Overlays across datasets (regional on global).**
-   - Draw `Alignment::Geo` overlays (their extent is already classified) and `IndexOnly` ones on request.
-   - Place an overlay with the heatmap's `tile_bounds`: the overlay's lon/lat bounding box normalized into the base layer's lon/lat frame, as coastlines already do with `dataset_geo_bounds`.
-   - Normalize longitude conventions (0–360 vs −180–180), and split quads that cross the antimeridian.
-   - The pyramid resampler also writes `tile_bounds`, so combine the two, or give overlays no pyramid at first.
-   - Match time and level by coordinate value (nearest within a tolerance, using `CoordValues`), not by index. Show a "nearest" note when they differ.
-   - Allow regular and 1D-irregular overlays first. Curvilinear and HEALPix work only as the base until the shader handles them.
-   - The view frame is the base layer's; a "fit all layers" option can come later.
-   - Sphere and surface overlays: a second mesh renderer using its own lon/lat bounds (`has_reference_globe`), a small radial offset, and OIT.
-4. **Operations (`Source::Derived`).**
-   - Compute on the CPU from each step's projected 2D slices; the result is a `MatrixData` that every renderer already draws.
-   - Same grid: element by element. Mixed grids: regrid onto a chosen target grid (nearest or bilinear over lon/lat).
-   - Cache results in an LRU keyed by the input block keys, the expression's hash and each source's `metadata_generation`.
-   - Write our own small AST, evaluated one whole array per node, with NaN propagating (+ − × ÷, comparisons, where/mask, abs, sqrt, log, hypot, atan2, clamp). Start with a fixed menu of operations, then free-form text.
-   - Derive units for the simple cases, warn when + or − mixes units, and reject cycles.
-   - `Source::Reduce` (time mean, anomalies) loads the animated range; it comes later.
-5. **Bivariate maps.** Look each cell up in a 2D color table on the CPU and draw the result through the existing RGB composite path (`COLORMAP_RGB_COMPOSITE`). Its legend is a 2D square. A GPU version (two data buffers plus a dedicated 2D lookup texture, not more colormap-atlas rows) can follow.
-6. **Vector fields (u, v).**
-   - Magnitude and direction need nothing new: they are derived sources (`hypot`, `atan2` with a cyclic colormap).
-   - Arrows: a new `VectorRenderer` that instances arrows on the GPU and pulls `u`/`v` from storage buffers (as the AGENTS.md rules require for grid data), sampled at a stride that follows the zoom.
-   - Streamlines: CPU line meshes, which the rules allow.
-   - Mind screen-y vs north, block flips (`flipped_dims`), tangent frames on the sphere, and grid-relative components on rotated or curvilinear grids.
-   - Dense textures and animated particles come last.
-7. **Multi-scale exploration.**
-   - Give `Source::Variable` an optional `ScaleLevels` ladder:
-     - OME-NGFF multiscales: today each level is listed as its own variable; group them instead.
-     - GeoTIFF overviews: today each overview is listed as its own variable; group them instead.
-     - Zarr and Icechunk multiscale groups.
-     - Keep `MatrixPyramid` as the fallback for data already in memory.
-   - Widen `slice_request` into a view request (visible bounding box, pixels, step). It picks the coarsest level with at least one cell per pixel and a chunk-aligned window.
-   - Refine progressively: a coarse backdrop for the whole area plus a fine viewport tile, both layers of the same source.
-   - Request only after the view settles (`view_interacting`). Play back at the coarse level and refine when paused.
-   - Base the color range on a stable reference (the coarsest level's or `valid_min`/`valid_max`), not on the current tile.
-   - Label operations computed from coarser data with their level, and offer an "exact" mode.
-   - Categorical data needs levels built with the mode, not the mean.
-   - Then add `Source::Mosaic` for nested datasets.
-8. **Later:** mixed plot types per canvas (an overlay of another type than the base), and saving and restoring sessions (serialize sources and layers).
+### Next Roadmap Objectives
+1. **Multi-Plot Overlays**: Extend overlays beyond heatmaps to 3D volumes (multi-channel texture raymarching) and surfaces.
+2. **Cross-Dataset Geographic Overlays**: Render `Alignment::Geo` overlays with normalized longitude conventions and bounding box placement.
+3. **Derived Sources & Operations (`Source::Derived`)**: CPU/GPU algebraic expressions across variables (e.g., wind speed from $u$ and $v$).
+4. **Multi-Scale Viewport Level-of-Detail**: Progressive multiscale loading for large-scale OME-NGFF and GeoTIFF overviews.
