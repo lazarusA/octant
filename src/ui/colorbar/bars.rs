@@ -36,6 +36,17 @@ pub struct BarColors {
     pub text: Color32,
 }
 
+impl BarColors {
+    /// The colors of the current theme.
+    pub fn from_visuals(visuals: &egui::Visuals) -> Self {
+        Self {
+            border: visuals.widgets.noninteractive.fg_stroke.color,
+            strong_text: visuals.strong_text_color(),
+            text: visuals.text_color(),
+        }
+    }
+}
+
 /// Categories shown without unique values: ten even bins of the range.
 fn fallback_categories(min: f32, max: f32) -> [f32; 10] {
     let span = (max - min).max(1e-30);

@@ -171,14 +171,10 @@ fn bar_row(
 /// triangles (the colors follow the lines, not the values), and the hovered
 /// line's coordinate as tooltip.
 fn series_bar_row(app: &OctantApp, ui: &egui::Ui, axis: BarAxis, response: egui::Response) {
-    let colors = BarColors {
-        border: ui.visuals().widgets.noninteractive.fg_stroke.color,
-        strong_text: ui.visuals().strong_text_color(),
-        text: ui.visuals().text_color(),
-    };
+    let colors = BarColors::from_visuals(ui.visuals());
     series::draw(app, ui, axis, app.layer_colormap(&app.layers.base), colors);
     if let Some(pos) = response.hover_pos() {
-        response.on_hover_text(series::hover_text(app, axis.t_at(pos)));
+        series::show_hover_text(app, response, axis.t_at(pos));
     }
 }
 
@@ -192,12 +188,7 @@ fn paint_bar(
     hover: Option<Pos2>,
 ) -> Option<f32> {
     let layer = app.layers.get(id)?;
-    let visuals = ui.visuals();
-    let colors = BarColors {
-        border: visuals.widgets.noninteractive.fg_stroke.color,
-        strong_text: visuals.strong_text_color(),
-        text: visuals.text_color(),
-    };
+    let colors = BarColors::from_visuals(ui.visuals());
     let style = &layer.color;
     let bar = BarStyle {
         color: style,

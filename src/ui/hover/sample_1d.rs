@@ -1,6 +1,6 @@
 //! 1D Line plot series lookup, inverse projection, and guideline painting.
 
-use crate::app::OctantApp;
+use crate::app::{LineLayout, OctantApp};
 use egui::{Context, Pos2, Rect, Stroke, Ui};
 
 /// Computes normalized `(nx, ny)` coordinates from screen position for 1D line charts.
@@ -20,16 +20,17 @@ pub fn screen_to_norm_1d(app: &OctantApp, rect: Rect, hover_pos: Pos2) -> (f32, 
     (nx, ny)
 }
 
-/// Finds the closest line series value at the sampled X location.
+/// Finds the closest line series value at the sampled X location, reading
+/// the lines of `layout` in `values` (`OctantApp::line_layout`).
 /// Returns `(sample_idx, best_line_idx, val)`.
 pub fn sample_line_series(
     app: &OctantApp,
     norm_x: f32,
     norm_y: f32,
-    profile_values: &[f32],
-    prof_len: usize,
-    l_count: usize,
+    values: &[f32],
+    layout: LineLayout,
 ) -> (usize, usize, f32) {
+    let (prof_len, l_count) = (layout.profile_length, layout.line_count);
     let sample_idx = if prof_len > 1 {
         ((norm_x * (prof_len - 1) as f32) + 0.5) as usize
     } else {
@@ -47,11 +48,8 @@ pub fn sample_line_series(
 
     if l_count > 0 {
         for line_idx in 0..l_count {
-            let idx = line_idx * prof_len + sample_idx;
-            if let Some(&v) = profile_values.get(idx)
-                && !v.is_nan()
-                && v.is_finite()
-            {
+            let v = layout.value(values, line_idx, sample_idx);
+            if v.is_finite() {
                 let norm_y_val = (((v - cmin) / range) * 2.0 - 1.0).clamp(-1.0, 1.0);
                 let dist = (norm_y_val - (norm_y * 2.0 - 1.0)).abs();
                 if dist < best_dist {
@@ -66,7 +64,7 @@ pub fn sample_line_series(
     let val = if !best_val.is_nan() {
         best_val
     } else {
-        profile_values.get(sample_idx).copied().unwrap_or(f32::NAN)
+        layout.value(values, 0, sample_idx)
     };
 
     (sample_idx, best_line_idx, val)
@@ -81,8 +79,7 @@ pub fn draw_line_guidelines_and_reticle(
     px: usize,
     raw_val: f32,
 ) {
-    let (_, profile_length, _) = app.get_line_profile_payload();
-    let prof_len = profile_length as usize;
+    let prof_len = app.line_layout().1.profile_length;
     let norm_x_step = if prof_len > 1 {
         px as f32 / (prof_len - 1) as f32
     } else {

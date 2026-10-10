@@ -34,5 +34,6 @@ mod ui;
 
 #[allow(unused_imports)] // used by tests and the library, not the binary
 pub use layers::VariableSelection;
-pub use state::line_series::{series_line_at, series_t};
+pub use state::line_profile::LineLayout;
+pub use state::line_series::{LineColoring, series_line_at, series_t};
 pub use state::{AnimationRole, DimConfig, OctantApp, SpatialRole, StoreKind};

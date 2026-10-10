@@ -11,8 +11,9 @@ use egui::{Mesh, Shape, Stroke};
 use super::axis::BarAxis;
 use super::bars::{self, BarColors};
 use crate::app::{OctantApp, series_line_at, series_t};
-use crate::ui::hover::entries_1d::series_field;
+use crate::ui::hover::entries_1d::{series_dim, series_field};
 use crate::utils::colormap::{orient, registry};
+use crate::utils::stack_str;
 
 /// Lines labeled at most, spread evenly from the first to the last.
 const MAX_LABELS: usize = 5;
@@ -40,7 +41,7 @@ pub(super) fn draw(
     colors: BarColors,
 ) {
     let style = &app.layers.base.color;
-    let (n, categorical) = (app.line_series_count(), style.categorical);
+    let (n, categorical) = (app.line_layout().1.line_count, style.categorical);
     let color_at = |t: f32| registry::sample(colormap, orient(t, style.reversed));
     let swatches = categorical && n <= MAX_SWATCHES;
     let mut mesh = Mesh::default();
@@ -72,34 +73,30 @@ pub(super) fn draw(
     }
 }
 
-/// The hover text at bar position `t`: the coordinate of the line drawn there.
-pub(super) fn hover_text(app: &OctantApp, t: f32) -> String {
-    let n = app.line_series_count();
+/// Shows the coordinate of the line drawn at bar position `t` as tooltip.
+pub(super) fn show_hover_text(app: &OctantApp, response: egui::Response, t: f32) {
+    let n = app.line_layout().1.line_count;
     let line = series_line_at(t, n, app.layers.base.color.categorical);
     let plotted = app.plotted();
-    let (field, _) = series_field(
-        app,
-        plotted.metadata.as_ref(),
-        plotted.variable_info(),
-        line,
-        n,
-    );
-    format!("{}: {}", field.label, field.value)
+    let var = plotted.variable_info();
+    let (field, _) = series_field(app, plotted.metadata.as_ref(), var, line, n);
+    let mut buf = [0u8; 96];
+    let text = stack_str(&mut buf, format_args!("{}: {}", field.label, field.value));
+    response.on_hover_text(text);
 }
 
 /// The labeled lines, formatted only when the series or its coordinates
 /// change (kept in egui temp memory).
 fn ticks(app: &OctantApp, ctx: &egui::Context, n: usize, categorical: bool) -> Arc<[SeriesTick]> {
     let plotted = app.plotted();
-    let base = &app.layers.base;
+    // Everything the labels read: the dataset and its coordinates, and where
+    // the series dimension's window sits (its roles, range and flip).
     let mut hasher = DefaultHasher::new();
     (
         (plotted.metadata_generation, app.coordinates_revision),
         (plotted.store_target.as_str(), plotted.variable_idx),
-        &plotted.dim_ranges,
-        base.load.slice_request.as_ref().map(|r| &r.selections),
-        &base.data.flipped_dims,
-        (app.line_profile_dim_idx, n, categorical),
+        series_dim(app, plotted.variable_info()),
+        (n, categorical),
     )
         .hash(&mut hasher);
     let key = hasher.finish();

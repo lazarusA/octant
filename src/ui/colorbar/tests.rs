@@ -108,3 +108,16 @@ fn test_colorbar_transparency_default() {
     let app = OctantApp::default();
     assert_eq!(app.colorbar_transparency, 0.0);
 }
+
+#[test]
+fn log_ticks_end_for_infinite_and_huge_ranges() {
+    let ticks = generate_colorbar_ticks(1.0, f32::INFINITY, 1, 1.0);
+    assert!(ticks.iter().any(|t| t.is_major));
+    let wide = generate_colorbar_ticks(1e-30, 1e30, 1, 1.0);
+    assert!(
+        wide.iter().all(|t| t.is_major),
+        "no minor ticks past 16 decades"
+    );
+    let narrow = generate_colorbar_ticks(1.0, 1e4, 1, 1.0);
+    assert!(narrow.iter().any(|t| !t.is_major));
+}

@@ -19,9 +19,24 @@ impl ColorbarTick {
     };
 }
 
-/// Enough ticks for any finite `f32` log range: 86 decades of one major and
-/// eight minor ticks, plus both ends.
-pub const MAX_TICKS: usize = 800;
+/// Decades of `f32`, from its smallest subnormal to its largest value: log
+/// ranges are clamped to them, so an infinite bound still ends the loop.
+const F32_DECADES: (i32, i32) = (-46, 39);
+/// Widest log range (in decades) that gets minor ticks; past it they would
+/// sit a pixel or two apart.
+const MINOR_DECADES: i32 = 16;
+/// Room for every tick: a log range with minor ticks (its decades plus one on
+/// either side, nine ticks each), or one major tick per `f32` decade, plus
+/// both ends.
+const MAX_TICKS: usize = {
+    let with_minor = (MINOR_DECADES as usize + 2) * 9 + 2;
+    let majors = (F32_DECADES.1 - F32_DECADES.0) as usize + 2 + 2;
+    if with_minor > majors {
+        with_minor
+    } else {
+        majors
+    }
+};
 
 /// A bar's ticks in a stack array, so drawing them allocates nothing.
 pub struct ColorbarTicks {
@@ -91,8 +106,10 @@ pub fn generate_colorbar_ticks(
         };
 
         if log_range >= 0.8 {
-            let dec_start = log_min.floor() as i32;
-            let dec_end = log_max.ceil() as i32;
+            let (lo, hi) = F32_DECADES;
+            let dec_start = (log_min.floor() as i32).clamp(lo, hi);
+            let dec_end = (log_max.ceil() as i32).clamp(lo, hi);
+            let minor = dec_end - dec_start <= MINOR_DECADES;
 
             for dec in (dec_start - 1)..=dec_end {
                 let base = 10.0_f32.powi(dec);
@@ -110,7 +127,7 @@ pub fn generate_colorbar_ticks(
                 }
 
                 // Minor ticks at m * 10^dec for m in 2..9
-                for m in 2..10 {
+                for m in (2..10).filter(|_| minor) {
                     let m_val = m as f32 * base;
                     if m_val > safe_min && m_val < safe_max {
                         let norm_linear = ((m_val.log10() - log_min) / log_range).clamp(0.0, 1.0);

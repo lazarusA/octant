@@ -123,7 +123,7 @@ pub fn show_hover_tooltip(
         hover_pos,
         target_pos,
         canvas_plot_type,
-        resolve_hover_color(app, canvas_plot_type, raw_val, py),
+        resolve_hover_color(app, raw_val, py),
         HoverValue::from_raw(raw_val, composite),
         var_name,
         var,
@@ -189,15 +189,10 @@ fn resolve_hover_target_info(
 
 /// The card's swatch: the color `raw_val` is drawn in, or on a line plot
 /// colored by series, the color of series line `line`.
-fn resolve_hover_color(
-    app: &OctantApp,
-    canvas_plot_type: PlotType,
-    raw_val: f32,
-    line: usize,
-) -> Color32 {
+fn resolve_hover_color(app: &OctantApp, raw_val: f32, line: usize) -> Color32 {
     if app.line_series_colored() {
         app.line_series_color(line)
-    } else if canvas_plot_type == PlotType::Line && app.line_use_custom_color {
+    } else if app.line_custom_colored() {
         let [r, g, b, a] = app.line_color.map(|c| (c * 255.0).clamp(0.0, 255.0) as u8);
         Color32::from_rgba_unmultiplied(r, g, b, a)
     } else {

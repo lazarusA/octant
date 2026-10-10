@@ -1,7 +1,7 @@
 //! Which settings change the plot on the canvas: one table, read by every
 //! settings section, so the panel shows only what the renderer honors.
 
-use crate::app::OctantApp;
+use crate::app::{LineColoring, OctantApp};
 use crate::plots::PlotType;
 
 /// Volume algorithms (`VolumeUniformParams::algorithm`) the table tells apart.
@@ -163,26 +163,25 @@ impl PlotState {
     fn categorical(&self) -> Support {
         if !self.plot_type.draws_categories() {
             Support::No
-        } else if self.plot_type == PlotType::Line
-            && self.line_all_series
-            && !self.line_custom_color
-        {
+        } else if self.line_coloring() == Some(LineColoring::Series) {
             Support::Yes
         } else {
             self.color_mapping()
         }
     }
 
+    /// How the plot colors its lines, when it is a line plot.
+    fn line_coloring(&self) -> Option<LineColoring> {
+        (self.plot_type == PlotType::Line)
+            .then(|| LineColoring::of(self.line_custom_color, self.line_all_series))
+    }
+
     /// The line settings that replace the colormap, when the plot is a line.
     fn line_override(&self) -> Option<Support> {
-        if self.plot_type != PlotType::Line {
-            None
-        } else if self.line_custom_color {
-            Some(Support::Overridden(CUSTOM_COLOR))
-        } else if self.line_all_series {
-            Some(Support::Overridden(ALL_SERIES))
-        } else {
-            None
+        match self.line_coloring()? {
+            LineColoring::Custom => Some(Support::Overridden(CUSTOM_COLOR)),
+            LineColoring::Series => Some(Support::Overridden(ALL_SERIES)),
+            LineColoring::Values => None,
         }
     }
 

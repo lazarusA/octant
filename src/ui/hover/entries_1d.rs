@@ -16,12 +16,10 @@ pub(crate) fn resolve_line_plot_entries(
     norm_x: f32,
     norm_y: f32,
 ) -> (f32, Vec<HoverField>, usize, usize) {
-    let (profile_values, profile_length, line_count) = app.get_line_profile_payload();
-    let prof_len = profile_length as usize;
-    let l_count = line_count as usize;
+    let (values, layout) = app.line_layout();
+    let (prof_len, l_count) = (layout.profile_length, layout.line_count);
 
-    let (sample_idx, best_line_idx, val) =
-        sample_line_series(app, norm_x, norm_y, &profile_values, prof_len, l_count);
+    let (sample_idx, best_line_idx, val) = sample_line_series(app, norm_x, norm_y, values, layout);
     let mut used_dims = HashSet::new();
 
     let (dim_name, prof_dim_idx) = resolve_line_profile_dim(app, var);
@@ -115,6 +113,38 @@ fn enrich_line_series_ortho_dim(
     used_dims.extend(dim);
 }
 
+/// The dimension series lines run across, placed in the plotted window: its
+/// index, the window's first index and the dimension's length, and whether
+/// blocks flipped it.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub(crate) struct SeriesDim {
+    pub index: usize,
+    pub origin: usize,
+    pub len: usize,
+    pub flipped: bool,
+}
+
+/// The dimension the lines of `var`'s line plot run across: Y for rows, X
+/// for columns, none for rays along Z.
+pub(crate) fn series_dim(app: &OctantApp, var: Option<&VariableInfo>) -> Option<SeriesDim> {
+    let v = var?;
+    let (explicit_x, explicit_y, _) = v.resolve_spatial_dim_indices(app.effective_dim_config());
+    let index = match app.line_profile_dim_idx {
+        0 => explicit_y,
+        1 => explicit_x,
+        _ => None,
+    }?;
+    let name = v.dimension_names.get(index)?;
+    let (origin, len) = get_dimension_origin_and_full_len(app, var, index);
+    let flipped = app.layers.base.data.flipped_dims.iter().any(|d| d == name);
+    Some(SeriesDim {
+        index,
+        origin,
+        len,
+        flipped,
+    })
+}
+
 /// Where series line `line` of `count` sits: the coordinate of the dimension
 /// the lines run across (with that dimension's index), else the line's index.
 pub(crate) fn series_field(
@@ -124,29 +154,16 @@ pub(crate) fn series_field(
     line: usize,
     count: usize,
 ) -> (HoverField, Option<usize>) {
-    let ortho = var.and_then(|v| {
-        let (explicit_x, explicit_y, _) = v.resolve_spatial_dim_indices(app.effective_dim_config());
-        let idx = match app.line_profile_dim_idx {
-            0 => explicit_y,
-            1 => explicit_x,
-            _ => None,
-        }?;
-        Some((v, idx, v.dimension_names.get(idx)?))
+    let named = var.zip(series_dim(app, var)).and_then(|(v, dim)| {
+        let name = v.dimension_names.get(dim.index)?;
+        Some((v, dim, name))
     });
-    let Some((v, o_idx, ortho_name)) = ortho else {
+    let Some((v, dim, name)) = named else {
         return (HoverField::index_of("series", line, count), None);
     };
-    let (origin_ortho, full_ortho_len) = get_dimension_origin_and_full_len(app, Some(v), o_idx);
-    let line_offset = stored_offset(app, ortho_name, line, count);
-    let global_ortho = (origin_ortho + line_offset).min(full_ortho_len.saturating_sub(1));
-    let field = format_dimension_coord(
-        meta,
-        Some(v),
-        Some(&app.plotted().store_target),
-        ortho_name,
-        global_ortho,
-        full_ortho_len,
-        None,
-    );
-    (field, Some(o_idx))
+    let offset = stored_offset(app, name, line, count);
+    let global = (dim.origin + offset).min(dim.len.saturating_sub(1));
+    let target = Some(app.plotted().store_target.as_str());
+    let field = format_dimension_coord(meta, Some(v), target, name, global, dim.len, None);
+    (field, Some(dim.index))
 }

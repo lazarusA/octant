@@ -7,6 +7,7 @@ pub mod app_state;
 pub mod colormap_state;
 pub mod dataset_activation;
 pub mod dimension_state;
+pub mod line_profile;
 pub mod line_series;
 mod notifications;
 pub mod plot_type;

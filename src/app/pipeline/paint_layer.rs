@@ -51,7 +51,7 @@ impl OctantApp {
             return;
         };
         let color_params = self.get_color_params(layer);
-        let (profile_values, profile_length, line_count) = self.get_line_profile_payload();
+        let payload = self.line_payload();
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.canvas_rect,
             crate::plots::LineCallback {
@@ -63,9 +63,10 @@ impl OctantApp {
                 show_points: self.line_show_points,
                 point_size: self.line_point_size,
                 rect: view.canvas_rect,
-                profile_values,
-                profile_length,
-                line_count,
+                profile_values: payload.values,
+                profile_length: payload.profile_length,
+                drawn_lines: payload.drawn_lines,
+                line_count: payload.line_count,
                 line_mode: if self.line_plot_all_series { 1 } else { 0 },
                 pan: view.pan,
                 zoom: view.zoom,

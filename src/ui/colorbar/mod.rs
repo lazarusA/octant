@@ -21,9 +21,7 @@ mod series;
 mod tests;
 pub mod ticks;
 
-pub use ticks::{
-    ColorbarTick, ColorbarTicks, ScientificTick, format_scientific_tick, generate_colorbar_ticks,
-};
+pub use ticks::{ColorbarTick, format_scientific_tick, generate_colorbar_ticks};
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;

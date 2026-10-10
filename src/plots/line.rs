@@ -336,8 +336,12 @@ pub struct LineCallback {
     pub show_points: bool,
     pub point_size: f32,
     pub rect: egui::Rect,
+    /// Each drawn line's index (`u32` bits), then its `profile_length` samples.
     pub profile_values: Vec<f32>,
     pub profile_length: u32,
+    /// Lines in `profile_values`.
+    pub drawn_lines: u32,
+    /// Lines in the plot, drawn or not (the series the colors spread over).
     pub line_count: u32,
     pub line_mode: u32,
     pub pan: [f32; 2],
@@ -398,16 +402,19 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         };
         rpass.set_bind_group(0, &guard.bind_group, &[]);
 
-        let profile_length = self.profile_length.max(2);
-        let line_count = self.line_count;
+        let line_count = self.drawn_lines;
         if line_count > 0 && !self.profile_values.is_empty() {
-            if self.show_lines {
+            // A single sample has no segment: only its point shows.
+            if self.show_lines && self.profile_length >= 2 {
                 rpass.set_pipeline(&self.renderer.render_pipeline);
-                rpass.draw(0..profile_length, 0..line_count);
+                rpass.draw(0..self.profile_length, 0..line_count);
             }
             if self.show_points {
+                // One point per sample: the shader splits instances by the
+                // uniform `profile_length` (at least 1).
+                let points = self.profile_length.max(1) * line_count;
                 rpass.set_pipeline(&self.renderer.scatter_pipeline);
-                rpass.draw(0..6, 0..(profile_length * line_count));
+                rpass.draw(0..6, 0..points);
             }
         }
     }

@@ -1,6 +1,7 @@
-//! How a line plot is colored: one custom color (no colorbar), by value, or
-//! by series (All Lines Series), where line `i` of `n` takes the colormap at
-//! `series_t(i, n, categorical)`, matching `line.wgsl` `series_t`.
+//! How a line plot is colored (`LineColoring`): one custom color (no
+//! colorbar), by value, or by series (All Lines Series), where line `i` of
+//! `n` takes the colormap at `series_t(i, n, categorical)`, matching
+//! `line.wgsl` `series_t`.
 
 use egui::Color32;
 
@@ -8,44 +9,52 @@ use super::app_state::OctantApp;
 use crate::plots::PlotType;
 use crate::utils::colormap::{orient, registry};
 
+/// What a line plot's colors come from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LineColoring {
+    /// Every line in the custom color.
+    Custom,
+    /// Each line by its place in the series (All Lines Series).
+    Series,
+    /// Each point by its value.
+    Values,
+}
+
+impl LineColoring {
+    /// The coloring the Custom Color and All Lines Series options choose.
+    pub fn of(custom_color: bool, all_series: bool) -> Self {
+        if custom_color {
+            Self::Custom
+        } else if all_series {
+            Self::Series
+        } else {
+            Self::Values
+        }
+    }
+}
+
 impl OctantApp {
+    /// The canvas line plot's coloring; `None` when the canvas is no line plot.
+    pub fn line_coloring(&self) -> Option<LineColoring> {
+        (self.effective_canvas_plot_type() == PlotType::Line)
+            .then(|| LineColoring::of(self.line_use_custom_color, self.line_plot_all_series))
+    }
+
     /// Whether the canvas line plot draws every line in the custom color.
     pub fn line_custom_colored(&self) -> bool {
-        self.effective_canvas_plot_type() == PlotType::Line && self.line_use_custom_color
+        self.line_coloring() == Some(LineColoring::Custom)
     }
 
-    /// Whether the canvas line plot colors each line by its place in the
-    /// series (All Lines Series without a custom color).
+    /// Whether the canvas line plot colors each line by its place in the series.
     pub fn line_series_colored(&self) -> bool {
-        self.effective_canvas_plot_type() == PlotType::Line
-            && self.line_plot_all_series
-            && !self.line_use_custom_color
-    }
-
-    /// Lines in `get_line_profile_payload`'s series, without building it.
-    pub fn line_series_count(&self) -> usize {
-        if !self.line_plot_all_series {
-            return 1;
-        }
-        if self.line_profile_dim_idx == 2
-            && let Some(vdata) = &self.layers.base.data.volume
-            && vdata.depth > 1
-        {
-            vdata.width * vdata.height
-        } else if let Some(matrix) = &self.layers.base.data.matrix {
-            match self.line_profile_dim_idx {
-                0 => matrix.height,
-                _ => matrix.width,
-            }
-        } else {
-            0
-        }
+        self.line_coloring() == Some(LineColoring::Series)
     }
 
     /// The color of series line `line`, as the line shader draws it.
     pub fn line_series_color(&self, line: usize) -> Color32 {
         let base = &self.layers.base;
-        let t = series_t(line, self.line_series_count(), base.color.categorical);
+        let n = self.line_layout().1.line_count;
+        let t = series_t(line, n, base.color.categorical);
         registry::sample(self.layer_colormap(base), orient(t, base.color.reversed))
     }
 }
@@ -74,7 +83,14 @@ pub fn series_line_at(t: f32, n: usize, categorical: bool) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{series_line_at, series_t};
+    use super::{LineColoring, series_line_at, series_t};
+
+    #[test]
+    fn custom_color_wins_over_all_series() {
+        assert_eq!(LineColoring::of(true, true), LineColoring::Custom);
+        assert_eq!(LineColoring::of(false, true), LineColoring::Series);
+        assert_eq!(LineColoring::of(false, false), LineColoring::Values);
+    }
 
     #[test]
     fn continuous_series_span_the_colormap() {

@@ -31,6 +31,7 @@ struct LineUniforms {
 };
 
 @group(0) @binding(0) var<uniform> uniforms: LineUniforms;
+// Each drawn line: its index in the plot (`u32` bits), then its samples.
 @group(0) @binding(1) var<storage, read> data_buffer: array<f32>;
 
 const CORNERS = array<vec2<f32>, 6>(
@@ -49,11 +50,11 @@ fn vs_main(
 ) -> LineVertexOutput {
     var out: LineVertexOutput;
     out.cell_index = vertex_idx;
-    out.line_index = instance_idx;
 
-    let line_offset = instance_idx * uniforms.profile_length;
+    let line_offset = instance_idx * (uniforms.profile_length + 1u);
     let max_data_idx = arrayLength(&data_buffer) - 1u;
-    let safe_idx = min(line_offset + vertex_idx, max_data_idx);
+    out.line_index = bitcast<u32>(data_buffer[min(line_offset, max_data_idx)]);
+    let safe_idx = min(line_offset + 1u + vertex_idx, max_data_idx);
     let raw_val = data_buffer[safe_idx];
     out.raw_val = raw_val;
 
@@ -115,11 +116,11 @@ fn vs_scatter(
 
     let pt_idx = instance_idx % uniforms.profile_length;
     let line_idx = instance_idx / uniforms.profile_length;
-    out.line_index = line_idx;
 
-    let line_offset = line_idx * uniforms.profile_length;
+    let line_offset = line_idx * (uniforms.profile_length + 1u);
     let max_data_idx = arrayLength(&data_buffer) - 1u;
-    let safe_idx = min(line_offset + pt_idx, max_data_idx);
+    out.line_index = bitcast<u32>(data_buffer[min(line_offset, max_data_idx)]);
+    let safe_idx = min(line_offset + 1u + pt_idx, max_data_idx);
     let raw_val = data_buffer[safe_idx];
     out.raw_val = raw_val;
 
