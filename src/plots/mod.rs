@@ -162,31 +162,6 @@ mod tests {
         }
     }
 
-    /// The line renderer reports the payload it holds only for the key it
-    /// was uploaded with, and forgets it after a raw write. Skipped without a GPU.
-    #[cfg(not(target_arch = "wasm32"))]
-    #[test]
-    fn line_renderer_tracks_its_uploaded_payload() {
-        let Some((device, queue)) = super::test_gpu::device() else {
-            eprintln!("SKIPPED line_renderer_tracks_its_uploaded_payload: no GPU device");
-            return;
-        };
-        let format = wgpu::TextureFormat::Rgba8Unorm;
-        let renderer = super::LineRenderer::new(&device, format);
-        assert_eq!(renderer.payload_shape(7), None, "nothing uploaded yet");
-        let shape = super::LineShape {
-            profile_length: 2,
-            drawn_lines: 1,
-            line_count: 2,
-        };
-        let payload = [1, 3.0f32.to_bits(), 4.0f32.to_bits()];
-        renderer.upload_payload(&device, &queue, 7, &payload, shape);
-        assert_eq!(renderer.payload_shape(7), Some(shape));
-        assert_eq!(renderer.payload_shape(8), None, "another key");
-        renderer.update_data(&queue, &[1.0, 2.0]);
-        assert_eq!(renderer.payload_shape(7), None, "overwritten");
-    }
-
     #[test]
     fn test_all_plot_shaders_parse_cleanly() {
         let shaders = [

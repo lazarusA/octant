@@ -43,16 +43,10 @@ pub(crate) fn resolve_line_plot_entries(
     );
     let mut entries = vec![loc_str];
 
-    if l_count > 1 {
-        enrich_line_series_ortho_dim(
-            app,
-            meta,
-            var,
-            &mut entries,
-            &mut used_dims,
-            best_line_idx,
-            l_count,
-        );
+    // Where the line sits among all of them: the picked one, or the nearest.
+    let (line, lines) = layout.pick.unwrap_or((best_line_idx, l_count));
+    if lines > 1 {
+        enrich_line_series_ortho_dim(app, meta, var, &mut entries, &mut used_dims, line, lines);
     }
 
     enrich_entries_with_animated_and_collapsed_dims(app, meta, var, &mut entries, &mut used_dims);

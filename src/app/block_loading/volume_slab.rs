@@ -53,7 +53,7 @@ impl OctantApp {
             );
 
             bounds_opt = Some((vdata.min_val, vdata.max_val));
-            layer.data.touch();
+            layer.data.touch_volume();
         }
         // Uploaded before the next paint, to the renderer on screen only.
         layer

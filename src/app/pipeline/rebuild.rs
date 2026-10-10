@@ -250,7 +250,7 @@ impl OctantApp {
         }
 
         layer.data.matrix = Some(data);
-        layer.data.touch();
+        layer.data.touch_matrix();
     }
 
     /// Rebuilds or updates layer `id`'s GPU buffers for 3D volume data.
@@ -329,7 +329,7 @@ impl OctantApp {
 
         let depth = data.depth;
         layer.data.volume = Some(data);
-        layer.data.touch();
+        layer.data.touch_volume();
         if upload_later {
             layer.renderers.mark_volume_dirty(0..depth);
         }

@@ -188,9 +188,10 @@ fn resolve_hover_target_info(
 }
 
 /// The card's swatch: the color `raw_val` is drawn in, or on a line plot
-/// colored by series, the color of series line `line`.
+/// colored by series, the color of series line `line` (a missing value takes
+/// the NaN color, as no line is under it).
 fn resolve_hover_color(app: &OctantApp, raw_val: f32, line: usize) -> Color32 {
-    if app.line_series_colored() {
+    if app.line_series_colored() && raw_val.is_finite() {
         app.line_series_color(line)
     } else if app.line_custom_colored() {
         let [r, g, b, a] = app.line_color.map(|c| (c * 255.0).clamp(0.0, 255.0) as u8);
