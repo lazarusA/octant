@@ -57,6 +57,21 @@ fn volume_changes_leave_matrix_lines_alone() {
 }
 
 #[test]
+fn matrix_and_volume_lines_of_one_layout_keep_apart() {
+    let mut app = OctantApp::default();
+    let matrix = MatrixData::new(2, 2, vec![1.0; 4], 1.0, 1.0, "m".to_string(), 1);
+    let volume = VolumeData::new(2, 1, 2, vec![1.0; 4], 1.0, 1.0, "v".to_string());
+    app.layers.base.data.matrix = Some(matrix);
+    app.layers.base.data.volume = Some(volume);
+    app.line_profile_dim_idx = 1;
+    let (_, columns) = app.line_layout();
+    let columns_key = app.line_payload_key();
+    app.line_profile_dim_idx = 2;
+    assert_eq!(app.line_layout().1, columns, "the same layout");
+    assert_ne!(app.line_payload_key(), columns_key, "read from other data");
+}
+
+#[test]
 fn rows_and_columns_of_a_matrix() {
     // 3 wide, 2 high.
     let rows = LineLayout::lines(3, 2, (3, 1), None);

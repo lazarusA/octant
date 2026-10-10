@@ -101,12 +101,21 @@ impl LineLayout {
 
     /// The shape of a payload of this layout with `drawn` lines.
     fn shape(&self, drawn: u32) -> LineShape {
+        let to_u32 = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
         LineShape {
-            profile_length: self.profile_length as u32,
+            profile_length: to_u32(self.profile_length),
             drawn_lines: drawn,
-            line_count: self.line_count as u32,
+            line_count: to_u32(self.line_count),
         }
     }
+}
+
+/// The data lines are read from, at its version (`LayerData::matrix_version`
+/// or `volume_version`): the two count apart, so the key names which one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum LineData {
+    Matrix(u64),
+    Volume(u64),
 }
 
 /// `count` values of `values` from `start`, `step` apart, NaN past the end.
@@ -135,27 +144,34 @@ impl OctantApp {
         (values, layout)
     }
 
-    /// The line data, its layout, and the version of the data it comes from
-    /// (`LayerData::matrix_version` or `volume_version`).
-    fn line_source(&self) -> (&[f32], LineLayout, u64) {
+    /// The line data, its layout, and which data it is at what version.
+    fn line_source(&self) -> (&[f32], LineLayout, LineData) {
         let data = &self.layers.base.data;
         let pick = (!self.line_plot_all_series).then_some(self.line_profile_slice_idx);
         if self.line_profile_dim_idx == 2
             && let Some(v) = data.volume.as_ref().filter(|v| v.depth > 1)
         {
             let Some(pixels) = v.width.checked_mul(v.height) else {
-                return (&[], LineLayout::default(), data.volume_version);
+                return (
+                    &[],
+                    LineLayout::default(),
+                    LineData::Volume(data.volume_version),
+                );
             };
             let layout = LineLayout::lines(v.depth, pixels, (1, pixels), pick);
-            (&v.values, layout, data.volume_version)
+            (&v.values, layout, LineData::Volume(data.volume_version))
         } else if let Some(m) = &data.matrix {
             let layout = match self.line_profile_dim_idx {
                 0 => LineLayout::lines(m.width, m.height, (m.width, 1), pick),
                 _ => LineLayout::lines(m.height, m.width, (1, m.width), pick),
             };
-            (&m.values, layout, data.matrix_version)
+            (&m.values, layout, LineData::Matrix(data.matrix_version))
         } else {
-            (&[], LineLayout::default(), data.matrix_version)
+            (
+                &[],
+                LineLayout::default(),
+                LineData::Matrix(data.matrix_version),
+            )
         }
     }
 
@@ -165,11 +181,11 @@ impl OctantApp {
         layout.payload(values, &layout.lines_with_data(values))
     }
 
-    /// Identifies the payload `line_payload` builds: the version of the data
-    /// it reads and the layout of its lines.
+    /// Identifies the payload `line_payload` builds: the data it reads (the
+    /// matrix or the volume, at its version) and the layout of its lines.
     pub fn line_payload_key(&self) -> u64 {
-        let (_, layout, version) = self.line_source();
-        payload_key(layout, version)
+        let (_, layout, source) = self.line_source();
+        payload_key(layout, source)
     }
 
     /// The shape of the payload `layer`'s line renderer draws, building and
@@ -185,8 +201,8 @@ impl OctantApp {
             return LineShape::default();
         };
         debug_assert_eq!(layer.id(), LayerId::BASE, "only the base layer draws lines");
-        let (values, layout, version) = self.line_source();
-        let key = payload_key(layout, version);
+        let (values, layout, source) = self.line_source();
+        let key = payload_key(layout, source);
         if let Some(shape) = renderer.payload_shape(key) {
             return shape;
         }
@@ -207,7 +223,7 @@ impl OctantApp {
     }
 }
 
-/// The key of the payload of `layout` over data at `version`.
-fn payload_key(layout: LineLayout, version: u64) -> u64 {
-    hash_key((version, layout))
+/// The key of the payload of `layout` over `source`.
+fn payload_key(layout: LineLayout, source: LineData) -> u64 {
+    hash_key((source, layout))
 }

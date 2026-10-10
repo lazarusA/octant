@@ -138,9 +138,13 @@ pub(super) fn push_gradient(
             push_quad(mesh, axis.quad(edge(k), edge(k + 1)), [color, color]);
         }
     } else {
-        for i in 0..SEGMENTS {
-            let (t0, t1) = (i as f32 / SEGMENTS as f32, (i + 1) as f32 / SEGMENTS as f32);
-            push_quad(mesh, axis.quad(t0, t1), [color_at(t0), color_at(t1)]);
+        // Each segment starts in the color the previous one ended in.
+        let mut start = (0.0, color_at(0.0));
+        for i in 1..=SEGMENTS {
+            let t = i as f32 / SEGMENTS as f32;
+            let end = (t, color_at(t));
+            push_quad(mesh, axis.quad(start.0, end.0), [start.1, end.1]);
+            start = end;
         }
     }
 }
