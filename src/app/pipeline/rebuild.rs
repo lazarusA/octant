@@ -166,13 +166,8 @@ impl OctantApp {
                     coord_x,
                     coord_y,
                 );
-                let line_renderer = LineRenderer::new(
-                    &wgpu_render_state.device,
-                    wgpu_render_state.target_format,
-                    &effective_data.values,
-                    effective_data.width,
-                    effective_data.height,
-                );
+                let line_renderer =
+                    LineRenderer::new(&wgpu_render_state.device, wgpu_render_state.target_format);
                 renderers.heatmap = Some(Arc::new(renderer));
                 renderers.line = Some(Arc::new(line_renderer));
 

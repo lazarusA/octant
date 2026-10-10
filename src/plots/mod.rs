@@ -5,6 +5,7 @@ pub mod device;
 pub mod fullscreen;
 pub mod heatmap;
 pub mod line;
+mod line_payload;
 pub mod mesh;
 mod mesh_draw;
 pub mod oit;
@@ -26,7 +27,8 @@ pub use coastline::{
 };
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
-pub use line::{LineCallback, LineRenderer, LineShape};
+pub use line::{LineCallback, LineRenderer};
+pub use line_payload::LineShape;
 pub use mesh::{Mesh3DCallback, Mesh3DRenderer};
 pub use point_cloud::{PointCloudCallback, PointCloudRenderer, PointCloudUniformParams};
 pub use sphere::{SphereCallback, SphereRenderer};
@@ -172,14 +174,14 @@ mod tests {
             return;
         };
         let format = wgpu::TextureFormat::Rgba8Unorm;
-        let renderer = super::LineRenderer::new(&device, format, &[0.0; 4], 2, 2);
+        let renderer = super::LineRenderer::new(&device, format);
         assert_eq!(renderer.payload_shape(7), None, "nothing uploaded yet");
         let shape = super::LineShape {
             profile_length: 2,
             drawn_lines: 1,
             line_count: 2,
         };
-        let payload = [f32::from_bits(1), 3.0, 4.0];
+        let payload = [1, 3.0f32.to_bits(), 4.0f32.to_bits()];
         renderer.upload_payload(&device, &queue, 7, &payload, shape);
         assert_eq!(renderer.payload_shape(7), Some(shape));
         assert_eq!(renderer.payload_shape(8), None, "another key");

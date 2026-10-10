@@ -31,13 +31,22 @@ impl LineColoring {
             Self::Values
         }
     }
+
+    /// The coloring of a `plot_type` plot: `None` unless it is a line plot.
+    pub fn for_plot(plot_type: PlotType, custom_color: bool, all_series: bool) -> Option<Self> {
+        (plot_type == PlotType::Line).then(|| Self::of(custom_color, all_series))
+    }
 }
 
 impl OctantApp {
     /// The canvas line plot's coloring; `None` when the canvas is no line plot.
     pub fn line_coloring(&self) -> Option<LineColoring> {
-        (self.effective_canvas_plot_type() == PlotType::Line)
-            .then(|| LineColoring::of(self.line_use_custom_color, self.line_plot_all_series))
+        let plot_type = self.effective_canvas_plot_type();
+        LineColoring::for_plot(
+            plot_type,
+            self.line_use_custom_color,
+            self.line_plot_all_series,
+        )
     }
 
     /// Whether the canvas line plot draws every line in the custom color.

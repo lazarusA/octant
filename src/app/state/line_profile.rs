@@ -10,7 +10,7 @@ use crate::plots::{LineRenderer, LineShape};
 
 /// `line_count` lines of `profile_length` samples: sample `s` of line `l` is
 /// `values[first + l * line_stride + s * sample_stride]` (NaN past the end).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct LineLayout {
     pub profile_length: usize,
     pub line_count: usize,
@@ -24,7 +24,11 @@ impl LineLayout {
     fn lines(len: usize, count: usize, strides: (usize, usize), pick: Option<usize>) -> Self {
         let (line_stride, sample_stride) = strides;
         let (first, line_count) = match pick {
-            Some(line) => (line.min(count.saturating_sub(1)) * line_stride, 1),
+            // An index past any data (on overflow) reads NaN.
+            Some(line) => {
+                let first = line.min(count.saturating_sub(1)).checked_mul(line_stride);
+                (first.unwrap_or(usize::MAX), 1)
+            }
             None => (0, count),
         };
         Self {
@@ -38,15 +42,18 @@ impl LineLayout {
 
     /// Sample `sample` of line `line` in `values`.
     pub fn value(&self, values: &[f32], line: usize, sample: usize) -> f32 {
-        let idx = self.first + line * self.line_stride + sample * self.sample_stride;
-        values.get(idx).copied().unwrap_or(f32::NAN)
+        let idx = line
+            .checked_mul(self.line_stride)
+            .zip(sample.checked_mul(self.sample_stride))
+            .and_then(|(l, s)| self.first.checked_add(l)?.checked_add(s));
+        idx.and_then(|i| values.get(i)).copied().unwrap_or(f32::NAN)
     }
 }
 
-/// What the line renderer draws: each line with data as its line index (the
-/// bits of a `u32`) followed by its `profile_length` samples.
+/// What the line renderer draws: each line with data as its line index
+/// followed by the bits of its `profile_length` samples.
 pub struct LinePayload {
-    pub values: Vec<f32>,
+    pub words: Vec<u32>,
     pub shape: LineShape,
 }
 
@@ -58,7 +65,9 @@ impl OctantApp {
         if self.line_profile_dim_idx == 2
             && let Some(v) = data.volume.as_ref().filter(|v| v.depth > 1)
         {
-            let pixels = v.width * v.height;
+            let Some(pixels) = v.width.checked_mul(v.height) else {
+                return (&[], LineLayout::default());
+            };
             let layout = LineLayout::lines(v.depth, pixels, (1, pixels), pick);
             (&v.values, layout)
         } else if let Some(m) = &data.matrix {
@@ -76,19 +85,20 @@ impl OctantApp {
     pub fn line_payload(&self) -> LinePayload {
         let (values, layout) = self.line_layout();
         let len = layout.profile_length;
-        let mut payload = Vec::with_capacity(layout.line_count * (len + 1));
+        let words = layout.line_count.checked_mul(len.saturating_add(1));
+        let mut payload = Vec::with_capacity(words.unwrap_or(0));
         let mut drawn = 0;
         for line in 0..layout.line_count {
             let sample = |s: usize| layout.value(values, line, s);
             if !(0..len).any(|s| sample(s).is_finite()) {
                 continue;
             }
-            payload.push(f32::from_bits(line as u32));
-            payload.extend((0..len).map(sample));
+            payload.push(line as u32);
+            payload.extend((0..len).map(|s| sample(s).to_bits()));
             drawn += 1;
         }
         LinePayload {
-            values: payload,
+            words: payload,
             shape: LineShape {
                 profile_length: len as u32,
                 drawn_lines: drawn,
@@ -98,16 +108,10 @@ impl OctantApp {
     }
 
     /// Identifies the payload `line_payload` builds: the base layer's data
-    /// version and the choices that lay its lines out.
+    /// version and the layout of its lines.
     pub fn line_payload_key(&self) -> u64 {
-        let pick = (!self.line_plot_all_series).then_some(self.line_profile_slice_idx);
         let mut hasher = DefaultHasher::new();
-        (
-            self.layers.base.data.version,
-            self.line_profile_dim_idx,
-            pick,
-        )
-            .hash(&mut hasher);
+        (self.layers.base.data.version, self.line_layout().1).hash(&mut hasher);
         hasher.finish()
     }
 
@@ -121,7 +125,7 @@ impl OctantApp {
         let payload = self.line_payload();
         if let Some(state) = &self.wgpu_render_state {
             let (device, queue) = (&state.device, &state.queue);
-            renderer.upload_payload(device, queue, key, &payload.values, payload.shape);
+            renderer.upload_payload(device, queue, key, &payload.words, payload.shape);
         }
         payload.shape
     }
@@ -135,16 +139,32 @@ mod tests {
     #[test]
     fn the_payload_key_follows_the_data_and_its_layout() {
         let mut app = OctantApp::default();
+        app.layers.base.data.matrix = Some(crate::data::MatrixData::new(
+            3,
+            2,
+            vec![1.0; 6],
+            1.0,
+            1.0,
+            "rows".to_string(),
+            1,
+        ));
         let key = app.line_payload_key();
         assert_eq!(app.line_payload_key(), key, "nothing changed");
         app.layers.base.data.touch();
         let touched = app.line_payload_key();
         assert_ne!(touched, key, "the data changed");
-        app.line_profile_slice_idx += 1;
-        assert_ne!(app.line_payload_key(), touched, "another line picked");
+        app.line_profile_slice_idx = 1;
+        let last = app.line_payload_key();
+        assert_ne!(last, touched, "another line picked");
+        app.line_profile_slice_idx = 5;
+        assert_eq!(
+            app.line_payload_key(),
+            last,
+            "past the last line: the same line"
+        );
         app.line_plot_all_series = true;
         let all = app.line_payload_key();
-        app.line_profile_slice_idx += 1;
+        app.line_profile_slice_idx = 0;
         assert_eq!(app.line_payload_key(), all, "every line drawn: no pick");
         app.line_profile_dim_idx = 1;
         assert_ne!(app.line_payload_key(), all, "lines along another axis");

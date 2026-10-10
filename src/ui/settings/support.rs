@@ -172,8 +172,7 @@ impl PlotState {
 
     /// How the plot colors its lines, when it is a line plot.
     fn line_coloring(&self) -> Option<LineColoring> {
-        (self.plot_type == PlotType::Line)
-            .then(|| LineColoring::of(self.line_custom_color, self.line_all_series))
+        LineColoring::for_plot(self.plot_type, self.line_custom_color, self.line_all_series)
     }
 
     /// The line settings that replace the colormap, when the plot is a line.

@@ -205,6 +205,11 @@ fn test_octant_block_volume_extraction() {
     assert_eq!(vdata.max_val, 23.0);
 }
 
+/// Payload words as the samples they hold.
+fn floats(words: &[u32]) -> Vec<f32> {
+    words.iter().map(|&w| f32::from_bits(w)).collect()
+}
+
 #[test]
 fn test_line_profile_along_z_and_xyz() {
     let mut app = OctantApp::default();
@@ -227,7 +232,7 @@ fn test_line_profile_along_z_and_xyz() {
     app.line_profile_slice_idx = 0;
     app.line_plot_all_series = false;
 
-    // Each drawn line is its index (as `u32` bits) followed by its samples.
+    // Each drawn line is its index followed by the bits of its samples.
     let p = app.line_payload();
     assert_eq!(
         (
@@ -237,14 +242,14 @@ fn test_line_profile_along_z_and_xyz() {
         ),
         (4, 1, 1)
     );
-    assert_eq!(p.values[0].to_bits(), 0);
-    assert_eq!(p.values[1..], [0.0, 6.0, 12.0, 18.0]);
+    assert_eq!(p.words[0], 0);
+    assert_eq!(floats(&p.words[1..]), [0.0, 6.0, 12.0, 18.0]);
 
     // 2. Along Z single profile at pixel 1 (x=1, y=0)
     app.line_profile_slice_idx = 1;
     let p = app.line_payload();
     assert_eq!((p.shape.profile_length, p.shape.drawn_lines), (4, 1));
-    assert_eq!(p.values[1..], [1.0, 7.0, 13.0, 19.0]);
+    assert_eq!(floats(&p.words[1..]), [1.0, 7.0, 13.0, 19.0]);
 
     // 3. Along X (dim 0) - extracted from the layer's matrix (timestep slice)
     app.line_profile_dim_idx = 0;
@@ -261,7 +266,7 @@ fn test_line_profile_along_z_and_xyz() {
 
     let p = app.line_payload();
     assert_eq!((p.shape.profile_length, p.shape.drawn_lines), (2, 1));
-    assert_eq!(p.values[1..], [10.0, 20.0]);
+    assert_eq!(floats(&p.words[1..]), [10.0, 20.0]);
 
     // Timestep advances -> new matrix slice
     app.layers.base.data.matrix = Some(octant::data::MatrixData::new(
@@ -275,7 +280,7 @@ fn test_line_profile_along_z_and_xyz() {
     ));
     let p = app.line_payload();
     assert_eq!((p.shape.profile_length, p.shape.drawn_lines), (2, 1));
-    assert_eq!(p.values[1..], [100.0, 200.0]);
+    assert_eq!(floats(&p.words[1..]), [100.0, 200.0]);
 }
 
 #[test]
@@ -303,10 +308,10 @@ fn all_lines_series_skip_empty_lines_but_keep_their_index() {
         ),
         (2, 2, 3)
     );
-    assert_eq!(p.values[0].to_bits(), 0);
-    assert_eq!(p.values[1..3], [1.0, 2.0]);
-    assert_eq!(p.values[3].to_bits(), 2, "row 1 has no data: row 2 follows");
-    assert_eq!(p.values[4..], [5.0, 6.0]);
+    assert_eq!(p.words[0], 0);
+    assert_eq!(floats(&p.words[1..3]), [1.0, 2.0]);
+    assert_eq!(p.words[3], 2, "row 1 has no data: row 2 follows");
+    assert_eq!(floats(&p.words[4..]), [5.0, 6.0]);
 }
 
 #[test]

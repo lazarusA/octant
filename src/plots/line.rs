@@ -1,7 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use eframe::egui;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -40,18 +39,9 @@ pub struct LineUniformParams {
     pub zoom: f32,
 }
 
-use std::sync::{Mutex, RwLock};
+use std::sync::RwLock;
 
-/// What a line payload holds: each drawn line's index (`u32` bits), then its
-/// `profile_length` samples.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct LineShape {
-    pub profile_length: u32,
-    /// Lines in the payload.
-    pub drawn_lines: u32,
-    /// Lines in the plot, drawn or not (the series the colors spread over).
-    pub line_count: u32,
-}
+use super::line_payload::{LineShape, PayloadSlot, buffer_capacity};
 
 pub struct LineRenderer {
     render_pipeline: wgpu::RenderPipeline,
@@ -59,10 +49,8 @@ pub struct LineRenderer {
     bind_group_layout: wgpu::BindGroupLayout,
     uniform_buffer: wgpu::Buffer,
     gpu_resources: RwLock<LineGpuResources>,
-    data_len: AtomicU32,
-    /// The key and shape of the payload in the data buffer; `None` until one
-    /// is uploaded, or after a raw `update_data` overwrote it.
-    payload: Mutex<Option<(u64, LineShape)>>,
+    /// The payload the data buffer holds (`upload_payload`).
+    payload: PayloadSlot,
 }
 
 struct LineGpuResources {
@@ -71,36 +59,26 @@ struct LineGpuResources {
 }
 
 impl LineRenderer {
-    pub fn new(
-        device: &wgpu::Device,
-        target_format: wgpu::TextureFormat,
-        matrix_data: &[f32],
-        width: usize,
-        height: usize,
-    ) -> Self {
+    /// A renderer with an empty data buffer: the first paint uploads the
+    /// line payload (`upload_payload`).
+    pub fn new(device: &wgpu::Device, target_format: wgpu::TextureFormat) -> Self {
         let shader_source = crate::assemble_plot_shader!(include_str!("shaders/line.wgsl"));
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("1D Line & Scatter WGSL Shader"),
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
-        let safe_data = if matrix_data.is_empty() {
-            vec![0.0f32; 64]
-        } else {
-            matrix_data.to_vec()
-        };
-
         let data_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("1D Line Storage Buffer"),
-            contents: bytemuck::cast_slice(&safe_data),
+            contents: bytemuck::cast_slice(&[0u32; 64]),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
         let initial_uniforms = LineUniforms {
             viewport_padding: [0.08, 0.12], // 8% horizontal, 12% vertical dynamic padding
             line_thickness: 2.0,
-            profile_length: width.max(1) as u32,
-            line_count: height.max(1) as u32,
+            profile_length: 1,
+            line_count: 1,
             line_mode: 0,
             pan: [0.0, 0.0],
             zoom: 1.0,
@@ -216,35 +194,36 @@ impl LineRenderer {
                 data_buffer,
                 bind_group,
             }),
-            data_len: AtomicU32::new(safe_data.len() as u32),
-            payload: Mutex::new(None),
+            payload: PayloadSlot::default(),
         }
     }
 
     /// The shape of the payload for `key`, when that is what the buffer holds.
     pub fn payload_shape(&self, key: u64) -> Option<LineShape> {
-        let guard = self.payload.lock().unwrap_or_else(|p| p.into_inner());
-        guard
-            .filter(|&(held, _)| held == key)
-            .map(|(_, shape)| shape)
+        self.payload.shape(key)
     }
 
-    /// Uploads `values`, a payload of `shape`, as the one for `key`.
+    /// Uploads `words`, a payload of `shape` (`line_payload`), as the one for
+    /// `key`. A payload past the device's buffer limit draws nothing.
     pub fn upload_payload(
         &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         key: u64,
-        values: &[f32],
+        words: &[u32],
         shape: LineShape,
     ) {
-        self.update_data_with_device(device, queue, values);
-        *self.payload.lock().unwrap_or_else(|p| p.into_inner()) = Some((key, shape));
-    }
-
-    /// Forgets the uploaded payload after its buffer was overwritten.
-    fn forget_payload(&self) {
-        *self.payload.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        let uploaded =
+            words.is_empty() || self.write_data(device, queue, bytemuck::cast_slice(words));
+        let drawn_lines = if uploaded { shape.drawn_lines } else { 0 };
+        // Held either way, so a payload that does not fit is reported once.
+        self.payload.hold(
+            key,
+            LineShape {
+                drawn_lines,
+                ..shape
+            },
+        );
     }
 
     pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &LineUniformParams) {
@@ -268,72 +247,69 @@ impl LineRenderer {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
-    fn update_data_with_device(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        matrix_data: &[f32],
-    ) {
-        if matrix_data.is_empty() {
-            return;
-        }
-
-        let needed_bytes = std::mem::size_of_val(matrix_data) as u64;
-        let current_capacity = self
+    /// Writes `bytes` to the start of the data buffer, growing it (to the next
+    /// power of two, within the device limit) when they do not fit. Reports
+    /// and returns `false` when they exceed the device's storage buffer limit.
+    fn write_data(&self, device: &wgpu::Device, queue: &wgpu::Queue, bytes: &[u8]) -> bool {
+        let needed = bytes.len() as u64;
+        let current = self
             .gpu_resources
             .read()
             .map(|g| g.data_buffer.size())
             .unwrap_or(0);
-
-        if needed_bytes > current_capacity {
-            let new_capacity = needed_bytes.next_power_of_two();
-            let new_data_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("1D Line Storage Buffer (Resized)"),
-                size: new_capacity,
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-
-            let new_bind_group = super::common::create_uniform_storage_bind_group(
-                device,
-                "1D Line Bind Group (Resized)",
-                &self.bind_group_layout,
-                &self.uniform_buffer,
-                &new_data_buffer,
-            );
-
-            queue.write_buffer(&new_data_buffer, 0, bytemuck::cast_slice(matrix_data));
-
-            if let Ok(mut guard) = self.gpu_resources.write() {
-                guard.data_buffer = new_data_buffer;
-                guard.bind_group = new_bind_group;
+        if needed <= current {
+            if let Ok(guard) = self.gpu_resources.read() {
+                queue.write_buffer(&guard.data_buffer, 0, bytes);
             }
-        } else if let Ok(guard) = self.gpu_resources.read() {
-            queue.write_buffer(&guard.data_buffer, 0, bytemuck::cast_slice(matrix_data));
+            return true;
         }
-
-        self.data_len
-            .store(matrix_data.len() as u32, Ordering::Relaxed);
+        let limits = device.limits();
+        let limit = limits
+            .max_storage_buffer_binding_size
+            .min(limits.max_buffer_size);
+        let Some(capacity) = buffer_capacity(needed, limit) else {
+            crate::ui::toast::report(
+                crate::ui::toast::Severity::Warning,
+                "Line plot too large for the GPU",
+                format!("The lines take {needed} bytes; this GPU binds at most {limit}."),
+            );
+            return false;
+        };
+        let data_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("1D Line Storage Buffer (Resized)"),
+            size: capacity,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let bind_group = super::common::create_uniform_storage_bind_group(
+            device,
+            "1D Line Bind Group (Resized)",
+            &self.bind_group_layout,
+            &self.uniform_buffer,
+            &data_buffer,
+        );
+        queue.write_buffer(&data_buffer, 0, bytes);
+        if let Ok(mut guard) = self.gpu_resources.write() {
+            guard.data_buffer = data_buffer;
+            guard.bind_group = bind_group;
+        }
+        true
     }
 
-    /// Writes raw values into the data buffer; the next paint uploads its
-    /// payload again.
+    /// Writes raw values into the data buffer (the `PlotRenderer` traits);
+    /// the next paint uploads its payload again.
     pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
         if matrix_data.is_empty() {
             return;
         }
-        self.forget_payload();
-
-        if let Ok(guard) = self.gpu_resources.read()
-            && super::common::safe_write_buffer(
+        self.payload.forget();
+        if let Ok(guard) = self.gpu_resources.read() {
+            super::common::safe_write_buffer(
                 queue,
                 &guard.data_buffer,
                 matrix_data,
                 "LineRenderer::update_data",
-            )
-        {
-            self.data_len
-                .store(matrix_data.len() as u32, Ordering::Relaxed);
+            );
         }
     }
 }

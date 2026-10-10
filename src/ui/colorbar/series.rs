@@ -13,7 +13,6 @@ use super::bars::{self, BarColors};
 use crate::app::{OctantApp, series_line_at, series_t};
 use crate::ui::hover::entries_1d::{series_dim, series_field};
 use crate::utils::colormap::{orient, registry};
-use crate::utils::stack_str;
 
 /// Lines labeled at most, spread evenly from the first to the last.
 const MAX_LABELS: usize = 5;
@@ -73,35 +72,56 @@ pub(super) fn draw(
     }
 }
 
-/// Shows the coordinate of the line drawn at bar position `t` as tooltip.
+/// Shows the coordinate of the line drawn at bar position `t` as tooltip,
+/// formatted only when the hovered line or the labels' inputs change.
 pub(super) fn show_hover_text(app: &OctantApp, response: egui::Response, t: f32) {
     let n = app.line_layout().1.line_count;
     let line = series_line_at(t, n, app.layers.base.color.categorical);
+    let key = (labels_key(app, n), line);
+    let id = egui::Id::new("colorbar_series_hover");
+    let cached = response
+        .ctx
+        .data(|d| d.get_temp::<((u64, usize), Arc<str>)>(id))
+        .filter(|(cached, _)| *cached == key);
+    let text = match cached {
+        Some((_, text)) => text,
+        None => {
+            let plotted = app.plotted();
+            let var = plotted.variable_info();
+            let (field, _) = series_field(app, plotted.metadata.as_ref(), var, line, n);
+            let text: Arc<str> = format!("{}: {}", field.label, field.value).into();
+            response
+                .ctx
+                .data_mut(|d| d.insert_temp(id, (key, text.clone())));
+            text
+        }
+    };
+    response.on_hover_text(&*text);
+}
+
+/// Identifies what the coordinate labels of `n` series lines read: the
+/// dataset and its coordinates, and where the series dimension's window sits
+/// (its roles, range and flip).
+fn labels_key(app: &OctantApp, n: usize) -> u64 {
     let plotted = app.plotted();
-    let var = plotted.variable_info();
-    let (field, _) = series_field(app, plotted.metadata.as_ref(), var, line, n);
-    let mut buf = [0u8; 96];
-    let text = stack_str(&mut buf, format_args!("{}: {}", field.label, field.value));
-    response.on_hover_text(text);
+    let mut hasher = DefaultHasher::new();
+    (
+        (plotted.metadata_generation, app.coordinates_revision),
+        (plotted.store_target.as_str(), plotted.variable_idx),
+        series_dim(app, plotted.variable_info()),
+        n,
+    )
+        .hash(&mut hasher);
+    hasher.finish()
 }
 
 /// The labeled lines, formatted only when the series or its coordinates
 /// change (kept in egui temp memory).
 fn ticks(app: &OctantApp, ctx: &egui::Context, n: usize, categorical: bool) -> Arc<[SeriesTick]> {
     let plotted = app.plotted();
-    // Everything the labels read: the dataset and its coordinates, and where
-    // the series dimension's window sits (its roles, range and flip).
-    let mut hasher = DefaultHasher::new();
-    (
-        (plotted.metadata_generation, app.coordinates_revision),
-        (plotted.store_target.as_str(), plotted.variable_idx),
-        series_dim(app, plotted.variable_info()),
-        (n, categorical),
-    )
-        .hash(&mut hasher);
-    let key = hasher.finish();
+    let key = (labels_key(app, n), categorical);
     let id = egui::Id::new("colorbar_series_ticks");
-    if let Some((cached, ticks)) = ctx.data(|d| d.get_temp::<(u64, Arc<[SeriesTick]>)>(id))
+    if let Some((cached, ticks)) = ctx.data(|d| d.get_temp::<((u64, bool), Arc<[SeriesTick]>)>(id))
         && cached == key
     {
         return ticks;

@@ -31,8 +31,9 @@ struct LineUniforms {
 };
 
 @group(0) @binding(0) var<uniform> uniforms: LineUniforms;
-// Each drawn line: its index in the plot (`u32` bits), then its samples.
-@group(0) @binding(1) var<storage, read> data_buffer: array<f32>;
+// Each drawn line: its index in the plot, then the bits of its samples. Read
+// as `u32` so no float load can flush a small index (a subnormal as `f32`).
+@group(0) @binding(1) var<storage, read> data_buffer: array<u32>;
 
 const CORNERS = array<vec2<f32>, 6>(
     vec2<f32>(-1.0, -1.0),
@@ -53,9 +54,9 @@ fn vs_main(
 
     let line_offset = instance_idx * (uniforms.profile_length + 1u);
     let max_data_idx = arrayLength(&data_buffer) - 1u;
-    out.line_index = bitcast<u32>(data_buffer[min(line_offset, max_data_idx)]);
+    out.line_index = data_buffer[min(line_offset, max_data_idx)];
     let safe_idx = min(line_offset + 1u + vertex_idx, max_data_idx);
-    let raw_val = data_buffer[safe_idx];
+    let raw_val = bitcast<f32>(data_buffer[safe_idx]);
     out.raw_val = raw_val;
 
     let is_valid = raw_val == raw_val && abs(raw_val) < 1e30;
@@ -119,9 +120,9 @@ fn vs_scatter(
 
     let line_offset = line_idx * (uniforms.profile_length + 1u);
     let max_data_idx = arrayLength(&data_buffer) - 1u;
-    out.line_index = bitcast<u32>(data_buffer[min(line_offset, max_data_idx)]);
+    out.line_index = data_buffer[min(line_offset, max_data_idx)];
     let safe_idx = min(line_offset + 1u + pt_idx, max_data_idx);
-    let raw_val = data_buffer[safe_idx];
+    let raw_val = bitcast<f32>(data_buffer[safe_idx]);
     out.raw_val = raw_val;
 
     let is_valid = raw_val == raw_val && abs(raw_val) < 1e30;
