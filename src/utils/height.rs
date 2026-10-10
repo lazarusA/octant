@@ -30,6 +30,19 @@ impl HeightScale {
         if self.flip { top - h } else { h }
     }
 
+    /// Lowest and highest heights `normalized` can return.
+    pub fn bounds(&self) -> (f32, f32) {
+        if self.composite {
+            return (0.0, 1.0);
+        }
+        let (low, high) = (self.range_height(self.cmin), self.range_height(self.cmax));
+        if self.flip {
+            (0.0, high - low)
+        } else {
+            (low, high)
+        }
+    }
+
     fn range_height(&self, val: f32) -> f32 {
         let (cmin, cmax) = (self.cmin, self.cmax);
         if cmin < 0.0 && cmax > 0.0 {
@@ -103,5 +116,8 @@ mod tests {
         let s = scale(-50.0, 100.0, false, true);
         assert_eq!(s.normalized(100.0), 0.0);
         assert!((s.normalized(-50.0) - 1.5).abs() < 1e-6);
+        assert_eq!(s.bounds(), (0.0, 1.5));
+        assert_eq!(scale(-50.0, 100.0, false, false).bounds(), (-0.5, 1.0));
+        assert_eq!(scale(0.0, 16_777_215.0, true, true).bounds(), (0.0, 1.0));
     }
 }

@@ -1,12 +1,9 @@
-//! Heightfield sampling and ray marching shared by the surface and sphere
-//! hovers, mirroring the smooth-mode vertices of `smooth_corner`
+//! Heightfield sampling shared by the surface and sphere hovers, mirroring
+//! the smooth-mode vertices of `smooth_corner`
 //! (`shaders/common/height.wgsl`): values sit at cell centers, the first and
 //! last stretched to the axis edges, unless the axis wraps around.
 
-/// Most samples a hover ray takes before refining its hit.
-const MAX_STEPS: usize = 8192;
-/// Bisection steps refining a hit between two samples.
-const BISECTIONS: usize = 12;
+use crate::data::MatrixData;
 
 /// Smooth vertex `j` of an axis of `n` cells, in cell units (cell `k` spans
 /// `[k, k + 1]`): its center, or the outer edge for the first and last.
@@ -58,35 +55,15 @@ pub fn bracket_wrapped(x: f32, n: usize) -> (usize, usize, f32) {
     (first, (first + 1) % n, g - floor)
 }
 
-/// First ray parameter in `[t0, t1]` where `hit` holds, sampled at most
-/// `step` apart and refined by bisection.
-pub fn march(t0: f32, t1: f32, step: f32, hit: impl Fn(f32) -> bool) -> Option<f32> {
-    if t1 <= t0 {
-        return None;
-    }
-    if hit(t0) {
-        return Some(t0);
-    }
-    let steps = ((t1 - t0) / step.max(1e-6))
-        .ceil()
-        .clamp(1.0, MAX_STEPS as f32) as usize;
-    let dt = (t1 - t0) / steps as f32;
-    let mut prev = t0;
-    for i in 1..=steps {
-        let t = t0 + dt * i as f32;
-        if hit(t) {
-            let (mut lo, mut hi) = (prev, t);
-            for _ in 0..BISECTIONS {
-                let mid = 0.5 * (lo + hi);
-                if hit(mid) {
-                    hi = mid;
-                } else {
-                    lo = mid;
-                }
-            }
-            return Some(hi);
-        }
-        prev = t;
-    }
-    None
+/// Value of cell `(px, py)`, NaN past the data.
+pub fn value_at(matrix: &MatrixData, px: usize, py: usize) -> f32 {
+    matrix
+        .values
+        .get(py * matrix.width + px)
+        .copied()
+        .unwrap_or(f32::NAN)
+}
+
+pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
 }

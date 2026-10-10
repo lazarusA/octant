@@ -1,17 +1,18 @@
 //! Surface and sphere hovers pick the cell drawn under the cursor: a cell
 //! center projected to the screen raycasts back to that cell.
 
-use super::smooth::{bracket, bracket_wrapped, index_sample, march};
+use super::march::{Probe, Shape, Side, march};
+use super::smooth::{bracket, bracket_wrapped, index_sample};
 use super::*;
 use crate::app::OctantApp;
 use crate::data::{CoordinateGrid, MatrixData};
 use egui::{Rect, pos2};
 
-fn rect() -> Rect {
+pub(super) fn rect() -> Rect {
     Rect::from_min_max(pos2(0.0, 0.0), pos2(800.0, 600.0))
 }
 
-fn matrix(
+pub(super) fn matrix(
     w: usize,
     h: usize,
     grid: CoordinateGrid,
@@ -21,7 +22,7 @@ fn matrix(
     MatrixData::new_with_grid(w, h, values, 0.0, 100.0, "test".to_string(), 1, grid)
 }
 
-fn app(rotation_x: f32, rotation_y: f32) -> OctantApp {
+pub(super) fn app(rotation_x: f32, rotation_y: f32) -> OctantApp {
     let mut app = OctantApp::default();
     app.layers.base.color.range_min = 0.0;
     app.layers.base.color.range_max = 100.0;
@@ -31,7 +32,7 @@ fn app(rotation_x: f32, rotation_y: f32) -> OctantApp {
 }
 
 /// Raycasts from where cell `(px, py)`'s drawn center appears on screen.
-fn surface_round_trip(
+pub(super) fn surface_round_trip(
     app: &OctantApp,
     m: &MatrixData,
     px: usize,
@@ -43,7 +44,7 @@ fn surface_round_trip(
     Some(m.grid.find_cell_from_norm(nx, ny, m.width, m.height))
 }
 
-fn sphere_round_trip(
+pub(super) fn sphere_round_trip(
     app: &OctantApp,
     m: &MatrixData,
     px: usize,
@@ -162,9 +163,27 @@ fn smooth_vertices_sit_at_centers_and_stretch_to_edges() {
 }
 
 #[test]
-fn march_finds_the_first_crossing() {
-    // Crossings at 2 and 5: the first one wins, refined well below a step.
-    let t = march(0.0, 10.0, 1.0, |t| (2.0..3.0).contains(&t) || t >= 5.0);
-    assert!(t.is_some_and(|t| (t - 2.0).abs() < 1e-2));
-    assert_eq!(march(0.0, 10.0, 1.0, |_| false), None);
+fn march_catches_a_column_crossed_within_one_step() {
+    // Above the column at one sample and below it at the next: the ray went
+    // through its top, though no sample landed inside.
+    let side = |t: f32| if t < 5.0 { Side::Above } else { Side::Below };
+    let probe = |t: f32| Probe {
+        cell: Some((0, 0)),
+        side: side(t),
+    };
+    let t = march((0.0, 10.0), 4.0, 100, Shape::Columns, probe);
+    assert!(t.is_some_and(|t| (t - 5.0).abs() < 1e-2));
+}
+
+#[test]
+fn march_passes_under_patches_into_other_cells() {
+    // Above cell 0's patch, then below cell 1's: steps have no walls.
+    let probe = |t: f32| Probe {
+        cell: Some((usize::from(t >= 5.0), 0)),
+        side: if t < 5.0 { Side::Above } else { Side::Below },
+    };
+    assert_eq!(march((0.0, 10.0), 1.0, 100, Shape::Patches, probe), None);
+    // A continuous surface is crossed there.
+    let t = march((0.0, 10.0), 1.0, 100, Shape::Smooth, probe);
+    assert!(t.is_some_and(|t| (t - 5.0).abs() < 1e-2));
 }

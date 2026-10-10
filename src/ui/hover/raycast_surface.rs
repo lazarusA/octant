@@ -3,7 +3,8 @@
 use crate::app::OctantApp;
 use crate::data::MatrixData;
 use crate::ui::hover::camera::{Camera3D, Ray3D, intersect_aabb};
-use crate::ui::hover::smooth::{bracket, march};
+use crate::ui::hover::march::{Probe, Shape, Side, march, max_steps};
+use crate::ui::hover::smooth::{bracket, lerp, value_at};
 use crate::utils::height::{HeightScale, surface_height};
 use egui::Pos2;
 
@@ -48,12 +49,7 @@ impl<'a> SurfaceField<'a> {
     }
 
     fn height_at(&self, px: usize, py: usize) -> f32 {
-        let val = self
-            .matrix
-            .values
-            .get(py * self.matrix.width + px)
-            .copied()
-            .unwrap_or(f32::NAN);
+        let val = value_at(self.matrix, px, py);
         surface_height(val, &self.scale, self.mode, self.disp)
     }
 
@@ -106,7 +102,7 @@ impl<'a> SurfaceField<'a> {
         [first.min(last), first.max(last)]
     }
 
-    pub fn cell(&self, u: f32, v: f32) -> (usize, usize) {
+    fn cell(&self, u: f32, v: f32) -> (usize, usize) {
         self.matrix.grid.find_cell_from_surface_uv(
             u.clamp(0.0, 1.0),
             v.clamp(0.0, 1.0),
@@ -115,18 +111,28 @@ impl<'a> SurfaceField<'a> {
         )
     }
 
-    /// Height of the surface's top at `(u, v)` in cell `(px, py)`.
-    fn top_in(&self, px: usize, py: usize, u: f32, v: f32) -> f32 {
+    /// Heights the drawn geometry spans at `(u, v)` in cell `(px, py)`: a
+    /// block's column from the zero plane, else the surface's single height.
+    fn span(&self, px: usize, py: usize, u: f32, v: f32) -> (f32, f32) {
         let h = self.height_at(px, py);
         match self.mode {
             0 if !self.matrix.grid.is_healpix() => {
                 let (x0, x1, tx) = bracket(u, px, self.matrix.width, |j| self.sample(j, true));
                 let (y0, y1, ty) = bracket(v, py, self.matrix.height, |j| self.sample(j, false));
                 let row = |y| lerp(self.height_at(x0, y), self.height_at(x1, y), tx);
-                lerp(row(y0), row(y1), ty)
+                let s = lerp(row(y0), row(y1), ty);
+                (s, s)
             }
-            2 => h.max(0.0),
-            _ => h,
+            2 => (h.min(0.0), h.max(0.0)),
+            _ => (h, h),
+        }
+    }
+
+    fn shape(&self) -> Shape {
+        match self.mode {
+            0 => Shape::Smooth,
+            1 => Shape::Patches,
+            _ => Shape::Columns,
         }
     }
 
@@ -141,47 +147,51 @@ impl<'a> SurfaceField<'a> {
         ((x / self.aspect + 1.0) * 0.5, (z + 1.0) * 0.5, y)
     }
 
-    /// Whether height `y` over `(u, v)` lies below the drawn top (block
-    /// columns are solid down to the zero plane, so their walls count).
-    fn below(&self, u: f32, v: f32, y: f32) -> bool {
+    fn probe(&self, ray: &Ray3D, t: f32, [u0, u1]: [f32; 2], [v0, v1]: [f32; 2]) -> Probe {
+        let (u, v, y) = self.point(ray, t);
+        if !(u0..=u1).contains(&u) || !(v0..=v1).contains(&v) {
+            return Probe::OFF_GRID;
+        }
         let (px, py) = self.cell(u, v);
-        y <= self.top_in(px, py, u, v)
+        let (lo, hi) = self.span(px, py, u, v);
+        Probe {
+            cell: Some((px, py)),
+            side: Side::of(y, lo, hi),
+        }
     }
 
-    /// The first point `(u, v)` where `ray` crosses the drawn surface, or the
-    /// zero plane when it crosses nothing.
-    pub fn hit(&self, ray: &Ray3D) -> Option<(f32, f32)> {
+    /// The cell where `ray` first meets the drawn surface, or crosses the
+    /// zero plane when it meets nothing.
+    pub fn hit(&self, ray: &Ray3D) -> Option<(usize, usize)> {
+        let margin = 1e-3;
         let ([u0, u1], [v0, v1]) = (self.edges(true), self.edges(false));
-        let reach = 0.8 * self.disp.abs() * if self.scale.flip { 2.0 } else { 1.0 };
-        let (x0, z0) = self.uv_to_world(u0, v0);
-        let (x1, z1) = self.uv_to_world(u1, v1);
-        let marched = intersect_aabb(ray, [x0, -reach - 1e-3, z0], [x1, reach + 1e-3, z1])
-            .and_then(|(t_in, t_out)| {
-                let t_in = t_in.max(0.0);
-                let (w, h) = (self.matrix.width.max(1), self.matrix.height.max(1));
-                let cell = ((x1 - x0) / w as f32).min((z1 - z0) / h as f32);
-                let step = 0.5 * cell / ray.dir[0].hypot(ray.dir[2]).max(1e-3);
-                let below = |t: f32| {
-                    let (u, v, y) = self.point(ray, t);
-                    self.below(u, v, y)
-                };
-                let start = below(t_in);
-                march(t_in, t_out, step, |t| below(t) != start)
-            });
+        let (us, vs) = ([u0 - margin, u1 + margin], [v0 - margin, v1 + margin]);
+        let (low, high) = self.scale.bounds();
+        let k = if self.mode == 1 { 0.6 } else { 0.8 } * self.disp;
+        let (y0, y1) = (k * low.min(0.0) - margin, k * high.max(0.0) + margin);
+        let (x0, z0) = self.uv_to_world(us[0], vs[0]);
+        let (x1, z1) = self.uv_to_world(us[1], vs[1]);
+        let (w, h) = (self.matrix.width.max(1), self.matrix.height.max(1));
+        let marched = intersect_aabb(ray, [x0, y0, z0], [x1, y1, z1]).and_then(|(t_in, t_out)| {
+            let cell = ((x1 - x0) / w as f32).min((z1 - z0) / h as f32);
+            let step = 0.5 * cell / ray.dir[0].hypot(ray.dir[2]).max(1e-3);
+            let probe = |t| self.probe(ray, t, us, vs);
+            march(
+                (t_in.max(0.0), t_out),
+                step,
+                max_steps(w, h),
+                self.shape(),
+                probe,
+            )
+        });
         let plane = || {
             (ray.dir[1].abs() > 1e-5)
                 .then(|| -ray.origin[1] / ray.dir[1])
                 .filter(|t| *t > 0.0)
         };
         let (u, v, _) = self.point(ray, marched.or_else(plane)?);
-        let margin = 1e-3;
-        ((u0 - margin..=u1 + margin).contains(&u) && (v0 - margin..=v1 + margin).contains(&v))
-            .then_some((u, v))
+        ((us[0]..=us[1]).contains(&u) && (vs[0]..=vs[1]).contains(&v)).then(|| self.cell(u, v))
     }
-}
-
-fn lerp(a: f32, b: f32, t: f32) -> f32 {
-    a + (b - a) * t
 }
 
 /// Raycasts against the 3D elevation surface heightfield.
@@ -194,9 +204,7 @@ pub fn raycast_surface(
     hover_pos: Pos2,
 ) -> Option<(f32, f32, Option<(f32, f32)>)> {
     let (_, world_ray) = camera.cast_ray(hover_pos);
-    let field = SurfaceField::new(app, matrix);
-    let (u, v) = field.hit(&world_ray)?;
-    let (px, py) = field.cell(u, v);
+    let (px, py) = SurfaceField::new(app, matrix).hit(&world_ray)?;
 
     let (nx, ny) = matrix
         .grid
@@ -229,5 +237,5 @@ pub fn surface_target_pos(
     let (world_x, world_z) = matrix
         .grid
         .cell_center_surface_xz(px, py, w, h, field.aspect);
-    camera.project_point([world_x, field.top_in(px, py, u, v), world_z])
+    camera.project_point([world_x, field.span(px, py, u, v).1, world_z])
 }
