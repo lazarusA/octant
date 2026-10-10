@@ -31,7 +31,9 @@ struct LineUniforms {
 };
 
 @group(0) @binding(0) var<uniform> uniforms: LineUniforms;
-@group(0) @binding(1) var<storage, read> data_buffer: array<f32>;
+// Each drawn line: its index in the plot, then the bits of its samples. Read
+// as `u32` so no float load can flush a small index (a subnormal as `f32`).
+@group(0) @binding(1) var<storage, read> data_buffer: array<u32>;
 
 const CORNERS = array<vec2<f32>, 6>(
     vec2<f32>(-1.0, -1.0),
@@ -49,12 +51,12 @@ fn vs_main(
 ) -> LineVertexOutput {
     var out: LineVertexOutput;
     out.cell_index = vertex_idx;
-    out.line_index = instance_idx;
 
-    let line_offset = instance_idx * uniforms.profile_length;
+    let line_offset = instance_idx * (uniforms.profile_length + 1u);
     let max_data_idx = arrayLength(&data_buffer) - 1u;
-    let safe_idx = min(line_offset + vertex_idx, max_data_idx);
-    let raw_val = data_buffer[safe_idx];
+    out.line_index = data_buffer[min(line_offset, max_data_idx)];
+    let safe_idx = min(line_offset + 1u + vertex_idx, max_data_idx);
+    let raw_val = bitcast<f32>(data_buffer[safe_idx]);
     out.raw_val = raw_val;
 
     let is_valid = raw_val == raw_val && abs(raw_val) < 1e30;
@@ -83,14 +85,24 @@ fn vs_main(
     return out;
 }
 
+// Colormap position of series line `i` (All Lines Series): one bin per line
+// when categorical, else the first and last lines at the ends. Matches the
+// CPU `series_t` (`app/state/line_series.rs`).
+fn series_t(i: u32) -> f32 {
+    let n = f32(max(uniforms.line_count, 1u));
+    if (uniforms.color.is_categorical == 1u) {
+        return (f32(i) + 0.5) / n;
+    }
+    return f32(i) / max(1.0, n - 1.0);
+}
+
 @fragment
 fn fs_main(in: LineVertexOutput) -> @location(0) vec4<f32> {
     if (uniforms.use_custom_color != 0u) {
         return uniforms.line_color;
     }
     if (uniforms.line_mode == 1u) {
-        let line_t = f32(in.line_index) / max(1.0, f32(uniforms.line_count - 1u));
-        let rgb = sample_plot_colormap(uniforms.color, line_t);
+        let rgb = sample_plot_colormap(uniforms.color, series_t(in.line_index));
         return vec4<f32>(rgb, 1.0);
     }
     return evaluate_plot_color(in.raw_val, uniforms.color);
@@ -105,12 +117,12 @@ fn vs_scatter(
 
     let pt_idx = instance_idx % uniforms.profile_length;
     let line_idx = instance_idx / uniforms.profile_length;
-    out.line_index = line_idx;
 
-    let line_offset = line_idx * uniforms.profile_length;
+    let line_offset = line_idx * (uniforms.profile_length + 1u);
     let max_data_idx = arrayLength(&data_buffer) - 1u;
-    let safe_idx = min(line_offset + pt_idx, max_data_idx);
-    let raw_val = data_buffer[safe_idx];
+    out.line_index = data_buffer[min(line_offset, max_data_idx)];
+    let safe_idx = min(line_offset + 1u + pt_idx, max_data_idx);
+    let raw_val = bitcast<f32>(data_buffer[safe_idx]);
     out.raw_val = raw_val;
 
     let is_valid = raw_val == raw_val && abs(raw_val) < 1e30;
@@ -157,8 +169,7 @@ fn fs_scatter(in: ScatterVertexOutput) -> @location(0) vec4<f32> {
     if (uniforms.use_custom_color != 0u) {
         base_color = uniforms.line_color;
     } else if (uniforms.line_mode == 1u) {
-        let line_t = f32(in.line_index) / max(1.0, f32(uniforms.line_count - 1u));
-        let rgb = sample_plot_colormap(uniforms.color, line_t);
+        let rgb = sample_plot_colormap(uniforms.color, series_t(in.line_index));
         base_color = vec4<f32>(rgb, 1.0);
     } else {
         base_color = evaluate_plot_color(in.raw_val, uniforms.color);

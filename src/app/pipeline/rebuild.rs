@@ -111,11 +111,14 @@ impl OctantApp {
             let surface_renderers_ready =
                 !can_have_3d_surface || (renderers.sphere.is_some() && renderers.surface.is_some());
 
-            if same_dimensions
-                && renderers.heatmap.is_some()
-                && renderers.line.is_some()
-                && surface_renderers_ready
-            {
+            // Line plots draw only the base layer, from data uploaded at paint time:
+            // its renderer does not depend on the data and is built once.
+            if is_base && renderers.line.is_none() {
+                let line_renderer =
+                    LineRenderer::new(&wgpu_render_state.device, wgpu_render_state.target_format);
+                renderers.line = Some(Arc::new(line_renderer));
+            }
+            if same_dimensions && renderers.heatmap.is_some() && surface_renderers_ready {
                 if let Some(renderer) = &renderers.heatmap {
                     if let (Some(cx), Some(cy)) = (
                         effective_data.grid.coords_x(),
@@ -154,9 +157,6 @@ impl OctantApp {
                     coastline_renderer
                         .update_data(&wgpu_render_state.queue, &effective_data.values);
                 }
-                if let Some(line_renderer) = &renderers.line {
-                    line_renderer.update_data(&wgpu_render_state.queue, &effective_data.values);
-                }
             } else {
                 let coord_x = effective_data.grid.coords_x();
                 let coord_y = effective_data.grid.coords_y();
@@ -169,15 +169,7 @@ impl OctantApp {
                     coord_x,
                     coord_y,
                 );
-                let line_renderer = LineRenderer::new(
-                    &wgpu_render_state.device,
-                    wgpu_render_state.target_format,
-                    &effective_data.values,
-                    effective_data.width,
-                    effective_data.height,
-                );
                 renderers.heatmap = Some(Arc::new(renderer));
-                renderers.line = Some(Arc::new(line_renderer));
 
                 if total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
                     let coord_x = effective_data.grid.coords_x();
@@ -258,6 +250,7 @@ impl OctantApp {
         }
 
         layer.data.matrix = Some(data);
+        layer.data.touch_matrix();
     }
 
     /// Rebuilds or updates layer `id`'s GPU buffers for 3D volume data.
@@ -336,6 +329,7 @@ impl OctantApp {
 
         let depth = data.depth;
         layer.data.volume = Some(data);
+        layer.data.touch_volume();
         if upload_later {
             layer.renderers.mark_volume_dirty(0..depth);
         }

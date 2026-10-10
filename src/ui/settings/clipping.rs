@@ -18,9 +18,9 @@ pub(crate) fn show_color_settings(
     show_colorbar_label_controls(app, ui, id);
     ui.add_space(4.0);
     // An overridden range overrides the whole mapping: one note says why.
-    let mapped = support.color_mapping.is_yes();
+    let categorical = support.categorical.is_yes();
     gated(ui, support.color_range, |ui| {
-        show_color_range_controls(app, ui, id, mapped);
+        show_color_range_controls(app, ui, id, categorical);
         ui.add_space(4.0);
         gated(ui, support.color_mapping, |ui| {
             if let Some(layer) = app.layers.get_mut(id) {
@@ -36,7 +36,7 @@ pub(crate) fn show_color_settings(
     gated(ui, support.nan_color, |ui| {
         show_nan_color_picker(ui, color, id)
     });
-    if mapped {
+    if support.color_mapping.is_yes() {
         show_clip_color_pickers(ui, color, id);
     }
 }
@@ -69,15 +69,20 @@ fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: Laye
 }
 
 /// Min and max inputs with lock and reset; the Categorical toggle when the
-/// colormap is `mapped`.
-fn show_color_range_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId, mapped: bool) {
+/// plot honors it (`categorical`).
+fn show_color_range_controls(
+    app: &mut OctantApp,
+    ui: &mut egui::Ui,
+    id: LayerId,
+    categorical: bool,
+) {
     let Some(layer) = app.layers.get_mut(id) else {
         return;
     };
     let color = &mut layer.color;
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Color Range").strong());
-        if !mapped {
+        if !categorical {
             return;
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

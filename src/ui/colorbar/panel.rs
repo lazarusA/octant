@@ -5,11 +5,10 @@
 use super::axis::BarAxis;
 use super::bars::{self, BarColors, BarStyle};
 use super::handles::{VERTICAL_END_ROOM, draw_clip_triangles, draw_end_range_inputs};
-use super::ticks::format_scientific_tick;
-use super::{controls, layout};
+use super::ticks::{ScientificTick, TICK_BUF};
+use super::{controls, layout, series};
 use crate::app::OctantApp;
 use crate::app::layers::{BarOrientation, LayerId};
-use crate::plots::PlotType;
 use crate::ui::layer_label::LabelEditor;
 use crate::utils::colormap::unscale_norm_to_value;
 use egui::{Pos2, Rect, Vec2};
@@ -149,6 +148,10 @@ fn bar_row(
     axis: BarAxis,
     response: egui::Response,
 ) {
+    if id == LayerId::BASE && app.line_series_colored() {
+        series_bar_row(app, ui, axis, response);
+        return;
+    }
     let hover = paint_bar(app, ui, id, axis, response.hover_pos());
     let Some(layer) = app.layers.get_mut(id) else {
         return;
@@ -157,12 +160,28 @@ fn bar_row(
     draw_clip_triangles(ui, axis, color, id);
     draw_end_range_inputs(ui, axis, color);
     if let Some(value) = hover {
-        response.on_hover_text(format!("Val: {}", format_scientific_tick(value)));
+        let mut buf = [0u8; TICK_BUF + 5];
+        let text =
+            crate::utils::stack_str(&mut buf, format_args!("Val: {}", ScientificTick(value)));
+        response.on_hover_text(text);
     }
 }
 
-/// Paints layer `id`'s bar on `axis`: categorical swatches on 2D plots set
-/// to categorical, else a gradient. Returns the value under `hover`.
+/// The series bar of a line plot colored by series: no range inputs or clip
+/// triangles (the colors follow the lines, not the values), and the hovered
+/// line's coordinate as tooltip.
+fn series_bar_row(app: &OctantApp, ui: &egui::Ui, axis: BarAxis, response: egui::Response) {
+    let colors = BarColors::from_visuals(ui.visuals());
+    let series = series::Series::of(app);
+    let colormap = app.layer_colormap(&app.layers.base);
+    series::draw(app, ui, axis, &series, colormap, colors);
+    if let Some(pos) = response.hover_pos() {
+        series::show_hover_text(app, response, &series, axis.t_at(pos));
+    }
+}
+
+/// Paints layer `id`'s bar on `axis`: categorical swatches when the layer is
+/// set to categorical and its plot draws categories, else a gradient. Returns the value under `hover`.
 fn paint_bar(
     app: &OctantApp,
     ui: &egui::Ui,
@@ -170,28 +189,15 @@ fn paint_bar(
     axis: BarAxis,
     hover: Option<Pos2>,
 ) -> Option<f32> {
-    let is_3d = matches!(
-        app.effective_canvas_plot_type(),
-        PlotType::Volume | PlotType::PointCloud
-    );
     let layer = app.layers.get(id)?;
-    let visuals = ui.visuals();
-    let colors = BarColors {
-        border: visuals.widgets.noninteractive.fg_stroke.color,
-        strong_text: visuals.strong_text_color(),
-        text: visuals.text_color(),
-    };
+    let colors = BarColors::from_visuals(ui.visuals());
     let style = &layer.color;
     let bar = BarStyle {
         color: style,
         colormap: app.layer_colormap(layer),
     };
-    if !is_3d && style.categorical {
-        let unique = layer
-            .data
-            .matrix
-            .as_ref()
-            .and_then(|m| m.detect_unique_values());
+    if style.categorical && app.effective_canvas_plot_type().draws_categories() {
+        let unique = layer.data.matrix.as_ref().and_then(|m| m.unique_values());
         bars::draw_categorical(ui, axis, &bar, unique, colors);
     } else {
         bars::draw_continuous(ui, axis, &bar, colors);

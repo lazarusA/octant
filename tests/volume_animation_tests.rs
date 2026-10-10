@@ -205,6 +205,11 @@ fn test_octant_block_volume_extraction() {
     assert_eq!(vdata.max_val, 23.0);
 }
 
+/// Payload words as the samples they hold.
+fn floats(words: &[u32]) -> Vec<f32> {
+    words.iter().map(|&w| f32::from_bits(w)).collect()
+}
+
 #[test]
 fn test_line_profile_along_z_and_xyz() {
     let mut app = OctantApp::default();
@@ -227,17 +232,24 @@ fn test_line_profile_along_z_and_xyz() {
     app.line_profile_slice_idx = 0;
     app.line_plot_all_series = false;
 
-    let (payload, len, count) = app.get_line_profile_payload();
-    assert_eq!(len, 4);
-    assert_eq!(count, 1);
-    assert_eq!(payload, vec![0.0, 6.0, 12.0, 18.0]);
+    // Each drawn line is its index followed by the bits of its samples.
+    let p = app.line_payload();
+    assert_eq!(
+        (
+            p.shape.profile_length,
+            p.shape.drawn_lines,
+            p.shape.line_count
+        ),
+        (4, 1, 1)
+    );
+    assert_eq!(p.words[0], 0);
+    assert_eq!(floats(&p.words[1..]), [0.0, 6.0, 12.0, 18.0]);
 
     // 2. Along Z single profile at pixel 1 (x=1, y=0)
     app.line_profile_slice_idx = 1;
-    let (payload_p1, len_p1, count_p1) = app.get_line_profile_payload();
-    assert_eq!(len_p1, 4);
-    assert_eq!(count_p1, 1);
-    assert_eq!(payload_p1, vec![1.0, 7.0, 13.0, 19.0]);
+    let p = app.line_payload();
+    assert_eq!((p.shape.profile_length, p.shape.drawn_lines), (4, 1));
+    assert_eq!(floats(&p.words[1..]), [1.0, 7.0, 13.0, 19.0]);
 
     // 3. Along X (dim 0) - extracted from the layer's matrix (timestep slice)
     app.line_profile_dim_idx = 0;
@@ -252,10 +264,9 @@ fn test_line_profile_along_z_and_xyz() {
         1,
     ));
 
-    let (payload_x, len_x, count_x) = app.get_line_profile_payload();
-    assert_eq!(len_x, 2);
-    assert_eq!(count_x, 1);
-    assert_eq!(payload_x, vec![10.0, 20.0]);
+    let p = app.line_payload();
+    assert_eq!((p.shape.profile_length, p.shape.drawn_lines), (2, 1));
+    assert_eq!(floats(&p.words[1..]), [10.0, 20.0]);
 
     // Timestep advances -> new matrix slice
     app.layers.base.data.matrix = Some(octant::data::MatrixData::new(
@@ -267,10 +278,40 @@ fn test_line_profile_along_z_and_xyz() {
         "slice_t1".to_string(),
         1,
     ));
-    let (payload_x1, len_x1, count_x1) = app.get_line_profile_payload();
-    assert_eq!(len_x1, 2);
-    assert_eq!(count_x1, 1);
-    assert_eq!(payload_x1, vec![100.0, 200.0]);
+    let p = app.line_payload();
+    assert_eq!((p.shape.profile_length, p.shape.drawn_lines), (2, 1));
+    assert_eq!(floats(&p.words[1..]), [100.0, 200.0]);
+}
+
+#[test]
+fn all_lines_series_skip_empty_lines_but_keep_their_index() {
+    let mut app = OctantApp {
+        line_plot_all_series: true,
+        line_profile_dim_idx: 0,
+        ..Default::default()
+    };
+    app.layers.base.data.matrix = Some(octant::data::MatrixData::new(
+        2,
+        3,
+        vec![1.0, 2.0, f32::NAN, f32::NAN, 5.0, 6.0],
+        1.0,
+        6.0,
+        "rows".to_string(),
+        1,
+    ));
+    let p = app.line_payload();
+    assert_eq!(
+        (
+            p.shape.profile_length,
+            p.shape.drawn_lines,
+            p.shape.line_count
+        ),
+        (2, 2, 3)
+    );
+    assert_eq!(p.words[0], 0);
+    assert_eq!(floats(&p.words[1..3]), [1.0, 2.0]);
+    assert_eq!(p.words[3], 2, "row 1 has no data: row 2 follows");
+    assert_eq!(floats(&p.words[4..]), [5.0, 6.0]);
 }
 
 #[test]

@@ -2,50 +2,6 @@ use super::OctantApp;
 use super::state::StoreKind;
 
 impl OctantApp {
-    pub fn get_line_profile_payload(&self) -> (Vec<f32>, u32, u32) {
-        if self.line_profile_dim_idx == 2
-            && let Some(vdata) = &self.layers.base.data.volume
-            && vdata.depth > 1
-        {
-            if self.line_plot_all_series {
-                vdata.extract_all_z_lines_payload()
-            } else {
-                let (nx, ny, nz) = (vdata.width, vdata.height, vdata.depth);
-                let num_pixels = nx * ny;
-                let target_pixel = self
-                    .line_profile_slice_idx
-                    .min(num_pixels.saturating_sub(1));
-                let target_y = target_pixel / nx.max(1);
-                let target_x = target_pixel % nx.max(1);
-                (
-                    vdata.extract_z_line_profile(target_x, target_y),
-                    nz as u32,
-                    1,
-                )
-            }
-        } else if let Some(matrix) = &self.layers.base.data.matrix {
-            if self.line_plot_all_series {
-                matrix.extract_all_lines_payload(self.line_profile_dim_idx)
-            } else {
-                let (profile_length, max_slices) = if self.line_profile_dim_idx == 0 {
-                    (matrix.width, matrix.height)
-                } else {
-                    (matrix.height, matrix.width)
-                };
-                let slice_idx = self
-                    .line_profile_slice_idx
-                    .min(max_slices.saturating_sub(1));
-                (
-                    matrix.extract_1d_line_profile(self.line_profile_dim_idx, slice_idx),
-                    profile_length as u32,
-                    1,
-                )
-            }
-        } else {
-            (Vec::new(), 0, 0)
-        }
-    }
-
     pub fn inspect_active_store(&mut self) {
         self.is_loading = true;
         self.clear_active_metadata();

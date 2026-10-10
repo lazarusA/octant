@@ -15,6 +15,7 @@ impl OctantApp {
         layer.color.params(
             self.layer_colormap(layer),
             layer.composite.enabled,
+            self.effective_canvas_plot_type().draws_categories(),
             layer.data.matrix.as_ref(),
         )
     }

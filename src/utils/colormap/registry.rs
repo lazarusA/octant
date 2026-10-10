@@ -178,10 +178,14 @@ pub fn sample(id: u32, t: f32) -> Color32 {
 }
 
 /// [`sample`] with the nearest-texel flag given by the caller (the plot
-/// uniforms carry it), as WGSL `sample_colormap` does.
+/// uniforms carry it), as WGSL `sample_colormap` does. Unknown rows sample the
+/// default colormap with its own flag, as `ColorStyle::params` draws them.
 pub fn sample_row(id: u32, t: f32, nearest: bool) -> Color32 {
     with_row_lut(id, |lut| sample_lut(lut, t, nearest))
-        .or_else(|| with_row_lut(default_id(), |lut| sample_lut(lut, t, false)))
+        .or_else(|| {
+            let default = default_id();
+            with_row_lut(default, |lut| sample_lut(lut, t, is_stepped(default)))
+        })
         .unwrap_or(Color32::BLACK)
 }
 

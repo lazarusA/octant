@@ -26,7 +26,7 @@ pub use coastline::{
 };
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
-pub use line::{LineCallback, LineRenderer};
+pub use line::{LineCallback, LineRenderer, LineShape};
 pub use mesh::{Mesh3DCallback, Mesh3DRenderer};
 pub use point_cloud::{PointCloudCallback, PointCloudRenderer, PointCloudUniformParams};
 pub use sphere::{SphereCallback, SphereRenderer};
@@ -64,6 +64,13 @@ impl PlotType {
             self,
             PlotType::Heatmap | PlotType::Surface | PlotType::Sphere
         )
+    }
+
+    /// Whether categorical colors apply. Volumes and point clouds draw no
+    /// categories: their data has no category set, and DVR blends values
+    /// across voxels.
+    pub fn draws_categories(&self) -> bool {
+        !matches!(self, PlotType::Volume | PlotType::PointCloud)
     }
 
     /// Whether the plot is drawn in 3D, with an orbiting camera.

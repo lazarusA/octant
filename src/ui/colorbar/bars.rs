@@ -3,9 +3,11 @@
 
 use super::axis::BarAxis;
 use super::checker;
-use super::ticks::{format_scientific_tick, generate_colorbar_ticks};
+use super::ticks::{ScientificTick, TICK_BUF, generate_colorbar_ticks};
 use crate::app::layers::ColorStyle;
-use crate::utils::colormap::{apply_color_scale_cpu, orient, registry, unscale_norm_to_value};
+use crate::utils::colormap::{
+    LUT_SIZE, apply_color_scale_cpu, orient, registry, unscale_norm_to_value,
+};
 use egui::{Color32, Mesh, Pos2, Rect, Shape, Stroke, epaint::Vertex};
 
 /// What a bar draws: a layer's color style and the colormap row it shows.
@@ -34,6 +36,17 @@ pub struct BarColors {
     pub border: Color32,
     pub strong_text: Color32,
     pub text: Color32,
+}
+
+impl BarColors {
+    /// The colors of the current theme.
+    pub fn from_visuals(visuals: &egui::Visuals) -> Self {
+        Self {
+            border: visuals.widgets.noninteractive.fg_stroke.color,
+            strong_text: visuals.strong_text_color(),
+            text: visuals.text_color(),
+        }
+    }
 }
 
 /// Categories shown without unique values: ten even bins of the range.
@@ -71,35 +84,33 @@ pub fn draw_categorical(
     }
     for (i, &val) in cats.iter().enumerate() {
         let t = (i as f32 + 0.5) / n;
-        let label = (t > 0.12 && t < 0.88).then(|| format_scientific_tick(val));
-        major_tick(ui, axis, t, label.as_deref(), colors.strong_text);
+        let mut buf = [0u8; TICK_BUF];
+        let label = (t > 0.12 && t < 0.88)
+            .then(|| crate::utils::stack_str(&mut buf, format_args!("{}", ScientificTick(val))));
+        major_tick(ui, axis, t, label, colors.strong_text);
     }
 }
 
 /// Draws `bar`'s colormap as a gradient over its scale, with ticks.
 pub fn draw_continuous(ui: &egui::Ui, axis: BarAxis, bar: &BarStyle<'_>, colors: BarColors) {
-    const SEGMENTS: usize = 128;
     let c = bar.color;
     let mut mesh = Mesh::default();
-    let mut prev: Option<(f32, Color32)> = None;
-    for i in 0..=SEGMENTS {
-        let t = i as f32 / SEGMENTS as f32;
+    push_gradient(&mut mesh, axis, registry::is_stepped(bar.colormap), |t| {
         let raw = unscale_norm_to_value(t, c.range_min, c.range_max, c.scale_type, c.scale_param);
-        let color = bar.color_at(bar.scaled(raw));
-        if let Some((t0, c0)) = prev {
-            push_quad(&mut mesh, axis.quad(t0, t), [c0, color]);
-        }
-        prev = Some((t, color));
-    }
+        bar.color_at(bar.scaled(raw))
+    });
     paint_bar(ui, axis.rect, bar, mesh, colors.border);
 
     let ticks = generate_colorbar_ticks(c.range_min, c.range_max, c.scale_type, c.scale_param);
-    for tick in ticks {
+    for tick in ticks.iter() {
         let t = tick.t_pos;
         if tick.is_major {
             let grid = Stroke::new(1.0, Color32::from_black_alpha(80));
             ui.painter().line_segment(axis.across(t), grid);
-            let label = tick.label.as_deref().filter(|_| t > 0.12 && t < 0.88);
+            let mut buf = [0u8; TICK_BUF];
+            let label = (tick.labeled && t > 0.12 && t < 0.88).then(|| {
+                crate::utils::stack_str(&mut buf, format_args!("{}", ScientificTick(tick.val)))
+            });
             major_tick(ui, axis, t, label, colors.strong_text);
         } else {
             let ends = [axis.edge(t, -3.0), axis.edge(t, 3.5)];
@@ -108,9 +119,39 @@ pub fn draw_continuous(ui: &egui::Ui, axis: BarAxis, bar: &BarStyle<'_>, colors:
     }
 }
 
+/// Adds the bar's colors along `axis`, `color_at(t)` at bar position `t`:
+/// blended between segment ends, or for a `stepped` colormap one flat segment
+/// per texel, its edges where `sample_lut` switches to the next texel (exact
+/// on a linear scale, where bar and colormap positions agree).
+pub(super) fn push_gradient(
+    mesh: &mut Mesh,
+    axis: BarAxis,
+    stepped: bool,
+    color_at: impl Fn(f32) -> Color32,
+) {
+    const SEGMENTS: usize = 128;
+    const LAST_TEXEL: f32 = (LUT_SIZE - 1) as f32;
+    if stepped {
+        let edge = |k: usize| ((k as f32 - 0.5) / LAST_TEXEL).clamp(0.0, 1.0);
+        for k in 0..LUT_SIZE {
+            let color = color_at(k as f32 / LAST_TEXEL);
+            push_quad(mesh, axis.quad(edge(k), edge(k + 1)), [color, color]);
+        }
+    } else {
+        // Each segment starts in the color the previous one ended in.
+        let mut start = (0.0, color_at(0.0));
+        for i in 1..=SEGMENTS {
+            let t = i as f32 / SEGMENTS as f32;
+            let end = (t, color_at(t));
+            push_quad(mesh, axis.quad(start.0, end.0), [start.1, end.1]);
+            start = end;
+        }
+    }
+}
+
 /// Adds `quad` (its two corners at the start, then the two at the end),
 /// colored `start` to `end`.
-fn push_quad(mesh: &mut Mesh, quad: [Pos2; 4], [start, end]: [Color32; 2]) {
+pub(super) fn push_quad(mesh: &mut Mesh, quad: [Pos2; 4], [start, end]: [Color32; 2]) {
     let idx = mesh.vertices.len() as u32;
     let colors = [start, start, end, end];
     mesh.vertices
@@ -138,19 +179,33 @@ fn paint_bar(ui: &egui::Ui, bar_rect: Rect, bar: &BarStyle<'_>, mesh: Mesh, bord
 }
 
 /// A major tick across the bar's outer edge at `t`, with `label` past it.
-fn major_tick(ui: &egui::Ui, axis: BarAxis, t: f32, label: Option<&str>, color: Color32) {
-    const OUT: f32 = 5.5;
+pub(super) fn major_tick(
+    ui: &egui::Ui,
+    axis: BarAxis,
+    t: f32,
+    label: Option<&str>,
+    color: Color32,
+) {
     haloed_line(
         ui,
-        [axis.edge(t, -4.5), axis.edge(t, OUT)],
+        [axis.edge(t, -4.5), axis.edge(t, TICK_OUT)],
         (2.2, 1.2),
         color,
     );
     if let Some(label) = label {
-        let (pos, align) = axis.label(t, OUT + 2.0);
-        let font = egui::FontId::proportional(11.0);
-        ui.painter().text(pos, align, label, font, color);
+        let (pos, align) = axis.label(t, LABEL_GAP);
+        ui.painter().text(pos, align, label, label_font(), color);
     }
+}
+
+/// How far a major tick reaches past the bar's outer edge.
+const TICK_OUT: f32 = 5.5;
+/// Gap between the bar's outer edge and a tick label.
+pub(super) const LABEL_GAP: f32 = TICK_OUT + 2.0;
+
+/// The font of tick labels.
+pub(super) fn label_font() -> egui::FontId {
+    egui::FontId::proportional(11.0)
 }
 
 /// A tick between `ends`: a dark halo of width `w.0` under a `color` line of

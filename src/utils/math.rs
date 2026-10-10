@@ -244,28 +244,6 @@ pub fn compute_normalized_surface_height(
     }
 }
 
-/// Formats tick values cleanly using integer/decimal or concise scientific notation.
-pub fn format_scientific_tick(val: f32) -> String {
-    let abs_val = val.abs();
-    if abs_val == 0.0 {
-        "0".to_string()
-    } else if !(0.001..10000.0).contains(&abs_val) {
-        let s = format!("{:.2e}", val);
-        if let Some((mantissa, exponent)) = s.split_once('e') {
-            let clean_mantissa = mantissa.trim_end_matches('0').trim_end_matches('.');
-            format!("{}e{}", clean_mantissa, exponent)
-        } else {
-            s
-        }
-    } else if (val.fract()).abs() < 1e-5 {
-        format!("{:.0}", val)
-    } else if (val * 10.0).fract().abs() < 1e-5 {
-        format!("{:.1}", val)
-    } else {
-        format!("{:.2}", val)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -340,13 +318,6 @@ mod tests {
 
         let h_nan = compute_normalized_surface_height(f32::NAN, 0.0, 100.0, 0, 1.0);
         assert_eq!(h_nan, 0.0);
-    }
-
-    #[test]
-    fn test_format_scientific_tick() {
-        assert_eq!(format_scientific_tick(0.0), "0");
-        assert_eq!(format_scientific_tick(15.0), "15");
-        assert_eq!(format_scientific_tick(0.000045), "4.5e-5");
     }
 
     #[test]

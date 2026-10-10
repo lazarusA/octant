@@ -20,33 +20,6 @@ struct Common3DSpatialContext {
 }
 
 impl OctantApp {
-    /// Updates GPU vertex/storage buffer data for the currently active 2D renderer.
-    pub fn update_active_2d_renderer_data(&self, queue: &wgpu::Queue, values: &[f32]) {
-        match self.effective_canvas_plot_type() {
-            PlotType::Heatmap => {
-                if let Some(renderer) = &self.layers.base.renderers.heatmap {
-                    renderer.update_data(queue, values);
-                }
-            }
-            PlotType::Sphere => {
-                if let Some(sphere_renderer) = &self.layers.base.renderers.sphere {
-                    sphere_renderer.update_data(queue, values);
-                }
-            }
-            PlotType::Surface => {
-                if let Some(surface_renderer) = &self.layers.base.renderers.surface {
-                    surface_renderer.update_data(queue, values);
-                }
-            }
-            PlotType::Line => {
-                if let Some(line_renderer) = &self.layers.base.renderers.line {
-                    line_renderer.update_data(queue, values);
-                }
-            }
-            PlotType::Volume | PlotType::PointCloud => {}
-        }
-    }
-
     /// Resolves `layer`'s (width, height) for 3D Volume and PointCloud shaders.
     pub fn get_volume_dimensions(layer: &Layer) -> (u32, u32) {
         layer

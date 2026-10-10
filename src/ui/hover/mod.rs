@@ -123,7 +123,7 @@ pub fn show_hover_tooltip(
         hover_pos,
         target_pos,
         canvas_plot_type,
-        raw_val,
+        resolve_hover_color(app, raw_val, py),
         HoverValue::from_raw(raw_val, composite),
         var_name,
         var,
@@ -187,14 +187,14 @@ fn resolve_hover_target_info(
     (meta, var, var_name, units_str)
 }
 
-fn resolve_hover_color(app: &OctantApp, canvas_plot_type: PlotType, raw_val: f32) -> Color32 {
-    if canvas_plot_type == PlotType::Line && app.line_use_custom_color {
-        Color32::from_rgba_unmultiplied(
-            (app.line_color[0] * 255.0).clamp(0.0, 255.0) as u8,
-            (app.line_color[1] * 255.0).clamp(0.0, 255.0) as u8,
-            (app.line_color[2] * 255.0).clamp(0.0, 255.0) as u8,
-            (app.line_color[3] * 255.0).clamp(0.0, 255.0) as u8,
-        )
+/// The card's swatch: the color `raw_val` is drawn in, or on a line plot
+/// colored by series, the color of series line `line` (a missing value takes
+/// the NaN color, as no line is under it).
+fn resolve_hover_color(app: &OctantApp, raw_val: f32, line: usize) -> Color32 {
+    if app.line_series_colored() && raw_val.is_finite() {
+        app.line_series_color(line)
+    } else if app.line_custom_colored() {
+        crate::utils::colormap::eval::rgba_to_color32(app.line_color)
     } else {
         let color_params = app.get_color_params(&app.layers.base);
         evaluate_color_cpu(raw_val, &color_params)
@@ -209,7 +209,7 @@ fn paint_hover_card(
     hover_pos: Pos2,
     target_pos: Option<Pos2>,
     canvas_plot_type: PlotType,
-    raw_val: f32,
+    swatch: Color32,
     value: HoverValue,
     var_name: &str,
     var: Option<&VariableInfo>,
@@ -220,7 +220,6 @@ fn paint_hover_card(
     let mut rows = [LayerValue::EMPTY; MAX_OVERLAYS];
     let layers = overlays::hover_rows(app, canvas_plot_type, pixel, &mut rows);
     let title = HoverCard::title_for(var_name, var.and_then(|v| v.long_name.as_deref()));
-    let swatch = resolve_hover_color(app, canvas_plot_type, raw_val);
     let anchoring = if canvas_plot_type == PlotType::Line {
         Anchoring::FollowPointer
     } else {

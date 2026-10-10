@@ -152,21 +152,24 @@ impl ColorStyle {
     }
 
     /// The shader color uniforms drawing atlas row `shown` (the colormap after
-    /// preview and smoothing), as an RGB composite when `composite`; `matrix`
-    /// counts categories for categorical colors.
+    /// preview and smoothing), as an RGB composite when `composite`;
+    /// categorical colors only when the plot `draws_categories`, with `matrix`
+    /// counting the categories.
     pub fn params(
         &self,
         shown: u32,
         composite: bool,
+        draws_categories: bool,
         matrix: Option<&MatrixData>,
     ) -> PlotColorParams {
+        let categorical = self.categorical && draws_categories;
         // Ids that are no atlas row (e.g. a stale selection) draw the default,
         // so the GPU never reads a padding row the CPU would not.
         let row = Some(shown)
             .filter(|&id| registry::is_row(id))
             .unwrap_or_else(registry::default_id);
         let num_categories = matrix
-            .and_then(MatrixData::detect_unique_values)
+            .and_then(MatrixData::unique_values)
             .map_or(10, |unique| unique.len() as u32);
         PlotColorParams {
             colormap: if composite {
@@ -181,8 +184,8 @@ impl ColorStyle {
             use_highclip: u32::from(self.use_highclip),
             scale_type: self.scale_type,
             scale_param: self.scale_param,
-            is_categorical: u32::from(self.categorical),
-            num_categories: if self.categorical { num_categories } else { 10 },
+            is_categorical: u32::from(categorical),
+            num_categories: if categorical { num_categories } else { 10 },
             reverse: u32::from(self.reversed),
             nearest: u32::from(registry::is_stepped(row)),
             fallback_colormap: row,

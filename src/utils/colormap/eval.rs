@@ -62,7 +62,8 @@ fn sample(params: &PlotColorParams, t: f32) -> Color32 {
     Color32::from_rgba_unmultiplied(r, g, b, alpha)
 }
 
-fn rgba_to_color32(rgba: [f32; 4]) -> Color32 {
+/// `rgba` (0..1 straight alpha) as an 8-bit color.
+pub(crate) fn rgba_to_color32(rgba: [f32; 4]) -> Color32 {
     Color32::from_rgba_unmultiplied(
         (rgba[0] * 255.0).clamp(0.0, 255.0) as u8,
         (rgba[1] * 255.0).clamp(0.0, 255.0) as u8,

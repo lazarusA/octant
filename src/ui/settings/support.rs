@@ -1,7 +1,7 @@
 //! Which settings change the plot on the canvas: one table, read by every
 //! settings section, so the panel shows only what the renderer honors.
 
-use crate::app::OctantApp;
+use crate::app::{LineColoring, OctantApp};
 use crate::plots::PlotType;
 
 /// Volume algorithms (`VolumeUniformParams::algorithm`) the table tells apart.
@@ -65,8 +65,11 @@ pub(crate) struct PlotState {
 pub(crate) struct OptionSupport {
     /// Color range min and max (also the line plot's value axis).
     pub color_range: Support,
-    /// Scale, categorical colors, and the low and high clip colors.
+    /// Scale and the low and high clip colors.
     pub color_mapping: Support,
+    /// The Categorical toggle (`PlotType::draws_categories`; one color per
+    /// line on a line plot colored by series).
+    pub categorical: Support,
     pub nan_color: Support,
     /// Opacity and the alpha curve.
     pub opacity: Support,
@@ -121,6 +124,7 @@ impl PlotState {
         OptionSupport {
             color_range: self.color_range(),
             color_mapping: self.color_mapping(),
+            categorical: self.categorical(),
             nan_color: self.nan_color(),
             opacity: self.opacity(),
             transparency: self.transparency(),
@@ -154,16 +158,29 @@ impl PlotState {
         }
     }
 
+    /// Categorical colors bin values, or on a line plot colored by series,
+    /// give each line its own color.
+    fn categorical(&self) -> Support {
+        if !self.plot_type.draws_categories() {
+            Support::No
+        } else if self.line_coloring() == Some(LineColoring::Series) {
+            Support::Yes
+        } else {
+            self.color_mapping()
+        }
+    }
+
+    /// How the plot colors its lines, when it is a line plot.
+    fn line_coloring(&self) -> Option<LineColoring> {
+        LineColoring::for_plot(self.plot_type, self.line_custom_color, self.line_all_series)
+    }
+
     /// The line settings that replace the colormap, when the plot is a line.
     fn line_override(&self) -> Option<Support> {
-        if self.plot_type != PlotType::Line {
-            None
-        } else if self.line_custom_color {
-            Some(Support::Overridden(CUSTOM_COLOR))
-        } else if self.line_all_series {
-            Some(Support::Overridden(ALL_SERIES))
-        } else {
-            None
+        match self.line_coloring()? {
+            LineColoring::Custom => Some(Support::Overridden(CUSTOM_COLOR)),
+            LineColoring::Series => Some(Support::Overridden(ALL_SERIES)),
+            LineColoring::Values => None,
         }
     }
 

@@ -1,7 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use eframe::egui;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -42,13 +41,19 @@ pub struct LineUniformParams {
 
 use std::sync::RwLock;
 
+mod payload;
+
+pub use payload::LineShape;
+use payload::PayloadSlot;
+
 pub struct LineRenderer {
     render_pipeline: wgpu::RenderPipeline,
     scatter_pipeline: wgpu::RenderPipeline,
     bind_group_layout: wgpu::BindGroupLayout,
     uniform_buffer: wgpu::Buffer,
     gpu_resources: RwLock<LineGpuResources>,
-    data_len: AtomicU32,
+    /// The payload the data buffer holds (`upload_payload`).
+    payload: PayloadSlot,
 }
 
 struct LineGpuResources {
@@ -57,36 +62,26 @@ struct LineGpuResources {
 }
 
 impl LineRenderer {
-    pub fn new(
-        device: &wgpu::Device,
-        target_format: wgpu::TextureFormat,
-        matrix_data: &[f32],
-        width: usize,
-        height: usize,
-    ) -> Self {
+    /// A renderer with an empty data buffer: the first paint uploads the
+    /// line payload (`upload_payload`).
+    pub fn new(device: &wgpu::Device, target_format: wgpu::TextureFormat) -> Self {
         let shader_source = crate::assemble_plot_shader!(include_str!("shaders/line.wgsl"));
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("1D Line & Scatter WGSL Shader"),
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
-        let safe_data = if matrix_data.is_empty() {
-            vec![0.0f32; 64]
-        } else {
-            matrix_data.to_vec()
-        };
-
         let data_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("1D Line Storage Buffer"),
-            contents: bytemuck::cast_slice(&safe_data),
+            contents: bytemuck::cast_slice(&[0u32; 64]),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
         let initial_uniforms = LineUniforms {
             viewport_padding: [0.08, 0.12], // 8% horizontal, 12% vertical dynamic padding
             line_thickness: 2.0,
-            profile_length: width.max(1) as u32,
-            line_count: height.max(1) as u32,
+            profile_length: 1,
+            line_count: 1,
             line_mode: 0,
             pan: [0.0, 0.0],
             zoom: 1.0,
@@ -202,7 +197,7 @@ impl LineRenderer {
                 data_buffer,
                 bind_group,
             }),
-            data_len: AtomicU32::new(safe_data.len() as u32),
+            payload: PayloadSlot::default(),
         }
     }
 
@@ -226,85 +221,19 @@ impl LineRenderer {
         };
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
-
-    pub fn update_data_with_device(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        matrix_data: &[f32],
-    ) {
-        if matrix_data.is_empty() {
-            return;
-        }
-
-        let needed_bytes = std::mem::size_of_val(matrix_data) as u64;
-        let current_capacity = self
-            .gpu_resources
-            .read()
-            .map(|g| g.data_buffer.size())
-            .unwrap_or(0);
-
-        if needed_bytes > current_capacity {
-            let new_capacity = needed_bytes.next_power_of_two();
-            let new_data_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("1D Line Storage Buffer (Resized)"),
-                size: new_capacity,
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-
-            let new_bind_group = super::common::create_uniform_storage_bind_group(
-                device,
-                "1D Line Bind Group (Resized)",
-                &self.bind_group_layout,
-                &self.uniform_buffer,
-                &new_data_buffer,
-            );
-
-            queue.write_buffer(&new_data_buffer, 0, bytemuck::cast_slice(matrix_data));
-
-            if let Ok(mut guard) = self.gpu_resources.write() {
-                guard.data_buffer = new_data_buffer;
-                guard.bind_group = new_bind_group;
-            }
-        } else if let Ok(guard) = self.gpu_resources.read() {
-            queue.write_buffer(&guard.data_buffer, 0, bytemuck::cast_slice(matrix_data));
-        }
-
-        self.data_len
-            .store(matrix_data.len() as u32, Ordering::Relaxed);
-    }
-
-    pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
-        if matrix_data.is_empty() {
-            return;
-        }
-
-        if let Ok(guard) = self.gpu_resources.read()
-            && super::common::safe_write_buffer(
-                queue,
-                &guard.data_buffer,
-                matrix_data,
-                "LineRenderer::update_data",
-            )
-        {
-            self.data_len
-                .store(matrix_data.len() as u32, Ordering::Relaxed);
-        }
-    }
 }
 
+// The `PlotRenderer` traits' raw values do not fit the payload layout
+// (`payload.rs`): they only make the next paint upload the payload again.
 impl super::common::PlotRenderer for LineRenderer {
-    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
-        self.update_data(queue, values);
+    fn update_data(&self, _queue: &wgpu::Queue, _values: &[f32]) {
+        self.payload.forget();
     }
 }
 
 impl super::traits::PlotRenderer for LineRenderer {
-    fn update_data(&self, queue: &wgpu::Queue, data: &crate::data::RenderData) {
-        if let crate::data::RenderData::Matrix(m) = data {
-            self.update_data(queue, &m.values);
-        }
+    fn update_data(&self, _queue: &wgpu::Queue, _data: &crate::data::RenderData) {
+        self.payload.forget();
     }
 
     fn paint(
@@ -336,9 +265,8 @@ pub struct LineCallback {
     pub show_points: bool,
     pub point_size: f32,
     pub rect: egui::Rect,
-    pub profile_values: Vec<f32>,
-    pub profile_length: u32,
-    pub line_count: u32,
+    /// The payload uploaded to the renderer (`LineRenderer::upload_payload`).
+    pub shape: LineShape,
     pub line_mode: u32,
     pub pan: [f32; 2],
     pub zoom: f32,
@@ -354,10 +282,6 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         super::colormap_atlas::prepare(device, queue, callback_resources);
-        if !self.profile_values.is_empty() {
-            self.renderer
-                .update_data_with_device(device, queue, &self.profile_values);
-        }
         let screen_aspect = self.rect.width() / self.rect.height().max(1.0);
         self.renderer.update_uniforms(
             queue,
@@ -370,8 +294,8 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
                 point_size: self.point_size,
                 screen_aspect,
                 viewport_padding: [0.0, 0.0],
-                profile_length: self.profile_length,
-                line_count: self.line_count,
+                profile_length: self.shape.profile_length,
+                line_count: self.shape.line_count,
                 line_mode: self.line_mode,
                 pan: self.pan,
                 zoom: self.zoom,
@@ -398,16 +322,23 @@ impl eframe::egui_wgpu::CallbackTrait for LineCallback {
         };
         rpass.set_bind_group(0, &guard.bind_group, &[]);
 
-        let profile_length = self.profile_length.max(2);
-        let line_count = self.line_count;
-        if line_count > 0 && !self.profile_values.is_empty() {
-            if self.show_lines {
+        let LineShape {
+            profile_length,
+            drawn_lines: line_count,
+            ..
+        } = self.shape;
+        if line_count > 0 {
+            // A single sample has no segment: only its point shows.
+            if self.show_lines && profile_length >= 2 {
                 rpass.set_pipeline(&self.renderer.render_pipeline);
                 rpass.draw(0..profile_length, 0..line_count);
             }
             if self.show_points {
+                // One point per sample: the shader splits instances by the
+                // uniform `profile_length` (at least 1).
+                let points = profile_length.max(1).saturating_mul(line_count);
                 rpass.set_pipeline(&self.renderer.scatter_pipeline);
-                rpass.draw(0..6, 0..(profile_length * line_count));
+                rpass.draw(0..6, 0..points);
             }
         }
     }
