@@ -1,6 +1,15 @@
 //! Values derived once and kept in egui temp memory until their key changes,
 //! for per-frame UI text that is costly to format (coordinate labels).
 
+use std::hash::{DefaultHasher, Hash, Hasher};
+
+/// A 64-bit key for `value`, for caches keyed on several inputs at once.
+pub fn hash_key(value: impl Hash) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
+}
+
 /// The value kept under `id` for `key`; `make` computes (and stores) it when
 /// nothing is kept or it was kept for another key.
 pub fn cached<K, T>(ctx: &egui::Context, id: egui::Id, key: K, make: impl FnOnce() -> T) -> T

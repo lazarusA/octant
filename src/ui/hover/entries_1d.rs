@@ -58,39 +58,28 @@ fn resolve_line_profile_dim(
     app: &OctantApp,
     var: Option<&VariableInfo>,
 ) -> (String, Option<usize>) {
-    if let Some(v) = var {
-        let (explicit_x, explicit_y, explicit_z) =
-            v.resolve_spatial_dim_indices(app.effective_dim_config());
+    let axis = app.line_profile_dim_idx.min(2);
+    let p_idx = var.and_then(|v| line_axes(app, v)[axis]);
+    let name = var
+        .zip(p_idx)
+        .and_then(|(v, i)| v.dimension_names.get(i).cloned())
+        .or_else(|| app.get_spatial_dim_name(app.line_profile_dim_idx))
+        .unwrap_or_else(|| ["x", "y", "z"][axis].to_string());
+    (name, p_idx)
+}
 
-        let p_idx = match app.line_profile_dim_idx {
-            0 => explicit_x.or_else(|| v.dimension_names.len().checked_sub(1)),
-            1 => explicit_y.or_else(|| v.dimension_names.len().checked_sub(2)),
-            _ => explicit_z.or_else(|| {
-                (0..v.dimension_names.len())
-                    .find(|&i| Some(i) != explicit_x && Some(i) != explicit_y)
-            }),
-        };
-
-        let name = p_idx
-            .and_then(|i| v.dimension_names.get(i).cloned())
-            .or_else(|| app.get_spatial_dim_name(app.line_profile_dim_idx))
-            .unwrap_or_else(|| match app.line_profile_dim_idx {
-                2 => "z".to_string(),
-                1 => "y".to_string(),
-                _ => "x".to_string(),
-            });
-
-        (name, p_idx)
-    } else {
-        let name = app
-            .get_spatial_dim_name(app.line_profile_dim_idx)
-            .unwrap_or_else(|| match app.line_profile_dim_idx {
-                2 => "z".to_string(),
-                1 => "y".to_string(),
-                _ => "x".to_string(),
-            });
-        (name, None)
-    }
+/// The dimensions of `v` along X, Y and Z in a line plot: their explicit
+/// roles, else the last, the second-to-last and the first other dimension.
+/// The profile and the series dimension both read them, so they agree.
+fn line_axes(app: &OctantApp, v: &VariableInfo) -> [Option<usize>; 3] {
+    let (x, y, z) = v.resolve_spatial_dim_indices(app.effective_dim_config());
+    let n = v.dimension_names.len();
+    let (x, y) = (
+        x.or_else(|| n.checked_sub(1)),
+        y.or_else(|| n.checked_sub(2)),
+    );
+    let z = z.or_else(|| (0..n).find(|&i| Some(i) != x && Some(i) != y));
+    [x, y, z]
 }
 
 fn enrich_line_series_ortho_dim(
@@ -126,10 +115,10 @@ pub(crate) fn series_dim<'a>(
     var: Option<&'a VariableInfo>,
 ) -> Option<SeriesDim<'a>> {
     let v = var?;
-    let (explicit_x, explicit_y, _) = v.resolve_spatial_dim_indices(app.effective_dim_config());
+    let [x, y, _] = line_axes(app, v);
     let index = match app.line_profile_dim_idx {
-        0 => explicit_y,
-        1 => explicit_x,
+        0 => y,
+        1 => x,
         _ => None,
     }?;
     let name = v.dimension_names.get(index)?;

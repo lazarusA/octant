@@ -1,7 +1,6 @@
 //! The coordinate under a dimension slider: `850 hPa` for an index, `1000 hPa - 500 hPa` for
 //! a range, formatted like the hover card and cached until the selection changes.
 
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
 use egui::{RichText, Ui};
@@ -9,7 +8,7 @@ use egui::{RichText, Ui};
 use crate::app::OctantApp;
 use crate::data::VariableInfo;
 use crate::ui::hover::format::format_dimension_coord;
-use crate::ui::temp_cache::cached;
+use crate::ui::temp_cache::{cached, hash_key};
 
 /// Shows the coordinate of `start..=end` along dimension `dim`; nothing without coordinates.
 pub(super) fn show_coord_label(
@@ -34,20 +33,18 @@ pub(super) fn cached_label(
 ) -> Option<Arc<str>> {
     // The loaded metadata's generation, not the editable URL field: typing there must not
     // refresh this. The plotted target gives date hints, so it is part of the key too.
-    let mut hasher = DefaultHasher::new();
     let target = date_target(app).unwrap_or_default();
     let generation = (app.selected.metadata_generation, app.coordinates_revision);
-    (
+    let key = hash_key((
         generation,
         target,
         var.name.as_str(),
         &var.shape,
         dim,
         range,
-    )
-        .hash(&mut hasher);
+    ));
     let id = egui::Id::new(("dim_coord_label", dim));
-    cached(ctx, id, hasher.finish(), || {
+    cached(ctx, id, key, || {
         format_label(app, var, dim, range).map(Arc::from)
     })
 }

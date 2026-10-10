@@ -51,7 +51,7 @@ impl OctantApp {
             return;
         };
         let color_params = self.get_color_params(layer);
-        let shape = self.upload_line_payload(line_renderer);
+        let shape = self.upload_line_payload(layer);
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.canvas_rect,
             crate::plots::LineCallback {

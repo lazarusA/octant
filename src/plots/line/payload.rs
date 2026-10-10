@@ -3,7 +3,7 @@
 //! `array<u32>` and bitcasts the samples, so no float load can flush a small
 //! index to zero), which payload the buffer holds, and its upload.
 //! `OctantApp::upload_line_payload` is the one gate against the device's
-//! buffer limit: a layout past it is refused and reported once.
+//! buffer limit: a payload past it is refused, and reported once per layout.
 
 use std::sync::Mutex;
 
@@ -20,15 +20,17 @@ pub struct LineShape {
 }
 
 /// What a renderer's buffer holds: the key and shape of its payload (`None`
-/// before the first upload or after a raw write), and the layout refused for
-/// being past the device's limit.
+/// before the first upload or after a raw write), and the last payload
+/// refused for being past the device's limit (its key and its layout's).
+/// Whether a payload fits depends on its data, so a refusal holds only for
+/// its key; it is reported again only for another layout.
 #[derive(Default)]
 pub(super) struct PayloadSlot(Mutex<Held>);
 
 #[derive(Clone, Copy, Default)]
 struct Held {
     payload: Option<(u64, LineShape)>,
-    refused: Option<u64>,
+    refused: Option<(u64, u64)>,
 }
 
 impl PayloadSlot {
@@ -52,13 +54,15 @@ impl PayloadSlot {
         self.with(|h| h.payload = None);
     }
 
-    /// Records layout `layout` as refused; `true` when it was not already.
-    fn refuse(&self, layout: u64) -> bool {
-        self.with(|h| h.refused.replace(layout) != Some(layout))
+    /// Records the payload for `key`, of layout `layout`, as refused; `true`
+    /// when no payload of that layout was refused last.
+    fn refuse(&self, key: u64, layout: u64) -> bool {
+        let last = self.with(|h| h.refused.replace((key, layout)));
+        last.is_none_or(|(_, l)| l != layout)
     }
 
-    fn refuses(&self, layout: u64) -> bool {
-        self.with(|h| h.refused == Some(layout))
+    fn refuses(&self, key: u64) -> bool {
+        self.with(|h| h.refused.is_some_and(|(k, _)| k == key))
     }
 }
 
@@ -78,16 +82,17 @@ impl LineRenderer {
         self.payload.shape(key)
     }
 
-    /// Whether layout `layout` (a hash of the app's `LineLayout`) was refused
-    /// for being past the device's limit.
-    pub fn refuses(&self, layout: u64) -> bool {
-        self.payload.refuses(layout)
+    /// Whether the payload for `key` was refused for being past the
+    /// device's limit.
+    pub fn refuses(&self, key: u64) -> bool {
+        self.payload.refuses(key)
     }
 
-    /// Refuses layout `layout`, whose payload takes `needed` bytes, past the
-    /// device's `limit`; reports it the first time.
-    pub fn refuse(&self, layout: u64, needed: u64, limit: u64) {
-        if self.payload.refuse(layout) {
+    /// Refuses the payload for `key`, of layout `layout` (a hash of the app's
+    /// `LineLayout`), which takes `needed` bytes, past the device's `limit`;
+    /// reports it unless the last refusal was of the same layout.
+    pub fn refuse(&self, key: u64, layout: u64, needed: u64, limit: u64) {
+        if self.payload.refuse(key, layout) {
             crate::ui::toast::report(
                 crate::ui::toast::Severity::Warning,
                 "Line plot too large for the GPU",
@@ -184,13 +189,15 @@ mod tests {
     }
 
     #[test]
-    fn a_layout_is_refused_once() {
+    fn a_refusal_holds_for_its_key_and_reports_once_per_layout() {
         let slot = PayloadSlot::default();
         assert!(!slot.refuses(4));
-        assert!(slot.refuse(4), "first refusal reports");
-        assert!(!slot.refuse(4), "the same layout again does not");
+        assert!(slot.refuse(4, 40), "first refusal reports");
         assert!(slot.refuses(4));
-        assert!(slot.refuse(5) && !slot.refuses(4), "another layout");
+        assert!(!slot.refuses(5), "new data is measured again");
+        assert!(!slot.refuse(5, 40), "the same layout does not report again");
+        assert!(slot.refuses(5) && !slot.refuses(4));
+        assert!(slot.refuse(6, 60), "another layout reports");
     }
 
     /// The renderer reports the payload it holds only for the key it was

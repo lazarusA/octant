@@ -3,7 +3,6 @@
 //! coordinate of the dimension the lines run across (`series_field`, as the
 //! hover card shows it).
 
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
 use egui::{Mesh, Rangef, Shape, Stroke};
@@ -12,7 +11,7 @@ use super::axis::BarAxis;
 use super::bars::{self, BarColors};
 use crate::app::{OctantApp, series_line_at, series_t};
 use crate::ui::hover::entries_1d::{series_dim, series_field};
-use crate::ui::temp_cache::cached;
+use crate::ui::temp_cache::{cached, hash_key};
 use crate::utils::colormap::{orient, registry};
 
 /// Lines labeled at most, spread evenly from the first to the last.
@@ -141,15 +140,12 @@ pub(super) fn show_hover_text(app: &OctantApp, response: egui::Response, series:
 /// (its roles, range and flip).
 fn labels_key(app: &OctantApp, n: usize) -> u64 {
     let plotted = app.plotted();
-    let mut hasher = DefaultHasher::new();
-    (
+    hash_key((
         (plotted.metadata_generation, app.coordinates_revision),
         (plotted.store_target.as_str(), plotted.variable_idx),
         series_dim(app, plotted.variable_info()),
         n,
-    )
-        .hash(&mut hasher);
-    hasher.finish()
+    ))
 }
 
 /// The labeled lines, formatted only when the series or its coordinates

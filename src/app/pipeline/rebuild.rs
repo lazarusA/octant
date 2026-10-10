@@ -111,11 +111,14 @@ impl OctantApp {
             let surface_renderers_ready =
                 !can_have_3d_surface || (renderers.sphere.is_some() && renderers.surface.is_some());
 
-            if same_dimensions
-                && renderers.heatmap.is_some()
-                && renderers.line.is_some()
-                && surface_renderers_ready
-            {
+            // Line plots draw only the base layer, from data uploaded at paint time:
+            // its renderer does not depend on the data and is built once.
+            if is_base && renderers.line.is_none() {
+                let line_renderer =
+                    LineRenderer::new(&wgpu_render_state.device, wgpu_render_state.target_format);
+                renderers.line = Some(Arc::new(line_renderer));
+            }
+            if same_dimensions && renderers.heatmap.is_some() && surface_renderers_ready {
                 if let Some(renderer) = &renderers.heatmap {
                     if let (Some(cx), Some(cy)) = (
                         effective_data.grid.coords_x(),
@@ -166,10 +169,7 @@ impl OctantApp {
                     coord_x,
                     coord_y,
                 );
-                let line_renderer =
-                    LineRenderer::new(&wgpu_render_state.device, wgpu_render_state.target_format);
                 renderers.heatmap = Some(Arc::new(renderer));
-                renderers.line = Some(Arc::new(line_renderer));
 
                 if total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
                     let coord_x = effective_data.grid.coords_x();

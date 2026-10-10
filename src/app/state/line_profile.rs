@@ -3,10 +3,10 @@
 //! on which line is which without building the payload. The payload is built
 //! and uploaded only when its key (`line_payload_key`) changes.
 
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use super::app_state::OctantApp;
+use crate::app::layers::{Layer, LayerId};
 use crate::plots::{LineRenderer, LineShape};
+use crate::ui::temp_cache::hash_key;
 
 /// `line_count` lines of `profile_length` samples: sample `s` of line `l` is
 /// `values[first + l * line_stride + s * sample_stride]` (NaN past the end).
@@ -77,6 +77,28 @@ impl LineLayout {
         u64::try_from(words).ok()?.checked_mul(4)
     }
 
+    /// The lines of `values` with data, in order: the lines a payload holds.
+    pub(super) fn lines_with_data(&self, values: &[f32]) -> Vec<u32> {
+        (0..self.line_count)
+            .filter(|&l| self.has_data(values, l))
+            .filter_map(|l| u32::try_from(l).ok())
+            .collect()
+    }
+
+    /// The payload of lines `drawn` (`lines_with_data`) of `values`.
+    fn payload(&self, values: &[f32], drawn: &[u32]) -> LinePayload {
+        let words = self.payload_bytes(drawn.len()).unwrap_or(0) / 4;
+        let mut payload = Vec::with_capacity(usize::try_from(words).unwrap_or(0));
+        for &line in drawn {
+            payload.push(line);
+            payload.extend(self.row(values, line as usize).map(f32::to_bits));
+        }
+        LinePayload {
+            words: payload,
+            shape: self.shape(u32::try_from(drawn.len()).unwrap_or(u32::MAX)),
+        }
+    }
+
     /// The shape of a payload of this layout with `drawn` lines.
     fn shape(&self, drawn: u32) -> LineShape {
         LineShape {
@@ -140,68 +162,54 @@ impl OctantApp {
     /// The renderer's payload: lines without a finite value are left out.
     pub fn line_payload(&self) -> LinePayload {
         let (values, layout) = self.line_layout();
-        let words = layout
-            .line_count
-            .checked_mul(layout.profile_length.saturating_add(1));
-        let mut payload = Vec::with_capacity(words.unwrap_or(0));
-        let mut drawn = 0;
-        for line in (0..layout.line_count).filter(|&l| layout.has_data(values, l)) {
-            payload.push(line as u32);
-            payload.extend(layout.row(values, line).map(f32::to_bits));
-            drawn += 1;
-        }
-        LinePayload {
-            words: payload,
-            shape: layout.shape(drawn),
-        }
+        layout.payload(values, &layout.lines_with_data(values))
     }
 
     /// Identifies the payload `line_payload` builds: the version of the data
     /// it reads and the layout of its lines.
     pub fn line_payload_key(&self) -> u64 {
         let (_, layout, version) = self.line_source();
-        hash_of((version, layout))
+        payload_key(layout, version)
     }
 
-    /// The shape of the payload `renderer` draws, building and uploading it
-    /// first only when the data or its layout changed since the last upload.
-    /// A payload past the device's buffer limit is never built: its layout is
-    /// refused (and reported) once, until the layout changes.
-    pub fn upload_line_payload(&self, renderer: &LineRenderer) -> LineShape {
+    /// The shape of the payload `layer`'s line renderer draws, building and
+    /// uploading it first only when the data or its layout changed since the
+    /// last upload. Only the base layer draws lines. A payload past the
+    /// device's buffer limit is never built: it is refused, and reported once
+    /// until the layout changes.
+    pub fn upload_line_payload(&self, layer: &Layer) -> LineShape {
+        let Some(renderer) = layer.renderers.line.as_deref() else {
+            return LineShape::default();
+        };
+        let Some(state) = self.wgpu_render_state.as_ref() else {
+            return LineShape::default();
+        };
+        if layer.id() != LayerId::BASE {
+            return LineShape::default();
+        }
         let (values, layout, version) = self.line_source();
-        let key = hash_of((version, layout));
+        let key = payload_key(layout, version);
         if let Some(shape) = renderer.payload_shape(key) {
             return shape;
         }
-        let layout_key = hash_of(layout);
-        let Some(state) = &self.wgpu_render_state else {
-            return LineShape::default();
-        };
-        if renderer.refuses(layout_key) {
+        if renderer.refuses(key) {
             return layout.shape(0);
         }
+        let drawn = layout.lines_with_data(values);
+        let bytes = layout.payload_bytes(drawn.len()).unwrap_or(u64::MAX);
         let limit = LineRenderer::payload_limit(&state.device);
-        // Count the lines with data only when drawing all of them would not fit.
-        let bytes = match layout.payload_bytes(layout.line_count) {
-            Some(most) if most <= limit => most,
-            _ => {
-                let drawn = (0..layout.line_count).filter(|&l| layout.has_data(values, l));
-                layout.payload_bytes(drawn.count()).unwrap_or(u64::MAX)
-            }
-        };
         if bytes > limit {
-            renderer.refuse(layout_key, bytes, limit);
+            renderer.refuse(key, hash_key(layout), bytes, limit);
             return layout.shape(0);
         }
-        let payload = self.line_payload();
+        let payload = layout.payload(values, &drawn);
         let (device, queue) = (&state.device, &state.queue);
         renderer.upload_payload(device, queue, key, &payload.words, payload.shape);
         payload.shape
     }
 }
 
-fn hash_of(value: impl Hash) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    value.hash(&mut hasher);
-    hasher.finish()
+/// The key of the payload of `layout` over data at `version`.
+fn payload_key(layout: LineLayout, version: u64) -> u64 {
+    hash_key((version, layout))
 }

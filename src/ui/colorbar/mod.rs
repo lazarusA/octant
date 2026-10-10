@@ -19,6 +19,7 @@ mod panel;
 mod series;
 #[cfg(test)]
 mod tests;
+mod tick_label;
 pub mod ticks;
 
 pub use ticks::{ColorbarTick, format_scientific_tick, generate_colorbar_ticks};
