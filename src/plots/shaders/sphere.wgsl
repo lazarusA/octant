@@ -71,8 +71,8 @@ fn vs_main(
         cell_x, cell_y, model.position.xy, grid_w, grid_h,
         uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
     );
-    let lon = coords.x;
-    let lat = coords.y;
+    var lon = coords.x;
+    var lat = coords.y;
 
     var pos_3d: vec3<f32>;
     var normal_3d: vec3<f32>;
@@ -89,10 +89,15 @@ fn vs_main(
             let healpix_uv = vec2<f32>(model.position.x, 1.0 - model.position.y);
             raw_val = healpix_get_interpolated_corner_val(safe_idx, healpix_uv, nside, uniforms.coord_mode == 5u, max_idx);
         } else {
-            let corner_x = min(cell_x + u32(round(model.position.x)), grid_w - 1u);
-            let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);
-            let corner_idx = min(corner_y * grid_w + corner_x, max_idx);
-            raw_val = data_buffer[corner_idx];
+            let sx = smooth_corner(cell_x, model.position.x, grid_w, uniforms.coord_mode == 0u);
+            let sy = smooth_corner(cell_y, model.position.y, grid_h, false);
+            raw_val = data_buffer[min(sy.cell * grid_w + sx.cell, max_idx)];
+            let corner = get_lon_lat(
+                sx.at_cell, sy.at_cell, vec2<f32>(sx.frac, sy.frac), grid_w, grid_h,
+                uniforms.coord_mode, uniforms.lon_bounds, uniforms.lat_bounds,
+            );
+            lon = corner.x;
+            lat = corner.y;
         }
 
         let dr = get_normalized_radial_dr(raw_val);

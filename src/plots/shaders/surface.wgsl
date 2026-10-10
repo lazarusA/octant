@@ -120,10 +120,14 @@ fn vs_main(
             let healpix_uv = vec2<f32>(model.position.x, 1.0 - model.position.y);
             raw_val = healpix_get_interpolated_corner_val(safe_idx, healpix_uv, nside, uniforms.coord_mode == 5u, max_idx);
         } else {
-            let corner_x = min(cell_x + u32(round(model.position.x)), grid_w - 1u);
-            let corner_y = min(cell_y + u32(round(model.position.y)), grid_h - 1u);
-            let corner_idx = min(corner_y * grid_w + corner_x, max_idx);
-            raw_val = data_buffer[corner_idx];
+            let sx = smooth_corner(cell_x, model.position.x, grid_w, false);
+            let sy = smooth_corner(cell_y, model.position.y, grid_h, false);
+            raw_val = data_buffer[min(sy.cell * grid_w + sx.cell, max_idx)];
+            let bounds_u = get_cell_normalized_bounds_x(sx.at_cell, grid_w, uniforms.coord_mode);
+            let bounds_v = get_cell_normalized_bounds_y(sy.at_cell, grid_h, uniforms.coord_mode);
+            let data_aspect = max(f32(grid_w) / f32(grid_h), 0.1);
+            world_x = -data_aspect + mix(bounds_u.x, bounds_u.y, sx.frac) * 2.0 * data_aspect;
+            world_z = -1.0 + mix(bounds_v.x, bounds_v.y, sy.frac) * 2.0;
         }
 
         let norm_h = get_normalized_height(raw_val);

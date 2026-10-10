@@ -167,17 +167,16 @@ pub fn resolve_target_screen_pos(
     transform_2d: &Transform2D,
     px: usize,
     py: usize,
-    raw_val: f32,
     point_3d_hit: Option<(usize, usize, usize, f32)>,
 ) -> Option<Pos2> {
     match app.effective_canvas_plot_type() {
         PlotType::Sphere => {
             let matrix = matrix?;
-            sphere_target_pos(app, matrix, camera, px, py, raw_val)
+            sphere_target_pos(app, matrix, camera, px, py)
         }
         PlotType::Surface => {
             let matrix = matrix?;
-            surface_target_pos(app, matrix, camera, px, py, raw_val)
+            surface_target_pos(app, matrix, camera, px, py)
         }
         PlotType::PointCloud | PlotType::Volume => {
             let sampler = sampler?;

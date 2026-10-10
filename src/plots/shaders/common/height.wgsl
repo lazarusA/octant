@@ -36,3 +36,34 @@ fn normalized_height(val: f32, cmin: f32, cmax: f32, composite: bool, flip: bool
     }
     return select(h, top - h, flip);
 }
+
+// Smooth-mode vertex of a heightfield quad: values sit at cell centers, so the
+// quad of a cell spans from its center to the next one's. The first and last
+// vertices of an axis stretch to its outer edges so the surface covers the
+// grid, unless the axis wraps around (global longitudes), where the last
+// quad joins the last center to the first (CPU mirror: `ui::hover::smooth`).
+struct SmoothCorner {
+    // Cell whose value the vertex carries.
+    cell: u32,
+    // Cell and fraction within it where the vertex sits; one cell past the
+    // last on a wrapped axis.
+    at_cell: u32,
+    frac: f32,
+};
+
+fn smooth_corner(cell: u32, pos: f32, n: u32, wrap: bool) -> SmoothCorner {
+    let count = max(n, 1u);
+    let j = cell + u32(round(pos));
+    if (wrap) {
+        return SmoothCorner(j % count, j, 0.5);
+    }
+    let last = count - 1u;
+    var frac = 0.5;
+    if (j == 0u) {
+        frac = 0.0;
+    } else if (j >= last) {
+        frac = 1.0;
+    }
+    let at = min(j, last);
+    return SmoothCorner(at, at, frac);
+}
