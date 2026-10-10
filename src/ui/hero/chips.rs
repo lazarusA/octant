@@ -78,7 +78,7 @@ pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 let (label, uri, desc) = SAMPLES[item - 1];
                 let galley = Arc::clone(&chips[item - 1]);
                 if render_chip(ui, item - 1, label, galley, desc).clicked() {
-                    app.hero_state.input = uri.to_string();
+                    app.layout.hero_state.input = uri.to_string();
                     app.submit_or_activate_source(uri, None);
                 }
             }

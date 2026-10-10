@@ -22,13 +22,11 @@ impl OctantApp {
     }
 
     pub fn reset_heatmap_view(&mut self) {
-        self.heatmap_zoom = 1.0;
-        self.heatmap_pan = egui::Vec2::ZERO;
+        self.nav.reset_heatmap();
     }
 
     pub fn reset_line_view(&mut self) {
-        self.line_zoom = 1.0;
-        self.line_pan = egui::Vec2::ZERO;
+        self.nav.reset_line();
     }
 
     /// Returns the default automatic label for the active plotted variable (including unit if available).

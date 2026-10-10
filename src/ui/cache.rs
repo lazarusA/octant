@@ -131,7 +131,10 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
 
         ui.separator();
         ui.label(egui::RichText::new("Prefetch & Capacity Settings").strong());
-        ui.checkbox(&mut app.enable_prefetch, "Enable Background Prefetching");
+        ui.checkbox(
+            &mut app.playback.enable_prefetch,
+            "Enable Background Prefetching",
+        );
         let old_mb = app.max_cache_mb;
         ui.add(egui::Slider::new(&mut app.max_cache_mb, 256..=8192).suffix(" MB Limit"));
         if old_mb != app.max_cache_mb {

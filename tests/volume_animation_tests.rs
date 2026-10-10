@@ -147,10 +147,10 @@ fn test_get_volume_shifts_for_spatial_dimensions() {
     ];
     app.layers.base.selection_mut().animated_dim = Some(0);
 
-    app.current_timestep = 5;
+    app.playback.current_timestep = 5;
     assert_eq!(app.get_volume_shifts(), (0, 0, 5));
 
-    app.current_timestep = 35; // 35 % 30 = 5
+    app.playback.current_timestep = 35; // 35 % 30 = 5
     assert_eq!(app.get_volume_shifts(), (0, 0, 5));
 
     // Case 2: X is animated (dim 2)
@@ -158,10 +158,10 @@ fn test_get_volume_shifts_for_spatial_dimensions() {
     app.layers.base.selection_mut().dim_config[2].animation = AnimationRole::Animated;
     app.layers.base.selection_mut().animated_dim = Some(2);
 
-    app.current_timestep = 4;
+    app.playback.current_timestep = 4;
     assert_eq!(app.get_volume_shifts(), (4, 0, 0));
 
-    app.current_timestep = 14; // 14 % 10 = 4
+    app.playback.current_timestep = 14; // 14 % 10 = 4
     assert_eq!(app.get_volume_shifts(), (4, 0, 0));
 
     // Case 3: Y is animated (dim 1)
@@ -169,10 +169,10 @@ fn test_get_volume_shifts_for_spatial_dimensions() {
     app.layers.base.selection_mut().dim_config[1].animation = AnimationRole::Animated;
     app.layers.base.selection_mut().animated_dim = Some(1);
 
-    app.current_timestep = 7;
+    app.playback.current_timestep = 7;
     assert_eq!(app.get_volume_shifts(), (0, 7, 0));
 
-    app.current_timestep = 27; // 27 % 20 = 7
+    app.playback.current_timestep = 27; // 27 % 20 = 7
     assert_eq!(app.get_volume_shifts(), (0, 7, 0));
 }
 
@@ -228,9 +228,9 @@ fn test_line_profile_along_z_and_xyz() {
     ));
 
     // 1. Along Z (dim 2) single profile at pixel 0 (x=0, y=0)
-    app.line_profile_dim_idx = 2;
-    app.line_profile_slice_idx = 0;
-    app.line_plot_all_series = false;
+    app.plot_configs.line.profile_dim_idx = 2;
+    app.plot_configs.line.profile_slice_idx = 0;
+    app.plot_configs.line.all_series = false;
 
     // Each drawn line is its index followed by the bits of its samples.
     let p = app.line_payload();
@@ -246,14 +246,14 @@ fn test_line_profile_along_z_and_xyz() {
     assert_eq!(floats(&p.words[1..]), [0.0, 6.0, 12.0, 18.0]);
 
     // 2. Along Z single profile at pixel 1 (x=1, y=0)
-    app.line_profile_slice_idx = 1;
+    app.plot_configs.line.profile_slice_idx = 1;
     let p = app.line_payload();
     assert_eq!((p.shape.profile_length, p.shape.drawn_lines), (4, 1));
     assert_eq!(floats(&p.words[1..]), [1.0, 7.0, 13.0, 19.0]);
 
     // 3. Along X (dim 0) - extracted from the layer's matrix (timestep slice)
-    app.line_profile_dim_idx = 0;
-    app.line_profile_slice_idx = 0;
+    app.plot_configs.line.profile_dim_idx = 0;
+    app.plot_configs.line.profile_slice_idx = 0;
     app.layers.base.data.matrix = Some(octant::data::MatrixData::new(
         2,
         3,
@@ -285,11 +285,9 @@ fn test_line_profile_along_z_and_xyz() {
 
 #[test]
 fn all_lines_series_skip_empty_lines_but_keep_their_index() {
-    let mut app = OctantApp {
-        line_plot_all_series: true,
-        line_profile_dim_idx: 0,
-        ..Default::default()
-    };
+    let mut app = OctantApp::default();
+    app.plot_configs.line.all_series = true;
+    app.plot_configs.line.profile_dim_idx = 0;
     app.layers.base.data.matrix = Some(octant::data::MatrixData::new(
         2,
         3,
@@ -688,7 +686,7 @@ fn test_volume_animation_timeline_progression() {
 
     // Simulate stepping through all timesteps in OctantApp
     for step in 0..nt {
-        app.current_timestep = step;
+        app.playback.current_timestep = step;
         app.selected.dim_indices[0] = step;
         app.sync_plotted_state_from_selected();
         app.apply_block_projection(LayerId::BASE, &block);
@@ -813,7 +811,7 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
     app.layers.base.color.lock_bounds = false;
 
     for step in 0..nt {
-        app.current_timestep = step;
+        app.playback.current_timestep = step;
         app.layers.base.selection_mut().dim_indices[0] = step;
         app.apply_block_projection(LayerId::BASE, &block);
 
@@ -828,7 +826,7 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
     app.layers.base.color.lock_bounds = true;
 
     for step in 0..nt {
-        app.current_timestep = step;
+        app.playback.current_timestep = step;
         app.layers.base.selection_mut().dim_indices[0] = step;
         app.apply_block_projection(LayerId::BASE, &block);
 
@@ -847,28 +845,28 @@ fn test_volume_dynamic_vs_locked_color_bounds() {
 #[test]
 fn test_volume_transparency_setting_default_and_toggle() {
     let mut app = OctantApp::default();
-    assert!(app.volume_transparency);
+    assert!(app.plot_configs.volume.transparency);
 
-    app.volume_transparency = false;
-    assert!(!app.volume_transparency);
+    app.plot_configs.volume.transparency = false;
+    assert!(!app.plot_configs.volume.transparency);
 
-    app.volume_transparency = true;
-    assert!(app.volume_transparency);
+    app.plot_configs.volume.transparency = true;
+    assert!(app.plot_configs.volume.transparency);
 }
 
 #[test]
 fn test_volume_attenuation_and_advanced_algorithms() {
     let mut app = OctantApp::default();
-    assert_eq!(app.volume_algorithm, 0);
-    assert_eq!(app.volume_attenuation, 0.0);
+    assert_eq!(app.plot_configs.volume.algorithm, 0);
+    assert_eq!(app.plot_configs.volume.attenuation, 0.0);
 
-    app.volume_attenuation = 1.5;
-    assert_eq!(app.volume_attenuation, 1.5);
+    app.plot_configs.volume.attenuation = 1.5;
+    assert_eq!(app.plot_configs.volume.attenuation, 1.5);
 
     // Test algorithm IDs: 0..=7
     for algo_id in 0..=7 {
-        app.volume_algorithm = algo_id;
-        assert_eq!(app.volume_algorithm, algo_id);
+        app.plot_configs.volume.algorithm = algo_id;
+        assert_eq!(app.plot_configs.volume.algorithm, algo_id);
     }
 }
 

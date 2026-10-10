@@ -66,31 +66,31 @@ impl OctantApp {
     ) -> crate::plots::VolumeUniformParams {
         let mut ctx = self.get_common_3d_spatial_context(layer);
         // Classic modes (1-7) keep their original opacity.
-        if self.volume_algorithm != 0 {
+        if self.plot_configs.volume.algorithm != 0 {
             ctx.color.opacity = 1.0;
             ctx.color.alpha_row = crate::utils::colormap::NO_ALPHA_ROW;
         }
 
         crate::plots::VolumeUniformParams {
             color: ctx.color,
-            rot_y: self.sphere_rotation_y,
-            rot_x: self.sphere_rotation_x,
+            rot_y: self.nav.sphere_rotation_y,
+            rot_x: self.nav.sphere_rotation_x,
             aspect_x: ctx.aspect_x,
             aspect_y: ctx.aspect_y,
             aspect_z: ctx.aspect_z,
-            zoom: self.sphere_zoom,
-            opacity_scale: self.volume_opacity,
-            quality: self.volume_quality,
-            algorithm: self.volume_algorithm,
-            isovalue: self.volume_isovalue,
-            isorange: self.volume_isorange,
-            attenuation: self.volume_attenuation,
+            zoom: self.nav.sphere_zoom,
+            opacity_scale: self.plot_configs.volume.opacity,
+            quality: self.plot_configs.volume.quality,
+            algorithm: self.plot_configs.volume.algorithm,
+            isovalue: self.plot_configs.volume.isovalue,
+            isorange: self.plot_configs.volume.isorange,
+            attenuation: self.plot_configs.volume.attenuation,
             screen_aspect,
             shift_x: ctx.shift_x,
             shift_y: ctx.shift_y,
             shift_z: ctx.shift_z,
-            transparency: self.volume_transparency,
-            lighting: self.volume_lighting,
+            transparency: self.plot_configs.volume.transparency,
+            lighting: self.plot_configs.volume.lighting,
         }
     }
 
@@ -104,13 +104,13 @@ impl OctantApp {
 
         crate::plots::PointCloudUniformParams {
             color: ctx.color,
-            rot_y: self.sphere_rotation_y,
-            rot_x: self.sphere_rotation_x,
+            rot_y: self.nav.sphere_rotation_y,
+            rot_x: self.nav.sphere_rotation_x,
             aspect_x: ctx.aspect_x,
             aspect_y: ctx.aspect_y,
             aspect_z: ctx.aspect_z,
-            zoom: self.sphere_zoom,
-            point_size: self.point_cloud_size,
+            zoom: self.nav.sphere_zoom,
+            point_size: self.plot_configs.point_cloud.point_size,
             width: ctx.width,
             height: ctx.height,
             screen_aspect,
@@ -149,10 +149,10 @@ impl OctantApp {
 
         crate::plots::Mesh3DUniformParams {
             color: self.get_color_params(layer),
-            rotation_y: self.sphere_rotation_y,
-            rotation_x: self.sphere_rotation_x,
+            rotation_y: self.nav.sphere_rotation_y,
+            rotation_x: self.nav.sphere_rotation_x,
             aspect_ratio,
-            zoom: self.sphere_zoom,
+            zoom: self.nav.sphere_zoom,
             displacement_strength,
             mode,
             coord_mode,
@@ -267,8 +267,16 @@ impl OctantApp {
                 && let Some(renderer) = self.coastline_3d_renderer.as_ref().map(Arc::clone)
             {
                 let (mode, plot_kind, displacement_strength) = match canvas_plot_type {
-                    PlotType::Sphere => (self.sphere_mode, 1, self.sphere_displacement_strength),
-                    _ => (self.surface_mode, 0, self.surface_displacement_strength),
+                    PlotType::Sphere => (
+                        self.plot_configs.mesh.sphere_mode,
+                        1,
+                        self.plot_configs.mesh.sphere_displacement,
+                    ),
+                    _ => (
+                        self.plot_configs.mesh.surface_mode,
+                        0,
+                        self.plot_configs.mesh.surface_displacement,
+                    ),
                 };
                 // Coastlines follow the base layer's grid.
                 let mesh_params = self.get_mesh_3d_uniform_params(

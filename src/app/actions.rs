@@ -27,7 +27,7 @@ impl OctantApp {
                 self.submit_or_activate_source(&target, Some(kind));
             }
             AppAction::SelectVariable(idx) => {
-                self.show_hero = false;
+                self.layout.show_hero = false;
                 self.selected.variable_idx = idx;
                 self.request_variable_coordinates(idx);
                 if let Some(meta) = self.selected.metadata.clone()
@@ -38,7 +38,7 @@ impl OctantApp {
                 self.load_selected_variable_block();
             }
             AppAction::SetTimestep(step) => {
-                self.current_timestep = step;
+                self.playback.current_timestep = step;
                 self.load_step_blocks();
             }
             AppAction::SetPlotType(plot_type) => {
@@ -48,17 +48,17 @@ impl OctantApp {
                 self.layers.base.color.colormap = cmap;
             }
             AppAction::SetLineProfileDim(dim_idx) => {
-                self.line_profile_dim_idx = dim_idx;
+                self.plot_configs.line.profile_dim_idx = dim_idx;
             }
             AppAction::SetLineProfileSlice(slice_idx) => {
-                self.line_profile_slice_idx = slice_idx;
+                self.plot_configs.line.profile_slice_idx = slice_idx;
             }
             AppAction::ToggleLineAllSeries => {
-                self.line_plot_all_series = !self.line_plot_all_series;
+                self.plot_configs.line.all_series = !self.plot_configs.line.all_series;
             }
             AppAction::TogglePlayback => {
-                self.is_playing = !self.is_playing;
-                if self.is_playing {
+                self.playback.is_playing = !self.playback.is_playing;
+                if self.playback.is_playing {
                     self.prefetch_animated_ranges();
                 }
             }

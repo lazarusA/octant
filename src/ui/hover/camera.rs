@@ -32,12 +32,12 @@ impl Camera3D {
         } else {
             0.1
         };
-        let cam_dist = app.sphere_zoom.clamp(min_zoom, 10.0);
+        let cam_dist = app.nav.sphere_zoom.clamp(min_zoom, 10.0);
         let fov_scale = 1.6_f32;
-        let cx = app.sphere_rotation_x.cos();
-        let sx = app.sphere_rotation_x.sin();
-        let cy = app.sphere_rotation_y.cos();
-        let sy = app.sphere_rotation_y.sin();
+        let cx = app.nav.sphere_rotation_x.cos();
+        let sx = app.nav.sphere_rotation_x.sin();
+        let cy = app.nav.sphere_rotation_y.cos();
+        let sy = app.nav.sphere_rotation_y.sin();
 
         Self {
             rect,

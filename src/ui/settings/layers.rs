@@ -17,7 +17,7 @@ enum RowAction {
 /// The collapsible Layers menu: open by default, and opened again after a
 /// plot or an added overlay (`OctantApp::reveal_layers_menu`).
 pub fn show_layers_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let reveal = std::mem::take(&mut app.reveal_layers_menu);
+    let reveal = std::mem::take(&mut app.layout.reveal_layers_menu);
     egui::CollapsingHeader::new("Layers")
         .id_salt("settings_layers_section")
         .default_open(true)

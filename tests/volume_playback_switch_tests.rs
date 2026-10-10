@@ -22,7 +22,7 @@ fn create_volume_app() -> OctantApp {
     app.selected.store_kind = StoreKind::ProceduralVolume4D;
     app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Volume;
     app
 }
@@ -40,11 +40,11 @@ fn test_playing_volume_switch_to_heatmap_play_past_selection_and_switch_back_to_
         "volume data should be present initially"
     );
 
-    app.is_playing = true;
+    app.playback.is_playing = true;
     for _ in 0..2 {
         tick(&mut app);
     }
-    assert!(app.current_timestep <= 3);
+    assert!(app.playback.current_timestep <= 3);
 
     app.switch_plot_type(PlotType::Heatmap);
     drain(&mut app);
@@ -54,9 +54,9 @@ fn test_playing_volume_switch_to_heatmap_play_past_selection_and_switch_back_to_
         tick(&mut app);
     }
     assert!(
-        app.current_timestep > 3,
+        app.playback.current_timestep > 3,
         "timestep must be beyond initial selection (now {})",
-        app.current_timestep
+        app.playback.current_timestep
     );
     assert!(
         app.layers.base.data.matrix.is_some(),
@@ -117,7 +117,7 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
     app.switch_plot_type(PlotType::Heatmap);
     assert_eq!(app.selected.plot_type, PlotType::Heatmap);
 
-    app.current_timestep = 10;
+    app.playback.current_timestep = 10;
     let step10_values = vec![200.0f32; 32 * 32];
     let step10_block = OctantBlock::new(
         "temp_3d".to_string(),

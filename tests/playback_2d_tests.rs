@@ -20,7 +20,7 @@ fn app_with(plot: PlotType) -> OctantApp {
     app.selected.store_kind = StoreKind::ProceduralVolume4D;
     app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.selected.plot_type = plot;
     app
 }
@@ -49,10 +49,10 @@ fn play(plot: PlotType) {
     drain(&mut app);
     assert_slice(&app, 0, z, "first plot");
     for t in 1..NT {
-        app.current_timestep = t;
+        app.playback.current_timestep = t;
         app.load_selected_variable_block();
         drain(&mut app);
-        assert_eq!(app.current_timestep, t);
+        assert_eq!(app.playback.current_timestep, t);
         assert_slice(&app, t, z, "playback");
     }
 }
@@ -84,22 +84,25 @@ fn play_past_window(plot: PlotType, cache_blocks: usize) {
     app.selected.dim_config[0].range = (0, 3);
     app.plot_selection();
     drain(&mut app);
-    app.is_playing = true;
+    app.playback.is_playing = true;
     // Frames: a timer step, then polls for a few milliseconds.
     for _ in 0..400 {
-        if app.current_timestep >= 8 {
+        if app.playback.current_timestep >= 8 {
             break;
         }
         app.advance_playback(Instant::now());
         // What the open variables panel writes every frame (`slider_row.rs`).
-        app.selected.dim_indices[0] = app.current_timestep.clamp(0, 3);
+        app.selected.dim_indices[0] = app.playback.current_timestep.clamp(0, 3);
         app.selected.dim_config[0].index = app.selected.dim_indices[0];
         for _ in 0..5 {
             app.poll_block_prefetch_results();
             std::thread::sleep(Duration::from_millis(1));
         }
     }
-    assert_eq!(app.current_timestep, 8, "playback must run past the window");
+    assert_eq!(
+        app.playback.current_timestep, 8,
+        "playback must run past the window"
+    );
     assert_slice(&app, 8, z, "past the window");
 }
 

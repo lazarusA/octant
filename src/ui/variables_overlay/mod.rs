@@ -29,11 +29,12 @@ const MIN_LIST_HEIGHT: f32 = 120.0;
 
 pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
     let shown = app
+        .layout
         .show_variables_overlay
         .then(|| dataset_key(app))
         .flatten();
     focus::note_shown(ctx, shown);
-    if !app.show_variables_overlay {
+    if !app.layout.show_variables_overlay {
         return;
     }
 
@@ -41,7 +42,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
     let width = (screen_size.x * 0.28).clamp(280.0, 520.0);
     let list_height = (screen_size.y * 0.65).clamp(250.0, 750.0);
     let origin = panel_layout::origin(app, Panel::Variables, canvas_rect);
-    app.variables_overlay_width = width;
+    app.layout.variables_overlay_width = width;
 
     let mut header = None;
     let area_resp = egui::Area::new(egui::Id::new("octant_variables_area"))
@@ -55,7 +56,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
             });
         });
     let rect = area_resp.response.rect;
-    app.variables_overlay_width = rect.width();
+    app.layout.variables_overlay_width = rect.width();
     if let Some(header) = header {
         panel_layout::apply_grip(app, Panel::Variables, header.grip, rect, canvas_rect);
         if header.close {
@@ -85,8 +86,11 @@ fn show_panel(
             ));
         })
         .body(|ui| {
-            let search =
-                ui.search_field_response(&mut app.variable_search, "Search variables...", None);
+            let search = ui.search_field_response(
+                &mut app.layout.variable_search,
+                "Search variables...",
+                None,
+            );
             if focus::take_open_focus(ui.ctx()) {
                 search.request_focus();
             }
@@ -106,8 +110,8 @@ fn show_panel(
 /// Hide the overlay; with the controls panel also closed, drop the unplotted
 /// selection.
 fn close(app: &mut OctantApp) {
-    app.show_variables_overlay = false;
-    if !app.show_variable_controls {
+    app.layout.show_variables_overlay = false;
+    if !app.layout.show_variable_controls {
         app.revert_selected_state_to_plotted();
     }
 }

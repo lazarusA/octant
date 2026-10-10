@@ -106,7 +106,7 @@ fn test_colorbar_ticks_generation_custom_bounds() {
 #[test]
 fn test_colorbar_transparency_default() {
     let app = OctantApp::default();
-    assert_eq!(app.colorbar_transparency, 0.0);
+    assert_eq!(app.layout.colorbar_transparency, 0.0);
 }
 
 #[test]

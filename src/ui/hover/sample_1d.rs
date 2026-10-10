@@ -5,9 +5,9 @@ use egui::{Context, Pos2, Rect, Stroke, Ui};
 
 /// Computes normalized `(nx, ny)` coordinates from screen position for 1D line charts.
 pub fn screen_to_norm_1d(app: &OctantApp, rect: Rect, hover_pos: Pos2) -> (f32, f32) {
-    let zoom = app.line_zoom;
-    let gpu_pan_x = app.line_pan.x / (0.5 * rect.width().max(1.0));
-    let gpu_pan_y = -app.line_pan.y / (0.5 * rect.height().max(1.0));
+    let zoom = app.nav.line_zoom;
+    let gpu_pan_x = app.nav.line_pan.x / (0.5 * rect.width().max(1.0));
+    let gpu_pan_y = -app.nav.line_pan.y / (0.5 * rect.height().max(1.0));
 
     let ndc_x = ((hover_pos.x - rect.min.x) / rect.width().max(1.0)) * 2.0 - 1.0;
     let unpanned_x = (ndc_x - gpu_pan_x) / zoom.max(0.01);
@@ -85,9 +85,9 @@ pub fn draw_line_guidelines_and_reticle(
         0.5
     };
 
-    let zoom = app.line_zoom;
-    let gpu_pan_x = app.line_pan.x / (0.5 * rect.width().max(1.0));
-    let gpu_pan_y = -app.line_pan.y / (0.5 * rect.height().max(1.0));
+    let zoom = app.nav.line_zoom;
+    let gpu_pan_x = app.nav.line_pan.x / (0.5 * rect.width().max(1.0));
+    let gpu_pan_y = -app.nav.line_pan.y / (0.5 * rect.height().max(1.0));
 
     let ndc_x = (norm_x_step * 2.0 - 1.0) * zoom + gpu_pan_x;
     let screen_dot_x = rect.min.x + (ndc_x + 1.0) * 0.5 * rect.width();

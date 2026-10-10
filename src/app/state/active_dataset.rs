@@ -16,7 +16,7 @@ impl OctantApp {
     /// Activate a freshly loaded or re-activated dataset: clear the search,
     /// apply the first variable's dimension defaults and select it.
     pub fn load_new_metadata(&mut self, meta: DatasetMetadata) {
-        self.variable_search.clear();
+        self.layout.variable_search.clear();
         if let Some(var_info) = meta.variables.first().cloned() {
             crate::ui::variables_panel::init_variable_dimension_defaults(self, &var_info);
         }
@@ -28,7 +28,7 @@ impl OctantApp {
     pub fn clear_active_metadata(&mut self) {
         self.selected.metadata = None;
         self.cached_variable_tree = None;
-        self.variable_search.clear();
+        self.layout.variable_search.clear();
         self.bump_metadata_generation();
     }
 

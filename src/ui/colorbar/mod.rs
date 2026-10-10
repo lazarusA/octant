@@ -31,7 +31,7 @@ use crate::app::layers::LayerId;
 /// unless the layer is an RGB composite (it has no colormap) or the base
 /// layer is a line plot in its custom color.
 pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas: egui::Rect) {
-    if !app.show_colorbar {
+    if !app.layout.show_colorbar {
         return;
     }
     for i in 0..=app.layers.overlays().len() {

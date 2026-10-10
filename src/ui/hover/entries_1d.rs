@@ -58,12 +58,12 @@ fn resolve_line_profile_dim(
     app: &OctantApp,
     var: Option<&VariableInfo>,
 ) -> (String, Option<usize>) {
-    let axis = app.line_profile_dim_idx.min(2);
+    let axis = app.plot_configs.line.profile_dim_idx.min(2);
     let p_idx = var.and_then(|v| line_axes(app, v)[axis]);
     let name = var
         .zip(p_idx)
         .and_then(|(v, i)| v.dimension_names.get(i).cloned())
-        .or_else(|| app.get_spatial_dim_name(app.line_profile_dim_idx))
+        .or_else(|| app.get_spatial_dim_name(app.plot_configs.line.profile_dim_idx))
         .unwrap_or_else(|| ["x", "y", "z"][axis].to_string());
     (name, p_idx)
 }
@@ -119,7 +119,7 @@ pub(crate) fn series_dim<'a>(
 ) -> Option<SeriesDim<'a>> {
     let v = var?;
     let [x, y, _] = line_axes(app, v);
-    let (index, profile) = match app.line_profile_dim_idx {
+    let (index, profile) = match app.plot_configs.line.profile_dim_idx {
         0 => (y, x),
         1 => (x, y),
         _ => (None, None),
@@ -197,7 +197,7 @@ mod tests {
         let mut app = app_with_roles(&[SpatialRole::Grid, SpatialRole::None]);
         let v = var(&["cell", "level"]);
         assert_eq!(line_axes(&app, &v)[1], None);
-        app.line_profile_dim_idx = 0;
+        app.plot_configs.line.profile_dim_idx = 0;
         assert!(series_dim(&app, Some(&v)).is_none(), "lines along the grid");
     }
 
@@ -205,9 +205,9 @@ mod tests {
     fn series_lines_run_across_the_other_axis_without_roles() {
         let mut app = OctantApp::default();
         let v = var(&["a", "b"]);
-        app.line_profile_dim_idx = 0;
+        app.plot_configs.line.profile_dim_idx = 0;
         assert_eq!(series_dim(&app, Some(&v)).map(|d| d.index), Some(0));
-        app.line_profile_dim_idx = 1;
+        app.plot_configs.line.profile_dim_idx = 1;
         assert_eq!(series_dim(&app, Some(&v)).map(|d| d.index), Some(1));
     }
 }

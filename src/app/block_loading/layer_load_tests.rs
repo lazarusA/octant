@@ -66,12 +66,12 @@ fn an_overlay_past_its_extent_shows_its_last_step() {
     let id = app.layers.push(Source::Variable(selection));
     make_resident(&mut app, &SliceRequest::full_range("t2m", &[3, 5, 4]));
     // The base layer's longer animated dimension is at step 7.
-    app.current_timestep = 7;
+    app.playback.current_timestep = 7;
 
     app.load_layer_block(id);
 
     assert_eq!(
-        app.current_timestep, 7,
+        app.playback.current_timestep, 7,
         "an overlay never moves the shared step"
     );
     assert_eq!(app.layer_step(id), 2);
@@ -95,8 +95,11 @@ fn a_base_step_that_arrives_reloads_the_animated_overlays() {
     make_resident(&mut app, &SliceRequest::full_range("sst", &[3, 5, 4]));
 
     app.request_step_or_load(1);
-    assert_eq!(app.current_timestep, 0, "the base step is still loading");
-    poll_until(&mut app, |app| app.current_timestep == 1);
+    assert_eq!(
+        app.playback.current_timestep, 0,
+        "the base step is still loading"
+    );
+    poll_until(&mut app, |app| app.playback.current_timestep == 1);
 
     let overlay = app.layers.get(id).expect("overlay");
     assert_eq!(overlay.selection().dim_indices.first(), Some(&1));

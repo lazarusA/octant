@@ -8,10 +8,8 @@ use egui::{Id, RawInput, Rect, pos2, vec2};
 const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1200.0, 1400.0));
 
 fn app(plot_type: PlotType) -> OctantApp {
-    let mut app = OctantApp {
-        show_settings_panel: true,
-        ..Default::default()
-    };
+    let mut app = OctantApp::default();
+    app.layout.show_settings_panel = true;
     app.selected.plot_type = plot_type;
     app
 }
@@ -70,7 +68,13 @@ fn panel_stops_at_the_canvas_bottom() {
 fn a_plot_reveals_the_layers_menu_once() {
     let mut app = app(PlotType::Heatmap);
     app.plot_from_panel();
-    assert!(app.reveal_layers_menu, "plotting asks for the Layers menu");
+    assert!(
+        app.layout.reveal_layers_menu,
+        "plotting asks for the Layers menu"
+    );
     settled_height(&egui::Context::default(), &mut app, SCREEN);
-    assert!(!app.reveal_layers_menu, "the settings panel opened it");
+    assert!(
+        !app.layout.reveal_layers_menu,
+        "the settings panel opened it"
+    );
 }

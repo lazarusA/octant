@@ -100,15 +100,15 @@ impl OctantApp {
     /// with a shorter animated dimension clamps into its own extent.
     pub(crate) fn layer_step(&self, id: LayerId) -> usize {
         if id == LayerId::BASE {
-            return self.current_timestep;
+            return self.playback.current_timestep;
         }
         let extent = self
             .layer_animated_dim(id)
             .and_then(|dim| self.layer_variable_info(id)?.shape.get(dim).copied())
             .unwrap_or(0) as usize;
         match extent {
-            0 => self.current_timestep,
-            n => self.current_timestep.min(n - 1),
+            0 => self.playback.current_timestep,
+            n => self.playback.current_timestep.min(n - 1),
         }
     }
 
@@ -122,7 +122,7 @@ impl OctantApp {
         anim_dim: Option<usize>,
     ) -> (SliceRequest, usize) {
         let mut selections = layer_request.request.selections.clone();
-        let mut step = self.current_timestep;
+        let mut step = self.playback.current_timestep;
         if let Some(anim_dim) = anim_dim {
             let shape = &layer_request.var.shape;
             let full_extent = shape.get(anim_dim).copied().unwrap_or(1) as usize;
@@ -130,7 +130,7 @@ impl OctantApp {
                 step = step.min(full_extent - 1);
             }
             if id == LayerId::BASE {
-                self.current_timestep = step;
+                self.playback.current_timestep = step;
             }
             self.set_layer_step_index(id, anim_dim, step);
             if anim_dim < selections.len() {

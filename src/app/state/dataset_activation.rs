@@ -42,7 +42,7 @@ impl OctantApp {
                     meta.name,
                     meta.variables.len()
                 );
-                self.show_variables_overlay = true;
+                self.layout.show_variables_overlay = true;
                 self.load_new_metadata(meta);
                 return true;
             }

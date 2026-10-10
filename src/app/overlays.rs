@@ -127,13 +127,13 @@ impl OctantApp {
     /// opens the settings.
     pub fn plot_from_panel(&mut self) {
         // The Layers menu shows what was plotted or added.
-        self.reveal_layers_menu = true;
-        if self.plot_as_overlay {
-            self.plot_as_overlay = false;
+        self.layout.reveal_layers_menu = true;
+        if self.layout.plot_as_overlay {
+            self.layout.plot_as_overlay = false;
             self.add_overlay(self.selected.variable_idx);
             return;
         }
-        self.show_hero = false;
+        self.layout.show_hero = false;
         self.plot_selection();
         self.open_only_settings_panel();
     }

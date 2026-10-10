@@ -7,7 +7,7 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .small()
                 .color(ui.visuals().weak_text_color()),
         );
-        let algo_label = match app.volume_algorithm {
+        let algo_label = match app.plot_configs.volume.algorithm {
             0 => "Volume Raymarching (DVR)",
             1 => "Maximum Intensity (MIP)",
             2 => "Minimum Intensity (MinIP)",
@@ -30,10 +30,10 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             ];
             for (id, label) in algos {
                 if ui
-                    .selectable_label(app.volume_algorithm == id, label)
+                    .selectable_label(app.plot_configs.volume.algorithm == id, label)
                     .clicked()
                 {
-                    app.volume_algorithm = id;
+                    app.plot_configs.volume.algorithm = id;
                     ui.close();
                 }
             }
@@ -42,23 +42,26 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     ui.separator();
     ui.add(
-        egui::Slider::new(&mut app.volume_quality, 0.25..=2.0)
+        egui::Slider::new(&mut app.plot_configs.volume.quality, 0.25..=2.0)
             .text("Quality")
             .logarithmic(true),
     )
     .on_hover_text("Samples per voxel along each ray");
 
-    if app.volume_algorithm == 0 || app.volume_algorithm >= 5 {
-        ui.add(egui::Slider::new(&mut app.volume_opacity, 0.1..=10.0).text("Density"));
+    if app.plot_configs.volume.algorithm == 0 || app.plot_configs.volume.algorithm >= 5 {
+        ui.add(egui::Slider::new(&mut app.plot_configs.volume.opacity, 0.1..=10.0).text("Density"));
     }
 
-    if app.volume_algorithm == 1 {
-        ui.add(egui::Slider::new(&mut app.volume_attenuation, 0.0..=5.0).text("Attenuation"));
+    if app.plot_configs.volume.algorithm == 1 {
+        ui.add(
+            egui::Slider::new(&mut app.plot_configs.volume.attenuation, 0.0..=5.0)
+                .text("Attenuation"),
+        );
     }
 
     ui.separator();
     ui.add(
-        egui::Slider::new(&mut app.volume_z_scale, 0.05..=10.0)
+        egui::Slider::new(&mut app.plot_configs.volume.z_scale, 0.05..=10.0)
             .text("Z-Scale")
             .logarithmic(true),
     );
@@ -71,17 +74,23 @@ pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.spacing_mut().item_spacing.x = 2.0;
         for (id, label) in modes {
             if ui
-                .selectable_label(app.sphere_mode == id, egui::RichText::new(label))
+                .selectable_label(
+                    app.plot_configs.mesh.sphere_mode == id,
+                    egui::RichText::new(label),
+                )
                 .clicked()
             {
-                app.sphere_mode = id;
+                app.plot_configs.mesh.sphere_mode = id;
             }
         }
     });
 
-    if app.sphere_mode > 0 {
+    if app.plot_configs.mesh.sphere_mode > 0 {
         ui.separator();
-        ui.add(egui::Slider::new(&mut app.sphere_displacement_strength, 0.0..=5.0).text("Height"));
+        ui.add(
+            egui::Slider::new(&mut app.plot_configs.mesh.sphere_displacement, 0.0..=5.0)
+                .text("Height"),
+        );
     }
 }
 
@@ -92,23 +101,31 @@ pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.spacing_mut().item_spacing.x = 2.0;
         for (id, label) in modes {
             if ui
-                .selectable_label(app.surface_mode == id, egui::RichText::new(label))
+                .selectable_label(
+                    app.plot_configs.mesh.surface_mode == id,
+                    egui::RichText::new(label),
+                )
                 .clicked()
             {
-                app.surface_mode = id;
+                app.plot_configs.mesh.surface_mode = id;
             }
         }
     });
 
     ui.separator();
-    ui.add(egui::Slider::new(&mut app.surface_displacement_strength, 0.0..=5.0).text("Height"));
+    ui.add(
+        egui::Slider::new(&mut app.plot_configs.mesh.surface_displacement, 0.0..=5.0)
+            .text("Height"),
+    );
 }
 
 pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.add(egui::Slider::new(&mut app.point_cloud_size, 0.002..=0.10).text("Size"));
+    ui.add(
+        egui::Slider::new(&mut app.plot_configs.point_cloud.point_size, 0.002..=0.10).text("Size"),
+    );
     ui.separator();
     ui.add(
-        egui::Slider::new(&mut app.volume_z_scale, 0.05..=10.0)
+        egui::Slider::new(&mut app.plot_configs.volume.z_scale, 0.05..=10.0)
             .text("Z-Scale")
             .logarithmic(true),
     );

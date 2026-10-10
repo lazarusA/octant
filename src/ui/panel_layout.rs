@@ -54,18 +54,24 @@ fn docked_origin(canvas: Rect, widths: impl Iterator<Item = f32>) -> Pos2 {
 /// The width of `panel` when it is shown and docked, for the panels after it.
 fn docked_width(app: &OctantApp, panel: Panel) -> Option<f32> {
     let (shown, width) = match panel {
-        Panel::Variables => (app.show_variables_overlay, app.variables_overlay_width),
-        Panel::Settings => (app.show_settings_panel, app.settings_overlay_width),
+        Panel::Variables => (
+            app.layout.show_variables_overlay,
+            app.layout.variables_overlay_width,
+        ),
+        Panel::Settings => (
+            app.layout.show_settings_panel,
+            app.layout.settings_overlay_width,
+        ),
         Panel::Dimensions => return None,
     };
-    let docked = app.panel_positions.get(panel).is_none();
+    let docked = app.layout.panel_positions.get(panel).is_none();
     (shown && docked && width > 0.0).then_some(width)
 }
 
 /// Where `panel`'s top-left corner sits on `canvas`: its dragged place, else
 /// after the docked panels before it.
 pub fn origin(app: &OctantApp, panel: Panel, canvas: Rect) -> Pos2 {
-    if let Some(f) = app.panel_positions.get(panel) {
+    if let Some(f) = app.layout.panel_positions.get(panel) {
         return drag_grip::from_fraction(f, canvas);
     }
     let before: &[Panel] = match panel {
@@ -86,6 +92,6 @@ pub fn room_below(ui: &egui::Ui, canvas: Rect) -> f32 {
 
 /// Applies `panel`'s grip `action`, its area at `rect` on `canvas`.
 pub fn apply_grip(app: &mut OctantApp, panel: Panel, action: GripAction, rect: Rect, canvas: Rect) {
-    let pos = app.panel_positions.get_mut(panel);
+    let pos = app.layout.panel_positions.get_mut(panel);
     *pos = drag_grip::apply(*pos, action, rect.min, canvas);
 }

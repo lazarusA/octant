@@ -10,13 +10,11 @@ use egui::{Id, Pos2, Rect, Ui, Vec2, pos2};
 const CANVAS: Rect = Rect::from_min_max(pos2(40.0, 30.0), pos2(1240.0, 930.0));
 
 fn app() -> OctantApp {
-    let mut app = OctantApp {
-        show_variables_overlay: true,
-        show_settings_panel: true,
-        ..Default::default()
-    };
-    app.variables_overlay_width = 300.0;
-    app.settings_overlay_width = 280.0;
+    let mut app = OctantApp::default();
+    app.layout.show_variables_overlay = true;
+    app.layout.show_settings_panel = true;
+    app.layout.variables_overlay_width = 300.0;
+    app.layout.settings_overlay_width = 280.0;
     app
 }
 
@@ -35,7 +33,7 @@ fn docked_panels_line_up_from_the_canvas_corner() {
 fn hidden_or_dragged_panels_leave_the_row() {
     let mut app = app();
     let corner = CANVAS.left_top() + Vec2::splat(GAP);
-    app.panel_positions.variables = Some(pos2(0.5, 0.5));
+    app.layout.panel_positions.variables = Some(pos2(0.5, 0.5));
     assert_eq!(panel_layout::origin(&app, Panel::Settings, CANVAS), corner);
     let dims = panel_layout::origin(&app, Panel::Dimensions, CANVAS);
     assert_eq!(dims, corner + Vec2::new(280.0 + GAP, 0.0));
@@ -45,7 +43,7 @@ fn hidden_or_dragged_panels_leave_the_row() {
         "a dragged panel sits at its own place"
     );
 
-    app.show_settings_panel = false;
+    app.layout.show_settings_panel = false;
     assert_eq!(
         panel_layout::origin(&app, Panel::Dimensions, CANVAS),
         corner
@@ -62,10 +60,8 @@ fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
 
 #[test]
 fn the_grip_drags_the_settings_panel_and_double_click_docks_it() {
-    let mut app = OctantApp {
-        show_settings_panel: true,
-        ..Default::default()
-    };
+    let mut app = OctantApp::default();
+    app.layout.show_settings_panel = true;
     let mut h = Harness::new(Rect::from_min_max(Pos2::ZERO, CANVAS.max));
     let shapes = h.settle(3, &mut run(&mut app));
     let dots: Vec<Pos2> = shapes
@@ -82,7 +78,7 @@ fn the_grip_drags_the_settings_panel_and_double_click_docks_it() {
 
     let delta = Vec2::new(300.0, 200.0);
     h.drag(grip, delta, &mut run(&mut app));
-    assert!(app.panel_positions.settings.is_some());
+    assert!(app.layout.panel_positions.settings.is_some());
     let moved = panel(&h).min - docked.min;
     assert!((moved - delta).length() < 12.0, "moved by {moved:?}");
 
@@ -90,6 +86,6 @@ fn the_grip_drags_the_settings_panel_and_double_click_docks_it() {
     h.click(grip, &mut run(&mut app));
     h.click(grip, &mut run(&mut app));
     h.frame(Vec::new(), &mut run(&mut app));
-    assert_eq!(app.panel_positions.settings, None);
+    assert_eq!(app.layout.panel_positions.settings, None);
     assert_eq!(panel(&h).min, docked.min);
 }

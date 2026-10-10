@@ -26,7 +26,7 @@ const PANEL_MIN_W: f32 = 220.0;
 
 /// Docked after the Variables and Settings panels (`panel_layout`), or where its grip dragged it.
 pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
-    if !app.show_variable_controls || app.selected.metadata.is_none() {
+    if !app.layout.show_variable_controls || app.selected.metadata.is_none() {
         return;
     }
 
@@ -63,8 +63,8 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> GripAction {
     };
     let header = header_row(ui, &var_info);
     if header.close {
-        app.show_variable_controls = false;
-        if !app.show_variables_overlay {
+        app.layout.show_variable_controls = false;
+        if !app.layout.show_variables_overlay {
             app.revert_selected_state_to_plotted();
         }
     }
@@ -112,7 +112,7 @@ fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> PanelH
 fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
     let unavailable = app.overlay_unavailable_for(app.selected.variable_idx);
     if unavailable.is_some() {
-        app.plot_as_overlay = false;
+        app.layout.plot_as_overlay = false;
     }
     let plot_icon = crate::ui::plot_type::plot_type_icon(app.selected.plot_type);
     let mut plot = false;
@@ -120,7 +120,7 @@ fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
     let row = egui::vec2(ui.available_width(), ui.spacing().interact_size.y);
     let layout = egui::Layout::right_to_left(egui::Align::Center);
     ui.allocate_ui_with_layout(row, layout, |ui| {
-        let hover = if app.plot_as_overlay {
+        let hover = if app.layout.plot_as_overlay {
             "Fetch this variable and add it as an overlay over the plot"
         } else {
             "Fetch this variable and plot it"
@@ -131,7 +131,7 @@ fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
             .clicked();
         let toggle = ToolbarButton::new(Icon::Layers, "Add Overlay")
             .icon_size(IconSize::Sm)
-            .toggled(app.plot_as_overlay)
+            .toggled(app.layout.plot_as_overlay)
             .hover("Plot Data adds this variable as an overlay while on");
         let response = ui.add_enabled(unavailable.is_none(), toggle);
         let response = match unavailable {
@@ -139,7 +139,7 @@ fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
             None => response,
         };
         if response.clicked() {
-            app.plot_as_overlay = !app.plot_as_overlay;
+            app.layout.plot_as_overlay = !app.layout.plot_as_overlay;
         }
     });
     plot

@@ -21,9 +21,9 @@ pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
         return;
     }
 
-    // Local copy avoids holding `&mut app.show_bottom_bar` while the panel
+    // Local copy avoids holding `&mut app.layout.show_bottom_bar` while the panel
     // closure borrows all of `app`.
-    let mut expanded = app.show_bottom_bar;
+    let mut expanded = app.layout.show_bottom_bar;
     let mut request_expand = false;
 
     egui::Panel::show_switched(
@@ -46,7 +46,7 @@ pub fn show_bottom_bar(app: &mut OctantApp, ui: &mut egui::Ui) {
         },
     );
 
-    app.show_bottom_bar = expanded || request_expand;
+    app.layout.show_bottom_bar = expanded || request_expand;
 }
 
 /// Thin collapsed strip; returns `true` when clicked or dragged up.
@@ -113,7 +113,7 @@ fn show_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
 /// Timeline slider filling the row except `reserve_right`.
 fn show_slider(app: &mut OctantApp, tl: &Timeline, ui: &mut egui::Ui, reserve_right: f32) {
     ui.spacing_mut().slider_width = (ui.available_width() - reserve_right).max(SLIDER_MIN_W);
-    let mut step = app.current_timestep;
+    let mut step = app.playback.current_timestep;
     let slider = egui::Slider::new(&mut step, 0..=tl.last_step)
         .show_value(false)
         .trailing_fill(true);

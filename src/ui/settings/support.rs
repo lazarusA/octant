@@ -97,7 +97,7 @@ impl PlotState {
         };
         Self {
             plot_type: PlotType::Heatmap,
-            volume_algorithm: app.volume_algorithm,
+            volume_algorithm: app.plot_configs.volume.algorithm,
             composite: layer.composite.enabled,
             line_custom_color: false,
             line_all_series: false,
@@ -111,10 +111,10 @@ impl PlotState {
         let base = &app.layers.base;
         Self {
             plot_type: app.effective_canvas_plot_type(),
-            volume_algorithm: app.volume_algorithm,
+            volume_algorithm: app.plot_configs.volume.algorithm,
             composite: base.composite.enabled,
-            line_custom_color: app.line_use_custom_color,
-            line_all_series: app.line_plot_all_series,
+            line_custom_color: app.plot_configs.line.use_custom_color,
+            line_all_series: app.plot_configs.line.all_series,
             translucent: app.has_color_alpha(),
             geographic: !app.is_ome_dataset() && base.composite.channel_configs.is_empty(),
         }

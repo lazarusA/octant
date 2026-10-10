@@ -189,11 +189,14 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                 app.selected.dim_ranges[i] = (start, end);
                 if is_animated {
                     let max_idx = dim_size.saturating_sub(1);
-                    if app.is_playing || app.current_timestep > end || app.current_timestep < start
+                    if app.playback.is_playing
+                        || app.playback.current_timestep > end
+                        || app.playback.current_timestep < start
                     {
-                        app.selected.dim_indices[i] = app.current_timestep.min(max_idx);
+                        app.selected.dim_indices[i] = app.playback.current_timestep.min(max_idx);
                     } else {
-                        app.selected.dim_indices[i] = app.current_timestep.clamp(start, end);
+                        app.selected.dim_indices[i] =
+                            app.playback.current_timestep.clamp(start, end);
                     }
                 } else {
                     app.selected.dim_indices[i] = start;
@@ -204,9 +207,10 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
             } else {
                 let max_index = dim_size.saturating_sub(1);
                 if is_animated
-                    && (app.is_playing || app.current_timestep != app.selected.dim_indices[i])
+                    && (app.playback.is_playing
+                        || app.playback.current_timestep != app.selected.dim_indices[i])
                 {
-                    app.selected.dim_indices[i] = app.current_timestep.min(max_index);
+                    app.selected.dim_indices[i] = app.playback.current_timestep.min(max_index);
                 }
                 let mut changed = false;
                 ui.horizontal(|ui| {
@@ -227,7 +231,7 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                     changed = s_resp.dragged() || v_resp.dragged() || s_resp.clicked();
                 });
                 if changed && is_animated {
-                    app.current_timestep = app.selected.dim_indices[i];
+                    app.playback.current_timestep = app.selected.dim_indices[i];
                 }
                 app.selected.dim_ranges[i] =
                     (app.selected.dim_indices[i], app.selected.dim_indices[i]);

@@ -20,7 +20,7 @@ fn new_volume_app() -> OctantApp {
     app.selected.store_kind = StoreKind::ProceduralVolume4D;
     app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Volume;
     app
 }
@@ -137,7 +137,7 @@ fn new_depth_animated_app(chunk: u64) -> OctantApp {
     app.selected.store_kind = StoreKind::ProceduralVolume4D;
     app.selected.store_target = "procedural://volume4d".to_string();
     app.load_new_metadata(meta);
-    app.show_hero = false;
+    app.layout.show_hero = false;
     app.selected.plot_type = PlotType::Volume;
     let role = |spatial, animation, range| DimConfig {
         spatial,
@@ -157,7 +157,7 @@ fn new_depth_animated_app(chunk: u64) -> OctantApp {
     app.selected.spatial_dims = vec![3, 2, 1];
     app.selected.dim_indices = vec![0; 4];
     app.selected.dim_ranges = vec![(0, 0), (0, 31), (0, 31), (0, 31)];
-    app.current_timestep = 0;
+    app.playback.current_timestep = 0;
     app
 }
 
@@ -205,7 +205,7 @@ fn depth_animated_volume_replot_changing_only_the_animated_range() {
 fn depth_animated_volume_plot_with_step_past_the_range() {
     // The step stays where playback left it, past the newly chosen Z range.
     let mut app = new_depth_animated_app(8);
-    app.current_timestep = 20;
+    app.playback.current_timestep = 20;
     set_range(&mut app, 1, (0, 15));
     press_plot(&mut app);
     assert_volume_matches(&app, 0, [(0, 15), (0, 31), (0, 31)], "step past range");
@@ -214,7 +214,7 @@ fn depth_animated_volume_plot_with_step_past_the_range() {
 /// What the playback timer does each frame (`src/app/ui.rs`): advance the step
 /// and load, then drain the prefetcher.
 fn play_to(app: &mut OctantApp, t: usize) {
-    app.current_timestep = t;
+    app.playback.current_timestep = t;
     app.load_selected_variable_block();
     drain(app);
 }
@@ -229,7 +229,10 @@ fn volume_playback_steps_past_the_selected_time_window() {
     assert_volume_matches(&app, 0, [(0, 31), (0, 31), (0, 31)], "first plot");
     for t in 1..8 {
         play_to(&mut app, t);
-        assert_eq!(app.current_timestep, t, "playback must reach step {t}");
+        assert_eq!(
+            app.playback.current_timestep, t,
+            "playback must reach step {t}"
+        );
         assert_volume_matches(&app, t, [(0, 31), (0, 31), (0, 31)], "playback");
     }
 }
@@ -242,7 +245,10 @@ fn depth_animated_volume_playback_keeps_the_full_volume() {
     press_plot(&mut app);
     for t in 1..12 {
         play_to(&mut app, t);
-        assert_eq!(app.current_timestep, t, "playback must reach step {t}");
+        assert_eq!(
+            app.playback.current_timestep, t,
+            "playback must reach step {t}"
+        );
         assert_volume_matches(&app, 0, [(0, 31), (0, 31), (0, 31)], "depth playback");
     }
 }

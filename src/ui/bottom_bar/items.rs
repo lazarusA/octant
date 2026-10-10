@@ -20,7 +20,7 @@ fn opens_group(item: Item) -> bool {
 }
 
 fn fps_label<'a>(buf: &'a mut FpsBuf, app: &OctantApp) -> &'a str {
-    let fps = app.playback_fps.round() as u32;
+    let fps = app.playback.playback_fps.round() as u32;
     stack_str(buf, format_args!("{fps} FPS"))
 }
 
@@ -39,9 +39,9 @@ fn button<'a>(
         Item::Prev => icon_only(Icon::StepBackward, "Previous Step"),
         Item::Next => icon_only(Icon::StepForward, "Next Step"),
         Item::Last => icon_only(Icon::SeekEnd, "Last Step"),
-        Item::PlayPause if app.is_playing => labelled(Icon::Pause, "Pause"),
+        Item::PlayPause if app.playback.is_playing => labelled(Icon::Pause, "Pause"),
         Item::PlayPause => labelled(Icon::Play, "Play"),
-        Item::Loop => labelled(Icon::Loop, "Loop").map(|b| b.toggled(app.loop_playback)),
+        Item::Loop => labelled(Icon::Loop, "Loop").map(|b| b.toggled(app.playback.loop_playback)),
         Item::Crop => labelled(Icon::Scissors, "Crop").map(|b| {
             b.toggled(app.show_crop_overlay)
                 .hover("Crop Guiding Lines (C)")
@@ -133,7 +133,9 @@ fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Tim
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| {
                 ui.label(egui::RichText::new("Playback Speed").strong());
-                ui.add(egui::Slider::new(&mut app.playback_fps, 1.0..=60.0).suffix(" FPS"));
+                ui.add(
+                    egui::Slider::new(&mut app.playback.playback_fps, 1.0..=60.0).suffix(" FPS"),
+                );
             });
         return;
     }
@@ -146,13 +148,13 @@ fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Tim
         Item::Next => app.step_next(),
         Item::Last => app.request_step_or_load(tl.last_step),
         Item::PlayPause => {
-            app.is_playing = !app.is_playing;
-            app.last_step_time = web_time::Instant::now();
-            if app.is_playing {
+            app.playback.is_playing = !app.playback.is_playing;
+            app.playback.last_step_time = web_time::Instant::now();
+            if app.playback.is_playing {
                 app.prefetch_animated_ranges();
             }
         }
-        Item::Loop => app.loop_playback = !app.loop_playback,
+        Item::Loop => app.playback.loop_playback = !app.playback.loop_playback,
         Item::Crop => app.show_crop_overlay = !app.show_crop_overlay,
         Item::Save => app.show_export_modal = true,
         Item::Fps | Item::DateInfo | Item::StartBadge | Item::StepSize | Item::EndBadge => {}

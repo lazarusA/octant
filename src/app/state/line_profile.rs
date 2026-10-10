@@ -147,8 +147,9 @@ impl OctantApp {
     /// The line data, its layout, and which data it is at what version.
     fn line_source(&self) -> (&[f32], LineLayout, LineData) {
         let data = &self.layers.base.data;
-        let pick = (!self.line_plot_all_series).then_some(self.line_profile_slice_idx);
-        if self.line_profile_dim_idx == 2
+        let pick = (!self.plot_configs.line.all_series)
+            .then_some(self.plot_configs.line.profile_slice_idx);
+        if self.plot_configs.line.profile_dim_idx == 2
             && let Some(v) = data.volume.as_ref().filter(|v| v.depth > 1)
         {
             let Some(pixels) = v.width.checked_mul(v.height) else {
@@ -161,7 +162,7 @@ impl OctantApp {
             let layout = LineLayout::lines(v.depth, pixels, (1, pixels), pick);
             (&v.values, layout, LineData::Volume(data.volume_version))
         } else if let Some(m) = &data.matrix {
-            let layout = match self.line_profile_dim_idx {
+            let layout = match self.plot_configs.line.profile_dim_idx {
                 0 => LineLayout::lines(m.width, m.height, (m.width, 1), pick),
                 _ => LineLayout::lines(m.height, m.width, (1, m.width), pick),
             };

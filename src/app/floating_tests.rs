@@ -63,11 +63,9 @@ impl Painted {
 
 #[test]
 fn hovering_a_colormap_in_an_overlay_picker_previews_on_its_colorbar() {
-    let mut app = OctantApp {
-        show_settings_panel: true,
-        show_colorbar: true,
-        ..Default::default()
-    };
+    let mut app = OctantApp::default();
+    app.layout.show_settings_panel = true;
+    app.layout.show_colorbar = true;
     let overlay = app.layers.push(Source::default());
     let mut h = Harness::new(SCREEN);
     // Past the areas' fade-in, so colors compare at full opacity.

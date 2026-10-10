@@ -193,10 +193,10 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 fn show_colorbar_options(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.checkbox(&mut app.show_colorbar, "Show Colorbar");
-    if app.show_colorbar {
+    ui.checkbox(&mut app.layout.show_colorbar, "Show Colorbar");
+    if app.layout.show_colorbar {
         ui.add(
-            egui::Slider::new(&mut app.colorbar_transparency, 0.0..=1.0)
+            egui::Slider::new(&mut app.layout.colorbar_transparency, 0.0..=1.0)
                 .custom_formatter(|n, _| format!("{:.0}%", n * 100.0)),
         );
         ui.label(egui::RichText::new("Box transparency"));

@@ -2,22 +2,22 @@ use crate::app::OctantApp;
 
 pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
-        ui.checkbox(&mut app.line_show_lines, "Lines")
+        ui.checkbox(&mut app.plot_configs.line.show_lines, "Lines")
             .on_hover_text("Show continuous lines connecting points");
-        ui.checkbox(&mut app.line_show_points, "Scatter")
+        ui.checkbox(&mut app.plot_configs.line.show_points, "Scatter")
             .on_hover_text("Show scatter markers at each point location");
 
-        if !app.line_show_lines && !app.line_show_points {
-            app.line_show_lines = true;
+        if !app.plot_configs.line.show_lines && !app.plot_configs.line.show_points {
+            app.plot_configs.line.show_lines = true;
         }
     });
 
-    if app.line_show_points {
+    if app.plot_configs.line.show_points {
         ui.add_space(2.0);
         ui.horizontal(|ui| {
             ui.label("Point Size:");
             ui.add(
-                egui::Slider::new(&mut app.line_point_size, 2.0..=24.0)
+                egui::Slider::new(&mut app.plot_configs.line.point_size, 2.0..=24.0)
                     .suffix(" px")
                     .show_value(true),
             );
@@ -26,14 +26,14 @@ pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     ui.add_space(2.0);
     ui.horizontal(|ui| {
-        ui.checkbox(&mut app.line_use_custom_color, "Custom Color")
+        ui.checkbox(&mut app.plot_configs.line.use_custom_color, "Custom Color")
             .on_hover_text("Use a solid line/scatter color instead of colormap evaluation");
 
-        if app.line_use_custom_color {
+        if app.plot_configs.line.use_custom_color {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 crate::ui::color_picker::ShapeColorPicker::new(
                     "settings_line_color_picker",
-                    &mut app.line_color,
+                    &mut app.plot_configs.line.line_color,
                     crate::ui::color_picker::ColorShape::Rect(3.0),
                 )
                 .size(egui::vec2(18.0, 16.0))
@@ -79,13 +79,13 @@ fn show_line_profile_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     let label_y = app.get_spatial_dim_label(1);
     let label_z = app.get_spatial_dim_label(2);
 
-    let selected_text = match app.line_profile_dim_idx {
+    let selected_text = match app.plot_configs.line.profile_dim_idx {
         2 if has_z_dim => &label_z,
         1 => &label_y,
         _ => &label_x,
     };
 
-    let mut selected_dim_idx = app.line_profile_dim_idx;
+    let mut selected_dim_idx = app.plot_configs.line.profile_dim_idx;
     egui::ComboBox::from_id_salt("line_profile_dim_selector")
         .selected_text(selected_text)
         .show_ui(ui, |ui| {
@@ -109,23 +109,23 @@ fn show_line_profile_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                 selected_dim_idx = 2;
             }
         });
-    if selected_dim_idx != app.line_profile_dim_idx {
-        app.line_profile_dim_idx = selected_dim_idx;
-        app.line_profile_slice_idx = 0;
+    if selected_dim_idx != app.plot_configs.line.profile_dim_idx {
+        app.plot_configs.line.profile_dim_idx = selected_dim_idx;
+        app.plot_configs.line.profile_slice_idx = 0;
     }
 
-    let mut all_series = app.line_plot_all_series;
+    let mut all_series = app.plot_configs.line.all_series;
     if ui.checkbox(&mut all_series, "All Lines Series").changed() {
-        app.line_plot_all_series = all_series;
+        app.plot_configs.line.all_series = all_series;
     }
 
-    if !app.line_plot_all_series {
+    if !app.plot_configs.line.all_series {
         show_line_profile_slider(app, ui, has_z_dim);
     }
 }
 
 fn show_line_profile_slider(app: &mut OctantApp, ui: &mut egui::Ui, has_z_dim: bool) {
-    let max_idx = match app.line_profile_dim_idx {
+    let max_idx = match app.plot_configs.line.profile_dim_idx {
         2 if has_z_dim => app
             .layers
             .base
@@ -149,12 +149,12 @@ fn show_line_profile_slider(app: &mut OctantApp, ui: &mut egui::Ui, has_z_dim: b
             .map_or(0, |matrix| matrix.height.saturating_sub(1)),
     };
     if max_idx > 0 {
-        let mut slice_idx = app.line_profile_slice_idx;
+        let mut slice_idx = app.plot_configs.line.profile_slice_idx;
         if ui
             .add(egui::Slider::new(&mut slice_idx, 0..=max_idx).text("Profile Index"))
             .changed()
         {
-            app.line_profile_slice_idx = slice_idx;
+            app.plot_configs.line.profile_slice_idx = slice_idx;
         }
     } else {
         ui.label("Single profile available.");
@@ -163,6 +163,6 @@ fn show_line_profile_slider(app: &mut OctantApp, ui: &mut egui::Ui, has_z_dim: b
 
 pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add_space(2.0);
-    ui.checkbox(&mut app.enforce_data_aspect_ratio, "Aspect Ratio")
+    ui.checkbox(&mut app.layout.enforce_data_aspect_ratio, "Aspect Ratio")
         .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
 }

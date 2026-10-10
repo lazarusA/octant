@@ -37,7 +37,7 @@ impl TimelineKey {
         Self {
             variable: app.plotted().variable_idx,
             animated_dim: app.plotted().animated_dim,
-            step: app.current_timestep,
+            step: app.playback.current_timestep,
             extent: app.animated_dim_extent(),
             dataset: hasher.finish(),
         }
@@ -86,7 +86,7 @@ impl Timeline {
             ),
         };
 
-        let step = app.current_timestep;
+        let step = app.playback.current_timestep;
         Self {
             current: label(step, label_at(step)),
             start: label(0, label_at(0)),

@@ -4,7 +4,7 @@ use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
 pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
     // Extract to a local bool to avoid split-borrow: we can't hold &mut app.field
     // AND also borrow all of app inside the closure at the same time.
-    let mut show = app.show_left_panel;
+    let mut show = app.layout.show_left_panel;
 
     egui::Panel::left("octant_left_store_panel")
         .resizable(true)
@@ -16,7 +16,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
                 .show(ui, |ui| {
                 ui.add_space(4.0);
                 if ui.icon_button(Icon::Catalog, "Open Catalog").clicked() {
-                    app.show_catalog_window = true;
+                    app.layout.show_catalog_window = true;
                 }
                 ui.add_space(4.0);
                 ui.separator();
@@ -211,7 +211,7 @@ pub fn show_left_panel(app: &mut OctantApp, ui: &mut egui::Ui) {
             });
         });
 
-    app.show_left_panel = show;
+    app.layout.show_left_panel = show;
 }
 
 pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
@@ -219,11 +219,11 @@ pub fn show_store_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
         .add(
             ToolbarButton::new(Icon::Dataset, "Dataset")
                 .compact(compact)
-                .active(app.show_left_panel),
+                .active(app.layout.show_left_panel),
         )
         .clicked()
     {
-        app.show_left_panel = !app.show_left_panel;
+        app.layout.show_left_panel = !app.layout.show_left_panel;
     }
 }
 

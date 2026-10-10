@@ -15,7 +15,7 @@ use crate::catalog::{GEOTIFF_CATALOG, ICECHUNK_CATALOG, PROCEDURAL_CATALOG, ZARR
 
 /// Render the responsive, centered Dataset Catalog modal dialog.
 pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
-    if !app.show_catalog_window {
+    if !app.layout.show_catalog_window {
         return;
     }
 
@@ -78,6 +78,6 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
         });
 
     if should_close {
-        app.show_catalog_window = false;
+        app.layout.show_catalog_window = false;
     }
 }

@@ -21,10 +21,8 @@ fn meta(names: &[&str]) -> DatasetMetadata {
 
 /// App with the overlay open on a dataset holding `names`.
 fn open_app(names: &[&str]) -> OctantApp {
-    let mut app = OctantApp {
-        show_variables_overlay: true,
-        ..Default::default()
-    };
+    let mut app = OctantApp::default();
+    app.layout.show_variables_overlay = true;
     app.set_active_metadata(meta(names));
     app
 }
@@ -89,9 +87,9 @@ fn reopening_the_overlay_refocuses_search() {
     run(&ctx, &mut app);
     drop_focus(&ctx);
 
-    app.show_variables_overlay = false;
+    app.layout.show_variables_overlay = false;
     run(&ctx, &mut app);
-    app.show_variables_overlay = true;
+    app.layout.show_variables_overlay = true;
     run(&ctx, &mut app);
     assert!(search_focused(&ctx));
 }
@@ -114,11 +112,11 @@ fn a_lookalike_dataset_still_counts_as_new() {
 fn clearing_the_search_releases_the_cached_results() {
     let ctx = egui::Context::default();
     let mut app = open_app(&["ocean/sst", "land/lai"]);
-    app.variable_search = "sst".into();
+    app.layout.variable_search = "sst".into();
     run(&ctx, &mut app);
     assert!(app.cached_search.is_some(), "searching caches the results");
 
-    app.variable_search.clear();
+    app.layout.variable_search.clear();
     run(&ctx, &mut app);
     assert!(app.cached_search.is_none(), "an empty search drops them");
 }
