@@ -172,9 +172,11 @@ fn bar_row(
 /// line's coordinate as tooltip.
 fn series_bar_row(app: &OctantApp, ui: &egui::Ui, axis: BarAxis, response: egui::Response) {
     let colors = BarColors::from_visuals(ui.visuals());
-    series::draw(app, ui, axis, app.layer_colormap(&app.layers.base), colors);
+    let series = series::Series::of(app);
+    let colormap = app.layer_colormap(&app.layers.base);
+    series::draw(app, ui, axis, &series, colormap, colors);
     if let Some(pos) = response.hover_pos() {
-        series::show_hover_text(app, response, axis.t_at(pos));
+        series::show_hover_text(app, response, &series, axis.t_at(pos));
     }
 }
 

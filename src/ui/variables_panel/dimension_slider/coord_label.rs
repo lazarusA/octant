@@ -9,6 +9,7 @@ use egui::{RichText, Ui};
 use crate::app::OctantApp;
 use crate::data::VariableInfo;
 use crate::ui::hover::format::format_dimension_coord;
+use crate::ui::temp_cache::cached;
 
 /// Shows the coordinate of `start..=end` along dimension `dim`; nothing without coordinates.
 pub(super) fn show_coord_label(
@@ -45,17 +46,10 @@ pub(super) fn cached_label(
         range,
     )
         .hash(&mut hasher);
-    let key = hasher.finish();
     let id = egui::Id::new(("dim_coord_label", dim));
-    let cached = ctx.data(|d| d.get_temp::<(u64, Option<Arc<str>>)>(id));
-    if let Some((cached_key, label)) = cached
-        && cached_key == key
-    {
-        return label;
-    }
-    let label: Option<Arc<str>> = format_label(app, var, dim, range).map(Arc::from);
-    ctx.data_mut(|d| d.insert_temp(id, (key, label.clone())));
-    label
+    cached(ctx, id, hasher.finish(), || {
+        format_label(app, var, dim, range).map(Arc::from)
+    })
 }
 
 /// The formatted coordinate of `start..=end` along dimension `dim` of `var`, or `None`

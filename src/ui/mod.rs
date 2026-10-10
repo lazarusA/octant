@@ -27,6 +27,7 @@ pub mod plot_type;
 pub mod settings;
 pub mod status;
 pub mod store;
+pub mod temp_cache;
 #[cfg(test)]
 pub(crate) mod test_input;
 #[cfg(test)]

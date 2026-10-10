@@ -5,7 +5,6 @@ pub mod device;
 pub mod fullscreen;
 pub mod heatmap;
 pub mod line;
-mod line_payload;
 pub mod mesh;
 mod mesh_draw;
 pub mod oit;
@@ -27,8 +26,7 @@ pub use coastline::{
 };
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
-pub use line::{LineCallback, LineRenderer};
-pub use line_payload::LineShape;
+pub use line::{LineCallback, LineRenderer, LineShape};
 pub use mesh::{Mesh3DCallback, Mesh3DRenderer};
 pub use point_cloud::{PointCloudCallback, PointCloudRenderer, PointCloudUniformParams};
 pub use sphere::{SphereCallback, SphereRenderer};

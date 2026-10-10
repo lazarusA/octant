@@ -47,8 +47,7 @@ pub fn sample_line_series(
     let mut best_val = f32::NAN;
 
     if l_count > 0 {
-        for line_idx in 0..l_count {
-            let v = layout.value(values, line_idx, sample_idx);
+        for (line_idx, v) in layout.column(values, sample_idx).enumerate() {
             if v.is_finite() {
                 let norm_y_val = (((v - cmin) / range) * 2.0 - 1.0).clamp(-1.0, 1.0);
                 let dist = (norm_y_val - (norm_y * 2.0 - 1.0)).abs();

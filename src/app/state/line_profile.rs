@@ -48,6 +48,40 @@ impl LineLayout {
             .and_then(|(l, s)| self.first.checked_add(l)?.checked_add(s));
         idx.and_then(|i| values.get(i)).copied().unwrap_or(f32::NAN)
     }
+
+    /// The samples of line `line` in `values`, in order.
+    pub fn row<'v>(&self, values: &'v [f32], line: usize) -> impl Iterator<Item = f32> + 'v {
+        let start = line.checked_mul(self.line_stride);
+        let start = start.and_then(|l| self.first.checked_add(l));
+        strided(values, start, self.sample_stride, self.profile_length)
+    }
+
+    /// Sample `sample` of every line in `values`, in line order.
+    pub fn column<'v>(&self, values: &'v [f32], sample: usize) -> impl Iterator<Item = f32> + 'v {
+        let start = sample.checked_mul(self.sample_stride);
+        let start = start.and_then(|s| self.first.checked_add(s));
+        strided(values, start, self.line_stride, self.line_count)
+    }
+
+    /// Upper bound of the payload's bytes: every line drawn.
+    fn max_payload_bytes(&self) -> Option<u64> {
+        let words = self
+            .line_count
+            .checked_mul(self.profile_length.checked_add(1)?)?;
+        u64::try_from(words).ok()?.checked_mul(4)
+    }
+}
+
+/// `count` values of `values` from `start`, `step` apart, NaN past the end.
+fn strided(
+    values: &[f32],
+    start: Option<usize>,
+    step: usize,
+    count: usize,
+) -> impl Iterator<Item = f32> + '_ {
+    let tail = start.and_then(|s| values.get(s..)).unwrap_or_default();
+    let present = tail.iter().step_by(step.max(1)).copied();
+    present.chain(std::iter::repeat(f32::NAN)).take(count)
 }
 
 /// What the line renderer draws: each line with data as its line index
@@ -89,22 +123,27 @@ impl OctantApp {
         let mut payload = Vec::with_capacity(words.unwrap_or(0));
         let mut drawn = 0;
         for line in 0..layout.line_count {
-            let sample = |s: usize| layout.value(values, line, s);
-            if !(0..len).any(|s| sample(s).is_finite()) {
+            if !layout.row(values, line).any(f32::is_finite) {
                 continue;
             }
             payload.push(line as u32);
-            payload.extend((0..len).map(|s| sample(s).to_bits()));
+            payload.extend(layout.row(values, line).map(f32::to_bits));
             drawn += 1;
         }
         LinePayload {
             words: payload,
-            shape: LineShape {
-                profile_length: len as u32,
-                drawn_lines: drawn,
-                line_count: layout.line_count as u32,
-            },
+            shape: shape_of(layout, drawn),
         }
+    }
+
+    /// Bytes of the payload `line_payload` would build, without building it.
+    fn line_payload_bytes(&self) -> Option<u64> {
+        let (values, layout) = self.line_layout();
+        let drawn = (0..layout.line_count)
+            .filter(|&line| layout.row(values, line).any(f32::is_finite))
+            .count();
+        let words = drawn.checked_mul(layout.profile_length.checked_add(1)?)?;
+        u64::try_from(words).ok()?.checked_mul(4)
     }
 
     /// Identifies the payload `line_payload` builds: the base layer's data
@@ -117,17 +156,39 @@ impl OctantApp {
 
     /// The shape of the payload `renderer` draws, building and uploading it
     /// first only when the data or its layout changed since the last upload.
+    /// A payload past the device's buffer limit is never built.
     pub fn upload_line_payload(&self, renderer: &LineRenderer) -> LineShape {
         let key = self.line_payload_key();
         if let Some(shape) = renderer.payload_shape(key) {
             return shape;
         }
-        let payload = self.line_payload();
-        if let Some(state) = &self.wgpu_render_state {
-            let (device, queue) = (&state.device, &state.queue);
-            renderer.upload_payload(device, queue, key, &payload.words, payload.shape);
+        let Some(state) = &self.wgpu_render_state else {
+            return LineShape::default();
+        };
+        let (device, queue) = (&state.device, &state.queue);
+        let limit = LineRenderer::payload_limit(device);
+        let layout = self.line_layout().1;
+        // Count the lines with data only when drawing all of them would not fit.
+        let bytes = match layout.max_payload_bytes() {
+            Some(most) if most <= limit => most,
+            _ => self.line_payload_bytes().unwrap_or(u64::MAX),
+        };
+        if bytes > limit {
+            renderer.skip_payload(key, shape_of(layout, 0), bytes, limit);
+            return renderer.payload_shape(key).unwrap_or_default();
         }
+        let payload = self.line_payload();
+        renderer.upload_payload(device, queue, key, &payload.words, payload.shape);
         payload.shape
+    }
+}
+
+/// The shape of a payload of `layout` with `drawn` lines.
+fn shape_of(layout: LineLayout, drawn: u32) -> LineShape {
+    LineShape {
+        profile_length: layout.profile_length as u32,
+        drawn_lines: drawn,
+        line_count: layout.line_count as u32,
     }
 }
 
@@ -181,6 +242,17 @@ mod tests {
         let cols = LineLayout::lines(2, 3, (1, 3), None);
         assert_eq!(cols.value(&VALUES, 2, 1), 6.0);
         assert_eq!(cols.value(&VALUES, 0, 1), 4.0);
+    }
+
+    #[test]
+    fn rows_and_columns_read_in_order_with_nan_past_the_end() {
+        let rows = LineLayout::lines(3, 2, (3, 1), None);
+        assert_eq!(rows.row(&VALUES, 1).collect::<Vec<_>>(), [4.0, 5.0, 6.0]);
+        assert_eq!(rows.column(&VALUES, 2).collect::<Vec<_>>(), [3.0, 6.0]);
+        let short: Vec<f32> = rows.row(&VALUES[..5], 1).collect();
+        assert_eq!(short[..2], [4.0, 5.0]);
+        assert!(short[2].is_nan());
+        assert_eq!(rows.max_payload_bytes(), Some(2 * 4 * 4));
     }
 
     #[test]

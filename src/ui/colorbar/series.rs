@@ -6,12 +6,13 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
-use egui::{Mesh, Shape, Stroke};
+use egui::{Mesh, Rangef, Shape, Stroke};
 
 use super::axis::BarAxis;
 use super::bars::{self, BarColors};
 use crate::app::{OctantApp, series_line_at, series_t};
 use crate::ui::hover::entries_1d::{series_dim, series_field};
+use crate::ui::temp_cache::cached;
 use crate::utils::colormap::{orient, registry};
 
 /// Lines labeled at most, spread evenly from the first to the last.
@@ -21,8 +22,31 @@ const MAX_LABELS: usize = 5;
 const MAX_SWATCHES: usize = 256;
 /// Narrowest swatch that gets dividers.
 const MIN_DIVIDED: f32 = 6.0;
-/// Segments of the gradient drawn for continuous or very long series.
-const SEGMENTS: usize = 128;
+/// Least room between two labels along the bar.
+const LABEL_SPACING: f32 = 6.0;
+
+/// What the base layer's series bar shows this frame.
+pub(super) struct Series {
+    /// Lines in the plot.
+    n: usize,
+    categorical: bool,
+    reversed: bool,
+    /// Identifies what the coordinate labels read (`labels_key`).
+    labels_key: u64,
+}
+
+impl Series {
+    pub(super) fn of(app: &OctantApp) -> Self {
+        let style = &app.layers.base.color;
+        let n = app.line_layout().1.line_count;
+        Self {
+            n,
+            categorical: style.categorical,
+            reversed: style.reversed,
+            labels_key: labels_key(app, n),
+        }
+    }
+}
 
 /// A labeled line: its place on the bar and its coordinate.
 #[derive(Clone)]
@@ -31,18 +55,18 @@ struct SeriesTick {
     label: Arc<str>,
 }
 
-/// Draws the base layer's series bar on `axis` in colormap row `colormap`.
+/// Draws `series` on `axis` in colormap row `colormap`.
 pub(super) fn draw(
     app: &OctantApp,
     ui: &egui::Ui,
     axis: BarAxis,
+    series: &Series,
     colormap: u32,
     colors: BarColors,
 ) {
-    let style = &app.layers.base.color;
-    let (n, categorical) = (app.line_layout().1.line_count, style.categorical);
-    let color_at = |t: f32| registry::sample(colormap, orient(t, style.reversed));
-    let swatches = categorical && n <= MAX_SWATCHES;
+    let n = series.n;
+    let color_at = |t: f32| registry::sample(colormap, orient(t, series.reversed));
+    let swatches = series.categorical && n <= MAX_SWATCHES;
     let mut mesh = Mesh::default();
     if swatches {
         for i in 0..n {
@@ -51,10 +75,7 @@ pub(super) fn draw(
             bars::push_quad(&mut mesh, quad, [color, color]);
         }
     } else {
-        for i in 0..SEGMENTS {
-            let (t0, t1) = (i as f32 / SEGMENTS as f32, (i + 1) as f32 / SEGMENTS as f32);
-            bars::push_quad(&mut mesh, axis.quad(t0, t1), [color_at(t0), color_at(t1)]);
-        }
+        bars::push_gradient(&mut mesh, axis, registry::is_stepped(colormap), color_at);
     }
     let painter = ui.painter();
     painter.add(Shape::mesh(mesh));
@@ -67,35 +88,51 @@ pub(super) fn draw(
     }
     let border = Stroke::new(1.0, colors.border);
     painter.rect_stroke(axis.rect, 0.0, border, egui::StrokeKind::Middle);
-    for tick in ticks(app, ui.ctx(), n, categorical).iter() {
-        bars::major_tick(ui, axis, tick.t, Some(&tick.label), colors.strong_text);
+    let ticks = ticks(app, ui.ctx(), series);
+    for tick in ticks.iter() {
+        bars::major_tick(ui, axis, tick.t, None, colors.strong_text);
+    }
+    draw_labels(ui, axis, &ticks, colors.strong_text);
+}
+
+/// Draws the labels of `ticks` that fit: the first and last first, then the
+/// others in order, each only when it keeps clear of those already drawn.
+fn draw_labels(ui: &egui::Ui, axis: BarAxis, ticks: &[SeriesTick], color: egui::Color32) {
+    let last = ticks.len().saturating_sub(1);
+    let order = [0, last].into_iter().chain(1..last).take(ticks.len());
+    let mut taken = [Rangef::NOTHING; MAX_LABELS];
+    let mut kept = 0;
+    for tick in order.filter_map(|i| ticks.get(i)) {
+        let text = tick.label.to_string();
+        let galley = ui.painter().layout_no_wrap(text, bars::label_font(), color);
+        let (pos, align) = axis.label(tick.t, bars::LABEL_GAP);
+        let rect = align.anchor_size(pos, galley.size());
+        let span = if axis.rect.width() >= axis.rect.height() {
+            rect.x_range()
+        } else {
+            rect.y_range()
+        };
+        let apart =
+            |t: &Rangef| span.max + LABEL_SPACING <= t.min || t.max + LABEL_SPACING <= span.min;
+        if kept < MAX_LABELS && taken[..kept].iter().all(apart) {
+            taken[kept] = span;
+            kept += 1;
+            ui.painter().galley(rect.min, galley, color);
+        }
     }
 }
 
 /// Shows the coordinate of the line drawn at bar position `t` as tooltip,
 /// formatted only when the hovered line or the labels' inputs change.
-pub(super) fn show_hover_text(app: &OctantApp, response: egui::Response, t: f32) {
-    let n = app.line_layout().1.line_count;
-    let line = series_line_at(t, n, app.layers.base.color.categorical);
-    let key = (labels_key(app, n), line);
+pub(super) fn show_hover_text(app: &OctantApp, response: egui::Response, series: &Series, t: f32) {
+    let line = series_line_at(t, series.n, series.categorical);
     let id = egui::Id::new("colorbar_series_hover");
-    let cached = response
-        .ctx
-        .data(|d| d.get_temp::<((u64, usize), Arc<str>)>(id))
-        .filter(|(cached, _)| *cached == key);
-    let text = match cached {
-        Some((_, text)) => text,
-        None => {
-            let plotted = app.plotted();
-            let var = plotted.variable_info();
-            let (field, _) = series_field(app, plotted.metadata.as_ref(), var, line, n);
-            let text: Arc<str> = format!("{}: {}", field.label, field.value).into();
-            response
-                .ctx
-                .data_mut(|d| d.insert_temp(id, (key, text.clone())));
-            text
-        }
-    };
+    let text: Arc<str> = cached(&response.ctx, id, (series.labels_key, line), || {
+        let plotted = app.plotted();
+        let meta = plotted.metadata.as_ref();
+        let (field, _) = series_field(app, meta, plotted.variable_info(), line, series.n);
+        format!("{}: {}", field.label, field.value).into()
+    });
     response.on_hover_text(&*text);
 }
 
@@ -117,33 +154,22 @@ fn labels_key(app: &OctantApp, n: usize) -> u64 {
 
 /// The labeled lines, formatted only when the series or its coordinates
 /// change (kept in egui temp memory).
-fn ticks(app: &OctantApp, ctx: &egui::Context, n: usize, categorical: bool) -> Arc<[SeriesTick]> {
-    let plotted = app.plotted();
-    let key = (labels_key(app, n), categorical);
+fn ticks(app: &OctantApp, ctx: &egui::Context, series: &Series) -> Arc<[SeriesTick]> {
+    let (n, categorical) = (series.n, series.categorical);
     let id = egui::Id::new("colorbar_series_ticks");
-    if let Some((cached, ticks)) = ctx.data(|d| d.get_temp::<((u64, bool), Arc<[SeriesTick]>)>(id))
-        && cached == key
-    {
-        return ticks;
-    }
-    let ticks = labeled_lines(n)
-        .map(|line| {
-            let (field, _) = series_field(
-                app,
-                plotted.metadata.as_ref(),
-                plotted.variable_info(),
-                line,
-                n,
-            );
-            let t = series_t(line, n, categorical);
-            SeriesTick {
-                t,
-                label: field.value.into(),
-            }
-        })
-        .collect::<Arc<[_]>>();
-    ctx.data_mut(|d| d.insert_temp(id, (key, ticks.clone())));
-    ticks
+    cached(ctx, id, (series.labels_key, categorical), || {
+        let plotted = app.plotted();
+        let meta = plotted.metadata.as_ref();
+        labeled_lines(n)
+            .map(|line| {
+                let (field, _) = series_field(app, meta, plotted.variable_info(), line, n);
+                SeriesTick {
+                    t: series_t(line, n, categorical),
+                    label: field.value.into(),
+                }
+            })
+            .collect()
+    })
 }
 
 /// Up to `MAX_LABELS` lines of `n`, evenly spread from the first to the last.

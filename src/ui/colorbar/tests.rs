@@ -121,3 +121,24 @@ fn log_ticks_end_for_infinite_and_huge_ranges() {
     let narrow = generate_colorbar_ticks(1.0, 1e4, 1, 1.0);
     assert!(narrow.iter().any(|t| !t.is_major));
 }
+
+#[test]
+fn stepped_gradients_switch_color_where_the_shader_does() {
+    use super::axis::BarAxis;
+    use crate::app::layers::BarOrientation;
+    // 255 px wide, so texel k's segment starts at x = k - 0.5.
+    let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(255.0, 10.0));
+    let axis = BarAxis::new(rect, BarOrientation::Horizontal);
+    let texel = |t: f32| egui::Color32::from_gray((t * 255.0).round() as u8);
+    let mut mesh = egui::Mesh::default();
+    super::bars::push_gradient(&mut mesh, axis, true, texel);
+    assert_eq!(mesh.vertices.len(), 256 * 4, "one flat segment per texel");
+    let quad = |k: usize| &mesh.vertices[k * 4..k * 4 + 4];
+    assert!(
+        quad(3)
+            .iter()
+            .all(|v| v.color == egui::Color32::from_gray(3))
+    );
+    assert_eq!((quad(3)[0].pos.x, quad(3)[2].pos.x), (2.5, 3.5));
+    assert_eq!((quad(0)[0].pos.x, quad(255)[2].pos.x), (0.0, 255.0));
+}

@@ -37,13 +37,18 @@ pub fn get_dimension_origin_and_full_len(
 /// screen index `i` shows: blocks flip axes so north is up and west is left, which
 /// reverses those dimensions relative to storage.
 pub fn stored_offset(app: &OctantApp, dim_name: &str, i: usize, len: usize) -> usize {
-    let flipped = app
-        .layers
-        .base
-        .data
-        .flipped_dims
-        .iter()
-        .any(|d| d == dim_name);
+    flipped_offset(is_flipped(app, dim_name), i, len)
+}
+
+/// Whether blocks flipped dimension `dim_name` of the plotted data.
+pub fn is_flipped(app: &OctantApp, dim_name: &str) -> bool {
+    let flipped_dims = &app.layers.base.data.flipped_dims;
+    flipped_dims.iter().any(|d| d == dim_name)
+}
+
+/// The stored offset of screen index `i` of `len` along a dimension that is
+/// `flipped` or not.
+pub fn flipped_offset(flipped: bool, i: usize, len: usize) -> usize {
     match len.checked_sub(1) {
         Some(last) if flipped => last - i.min(last),
         _ => i,

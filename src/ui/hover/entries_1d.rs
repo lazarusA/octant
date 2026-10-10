@@ -1,8 +1,8 @@
 use crate::app::OctantApp;
 use crate::data::{DatasetMetadata, VariableInfo};
 use crate::ui::hover::enrich::{
-    enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
-    stored_offset,
+    enrich_entries_with_animated_and_collapsed_dims, flipped_offset,
+    get_dimension_origin_and_full_len, is_flipped, stored_offset,
 };
 use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
@@ -114,11 +114,12 @@ fn enrich_line_series_ortho_dim(
 }
 
 /// The dimension series lines run across, placed in the plotted window: its
-/// index, the window's first index and the dimension's length, and whether
-/// blocks flipped it.
+/// index and name, the window's first index and the dimension's length, and
+/// whether blocks flipped it.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub(crate) struct SeriesDim {
+pub(crate) struct SeriesDim<'a> {
     pub index: usize,
+    pub name: &'a str,
     pub origin: usize,
     pub len: usize,
     pub flipped: bool,
@@ -126,7 +127,10 @@ pub(crate) struct SeriesDim {
 
 /// The dimension the lines of `var`'s line plot run across: Y for rows, X
 /// for columns, none for rays along Z.
-pub(crate) fn series_dim(app: &OctantApp, var: Option<&VariableInfo>) -> Option<SeriesDim> {
+pub(crate) fn series_dim<'a>(
+    app: &OctantApp,
+    var: Option<&'a VariableInfo>,
+) -> Option<SeriesDim<'a>> {
     let v = var?;
     let (explicit_x, explicit_y, _) = v.resolve_spatial_dim_indices(app.effective_dim_config());
     let index = match app.line_profile_dim_idx {
@@ -136,9 +140,10 @@ pub(crate) fn series_dim(app: &OctantApp, var: Option<&VariableInfo>) -> Option<
     }?;
     let name = v.dimension_names.get(index)?;
     let (origin, len) = get_dimension_origin_and_full_len(app, var, index);
-    let flipped = app.layers.base.data.flipped_dims.iter().any(|d| d == name);
+    let flipped = is_flipped(app, name);
     Some(SeriesDim {
         index,
+        name,
         origin,
         len,
         flipped,
@@ -154,16 +159,12 @@ pub(crate) fn series_field(
     line: usize,
     count: usize,
 ) -> (HoverField, Option<usize>) {
-    let named = var.zip(series_dim(app, var)).and_then(|(v, dim)| {
-        let name = v.dimension_names.get(dim.index)?;
-        Some((v, dim, name))
-    });
-    let Some((v, dim, name)) = named else {
+    let Some((v, dim)) = var.zip(series_dim(app, var)) else {
         return (HoverField::index_of("series", line, count), None);
     };
-    let offset = stored_offset(app, name, line, count);
+    let offset = flipped_offset(dim.flipped, line, count);
     let global = (dim.origin + offset).min(dim.len.saturating_sub(1));
     let target = Some(app.plotted().store_target.as_str());
-    let field = format_dimension_coord(meta, Some(v), target, name, global, dim.len, None);
+    let field = format_dimension_coord(meta, Some(v), target, dim.name, global, dim.len, None);
     (field, Some(dim.index))
 }

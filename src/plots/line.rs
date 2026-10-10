@@ -41,7 +41,10 @@ pub struct LineUniformParams {
 
 use std::sync::RwLock;
 
-use super::line_payload::{LineShape, PayloadSlot, buffer_capacity};
+mod payload;
+
+pub use payload::LineShape;
+use payload::PayloadSlot;
 
 pub struct LineRenderer {
     render_pipeline: wgpu::RenderPipeline,
@@ -198,34 +201,6 @@ impl LineRenderer {
         }
     }
 
-    /// The shape of the payload for `key`, when that is what the buffer holds.
-    pub fn payload_shape(&self, key: u64) -> Option<LineShape> {
-        self.payload.shape(key)
-    }
-
-    /// Uploads `words`, a payload of `shape` (`line_payload`), as the one for
-    /// `key`. A payload past the device's buffer limit draws nothing.
-    pub fn upload_payload(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        key: u64,
-        words: &[u32],
-        shape: LineShape,
-    ) {
-        let uploaded =
-            words.is_empty() || self.write_data(device, queue, bytemuck::cast_slice(words));
-        let drawn_lines = if uploaded { shape.drawn_lines } else { 0 };
-        // Held either way, so a payload that does not fit is reported once.
-        self.payload.hold(
-            key,
-            LineShape {
-                drawn_lines,
-                ..shape
-            },
-        );
-    }
-
     pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &LineUniformParams) {
         let uniforms = LineUniforms {
             viewport_padding: params.viewport_padding,
@@ -247,70 +222,10 @@ impl LineRenderer {
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
     }
 
-    /// Writes `bytes` to the start of the data buffer, growing it (to the next
-    /// power of two, within the device limit) when they do not fit. Reports
-    /// and returns `false` when they exceed the device's storage buffer limit.
-    fn write_data(&self, device: &wgpu::Device, queue: &wgpu::Queue, bytes: &[u8]) -> bool {
-        let needed = bytes.len() as u64;
-        let current = self
-            .gpu_resources
-            .read()
-            .map(|g| g.data_buffer.size())
-            .unwrap_or(0);
-        if needed <= current {
-            if let Ok(guard) = self.gpu_resources.read() {
-                queue.write_buffer(&guard.data_buffer, 0, bytes);
-            }
-            return true;
-        }
-        let limits = device.limits();
-        let limit = limits
-            .max_storage_buffer_binding_size
-            .min(limits.max_buffer_size);
-        let Some(capacity) = buffer_capacity(needed, limit) else {
-            crate::ui::toast::report(
-                crate::ui::toast::Severity::Warning,
-                "Line plot too large for the GPU",
-                format!("The lines take {needed} bytes; this GPU binds at most {limit}."),
-            );
-            return false;
-        };
-        let data_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("1D Line Storage Buffer (Resized)"),
-            size: capacity,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let bind_group = super::common::create_uniform_storage_bind_group(
-            device,
-            "1D Line Bind Group (Resized)",
-            &self.bind_group_layout,
-            &self.uniform_buffer,
-            &data_buffer,
-        );
-        queue.write_buffer(&data_buffer, 0, bytes);
-        if let Ok(mut guard) = self.gpu_resources.write() {
-            guard.data_buffer = data_buffer;
-            guard.bind_group = bind_group;
-        }
-        true
-    }
-
-    /// Writes raw values into the data buffer (the `PlotRenderer` traits);
-    /// the next paint uploads its payload again.
-    pub fn update_data(&self, queue: &wgpu::Queue, matrix_data: &[f32]) {
-        if matrix_data.is_empty() {
-            return;
-        }
+    /// The `PlotRenderer` traits' raw values do not fit the payload layout
+    /// (`payload.rs`): they only make the next paint upload the payload again.
+    pub fn update_data(&self, _queue: &wgpu::Queue, _matrix_data: &[f32]) {
         self.payload.forget();
-        if let Ok(guard) = self.gpu_resources.read() {
-            super::common::safe_write_buffer(
-                queue,
-                &guard.data_buffer,
-                matrix_data,
-                "LineRenderer::update_data",
-            );
-        }
     }
 }
 
