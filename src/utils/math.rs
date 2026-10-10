@@ -217,33 +217,6 @@ pub fn calculate_2d_elements(
     nx.saturating_mul(ny)
 }
 
-/// Computes normalized surface height on the 3D surface mesh matching surface.wgsl.
-#[inline]
-pub fn compute_normalized_surface_height(
-    val: f32,
-    cmin: f32,
-    cmax: f32,
-    surface_mode: u32,
-    disp: f32,
-) -> f32 {
-    if !val.is_finite() {
-        return 0.0;
-    }
-    let range = (cmax - cmin).max(1e-6);
-    let mult = match surface_mode {
-        1 => 0.6, // Flat Steps
-        _ => 0.8, // Smooth Terrain (0) and 3D Lego Cubes (2)
-    };
-
-    if cmin < 0.0 && cmax > 0.0 {
-        let max_abs = cmin.abs().max(cmax.abs());
-        (val / max_abs).clamp(-1.0, 1.0) * mult * disp
-    } else {
-        let norm_val = ((val - cmin) / range).clamp(0.0, 1.0);
-        norm_val * mult * disp
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -309,15 +282,6 @@ mod tests {
         let vz = xorshift64_f32(&mut zero_seed);
         assert!((0.0..1.0).contains(&vz));
         assert_ne!(zero_seed, 0);
-    }
-
-    #[test]
-    fn test_compute_normalized_surface_height() {
-        let h_mid = compute_normalized_surface_height(50.0, 0.0, 100.0, 0, 1.0);
-        assert!((h_mid - 0.4).abs() < 1e-4);
-
-        let h_nan = compute_normalized_surface_height(f32::NAN, 0.0, 100.0, 0, 1.0);
-        assert_eq!(h_nan, 0.0);
     }
 
     #[test]

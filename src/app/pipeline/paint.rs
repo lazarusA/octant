@@ -124,10 +124,10 @@ impl OctantApp {
     pub fn get_mesh_3d_uniform_params(
         &self,
         layer: &Layer,
-        mode: u32,
-        displacement_strength: f32,
+        sphere: bool,
         aspect_ratio: f32,
     ) -> crate::plots::Mesh3DUniformParams {
+        let (mode, displacement_strength, flip_height) = self.plot_configs.mesh.heights(sphere);
         let (coord_mode, has_reference_globe, lon_bounds, lat_bounds) = layer
             .data
             .matrix
@@ -159,6 +159,7 @@ impl OctantApp {
             has_reference_globe,
             lon_bounds,
             lat_bounds,
+            flip_height,
         }
     }
 
@@ -266,23 +267,11 @@ impl OctantApp {
             if canvas_plot_type != PlotType::Heatmap
                 && let Some(renderer) = self.coastline_3d_renderer.as_ref().map(Arc::clone)
             {
-                let (mode, plot_kind, displacement_strength) = match canvas_plot_type {
-                    PlotType::Sphere => (
-                        self.plot_configs.mesh.sphere_mode,
-                        1,
-                        self.plot_configs.mesh.sphere_displacement,
-                    ),
-                    _ => (
-                        self.plot_configs.mesh.surface_mode,
-                        0,
-                        self.plot_configs.mesh.surface_displacement,
-                    ),
-                };
+                let sphere = canvas_plot_type == PlotType::Sphere;
                 // Coastlines follow the base layer's grid.
                 let mesh_params = self.get_mesh_3d_uniform_params(
                     &self.layers.base,
-                    mode,
-                    displacement_strength,
+                    sphere,
                     crate::plots::common::compute_aspect_ratio(&plot_rect),
                 );
                 let line_color = self.coastline_color.unwrap_or_else(|| {
@@ -302,8 +291,8 @@ impl OctantApp {
                             aspect_ratio: mesh_params.aspect_ratio,
                             zoom: mesh_params.zoom,
                             displacement_strength: mesh_params.displacement_strength,
-                            plot_kind,
-                            plot_mode: mode,
+                            plot_kind: u32::from(sphere),
+                            plot_mode: mesh_params.mode,
                             line_width: self.coastline_line_width,
                             coord_mode: mesh_params.coord_mode,
                             crop_to_domain: if self.coastline_crop_to_data_domain {
@@ -315,6 +304,9 @@ impl OctantApp {
                             lat_bounds: mesh_params.lat_bounds,
                             color: line_color,
                             color_range: [mesh_params.color.cmin, mesh_params.color.cmax],
+                            flip_height: mesh_params.flip_height,
+                            composite: mesh_params.color.colormap
+                                == crate::utils::colormap::COLORMAP_RGB_COMPOSITE,
                         },
                         rect: plot_rect,
                     },

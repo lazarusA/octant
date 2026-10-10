@@ -6,6 +6,7 @@ pub mod executor;
 mod executor_tests;
 pub mod grid;
 pub mod grid_flips;
+pub mod height;
 pub mod math;
 pub mod metadata;
 pub mod path;

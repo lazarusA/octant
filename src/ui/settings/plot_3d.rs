@@ -91,6 +91,7 @@ pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             egui::Slider::new(&mut app.plot_configs.mesh.sphere_displacement, 0.0..=5.0)
                 .text("Height"),
         );
+        flip_height_checkbox(ui, &mut app.plot_configs.mesh.sphere_flip_height);
     }
 }
 
@@ -117,6 +118,13 @@ pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         egui::Slider::new(&mut app.plot_configs.mesh.surface_displacement, 0.0..=5.0)
             .text("Height"),
     );
+    flip_height_checkbox(ui, &mut app.plot_configs.mesh.surface_flip_height);
+}
+
+/// Toggles heights measured down from the top value (`HeightScale::flip`).
+fn flip_height_checkbox(ui: &mut egui::Ui, flip: &mut bool) {
+    ui.checkbox(flip, "Flip heights")
+        .on_hover_text("The highest value lies flat and lower values rise above it");
 }
 
 pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {

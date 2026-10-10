@@ -64,8 +64,30 @@ impl Default for VolumePlotConfig {
 pub struct MeshPlotConfig {
     pub surface_displacement: f32,
     pub surface_mode: u32,
+    /// Heights measured down from the top value (`HeightScale::flip`).
+    pub surface_flip_height: bool,
     pub sphere_displacement: f32,
     pub sphere_mode: u32,
+    pub sphere_flip_height: bool,
+}
+
+impl MeshPlotConfig {
+    /// `(mode, displacement, flip_height)` of the sphere or the surface.
+    pub fn heights(&self, sphere: bool) -> (u32, f32, bool) {
+        if sphere {
+            (
+                self.sphere_mode,
+                self.sphere_displacement,
+                self.sphere_flip_height,
+            )
+        } else {
+            (
+                self.surface_mode,
+                self.surface_displacement,
+                self.surface_flip_height,
+            )
+        }
+    }
 }
 
 impl Default for MeshPlotConfig {
@@ -73,8 +95,10 @@ impl Default for MeshPlotConfig {
         Self {
             surface_displacement: 0.3,
             surface_mode: 0,
+            surface_flip_height: false,
             sphere_displacement: 0.3,
             sphere_mode: 0,
+            sphere_flip_height: false,
         }
     }
 }

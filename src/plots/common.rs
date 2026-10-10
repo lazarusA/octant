@@ -112,7 +112,9 @@ pub struct Mesh3DUniforms {
     pub has_reference_globe: u32,
     pub lon_bounds: [f32; 2],
     pub lat_bounds: [f32; 2],
-    pub _pad: [u32; 2],
+    /// 1 when heights are flipped (`utils::height::HeightScale::flip`).
+    pub flip_height: u32,
+    pub _pad: u32,
     pub color: PlotColorParams,
 }
 
@@ -130,6 +132,7 @@ pub struct Mesh3DUniformParams {
     pub has_reference_globe: bool,
     pub lon_bounds: [f32; 2],
     pub lat_bounds: [f32; 2],
+    pub flip_height: bool,
 }
 
 /// Standard trait implemented by all Octant WGPU plot renderers.

@@ -123,6 +123,8 @@ macro_rules! assemble_plot_with_coords_shader {
             "\n",
             include_str!("shaders/common/projections.wgsl"),
             "\n",
+            include_str!("shaders/common/height.wgsl"),
+            "\n",
             $plot_shader
         )
     };
@@ -222,6 +224,8 @@ mod tests {
                     include_str!("shaders/common/healpix_math.wgsl"),
                     "\n",
                     include_str!("shaders/common/projections.wgsl"),
+                    "\n",
+                    include_str!("shaders/common/height.wgsl"),
                     "\n",
                     include_str!("shaders/coastline_3d.wgsl"),
                 ),

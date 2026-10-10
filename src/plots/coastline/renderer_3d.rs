@@ -51,6 +51,8 @@ impl Coastline3DRenderer {
                     "\n",
                     include_str!("../shaders/common/projections.wgsl"),
                     "\n",
+                    include_str!("../shaders/common/height.wgsl"),
+                    "\n",
                     include_str!("../shaders/coastline_3d.wgsl"),
                 )
                 .into(),
@@ -75,7 +77,8 @@ impl Coastline3DRenderer {
             color: [1.0, 1.0, 1.0, 0.8],
             _pad_color: [0; 2],
             color_range: [-1.0, 1.0],
-            _pad: [0; 2],
+            flip_height: 0,
+            composite: 0,
             _pad_tail: [0; 2],
         };
         let uniform_buffer = crate::plots::common::create_uniform_buffer(
@@ -324,7 +327,8 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
             color: p.color,
             _pad_color: [0; 2],
             color_range: p.color_range,
-            _pad: [0; 2],
+            flip_height: u32::from(p.flip_height),
+            composite: u32::from(p.composite),
             _pad_tail: [0; 2],
         };
         queue.write_buffer(
