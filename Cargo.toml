@@ -58,6 +58,7 @@ netcdf = { version = "0.12", features = ["static"] }
 rayon = "1.10"
 reqwest = { version = "0.13", features = ["blocking", "json"] }
 md-5 = "0.11"
+sys-locale = "0.3"
 # Only for `cargo run --features font-tools --bin subset_fonts`.
 allsorts = { version = "0.17", default-features = false, features = ["flate2_rust"], optional = true }
 crc32fast = "1.5"
@@ -77,6 +78,7 @@ uuid = { version = "1", features = ["v4", "js"] }
 zarrs = { version = "0.23", default-features = false, features = ["ndarray", "crc32c", "gzip", "zlib", "sharding", "transpose", "async", "bitround", "pcodec"] }
 web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlCanvasElement", "Response", "Request", "RequestInit", "Headers", "RequestMode"] }
 js-sys = "0.3"
+sys-locale = { version = "0.3", features = ["js"] }
 blusc = "0.0.6"
 getrandom = { version = "0.4", features = ["wasm_js"] }
 async-tiff = { version = "0.4.0", default-features = false }

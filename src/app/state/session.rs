@@ -25,14 +25,14 @@ impl OctantApp {
         app
     }
 
-    /// Restores the user's language preference from eframe storage.
+    /// Restores the user's language preference from eframe storage; on the
+    /// first run (nothing saved yet), starts in the system's language when
+    /// Octant has it, else English.
     pub fn load_language_pref(&mut self, storage: Option<&dyn eframe::Storage>) {
-        let Some(storage) = storage else {
-            return;
-        };
-        if let Some(lang) =
+        let saved = storage.and_then(|storage| {
             eframe::get_value::<crate::i18n::Language>(storage, LANGUAGE_STORAGE_KEY)
-        {
+        });
+        if let Some(lang) = saved.or_else(crate::i18n::locale::system_language) {
             crate::i18n::set_language(lang);
         }
     }

@@ -116,3 +116,35 @@ fn test_translations_are_plain_text() {
 fn is_cjk_punctuation(c: char) -> bool {
     matches!(c, '\u{3000}'..='\u{303F}' | '\u{30FB}' | '\u{30FC}' | '\u{FF01}'..='\u{FF65}')
 }
+
+#[test]
+fn test_system_locales_map_to_languages() {
+    use super::locale::from_locale;
+    let cases = [
+        ("en-US", Some(Language::English)),
+        ("es-419", Some(Language::Spanish)),
+        ("pt-BR", Some(Language::Portuguese)),
+        ("de_DE.UTF-8", Some(Language::German)),
+        ("FR", Some(Language::French)),
+        ("uk_UA", Some(Language::Ukrainian)),
+        ("nb-NO", Some(Language::Norwegian)),
+        ("nn", Some(Language::Norwegian)),
+        ("no", Some(Language::Norwegian)),
+        ("in_ID", Some(Language::Indonesian)),
+        ("fi-FI", Some(Language::Finnish)),
+        ("zh", Some(Language::ChineseSimp)),
+        ("zh-CN", Some(Language::ChineseSimp)),
+        ("zh-Hans-SG", Some(Language::ChineseSimp)),
+        ("zh-Hant-TW", None),
+        ("zh_TW", None),
+        ("zh-HK", None),
+        ("ja-JP", Some(Language::Japanese)),
+        ("ko_KR.UTF-8", Some(Language::Korean)),
+        ("nl-NL", None),
+        ("C", None),
+        ("", None),
+    ];
+    for (tag, expected) in cases {
+        assert_eq!(from_locale(tag), expected, "{tag}");
+    }
+}

@@ -9,6 +9,7 @@
 
 pub mod keys;
 pub mod lang;
+pub mod locale;
 pub mod template;
 pub mod translations;
 
