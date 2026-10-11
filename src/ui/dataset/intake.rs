@@ -25,20 +25,54 @@ const SAMPLE_PRESETS: [(&str, &str, Option<StoreKind>); 4] = [
     ),
 ];
 
+const FORMAT_OPTIONS: [(StoreKind, &str); 9] = [
+    (StoreKind::RemoteZarr, "Remote Zarr (HTTP/S3)"),
+    (StoreKind::LocalZarr, "Local Zarr (Filesystem)"),
+    (StoreKind::RemoteIcechunk, "Remote Icechunk (HTTP/S3)"),
+    (StoreKind::LocalIcechunk, "Local Icechunk (Filesystem)"),
+    (StoreKind::RemoteGeoTiff, "Remote GeoTIFF / COG (HTTP/S3)"),
+    (StoreKind::LocalGeoTiff, "Local GeoTIFF (.tif/.tiff/.cog)"),
+    (StoreKind::LocalNetCdf, "Local NetCDF / HDF5 (.nc/.h5)"),
+    (
+        StoreKind::ProceduralVolume4D,
+        "4D Known-Truth Volume (Procedural)",
+    ),
+    (
+        StoreKind::ProceduralRandom,
+        "2D Procedural Matrix (Procedural)",
+    ),
+];
+
 /// Renders the source intake controls: URL/path text input, format selection,
 /// quick sample presets, catalog opener, and drop zone.
 pub fn show_source_intake(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.label(egui::RichText::new("Target URL / File Path").strong());
 
     let has_input = !app.selected.store_target.is_empty();
+    if show_input_bar(app, ui) {
+        let target = app.selected.store_target.clone();
+        app.submit_or_activate_source(&target, Some(app.selected.store_kind));
+    }
+
+    ui.add_space(4.0);
+    show_format_selector(app, ui);
+
+    ui.add_space(4.0);
+    show_intake_actions(app, ui, has_input);
+
+    ui.add_space(6.0);
+    crate::ui::drop_zone::show_drop_zone(ui, None, 54.0);
+}
+
+fn show_input_bar(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
     let load_icon = if app.is_loading {
         Icon::Hourglass
     } else {
         Icon::DropTray
     };
     let load_text = if app.is_loading { "Loading..." } else { "Load" };
+    let mut submit = false;
 
-    let mut should_submit = false;
     ui.horizontal(|ui| {
         let edit_width = (ui.available_width() - 70.0).max(100.0);
         let edit_resp = ui.add_sized(
@@ -48,7 +82,7 @@ pub fn show_source_intake(app: &mut OctantApp, ui: &mut egui::Ui) {
         );
 
         if edit_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-            should_submit = true;
+            submit = true;
         }
 
         if ui
@@ -57,19 +91,14 @@ pub fn show_source_intake(app: &mut OctantApp, ui: &mut egui::Ui) {
             })
             .clicked()
         {
-            should_submit = true;
+            submit = true;
         }
     });
 
-    if should_submit {
-        let target = app.selected.store_target.clone();
-        app.submit_or_activate_source(&target, Some(app.selected.store_kind));
-    }
+    submit
+}
 
-    ui.add_space(4.0);
-    show_format_selector(app, ui);
-
-    ui.add_space(4.0);
+fn show_intake_actions(app: &mut OctantApp, ui: &mut egui::Ui, has_input: bool) {
     ui.horizontal(|ui| {
         if ui.icon_button(Icon::Catalog, "Catalog...").clicked() {
             app.layout.show_catalog_window = true;
@@ -94,9 +123,20 @@ pub fn show_source_intake(app: &mut OctantApp, ui: &mut egui::Ui) {
             app.selected.store_target.clear();
         }
     });
+}
 
-    ui.add_space(6.0);
-    crate::ui::drop_zone::show_drop_zone(ui, None, 54.0);
+fn format_label(kind: StoreKind) -> &'static str {
+    match kind {
+        StoreKind::RemoteZarr => "Remote Zarr (HTTP/S3)",
+        StoreKind::LocalZarr => "Local Zarr (Filesystem)",
+        StoreKind::RemoteIcechunk => "Remote Icechunk (HTTP/S3)",
+        StoreKind::LocalIcechunk => "Local Icechunk (Filesystem)",
+        StoreKind::RemoteGeoTiff => "Remote GeoTIFF / COG",
+        StoreKind::LocalGeoTiff => "Local GeoTIFF",
+        StoreKind::LocalNetCdf => "Local NetCDF / HDF5",
+        StoreKind::ProceduralVolume4D => "4D Known-Truth Volume",
+        StoreKind::ProceduralRandom => "2D Procedural Matrix",
+    }
 }
 
 fn show_format_selector(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -106,64 +146,14 @@ fn show_format_selector(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         let mut selected = app.selected.store_kind;
         egui::ComboBox::from_id_salt("dataset_store_kind_select")
-            .selected_text(match selected {
-                StoreKind::RemoteZarr => "Remote Zarr (HTTP/S3)",
-                StoreKind::LocalZarr => "Local Zarr (Filesystem)",
-                StoreKind::RemoteIcechunk => "Remote Icechunk (HTTP/S3)",
-                StoreKind::LocalIcechunk => "Local Icechunk (Filesystem)",
-                StoreKind::RemoteGeoTiff => "Remote GeoTIFF / COG",
-                StoreKind::LocalGeoTiff => "Local GeoTIFF",
-                StoreKind::LocalNetCdf => "Local NetCDF / HDF5",
-                StoreKind::ProceduralVolume4D => "4D Known-Truth Volume",
-                StoreKind::ProceduralRandom => "2D Procedural Matrix",
-            })
+            .selected_text(format_label(selected))
             .show_ui(ui, |ui| {
-                ui.selectable_value(
-                    &mut selected,
-                    StoreKind::RemoteZarr,
-                    "Remote Zarr (HTTP/S3)",
-                );
-                ui.selectable_value(
-                    &mut selected,
-                    StoreKind::LocalZarr,
-                    "Local Zarr (Filesystem)",
-                );
-                ui.selectable_value(
-                    &mut selected,
-                    StoreKind::RemoteIcechunk,
-                    "Remote Icechunk (HTTP/S3)",
-                );
-                ui.selectable_value(
-                    &mut selected,
-                    StoreKind::LocalIcechunk,
-                    "Local Icechunk (Filesystem)",
-                );
-                ui.selectable_value(
-                    &mut selected,
-                    StoreKind::RemoteGeoTiff,
-                    "Remote GeoTIFF / COG (HTTP/S3)",
-                );
-                ui.selectable_value(
-                    &mut selected,
-                    StoreKind::LocalGeoTiff,
-                    "Local GeoTIFF (.tif/.tiff/.cog)",
-                );
-                ui.selectable_value(
-                    &mut selected,
-                    StoreKind::LocalNetCdf,
-                    "Local NetCDF / HDF5 (.nc/.h5)",
-                );
-                ui.separator();
-                ui.selectable_value(
-                    &mut selected,
-                    StoreKind::ProceduralVolume4D,
-                    "4D Known-Truth Volume (Procedural)",
-                );
-                ui.selectable_value(
-                    &mut selected,
-                    StoreKind::ProceduralRandom,
-                    "2D Procedural Matrix (Procedural)",
-                );
+                for (i, (kind, label)) in FORMAT_OPTIONS.iter().enumerate() {
+                    if i == 7 {
+                        ui.separator();
+                    }
+                    ui.selectable_value(&mut selected, *kind, *label);
+                }
             });
 
         if selected != app.selected.store_kind {
