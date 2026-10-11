@@ -99,6 +99,10 @@ fn load_button(ui: &mut egui::Ui) -> bool {
 /// Load the typed source, or the current store target when the field is empty.
 fn submit_intake(app: &mut OctantApp) {
     let typed = app.layout.hero_state.input.trim();
+    if typed.eq_ignore_ascii_case("/catalog") || typed.eq_ignore_ascii_case("catalog") {
+        app.layout.show_catalog_window = true;
+        return;
+    }
     let target = if typed.is_empty() {
         app.selected.store_target.clone()
     } else {
