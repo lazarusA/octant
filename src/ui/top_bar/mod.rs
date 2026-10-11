@@ -24,6 +24,7 @@ const ALL_ITEMS: [TopBarItem; ITEM_COUNT] = [
     TopBarItem::Settings,
     TopBarItem::Status,
     TopBarItem::Cache,
+    TopBarItem::Language,
     TopBarItem::Theme,
 ];
 
@@ -55,6 +56,13 @@ fn show_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         items::show_item(TopBarItem::Theme, compact.get(TopBarItem::Theme), app, ui);
+        ui.separator();
+        items::show_item(
+            TopBarItem::Language,
+            compact.get(TopBarItem::Language),
+            app,
+            ui,
+        );
         ui.separator();
         items::show_item(TopBarItem::Cache, compact.get(TopBarItem::Cache), app, ui);
 

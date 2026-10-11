@@ -4,6 +4,7 @@ mod app;
 pub mod catalog;
 pub mod data;
 pub mod export;
+pub mod i18n;
 pub mod plots;
 pub mod ui;
 pub mod utils;

@@ -12,14 +12,15 @@ const BRAND_LABEL: &str = "Octant";
 fn label(item: TopBarItem, app: &OctantApp) -> &'static str {
     match item {
         TopBarItem::Brand => BRAND_LABEL,
-        TopBarItem::Dataset => "Dataset",
-        TopBarItem::Variables => "Variables",
-        TopBarItem::Dimensions => "Dimensions",
+        TopBarItem::Dataset => app.tr(crate::i18n::Key::Dataset),
+        TopBarItem::Variables => app.tr(crate::i18n::Key::Variables),
+        TopBarItem::Dimensions => app.tr(crate::i18n::Key::Dimensions),
         TopBarItem::PlotType => app.selected.plot_type.display_name(),
-        TopBarItem::Colormap => "Colormap",
-        TopBarItem::Settings => "Settings",
+        TopBarItem::Colormap => app.tr(crate::i18n::Key::Colormaps),
+        TopBarItem::Settings => app.tr(crate::i18n::Key::Settings),
         TopBarItem::Status => "",
-        TopBarItem::Cache => "Cache",
+        TopBarItem::Cache => app.tr(crate::i18n::Key::CacheUsage),
+        TopBarItem::Language => app.layout.language.code(),
         TopBarItem::Theme => theme_icon_label(app).1,
     }
 }
@@ -137,6 +138,7 @@ pub(super) fn show_item(item: TopBarItem, compact: bool, app: &mut OctantApp, ui
             }
         }
         TopBarItem::Cache => cache::show_cache_menu(app, ui, compact),
+        TopBarItem::Language => crate::ui::language_picker::show_language_menu(app, ui, compact),
         TopBarItem::Theme => show_theme_toggle(app, ui, compact),
     }
 }

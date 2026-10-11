@@ -59,7 +59,10 @@ fn render_variable_row(
         ui.label(egui::RichText::new(&var_info.name).strong());
         if let Some(group) = var_info.group_path() {
             ui.horizontal(|ui| {
-                ui.label("Group:");
+                ui.label(crate::i18n::translate(
+                    ctx.language,
+                    crate::i18n::Key::Group,
+                ));
                 ui.icon(Icon::Folder, IconSize::Sm);
                 for (i, seg) in group.split('/').filter(|s| !s.is_empty()).enumerate() {
                     if i > 0 {
@@ -69,10 +72,22 @@ fn render_variable_row(
                 }
             });
         }
-        ui.label(format!("Type: [{}]", var_info.data_type));
-        ui.label(format!("Shape: {:?}", var_info.shape));
+        ui.label(format!(
+            "{}: [{}]",
+            crate::i18n::translate(ctx.language, crate::i18n::Key::DataType),
+            var_info.data_type
+        ));
+        ui.label(format!(
+            "{}: {:?}",
+            crate::i18n::translate(ctx.language, crate::i18n::Key::Shape),
+            var_info.shape
+        ));
         if let Some(desc) = &var_info.long_name {
-            ui.label(format!("Description: {}", desc));
+            ui.label(format!(
+                "{}: {}",
+                crate::i18n::translate(ctx.language, crate::i18n::Key::Description),
+                desc
+            ));
         }
     });
 

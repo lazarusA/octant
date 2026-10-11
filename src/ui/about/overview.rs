@@ -4,7 +4,7 @@ use super::types::AboutTab;
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
 
-pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &mut AboutTab) {
+pub fn show_overview_tab(app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &mut AboutTab) {
     egui::ScrollArea::vertical()
         .auto_shrink([false, true])
         .show(ui, |ui| {
@@ -18,7 +18,7 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
                     egui::RichText::new(format!("Octant v{}", env!("CARGO_PKG_VERSION"))).strong(),
                 );
                 ui.label(
-                    egui::RichText::new("N-Dimensional Data Explorer")
+                    egui::RichText::new(app.tr(crate::i18n::Key::AboutSubtitle))
                         .small()
                         .italics()
                         .color(ui.visuals().weak_text_color()),
@@ -30,9 +30,7 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
             ui.add_space(8.0);
 
             // Core Platform Description
-            ui.label(
-                "Octant is an interactive viewer for N-dimensional datasets with native support for local and cloud object storage, Zarr (v2/v3), and Icechunk. Built in Rust with GPU-accelerated rendering via WGPU. Octant runs natively on macOS, Linux, and Windows.",
-            );
+            ui.label(app.tr(crate::i18n::Key::AboutDescription));
 
             ui.add_space(10.0);
 
@@ -46,37 +44,52 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
                     ui.spacing_mut().item_spacing.y = 4.0;
                     ui.horizontal(|ui| {
                         ui.icon(Icon::Bolt, IconSize::Sm);
-                        ui.label(egui::RichText::new("Hyperslab Slicing").strong());
+                        ui.label(
+                            egui::RichText::new(app.tr(crate::i18n::Key::AboutHyperslabTitle))
+                                .strong(),
+                        );
                     });
-                    ui.label("   Async LRU chunk cache & multi-resolution pyramids.");
+                    ui.label(format!(
+                        "   {}",
+                        app.tr(crate::i18n::Key::AboutHyperslabDesc)
+                    ));
                     ui.horizontal(|ui| {
                         ui.icon(Icon::Icechunk, IconSize::Sm);
-                        ui.label(egui::RichText::new("Zarr & Icechunk Native").strong());
+                        ui.label(
+                            egui::RichText::new(app.tr(crate::i18n::Key::AboutStorageTitle))
+                                .strong(),
+                        );
                     });
-                    ui.label("   Local, S3, GCS, Azure, and HTTP streaming backends.");
+                    ui.label(format!("   {}", app.tr(crate::i18n::Key::AboutStorageDesc)));
                     ui.horizontal(|ui| {
                         ui.icon(Icon::Colormap, IconSize::Sm);
                         ui.label(
-                            egui::RichText::new("Hardware-Accelerated WGPU Shaders").strong(),
+                            egui::RichText::new(app.tr(crate::i18n::Key::AboutShadersTitle))
+                                .strong(),
                         );
                     });
-                    ui.label(
-                        "   2D Flatmaps, 3D Spheres, Elevation Surfaces, Volumes & 1D Profiles.",
-                    );
+                    ui.label(format!("   {}", app.tr(crate::i18n::Key::AboutShadersDesc)));
                 });
 
             ui.add_space(8.0);
             ui.separator();
             ui.add_space(6.0);
 
-            show_links_and_credits(ui);
+            show_links_and_credits(app, ui);
 
             ui.add_space(8.0);
             if ui
-                .icon_button(Icon::Colormap, crate::utils::stack_str(
-                    &mut [0; 48],
-                    format_args!("Browse Native Vector Icons ({})", Icon::ALL.len()),
-                ))
+                .icon_button(
+                    Icon::Colormap,
+                    crate::utils::stack_str(
+                        &mut [0; 64],
+                        format_args!(
+                            "{} ({})",
+                            app.tr(crate::i18n::Key::AboutBrowseIcons),
+                            Icon::ALL.len()
+                        ),
+                    ),
+                )
                 .on_hover_text("Explore procedural vector icons in popover")
                 .clicked()
             {
@@ -86,9 +99,9 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
 }
 
 /// Project links, the good-faith notice, colormap credits and third-party licenses.
-fn show_links_and_credits(ui: &mut egui::Ui) {
+fn show_links_and_credits(app: &OctantApp, ui: &mut egui::Ui) {
     // Links & Resources
-    ui.heading("Links & Resources");
+    ui.heading(app.tr(crate::i18n::Key::AboutLinksHeading));
     ui.add_space(4.0);
 
     ui.horizontal_wrapped(|ui| {
@@ -109,13 +122,9 @@ fn show_links_and_credits(ui: &mut egui::Ui) {
 
     ui.add_space(6.0);
     ui.label(
-        egui::RichText::new(
-            "Octant credits third-party work in good faith. If you believe something \
-             is missing or incorrectly attributed, please let us know and we will \
-             correct or remove it.",
-        )
-        .small()
-        .weak(),
+        egui::RichText::new(app.tr(crate::i18n::Key::AboutGoodFaithNotice))
+            .small()
+            .weak(),
     );
     ui.hyperlink_to(
         egui::RichText::new("github.com/lazarusA/octant/issues").small(),

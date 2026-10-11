@@ -5,7 +5,7 @@ use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 /// Renders the currently loaded dataset summary card and quick actions.
 pub fn show_active_dataset(app: &mut OctantApp, ui: &mut egui::Ui) {
     let Some(meta) = &app.selected.metadata else {
-        show_active_empty(ui);
+        show_active_empty(app, ui);
         return;
     };
     let store_kind = app.selected.store_kind;
@@ -30,7 +30,7 @@ struct ActiveAction {
     reload: bool,
 }
 
-fn show_active_empty(ui: &mut egui::Ui) {
+fn show_active_empty(app: &OctantApp, ui: &mut egui::Ui) {
     egui::Frame::default()
         .fill(ui.visuals().faint_bg_color)
         .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
@@ -39,7 +39,7 @@ fn show_active_empty(ui: &mut egui::Ui) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.icon_toned(Icon::Info, IconSize::Sm, IconTone::Muted);
-                ui.label(egui::RichText::new("No dataset currently loaded").weak());
+                ui.label(egui::RichText::new(app.tr(crate::i18n::Key::NoActiveDatasets)).weak());
             });
         });
 }

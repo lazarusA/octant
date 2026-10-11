@@ -15,10 +15,11 @@ pub(super) enum TopBarItem {
     Settings,
     Status,
     Cache,
+    Language,
     Theme,
 }
 
-pub(super) const ITEM_COUNT: usize = 10;
+pub(super) const ITEM_COUNT: usize = 11;
 
 /// Items drawn left-aligned after the brand header.
 pub(super) const LEFT_ITEMS: [TopBarItem; 6] = [
@@ -34,6 +35,7 @@ pub(super) const LEFT_ITEMS: [TopBarItem; 6] = [
 /// important label first, brand text last.
 pub(super) const COLLAPSE_ORDER: [TopBarItem; ITEM_COUNT] = [
     TopBarItem::Status,
+    TopBarItem::Language,
     TopBarItem::Theme,
     TopBarItem::Cache,
     TopBarItem::Settings,

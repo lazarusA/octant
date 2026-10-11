@@ -15,6 +15,7 @@ impl Icon {
         match self {
             // Nav
             Icon::Globe => nav::draw_globe(c),
+            Icon::Language => nav::draw_language(c),
             Icon::Variables => nav::draw_variables(c),
             Icon::Dimensions => nav::draw_dimensions(c),
             Icon::Settings => nav::draw_settings(c),

@@ -15,7 +15,7 @@ pub(super) fn show_list(
     jump: Option<SearchJump>,
 ) {
     if app.is_loading {
-        show_loading(ui);
+        show_loading(app, ui);
         return;
     }
     let Some(var_count) = app.selected.metadata.as_ref().map(|m| m.variables.len()) else {
@@ -44,11 +44,11 @@ pub(super) fn show_list(
     }
 }
 
-fn show_loading(ui: &mut egui::Ui) {
+fn show_loading(app: &OctantApp, ui: &mut egui::Ui) {
     ui.vertical_centered(|ui| {
         ui.add_space(10.0);
         ui.spinner();
-        ui.label(egui::RichText::new("Inspecting store metadata in background...").italics());
+        ui.label(egui::RichText::new(app.tr(crate::i18n::Key::LoadingMetadata)).italics());
         ui.add_space(10.0);
     });
 }
@@ -97,7 +97,13 @@ fn show_tree(
     let Some(root) = root else {
         ui.vertical_centered(|ui| {
             ui.add_space(10.0);
-            ui.label(egui::RichText::new(format!("No variables matching '{query}'")).italics());
+            ui.label(
+                egui::RichText::new(format!(
+                    "{}: '{query}'",
+                    app.tr(crate::i18n::Key::NoVariablesMatching)
+                ))
+                .italics(),
+            );
             ui.add_space(10.0);
         });
         return None;
@@ -110,6 +116,7 @@ fn show_tree(
         newly_selected_idx: None,
         search_id,
         search_jump: jump,
+        language: app.layout.language,
     };
     render_tree_group(ui, root, &mut tree_ctx);
     tree_ctx.newly_selected_idx

@@ -13,6 +13,7 @@ pub struct VariableTreeContext<'a> {
     pub search_id: egui::Id,
     /// Pending focus jump requested by a key in the search field.
     pub search_jump: Option<SearchJump>,
+    pub language: crate::i18n::Language,
 }
 
 /// Draw the whole tree from its root group.

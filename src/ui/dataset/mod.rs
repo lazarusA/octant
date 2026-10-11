@@ -54,7 +54,12 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Opt
     let mut header = None;
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)
         .show_header(ui, |ui| {
-            let title = panel_header::show(ui, Icon::Dataset, "Dataset", "Close Dataset");
+            let title = panel_header::show(
+                ui,
+                Icon::Dataset,
+                app.tr(crate::i18n::Key::Dataset),
+                "Close Dataset",
+            );
             header = Some(title);
         })
         .body(|ui| {
@@ -70,7 +75,7 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Opt
 
 /// Body content organized into Active Dataset, Open Source, Dataset Manager, and Cache sections.
 fn show_dataset_body(app: &mut OctantApp, ui: &mut egui::Ui) {
-    section(ui, "Active Dataset");
+    section(ui, app.tr(crate::i18n::Key::ActiveDatasets));
     active::show_active_dataset(app, ui);
 
     section(ui, "Open Source");
@@ -81,7 +86,7 @@ fn show_dataset_body(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     ui.add_space(6.0);
     ui.separator();
-    ui.collapsing("Memory & Cache", |ui| {
+    ui.collapsing(app.tr(crate::i18n::Key::CacheUsage), |ui| {
         cache_stats::show_cache_stats(app, ui);
     });
 }

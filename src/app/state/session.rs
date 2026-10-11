@@ -4,13 +4,18 @@ use super::app_state::OctantApp;
 use super::store_kind::StoreKind;
 use crate::app::layers::LayerId;
 
+const LANGUAGE_STORAGE_KEY: &str = "octant_language";
+
 impl OctantApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        crate::ui::fonts::FontEngine::init(&cc.egui_ctx);
+
         #[allow(unused_mut)]
         let mut app = Self {
             wgpu_render_state: cc.wgpu_render_state.clone(),
             ..Default::default()
         };
+        app.load_language_pref(cc.storage);
         app.load_colormap_prefs(cc.storage);
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -19,6 +24,29 @@ impl OctantApp {
         }
 
         app
+    }
+
+    /// Restores the user's language preference from eframe storage.
+    pub fn load_language_pref(&mut self, storage: Option<&dyn eframe::Storage>) {
+        let Some(storage) = storage else {
+            return;
+        };
+        if let Some(lang) =
+            eframe::get_value::<crate::i18n::Language>(storage, LANGUAGE_STORAGE_KEY)
+        {
+            self.layout.language = lang;
+        }
+    }
+
+    /// Persists the user's language preference to eframe storage.
+    pub fn save_language_pref(&self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, LANGUAGE_STORAGE_KEY, &self.layout.language);
+    }
+
+    /// Translates `key` into the user's active language.
+    #[inline]
+    pub fn tr(&self, key: crate::i18n::Key) -> &'static str {
+        crate::i18n::translate(self.layout.language, key)
     }
 
     pub fn reset_heatmap_view(&mut self) {

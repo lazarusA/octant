@@ -4,6 +4,7 @@ use super::OctantApp;
 
 impl eframe::App for OctantApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        self.save_language_pref(storage);
         self.save_colormap_prefs(storage);
     }
 
