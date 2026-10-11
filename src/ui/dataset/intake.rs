@@ -28,11 +28,7 @@ const SAMPLE_PRESETS: [(&str, &str, Option<StoreKind>); 4] = [
 /// Renders the source intake controls: URL/path text input, format selection,
 /// quick sample presets, catalog opener, and drop zone.
 pub fn show_source_intake(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.label(
-        egui::RichText::new("Target URL / File Path")
-            .strong()
-            .small(),
-    );
+    ui.label(egui::RichText::new("Target URL / File Path").strong());
 
     let has_input = !app.selected.store_target.is_empty();
     let load_icon = if app.is_loading {
@@ -79,18 +75,20 @@ pub fn show_source_intake(app: &mut OctantApp, ui: &mut egui::Ui) {
             app.layout.show_catalog_window = true;
         }
 
-        ui.menu_button("Samples ▾", |ui| {
-            for (label, url, kind) in SAMPLE_PRESETS {
-                if ui.button(label).clicked() {
-                    app.selected.store_target = url.to_string();
-                    if let Some(k) = kind {
-                        app.selected.store_kind = k;
+        let samples_btn = ui.icon_button(Icon::FolderOpen, "Samples");
+        egui::Popup::from_toggle_button_response(&samples_btn)
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClick)
+            .show(|ui| {
+                for (label, url, kind) in SAMPLE_PRESETS {
+                    if ui.button(label).clicked() {
+                        app.selected.store_target = url.to_string();
+                        if let Some(k) = kind {
+                            app.selected.store_kind = k;
+                        }
+                        app.submit_or_activate_source(url, kind);
                     }
-                    app.submit_or_activate_source(url, kind);
-                    ui.close();
                 }
-            }
-        });
+            });
 
         if has_input && ui.button("Clear").clicked() {
             app.selected.store_target.clear();
@@ -98,13 +96,13 @@ pub fn show_source_intake(app: &mut OctantApp, ui: &mut egui::Ui) {
     });
 
     ui.add_space(6.0);
-    crate::ui::drop_zone::show_drop_zone(ui, None, 46.0);
+    crate::ui::drop_zone::show_drop_zone(ui, None, 54.0);
 }
 
 fn show_format_selector(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.icon(Icon::Dataset, IconSize::Xs);
-        ui.label(egui::RichText::new("Format:").small().weak());
+        ui.label(egui::RichText::new("Format:").weak());
 
         let mut selected = app.selected.store_kind;
         egui::ComboBox::from_id_salt("dataset_store_kind_select")

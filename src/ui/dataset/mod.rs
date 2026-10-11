@@ -49,7 +49,7 @@ pub fn show_dataset_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rect
 
 /// The collapsible "Dataset" header over the scrolled body.
 fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Option<PanelHeader> {
-    ui.set_max_width(280.0);
+    ui.set_width(280.0);
     let header_id = ui.make_persistent_id("dataset_panel_header");
     let mut header = None;
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)
@@ -89,5 +89,5 @@ fn show_dataset_body(app: &mut OctantApp, ui: &mut egui::Ui) {
 fn section(ui: &mut egui::Ui, title: &str) {
     ui.add_space(4.0);
     ui.separator();
-    ui.label(egui::RichText::new(title).small().weak());
+    ui.label(egui::RichText::new(title).weak());
 }

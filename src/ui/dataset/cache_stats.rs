@@ -22,7 +22,6 @@ pub fn show_cache_stats(app: &OctantApp, ui: &mut egui::Ui) {
                 app.block_cache.cached_count(),
                 app.block_cache.hit_rate()
             ))
-            .small()
             .weak(),
         );
     });

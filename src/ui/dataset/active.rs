@@ -19,11 +19,7 @@ pub fn show_active_dataset(app: &mut OctantApp, ui: &mut egui::Ui) {
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.icon_toned(Icon::Info, IconSize::Sm, IconTone::Muted);
-                    ui.label(
-                        egui::RichText::new("No dataset currently loaded")
-                            .small()
-                            .weak(),
-                    );
+                    ui.label(egui::RichText::new("No dataset currently loaded").weak());
                 });
             });
         return;
@@ -53,23 +49,25 @@ pub fn show_active_dataset(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.icon_toned(badge_icon, IconSize::Xs, badge_tone);
                 ui.label(
                     egui::RichText::new(badge_text)
-                        .small()
                         .strong()
                         .color(badge_tone.color(ui.visuals())),
                 );
-                ui.label(egui::RichText::new(&name).strong());
             });
+
+            ui.add(
+                egui::Label::new(egui::RichText::new(&name).strong())
+                    .wrap_mode(egui::TextWrapMode::Wrap),
+            );
 
             let uri = &app.selected.store_target;
             if !uri.is_empty() {
                 ui.add(
                     egui::Label::new(
                         egui::RichText::new(uri)
-                            .small()
                             .monospace()
                             .color(ui.visuals().weak_text_color()),
                     )
-                    .truncate(),
+                    .wrap_mode(egui::TextWrapMode::Wrap),
                 )
                 .on_hover_text(format!("Target URI:\n{uri}"));
             }
@@ -81,15 +79,10 @@ pub fn show_active_dataset(app: &mut OctantApp, ui: &mut egui::Ui) {
                         var_count,
                         if var_count == 1 { "" } else { "s" }
                     ))
-                    .small()
                     .weak(),
                 );
                 if !store_type.is_empty() {
-                    ui.label(
-                        egui::RichText::new(format!("• {store_type}"))
-                            .small()
-                            .weak(),
-                    );
+                    ui.label(egui::RichText::new(format!("• {store_type}")).weak());
                 }
             });
 

@@ -5,20 +5,12 @@ use crate::ui::icons::{Icon, IconSize, UiIconExt};
 /// Renders the multi-dataset manager list, switching active dataset, and removal.
 pub fn show_dataset_manager(app: &mut OctantApp, ui: &mut egui::Ui) {
     if app.dataset_manager.is_empty() {
-        ui.label(
-            egui::RichText::new("No datasets currently registered in manager.")
-                .small()
-                .weak(),
-        );
+        ui.label(egui::RichText::new("No datasets currently registered in manager.").weak());
         return;
     }
 
     ui.horizontal(|ui| {
-        ui.label(
-            egui::RichText::new(format!("Loaded ({}):", app.dataset_manager.len()))
-                .strong()
-                .small(),
-        );
+        ui.label(egui::RichText::new(format!("Loaded ({}):", app.dataset_manager.len())).strong());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui
                 .icon_button(Icon::Trash, "Clear All")
@@ -60,10 +52,10 @@ pub fn show_dataset_manager(app: &mut OctantApp, ui: &mut egui::Ui) {
                     let short_name =
                         truncate_display_name(&d.source.display_name, approx_chars.max(10));
 
-                    let btn = egui::Button::new(egui::RichText::new(short_name).small().strong())
+                    let btn = egui::Button::new(egui::RichText::new(short_name).strong())
                         .selected(is_active);
 
-                    let item_btn = ui.add_sized([avail_w, 18.0], btn);
+                    let item_btn = ui.add_sized([avail_w, 20.0], btn);
                     if item_btn
                         .on_hover_text(format!("{}\nURI: {}", d.source.display_name, d.source.uri))
                         .clicked()
