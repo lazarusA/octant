@@ -29,8 +29,8 @@ fn test_language_index_roundtrip() {
 }
 
 #[test]
-fn test_all_phase1_languages_translate_every_key() {
-    for &lang in Language::ALL_PHASE1 {
+fn test_all_languages_translate_every_key() {
+    for &lang in Language::ALL {
         for key in Key::all() {
             let translated = translations::exact(lang, key);
             assert!(
@@ -83,20 +83,6 @@ fn test_fill_places_values_in_order() {
 }
 
 #[test]
-fn test_cjk_stubs_fall_back_to_english() {
-    for &lang in &[Language::ChineseSimp, Language::Japanese, Language::Korean] {
-        for key in Key::all() {
-            let translated = translate(lang, key);
-            let english = translate(Language::English, key);
-            assert_eq!(
-                translated, english,
-                "CJK stub for {key:?} in {lang:?} should fall back to English"
-            );
-        }
-    }
-}
-
-#[test]
 fn test_language_serde_roundtrip() {
     for &lang in Language::ALL {
         let json = serde_json::to_string(&lang).expect("serialize language");
@@ -108,17 +94,25 @@ fn test_language_serde_roundtrip() {
 #[test]
 fn test_translations_are_plain_text() {
     // Letters of any script, digits, ASCII punctuation, Spanish opening marks,
-    // spaces, line breaks and the degree sign only: no typographic quotes, ellipsis characters,
-    // arrows or emoji (AGENTS.md).
+    // CJK punctuation, spaces, line breaks and the degree sign only: no
+    // typographic quotes, ellipsis characters, arrows or emoji (AGENTS.md).
     for &lang in Language::ALL {
         for key in Key::all() {
             let text = translate(lang, key);
             let odd = text.chars().find(|&c| {
                 !(c.is_alphanumeric()
                     || matches!(c, ' ' | '\n' | '°' | '¿' | '¡')
-                    || c.is_ascii_punctuation())
+                    || c.is_ascii_punctuation()
+                    || is_cjk_punctuation(c))
             });
             assert!(odd.is_none(), "{key:?} in {lang:?} has {odd:?}: '{text}'");
         }
     }
+}
+
+/// Full-width punctuation of Chinese, Japanese and Korean text: the CJK
+/// symbols block (ideographic comma and full stop, corner brackets), the
+/// katakana middle dot and long vowel mark, and the full-width forms.
+fn is_cjk_punctuation(c: char) -> bool {
+    matches!(c, '\u{3000}'..='\u{303F}' | '\u{30FB}' | '\u{30FC}' | '\u{FF01}'..='\u{FF65}')
 }

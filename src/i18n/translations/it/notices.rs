@@ -35,5 +35,7 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::LinePayloadTooLargeDetail => {
             "Le linee occupano {} byte; questa GPU ne collega al massimo {}."
         }
+        NoticesKey::FontLoadFailed => "Impossibile caricare un font",
+        NoticesKey::FontLoadFailedDetail => "Il testo in {} potrebbe apparire come riquadri: {}",
     })
 }

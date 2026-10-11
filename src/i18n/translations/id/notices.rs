@@ -35,5 +35,7 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::LinePayloadTooLargeDetail => {
             "Garis-garis ini memerlukan {} byte; GPU ini mengikat paling banyak {}."
         }
+        NoticesKey::FontLoadFailed => "Tidak dapat memuat font",
+        NoticesKey::FontLoadFailedDetail => "Teks dalam {} mungkin tampil sebagai kotak: {}",
     })
 }

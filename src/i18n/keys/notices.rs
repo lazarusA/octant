@@ -26,5 +26,7 @@ crate::i18n::keys::define_keys! {
     BufferRangeTooLargeDetail,
     LinePlotTooLargeForGpu,
     LinePayloadTooLargeDetail,
+    FontLoadFailed,
+    FontLoadFailedDetail,
     }
 }

@@ -19,30 +19,13 @@ pub enum Language {
     Norwegian,
     Finnish,
 
-    // Phase 2 Placeholders (CJK)
     ChineseSimp,
     Japanese,
     Korean,
 }
 
 impl Language {
-    /// All Phase 1 active zero-cost languages available in the UI selector.
-    pub const ALL_PHASE1: &'static [Self] = &[
-        Self::English,
-        Self::Spanish,
-        Self::French,
-        Self::German,
-        Self::Portuguese,
-        Self::Italian,
-        Self::Ukrainian,
-        Self::Russian,
-        Self::Indonesian,
-        Self::Swedish,
-        Self::Norwegian,
-        Self::Finnish,
-    ];
-
-    /// All languages including Phase 2 placeholders, in declaration order, so
+    /// Every language, in declaration order, so
     /// `ALL[lang as usize] == lang`.
     pub const ALL: &'static [Self] = &[
         Self::English,
@@ -110,10 +93,5 @@ impl Language {
             Self::Japanese => "ja",
             Self::Korean => "ko",
         }
-    }
-
-    /// Returns true if this language uses default fonts without extra font assets.
-    pub const fn is_zero_cost(self) -> bool {
-        !matches!(self, Self::ChineseSimp | Self::Japanese | Self::Korean)
     }
 }

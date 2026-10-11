@@ -1,0 +1,128 @@
+use crate::i18n::keys::DatasetKey;
+
+pub fn text(key: DatasetKey) -> Option<&'static str> {
+    Some(match key {
+        DatasetKey::ActiveDataset => "当前数据集",
+        DatasetKey::NoDatasetLoaded => "当前未加载数据集",
+        DatasetKey::MemoryCache => "内存与缓存",
+        DatasetKey::SampleDatasets => "示例",
+        DatasetKey::DropFilesHere => "拖放文件或目录",
+        DatasetKey::SourceUrlOrPath => "目标 URL / 文件路径",
+        DatasetKey::LoadingMetadata => "正在后台读取存储元数据...",
+        // Dataset panel
+        DatasetKey::OpenSource => "打开数据源",
+        DatasetKey::DatasetManager => "数据集管理",
+        DatasetKey::CloseDatasetHover => "关闭数据集",
+        // Active dataset card
+        DatasetKey::TargetUriHover => "目标 URI：\n{}",
+        DatasetKey::VariableCountOne => "{} 个变量",
+        DatasetKey::VariableCountMany => "{} 个变量",
+        DatasetKey::InspectVariables => "查看变量",
+        DatasetKey::Reload => "重新加载",
+        DatasetKey::BadgeVolume4D => "4D 体数据",
+        DatasetKey::BadgeMatrix2D => "2D 矩阵",
+        DatasetKey::BadgeStore => "存储",
+        // Source intake
+        DatasetKey::Load => "加载",
+        DatasetKey::TargetPathHint => "https://... 或路径 (.zarr, .nc, .tif)",
+        DatasetKey::CatalogEllipsis => "目录...",
+        DatasetKey::Clear => "清除",
+        DatasetKey::FormatLabel => "格式：",
+        DatasetKey::SampleSeasFire => "SeasFire 全球野火 (Zarr)",
+        DatasetKey::SampleSentinel2 => "Sentinel-2 L2A COG (GeoTIFF)",
+        DatasetKey::SampleMatrixTest => "2D 程序生成矩阵（测试）",
+        // Store formats (menu entries, then the shorter selected texts)
+        DatasetKey::FormatRemoteZarr => "远程 Zarr (HTTP/S3)",
+        DatasetKey::FormatLocalZarr => "本地 Zarr（文件系统）",
+        DatasetKey::FormatRemoteIcechunk => "远程 Icechunk (HTTP/S3)",
+        DatasetKey::FormatLocalIcechunk => "本地 Icechunk（文件系统）",
+        DatasetKey::FormatRemoteGeoTiff => "远程 GeoTIFF / COG (HTTP/S3)",
+        DatasetKey::FormatLocalGeoTiff => "本地 GeoTIFF (.tif/.tiff/.cog)",
+        DatasetKey::FormatLocalNetCdf => "本地 NetCDF / HDF5 (.nc/.h5)",
+        DatasetKey::FormatVolume4D => "4D 已知真值体数据（程序生成）",
+        DatasetKey::FormatMatrix2D => "2D 程序生成矩阵（程序生成）",
+        DatasetKey::FormatRemoteGeoTiffShort => "远程 GeoTIFF / COG",
+        DatasetKey::FormatLocalGeoTiffShort => "本地 GeoTIFF",
+        DatasetKey::FormatLocalNetCdfShort => "本地 NetCDF / HDF5",
+        DatasetKey::FormatVolume4DShort => "4D 已知真值体数据",
+        DatasetKey::FormatMatrix2DShort => "2D 程序生成矩阵",
+        // Dataset manager
+        DatasetKey::NoDatasetsRegistered => "管理器中当前没有已注册的数据集。",
+        DatasetKey::LoadedCount => "已加载（{}）：",
+        DatasetKey::ClearAll => "全部清除",
+        DatasetKey::ClearAllHover => "从管理器中移除所有数据集",
+        DatasetKey::DatasetRowHover => "{}\nURI：{}",
+        DatasetKey::RemoveDatasetHover => "移除此数据集",
+        // Cache statistics
+        DatasetKey::CacheUsage => "{} MB / {} MB",
+        DatasetKey::CacheBlocksHitRate => "{} 块 | 命中率 {}%",
+        DatasetKey::CacheMenuTitle => "统一多变量内存缓存",
+        DatasetKey::GlobalMemoryUsage => "全局内存占用：",
+        DatasetKey::CacheUsagePercent => "{} MB / {} MB（{}%）",
+        DatasetKey::MemoryBreakdown => "按类型分列的内存：",
+        DatasetKey::ResidentHyperslabs => "常驻超切片：{} MB（{} 块）",
+        DatasetKey::MultiResPyramid => "多分辨率金字塔：{} MB",
+        DatasetKey::CacheHitsMisses => "缓存命中：{} | 未命中：{}（命中率：{}%）",
+        DatasetKey::PrefetchInFlight => "后台预取：{} 个进行中",
+        DatasetKey::AllBlocksCached => "缓冲已就绪 / 所有块已缓存",
+        DatasetKey::SummaryPerVariable => "各变量概览：",
+        DatasetKey::NoVariablesCached => "（内存中当前没有缓存的变量）",
+        DatasetKey::VariableCacheSize => "（{} MB，{} 块）",
+        DatasetKey::ClearVariableCacheHover => "清除此变量的缓存",
+        DatasetKey::PrefetchCapacitySettings => "预取与容量设置",
+        DatasetKey::EnablePrefetching => "启用后台预取",
+        DatasetKey::CacheLimitSuffix => " MB 上限",
+        DatasetKey::WindowSizeSuffix => " 窗口大小（步）",
+        DatasetKey::PrefetchWorkersSuffix => " 预取线程数",
+        DatasetKey::FlushAllCaches => "清空所有缓存",
+        // Catalog
+        DatasetKey::CatalogTitle => "数据集目录",
+        DatasetKey::CatalogStoreCount => "{} 个存储",
+        DatasetKey::CatalogBlurb => {
+            "精选的云端 Zarr、Icechunk 以及程序生成的真值数据集。选择任一数据集即可加载。"
+        }
+        DatasetKey::CatalogSearchHint => "按名称、描述或 URL 筛选...",
+        DatasetKey::CatalogCategory => "类别：",
+        DatasetKey::CategoryAll => "全部",
+        DatasetKey::CategoryProcedural => "程序生成",
+        DatasetKey::NoCatalogMatches => "没有找到与搜索匹配的数据集。",
+        DatasetKey::ClearSearch => "清除搜索",
+        DatasetKey::SelectAndLoadDataset => "选择并加载数据集",
+        DatasetKey::SelectAndLoad => "选择并加载",
+        // Drop zone
+        DatasetKey::DropTypeNotSupported => "不支持此类型",
+        DatasetKey::DropReleaseToLoad => "松开以加载数据集",
+        DatasetKey::DropSupportedList => "支持：{}",
+        // Hero landing
+        DatasetKey::HeroTryPrefix => "试试：",
+        DatasetKey::HeroSeasFireHover => "全球野火与气候重分块数据集 (Zarr)",
+        DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A 真彩色 COG (AWS S3)",
+        DatasetKey::HeroVolume4DHover => "合成的 4D 时空体数据",
+        DatasetKey::HeroCatalogHover => "浏览数据集目录",
+        DatasetKey::LoadSampleHover => "加载示例：{}",
+        DatasetKey::HeroHintLong => "粘贴 URL、本地路径，或将文件拖放到任意位置",
+        DatasetKey::HeroHintMedium => "粘贴 URL、路径，或拖放文件",
+        DatasetKey::HeroHintShort => "粘贴 URL 或拖放文件",
+        DatasetKey::HeroDropLong => "拖放数据集以加载 (.nc, .h5, .zarr, .icechunk, .tif)",
+        DatasetKey::HeroDropMedium => "拖放数据集 (.nc, .zarr, .icechunk, .tif)",
+        DatasetKey::HeroDropShort => "拖放数据集以加载",
+        DatasetKey::HeroUnsupportedLong => "不支持的类型。支持：.nc, .h5, .zarr, .icechunk, .tif",
+        DatasetKey::HeroUnsupportedMedium => "不支持的格式 (.nc, .zarr, .icechunk, .tif)",
+        DatasetKey::HeroUnsupportedShort => "不支持的格式",
+        DatasetKey::HeroInputHintLong => {
+            "https://... 或路径 (.zarr, .icechunk, .nc, .h5, .tiff, ...)"
+        }
+        DatasetKey::HeroInputHintMedium => "https://... 或路径 (.zarr, .nc, .tiff, ...)",
+        DatasetKey::HeroInputHintShort => "URL 或路径...",
+        DatasetKey::ClearInputHover => "清除输入",
+        DatasetKey::LoadDatasetHover => "加载数据集并打开变量",
+        DatasetKey::HopOctantHover => "点击切换卦限",
+        DatasetKey::HeroLoadingSource => "正在加载：{}",
+        DatasetKey::HeroLoading => "正在加载...",
+        DatasetKey::HeroLoaded => "已加载：{}",
+        // Errors
+        DatasetKey::BrowserLocalPaths => {
+            "出于网页沙盒安全限制，浏览器无法直接读取本地文件路径。\n\n要在浏览器中查看本地数据集：\n1. 用本地 HTTP 服务器提供目录或文件：`npx serve` 或 `python3 -m http.server`\n2. 输入 URL：`http://localhost:8000/my_dataset`\n\n或者运行 Octant 的原生桌面版本 (`cargo run --release`)。"
+        }
+    })
+}

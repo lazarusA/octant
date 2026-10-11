@@ -35,5 +35,7 @@ pub fn text(key: NoticesKey) -> &'static str {
         NoticesKey::LinePayloadTooLargeDetail => {
             "The lines take {} bytes; this GPU binds at most {}."
         }
+        NoticesKey::FontLoadFailed => "Couldn't load a font",
+        NoticesKey::FontLoadFailedDetail => "Text in {} may show as boxes: {}",
     }
 }

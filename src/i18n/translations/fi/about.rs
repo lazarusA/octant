@@ -45,5 +45,8 @@ pub fn text(key: AboutKey) -> Option<&'static str> {
         AboutKey::IconsClickToCopy => "Kopioi enum-tunniste napsauttamalla",
         AboutKey::IconsSizesTones => "Koot ja sävyt",
         AboutKey::ClearSearchHover => "Tyhjennä haku",
+        AboutKey::FontLicensesNote => {
+            "Noto Sans SC, JP ja KR (kiinan-, japanin- ja koreankielinen teksti):"
+        }
     })
 }

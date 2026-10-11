@@ -8,14 +8,13 @@ const LANGUAGE_STORAGE_KEY: &str = "octant_language";
 
 impl OctantApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        crate::ui::fonts::FontEngine::init(&cc.egui_ctx);
-
         #[allow(unused_mut)]
         let mut app = Self {
             wgpu_render_state: cc.wgpu_render_state.clone(),
             ..Default::default()
         };
         app.load_language_pref(cc.storage);
+        crate::ui::fonts::FontEngine::init(&cc.egui_ctx);
         app.load_colormap_prefs(cc.storage);
 
         #[cfg(not(target_arch = "wasm32"))]

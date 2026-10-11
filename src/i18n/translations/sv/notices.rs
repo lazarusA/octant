@@ -33,5 +33,7 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::LinePlotTooLargeForGpu => "Linjediagrammet är för stort för GPU:n",
         NoticesKey::LinePayloadTooLargeDetail => "Linjerna tar {} byte; denna GPU binder högst {}.",
+        NoticesKey::FontLoadFailed => "Kunde inte läsa in ett typsnitt",
+        NoticesKey::FontLoadFailedDetail => "Text på {} kan visas som rutor: {}",
     })
 }

@@ -21,7 +21,7 @@ pub fn show_language_menu(ui: &mut egui::Ui, compact: bool) {
         });
         ui.separator();
 
-        for &lang in Language::ALL_PHASE1 {
+        for &lang in Language::ALL {
             let mut buf = [0; 48];
             let label = stack_str(
                 &mut buf,

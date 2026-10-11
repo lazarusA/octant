@@ -38,5 +38,6 @@ crate::i18n::keys::define_keys! {
     IconsSizesTones,
     // Shared search field
     ClearSearchHover,
+    FontLicensesNote,
     }
 }

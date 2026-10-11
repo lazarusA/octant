@@ -45,5 +45,8 @@ pub fn text(key: AboutKey) -> Option<&'static str> {
         AboutKey::IconsClickToCopy => "Klicken, um den Enum-Bezeichner zu kopieren",
         AboutKey::IconsSizesTones => "Größen & Töne",
         AboutKey::ClearSearchHover => "Suche leeren",
+        AboutKey::FontLicensesNote => {
+            "Noto Sans SC, JP und KR (chinesischer, japanischer und koreanischer Text):"
+        }
     })
 }

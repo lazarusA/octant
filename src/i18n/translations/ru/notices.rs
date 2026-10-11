@@ -35,5 +35,7 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::LinePayloadTooLargeDetail => {
             "Линии занимают {} байт; этот GPU связывает не более {}."
         }
+        NoticesKey::FontLoadFailed => "Не удалось загрузить шрифт",
+        NoticesKey::FontLoadFailedDetail => "Текст на языке {} может отображаться квадратами: {}",
     })
 }

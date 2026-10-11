@@ -43,5 +43,8 @@ pub fn text(key: AboutKey) -> Option<&'static str> {
         AboutKey::IconsClickToCopy => "Klik untuk menyalin pengenal enum",
         AboutKey::IconsSizesTones => "Ukuran & nada",
         AboutKey::ClearSearchHover => "Hapus pencarian",
+        AboutKey::FontLicensesNote => {
+            "Noto Sans SC, JP, dan KR (teks Tionghoa, Jepang, dan Korea):"
+        }
     })
 }

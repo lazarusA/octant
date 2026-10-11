@@ -7,17 +7,20 @@ mod fi;
 mod fr;
 mod id;
 mod it;
+mod ja;
+mod ko;
 mod no;
 mod pt;
 mod ru;
 mod sv;
 mod uk;
+mod zh;
 
 use crate::i18n::keys::Key;
 use crate::i18n::lang::Language;
 
 /// Looks up the translation for `(lang, key)`, falling back to English for
-/// untranslated keys and for languages without translations yet (CJK).
+/// untranslated keys.
 #[inline]
 pub fn lookup(lang: Language, key: Key) -> &'static str {
     exact(lang, key).unwrap_or_else(|| en::text(key))
@@ -38,6 +41,8 @@ pub fn exact(lang: Language, key: Key) -> Option<&'static str> {
         Language::Swedish => sv::text(key),
         Language::Norwegian => no::text(key),
         Language::Finnish => fi::text(key),
-        Language::ChineseSimp | Language::Japanese | Language::Korean => None,
+        Language::ChineseSimp => zh::text(key),
+        Language::Japanese => ja::text(key),
+        Language::Korean => ko::text(key),
     }
 }

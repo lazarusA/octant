@@ -1,4 +1,4 @@
-//! Embedded license documents (third-party dependencies and colormap data) and a
+//! Embedded license documents (third-party dependencies, CJK fonts and colormap data) and a
 //! virtualized viewer that lays out only the visible lines.
 
 use super::license_wrap::{self, LineKind, VisualLine};
@@ -14,6 +14,11 @@ pub const THIRD_PARTY_LICENSES: &str =
 
 const THIRD_PARTY_URL: &str =
     "https://github.com/lazarusA/octant/blob/main/assets/licenses/THIRD_PARTY_LICENSES.md";
+/// The license of the bundled Chinese, Japanese and Korean font subsets,
+/// written by the `subset_fonts` tool.
+pub const FONT_LICENSES: &str = include_str!("../../../assets/fonts/LICENSE.md");
+const FONT_LICENSES_URL: &str =
+    "https://github.com/lazarusA/octant/blob/main/assets/fonts/LICENSE.md";
 const COLORMAP_LICENSES_URL: &str =
     "https://github.com/lazarusA/octant/blob/main/assets/colormaps/LICENSES.md";
 
@@ -58,6 +63,9 @@ pub fn show_third_party_licenses(ui: &mut egui::Ui) {
         .show(ui, |ui| {
             ui.label(RichText::new(tr(AboutKey::ThirdPartyNote)).small().weak());
             show_document(ui, "third_party", THIRD_PARTY_LICENSES, THIRD_PARTY_URL);
+            ui.add_space(6.0);
+            ui.label(RichText::new(tr(AboutKey::FontLicensesNote)).small().weak());
+            show_document(ui, "fonts", FONT_LICENSES, FONT_LICENSES_URL);
         });
 }
 

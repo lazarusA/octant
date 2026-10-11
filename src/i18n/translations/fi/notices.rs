@@ -35,5 +35,7 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::LinePayloadTooLargeDetail => {
             "Viivat vievät {} tavua; tämä GPU sitoo enintään {}."
         }
+        NoticesKey::FontLoadFailed => "Fonttia ei voitu ladata",
+        NoticesKey::FontLoadFailedDetail => "Teksti ({}) voi näkyä laatikkoina: {}",
     })
 }

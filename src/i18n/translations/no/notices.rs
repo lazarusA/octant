@@ -35,5 +35,7 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::LinePayloadTooLargeDetail => {
             "Linjene tar {} byte; denne GPU-en binder høyst {}."
         }
+        NoticesKey::FontLoadFailed => "Kunne ikke laste inn en skrift",
+        NoticesKey::FontLoadFailedDetail => "Tekst på {} kan vises som bokser: {}",
     })
 }

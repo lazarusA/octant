@@ -35,5 +35,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::LinePayloadTooLargeDetail => {
             "Les lignes occupent {} octets ; ce GPU en lie au plus {}."
         }
+        NoticesKey::FontLoadFailed => "Impossible de charger une police",
+        NoticesKey::FontLoadFailedDetail => {
+            "Le texte en {} peut s'afficher sous forme de carrés : {}"
+        }
     })
 }
