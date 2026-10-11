@@ -1,7 +1,7 @@
 //! Multi-channel bioimaging 3D volumetric additive overlay slicing with per-channel color tints.
 
+use crate::data::VolumeData;
 use crate::data::octant_block::OctantBlock;
-use crate::data::volume_data::VolumeData;
 
 use super::types::ChannelColorConfig;
 use super::utils::{compute_channel_normalization, normalize_channel_value, pack_rgb};

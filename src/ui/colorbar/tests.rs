@@ -1,7 +1,7 @@
 //! Colorbar labels, range reset, ticks and defaults.
 
 use super::*;
-use crate::data::{DatasetMetadata, VariableInfo, matrix_data::MatrixData};
+use crate::data::{DatasetMetadata, MatrixData, VariableInfo};
 use std::collections::HashMap;
 
 #[test]

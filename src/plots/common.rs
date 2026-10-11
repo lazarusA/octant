@@ -135,11 +135,6 @@ pub struct Mesh3DUniformParams {
     pub flip_height: bool,
 }
 
-/// Standard trait implemented by all Octant WGPU plot renderers.
-pub trait PlotRenderer: Send + Sync {
-    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]);
-}
-
 /// Setup viewport and scissor rect on a wgpu RenderPass based on egui Rect and PaintCallbackInfo,
 /// guaranteeing that the scissor rect is strictly clamped within render target bounds.
 /// Returns false if the render target is empty (e.g. window minimized or asleep), in which case
@@ -461,82 +456,72 @@ pub fn build_unit_cube_mesh<V, F>(mut make_vertex: F) -> (Vec<V>, Vec<u32>)
 where
     F: FnMut([f32; 3], [f32; 2], [f32; 3]) -> V,
 {
+    let faces: [([[f32; 3]; 4], [f32; 3]); 6] = [
+        (
+            [
+                [0.0, 0.0, 1.0],
+                [0.0, 1.0, 1.0],
+                [1.0, 0.0, 1.0],
+                [1.0, 1.0, 1.0],
+            ],
+            [0.0, 1.0, 0.0],
+        ),
+        (
+            [
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [1.0, 1.0, 0.0],
+            ],
+            [0.0, -1.0, 0.0],
+        ),
+        (
+            [
+                [0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0],
+                [1.0, 0.0, 0.0],
+                [1.0, 0.0, 1.0],
+            ],
+            [0.0, 0.0, -1.0],
+        ),
+        (
+            [
+                [0.0, 1.0, 0.0],
+                [1.0, 1.0, 0.0],
+                [0.0, 1.0, 1.0],
+                [1.0, 1.0, 1.0],
+            ],
+            [0.0, 0.0, 1.0],
+        ),
+        (
+            [
+                [0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+                [0.0, 1.0, 1.0],
+            ],
+            [-1.0, 0.0, 0.0],
+        ),
+        (
+            [
+                [1.0, 0.0, 0.0],
+                [1.0, 0.0, 1.0],
+                [1.0, 1.0, 0.0],
+                [1.0, 1.0, 1.0],
+            ],
+            [1.0, 0.0, 0.0],
+        ),
+    ];
     let mut vertices = Vec::with_capacity(24);
     let mut indices = Vec::with_capacity(36);
-
-    let mut push_face = |p0: [f32; 3], p1: [f32; 3], p2: [f32; 3], p3: [f32; 3], norm: [f32; 3]| {
-        let base_idx = vertices.len() as u32;
-        vertices.push(make_vertex(p0, [0.0, 0.0], norm));
-        vertices.push(make_vertex(p1, [1.0, 0.0], norm));
-        vertices.push(make_vertex(p2, [0.0, 1.0], norm));
-        vertices.push(make_vertex(p3, [1.0, 1.0], norm));
-
-        // Counter-Clockwise (CCW) face triangles
-        indices.push(base_idx);
-        indices.push(base_idx + 1);
-        indices.push(base_idx + 2);
-
-        indices.push(base_idx + 2);
-        indices.push(base_idx + 1);
-        indices.push(base_idx + 3);
-    };
-
-    let norm_top = [0.0, 1.0, 0.0];
-    let norm_bottom = [0.0, -1.0, 0.0];
-    let norm_front = [0.0, 0.0, -1.0];
-    let norm_back = [0.0, 0.0, 1.0];
-    let norm_left = [-1.0, 0.0, 0.0];
-    let norm_right = [1.0, 0.0, 0.0];
-
-    // 1. Top Face (+Y normal in world space: z=1.0)
-    push_face(
-        [0.0, 0.0, 1.0],
-        [0.0, 1.0, 1.0],
-        [1.0, 0.0, 1.0],
-        [1.0, 1.0, 1.0],
-        norm_top,
-    );
-    // 2. Bottom Base (-Y normal in world space: z=0.0)
-    push_face(
-        [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [1.0, 1.0, 0.0],
-        norm_bottom,
-    );
-    // 3. Front Wall (-Z normal in world space: y=0.0)
-    push_face(
-        [0.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0],
-        [1.0, 0.0, 0.0],
-        [1.0, 0.0, 1.0],
-        norm_front,
-    );
-    // 4. Back Wall (+Z normal in world space: y=1.0)
-    push_face(
-        [0.0, 1.0, 0.0],
-        [1.0, 1.0, 0.0],
-        [0.0, 1.0, 1.0],
-        [1.0, 1.0, 1.0],
-        norm_back,
-    );
-    // 5. Left Wall (-X normal in world space: x=0.0)
-    push_face(
-        [0.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [0.0, 0.0, 1.0],
-        [0.0, 1.0, 1.0],
-        norm_left,
-    );
-    // 6. Right Wall (+X normal in world space: x=1.0)
-    push_face(
-        [1.0, 0.0, 0.0],
-        [1.0, 0.0, 1.0],
-        [1.0, 1.0, 0.0],
-        [1.0, 1.0, 1.0],
-        norm_right,
-    );
-
+    for (pts, norm) in faces {
+        let base = vertices.len() as u32;
+        vertices.push(make_vertex(pts[0], [0.0, 0.0], norm));
+        vertices.push(make_vertex(pts[1], [1.0, 0.0], norm));
+        vertices.push(make_vertex(pts[2], [0.0, 1.0], norm));
+        vertices.push(make_vertex(pts[3], [1.0, 1.0], norm));
+        indices.extend_from_slice(&[base, base + 1, base + 2, base + 2, base + 1, base + 3]);
+    }
     (vertices, indices)
 }
 

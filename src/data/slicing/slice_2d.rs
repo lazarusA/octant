@@ -1,7 +1,7 @@
 //! 2D hyperslab slicing for MatrixData representations.
 
 use crate::data::CoordinateGrid;
-use crate::data::matrix_data::MatrixData;
+use crate::data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slicing::common::{clamp_slice_range, compute_fixed_dims_offset, resolve_min_max};
 use crate::data::slicing::coords::extract_sliced_coords_for_dim;

@@ -1,7 +1,7 @@
 //! TrueColor RGB composite slicing for 3D volumetric datasets.
 
+use crate::data::VolumeData;
 use crate::data::octant_block::OctantBlock;
-use crate::data::volume_data::VolumeData;
 
 use super::cmyk::{blend_cmyk, is_cmyk_block};
 use super::probe::local_channel;

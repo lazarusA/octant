@@ -14,35 +14,6 @@ pub mod render;
 pub mod slice_request;
 pub mod slicing;
 
-// Direct re-exports for backwards compatibility
-pub mod data_source {
-    pub use crate::data::dataset::source::*;
-}
-pub mod dataset_manager {
-    pub use crate::data::dataset::manager::*;
-}
-pub mod matrix_data {
-    pub use crate::data::render::matrix::*;
-}
-pub mod pyramid {
-    pub use crate::data::render::pyramid::*;
-}
-pub mod render_data {
-    pub use crate::data::render::payload::*;
-}
-pub mod resampler {
-    pub use crate::data::render::resampler::*;
-}
-pub mod source_factory {
-    pub use crate::data::dataset::factory::*;
-}
-pub mod store_handle {
-    pub use crate::data::dataset::handle::*;
-}
-pub mod volume_data {
-    pub use crate::data::render::volume::*;
-}
-
 pub use blocks::{
     BlockBatchOutcome, BlockCache, BlockCacheKey, BlockLoadOutcome, BlockLoader, BlockPrefetcher,
     BlockRequest, BlockRequestBatch, BlockResult, BlockStore, BlockStoreError, PrefetchResult,

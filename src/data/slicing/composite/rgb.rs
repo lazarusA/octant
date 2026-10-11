@@ -1,6 +1,6 @@
 //! Standard 3-slot RGB composite slicing for multi-band imagery and tensors.
 
-use crate::data::matrix_data::MatrixData;
+use crate::data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 
 use super::cmyk::{blend_cmyk_planes, is_cmyk_block, slice_cmyk_composite};

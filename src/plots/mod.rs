@@ -11,8 +11,6 @@ pub mod oit;
 pub mod point_cloud;
 mod point_cloud_draw;
 mod point_cloud_types;
-pub mod sphere;
-pub mod surface;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) mod test_gpu;
 pub mod traits;
@@ -25,12 +23,13 @@ pub use coastline::{
     load_coastline_sync,
 };
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
-pub use heatmap::{HeatmapCallback, HeatmapRenderer, MatrixCallback, MatrixRenderer};
+pub use heatmap::{HeatmapCallback, HeatmapRenderer};
 pub use line::{LineCallback, LineRenderer, LineShape};
-pub use mesh::{Mesh3DCallback, Mesh3DRenderer};
+pub use mesh::Mesh3DRenderer;
+pub use mesh_draw::{
+    Mesh3DCallback, SphereCallback, SphereRenderer, SurfaceCallback, SurfaceRenderer,
+};
 pub use point_cloud::{PointCloudCallback, PointCloudRenderer, PointCloudUniformParams};
-pub use sphere::{SphereCallback, SphereRenderer};
-pub use surface::{SurfaceCallback, SurfaceRenderer};
 pub use traits::{HoverSample, PlotRenderParams, PlotRenderer};
 pub use volume::{VolumeCallback, VolumeEncoding, VolumeRenderer, VolumeUniformParams};
 

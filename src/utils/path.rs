@@ -25,14 +25,22 @@ pub fn expand_tilde_str(path: &str) -> String {
     expand_tilde(path).to_string_lossy().to_string()
 }
 
+const GEOTIFF_EXTS: &[&str] = &[".tif", ".tiff", ".geotif", ".geotiff", ".cog"];
+const NETCDF_EXTS: &[&str] = &[
+    ".nc", ".nc4", ".cdf", ".netcdf", ".h5", ".hdf5", ".hdf", ".he5",
+];
+
+fn has_ext(s: &str, exts: &[&str]) -> bool {
+    exts.iter().any(|ext| s.ends_with(ext))
+}
+
 /// Automatically infers the supported `StoreKind` from a given target URI, file path, or directory.
 ///
 /// Returns `Ok(StoreKind)` for supported formats and sources, or `Err("Type not supported")` otherwise.
 pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKind, &'static str> {
     use crate::app::StoreKind;
-    let target = target.trim();
-    let target = target.strip_prefix("file://").unwrap_or(target);
     let trimmed = target.trim();
+    let trimmed = trimmed.strip_prefix("file://").unwrap_or(trimmed).trim();
     if trimmed.is_empty() {
         return Err("Type not supported");
     }
@@ -46,41 +54,28 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
     }
 
     // 2. Remote URIs (HTTP / HTTPS / S3 / GS / AZ / VCC / ICECHUNK+)
-    if trimmed.starts_with("icechunk+")
-        || trimmed.starts_with("vcc://")
-        || trimmed.starts_with("http://")
-        || trimmed.starts_with("https://")
-        || trimmed.starts_with("s3://")
-        || trimmed.starts_with("gs://")
-        || trimmed.starts_with("az://")
+    let lower = trimmed.to_lowercase();
+    if lower.starts_with("icechunk+")
+        || lower.starts_with("vcc://")
+        || lower.starts_with("http://")
+        || lower.starts_with("https://")
+        || lower.starts_with("s3://")
+        || lower.starts_with("gs://")
+        || lower.starts_with("az://")
     {
-        let lower = trimmed.to_lowercase();
         if lower.starts_with("icechunk+")
             || lower.starts_with("vcc://")
             || lower.contains("icechunk")
         {
             return Ok(StoreKind::RemoteIcechunk);
         }
-
-        // Check if remote URL points to a TIFF/GeoTIFF/COG or NetCDF file
         let path_part = lower.split('?').next().unwrap_or(&lower);
-        if path_part.ends_with(".tif")
-            || path_part.ends_with(".tiff")
-            || path_part.ends_with(".geotif")
-            || path_part.ends_with(".geotiff")
-            || path_part.ends_with(".cog")
-        {
+        if has_ext(path_part, GEOTIFF_EXTS) {
             return Ok(StoreKind::RemoteGeoTiff);
         }
-        if path_part.ends_with(".nc")
-            || path_part.ends_with(".nc4")
-            || path_part.ends_with(".netcdf")
-            || path_part.ends_with(".h5")
-            || path_part.ends_with(".hdf5")
-        {
+        if has_ext(path_part, NETCDF_EXTS) {
             return Ok(StoreKind::LocalNetCdf);
         }
-
         return Ok(StoreKind::RemoteZarr);
     }
 
@@ -97,36 +92,8 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
 
     // 4. Local Filesystem (File or Directory)
     let path = std::path::Path::new(trimmed);
-    let path_str = trimmed.to_lowercase();
-
-    // Check by file extension
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase());
-
-    if let Some(ref ext_str) = ext {
-        match ext_str.as_str() {
-            "nc" | "nc4" | "cdf" | "netcdf" | "h5" | "hdf5" | "hdf" | "he5" => {
-                return Ok(StoreKind::LocalNetCdf);
-            }
-            "tif" | "tiff" | "geotif" | "geotiff" | "cog" => {
-                return Ok(StoreKind::LocalGeoTiff);
-            }
-            "zarr" | "zip" => {
-                return Ok(StoreKind::LocalZarr);
-            }
-            _ => {
-                if path.is_file() {
-                    return Err("Type not supported");
-                }
-            }
-        }
-    }
-
-    // Check directory on disk
     if path.is_dir() {
-        if path_str.contains("icechunk")
+        if lower.contains("icechunk")
             || path.join("icechunk.json").exists()
             || path.join("snapshots").exists()
             || path.join("manifests").exists()
@@ -134,42 +101,20 @@ pub fn infer_store_kind_from_target(target: &str) -> Result<crate::app::StoreKin
         {
             return Ok(StoreKind::LocalIcechunk);
         }
-        if path.join("zarr.json").exists()
-            || path.join(".zmetadata").exists()
-            || path.join(".zgroup").exists()
-            || path.join(".zarray").exists()
-            || path_str.ends_with(".zarr")
-        {
-            return Ok(StoreKind::LocalZarr);
-        }
         return Ok(StoreKind::LocalZarr);
     }
 
-    // Check string patterns for typed paths
-    if path_str.contains("icechunk") {
-        return Ok(StoreKind::LocalIcechunk);
-    }
-    if path_str.ends_with(".nc")
-        || path_str.ends_with(".nc4")
-        || path_str.ends_with(".cdf")
-        || path_str.ends_with(".netcdf")
-        || path_str.ends_with(".h5")
-        || path_str.ends_with(".hdf5")
-        || path_str.ends_with(".hdf")
-        || path_str.ends_with(".he5")
-    {
+    if has_ext(&lower, NETCDF_EXTS) {
         return Ok(StoreKind::LocalNetCdf);
     }
-    if path_str.ends_with(".tif")
-        || path_str.ends_with(".tiff")
-        || path_str.ends_with(".geotif")
-        || path_str.ends_with(".geotiff")
-        || path_str.ends_with(".cog")
-    {
+    if has_ext(&lower, GEOTIFF_EXTS) {
         return Ok(StoreKind::LocalGeoTiff);
     }
-    if path_str.ends_with(".zarr") || path_str.ends_with(".zip") {
+    if lower.ends_with(".zarr") || lower.ends_with(".zip") {
         return Ok(StoreKind::LocalZarr);
+    }
+    if lower.contains("icechunk") {
+        return Ok(StoreKind::LocalIcechunk);
     }
 
     Err("Type not supported")

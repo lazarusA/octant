@@ -4,13 +4,13 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use crate::plots::{
-    LineRenderer, MatrixRenderer, PlotType, PointCloudRenderer, SphereRenderer, SurfaceRenderer,
+    HeatmapRenderer, LineRenderer, PlotType, PointCloudRenderer, SphereRenderer, SurfaceRenderer,
     VolumeRenderer,
 };
 
 #[derive(Default)]
 pub struct LayerRenderers {
-    pub heatmap: Option<Arc<MatrixRenderer>>,
+    pub heatmap: Option<Arc<HeatmapRenderer>>,
     pub line: Option<Arc<LineRenderer>>,
     pub sphere: Option<Arc<SphereRenderer>>,
     pub surface: Option<Arc<SurfaceRenderer>>,

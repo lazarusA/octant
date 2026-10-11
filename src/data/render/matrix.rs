@@ -16,7 +16,7 @@ pub enum SpatialLayout {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct MatrixData {
     pub width: usize,
     pub height: usize,

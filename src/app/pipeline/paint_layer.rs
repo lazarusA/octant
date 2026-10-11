@@ -150,7 +150,7 @@ impl OctantApp {
             .map_or(0, |m| m.grid.render_coord_mode());
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.canvas_rect,
-            crate::plots::MatrixCallback {
+            crate::plots::HeatmapCallback {
                 renderer: renderer.clone(),
                 color_params: self.get_color_params(layer),
                 rect: view.canvas_rect,

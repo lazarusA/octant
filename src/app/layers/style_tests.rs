@@ -2,7 +2,7 @@
 //! under `registry::test_lock`).
 
 use super::ColorStyle;
-use crate::data::matrix_data::MatrixData;
+use crate::data::MatrixData;
 use crate::utils::colormap::{COLORMAP_RGB_COMPOSITE, registry};
 
 fn categories(values: Vec<f32>) -> MatrixData {

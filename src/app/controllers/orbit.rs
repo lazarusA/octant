@@ -1,15 +1,24 @@
-//! 3D Point Cloud plot controller.
+//! 3D Orbit camera plot controller.
 
 use super::traits::PlotController;
 use crate::app::state::NavigationState;
 use crate::plots::PlotType;
 
-/// Controller for 3D Point Cloud plots.
-pub struct PointCloudController;
+/// Controller for 3D orbiting camera plots (Surface, Sphere, Volume, PointCloud).
+pub struct Orbit3DController {
+    plot_type: PlotType,
+}
 
-impl PlotController for PointCloudController {
+impl Orbit3DController {
+    /// Constructs an orbit controller for the given 3D plot type.
+    pub const fn new(plot_type: PlotType) -> Self {
+        Self { plot_type }
+    }
+}
+
+impl PlotController for Orbit3DController {
     fn plot_type(&self) -> PlotType {
-        PlotType::PointCloud
+        self.plot_type
     }
 
     fn reset_view(&self, nav: &mut NavigationState) {

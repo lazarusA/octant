@@ -1,8 +1,8 @@
 //! 3D Volume Slicing from N-Dimensional Resident Blocks.
 
+use crate::data::VolumeData;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slicing::common::{clamp_slice_range, compute_fixed_dims_offset, resolve_min_max};
-use crate::data::volume_data::VolumeData;
 
 /// Computes the clamped effective depth ensuring the total voxel count stays within GPU storage limits.
 pub fn clamp_gpu_volume_depth(nx: usize, ny: usize, nz: usize) -> usize {

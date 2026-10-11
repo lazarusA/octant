@@ -2,10 +2,9 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
-use crate::data::matrix_data::MatrixData;
-use crate::data::volume_data::VolumeData;
+use crate::data::{MatrixData, VolumeData};
 use crate::plots::{
-    Coastline3DRenderer, CoastlineRenderer, LineRenderer, MatrixRenderer, PlotType,
+    Coastline3DRenderer, CoastlineRenderer, HeatmapRenderer, LineRenderer, PlotType,
     PointCloudRenderer, SphereRenderer, SurfaceRenderer, VolumeRenderer,
 };
 use std::sync::Arc;
@@ -160,7 +159,7 @@ impl OctantApp {
             } else {
                 let coord_x = effective_data.grid.coords_x();
                 let coord_y = effective_data.grid.coords_y();
-                let renderer = MatrixRenderer::new_with_coords(
+                let renderer = HeatmapRenderer::new_with_coords(
                     &wgpu_render_state.device,
                     wgpu_render_state.target_format,
                     &effective_data.values,
