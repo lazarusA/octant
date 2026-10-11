@@ -1,6 +1,6 @@
 //! CMYK 4-channel composite slicing to 24-bit TrueColor `MatrixData`.
 
-use crate::data::matrix_data::MatrixData;
+use crate::data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 
 use super::utils::{compute_normalization_scale, linear_to_srgb, pack_rgb};

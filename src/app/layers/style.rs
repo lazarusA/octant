@@ -1,6 +1,6 @@
 //! How a layer colors its data: colormap, range, clipping and composites.
 
-use crate::data::matrix_data::MatrixData;
+use crate::data::MatrixData;
 use crate::plots::common::PlotColorParams;
 use crate::utils::colormap::{AlphaInterp, COLORMAP_RGB_COMPOSITE, NO_ALPHA_ROW, registry};
 

@@ -12,9 +12,7 @@
 //!   opened against a different store.
 
 use super::cache::{BlockCache, BlockCacheKey};
-use crate::data::{
-    octant_block::OctantBlock, slice_request::SliceRequest, store_handle::StoreHandle,
-};
+use crate::data::{StoreHandle, octant_block::OctantBlock, slice_request::SliceRequest};
 
 #[derive(Clone)]
 pub struct BlockRequest {

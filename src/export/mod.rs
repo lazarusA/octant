@@ -133,40 +133,19 @@ pub fn generate_export_filename(var_name: &str, format: ExportFormat) -> String 
 
 /// Returns default Downloads directory path or fallback.
 pub fn default_downloads_dir() -> String {
-    if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
-        let p = PathBuf::from(&home).join("Downloads");
-        if p.exists() {
-            return p.to_string_lossy().to_string();
-        }
-        return home;
+    let dl = crate::utils::expand_tilde("~/Downloads");
+    if dl.exists() {
+        dl.to_string_lossy().to_string()
+    } else {
+        crate::utils::expand_tilde("~")
+            .to_string_lossy()
+            .to_string()
     }
-    ".".to_string()
 }
 
 /// Resolves user export directory strings (expanding ~ and relative paths).
 pub fn resolve_export_path(dir: &str, filename: &str) -> PathBuf {
-    let get_home = || {
-        std::env::var("HOME")
-            .or_else(|_| std::env::var("USERPROFILE"))
-            .map(PathBuf::from)
-            .ok()
-    };
-    let base = if let Some(stripped) = dir.strip_prefix("~/") {
-        if let Some(home) = get_home() {
-            home.join(stripped)
-        } else {
-            PathBuf::from(dir)
-        }
-    } else if dir == "~" {
-        if let Some(home) = get_home() {
-            home
-        } else {
-            PathBuf::from(dir)
-        }
-    } else {
-        PathBuf::from(dir)
-    };
-    base.join(filename)
+    crate::utils::expand_tilde(dir).join(filename)
 }
 
 /// User configurable export settings.
@@ -208,27 +187,20 @@ impl PendingExportRequest {
     /// Computes the pixel-space crop rectangle `(crop_x, crop_y, crop_w, crop_h)` clamped to source bounds.
     pub fn compute_crop_rect(&self, full_w: u32, full_h: u32) -> (u32, u32, u32, u32) {
         let ppp = self.pixels_per_point.max(1.0);
-        let (cx, cy, cw, ch) = match self.target {
-            ExportTarget::FullCanvas => {
-                let x = (self.canvas_rect_in_points.left() * ppp).round() as u32;
-                let y = (self.canvas_rect_in_points.top() * ppp).round() as u32;
-                let w = (self.canvas_rect_in_points.width() * ppp).round() as u32;
-                let h = (self.canvas_rect_in_points.height() * ppp).round() as u32;
-                (x, y, w, h)
-            }
-            ExportTarget::RoiCrop => {
-                let cr = self.canvas_rect_in_points;
-                let rx = cr.left() + self.roi.u_min * cr.width();
-                let ry = cr.top() + self.roi.v_min * cr.height();
-                let rw = (self.roi.u_max - self.roi.u_min) * cr.width();
-                let rh = (self.roi.v_max - self.roi.v_min) * cr.height();
-                let x = (rx * ppp).round() as u32;
-                let y = (ry * ppp).round() as u32;
-                let w = (rw * ppp).round() as u32;
-                let h = (rh * ppp).round() as u32;
-                (x, y, w, h)
-            }
+        let cr = self.canvas_rect_in_points;
+        let (u0, v0, u1, v1) = match self.target {
+            ExportTarget::FullCanvas => (0.0, 0.0, 1.0, 1.0),
+            ExportTarget::RoiCrop => (
+                self.roi.u_min,
+                self.roi.v_min,
+                self.roi.u_max,
+                self.roi.v_max,
+            ),
         };
+        let cx = ((cr.left() + u0 * cr.width()) * ppp).round() as u32;
+        let cy = ((cr.top() + v0 * cr.height()) * ppp).round() as u32;
+        let cw = (((u1 - u0) * cr.width()) * ppp).round() as u32;
+        let ch = (((v1 - v0) * cr.height()) * ppp).round() as u32;
         let crop_x = cx.min(full_w.saturating_sub(1));
         let crop_y = cy.min(full_h.saturating_sub(1));
         let crop_w = cw.min(full_w.saturating_sub(crop_x)).max(1);

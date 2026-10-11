@@ -1,6 +1,6 @@
 //! Multi-channel bioimaging additive overlay slicing with per-channel unique color tints.
 
-use crate::data::matrix_data::MatrixData;
+use crate::data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 
 use super::types::ChannelColorConfig;

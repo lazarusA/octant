@@ -2,8 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::data::matrix_data::MatrixData;
-use crate::data::{MatrixPyramid, ViewportResampler, VolumeData};
+use crate::data::{MatrixData, MatrixPyramid, ViewportResampler, VolumeData};
 
 #[derive(Default)]
 pub struct LayerData {

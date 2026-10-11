@@ -212,12 +212,6 @@ impl PointCloudRenderer {
     }
 }
 
-impl super::common::PlotRenderer for PointCloudRenderer {
-    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
-        self.update_data(queue, values);
-    }
-}
-
 impl super::traits::PlotRenderer for PointCloudRenderer {
     fn update_data(&self, queue: &wgpu::Queue, data: &crate::data::RenderData) {
         match data {

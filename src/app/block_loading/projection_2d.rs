@@ -73,7 +73,7 @@ impl OctantApp {
         x_range: (usize, usize),
         y_range: (usize, usize),
         fixed_indices: &[usize],
-    ) -> Option<crate::data::matrix_data::MatrixData> {
+    ) -> Option<crate::data::MatrixData> {
         let is_geotiff = self.layer_is_geotiff(id);
         let anim_extent = self.layer_animated_dim_extent(id);
         let layer = self.layers.get_mut(id)?;

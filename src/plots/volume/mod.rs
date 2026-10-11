@@ -156,12 +156,6 @@ fn view_entry(binding: u32, view: &wgpu::TextureView) -> wgpu::BindGroupEntry<'_
     }
 }
 
-impl super::common::PlotRenderer for VolumeRenderer {
-    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
-        self.update_data(queue, values);
-    }
-}
-
 impl super::traits::PlotRenderer for VolumeRenderer {
     fn update_data(&self, queue: &wgpu::Queue, data: &crate::data::RenderData) {
         match data {

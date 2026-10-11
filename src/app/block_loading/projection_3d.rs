@@ -3,8 +3,8 @@
 use super::projection_hash::{compute_composite_hash, compute_target_dims};
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId};
+use crate::data::VolumeData;
 use crate::data::octant_block::OctantBlock;
-use crate::data::volume_data::VolumeData;
 
 impl OctantApp {
     /// Projects a 3D scalar or composite block subvolume onto layer `id`'s 3D render pipelines.

@@ -37,64 +37,17 @@ impl OctantApp {
         } else {
             None
         };
-        for (z_idx, c) in self.selected.dim_config.iter_mut().enumerate() {
-            if c.spatial == SpatialRole::Z {
-                if c.animation == AnimationRole::Animated || Some(z_idx) == channel_dim {
-                    c.spatial = SpatialRole::None;
-                    c.active = true;
-                } else {
-                    let current_z = self.selected.dim_indices.get(z_idx).copied().unwrap_or(0);
-                    c.spatial = SpatialRole::None;
-                    c.active = false;
-                    c.range = (current_z, current_z);
-                    if z_idx < self.selected.dim_ranges.len() {
-                        self.selected.dim_ranges[z_idx] = (current_z, current_z);
-                    }
-                    if z_idx < self.layers.base.selection().dim_ranges.len() {
-                        self.layers.base.selection_mut().dim_ranges[z_idx] = (current_z, current_z);
-                    }
-                }
-            }
-        }
-        let plotted = self.layers.base.selection_mut();
-        for (z_idx, c) in plotted.dim_config.iter_mut().enumerate() {
-            if c.spatial == SpatialRole::Z {
-                if c.animation == AnimationRole::Animated || Some(z_idx) == channel_dim {
-                    c.spatial = SpatialRole::None;
-                    c.active = true;
-                } else {
-                    let current_z = plotted.dim_indices.get(z_idx).copied().unwrap_or(0);
-                    c.spatial = SpatialRole::None;
-                    c.active = false;
-                    c.range = (current_z, current_z);
-                }
-            }
-        }
-        if let Some(ch_idx) = channel_dim {
-            let max_ch = self
-                .plotted_variable_info()
-                .or_else(|| self.selected_variable_info())
-                .and_then(|v| v.shape.get(ch_idx))
-                .map(|&s| (s as usize).saturating_sub(1))
-                .unwrap_or(0);
-            if ch_idx < self.selected.dim_config.len() {
-                self.selected.dim_config[ch_idx].range = (0, max_ch);
-                self.selected.dim_config[ch_idx].active = true;
-            }
-            if ch_idx < self.layers.base.selection().dim_config.len() {
-                self.layers.base.selection_mut().dim_config[ch_idx].range = (0, max_ch);
-                self.layers.base.selection_mut().dim_config[ch_idx].active = true;
-            }
-            if ch_idx < self.selected.dim_ranges.len() {
-                self.selected.dim_ranges[ch_idx] = (0, max_ch);
-            }
-            if ch_idx < self.layers.base.selection().dim_ranges.len() {
-                self.layers.base.selection_mut().dim_ranges[ch_idx] = (0, max_ch);
-            }
-        }
-        self.selected.spatial_dims = crate::app::DimConfig::spatial_dims(&self.selected.dim_config);
-        self.layers.base.selection_mut().spatial_dims =
-            crate::app::DimConfig::spatial_dims(&self.layers.base.selection().dim_config);
+        let max_ch = channel_dim
+            .and_then(|ch| {
+                self.plotted_variable_info()
+                    .or_else(|| self.selected_variable_info())
+                    .and_then(|v| v.shape.get(ch))
+                    .map(|&s| (s as usize).saturating_sub(1))
+            })
+            .unwrap_or(0);
+
+        adapt_sel_to_2d(&mut self.selected, channel_dim, max_ch);
+        adapt_sel_to_2d(self.layers.base.selection_mut(), channel_dim, max_ch);
         self.layers.base.selection_mut().plot_type = self.selected.plot_type;
 
         let cur_var = self.plotted_variable_info();
@@ -150,34 +103,20 @@ impl OctantApp {
             })
             .or(fallback_anim);
         if let Some(z_idx) = z_idx_opt {
-            self.selected.dim_config[z_idx].spatial = SpatialRole::Z;
-            self.selected.dim_config[z_idx].active = true;
-            if z_idx < self.layers.base.selection().dim_config.len() {
-                self.layers.base.selection_mut().dim_config[z_idx].spatial = SpatialRole::Z;
-                self.layers.base.selection_mut().dim_config[z_idx].active = true;
-            }
-            if self.selected.dim_config[z_idx].animation != AnimationRole::Animated {
-                let max_z = self
+            let max_z = if self.selected.dim_config[z_idx].animation != AnimationRole::Animated {
+                let max = self
                     .plotted_variable_info()
                     .or_else(|| self.selected_variable_info())
                     .and_then(|v| v.shape.get(z_idx))
                     .map(|&s| (s as usize).saturating_sub(1))
                     .unwrap_or(0);
-                self.selected.dim_config[z_idx].range = (0, max_z);
-                if z_idx < self.layers.base.selection().dim_config.len() {
-                    self.layers.base.selection_mut().dim_config[z_idx].range = (0, max_z);
-                }
-                if z_idx < self.selected.dim_ranges.len() {
-                    self.selected.dim_ranges[z_idx] = (0, max_z);
-                }
-                if z_idx < self.layers.base.selection().dim_ranges.len() {
-                    self.layers.base.selection_mut().dim_ranges[z_idx] = (0, max_z);
-                }
-            }
+                Some(max)
+            } else {
+                None
+            };
+            adapt_sel_to_3d(&mut self.selected, z_idx, max_z);
+            adapt_sel_to_3d(self.layers.base.selection_mut(), z_idx, max_z);
         }
-        self.selected.spatial_dims = crate::app::DimConfig::spatial_dims(&self.selected.dim_config);
-        self.layers.base.selection_mut().spatial_dims =
-            crate::app::DimConfig::spatial_dims(&self.layers.base.selection().dim_config);
         self.layers.base.selection_mut().plot_type = self.selected.plot_type;
 
         let cur_var = self.plotted_variable_info();
@@ -196,4 +135,52 @@ impl OctantApp {
 
         self.layers.base.color.lock_bounds = false;
     }
+}
+
+fn adapt_sel_to_2d(
+    sel: &mut crate::app::VariableSelection,
+    channel_dim: Option<usize>,
+    max_ch: usize,
+) {
+    for (z_idx, c) in sel.dim_config.iter_mut().enumerate() {
+        if c.spatial == SpatialRole::Z {
+            c.spatial = SpatialRole::None;
+            if c.animation == AnimationRole::Animated || Some(z_idx) == channel_dim {
+                c.active = true;
+            } else {
+                let current_z = sel.dim_indices.get(z_idx).copied().unwrap_or(0);
+                c.active = false;
+                c.range = (current_z, current_z);
+                if let Some(r) = sel.dim_ranges.get_mut(z_idx) {
+                    *r = (current_z, current_z);
+                }
+            }
+        }
+    }
+    if let Some(ch_idx) = channel_dim {
+        if let Some(c) = sel.dim_config.get_mut(ch_idx) {
+            c.range = (0, max_ch);
+            c.active = true;
+        }
+        if let Some(r) = sel.dim_ranges.get_mut(ch_idx) {
+            *r = (0, max_ch);
+        }
+    }
+    sel.spatial_dims = crate::app::DimConfig::spatial_dims(&sel.dim_config);
+}
+
+fn adapt_sel_to_3d(sel: &mut crate::app::VariableSelection, z_idx: usize, max_z: Option<usize>) {
+    if let Some(c) = sel.dim_config.get_mut(z_idx) {
+        c.spatial = SpatialRole::Z;
+        c.active = true;
+    }
+    if let Some(max) = max_z {
+        if let Some(c) = sel.dim_config.get_mut(z_idx) {
+            c.range = (0, max);
+        }
+        if let Some(r) = sel.dim_ranges.get_mut(z_idx) {
+            *r = (0, max);
+        }
+    }
+    sel.spatial_dims = crate::app::DimConfig::spatial_dims(&sel.dim_config);
 }

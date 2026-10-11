@@ -2,9 +2,9 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::data::VolumeData;
 use crate::data::block_orientation::slab_destination;
 use crate::data::octant_block::OctantBlock;
-use crate::data::volume_data::VolumeData;
 
 impl OctantApp {
     #[allow(clippy::too_many_arguments)]

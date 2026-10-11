@@ -28,70 +28,16 @@ pub type ProgressCallback<'a> = Option<&'a mut (dyn FnMut(u64) + Send)>;
 pub type ProgressCallback<'a> = Option<&'a mut dyn FnMut(u64)>;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub trait BlockStore: Send + Sync {
-    /// Human-readable backend name.
-    fn backend_name(&self) -> &str;
-
-    /// List variables available from this source.
-    fn variables(&self) -> Result<Vec<String>, BlockStoreError>;
-
-    /// Inspect variables and metadata from this dataset source.
-    fn inspect(&self) -> Result<crate::data::metadata::DatasetMetadata, BlockStoreError> {
-        let vars = self.variables()?;
-        let var_infos = vars
-            .into_iter()
-            .map(|name| crate::data::metadata::VariableInfo {
-                name,
-                data_type: "float32".to_string(),
-                ..Default::default()
-            })
-            .collect();
-
-        Ok(crate::data::metadata::DatasetMetadata {
-            name: self.backend_name().to_string(),
-            store_type: self.backend_name().to_string(),
-            variables: var_infos,
-            dimension_coordinates: std::collections::HashMap::new(),
-        })
-    }
-
-    /// The coordinates of `variable`'s dimensions, keyed like
-    /// `DatasetMetadata::dimension_coordinates`, for stores whose [`inspect`](Self::inspect)
-    /// leaves them out so datasets open with metadata alone. Empty when inspect has them.
-    fn variable_coordinates(
-        &self,
-        _variable: &VariableInfo,
-    ) -> Result<HashMap<String, CoordValues>, BlockStoreError> {
-        Ok(HashMap::new())
-    }
-
-    /// Load one arbitrary N-dimensional block.
-    fn fetch_block(&self, request: &SliceRequest) -> Result<OctantBlock, BlockStoreError> {
-        self.fetch_block_with_progress(request, None)
-    }
-
-    /// Load one arbitrary N-dimensional block with progressive byte reporting.
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        _on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError>;
-
-    /// Default implementation for loading multiple variables from this
-    /// same backend in one call.
-    fn fetch_blocks(&self, requests: &[SliceRequest]) -> Result<BlockResult, BlockStoreError> {
-        let mut blocks = Vec::with_capacity(requests.len());
-
-        for request in requests {
-            blocks.push(self.fetch_block(request)?);
-        }
-
-        Ok(BlockResult::new(blocks))
-    }
-}
+pub trait MaybeSendSync: Send + Sync {}
+#[cfg(not(target_arch = "wasm32"))]
+impl<T: Send + Sync + ?Sized> MaybeSendSync for T {}
 
 #[cfg(target_arch = "wasm32")]
-pub trait BlockStore {
+pub trait MaybeSendSync {}
+#[cfg(target_arch = "wasm32")]
+impl<T: ?Sized> MaybeSendSync for T {}
+
+pub trait BlockStore: MaybeSendSync {
     /// Human-readable backend name.
     fn backend_name(&self) -> &str;
 

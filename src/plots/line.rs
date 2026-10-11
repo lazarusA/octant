@@ -223,14 +223,6 @@ impl LineRenderer {
     }
 }
 
-// The `PlotRenderer` traits' raw values do not fit the payload layout
-// (`payload.rs`): they only make the next paint upload the payload again.
-impl super::common::PlotRenderer for LineRenderer {
-    fn update_data(&self, _queue: &wgpu::Queue, _values: &[f32]) {
-        self.payload.forget();
-    }
-}
-
 impl super::traits::PlotRenderer for LineRenderer {
     fn update_data(&self, _queue: &wgpu::Queue, _data: &crate::data::RenderData) {
         self.payload.forget();

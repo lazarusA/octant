@@ -397,12 +397,6 @@ impl HeatmapRenderer {
     }
 }
 
-impl super::common::PlotRenderer for HeatmapRenderer {
-    fn update_data(&self, queue: &wgpu::Queue, values: &[f32]) {
-        self.update_data(queue, values);
-    }
-}
-
 impl super::traits::PlotRenderer for HeatmapRenderer {
     fn update_data(&self, queue: &wgpu::Queue, data: &crate::data::RenderData) {
         if let crate::data::RenderData::Matrix(m) = data {
@@ -501,7 +495,3 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
         rpass.draw_indexed(0..self.renderer.num_indices, 0, 0..1);
     }
 }
-
-// Backward compatibility alias during refactoring
-pub type MatrixRenderer = HeatmapRenderer;
-pub type MatrixCallback = HeatmapCallback;

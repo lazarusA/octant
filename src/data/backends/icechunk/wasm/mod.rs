@@ -19,6 +19,3 @@ pub use header::{decompress_icechunk_file, decompress_payload, try_decompress_zs
 pub use inspect::inspect_wasm_remote_icechunk;
 pub use loader::load_one_icechunk_wasm_with_progress;
 pub use store::{ArrayManifestInfo, WasmIcechunkBlockStore};
-
-// Backwards compatibility re-export
-pub use crate::utils::remote::s3_to_https;

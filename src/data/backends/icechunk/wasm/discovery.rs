@@ -33,31 +33,7 @@ pub async fn resolve_snapshot_id(clean_url: &str) -> Result<(String, SpecVersion
         }
     }
 
-    // 2. Fallback to Icechunk V1 discovery via /refs/branch.main/ref.json
-    let ref_endpoints = [
-        format!("{clean_url}/refs/branch.main/ref.json"),
-        format!("{clean_url}/refs/branch.master/ref.json"),
-        format!("{clean_url}/refs/tag.latest/ref.json"),
-    ];
-
-    for endpoint in ref_endpoints {
-        if let Ok(bytes) = fetch_url_bytes(&endpoint).await {
-            let text = String::from_utf8_lossy(&bytes).trim().to_string();
-            let snap_id = if let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) {
-                val.get("snapshot")
-                    .and_then(|v| v.as_str())
-                    .or_else(|| val.as_str())
-                    .or_else(|| val.get("id").and_then(|v| v.as_str()))
-                    .map(|s| s.to_string())
-                    .unwrap_or(text)
-            } else {
-                text.trim_matches('"').to_string()
-            };
-            return Ok((snap_id, SpecVersionBin::V1));
-        }
-    }
-
     Err(format!(
-        "Failed to find Icechunk branch reference at '{clean_url}/repo' (V2) or '{clean_url}/refs/branch.main/ref.json' (V1). Ensure the server allows CORS."
+        "Failed to find Icechunk branch reference at '{clean_url}/repo'. Ensure the server allows CORS."
     ))
 }

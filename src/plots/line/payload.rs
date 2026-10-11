@@ -224,7 +224,11 @@ mod tests {
         renderer.upload_payload(&device, &queue, 7, &payload, SHAPE);
         assert_eq!(renderer.payload_shape(7), Some(SHAPE));
         assert_eq!(renderer.payload_shape(8), None, "another key");
-        crate::plots::common::PlotRenderer::update_data(&renderer, &queue, &[1.0, 2.0]);
+        crate::plots::PlotRenderer::update_data(
+            &renderer,
+            &queue,
+            &crate::data::RenderData::Matrix(Default::default()),
+        );
         assert_eq!(renderer.payload_shape(7), None, "overwritten");
         assert_eq!(LineRenderer::payload_limit(&device) % 4, 0, "whole words");
     }
