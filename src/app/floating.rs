@@ -14,6 +14,7 @@ impl OctantApp {
         canvas_rect: egui::Rect,
         colorbars: bool,
     ) {
+        crate::ui::dataset::show_dataset_window(self, ctx, canvas_rect);
         crate::ui::variables_overlay::show_variables_overlay(self, ctx, canvas_rect);
         crate::ui::settings::show_settings_window(self, ctx, canvas_rect);
         crate::ui::variables_panel::show_variable_controls(self, ctx, canvas_rect);

@@ -298,7 +298,7 @@ By decoupling presentation, navigation, and configuration from the top-level app
 The fields of `OctantApp` are decomposed into cohesive sub-states:
 - `NavigationState`: 2D `heatmap_pan`, `heatmap_zoom`, `line_pan`, `line_zoom`, 3D `sphere_rotation_x/y`, `sphere_zoom`.
 - `PlaybackState`: `is_playing`, `playback_fps`, `loop_playback`, `last_step_time`, `current_timestep`.
-- `UiLayoutState`: `show_left_panel`, `show_variables_overlay`, `show_settings_panel`, `panel_positions`, search query.
+- `UiLayoutState`: `show_dataset_panel`, `show_variables_overlay`, `show_settings_panel`, `panel_positions`, search query.
 - `PlotConfigs`: Holds typed configuration structs (`LinePlotConfig`, `VolumePlotConfig`, `MeshPlotConfig`, `PointCloudPlotConfig`) instead of loose primitive fields.
 
 #### 2. Plot Controllers (`src/app/controllers/`)

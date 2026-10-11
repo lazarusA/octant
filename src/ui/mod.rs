@@ -14,6 +14,7 @@ pub mod export_modal;
 pub mod hero;
 pub mod hover;
 pub use hover as hover_tooltip;
+pub mod dataset;
 pub mod icons;
 pub mod key_focus;
 pub mod layer_label;
@@ -26,7 +27,6 @@ mod panel_layout_tests;
 pub mod plot_type;
 pub mod settings;
 pub mod status;
-pub mod store;
 pub mod temp_cache;
 #[cfg(test)]
 pub(crate) mod test_input;

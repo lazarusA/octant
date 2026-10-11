@@ -4,7 +4,7 @@ use super::layout::TopBarItem;
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, TOOLBAR_ITEM_HEIGHT, ToolbarButton};
 use crate::ui::toolbar::{ItemWidths, SEPARATOR_WIDTH};
-use crate::ui::{cache, colormap, plot_type, store};
+use crate::ui::{cache, colormap, plot_type};
 
 const BRAND_LABEL: &str = "Octant";
 
@@ -107,7 +107,11 @@ pub(super) fn show_item(item: TopBarItem, compact: bool, app: &mut OctantApp, ui
         TopBarItem::Brand => show_brand(app, ui, compact),
         // Drawn by `show_contents`, which owns the fetch progress snapshot.
         TopBarItem::Status => {}
-        TopBarItem::Dataset => store::show_store_menu(app, ui, compact),
+        TopBarItem::Dataset => {
+            if ui.add(button(Icon::Dataset, item, app, compact)).clicked() {
+                app.layout.show_dataset_panel = !app.layout.show_dataset_panel;
+            }
+        }
         TopBarItem::Variables => {
             if ui
                 .add(button(Icon::Variables, item, app, compact))
@@ -146,6 +150,7 @@ fn button(icon: Icon, item: TopBarItem, app: &OctantApp, compact: bool) -> Toolb
 /// Whether the panel or overlay toggled by a panel button is currently shown.
 fn is_panel_open(item: TopBarItem, app: &OctantApp) -> bool {
     match item {
+        TopBarItem::Dataset => app.layout.show_dataset_panel,
         TopBarItem::Variables => app.layout.show_variables_overlay,
         TopBarItem::Dimensions => app.layout.show_variable_controls,
         TopBarItem::Settings => app.layout.show_settings_panel,
