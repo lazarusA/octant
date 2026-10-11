@@ -3,12 +3,16 @@
 //! there counts as "outside" the colormap popup and closes it.
 
 use super::search::{FamilyFilter, FilterKey};
+use crate::i18n::{ColormapKey as K, tr};
 use crate::utils::colormap::{ColormapKind, builtin};
 
 pub fn show(ui: &mut egui::Ui, filter: &mut FilterKey) {
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
-        if ui.selectable_label(filter.kind.is_none(), "All").clicked() {
+        if ui
+            .selectable_label(filter.kind.is_none(), tr(K::FilterAll))
+            .clicked()
+        {
             filter.kind = None;
         }
         for kind in ColormapKind::ALL {
@@ -25,18 +29,20 @@ pub fn show(ui: &mut egui::Ui, filter: &mut FilterKey) {
 fn show_family_chips(ui: &mut egui::Ui, filter: &mut FilterKey) {
     let families = &builtin().families;
     let selected = match filter.family {
-        None => "All",
-        Some(FamilyFilter::Custom) => "Custom",
-        Some(FamilyFilter::Builtin(i)) => families.get(i).map_or("All", |f| f.name.as_str()),
+        None => tr(K::FilterAll),
+        Some(FamilyFilter::Custom) => tr(K::FamilyCustom),
+        Some(FamilyFilter::Builtin(i)) => families
+            .get(i)
+            .map_or(tr(K::FilterAll), |f| f.name.as_str()),
     };
-    let mut buf = [0u8; 64];
-    let title = crate::utils::stack_str(&mut buf, format_args!("Family: {selected}"));
+    let mut buf = [0u8; 160];
+    let title = crate::i18n::fill(&mut buf, tr(K::FamilyTitle), &[&selected]);
     egui::CollapsingHeader::new(title)
         .id_salt(("colormap_family_filter", 0))
         .show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
-                ui.selectable_value(&mut filter.family, None, "All");
+                ui.selectable_value(&mut filter.family, None, tr(K::FilterAll));
                 for (i, family) in families.iter().enumerate() {
                     ui.selectable_value(
                         &mut filter.family,
@@ -48,7 +54,11 @@ fn show_family_chips(ui: &mut egui::Ui, filter: &mut FilterKey) {
                         ui.label(egui::RichText::new(&family.license).small().weak());
                     });
                 }
-                ui.selectable_value(&mut filter.family, Some(FamilyFilter::Custom), "Custom");
+                ui.selectable_value(
+                    &mut filter.family,
+                    Some(FamilyFilter::Custom),
+                    tr(K::FamilyCustom),
+                );
             });
         });
 }

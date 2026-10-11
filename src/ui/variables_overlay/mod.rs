@@ -18,6 +18,7 @@ mod tests;
 pub use search::SearchCache;
 
 use crate::app::OctantApp;
+use crate::i18n::{CommonKey, VariablesKey, tr};
 use crate::ui::icons::{Icon, UiIconExt};
 use crate::ui::key_focus;
 use crate::ui::panel_header::{self, PanelHeader};
@@ -81,14 +82,14 @@ fn show_panel(
             header = Some(panel_header::show(
                 ui,
                 Icon::Variables,
-                "Variables",
-                "Close Variables Window",
+                tr(CommonKey::Variables),
+                tr(VariablesKey::CloseVariablesWindow),
             ));
         })
         .body(|ui| {
             let search = ui.search_field_response(
                 &mut app.layout.variable_search,
-                "Search variables...",
+                tr(VariablesKey::SearchVariables),
                 None,
             );
             if focus::take_open_focus(ui.ctx()) {

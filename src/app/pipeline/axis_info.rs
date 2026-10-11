@@ -1,6 +1,7 @@
 //! Dimension coordinate bounds and title resolution for plot axes.
 
 use crate::app::OctantApp;
+use crate::i18n::{HoverKey, filled, tr};
 
 impl OctantApp {
     /// Resolves coordinate bounds, formatted title, and units/time context for a given dimension index.
@@ -73,9 +74,9 @@ impl OctantApp {
     /// Returns a human-friendly label for the spatial axis (e.g., "Along X (lon)", "Along Z (depth)").
     pub fn get_spatial_dim_label(&self, axis: usize) -> String {
         let (name_opt, fallback) = match axis {
-            0 => (self.get_spatial_dim_name(0), "X / Longitude"),
-            1 => (self.get_spatial_dim_name(1), "Y / Latitude"),
-            _ => (self.get_spatial_dim_name(2), "Z / Depth"),
+            0 => (self.get_spatial_dim_name(0), HoverKey::AxisXLongitude),
+            1 => (self.get_spatial_dim_name(1), HoverKey::AxisYLatitude),
+            _ => (self.get_spatial_dim_name(2), HoverKey::AxisZDepth),
         };
 
         if let Some(name) = name_opt {
@@ -84,9 +85,9 @@ impl OctantApp {
                 1 => "Y",
                 _ => "Z",
             };
-            format!("Along {} ({})", axis_letter, name)
+            filled(tr(HoverKey::AlongAxisNamed), &[&axis_letter, &name])
         } else {
-            format!("Along {}", fallback)
+            filled(tr(HoverKey::AlongAxis), &[&tr(fallback)])
         }
     }
 }

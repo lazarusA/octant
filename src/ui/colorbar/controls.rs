@@ -4,6 +4,7 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::drag_grip;
 use crate::ui::icons::{Icon, IconSize, ToolbarButton};
 use egui::{Align2, Rect, Vec2};
@@ -41,7 +42,7 @@ pub fn show(
     }
     let [grip_rect, flip_rect] = rects(panel);
     let grip = ui.put(grip_rect, drag_grip::button(IconSize::Xs));
-    let flip = ToolbarButton::new(Icon::Orientation, "Flip orientation")
+    let flip = ToolbarButton::new(Icon::Orientation, tr(K::FlipOrientation))
         .compact(true)
         .icon_size(IconSize::Xs);
     let flip = ui.put(flip_rect, flip);

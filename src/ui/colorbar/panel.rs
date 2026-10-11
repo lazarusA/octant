@@ -9,6 +9,7 @@ use super::ticks::{ScientificTick, TICK_BUF};
 use super::{controls, layout, series};
 use crate::app::OctantApp;
 use crate::app::layers::{BarOrientation, LayerId};
+use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::layer_label::LabelEditor;
 use crate::utils::colormap::unscale_norm_to_value;
 use egui::{Pos2, Rect, Vec2};
@@ -160,9 +161,8 @@ fn bar_row(
     draw_clip_triangles(ui, axis, color, id);
     draw_end_range_inputs(ui, axis, color);
     if let Some(value) = hover {
-        let mut buf = [0u8; TICK_BUF + 5];
-        let text =
-            crate::utils::stack_str(&mut buf, format_args!("Val: {}", ScientificTick(value)));
+        let mut buf = [0u8; TICK_BUF + 48];
+        let text = crate::i18n::fill(&mut buf, tr(K::HoveredValue), &[&ScientificTick(value)]);
         response.on_hover_text(text);
     }
 }

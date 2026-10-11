@@ -16,6 +16,8 @@ pub(crate) mod test_gpu;
 pub mod traits;
 pub mod volume;
 
+use crate::i18n::{PlotKey, tr};
+
 pub use coastline::{
     Coastline3DCallback, Coastline3DParams, Coastline3DRenderer, CoastlineBuffer,
     CoastlineCallback, CoastlineFetchResult, CoastlineLod, CoastlineReceiver, CoastlineRenderer,
@@ -48,12 +50,12 @@ pub enum PlotType {
 impl PlotType {
     pub fn display_name(&self) -> &'static str {
         match self {
-            PlotType::Heatmap => "Heatmap",
-            PlotType::Line => "1D Line",
-            PlotType::Surface => "Surface",
-            PlotType::Volume => "Volume",
-            PlotType::Sphere => "Sphere",
-            PlotType::PointCloud => "Point Cloud",
+            PlotType::Heatmap => tr(PlotKey::Heatmap),
+            PlotType::Line => tr(PlotKey::Line),
+            PlotType::Surface => tr(PlotKey::Surface),
+            PlotType::Volume => tr(PlotKey::Volume),
+            PlotType::Sphere => tr(PlotKey::Sphere),
+            PlotType::PointCloud => tr(PlotKey::PointCloud),
         }
     }
 

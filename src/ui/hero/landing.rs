@@ -12,6 +12,7 @@ use super::intake::intake_row;
 use super::style::{gap, vspace, wordmark_cell};
 use super::widget::draw_octant_widget;
 use crate::app::OctantApp;
+use crate::i18n::{DatasetKey, fill, tr};
 use crate::ui::brand::Wordmark;
 
 /// Render the clean, centered Hero Landing page.
@@ -70,7 +71,10 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                 // Centered 3D Octant procedural widget (interactive click to hop)
                 let octant_resp =
                     draw_octant_widget(ui, octant_size, filled, extra_rot, extra_scale);
-                if octant_resp.on_hover_text("Click to hop octant").clicked() {
+                if octant_resp
+                    .on_hover_text(tr(DatasetKey::HopOctantHover))
+                    .clicked()
+                {
                     app.layout.hero_state.start_hop(Duration::from_millis(350));
                     wants_focus = true;
                 }
@@ -95,30 +99,30 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
                 ui.add_space(space(gap::HINT_CHIPS));
                 sample_slash_chips_row(ui, app);
 
+                let source = app.layout.hero_state.source_label.as_str();
+                let mut buf = [0u8; 1024];
                 if app.is_loading || app.layout.hero_state.loading {
-                    let label = if !app.layout.hero_state.source_label.is_empty() {
-                        format!("loading: {}", app.layout.hero_state.source_label)
+                    let label = if !source.is_empty() {
+                        fill(&mut buf, tr(DatasetKey::HeroLoadingSource), &[&source])
                     } else {
-                        "loading...".to_string()
+                        tr(DatasetKey::HeroLoading)
                     };
                     ui.add_space(space(gap::CHIPS_STATUS));
                     render_status_pill(
                         ui,
                         crate::ui::icons::Icon::Hourglass,
                         crate::ui::icons::IconTone::Muted.color(ui.visuals()),
-                        &label,
+                        label,
                         ui.visuals().text_color(),
                     );
-                } else if app.layout.hero_state.loaded
-                    && !app.layout.hero_state.source_label.is_empty()
-                {
-                    let label = format!("loaded: {}", app.layout.hero_state.source_label);
+                } else if app.layout.hero_state.loaded && !source.is_empty() {
+                    let label = fill(&mut buf, tr(DatasetKey::HeroLoaded), &[&source]);
                     ui.add_space(space(gap::CHIPS_STATUS));
                     render_status_pill(
                         ui,
                         crate::ui::icons::Icon::Check,
                         crate::ui::icons::IconTone::Accent.color(ui.visuals()),
-                        &label,
+                        label,
                         ui.visuals().text_color(),
                     );
                 }

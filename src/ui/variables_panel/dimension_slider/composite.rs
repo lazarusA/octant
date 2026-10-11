@@ -70,10 +70,10 @@ fn extract_channel_configs(
 
     let mut configs = Vec::with_capacity(num_ch);
     for i in 0..num_ch {
-        let name = channel_labels
-            .get(i)
-            .cloned()
-            .unwrap_or_else(|| format!("Channel {}", i + 1));
+        let name = channel_labels.get(i).cloned().unwrap_or_else(|| {
+            use crate::i18n::{VariablesKey, filled, tr};
+            filled(tr(VariablesKey::ChannelN), &[&(i + 1)])
+        });
 
         let color_rgb = channel_colors
             .get(i)

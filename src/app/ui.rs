@@ -1,3 +1,4 @@
+use crate::i18n::{NoticesKey, tr};
 use crate::ui::toast::Severity;
 
 use super::OctantApp;
@@ -32,7 +33,11 @@ impl eframe::App for OctantApp {
                         if metadata.variables.is_empty() {
                             self.status_message =
                                 format!("No variables discovered in '{}'", metadata.name);
-                            self.notify(Severity::Warning, "No variables found", &metadata.name);
+                            self.notify(
+                                Severity::Warning,
+                                tr(NoticesKey::NoVariablesFound),
+                                &metadata.name,
+                            );
                         } else {
                             self.status_message = format!(
                                 "Inspected '{}' (Found {} variables)",
@@ -61,7 +66,7 @@ impl eframe::App for OctantApp {
                         self.layout.hero_state.loaded = false;
                         self.clear_active_metadata();
                         self.status_message = format!("Store inspect error: {}", err);
-                        self.notify(Severity::Error, "Couldn't open dataset", &err);
+                        self.notify(Severity::Error, tr(NoticesKey::CouldntOpenDataset), &err);
                     }
                 }
             } else {
@@ -155,7 +160,7 @@ impl eframe::App for OctantApp {
                         crate::ui::drop_zone::trigger_drop_zone_warning(&ctx);
                         self.notify(
                             Severity::Warning,
-                            "Unsupported file",
+                            tr(NoticesKey::UnsupportedFile),
                             format!("{err}: {path_str}"),
                         );
                     }

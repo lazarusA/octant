@@ -2,6 +2,7 @@ use crate::app::OctantApp;
 use crate::catalog::{
     CatalogCategoryFilter, GEOTIFF_CATALOG, ICECHUNK_CATALOG, PROCEDURAL_CATALOG, ZARR_CATALOG,
 };
+use crate::i18n::{DatasetKey, tr};
 use crate::ui::icons::UiIconExt;
 use crate::utils::stack_str;
 
@@ -18,7 +19,7 @@ pub fn render_search_and_filters(
 
     ui.search_field(
         &mut app.layout.catalog_search_query,
-        "Filter by name, description, or URL...",
+        tr(DatasetKey::CatalogSearchHint),
         None,
     );
 
@@ -32,18 +33,25 @@ pub fn render_search_and_filters(
     };
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = spacing;
-        ui.label(egui::RichText::new("Category:").strong().small());
+        ui.label(
+            egui::RichText::new(tr(DatasetKey::CatalogCategory))
+                .strong()
+                .small(),
+        );
 
-        let mut buf_all = [0u8; 32];
+        let mut buf_all = [0u8; 64];
         let mut buf_zarr = [0u8; 32];
         let mut buf_ice = [0u8; 32];
         let mut buf_geo = [0u8; 32];
-        let mut buf_proc = [0u8; 32];
+        let mut buf_proc = [0u8; 64];
 
         ui.selectable_value(
             &mut app.layout.catalog_category_filter,
             CatalogCategoryFilter::All,
-            stack_str(&mut buf_all, format_args!("All ({total_count})")),
+            stack_str(
+                &mut buf_all,
+                format_args!("{} ({total_count})", tr(DatasetKey::CategoryAll)),
+            ),
         );
         ui.selectable_value(
             &mut app.layout.catalog_category_filter,
@@ -68,7 +76,10 @@ pub fn render_search_and_filters(
             CatalogCategoryFilter::Procedural,
             stack_str(
                 &mut buf_proc,
-                format_args!("Procedural ({procedural_count})"),
+                format_args!(
+                    "{} ({procedural_count})",
+                    tr(DatasetKey::CategoryProcedural)
+                ),
             ),
         );
     });

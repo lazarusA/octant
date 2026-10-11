@@ -1,6 +1,8 @@
 use crate::app::OctantApp;
+use crate::i18n::{PlotKey, fill, tr};
 use crate::plots::PlotType;
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
+use crate::utils::stack_str;
 
 /// Map a PlotType to its corresponding vector Icon.
 #[inline]
@@ -62,7 +64,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
                 .supported_plot_types(),
             ),
-            "HEALPix / Discrete",
+            tr(PlotKey::GridHealpixDiscrete),
         )
     } else if let Some(m) = &app.layers.base.data.matrix
         && target_var.map(|v| &v.name) == app.plotted_variable_info().map(|p| &p.name)
@@ -111,7 +113,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.set_min_width(220.0);
 
     ui.label(
-        egui::RichText::new("Select Visualization Projection")
+        egui::RichText::new(tr(PlotKey::SelectProjection))
             .small()
             .weak(),
     );
@@ -174,23 +176,34 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
                 app.switch_plot_type(plot_type);
             }
         } else {
+            let mut reason_buf = [0; 256];
+            let mut mb_buf = [0; 24];
             let reason = if !is_supported {
-                format!("Unsupported for {} grid", grid_name)
+                fill(
+                    &mut reason_buf,
+                    tr(PlotKey::UnsupportedForGrid),
+                    &[&grid_name],
+                )
             } else if pyramid_disabled {
-                "Disabled: 2D Aggregation is on".to_string()
+                tr(PlotKey::DisabledAggregation)
             } else if (plot_type == PlotType::Volume || plot_type == PlotType::PointCloud)
                 && !is_3d_available
             {
-                "Requires 3D Data".to_string()
-            } else if plot_type == PlotType::Sphere || plot_type == PlotType::Surface {
-                format!("Disabled: {:.0} MB > 128 MB GPU limit", surface_mb)
+                tr(PlotKey::Requires3D)
             } else {
-                format!("Disabled: {:.0} MB > 128 MB GPU limit", vol_mb)
+                let mb = match plot_type {
+                    PlotType::Sphere | PlotType::Surface => surface_mb,
+                    _ => vol_mb,
+                };
+                let mb = stack_str(&mut mb_buf, format_args!("{mb:.0}"));
+                fill(&mut reason_buf, tr(PlotKey::DisabledGpuLimit), &[&mb])
             };
 
             ui.horizontal(|ui| {
                 ui.icon_toned(icon, IconSize::Sm, IconTone::Muted);
-                ui.add_enabled(false, egui::Label::new(format!("{} ({})", label, reason)));
+                let mut buf = [0; 384];
+                let text = fill(&mut buf, tr(PlotKey::DisabledItem), &[&label, &reason]);
+                ui.add_enabled(false, egui::Label::new(text));
             });
         }
     }

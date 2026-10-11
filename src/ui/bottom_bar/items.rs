@@ -5,14 +5,13 @@ use super::labels;
 use super::layout::BottomBarItem as Item;
 use super::timeline::Timeline;
 use crate::app::OctantApp;
+use crate::i18n::{CommonKey, PlaybackKey as K, tr};
 use crate::ui::icons::{Icon, ToolbarButton};
 use crate::ui::toolbar::{BarItem, ItemWidths, SEPARATOR_WIDTH};
 use crate::utils::stack_str;
 
 /// Stack buffer for the "N FPS" label.
 type FpsBuf = [u8; 16];
-
-const SAVE_HOVER: &str = "Save / Export Figure (Cmd+S for Quick Save, Cmd+Shift+S for Settings)";
 
 /// Items preceded by a separator, opening a new group.
 fn opens_group(item: Item) -> bool {
@@ -35,27 +34,29 @@ fn button<'a>(
     let icon_only = |icon, label| Some(ToolbarButton::new(icon, label).compact(true));
     let labelled = |icon, label| Some(ToolbarButton::new(icon, label).compact(compact));
     match item {
-        Item::First => icon_only(Icon::SeekStart, "First Step"),
-        Item::Prev => icon_only(Icon::StepBackward, "Previous Step"),
-        Item::Next => icon_only(Icon::StepForward, "Next Step"),
-        Item::Last => icon_only(Icon::SeekEnd, "Last Step"),
-        Item::PlayPause if app.playback.is_playing => labelled(Icon::Pause, "Pause"),
-        Item::PlayPause => labelled(Icon::Play, "Play"),
-        Item::Loop => labelled(Icon::Loop, "Loop").map(|b| b.toggled(app.playback.loop_playback)),
-        Item::Crop => labelled(Icon::Scissors, "Crop").map(|b| {
-            b.toggled(app.show_crop_overlay)
-                .hover("Crop Guiding Lines (C)")
-        }),
+        Item::First => icon_only(Icon::SeekStart, tr(K::FirstStep)),
+        Item::Prev => icon_only(Icon::StepBackward, tr(K::PreviousStep)),
+        Item::Next => icon_only(Icon::StepForward, tr(K::NextStep)),
+        Item::Last => icon_only(Icon::SeekEnd, tr(K::LastStep)),
+        Item::PlayPause if app.playback.is_playing => labelled(Icon::Pause, tr(K::Pause)),
+        Item::PlayPause => labelled(Icon::Play, tr(K::Play)),
+        Item::Loop => {
+            labelled(Icon::Loop, tr(K::Loop)).map(|b| b.toggled(app.playback.loop_playback))
+        }
+        Item::Crop => labelled(Icon::Scissors, tr(K::Crop))
+            .map(|b| b.toggled(app.show_crop_overlay).hover(tr(K::CropHover))),
         // Collapsed, the FPS value itself becomes the tooltip.
         Item::Fps => labelled(Icon::Gauge, fps).map(|b| {
             let b = b.owns_popup();
             if compact {
                 b
             } else {
-                b.hover("Playback Speed")
+                b.hover(tr(K::PlaybackSpeed))
             }
         }),
-        Item::Save => labelled(Icon::Snapshot, "Save").map(|b| b.hover(SAVE_HOVER)),
+        Item::Save => {
+            labelled(Icon::Snapshot, tr(CommonKey::Save)).map(|b| b.hover(tr(K::SaveExportHover)))
+        }
         Item::DateInfo | Item::StartBadge | Item::StepSize | Item::EndBadge => None,
     }
 }
@@ -132,7 +133,7 @@ fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Tim
         egui::Popup::from_toggle_button_response(response)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| {
-                ui.label(egui::RichText::new("Playback Speed").strong());
+                ui.label(egui::RichText::new(tr(K::PlaybackSpeed)).strong());
                 ui.add(
                     egui::Slider::new(&mut app.playback.playback_fps, 1.0..=60.0).suffix(" FPS"),
                 );

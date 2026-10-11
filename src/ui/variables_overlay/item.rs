@@ -2,7 +2,9 @@ use super::nav::{NodeKey, row_id};
 use super::row::{RowKind, allocate_row, paint_row};
 use super::tree::VariableTreeContext;
 use crate::data::VariableInfo;
+use crate::i18n::{VariablesKey, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
+use crate::utils::stack_str;
 
 pub const MAX_ITEMS_PER_LEVEL: usize = 100;
 
@@ -17,16 +19,17 @@ pub fn render_variable_list(
             render_variable_row(ui, var_info, idx, ctx);
         }
     }
-    truncation_note(ui, total, "variables in this folder");
+    truncation_note(ui, total, VariablesKey::TruncatedVariables);
 }
 
-/// Muted note under a level listing more than [`MAX_ITEMS_PER_LEVEL`] items.
-pub fn truncation_note(ui: &mut egui::Ui, total: usize, what: &str) {
+/// Muted note under a level listing more than [`MAX_ITEMS_PER_LEVEL`] items;
+/// `note` is a template taking the shown and total counts.
+pub fn truncation_note(ui: &mut egui::Ui, total: usize, note: VariablesKey) {
     if total <= MAX_ITEMS_PER_LEVEL {
         return;
     }
-    let text =
-        format!("Showing {MAX_ITEMS_PER_LEVEL} of {total} {what}. Use search to discover all.");
+    let mut buf = [0; 384];
+    let text = crate::i18n::fill(&mut buf, tr(note), &[&MAX_ITEMS_PER_LEVEL, &total]);
     ui.label(
         egui::RichText::new(text)
             .small()
@@ -59,10 +62,7 @@ fn render_variable_row(
         ui.label(egui::RichText::new(&var_info.name).strong());
         if let Some(group) = var_info.group_path() {
             ui.horizontal(|ui| {
-                ui.label(crate::i18n::translate(
-                    ctx.language,
-                    crate::i18n::Key::Group,
-                ));
+                label_with_colon(ui, VariablesKey::Group);
                 ui.icon(Icon::Folder, IconSize::Sm);
                 for (i, seg) in group.split('/').filter(|s| !s.is_empty()).enumerate() {
                     if i > 0 {
@@ -72,26 +72,30 @@ fn render_variable_row(
                 }
             });
         }
-        ui.label(format!(
-            "{}: [{}]",
-            crate::i18n::translate(ctx.language, crate::i18n::Key::DataType),
-            var_info.data_type
+        let mut buf = [0; 160];
+        ui.label(stack_str(
+            &mut buf,
+            format_args!("{}: [{}]", tr(VariablesKey::DataType), var_info.data_type),
         ));
-        ui.label(format!(
-            "{}: {:?}",
-            crate::i18n::translate(ctx.language, crate::i18n::Key::Shape),
-            var_info.shape
+        ui.label(stack_str(
+            &mut buf,
+            format_args!("{}: {:?}", tr(VariablesKey::Shape), var_info.shape),
         ));
         if let Some(desc) = &var_info.long_name {
-            ui.label(format!(
-                "{}: {}",
-                crate::i18n::translate(ctx.language, crate::i18n::Key::Description),
-                desc
-            ));
+            ui.horizontal_wrapped(|ui| {
+                label_with_colon(ui, VariablesKey::Description);
+                ui.label(desc.as_str());
+            });
         }
     });
 
     if clicked {
         ctx.newly_selected_idx = Some(idx);
     }
+}
+
+/// `key`'s text followed by a colon, as a row label.
+fn label_with_colon(ui: &mut egui::Ui, key: VariablesKey) {
+    let mut buf = [0; 64];
+    ui.label(stack_str(&mut buf, format_args!("{}:", tr(key))));
 }

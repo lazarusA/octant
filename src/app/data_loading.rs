@@ -78,7 +78,7 @@ impl OctantApp {
                             | StoreKind::LocalIcechunk
                             | StoreKind::LocalGeoTiff
                             | StoreKind::LocalNetCdf => {
-                                Err("Direct local file paths cannot be read in a browser due to web sandbox security.\n\nTo view local datasets in the browser:\n1. Serve your directory or file with a local HTTP server: `npx serve` or `python3 -m http.server`\n2. Enter the URL: `http://localhost:8000/my_dataset`\n\nOr run the native desktop version of Octant (`cargo run --release`).".to_string())
+                                Err(crate::i18n::tr(crate::i18n::DatasetKey::BrowserLocalPaths).to_owned())
                             }
                             _ => {
                                 let handle = crate::data::SourceFactory::open(source)

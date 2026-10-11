@@ -1,96 +1,65 @@
 //! About tab content for the About Octant dialog.
 
+use super::octant;
 use super::types::AboutTab;
-use crate::app::OctantApp;
+use crate::i18n::{AboutKey, tr};
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
+use crate::utils::stack_str;
 
-pub fn show_overview_tab(app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &mut AboutTab) {
+pub fn show_overview_tab(ui: &mut egui::Ui, active_tab: &mut AboutTab) {
     egui::ScrollArea::vertical()
         .auto_shrink([false, true])
         .show(ui, |ui| {
             ui.add_space(2.0);
 
-            // Centered Header with Animated Octant Cube Widget & Title
+            // Centered header: the octant cube, its name, the title and subtitle
             ui.vertical_centered(|ui| {
-                crate::ui::hero::draw_octant_widget(ui, 42.0, [-1.0, -1.0, -1.0], 0.0, 1.0);
+                octant::show_octant_cube(ui);
                 ui.add_space(4.0);
-                ui.heading(
-                    egui::RichText::new(format!("Octant v{}", env!("CARGO_PKG_VERSION"))).strong(),
+                let mut version = [0; 32];
+                let title = stack_str(
+                    &mut version,
+                    format_args!("Octant v{}", env!("CARGO_PKG_VERSION")),
                 );
+                ui.heading(egui::RichText::new(title).strong());
                 ui.label(
-                    egui::RichText::new(app.tr(crate::i18n::Key::AboutSubtitle))
+                    egui::RichText::new(tr(AboutKey::Subtitle))
                         .small()
                         .italics()
                         .color(ui.visuals().weak_text_color()),
                 );
             });
 
+            // Why the name: right under it
+            ui.add_space(8.0);
+            octant::show_why_octant(ui);
+
             ui.add_space(8.0);
             ui.separator();
             ui.add_space(8.0);
 
             // Core Platform Description
-            ui.label(app.tr(crate::i18n::Key::AboutDescription));
+            ui.label(tr(AboutKey::Description));
 
             ui.add_space(10.0);
 
-            // Key Specs
-            egui::Frame::default()
-                .fill(ui.visuals().extreme_bg_color)
-                .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
-                .corner_radius(6.0)
-                .inner_margin(egui::Margin::symmetric(12, 8))
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing.y = 4.0;
-                    ui.horizontal(|ui| {
-                        ui.icon(Icon::Bolt, IconSize::Sm);
-                        ui.label(
-                            egui::RichText::new(app.tr(crate::i18n::Key::AboutHyperslabTitle))
-                                .strong(),
-                        );
-                    });
-                    ui.label(format!(
-                        "   {}",
-                        app.tr(crate::i18n::Key::AboutHyperslabDesc)
-                    ));
-                    ui.horizontal(|ui| {
-                        ui.icon(Icon::Icechunk, IconSize::Sm);
-                        ui.label(
-                            egui::RichText::new(app.tr(crate::i18n::Key::AboutStorageTitle))
-                                .strong(),
-                        );
-                    });
-                    ui.label(format!("   {}", app.tr(crate::i18n::Key::AboutStorageDesc)));
-                    ui.horizontal(|ui| {
-                        ui.icon(Icon::Colormap, IconSize::Sm);
-                        ui.label(
-                            egui::RichText::new(app.tr(crate::i18n::Key::AboutShadersTitle))
-                                .strong(),
-                        );
-                    });
-                    ui.label(format!("   {}", app.tr(crate::i18n::Key::AboutShadersDesc)));
-                });
+            show_key_specs(ui);
 
             ui.add_space(8.0);
             ui.separator();
             ui.add_space(6.0);
 
-            show_links_and_credits(app, ui);
+            show_links_and_credits(ui);
 
             ui.add_space(8.0);
+            let mut label = [0; 64];
+            let label = stack_str(
+                &mut label,
+                format_args!("{} ({})", tr(AboutKey::BrowseIcons), Icon::ALL.len()),
+            );
             if ui
-                .icon_button(
-                    Icon::Colormap,
-                    crate::utils::stack_str(
-                        &mut [0; 64],
-                        format_args!(
-                            "{} ({})",
-                            app.tr(crate::i18n::Key::AboutBrowseIcons),
-                            Icon::ALL.len()
-                        ),
-                    ),
-                )
-                .on_hover_text("Explore procedural vector icons in popover")
+                .icon_button(Icon::Colormap, label)
+                .on_hover_text(tr(AboutKey::BrowseIconsHover))
                 .clicked()
             {
                 *active_tab = AboutTab::Icons;
@@ -98,10 +67,46 @@ pub fn show_overview_tab(app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &mu
         });
 }
 
+/// The framed list of headline features, each a titled row over an indented line.
+fn show_key_specs(ui: &mut egui::Ui) {
+    let specs = [
+        (
+            Icon::Bolt,
+            AboutKey::HyperslabTitle,
+            AboutKey::HyperslabDesc,
+        ),
+        (
+            Icon::Icechunk,
+            AboutKey::StorageTitle,
+            AboutKey::StorageDesc,
+        ),
+        (
+            Icon::Colormap,
+            AboutKey::ShadersTitle,
+            AboutKey::ShadersDesc,
+        ),
+    ];
+    egui::Frame::default()
+        .fill(ui.visuals().extreme_bg_color)
+        .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+        .corner_radius(6.0)
+        .inner_margin(egui::Margin::symmetric(12, 8))
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 4.0;
+            for (icon, title, desc) in specs {
+                ui.horizontal(|ui| {
+                    ui.icon(icon, IconSize::Sm);
+                    ui.label(egui::RichText::new(tr(title)).strong());
+                });
+                ui.indent(("about_spec", title), |ui| ui.label(tr(desc)));
+            }
+        });
+}
+
 /// Project links, the good-faith notice, colormap credits and third-party licenses.
-fn show_links_and_credits(app: &OctantApp, ui: &mut egui::Ui) {
+fn show_links_and_credits(ui: &mut egui::Ui) {
     // Links & Resources
-    ui.heading(app.tr(crate::i18n::Key::AboutLinksHeading));
+    ui.heading(tr(AboutKey::LinksHeading));
     ui.add_space(4.0);
 
     ui.horizontal_wrapped(|ui| {
@@ -113,7 +118,7 @@ fn show_links_and_credits(app: &OctantApp, ui: &mut egui::Ui) {
     });
     ui.horizontal_wrapped(|ui| {
         ui.icon(Icon::VariableDoc, IconSize::Sm);
-        ui.hyperlink_to("octant documentation", "https://docs.rs/octant");
+        ui.hyperlink_to(tr(AboutKey::DocsLink), "https://docs.rs/octant");
     });
     ui.horizontal_wrapped(|ui| {
         ui.icon(Icon::Globe, IconSize::Sm);
@@ -122,7 +127,7 @@ fn show_links_and_credits(app: &OctantApp, ui: &mut egui::Ui) {
 
     ui.add_space(6.0);
     ui.label(
-        egui::RichText::new(app.tr(crate::i18n::Key::AboutGoodFaithNotice))
+        egui::RichText::new(tr(AboutKey::GoodFaithNotice))
             .small()
             .weak(),
     );

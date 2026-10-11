@@ -163,7 +163,10 @@ fn lay_out_pairs(
         *cell = pair(field);
     }
     if overflow {
-        let more = HoverField::new(format!("+{} more", fields.len() - shown), "");
+        let mut buf = [0; 64];
+        let template = crate::i18n::tr(crate::i18n::HoverKey::MoreFields);
+        let label = crate::i18n::fill(&mut buf, template, &[&(fields.len() - shown)]);
+        let more = HoverField::new(label, "");
         pairs[shown] = pair(&more);
     }
     (pairs, shown + usize::from(overflow))

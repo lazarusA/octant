@@ -4,6 +4,7 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId};
+use crate::i18n::{SettingsKey as K, tr};
 use crate::plots::PlotType;
 use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
 
@@ -18,7 +19,7 @@ enum RowAction {
 /// plot or an added overlay (`OctantApp::reveal_layers_menu`).
 pub fn show_layers_menu(app: &mut OctantApp, ui: &mut egui::Ui) {
     let reveal = std::mem::take(&mut app.layout.reveal_layers_menu);
-    egui::CollapsingHeader::new("Layers")
+    egui::CollapsingHeader::new(tr(K::Layers))
         .id_salt("settings_layers_section")
         .default_open(true)
         .open(reveal.then_some(true))
@@ -61,8 +62,8 @@ fn base_header(app: &OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         let name = layer_name(app, LayerId::BASE);
         ui.add(egui::Label::new(egui::RichText::new(name).strong()).truncate())
-            .on_hover_text("Base layer: decides the canvas, axes and view");
-        ui.label(egui::RichText::new("base").small().weak());
+            .on_hover_text(tr(K::BaseLayerHover));
+        ui.label(egui::RichText::new(tr(K::BaseTag)).small().weak());
     });
 }
 
@@ -92,7 +93,7 @@ fn layer_body(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     if !line {
         super::composite::show_composite_controls(app, ui, id);
     }
-    egui::CollapsingHeader::new("Color")
+    egui::CollapsingHeader::new(tr(K::Color))
         .id_salt(("layer_color_menu", id))
         .default_open(false)
         .show(ui, |ui| super::show_color_menu(app, ui, id));
@@ -110,20 +111,20 @@ fn name_row(
     let mut action = None;
     ui.horizontal(|ui| {
         let (icon, hover) = if layer.visible {
-            (Icon::Eye, "Hide layer")
+            (Icon::Eye, tr(K::HideLayerHover))
         } else {
-            (Icon::EyeOff, "Show layer")
+            (Icon::EyeOff, tr(K::ShowLayerHover))
         };
         if ui.add(small(icon, hover)).clicked() {
             action = Some(RowAction::ToggleVisible(id));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.close_button("Remove layer").clicked() {
+            if ui.close_button(tr(K::RemoveLayerHover)).clicked() {
                 action = Some(RowAction::Remove(id));
             }
             let moves = [
-                (index > 0, Icon::ChevronDown, "Move down", false),
-                (index + 1 < count, Icon::ChevronUp, "Move up", true),
+                (index > 0, Icon::ChevronDown, tr(K::MoveDownHover), false),
+                (index + 1 < count, Icon::ChevronUp, tr(K::MoveUpHover), true),
             ];
             for (enabled, icon, hover, up) in moves {
                 if ui.add_enabled(enabled, small(icon, hover)).clicked() {
@@ -143,7 +144,7 @@ fn name_row(
 /// plot), or a placeholder.
 fn layer_name(app: &OctantApp, id: LayerId) -> &str {
     app.layer_variable_info(id)
-        .map_or("(no variable)", |v| v.leaf_name())
+        .map_or(tr(K::NoVariable), |v| v.leaf_name())
 }
 
 fn small<'a>(icon: Icon, hover: &'a str) -> ToolbarButton<'a> {

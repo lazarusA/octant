@@ -1,4 +1,5 @@
 use crate::app::layers::{ColorStyle, LayerId};
+use crate::i18n::{SettingsKey as K, tr};
 
 /// Layer `id`'s color scale (linear, log, symlog, sqrt, exponential) and its
 /// parameter.
@@ -9,35 +10,35 @@ pub(crate) fn show_scale_type_controls(ui: &mut egui::Ui, color: &mut ColorStyle
     }
 
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("Scale").strong());
+        ui.label(egui::RichText::new(tr(K::Scale)).strong());
         egui::ComboBox::from_id_salt(("settings_color_scale_dropdown", id))
-            .selected_text(match color.scale_type {
-                1 => "Logarithmic",
-                2 => "Symlog",
-                3 => "Sqrt",
-                4 => "Exponential",
-                _ => "Linear",
-            })
+            .selected_text(tr(match color.scale_type {
+                1 => K::ScaleLog,
+                2 => K::ScaleSymlog,
+                3 => K::ScaleSqrt,
+                4 => K::ScaleExponential,
+                _ => K::ScaleLinear,
+            }))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut color.scale_type, 0, "Linear");
+                ui.selectable_value(&mut color.scale_type, 0, tr(K::ScaleLinear));
                 ui.add_enabled_ui(is_valid_log, |ui| {
-                    ui.selectable_value(&mut color.scale_type, 1, "Logarithmic")
-                        .on_hover_text(if is_valid_log {
-                            "Log scale (non-negative data)"
+                    ui.selectable_value(&mut color.scale_type, 1, tr(K::ScaleLog))
+                        .on_hover_text(tr(if is_valid_log {
+                            K::ScaleLogHover
                         } else {
-                            "Disabled: requires min >= 0. Use Symlog for negative data."
-                        });
+                            K::ScaleLogDisabledHover
+                        }));
                 });
-                ui.selectable_value(&mut color.scale_type, 2, "Symlog");
-                ui.selectable_value(&mut color.scale_type, 3, "Sqrt");
-                ui.selectable_value(&mut color.scale_type, 4, "Exponential");
+                ui.selectable_value(&mut color.scale_type, 2, tr(K::ScaleSymlog));
+                ui.selectable_value(&mut color.scale_type, 3, tr(K::ScaleSqrt));
+                ui.selectable_value(&mut color.scale_type, 4, tr(K::ScaleExponential));
             });
     });
 
     if matches!(color.scale_type, 1 | 2 | 4) {
         ui.add_space(2.0);
         ui.horizontal(|ui| {
-            ui.label("Param:");
+            ui.label(tr(K::ScaleParam));
             ui.add(
                 egui::DragValue::new(&mut color.scale_param)
                     .speed(0.01)

@@ -6,6 +6,7 @@ use web_time::Instant;
 
 use super::model::{Severity, Toast, ToastAction};
 use super::queue::{MAX_TOASTS, Toasts, opacity};
+use crate::i18n::{NoticesKey, tr};
 use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
 
 /// Width of a toast, in points.
@@ -85,7 +86,7 @@ fn toast_card(
                     }
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                    if ui.close_button("Dismiss").clicked() {
+                    if ui.close_button(tr(NoticesKey::DismissHover)).clicked() {
                         *dismissed = Some(toast.id);
                     }
                     if notice.severity == Severity::Error
@@ -127,7 +128,7 @@ fn detail_label(ui: &mut Ui, detail: &str) {
 
 fn copy_button(ui: &mut Ui) -> egui::Response {
     ui.add(
-        ToolbarButton::new(Icon::Clipboard, "Copy details")
+        ToolbarButton::new(Icon::Clipboard, tr(NoticesKey::CopyDetails))
             .compact(true)
             .icon_size(IconSize::Sm),
     )
@@ -137,14 +138,15 @@ fn action_button(ui: &mut Ui, action: &ToastAction) -> egui::Response {
     match action {
         ToastAction::RevealFile(path) => {
             #[cfg(target_os = "macos")]
-            let label = "Reveal in Finder";
+            let label = tr(NoticesKey::RevealInFinder);
             #[cfg(not(target_os = "macos"))]
-            let label = "Open Folder";
-            let hover = format!("{label}: {}", path.display());
+            let label = tr(NoticesKey::OpenFolder);
+            let mut hover = [0; 1024];
+            let hover = crate::i18n::fill(&mut hover, "{}: {}", &[&label, &path.display()]);
             ui.add(
                 ToolbarButton::new(Icon::FolderOpen, label)
                     .compact(true)
-                    .hover(&hover)
+                    .hover(hover)
                     .icon_size(IconSize::Sm),
             )
         }

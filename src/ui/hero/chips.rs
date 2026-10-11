@@ -3,30 +3,30 @@
 use super::chip_nav::{self, chip_id};
 use super::style::{BODY_FONT, GUTTER, SMALL_FONT, gap};
 use crate::app::OctantApp;
+use crate::i18n::{DatasetKey, fill, tr};
 use crate::ui::key_focus;
 use egui::Galley;
 use std::sync::Arc;
 
-const SAMPLES: [(&str, &str, &str); 4] = [
+const SAMPLES: [(&str, &str, DatasetKey); 4] = [
     (
         "/seasfire",
         "https://s3.bgc-jena.mpg.de:9000/misc/seasfire_rechunked.zarr",
-        "Global wildfire & climate rechunked dataset (Zarr)",
+        DatasetKey::HeroSeasFireHover,
     ),
     (
         "/sentinel-2",
         "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/36/Q/WD/2020/7/S2A_36QWD_20200701_0_L2A/TCI.tif",
-        "Sentinel-2 L2A True Color COG (AWS S3)",
+        DatasetKey::HeroSentinel2Hover,
     ),
     (
         "/procedural-4d",
         "procedural://volume4d",
-        "Synthetic 4D spatiotemporal volume",
+        DatasetKey::HeroVolume4DHover,
     ),
-    ("/catalog", "catalog", "Browse dataset catalog"),
+    ("/catalog", "catalog", DatasetKey::HeroCatalogHover),
 ];
 const COUNT: usize = SAMPLES.len();
-const PREFIX: &str = "try:";
 
 /// Inner padding of a chip around its label (horizontal, vertical).
 const CHIP_PADDING: egui::Vec2 = egui::vec2(14.0, 7.0);
@@ -48,7 +48,7 @@ pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
 
     // Lay out every label once per frame; the same galleys size and draw.
     let prefix = ui.painter().layout_no_wrap(
-        PREFIX.to_owned(),
+        tr(DatasetKey::HeroTryPrefix).to_owned(),
         egui::FontId::monospace(SMALL_FONT),
         ui.visuals().weak_text_color(),
     );
@@ -78,7 +78,7 @@ pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 }
                 let (label, uri, desc) = SAMPLES[item - 1];
                 let galley = Arc::clone(&chips[item - 1]);
-                if render_chip(ui, item - 1, label, galley, desc).clicked() {
+                if render_chip(ui, item - 1, label, galley, tr(desc)).clicked() {
                     if uri == "catalog" {
                         app.layout.show_catalog_window = true;
                     } else {
@@ -198,7 +198,8 @@ fn render_chip(
             if label.ends_with("catalog") {
                 ui.label(desc);
             } else {
-                ui.label(format!("Load sample: {desc}"));
+                let mut buf = [0u8; 256];
+                ui.label(fill(&mut buf, tr(DatasetKey::LoadSampleHover), &[&desc]));
             }
         })
 }

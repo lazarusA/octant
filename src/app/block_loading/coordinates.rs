@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use crate::app::OctantApp;
 use crate::app::layers::{LayerId, VariableSelection};
 use crate::data::{CoordValues, StoreHandle, VariableInfo};
+use crate::i18n::{NoticesKey, filled, tr};
 
 impl OctantApp {
     /// Reads the coordinates of variable `idx` of the selected dataset in the background,
@@ -48,10 +49,10 @@ impl OctantApp {
                 Ok(coords) => self.merge_variable_coordinates(&result.source_id, coords),
                 Err(e) => self.notify(
                     crate::ui::toast::Severity::Warning,
-                    "Coordinates unavailable",
-                    format!(
-                        "Coordinates of '{}' failed to load ({e}); axes show indices",
-                        result.variable
+                    tr(NoticesKey::CoordinatesUnavailable),
+                    filled(
+                        tr(NoticesKey::CoordinatesFailedDetail),
+                        &[&result.variable, &e],
                     ),
                 ),
             }

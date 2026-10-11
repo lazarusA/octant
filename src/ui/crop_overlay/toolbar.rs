@@ -1,6 +1,7 @@
 //! Floating theme-aware toolbar for interactive ROI cropping.
 
 use crate::export::{AspectPreset, RoiCropBox};
+use crate::i18n::{CommonKey, ExportKey, tr};
 use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
 use egui::{Color32, Rect};
 
@@ -36,15 +37,18 @@ pub fn render_crop_toolbar(
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.icon(Icon::Scissors, IconSize::Xs);
-                        ui.label(egui::RichText::new("ROI:").small().strong());
+                        ui.label(
+                            egui::RichText::new(tr(ExportKey::RoiLabel))
+                                .small()
+                                .strong(),
+                        );
 
                         let w_px = (box_rect.width()).round() as u32;
                         let h_px = (box_rect.height()).round() as u32;
-                        ui.label(
-                            egui::RichText::new(format!("{}x{} px", w_px, h_px))
-                                .small()
-                                .color(accent_color),
-                        );
+                        let mut size = [0; 64];
+                        let size =
+                            crate::i18n::fill(&mut size, tr(ExportKey::RoiSize), &[&w_px, &h_px]);
+                        ui.label(egui::RichText::new(size).small().color(accent_color));
 
                         ui.separator();
 
@@ -68,8 +72,8 @@ pub fn render_crop_toolbar(
 
                         if ui
                             .add(
-                                ToolbarButton::new(Icon::Save, "Save")
-                                    .hover("Save cropped ROI figure (Cmd+S)"),
+                                ToolbarButton::new(Icon::Save, tr(CommonKey::Save))
+                                    .hover(tr(ExportKey::CropSaveHover)),
                             )
                             .clicked()
                         {
@@ -78,8 +82,8 @@ pub fn render_crop_toolbar(
 
                         if ui
                             .add(
-                                ToolbarButton::new(Icon::Reset, "Reset")
-                                    .hover("Fit crop box to full canvas"),
+                                ToolbarButton::new(Icon::Reset, tr(CommonKey::Reset))
+                                    .hover(tr(ExportKey::CropResetHover)),
                             )
                             .clicked()
                         {
@@ -89,7 +93,8 @@ pub fn render_crop_toolbar(
 
                         if ui
                             .add(
-                                ToolbarButton::new(Icon::Check, "Done").hover("Close crop overlay"),
+                                ToolbarButton::new(Icon::Check, tr(ExportKey::CropDone))
+                                    .hover(tr(ExportKey::CropDoneHover)),
                             )
                             .clicked()
                         {

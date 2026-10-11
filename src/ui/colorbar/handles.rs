@@ -3,6 +3,7 @@
 use super::axis::BarAxis;
 use super::ticks::format_scientific_tick;
 use crate::app::layers::{BarOrientation, ColorStyle, LayerId};
+use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::color_picker::{ColorShape, ShapeColorPicker};
 use egui::{Pos2, Rect, Ui, Vec2};
 
@@ -51,18 +52,8 @@ pub fn draw_end_range_inputs(ui: &mut Ui, axis: BarAxis, color: &mut ColorStyle)
         )
         .on_hover_text(hover)
     };
-    let min_resp = input(
-        ui,
-        min_center,
-        &mut new_min,
-        "Lower end range (Min). Drag to adjust or click to type.",
-    );
-    let max_resp = input(
-        ui,
-        max_center,
-        &mut new_max,
-        "Upper end range (Max). Drag to adjust or click to type.",
-    );
+    let min_resp = input(ui, min_center, &mut new_min, tr(K::RangeMinHover));
+    let max_resp = input(ui, max_center, &mut new_max, tr(K::RangeMaxHover));
 
     if min_resp.changed() || new_min != color.range_min {
         color.range_min = new_min;
@@ -112,8 +103,8 @@ pub fn draw_clip_triangles(ui: &mut Ui, axis: BarAxis, color: &mut ColorStyle, i
             &mut color.lowclip_color,
             low_shape,
         )
-        .title("Low Clip Color (< Min)")
-        .tooltip("Low Clip color (< Min). Click to select color.")
+        .title(tr(K::LowClipTitle))
+        .tooltip(tr(K::LowClipHover))
         .show_at(ui, low_rect);
     }
 
@@ -123,8 +114,8 @@ pub fn draw_clip_triangles(ui: &mut Ui, axis: BarAxis, color: &mut ColorStyle, i
             &mut color.highclip_color,
             high_shape,
         )
-        .title("High Clip Color (> Max)")
-        .tooltip("High Clip color (> Max). Click to select color.")
+        .title(tr(K::HighClipTitle))
+        .tooltip(tr(K::HighClipHover))
         .anchor_offset(egui::Vec2::new(-170.0, -250.0))
         .show_at(ui, high_rect);
     }

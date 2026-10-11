@@ -1,8 +1,10 @@
 //! Native procedural vector icons gallery tab for the About Octant dialog.
 
-use super::types::{ALL_CATEGORIES, icon_categories_for, icon_category, icon_category_count};
+use super::types::{icon_categories_for, icon_category, icon_category_count};
 use crate::data::coordinates::naming::contains_ascii_case_insensitive;
+use crate::i18n::{AboutKey, fill, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
+use crate::utils::stack_str;
 
 pub fn show_icons_tab(ui: &mut egui::Ui) {
     let search_id = egui::Id::new(("about_icons", "search_query"));
@@ -20,7 +22,11 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
         ui.ctx().data(|d| d.get_temp(copied_id));
 
     ui.horizontal(|ui| {
-        ui.search_field(&mut search_query, "Search icons...", Some(180.0));
+        ui.search_field(
+            &mut search_query,
+            tr(AboutKey::IconsSearchHint),
+            Some(180.0),
+        );
 
         ui.separator();
 
@@ -43,8 +49,12 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
         {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.horizontal(|ui| {
+                    let mut ident = [0; 64];
+                    let ident = stack_str(&mut ident, format_args!("Icon::{name}"));
+                    let mut copied = [0; 160];
+                    let copied = fill(&mut copied, tr(AboutKey::IconsCopied), &[&ident]);
                     ui.label(
-                        egui::RichText::new(format!("Copied Icon::{name}"))
+                        egui::RichText::new(copied)
                             .small()
                             .color(ui.visuals().selection.bg_fill),
                     );
@@ -63,8 +73,7 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
     let current_cat_filter = icon_category(selected_cat);
 
     let icon_matches = |icon: &Icon| -> bool {
-        let matches_cat =
-            current_cat_filter == ALL_CATEGORIES || icon.category() == current_cat_filter;
+        let matches_cat = selected_cat == 0 || icon.category() == current_cat_filter;
         let matches_search = query_trimmed.is_empty()
             || contains_ascii_case_insensitive(icon.name(), query_trimmed)
             || contains_ascii_case_insensitive(icon.category(), query_trimmed);
@@ -79,7 +88,7 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
             ui.icon_toned(Icon::Info, IconSize::Md, IconTone::Muted);
             ui.add_space(4.0);
             ui.label(
-                egui::RichText::new("No matching vector icons found.")
+                egui::RichText::new(tr(AboutKey::IconsNoMatch))
                     .small()
                     .color(ui.visuals().weak_text_color()),
             );
@@ -198,15 +207,14 @@ pub fn show_icons_tab(ui: &mut egui::Ui) {
                                             egui::RichText::new(format!("Icon::{icon_name}"))
                                                 .strong(),
                                         );
-                                        ui.label(
-                                            egui::RichText::new(format!(
-                                                "Category: {}",
-                                                icon.category()
-                                            ))
-                                            .small()
-                                            .weak(),
+                                        let mut category = [0; 128];
+                                        let category = fill(
+                                            &mut category,
+                                            tr(AboutKey::IconsCategory),
+                                            &[&icon.category()],
                                         );
-                                        ui.small("Click to copy enum identifier");
+                                        ui.label(egui::RichText::new(category).small().weak());
+                                        ui.small(tr(AboutKey::IconsClickToCopy));
                                     });
 
                                     ui.add_space(2.0);

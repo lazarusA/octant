@@ -2,8 +2,19 @@ use super::gated;
 use super::support::{OptionSupport, Support};
 use crate::app::OctantApp;
 use crate::app::layers::{AlphaCurveState, LayerId};
+use crate::i18n::{SettingsKey as K, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 use crate::utils::colormap::{AlphaInterp, alpha::PRESETS};
+
+/// The names of the alpha curve `PRESETS`, in their order.
+const PRESET_NAMES: [K; PRESETS.len()] = [
+    K::PresetRampUp,
+    K::PresetRampDown,
+    K::PresetPeak,
+    K::PresetSink,
+    K::PresetHideLow,
+    K::PresetHideCenter,
+];
 
 /// Layer `id`'s opacity and alpha curve, then (for the base layer, whose
 /// plot type decides the canvas) the toggle that draws translucent meshes,
@@ -29,10 +40,7 @@ pub(crate) fn show_transparency_settings(
             &mut app.plot_configs.plot_transparency,
             support.transparency,
         )
-        .on_hover_text(
-            "With translucent colors (Opacity or Alpha curve), draw every layer \
-                 instead of letting the nearest one hide those behind it.",
-        );
+        .on_hover_text(tr(K::TransparencyHover));
     }
     if support.volume_transparency != Support::No {
         transparency_toggle(
@@ -41,15 +49,18 @@ pub(crate) fn show_transparency_settings(
             support.volume_transparency,
         );
         if app.plot_configs.volume.algorithm == 0 && app.plot_configs.volume.transparency {
-            ui.checkbox(&mut app.plot_configs.volume.lighting, "Lighting")
-                .on_hover_text("Shade samples by their gradient so fronts and edges gain shape");
+            ui.checkbox(&mut app.plot_configs.volume.lighting, tr(K::Lighting))
+                .on_hover_text(tr(K::LightingHover));
         }
     }
 }
 
 /// The Transparency checkbox, disabled with the reason when overridden.
 fn transparency_toggle(ui: &mut egui::Ui, value: &mut bool, support: Support) -> egui::Response {
-    let response = ui.add_enabled(support.is_yes(), egui::Checkbox::new(value, "Transparency"));
+    let response = ui.add_enabled(
+        support.is_yes(),
+        egui::Checkbox::new(value, tr(K::Transparency)),
+    );
     match support.reason() {
         Some(reason) => response.on_disabled_hover_text(reason),
         None => response,
@@ -63,8 +74,8 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     };
     let color = &mut layer.color;
     let resp = ui
-        .add(egui::Slider::new(&mut color.opacity, 0.0..=1.0).text("Opacity"))
-        .on_hover_text("Opacity of colormapped values. NaN and clip colors keep their own alpha. Double-click to reset.");
+        .add(egui::Slider::new(&mut color.opacity, 0.0..=1.0).text(tr(K::Opacity)))
+        .on_hover_text(tr(K::OpacityHover));
     if resp.double_clicked() {
         color.opacity = 1.0;
     }
@@ -72,16 +83,9 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     let curve = &mut color.alpha;
     let mut changed = curve_header(ui, curve);
     let edit = egui::TextEdit::singleline(&mut curve.text)
-        .hint_text("0.1, 0.4, 0.3  or  0:0, 0.5:1, 1:0")
+        .hint_text(tr(K::AlphaCurveHint))
         .desired_width(f32::INFINITY);
-    changed |= ui
-        .add(edit)
-        .on_hover_text(
-            "Alpha over the colorbar, from its start to its end. Values are evenly \
-             spaced (Step: one equal bin each); position:alpha stops are placed \
-             along the bar. Empty for none.",
-        )
-        .changed();
+    changed |= ui.add(edit).on_hover_text(tr(K::AlphaCurveHover)).changed();
     if let Some(error) = &curve.error {
         ui.horizontal(|ui| {
             ui.icon_toned(Icon::Warning, IconSize::Sm, IconTone::Error);
@@ -98,15 +102,15 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
 fn curve_header(ui: &mut egui::Ui, curve: &mut AlphaCurveState) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
-        ui.label("Alpha curve");
+        ui.label(tr(K::AlphaCurve));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if !curve.text.is_empty() && ui.close_button("Clear curve").clicked() {
+            if !curve.text.is_empty() && ui.close_button(tr(K::ClearCurveHover)).clicked() {
                 curve.text.clear();
                 changed = true;
             }
-            ui.menu_button(egui::RichText::new("Presets").small(), |ui| {
-                for (label, text, interp) in PRESETS {
-                    if ui.button(label).clicked() {
+            ui.menu_button(egui::RichText::new(tr(K::Presets)).small(), |ui| {
+                for (name, (_, text, interp)) in PRESET_NAMES.into_iter().zip(PRESETS) {
+                    if ui.button(tr(name)).clicked() {
                         curve.text = text.to_string();
                         curve.interp = interp;
                         changed = true;
@@ -114,8 +118,15 @@ fn curve_header(ui: &mut egui::Ui, curve: &mut AlphaCurveState) -> bool {
                     }
                 }
             });
-            for (interp, label) in [(AlphaInterp::Step, "Step"), (AlphaInterp::Linear, "Linear")] {
-                if ui.selectable_label(curve.interp == interp, label).clicked() {
+            let interps = [
+                (AlphaInterp::Step, K::InterpStep),
+                (AlphaInterp::Linear, K::InterpLinear),
+            ];
+            for (interp, label) in interps {
+                if ui
+                    .selectable_label(curve.interp == interp, tr(label))
+                    .clicked()
+                {
                     curve.interp = interp;
                     changed = true;
                 }

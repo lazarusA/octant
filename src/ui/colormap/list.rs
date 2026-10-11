@@ -4,6 +4,7 @@
 use super::label;
 use super::swatch::SwatchAtlas;
 use crate::app::OctantApp;
+use crate::i18n::{ColormapKey as K, tr};
 use crate::utils::colormap::registry;
 use egui::{Rect, Sense, vec2};
 
@@ -31,7 +32,7 @@ pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
     } = &mut app.colormaps.picker;
     let ids = cache.ids(filter);
     if ids.is_empty() {
-        ui.label(egui::RichText::new("No colormaps match").small().weak());
+        ui.label(egui::RichText::new(tr(K::NoMatches)).small().weak());
         return;
     }
 

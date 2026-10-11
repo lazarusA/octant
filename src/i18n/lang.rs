@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum Language {
     #[default]
     English,
@@ -41,7 +42,8 @@ impl Language {
         Self::Finnish,
     ];
 
-    /// All languages including Phase 2 placeholders.
+    /// All languages including Phase 2 placeholders, in declaration order, so
+    /// `ALL[lang as usize] == lang`.
     pub const ALL: &'static [Self] = &[
         Self::English,
         Self::Spanish,
@@ -59,6 +61,14 @@ impl Language {
         Self::Japanese,
         Self::Korean,
     ];
+
+    /// The language stored as `index`, English for an unknown index.
+    pub fn from_index(index: u8) -> Self {
+        Self::ALL
+            .get(usize::from(index))
+            .copied()
+            .unwrap_or_default()
+    }
 
     /// Native localized name displayed in the language selector.
     pub const fn display_name(self) -> &'static str {

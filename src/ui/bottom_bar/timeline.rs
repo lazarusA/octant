@@ -2,6 +2,7 @@
 //! size) for the bottom bar, cached until the step or variable changes.
 
 use crate::app::OctantApp;
+use crate::i18n::{PlaybackKey, tr};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
@@ -27,6 +28,8 @@ struct TimelineKey {
     step: usize,
     extent: usize,
     dataset: u64,
+    /// The labels' language, so switching it rebuilds them.
+    language: crate::i18n::Language,
 }
 
 impl TimelineKey {
@@ -40,6 +43,7 @@ impl TimelineKey {
             step: app.playback.current_timestep,
             extent: app.animated_dim_extent(),
             dataset: hasher.finish(),
+            language: crate::i18n::language(),
         }
     }
 }
@@ -93,7 +97,7 @@ impl Timeline {
             end: label(last_step, label_at(last_step)),
             step_size: var
                 .and_then(|v| v.temporal_resolution.clone())
-                .unwrap_or_else(|| "Step: 1".to_owned()),
+                .unwrap_or_else(|| tr(PlaybackKey::DefaultStepSize).to_owned()),
             step,
             last_step,
         }

@@ -4,6 +4,7 @@
 //! applied as it is typed, so the layer's other label views follow along.
 
 use crate::app::layers::{LABEL_BUF, Layer};
+use crate::i18n::{ColormapKey as K, tr};
 
 /// How the label looks: framed like a text field (settings) or bare and
 /// centered (colorbar titles).
@@ -50,7 +51,7 @@ impl LabelEditor {
         };
         response
             .on_hover_cursor(egui::CursorIcon::Text)
-            .on_hover_text("Colorbar title. Click to edit.")
+            .on_hover_text(tr(K::TitleHover))
     }
 
     /// The field while editing `text`; the custom label when the text changes

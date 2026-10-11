@@ -88,13 +88,13 @@ impl UiIconExt for Ui {
         hint: &str,
         width: Option<f32>,
     ) -> Response {
-        const HOVER: &str = "Clear search";
+        let hover = crate::i18n::tr(crate::i18n::AboutKey::ClearSearchHover);
         self.horizontal(|ui| {
             ui.icon(Icon::Search, IconSize::Sm);
             let has_text = !text.is_empty();
             // Reserve exactly the clear button's measured width.
             let clear_w = if has_text {
-                close_button_widget(HOVER).width(ui) + ui.spacing().item_spacing.x
+                close_button_widget(hover).width(ui) + ui.spacing().item_spacing.x
             } else {
                 0.0
             };
@@ -103,7 +103,7 @@ impl UiIconExt for Ui {
                 .hint_text(hint)
                 .desired_width(field_w);
             let mut resp = ui.add(edit);
-            if has_text && ui.close_button(HOVER).clicked() {
+            if has_text && ui.close_button(hover).clicked() {
                 text.clear();
                 resp.mark_changed();
             }

@@ -2,6 +2,7 @@
 //! virtualized viewer that lays out only the visible lines.
 
 use super::license_wrap::{self, LineKind, VisualLine};
+use crate::i18n::{AboutKey, tr};
 use crate::utils::colormap::LICENSES_TEXT;
 use egui::{Color32, FontId, Label, Pos2, Rect, RichText, Sense, vec2};
 use std::sync::Arc;
@@ -52,17 +53,10 @@ fn wrapped(
 
 /// Collapsible section with the third-party notices.
 pub fn show_third_party_licenses(ui: &mut egui::Ui) {
-    egui::CollapsingHeader::new("Third-party licenses")
+    egui::CollapsingHeader::new(tr(AboutKey::ThirdPartyLicenses))
         .id_salt(("about_third_party_licenses", 0))
         .show(ui, |ui| {
-            ui.label(
-                RichText::new(
-                    "Octant includes open-source crates, fonts and C libraries (netCDF, \
-                     HDF5), each under its own license.",
-                )
-                .small()
-                .weak(),
-            );
+            ui.label(RichText::new(tr(AboutKey::ThirdPartyNote)).small().weak());
             show_document(ui, "third_party", THIRD_PARTY_LICENSES, THIRD_PARTY_URL);
         });
 }
@@ -121,7 +115,7 @@ pub(super) fn show_document(ui: &mut egui::Ui, salt: &'static str, text: &'stati
                     }
                 });
         });
-    ui.hyperlink_to("View on GitHub", url);
+    ui.hyperlink_to(tr(AboutKey::ViewOnGithub), url);
 }
 
 /// Draws visual line `row` as a selectable label starting at its indent.

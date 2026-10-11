@@ -14,6 +14,7 @@ mod tests;
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::{Icon, ToolbarButton, UiIconExt};
 use crate::utils::colormap::registry;
 
@@ -39,7 +40,7 @@ const ACTIVE_SWATCH_WIDTH: f32 = 120.0;
 
 pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
     let button_response = ui.add(
-        ToolbarButton::new(Icon::Colormap, "Colormap")
+        ToolbarButton::new(Icon::Colormap, tr(K::Colormap))
             .compact(compact)
             .owns_popup(),
     );
@@ -82,7 +83,7 @@ pub fn show_layer_colormap_button(app: &mut OctantApp, ui: &mut egui::Ui, id: La
         ui.painter()
             .rect_stroke(rect, 2.0, stroke, egui::StrokeKind::Outside);
     }
-    let response = response.on_hover_text("Colormap");
+    let response = response.on_hover_text(tr(K::Colormap));
     if response.clicked() {
         app.colormaps.target = Some(id);
     }
@@ -124,14 +125,14 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
     if registry::smooth_variant(app.picker_style().colormap).is_some()
         && let Some(style) = app.picker_style_mut()
     {
-        ui.checkbox(&mut style.smooth, "Smooth")
-            .on_hover_text("Blend this palette's colors into a continuous gradient (Oklab)");
+        ui.checkbox(&mut style.smooth, tr(K::Smooth))
+            .on_hover_text(tr(K::SmoothHover));
     }
     ui.separator();
 
     ui.search_field(
         &mut app.colormaps.picker.filter.query,
-        "Search colormaps...",
+        tr(K::SearchHint),
         None,
     );
     filters::show(ui, &mut app.colormaps.picker.filter);
@@ -171,7 +172,7 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
             .paint(ui, rect, shown, reversed);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if let Some(style) = app.picker_style_mut() {
-                ui.checkbox(&mut style.reversed, "Reversed");
+                ui.checkbox(&mut style.reversed, tr(K::Reversed));
             }
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 let font_size = egui::TextStyle::Body.resolve(ui.style()).size;
@@ -193,13 +194,13 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 fn show_colorbar_options(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.checkbox(&mut app.layout.show_colorbar, "Show Colorbar");
+    ui.checkbox(&mut app.layout.show_colorbar, tr(K::ShowColorbar));
     if app.layout.show_colorbar {
         ui.add(
             egui::Slider::new(&mut app.layout.colorbar_transparency, 0.0..=1.0)
                 .custom_formatter(|n, _| format!("{:.0}%", n * 100.0)),
         );
-        ui.label(egui::RichText::new("Box transparency"));
+        ui.label(egui::RichText::new(tr(K::BoxTransparency)));
     }
 }
 

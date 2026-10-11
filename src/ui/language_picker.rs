@@ -1,11 +1,11 @@
 //! Language selection popup menu for the top bar and settings panel.
 
-use crate::app::OctantApp;
-use crate::i18n::Language;
+use crate::i18n::{CommonKey, Language, tr};
 use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
+use crate::utils::stack_str;
 
-pub fn show_language_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
-    let current_lang = app.layout.language;
+pub fn show_language_menu(ui: &mut egui::Ui, compact: bool) {
+    let current_lang = crate::i18n::language();
     let button_response = ui.add(
         ToolbarButton::new(Icon::Language, current_lang.code())
             .compact(compact)
@@ -17,15 +17,18 @@ pub fn show_language_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool)
         ui.set_min_width(180.0);
         ui.horizontal(|ui| {
             ui.icon(Icon::Language, IconSize::Sm);
-            ui.label(egui::RichText::new("Language").strong());
+            ui.label(egui::RichText::new(tr(CommonKey::Language)).strong());
         });
         ui.separator();
 
         for &lang in Language::ALL_PHASE1 {
-            let is_selected = app.layout.language == lang;
-            let label = format!("{} ({})", lang.display_name(), lang.code());
-            if ui.selectable_label(is_selected, label).clicked() {
-                app.layout.language = lang;
+            let mut buf = [0; 48];
+            let label = stack_str(
+                &mut buf,
+                format_args!("{} ({})", lang.display_name(), lang.code()),
+            );
+            if ui.selectable_label(current_lang == lang, label).clicked() {
+                crate::i18n::set_language(lang);
                 crate::ui::fonts::FontEngine::on_language_changed(ui.ctx(), lang);
                 ui.close();
             }

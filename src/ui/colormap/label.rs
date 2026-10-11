@@ -1,5 +1,6 @@
 //! Colormap name labels (single line, elided to fit) and the hover details.
 
+use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::hover::card::layout::line;
 use crate::utils::colormap::{ColormapEntry, builtin, registry};
 use egui::{Color32, FontId, Galley, Painter};
@@ -38,7 +39,7 @@ pub fn hover_details(ui: &mut egui::Ui, entry: &ColormapEntry) {
     ui.label(egui::RichText::new(&entry.name).strong());
     let family = entry.family.and_then(|f| builtin().families.get(f));
     ui.horizontal(|ui| {
-        ui.label(family.map_or("Custom", |f| f.name.as_str()));
+        ui.label(family.map_or(tr(K::FamilyCustom), |f| f.name.as_str()));
         ui.label(egui::RichText::new(entry.kind.label()).weak());
     });
     if let Some(family) = family {

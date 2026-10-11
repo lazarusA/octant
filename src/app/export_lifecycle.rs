@@ -1,6 +1,7 @@
 //! Frame lifecycle handling for in-flight figure export and screenshot requests.
 
 use crate::app::OctantApp;
+use crate::i18n::{ExportKey, filled, tr};
 use crate::ui::toast::{Notice, Severity, ToastAction};
 
 impl OctantApp {
@@ -75,15 +76,15 @@ impl OctantApp {
                 } else if let Some(ref path) = req.output_path {
                     if let Err(e) = crate::export::save_exported_file(&data, path) {
                         self.status_message = format!("Export error: {}", e);
-                        self.notify(Severity::Error, "Export failed", e.to_string());
+                        self.notify(Severity::Error, tr(ExportKey::ExportFailed), e);
                     } else {
                         let filename = path
                             .file_name()
                             .map(|s| s.to_string_lossy().to_string())
-                            .unwrap_or_else(|| "figure".to_string());
+                            .unwrap_or_else(|| tr(ExportKey::FallbackFilename).to_string());
                         self.status_message = format!("Saved figure to {}", path.display());
                         self.push_notice(
-                            Notice::new(Severity::Success, "Saved", filename)
+                            Notice::new(Severity::Success, tr(ExportKey::Saved), filename)
                                 .with_action(ToastAction::RevealFile(path.clone())),
                         );
                     }
@@ -93,8 +94,8 @@ impl OctantApp {
                 self.status_message = format!("Encoding error: {}", err);
                 self.notify(
                     Severity::Error,
-                    "Export failed",
-                    format!("Encoding error: {err}"),
+                    tr(ExportKey::ExportFailed),
+                    filled(tr(ExportKey::EncodingError), &[&err]),
                 );
             }
         }

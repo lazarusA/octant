@@ -1,5 +1,6 @@
 use crate::app::{OctantApp, SpatialRole};
 use crate::data::{DatasetMetadata, VariableInfo};
+use crate::i18n::{HoverKey, tr};
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, flipped_offset,
     get_dimension_origin_and_full_len, is_flipped, stored_offset,
@@ -148,7 +149,10 @@ pub(crate) fn series_field(
     count: usize,
 ) -> (HoverField, Option<usize>) {
     let Some((v, dim)) = var.zip(series_dim(app, var)) else {
-        return (HoverField::index_of("series", line, count), None);
+        return (
+            HoverField::index_of(tr(HoverKey::SeriesLabel), line, count),
+            None,
+        );
     };
     let offset = flipped_offset(dim.flipped, line, count);
     let global = (dim.origin + offset).min(dim.len.saturating_sub(1));

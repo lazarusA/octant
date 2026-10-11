@@ -14,6 +14,7 @@ pub use dimension_slider::{
 pub use info::show_variable_info;
 
 use crate::app::OctantApp;
+use crate::i18n::{VariablesKey, tr};
 use crate::ui::drag_grip::GripAction;
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
 use crate::ui::panel_header::{self, PanelHeader};
@@ -58,7 +59,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 /// the header's grip asked for.
 fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> GripAction {
     let Some(var_info) = app.selected.variable_info().cloned() else {
-        ui.label("No variable selected.");
+        ui.label(tr(VariablesKey::NoVariableSelected));
         return GripAction::None;
     };
     let header = header_row(ui, &var_info);
@@ -74,7 +75,8 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> GripAction {
 
     ui.add_space(4.0);
 
-    egui::CollapsingHeader::new("Dimension Sliders")
+    egui::CollapsingHeader::new(tr(VariablesKey::DimensionSliders))
+        .id_salt("dimension_sliders")
         .default_open(true)
         .show(ui, |ui| {
             show_dimension_sliders(app, ui, &var_info);
@@ -95,7 +97,7 @@ fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> PanelH
                 None => var_info.name.clone(),
             };
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                header = panel_header::buttons(ui, "Close Dimension Panel");
+                header = panel_header::buttons(ui, tr(VariablesKey::CloseDimensionPanel));
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     ui.add(egui::Label::new(egui::RichText::new(name).strong()).truncate());
                 });
@@ -121,18 +123,18 @@ fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
     let layout = egui::Layout::right_to_left(egui::Align::Center);
     ui.allocate_ui_with_layout(row, layout, |ui| {
         let hover = if app.layout.plot_as_overlay {
-            "Fetch this variable and add it as an overlay over the plot"
+            tr(VariablesKey::PlotDataOverlayHover)
         } else {
-            "Fetch this variable and plot it"
+            tr(VariablesKey::PlotDataHover)
         };
         plot = ui
-            .outlined_icon_button(plot_icon, "Plot Data", IconTone::Default)
+            .outlined_icon_button(plot_icon, tr(VariablesKey::PlotData), IconTone::Default)
             .on_hover_text(hover)
             .clicked();
-        let toggle = ToolbarButton::new(Icon::Layers, "Add Overlay")
+        let toggle = ToolbarButton::new(Icon::Layers, tr(VariablesKey::AddOverlay))
             .icon_size(IconSize::Sm)
             .toggled(app.layout.plot_as_overlay)
-            .hover("Plot Data adds this variable as an overlay while on");
+            .hover(tr(VariablesKey::AddOverlayHover));
         let response = ui.add_enabled(unavailable.is_none(), toggle);
         let response = match unavailable {
             Some(reason) => response.on_disabled_hover_text(reason),

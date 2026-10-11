@@ -16,7 +16,7 @@ const LABEL_GAP: f32 = 4.0;
 
 /// Collapsible reference showing every [`IconSize`] and [`IconTone`].
 pub fn show_scale_reference(ui: &mut Ui) {
-    egui::CollapsingHeader::new("Sizes & tones")
+    egui::CollapsingHeader::new(crate::i18n::tr(crate::i18n::AboutKey::IconsSizesTones))
         .id_salt(("about_icons", "scale_reference"))
         .default_open(false)
         .show(ui, scale_rows);

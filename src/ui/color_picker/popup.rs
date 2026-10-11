@@ -1,5 +1,6 @@
 //! Streamlined color picker popup with RGB channel edits, 2D SV area, and Hue/Alpha bars.
 
+use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::{Icon, UiIconExt};
 use egui::{Color32, Pos2, Rect, Shape, Stroke, Vec2, ecolor::Hsva};
 
@@ -67,8 +68,8 @@ pub(crate) fn show_clean_color_picker_popup(
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
-                            .icon_button(Icon::Clipboard, "Copy")
-                            .on_hover_text("Copy color values to clipboard")
+                            .icon_button(Icon::Clipboard, tr(K::Copy))
+                            .on_hover_text(tr(K::CopyHover))
                             .clicked()
                         {
                             let copy_text = match gamma_space {

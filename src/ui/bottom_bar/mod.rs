@@ -70,7 +70,7 @@ fn show_collapsed_strip(ui: &mut egui::Ui) -> bool {
             ui.add_space((ui.available_width() - 200.0).max(0.0) * 0.5);
             ui.icon(Icon::Play, IconSize::Xs);
             ui.label(
-                egui::RichText::new("Playback (click or drag to expand)")
+                egui::RichText::new(crate::i18n::tr(crate::i18n::PlaybackKey::CollapsedHint))
                     .small()
                     .color(text_color),
             );

@@ -1,5 +1,7 @@
 //! Perceptual classification of colormaps, used for grouping and filtering.
 
+use crate::i18n::{ColormapKey, tr};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[repr(u8)]
 pub enum ColormapKind {
@@ -35,11 +37,11 @@ impl ColormapKind {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Sequential => "Sequential",
-            Self::Diverging => "Diverging",
-            Self::Cyclic => "Cyclic",
-            Self::Categorical => "Categorical",
-            Self::Other => "Other",
+            Self::Sequential => tr(ColormapKey::Sequential),
+            Self::Diverging => tr(ColormapKey::Diverging),
+            Self::Cyclic => tr(ColormapKey::Cyclic),
+            Self::Categorical => tr(ColormapKey::Categorical),
+            Self::Other => tr(ColormapKey::Other),
         }
     }
 

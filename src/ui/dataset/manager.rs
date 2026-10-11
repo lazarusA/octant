@@ -1,22 +1,29 @@
 use crate::app::OctantApp;
 use crate::app::StoreKind;
 use crate::data::{DataSourceKind, Dataset};
+use crate::i18n::{DatasetKey, fill, tr};
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
 use std::borrow::Cow;
 
 /// Renders the multi-dataset manager list, switching active dataset, and removal.
 pub fn show_dataset_manager(app: &mut OctantApp, ui: &mut egui::Ui) {
     if app.dataset_manager.is_empty() {
-        ui.label(egui::RichText::new("No datasets currently registered in manager.").weak());
+        ui.label(egui::RichText::new(tr(DatasetKey::NoDatasetsRegistered)).weak());
         return;
     }
 
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(format!("Loaded ({}):", app.dataset_manager.len())).strong());
+        let mut buf = [0u8; 64];
+        let loaded = fill(
+            &mut buf,
+            tr(DatasetKey::LoadedCount),
+            &[&app.dataset_manager.len()],
+        );
+        ui.label(egui::RichText::new(loaded).strong());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui
-                .icon_button(Icon::Trash, "Clear All")
-                .on_hover_text("Remove all datasets from manager")
+                .icon_button(Icon::Trash, tr(DatasetKey::ClearAll))
+                .on_hover_text(tr(DatasetKey::ClearAllHover))
                 .clicked()
             {
                 app.clear_all_datasets();
@@ -78,7 +85,9 @@ fn show_dataset_row(
         let item_btn = ui.add_sized([avail_w, 20.0], btn);
         if item_btn
             .on_hover_ui(|ui| {
-                ui.label(format!("{}\nURI: {}", d.source.display_name, d.source.uri));
+                let mut buf = [0u8; 1024];
+                let args: [&dyn std::fmt::Display; 2] = [&d.source.display_name, &d.source.uri];
+                ui.label(fill(&mut buf, tr(DatasetKey::DatasetRowHover), &args));
             })
             .clicked()
         {
@@ -90,7 +99,7 @@ fn show_dataset_row(
 
         if ui
             .icon_button(Icon::Trash, "")
-            .on_hover_text("Remove this dataset")
+            .on_hover_text(tr(DatasetKey::RemoveDatasetHover))
             .clicked()
         {
             *to_delete = Some(d.id.clone());

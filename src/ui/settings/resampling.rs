@@ -1,4 +1,14 @@
 use crate::app::OctantApp;
+use crate::data::AggregationOp;
+use crate::i18n::{SettingsKey as K, tr};
+
+/// Each aggregation, its name and what it does.
+const AGGREGATIONS: [(AggregationOp, K, K); 4] = [
+    (AggregationOp::Mean, K::AggMean, K::AggMeanHover),
+    (AggregationOp::Max, K::AggMax, K::AggMaxHover),
+    (AggregationOp::Min, K::AggMin, K::AggMinHover),
+    (AggregationOp::Nearest, K::AggNearest, K::AggNearestHover),
+];
 
 pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     let prev_resampling = app.enable_pyramid_resampling;
@@ -15,50 +25,25 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         let checkbox = egui::Checkbox::new(
             &mut app.enable_pyramid_resampling,
-            egui::RichText::new("2D Aggregation").strong(),
+            egui::RichText::new(tr(K::Aggregation)).strong(),
         );
         let resp = ui.add_enabled(!is_oversized, checkbox);
         if is_oversized {
-            resp.on_hover_text("Mandatory: Array exceeds single GPU buffer limit (128 MB / 33.5M cells). Aggregation cannot be disabled.");
+            resp.on_hover_text(tr(K::AggregationMandatoryHover));
         } else {
-            resp.on_hover_text("Multi-resolution pyramid downsampling and viewport resampling.");
+            resp.on_hover_text(tr(K::AggregationHover));
         }
     });
     if app.enable_pyramid_resampling {
         ui.horizontal(|ui| {
-            ui.label("Mode:");
+            ui.label(tr(K::AggregationMode));
             egui::ComboBox::from_id_salt("settings_resampling_mode_dropdown")
-                .selected_text(match app.pyramid_aggregation_op {
-                    crate::data::AggregationOp::Mean => "Mean (Box Filter)",
-                    crate::data::AggregationOp::Max => "Max (Peak Preserve)",
-                    crate::data::AggregationOp::Min => "Min (Trough Preserve)",
-                    crate::data::AggregationOp::Nearest => "Nearest Neighbor",
-                })
+                .selected_text(tr(aggregation_name(app.pyramid_aggregation_op)))
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(
-                        &mut app.pyramid_aggregation_op,
-                        crate::data::AggregationOp::Mean,
-                        "Mean (Box Filter)",
-                    )
-                    .on_hover_text("Averages sub-pixels in 2x2 cells, ignoring NaNs.");
-                    ui.selectable_value(
-                        &mut app.pyramid_aggregation_op,
-                        crate::data::AggregationOp::Max,
-                        "Max (Peak Preserve)",
-                    )
-                    .on_hover_text("Preserves extreme high values.");
-                    ui.selectable_value(
-                        &mut app.pyramid_aggregation_op,
-                        crate::data::AggregationOp::Min,
-                        "Min (Trough Preserve)",
-                    )
-                    .on_hover_text("Preserves extreme low values.");
-                    ui.selectable_value(
-                        &mut app.pyramid_aggregation_op,
-                        crate::data::AggregationOp::Nearest,
-                        "Nearest Neighbor",
-                    )
-                    .on_hover_text("Fast nearest point selection without interpolation.");
+                    for (op, name, hover) in AGGREGATIONS {
+                        ui.selectable_value(&mut app.pyramid_aggregation_op, op, tr(name))
+                            .on_hover_text(tr(hover));
+                    }
                 });
         });
     }
@@ -89,5 +74,15 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             app.layers.base.data.pyramid = None;
             app.layers.base.data.resampler.set_pyramid(None);
         }
+    }
+}
+
+/// The name of aggregation `op`.
+fn aggregation_name(op: AggregationOp) -> K {
+    match op {
+        AggregationOp::Mean => K::AggMean,
+        AggregationOp::Max => K::AggMax,
+        AggregationOp::Min => K::AggMin,
+        AggregationOp::Nearest => K::AggNearest,
     }
 }

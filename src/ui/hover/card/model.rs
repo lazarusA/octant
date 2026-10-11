@@ -30,7 +30,7 @@ impl HoverValue {
     /// Formats the value into `buf` without allocating.
     pub fn format<'a>(&self, buf: &'a mut [u8; 32]) -> &'a str {
         match *self {
-            Self::NoData => "No data",
+            Self::NoData => crate::i18n::tr(crate::i18n::HoverKey::NoData),
             Self::Composite(kind) => kind.label(),
             Self::Scalar(v) => format_scalar(buf, v),
         }

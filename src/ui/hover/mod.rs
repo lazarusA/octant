@@ -164,7 +164,7 @@ fn resolve_hover_target_info(
         .volume
         .as_ref()
         .map(|v| v.dataset_name.as_str())
-        .unwrap_or("variable");
+        .unwrap_or(crate::i18n::tr(crate::i18n::HoverKey::FallbackVariable));
     let var_name = var.map(|v| v.name.as_str()).unwrap_or(default_name);
     let units_str = resolve_variable_units(var);
 

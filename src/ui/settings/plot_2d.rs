@@ -1,11 +1,12 @@
 use crate::app::OctantApp;
+use crate::i18n::{PlotOptionsKey as K, tr};
 
 pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
-        ui.checkbox(&mut app.plot_configs.line.show_lines, "Lines")
-            .on_hover_text("Show continuous lines connecting points");
-        ui.checkbox(&mut app.plot_configs.line.show_points, "Scatter")
-            .on_hover_text("Show scatter markers at each point location");
+        ui.checkbox(&mut app.plot_configs.line.show_lines, tr(K::Lines))
+            .on_hover_text(tr(K::LinesHover));
+        ui.checkbox(&mut app.plot_configs.line.show_points, tr(K::Scatter))
+            .on_hover_text(tr(K::ScatterHover));
 
         if !app.plot_configs.line.show_lines && !app.plot_configs.line.show_points {
             app.plot_configs.line.show_lines = true;
@@ -15,7 +16,7 @@ pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     if app.plot_configs.line.show_points {
         ui.add_space(2.0);
         ui.horizontal(|ui| {
-            ui.label("Point Size:");
+            ui.label(tr(K::PointSize));
             ui.add(
                 egui::Slider::new(&mut app.plot_configs.line.point_size, 2.0..=24.0)
                     .suffix(" px")
@@ -26,8 +27,11 @@ pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     ui.add_space(2.0);
     ui.horizontal(|ui| {
-        ui.checkbox(&mut app.plot_configs.line.use_custom_color, "Custom Color")
-            .on_hover_text("Use a solid line/scatter color instead of colormap evaluation");
+        ui.checkbox(
+            &mut app.plot_configs.line.use_custom_color,
+            tr(K::CustomColor),
+        )
+        .on_hover_text(tr(K::CustomColorHover));
 
         if app.plot_configs.line.use_custom_color {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -37,7 +41,7 @@ pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
                     crate::ui::color_picker::ColorShape::Rect(3.0),
                 )
                 .size(egui::vec2(18.0, 16.0))
-                .tooltip("Line / scatter color. Click to select color.")
+                .tooltip(tr(K::LineColorHover))
                 .anchor_offset(egui::vec2(-240.0, -100.0))
                 .show(ui);
             });
@@ -73,7 +77,7 @@ fn show_line_profile_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 
     ui.separator();
-    ui.label(egui::RichText::new("Line Profile").small().weak());
+    ui.label(egui::RichText::new(tr(K::LineProfile)).small().weak());
 
     let label_x = app.get_spatial_dim_label(0);
     let label_y = app.get_spatial_dim_label(1);
@@ -115,7 +119,10 @@ fn show_line_profile_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 
     let mut all_series = app.plot_configs.line.all_series;
-    if ui.checkbox(&mut all_series, "All Lines Series").changed() {
+    if ui
+        .checkbox(&mut all_series, tr(K::AllLinesSeries))
+        .changed()
+    {
         app.plot_configs.line.all_series = all_series;
     }
 
@@ -151,18 +158,21 @@ fn show_line_profile_slider(app: &mut OctantApp, ui: &mut egui::Ui, has_z_dim: b
     if max_idx > 0 {
         let mut slice_idx = app.plot_configs.line.profile_slice_idx;
         if ui
-            .add(egui::Slider::new(&mut slice_idx, 0..=max_idx).text("Profile Index"))
+            .add(egui::Slider::new(&mut slice_idx, 0..=max_idx).text(tr(K::ProfileIndex)))
             .changed()
         {
             app.plot_configs.line.profile_slice_idx = slice_idx;
         }
     } else {
-        ui.label("Single profile available.");
+        ui.label(tr(K::SingleProfile));
     }
 }
 
 pub(crate) fn show_heatmap_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add_space(2.0);
-    ui.checkbox(&mut app.layout.enforce_data_aspect_ratio, "Aspect Ratio")
-        .on_hover_text("If checked, 2D plots preserve matrix data aspect ratio (width/height). If unchecked, 2D plots expand to fill full canvas.");
+    ui.checkbox(
+        &mut app.layout.enforce_data_aspect_ratio,
+        tr(K::AspectRatio),
+    )
+    .on_hover_text(tr(K::AspectRatioHover));
 }

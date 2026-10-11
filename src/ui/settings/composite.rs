@@ -2,6 +2,7 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::i18n::{SettingsKey as K, tr};
 use crate::ui::hover::composite::composite_labels;
 use crate::utils::stack_str;
 
@@ -26,11 +27,7 @@ pub(crate) fn show_composite_controls(app: &mut OctantApp, ui: &mut egui::Ui, id
         if has_mc {
             show_multichannel_controls(app, ui, id);
         } else if is_cmyk {
-            ui.label(
-                egui::RichText::new("Auto-mapped channels: C (1), M (2), Y (3), K (4)")
-                    .small()
-                    .weak(),
-            );
+            ui.label(egui::RichText::new(tr(K::CmykAutoMapped)).small().weak());
         } else {
             super::composite_rgb::show_standard_rgb_controls(app, ui, id);
         }
@@ -49,8 +46,9 @@ fn composite_toggle(
 ) -> bool {
     let enabled = app.layers.get(id).is_some_and(|l| l.composite.enabled);
     let (label, tooltip) = toggle_text(has_mc, is_cmyk);
+    let (label, tooltip) = (tr(label), tr(tooltip));
     // The band names cache follows the base layer (the hover card's).
-    let mut label_buf = [0u8; 48];
+    let mut label_buf = [0u8; 160];
     let label = if enabled && !has_mc && !is_cmyk && id == LayerId::BASE {
         let meta = app.plotted().metadata.as_ref();
         let kind = composite_labels(app, ui.ctx(), meta, app.plotted_variable_info()).kind;
@@ -73,22 +71,13 @@ fn composite_toggle(
 }
 
 /// The composite checkbox's label and tooltip for the mode the dataset supports.
-fn toggle_text(has_mc: bool, is_cmyk: bool) -> (&'static str, &'static str) {
+fn toggle_text(has_mc: bool, is_cmyk: bool) -> (K, K) {
     if has_mc {
-        (
-            "Multi-Channel Overlay",
-            "Overlays multiple channels additively, each rendered with its unique color tint.",
-        )
+        (K::MultiChannelOverlay, K::MultiChannelOverlayHover)
     } else if is_cmyk {
-        (
-            "CMYK Composite",
-            "Composites 4-channel Cyan, Magenta, Yellow, Black (CMYK) into Truecolor RGB.",
-        )
+        (K::CmykComposite, K::CmykCompositeHover)
     } else {
-        (
-            "RGB Composite",
-            "Composites selected 3 channels into Truecolor RGB.",
-        )
+        (K::RgbComposite, K::RgbCompositeHover)
     }
 }
 
@@ -107,9 +96,9 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerI
     let configs = &mut layer.composite.channel_configs;
     let mut changed = false;
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("Channels:").small().strong());
-        for (label, visible) in [("All", true), ("None", false)] {
-            if ui.small_button(label).clicked() {
+        ui.label(egui::RichText::new(tr(K::Channels)).small().strong());
+        for (label, visible) in [(K::ChannelsAll, true), (K::ChannelsNone, false)] {
+            if ui.small_button(tr(label)).clicked() {
                 configs.iter_mut().for_each(|cfg| cfg.visible = visible);
                 changed = true;
             }
@@ -151,7 +140,7 @@ fn channel_row(
         crate::ui::color_picker::ColorShape::Circle,
     )
     .size(egui::vec2(14.0, 14.0))
-    .tooltip("Click to customize channel tint color")
+    .tooltip(tr(K::ChannelTintHover))
     .show(ui);
     if color != initial {
         let to_u8 = |c: f32| (c * 255.0).round().clamp(0.0, 255.0) as u8;

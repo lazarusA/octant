@@ -1,6 +1,7 @@
 //! Hero status pill, idle hints, drag cues, and warning banners.
 
 use super::style::{BODY_FONT, SMALL_FONT, content_width, fit_text};
+use crate::i18n::{DatasetKey, tr};
 use crate::ui::icons::{ICON_GAP, Icon, IconSize, IconTone};
 
 /// Height of the drag-hover and warning banners.
@@ -56,9 +57,9 @@ pub fn render_idle_hint(ui: &mut egui::Ui) {
     let text = fit_text(
         ui,
         &[
-            "paste URL, local path, or drag & drop files anywhere",
-            "paste URL, path, or drag & drop files",
-            "paste URL or drop files",
+            tr(DatasetKey::HeroHintLong),
+            tr(DatasetKey::HeroHintMedium),
+            tr(DatasetKey::HeroHintShort),
         ],
         SMALL_FONT,
         content_width(ui.available_width()),
@@ -77,9 +78,9 @@ pub fn render_drag_hover_cue(ui: &mut egui::Ui) {
         Icon::DropTray,
         IconTone::Accent,
         &[
-            "Drop dataset to load (.nc, .h5, .zarr, .icechunk, .tif)",
-            "Drop dataset (.nc, .zarr, .icechunk, .tif)",
-            "Drop dataset to load",
+            tr(DatasetKey::HeroDropLong),
+            tr(DatasetKey::HeroDropMedium),
+            tr(DatasetKey::HeroDropShort),
         ],
     );
 }
@@ -90,9 +91,9 @@ pub fn render_warning_banner(ui: &mut egui::Ui) {
         Icon::Warning,
         IconTone::Warning,
         &[
-            "Unsupported type. Supported: .nc, .h5, .zarr, .icechunk, .tif",
-            "Unsupported format (.nc, .zarr, .icechunk, .tif)",
-            "Unsupported format",
+            tr(DatasetKey::HeroUnsupportedLong),
+            tr(DatasetKey::HeroUnsupportedMedium),
+            tr(DatasetKey::HeroUnsupportedShort),
         ],
     );
 }

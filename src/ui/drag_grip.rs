@@ -3,6 +3,7 @@
 //! a `GripAction`, and dragged positions kept as fractions of the canvas so
 //! a panel keeps its place when the canvas resizes.
 
+use crate::i18n::{CommonKey, tr};
 use crate::ui::icons::{Icon, IconSize, ToolbarButton};
 use egui::{CursorIcon, Pos2, Rect, Response, Sense, Vec2};
 
@@ -18,11 +19,11 @@ pub enum GripAction {
 
 /// A grip button with a `size` glyph.
 pub fn button(size: IconSize) -> ToolbarButton<'static> {
-    ToolbarButton::new(Icon::Grip, "Move")
+    ToolbarButton::new(Icon::Grip, tr(CommonKey::Move))
         .compact(true)
         .icon_size(size)
         .sense(Sense::click_and_drag())
-        .hover("Drag to move; double-click to reset")
+        .hover(tr(CommonKey::MoveHover))
 }
 
 /// Reads the grip's `response`, showing the grab cursor over it.

@@ -5,20 +5,13 @@ use crate::app::OctantApp;
 use crate::app::layers::{
     Alignment, LayerId, Source, classify, follow_base_window, overlay_selection,
 };
+use crate::i18n::{PlotKey, tr};
 use crate::ui::toast::Severity;
 use crate::utils::colormap::registry;
 
-/// The overlay limit as a literal, so its message can name it.
-macro_rules! max_overlays {
-    () => {
-        4
-    };
-}
-
 /// Most overlays drawn over the base layer (the hover card has a row each).
-pub const MAX_OVERLAYS: usize = max_overlays!();
-/// Why no further overlay can be added once [`MAX_OVERLAYS`] exist.
-const STACK_FULL: &str = concat!("At most ", max_overlays!(), " overlays");
+/// `PlotKey::OverlayStackFull` names it in every language (checked by a test).
+pub const MAX_OVERLAYS: usize = 4;
 /// Opacity a new overlay starts at, so the base shows through.
 const OVERLAY_OPACITY: f32 = 0.75;
 /// Colormaps new overlays take, in order: perceptually uniform sequential
@@ -38,13 +31,13 @@ impl OctantApp {
     /// Why no overlay can be added right now; `None` when one can.
     pub fn overlay_unavailable(&self) -> Option<&'static str> {
         if self.plotted().metadata.is_none() {
-            return Some("Plot a variable first");
+            return Some(tr(PlotKey::OverlayPlotFirst));
         }
         if self.effective_canvas_plot_type() != crate::plots::PlotType::Heatmap {
-            return Some("Overlays draw over heatmaps");
+            return Some(tr(PlotKey::OverlayHeatmapOnly));
         }
         if self.layers.overlays().len() >= MAX_OVERLAYS {
-            return Some(STACK_FULL);
+            return Some(tr(PlotKey::OverlayStackFull));
         }
         None
     }
@@ -62,7 +55,7 @@ impl OctantApp {
                     && s.store_target == staged.store_target
                     && s.metadata.is_some()
             });
-            shown.then_some("Already a layer of the plot")
+            shown.then(|| tr(PlotKey::OverlayAlreadyLayer))
         })
     }
 
@@ -70,7 +63,7 @@ impl OctantApp {
     /// base layer's window, and loads it. Tells the user when it can't be.
     pub fn add_overlay(&mut self, var_idx: usize) -> Option<LayerId> {
         if let Some(reason) = self.overlay_unavailable_for(var_idx) {
-            self.notify(Severity::Warning, "Can't add overlay", reason);
+            self.notify(Severity::Warning, tr(PlotKey::OverlayCantAdd), reason);
             return None;
         }
         let selection = overlay_selection(self.plotted(), &self.selected, var_idx)?;
@@ -82,8 +75,8 @@ impl OctantApp {
             .reason()
             .filter(|_| alignment != Alignment::IndexOnly)
         {
-            let detail = format!("'{name}': {reason}");
-            self.notify(Severity::Warning, "Can't add overlay", detail);
+            let detail = crate::i18n::filled(tr(PlotKey::OverlayNamedReason), &[&name, &reason]);
+            self.notify(Severity::Warning, tr(PlotKey::OverlayCantAdd), detail);
             return None;
         }
         let var = selection.variable_info().cloned();

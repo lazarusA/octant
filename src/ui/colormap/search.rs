@@ -1,6 +1,7 @@
 //! Cached filtering of the colormap registry by query, kind and family.
 
 use crate::data::coordinates::naming::contains_ascii_case_insensitive;
+use crate::i18n::{ColormapKey as K, tr};
 use crate::utils::colormap::{ColormapKind, builtin, registry};
 
 /// Family filter: a bundled family index, or the user's custom maps.
@@ -50,7 +51,7 @@ pub(super) fn filter_ids(key: &FilterKey) -> Vec<u32> {
                 let family_name = e
                     .family
                     .and_then(|f| families.get(f))
-                    .map_or("Custom", |f| f.name.as_str());
+                    .map_or(tr(K::FamilyCustom), |f| f.name.as_str());
                 let kind_ok = key.kind.is_none_or(|k| k == e.kind);
                 let family_ok = match key.family {
                     None => true,

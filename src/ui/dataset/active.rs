@@ -1,11 +1,12 @@
 use crate::app::OctantApp;
 use crate::app::StoreKind;
+use crate::i18n::{DatasetKey, fill, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
 /// Renders the currently loaded dataset summary card and quick actions.
 pub fn show_active_dataset(app: &mut OctantApp, ui: &mut egui::Ui) {
     let Some(meta) = &app.selected.metadata else {
-        show_active_empty(app, ui);
+        show_active_empty(ui);
         return;
     };
     let store_kind = app.selected.store_kind;
@@ -30,7 +31,7 @@ struct ActiveAction {
     reload: bool,
 }
 
-fn show_active_empty(app: &OctantApp, ui: &mut egui::Ui) {
+fn show_active_empty(ui: &mut egui::Ui) {
     egui::Frame::default()
         .fill(ui.visuals().faint_bg_color)
         .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
@@ -39,7 +40,7 @@ fn show_active_empty(app: &OctantApp, ui: &mut egui::Ui) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.icon_toned(Icon::Info, IconSize::Sm, IconTone::Muted);
-                ui.label(egui::RichText::new(app.tr(crate::i18n::Key::NoActiveDatasets)).weak());
+                ui.label(egui::RichText::new(tr(DatasetKey::NoDatasetLoaded)).weak());
             });
         });
 }
@@ -54,8 +55,16 @@ fn store_badge(kind: StoreKind) -> (Icon, &'static str, IconTone) {
             (Icon::Folder, "GeoTIFF", IconTone::Success)
         }
         StoreKind::LocalNetCdf => (Icon::Folder, "NetCDF", IconTone::Muted),
-        StoreKind::ProceduralVolume4D => (Icon::PlotVolume, "4D Volume", IconTone::Warning),
-        StoreKind::ProceduralRandom => (Icon::PlotPlane, "2D Matrix", IconTone::Warning),
+        StoreKind::ProceduralVolume4D => (
+            Icon::PlotVolume,
+            tr(DatasetKey::BadgeVolume4D),
+            IconTone::Warning,
+        ),
+        StoreKind::ProceduralRandom => (
+            Icon::PlotPlane,
+            tr(DatasetKey::BadgeMatrix2D),
+            IconTone::Warning,
+        ),
     }
 }
 
@@ -113,15 +122,23 @@ fn show_card_metadata(
             .wrap_mode(egui::TextWrapMode::Wrap),
         )
         .on_hover_ui(|ui| {
-            ui.label(format!("Target URI:\n{uri}"));
+            let mut buf = [0u8; 1024];
+            ui.label(fill(&mut buf, tr(DatasetKey::TargetUriHover), &[&uri]));
         });
     }
 
     ui.horizontal(|ui| {
-        let plural = if var_count == 1 { "" } else { "s" };
-        ui.label(egui::RichText::new(format!("{var_count} variable{plural}")).weak());
+        let template = if var_count == 1 {
+            tr(DatasetKey::VariableCountOne)
+        } else {
+            tr(DatasetKey::VariableCountMany)
+        };
+        let mut buf = [0u8; 96];
+        ui.label(egui::RichText::new(fill(&mut buf, template, &[&var_count])).weak());
         if !store_type.is_empty() {
-            ui.label(egui::RichText::new(format!("• {store_type}")).weak());
+            let mut buf = [0u8; 128];
+            let text = crate::utils::stack_str(&mut buf, format_args!("• {store_type}"));
+            ui.label(egui::RichText::new(text).weak());
         }
     });
 }
@@ -130,12 +147,15 @@ fn show_card_buttons(ui: &mut egui::Ui, action: &mut ActiveAction) {
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         if ui
-            .icon_button(Icon::Variables, "Inspect Variables")
+            .icon_button(Icon::Variables, tr(DatasetKey::InspectVariables))
             .clicked()
         {
             action.inspect_variables = true;
         }
-        if ui.icon_button(Icon::Reset, "Reload").clicked() {
+        if ui
+            .icon_button(Icon::Reset, tr(DatasetKey::Reload))
+            .clicked()
+        {
             action.reload = true;
         }
     });

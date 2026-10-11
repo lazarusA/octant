@@ -66,7 +66,6 @@ pub(super) fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool
             newly_selected_idx: None,
             search_id: search.id,
             search_jump: jump,
-            language: crate::i18n::Language::English,
         };
         render_tree_group(ui, &root, &mut tree_ctx);
         out = Some(Frame {

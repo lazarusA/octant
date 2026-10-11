@@ -1,6 +1,7 @@
 use super::card::render_entry_card;
 use crate::app::{OctantApp, StoreKind};
 use crate::catalog::get_catalog_entries;
+use crate::i18n::{DatasetKey, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 
 pub fn render_entries_list(
@@ -32,9 +33,9 @@ pub fn render_entries_list(
             ui.add_space(32.0);
             ui.icon_toned(Icon::Info, IconSize::Md, IconTone::Muted);
             ui.add_space(6.0);
-            ui.label(egui::RichText::new("No datasets found matching your search.").strong());
+            ui.label(egui::RichText::new(tr(DatasetKey::NoCatalogMatches)).strong());
             ui.add_space(8.0);
-            if ui.button("Clear Search").clicked() {
+            if ui.button(tr(DatasetKey::ClearSearch)).clicked() {
                 app.layout.catalog_search_query.clear();
             }
         });

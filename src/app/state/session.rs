@@ -34,19 +34,13 @@ impl OctantApp {
         if let Some(lang) =
             eframe::get_value::<crate::i18n::Language>(storage, LANGUAGE_STORAGE_KEY)
         {
-            self.layout.language = lang;
+            crate::i18n::set_language(lang);
         }
     }
 
     /// Persists the user's language preference to eframe storage.
     pub fn save_language_pref(&self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, LANGUAGE_STORAGE_KEY, &self.layout.language);
-    }
-
-    /// Translates `key` into the user's active language.
-    #[inline]
-    pub fn tr(&self, key: crate::i18n::Key) -> &'static str {
-        crate::i18n::translate(self.layout.language, key)
+        eframe::set_value(storage, LANGUAGE_STORAGE_KEY, &crate::i18n::language());
     }
 
     pub fn reset_heatmap_view(&mut self) {

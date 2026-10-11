@@ -5,6 +5,7 @@ use super::nav::SearchJump;
 use super::search;
 use super::tree::{VariableTreeContext, render_tree_group};
 use crate::app::OctantApp;
+use crate::i18n::{DatasetKey, VariablesKey, fill, tr};
 use crate::ui::icons::{Icon, UiIconExt};
 
 /// List area under the search field: the state that applies, or the tree.
@@ -15,14 +16,14 @@ pub(super) fn show_list(
     jump: Option<SearchJump>,
 ) {
     if app.is_loading {
-        show_loading(app, ui);
+        show_loading(ui);
         return;
     }
     let Some(var_count) = app.selected.metadata.as_ref().map(|m| m.variables.len()) else {
         if empty_state(
             ui,
-            "No store metadata loaded yet.",
-            "Fetch / Load Store Metadata",
+            tr(VariablesKey::NoMetadataLoaded),
+            tr(VariablesKey::FetchStoreMetadata),
         ) {
             let target = app.selected.store_target.clone();
             app.submit_or_activate_source(&target, Some(app.selected.store_kind));
@@ -32,8 +33,8 @@ pub(super) fn show_list(
     if var_count == 0 {
         if empty_state(
             ui,
-            "No variables found in this dataset store.",
-            "Refresh Store Metadata",
+            tr(VariablesKey::NoVariablesFound),
+            tr(VariablesKey::RefreshStoreMetadata),
         ) {
             app.inspect_active_store();
         }
@@ -44,11 +45,11 @@ pub(super) fn show_list(
     }
 }
 
-fn show_loading(app: &OctantApp, ui: &mut egui::Ui) {
+fn show_loading(ui: &mut egui::Ui) {
     ui.vertical_centered(|ui| {
         ui.add_space(10.0);
         ui.spinner();
-        ui.label(egui::RichText::new(app.tr(crate::i18n::Key::LoadingMetadata)).italics());
+        ui.label(egui::RichText::new(tr(DatasetKey::LoadingMetadata)).italics());
         ui.add_space(10.0);
     });
 }
@@ -97,13 +98,9 @@ fn show_tree(
     let Some(root) = root else {
         ui.vertical_centered(|ui| {
             ui.add_space(10.0);
-            ui.label(
-                egui::RichText::new(format!(
-                    "{}: '{query}'",
-                    app.tr(crate::i18n::Key::NoVariablesMatching)
-                ))
-                .italics(),
-            );
+            let mut buf = [0; 256];
+            let note = fill(&mut buf, tr(VariablesKey::NoVariablesMatching), &[&query]);
+            ui.label(egui::RichText::new(note).italics());
             ui.add_space(10.0);
         });
         return None;
@@ -116,7 +113,6 @@ fn show_tree(
         newly_selected_idx: None,
         search_id,
         search_jump: jump,
-        language: app.layout.language,
     };
     render_tree_group(ui, root, &mut tree_ctx);
     tree_ctx.newly_selected_idx

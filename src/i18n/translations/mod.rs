@@ -1,6 +1,5 @@
 //! Translation registry and language dispatch with canonical English fallback.
 
-mod cjk_stubs;
 mod de;
 mod en;
 mod es;
@@ -17,26 +16,28 @@ mod uk;
 use crate::i18n::keys::Key;
 use crate::i18n::lang::Language;
 
-/// Looks up the translation for `(lang, key)`, falling back to English.
+/// Looks up the translation for `(lang, key)`, falling back to English for
+/// untranslated keys and for languages without translations yet (CJK).
 #[inline]
 pub fn lookup(lang: Language, key: Key) -> &'static str {
-    let text = match lang {
-        Language::English => None,
-        Language::Spanish => es::translate(key),
-        Language::French => fr::translate(key),
-        Language::German => de::translate(key),
-        Language::Portuguese => pt::translate(key),
-        Language::Italian => it::translate(key),
-        Language::Ukrainian => uk::translate(key),
-        Language::Russian => ru::translate(key),
-        Language::Indonesian => id::translate(key),
-        Language::Swedish => sv::translate(key),
-        Language::Norwegian => no::translate(key),
-        Language::Finnish => fi::translate(key),
-        Language::ChineseSimp => cjk_stubs::translate_zh(key),
-        Language::Japanese => cjk_stubs::translate_ja(key),
-        Language::Korean => cjk_stubs::translate_ko(key),
-    };
+    exact(lang, key).unwrap_or_else(|| en::text(key))
+}
 
-    text.unwrap_or_else(|| en::translate(key))
+/// The translation of `key` in `lang` itself, `None` when it has none.
+pub fn exact(lang: Language, key: Key) -> Option<&'static str> {
+    match lang {
+        Language::English => Some(en::text(key)),
+        Language::Spanish => es::text(key),
+        Language::French => fr::text(key),
+        Language::German => de::text(key),
+        Language::Portuguese => pt::text(key),
+        Language::Italian => it::text(key),
+        Language::Ukrainian => uk::text(key),
+        Language::Russian => ru::text(key),
+        Language::Indonesian => id::text(key),
+        Language::Swedish => sv::text(key),
+        Language::Norwegian => no::text(key),
+        Language::Finnish => fi::text(key),
+        Language::ChineseSimp | Language::Japanese | Language::Korean => None,
+    }
 }

@@ -3,6 +3,7 @@
 use super::VariableSelection;
 use crate::app::DimConfig;
 use crate::data::{CoordValues, VariableInfo};
+use crate::i18n::{PlotKey, tr};
 use crate::plots::PlotType;
 
 /// Where an overlay falls on the base layer's canvas.
@@ -30,9 +31,9 @@ impl Alignment {
     pub fn reason(self) -> Option<&'static str> {
         match self {
             Self::SameGrid => None,
-            Self::Geo { .. } => Some("On another longitude/latitude grid (not supported yet)"),
-            Self::IndexOnly => Some("Same grid shape, but no coordinates match the plot"),
-            Self::Incompatible => Some("Shares no grid with the plot"),
+            Self::Geo { .. } => Some(tr(PlotKey::AlignGeo)),
+            Self::IndexOnly => Some(tr(PlotKey::AlignIndexOnly)),
+            Self::Incompatible => Some(tr(PlotKey::AlignIncompatible)),
         }
     }
 }

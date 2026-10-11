@@ -2,6 +2,7 @@ use super::item::{MAX_ITEMS_PER_LEVEL, render_variable_list, truncation_note};
 use super::nav::{self, NodeKey, SearchJump, folder_state, row_id};
 use super::row::{RowKind, allocate_row, paint_row};
 use crate::data::{VariableInfo, VariableTreeGroup};
+use crate::i18n::VariablesKey;
 use crate::utils::stack_str;
 
 pub struct VariableTreeContext<'a> {
@@ -13,7 +14,6 @@ pub struct VariableTreeContext<'a> {
     pub search_id: egui::Id,
     /// Pending focus jump requested by a key in the search field.
     pub search_jump: Option<SearchJump>,
-    pub language: crate::i18n::Language,
 }
 
 /// Draw the whole tree from its root group.
@@ -62,7 +62,7 @@ fn render_subgroups(
     for subgroup in subgroups.iter().take(MAX_ITEMS_PER_LEVEL) {
         render_subgroup(ui, subgroup, ctx);
     }
-    truncation_note(ui, subgroups.len(), "folders");
+    truncation_note(ui, subgroups.len(), VariablesKey::TruncatedFolders);
 }
 
 /// Full-width folder row: clicking anywhere on it (chevron, icon or name) toggles it.
