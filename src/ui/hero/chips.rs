@@ -7,7 +7,7 @@ use crate::ui::key_focus;
 use egui::Galley;
 use std::sync::Arc;
 
-const SAMPLES: [(&str, &str, &str); 3] = [
+const SAMPLES: [(&str, &str, &str); 4] = [
     (
         "/seasfire",
         "https://s3.bgc-jena.mpg.de:9000/misc/seasfire_rechunked.zarr",
@@ -23,6 +23,7 @@ const SAMPLES: [(&str, &str, &str); 3] = [
         "procedural://volume4d",
         "Synthetic 4D spatiotemporal volume",
     ),
+    ("/catalog", "catalog", "Browse dataset catalog"),
 ];
 const COUNT: usize = SAMPLES.len();
 const PREFIX: &str = "try:";
@@ -78,8 +79,12 @@ pub fn sample_slash_chips_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 let (label, uri, desc) = SAMPLES[item - 1];
                 let galley = Arc::clone(&chips[item - 1]);
                 if render_chip(ui, item - 1, label, galley, desc).clicked() {
-                    app.layout.hero_state.input = uri.to_string();
-                    app.submit_or_activate_source(uri, None);
+                    if uri == "catalog" {
+                        app.layout.show_catalog_window = true;
+                    } else {
+                        app.layout.hero_state.input = uri.to_string();
+                        app.submit_or_activate_source(uri, None);
+                    }
                 }
             }
         });
@@ -190,7 +195,11 @@ fn render_chip(
     response
         .on_hover_cursor(egui::CursorIcon::PointingHand)
         .on_hover_ui(|ui| {
-            ui.label(format!("Load sample: {desc}"));
+            if label.ends_with("catalog") {
+                ui.label(desc);
+            } else {
+                ui.label(format!("Load sample: {desc}"));
+            }
         })
 }
 
@@ -200,14 +209,14 @@ mod tests {
 
     #[test]
     fn test_all_items_on_one_line_when_wide() {
-        let (lines, n) = pack_lines(&[30.0, 100.0, 100.0, 100.0], 1000.0);
+        let (lines, n) = pack_lines(&[30.0, 100.0, 100.0, 100.0, 100.0], 1000.0);
         assert_eq!(n, 1);
         assert_eq!((lines[0].start, lines[0].end), (0, COUNT + 1));
     }
 
     #[test]
     fn test_wraps_whole_items_and_covers_all() {
-        let (lines, n) = pack_lines(&[30.0, 100.0, 100.0, 100.0], 250.0);
+        let (lines, n) = pack_lines(&[30.0, 100.0, 100.0, 100.0, 100.0], 250.0);
         assert!(n > 1);
         let mut next = 0;
         for line in &lines[..n] {
@@ -221,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_over_wide_item_gets_its_own_line() {
-        let (lines, n) = pack_lines(&[30.0, 400.0, 50.0, 50.0], 200.0);
+        let (lines, n) = pack_lines(&[30.0, 400.0, 50.0, 50.0, 50.0], 200.0);
         assert!(
             lines[..n]
                 .iter()

@@ -2,7 +2,8 @@
 
 #[derive(Clone, Debug)]
 pub struct UiLayoutState {
-    pub show_left_panel: bool,
+    pub show_dataset_panel: bool,
+    pub dataset_overlay_width: f32,
     pub show_hero: bool,
     pub hero_state: crate::ui::hero::HeroState,
     pub show_variables_overlay: bool,
@@ -34,7 +35,8 @@ pub struct UiLayoutState {
 impl Default for UiLayoutState {
     fn default() -> Self {
         Self {
-            show_left_panel: false,
+            show_dataset_panel: false,
+            dataset_overlay_width: 280.0,
             show_hero: true,
             hero_state: crate::ui::hero::HeroState::default(),
             show_variables_overlay: false,
@@ -62,10 +64,10 @@ impl Default for UiLayoutState {
 }
 
 impl UiLayoutState {
-    /// Opens the Settings panel and closes Store, Variables, Controls, and Catalog.
+    /// Opens the Settings panel and closes Dataset, Variables, Controls, and Catalog.
     pub fn open_only_settings_panel(&mut self) {
         self.show_settings_panel = true;
-        self.show_left_panel = false;
+        self.show_dataset_panel = false;
         self.show_variables_overlay = false;
         self.show_variable_controls = false;
         self.show_catalog_window = false;

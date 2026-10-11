@@ -30,6 +30,19 @@ fn docked_panels_line_up_from_the_canvas_corner() {
 }
 
 #[test]
+fn docked_panels_include_dataset_when_open() {
+    let mut app = app();
+    app.layout.show_dataset_panel = true;
+    app.layout.dataset_overlay_width = 250.0;
+    let corner = CANVAS.left_top() + Vec2::splat(GAP);
+    assert_eq!(panel_layout::origin(&app, Panel::Dataset, CANVAS), corner);
+    let vars = panel_layout::origin(&app, Panel::Variables, CANVAS);
+    assert_eq!(vars, corner + Vec2::new(250.0 + GAP, 0.0));
+    let settings = panel_layout::origin(&app, Panel::Settings, CANVAS);
+    assert_eq!(settings, corner + Vec2::new(250.0 + 300.0 + 2.0 * GAP, 0.0));
+}
+
+#[test]
 fn hidden_or_dragged_panels_leave_the_row() {
     let mut app = app();
     let corner = CANVAS.left_top() + Vec2::splat(GAP);

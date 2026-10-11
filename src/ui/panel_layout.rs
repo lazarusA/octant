@@ -13,6 +13,7 @@ pub const GAP: f32 = 8.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Panel {
+    Dataset,
     Variables,
     Settings,
     Dimensions,
@@ -22,6 +23,7 @@ pub enum Panel {
 /// docked.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct PanelPositions {
+    pub dataset: Option<Pos2>,
     pub variables: Option<Pos2>,
     pub settings: Option<Pos2>,
     pub dimensions: Option<Pos2>,
@@ -30,6 +32,7 @@ pub struct PanelPositions {
 impl PanelPositions {
     pub fn get(&self, panel: Panel) -> Option<Pos2> {
         match panel {
+            Panel::Dataset => self.dataset,
             Panel::Variables => self.variables,
             Panel::Settings => self.settings,
             Panel::Dimensions => self.dimensions,
@@ -38,6 +41,7 @@ impl PanelPositions {
 
     fn get_mut(&mut self, panel: Panel) -> &mut Option<Pos2> {
         match panel {
+            Panel::Dataset => &mut self.dataset,
             Panel::Variables => &mut self.variables,
             Panel::Settings => &mut self.settings,
             Panel::Dimensions => &mut self.dimensions,
@@ -54,6 +58,10 @@ fn docked_origin(canvas: Rect, widths: impl Iterator<Item = f32>) -> Pos2 {
 /// The width of `panel` when it is shown and docked, for the panels after it.
 fn docked_width(app: &OctantApp, panel: Panel) -> Option<f32> {
     let (shown, width) = match panel {
+        Panel::Dataset => (
+            app.layout.show_dataset_panel,
+            app.layout.dataset_overlay_width,
+        ),
         Panel::Variables => (
             app.layout.show_variables_overlay,
             app.layout.variables_overlay_width,
@@ -75,9 +83,10 @@ pub fn origin(app: &OctantApp, panel: Panel, canvas: Rect) -> Pos2 {
         return drag_grip::from_fraction(f, canvas);
     }
     let before: &[Panel] = match panel {
-        Panel::Variables => &[],
-        Panel::Settings => &[Panel::Variables],
-        Panel::Dimensions => &[Panel::Variables, Panel::Settings],
+        Panel::Dataset => &[],
+        Panel::Variables => &[Panel::Dataset],
+        Panel::Settings => &[Panel::Dataset, Panel::Variables],
+        Panel::Dimensions => &[Panel::Dataset, Panel::Variables, Panel::Settings],
     };
     let widths = before.iter().filter_map(|&p| docked_width(app, p));
     docked_origin(canvas, widths)

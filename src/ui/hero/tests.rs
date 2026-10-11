@@ -105,15 +105,40 @@ fn arrows_move_from_intake_through_the_chips_and_back() {
     press(&ctx, &mut app, Key::ArrowRight);
     assert_eq!(focused(&ctx), Some(chip_id(1)));
     press(&ctx, &mut app, Key::End);
-    assert_eq!(focused(&ctx), Some(chip_id(2)));
+    assert_eq!(focused(&ctx), Some(chip_id(3)));
     press(&ctx, &mut app, Key::ArrowRight);
-    assert_eq!(focused(&ctx), Some(chip_id(2)), "last chip stays put");
+    assert_eq!(focused(&ctx), Some(chip_id(3)), "last chip stays put");
     press(&ctx, &mut app, Key::ArrowLeft);
-    assert_eq!(focused(&ctx), Some(chip_id(1)));
+    assert_eq!(focused(&ctx), Some(chip_id(2)));
     press(&ctx, &mut app, Key::Home);
     assert_eq!(focused(&ctx), Some(chip_id(0)));
     press(&ctx, &mut app, Key::ArrowUp);
     assert!(intake_focused(&ctx), "Up returns to the field");
+}
+
+#[test]
+fn clicking_catalog_chip_opens_catalog_window() {
+    let ctx = egui::Context::default();
+    let mut app = OctantApp::default();
+    assert!(!app.layout.show_catalog_window);
+    frame(&ctx, &mut app, Vec::new(), true);
+
+    press(&ctx, &mut app, Key::ArrowDown);
+    press(&ctx, &mut app, Key::End);
+    assert_eq!(focused(&ctx), Some(chip_id(3)));
+    press(&ctx, &mut app, Key::Enter);
+    assert!(app.layout.show_catalog_window);
+}
+
+#[test]
+fn typing_catalog_in_intake_opens_catalog_window() {
+    let ctx = egui::Context::default();
+    let mut app = OctantApp::default();
+    assert!(!app.layout.show_catalog_window);
+    app.layout.hero_state.input = "/catalog".to_string();
+    frame(&ctx, &mut app, Vec::new(), true);
+    press(&ctx, &mut app, Key::Enter);
+    assert!(app.layout.show_catalog_window);
 }
 
 #[test]

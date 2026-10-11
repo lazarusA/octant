@@ -165,10 +165,6 @@ impl eframe::App for OctantApp {
         // 3. Render panels (each consumes space from the remaining area)
         crate::ui::top_bar::show_top_bar(self, ui);
 
-        if self.layout.show_left_panel {
-            crate::ui::store::show_left_panel(self, ui);
-        }
-
         if !is_hero_active && self.has_animated_dimension() {
             crate::ui::bottom_bar::show_bottom_bar(self, ui);
         }
