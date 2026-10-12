@@ -16,6 +16,24 @@ pub struct Date {
 }
 
 impl Date {
+    /// A calendar day.
+    pub fn day(year: usize, month: usize, day: usize) -> Self {
+        Self {
+            year,
+            month,
+            day,
+            hour: None,
+        }
+    }
+
+    /// A day at an hour.
+    pub fn at_hour(year: usize, month: usize, day: usize, hour: usize) -> Self {
+        Self {
+            hour: Some(hour),
+            ..Self::day(year, month, day)
+        }
+    }
+
     /// The date in `lang`'s style.
     pub fn in_language(self, lang: Language) -> InLanguage {
         InLanguage { date: self, lang }

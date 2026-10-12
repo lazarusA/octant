@@ -36,18 +36,7 @@ fn with_requested<T>(
 /// go on to the first of `rest`.
 pub fn request(ctx: egui::Context, font: CjkFont, chars: BTreeSet<char>, rest: Vec<CjkFont>) {
     wasm_bindgen_futures::spawn_local(async move {
-        let index = if with_requested(|_, failed| failed.contains(&font)) {
-            None
-        } else {
-            match index(font).await {
-                Ok(index) => Some(index),
-                Err(error) => {
-                    with_requested(|_, failed| failed.insert(font));
-                    report(font, &error);
-                    None
-                }
-            }
-        };
+        let index = usable_index(font).await;
         let (held, missing): (BTreeSet<char>, BTreeSet<char>) = chars
             .into_iter()
             .partition(|&c| index.as_ref().is_some_and(|i| i.slice_of(c).is_some()));
@@ -56,38 +45,56 @@ pub fn request(ctx: egui::Context, font: CjkFont, chars: BTreeSet<char>, rest: V
         {
             request(ctx.clone(), next, missing, more.to_vec());
         }
-        let Some(index) = index else {
-            return;
-        };
-        let wanted: BTreeSet<u16> = held.iter().filter_map(|&c| index.slice_of(c)).collect();
-        let new: Vec<u16> = with_requested(|slices, _| {
-            wanted
-                .into_iter()
-                .filter(|&slice| slices.insert((font, slice)))
-                .collect()
-        });
-        if new.is_empty() {
-            return;
-        }
-        let fetches = new.iter().map(|&slice| fetch(font, slice_file(slice)));
-        let mut arrived = false;
-        for (&slice, result) in new.iter().zip(futures::future::join_all(fetches).await) {
-            match result {
-                Ok(bytes) => {
-                    store::add_slice(font, slice, bytes);
-                    arrived = true;
-                }
-                Err(error) => {
-                    with_requested(|slices, _| slices.remove(&(font, slice)));
-                    report(font, &error);
-                }
-            }
-        }
-        if arrived {
+        if let Some(index) = index
+            && fetch_slices(font, &index, &held).await
+        {
             super::apply(&ctx, crate::i18n::language());
             ctx.request_repaint();
         }
     });
+}
+
+/// `font`'s slice index, `None` when it failed to load (reported once; the
+/// font is not asked again this session).
+async fn usable_index(font: CjkFont) -> Option<Arc<SliceIndex>> {
+    if with_requested(|_, failed| failed.contains(&font)) {
+        return None;
+    }
+    match index(font).await {
+        Ok(index) => Some(index),
+        Err(error) => {
+            with_requested(|_, failed| failed.insert(font));
+            report(font, &error);
+            None
+        }
+    }
+}
+
+/// Fetches the slices of `font` holding `chars` that were not requested
+/// before; `true` when at least one arrived.
+async fn fetch_slices(font: CjkFont, index: &SliceIndex, chars: &BTreeSet<char>) -> bool {
+    let wanted: BTreeSet<u16> = chars.iter().filter_map(|&c| index.slice_of(c)).collect();
+    let new: Vec<u16> = with_requested(|slices, _| {
+        wanted
+            .into_iter()
+            .filter(|&slice| slices.insert((font, slice)))
+            .collect()
+    });
+    let fetches = new.iter().map(|&slice| fetch(font, slice_file(slice)));
+    let mut arrived = false;
+    for (&slice, result) in new.iter().zip(futures::future::join_all(fetches).await) {
+        match result {
+            Ok(bytes) => {
+                store::add_slice(font, slice, bytes);
+                arrived = true;
+            }
+            Err(error) => {
+                with_requested(|slices, _| slices.remove(&(font, slice)));
+                report(font, &error);
+            }
+        }
+    }
+    arrived
 }
 
 /// `font`'s slice index, fetched on first use.

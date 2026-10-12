@@ -33,13 +33,7 @@ pub fn format_scalar_coordinate(
         && let Some((y, m, d)) = parse_iso_date(start_str)
     {
         let (res_y, res_m, res_d) = add_days_to_date(y, m, d, val.round() as i64);
-        return Date {
-            year: res_y,
-            month: res_m,
-            day: res_d,
-            hour: None,
-        }
-        .to_string();
+        return Date::day(res_y, res_m, res_d).to_string();
     }
 
     // 3. Unix timestamps (> 100M seconds or > 100B ms)
@@ -53,13 +47,7 @@ pub fn format_scalar_coordinate(
         let days_added = total_hours.div_euclid(24);
         let hour_of_day = total_hours.rem_euclid(24) as usize;
         let (res_y, res_m, res_d) = add_days_to_date(1970, 1, 1, days_added);
-        return Date {
-            year: res_y,
-            month: res_m,
-            day: res_d,
-            hour: Some(hour_of_day),
-        }
-        .to_string();
+        return Date::at_hour(res_y, res_m, res_d, hour_of_day).to_string();
     }
 
     // 4. Step indices
@@ -137,15 +125,7 @@ pub fn parse_loc(val: Option<f64>, units_str: &str) -> Option<String> {
         let hour_of_day = total_hours.rem_euclid(24) as usize;
 
         let (res_y, res_m, res_d) = add_days_to_date(y, m, d, days_added);
-        return Some(
-            Date {
-                year: res_y,
-                month: res_m,
-                day: res_d,
-                hour: Some(hour_of_day),
-            }
-            .to_string(),
-        );
+        return Some(Date::at_hour(res_y, res_m, res_d, hour_of_day).to_string());
     }
 
     // 2. Bare Time Duration (e.g. "hours", "seconds", "d")
@@ -249,13 +229,7 @@ pub fn format_axis_value(
         let (year, month, day) =
             add_days_to_date(start_year, start_month, start_day, total_days_offset);
 
-        return Date {
-            year,
-            month,
-            day,
-            hour: None,
-        }
-        .to_string();
+        return Date::day(year, month, day).to_string();
     }
 
     // 2. Pressure levels (hPa, Pa, bar, plev, level)
