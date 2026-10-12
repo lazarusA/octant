@@ -195,3 +195,13 @@ fn dataset_text_reads_new_labels_only_once() {
     text.update(&other, 2);
     assert!(!text.scripts.any());
 }
+
+#[test]
+fn fonts_loaded_off_frame_are_installed_by_the_next_frame() {
+    use std::sync::atomic::Ordering;
+    let ctx = egui::Context::default();
+    super::fonts_arrived(&ctx);
+    assert!(super::FONTS_ARRIVED.load(Ordering::Acquire));
+    super::FontEngine::watch_dataset(&ctx, &crate::app::OctantApp::default());
+    assert!(!super::FONTS_ARRIVED.load(Ordering::Acquire));
+}

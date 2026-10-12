@@ -48,8 +48,7 @@ pub fn request(ctx: egui::Context, font: CjkFont, chars: BTreeSet<char>, rest: V
         if let Some(index) = index
             && fetch_slices(font, &index, &held).await
         {
-            super::apply(&ctx, crate::i18n::language());
-            ctx.request_repaint();
+            super::fonts_arrived(&ctx);
         }
     });
 }

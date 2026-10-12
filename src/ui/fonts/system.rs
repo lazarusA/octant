@@ -103,7 +103,6 @@ pub fn request(ctx: &egui::Context, needed: [bool; 3]) {
                 ),
             }
         }
-        super::apply(&ctx, crate::i18n::language());
-        ctx.request_repaint();
+        super::fonts_arrived(&ctx);
     });
 }

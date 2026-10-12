@@ -19,8 +19,7 @@ pub fn fetch_ui_font(ctx: egui::Context, font: CjkFont) {
         match crate::data::backends::http::fetch_url_bytes(&url).await {
             Ok(bytes) => {
                 store::set_fetched(font, bytes);
-                super::apply(&ctx, crate::i18n::language());
-                ctx.request_repaint();
+                super::fonts_arrived(&ctx);
             }
             Err(error) => {
                 end(font);

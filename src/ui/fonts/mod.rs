@@ -37,6 +37,11 @@ use dataset_text::DatasetText;
 use crate::app::OctantApp;
 use crate::i18n::Language;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Set when fonts finish loading outside the UI frame (the desktop font
+/// thread, web fetches); the next frame reinstalls them on the UI thread.
+static FONTS_ARRIVED: AtomicBool = AtomicBool::new(false);
 
 /// Installs Octant's fonts into egui and keeps them in step with the language.
 pub struct FontEngine;
@@ -58,11 +63,15 @@ impl FontEngine {
         }
     }
 
-    /// Makes the staged dataset's CJK text drawable when the dataset, its
-    /// coordinate labels or the UI language change (a key comparison
-    /// otherwise): reads what is new in it (`DatasetText`), puts the font
-    /// for its Han characters first, and loads the fonts it needs.
+    /// Called every frame. Reinstalls fonts that arrived since the last
+    /// frame, and makes the staged dataset's CJK text drawable when the
+    /// dataset, its coordinate labels or the UI language change (a key
+    /// comparison otherwise): reads what is new in it (`DatasetText`), puts
+    /// the font for its Han characters first, and loads the fonts it needs.
     pub fn watch_dataset(ctx: &egui::Context, app: &OctantApp) {
+        if FONTS_ARRIVED.swap(false, Ordering::AcqRel) {
+            apply(ctx, crate::i18n::language());
+        }
         /// The dataset text read so far, and the key it was last read at.
         #[derive(Default)]
         struct Watched {
@@ -104,6 +113,14 @@ impl FontEngine {
             }
         }
     }
+}
+
+/// Called by font loaders that finish outside the UI frame: the next frame
+/// reinstalls the fonts on the UI thread, so a rebuild never overwrites one
+/// made for a language switch in between.
+fn fonts_arrived(ctx: &egui::Context) {
+    FONTS_ARRIVED.store(true, Ordering::Release);
+    ctx.request_repaint();
 }
 
 /// Rebuilds egui's font definitions: its defaults, then every loaded CJK
