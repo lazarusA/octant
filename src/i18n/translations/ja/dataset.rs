@@ -100,7 +100,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "合成された4D時空間ボリューム",
         DatasetKey::HeroCatalogHover => "データセットカタログを見る",
         DatasetKey::LoadSampleHover => "サンプルを読み込み: {}",
-        DatasetKey::HeroHintLong => "URL / ローカルパス / ファイルをどこにでもドラッグ&ドロップ",
+        DatasetKey::HeroHintLong => "URL / ローカルパス / ファイルを任意の場所にドラッグ&ドロップ",
         DatasetKey::HeroHintMedium => "URL / パス / ファイルをドラッグ&ドロップ",
         DatasetKey::HeroHintShort => "URL / ファイルをドロップ",
         DatasetKey::HeroDropLong => {
