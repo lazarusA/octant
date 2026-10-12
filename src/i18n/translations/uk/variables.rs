@@ -40,13 +40,13 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoResolution => "Роздільність: {}",
         VariablesKey::InfoSize => "Розмір: {} MB",
         VariablesKey::InfoAttributes => "Атрибути (.zattrs)",
-        VariablesKey::Download => "Завантажити",
-        VariablesKey::DownloadCells => "{} ({} комірок)",
+        VariablesKey::Download => "Завантаження",
+        VariablesKey::DownloadCells => "{} (комірок: {})",
         VariablesKey::LargeSelectionPyramid => {
-            "Велика 2D-вибірка ({} комірок, {} MB): увімкнено автоматичну агрегацію в піраміду кількох роздільностей."
+            "Велика 2D-вибірка (комірок: {}, {} MB): увімкнено автоматичну агрегацію в піраміду кількох роздільностей."
         }
         VariablesKey::LargeSelectionNoMeshes => {
-            "3D-глобус і 3D-поверхню вимкнено для цієї великої вибірки ({} комірок, {} MB). 2D-площина та 1D-лінія залишаються доступними."
+            "3D-глобус і 3D-поверхню вимкнено для цієї великої вибірки (комірок: {}, {} MB). 2D-площина та 1D-лінія залишаються доступними."
         }
         VariablesKey::LargeVolumeDisabled => {
             "3D-об'єм і хмару точок вимкнено для цієї вибірки: розмір об'єму ({} MB) перевищує ліміт буфера зберігання GPU 128 MB. 2D-площина, 1D-лінія та 3D-глобус залишаються доступними."

@@ -60,15 +60,15 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::NanColor => "Colore NaN",
         SettingsKey::NanColorHover => "Se disattivo, i valori NaN/Inf sono trasparenti.",
         SettingsKey::NanColorPickerHover => "Colore NaN. Clicca per scegliere il colore.",
-        SettingsKey::LowClip => "Taglio inferiore",
+        SettingsKey::LowClip => "Sotto l'intervallo",
         SettingsKey::LowClipHover => "Valori < cmin resi con questo colore.",
         SettingsKey::LowClipPickerHover => {
-            "Colore di taglio inferiore (< Min). Clicca per scegliere il colore."
+            "Colore sotto l'intervallo (< Min). Clicca per scegliere il colore."
         }
-        SettingsKey::HighClip => "Taglio superiore",
+        SettingsKey::HighClip => "Sopra l'intervallo",
         SettingsKey::HighClipHover => "Valori > cmax resi con questo colore.",
         SettingsKey::HighClipPickerHover => {
-            "Colore di taglio superiore (> Max). Clicca per scegliere il colore."
+            "Colore sopra l'intervallo (> Max). Clicca per scegliere il colore."
         }
         SettingsKey::Scale => "Scala",
         SettingsKey::ScaleLinear => "Lineare",
@@ -83,7 +83,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleParam => "Param.:",
         SettingsKey::Opacity => "Opacità",
         SettingsKey::OpacityHover => {
-            "Opacità dei valori mappati sui colori. I colori NaN e di taglio mantengono il proprio alfa. \
+            "Opacità dei valori mappati sui colori. I colori NaN e fuori intervallo mantengono il proprio alfa. \
              Doppio clic per reimpostare."
         }
         SettingsKey::AlphaCurve => "Curva alfa",

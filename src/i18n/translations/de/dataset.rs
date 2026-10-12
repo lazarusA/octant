@@ -125,8 +125,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::ClearInputHover => "Eingabe leeren",
         DatasetKey::LoadDatasetHover => "Datensatz laden & Variablen öffnen",
         DatasetKey::HopOctantHover => "Klicken, um den Oktanten zu wechseln",
-        DatasetKey::HeroLoadingSource => "lade: {}",
-        DatasetKey::HeroLoading => "lade...",
+        DatasetKey::HeroLoadingSource => "wird geladen: {}",
+        DatasetKey::HeroLoading => "wird geladen...",
         DatasetKey::HeroLoaded => "geladen: {}",
         // Errors
         DatasetKey::BrowserLocalPaths => {

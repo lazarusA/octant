@@ -7,7 +7,7 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
         HoverKey::ChannelN => "Kanava {}",
         HoverKey::SeriesLabel => "sarja",
         HoverKey::FallbackVariable => "muuttuja",
-        HoverKey::FallbackOverlay => "päällyste",
+        HoverKey::FallbackOverlay => "päällystaso",
         HoverKey::DataValue => "Data-arvo",
         HoverKey::LongitudeDegrees => "Pituusaste (astetta)",
         HoverKey::LatitudeDegrees => "Leveysaste (astetta)",

@@ -51,13 +51,13 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::RangeMaxHover => {
             "Extremo superior del rango (Máx.). Arrastre para ajustar o haga clic para escribir."
         }
-        ColormapKey::LowClipTitle => "Color de recorte inferior (< Mín.)",
+        ColormapKey::LowClipTitle => "Color bajo el rango (< Mín.)",
         ColormapKey::LowClipHover => {
-            "Color de recorte inferior (< Mín.). Haga clic para seleccionar el color."
+            "Color bajo el rango (< Mín.). Haga clic para seleccionar el color."
         }
-        ColormapKey::HighClipTitle => "Color de recorte superior (> Máx.)",
+        ColormapKey::HighClipTitle => "Color sobre el rango (> Máx.)",
         ColormapKey::HighClipHover => {
-            "Color de recorte superior (> Máx.). Haga clic para seleccionar el color."
+            "Color sobre el rango (> Máx.). Haga clic para seleccionar el color."
         }
         ColormapKey::HoveredValue => "Val.: {}",
         ColormapKey::TitleHover => "Título de la barra de color. Haga clic para editarlo.",

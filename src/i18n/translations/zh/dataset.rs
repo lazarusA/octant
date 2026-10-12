@@ -72,7 +72,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PrefetchCapacitySettings => "预取与容量设置",
         DatasetKey::EnablePrefetching => "启用后台预取",
         DatasetKey::CacheLimitSuffix => " MB 上限",
-        DatasetKey::WindowSizeSuffix => " 窗口大小（步）",
+        DatasetKey::WindowSizeSuffix => " 窗口大小（时间步）",
         DatasetKey::PrefetchWorkersSuffix => " 预取线程数",
         DatasetKey::FlushAllCaches => "清空所有缓存",
         // Catalog

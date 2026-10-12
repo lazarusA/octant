@@ -53,7 +53,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         }
         VariablesKey::RoleNone => "Ninguno",
         VariablesKey::RoleAnimated => "Animado",
-        VariablesKey::RoleGrid => "Malla",
+        VariablesKey::RoleGrid => "Cuadrícula",
         VariablesKey::Index => "Índice:",
         VariablesKey::ChannelN => "Canal {}",
     })

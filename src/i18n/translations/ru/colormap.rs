@@ -49,10 +49,14 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::RangeMaxHover => {
             "Верхняя граница диапазона (Макс.). Потяните или нажмите для ввода."
         }
-        ColormapKey::LowClipTitle => "Цвет нижнего среза (< Мин.)",
-        ColormapKey::LowClipHover => "Цвет нижнего среза (< Мин.). Нажмите, чтобы выбрать цвет.",
-        ColormapKey::HighClipTitle => "Цвет верхнего среза (> Макс.)",
-        ColormapKey::HighClipHover => "Цвет верхнего среза (> Макс.). Нажмите, чтобы выбрать цвет.",
+        ColormapKey::LowClipTitle => "Цвет нижнего отсечения (< Мин.)",
+        ColormapKey::LowClipHover => {
+            "Цвет нижнего отсечения (< Мин.). Нажмите, чтобы выбрать цвет."
+        }
+        ColormapKey::HighClipTitle => "Цвет верхнего отсечения (> Макс.)",
+        ColormapKey::HighClipHover => {
+            "Цвет верхнего отсечения (> Макс.). Нажмите, чтобы выбрать цвет."
+        }
         ColormapKey::HoveredValue => "Знач.: {}",
         ColormapKey::TitleHover => "Заголовок легенды. Нажмите, чтобы изменить.",
         ColormapKey::ColorPicker => "Выбор цвета",

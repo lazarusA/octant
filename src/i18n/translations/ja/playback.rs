@@ -22,6 +22,6 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::TimelineCurrent => "現在: {}",
         PlaybackKey::TimelineRange => "範囲: {} -> {}",
         PlaybackKey::TimelineStepSize => "ステップ幅: {}",
-        PlaybackKey::DefaultStepSize => "ステップ: 1",
+        PlaybackKey::DefaultStepSize => "ステップ幅: 1",
     })
 }

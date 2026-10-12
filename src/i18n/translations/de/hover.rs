@@ -9,12 +9,12 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
         HoverKey::FallbackVariable => "Variable",
         HoverKey::FallbackOverlay => "Überlagerung",
         HoverKey::DataValue => "Datenwert",
-        HoverKey::LongitudeDegrees => "Länge (Grad)",
-        HoverKey::LatitudeDegrees => "Breite (Grad)",
+        HoverKey::LongitudeDegrees => "Längengrad (°)",
+        HoverKey::LatitudeDegrees => "Breitengrad (°)",
         HoverKey::AlongAxisNamed => "Entlang {} ({})",
         HoverKey::AlongAxis => "Entlang {}",
-        HoverKey::AxisXLongitude => "X / Länge",
-        HoverKey::AxisYLatitude => "Y / Breite",
+        HoverKey::AxisXLongitude => "X / Längengrad",
+        HoverKey::AxisYLatitude => "Y / Breitengrad",
         HoverKey::AxisZDepth => "Z / Tiefe",
         HoverKey::DropDataset => {
             "Datensatz zum Visualisieren ablegen (.nc, .h5, .zarr, .icechunk, .tif)"

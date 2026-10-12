@@ -42,7 +42,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoResolution => "Resolusi: {}",
         VariablesKey::InfoSize => "Ukuran: {} MB",
         VariablesKey::InfoAttributes => "Atribut (.zattrs)",
-        VariablesKey::Download => "Unduh",
+        VariablesKey::Download => "Unduhan",
         VariablesKey::DownloadCells => "{} ({} sel)",
         VariablesKey::LargeSelectionPyramid => {
             "Pilihan 2D besar ({} sel, {} MB): agregasi piramida multi-resolusi otomatis diaktifkan."

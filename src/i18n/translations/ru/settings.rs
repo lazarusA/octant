@@ -56,15 +56,15 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::NanColor => "Цвет NaN",
         SettingsKey::NanColorHover => "Если не отмечено, значения NaN/Inf прозрачны.",
         SettingsKey::NanColorPickerHover => "Цвет NaN. Нажмите, чтобы выбрать цвет.",
-        SettingsKey::LowClip => "Нижний срез",
+        SettingsKey::LowClip => "Нижнее отсечение",
         SettingsKey::LowClipHover => "Значения < cmin окрашиваются этим цветом.",
         SettingsKey::LowClipPickerHover => {
-            "Цвет нижнего среза (< Мин.). Нажмите, чтобы выбрать цвет."
+            "Цвет нижнего отсечения (< Мин.). Нажмите, чтобы выбрать цвет."
         }
-        SettingsKey::HighClip => "Верхний срез",
+        SettingsKey::HighClip => "Верхнее отсечение",
         SettingsKey::HighClipHover => "Значения > cmax окрашиваются этим цветом.",
         SettingsKey::HighClipPickerHover => {
-            "Цвет верхнего среза (> Макс.). Нажмите, чтобы выбрать цвет."
+            "Цвет верхнего отсечения (> Макс.). Нажмите, чтобы выбрать цвет."
         }
         SettingsKey::Scale => "Шкала",
         SettingsKey::ScaleLinear => "Линейная",
@@ -79,7 +79,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleParam => "Параметр:",
         SettingsKey::Opacity => "Непрозрачность",
         SettingsKey::OpacityHover => {
-            "Непрозрачность значений цветовой шкалы. Цвета NaN и срезов сохраняют свою альфу. \
+            "Непрозрачность значений цветовой шкалы. Цвета NaN и отсечения сохраняют свою альфу. \
              Двойной щелчок - сброс."
         }
         SettingsKey::AlphaCurve => "Кривая альфа",

@@ -54,12 +54,12 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
             "Wenn deaktiviert, werden NaN/Inf-Werte transparent dargestellt."
         }
         SettingsKey::NanColorPickerHover => "NaN-Farbe. Klicken, um eine Farbe zu wählen.",
-        SettingsKey::LowClip => "Untere Grenze",
+        SettingsKey::LowClip => "Unter Bereich",
         SettingsKey::LowClipHover => "Werte < cmin erhalten diese Farbe.",
         SettingsKey::LowClipPickerHover => {
             "Farbe unter dem Bereich (< Min). Klicken, um eine Farbe zu wählen."
         }
-        SettingsKey::HighClip => "Obere Grenze",
+        SettingsKey::HighClip => "Über Bereich",
         SettingsKey::HighClipHover => "Werte > cmax erhalten diese Farbe.",
         SettingsKey::HighClipPickerHover => {
             "Farbe über dem Bereich (> Max). Klicken, um eine Farbe zu wählen."
@@ -77,7 +77,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleParam => "Param.:",
         SettingsKey::Opacity => "Deckkraft",
         SettingsKey::OpacityHover => {
-            "Deckkraft der Werte aus der Farbtabelle. NaN- und Grenzfarben behalten ihr eigenes Alpha. \
+            "Deckkraft der Werte aus der Farbtabelle. NaN-Farben und Farben außerhalb des Bereichs behalten ihr eigenes Alpha. \
              Doppelklick zum Zurücksetzen."
         }
         SettingsKey::AlphaCurve => "Alphakurve",

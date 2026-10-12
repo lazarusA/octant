@@ -11,17 +11,17 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::CompositeTrueColor => "Luonnolliset värit",
         PlotKey::CompositeFalseColor => "Väärät värit",
         PlotKey::CompositeRgb => "RGB-yhdistelmä",
-        PlotKey::CompositeOverlay => "Kanavapäällyste",
+        PlotKey::CompositeOverlay => "Kanavapäällystaso",
         PlotKey::AlignGeo => "Eri pituus-/leveysasteruudukossa (ei vielä tuettu)",
         PlotKey::AlignIndexOnly => {
             "Sama ruudukon muoto, mutta mikään koordinaatti ei vastaa kuvaajaa"
         }
         PlotKey::AlignIncompatible => "Ei yhteistä ruudukkoa kuvaajan kanssa",
         PlotKey::OverlayPlotFirst => "Piirrä ensin muuttuja",
-        PlotKey::OverlayHeatmapOnly => "Päällysteet piirretään lämpökarttojen päälle",
-        PlotKey::OverlayStackFull => "Enintään 4 päällystettä",
+        PlotKey::OverlayHeatmapOnly => "Päällystasot piirretään lämpökarttojen päälle",
+        PlotKey::OverlayStackFull => "Enintään 4 päällystasoa",
         PlotKey::OverlayAlreadyLayer => "Jo kuvaajan taso",
-        PlotKey::OverlayCantAdd => "Päällystettä ei voi lisätä",
+        PlotKey::OverlayCantAdd => "Päällystasoa ei voi lisätä",
         PlotKey::OverlayNamedReason => "'{}': {}",
         PlotKey::SelectProjection => "Valitse visualisoinnin projektio",
         PlotKey::GridHealpixDiscrete => "HEALPix / diskreetti",

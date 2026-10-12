@@ -5,7 +5,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::ActiveDataset => "Conjunto de datos activo",
         DatasetKey::NoDatasetLoaded => "No hay ningún conjunto de datos cargado",
         DatasetKey::MemoryCache => "Memoria y caché",
-        DatasetKey::SampleDatasets => "Muestras",
+        DatasetKey::SampleDatasets => "Ejemplos",
         DatasetKey::DropFilesHere => "Arrastre un archivo o directorio",
         DatasetKey::SourceUrlOrPath => "URL de destino / ruta de archivo",
         DatasetKey::LoadingMetadata => "Inspeccionando metadatos del almacén en segundo plano...",
@@ -60,7 +60,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::GlobalMemoryUsage => "Uso global de memoria RAM:",
         DatasetKey::CacheUsagePercent => "{} MB / {} MB ({}%)",
         DatasetKey::MemoryBreakdown => "Desglose de memoria por tipo:",
-        DatasetKey::ResidentHyperslabs => "Hiperbloques residentes: {} MB ({} bloques)",
+        DatasetKey::ResidentHyperslabs => "Hyperslabs residentes: {} MB ({} bloques)",
         DatasetKey::MultiResPyramid => "Pirámide multirresolución: {} MB",
         DatasetKey::CacheHitsMisses => "Aciertos: {} | Fallos: {} (tasa de aciertos: {}%)",
         DatasetKey::PrefetchInFlight => "Precarga en segundo plano: {} en curso",
@@ -101,7 +101,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroSentinel2Hover => "Sentinel-2 L2A en color verdadero, COG (AWS S3)",
         DatasetKey::HeroVolume4DHover => "Volumen espaciotemporal 4D sintético",
         DatasetKey::HeroCatalogHover => "Explorar el catálogo de conjuntos de datos",
-        DatasetKey::LoadSampleHover => "Cargar muestra: {}",
+        DatasetKey::LoadSampleHover => "Cargar ejemplo: {}",
         DatasetKey::HeroHintLong => {
             "pegue una URL o ruta local, o arrastre y suelte archivos en cualquier lugar"
         }

@@ -14,7 +14,7 @@ pub fn text(key: AboutKey) -> Option<&'static str> {
         AboutKey::StorageTitle => "Zarr 및 Icechunk 기본 지원",
         AboutKey::StorageDesc => "로컬, S3, GCS, Azure, HTTP 스트리밍 백엔드.",
         AboutKey::ShadersTitle => "하드웨어 가속 WGPU 셰이더",
-        AboutKey::ShadersDesc => "2D 평면 지도, 3D 구, 고도 표면, 볼륨 및 1D 프로파일.",
+        AboutKey::ShadersDesc => "2D 평면 지도, 3D 구체, 고도 표면, 볼륨 및 1D 프로파일.",
         AboutKey::LinksHeading => "링크 및 자료",
         AboutKey::DocsLink => "Octant 문서",
         AboutKey::GoodFaithNotice => {

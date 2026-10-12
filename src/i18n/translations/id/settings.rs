@@ -50,12 +50,12 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::NanColor => "Warna NaN",
         SettingsKey::NanColorHover => "Jika tidak dicentang, nilai NaN/Inf digambar transparan.",
         SettingsKey::NanColorPickerHover => "Warna NaN. Klik untuk memilih warna.",
-        SettingsKey::LowClip => "Potong Bawah",
+        SettingsKey::LowClip => "Klip Bawah",
         SettingsKey::LowClipHover => "Nilai < cmin dipotong ke warna ini.",
-        SettingsKey::LowClipPickerHover => "Warna potong bawah (< Min). Klik untuk memilih warna.",
-        SettingsKey::HighClip => "Potong Atas",
+        SettingsKey::LowClipPickerHover => "Warna klip bawah (< Min). Klik untuk memilih warna.",
+        SettingsKey::HighClip => "Klip Atas",
         SettingsKey::HighClipHover => "Nilai > cmax dipotong ke warna ini.",
-        SettingsKey::HighClipPickerHover => "Warna potong atas (> Max). Klik untuk memilih warna.",
+        SettingsKey::HighClipPickerHover => "Warna klip atas (> Max). Klik untuk memilih warna.",
         SettingsKey::Scale => "Skala",
         SettingsKey::ScaleLinear => "Linear",
         SettingsKey::ScaleLog => "Logaritmik",
@@ -69,7 +69,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleParam => "Param:",
         SettingsKey::Opacity => "Opasitas",
         SettingsKey::OpacityHover => {
-            "Opasitas nilai yang dipetakan warna. Warna NaN dan potong tetap memakai alfanya sendiri. Klik ganda untuk mengatur ulang."
+            "Opasitas nilai yang dipetakan warna. Warna NaN dan klip tetap memakai alfanya sendiri. Klik ganda untuk mengatur ulang."
         }
         SettingsKey::AlphaCurve => "Kurva alfa",
         SettingsKey::AlphaCurveHint => "0.1, 0.4, 0.3  atau  0:0, 0.5:1, 1:0",

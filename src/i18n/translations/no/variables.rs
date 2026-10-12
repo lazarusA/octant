@@ -38,7 +38,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoResolution => "Oppløsning: {}",
         VariablesKey::InfoSize => "Størrelse: {} MB",
         VariablesKey::InfoAttributes => "Attributter (.zattrs)",
-        VariablesKey::Download => "Last ned",
+        VariablesKey::Download => "Nedlasting",
         VariablesKey::DownloadCells => "{} ({} celler)",
         VariablesKey::LargeSelectionPyramid => {
             "Stort 2D-utvalg ({} celler, {} MB): automatisk aggregering med flernivåpyramide er slått på."

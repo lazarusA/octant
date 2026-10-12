@@ -47,10 +47,10 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::RangeMaxHover => {
             "Batas atas rentang (Max). Seret untuk menyesuaikan atau klik untuk mengetik."
         }
-        ColormapKey::LowClipTitle => "Warna Potong Bawah (< Min)",
-        ColormapKey::LowClipHover => "Warna potong bawah (< Min). Klik untuk memilih warna.",
-        ColormapKey::HighClipTitle => "Warna Potong Atas (> Max)",
-        ColormapKey::HighClipHover => "Warna potong atas (> Max). Klik untuk memilih warna.",
+        ColormapKey::LowClipTitle => "Warna Klip Bawah (< Min)",
+        ColormapKey::LowClipHover => "Warna klip bawah (< Min). Klik untuk memilih warna.",
+        ColormapKey::HighClipTitle => "Warna Klip Atas (> Max)",
+        ColormapKey::HighClipHover => "Warna klip atas (> Max). Klik untuk memilih warna.",
         ColormapKey::HoveredValue => "Nilai: {}",
         ColormapKey::TitleHover => "Judul bilah warna. Klik untuk mengedit.",
         ColormapKey::ColorPicker => "Pemilih Warna",

@@ -12,11 +12,11 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::CompositeFalseColor => "Falso color",
         PlotKey::CompositeRgb => "Composición RGB",
         PlotKey::CompositeOverlay => "Superposición de canales",
-        PlotKey::AlignGeo => "En otra malla de longitud/latitud (aún no compatible)",
+        PlotKey::AlignGeo => "En otra cuadrícula de longitud/latitud (aún no compatible)",
         PlotKey::AlignIndexOnly => {
-            "Misma forma de malla, pero ninguna coordenada coincide con el gráfico"
+            "Misma forma de cuadrícula, pero ninguna coordenada coincide con el gráfico"
         }
-        PlotKey::AlignIncompatible => "No comparte malla con el gráfico",
+        PlotKey::AlignIncompatible => "No comparte cuadrícula con el gráfico",
         PlotKey::OverlayPlotFirst => "Primero grafique una variable",
         PlotKey::OverlayHeatmapOnly => "Las superposiciones se dibujan sobre mapas de calor",
         PlotKey::OverlayStackFull => "Como máximo 4 superposiciones",
@@ -26,7 +26,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::SelectProjection => "Seleccionar proyección de visualización",
         PlotKey::GridHealpixDiscrete => "HEALPix / discreta",
         PlotKey::DisabledItem => "{} ({})",
-        PlotKey::UnsupportedForGrid => "No compatible con la malla {}",
+        PlotKey::UnsupportedForGrid => "No compatible con la cuadrícula {}",
         PlotKey::DisabledAggregation => "Desactivado: la agregación 2D está activa",
         PlotKey::Requires3D => "Requiere datos 3D",
         PlotKey::DisabledGpuLimit => "Desactivado: {} MB > límite de GPU de 128 MB",

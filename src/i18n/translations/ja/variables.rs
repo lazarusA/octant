@@ -46,7 +46,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
             "大きな2D選択範囲 ({} セル、{} MB): 多解像度ピラミッドによる自動集約が有効です。"
         }
         VariablesKey::LargeSelectionNoMeshes => {
-            "この大きな選択範囲 ({} セル、{} MB) では3D球体と3D表面のメッシュは無効です。2D平面と1Dラインのプロットは引き続き使えます。"
+            "この大きな選択範囲 ({} セル、{} MB) では3D球体と3Dサーフェスのメッシュは無効です。2D平面と1Dラインのプロットは引き続き使えます。"
         }
         VariablesKey::LargeVolumeDisabled => {
             "この選択範囲では3Dボリュームと点群は無効です: ボリュームサイズ ({} MB) が128 MBのGPUストレージバッファ上限を超えています。2D平面、1Dライン、3D球体は引き続き使えます。"

@@ -23,7 +23,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ReasonLabelOpaque => "'Kategorinen tunnistepinta' piirretään aina peittävänä.",
         SettingsKey::ReasonAlwaysBlends => "Tämä algoritmi sekoittaa aina säteen suuntaisesti.",
         SettingsKey::CloseSettingsHover => "Sulje asetukset",
-        SettingsKey::SectionOverlays => "Päällysteet",
+        SettingsKey::SectionOverlays => "Päällystasot",
         SettingsKey::SectionResolution => "Resoluutio",
         SettingsKey::SectionView => "Näkymä",
         SettingsKey::Layers => "Tasot",
@@ -157,7 +157,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CmykAutoMapped => {
             "Automaattisesti kohdistetut kanavat: C (1), M (2), Y (3), K (4)"
         }
-        SettingsKey::MultiChannelOverlay => "Monikanavapäällyste",
+        SettingsKey::MultiChannelOverlay => "Monikanavapäällystaso",
         SettingsKey::MultiChannelOverlayHover => {
             "Yhdistää useita kanavia additiivisesti, kukin omalla värisävyllään."
         }

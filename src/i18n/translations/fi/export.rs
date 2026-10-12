@@ -15,7 +15,7 @@ pub fn text(key: ExportKey) -> Option<&'static str> {
         ExportKey::FormatHeading => "Vientimuoto",
         ExportKey::JpegQuality => "JPEG-laatu:",
         ExportKey::AreaHeading => "Vientialue",
-        ExportKey::FullCanvas => "Koko piirtoalue (päällysteineen)",
+        ExportKey::FullCanvas => "Koko piirtoalue (päällystasoineen)",
         ExportKey::FramedRoi => "Rajattu ROI",
         ExportKey::HideGuides => "Piilota apuviivat",
         ExportKey::ShowGuides => "Näytä apuviivat piirtoalueella",

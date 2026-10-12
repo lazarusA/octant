@@ -15,7 +15,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         }
         SettingsKey::ReasonCompositeOpaque => "Композити малюються непрозорими.",
         SettingsKey::ReasonLabelOpaque => {
-            "Поверхня категорійних міток завжди малюється непрозорою."
+            "Поверхня категоріальних міток завжди малюється непрозорою."
         }
         SettingsKey::ReasonAlwaysBlends => "Цей алгоритм завжди змішує вздовж променя.",
         SettingsKey::CloseSettingsHover => "Закрити налаштування",
@@ -167,6 +167,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsAll => "Усі",
         SettingsKey::ChannelsNone => "Жодного",
         SettingsKey::ChannelTintHover => "Клацніть, щоб налаштувати відтінок каналу",
-        SettingsKey::BandNumber => "Смуга {}",
+        SettingsKey::BandNumber => "Канал {}",
     })
 }

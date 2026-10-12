@@ -4,7 +4,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
     Some(match key {
         PlotOptionsKey::Lines => "Viivat",
         PlotOptionsKey::LinesHover => "Näytä pisteitä yhdistävät yhtenäiset viivat",
-        PlotOptionsKey::Scatter => "Hajonta",
+        PlotOptionsKey::Scatter => "Pisteet",
         PlotOptionsKey::ScatterHover => "Näytä merkki jokaisen pisteen kohdalla",
         PlotOptionsKey::PointSize => "Pistekoko:",
         PlotOptionsKey::CustomColor => "Mukautettu väri",

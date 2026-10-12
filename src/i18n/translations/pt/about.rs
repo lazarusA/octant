@@ -9,7 +9,7 @@ pub fn text(key: AboutKey) -> Option<&'static str> {
         AboutKey::Description => {
             "O Octant é um visualizador interativo para conjuntos de dados N-dimensionais com suporte nativo para armazenamento de objetos local e em nuvem, Zarr (v2/v3) e Icechunk. Construído em Rust com renderização acelerada por GPU via WGPU. O Octant roda nativamente em macOS, Linux e Windows."
         }
-        AboutKey::HyperslabTitle => "Fatiamento de hiperblocos",
+        AboutKey::HyperslabTitle => "Fatiamento de hyperslabs",
         AboutKey::HyperslabDesc => "Cache LRU assíncrono de chunks e pirâmides de multi-resolução.",
         AboutKey::StorageTitle => "Nativo em Zarr e Icechunk",
         AboutKey::StorageDesc => "Backends locais, S3, GCS, Azure e streaming HTTP.",

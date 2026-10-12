@@ -51,7 +51,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::LargeVolumeDisabled => {
             "Volume 3D e Nuvola di punti sono disattivati per questa selezione: la dimensione del volume ({} MB) supera il limite di 128 MB del buffer di archiviazione della GPU. Piano 2D, Linea 1D e Globo 3D restano attivi."
         }
-        VariablesKey::RoleNone => "Nessuno",
+        VariablesKey::RoleNone => "Nessuna",
         VariablesKey::RoleAnimated => "Animata",
         VariablesKey::RoleGrid => "Griglia",
         VariablesKey::Index => "Indice:",

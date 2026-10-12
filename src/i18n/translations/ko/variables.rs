@@ -3,7 +3,7 @@ use crate::i18n::keys::VariablesKey;
 pub fn text(key: VariablesKey) -> Option<&'static str> {
     Some(match key {
         VariablesKey::Group => "그룹",
-        VariablesKey::DataType => "유형",
+        VariablesKey::DataType => "자료형",
         VariablesKey::Shape => "형태",
         VariablesKey::Description => "설명",
         VariablesKey::SearchVariables => "변수 검색...",
@@ -44,10 +44,10 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
             "큰 2D 선택 영역 (셀 {}개, {} MB): 다중 해상도 피라미드 집계가 자동으로 사용됩니다."
         }
         VariablesKey::LargeSelectionNoMeshes => {
-            "이 큰 선택 영역 (셀 {}개, {} MB)에서는 3D 구와 3D 표면 메시를 사용할 수 없습니다. 2D 평면과 1D 선 플롯은 그대로 사용할 수 있습니다."
+            "이 큰 선택 영역 (셀 {}개, {} MB)에서는 3D 구체와 3D 표면 메시를 사용할 수 없습니다. 2D 평면과 1D 선 플롯은 그대로 사용할 수 있습니다."
         }
         VariablesKey::LargeVolumeDisabled => {
-            "이 선택 영역에서는 3D 볼륨과 점 구름을 사용할 수 없습니다: 볼륨 크기 ({} MB)가 128 MB GPU 저장 버퍼 한도를 넘습니다. 2D 평면, 1D 선, 3D 구는 그대로 사용할 수 있습니다."
+            "이 선택 영역에서는 3D 볼륨과 포인트 클라우드를 사용할 수 없습니다: 볼륨 크기 ({} MB)가 128 MB GPU 저장 버퍼 한도를 넘습니다. 2D 평면, 1D 선, 3D 구체는 그대로 사용할 수 있습니다."
         }
         VariablesKey::RoleNone => "없음",
         VariablesKey::RoleAnimated => "애니메이션",

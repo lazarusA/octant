@@ -27,7 +27,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::PlotDataOverlayHover => {
             "Загрузить эту переменную и добавить её как наложение поверх графика"
         }
-        VariablesKey::AddOverlay => "Наложение",
+        VariablesKey::AddOverlay => "Добавить наложение",
         VariablesKey::AddOverlayHover => {
             "Пока включено, 'Построить' добавляет эту переменную как наложение"
         }

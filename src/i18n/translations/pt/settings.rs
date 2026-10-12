@@ -56,15 +56,15 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::NanColor => "Cor de NaN",
         SettingsKey::NanColorHover => "Se desmarcado, valores NaN/Inf ficam transparentes.",
         SettingsKey::NanColorPickerHover => "Cor de NaN. Clique para selecionar a cor.",
-        SettingsKey::LowClip => "Corte inferior",
+        SettingsKey::LowClip => "Abaixo do intervalo",
         SettingsKey::LowClipHover => "Valores < cmin recebem esta cor.",
         SettingsKey::LowClipPickerHover => {
-            "Cor do corte inferior (< Mín). Clique para selecionar a cor."
+            "Cor abaixo do intervalo (< Mín). Clique para selecionar a cor."
         }
-        SettingsKey::HighClip => "Corte superior",
+        SettingsKey::HighClip => "Acima do intervalo",
         SettingsKey::HighClipHover => "Valores > cmax recebem esta cor.",
         SettingsKey::HighClipPickerHover => {
-            "Cor do corte superior (> Máx). Clique para selecionar a cor."
+            "Cor acima do intervalo (> Máx). Clique para selecionar a cor."
         }
         SettingsKey::Scale => "Escala",
         SettingsKey::ScaleLinear => "Linear",
@@ -79,7 +79,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleParam => "Parâmetro:",
         SettingsKey::Opacity => "Opacidade",
         SettingsKey::OpacityHover => {
-            "Opacidade dos valores mapeados em cores. As cores de NaN e de corte mantêm o próprio alfa. \
+            "Opacidade dos valores mapeados em cores. As cores de NaN e fora do intervalo mantêm o próprio alfa. \
              Clique duas vezes para redefinir."
         }
         SettingsKey::AlphaCurve => "Curva alfa",
@@ -125,7 +125,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
             "Recorta os litorais estritamente ao limite espacial do conjunto de dados ativo."
         }
         SettingsKey::AutoRotate => "Rotação automática",
-        SettingsKey::ResetView => "Redefinir vista",
+        SettingsKey::ResetView => "Redefinir visualização",
         SettingsKey::ResetViewHover => "Redefinir a orientação da câmera 3D",
         SettingsKey::HoverCard => "Cartão de informações",
         SettingsKey::HideHoverCardHover => "Ocultar o cartão de informações",

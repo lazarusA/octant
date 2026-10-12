@@ -2,7 +2,7 @@ use crate::i18n::keys::CommonKey;
 
 pub fn text(key: CommonKey) -> Option<&'static str> {
     Some(match key {
-        CommonKey::Dataset => "Tietoaineisto",
+        CommonKey::Dataset => "Aineisto",
         CommonKey::Variables => "Muuttujat",
         CommonKey::Dimensions => "Ulottuvuudet",
         CommonKey::Colormaps => "Värikartat",

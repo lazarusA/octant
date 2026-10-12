@@ -4,7 +4,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
     Some(match key {
         PlotKey::Heatmap => "ヒートマップ",
         PlotKey::Line => "1Dライン",
-        PlotKey::Surface => "表面",
+        PlotKey::Surface => "サーフェス",
         PlotKey::Volume => "ボリューム",
         PlotKey::Sphere => "球体",
         PlotKey::PointCloud => "点群",

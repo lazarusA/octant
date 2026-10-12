@@ -26,7 +26,7 @@ pub fn text(key: PlotOptionsKey) -> Option<&'static str> {
         PlotOptionsKey::AlgoMip => "Максимальна інтенсивність (MIP)",
         PlotOptionsKey::AlgoMinIp => "Мінімальна інтенсивність (MinIP)",
         PlotOptionsKey::AlgoXray => "Середня проєкція (рентген)",
-        PlotOptionsKey::AlgoLabelSurface => "Поверхня категорійних міток",
+        PlotOptionsKey::AlgoLabelSurface => "Поверхня категоріальних міток",
         PlotOptionsKey::AlgoAbsorption => "Поглинання RGBA",
         PlotOptionsKey::AlgoAdditive => "Адитивний RGBA",
         PlotOptionsKey::AlgoIndexed => "Індексований RGBA",

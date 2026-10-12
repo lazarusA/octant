@@ -2,9 +2,9 @@ use crate::i18n::keys::ColormapKey;
 
 pub fn text(key: ColormapKey) -> Option<&'static str> {
     Some(match key {
-        ColormapKey::Sequential => "連続",
-        ColormapKey::Diverging => "発散",
-        ColormapKey::Cyclic => "周期",
+        ColormapKey::Sequential => "シーケンシャル",
+        ColormapKey::Diverging => "ダイバージング",
+        ColormapKey::Cyclic => "サイクリック",
         ColormapKey::Categorical => "カテゴリ",
         ColormapKey::Other => "その他",
         ColormapKey::InterpolationLinear => "線形",

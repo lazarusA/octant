@@ -69,7 +69,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::PrefsUnreadable => "Не вдалося прочитати налаштування колірних шкал",
         ColormapKey::PrefsBackedUp => "Резервну копію збережено як `{}`",
         ColormapKey::PrefsNotBackedUp => "Резервну копію налаштувань колірних шкал не створено",
-        ColormapKey::BackupsFull => "Усі {} резервні копії налаштувань колірних шкал зайняті",
+        ColormapKey::BackupsFull => "Усі {} резервних копій налаштувань колірних шкал зайняті",
         ColormapKey::CustomNotLoaded => "Власну колірну шкалу не завантажено",
         ColormapKey::CustomDoesNotBuild => "`{}` не будується: {}",
         ColormapKey::NotRegistered => "Колірну шкалу {} не зареєстровано",

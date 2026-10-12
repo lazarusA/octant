@@ -23,11 +23,11 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::PlotData => "Piirrä data",
         VariablesKey::PlotDataHover => "Hae tämä muuttuja ja piirrä se",
         VariablesKey::PlotDataOverlayHover => {
-            "Hae tämä muuttuja ja lisää se päällysteeksi kuvaajan päälle"
+            "Hae tämä muuttuja ja lisää se päällystasoksi kuvaajan päälle"
         }
-        VariablesKey::AddOverlay => "Lisää päällyste",
+        VariablesKey::AddOverlay => "Lisää päällystaso",
         VariablesKey::AddOverlayHover => {
-            "Kun päällä, 'Piirrä data' lisää tämän muuttujan päällysteeksi"
+            "Kun päällä, 'Piirrä data' lisää tämän muuttujan päällystasoksi"
         }
         VariablesKey::InfoPath => "Polku:",
         VariablesKey::InfoUnits => "Yksiköt: {}",

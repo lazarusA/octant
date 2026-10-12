@@ -62,15 +62,15 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
             "Si no está marcado, los valores NaN/Inf se muestran transparentes."
         }
         SettingsKey::NanColorPickerHover => "Color NaN. Haga clic para seleccionar el color.",
-        SettingsKey::LowClip => "Recorte inferior",
-        SettingsKey::LowClipHover => "Los valores < cmin se recortan a este color.",
+        SettingsKey::LowClip => "Bajo el rango",
+        SettingsKey::LowClipHover => "Los valores < cmin toman este color.",
         SettingsKey::LowClipPickerHover => {
-            "Color de recorte inferior (< Mín.). Haga clic para seleccionar el color."
+            "Color bajo el rango (< Mín.). Haga clic para seleccionar el color."
         }
-        SettingsKey::HighClip => "Recorte superior",
-        SettingsKey::HighClipHover => "Los valores > cmax se recortan a este color.",
+        SettingsKey::HighClip => "Sobre el rango",
+        SettingsKey::HighClipHover => "Los valores > cmax toman este color.",
         SettingsKey::HighClipPickerHover => {
-            "Color de recorte superior (> Máx.). Haga clic para seleccionar el color."
+            "Color sobre el rango (> Máx.). Haga clic para seleccionar el color."
         }
         SettingsKey::Scale => "Escala",
         SettingsKey::ScaleLinear => "Lineal",
@@ -85,7 +85,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleParam => "Parám.:",
         SettingsKey::Opacity => "Opacidad",
         SettingsKey::OpacityHover => {
-            "Opacidad de los valores con mapa de color. Los colores NaN y de recorte conservan su propio alfa. \
+            "Opacidad de los valores con mapa de color. Los colores NaN y fuera del rango conservan su propio alfa. \
              Doble clic para restablecer."
         }
         SettingsKey::AlphaCurve => "Curva alfa",

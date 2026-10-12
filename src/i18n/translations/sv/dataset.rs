@@ -19,7 +19,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::Reload => "Läs in igen",
         DatasetKey::BadgeVolume4D => "4D-volym",
         DatasetKey::BadgeMatrix2D => "2D-matris",
-        DatasetKey::BadgeStore => "Lagring",
+        DatasetKey::BadgeStore => "Datalager",
         DatasetKey::Load => "Läs in",
         DatasetKey::TargetPathHint => "https://... eller sökväg (.zarr, .nc, .tif)",
         DatasetKey::CatalogEllipsis => "Katalog...",
@@ -70,7 +70,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PrefetchWorkersSuffix => " förhämtningsarbetare (trådar)",
         DatasetKey::FlushAllCaches => "Töm och rensa alla cachar",
         DatasetKey::CatalogTitle => "Datasetkatalog",
-        DatasetKey::CatalogStoreCount => "{} lagringar",
+        DatasetKey::CatalogStoreCount => "{} datalager",
         DatasetKey::CatalogBlurb => {
             "Utvalda Zarr- och Icechunk-dataset i molnet samt procedurella dataset med känt facit. Välj ett dataset för att läsa in det."
         }

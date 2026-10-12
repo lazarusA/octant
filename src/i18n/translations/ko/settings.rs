@@ -36,10 +36,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
             "이산 컬러바 (고유값 또는 같은 간격의 구간 10개를 자동으로 감지)."
         }
         SettingsKey::LockBoundsHover => {
-            "최소/최대를 고정하여 시간 단계가 바뀌어도 색상 매핑을 유지합니다."
+            "최소/최대를 고정하여 시간 스텝이 바뀌어도 색상 매핑을 유지합니다."
         }
         SettingsKey::ResetBoundsHover => {
-            "범위를 현재 슬라이스/데이터셋의 기본 최소값과 최대값으로 초기화"
+            "범위를 현재 슬라이스/데이터셋의 기본 최솟값과 최댓값으로 초기화"
         }
         SettingsKey::ResetAllColorbar => "컬러바 기본값 모두 초기화",
         SettingsKey::ResetAllColorbarHover => "컬러바 레이블과 범위를 모두 기본값으로 초기화",
@@ -62,7 +62,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ScaleExponential => "지수",
         SettingsKey::ScaleLogHover => "로그 척도 (음이 아닌 데이터)",
         SettingsKey::ScaleLogDisabledHover => {
-            "사용 불가: 최소값이 0 이상이어야 합니다. 음수 데이터에는 대칭 로그를 사용하세요."
+            "사용 불가: 최솟값이 0 이상이어야 합니다. 음수 데이터에는 대칭 로그를 사용하세요."
         }
         SettingsKey::ScaleParam => "매개변수:",
         SettingsKey::Opacity => "불투명도",
@@ -89,8 +89,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::PresetHideCenter => "가운데 숨기기",
         SettingsKey::Transparency => "투명도",
         SettingsKey::TransparencyHover => {
-            "반투명 색상 (불투명도 또는 알파 곡선)을 쓸 때, 가장 가까운 레이어가 \
-             뒤의 레이어를 가리지 않고 모든 레이어를 그립니다."
+            "반투명 색상 (불투명도 또는 알파 곡선)을 쓸 때, 가장 가까운 면이 \
+             뒤의 면을 가리지 않고 모든 면을 그립니다."
         }
         SettingsKey::Lighting => "조명",
         SettingsKey::LightingHover => {
@@ -127,8 +127,8 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggregationHover => "다중 해상도 피라미드 다운샘플링 및 뷰포트 리샘플링.",
         SettingsKey::AggregationMode => "모드:",
         SettingsKey::AggMean => "평균 (박스 필터)",
-        SettingsKey::AggMax => "최대 (봉우리 보존)",
-        SettingsKey::AggMin => "최소 (골 보존)",
+        SettingsKey::AggMax => "최대 (피크 보존)",
+        SettingsKey::AggMin => "최소 (최저값 보존)",
         SettingsKey::AggNearest => "최근접 이웃",
         SettingsKey::AggMeanHover => "2x2 셀의 하위 픽셀을 평균하며 NaN은 무시합니다.",
         SettingsKey::AggMaxHover => "극단적으로 높은 값을 보존합니다.",
