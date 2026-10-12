@@ -47,6 +47,12 @@ jobs:
       # Slices of the Noto CJK fonts for Chinese, Japanese and Korean text in
       # datasets (about 18 MB, fetched by the page only as needed). Built here
       # instead of committed; the tool does not compile Octant itself.
+      # The pinned upstream fonts, downloaded once per pin change.
+      - uses: actions/cache@v4
+        with:
+          path: target/subset_fonts
+          key: noto-cjk-${{ hashFiles('src/bin/subset_fonts/pins.rs') }}
+
       - name: Build CJK font slices
         run: cargo run --release --manifest-path tools/cjk_slices/Cargo.toml -- dist/fonts/cjk
 

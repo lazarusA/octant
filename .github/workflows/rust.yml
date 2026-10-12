@@ -68,10 +68,21 @@ jobs:
             tools/cjk_slices -> target
       - name: Run Clippy
         run: cargo clippy --all-targets -- -D warnings
+      - name: Run Clippy (font subset tool)
+        run: cargo clippy --features font-tools --bin subset_fonts -- -D warnings
       - name: Run Clippy and tests (CJK slice tool)
         run: |
           cargo clippy --manifest-path tools/cjk_slices/Cargo.toml --all-targets -- -D warnings
           cargo test --manifest-path tools/cjk_slices/Cargo.toml
+      # The pinned upstream fonts, downloaded once per pin change.
+      - uses: actions/cache@v4
+        with:
+          path: target/subset_fonts
+          key: noto-cjk-${{ hashFiles('src/bin/subset_fonts/pins.rs') }}
+      # Builds the web font slices the way pages.yml does, so a broken pin or
+      # slicer fails here rather than at deploy time.
+      - name: Build CJK font slices
+        run: cargo run --release --manifest-path tools/cjk_slices/Cargo.toml -- target/cjk_slices_check
 
   licenses:
     name: Third-party License Notices

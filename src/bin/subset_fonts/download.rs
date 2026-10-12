@@ -32,18 +32,11 @@ impl Downloader {
             return Ok(bytes);
         }
         let url = remote.url();
-        println!("downloading {url}");
-        let bytes = self
-            .client
-            .get(&url)
-            .send()?
-            .error_for_status()?
-            .bytes()?
-            .to_vec();
+        let bytes = self.download(&url)?;
         let actual = md5_hex(&bytes);
         if actual != remote.md5 {
             return Err(format!(
-                "{url}: MD5 mismatch (expected {}, got {actual}); review upstream and update sources.rs",
+                "{url}: MD5 mismatch (expected {}, got {actual}); review upstream and update pins.rs",
                 remote.md5
             )
             .into());
@@ -51,6 +44,33 @@ impl Downloader {
         std::fs::create_dir_all(&dir)?;
         std::fs::write(&path, &bytes)?;
         Ok(bytes)
+    }
+
+    /// `url`'s bytes, retrying transient failures (network errors and
+    /// server errors) a few times with growing pauses.
+    fn download(&self, url: &str) -> Result<Vec<u8>, Error> {
+        const ATTEMPTS: u32 = 4;
+        let mut attempt = 1;
+        loop {
+            println!("downloading {url}");
+            let result = self
+                .client
+                .get(url)
+                .send()
+                .and_then(reqwest::blocking::Response::error_for_status)
+                .and_then(reqwest::blocking::Response::bytes);
+            match result {
+                Ok(bytes) => return Ok(bytes.to_vec()),
+                Err(e)
+                    if attempt < ATTEMPTS && !e.status().is_some_and(|s| s.is_client_error()) =>
+                {
+                    eprintln!("{url}: {e}; retrying");
+                    std::thread::sleep(std::time::Duration::from_secs(2u64.pow(attempt)));
+                    attempt += 1;
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
     }
 }
 
