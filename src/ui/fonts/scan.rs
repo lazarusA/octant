@@ -5,6 +5,87 @@
 use super::CjkFont;
 use crate::data::{CoordValues, DatasetMetadata};
 use crate::i18n::Language;
+use std::collections::BTreeSet;
+
+/// A character's CJK script, `Other` for CJK punctuation and symbols.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Script {
+    Han,
+    Kana,
+    Hangul,
+    Other,
+}
+
+/// The CJK script of `c`, `None` outside the ranges the CJK fonts are
+/// sliced over (`tools/cjk_slices` `coverage.rs`).
+pub fn script_of(c: char) -> Option<Script> {
+    match c {
+        '\u{3040}'..='\u{30FF}' | '\u{31F0}'..='\u{31FF}' | '\u{FF66}'..='\u{FF9F}' => {
+            Some(Script::Kana)
+        }
+        '\u{1100}'..='\u{11FF}' | '\u{3130}'..='\u{318F}' | '\u{AC00}'..='\u{D7AF}' => {
+            Some(Script::Hangul)
+        }
+        '\u{3400}'..='\u{4DBF}'
+        | '\u{4E00}'..='\u{9FFF}'
+        | '\u{F900}'..='\u{FAFF}'
+        | '\u{20000}'..='\u{3134F}' => Some(Script::Han),
+        '\u{2E80}'..='\u{D7FF}' | '\u{FE30}'..='\u{FE4F}' | '\u{FF00}'..='\u{FFEF}' => {
+            Some(Script::Other)
+        }
+        _ => None,
+    }
+}
+
+/// Calls `f` with every text of `meta`: its name, its variables' names,
+/// long names, units, dimension names and attributes, and its dimensions'
+/// names and coordinate labels.
+pub fn for_each_text(meta: &DatasetMetadata, mut f: impl FnMut(&str)) {
+    f(&meta.name);
+    for var in &meta.variables {
+        f(&var.name);
+        for text in [&var.long_name, &var.units].into_iter().flatten() {
+            f(text);
+        }
+        for name in &var.dimension_names {
+            f(name);
+        }
+        for (key, value) in &var.attributes {
+            f(key);
+            f(value);
+        }
+    }
+    for (dim, coords) in &meta.dimension_coordinates {
+        f(dim);
+        if let CoordValues::Labels(labels) = coords {
+            for label in labels.iter() {
+                f(label);
+            }
+        }
+    }
+}
+
+/// The CJK characters of `meta` by the font that draws them (`CjkFont::ALL`
+/// order): kana Japanese, Hangul Korean, Han and CJK symbols `han_font`.
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+pub fn chars_by_font(meta: &DatasetMetadata, han_font: CjkFont) -> [BTreeSet<char>; 3] {
+    let mut chars: [BTreeSet<char>; 3] = Default::default();
+    let slot = |font: CjkFont| CjkFont::ALL.iter().position(|&f| f == font).unwrap_or(0);
+    for_each_text(meta, |text| {
+        for c in text.chars().filter(|c| !c.is_ascii()) {
+            let font = match script_of(c) {
+                Some(Script::Kana) => CjkFont::Jp,
+                Some(Script::Hangul) => CjkFont::Kr,
+                Some(Script::Han | Script::Other) => han_font,
+                None => continue,
+            };
+            if let Some(set) = chars.get_mut(slot(font)) {
+                set.insert(c);
+            }
+        }
+    });
+    chars
+}
 
 /// The CJK scripts found in a dataset's text.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -25,18 +106,11 @@ impl Scripts {
     /// Adds the scripts of `text`.
     pub fn add(&mut self, text: &str) {
         for c in text.chars().filter(|c| !c.is_ascii()) {
-            match c {
-                '\u{3040}'..='\u{30FF}' | '\u{31F0}'..='\u{31FF}' | '\u{FF66}'..='\u{FF9F}' => {
-                    self.kana = true
-                }
-                '\u{1100}'..='\u{11FF}' | '\u{3130}'..='\u{318F}' | '\u{AC00}'..='\u{D7AF}' => {
-                    self.hangul = true
-                }
-                '\u{3400}'..='\u{4DBF}'
-                | '\u{4E00}'..='\u{9FFF}'
-                | '\u{F900}'..='\u{FAFF}'
-                | '\u{20000}'..='\u{3134F}' => self.han = true,
-                _ => {}
+            match script_of(c) {
+                Some(Script::Kana) => self.kana = true,
+                Some(Script::Hangul) => self.hangul = true,
+                Some(Script::Han) => self.han = true,
+                Some(Script::Other) | None => {}
             }
         }
     }
@@ -44,28 +118,7 @@ impl Scripts {
     /// The scripts of every text in `meta`.
     pub fn of(meta: &DatasetMetadata) -> Self {
         let mut scripts = Scripts::default();
-        scripts.add(&meta.name);
-        for var in &meta.variables {
-            scripts.add(&var.name);
-            for text in [&var.long_name, &var.units].into_iter().flatten() {
-                scripts.add(text);
-            }
-            for name in &var.dimension_names {
-                scripts.add(name);
-            }
-            for (key, value) in &var.attributes {
-                scripts.add(key);
-                scripts.add(value);
-            }
-        }
-        for (dim, coords) in &meta.dimension_coordinates {
-            scripts.add(dim);
-            if let CoordValues::Labels(labels) = coords {
-                for label in labels.iter() {
-                    scripts.add(label);
-                }
-            }
-        }
+        for_each_text(meta, |text| scripts.add(text));
         scripts
     }
 

@@ -1,6 +1,6 @@
 //! MD5-verified downloads, cached in `target/subset_fonts/<md5>-<name>`.
 
-use super::sources::Remote;
+use super::pins::Remote;
 use md5::{Digest, Md5};
 use std::fmt::Write as _;
 use std::path::PathBuf;

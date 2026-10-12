@@ -154,3 +154,19 @@ fn system_fonts_draw_their_script_when_installed() {
         );
     }
 }
+
+#[test]
+fn dataset_characters_go_to_the_font_that_draws_them() {
+    let meta = crate::data::DatasetMetadata {
+        name: "\u{6771}\u{4EAC}\u{306E}\u{6C17}\u{6E29} \u{AE30}\u{C628} caf\u{E9}\u{3002}".into(),
+        ..Default::default()
+    };
+    let [sc, jp, kr] = super::scan::chars_by_font(&meta, CjkFont::Sc);
+    // Han and CJK punctuation go to the Han font, kana and Hangul to theirs.
+    assert_eq!(
+        sc.into_iter().collect::<String>(),
+        "\u{3002}\u{4EAC}\u{6771}\u{6C17}\u{6E29}"
+    );
+    assert_eq!(jp.into_iter().collect::<String>(), "\u{306E}");
+    assert_eq!(kr.into_iter().collect::<String>(), "\u{AE30}\u{C628}");
+}

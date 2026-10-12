@@ -28,6 +28,10 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            tools/cjk_slices -> target
 
       - name: Download & Install Trunk
         env:
@@ -39,6 +43,12 @@ jobs:
 
       - name: Build Web Application
         run: trunk build --release --public-url /octant/
+
+      # Slices of the Noto CJK fonts for Chinese, Japanese and Korean text in
+      # datasets (about 18 MB, fetched by the page only as needed). Built here
+      # instead of committed; the tool does not compile Octant itself.
+      - name: Build CJK font slices
+        run: cargo run --release --manifest-path tools/cjk_slices/Cargo.toml -- dist/fonts/cjk
 
       - name: Upload GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v3

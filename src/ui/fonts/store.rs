@@ -11,6 +11,9 @@ static FETCHED: Mutex<[Option<Arc<egui::FontData>>; 3]> = Mutex::new([None, None
 /// System fonts loaded for dataset text (desktop), by `CjkFont::ALL` index.
 static SYSTEM: Mutex<[Option<Arc<egui::FontData>>; 3]> = Mutex::new([None, None, None]);
 
+/// Font slices fetched for dataset text (web): font, slice number, data.
+static SLICES: Mutex<Vec<(CjkFont, u16, Arc<egui::FontData>)>> = Mutex::new(Vec::new());
+
 /// The font tried first for Han characters in dataset text, when a dataset
 /// has some; the UI language's font still comes before it.
 static DATA_FIRST: Mutex<Option<CjkFont>> = Mutex::new(None);
@@ -33,6 +36,27 @@ pub fn set_system(font: CjkFont, data: Arc<egui::FontData>) {
     let mut slots = SYSTEM.lock().unwrap_or_else(|p| p.into_inner());
     if let Some(slot) = slots.get_mut(index(font)) {
         *slot = Some(data);
+    }
+}
+
+/// The slices of `font` fetched so far, by slice number, with their names
+/// in egui's font definitions.
+pub fn slices(font: CjkFont) -> Vec<(String, Arc<egui::FontData>)> {
+    let slices = SLICES.lock().unwrap_or_else(|p| p.into_inner());
+    let mut of_font: Vec<_> = slices.iter().filter(|(f, _, _)| *f == font).collect();
+    of_font.sort_by_key(|(_, slice, _)| *slice);
+    of_font
+        .into_iter()
+        .map(|(f, slice, data)| (format!("{}-slice-{slice}", f.code()), Arc::clone(data)))
+        .collect()
+}
+
+/// Keeps slice `slice` of `font`.
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+pub fn add_slice(font: CjkFont, slice: u16, bytes: Vec<u8>) {
+    let mut slices = SLICES.lock().unwrap_or_else(|p| p.into_inner());
+    if !slices.iter().any(|(f, s, _)| *f == font && *s == slice) {
+        slices.push((font, slice, Arc::new(egui::FontData::from_owned(bytes))));
     }
 }
 

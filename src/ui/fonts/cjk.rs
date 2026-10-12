@@ -67,6 +67,15 @@ impl CjkFont {
         }
     }
 
+    /// Short code of the font: its slice folder under `fonts/cjk/` on the web.
+    pub fn code(self) -> &'static str {
+        match self {
+            CjkFont::Sc => "sc",
+            CjkFont::Jp => "jp",
+            CjkFont::Kr => "kr",
+        }
+    }
+
     /// The name in egui's font definitions of the system font found for it.
     pub fn system_key(self) -> &'static str {
         match self {

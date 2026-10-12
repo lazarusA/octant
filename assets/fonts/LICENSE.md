@@ -1,6 +1,6 @@
 # Noto Sans CJK (SC, JP, KR)
 
-The `noto-sans-*-ui.otf` and `noto-sans-*-names.otf` files are subsets of Noto Sans SC, JP and KR Regular from https://github.com/notofonts/noto-cjk (commit f8d157532fbfaeda587e826d4cd5b21a49186f7c), modified by Octant's `subset_fonts` tool to keep only the characters its translations and language names use.
+The `noto-sans-*-ui.otf` and `noto-sans-*-names.otf` files are subsets of Noto Sans SC, JP and KR Regular from https://github.com/notofonts/noto-cjk (commit f8d157532fbfaeda587e826d4cd5b21a49186f7c), modified by Octant's `subset_fonts` tool to keep only the characters its translations and language names use. The web build also serves slices of the same fonts (`fonts/cjk/`, built by `tools/cjk_slices`) for text in datasets.
 
 © 2014-2021 Adobe (http://www.adobe.com/).
 

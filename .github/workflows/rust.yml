@@ -46,6 +46,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Check formatting
         run: cargo fmt --all -- --check
+      - name: Check formatting (CJK slice tool)
+        run: cargo fmt --manifest-path tools/cjk_slices/Cargo.toml -- --check
 
   clippy:
     name: Linting (cargo clippy)
@@ -60,8 +62,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libnetcdf-dev libhdf5-dev
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            tools/cjk_slices -> target
       - name: Run Clippy
         run: cargo clippy --all-targets -- -D warnings
+      - name: Run Clippy and tests (CJK slice tool)
+        run: |
+          cargo clippy --manifest-path tools/cjk_slices/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path tools/cjk_slices/Cargo.toml
 
   licenses:
     name: Third-party License Notices

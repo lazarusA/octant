@@ -17,6 +17,8 @@ fn main() {}
 #[cfg(not(target_arch = "wasm32"))]
 mod download;
 #[cfg(not(target_arch = "wasm32"))]
+mod pins;
+#[cfg(not(target_arch = "wasm32"))]
 mod sources;
 #[cfg(not(target_arch = "wasm32"))]
 mod subset;
@@ -59,7 +61,7 @@ fn run() -> Result<(), download::Error> {
             names_font.len()
         );
     }
-    let license = downloader.cached(&sources::LICENSE, "noto-cjk-LICENSE")?;
+    let license = downloader.cached(&pins::LICENSE, "noto-cjk-LICENSE")?;
     let license = String::from_utf8(license)?;
     std::fs::write(
         out.join("LICENSE.md"),
