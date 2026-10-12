@@ -21,6 +21,7 @@ impl eframe::App for OctantApp {
         // Notices reported by renderers, backends and background threads.
         self.drain_reported_notices();
         crate::ui::fonts::FontEngine::watch_dataset(&ctx, self);
+        super::window_title::sync(&ctx);
 
         // 0. Poll completed background metadata inspection
         let mut metadata_done = false;

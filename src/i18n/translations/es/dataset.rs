@@ -102,11 +102,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Volumen espaciotemporal 4D sintético",
         DatasetKey::HeroCatalogHover => "Explorar el catálogo de conjuntos de datos",
         DatasetKey::LoadSampleHover => "Cargar ejemplo: {}",
-        DatasetKey::HeroHintLong => {
-            "pegue una URL o ruta local, o arrastre y suelte archivos en cualquier lugar"
-        }
-        DatasetKey::HeroHintMedium => "pegue una URL o ruta, o arrastre archivos",
-        DatasetKey::HeroHintShort => "pegue una URL o suelte archivos",
+        DatasetKey::HeroHintLong => "URL / ruta local / arrastre archivos a cualquier parte",
+        DatasetKey::HeroHintMedium => "URL / ruta / arrastre archivos",
+        DatasetKey::HeroHintShort => "URL / suelte archivos",
         DatasetKey::HeroDropLong => {
             "Suelte el conjunto de datos para cargarlo (.nc, .h5, .zarr, .icechunk, .tif)"
         }

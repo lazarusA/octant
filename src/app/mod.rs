@@ -34,6 +34,7 @@ mod state;
 #[cfg(test)]
 pub(crate) mod test_support;
 mod ui;
+pub(crate) mod window_title;
 
 #[allow(unused_imports)] // used by tests and the library, not the binary
 pub use layers::VariableSelection;

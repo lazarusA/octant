@@ -22,7 +22,7 @@ fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1150.0, 720.0])
-            .with_title("Octant: N-dimensional Data Explorer"),
+            .with_title(app::window_title::title_in(i18n::language())),
         depth_buffer: 32,
         wgpu_options: plots::device::wgpu_configuration(),
         // Persistence stores colormap preferences only; keep window geometry unmanaged.

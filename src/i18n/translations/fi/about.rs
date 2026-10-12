@@ -5,7 +5,7 @@ pub fn text(key: AboutKey) -> Option<&'static str> {
         AboutKey::WindowTitle => "Tietoja Octantista",
         AboutKey::IconsWindowTitle => "Sisäänrakennetut vektorikuvakkeet",
         AboutKey::IconsTab => "Vektorikuvakkeet",
-        AboutKey::Subtitle => "N-ulotteisen datan tutkija",
+        AboutKey::Subtitle => "N-ulotteisen datan katselin",
         AboutKey::Description => {
             "Octant on interaktiivinen katseluohjelma N-ulotteisille tietoaineistoille, jossa on natiivi tuki paikalliselle ja pilviobjektitallennukselle sekä Zarr- (v2/v3) ja Icechunk-formaateille. Rakennettu Rustilla GPU-kiihdytetyllä WGPU-renderöinnillä. Octant toimii natiivisti macOS-, Linux- ja Windows-käyttöjärjestelmissä."
         }

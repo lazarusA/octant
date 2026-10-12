@@ -5,7 +5,7 @@ pub fn text(key: AboutKey) -> &'static str {
         AboutKey::WindowTitle => "About Octant",
         AboutKey::IconsWindowTitle => "Native Vector Icons",
         AboutKey::IconsTab => "Vector Icons",
-        AboutKey::Subtitle => "N-Dimensional Data Explorer",
+        AboutKey::Subtitle => "N-Dimensional Data Viewer",
         AboutKey::Description => {
             "Octant is an interactive viewer for N-dimensional datasets with native support for local and cloud object storage, Zarr (v2/v3), and Icechunk. Built in Rust with GPU-accelerated rendering via WGPU. Octant runs natively on macOS, Linux, and Windows."
         }

@@ -5,7 +5,7 @@ pub fn text(key: AboutKey) -> Option<&'static str> {
         AboutKey::WindowTitle => "关于 Octant",
         AboutKey::IconsWindowTitle => "原生矢量图标",
         AboutKey::IconsTab => "矢量图标",
-        AboutKey::Subtitle => "N 维数据浏览器",
+        AboutKey::Subtitle => "N 维数据查看器",
         AboutKey::Description => {
             "Octant 是一款交互式 N 维数据集查看器，原生支持本地与云端对象存储、Zarr (v2/v3) 和 Icechunk。它使用 Rust 编写，通过 WGPU 进行 GPU 加速渲染，可在 macOS、Linux 和 Windows 上原生运行。"
         }

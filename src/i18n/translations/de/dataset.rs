@@ -102,9 +102,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Synthetisches raumzeitliches 4D-Volumen",
         DatasetKey::HeroCatalogHover => "Datensatzkatalog durchsuchen",
         DatasetKey::LoadSampleHover => "Beispiel laden: {}",
-        DatasetKey::HeroHintLong => "URL oder lokalen Pfad einfügen, oder Dateien irgendwo ablegen",
-        DatasetKey::HeroHintMedium => "URL oder Pfad einfügen, oder Dateien ablegen",
-        DatasetKey::HeroHintShort => "URL einfügen oder Dateien ablegen",
+        DatasetKey::HeroHintLong => "URL / lokaler Pfad / Dateien an beliebiger Stelle ablegen",
+        DatasetKey::HeroHintMedium => "URL / Pfad / Dateien ablegen",
+        DatasetKey::HeroHintShort => "URL / Dateien ablegen",
         DatasetKey::HeroDropLong => {
             "Datensatz zum Laden ablegen (.nc, .h5, .zarr, .icechunk, .tif)"
         }
