@@ -93,9 +93,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Синтетичний 4D просторово-часовий об'єм",
         DatasetKey::HeroCatalogHover => "Переглянути каталог наборів даних",
         DatasetKey::LoadSampleHover => "Завантажити зразок: {}",
-        DatasetKey::HeroHintLong => "вставте URL, локальний шлях або перетягніть файли будь-куди",
-        DatasetKey::HeroHintMedium => "вставте URL, шлях або перетягніть файли",
-        DatasetKey::HeroHintShort => "вставте URL або перетягніть файли",
+        DatasetKey::HeroHintLong => "URL / локальний шлях / перетягніть файли будь-куди",
+        DatasetKey::HeroHintMedium => "URL / шлях / перетягніть файли",
+        DatasetKey::HeroHintShort => "URL / перетягніть файли",
         DatasetKey::HeroDropLong => {
             "Відпустіть набір даних, щоб завантажити (.nc, .h5, .zarr, .icechunk, .tif)"
         }

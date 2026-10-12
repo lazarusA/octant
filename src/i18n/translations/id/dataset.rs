@@ -102,11 +102,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Volume spasiotemporal 4D sintetis",
         DatasetKey::HeroCatalogHover => "Jelajahi katalog dataset",
         DatasetKey::LoadSampleHover => "Muat contoh: {}",
-        DatasetKey::HeroHintLong => {
-            "tempel URL, jalur lokal, atau seret & lepas berkas di mana saja"
-        }
-        DatasetKey::HeroHintMedium => "tempel URL, jalur, atau seret & lepas berkas",
-        DatasetKey::HeroHintShort => "tempel URL atau lepas berkas",
+        DatasetKey::HeroHintLong => "URL / jalur lokal / seret & lepas berkas di mana saja",
+        DatasetKey::HeroHintMedium => "URL / jalur / seret & lepas berkas",
+        DatasetKey::HeroHintShort => "URL / lepas berkas",
         DatasetKey::HeroDropLong => "Lepas dataset untuk dimuat (.nc, .h5, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropMedium => "Lepas dataset (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropShort => "Lepas dataset untuk dimuat",

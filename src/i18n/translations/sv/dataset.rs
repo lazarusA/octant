@@ -93,11 +93,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Syntetisk 4D-volym i rum och tid",
         DatasetKey::HeroCatalogHover => "Bläddra i datasetkatalogen",
         DatasetKey::LoadSampleHover => "Läs in exempel: {}",
-        DatasetKey::HeroHintLong => {
-            "klistra in URL, lokal sökväg eller dra och släpp filer var som helst"
-        }
-        DatasetKey::HeroHintMedium => "klistra in URL, sökväg eller dra och släpp filer",
-        DatasetKey::HeroHintShort => "klistra in URL eller släpp filer",
+        DatasetKey::HeroHintLong => "URL / lokal sökväg / dra och släpp filer var som helst",
+        DatasetKey::HeroHintMedium => "URL / sökväg / dra och släpp filer",
+        DatasetKey::HeroHintShort => "URL / släpp filer",
         DatasetKey::HeroDropLong => {
             "Släpp dataset för att läsa in (.nc, .h5, .zarr, .icechunk, .tif)"
         }

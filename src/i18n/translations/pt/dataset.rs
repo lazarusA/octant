@@ -103,10 +103,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroCatalogHover => "Explorar o catálogo de conjuntos de dados",
         DatasetKey::LoadSampleHover => "Carregar exemplo: {}",
         DatasetKey::HeroHintLong => {
-            "cole uma URL ou caminho local, ou arraste e solte arquivos em qualquer lugar"
+            "URL / caminho local / arraste e solte arquivos em qualquer lugar"
         }
-        DatasetKey::HeroHintMedium => "cole uma URL ou caminho, ou arraste e solte arquivos",
-        DatasetKey::HeroHintShort => "cole uma URL ou solte arquivos",
+        DatasetKey::HeroHintMedium => "URL / caminho / arraste e solte arquivos",
+        DatasetKey::HeroHintShort => "URL / solte arquivos",
         DatasetKey::HeroDropLong => {
             "Solte o conjunto de dados para carregar (.nc, .h5, .zarr, .icechunk, .tif)"
         }

@@ -100,11 +100,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "합성 4D 시공간 볼륨",
         DatasetKey::HeroCatalogHover => "데이터셋 카탈로그 둘러보기",
         DatasetKey::LoadSampleHover => "샘플 불러오기: {}",
-        DatasetKey::HeroHintLong => {
-            "URL이나 로컬 경로를 붙여넣거나 파일을 아무 곳에나 끌어다 놓으세요"
-        }
-        DatasetKey::HeroHintMedium => "URL이나 경로를 붙여넣거나 파일을 끌어다 놓으세요",
-        DatasetKey::HeroHintShort => "URL 붙여넣기 또는 파일 놓기",
+        DatasetKey::HeroHintLong => "URL / 로컬 경로 / 파일을 아무 곳에나 끌어다 놓기",
+        DatasetKey::HeroHintMedium => "URL / 경로 / 파일 끌어다 놓기",
+        DatasetKey::HeroHintShort => "URL / 파일 놓기",
         DatasetKey::HeroDropLong => "데이터셋을 놓아 불러오기 (.nc, .h5, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropMedium => "데이터셋 놓기 (.nc, .zarr, .icechunk, .tif)",
         DatasetKey::HeroDropShort => "데이터셋을 놓아 불러오기",

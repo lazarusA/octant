@@ -94,10 +94,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroCatalogHover => "Selaa aineistoluetteloa",
         DatasetKey::LoadSampleHover => "Lataa esimerkki: {}",
         DatasetKey::HeroHintLong => {
-            "liitä URL tai paikallinen polku, tai vedä ja pudota tiedostoja mihin tahansa"
+            "URL / paikallinen polku / vedä ja pudota tiedostoja mihin tahansa"
         }
-        DatasetKey::HeroHintMedium => "liitä URL tai polku, tai vedä ja pudota tiedostoja",
-        DatasetKey::HeroHintShort => "liitä URL tai pudota tiedostoja",
+        DatasetKey::HeroHintMedium => "URL / polku / vedä ja pudota tiedostoja",
+        DatasetKey::HeroHintShort => "URL / pudota tiedostoja",
         DatasetKey::HeroDropLong => {
             "Pudota aineisto ladataksesi (.nc, .h5, .zarr, .icechunk, .tif)"
         }

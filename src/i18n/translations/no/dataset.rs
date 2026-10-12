@@ -102,11 +102,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Syntetisk 4D-volum i rom og tid",
         DatasetKey::HeroCatalogHover => "Bla gjennom datasettkatalogen",
         DatasetKey::LoadSampleHover => "Last inn eksempel: {}",
-        DatasetKey::HeroHintLong => {
-            "lim inn URL, lokal bane, eller dra og slipp filer hvor som helst"
-        }
-        DatasetKey::HeroHintMedium => "lim inn URL, bane, eller dra og slipp filer",
-        DatasetKey::HeroHintShort => "lim inn URL eller slipp filer",
+        DatasetKey::HeroHintLong => "URL / lokal bane / dra og slipp filer hvor som helst",
+        DatasetKey::HeroHintMedium => "URL / bane / dra og slipp filer",
+        DatasetKey::HeroHintShort => "URL / slipp filer",
         DatasetKey::HeroDropLong => {
             "Slipp datasett for å laste inn (.nc, .h5, .zarr, .icechunk, .tif)"
         }

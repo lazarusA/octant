@@ -101,10 +101,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroCatalogHover => "Parcourir le catalogue de jeux de données",
         DatasetKey::LoadSampleHover => "Charger l'exemple : {}",
         DatasetKey::HeroHintLong => {
-            "collez une URL, un chemin local, ou glissez-déposez des fichiers n'importe où"
+            "URL / chemin local / glissez-déposez des fichiers n'importe où"
         }
-        DatasetKey::HeroHintMedium => "collez une URL, un chemin, ou glissez-déposez des fichiers",
-        DatasetKey::HeroHintShort => "collez une URL ou déposez des fichiers",
+        DatasetKey::HeroHintMedium => "URL / chemin / glissez-déposez des fichiers",
+        DatasetKey::HeroHintShort => "URL / déposez des fichiers",
         DatasetKey::HeroDropLong => {
             "Déposez un jeu de données à charger (.nc, .h5, .zarr, .icechunk, .tif)"
         }

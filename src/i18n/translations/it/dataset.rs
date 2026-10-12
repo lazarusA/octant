@@ -104,9 +104,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::HeroVolume4DHover => "Volume spazio-temporale 4D sintetico",
         DatasetKey::HeroCatalogHover => "Sfoglia il catalogo dei set di dati",
         DatasetKey::LoadSampleHover => "Carica esempio: {}",
-        DatasetKey::HeroHintLong => "incolla un URL, un percorso locale o trascina i file ovunque",
-        DatasetKey::HeroHintMedium => "incolla un URL, un percorso o trascina i file",
-        DatasetKey::HeroHintShort => "incolla un URL o rilascia i file",
+        DatasetKey::HeroHintLong => "URL / percorso locale / trascina i file ovunque",
+        DatasetKey::HeroHintMedium => "URL / percorso / trascina i file",
+        DatasetKey::HeroHintShort => "URL / rilascia i file",
         DatasetKey::HeroDropLong => {
             "Rilascia il set di dati da caricare (.nc, .h5, .zarr, .icechunk, .tif)"
         }
