@@ -5,6 +5,7 @@ use super::swatch::PreviewSwatch;
 use crate::app::OctantApp;
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
+use crate::ui::number_input::LocalizedInput;
 use crate::utils::colormap::{BlendSpace, CustomColormapSpec, Interpolation};
 
 /// Example colors in CSS gradient syntax: parse syntax, the same in every language.
@@ -62,8 +63,12 @@ fn edit_spec(ui: &mut egui::Ui, editor: &mut EditorState) {
             choices(ui, &mut spec.blend, &BlendSpace::ALL, |b| b.label());
             ui.end_row();
             ui.label(tr(K::Classes));
-            ui.add(egui::DragValue::new(&mut spec.classes).range(0..=64))
-                .on_hover_text(tr(K::ClassesHover));
+            ui.add(
+                egui::DragValue::new(&mut spec.classes)
+                    .localized()
+                    .range(0..=64),
+            )
+            .on_hover_text(tr(K::ClassesHover));
             ui.end_row();
         });
     refresh_preview(ui.ctx(), editor);

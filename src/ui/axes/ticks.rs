@@ -150,6 +150,7 @@ impl TickMark {
             write!(cursor, "{:.2}", self.val)
         };
         self.len = cursor.position() as u8;
+        crate::i18n::number::localize_bytes(&mut self.buf[..self.len as usize]);
     }
 
     #[inline]

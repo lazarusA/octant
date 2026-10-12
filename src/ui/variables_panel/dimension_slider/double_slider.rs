@@ -1,5 +1,6 @@
 //! Double slider widget with numeric drag inputs.
 
+use crate::ui::number_input::LocalizedInput;
 use egui::{DragValue, Id, Rect, Sense, Stroke, Ui, Vec2, pos2};
 
 const HANDLE_RADIUS: f32 = 6.0;
@@ -27,7 +28,7 @@ pub fn double_slider_with_inputs(
     ui.horizontal(|ui| {
         changed |= ui
             .push_id(base_id.with("start_input"), |ui| {
-                ui.add(DragValue::new(start).range(min..=*end).speed(1))
+                ui.add(DragValue::new(start).localized().range(min..=*end).speed(1))
             })
             .inner
             .changed();
@@ -45,7 +46,7 @@ pub fn double_slider_with_inputs(
                 let height = ui.spacing().interact_size.y;
                 ui.add_sized(
                     [VALUE_BOX_W, height],
-                    DragValue::new(end).range(*start..=max).speed(1),
+                    DragValue::new(end).localized().range(*start..=max).speed(1),
                 )
             })
             .inner

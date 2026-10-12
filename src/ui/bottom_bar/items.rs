@@ -7,6 +7,7 @@ use super::timeline::Timeline;
 use crate::app::OctantApp;
 use crate::i18n::{CommonKey, PlaybackKey as K, tr};
 use crate::ui::icons::{Icon, ToolbarButton};
+use crate::ui::number_input::LocalizedInput;
 use crate::ui::toolbar::{BarItem, ItemWidths, SEPARATOR_WIDTH};
 use crate::utils::stack_str;
 
@@ -135,7 +136,9 @@ fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Tim
             .show(|ui| {
                 ui.label(egui::RichText::new(tr(K::PlaybackSpeed)).strong());
                 ui.add(
-                    egui::Slider::new(&mut app.playback.playback_fps, 1.0..=60.0).suffix(" FPS"),
+                    egui::Slider::new(&mut app.playback.playback_fps, 1.0..=60.0)
+                        .localized()
+                        .suffix(" FPS"),
                 );
             });
         return;

@@ -4,6 +4,7 @@ use crate::app::OctantApp;
 use crate::app::layers::{AlphaCurveState, LayerId};
 use crate::i18n::{SettingsKey as K, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
+use crate::ui::number_input::LocalizedInput;
 use crate::utils::colormap::{AlphaInterp, alpha::PRESETS};
 
 /// The names of the alpha curve `PRESETS`, in their order.
@@ -74,7 +75,11 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     };
     let color = &mut layer.color;
     let resp = ui
-        .add(egui::Slider::new(&mut color.opacity, 0.0..=1.0).text(tr(K::Opacity)))
+        .add(
+            egui::Slider::new(&mut color.opacity, 0.0..=1.0)
+                .localized()
+                .text(tr(K::Opacity)),
+        )
         .on_hover_text(tr(K::OpacityHover));
     if resp.double_clicked() {
         color.opacity = 1.0;

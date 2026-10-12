@@ -5,6 +5,8 @@ use super::cf::{
     is_cf_time_unit, parse_iso_date, parse_reference_date, split_since, unit_to_milliseconds,
 };
 use crate::data::coordinates::naming::contains_ascii_case_insensitive;
+use crate::i18n::date::Date;
+use crate::i18n::number::Num;
 
 /// Formats a coordinate scalar value (without the dimension name) with units, datetime
 /// conversion, or cardinal degrees.
@@ -31,7 +33,13 @@ pub fn format_scalar_coordinate(
         && let Some((y, m, d)) = parse_iso_date(start_str)
     {
         let (res_y, res_m, res_d) = add_days_to_date(y, m, d, val.round() as i64);
-        return format!("{:04}-{:02}-{:02}", res_y, res_m, res_d);
+        return Date {
+            year: res_y,
+            month: res_m,
+            day: res_d,
+            hour: None,
+        }
+        .to_string();
     }
 
     // 3. Unix timestamps (> 100M seconds or > 100B ms)
@@ -45,10 +53,13 @@ pub fn format_scalar_coordinate(
         let days_added = total_hours.div_euclid(24);
         let hour_of_day = total_hours.rem_euclid(24) as usize;
         let (res_y, res_m, res_d) = add_days_to_date(1970, 1, 1, days_added);
-        return format!(
-            "{:04}-{:02}-{:02} {:02}:00",
-            res_y, res_m, res_d, hour_of_day
-        );
+        return Date {
+            year: res_y,
+            month: res_m,
+            day: res_d,
+            hour: Some(hour_of_day),
+        }
+        .to_string();
     }
 
     // 4. Step indices
@@ -80,21 +91,21 @@ pub fn format_coord_scalar(clean: &str, val: f64, units: Option<&str>) -> String
     } else if let Some(u) = units
         && !is_dimensionless_unit(u)
     {
-        format!("{:.2} {}", val, u.trim())
+        format!("{} {}", Num(format_args!("{val:.2}")), u.trim())
     } else if contains_ascii_case_insensitive(clean, "depth")
         || contains_ascii_case_insensitive(clean, "height")
         || contains_ascii_case_insensitive(clean, "alt")
     {
-        format!("{:.2} m", val)
+        format!("{} m", Num(format_args!("{val:.2}")))
     } else if contains_ascii_case_insensitive(clean, "level")
         || contains_ascii_case_insensitive(clean, "lev")
         || contains_ascii_case_insensitive(clean, "plev")
         || contains_ascii_case_insensitive(clean, "pressure")
         || contains_ascii_case_insensitive(clean, "pres")
     {
-        format!("{:.2} hPa", val)
+        format!("{} hPa", Num(format_args!("{val:.2}")))
     } else {
-        format!("{:.2}", val)
+        format!("{}", Num(format_args!("{val:.2}")))
     }
 }
 
@@ -108,7 +119,7 @@ pub fn format_cardinal_degrees(val: f64, is_longitude: bool) -> String {
     } else {
         "°S"
     };
-    format!("{:.2}{}", val.abs(), suffix)
+    format!("{}{suffix}", Num(format_args!("{:.2}", val.abs())))
 }
 
 /// Formats a numerical value with CF units or bare units into a human-readable location/duration/date string.
@@ -126,10 +137,15 @@ pub fn parse_loc(val: Option<f64>, units_str: &str) -> Option<String> {
         let hour_of_day = total_hours.rem_euclid(24) as usize;
 
         let (res_y, res_m, res_d) = add_days_to_date(y, m, d, days_added);
-        return Some(format!(
-            "{:02}-{:02}-{:04} {:02}:00",
-            res_m, res_d, res_y, hour_of_day
-        ));
+        return Some(
+            Date {
+                year: res_y,
+                month: res_m,
+                day: res_d,
+                hour: Some(hour_of_day),
+            }
+            .to_string(),
+        );
     }
 
     // 2. Bare Time Duration (e.g. "hours", "seconds", "d")
@@ -188,11 +204,11 @@ pub fn parse_loc(val: Option<f64>, units_str: &str) -> Option<String> {
 
     // 3. Degrees (e.g. "degrees_east", "deg")
     if contains_ascii_case_insensitive(clean_units, "deg") {
-        return Some(format!("{:.2}°", v));
+        return Some(format!("{}°", Num(format_args!("{v:.2}"))));
     }
 
     // 4. Default fallback
-    Some(format!("{:.2}", v))
+    Some(format!("{}", Num(format_args!("{v:.2}"))))
 }
 
 /// Helper to format number with unit, rendering integer without trailing decimals.
@@ -201,7 +217,7 @@ pub fn format_num_with_unit(v: f64, unit: &str) -> String {
     if v.fract() == 0.0 {
         format!("{:.0} {}", v, unit)
     } else {
-        format!("{:.2} {}", v, unit)
+        format!("{} {unit}", Num(format_args!("{v:.2}")))
     }
 }
 
@@ -233,7 +249,13 @@ pub fn format_axis_value(
         let (year, month, day) =
             add_days_to_date(start_year, start_month, start_day, total_days_offset);
 
-        return format!("{:04}-{:02}-{:02}", year, month, day);
+        return Date {
+            year,
+            month,
+            day,
+            hour: None,
+        }
+        .to_string();
     }
 
     // 2. Pressure levels (hPa, Pa, bar, plev, level)
@@ -265,5 +287,8 @@ pub fn format_axis_value(
     }
 
     // Fallback default
-    format!("Step {} / {}", timestep + 1, max_timesteps)
+    crate::i18n::filled(
+        crate::i18n::tr(crate::i18n::PlaybackKey::TimelineStep),
+        &[&(timestep + 1), &max_timesteps],
+    )
 }

@@ -7,14 +7,18 @@
 //! app (plot type names, colormap kinds, settings reasons) translates with
 //! [`tr`] too. Tests never change it: they call [`translate`] with a language.
 
+pub mod date;
 pub mod keys;
 pub mod lang;
 pub mod locale;
+pub mod number;
 pub mod template;
 pub mod translations;
 
 #[cfg(test)]
 mod guard_tests;
+#[cfg(test)]
+mod number_tests;
 #[cfg(test)]
 mod tests;
 

@@ -79,12 +79,13 @@ impl CjkFont {
     }
 
     /// The characters a font subset must cover for `lang`'s text: every
-    /// non-ASCII character of its translations, plus its own name.
+    /// non-ASCII character of its translations, its own name and its dates.
     pub fn required_chars(self) -> std::collections::BTreeSet<char> {
         let lang = self.language();
         crate::i18n::Key::all()
             .flat_map(|key| crate::i18n::translate(lang, key).chars())
             .chain(lang.display_name().chars())
+            .chain(crate::i18n::date::date_chars(lang).chars())
             .filter(|c| !c.is_ascii())
             .collect()
     }

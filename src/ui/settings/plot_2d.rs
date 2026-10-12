@@ -1,5 +1,6 @@
 use crate::app::OctantApp;
 use crate::i18n::{PlotOptionsKey as K, tr};
+use crate::ui::number_input::LocalizedInput;
 
 pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
@@ -19,6 +20,7 @@ pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             ui.label(tr(K::PointSize));
             ui.add(
                 egui::Slider::new(&mut app.plot_configs.line.point_size, 2.0..=24.0)
+                    .localized()
                     .suffix(" px")
                     .show_value(true),
             );
@@ -158,7 +160,11 @@ fn show_line_profile_slider(app: &mut OctantApp, ui: &mut egui::Ui, has_z_dim: b
     if max_idx > 0 {
         let mut slice_idx = app.plot_configs.line.profile_slice_idx;
         if ui
-            .add(egui::Slider::new(&mut slice_idx, 0..=max_idx).text(tr(K::ProfileIndex)))
+            .add(
+                egui::Slider::new(&mut slice_idx, 0..=max_idx)
+                    .localized()
+                    .text(tr(K::ProfileIndex)),
+            )
             .changed()
         {
             app.plot_configs.line.profile_slice_idx = slice_idx;

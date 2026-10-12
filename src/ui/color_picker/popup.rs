@@ -2,6 +2,7 @@
 
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::number_input::LocalizedInput;
 use egui::{Color32, Pos2, Rect, Shape, Stroke, Vec2, ecolor::Hsva};
 
 /// Color space selection for RGB channel displays (Byte 0-255 vs Float 0-1)
@@ -116,7 +117,12 @@ pub(crate) fn show_clean_color_picker_popup(
                                     .color(Color32::from_rgb(255, 100, 100)),
                             );
                             rgb_changed |= ui
-                                .add(egui::DragValue::new(&mut r).range(0..=255).speed(1.0))
+                                .add(
+                                    egui::DragValue::new(&mut r)
+                                        .localized()
+                                        .range(0..=255)
+                                        .speed(1.0),
+                                )
                                 .changed();
                             ui.label(
                                 egui::RichText::new("G")
@@ -125,7 +131,12 @@ pub(crate) fn show_clean_color_picker_popup(
                                     .color(Color32::from_rgb(100, 255, 100)),
                             );
                             rgb_changed |= ui
-                                .add(egui::DragValue::new(&mut g).range(0..=255).speed(1.0))
+                                .add(
+                                    egui::DragValue::new(&mut g)
+                                        .localized()
+                                        .range(0..=255)
+                                        .speed(1.0),
+                                )
                                 .changed();
                             ui.label(
                                 egui::RichText::new("B")
@@ -134,7 +145,12 @@ pub(crate) fn show_clean_color_picker_popup(
                                     .color(Color32::from_rgb(100, 150, 255)),
                             );
                             rgb_changed |= ui
-                                .add(egui::DragValue::new(&mut b).range(0..=255).speed(1.0))
+                                .add(
+                                    egui::DragValue::new(&mut b)
+                                        .localized()
+                                        .range(0..=255)
+                                        .speed(1.0),
+                                )
                                 .changed();
                             ui.label(
                                 egui::RichText::new("A")
@@ -143,7 +159,12 @@ pub(crate) fn show_clean_color_picker_popup(
                                     .color(Color32::from_gray(180)),
                             );
                             rgb_changed |= ui
-                                .add(egui::DragValue::new(&mut a).range(0..=255).speed(1.0))
+                                .add(
+                                    egui::DragValue::new(&mut a)
+                                        .localized()
+                                        .range(0..=255)
+                                        .speed(1.0),
+                                )
                                 .changed();
 
                             if rgb_changed {
@@ -178,6 +199,7 @@ pub(crate) fn show_clean_color_picker_popup(
                             rgb_changed |= ui
                                 .add(
                                     egui::DragValue::new(&mut r)
+                                        .localized()
                                         .range(0.0..=1.0)
                                         .speed(0.01)
                                         .max_decimals(2),
@@ -192,6 +214,7 @@ pub(crate) fn show_clean_color_picker_popup(
                             rgb_changed |= ui
                                 .add(
                                     egui::DragValue::new(&mut g)
+                                        .localized()
                                         .range(0.0..=1.0)
                                         .speed(0.01)
                                         .max_decimals(2),
@@ -206,6 +229,7 @@ pub(crate) fn show_clean_color_picker_popup(
                             rgb_changed |= ui
                                 .add(
                                     egui::DragValue::new(&mut b)
+                                        .localized()
                                         .range(0.0..=1.0)
                                         .speed(0.01)
                                         .max_decimals(2),
@@ -220,6 +244,7 @@ pub(crate) fn show_clean_color_picker_popup(
                             rgb_changed |= ui
                                 .add(
                                     egui::DragValue::new(&mut a)
+                                        .localized()
                                         .range(0.0..=1.0)
                                         .speed(0.01)
                                         .max_decimals(2),

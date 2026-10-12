@@ -7,6 +7,7 @@ use crate::i18n::{SettingsKey as K, tr};
 use crate::ui::color_picker::{ColorShape, ShapeColorPicker};
 use crate::ui::icons::{Icon, UiIconExt};
 use crate::ui::layer_label::LabelEditor;
+use crate::ui::number_input::LocalizedInput;
 
 /// Layer `id`'s colorbar label, color range, scale and the NaN and clip
 /// colors, as far as its plot honors them.
@@ -135,9 +136,9 @@ fn range_inputs(ui: &mut egui::Ui, color: &mut ColorStyle) {
     ] {
         ui.label(tr(label));
         let input = egui::DragValue::new(value)
+            .localized()
             .speed(speed)
-            .custom_formatter(|val, _| crate::ui::colorbar::format_scientific_tick(val as f32))
-            .custom_parser(|s| s.trim().parse::<f64>().ok());
+            .custom_formatter(|val, _| crate::ui::colorbar::format_scientific_tick(val as f32));
         if ui.add(input).changed() {
             color.lock_bounds = true;
         }

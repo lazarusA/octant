@@ -62,7 +62,10 @@ pub fn show_variable_info(ui: &mut Ui, var_info: &VariableInfo) {
 
     let size_mb = var_info.file_size as f64 / (1024.0 * 1024.0);
     let mut buf = [0; 32];
-    let size = stack_str(&mut buf, format_args!("{size_mb:.2}"));
+    let size = stack_str(
+        &mut buf,
+        format_args!("{}", crate::i18n::number::Num(format_args!("{size_mb:.2}"))),
+    );
     detail(ui, VariablesKey::InfoSize, &[&size]);
 
     if !var_info.attributes.is_empty() {

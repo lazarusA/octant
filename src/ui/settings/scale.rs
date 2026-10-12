@@ -1,5 +1,6 @@
 use crate::app::layers::{ColorStyle, LayerId};
 use crate::i18n::{SettingsKey as K, tr};
+use crate::ui::number_input::LocalizedInput;
 
 /// Layer `id`'s color scale (linear, log, symlog, sqrt, exponential) and its
 /// parameter.
@@ -41,6 +42,7 @@ pub(crate) fn show_scale_type_controls(ui: &mut egui::Ui, color: &mut ColorStyle
             ui.label(tr(K::ScaleParam));
             ui.add(
                 egui::DragValue::new(&mut color.scale_param)
+                    .localized()
                     .speed(0.01)
                     .range(0.0001..=100.0),
             );

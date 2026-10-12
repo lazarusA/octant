@@ -2,6 +2,7 @@ use crate::app::OctantApp;
 use crate::export::{ExportFormat, ExportTarget};
 use crate::i18n::{CommonKey, ExportKey, tr};
 use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::number_input::LocalizedInput;
 use std::path::PathBuf;
 
 /// Shows the floating modal dialog for saving and exporting the canvas/figure.
@@ -47,6 +48,7 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
                     ui.label(tr(ExportKey::JpegQuality));
                     ui.add(
                         egui::Slider::new(&mut app.export_settings.jpeg_quality, 10..=100)
+                            .localized()
                             .suffix("%"),
                     );
                 });

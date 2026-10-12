@@ -22,6 +22,7 @@ pub mod language_picker;
 pub mod layer_label;
 #[cfg(test)]
 mod layer_label_tests;
+pub mod number_input;
 pub mod panel_header;
 pub mod panel_layout;
 #[cfg(test)]

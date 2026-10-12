@@ -1,5 +1,6 @@
 use crate::app::OctantApp;
 use crate::i18n::{CommonKey, SettingsKey as K, tr};
+use crate::ui::number_input::LocalizedInput;
 
 pub(crate) fn show_coastline_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
@@ -85,6 +86,7 @@ fn show_coastline_details(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     ui.add(
         egui::Slider::new(&mut app.coastline_line_width, 1.0..=4.0)
+            .localized()
             .step_by(0.1)
             .text(tr(K::LineWidth)),
     );

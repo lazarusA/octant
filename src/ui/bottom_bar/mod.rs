@@ -12,6 +12,7 @@ mod timeline;
 
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
+use crate::ui::number_input::LocalizedInput;
 use crate::ui::toolbar::ItemWidths;
 use layout::{ITEM_COUNT, LEFT_ITEMS, RIGHT_ITEMS, SLIDER_MIN_W};
 use timeline::Timeline;
@@ -115,6 +116,7 @@ fn show_slider(app: &mut OctantApp, tl: &Timeline, ui: &mut egui::Ui, reserve_ri
     ui.spacing_mut().slider_width = (ui.available_width() - reserve_right).max(SLIDER_MIN_W);
     let mut step = app.playback.current_timestep;
     let slider = egui::Slider::new(&mut step, 0..=tl.last_step)
+        .localized()
         .show_value(false)
         .trailing_fill(true);
     // Fixed id so badges hiding before the slider never break a drag.

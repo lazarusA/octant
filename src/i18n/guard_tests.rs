@@ -57,7 +57,7 @@ const ALLOWED: &[&str] = &[
 ];
 
 /// Source trees holding UI text.
-const ROOTS: &[&str] = &["src/ui", "src/app", "src/export"];
+const ROOTS: &[&str] = &["src/ui", "src/app", "src/export", "src/utils/units"];
 
 #[test]
 fn ui_text_goes_through_translations() {
@@ -170,4 +170,51 @@ fn guard_flags_english_and_skips_translated_text() {
         untranslated_literal(r#"    // ui.label("Hello world");"#, None),
         None
     );
+}
+
+/// Widgets that show and read numbers; each must take `.localized()`
+/// (`crate::ui::number_input`) so a typed decimal comma parses.
+const NUMBER_WIDGETS: &[&str] = &["DragValue::new(", "Slider::new("];
+
+#[test]
+fn number_widgets_read_localized_input() {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut files = Vec::new();
+    collect_sources(&manifest.join("src/ui"), &mut files);
+    collect_sources(&manifest.join("src/app"), &mut files);
+    let mut found = Vec::new();
+    for file in &files {
+        let Ok(source) = std::fs::read_to_string(file) else {
+            continue;
+        };
+        let lines: Vec<&str> = source.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            let code = line.trim_start();
+            if code.starts_with("//") || !NUMBER_WIDGETS.iter().any(|w| line.contains(w)) {
+                continue;
+            }
+            if !statement_from(&lines[i..]).contains(".localized()") {
+                let path = file.strip_prefix(manifest).unwrap_or(file);
+                found.push(format!("{}:{}", path.display(), i + 1));
+            }
+        }
+    }
+    assert!(
+        found.is_empty(),
+        "number widgets without .localized() (a typed decimal comma would not parse):\n{}",
+        found.join("\n")
+    );
+}
+
+/// The lines of the statement starting at `lines[0]`, up to the first one
+/// ending it with `;`, at most twelve.
+fn statement_from(lines: &[&str]) -> String {
+    let mut statement = String::new();
+    for line in lines.iter().take(12) {
+        statement.push_str(line);
+        if line.trim_end().ends_with(';') {
+            break;
+        }
+    }
+    statement
 }

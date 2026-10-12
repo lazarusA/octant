@@ -11,7 +11,13 @@ pub fn show_cache_stats(app: &OctantApp, ui: &mut egui::Ui) {
     let fraction = (current_bytes as f32 / max_bytes.max(1) as f32).clamp(0.0, 1.0);
 
     let (mut cur_buf, mut max_buf, mut buf) = ([0u8; 16], [0u8; 16], [0u8; 96]);
-    let current = stack_str(&mut cur_buf, format_args!("{current_mb:.1}"));
+    let current = stack_str(
+        &mut cur_buf,
+        format_args!(
+            "{}",
+            crate::i18n::number::Num(format_args!("{current_mb:.1}"))
+        ),
+    );
     let max = stack_str(&mut max_buf, format_args!("{max_mb:.0}"));
     ui.add(
         egui::ProgressBar::new(fraction)
@@ -27,7 +33,10 @@ pub fn show_cache_stats(app: &OctantApp, ui: &mut egui::Ui) {
     let mut rate_buf = [0u8; 16];
     let rate = stack_str(
         &mut rate_buf,
-        format_args!("{:.1}", app.block_cache.hit_rate()),
+        format_args!(
+            "{}",
+            crate::i18n::number::Num(format_args!("{:.1}", app.block_cache.hit_rate()))
+        ),
     );
     let mut buf = [0u8; 128];
     ui.horizontal(|ui| {

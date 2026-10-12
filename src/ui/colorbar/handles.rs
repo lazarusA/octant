@@ -5,6 +5,7 @@ use super::ticks::format_scientific_tick;
 use crate::app::layers::{BarOrientation, ColorStyle, LayerId};
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::color_picker::{ColorShape, ShapeColorPicker};
+use crate::ui::number_input::LocalizedInput;
 use egui::{Pos2, Rect, Ui, Vec2};
 
 /// Size of a range input box.
@@ -46,9 +47,9 @@ pub fn draw_end_range_inputs(ui: &mut Ui, axis: BarAxis, color: &mut ColorStyle)
         ui.put(
             Rect::from_center_size(center, INPUT),
             egui::DragValue::new(value)
+                .localized()
                 .speed(drag_speed)
-                .custom_formatter(|val, _| format_scientific_tick(val as f32))
-                .custom_parser(|s| s.trim().parse::<f64>().ok()),
+                .custom_formatter(|val, _| format_scientific_tick(val as f32)),
         )
         .on_hover_text(hover)
     };

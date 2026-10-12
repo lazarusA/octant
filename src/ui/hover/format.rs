@@ -2,6 +2,7 @@
 
 use crate::data::coordinates::naming::{contains_ascii_case_insensitive, is_animated_time_name};
 use crate::data::{CoordValue, CoordValues, DatasetMetadata, VariableInfo};
+use crate::i18n::number::Num;
 use crate::ui::hover::field::HoverField;
 use crate::utils::units::{
     format_axis_value, format_cardinal_degrees, format_scalar_coordinate, is_cf_time_unit,
@@ -145,7 +146,7 @@ fn from_geo(dim_name: &str, geo: f32) -> String {
     } else if contains_ascii_case_insensitive(dim_name, "lat") {
         format_cardinal_degrees(geo as f64, false)
     } else {
-        format!("{:.2}°", geo)
+        format!("{}°", Num(format_args!("{geo:.2}")))
     }
 }
 
@@ -172,7 +173,7 @@ mod tests {
         assert_eq!(res_dim, HoverField::new("dim0", "6 / 10"));
 
         let res_step = format_dimension_coord(None, None, None, "step", 5, 10, None);
-        assert_eq!(res_step, HoverField::new("step", "Step 6 / 10"));
+        assert_eq!(res_step, HoverField::new("step", "Step: 6 / 10"));
     }
 
     #[test]

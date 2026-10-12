@@ -1,3 +1,4 @@
+use crate::ui::number_input::LocalizedInput;
 use crate::{
     app::OctantApp,
     i18n::{CommonKey, DatasetKey, fill, tr},
@@ -39,8 +40,20 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
 
         let (mut a, mut b, mut buf) = ([0u8; 16], [0u8; 16], [0u8; 128]);
         ui.label(egui::RichText::new(tr(DatasetKey::GlobalMemoryUsage)).small());
-        let total = stack_str(&mut a, format_args!("{total_mb:.2}"));
-        let percent = stack_str(&mut b, format_args!("{:.1}", fraction * 100.0));
+        let total = stack_str(
+            &mut a,
+            format_args!(
+                "{}",
+                crate::i18n::number::Num(format_args!("{total_mb:.2}"))
+            ),
+        );
+        let percent = stack_str(
+            &mut b,
+            format_args!(
+                "{}",
+                crate::i18n::number::Num(format_args!("{:.1}", fraction * 100.0))
+            ),
+        );
         let usage = fill(
             &mut buf,
             tr(DatasetKey::CacheUsagePercent),
@@ -56,7 +69,13 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
         );
         ui.horizontal(|ui| {
             ui.icon(Icon::Bullet, IconSize::Xs);
-            let mb = stack_str(&mut a, format_args!("{block_mb:.2}"));
+            let mb = stack_str(
+                &mut a,
+                format_args!(
+                    "{}",
+                    crate::i18n::number::Num(format_args!("{block_mb:.2}"))
+                ),
+            );
             let count = app.block_cache.cached_count();
             ui.small(fill(
                 &mut buf,
@@ -67,13 +86,25 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
         if pyramid_bytes > 0 {
             ui.horizontal(|ui| {
                 ui.icon(Icon::Bullet, IconSize::Xs);
-                let mb = stack_str(&mut a, format_args!("{pyramid_mb:.2}"));
+                let mb = stack_str(
+                    &mut a,
+                    format_args!(
+                        "{}",
+                        crate::i18n::number::Num(format_args!("{pyramid_mb:.2}"))
+                    ),
+                );
                 ui.small(fill(&mut buf, tr(DatasetKey::MultiResPyramid), &[&mb]));
             });
         }
 
         ui.add_space(4.0);
-        let rate = stack_str(&mut b, format_args!("{:.1}", app.block_cache.hit_rate()));
+        let rate = stack_str(
+            &mut b,
+            format_args!(
+                "{}",
+                crate::i18n::number::Num(format_args!("{:.1}", app.block_cache.hit_rate()))
+            ),
+        );
         let (hits, misses) = (app.block_cache.hits(), app.block_cache.misses());
         ui.small(fill(
             &mut buf,
@@ -126,7 +157,13 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
                                         .monospace()
                                         .color(ui.visuals().strong_text_color()),
                                 );
-                                let mb = stack_str(&mut a, format_args!("{mb:.1}"));
+                                let mb = stack_str(
+                                    &mut a,
+                                    format_args!(
+                                        "{}",
+                                        crate::i18n::number::Num(format_args!("{mb:.1}"))
+                                    ),
+                                );
                                 ui.small(fill(
                                     &mut buf,
                                     tr(DatasetKey::VariableCacheSize),
@@ -159,6 +196,7 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
         let old_mb = app.max_cache_mb;
         ui.add(
             egui::Slider::new(&mut app.max_cache_mb, 256..=8192)
+                .localized()
                 .suffix(tr(DatasetKey::CacheLimitSuffix)),
         );
         if old_mb != app.max_cache_mb {
@@ -168,12 +206,14 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
 
         ui.add(
             egui::Slider::new(&mut app.block_window_size, 8..=128)
+                .localized()
                 .suffix(tr(DatasetKey::WindowSizeSuffix)),
         );
 
         let old_threads = app.prefetch_threads;
         ui.add(
             egui::Slider::new(&mut app.prefetch_threads, 2..=32)
+                .localized()
                 .suffix(tr(DatasetKey::PrefetchWorkersSuffix)),
         );
         if old_threads != app.prefetch_threads {

@@ -4,6 +4,7 @@ use crate::app::{AnimationRole, OctantApp, SpatialRole};
 use crate::data::VariableInfo;
 use crate::i18n::{VariablesKey as K, fill, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
+use crate::ui::number_input::LocalizedInput;
 use crate::utils::{ByteSize, format_count_metric, stack_str};
 use egui::{RichText, Ui};
 use std::fmt::Display;
@@ -193,11 +194,18 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                     let spacing = ui.spacing().item_spacing.x;
                     ui.spacing_mut().slider_width =
                         (ui.available_width() - VALUE_BOX_W - spacing).max(40.0);
-                    let s_resp = ui.add(egui::Slider::new(index, 0..=max_index).show_value(false));
+                    let s_resp = ui.add(
+                        egui::Slider::new(index, 0..=max_index)
+                            .localized()
+                            .show_value(false),
+                    );
                     let height = ui.spacing().interact_size.y;
                     let v_resp = ui.add_sized(
                         [VALUE_BOX_W, height],
-                        egui::DragValue::new(index).range(0..=max_index).speed(1),
+                        egui::DragValue::new(index)
+                            .localized()
+                            .range(0..=max_index)
+                            .speed(1),
                     );
                     changed = s_resp.dragged() || v_resp.dragged() || s_resp.clicked();
                 });

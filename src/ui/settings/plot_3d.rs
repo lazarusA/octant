@@ -1,5 +1,6 @@
 use crate::app::OctantApp;
 use crate::i18n::{PlotOptionsKey as K, tr};
+use crate::ui::number_input::LocalizedInput;
 
 /// Each volume algorithm's id and name.
 const ALGORITHMS: [(u32, K); 8] = [
@@ -40,6 +41,7 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.separator();
     ui.add(
         egui::Slider::new(&mut app.plot_configs.volume.quality, 0.25..=2.0)
+            .localized()
             .text(tr(K::Quality))
             .logarithmic(true),
     )
@@ -48,6 +50,7 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     if app.plot_configs.volume.algorithm == 0 || app.plot_configs.volume.algorithm >= 5 {
         ui.add(
             egui::Slider::new(&mut app.plot_configs.volume.opacity, 0.1..=10.0)
+                .localized()
                 .text(tr(K::Density)),
         );
     }
@@ -55,6 +58,7 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     if app.plot_configs.volume.algorithm == 1 {
         ui.add(
             egui::Slider::new(&mut app.plot_configs.volume.attenuation, 0.0..=5.0)
+                .localized()
                 .text(tr(K::Attenuation)),
         );
     }
@@ -62,6 +66,7 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.separator();
     ui.add(
         egui::Slider::new(&mut app.plot_configs.volume.z_scale, 0.05..=10.0)
+            .localized()
             .text(tr(K::ZScale))
             .logarithmic(true),
     );
@@ -94,6 +99,7 @@ pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.separator();
         ui.add(
             egui::Slider::new(&mut app.plot_configs.mesh.sphere_displacement, 0.0..=5.0)
+                .localized()
                 .text(tr(K::Height)),
         );
         flip_height_checkbox(ui, &mut app.plot_configs.mesh.sphere_flip_height);
@@ -121,6 +127,7 @@ pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.separator();
     ui.add(
         egui::Slider::new(&mut app.plot_configs.mesh.surface_displacement, 0.0..=5.0)
+            .localized()
             .text(tr(K::Height)),
     );
     flip_height_checkbox(ui, &mut app.plot_configs.mesh.surface_flip_height);
@@ -135,11 +142,13 @@ fn flip_height_checkbox(ui: &mut egui::Ui, flip: &mut bool) {
 pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.add(
         egui::Slider::new(&mut app.plot_configs.point_cloud.point_size, 0.002..=0.10)
+            .localized()
             .text(tr(K::Size)),
     );
     ui.separator();
     ui.add(
         egui::Slider::new(&mut app.plot_configs.volume.z_scale, 0.05..=10.0)
+            .localized()
             .text(tr(K::ZScale))
             .logarithmic(true),
     );

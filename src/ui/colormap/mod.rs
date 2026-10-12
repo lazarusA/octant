@@ -16,6 +16,7 @@ use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::{Icon, ToolbarButton, UiIconExt};
+use crate::ui::number_input::LocalizedInput;
 use crate::utils::colormap::registry;
 
 /// Persistent (per-session) picker UI state.
@@ -198,6 +199,7 @@ fn show_colorbar_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     if app.layout.show_colorbar {
         ui.add(
             egui::Slider::new(&mut app.layout.colorbar_transparency, 0.0..=1.0)
+                .localized()
                 .custom_formatter(|n, _| format!("{:.0}%", n * 100.0)),
         );
         ui.label(egui::RichText::new(tr(K::BoxTransparency)));
