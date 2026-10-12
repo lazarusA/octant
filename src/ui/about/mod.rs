@@ -7,7 +7,7 @@ pub mod icons;
 mod license_sheet;
 mod license_wrap;
 pub mod licenses;
-mod octant;
+mod octant_cube;
 pub mod overview;
 pub mod types;
 

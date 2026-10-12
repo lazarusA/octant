@@ -1,6 +1,6 @@
 //! About tab content for the About Octant dialog.
 
-use super::octant;
+use super::octant_cube;
 use super::types::AboutTab;
 use crate::i18n::{AboutKey, tr};
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
@@ -14,7 +14,7 @@ pub fn show_overview_tab(ui: &mut egui::Ui, active_tab: &mut AboutTab) {
 
             // Centered header: the octant cube, its name, the title and subtitle
             ui.vertical_centered(|ui| {
-                octant::show_octant_cube(ui);
+                octant_cube::show_octant_cube(ui);
                 ui.add_space(4.0);
                 let mut version = [0; 32];
                 let title = stack_str(
@@ -32,7 +32,7 @@ pub fn show_overview_tab(ui: &mut egui::Ui, active_tab: &mut AboutTab) {
 
             // Why the name: right under it
             ui.add_space(8.0);
-            octant::show_why_octant(ui);
+            octant_cube::show_why_octant(ui);
 
             ui.add_space(8.0);
             ui.separator();
