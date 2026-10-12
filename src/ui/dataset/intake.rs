@@ -1,7 +1,7 @@
 use crate::app::OctantApp;
 use crate::app::StoreKind;
 use crate::i18n::{CommonKey, DatasetKey, tr};
-use crate::ui::icons::{Icon, IconSize, UiIconExt};
+use crate::ui::icons::{Icon, IconSize, UiIconExt, icon_button_width};
 
 const SAMPLE_PRESETS: [(DatasetKey, &str, Option<StoreKind>); 4] = [
     (
@@ -72,8 +72,13 @@ fn show_input_bar(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
     };
     let mut submit = false;
 
+    // Room for the button at its widest label, so the field keeps its width
+    // while loading.
+    let button_w = icon_button_width(ui, tr(DatasetKey::Load))
+        .max(icon_button_width(ui, tr(CommonKey::Loading)));
     ui.horizontal(|ui| {
-        let edit_width = (ui.available_width() - 70.0).max(100.0);
+        let spacing = ui.spacing().item_spacing.x;
+        let edit_width = (ui.available_width() - button_w - spacing).max(100.0);
         let edit_resp = ui.add_sized(
             [edit_width, 22.0],
             egui::TextEdit::singleline(&mut app.selected.store_target)
@@ -98,7 +103,7 @@ fn show_input_bar(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
 }
 
 fn show_intake_actions(app: &mut OctantApp, ui: &mut egui::Ui, has_input: bool) {
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         if ui
             .icon_button(Icon::Catalog, tr(DatasetKey::CatalogEllipsis))
             .clicked()
@@ -142,7 +147,7 @@ fn format_label(kind: StoreKind) -> DatasetKey {
 }
 
 fn show_format_selector(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.icon(Icon::Dataset, IconSize::Xs);
         ui.label(egui::RichText::new(tr(DatasetKey::FormatLabel)).weak());
 

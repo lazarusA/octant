@@ -39,14 +39,12 @@ pub fn show_cache_stats(app: &OctantApp, ui: &mut egui::Ui) {
         ),
     );
     let mut buf = [0u8; 128];
-    ui.horizontal(|ui| {
-        ui.label(
-            egui::RichText::new(fill(
-                &mut buf,
-                tr(DatasetKey::CacheBlocksHitRate),
-                &[&app.block_cache.cached_count(), &rate],
-            ))
-            .weak(),
-        );
-    });
+    ui.label(
+        egui::RichText::new(fill(
+            &mut buf,
+            tr(DatasetKey::CacheBlocksHitRate),
+            &[&app.block_cache.cached_count(), &rate],
+        ))
+        .weak(),
+    );
 }

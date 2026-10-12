@@ -1,12 +1,13 @@
-//! The Settings and Dimensions panels keep their width in every language:
+//! The Dataset, Settings and Dimensions panels keep their width in every language:
 //! rows whose translations run longer stack (`flow_row`) instead of
 //! widening the panel or spilling past its edge.
 
 use crate::app::OctantApp;
 use crate::app::test_support::{make_resident, memory_app, selection_of};
 use crate::data::SliceRequest;
-use crate::i18n::{Language, SettingsKey, translate, with_language};
+use crate::i18n::{DatasetKey, Key, Language, SettingsKey, translate, with_language};
 use crate::plots::PlotType;
+use crate::ui::dataset::{self, show_dataset_window};
 use crate::ui::settings::{PANEL_W, show_settings_window};
 use crate::ui::test_input::Harness;
 use crate::ui::variables_panel::show_variable_controls;
@@ -71,12 +72,7 @@ fn text_center(shapes: &[ClippedShape], label: &str) -> Option<Pos2> {
 
 /// Width of the area `id` that `run` shows in `lang`, after opening the
 /// collapsed sections titled `open`.
-fn area_width(
-    lang: Language,
-    id: &str,
-    open: &[SettingsKey],
-    run: &mut impl FnMut(&mut Ui),
-) -> f32 {
+fn area_width(lang: Language, id: &str, open: &[Key], run: &mut impl FnMut(&mut Ui)) -> f32 {
     with_language(lang, || {
         let mut h = Harness::new(SCREEN);
         let mut shapes = h.settle(SETTLE, run);
@@ -101,7 +97,7 @@ fn frame_margins() -> f32 {
 #[test]
 fn settings_panel_keeps_its_width_in_every_language() {
     let limit = PANEL_W + frame_margins() + SLACK;
-    let open = [SettingsKey::Color, SettingsKey::Export];
+    let open = [SettingsKey::Color.into(), SettingsKey::Export.into()];
     let mut wide = Vec::new();
     for plot_type in PLOT_TYPES {
         for &lang in Language::ALL {
@@ -138,6 +134,38 @@ fn dimensions_panel_keeps_its_narrowest_width_in_every_language() {
     assert!(
         wide.is_empty(),
         "dimensions panel wider than {limit}: {}",
+        wide.join(", ")
+    );
+}
+
+#[test]
+fn dataset_panel_keeps_its_width_in_every_language() {
+    let limit = dataset::PANEL_W + frame_margins() + SLACK;
+    let open = [DatasetKey::MemoryCache.into()];
+    let mut wide = Vec::new();
+    for (case, loaded, loading) in [
+        ("empty", false, false),
+        ("loaded", true, false),
+        ("loading", true, true),
+    ] {
+        for &lang in Language::ALL {
+            let mut app = if loaded {
+                plotted(PlotType::Heatmap)
+            } else {
+                OctantApp::default()
+            };
+            app.layout.show_dataset_panel = true;
+            app.is_loading = loading;
+            let mut run = |ui: &mut Ui| show_dataset_window(&mut app, ui.ctx(), SCREEN);
+            let width = area_width(lang, "octant_dataset_area", &open, &mut run);
+            if width > limit {
+                wide.push(format!("{case} {lang:?}: {width:.0}"));
+            }
+        }
+    }
+    assert!(
+        wide.is_empty(),
+        "dataset panel wider than {limit}: {}",
         wide.join(", ")
     );
 }
