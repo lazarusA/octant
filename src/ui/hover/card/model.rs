@@ -30,7 +30,7 @@ impl HoverValue {
     /// Formats the value into `buf` without allocating.
     pub fn format<'a>(&self, buf: &'a mut [u8; 32]) -> &'a str {
         match *self {
-            Self::NoData => "No data",
+            Self::NoData => crate::i18n::tr(crate::i18n::HoverKey::NoData),
             Self::Composite(kind) => kind.label(),
             Self::Scalar(v) => format_scalar(buf, v),
         }
@@ -86,7 +86,9 @@ fn format_scalar(buf: &mut [u8; 32], v: f32) -> &str {
     };
     // Shift the exponent (if any) left over the trimmed zeros.
     buf.copy_within(e_start..len, m_len);
-    let out = std::str::from_utf8(&buf[..m_len + len - e_start]).unwrap_or_default();
+    let end = m_len + len - e_start;
+    crate::i18n::number::localize_bytes(&mut buf[..end]);
+    let out = std::str::from_utf8(&buf[..end]).unwrap_or_default();
     // "-0" reads as noise for values that round to zero.
     if out == "-0" { "0" } else { out }
 }

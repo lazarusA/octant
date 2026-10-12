@@ -94,7 +94,7 @@ impl Layer {
     pub fn write_default_label<'a>(&self, buf: &'a mut [u8]) -> &'a str {
         let var = self.selection().variable_info();
         let Some(var) = var else {
-            return crate::utils::stack_str(buf, format_args!("Scalar Field"));
+            return crate::i18n::tr(crate::i18n::PlotKey::ScalarField);
         };
         match var.attributes.get("units").or(var.units.as_ref()) {
             Some(unit) => crate::utils::stack_str(buf, format_args!("{} ({unit})", var.name)),

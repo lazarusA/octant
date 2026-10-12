@@ -11,6 +11,7 @@ pub use intake::show_source_intake;
 pub use manager::show_dataset_manager;
 
 use crate::app::OctantApp;
+use crate::i18n::{CommonKey, DatasetKey, tr};
 use crate::ui::icons::Icon;
 use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
@@ -54,7 +55,12 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Opt
     let mut header = None;
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)
         .show_header(ui, |ui| {
-            let title = panel_header::show(ui, Icon::Dataset, "Dataset", "Close Dataset");
+            let title = panel_header::show(
+                ui,
+                Icon::Dataset,
+                tr(CommonKey::Dataset),
+                tr(DatasetKey::CloseDatasetHover),
+            );
             header = Some(title);
         })
         .body(|ui| {
@@ -70,20 +76,22 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Opt
 
 /// Body content organized into Active Dataset, Open Source, Dataset Manager, and Cache sections.
 fn show_dataset_body(app: &mut OctantApp, ui: &mut egui::Ui) {
-    section(ui, "Active Dataset");
+    section(ui, tr(DatasetKey::ActiveDataset));
     active::show_active_dataset(app, ui);
 
-    section(ui, "Open Source");
+    section(ui, tr(DatasetKey::OpenSource));
     intake::show_source_intake(app, ui);
 
-    section(ui, "Dataset Manager");
+    section(ui, tr(DatasetKey::DatasetManager));
     manager::show_dataset_manager(app, ui);
 
     ui.add_space(6.0);
     ui.separator();
-    ui.collapsing("Memory & Cache", |ui| {
-        cache_stats::show_cache_stats(app, ui);
-    });
+    egui::CollapsingHeader::new(tr(DatasetKey::MemoryCache))
+        .id_salt("dataset_memory_cache")
+        .show(ui, |ui| {
+            cache_stats::show_cache_stats(app, ui);
+        });
 }
 
 fn section(ui: &mut egui::Ui, title: &str) {

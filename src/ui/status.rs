@@ -1,5 +1,6 @@
 use crate::{
     app::OctantApp,
+    i18n::{CommonKey, fill, tr},
     ui::icons::{Icon, IconTone, ToolbarButton},
     utils::{ByteSize, stack_str},
 };
@@ -7,7 +8,7 @@ use crate::{
 /// Spinner diameter shown next to the fetch progress label.
 const SPINNER_SIZE: f32 = 12.0;
 /// Stack buffer large enough for the longest progress label.
-type LabelBuf = [u8; 64];
+type LabelBuf = [u8; 160];
 
 /// Numbers of an ongoing block fetch. Labels are formatted on demand into
 /// stack buffers, so building one per frame does not allocate.
@@ -40,20 +41,16 @@ impl FetchProgress {
         if compact {
             stack_str(buf, format_args!("{percent:.0}%"))
         } else {
-            stack_str(
-                buf,
-                format_args!(
-                    "Fetching {} / {} ({percent:.0}%)",
-                    ByteSize(self.completed),
-                    ByteSize(self.total)
-                ),
-            )
+            let mut pct = [0; 8];
+            let pct = stack_str(&mut pct, format_args!("{percent:.0}"));
+            let (done, total) = (ByteSize(self.completed), ByteSize(self.total));
+            fill(buf, tr(CommonKey::FetchingProgress), &[&done, &total, &pct])
         }
     }
 
     /// Width of the status item (abort button, spinner and label).
     pub fn width(&self, ui: &egui::Ui, compact: bool) -> f32 {
-        let mut buf = [0u8; 64];
+        let mut buf: LabelBuf = [0; 160];
         let galley = egui::WidgetText::from(rich_label(ui, self.label(&mut buf, compact)))
             .into_galley(
                 ui,
@@ -74,9 +71,9 @@ fn rich_label(ui: &egui::Ui, text: &str) -> egui::RichText {
 }
 
 fn abort_button(compact: bool) -> ToolbarButton<'static> {
-    ToolbarButton::new(Icon::Stop, "Abort")
+    ToolbarButton::new(Icon::Stop, tr(CommonKey::Abort))
         .compact(compact)
-        .hover("Interrupt and abort ongoing data transfer")
+        .hover(tr(CommonKey::AbortHover))
 }
 
 pub fn show_status_bar(
@@ -90,7 +87,7 @@ pub fn show_status_bar(
             app.abort_current_fetch();
         }
         ui.add(egui::Spinner::new().size(SPINNER_SIZE));
-        let mut buf = [0u8; 64];
+        let mut buf: LabelBuf = [0; 160];
         ui.label(rich_label(ui, progress.label(&mut buf, compact)));
     });
 }

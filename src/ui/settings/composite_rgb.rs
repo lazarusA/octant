@@ -2,6 +2,7 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::i18n::{SettingsKey, tr};
 use crate::utils::stack_str;
 
 /// Width reserved for each "R:" / "G:" / "B:" channel label.
@@ -89,13 +90,13 @@ fn rgb_channel_select(
         egui::Label::new(egui::RichText::new(label).color(color)),
     );
 
-    let mut buf = [0u8; 64];
+    let mut buf = [0u8; 96];
     egui::ComboBox::from_id_salt(salt)
         .width((share - RGB_LABEL_W - spacing).max(RGB_MIN_COMBO_W))
         .selected_text(band_title(&mut buf, names, *band))
         .show_ui(ui, |ui| {
             for b in bands {
-                let mut buf = [0u8; 64];
+                let mut buf = [0u8; 96];
                 if ui
                     .selectable_label(*band == b, band_title(&mut buf, names, b))
                     .clicked()
@@ -108,10 +109,10 @@ fn rgb_channel_select(
 
 /// "N: name" from the comma-separated `names` attribute, else "Band N",
 /// written into `buf` without allocating.
-fn band_title<'a>(buf: &'a mut [u8; 64], names: Option<&str>, band: usize) -> &'a str {
+fn band_title<'a>(buf: &'a mut [u8; 96], names: Option<&str>, band: usize) -> &'a str {
     let number = band + 1;
     match names.and_then(|n| n.split(',').nth(band)).map(str::trim) {
         Some(name) => stack_str(buf, format_args!("{number}: {name}")),
-        None => stack_str(buf, format_args!("Band {number}")),
+        None => crate::i18n::fill(buf, tr(SettingsKey::BandNumber), &[&number]),
     }
 }

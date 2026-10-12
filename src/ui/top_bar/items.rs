@@ -2,6 +2,7 @@
 
 use super::layout::TopBarItem;
 use crate::app::OctantApp;
+use crate::i18n::{CommonKey, tr};
 use crate::ui::icons::{Icon, TOOLBAR_ITEM_HEIGHT, ToolbarButton};
 use crate::ui::toolbar::{ItemWidths, SEPARATOR_WIDTH};
 use crate::ui::{cache, colormap, plot_type};
@@ -12,14 +13,15 @@ const BRAND_LABEL: &str = "Octant";
 fn label(item: TopBarItem, app: &OctantApp) -> &'static str {
     match item {
         TopBarItem::Brand => BRAND_LABEL,
-        TopBarItem::Dataset => "Dataset",
-        TopBarItem::Variables => "Variables",
-        TopBarItem::Dimensions => "Dimensions",
+        TopBarItem::Dataset => tr(CommonKey::Dataset),
+        TopBarItem::Variables => tr(CommonKey::Variables),
+        TopBarItem::Dimensions => tr(CommonKey::Dimensions),
         TopBarItem::PlotType => app.selected.plot_type.display_name(),
-        TopBarItem::Colormap => "Colormap",
-        TopBarItem::Settings => "Settings",
+        TopBarItem::Colormap => tr(CommonKey::Colormaps),
+        TopBarItem::Settings => tr(CommonKey::Settings),
         TopBarItem::Status => "",
-        TopBarItem::Cache => "Cache",
+        TopBarItem::Cache => tr(CommonKey::Cache),
+        TopBarItem::Language => crate::i18n::language().code(),
         TopBarItem::Theme => theme_icon_label(app).1,
     }
 }
@@ -30,9 +32,9 @@ fn is_dark(app: &OctantApp) -> bool {
 
 fn theme_icon_label(app: &OctantApp) -> (Icon, &'static str) {
     if is_dark(app) {
-        (Icon::Sun, "Light")
+        (Icon::Sun, tr(CommonKey::Light))
     } else {
-        (Icon::Moon, "Dark")
+        (Icon::Moon, tr(CommonKey::Dark))
     }
 }
 
@@ -81,7 +83,7 @@ fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
     let icon_resp =
         crate::ui::hero::draw_octant_widget(ui, TOOLBAR_ITEM_HEIGHT, [-1.0, -1.0, -1.0], 0.0, 1.0)
             .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text("Toggle Hero / Landing View (right-click for About)");
+            .on_hover_text(tr(CommonKey::ToggleHeroHover));
     if icon_resp.clicked() {
         app.layout.show_hero = !app.layout.show_hero;
     }
@@ -93,7 +95,7 @@ fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
         let label_resp = ui
             .add(egui::Label::new(brand_label_text()).sense(egui::Sense::click()))
             .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text("About Octant");
+            .on_hover_text(tr(CommonKey::AboutOctantHover));
         if label_resp.clicked() {
             app.layout.show_about_window = !app.layout.show_about_window;
         }
@@ -123,7 +125,7 @@ pub(super) fn show_item(item: TopBarItem, compact: bool, app: &mut OctantApp, ui
         }
         TopBarItem::Dimensions => {
             let btn = button(Icon::Dimensions, item, app, compact)
-                .hover("Toggle Variable Controls Panel");
+                .hover(tr(CommonKey::ToggleVariableControlsHover));
             if ui.add(btn).clicked() {
                 app.layout.show_variable_controls = !app.layout.show_variable_controls;
                 revert_if_panels_closed(app);
@@ -137,6 +139,7 @@ pub(super) fn show_item(item: TopBarItem, compact: bool, app: &mut OctantApp, ui
             }
         }
         TopBarItem::Cache => cache::show_cache_menu(app, ui, compact),
+        TopBarItem::Language => crate::ui::language_picker::show_language_menu(ui, compact),
         TopBarItem::Theme => show_theme_toggle(app, ui, compact),
     }
 }
@@ -168,9 +171,9 @@ fn show_theme_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
     let dark = is_dark(app);
     let (icon, text) = theme_icon_label(app);
     let hover = if dark {
-        "Switch to Light mode"
+        tr(CommonKey::SwitchToLightHover)
     } else {
-        "Switch to Dark mode"
+        tr(CommonKey::SwitchToDarkHover)
     };
     let btn = ToolbarButton::new(icon, text).compact(compact).hover(hover);
     if ui.add(btn).clicked() {

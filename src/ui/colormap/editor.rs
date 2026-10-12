@@ -3,8 +3,13 @@
 
 use super::swatch::PreviewSwatch;
 use crate::app::OctantApp;
+use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
+use crate::ui::number_input::LocalizedInput;
 use crate::utils::colormap::{BlendSpace, CustomColormapSpec, Interpolation};
+
+/// Example colors in CSS gradient syntax: parse syntax, the same in every language.
+const COLORS_EXAMPLE: &str = "navy, 30%, gold, white";
 
 #[derive(Default)]
 pub struct EditorState {
@@ -28,7 +33,7 @@ pub fn show(app: &mut OctantApp, ui: &mut egui::Ui) {
         section_id(ui),
         false,
     )
-    .show_header(ui, |ui| ui.label("Custom colormap"))
+    .show_header(ui, |ui| ui.label(tr(K::CustomColormap)))
     .body(|ui| {
         edit_spec(ui, &mut app.colormaps.picker.editor);
         show_actions(app, ui);
@@ -42,26 +47,28 @@ fn edit_spec(ui: &mut egui::Ui, editor: &mut EditorState) {
         .num_columns(2)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
-            ui.label("Name");
+            ui.label(tr(K::Name));
             ui.add(egui::TextEdit::singleline(&mut spec.name).hint_text("my_colormap"));
             ui.end_row();
-            ui.label("Colors");
-            ui.add(
-                egui::TextEdit::singleline(&mut spec.colors).hint_text("navy, 30%, gold, white"),
-            )
-            .on_hover_text("Hex, rgb(), hsl() or CSS color names, optionally with positions");
+            ui.label(tr(K::Colors));
+            ui.add(egui::TextEdit::singleline(&mut spec.colors).hint_text(COLORS_EXAMPLE))
+                .on_hover_text(tr(K::ColorsHover));
             ui.end_row();
-            ui.label("Interpolation");
+            ui.label(tr(K::Interpolation));
             choices(ui, &mut spec.interpolation, &Interpolation::ALL, |i| {
                 i.label()
             });
             ui.end_row();
-            ui.label("Blend");
+            ui.label(tr(K::Blend));
             choices(ui, &mut spec.blend, &BlendSpace::ALL, |b| b.label());
             ui.end_row();
-            ui.label("Classes");
-            ui.add(egui::DragValue::new(&mut spec.classes).range(0..=64))
-                .on_hover_text("0 keeps the gradient continuous");
+            ui.label(tr(K::Classes));
+            ui.add(
+                egui::DragValue::new(&mut spec.classes)
+                    .localized()
+                    .range(0..=64),
+            )
+            .on_hover_text(tr(K::ClassesHover));
             ui.end_row();
         });
     refresh_preview(ui.ctx(), editor);
@@ -117,11 +124,11 @@ fn show_actions(app: &mut OctantApp, ui: &mut egui::Ui) {
     // Saving an edited map under another saved map's name would replace that map.
     let clashes = renames && app.has_custom_name(&editor.spec.name);
     let can_save = editor.error.is_none() && !editor.spec.name.trim().is_empty() && !clashes;
-    let label = if renames {
-        "Rename & apply"
+    let label = tr(if renames {
+        K::RenameAndApply
     } else {
-        "Save & apply"
-    };
+        K::SaveAndApply
+    });
     let mut rename = None;
     ui.add_enabled_ui(can_save, |ui| {
         ui.horizontal(|ui| {
@@ -131,13 +138,13 @@ fn show_actions(app: &mut OctantApp, ui: &mut egui::Ui) {
             {
                 rename = Some(renames);
             }
-            if renames && ui.button("Save as new").clicked() {
+            if renames && ui.button(tr(K::SaveAsNew)).clicked() {
                 rename = Some(false);
             }
         });
     });
     if clashes {
-        warning(ui, "A saved colormap already has this name");
+        warning(ui, tr(K::NameTaken));
     }
     if let Some(rename) = rename {
         save(app, rename);
@@ -175,7 +182,7 @@ fn show_saved(app: &mut OctantApp, ui: &mut egui::Ui) {
         return;
     }
     ui.add_space(4.0);
-    ui.label(egui::RichText::new("Saved").small().weak());
+    ui.label(egui::RichText::new(tr(K::Saved)).small().weak());
     let mut edit = None;
     let mut delete = None;
     let built = colormaps.custom.iter().map(|s| (s, false));
@@ -184,15 +191,15 @@ fn show_saved(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if broken {
                 ui.icon_toned(Icon::Warning, IconSize::Xs, IconTone::Warning)
-                    .on_hover_text("Does not build with this version: edit to fix, or delete");
+                    .on_hover_text(tr(K::BrokenHover));
             }
-            if ui.link(&spec.name).on_hover_text("Edit").clicked() {
+            if ui.link(&spec.name).on_hover_text(tr(K::Edit)).clicked() {
                 edit = Some(spec.clone());
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let trash = ToolbarButton::new(Icon::Trash, "Delete")
+                let trash = ToolbarButton::new(Icon::Trash, tr(K::Delete))
                     .compact(true)
-                    .hover("Delete colormap");
+                    .hover(tr(K::DeleteHover));
                 if ui.add(trash).clicked() {
                     delete = Some(spec.key());
                 }

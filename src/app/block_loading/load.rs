@@ -154,7 +154,11 @@ impl OctantApp {
                 }
                 Err(e) => {
                     self.status_message = format!("Block cache fetch error: {e}");
-                    self.notify(crate::ui::toast::Severity::Error, "Couldn't load data", &e);
+                    self.notify(
+                        crate::ui::toast::Severity::Error,
+                        crate::i18n::tr(crate::i18n::NoticesKey::CouldntLoadData),
+                        &e,
+                    );
                 }
             }
         }

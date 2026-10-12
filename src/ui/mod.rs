@@ -11,15 +11,18 @@ pub mod crop_overlay;
 pub mod drag_grip;
 pub mod drop_zone;
 pub mod export_modal;
+pub mod fonts;
 pub mod hero;
 pub mod hover;
 pub use hover as hover_tooltip;
 pub mod dataset;
 pub mod icons;
 pub mod key_focus;
+pub mod language_picker;
 pub mod layer_label;
 #[cfg(test)]
 mod layer_label_tests;
+pub mod number_input;
 pub mod panel_header;
 pub mod panel_layout;
 #[cfg(test)]

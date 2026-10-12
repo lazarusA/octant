@@ -1,6 +1,8 @@
 use crate::app::StoreKind;
 use crate::catalog::CatalogEntry;
+use crate::i18n::{DatasetKey, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
+use crate::utils::stack_str;
 
 pub fn render_entry_card(
     ui: &mut egui::Ui,
@@ -8,16 +10,26 @@ pub fn render_entry_card(
     trimmed_url: &str,
     is_mobile: bool,
 ) -> bool {
-    let (badge_icon, badge_bracket, badge_tone) = match entry.store_kind {
-        StoreKind::RemoteZarr => (Icon::Globe, "[Zarr]", IconTone::Accent),
-        StoreKind::RemoteIcechunk => (Icon::Icechunk, "[Icechunk]", IconTone::Info),
+    let (badge_icon, badge_name, badge_tone) = match entry.store_kind {
+        StoreKind::RemoteZarr => (Icon::Globe, "Zarr", IconTone::Accent),
+        StoreKind::RemoteIcechunk => (Icon::Icechunk, "Icechunk", IconTone::Info),
         StoreKind::RemoteGeoTiff | StoreKind::LocalGeoTiff => {
-            (Icon::Folder, "[GeoTIFF/COG]", IconTone::Success)
+            (Icon::Folder, "GeoTIFF/COG", IconTone::Success)
         }
-        StoreKind::ProceduralVolume4D => (Icon::PlotVolume, "[4D Volume]", IconTone::Warning),
-        StoreKind::ProceduralRandom => (Icon::PlotPlane, "[2D Matrix]", IconTone::Warning),
-        _ => (Icon::Folder, "[Store]", IconTone::Muted),
+        StoreKind::ProceduralVolume4D => (
+            Icon::PlotVolume,
+            tr(DatasetKey::BadgeVolume4D),
+            IconTone::Warning,
+        ),
+        StoreKind::ProceduralRandom => (
+            Icon::PlotPlane,
+            tr(DatasetKey::BadgeMatrix2D),
+            IconTone::Warning,
+        ),
+        _ => (Icon::Folder, tr(DatasetKey::BadgeStore), IconTone::Muted),
     };
+    let mut badge_buf = [0u8; 96];
+    let badge_bracket = stack_str(&mut badge_buf, format_args!("[{badge_name}]"));
 
     let mut clicked_load = false;
 
@@ -59,7 +71,7 @@ pub fn render_entry_card(
 
                 ui.add_space(4.0);
                 if ui
-                    .icon_button(Icon::DropTray, "Select & Load Dataset")
+                    .icon_button(Icon::DropTray, tr(DatasetKey::SelectAndLoadDataset))
                     .clicked()
                 {
                     clicked_load = true;
@@ -77,7 +89,10 @@ pub fn render_entry_card(
                     ui.label(egui::RichText::new(entry.label).strong().size(14.0));
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.icon_button(Icon::DropTray, "Select & Load").clicked() {
+                        if ui
+                            .icon_button(Icon::DropTray, tr(DatasetKey::SelectAndLoad))
+                            .clicked()
+                        {
                             clicked_load = true;
                         }
                     });

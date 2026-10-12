@@ -20,6 +20,7 @@ mod view;
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::i18n::{CommonKey, SettingsKey as K, tr};
 use crate::ui::icons::Icon;
 use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
@@ -67,7 +68,12 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Opt
     let mut header = None;
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)
         .show_header(ui, |ui| {
-            let title = panel_header::show(ui, Icon::Settings, "Settings", "Close Settings");
+            let title = panel_header::show(
+                ui,
+                Icon::Settings,
+                tr(CommonKey::Settings),
+                tr(K::CloseSettingsHover),
+            );
             header = Some(title);
         })
         .body(|ui| {
@@ -98,16 +104,16 @@ fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.separator();
     layers::show_layers_menu(app, ui);
     if support.coastlines != Support::No {
-        section(ui, "Overlays");
+        section(ui, tr(K::SectionOverlays));
         coastline::show_coastline_controls(app, ui);
     }
     if support.aggregation != Support::No {
-        section(ui, "Resolution");
+        section(ui, tr(K::SectionResolution));
         gated(ui, support.aggregation, |ui| {
             resampling::show_resampling_controls(app, ui);
         });
     }
-    section(ui, "View");
+    section(ui, tr(K::SectionView));
     view::show_view_controls(app, ui, &support);
     ui.separator();
     export::show_export_preferences(app, ui);
@@ -135,7 +141,7 @@ fn section(ui: &mut egui::Ui, title: &str) {
 fn gated(ui: &mut egui::Ui, support: Support, add: impl FnOnce(&mut egui::Ui)) {
     match support {
         Support::Yes => add(ui),
-        Support::Overridden(reason) => note(ui, reason),
+        Support::Overridden(reason) => note(ui, tr(reason)),
         Support::No => {}
     }
 }

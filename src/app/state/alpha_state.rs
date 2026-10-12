@@ -21,7 +21,7 @@ impl OctantApp {
                 state.error = None;
                 registry::set_alpha_curve(key, curve.map(|c| alpha::bake(&c, state.interp)));
             }
-            Err(e) => state.error = Some(e.to_string()),
+            Err(e) => state.error = Some(e),
         }
     }
 

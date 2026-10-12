@@ -68,15 +68,15 @@ fn test_parse_loc_bare_duration_coarsest_unit() {
 fn test_parse_loc_cf_absolute_datetime() {
     assert_eq!(
         parse_loc(Some(12.0), "hours since 2024-01-01"),
-        Some("01-01-2024 12:00".to_string())
+        Some("2024-01-01 12:00".to_string())
     );
     assert_eq!(
         parse_loc(Some(12.0), "h since 2024-01-01"),
-        Some("01-01-2024 12:00".to_string())
+        Some("2024-01-01 12:00".to_string())
     );
     assert_eq!(
         parse_loc(Some(12.0), "hrs since 2024-01-01"),
-        Some("01-01-2024 12:00".to_string())
+        Some("2024-01-01 12:00".to_string())
     );
 }
 

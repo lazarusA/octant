@@ -8,6 +8,7 @@ pub use clipboard::reveal_in_file_manager;
 pub use raster::{crop_rgba_buffer, encode_raster_image, inject_display_p3_chunks};
 pub use vector::{generate_pdf, generate_svg};
 
+use crate::i18n::{ExportKey, tr};
 use std::path::{Path, PathBuf};
 
 /// Supported export formats for saving figures and canvases.
@@ -36,11 +37,11 @@ impl ExportFormat {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Png => "PNG (Lossless)",
-            Self::Jpeg => "JPEG (Lossy)",
-            Self::Webp => "WebP (Modern)",
-            Self::Svg => "SVG (Vector / Hybrid)",
-            Self::Pdf => "PDF (Publication)",
+            Self::Png => tr(ExportKey::Png),
+            Self::Jpeg => tr(ExportKey::Jpeg),
+            Self::Webp => tr(ExportKey::Webp),
+            Self::Svg => tr(ExportKey::Svg),
+            Self::Pdf => tr(ExportKey::Pdf),
         }
     }
 }
@@ -73,10 +74,10 @@ impl AspectPreset {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Freeform => "Freeform",
-            Self::Ratio16x9 => "16:9 (Slides)",
-            Self::Ratio4x3 => "4:3 (Figure)",
-            Self::Ratio1x1 => "1:1 (Square)",
+            Self::Freeform => tr(ExportKey::AspectFreeform),
+            Self::Ratio16x9 => tr(ExportKey::Aspect16x9),
+            Self::Ratio4x3 => tr(ExportKey::Aspect4x3),
+            Self::Ratio1x1 => tr(ExportKey::Aspect1x1),
         }
     }
 
@@ -232,9 +233,10 @@ pub fn encode_figure(
 pub fn save_exported_file(data: &[u8], path: &Path) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create export directory: {}", e))?;
+            .map_err(|e| crate::i18n::filled(tr(ExportKey::CreateDirFailed), &[&e]))?;
     }
-    std::fs::write(path, data).map_err(|e| format!("Failed to write export file: {}", e))
+    std::fs::write(path, data)
+        .map_err(|e| crate::i18n::filled(tr(ExportKey::WriteFileFailed), &[&e]))
 }
 
 #[cfg(test)]

@@ -5,6 +5,7 @@ use super::nav::SearchJump;
 use super::search;
 use super::tree::{VariableTreeContext, render_tree_group};
 use crate::app::OctantApp;
+use crate::i18n::{DatasetKey, VariablesKey, fill, tr};
 use crate::ui::icons::{Icon, UiIconExt};
 
 /// List area under the search field: the state that applies, or the tree.
@@ -21,8 +22,8 @@ pub(super) fn show_list(
     let Some(var_count) = app.selected.metadata.as_ref().map(|m| m.variables.len()) else {
         if empty_state(
             ui,
-            "No store metadata loaded yet.",
-            "Fetch / Load Store Metadata",
+            tr(VariablesKey::NoMetadataLoaded),
+            tr(VariablesKey::FetchStoreMetadata),
         ) {
             let target = app.selected.store_target.clone();
             app.submit_or_activate_source(&target, Some(app.selected.store_kind));
@@ -32,8 +33,8 @@ pub(super) fn show_list(
     if var_count == 0 {
         if empty_state(
             ui,
-            "No variables found in this dataset store.",
-            "Refresh Store Metadata",
+            tr(VariablesKey::NoVariablesFound),
+            tr(VariablesKey::RefreshStoreMetadata),
         ) {
             app.inspect_active_store();
         }
@@ -48,7 +49,7 @@ fn show_loading(ui: &mut egui::Ui) {
     ui.vertical_centered(|ui| {
         ui.add_space(10.0);
         ui.spinner();
-        ui.label(egui::RichText::new("Inspecting store metadata in background...").italics());
+        ui.label(egui::RichText::new(tr(DatasetKey::LoadingMetadata)).italics());
         ui.add_space(10.0);
     });
 }
@@ -97,7 +98,9 @@ fn show_tree(
     let Some(root) = root else {
         ui.vertical_centered(|ui| {
             ui.add_space(10.0);
-            ui.label(egui::RichText::new(format!("No variables matching '{query}'")).italics());
+            let mut buf = [0; 256];
+            let note = fill(&mut buf, tr(VariablesKey::NoVariablesMatching), &[&query]);
+            ui.label(egui::RichText::new(note).italics());
             ui.add_space(10.0);
         });
         return None;

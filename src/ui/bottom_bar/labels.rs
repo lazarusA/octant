@@ -4,6 +4,7 @@
 use super::layout::BottomBarItem as Item;
 use super::timeline::{Timeline, dim_name};
 use crate::app::OctantApp;
+use crate::i18n::{PlaybackKey as K, fill, tr};
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
 use crate::utils::stack_str;
 
@@ -89,10 +90,14 @@ pub(super) fn show(item: Item, compact: bool, tl: &Timeline, app: &OctantApp, ui
 
 /// Popover body; formatted only while it is shown.
 fn timeline_details(ui: &mut egui::Ui, tl: &Timeline, app: &OctantApp) {
-    ui.label(egui::RichText::new("Timeline Details").strong());
-    ui.label(format!("Dimension: {}", dim_name(app)));
-    ui.label(format!("Step: {} / {}", tl.step, tl.last_step));
-    ui.label(format!("Current: {}", tl.current));
-    ui.label(format!("Range: {} -> {}", tl.start, tl.end));
-    ui.label(format!("Step Size: {}", tl.step_size));
+    ui.label(egui::RichText::new(tr(K::TimelineDetails)).strong());
+    let mut line = |key, args: &[&dyn std::fmt::Display]| {
+        let mut buf: LabelBuf = [0; LABEL_BUF_LEN];
+        ui.label(fill(&mut buf, tr(key), args));
+    };
+    line(K::TimelineDimension, &[&dim_name(app)]);
+    line(K::TimelineStep, &[&tl.step, &tl.last_step]);
+    line(K::TimelineCurrent, &[&tl.current]);
+    line(K::TimelineRange, &[&tl.start, &tl.end]);
+    line(K::TimelineStepSize, &[&tl.step_size]);
 }

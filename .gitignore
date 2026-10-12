@@ -10,3 +10,4 @@ tests/data/
 dev
 # Generated coastline vertex buffers — run `cargo run --bin fetch_coastlines` to rebuild
 # assets/coastlines/
+/tools/cjk_slices/target

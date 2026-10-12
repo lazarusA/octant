@@ -17,6 +17,8 @@ pub const TICK_BUF: usize = 16;
 
 impl std::fmt::Display for ScientificTick {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Write as _;
+        let f = &mut crate::i18n::number::localizing(f);
         let val = self.0;
         let abs_val = val.abs();
         if abs_val == 0.0 {

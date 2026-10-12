@@ -2,6 +2,7 @@
 
 use super::app_state::OctantApp;
 use crate::app::layers::{ColorStyle, Layer, LayerId};
+use crate::i18n::{ColormapKey as K, filled, tr};
 use crate::utils::colormap::{ColormapEntry, CustomColormapSpec, registry};
 use serde::{Deserialize, Serialize};
 
@@ -51,8 +52,8 @@ impl OctantApp {
             if let Some(raw) = storage.get_string(STORAGE_KEY) {
                 self.notify(
                     crate::ui::toast::Severity::Warning,
-                    "Colormap preferences unreadable",
-                    format!("Backed up under `{UNREADABLE_KEY}`"),
+                    tr(K::PrefsUnreadable),
+                    filled(tr(K::PrefsBackedUp), &[&UNREADABLE_KEY]),
                 );
                 self.colormaps.unreadable_prefs = Some(raw);
             }
@@ -66,8 +67,8 @@ impl OctantApp {
                 Err(e) => {
                     self.notify(
                         crate::ui::toast::Severity::Warning,
-                        "Custom colormap not loaded",
-                        format!("`{}` does not build: {e}", spec.name),
+                        tr(K::CustomNotLoaded),
+                        filled(tr(K::CustomDoesNotBuild), &[&spec.name, &e]),
                     );
                     // A map that builds wins over a broken one with the same name.
                     if !self.has_custom_name(&spec.name) {
@@ -184,7 +185,7 @@ impl OctantApp {
             // Removing a map shifts the ids after it, so look the new one up again.
             Some(old) => {
                 self.remove_custom_colormap(old);
-                registry::find(&key).ok_or_else(|| format!("Colormap {key} was not registered"))
+                registry::find(&key).ok_or_else(|| filled(tr(K::NotRegistered), &[&key]))
             }
             None => Ok(id),
         }
@@ -229,8 +230,8 @@ fn back_up_unreadable(storage: &mut dyn eframe::Storage, raw: &str) {
     }
     crate::ui::toast::report(
         crate::ui::toast::Severity::Warning,
-        "Colormap preferences not backed up",
-        format!("All {MAX_UNREADABLE_BACKUPS} colormap preference backups are in use"),
+        tr(K::PrefsNotBackedUp),
+        filled(tr(K::BackupsFull), &[&MAX_UNREADABLE_BACKUPS]),
     );
 }
 

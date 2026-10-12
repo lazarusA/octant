@@ -103,7 +103,7 @@ fn draw_drag_hover_cue(app: &OctantApp, ui: &mut egui::Ui, canvas_rect: egui::Re
     ui.painter().text(
         badge_pos,
         egui::Align2::CENTER_CENTER,
-        "Drop dataset to visualize (.nc, .h5, .zarr, .icechunk, .tif)",
+        crate::i18n::tr(crate::i18n::HoverKey::DropDataset),
         egui::FontId::proportional(15.0),
         stroke_color,
     );

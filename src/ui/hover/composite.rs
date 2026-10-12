@@ -7,6 +7,7 @@ use std::sync::Arc;
 use crate::app::OctantApp;
 use crate::data::slicing::CompositeProbe;
 use crate::data::{DatasetMetadata, VariableInfo};
+use crate::i18n::{HoverKey, PlotKey, filled, tr};
 use crate::ui::hover::composite_bands::{BandNames, is_non_visible, visible_color};
 use crate::ui::hover::field::HoverField;
 
@@ -28,11 +29,11 @@ pub enum CompositeKind {
 impl CompositeKind {
     pub fn label(self) -> &'static str {
         match self {
-            Self::TrueColor => "True color",
-            Self::FalseColor => "False color",
-            Self::Rgb => "RGB composite",
+            Self::TrueColor => tr(PlotKey::CompositeTrueColor),
+            Self::FalseColor => tr(PlotKey::CompositeFalseColor),
+            Self::Rgb => tr(PlotKey::CompositeRgb),
             Self::Cmyk => "CMYK",
-            Self::Overlay => "Channel overlay",
+            Self::Overlay => tr(PlotKey::CompositeOverlay),
         }
     }
 }
@@ -90,6 +91,7 @@ pub fn composite_labels(
     var.map(|v| (&v.name, &v.shape, &v.dimension_names))
         .hash(&mut hasher);
     (is_overlay(app), cmyk_bands(app), rgb_bands(app)).hash(&mut hasher);
+    crate::i18n::language().hash(&mut hasher);
     for c in &app.layers.base.composite.channel_configs {
         (c.index, &c.name, c.visible).hash(&mut hasher);
     }
@@ -122,7 +124,7 @@ pub fn build_labels(
             .filter(|c| c.visible);
         let channels = channels.map(|c| CompositeChannel {
             label: match c.name.trim() {
-                "" => format!("Channel {}", c.index + 1).into(),
+                "" => filled(tr(HoverKey::ChannelN), &[&(c.index + 1)]).into(),
                 name => name.into(),
             },
             band: c.index,
@@ -209,7 +211,7 @@ fn rgb_bands(app: &OctantApp) -> [usize; 3] {
 /// Appends a channel's raw value (with `units`), or "No data", to `out`.
 fn write_raw(out: &mut String, raw: Option<f32>, units: &str) {
     let Some(value) = raw else {
-        out.push_str("No data");
+        out.push_str(tr(HoverKey::NoData));
         return;
     };
     let mut buf = [0u8; 32];

@@ -2,6 +2,7 @@
 
 use crate::app::OctantApp;
 use crate::data::MatrixData;
+use crate::i18n::{HoverKey, tr};
 use crate::plots::PlotType;
 use crate::ui::axes::{PlotAxisOptions, draw_plot_axes};
 
@@ -74,7 +75,7 @@ fn resolve_line_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTupl
                 var.name.clone()
             }
         })
-        .unwrap_or_else(|| "Data Value".to_string());
+        .unwrap_or_else(|| tr(HoverKey::DataValue).to_string());
 
     let target_dim_idx = app.get_spatial_dim_index(app.plot_configs.line.profile_dim_idx);
     let fallback_dim_name = match app.plot_configs.line.profile_dim_idx {
@@ -93,8 +94,8 @@ fn resolve_2d_plot_axis_info(app: &OctantApp, matrix: &MatrixData) -> AxisTuple 
     if matrix.grid.is_healpix() {
         let x_bounds = (-180.0, 180.0);
         let y_bounds = (-90.0, 90.0);
-        let x_title = "Longitude (°)".to_string();
-        let y_title = "Latitude (°)".to_string();
+        let x_title = tr(HoverKey::LongitudeDegrees).to_string();
+        let y_title = tr(HoverKey::LatitudeDegrees).to_string();
         (x_bounds, y_bounds, x_title, y_title, None, None)
     } else {
         let (orig_w, orig_h) = app.active_data_dimensions_2d();

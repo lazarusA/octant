@@ -2,6 +2,8 @@ use bytemuck::{Pod, Zeroable};
 use eframe::egui;
 use wgpu::util::DeviceExt;
 
+use crate::i18n::{NoticesKey, filled, tr};
+
 /// Maximum buffer size for GPU storage buffers in bytes (128 MiB default WebGPU/Metal limit).
 pub const MAX_GPU_STORAGE_BUFFER_BYTES: usize = 128 * 1024 * 1024;
 /// Maximum number of f32 elements that fit in a single GPU storage buffer.
@@ -243,10 +245,10 @@ pub fn safe_write_buffer<T: bytemuck::Pod>(
     } else {
         crate::ui::toast::report(
             crate::ui::toast::Severity::Warning,
-            "Data too large for the GPU buffer",
-            format!(
-                "{label}: data size ({copy_bytes} bytes) exceeds GPU buffer capacity ({} bytes), skipping write",
-                buffer.size()
+            tr(NoticesKey::DataTooLargeForGpuBuffer),
+            filled(
+                tr(NoticesKey::BufferTooLargeDetail),
+                &[&label, &copy_bytes, &buffer.size()],
             ),
         );
         false
@@ -265,11 +267,10 @@ pub fn safe_write_buffer_range<T: bytemuck::Pod>(
     let Some((start, end)) = buffer_range_bytes::<T>(offset, data.len(), buffer.size()) else {
         crate::ui::toast::report(
             crate::ui::toast::Severity::Warning,
-            "Data too large for the GPU buffer",
-            format!(
-                "{label}: range at element {offset} (+{} elements) exceeds GPU buffer capacity ({} bytes), skipping write",
-                data.len(),
-                buffer.size()
+            tr(NoticesKey::DataTooLargeForGpuBuffer),
+            filled(
+                tr(NoticesKey::BufferRangeTooLargeDetail),
+                &[&label, &offset, &data.len(), &buffer.size()],
             ),
         );
         return false;

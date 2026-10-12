@@ -4,6 +4,7 @@
 use super::catalog::ColormapEntry;
 use super::kind::ColormapKind;
 use super::lut::Lut;
+use crate::i18n::{ColormapKey, tr};
 use colorgrad::{BlendMode, Gradient, GradientBuilder};
 use serde::{Deserialize, Serialize};
 
@@ -34,7 +35,7 @@ impl Interpolation {
     pub const ALL: [Self; 3] = [Self::Linear, Self::Basis, Self::CatmullRom];
     pub fn label(self) -> &'static str {
         match self {
-            Self::Linear => "Linear",
+            Self::Linear => tr(ColormapKey::InterpolationLinear),
             Self::Basis => "B-spline",
             Self::CatmullRom => "Catmull-Rom",
         }
@@ -46,7 +47,7 @@ impl BlendSpace {
     pub fn label(self) -> &'static str {
         match self {
             Self::Rgb => "sRGB",
-            Self::LinearRgb => "Linear RGB",
+            Self::LinearRgb => tr(ColormapKey::BlendLinearRgb),
             Self::Oklab => "Oklab",
             Self::Lab => "CIE Lab",
         }
@@ -128,7 +129,7 @@ impl CustomColormapSpec {
     pub fn to_entry(&self) -> Result<ColormapEntry, String> {
         let name = self.name.trim();
         if name.is_empty() {
-            return Err("Name is required".into());
+            return Err(tr(ColormapKey::NameRequired).into());
         }
         let kind = if self.classes > 1 {
             ColormapKind::Categorical

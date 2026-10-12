@@ -1,69 +1,49 @@
 //! About tab content for the About Octant dialog.
 
+use super::octant_cube;
 use super::types::AboutTab;
-use crate::app::OctantApp;
+use crate::i18n::{AboutKey, tr};
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
+use crate::utils::stack_str;
 
-pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &mut AboutTab) {
+pub fn show_overview_tab(ui: &mut egui::Ui, active_tab: &mut AboutTab) {
     egui::ScrollArea::vertical()
         .auto_shrink([false, true])
         .show(ui, |ui| {
             ui.add_space(2.0);
 
-            // Centered Header with Animated Octant Cube Widget & Title
+            // Centered header: the octant cube, its name, the title and subtitle
             ui.vertical_centered(|ui| {
-                crate::ui::hero::draw_octant_widget(ui, 42.0, [-1.0, -1.0, -1.0], 0.0, 1.0);
+                octant_cube::show_octant_cube(ui);
                 ui.add_space(4.0);
-                ui.heading(
-                    egui::RichText::new(format!("Octant v{}", env!("CARGO_PKG_VERSION"))).strong(),
+                let mut version = [0; 32];
+                let title = stack_str(
+                    &mut version,
+                    format_args!("Octant v{}", env!("CARGO_PKG_VERSION")),
                 );
+                ui.heading(egui::RichText::new(title).strong());
                 ui.label(
-                    egui::RichText::new("N-Dimensional Data Explorer")
+                    egui::RichText::new(tr(AboutKey::Subtitle))
                         .small()
                         .italics()
                         .color(ui.visuals().weak_text_color()),
                 );
             });
 
+            // Why the name: right under it
+            ui.add_space(8.0);
+            octant_cube::show_why_octant(ui);
+
             ui.add_space(8.0);
             ui.separator();
             ui.add_space(8.0);
 
             // Core Platform Description
-            ui.label(
-                "Octant is an interactive viewer for N-dimensional datasets with native support for local and cloud object storage, Zarr (v2/v3), and Icechunk. Built in Rust with GPU-accelerated rendering via WGPU. Octant runs natively on macOS, Linux, and Windows.",
-            );
+            ui.label(tr(AboutKey::Description));
 
             ui.add_space(10.0);
 
-            // Key Specs
-            egui::Frame::default()
-                .fill(ui.visuals().extreme_bg_color)
-                .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
-                .corner_radius(6.0)
-                .inner_margin(egui::Margin::symmetric(12, 8))
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing.y = 4.0;
-                    ui.horizontal(|ui| {
-                        ui.icon(Icon::Bolt, IconSize::Sm);
-                        ui.label(egui::RichText::new("Hyperslab Slicing").strong());
-                    });
-                    ui.label("   Async LRU chunk cache & multi-resolution pyramids.");
-                    ui.horizontal(|ui| {
-                        ui.icon(Icon::Icechunk, IconSize::Sm);
-                        ui.label(egui::RichText::new("Zarr & Icechunk Native").strong());
-                    });
-                    ui.label("   Local, S3, GCS, Azure, and HTTP streaming backends.");
-                    ui.horizontal(|ui| {
-                        ui.icon(Icon::Colormap, IconSize::Sm);
-                        ui.label(
-                            egui::RichText::new("Hardware-Accelerated WGPU Shaders").strong(),
-                        );
-                    });
-                    ui.label(
-                        "   2D Flatmaps, 3D Spheres, Elevation Surfaces, Volumes & 1D Profiles.",
-                    );
-                });
+            show_key_specs(ui);
 
             ui.add_space(8.0);
             ui.separator();
@@ -72,12 +52,14 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
             show_links_and_credits(ui);
 
             ui.add_space(8.0);
+            let mut label = [0; 64];
+            let label = stack_str(
+                &mut label,
+                format_args!("{} ({})", tr(AboutKey::BrowseIcons), Icon::ALL.len()),
+            );
             if ui
-                .icon_button(Icon::Colormap, crate::utils::stack_str(
-                    &mut [0; 48],
-                    format_args!("Browse Native Vector Icons ({})", Icon::ALL.len()),
-                ))
-                .on_hover_text("Explore procedural vector icons in popover")
+                .icon_button(Icon::Colormap, label)
+                .on_hover_text(tr(AboutKey::BrowseIconsHover))
                 .clicked()
             {
                 *active_tab = AboutTab::Icons;
@@ -85,10 +67,46 @@ pub fn show_overview_tab(_app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &m
         });
 }
 
+/// The framed list of headline features, each a titled row over an indented line.
+fn show_key_specs(ui: &mut egui::Ui) {
+    let specs = [
+        (
+            Icon::Bolt,
+            AboutKey::HyperslabTitle,
+            AboutKey::HyperslabDesc,
+        ),
+        (
+            Icon::Icechunk,
+            AboutKey::StorageTitle,
+            AboutKey::StorageDesc,
+        ),
+        (
+            Icon::Colormap,
+            AboutKey::ShadersTitle,
+            AboutKey::ShadersDesc,
+        ),
+    ];
+    egui::Frame::default()
+        .fill(ui.visuals().extreme_bg_color)
+        .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+        .corner_radius(6.0)
+        .inner_margin(egui::Margin::symmetric(12, 8))
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 4.0;
+            for (icon, title, desc) in specs {
+                ui.horizontal(|ui| {
+                    ui.icon(icon, IconSize::Sm);
+                    ui.label(egui::RichText::new(tr(title)).strong());
+                });
+                ui.indent(("about_spec", title), |ui| ui.label(tr(desc)));
+            }
+        });
+}
+
 /// Project links, the good-faith notice, colormap credits and third-party licenses.
 fn show_links_and_credits(ui: &mut egui::Ui) {
     // Links & Resources
-    ui.heading("Links & Resources");
+    ui.heading(tr(AboutKey::LinksHeading));
     ui.add_space(4.0);
 
     ui.horizontal_wrapped(|ui| {
@@ -100,7 +118,7 @@ fn show_links_and_credits(ui: &mut egui::Ui) {
     });
     ui.horizontal_wrapped(|ui| {
         ui.icon(Icon::VariableDoc, IconSize::Sm);
-        ui.hyperlink_to("octant documentation", "https://docs.rs/octant");
+        ui.hyperlink_to(tr(AboutKey::DocsLink), "https://docs.rs/octant");
     });
     ui.horizontal_wrapped(|ui| {
         ui.icon(Icon::Globe, IconSize::Sm);
@@ -109,13 +127,9 @@ fn show_links_and_credits(ui: &mut egui::Ui) {
 
     ui.add_space(6.0);
     ui.label(
-        egui::RichText::new(
-            "Octant credits third-party work in good faith. If you believe something \
-             is missing or incorrectly attributed, please let us know and we will \
-             correct or remove it.",
-        )
-        .small()
-        .weak(),
+        egui::RichText::new(tr(AboutKey::GoodFaithNotice))
+            .small()
+            .weak(),
     );
     ui.hyperlink_to(
         egui::RichText::new("github.com/lazarusA/octant/issues").small(),

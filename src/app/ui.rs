@@ -1,9 +1,11 @@
+use crate::i18n::{NoticesKey as N, tr};
 use crate::ui::toast::Severity;
 
 use super::OctantApp;
 
 impl eframe::App for OctantApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        self.save_language_pref(storage);
         self.save_colormap_prefs(storage);
     }
 
@@ -14,11 +16,11 @@ impl eframe::App for OctantApp {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
-        // Reset hover preview at start of frame
         self.preview_colormap = None;
 
         // Notices reported by renderers, backends and background threads.
         self.drain_reported_notices();
+        crate::ui::fonts::FontEngine::watch_dataset(&ctx, self);
 
         // 0. Poll completed background metadata inspection
         let mut metadata_done = false;
@@ -31,7 +33,7 @@ impl eframe::App for OctantApp {
                         if metadata.variables.is_empty() {
                             self.status_message =
                                 format!("No variables discovered in '{}'", metadata.name);
-                            self.notify(Severity::Warning, "No variables found", &metadata.name);
+                            self.notify(Severity::Warning, tr(N::NoVariablesFound), &metadata.name);
                         } else {
                             self.status_message = format!(
                                 "Inspected '{}' (Found {} variables)",
@@ -60,7 +62,7 @@ impl eframe::App for OctantApp {
                         self.layout.hero_state.loaded = false;
                         self.clear_active_metadata();
                         self.status_message = format!("Store inspect error: {}", err);
-                        self.notify(Severity::Error, "Couldn't open dataset", &err);
+                        self.notify(Severity::Error, tr(N::CouldntOpenDataset), &err);
                     }
                 }
             } else {
@@ -154,7 +156,7 @@ impl eframe::App for OctantApp {
                         crate::ui::drop_zone::trigger_drop_zone_warning(&ctx);
                         self.notify(
                             Severity::Warning,
-                            "Unsupported file",
+                            tr(N::UnsupportedFile),
                             format!("{err}: {path_str}"),
                         );
                     }

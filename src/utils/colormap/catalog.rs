@@ -4,6 +4,7 @@
 use super::format::{self, CatalogRecords, FamilyRecord, MapRecord};
 use super::kind::ColormapKind;
 use super::lut::{Lut, resample, smooth};
+use crate::i18n::{ColormapKey as K, filled, tr};
 use std::sync::LazyLock;
 
 static CATALOG_BYTES: &[u8] = include_bytes!("../../../assets/colormaps/colormaps.bin");
@@ -51,8 +52,8 @@ static BUILTIN: LazyLock<BuiltinCatalog> = LazyLock::new(|| match format::decode
     Err(e) => {
         crate::ui::toast::report(
             crate::ui::toast::Severity::Error,
-            "Bundled colormaps unreadable",
-            format!("{e}; falling back to grayscale"),
+            tr(K::BundledUnreadable),
+            filled(tr(K::FallingBackToGray), &[&e]),
         );
         BuiltinCatalog::fallback()
     }

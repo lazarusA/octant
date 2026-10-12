@@ -2,6 +2,7 @@
 
 use super::style::{BODY_FONT, content_width, fit_text};
 use crate::app::OctantApp;
+use crate::i18n::{DatasetKey, tr};
 use crate::ui::icons::{Icon, UiIconExt};
 
 /// Horizontal / vertical inner padding of the intake frame.
@@ -47,7 +48,7 @@ pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                 let enter_pressed =
                     response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
-                if has_input && ui.close_button("Clear input").clicked() {
+                if has_input && ui.close_button(tr(DatasetKey::ClearInputHover)).clicked() {
                     app.layout.hero_state.input.clear();
                 }
 
@@ -63,9 +64,9 @@ fn intake_hint(ui: &egui::Ui, text_w: f32) -> &'static str {
     fit_text(
         ui,
         &[
-            "https://... or path (.zarr, .icechunk, .nc, .h5, .tiff, ...)",
-            "https://... or path (.zarr, .nc, .tiff, ...)",
-            "URL or path...",
+            tr(DatasetKey::HeroInputHintLong),
+            tr(DatasetKey::HeroInputHintMedium),
+            tr(DatasetKey::HeroInputHintShort),
         ],
         BODY_FONT,
         text_w,
@@ -92,7 +93,7 @@ fn load_button(ui: &mut egui::Ui) -> bool {
         );
     }
     response
-        .on_hover_text("Load Dataset & Open Variables")
+        .on_hover_text(tr(DatasetKey::LoadDatasetHover))
         .clicked()
 }
 

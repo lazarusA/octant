@@ -124,3 +124,28 @@ pub fn draw_moon(c: &IconCanvas) {
         c.circle((8.5, 15.5), 1.2, crater, egui::Stroke::NONE);
     }
 }
+
+/// Language: dual-script translation mark ('文' radical at top-left, Latin 'A' at bottom-right).
+pub fn draw_language(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+
+    if c.compact() {
+        // Simplified dual-script marks for small displays (< 16 px)
+        c.line((4.0, 6.0), (11.5, 6.0), s);
+        c.line((7.5, 4.0), (7.5, 11.5), s);
+        c.line((5.0, 11.5), (10.0, 11.5), s);
+
+        c.path_round(&[(13.0, 19.5), (16.5, 10.0), (20.0, 19.5)], s);
+        c.line((14.5, 16.0), (18.5, 16.0), s);
+    } else {
+        // Top-left: universal script radical ('文')
+        c.line((7.5, 3.5), (7.5, 5.5), s);
+        c.line((3.5, 6.0), (13.0, 6.0), s);
+        c.line((11.0, 6.0), (4.5, 14.5), s);
+        c.path_round(&[(5.5, 9.0), (8.5, 12.0), (12.0, 14.5)], s);
+
+        // Bottom-right: Latin capital 'A'
+        c.path_round(&[(13.0, 19.5), (16.5, 10.0), (20.0, 19.5)], s);
+        c.line((14.5, 16.0), (18.5, 16.0), s);
+    }
+}

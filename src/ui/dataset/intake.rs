@@ -1,52 +1,47 @@
 use crate::app::OctantApp;
 use crate::app::StoreKind;
+use crate::i18n::{CommonKey, DatasetKey, tr};
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
 
-const SAMPLE_PRESETS: [(&str, &str, Option<StoreKind>); 4] = [
+const SAMPLE_PRESETS: [(DatasetKey, &str, Option<StoreKind>); 4] = [
     (
-        "SeasFire Global Wildfire (Zarr)",
+        DatasetKey::SampleSeasFire,
         "https://s3.bgc-jena.mpg.de:9000/misc/seasfire_rechunked.zarr",
         Some(StoreKind::RemoteZarr),
     ),
     (
-        "Sentinel-2 L2A COG (GeoTIFF)",
+        DatasetKey::SampleSentinel2,
         "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/36/Q/WD/2020/7/S2A_36QWD_20200701_0_L2A/TCI.tif",
         Some(StoreKind::RemoteGeoTiff),
     ),
     (
-        "4D Known-Truth Volume (Procedural)",
+        DatasetKey::FormatVolume4D,
         "procedural://volume4d",
         Some(StoreKind::ProceduralVolume4D),
     ),
     (
-        "2D Procedural Matrix (Test)",
+        DatasetKey::SampleMatrixTest,
         "procedural://matrix2d",
         Some(StoreKind::ProceduralRandom),
     ),
 ];
 
-const FORMAT_OPTIONS: [(StoreKind, &str); 9] = [
-    (StoreKind::RemoteZarr, "Remote Zarr (HTTP/S3)"),
-    (StoreKind::LocalZarr, "Local Zarr (Filesystem)"),
-    (StoreKind::RemoteIcechunk, "Remote Icechunk (HTTP/S3)"),
-    (StoreKind::LocalIcechunk, "Local Icechunk (Filesystem)"),
-    (StoreKind::RemoteGeoTiff, "Remote GeoTIFF / COG (HTTP/S3)"),
-    (StoreKind::LocalGeoTiff, "Local GeoTIFF (.tif/.tiff/.cog)"),
-    (StoreKind::LocalNetCdf, "Local NetCDF / HDF5 (.nc/.h5)"),
-    (
-        StoreKind::ProceduralVolume4D,
-        "4D Known-Truth Volume (Procedural)",
-    ),
-    (
-        StoreKind::ProceduralRandom,
-        "2D Procedural Matrix (Procedural)",
-    ),
+const FORMAT_OPTIONS: [(StoreKind, DatasetKey); 9] = [
+    (StoreKind::RemoteZarr, DatasetKey::FormatRemoteZarr),
+    (StoreKind::LocalZarr, DatasetKey::FormatLocalZarr),
+    (StoreKind::RemoteIcechunk, DatasetKey::FormatRemoteIcechunk),
+    (StoreKind::LocalIcechunk, DatasetKey::FormatLocalIcechunk),
+    (StoreKind::RemoteGeoTiff, DatasetKey::FormatRemoteGeoTiff),
+    (StoreKind::LocalGeoTiff, DatasetKey::FormatLocalGeoTiff),
+    (StoreKind::LocalNetCdf, DatasetKey::FormatLocalNetCdf),
+    (StoreKind::ProceduralVolume4D, DatasetKey::FormatVolume4D),
+    (StoreKind::ProceduralRandom, DatasetKey::FormatMatrix2D),
 ];
 
 /// Renders the source intake controls: URL/path text input, format selection,
 /// quick sample presets, catalog opener, and drop zone.
 pub fn show_source_intake(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.label(egui::RichText::new("Target URL / File Path").strong());
+    ui.label(egui::RichText::new(tr(DatasetKey::SourceUrlOrPath)).strong());
 
     let has_input = !app.selected.store_target.is_empty();
     if show_input_bar(app, ui) {
@@ -70,7 +65,11 @@ fn show_input_bar(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
     } else {
         Icon::DropTray
     };
-    let load_text = if app.is_loading { "Loading..." } else { "Load" };
+    let load_text = if app.is_loading {
+        tr(CommonKey::Loading)
+    } else {
+        tr(DatasetKey::Load)
+    };
     let mut submit = false;
 
     ui.horizontal(|ui| {
@@ -78,7 +77,7 @@ fn show_input_bar(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
         let edit_resp = ui.add_sized(
             [edit_width, 22.0],
             egui::TextEdit::singleline(&mut app.selected.store_target)
-                .hint_text("https://... or path (.zarr, .nc, .tif)"),
+                .hint_text(tr(DatasetKey::TargetPathHint)),
         );
 
         if edit_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
@@ -100,16 +99,19 @@ fn show_input_bar(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
 
 fn show_intake_actions(app: &mut OctantApp, ui: &mut egui::Ui, has_input: bool) {
     ui.horizontal(|ui| {
-        if ui.icon_button(Icon::Catalog, "Catalog...").clicked() {
+        if ui
+            .icon_button(Icon::Catalog, tr(DatasetKey::CatalogEllipsis))
+            .clicked()
+        {
             app.layout.show_catalog_window = true;
         }
 
-        let samples_btn = ui.icon_button(Icon::FolderOpen, "Samples");
+        let samples_btn = ui.icon_button(Icon::FolderOpen, tr(DatasetKey::SampleDatasets));
         egui::Popup::from_toggle_button_response(&samples_btn)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClick)
             .show(|ui| {
                 for (label, url, kind) in SAMPLE_PRESETS {
-                    if ui.button(label).clicked() {
+                    if ui.button(tr(label)).clicked() {
                         app.selected.store_target = url.to_string();
                         if let Some(k) = kind {
                             app.selected.store_kind = k;
@@ -119,40 +121,40 @@ fn show_intake_actions(app: &mut OctantApp, ui: &mut egui::Ui, has_input: bool) 
                 }
             });
 
-        if has_input && ui.button("Clear").clicked() {
+        if has_input && ui.button(tr(DatasetKey::Clear)).clicked() {
             app.selected.store_target.clear();
         }
     });
 }
 
-fn format_label(kind: StoreKind) -> &'static str {
+fn format_label(kind: StoreKind) -> DatasetKey {
     match kind {
-        StoreKind::RemoteZarr => "Remote Zarr (HTTP/S3)",
-        StoreKind::LocalZarr => "Local Zarr (Filesystem)",
-        StoreKind::RemoteIcechunk => "Remote Icechunk (HTTP/S3)",
-        StoreKind::LocalIcechunk => "Local Icechunk (Filesystem)",
-        StoreKind::RemoteGeoTiff => "Remote GeoTIFF / COG",
-        StoreKind::LocalGeoTiff => "Local GeoTIFF",
-        StoreKind::LocalNetCdf => "Local NetCDF / HDF5",
-        StoreKind::ProceduralVolume4D => "4D Known-Truth Volume",
-        StoreKind::ProceduralRandom => "2D Procedural Matrix",
+        StoreKind::RemoteZarr => DatasetKey::FormatRemoteZarr,
+        StoreKind::LocalZarr => DatasetKey::FormatLocalZarr,
+        StoreKind::RemoteIcechunk => DatasetKey::FormatRemoteIcechunk,
+        StoreKind::LocalIcechunk => DatasetKey::FormatLocalIcechunk,
+        StoreKind::RemoteGeoTiff => DatasetKey::FormatRemoteGeoTiffShort,
+        StoreKind::LocalGeoTiff => DatasetKey::FormatLocalGeoTiffShort,
+        StoreKind::LocalNetCdf => DatasetKey::FormatLocalNetCdfShort,
+        StoreKind::ProceduralVolume4D => DatasetKey::FormatVolume4DShort,
+        StoreKind::ProceduralRandom => DatasetKey::FormatMatrix2DShort,
     }
 }
 
 fn show_format_selector(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.icon(Icon::Dataset, IconSize::Xs);
-        ui.label(egui::RichText::new("Format:").weak());
+        ui.label(egui::RichText::new(tr(DatasetKey::FormatLabel)).weak());
 
         let mut selected = app.selected.store_kind;
         egui::ComboBox::from_id_salt("dataset_store_kind_select")
-            .selected_text(format_label(selected))
+            .selected_text(tr(format_label(selected)))
             .show_ui(ui, |ui| {
                 for (i, (kind, label)) in FORMAT_OPTIONS.iter().enumerate() {
                     if i == 7 {
                         ui.separator();
                     }
-                    ui.selectable_value(&mut selected, *kind, *label);
+                    ui.selectable_value(&mut selected, *kind, tr(*label));
                 }
             });
 

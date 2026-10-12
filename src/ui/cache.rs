@@ -1,11 +1,14 @@
+use crate::ui::number_input::LocalizedInput;
 use crate::{
     app::OctantApp,
+    i18n::{CommonKey, DatasetKey, fill, tr},
     ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt},
+    utils::stack_str,
 };
 
 pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
     let button_response = ui.add(
-        ToolbarButton::new(Icon::Cache, "Cache")
+        ToolbarButton::new(Icon::Cache, tr(CommonKey::Cache))
             .compact(compact)
             .owns_popup(),
     );
@@ -13,7 +16,7 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
         ui.set_min_width(360.0);
         ui.horizontal(|ui| {
             ui.icon(Icon::Cache, IconSize::Sm);
-            ui.label(egui::RichText::new("Unified Multi-Variable Memory Cache").strong());
+            ui.label(egui::RichText::new(tr(DatasetKey::CacheMenuTitle)).strong());
         });
         ui.separator();
 
@@ -35,66 +38,110 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
         let max_bytes = app.block_cache.max_bytes();
         let fraction = (total_bytes as f32 / max_bytes.max(1) as f32).clamp(0.0, 1.0);
 
-        ui.label(egui::RichText::new("Global RAM Memory Usage:").small());
-        ui.add(egui::ProgressBar::new(fraction).text(format!(
-            "{:.2} MB / {} MB ({:.1}%)",
-            total_mb,
-            app.max_cache_mb,
-            fraction * 100.0
-        )));
+        let (mut a, mut b, mut buf) = ([0u8; 16], [0u8; 16], [0u8; 128]);
+        ui.label(egui::RichText::new(tr(DatasetKey::GlobalMemoryUsage)).small());
+        let total = stack_str(
+            &mut a,
+            format_args!(
+                "{}",
+                crate::i18n::number::Num(format_args!("{total_mb:.2}"))
+            ),
+        );
+        let percent = stack_str(
+            &mut b,
+            format_args!(
+                "{}",
+                crate::i18n::number::Num(format_args!("{:.1}", fraction * 100.0))
+            ),
+        );
+        let usage = fill(
+            &mut buf,
+            tr(DatasetKey::CacheUsagePercent),
+            &[&total, &app.max_cache_mb, &percent],
+        );
+        ui.add(egui::ProgressBar::new(fraction).text(usage));
 
         ui.add_space(4.0);
         ui.label(
-            egui::RichText::new("Memory Breakdown by Kind:")
+            egui::RichText::new(tr(DatasetKey::MemoryBreakdown))
                 .strong()
                 .small(),
         );
         ui.horizontal(|ui| {
             ui.icon(Icon::Bullet, IconSize::Xs);
-            ui.small(format!(
-                "Resident Hyperslabs: {:.2} MB ({} blocks)",
-                block_mb,
-                app.block_cache.cached_count()
+            let mb = stack_str(
+                &mut a,
+                format_args!(
+                    "{}",
+                    crate::i18n::number::Num(format_args!("{block_mb:.2}"))
+                ),
+            );
+            let count = app.block_cache.cached_count();
+            ui.small(fill(
+                &mut buf,
+                tr(DatasetKey::ResidentHyperslabs),
+                &[&mb, &count],
             ));
         });
         if pyramid_bytes > 0 {
             ui.horizontal(|ui| {
                 ui.icon(Icon::Bullet, IconSize::Xs);
-                ui.small(format!("Multi-Res Pyramid: {:.2} MB", pyramid_mb));
+                let mb = stack_str(
+                    &mut a,
+                    format_args!(
+                        "{}",
+                        crate::i18n::number::Num(format_args!("{pyramid_mb:.2}"))
+                    ),
+                );
+                ui.small(fill(&mut buf, tr(DatasetKey::MultiResPyramid), &[&mb]));
             });
         }
 
         ui.add_space(4.0);
-        ui.small(format!(
-            "Cache Hits: {} | Misses: {} (Hit Rate: {:.1}%)",
-            app.block_cache.hits(),
-            app.block_cache.misses(),
-            app.block_cache.hit_rate()
+        let rate = stack_str(
+            &mut b,
+            format_args!(
+                "{}",
+                crate::i18n::number::Num(format_args!("{:.1}", app.block_cache.hit_rate()))
+            ),
+        );
+        let (hits, misses) = (app.block_cache.hits(), app.block_cache.misses());
+        ui.small(fill(
+            &mut buf,
+            tr(DatasetKey::CacheHitsMisses),
+            &[&hits, &misses, &rate],
         ));
 
         let pending = app.block_prefetcher.pending_count();
         if pending > 0 {
             ui.horizontal(|ui| {
                 ui.icon_toned(Icon::Bolt, IconSize::Xs, IconTone::Success);
-                ui.small(format!("Background Prefetching: {} in-flight", pending));
+                ui.small(fill(
+                    &mut buf,
+                    tr(DatasetKey::PrefetchInFlight),
+                    &[&pending],
+                ));
             });
         } else {
             ui.horizontal(|ui| {
                 ui.icon_toned(Icon::Check, IconSize::Xs, IconTone::Muted);
-                ui.small("Buffer Warm / All Blocks Cached");
+                ui.small(tr(DatasetKey::AllBlocksCached));
             });
         }
 
         ui.separator();
         ui.label(
-            egui::RichText::new("Summary per Variable:")
+            egui::RichText::new(tr(DatasetKey::SummaryPerVariable))
                 .strong()
                 .small(),
         );
 
         let summaries = app.block_cache.summary_per_variable();
         if summaries.is_empty() {
-            ui.small("  (No variables currently cached in memory)");
+            ui.horizontal(|ui| {
+                ui.add_space(6.0);
+                ui.small(tr(DatasetKey::NoVariablesCached));
+            });
         } else {
             egui::ScrollArea::vertical()
                 .max_height(140.0)
@@ -110,10 +157,21 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
                                         .monospace()
                                         .color(ui.visuals().strong_text_color()),
                                 );
-                                ui.small(format!("({:.1} MB, {} blks)", mb, s.block_count));
+                                let mb = stack_str(
+                                    &mut a,
+                                    format_args!(
+                                        "{}",
+                                        crate::i18n::number::Num(format_args!("{mb:.1}"))
+                                    ),
+                                );
+                                ui.small(fill(
+                                    &mut buf,
+                                    tr(DatasetKey::VariableCacheSize),
+                                    &[&mb, &s.block_count],
+                                ));
                                 if ui
                                     .icon_button(Icon::Trash, "")
-                                    .on_hover_text("Clear cache for this variable")
+                                    .on_hover_text(tr(DatasetKey::ClearVariableCacheHover))
                                     .clicked()
                                 {
                                     var_to_clear =
@@ -130,26 +188,33 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
         }
 
         ui.separator();
-        ui.label(egui::RichText::new("Prefetch & Capacity Settings").strong());
+        ui.label(egui::RichText::new(tr(DatasetKey::PrefetchCapacitySettings)).strong());
         ui.checkbox(
             &mut app.playback.enable_prefetch,
-            "Enable Background Prefetching",
+            tr(DatasetKey::EnablePrefetching),
         );
         let old_mb = app.max_cache_mb;
-        ui.add(egui::Slider::new(&mut app.max_cache_mb, 256..=8192).suffix(" MB Limit"));
+        ui.add(
+            egui::Slider::new(&mut app.max_cache_mb, 256..=8192)
+                .localized()
+                .suffix(tr(DatasetKey::CacheLimitSuffix)),
+        );
         if old_mb != app.max_cache_mb {
             app.block_cache
                 .set_max_bytes(app.max_cache_mb * 1024 * 1024);
         }
 
         ui.add(
-            egui::Slider::new(&mut app.block_window_size, 8..=128).suffix(" Window Size (steps)"),
+            egui::Slider::new(&mut app.block_window_size, 8..=128)
+                .localized()
+                .suffix(tr(DatasetKey::WindowSizeSuffix)),
         );
 
         let old_threads = app.prefetch_threads;
         ui.add(
             egui::Slider::new(&mut app.prefetch_threads, 2..=32)
-                .suffix(" Prefetch Workers (threads)"),
+                .localized()
+                .suffix(tr(DatasetKey::PrefetchWorkersSuffix)),
         );
         if old_threads != app.prefetch_threads {
             app.block_prefetcher
@@ -158,7 +223,7 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
 
         ui.add_space(4.0);
         if ui
-            .icon_button(Icon::Trash, "Flush & Clear All Caches")
+            .icon_button(Icon::Trash, tr(DatasetKey::FlushAllCaches))
             .clicked()
         {
             app.block_cache.clear();

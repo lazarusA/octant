@@ -2,6 +2,8 @@
 //! and validity (`R8Unorm`), uploaded as whole Z planes.
 
 use super::encode::{self, Dims, Encoded, VolumeEncoding};
+use crate::i18n::{NoticesKey as K, filled, tr};
+use crate::ui::toast::{Severity, report};
 use std::ops::Range;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
@@ -27,14 +29,9 @@ impl VolumeTextures {
     pub fn new(device: &wgpu::Device, dims: Dims, encoding: VolumeEncoding) -> Option<Self> {
         let max = device.limits().max_texture_dimension_3d as usize;
         if dims.w > max || dims.h > max || dims.d > max {
-            crate::ui::toast::report(
-                crate::ui::toast::Severity::Error,
-                "Volume too large for the GPU",
-                format!(
-                    "Volume {}x{}x{} exceeds GPU 3D texture limit ({max})",
-                    dims.w, dims.h, dims.d
-                ),
-            );
+            let detail = [&dims.w as &dyn std::fmt::Display, &dims.h, &dims.d, &max];
+            let detail = filled(tr(K::VolumeTextureTooLargeDetail), &detail);
+            report(Severity::Error, tr(K::VolumeTooLargeForGpu), detail);
             return None;
         }
         let format = match encoding {
@@ -76,11 +73,11 @@ impl VolumeTextures {
     pub fn upload_planes(&self, queue: &wgpu::Queue, values: &[f32], z: Range<usize>) {
         let Dims { w, h, d } = self.dims;
         if values.len() != w * h * d {
-            crate::ui::toast::report(
-                crate::ui::toast::Severity::Warning,
-                "Volume upload skipped",
-                format!("{} values for a {w}x{h}x{d} texture", values.len()),
+            let detail = filled(
+                tr(K::VolumeUploadMismatchDetail),
+                &[&values.len(), &w, &h, &d],
             );
+            report(Severity::Warning, tr(K::VolumeUploadSkipped), detail);
             return;
         }
         self.version.fetch_add(1, Ordering::Relaxed);

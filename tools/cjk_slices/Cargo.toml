@@ -1,0 +1,16 @@
+[package]
+name = "cjk_slices"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Cuts Noto Sans SC, JP and KR into slices for Octant's web build."
+
+[dependencies]
+allsorts = { version = "0.17", default-features = false, features = ["flate2_rust"] }
+encoding_rs = "0.8"
+md-5 = "0.11"
+reqwest = { version = "0.13", features = ["blocking"] }
+
+# A standalone tool, kept out of Octant's package (built by `pages.yml`
+# without compiling Octant itself).
+[workspace]

@@ -7,12 +7,14 @@ pub mod icons;
 mod license_sheet;
 mod license_wrap;
 pub mod licenses;
+mod octant_cube;
 pub mod overview;
 pub mod types;
 
 pub use types::AboutTab;
 
 use crate::app::OctantApp;
+use crate::i18n::{AboutKey, CommonKey, tr};
 use crate::ui::icons::UiIconExt;
 use icons::show_icons_tab;
 use overview::show_overview_tab;
@@ -42,8 +44,8 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
 
     let (default_size, min_size, max_size) = window_sizes(active_tab, ctx.viewport_rect().size());
     let title = match active_tab {
-        AboutTab::About => "About Octant",
-        AboutTab::Icons => "Native Vector Icons",
+        AboutTab::About => tr(AboutKey::WindowTitle),
+        AboutTab::Icons => tr(AboutKey::IconsWindowTitle),
     };
 
     let mut open = true;
@@ -59,7 +61,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             egui::Frame::default()
                 .inner_margin(egui::Margin::symmetric(14, 8))
-                .show(ui, |ui| open = window_body(app, ui, &mut active_tab));
+                .show(ui, |ui| open = window_body(ui, &mut active_tab));
         });
 
     ctx.data_mut(|d| d.insert_temp(storage_id, active_tab));
@@ -84,12 +86,12 @@ fn window_sizes(tab: AboutTab, screen: egui::Vec2) -> (egui::Vec2, egui::Vec2, e
 
 /// Tab bar, active tab content and footer. Returns `false` once the close
 /// button is clicked.
-fn window_body(app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &mut AboutTab) -> bool {
+fn window_body(ui: &mut egui::Ui, active_tab: &mut AboutTab) -> bool {
     let mut open = true;
     ui.horizontal(|ui| {
-        let mut label_buf = [0; 32];
+        let mut label_buf = [0; 64];
         let tabs = [
-            (AboutTab::About, "About"),
+            (AboutTab::About, tr(CommonKey::About)),
             (AboutTab::Icons, types::icons_tab_label(&mut label_buf)),
         ];
         for (tab, label) in tabs {
@@ -99,7 +101,7 @@ fn window_body(app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &mut AboutTab
             }
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.close_button("Close (Esc)").clicked() {
+            if ui.close_button(tr(CommonKey::CloseEsc)).clicked() {
                 open = false;
             }
         });
@@ -109,13 +111,13 @@ fn window_body(app: &mut OctantApp, ui: &mut egui::Ui, active_tab: &mut AboutTab
     ui.separator();
     ui.add_space(6.0);
     match *active_tab {
-        AboutTab::About => show_overview_tab(app, ui, active_tab),
+        AboutTab::About => show_overview_tab(ui, active_tab),
         AboutTab::Icons => show_icons_tab(ui),
     }
     ui.add_space(6.0);
     ui.separator();
     ui.add_space(4.0);
-    ui.small("Licensed under MIT or Apache-2.0");
+    ui.small(tr(AboutKey::Licensed));
     open
 }
 

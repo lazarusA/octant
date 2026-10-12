@@ -2,6 +2,7 @@
 
 use super::popup::show_clean_color_picker_popup;
 use super::shape::ColorShape;
+use crate::i18n::{ColormapKey as K, tr};
 use egui::{Color32, Rect, Vec2};
 
 /// A flexible color picker button widget that supports arbitrary custom vector shapes
@@ -11,8 +12,8 @@ pub struct ShapeColorPicker<'a> {
     color: &'a mut [f32; 4],
     shape: ColorShape,
     size: Option<Vec2>,
-    title: String,
-    tooltip: Option<String>,
+    title: &'a str,
+    tooltip: Option<&'a str>,
     anchor_offset: Vec2,
 }
 
@@ -28,21 +29,21 @@ impl<'a> ShapeColorPicker<'a> {
             color,
             shape,
             size: None,
-            title: "Color Picker".to_string(),
+            title: tr(K::ColorPicker),
             tooltip: None,
             anchor_offset: Vec2::new(-70.0, -250.0),
         }
     }
 
     /// Sets the header title displayed inside the popup.
-    pub fn title(mut self, title: impl Into<String>) -> Self {
-        self.title = title.into();
+    pub fn title(mut self, title: &'a str) -> Self {
+        self.title = title;
         self
     }
 
     /// Sets an optional hover tooltip on the shape button.
-    pub fn tooltip(mut self, tooltip: impl Into<String>) -> Self {
-        self.tooltip = Some(tooltip.into());
+    pub fn tooltip(mut self, tooltip: &'a str) -> Self {
+        self.tooltip = Some(tooltip);
         self
     }
 
@@ -61,7 +62,7 @@ impl<'a> ShapeColorPicker<'a> {
     /// Displays the color picker widget at a specified pre-calculated `Rect`.
     pub fn show_at(self, ui: &mut egui::Ui, rect: Rect) -> egui::Response {
         let resp = ui.interact(rect, self.id_salt.with("btn"), egui::Sense::click());
-        let resp = if let Some(tip) = &self.tooltip {
+        let resp = if let Some(tip) = self.tooltip {
             resp.on_hover_text(tip)
         } else {
             resp

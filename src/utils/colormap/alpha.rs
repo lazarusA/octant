@@ -10,6 +10,8 @@
 //!   position, blended linearly or held until the next stop (step).
 
 use super::lut::{LUT_SIZE, Lut, unit_to_u8};
+use crate::i18n::template::display;
+use crate::i18n::{ColormapKey as K, tr};
 use std::fmt;
 
 /// Uniform `alpha_row` value when no opacity curve is active.
@@ -40,10 +42,10 @@ pub enum AlphaError {
 impl fmt::Display for AlphaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NotANumber(s) => write!(f, "'{s}' is not a number"),
-            Self::OutOfRange(v) => write!(f, "{v} is outside 0..1"),
-            Self::MixedForms => f.write_str("use either values or position:alpha stops"),
-            Self::Unsorted => f.write_str("stop positions must increase"),
+            Self::NotANumber(s) => write!(f, "{}", display(tr(K::AlphaNotANumber), &[s])),
+            Self::OutOfRange(v) => write!(f, "{}", display(tr(K::AlphaOutOfRange), &[v])),
+            Self::MixedForms => f.write_str(tr(K::AlphaMixedForms)),
+            Self::Unsorted => f.write_str(tr(K::AlphaUnsorted)),
         }
     }
 }

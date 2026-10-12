@@ -1,3 +1,4 @@
+use crate::i18n::{DatasetKey, fill, tr};
 use std::time::Duration;
 use web_time::Instant;
 
@@ -126,11 +127,11 @@ pub fn show_drop_zone(
 
         // Labels
         let title_text = if is_warning_active {
-            "Type not supported"
+            tr(DatasetKey::DropTypeNotSupported)
         } else if is_drag_hovering {
-            "Release to load dataset"
+            tr(DatasetKey::DropReleaseToLoad)
         } else {
-            "Drag & Drop File or Directory"
+            tr(DatasetKey::DropFilesHere)
         };
 
         let title_color = if is_warning_active {
@@ -150,10 +151,16 @@ pub fn show_drop_zone(
             title_color,
         );
 
+        const EXTENSIONS: &str = ".nc, .h5, .zarr, .icechunk, .tif";
+        let mut sub_buf = [0u8; 128];
         let sub_text = if is_warning_active {
-            "Supported: .nc, .h5, .zarr, .icechunk, .tif"
+            fill(
+                &mut sub_buf,
+                tr(DatasetKey::DropSupportedList),
+                &[&EXTENSIONS],
+            )
         } else {
-            ".nc, .h5, .zarr, .icechunk, .tif"
+            EXTENSIONS
         };
         let sub_color = if is_warning_active {
             warning_accent.gamma_multiply(0.85)

@@ -2,6 +2,7 @@
 //! settings section, so the panel shows only what the renderer honors.
 
 use crate::app::{LineColoring, OctantApp};
+use crate::i18n::{SettingsKey, tr};
 use crate::plots::PlotType;
 
 /// Volume algorithms (`VolumeUniformParams::algorithm`) the table tells apart.
@@ -10,24 +11,13 @@ const VOLUME_LABEL_SURFACE: u32 = 4;
 const VOLUME_ADDITIVE_RGBA: u32 = 6;
 const VOLUME_INDEXED_RGBA: u32 = 7;
 
-const COMPOSITE: &str = "Colors come from the composite channels.";
-const CUSTOM_COLOR: &str = "Custom Color draws every point in one color.";
-const ALL_SERIES: &str = "All Lines Series colors each line by its index.";
-const INDEXED: &str = "Indexed RGBA colors voxels by their label index.";
-const INDEXED_MISSING: &str = "Indexed RGBA skips missing voxels.";
-const CLASSIC_OPAQUE: &str = "Only the DVR algorithm draws translucent colors.";
-const NOT_TRANSLUCENT: &str = "Takes effect with Opacity below 1 or an alpha curve.";
-const COMPOSITE_OPAQUE: &str = "Composites are drawn opaque.";
-const LABEL_OPAQUE: &str = "Label surfaces are always drawn opaque.";
-const ALWAYS_BLENDS: &str = "This algorithm always blends along the ray.";
-
 /// Whether a setting changes the current plot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Support {
     /// The setting takes effect.
     Yes,
     /// Another setting the user chose takes its place, for this reason.
-    Overridden(&'static str),
+    Overridden(SettingsKey),
     /// The plot type has no use for it.
     No,
 }
@@ -40,7 +30,7 @@ impl Support {
     /// Why the setting has no effect, when another setting overrides it.
     pub(crate) fn reason(self) -> Option<&'static str> {
         match self {
-            Support::Overridden(reason) => Some(reason),
+            Support::Overridden(reason) => Some(tr(reason)),
             Support::Yes | Support::No => None,
         }
     }
@@ -143,9 +133,9 @@ impl PlotState {
 
     fn color_range(&self) -> Support {
         if self.composite {
-            Support::Overridden(COMPOSITE)
+            Support::Overridden(SettingsKey::ReasonComposite)
         } else if self.indexed_volume() {
-            Support::Overridden(INDEXED)
+            Support::Overridden(SettingsKey::ReasonIndexed)
         } else {
             Support::Yes
         }
@@ -178,8 +168,8 @@ impl PlotState {
     /// The line settings that replace the colormap, when the plot is a line.
     fn line_override(&self) -> Option<Support> {
         match self.line_coloring()? {
-            LineColoring::Custom => Some(Support::Overridden(CUSTOM_COLOR)),
-            LineColoring::Series => Some(Support::Overridden(ALL_SERIES)),
+            LineColoring::Custom => Some(Support::Overridden(SettingsKey::ReasonCustomColor)),
+            LineColoring::Series => Some(Support::Overridden(SettingsKey::ReasonAllSeries)),
             LineColoring::Values => None,
         }
     }
@@ -189,7 +179,7 @@ impl PlotState {
             // Missing values leave gaps in the line.
             Support::No
         } else if self.indexed_volume() {
-            Support::Overridden(INDEXED_MISSING)
+            Support::Overridden(SettingsKey::ReasonIndexedMissing)
         } else {
             Support::Yes
         }
@@ -197,9 +187,9 @@ impl PlotState {
 
     fn opacity(&self) -> Support {
         if self.composite {
-            Support::Overridden(COMPOSITE)
+            Support::Overridden(SettingsKey::ReasonComposite)
         } else if self.plot_type == PlotType::Volume && self.volume_algorithm != VOLUME_DVR {
-            Support::Overridden(CLASSIC_OPAQUE)
+            Support::Overridden(SettingsKey::ReasonClassicOpaque)
         } else {
             self.line_override().unwrap_or(Support::Yes)
         }
@@ -212,9 +202,9 @@ impl PlotState {
         ) {
             Support::No
         } else if self.composite {
-            Support::Overridden(COMPOSITE_OPAQUE)
+            Support::Overridden(SettingsKey::ReasonCompositeOpaque)
         } else if !self.translucent {
-            Support::Overridden(NOT_TRANSLUCENT)
+            Support::Overridden(SettingsKey::ReasonNotTranslucent)
         } else {
             Support::Yes
         }
@@ -225,8 +215,10 @@ impl PlotState {
             return Support::No;
         }
         match self.volume_algorithm {
-            VOLUME_LABEL_SURFACE => Support::Overridden(LABEL_OPAQUE),
-            VOLUME_ADDITIVE_RGBA | VOLUME_INDEXED_RGBA => Support::Overridden(ALWAYS_BLENDS),
+            VOLUME_LABEL_SURFACE => Support::Overridden(SettingsKey::ReasonLabelOpaque),
+            VOLUME_ADDITIVE_RGBA | VOLUME_INDEXED_RGBA => {
+                Support::Overridden(SettingsKey::ReasonAlwaysBlends)
+            }
             _ => Support::Yes,
         }
     }

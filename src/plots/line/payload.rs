@@ -8,6 +8,7 @@
 use std::sync::Mutex;
 
 use super::LineRenderer;
+use crate::i18n::{NoticesKey, filled, tr};
 
 /// What a line payload holds.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -101,8 +102,11 @@ impl LineRenderer {
         if self.payload.refuse(key, layout) {
             crate::ui::toast::report(
                 crate::ui::toast::Severity::Warning,
-                "Line plot too large for the GPU",
-                format!("The lines take {needed} bytes; this GPU binds at most {limit}."),
+                tr(NoticesKey::LinePlotTooLargeForGpu),
+                filled(
+                    tr(NoticesKey::LinePayloadTooLargeDetail),
+                    &[&needed, &limit],
+                ),
             );
         }
     }

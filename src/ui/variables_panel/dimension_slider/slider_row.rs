@@ -2,9 +2,12 @@
 
 use crate::app::{AnimationRole, OctantApp, SpatialRole};
 use crate::data::VariableInfo;
+use crate::i18n::{VariablesKey as K, fill, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
-use crate::utils::format_byte_size;
+use crate::ui::number_input::LocalizedInput;
+use crate::utils::{ByteSize, format_count_metric, stack_str};
 use egui::{RichText, Ui};
+use std::fmt::Display;
 
 use super::coord_label::show_coord_label;
 use super::double_slider::{VALUE_BOX_W, double_slider_with_inputs};
@@ -47,73 +50,39 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
     };
 
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Download").strong());
-        ui.label(
-            RichText::new(format!(
-                "{} ({} cells)",
-                format_byte_size(requested_bytes),
-                crate::utils::format_count_metric(requested_cells.min(usize::MAX as u64) as usize)
-            ))
-            .strong(),
-        );
-        ui.label(RichText::new(format!("/ {}", format_byte_size(total_bytes))).weak());
+        ui.label(RichText::new(tr(K::Download)).strong());
+        let cells = format_count_metric(requested_cells.min(usize::MAX as u64) as usize);
+        let mut buf = [0; 128];
+        let requested = ByteSize(requested_bytes);
+        let text = fill(&mut buf, tr(K::DownloadCells), &[&requested, &cells]);
+        ui.label(RichText::new(text).strong());
+        let mut buf = [0; 32];
+        let total = stack_str(&mut buf, format_args!("/ {}", ByteSize(total_bytes)));
+        ui.label(RichText::new(total).weak());
     });
     ui.add_space(4.0);
 
     let total_2d_elements = calculate_selected_2d_elements(app);
-    if total_2d_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
-        let data_mb = (total_2d_elements as f64 * 4.0) / (1024.0 * 1024.0);
-        ui.group(|ui| {
-            ui.horizontal_wrapped(|ui| {
-                ui.icon_toned(Icon::Bolt, IconSize::Xs, IconTone::Info);
-                ui.label(
-                    RichText::new(format!(
-                        "Large 2D selection ({} cells, {:.0} MB): Automatic multi-resolution pyramid aggregation is enabled.",
-                        crate::utils::format_count_metric(total_2d_elements),
-                        data_mb,
-                    ))
-                    .small()
-                    .color(IconTone::Info.color(ui.visuals())),
-                );
-            });
-        });
-        ui.add_space(2.0);
+    let large_2d = if total_2d_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+        Some((Icon::Bolt, IconTone::Info, K::LargeSelectionPyramid))
     } else if total_2d_elements > crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
-        let data_mb = (total_2d_elements as f64 * 4.0) / (1024.0 * 1024.0);
-        ui.group(|ui| {
-            ui.horizontal_wrapped(|ui| {
-                ui.icon_toned(Icon::Info, IconSize::Xs, IconTone::Warning);
-                ui.label(
-                    RichText::new(format!(
-                        "3D Globe & 3D Surface meshes are disabled for this large selection ({} cells, {:.0} MB). 2D Plane and 1D Line plots remain fully active.",
-                        crate::utils::format_count_metric(total_2d_elements),
-                        data_mb,
-                    ))
-                    .small()
-                    .color(IconTone::Warning.color(ui.visuals())),
-                );
-            });
-        });
-        ui.add_space(2.0);
+        Some((Icon::Info, IconTone::Warning, K::LargeSelectionNoMeshes))
+    } else {
+        None
+    };
+    if let Some((icon, tone, key)) = large_2d {
+        let cells = format_count_metric(total_2d_elements);
+        let mut buf = [0; 24];
+        let data_mb = megabytes(&mut buf, total_2d_elements);
+        banner(ui, icon, tone, key, &[&cells, &data_mb]);
     }
 
     let total_vol_elements = calculate_selected_volume_elements(app);
     if total_vol_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
-        let vol_mb = (total_vol_elements as f64 * 4.0) / (1024.0 * 1024.0);
-        ui.group(|ui| {
-            ui.horizontal_wrapped(|ui| {
-                ui.icon_toned(Icon::Warning, IconSize::Xs, IconTone::Warning);
-                ui.label(
-                    RichText::new(format!(
-                        "3D Volume & Point Cloud are disabled for this selection: volume size ({:.0} MB) exceeds the 128 MB GPU storage buffer limit. 2D Plane, 1D Line, and 3D Globe remain active.",
-                        vol_mb
-                    ))
-                    .small()
-                    .color(IconTone::Warning.color(ui.visuals())),
-                );
-            });
-        });
-        ui.add_space(2.0);
+        let mut buf = [0; 24];
+        let vol_mb = megabytes(&mut buf, total_vol_elements);
+        let key = K::LargeVolumeDisabled;
+        banner(ui, Icon::Warning, IconTone::Warning, key, &[&vol_mb]);
     }
 
     for i in 0..rank {
@@ -145,25 +114,28 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     egui::ComboBox::from_id_salt(("anim_role", i))
                         .selected_text(match anim {
-                            AnimationRole::None => "None",
-                            AnimationRole::Animated => "Animated",
+                            AnimationRole::None => tr(K::RoleNone),
+                            AnimationRole::Animated => tr(K::RoleAnimated),
                         })
                         .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut anim, AnimationRole::None, "None");
-                            ui.selectable_value(&mut anim, AnimationRole::Animated, "Animated");
+                            let (none, animated) = (AnimationRole::None, AnimationRole::Animated);
+                            ui.selectable_value(&mut anim, none, tr(K::RoleNone));
+                            ui.selectable_value(&mut anim, animated, tr(K::RoleAnimated));
                         });
 
                     egui::ComboBox::from_id_salt(("spatial_role", i))
                         .selected_text(match spatial {
-                            SpatialRole::None => "None",
-                            SpatialRole::Grid => "Grid",
+                            SpatialRole::None => tr(K::RoleNone),
+                            SpatialRole::Grid => tr(K::RoleGrid),
                             SpatialRole::X => "X",
                             SpatialRole::Y => "Y",
                             SpatialRole::Z => "Z",
                         })
                         .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut spatial, SpatialRole::None, "None");
-                            ui.selectable_value(&mut spatial, SpatialRole::Grid, "Grid");
+                            let none = tr(K::RoleNone);
+                            ui.selectable_value(&mut spatial, SpatialRole::None, none);
+                            let grid = tr(K::RoleGrid);
+                            ui.selectable_value(&mut spatial, SpatialRole::Grid, grid);
                             ui.selectable_value(&mut spatial, SpatialRole::X, "X");
                             ui.selectable_value(&mut spatial, SpatialRole::Y, "Y");
                             ui.selectable_value(&mut spatial, SpatialRole::Z, "Z");
@@ -214,7 +186,7 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                 }
                 let mut changed = false;
                 ui.horizontal(|ui| {
-                    ui.label("Index:");
+                    ui.label(tr(K::Index));
                     // Slider fills the row up to a fixed-width value box,
                     // matching the range rows. The slider runs first so the box
                     // shows the dragged value on the same frame.
@@ -222,11 +194,18 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                     let spacing = ui.spacing().item_spacing.x;
                     ui.spacing_mut().slider_width =
                         (ui.available_width() - VALUE_BOX_W - spacing).max(40.0);
-                    let s_resp = ui.add(egui::Slider::new(index, 0..=max_index).show_value(false));
+                    let s_resp = ui.add(
+                        egui::Slider::new(index, 0..=max_index)
+                            .localized()
+                            .show_value(false),
+                    );
                     let height = ui.spacing().interact_size.y;
                     let v_resp = ui.add_sized(
                         [VALUE_BOX_W, height],
-                        egui::DragValue::new(index).range(0..=max_index).speed(1),
+                        egui::DragValue::new(index)
+                            .localized()
+                            .range(0..=max_index)
+                            .speed(1),
                     );
                     changed = s_resp.dragged() || v_resp.dragged() || s_resp.clicked();
                 });
@@ -243,4 +222,24 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
 
         ui.add_space(6.0);
     }
+}
+
+/// Megabytes taken by `elements` `f32` values, without decimals.
+fn megabytes(buf: &mut [u8], elements: usize) -> &str {
+    let mb = (elements as f64 * 4.0) / (1024.0 * 1024.0);
+    stack_str(buf, format_args!("{mb:.0}"))
+}
+
+/// A grouped, wrapped notice: `icon` and `key`'s template filled with `args`,
+/// small and in `tone`'s color.
+fn banner(ui: &mut Ui, icon: Icon, tone: IconTone, key: K, args: &[&dyn Display]) {
+    ui.group(|ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.icon_toned(icon, IconSize::Xs, tone);
+            let mut buf = [0; 768];
+            let text = fill(&mut buf, tr(key), args);
+            ui.label(RichText::new(text).small().color(tone.color(ui.visuals())));
+        });
+    });
+    ui.add_space(2.0);
 }

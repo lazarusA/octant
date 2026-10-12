@@ -4,6 +4,7 @@
 use crate::app::OctantApp;
 use crate::app::layers::Layer;
 use crate::app::overlays::MAX_OVERLAYS;
+use crate::i18n::{HoverKey, tr};
 use crate::plots::PlotType;
 use crate::ui::hover::card::{HoverValue, LayerValue};
 use crate::ui::hover::composite::CompositeKind;
@@ -24,7 +25,7 @@ pub fn overlay_values<'a>(
         let raw = cell_value(layer, cell);
         let var = layer.selection().variable_info();
         *slot = LayerValue {
-            name: var.map_or("overlay", |v| v.leaf_name()),
+            name: var.map_or(tr(HoverKey::FallbackOverlay), |v| v.leaf_name()),
             value: HoverValue::from_raw(raw, composite_kind(app, layer)),
             units: resolve_variable_units(var),
             swatch: evaluate_color_cpu(raw, &app.get_color_params(layer)),

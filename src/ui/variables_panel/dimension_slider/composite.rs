@@ -70,10 +70,9 @@ fn extract_channel_configs(
 
     let mut configs = Vec::with_capacity(num_ch);
     for i in 0..num_ch {
-        let name = channel_labels
-            .get(i)
-            .cloned()
-            .unwrap_or_else(|| format!("Channel {}", i + 1));
+        // Unnamed channels stay empty and are named in the UI language
+        // when drawn ("Channel N").
+        let name = channel_labels.get(i).cloned().unwrap_or_default();
 
         let color_rgb = channel_colors
             .get(i)
