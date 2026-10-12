@@ -75,3 +75,39 @@ fn grip_drags_dataset_panel_and_double_click_docks_it() {
     assert_eq!(app.layout.panel_positions.dataset, None);
     assert_eq!(panel(&h).min, docked.min);
 }
+
+#[test]
+fn the_format_select_keeps_its_width_whatever_format_it_shows() {
+    use crate::i18n::{Language, with_language};
+    use crate::ui::fonts::FontEngine;
+
+    let mut wide = Vec::new();
+    for &lang in Language::ALL {
+        with_language(lang, || {
+            let mut h = Harness::new(CANVAS);
+            FontEngine::on_language_changed(&h.ctx, lang);
+            let mut widths = Vec::new();
+            for (kind, _) in super::intake::FORMAT_OPTIONS {
+                let mut app = app();
+                app.selected.store_kind = kind;
+                let mut width = 0.0;
+                h.settle(3, &mut |ui: &mut Ui| {
+                    let row = ui.scope(|ui| super::intake::show_format_selector(&mut app, ui));
+                    width = row.response.rect.width();
+                });
+                widths.push(width);
+            }
+            let (min, max) = widths
+                .iter()
+                .fold((f32::MAX, 0.0_f32), |(lo, hi), &w| (lo.min(w), hi.max(w)));
+            if max - min > 0.5 {
+                wide.push(format!("{lang:?}: {min:.0}..{max:.0}"));
+            }
+        });
+    }
+    assert!(
+        wide.is_empty(),
+        "the row's width follows the format: {}",
+        wide.join(", ")
+    );
+}

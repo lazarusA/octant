@@ -27,7 +27,7 @@ const SAMPLE_PRESETS: [(DatasetKey, &str, Option<StoreKind>); 4] = [
     ),
 ];
 
-const FORMAT_OPTIONS: [(StoreKind, DatasetKey); 9] = [
+pub(super) const FORMAT_OPTIONS: [(StoreKind, DatasetKey); 9] = [
     (StoreKind::RemoteZarr, DatasetKey::FormatRemoteZarr),
     (StoreKind::LocalZarr, DatasetKey::FormatLocalZarr),
     (StoreKind::RemoteIcechunk, DatasetKey::FormatRemoteIcechunk),
@@ -63,6 +63,9 @@ pub fn show_source_intake(app: &mut OctantApp, ui: &mut egui::Ui) {
 /// Narrowest the source field gets beside the Load button; any narrower and
 /// the button moves below it.
 const MIN_FIELD_W: f32 = 100.0;
+
+/// Width of the format select, whatever format it shows.
+const FORMAT_SELECT_W: f32 = 160.0;
 
 /// The source field and the Load button; whether either submitted it.
 fn show_input_bar(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
@@ -154,22 +157,33 @@ fn format_label(kind: StoreKind) -> DatasetKey {
     }
 }
 
-fn show_format_selector(app: &mut OctantApp, ui: &mut egui::Ui) {
+/// The format select: its selected name is cut to `FORMAT_SELECT_W` (the
+/// full name on hover) so a long one never widens the panel; the list opens
+/// at full width.
+pub(super) fn show_format_selector(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal_wrapped(|ui| {
         ui.icon(Icon::Dataset, IconSize::Xs);
         ui.label(egui::RichText::new(tr(DatasetKey::FormatLabel)).weak());
 
         let mut selected = app.selected.store_kind;
-        egui::ComboBox::from_id_salt("dataset_store_kind_select")
-            .selected_text(tr(format_label(selected)))
-            .show_ui(ui, |ui| {
-                for (i, (kind, label)) in FORMAT_OPTIONS.iter().enumerate() {
-                    if i == 7 {
-                        ui.separator();
+        let name = tr(format_label(selected));
+        let size = egui::vec2(FORMAT_SELECT_W, ui.spacing().interact_size.y);
+        ui.allocate_ui(size, |ui| {
+            egui::ComboBox::from_id_salt("dataset_store_kind_select")
+                .width(FORMAT_SELECT_W)
+                .truncate()
+                .selected_text(name)
+                .show_ui(ui, |ui| {
+                    for (i, (kind, label)) in FORMAT_OPTIONS.iter().enumerate() {
+                        if i == 7 {
+                            ui.separator();
+                        }
+                        ui.selectable_value(&mut selected, *kind, tr(*label));
                     }
-                    ui.selectable_value(&mut selected, *kind, tr(*label));
-                }
-            });
+                })
+                .response
+                .on_hover_text(name);
+        });
 
         if selected != app.selected.store_kind {
             app.selected.store_kind = selected;
