@@ -5,7 +5,7 @@ pub fn text(key: AboutKey) -> Option<&'static str> {
         AboutKey::WindowTitle => "Octant 정보",
         AboutKey::IconsWindowTitle => "네이티브 벡터 아이콘",
         AboutKey::IconsTab => "벡터 아이콘",
-        AboutKey::Subtitle => "N차원 데이터 탐색기",
+        AboutKey::Subtitle => "N차원 데이터 뷰어",
         AboutKey::Description => {
             "Octant는 로컬 및 클라우드 객체 저장소, Zarr (v2/v3), Icechunk를 기본 지원하는 N차원 데이터셋용 대화형 뷰어입니다. Rust로 만들었으며 WGPU를 통한 GPU 가속 렌더링을 사용합니다. Octant는 macOS, Linux, Windows에서 네이티브로 실행됩니다."
         }

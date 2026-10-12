@@ -5,7 +5,7 @@ pub fn text(key: AboutKey) -> Option<&'static str> {
         AboutKey::WindowTitle => "Octantについて",
         AboutKey::IconsWindowTitle => "ネイティブベクターアイコン",
         AboutKey::IconsTab => "ベクターアイコン",
-        AboutKey::Subtitle => "N次元データエクスプローラー",
+        AboutKey::Subtitle => "N次元データビューアー",
         AboutKey::Description => {
             "Octant は N 次元データセットのための対話型ビューアーで、ローカルとクラウドのオブジェクトストレージ、Zarr (v2/v3)、Icechunk にネイティブ対応しています。Rust で開発され、WGPU による GPU 高速化レンダリングを備えています。Octant は macOS、Linux、Windows でネイティブに動作します。"
         }
