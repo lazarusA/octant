@@ -1,13 +1,15 @@
 //! A dataset's CJK text, gathered incrementally: its names and attributes
-//! once per dataset (`metadata_generation`), then each dimension's
-//! coordinate labels once, when they arrive, so the many coordinate
-//! arrivals of a session don't re-read everything (large label coordinates
-//! such as station names would otherwise be re-scanned each time).
+//! once per dataset (`metadata_generation`), then each coordinate label
+//! array once, when it arrives, so the many coordinate arrivals of a session
+//! don't re-read everything. NetCDF shares one label array between every
+//! `{variable}/{dimension}` key, so arrays are told apart by identity, not by
+//! key (each one read is kept, so its address can't be reused meanwhile).
 
 use super::CjkFont;
 use super::scan::{Script, Scripts, script_of};
 use crate::data::{CoordValues, DatasetMetadata};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
+use std::sync::Arc;
 
 /// The CJK scripts and characters of one dataset's text.
 #[derive(Debug, Default)]
@@ -16,8 +18,8 @@ pub struct DatasetText {
     pub scripts: Scripts,
     /// Every CJK character met (`scan::script_of`).
     chars: BTreeSet<char>,
-    /// Dimensions whose coordinate labels were read.
-    labels_read: HashSet<String>,
+    /// Coordinate label arrays already read.
+    labels_read: Vec<Arc<[String]>>,
 }
 
 impl DatasetText {
@@ -55,23 +57,51 @@ impl DatasetText {
             let CoordValues::Labels(labels) = coords else {
                 continue;
             };
-            if self.labels_read.insert(dim.clone()) {
-                self.add(dim);
-                for label in labels.iter() {
-                    self.add(label);
-                }
+            if self
+                .labels_read
+                .iter()
+                .any(|read| Arc::ptr_eq(read, labels))
+            {
+                continue;
+            }
+            self.labels_read.push(Arc::clone(labels));
+            self.add(dim);
+            for label in labels.iter() {
+                self.add(label);
             }
         }
     }
 
+    /// Adds the CJK scripts and characters of `text`, in one pass.
     fn add(&mut self, text: &str) {
-        self.scripts.add(text);
-        if self.scripts.any() {
-            self.chars.extend(
-                text.chars()
-                    .filter(|&c| !c.is_ascii() && script_of(c).is_some()),
-            );
+        for c in text.chars().filter(|c| !c.is_ascii()) {
+            if let Some(script) = script_of(c) {
+                self.scripts.mark(script);
+                self.chars.insert(c);
+            }
         }
+    }
+
+    /// How many coordinate label arrays were read.
+    #[cfg(test)]
+    pub fn arrays_read(&self) -> usize {
+        self.labels_read.len()
+    }
+
+    /// How many distinct CJK characters were met so far.
+    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+    pub fn char_count(&self) -> usize {
+        self.chars.len()
+    }
+
+    /// The Han characters met so far.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub fn han_chars(&self) -> BTreeSet<char> {
+        self.chars
+            .iter()
+            .copied()
+            .filter(|&c| script_of(c) == Some(Script::Han))
+            .collect()
     }
 
     /// The characters by the font that draws them (`CjkFont::ALL` order):

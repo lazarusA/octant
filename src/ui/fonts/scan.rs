@@ -54,13 +54,18 @@ impl Scripts {
 
     /// Adds the scripts of `text`.
     pub fn add(&mut self, text: &str) {
-        for c in text.chars().filter(|c| !c.is_ascii()) {
-            match script_of(c) {
-                Some(Script::Kana) => self.kana = true,
-                Some(Script::Hangul) => self.hangul = true,
-                Some(Script::Han) => self.han = true,
-                Some(Script::Other) | None => {}
-            }
+        for script in text.chars().filter(|c| !c.is_ascii()).filter_map(script_of) {
+            self.mark(script);
+        }
+    }
+
+    /// Records one character's script.
+    pub fn mark(&mut self, script: Script) {
+        match script {
+            Script::Kana => self.kana = true,
+            Script::Hangul => self.hangul = true,
+            Script::Han => self.han = true,
+            Script::Other => {}
         }
     }
 
@@ -85,9 +90,9 @@ impl Scripts {
     }
 
     /// The fonts this text needs, by `CjkFont::ALL` index: Japanese for
-    /// kana, Korean for Hangul, and `han_font` for Han characters, plus the
-    /// Chinese font for the Han characters `han_font` lacks (each region's
-    /// font covers a different set; the Chinese one covers the most).
+    /// kana, Korean for Hangul, and `han_font` for Han characters (the
+    /// desktop adds the Chinese font when `han_font` lacks some of them,
+    /// `system::request`).
     pub fn needed(self, han_font: CjkFont) -> [bool; 3] {
         let mut needed = [false; 3];
         let mut need = |font: CjkFont| {
@@ -103,7 +108,6 @@ impl Scripts {
         }
         if self.han {
             need(han_font);
-            need(CjkFont::Sc);
         }
         needed
     }

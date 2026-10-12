@@ -132,8 +132,7 @@ fn han_text_uses_the_ui_then_system_then_dataset_font() {
     assert_eq!(han_only.han_font(Language::German, None), CjkFont::Sc);
     // Kana needs the Japanese font even when Han text goes to Chinese.
     assert_eq!(with_kana.needed(CjkFont::Sc), [true, true, false]);
-    // Han text in the Korean font also loads the Chinese one for what it lacks.
-    assert_eq!(han_only.needed(CjkFont::Kr), [true, false, true]);
+    assert_eq!(han_only.needed(CjkFont::Kr), [false, false, true]);
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -204,4 +203,36 @@ fn fonts_loaded_off_frame_are_installed_by_the_next_frame() {
     assert!(super::FONTS_ARRIVED.load(Ordering::Acquire));
     super::FontEngine::watch_dataset(&ctx, &crate::app::OctantApp::default());
     assert!(!super::FONTS_ARRIVED.load(Ordering::Acquire));
+}
+
+#[test]
+fn label_arrays_shared_between_keys_are_read_once() {
+    use super::dataset_text::DatasetText;
+    use std::sync::Arc;
+    // NetCDF stores one label array under every `{variable}/{dim}` key.
+    let labels: Arc<[String]> = vec!["\u{6771}\u{4EAC}".to_string(); 3].into();
+    let mut meta = crate::data::DatasetMetadata::default();
+    for key in ["station", "tas/station", "pr/station"] {
+        meta.dimension_coordinates.insert(
+            key.into(),
+            crate::data::CoordValues::Labels(Arc::clone(&labels)),
+        );
+    }
+    let mut text = DatasetText::default();
+    text.update(&meta, 1);
+    text.update(&meta, 1);
+    assert_eq!(text.arrays_read(), 1);
+    assert_eq!(text.char_count(), 2);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn font_coverage_is_checked_per_character() {
+    let data = egui::FontData::from_static(super::store::bundled(CjkFont::Sc));
+    let mut chars: std::collections::BTreeSet<char> = CjkFont::Sc.required_chars();
+    chars.retain(|&c| super::scan::script_of(c) == Some(super::scan::Script::Han));
+    assert!(super::system::covers(&data, &chars));
+    // A rare ideograph the UI subset was never cut to.
+    chars.insert('\u{9F98}');
+    assert!(!super::system::covers(&data, &chars));
 }

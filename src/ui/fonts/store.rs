@@ -56,7 +56,11 @@ pub fn slices(font: CjkFont) -> Vec<(String, Arc<egui::FontData>)> {
 pub fn add_slice(font: CjkFont, slice: u16, bytes: Vec<u8>) {
     let mut slices = SLICES.lock().unwrap_or_else(|p| p.into_inner());
     if !slices.iter().any(|(f, s, _)| *f == font && *s == slice) {
-        slices.push((font, slice, Arc::new(egui::FontData::from_owned(bytes))));
+        slices.push((
+            font,
+            slice,
+            Arc::new(egui::FontData::from_static(leak(bytes))),
+        ));
     }
 }
 
@@ -83,8 +87,16 @@ pub fn fetched(font: CjkFont) -> Option<Arc<egui::FontData>> {
 pub fn set_fetched(font: CjkFont, bytes: Vec<u8>) {
     let mut slots = FETCHED.lock().unwrap_or_else(|p| p.into_inner());
     if let Some(slot) = slots.get_mut(index(font)) {
-        *slot = Some(Arc::new(egui::FontData::from_owned(bytes)));
+        *slot = Some(Arc::new(egui::FontData::from_static(leak(bytes))));
     }
+}
+
+/// Font bytes kept for the rest of the session. egui copies owned font
+/// bytes on every font rebuild (language switch, theme change, a full glyph
+/// atlas), while `'static` ones are shared, so fonts loaded at runtime are
+/// leaked once instead: they are never dropped anyway.
+pub fn leak(bytes: Vec<u8>) -> &'static [u8] {
+    Box::leak(bytes.into_boxed_slice())
 }
 
 /// Position of `font` in `CjkFont::ALL`.

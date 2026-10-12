@@ -100,18 +100,9 @@ impl FontEngine {
             apply(ctx, lang);
         }
         #[cfg(not(target_arch = "wasm32"))]
-        system::request(ctx, scripts.needed(han));
+        system::request(ctx, scripts.needed(han), han, text.han_chars());
         #[cfg(target_arch = "wasm32")]
-        for (font, chars) in CjkFont::ALL.into_iter().zip(text.by_font(han)) {
-            if !chars.is_empty() {
-                // Characters a font lacks go on to the next one.
-                let rest = CjkFont::fallback_order(lang, Some(han))
-                    .into_iter()
-                    .filter(|&f| f != font)
-                    .collect();
-                web_slices::request(ctx.clone(), font, chars, rest);
-            }
-        }
+        web_slices::request_dataset(ctx, text, generation, han, lang);
     }
 }
 

@@ -60,6 +60,8 @@ reqwest = { version = "0.13", features = ["blocking", "json"] }
 md-5 = "0.11"
 sys-locale = "0.3"
 # System CJK fonts for text in datasets (desktop only).
+# Checks whether a system font covers a dataset's Han characters (egui uses it already).
+skrifa = "0.44"
 fontdb = { version = "0.24", default-features = false, features = ["std", "fs", "fontconfig"] }
 # Only for `cargo run --features font-tools --bin subset_fonts`.
 allsorts = { version = "0.17", default-features = false, features = ["flate2_rust"], optional = true }
@@ -95,7 +97,6 @@ path = "src/bin/subset_fonts/main.rs"
 required-features = ["font-tools"]
 
 [dev-dependencies]
-skrifa = "0.44"
 blusc = "0.0.6"
 
 [patch.crates-io]
