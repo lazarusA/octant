@@ -2,6 +2,7 @@
 
 use crate::data::MatrixData;
 use crate::plots::common::PlotColorParams;
+use crate::utils::colormap::alpha::AlphaError;
 use crate::utils::colormap::{AlphaInterp, COLORMAP_RGB_COMPOSITE, NO_ALPHA_ROW, registry};
 
 /// Text of an opacity curve as typed, its interpolation and parse error.
@@ -9,7 +10,8 @@ use crate::utils::colormap::{AlphaInterp, COLORMAP_RGB_COMPOSITE, NO_ALPHA_ROW, 
 pub struct AlphaCurveState {
     pub text: String,
     pub interp: AlphaInterp,
-    pub error: Option<String>,
+    /// Kept as the error itself, written in the UI language when drawn.
+    pub error: Option<AlphaError>,
 }
 
 /// Colormapping of a scalar layer.

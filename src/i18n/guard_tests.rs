@@ -145,8 +145,24 @@ fn reads_as_words(literal: &str) -> bool {
     if ALLOWED.contains(&literal) || literal.contains("://") || literal.contains('_') {
         return false;
     }
-    literal
-        .split(|c: char| !c.is_ascii_alphabetic())
+    // Format placeholders (`{error}`, `{v:.2}`) are not words.
+    let mut depth = 0usize;
+    let text: String = literal
+        .chars()
+        .map(|c| match c {
+            '{' => {
+                depth += 1;
+                ' '
+            }
+            '}' => {
+                depth = depth.saturating_sub(1);
+                ' '
+            }
+            _ if depth > 0 => ' ',
+            _ => c,
+        })
+        .collect();
+    text.split(|c: char| !c.is_ascii_alphabetic())
         .any(|word| word.len() >= 3 && word.chars().filter(char::is_ascii_lowercase).count() >= 2)
 }
 
@@ -165,6 +181,10 @@ fn guard_flags_english_and_skips_translated_text() {
         None
     );
     assert_eq!(untranslated_literal(r#"    ui.label("R:");"#, None), None);
+    assert_eq!(
+        untranslated_literal(r#"    ui.small(f("{error}"));"#, None),
+        None
+    );
     assert_eq!(untranslated_literal(r#"    ui.label("Zarr");"#, None), None);
     assert_eq!(
         untranslated_literal(r#"    // ui.label("Hello world");"#, None),

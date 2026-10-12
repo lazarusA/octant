@@ -87,9 +87,11 @@ fn show_dataset_body(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     ui.add_space(6.0);
     ui.separator();
-    ui.collapsing(tr(DatasetKey::MemoryCache), |ui| {
-        cache_stats::show_cache_stats(app, ui);
-    });
+    egui::CollapsingHeader::new(tr(DatasetKey::MemoryCache))
+        .id_salt("dataset_memory_cache")
+        .show(ui, |ui| {
+            cache_stats::show_cache_stats(app, ui);
+        });
 }
 
 fn section(ui: &mut egui::Ui, title: &str) {

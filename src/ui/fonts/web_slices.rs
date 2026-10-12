@@ -32,19 +32,34 @@ fn with_requested<T>(
 }
 
 /// Fetches the slices of `font` holding `chars`, then reinstalls the fonts.
-pub fn request(ctx: egui::Context, font: CjkFont, chars: BTreeSet<char>) {
-    if with_requested(|_, failed| failed.contains(&font)) {
-        return;
-    }
+/// Characters `font` lacks (or all of them, when its index is unavailable)
+/// go on to the first of `rest`.
+pub fn request(ctx: egui::Context, font: CjkFont, chars: BTreeSet<char>, rest: Vec<CjkFont>) {
     wasm_bindgen_futures::spawn_local(async move {
-        let index = match index(font).await {
-            Ok(index) => index,
-            Err(error) => {
-                with_requested(|_, failed| failed.insert(font));
-                return report(font, &error);
+        let index = if with_requested(|_, failed| failed.contains(&font)) {
+            None
+        } else {
+            match index(font).await {
+                Ok(index) => Some(index),
+                Err(error) => {
+                    with_requested(|_, failed| failed.insert(font));
+                    report(font, &error);
+                    None
+                }
             }
         };
-        let wanted: BTreeSet<u16> = chars.iter().filter_map(|&c| index.slice_of(c)).collect();
+        let (held, missing): (BTreeSet<char>, BTreeSet<char>) = chars
+            .into_iter()
+            .partition(|&c| index.as_ref().is_some_and(|i| i.slice_of(c).is_some()));
+        if let Some((&next, more)) = rest.split_first()
+            && !missing.is_empty()
+        {
+            request(ctx.clone(), next, missing, more.to_vec());
+        }
+        let Some(index) = index else {
+            return;
+        };
+        let wanted: BTreeSet<u16> = held.iter().filter_map(|&c| index.slice_of(c)).collect();
         let new: Vec<u16> = with_requested(|slices, _| {
             wanted
                 .into_iter()

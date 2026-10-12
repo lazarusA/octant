@@ -57,6 +57,34 @@ fn typed_numbers_parse_in_either_style() {
     assert_eq!(parse_in(Language::English, "1,000.5"), Some(1000.5));
     assert_eq!(parse_in(Language::Korean, "2.5"), Some(2.5));
     assert_eq!(parse_in(Language::German, "abc"), None);
+    // A comma is only a thousands separator where the point is the decimal one.
+    assert_eq!(parse_in(Language::English, "0,5"), None);
+    assert_eq!(parse_in(Language::English, "1,00"), None);
+    assert_eq!(
+        parse_in(Language::English, "-12,345,678"),
+        Some(-12_345_678.0)
+    );
+    assert_eq!(parse_in(Language::English, "1,000.5,0"), None);
+    // Full-width input from CJK input methods.
+    assert_eq!(
+        parse_in(Language::Japanese, "\u{FF10}\u{FF0E}\u{FF15}"),
+        Some(0.5)
+    );
+    assert_eq!(
+        parse_in(
+            Language::ChineseSimp,
+            "\u{FF11}\u{FF0C}\u{FF12}\u{FF13}\u{FF14}"
+        ),
+        Some(1234.0)
+    );
+    assert_eq!(
+        parse_in(Language::Korean, "\u{FF0D}\u{FF12}\u{FF45}\u{FF0D}\u{FF13}"),
+        Some(-0.002)
+    );
+    assert_eq!(
+        parse_in(Language::German, "\u{FF10}\u{FF0C}\u{FF15}\u{3000}"),
+        Some(0.5)
+    );
 }
 
 #[test]

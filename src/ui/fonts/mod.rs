@@ -60,8 +60,13 @@ impl FontEngine {
     /// for its Han characters goes first, and the desktop loads the system
     /// fonts it needs.
     pub fn watch_dataset(ctx: &egui::Context, app: &OctantApp) {
-        static SCANNED: Mutex<Option<(u64, u64)>> = Mutex::new(None);
-        let key = (app.selected.metadata_generation, app.coordinates_revision);
+        static SCANNED: Mutex<Option<(u64, u64, Language)>> = Mutex::new(None);
+        // The font for Han text depends on the UI language too.
+        let key = (
+            app.selected.metadata_generation,
+            app.coordinates_revision,
+            crate::i18n::language(),
+        );
         {
             let mut scanned = SCANNED.lock().unwrap_or_else(|p| p.into_inner());
             if scanned.replace(key) == Some(key) {
@@ -85,7 +90,12 @@ impl FontEngine {
         #[cfg(target_arch = "wasm32")]
         for (font, chars) in CjkFont::ALL.into_iter().zip(scan::chars_by_font(meta, han)) {
             if !chars.is_empty() {
-                web_slices::request(ctx.clone(), font, chars);
+                // Characters a font lacks go on to the next one.
+                let rest = CjkFont::fallback_order(lang, Some(han))
+                    .into_iter()
+                    .filter(|&f| f != font)
+                    .collect();
+                web_slices::request(ctx.clone(), font, chars, rest);
             }
         }
     }

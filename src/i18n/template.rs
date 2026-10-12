@@ -20,6 +20,12 @@ pub fn filled(template: &str, args: &[&dyn Display]) -> String {
     Filled { template, args }.to_string()
 }
 
+/// `template` with its `{}` filled by `args`, written straight into a
+/// formatter (for `Display` impls) without an intermediate `String`.
+pub fn display<'t>(template: &'t str, args: &'t [&'t dyn Display]) -> impl Display + 't {
+    Filled { template, args }
+}
+
 struct Filled<'t> {
     template: &'t str,
     args: &'t [&'t dyn Display],

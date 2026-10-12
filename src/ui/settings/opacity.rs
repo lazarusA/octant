@@ -94,7 +94,8 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     if let Some(error) = &curve.error {
         ui.horizontal(|ui| {
             ui.icon_toned(Icon::Warning, IconSize::Sm, IconTone::Error);
-            ui.small(error.as_str());
+            let mut buf = [0; 256];
+            ui.small(crate::utils::stack_str(&mut buf, format_args!("{error}")));
         });
     }
     if changed {

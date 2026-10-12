@@ -2,7 +2,7 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
-use crate::i18n::{SettingsKey as K, tr};
+use crate::i18n::{SettingsKey as K, VariablesKey, tr};
 use crate::ui::hover::composite::composite_labels;
 use crate::utils::stack_str;
 
@@ -148,7 +148,11 @@ fn channel_row(
         changed = true;
     }
     let mut buf = [0u8; 96];
-    let label = stack_str(&mut buf, format_args!("{}: {}", cfg.index + 1, cfg.name));
+    let number = cfg.index + 1;
+    let label = match cfg.name.trim() {
+        "" => crate::i18n::fill(&mut buf, tr(VariablesKey::ChannelN), &[&number]),
+        name => stack_str(&mut buf, format_args!("{number}: {name}")),
+    };
     ui.label(egui::RichText::new(label).small());
     changed
 }

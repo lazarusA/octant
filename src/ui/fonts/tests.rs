@@ -132,6 +132,8 @@ fn han_text_uses_the_ui_then_system_then_dataset_font() {
     assert_eq!(han_only.han_font(Language::German, None), CjkFont::Sc);
     // Kana needs the Japanese font even when Han text goes to Chinese.
     assert_eq!(with_kana.needed(CjkFont::Sc), [true, true, false]);
+    // Han text in the Korean font also loads the Chinese one for what it lacks.
+    assert_eq!(han_only.needed(CjkFont::Kr), [true, false, true]);
 }
 
 #[cfg(not(target_arch = "wasm32"))]

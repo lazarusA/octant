@@ -145,6 +145,8 @@ fn labels_key(app: &OctantApp, n: usize) -> u64 {
         (plotted.store_target.as_str(), plotted.variable_idx),
         series_dim(app, plotted.variable_info()),
         n,
+        // Labels hold localized numbers, dates and the translated fallback.
+        crate::i18n::language(),
     ))
 }
 
