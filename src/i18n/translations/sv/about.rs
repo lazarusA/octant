@@ -5,7 +5,7 @@ pub fn text(key: AboutKey) -> Option<&'static str> {
         AboutKey::WindowTitle => "Om Octant",
         AboutKey::IconsWindowTitle => "Inbyggda vektorikoner",
         AboutKey::IconsTab => "Vektorikoner",
-        AboutKey::Subtitle => "N-dimensionell datavisare",
+        AboutKey::Subtitle => "Visningsprogram för N-dimensionella data",
         AboutKey::Description => {
             "Octant är en interaktiv visare för N-dimensionella dataset med inbyggt stöd för lokal och molnbaserad objektlagring, Zarr (v2/v3) och Icechunk. Byggd i Rust med GPU-accelererad rendering via WGPU. Octant körs inbyggt på macOS, Linux och Windows."
         }
