@@ -14,7 +14,7 @@ use super::double_slider::double_slider_with_inputs;
 use super::metrics::{
     calculate_download_sizes, calculate_selected_2d_elements, calculate_selected_volume_elements,
 };
-use super::role_row::role_row;
+use super::role_row::{DimName, role_row};
 use super::roles::apply_role_change;
 use crate::ui::flow_row::{self, VALUE_BOX_W};
 
@@ -102,8 +102,10 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
             ui.set_width(ui.available_width());
             let mut spatial = app.selected.dim_config[i].spatial;
             let mut anim = app.selected.dim_config[i].animation;
-            let mut buf = [0; 128];
-            let name = stack_str(&mut buf, format_args!("{dim_name} ({dim_size})"));
+            let name = DimName {
+                name: dim_name,
+                size: dim_size,
+            };
             let active = &mut app.selected.dim_config[i].active;
             role_row(ui, i, name, active, &mut spatial, &mut anim);
             apply_role_change(i, spatial, anim, app);

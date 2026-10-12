@@ -15,6 +15,8 @@
 
 mod cjk;
 mod dataset_text;
+#[cfg(test)]
+mod generation_tests;
 mod scan;
 pub mod slice_index;
 #[cfg(test)]
@@ -46,15 +48,16 @@ static FONTS_ARRIVED: AtomicBool = AtomicBool::new(false);
 /// Bumped whenever the font definitions are rebuilt, so text measured with
 /// the old fonts (cached widths) is measured again.
 static GENERATION: AtomicU64 = AtomicU64::new(0);
-/// The pass from which the latest definitions are in use: egui installs new
-/// fonts at the start of the next pass.
-static ACTIVE_FROM: AtomicU64 = AtomicU64::new(0);
+/// Where each context keeps the pass from which its latest definitions are
+/// in use: egui installs new fonts at the start of the next pass.
+const ACTIVE_FROM: &str = "octant_fonts_active_from";
 
 /// The font definitions' generation, changing whenever they are rebuilt;
-/// `u64::MAX` while new definitions wait for the next pass, so nothing
-/// measured with the old fonts is kept under the new generation.
+/// `u64::MAX` while `ctx`'s new definitions wait for the next pass, so
+/// nothing measured with its old fonts is kept under the new generation.
 pub fn generation(ctx: &egui::Context) -> u64 {
-    if ctx.cumulative_pass_nr() < ACTIVE_FROM.load(Ordering::Acquire) {
+    let active_from = ctx.data(|d| d.get_temp::<u64>(egui::Id::new(ACTIVE_FROM)));
+    if active_from.is_some_and(|pass| ctx.cumulative_pass_nr() < pass) {
         return u64::MAX;
     }
     GENERATION.load(Ordering::Acquire)
@@ -151,5 +154,6 @@ fn apply(ctx: &egui::Context, lang: Language) {
     }
     ctx.set_fonts(fonts);
     GENERATION.fetch_add(1, Ordering::AcqRel);
-    ACTIVE_FROM.store(ctx.cumulative_pass_nr() + 1, Ordering::Release);
+    let active_from = ctx.cumulative_pass_nr() + 1;
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new(ACTIVE_FROM), active_from));
 }

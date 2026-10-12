@@ -87,6 +87,7 @@ fn show_coastline_details(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     labeled_slider(
         ui,
+        "coastline_width",
         SliderLabel::After(tr(K::LineWidth)),
         egui::Slider::new(&mut app.coastline_line_width, 1.0..=4.0)
             .localized()

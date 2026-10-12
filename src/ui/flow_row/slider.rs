@@ -2,6 +2,7 @@
 
 use super::{cached_widths, fits, text_width};
 use egui::{Id, Response, Slider, TextStyle, Ui};
+use std::hash::Hash;
 
 /// Width of a value box beside a slider track: the fixed boxes of the
 /// dimension rows (7 digits), so their tracks end at the same x, and a
@@ -26,14 +27,22 @@ pub enum SliderLabel<'a> {
 
 /// `slider` with its label on the same row when the row fits it at egui's
 /// default slider width; otherwise the label on its own line above a slider
-/// that fills the row. Its value box (which follows the value's text) is
-/// measured each time it is drawn and kept for the next frame. The slider's
-/// response.
-pub fn labeled_slider(ui: &mut Ui, label: SliderLabel<'_>, slider: Slider<'_>) -> Response {
+/// that fills the row, named by it and sharing its hover. `salt` names the
+/// slider in its `ui` (fixed, so it survives a language switch).
+///
+/// Its value box follows the value's text: it is measured when drawn and the
+/// widest seen is kept, so a slider moves under its label at most once,
+/// never back and forth while dragged. The slider's response.
+pub fn labeled_slider(
+    ui: &mut Ui,
+    salt: impl Hash + std::fmt::Debug,
+    label: SliderLabel<'_>,
+    slider: Slider<'_>,
+) -> Response {
     let text = match label {
         SliderLabel::Before(text) | SliderLabel::After(text) => text,
     };
-    let id = ui.id().with(("labeled_slider", text));
+    let id = ui.id().with(("labeled_slider", salt));
     let [label_w] = cached_widths(ui, id, text, |ui| [text_width(ui, text, TextStyle::Body)]);
     let value_id = id.with("value_w");
     let value_w = ui
@@ -41,39 +50,53 @@ pub fn labeled_slider(ui: &mut Ui, label: SliderLabel<'_>, slider: Slider<'_>) -
         .unwrap_or(VALUE_BOX_W);
     let spacing = ui.spacing().item_spacing.x;
     let slider_w = ui.spacing().slider_width;
+    if !fits(ui, &[label_w, slider_w, value_w]) {
+        return stacked(ui, text, slider, value_id, value_w);
+    }
     // The response's width, less everything but the value box.
-    let (response, others) = if fits(ui, &[label_w, slider_w, value_w]) {
-        match label {
-            SliderLabel::After(text) => (
-                ui.add(slider.text(text)),
-                slider_w + spacing * 2.0 + label_w,
-            ),
-            SliderLabel::Before(text) => {
-                let response = ui
-                    .horizontal(|ui| {
-                        ui.label(text);
-                        ui.add(slider)
-                    })
-                    .inner;
-                (response, slider_w + spacing)
-            }
+    let (response, others) = match label {
+        SliderLabel::After(text) => (
+            ui.add(slider.text(text)),
+            slider_w + spacing * 2.0 + label_w,
+        ),
+        SliderLabel::Before(text) => {
+            let response = ui
+                .horizontal(|ui| {
+                    ui.label(text);
+                    ui.add(slider)
+                })
+                .inner;
+            (response, slider_w + spacing)
         }
-    } else {
-        ui.label(text);
-        ui.scope(|ui| {
-            let track = track_width(ui, value_w);
-            ui.spacing_mut().slider_width = track;
-            (ui.add(slider), track + spacing)
-        })
-        .inner
     };
-    remember_value_width(ui, value_id, value_w, response.rect.width() - others);
+    widen_value_box(ui, value_id, value_w, response.rect.width() - others);
     response
 }
 
-/// Keeps `measured` under `id` when it differs from the `kept` width.
-fn remember_value_width(ui: &Ui, id: Id, kept: f32, measured: f32) {
-    if measured > 0.0 && (measured - kept).abs() > 0.5 {
+/// `text` on its own line above `slider`, whose track fills the row beside
+/// its `value_w` wide value box (kept under `value_id`).
+fn stacked(ui: &mut Ui, text: &str, slider: Slider<'_>, value_id: Id, value_w: f32) -> Response {
+    let label = ui.label(text);
+    let (response, track) = ui
+        .scope(|ui| {
+            let track = track_width(ui, value_w);
+            ui.spacing_mut().slider_width = track;
+            (ui.add(slider), track)
+        })
+        .inner;
+    let spacing = ui.spacing().item_spacing.x;
+    widen_value_box(
+        ui,
+        value_id,
+        value_w,
+        response.rect.width() - track - spacing,
+    );
+    response.labelled_by(label.id) | label
+}
+
+/// Keeps `measured` under `id` when it is wider than the `kept` width.
+fn widen_value_box(ui: &Ui, id: Id, kept: f32, measured: f32) {
+    if measured > kept + 0.5 {
         ui.data_mut(|d| d.insert_temp(id, measured));
         ui.ctx().request_repaint();
     }

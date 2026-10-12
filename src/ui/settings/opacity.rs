@@ -77,6 +77,7 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     let color = &mut layer.color;
     let resp = labeled_slider(
         ui,
+        "opacity",
         SliderLabel::After(tr(K::Opacity)),
         egui::Slider::new(&mut color.opacity, 0.0..=1.0).localized(),
     )
@@ -123,44 +124,56 @@ fn curve_header(ui: &mut egui::Ui, curve: &mut AlphaCurveState) -> bool {
     // Item 0 (clear, the rightmost) shows only while there is a curve.
     let first = usize::from(curve.text.is_empty());
     let mut changed = false;
-    flow_row::split(
-        ui,
-        title_w,
-        &widths[first..],
-        |ui| {
-            ui.label(title);
-        },
-        |ui, item| match item + first {
-            0 => {
-                if ui.close_button(tr(K::ClearCurveHover)).clicked() {
-                    curve.text.clear();
-                    changed = true;
-                }
-            }
-            1 => {
-                ui.menu_button(egui::RichText::new(presets).small(), |ui| {
-                    for (name, (_, text, interp)) in PRESET_NAMES.into_iter().zip(PRESETS) {
-                        if ui.button(tr(name)).clicked() {
-                            curve.text = text.to_string();
-                            curve.interp = interp;
-                            changed = true;
-                            ui.close();
-                        }
-                    }
-                });
-            }
-            index => {
-                let (interp, label) = if index == 2 {
-                    (AlphaInterp::Step, step)
-                } else {
-                    (AlphaInterp::Linear, linear)
-                };
-                if ui.selectable_label(curve.interp == interp, label).clicked() {
-                    curve.interp = interp;
-                    changed = true;
-                }
-            }
-        },
-    );
+    let title_label = |ui: &mut egui::Ui| {
+        ui.label(title);
+    };
+    flow_row::split(ui, title_w, &widths[first..], title_label, |ui, item| {
+        changed |= curve_header_item(ui, item + first, curve);
+    });
     changed
+}
+
+/// Item `item` of the alpha curve's title row: 0 clear, 1 presets, 2 step
+/// and 3 linear interpolation. Whether the curve changed.
+fn curve_header_item(ui: &mut egui::Ui, item: usize, curve: &mut AlphaCurveState) -> bool {
+    match item {
+        0 => {
+            let clear = ui.close_button(tr(K::ClearCurveHover)).clicked();
+            if clear {
+                curve.text.clear();
+            }
+            clear
+        }
+        1 => presets_menu(ui, curve),
+        _ => {
+            let (interp, label) = if item == 2 {
+                (AlphaInterp::Step, K::InterpStep)
+            } else {
+                (AlphaInterp::Linear, K::InterpLinear)
+            };
+            let picked = ui
+                .selectable_label(curve.interp == interp, tr(label))
+                .clicked();
+            if picked {
+                curve.interp = interp;
+            }
+            picked
+        }
+    }
+}
+
+/// The Presets menu; whether a preset replaced the curve.
+fn presets_menu(ui: &mut egui::Ui, curve: &mut AlphaCurveState) -> bool {
+    let mut picked = false;
+    ui.menu_button(egui::RichText::new(tr(K::Presets)).small(), |ui| {
+        for (name, (_, text, interp)) in PRESET_NAMES.into_iter().zip(PRESETS) {
+            if ui.button(tr(name)).clicked() {
+                curve.text = text.to_string();
+                curve.interp = interp;
+                picked = true;
+                ui.close();
+            }
+        }
+    });
+    picked
 }

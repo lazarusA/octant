@@ -16,6 +16,50 @@ const ALGORITHMS: [(u32, K); 8] = [
 ];
 
 pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
+    algorithm_row(app, ui);
+
+    ui.separator();
+    labeled_slider(
+        ui,
+        "quality",
+        SliderLabel::After(tr(K::Quality)),
+        egui::Slider::new(&mut app.plot_configs.volume.quality, 0.25..=2.0)
+            .localized()
+            .logarithmic(true),
+    )
+    .on_hover_text(tr(K::QualityHover));
+
+    if app.plot_configs.volume.algorithm == 0 || app.plot_configs.volume.algorithm >= 5 {
+        labeled_slider(
+            ui,
+            "density",
+            SliderLabel::After(tr(K::Density)),
+            egui::Slider::new(&mut app.plot_configs.volume.opacity, 0.1..=10.0).localized(),
+        );
+    }
+
+    if app.plot_configs.volume.algorithm == 1 {
+        labeled_slider(
+            ui,
+            "attenuation",
+            SliderLabel::After(tr(K::Attenuation)),
+            egui::Slider::new(&mut app.plot_configs.volume.attenuation, 0.0..=5.0).localized(),
+        );
+    }
+
+    ui.separator();
+    labeled_slider(
+        ui,
+        "volume_z_scale",
+        SliderLabel::After(tr(K::ZScale)),
+        egui::Slider::new(&mut app.plot_configs.volume.z_scale, 0.05..=10.0)
+            .localized()
+            .logarithmic(true),
+    );
+}
+
+/// The volume algorithm's name, opening the menu of algorithms.
+fn algorithm_row(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal_wrapped(|ui| {
         ui.label(
             egui::RichText::new(tr(K::Algorithm))
@@ -38,41 +82,6 @@ pub(crate) fn show_volume_options(app: &mut OctantApp, ui: &mut egui::Ui) {
             }
         });
     });
-
-    ui.separator();
-    labeled_slider(
-        ui,
-        SliderLabel::After(tr(K::Quality)),
-        egui::Slider::new(&mut app.plot_configs.volume.quality, 0.25..=2.0)
-            .localized()
-            .logarithmic(true),
-    )
-    .on_hover_text(tr(K::QualityHover));
-
-    if app.plot_configs.volume.algorithm == 0 || app.plot_configs.volume.algorithm >= 5 {
-        labeled_slider(
-            ui,
-            SliderLabel::After(tr(K::Density)),
-            egui::Slider::new(&mut app.plot_configs.volume.opacity, 0.1..=10.0).localized(),
-        );
-    }
-
-    if app.plot_configs.volume.algorithm == 1 {
-        labeled_slider(
-            ui,
-            SliderLabel::After(tr(K::Attenuation)),
-            egui::Slider::new(&mut app.plot_configs.volume.attenuation, 0.0..=5.0).localized(),
-        );
-    }
-
-    ui.separator();
-    labeled_slider(
-        ui,
-        SliderLabel::After(tr(K::ZScale)),
-        egui::Slider::new(&mut app.plot_configs.volume.z_scale, 0.05..=10.0)
-            .localized()
-            .logarithmic(true),
-    );
 }
 
 pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -102,6 +111,7 @@ pub(crate) fn show_sphere_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.separator();
         labeled_slider(
             ui,
+            "sphere_height",
             SliderLabel::After(tr(K::Height)),
             egui::Slider::new(&mut app.plot_configs.mesh.sphere_displacement, 0.0..=5.0)
                 .localized(),
@@ -131,6 +141,7 @@ pub(crate) fn show_surface_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.separator();
     labeled_slider(
         ui,
+        "surface_height",
         SliderLabel::After(tr(K::Height)),
         egui::Slider::new(&mut app.plot_configs.mesh.surface_displacement, 0.0..=5.0).localized(),
     );
@@ -146,12 +157,14 @@ fn flip_height_checkbox(ui: &mut egui::Ui, flip: &mut bool) {
 pub(crate) fn show_point_cloud_options(app: &mut OctantApp, ui: &mut egui::Ui) {
     labeled_slider(
         ui,
+        "point_size",
         SliderLabel::After(tr(K::Size)),
         egui::Slider::new(&mut app.plot_configs.point_cloud.point_size, 0.002..=0.10).localized(),
     );
     ui.separator();
     labeled_slider(
         ui,
+        "point_cloud_z_scale",
         SliderLabel::After(tr(K::ZScale)),
         egui::Slider::new(&mut app.plot_configs.volume.z_scale, 0.05..=10.0)
             .localized()

@@ -33,15 +33,7 @@ fn rich(item: Item, text: &str) -> egui::RichText {
 }
 
 fn text_width(ui: &egui::Ui, item: Item, text: &str) -> f32 {
-    egui::WidgetText::from(rich(item, text))
-        .into_galley(
-            ui,
-            Some(egui::TextWrapMode::Extend),
-            f32::INFINITY,
-            egui::TextStyle::Small,
-        )
-        .size()
-        .x
+    crate::ui::flow_row::text_width(ui, rich(item, text), egui::TextStyle::Small)
 }
 
 /// Width reserved for the date value: the widest of the start, end and

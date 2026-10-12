@@ -59,10 +59,15 @@ thread_local! {
 /// the process-wide language (and tests on other threads) alone.
 #[cfg(test)]
 pub fn with_language<R>(lang: Language, f: impl FnOnce() -> R) -> R {
-    let previous = TEST_LANGUAGE.replace(Some(lang));
-    let result = f();
-    TEST_LANGUAGE.set(previous);
-    result
+    /// Restores the thread's previous language, also when `f` panics.
+    struct Restore(Option<Language>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            TEST_LANGUAGE.set(self.0);
+        }
+    }
+    let _restore = Restore(TEST_LANGUAGE.replace(Some(lang)));
+    f()
 }
 
 /// Translates `key` into the active language.

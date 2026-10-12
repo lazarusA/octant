@@ -1,5 +1,6 @@
 //! Rows keep their items' reading order when they stack, and a labeled
-//! slider learns its value box so a wide value stays within the row.
+//! slider learns its value box so a wide value stays within the row and
+//! never moves back beside its label.
 
 use super::{SliderLabel, labeled_slider, right_aligned};
 use crate::ui::number_input::LocalizedInput;
@@ -59,10 +60,44 @@ fn a_wide_value_box_is_learned_and_stays_in_the_row() {
             .localized()
             .suffix(" units");
         let label = SliderLabel::After("A rather long label");
-        right = labeled_slider(ui, label, slider).rect.right();
+        right = labeled_slider(ui, "wide", label, slider).rect.right();
     });
     assert!(
         right <= column + 0.5,
         "slider ends at {right}, past {column}"
+    );
+}
+
+#[test]
+fn a_slider_under_its_label_stays_there_when_its_value_narrows() {
+    let column = 220.0;
+    let mut h = Harness::new(SCREEN);
+    let mut value = 999_999.5_f64;
+    let mut bottoms = Vec::new();
+    for narrow in [false, false, false, true, true, true] {
+        if narrow {
+            value = 1.0;
+        }
+        h.frame(Vec::new(), &mut |ui: &mut Ui| {
+            ui.allocate_ui(vec2(column, 400.0), |ui| {
+                ui.set_width(column);
+                let slider = egui::Slider::new(&mut value, 0.0..=1_000_000.0)
+                    .localized()
+                    .suffix(" units");
+                let label = SliderLabel::After("Label");
+                bottoms.push(labeled_slider(ui, "flip", label, slider).rect.bottom());
+            });
+        });
+    }
+    let stacked = bottoms[2];
+    assert!(
+        stacked > bottoms[0],
+        "a wide value moves the slider under its label"
+    );
+    assert!(
+        bottoms[3..]
+            .iter()
+            .all(|&bottom| (bottom - stacked).abs() < 0.5),
+        "it stays there: {bottoms:?}"
     );
 }

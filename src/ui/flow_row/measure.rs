@@ -5,13 +5,13 @@ use crate::ui::temp_cache::{cached, hash_key};
 use egui::{Id, TextStyle, TextWrapMode, Ui, WidgetText};
 use std::hash::Hash;
 
-/// Width of `text` on one line in `style`.
-pub fn text_width(ui: &Ui, text: &str, style: TextStyle) -> f32 {
+/// Width of `text` on one line, in `style` unless the text sets its own.
+pub fn text_width(ui: &Ui, text: impl Into<WidgetText>, style: TextStyle) -> f32 {
+    let text: WidgetText = text.into();
     if text.is_empty() {
         return 0.0;
     }
-    WidgetText::from(text)
-        .into_galley(ui, Some(TextWrapMode::Extend), f32::INFINITY, style)
+    text.into_galley(ui, Some(TextWrapMode::Extend), f32::INFINITY, style)
         .size()
         .x
 }
@@ -38,9 +38,10 @@ pub fn checkbox_width(ui: &Ui) -> f32 {
     spacing.icon_width.max(spacing.interact_size.y)
 }
 
-/// The widths `measure` returns for the row `salt`, kept in egui temp memory
-/// and measured again only when `key` (the row's text), the language, the
-/// fonts or the UI scale change.
+/// The widths `measure` returns for the row `salt` of `ui`, kept in egui
+/// temp memory and measured again only when `key` (the row's text), the
+/// language, the fonts, the UI scale or the spacing and text sizes they are
+/// measured with change.
 pub fn cached_widths<const N: usize>(
     ui: &Ui,
     salt: impl Hash + std::fmt::Debug,
@@ -52,9 +53,34 @@ pub fn cached_widths<const N: usize>(
         crate::ui::fonts::generation(ctx),
         crate::i18n::language(),
         ui.pixels_per_point().to_bits(),
+        style_key(ui),
         key,
     ));
-    cached(ctx, Id::new("flow_row_widths").with(salt), key, || {
-        measure(ui)
-    })
+    let id = Id::new("flow_row_widths").with(ui.id()).with(salt);
+    cached(ctx, id, key, || measure(ui))
+}
+
+/// The spacing and text sizes the widths above are measured with, as bits.
+fn style_key(ui: &Ui) -> [u32; 11] {
+    let style = ui.style();
+    let spacing = &style.spacing;
+    let size = |text_style: TextStyle| {
+        style
+            .text_styles
+            .get(&text_style)
+            .map_or(0, |font| font.size.to_bits())
+    };
+    [
+        spacing.button_padding.x.to_bits(),
+        spacing.item_spacing.x.to_bits(),
+        spacing.combo_width.to_bits(),
+        spacing.interact_size.y.to_bits(),
+        spacing.icon_width.to_bits(),
+        spacing.icon_spacing.to_bits(),
+        spacing.slider_width.to_bits(),
+        size(TextStyle::Body),
+        size(TextStyle::Button),
+        size(TextStyle::Small),
+        size(TextStyle::Monospace),
+    ]
 }

@@ -19,6 +19,7 @@ pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.add_space(2.0);
         labeled_slider(
             ui,
+            "line_point_size",
             SliderLabel::Before(tr(K::PointSize)),
             egui::Slider::new(&mut app.plot_configs.line.point_size, 2.0..=24.0)
                 .localized()
@@ -161,6 +162,7 @@ fn show_line_profile_slider(app: &mut OctantApp, ui: &mut egui::Ui, has_z_dim: b
         let mut slice_idx = app.plot_configs.line.profile_slice_idx;
         if labeled_slider(
             ui,
+            "profile_index",
             SliderLabel::After(tr(K::ProfileIndex)),
             egui::Slider::new(&mut slice_idx, 0..=max_idx).localized(),
         )

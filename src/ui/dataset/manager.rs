@@ -12,36 +12,7 @@ pub fn show_dataset_manager(app: &mut OctantApp, ui: &mut egui::Ui) {
         return;
     }
 
-    let mut buf = [0u8; 64];
-    let loaded = fill(
-        &mut buf,
-        tr(DatasetKey::LoadedCount),
-        &[&app.dataset_manager.len()],
-    );
-    let clear = tr(DatasetKey::ClearAll);
-    let [loaded_w, clear_w] =
-        flow_row::cached_widths(ui, "dataset_loaded_row", (loaded, clear), |ui| {
-            [
-                flow_row::text_width(ui, loaded, egui::TextStyle::Body),
-                icon_button_width(ui, clear),
-            ]
-        });
-    let mut clear_all = false;
-    flow_row::split(
-        ui,
-        loaded_w,
-        &[clear_w],
-        |ui| {
-            ui.label(egui::RichText::new(loaded).strong());
-        },
-        |ui, _| {
-            clear_all = ui
-                .icon_button(Icon::Trash, clear)
-                .on_hover_text(tr(DatasetKey::ClearAllHover))
-                .clicked();
-        },
-    );
-    if clear_all {
+    if loaded_row(ui, app.dataset_manager.len()) {
         app.clear_all_datasets();
     }
 
@@ -65,6 +36,32 @@ pub fn show_dataset_manager(app: &mut OctantApp, ui: &mut egui::Ui) {
     } else if let Some((uri, kind)) = to_activate {
         app.submit_or_activate_source(&uri, Some(kind));
     }
+}
+
+/// The count of `loaded` datasets with Clear All at the row's right end, or
+/// below it when they don't fit; whether Clear All was clicked.
+fn loaded_row(ui: &mut egui::Ui, loaded: usize) -> bool {
+    let mut buf = [0u8; 64];
+    let loaded = fill(&mut buf, tr(DatasetKey::LoadedCount), &[&loaded]);
+    let clear = tr(DatasetKey::ClearAll);
+    let [loaded_w, clear_w] =
+        flow_row::cached_widths(ui, "dataset_loaded_row", (loaded, clear), |ui| {
+            [
+                flow_row::text_width(ui, loaded, egui::TextStyle::Body),
+                icon_button_width(ui, clear),
+            ]
+        });
+    let mut clear_all = false;
+    let count = |ui: &mut egui::Ui| {
+        ui.label(egui::RichText::new(loaded).strong());
+    };
+    flow_row::split(ui, loaded_w, &[clear_w], count, |ui, _| {
+        clear_all = ui
+            .icon_button(Icon::Trash, clear)
+            .on_hover_text(tr(DatasetKey::ClearAllHover))
+            .clicked();
+    });
+    clear_all
 }
 
 fn source_kind_icon(kind: &DataSourceKind) -> Icon {
