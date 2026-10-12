@@ -38,7 +38,7 @@ fn panel_grows_when_its_body_gets_taller() {
     );
 
     let ctx = egui::Context::default();
-    let mut app = app(PlotType::Volume);
+    let mut app = app(PlotType::PointCloud);
     let short = settled_height(&ctx, &mut app, canvas);
     app.selected.plot_type = PlotType::Heatmap;
     let grown = settled_height(&ctx, &mut app, canvas);

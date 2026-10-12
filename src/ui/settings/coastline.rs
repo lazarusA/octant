@@ -1,5 +1,6 @@
 use crate::app::OctantApp;
 use crate::i18n::{CommonKey, SettingsKey as K, tr};
+use crate::ui::flow_row::{SliderLabel, labeled_slider};
 use crate::ui::number_input::LocalizedInput;
 
 pub(crate) fn show_coastline_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -84,11 +85,12 @@ fn show_coastline_details(app: &mut OctantApp, ui: &mut egui::Ui) {
         }
     });
 
-    ui.add(
+    labeled_slider(
+        ui,
+        SliderLabel::After(tr(K::LineWidth)),
         egui::Slider::new(&mut app.coastline_line_width, 1.0..=4.0)
             .localized()
-            .step_by(0.1)
-            .text(tr(K::LineWidth)),
+            .step_by(0.1),
     );
 
     ui.checkbox(&mut app.coastline_crop_to_data_domain, tr(K::CropToDomain))

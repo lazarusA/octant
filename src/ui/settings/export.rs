@@ -24,10 +24,12 @@ pub(crate) fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
 
             ui.horizontal(|ui| {
                 ui.label(tr(K::ExportFolder));
-                ui.text_edit_singleline(&mut app.export_settings.export_dir);
+                let field = egui::TextEdit::singleline(&mut app.export_settings.export_dir)
+                    .desired_width(f32::INFINITY);
+                ui.add(field);
             });
 
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 if ui.icon_button(Icon::Save, tr(K::OpenSaveDialog)).clicked() {
                     app.show_export_modal = true;
                 }

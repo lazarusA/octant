@@ -3,7 +3,8 @@ use super::support::{OptionSupport, Support};
 use crate::app::OctantApp;
 use crate::app::layers::{AlphaCurveState, LayerId};
 use crate::i18n::{SettingsKey as K, tr};
-use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
+use crate::ui::flow_row::{self, SliderLabel, labeled_slider};
+use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
 use crate::ui::number_input::LocalizedInput;
 use crate::utils::colormap::{AlphaInterp, alpha::PRESETS};
 
@@ -74,13 +75,12 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
         return;
     };
     let color = &mut layer.color;
-    let resp = ui
-        .add(
-            egui::Slider::new(&mut color.opacity, 0.0..=1.0)
-                .localized()
-                .text(tr(K::Opacity)),
-        )
-        .on_hover_text(tr(K::OpacityHover));
+    let resp = labeled_slider(
+        ui,
+        SliderLabel::After(tr(K::Opacity)),
+        egui::Slider::new(&mut color.opacity, 0.0..=1.0).localized(),
+    )
+    .on_hover_text(tr(K::OpacityHover));
     if resp.double_clicked() {
         color.opacity = 1.0;
     }
@@ -104,17 +104,34 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
 }
 
 /// The alpha curve's title row: clear, presets, and step or linear
-/// interpolation. Whether the curve changed.
+/// interpolation, below the title when they don't fit beside it. Whether the
+/// curve changed.
 fn curve_header(ui: &mut egui::Ui, curve: &mut AlphaCurveState) -> bool {
+    let presets = egui::RichText::new(tr(K::Presets)).small();
+    let widths = [
+        ToolbarButton::side(IconSize::Sm),
+        flow_row::button_width(ui, presets.clone()),
+        flow_row::button_width(ui, tr(K::InterpStep)),
+        flow_row::button_width(ui, tr(K::InterpLinear)),
+    ];
+    // The clear button shows only while there is a curve.
+    let widths = &widths[usize::from(curve.text.is_empty())..];
+    let title = tr(K::AlphaCurve);
+    let title_w = flow_row::text_width(ui, title, egui::TextStyle::Body);
     let mut changed = false;
-    ui.horizontal(|ui| {
-        ui.label(tr(K::AlphaCurve));
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+    flow_row::split(
+        ui,
+        title_w,
+        widths,
+        |ui| {
+            ui.label(title);
+        },
+        |ui| {
             if !curve.text.is_empty() && ui.close_button(tr(K::ClearCurveHover)).clicked() {
                 curve.text.clear();
                 changed = true;
             }
-            ui.menu_button(egui::RichText::new(tr(K::Presets)).small(), |ui| {
+            ui.menu_button(presets, |ui| {
                 for (name, (_, text, interp)) in PRESET_NAMES.into_iter().zip(PRESETS) {
                     if ui.button(tr(name)).clicked() {
                         curve.text = text.to_string();
@@ -137,7 +154,7 @@ fn curve_header(ui: &mut egui::Ui, curve: &mut AlphaCurveState) -> bool {
                     changed = true;
                 }
             }
-        });
-    });
+        },
+    );
     changed
 }

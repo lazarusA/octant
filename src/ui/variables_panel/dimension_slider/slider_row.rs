@@ -1,6 +1,6 @@
 //! Dimension row controls and metric banners.
 
-use crate::app::{AnimationRole, OctantApp, SpatialRole};
+use crate::app::{AnimationRole, OctantApp};
 use crate::data::VariableInfo;
 use crate::i18n::{VariablesKey as K, fill, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
@@ -14,6 +14,7 @@ use super::double_slider::{VALUE_BOX_W, double_slider_with_inputs};
 use super::metrics::{
     calculate_download_sizes, calculate_selected_2d_elements, calculate_selected_volume_elements,
 };
+use super::role_row::role_row;
 use super::roles::apply_role_change;
 
 /// Renders the complete dimension sliders section including capacity and bandwidth metrics.
@@ -49,7 +50,7 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
         1
     };
 
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new(tr(K::Download)).strong());
         let cells = format_count_metric(requested_cells.min(usize::MAX as u64) as usize);
         let mut buf = [0; 128];
@@ -98,52 +99,13 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
         ui.group(|ui| {
             // Fill the panel width so every dimension box lines up.
             ui.set_width(ui.available_width());
-            ui.horizontal(|ui| {
-                ui.checkbox(&mut app.selected.dim_config[i].active, "");
-
-                ui.label(
-                    RichText::new(format!("{} ({})", dim_name, dim_size))
-                        .strong()
-                        .small(),
-                );
-
-                // Role selects pinned to the right edge. Right-to-left order:
-                // the animation select is added first so it ends up rightmost.
-                let mut spatial = app.selected.dim_config[i].spatial;
-                let mut anim = app.selected.dim_config[i].animation;
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    egui::ComboBox::from_id_salt(("anim_role", i))
-                        .selected_text(match anim {
-                            AnimationRole::None => tr(K::RoleNone),
-                            AnimationRole::Animated => tr(K::RoleAnimated),
-                        })
-                        .show_ui(ui, |ui| {
-                            let (none, animated) = (AnimationRole::None, AnimationRole::Animated);
-                            ui.selectable_value(&mut anim, none, tr(K::RoleNone));
-                            ui.selectable_value(&mut anim, animated, tr(K::RoleAnimated));
-                        });
-
-                    egui::ComboBox::from_id_salt(("spatial_role", i))
-                        .selected_text(match spatial {
-                            SpatialRole::None => tr(K::RoleNone),
-                            SpatialRole::Grid => tr(K::RoleGrid),
-                            SpatialRole::X => "X",
-                            SpatialRole::Y => "Y",
-                            SpatialRole::Z => "Z",
-                        })
-                        .show_ui(ui, |ui| {
-                            let none = tr(K::RoleNone);
-                            ui.selectable_value(&mut spatial, SpatialRole::None, none);
-                            let grid = tr(K::RoleGrid);
-                            ui.selectable_value(&mut spatial, SpatialRole::Grid, grid);
-                            ui.selectable_value(&mut spatial, SpatialRole::X, "X");
-                            ui.selectable_value(&mut spatial, SpatialRole::Y, "Y");
-                            ui.selectable_value(&mut spatial, SpatialRole::Z, "Z");
-                        });
-                });
-
-                apply_role_change(i, spatial, anim, app);
-            });
+            let mut spatial = app.selected.dim_config[i].spatial;
+            let mut anim = app.selected.dim_config[i].animation;
+            let mut buf = [0; 128];
+            let name = stack_str(&mut buf, format_args!("{dim_name} ({dim_size})"));
+            let active = &mut app.selected.dim_config[i].active;
+            role_row(ui, i, name, active, &mut spatial, &mut anim);
+            apply_role_change(i, spatial, anim, app);
 
             ui.add_space(4.0);
 

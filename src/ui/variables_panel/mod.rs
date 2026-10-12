@@ -16,7 +16,8 @@ pub use info::show_variable_info;
 use crate::app::OctantApp;
 use crate::i18n::{VariablesKey, tr};
 use crate::ui::drag_grip::GripAction;
-use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
+use crate::ui::flow_row;
+use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt, icon_button_width};
 use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
 
@@ -110,18 +111,24 @@ fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> PanelH
 /// The header's second row, right-aligned: the "Add Overlay" toggle
 /// (highlighted while on; disabled with the reason while the staged variable
 /// can't be overlaid), then "Plot Data", which adds the variable as an
-/// overlay while the toggle is on. Whether Plot Data was clicked.
+/// overlay while the toggle is on; stacked, Plot Data on top, when the two
+/// don't fit side by side. Whether Plot Data was clicked.
 fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
     let unavailable = app.overlay_unavailable_for(app.selected.variable_idx);
     if unavailable.is_some() {
         app.layout.plot_as_overlay = false;
     }
     let plot_icon = crate::ui::plot_type::plot_type_icon(app.selected.plot_type);
+    let toggle = ToolbarButton::new(Icon::Layers, tr(VariablesKey::AddOverlay))
+        .icon_size(IconSize::Sm)
+        .toggled(app.layout.plot_as_overlay)
+        .hover(tr(VariablesKey::AddOverlayHover));
+    let widths = [
+        icon_button_width(ui, tr(VariablesKey::PlotData)),
+        toggle.width(ui),
+    ];
     let mut plot = false;
-    // One row tall: a bare right-to-left layout would take the panel's height.
-    let row = egui::vec2(ui.available_width(), ui.spacing().interact_size.y);
-    let layout = egui::Layout::right_to_left(egui::Align::Center);
-    ui.allocate_ui_with_layout(row, layout, |ui| {
+    flow_row::right_aligned(ui, &widths, |ui| {
         let hover = if app.layout.plot_as_overlay {
             tr(VariablesKey::PlotDataOverlayHover)
         } else {
@@ -131,10 +138,6 @@ fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
             .outlined_icon_button(plot_icon, tr(VariablesKey::PlotData), IconTone::Default)
             .on_hover_text(hover)
             .clicked();
-        let toggle = ToolbarButton::new(Icon::Layers, tr(VariablesKey::AddOverlay))
-            .icon_size(IconSize::Sm)
-            .toggled(app.layout.plot_as_overlay)
-            .hover(tr(VariablesKey::AddOverlayHover));
         let response = ui.add_enabled(unavailable.is_none(), toggle);
         let response = match unavailable {
             Some(reason) => response.on_disabled_hover_text(reason),

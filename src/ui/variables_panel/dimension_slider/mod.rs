@@ -11,6 +11,7 @@ pub mod defaults_spatial;
 pub mod double_slider;
 
 pub mod metrics;
+mod role_row;
 pub mod roles;
 pub mod slider_row;
 

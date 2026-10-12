@@ -5,7 +5,8 @@ use crate::app::OctantApp;
 use crate::app::layers::{ColorStyle, LayerId};
 use crate::i18n::{SettingsKey as K, tr};
 use crate::ui::color_picker::{ColorShape, ShapeColorPicker};
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::flow_row;
+use crate::ui::icons::{Icon, UiIconExt, icon_button_width};
 use crate::ui::layer_label::LabelEditor;
 use crate::ui::number_input::LocalizedInput;
 
@@ -70,8 +71,9 @@ fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: Laye
     }
 }
 
-/// Min and max inputs with lock and reset; the Categorical toggle when the
-/// plot honors it (`categorical`).
+/// The Color range title with the Categorical toggle (when the plot honors
+/// it, `categorical`) and the lock and reset buttons, then the Min and Max
+/// inputs.
 fn show_color_range_controls(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
@@ -82,37 +84,52 @@ fn show_color_range_controls(
         return;
     };
     let color = &mut layer.color;
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tr(K::ColorRange)).strong());
-        if !categorical {
-            return;
-        }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.toggle_value(&mut color.categorical, tr(K::Categorical))
-                .on_hover_text(tr(K::CategoricalHover));
-        });
-    });
-    ui.add_space(2.0);
+    let title = egui::RichText::new(tr(K::ColorRange)).strong();
+    let title_w = flow_row::text_width(ui, title.clone(), egui::TextStyle::Body);
+    let icon_w = icon_button_width(ui, "");
+    let widths = [
+        icon_w,
+        icon_w,
+        flow_row::button_width(ui, tr(K::Categorical)),
+    ];
+    let widths = if categorical {
+        &widths[..]
+    } else {
+        &widths[..2]
+    };
     let mut reset_range = false;
-    ui.horizontal(|ui| {
-        range_inputs(ui, color);
-        let lock_icon = if color.lock_bounds {
-            Icon::Lock
-        } else {
-            Icon::Unlock
-        };
-        if ui
-            .icon_button(lock_icon, "")
-            .on_hover_text(tr(K::LockBoundsHover))
-            .clicked()
-        {
-            color.lock_bounds = !color.lock_bounds;
-        }
-        reset_range = ui
-            .icon_button(Icon::Reset, "")
-            .on_hover_text(tr(K::ResetBoundsHover))
-            .clicked();
-    });
+    flow_row::split(
+        ui,
+        title_w,
+        widths,
+        |ui| {
+            ui.label(title);
+        },
+        |ui| {
+            reset_range = ui
+                .icon_button(Icon::Reset, "")
+                .on_hover_text(tr(K::ResetBoundsHover))
+                .clicked();
+            let lock_icon = if color.lock_bounds {
+                Icon::Lock
+            } else {
+                Icon::Unlock
+            };
+            if ui
+                .icon_button(lock_icon, "")
+                .on_hover_text(tr(K::LockBoundsHover))
+                .clicked()
+            {
+                color.lock_bounds = !color.lock_bounds;
+            }
+            if categorical {
+                ui.toggle_value(&mut color.categorical, tr(K::Categorical))
+                    .on_hover_text(tr(K::CategoricalHover));
+            }
+        },
+    );
+    ui.add_space(2.0);
+    ui.horizontal_wrapped(|ui| range_inputs(ui, color));
     if (color.custom_label.is_some() || color.lock_bounds)
         && ui
             .icon_button(Icon::Reset, tr(K::ResetAllColorbar))

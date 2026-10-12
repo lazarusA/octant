@@ -123,6 +123,14 @@ impl UiIconExt for Ui {
     }
 }
 
+/// Width of an [`UiIconExt::icon_button`] (or outlined one) labeled `text`
+/// on one line, without allocating it.
+pub fn icon_button_width(ui: &Ui, text: impl Into<WidgetText>) -> f32 {
+    let label = crate::ui::flow_row::text_width(ui, text, egui::TextStyle::Button);
+    let gap = if label > 0.0 { ICON_GAP } else { 0.0 };
+    IconSize::Sm.px() + gap + label + ui.spacing().button_padding.x * 2.0
+}
+
 /// The standard close / clear button widget, shared by [`UiIconExt::close_button`]
 /// and layouts that need its width.
 fn close_button_widget(hover: &str) -> ToolbarButton<'_> {
@@ -141,11 +149,19 @@ fn framed_icon_button(
     outline: Option<Color32>,
 ) -> Response {
     let font_id = egui::TextStyle::Button.resolve(ui.style());
-    let galley = text.into_galley(ui, None, ui.available_width(), font_id);
-
     let icon_size = IconSize::Sm.px();
-    let gap = if galley.is_empty() { 0.0 } else { ICON_GAP };
     let padding = ui.spacing().button_padding;
+    // The label wraps within what the row leaves once the icon and padding
+    // are placed; a wrapping row moves the button to a fresh line instead.
+    let room = if ui.layout().main_wrap() {
+        ui.max_rect().width()
+    } else {
+        ui.available_width()
+    };
+    let wrap_width = (room - icon_size - ICON_GAP - padding.x * 2.0).max(0.0);
+    let galley = text.into_galley(ui, None, wrap_width, font_id);
+
+    let gap = if galley.is_empty() { 0.0 } else { ICON_GAP };
     let content_size = vec2(
         icon_size + gap + galley.size().x,
         icon_size.max(galley.size().y),
