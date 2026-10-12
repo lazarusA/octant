@@ -3,9 +3,8 @@
 //! once per dataset (and again when coordinate labels arrive).
 
 use super::CjkFont;
-use crate::data::{CoordValues, DatasetMetadata};
+use crate::data::DatasetMetadata;
 use crate::i18n::Language;
-use std::collections::BTreeSet;
 
 /// A character's CJK script, `Other` for CJK punctuation and symbols.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,56 +34,6 @@ pub fn script_of(c: char) -> Option<Script> {
         }
         _ => None,
     }
-}
-
-/// Calls `f` with every text of `meta`: its name, its variables' names,
-/// long names, units, dimension names and attributes, and its dimensions'
-/// names and coordinate labels.
-pub fn for_each_text(meta: &DatasetMetadata, mut f: impl FnMut(&str)) {
-    f(&meta.name);
-    for var in &meta.variables {
-        f(&var.name);
-        for text in [&var.long_name, &var.units].into_iter().flatten() {
-            f(text);
-        }
-        for name in &var.dimension_names {
-            f(name);
-        }
-        for (key, value) in &var.attributes {
-            f(key);
-            f(value);
-        }
-    }
-    for (dim, coords) in &meta.dimension_coordinates {
-        f(dim);
-        if let CoordValues::Labels(labels) = coords {
-            for label in labels.iter() {
-                f(label);
-            }
-        }
-    }
-}
-
-/// The CJK characters of `meta` by the font that draws them (`CjkFont::ALL`
-/// order): kana Japanese, Hangul Korean, Han and CJK symbols `han_font`.
-#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
-pub fn chars_by_font(meta: &DatasetMetadata, han_font: CjkFont) -> [BTreeSet<char>; 3] {
-    let mut chars: [BTreeSet<char>; 3] = Default::default();
-    let slot = |font: CjkFont| CjkFont::ALL.iter().position(|&f| f == font).unwrap_or(0);
-    for_each_text(meta, |text| {
-        for c in text.chars().filter(|c| !c.is_ascii()) {
-            let font = match script_of(c) {
-                Some(Script::Kana) => CjkFont::Jp,
-                Some(Script::Hangul) => CjkFont::Kr,
-                Some(Script::Han | Script::Other) => han_font,
-                None => continue,
-            };
-            if let Some(set) = chars.get_mut(slot(font)) {
-                set.insert(c);
-            }
-        }
-    });
-    chars
 }
 
 /// The CJK scripts found in a dataset's text.
@@ -117,9 +66,7 @@ impl Scripts {
 
     /// The scripts of every text in `meta`.
     pub fn of(meta: &DatasetMetadata) -> Self {
-        let mut scripts = Scripts::default();
-        for_each_text(meta, |text| scripts.add(text));
-        scripts
+        super::dataset_text::DatasetText::of(meta).scripts
     }
 
     /// The font to try first for Han characters: the UI language's when it

@@ -163,7 +163,7 @@ fn dataset_characters_go_to_the_font_that_draws_them() {
         name: "\u{6771}\u{4EAC}\u{306E}\u{6C17}\u{6E29} \u{AE30}\u{C628} caf\u{E9}\u{3002}".into(),
         ..Default::default()
     };
-    let [sc, jp, kr] = super::scan::chars_by_font(&meta, CjkFont::Sc);
+    let [sc, jp, kr] = super::dataset_text::DatasetText::of(&meta).by_font(CjkFont::Sc);
     // Han and CJK punctuation go to the Han font, kana and Hangul to theirs.
     assert_eq!(
         sc.into_iter().collect::<String>(),
@@ -171,4 +171,27 @@ fn dataset_characters_go_to_the_font_that_draws_them() {
     );
     assert_eq!(jp.into_iter().collect::<String>(), "\u{306E}");
     assert_eq!(kr.into_iter().collect::<String>(), "\u{AE30}\u{C628}");
+}
+
+#[test]
+fn dataset_text_reads_new_labels_only_once() {
+    use super::dataset_text::DatasetText;
+    let mut meta = crate::data::DatasetMetadata {
+        name: "plain".into(),
+        ..Default::default()
+    };
+    let mut text = DatasetText::default();
+    text.update(&meta, 1);
+    assert!(!text.scripts.any());
+    // Labels arriving later (same dataset) are read.
+    meta.dimension_coordinates.insert(
+        "station".into(),
+        crate::data::CoordValues::Labels(vec!["\u{D55C}".to_string()].into()),
+    );
+    text.update(&meta, 1);
+    assert!(text.scripts.hangul);
+    // A new dataset starts over.
+    let other = crate::data::DatasetMetadata::default();
+    text.update(&other, 2);
+    assert!(!text.scripts.any());
 }

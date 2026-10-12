@@ -14,6 +14,7 @@
 //! (`web_slices.rs`, built by `tools/cjk_slices`).
 
 mod cjk;
+mod dataset_text;
 mod scan;
 pub mod slice_index;
 #[cfg(test)]
@@ -30,6 +31,8 @@ mod web_slices;
 
 pub use cjk::CjkFont;
 pub use scan::Scripts;
+
+use dataset_text::DatasetText;
 
 use crate::app::OctantApp;
 use crate::i18n::Language;
@@ -55,32 +58,34 @@ impl FontEngine {
         }
     }
 
-    /// Reads the staged dataset's text when it or its coordinate labels
-    /// change (cheap otherwise) and makes its CJK text drawable: the font
-    /// for its Han characters goes first, and the desktop loads the system
-    /// fonts it needs.
+    /// Makes the staged dataset's CJK text drawable when the dataset, its
+    /// coordinate labels or the UI language change (a key comparison
+    /// otherwise): reads what is new in it (`DatasetText`), puts the font
+    /// for its Han characters first, and loads the fonts it needs.
     pub fn watch_dataset(ctx: &egui::Context, app: &OctantApp) {
-        static SCANNED: Mutex<Option<(u64, u64, Language)>> = Mutex::new(None);
-        // The font for Han text depends on the UI language too.
-        let key = (
-            app.selected.metadata_generation,
-            app.coordinates_revision,
-            crate::i18n::language(),
-        );
-        {
-            let mut scanned = SCANNED.lock().unwrap_or_else(|p| p.into_inner());
-            if scanned.replace(key) == Some(key) {
-                return;
-            }
+        /// The dataset text read so far, and the key it was last read at.
+        #[derive(Default)]
+        struct Watched {
+            text: DatasetText,
+            key: Option<(u64, u64, Language)>,
         }
+        static WATCHED: Mutex<Option<Watched>> = Mutex::new(None);
         let Some(meta) = &app.selected.metadata else {
             return;
         };
-        let scripts = Scripts::of(meta);
+        let lang = crate::i18n::language();
+        let generation = app.selected.metadata_generation;
+        let key = (generation, app.coordinates_revision, lang);
+        let mut watched = WATCHED.lock().unwrap_or_else(|p| p.into_inner());
+        let Watched { text, key: seen } = watched.get_or_insert_with(Watched::default);
+        if seen.replace(key) == Some(key) {
+            return;
+        }
+        text.update(meta, generation);
+        let scripts = text.scripts;
         if !scripts.any() {
             return;
         }
-        let lang = crate::i18n::language();
         let han = scripts.han_font(lang, crate::i18n::locale::system_language());
         if store::set_data_first(han) {
             apply(ctx, lang);
@@ -88,7 +93,7 @@ impl FontEngine {
         #[cfg(not(target_arch = "wasm32"))]
         system::request(ctx, scripts.needed(han));
         #[cfg(target_arch = "wasm32")]
-        for (font, chars) in CjkFont::ALL.into_iter().zip(scan::chars_by_font(meta, han)) {
+        for (font, chars) in CjkFont::ALL.into_iter().zip(text.by_font(han)) {
             if !chars.is_empty() {
                 // Characters a font lacks go on to the next one.
                 let rest = CjkFont::fallback_order(lang, Some(han))
