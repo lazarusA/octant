@@ -28,5 +28,7 @@ crate::i18n::keys::define_keys! {
     LinePayloadTooLargeDetail,
     FontLoadFailed,
     FontLoadFailedDetail,
+    DataFontMissing,
+    DataFontMissingDetail,
     }
 }

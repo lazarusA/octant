@@ -31,5 +31,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::LinePayloadTooLargeDetail => "线条占用 {} 字节；此 GPU 最多可绑定 {}。",
         NoticesKey::FontLoadFailed => "无法加载字体",
         NoticesKey::FontLoadFailedDetail => "{} 文本可能显示为方框：{}",
+        NoticesKey::DataFontMissing => "数据集中部分文本缺少字体",
+        NoticesKey::DataFontMissingDetail => {
+            "此数据集中的 {} 文本可能显示为方框。请安装 Noto Sans CJK 等字体。"
+        }
     })
 }

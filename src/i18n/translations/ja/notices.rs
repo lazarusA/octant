@@ -37,5 +37,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "フォントを読み込めませんでした",
         NoticesKey::FontLoadFailedDetail => "{} のテキストが四角で表示される場合があります：{}",
+        NoticesKey::DataFontMissing => "データセットの一部のテキストにフォントがありません",
+        NoticesKey::DataFontMissingDetail => {
+            "このデータセットの {} のテキストが四角で表示される場合があります。Noto Sans CJK などのフォントをインストールしてください。"
+        }
     })
 }

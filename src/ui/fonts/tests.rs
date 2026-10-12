@@ -55,16 +55,102 @@ fn bundled_desktop_fonts_are_the_ui_subsets() {
 #[test]
 fn the_ui_language_font_comes_first() {
     assert_eq!(
-        CjkFont::fallback_order(Language::Korean),
+        CjkFont::fallback_order(Language::Korean, Some(CjkFont::Jp)),
         [CjkFont::Kr, CjkFont::Sc, CjkFont::Jp]
     );
     assert_eq!(
-        CjkFont::fallback_order(Language::Japanese),
+        CjkFont::fallback_order(Language::Japanese, None),
         [CjkFont::Jp, CjkFont::Sc, CjkFont::Kr]
     );
-    assert_eq!(CjkFont::fallback_order(Language::German), CjkFont::ALL);
+    assert_eq!(
+        CjkFont::fallback_order(Language::German, None),
+        CjkFont::ALL
+    );
+    assert_eq!(
+        CjkFont::fallback_order(Language::German, Some(CjkFont::Kr)),
+        [CjkFont::Kr, CjkFont::Sc, CjkFont::Jp]
+    );
     for &lang in Language::ALL {
         let font = CjkFont::for_language(lang);
         assert_eq!(font.map(CjkFont::language), font.map(|_| lang));
+    }
+}
+
+#[test]
+fn dataset_text_scripts_are_detected() {
+    use super::Scripts;
+    let scripts = |text: &str| {
+        let mut s = Scripts::default();
+        s.add(text);
+        s
+    };
+    assert!(!scripts("precipitation (mm/day)").any());
+    assert_eq!(
+        scripts("\u{964D}\u{6C34}\u{91CF}"),
+        Scripts {
+            han: true,
+            ..Default::default()
+        }
+    );
+    let japanese = scripts("\u{6C17}\u{6E29}\u{30C7}\u{30FC}\u{30BF}");
+    assert!(japanese.han && japanese.kana && !japanese.hangul);
+    assert!(scripts("\u{AC15}\u{C218}\u{B7C9}").hangul);
+
+    let mut meta = crate::data::DatasetMetadata {
+        name: "store".into(),
+        store_type: "zarr".into(),
+        variables: Vec::new(),
+        dimension_coordinates: Default::default(),
+    };
+    meta.dimension_coordinates.insert(
+        "station".into(),
+        crate::data::CoordValues::Labels(vec!["\u{6771}\u{4EAC}".to_string()].into()),
+    );
+    assert!(Scripts::of(&meta).han);
+}
+
+#[test]
+fn han_text_uses_the_ui_then_system_then_dataset_font() {
+    use super::Scripts;
+    let han_only = Scripts {
+        han: true,
+        ..Default::default()
+    };
+    let with_kana = Scripts {
+        kana: true,
+        ..han_only
+    };
+    assert_eq!(
+        han_only.han_font(Language::Korean, Some(Language::Japanese)),
+        CjkFont::Kr
+    );
+    assert_eq!(
+        han_only.han_font(Language::English, Some(Language::Japanese)),
+        CjkFont::Jp
+    );
+    assert_eq!(with_kana.han_font(Language::English, None), CjkFont::Jp);
+    assert_eq!(han_only.han_font(Language::German, None), CjkFont::Sc);
+    // Kana needs the Japanese font even when Han text goes to Chinese.
+    assert_eq!(with_kana.needed(CjkFont::Sc), [true, true, false]);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn system_fonts_draw_their_script_when_installed() {
+    for font in CjkFont::ALL {
+        assert!(!super::system::families(font).is_empty());
+        // Only machines with a CJK font installed check one.
+        let Some(data) = super::system::load(font) else {
+            continue;
+        };
+        let face = skrifa::FontRef::from_index(&data.font, data.index).expect("system font parses");
+        let sample = match font {
+            CjkFont::Kr => '\u{D55C}',
+            _ => '\u{4E2D}',
+        };
+        assert!(
+            face.charmap().map(sample).is_some(),
+            "{font:?} lacks {sample}"
+        );
     }
 }

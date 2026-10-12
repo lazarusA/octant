@@ -16,11 +16,11 @@ impl eframe::App for OctantApp {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
-        // Reset hover preview at start of frame
         self.preview_colormap = None;
 
         // Notices reported by renderers, backends and background threads.
         self.drain_reported_notices();
+        crate::ui::fonts::FontEngine::watch_dataset(&ctx, self);
 
         // 0. Poll completed background metadata inspection
         let mut metadata_done = false;

@@ -37,5 +37,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "Не вдалося завантажити шрифт",
         NoticesKey::FontLoadFailedDetail => "Текст мовою {} може відображатися квадратами: {}",
+        NoticesKey::DataFontMissing => "Немає шрифту для частини тексту набору даних",
+        NoticesKey::DataFontMissingDetail => {
+            "Текст мовою {} у цьому наборі даних може відображатися квадратами. Установіть шрифт, наприклад Noto Sans CJK."
+        }
     })
 }

@@ -37,5 +37,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "Fonttia ei voitu ladata",
         NoticesKey::FontLoadFailedDetail => "Teksti ({}) voi näkyä laatikkoina: {}",
+        NoticesKey::DataFontMissing => "Osalle aineiston tekstistä ei löydy fonttia",
+        NoticesKey::DataFontMissingDetail => {
+            "Aineiston teksti ({}) voi näkyä laatikkoina. Asenna fontti, kuten Noto Sans CJK."
+        }
     })
 }

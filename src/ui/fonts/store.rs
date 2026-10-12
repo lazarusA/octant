@@ -1,5 +1,6 @@
-//! Where each CJK font's bytes come from: bundled in the binary, or (on the
-//! web) fetched once and kept for the session.
+//! Where each CJK font's bytes come from: bundled in the binary, (on the
+//! web) fetched once and kept for the session, or (on the desktop) the
+//! system's own font, loaded when a dataset's text needs it.
 
 use super::CjkFont;
 use std::sync::{Arc, Mutex};
@@ -7,10 +8,43 @@ use std::sync::{Arc, Mutex};
 /// Translation subsets fetched at runtime (web), by `CjkFont::ALL` index.
 static FETCHED: Mutex<[Option<Arc<egui::FontData>>; 3]> = Mutex::new([None, None, None]);
 
-/// The best font data available for `font`: a fetched translation subset,
-/// else the bundled one.
-pub fn get(font: CjkFont) -> Option<Arc<egui::FontData>> {
-    fetched(font).or_else(|| Some(Arc::new(egui::FontData::from_static(bundled(font)))))
+/// System fonts loaded for dataset text (desktop), by `CjkFont::ALL` index.
+static SYSTEM: Mutex<[Option<Arc<egui::FontData>>; 3]> = Mutex::new([None, None, None]);
+
+/// The font tried first for Han characters in dataset text, when a dataset
+/// has some; the UI language's font still comes before it.
+static DATA_FIRST: Mutex<Option<CjkFont>> = Mutex::new(None);
+
+/// The subset available for `font`: a fetched translation subset, else the
+/// bundled one.
+pub fn subset(font: CjkFont) -> Arc<egui::FontData> {
+    fetched(font).unwrap_or_else(|| Arc::new(egui::FontData::from_static(bundled(font))))
+}
+
+/// The system font loaded for `font`, if any.
+pub fn system(font: CjkFont) -> Option<Arc<egui::FontData>> {
+    let slots = SYSTEM.lock().unwrap_or_else(|p| p.into_inner());
+    slots.get(index(font)).and_then(Clone::clone)
+}
+
+/// Keeps `data`, the system font found for `font`.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub fn set_system(font: CjkFont, data: Arc<egui::FontData>) {
+    let mut slots = SYSTEM.lock().unwrap_or_else(|p| p.into_inner());
+    if let Some(slot) = slots.get_mut(index(font)) {
+        *slot = Some(data);
+    }
+}
+
+/// The font tried first for Han characters in dataset text.
+pub fn data_first() -> Option<CjkFont> {
+    *DATA_FIRST.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// Sets [`data_first`]; `true` when it changed.
+pub fn set_data_first(font: CjkFont) -> bool {
+    let mut first = DATA_FIRST.lock().unwrap_or_else(|p| p.into_inner());
+    first.replace(font) != Some(font)
 }
 
 /// Whether `font`'s translation subset has been fetched.

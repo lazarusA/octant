@@ -37,5 +37,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "글꼴을 불러올 수 없습니다",
         NoticesKey::FontLoadFailedDetail => "{} 텍스트가 네모로 표시될 수 있습니다: {}",
+        NoticesKey::DataFontMissing => "데이터셋의 일부 텍스트에 사용할 글꼴이 없습니다",
+        NoticesKey::DataFontMissingDetail => {
+            "이 데이터셋의 {} 텍스트가 네모로 표시될 수 있습니다. Noto Sans CJK 같은 글꼴을 설치하세요."
+        }
     })
 }

@@ -37,5 +37,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "Tidak dapat memuat font",
         NoticesKey::FontLoadFailedDetail => "Teks dalam {} mungkin tampil sebagai kotak: {}",
+        NoticesKey::DataFontMissing => "Tidak ada font untuk sebagian teks dataset",
+        NoticesKey::DataFontMissingDetail => {
+            "Teks dalam {} di dataset ini mungkin tampil sebagai kotak. Pasang font seperti Noto Sans CJK."
+        }
     })
 }

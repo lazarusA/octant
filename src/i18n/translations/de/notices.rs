@@ -37,5 +37,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "Schriftart konnte nicht geladen werden",
         NoticesKey::FontLoadFailedDetail => "Text in {} wird eventuell als Kästchen angezeigt: {}",
+        NoticesKey::DataFontMissing => "Keine Schriftart für einen Teil des Datensatztexts",
+        NoticesKey::DataFontMissingDetail => {
+            "Text in {} in diesem Datensatz wird eventuell als Kästchen angezeigt. Installieren Sie eine Schriftart wie Noto Sans CJK."
+        }
     })
 }

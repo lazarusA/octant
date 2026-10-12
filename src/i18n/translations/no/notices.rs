@@ -37,5 +37,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "Kunne ikke laste inn en skrift",
         NoticesKey::FontLoadFailedDetail => "Tekst på {} kan vises som bokser: {}",
+        NoticesKey::DataFontMissing => "Ingen skrift for deler av datasettets tekst",
+        NoticesKey::DataFontMissingDetail => {
+            "Tekst på {} i dette datasettet kan vises som bokser. Installer en skrift som Noto Sans CJK."
+        }
     })
 }

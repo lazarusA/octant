@@ -37,5 +37,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "Impossibile caricare un font",
         NoticesKey::FontLoadFailedDetail => "Il testo in {} potrebbe apparire come riquadri: {}",
+        NoticesKey::DataFontMissing => "Nessun font per parte del testo del set di dati",
+        NoticesKey::DataFontMissingDetail => {
+            "Il testo in {} di questo set di dati potrebbe apparire come riquadri. Installa un font come Noto Sans CJK."
+        }
     })
 }
