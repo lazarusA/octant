@@ -18,20 +18,27 @@ pub fn show_dataset_manager(app: &mut OctantApp, ui: &mut egui::Ui) {
         tr(DatasetKey::LoadedCount),
         &[&app.dataset_manager.len()],
     );
-    let loaded = egui::RichText::new(loaded).strong();
-    let loaded_w = flow_row::text_width(ui, loaded.clone(), egui::TextStyle::Body);
-    let clear_w = icon_button_width(ui, tr(DatasetKey::ClearAll));
-    let clear_all = flow_row::split(
+    let clear = tr(DatasetKey::ClearAll);
+    let [loaded_w, clear_w] =
+        flow_row::cached_widths(ui, "dataset_loaded_row", (loaded, clear), |ui| {
+            [
+                flow_row::text_width(ui, loaded, egui::TextStyle::Body),
+                icon_button_width(ui, clear),
+            ]
+        });
+    let mut clear_all = false;
+    flow_row::split(
         ui,
         loaded_w,
         &[clear_w],
         |ui| {
-            ui.label(loaded);
+            ui.label(egui::RichText::new(loaded).strong());
         },
-        |ui| {
-            ui.icon_button(Icon::Trash, tr(DatasetKey::ClearAll))
+        |ui, _| {
+            clear_all = ui
+                .icon_button(Icon::Trash, clear)
                 .on_hover_text(tr(DatasetKey::ClearAllHover))
-                .clicked()
+                .clicked();
         },
     );
     if clear_all {

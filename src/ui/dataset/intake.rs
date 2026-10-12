@@ -1,6 +1,7 @@
 use crate::app::OctantApp;
 use crate::app::StoreKind;
 use crate::i18n::{CommonKey, DatasetKey, tr};
+use crate::ui::flow_row;
 use crate::ui::icons::{Icon, IconSize, UiIconExt, icon_button_width};
 
 const SAMPLE_PRESETS: [(DatasetKey, &str, Option<StoreKind>); 4] = [
@@ -59,47 +60,54 @@ pub fn show_source_intake(app: &mut OctantApp, ui: &mut egui::Ui) {
     crate::ui::drop_zone::show_drop_zone(ui, None, 54.0);
 }
 
-fn show_input_bar(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
-    let load_icon = if app.is_loading {
-        Icon::Hourglass
-    } else {
-        Icon::DropTray
-    };
-    let load_text = if app.is_loading {
-        tr(CommonKey::Loading)
-    } else {
-        tr(DatasetKey::Load)
-    };
-    let mut submit = false;
+/// Narrowest the source field gets beside the Load button; any narrower and
+/// the button moves below it.
+const MIN_FIELD_W: f32 = 100.0;
 
+/// The source field and the Load button; whether either submitted it.
+fn show_input_bar(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
+    let (load, loading) = (tr(DatasetKey::Load), tr(CommonKey::Loading));
+    let [load_w, loading_w] = flow_row::cached_widths(ui, "dataset_load", (load, loading), |ui| {
+        [icon_button_width(ui, load), icon_button_width(ui, loading)]
+    });
     // Room for the button at its widest label, so the field keeps its width
     // while loading.
-    let button_w = icon_button_width(ui, tr(DatasetKey::Load))
-        .max(icon_button_width(ui, tr(CommonKey::Loading)));
-    ui.horizontal(|ui| {
-        let spacing = ui.spacing().item_spacing.x;
-        let edit_width = (ui.available_width() - button_w - spacing).max(100.0);
-        let edit_resp = ui.add_sized(
-            [edit_width, 22.0],
-            egui::TextEdit::singleline(&mut app.selected.store_target)
-                .hint_text(tr(DatasetKey::TargetPathHint)),
-        );
+    let button_w = load_w.max(loading_w);
+    let target = &mut app.selected.store_target;
+    if flow_row::fits(ui, &[MIN_FIELD_W, button_w]) {
+        ui.horizontal(|ui| {
+            let spacing = ui.spacing().item_spacing.x;
+            let field_w = ui.available_width() - button_w - spacing;
+            let entered = source_field(ui, target, field_w);
+            load_button(ui, app.is_loading) || entered
+        })
+        .inner
+    } else {
+        let entered = source_field(ui, target, ui.available_width());
+        let mut clicked = false;
+        flow_row::right_aligned(ui, &[button_w], |ui, _| {
+            clicked = load_button(ui, app.is_loading);
+        });
+        entered || clicked
+    }
+}
 
-        if edit_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-            submit = true;
-        }
+/// The source field, `width` wide; whether Enter submitted it.
+fn source_field(ui: &mut egui::Ui, target: &mut String, width: f32) -> bool {
+    let edit = egui::TextEdit::singleline(target).hint_text(tr(DatasetKey::TargetPathHint));
+    let response = ui.add_sized([width, 22.0], edit);
+    response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))
+}
 
-        if ui
-            .add_enabled(!app.is_loading, |ui: &mut egui::Ui| {
-                ui.icon_button(load_icon, load_text)
-            })
-            .clicked()
-        {
-            submit = true;
-        }
-    });
-
-    submit
+/// The Load button, an hourglass while `loading`; whether it was clicked.
+fn load_button(ui: &mut egui::Ui, loading: bool) -> bool {
+    let (icon, text) = if loading {
+        (Icon::Hourglass, tr(CommonKey::Loading))
+    } else {
+        (Icon::DropTray, tr(DatasetKey::Load))
+    };
+    ui.add_enabled(!loading, |ui: &mut egui::Ui| ui.icon_button(icon, text))
+        .clicked()
 }
 
 fn show_intake_actions(app: &mut OctantApp, ui: &mut egui::Ui, has_input: bool) {

@@ -37,11 +37,28 @@ use dataset_text::DatasetText;
 use crate::app::OctantApp;
 use crate::i18n::Language;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 /// Set when fonts finish loading outside the UI frame (the desktop font
 /// thread, web fetches); the next frame reinstalls them on the UI thread.
 static FONTS_ARRIVED: AtomicBool = AtomicBool::new(false);
+
+/// Bumped whenever the font definitions are rebuilt, so text measured with
+/// the old fonts (cached widths) is measured again.
+static GENERATION: AtomicU64 = AtomicU64::new(0);
+/// The pass from which the latest definitions are in use: egui installs new
+/// fonts at the start of the next pass.
+static ACTIVE_FROM: AtomicU64 = AtomicU64::new(0);
+
+/// The font definitions' generation, changing whenever they are rebuilt;
+/// `u64::MAX` while new definitions wait for the next pass, so nothing
+/// measured with the old fonts is kept under the new generation.
+pub fn generation(ctx: &egui::Context) -> u64 {
+    if ctx.cumulative_pass_nr() < ACTIVE_FROM.load(Ordering::Acquire) {
+        return u64::MAX;
+    }
+    GENERATION.load(Ordering::Acquire)
+}
 
 /// Installs Octant's fonts into egui and keeps them in step with the language.
 pub struct FontEngine;
@@ -133,4 +150,6 @@ fn apply(ctx: &egui::Context, lang: Language) {
         }
     }
     ctx.set_fonts(fonts);
+    GENERATION.fetch_add(1, Ordering::AcqRel);
+    ACTIVE_FROM.store(ctx.cumulative_pass_nr() + 1, Ordering::Release);
 }

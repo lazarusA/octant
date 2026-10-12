@@ -3,7 +3,7 @@
 use crate::app::{AnimationRole, SpatialRole};
 use crate::i18n::{VariablesKey as K, tr};
 use crate::ui::flow_row;
-use egui::{RichText, Ui};
+use egui::{RichText, TextStyle, Ui};
 
 /// Dimension `i`'s row: its active checkbox and `name`, then its spatial
 /// and animation role selects pinned to the right edge, or below the name
@@ -27,31 +27,36 @@ pub(super) fn role_row(
         AnimationRole::None => tr(K::RoleNone),
         AnimationRole::Animated => tr(K::RoleAnimated),
     };
-    let name = RichText::new(name).strong().small();
-    let leading_w = ui.spacing().icon_width
-        + ui.spacing().item_spacing.x
-        + flow_row::text_width(ui, name.clone(), egui::TextStyle::Body);
-    let widths = [
-        flow_row::combo_width(ui, anim_text),
-        flow_row::combo_width(ui, spatial_text),
-    ];
+    let widths =
+        flow_row::cached_widths(ui, ("role_row", i), (name, anim_text, spatial_text), |ui| {
+            [
+                flow_row::checkbox_width(ui)
+                    + ui.spacing().item_spacing.x
+                    + flow_row::text_width(ui, name, TextStyle::Small),
+                flow_row::combo_width(ui, anim_text),
+                flow_row::combo_width(ui, spatial_text),
+            ]
+        });
+    let [leading_w, trailing @ ..] = widths;
     flow_row::split(
         ui,
         leading_w,
-        &widths,
+        &trailing,
         |ui| {
             ui.checkbox(active, "");
-            ui.label(name);
+            ui.label(RichText::new(name).strong().small());
         },
-        // Right-to-left: the animation select is added first so it ends up
-        // rightmost.
-        |ui| {
-            egui::ComboBox::from_id_salt(("anim_role", i))
-                .selected_text(anim_text)
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(anim, AnimationRole::None, tr(K::RoleNone));
-                    ui.selectable_value(anim, AnimationRole::Animated, tr(K::RoleAnimated));
-                });
+        // Item 0, the animation select, is the rightmost.
+        |ui, item| {
+            if item == 0 {
+                egui::ComboBox::from_id_salt(("anim_role", i))
+                    .selected_text(anim_text)
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(anim, AnimationRole::None, tr(K::RoleNone));
+                        ui.selectable_value(anim, AnimationRole::Animated, tr(K::RoleAnimated));
+                    });
+                return;
+            }
             egui::ComboBox::from_id_salt(("spatial_role", i))
                 .selected_text(spatial_text)
                 .show_ui(ui, |ui| {

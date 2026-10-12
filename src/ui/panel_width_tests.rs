@@ -7,8 +7,10 @@ use crate::app::test_support::{make_resident, memory_app, selection_of};
 use crate::data::SliceRequest;
 use crate::i18n::{DatasetKey, Key, Language, SettingsKey, translate, with_language};
 use crate::plots::PlotType;
-use crate::ui::dataset::{self, show_dataset_window};
-use crate::ui::settings::{PANEL_W, show_settings_window};
+use crate::ui::dataset::show_dataset_window;
+use crate::ui::fonts::FontEngine;
+use crate::ui::panel_layout::PANEL_W;
+use crate::ui::settings::show_settings_window;
 use crate::ui::test_input::Harness;
 use crate::ui::variables_panel::show_variable_controls;
 use egui::epaint::ClippedShape;
@@ -26,12 +28,13 @@ const SETTLE: usize = 8;
 /// Rounding of measured against drawn widths.
 const SLACK: f32 = 1.0;
 
-const PLOT_TYPES: [PlotType; 5] = [
+const PLOT_TYPES: [PlotType; 6] = [
     PlotType::Heatmap,
     PlotType::Line,
     PlotType::Volume,
     PlotType::Sphere,
     PlotType::Surface,
+    PlotType::PointCloud,
 ];
 
 /// `t2m` plotted as `plot_type` from resident blocks, staged in the
@@ -70,11 +73,13 @@ fn text_center(shapes: &[ClippedShape], label: &str) -> Option<Pos2> {
     })
 }
 
-/// Width of the area `id` that `run` shows in `lang`, after opening the
-/// collapsed sections titled `open`.
+/// Width of the area `id` that `run` shows in `lang`, with the app's fonts
+/// for it (the CJK fallbacks draw Chinese, Japanese and Korean at their real
+/// widths), after opening the collapsed sections titled `open`.
 fn area_width(lang: Language, id: &str, open: &[Key], run: &mut impl FnMut(&mut Ui)) -> f32 {
     with_language(lang, || {
         let mut h = Harness::new(SCREEN);
+        FontEngine::on_language_changed(&h.ctx, lang);
         let mut shapes = h.settle(SETTLE, run);
         for &key in open {
             if let Some(pos) = text_center(&shapes, translate(lang, key)) {
@@ -140,7 +145,7 @@ fn dimensions_panel_keeps_its_narrowest_width_in_every_language() {
 
 #[test]
 fn dataset_panel_keeps_its_width_in_every_language() {
-    let limit = dataset::PANEL_W + frame_margins() + SLACK;
+    let limit = PANEL_W + frame_margins() + SLACK;
     let open = [DatasetKey::MemoryCache.into()];
     let mut wide = Vec::new();
     for (case, loaded, loading) in [

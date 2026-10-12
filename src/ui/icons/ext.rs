@@ -125,7 +125,7 @@ impl UiIconExt for Ui {
 
 /// Width of an [`UiIconExt::icon_button`] (or outlined one) labeled `text`
 /// on one line, without allocating it.
-pub fn icon_button_width(ui: &Ui, text: impl Into<WidgetText>) -> f32 {
+pub fn icon_button_width(ui: &Ui, text: &str) -> f32 {
     let label = crate::ui::flow_row::text_width(ui, text, egui::TextStyle::Button);
     let gap = if label > 0.0 { ICON_GAP } else { 0.0 };
     IconSize::Sm.px() + gap + label + ui.spacing().button_padding.x * 2.0

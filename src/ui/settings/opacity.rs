@@ -107,49 +107,55 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
 /// interpolation, below the title when they don't fit beside it. Whether the
 /// curve changed.
 fn curve_header(ui: &mut egui::Ui, curve: &mut AlphaCurveState) -> bool {
-    let presets = egui::RichText::new(tr(K::Presets)).small();
-    let widths = [
-        ToolbarButton::side(IconSize::Sm),
-        flow_row::button_width(ui, presets.clone()),
-        flow_row::button_width(ui, tr(K::InterpStep)),
-        flow_row::button_width(ui, tr(K::InterpLinear)),
-    ];
-    // The clear button shows only while there is a curve.
-    let widths = &widths[usize::from(curve.text.is_empty())..];
-    let title = tr(K::AlphaCurve);
-    let title_w = flow_row::text_width(ui, title, egui::TextStyle::Body);
+    let (title, presets) = (tr(K::AlphaCurve), tr(K::Presets));
+    let (step, linear) = (tr(K::InterpStep), tr(K::InterpLinear));
+    let salt = ui.id().with("alpha_curve_header");
+    let [title_w, widths @ ..] =
+        flow_row::cached_widths(ui, salt, (title, presets, step, linear), |ui| {
+            [
+                flow_row::text_width(ui, title, egui::TextStyle::Body),
+                ToolbarButton::side(IconSize::Sm),
+                flow_row::button_width(ui, presets, egui::TextStyle::Small),
+                flow_row::button_width(ui, step, egui::TextStyle::Button),
+                flow_row::button_width(ui, linear, egui::TextStyle::Button),
+            ]
+        });
+    // Item 0 (clear, the rightmost) shows only while there is a curve.
+    let first = usize::from(curve.text.is_empty());
     let mut changed = false;
     flow_row::split(
         ui,
         title_w,
-        widths,
+        &widths[first..],
         |ui| {
             ui.label(title);
         },
-        |ui| {
-            if !curve.text.is_empty() && ui.close_button(tr(K::ClearCurveHover)).clicked() {
-                curve.text.clear();
-                changed = true;
-            }
-            ui.menu_button(presets, |ui| {
-                for (name, (_, text, interp)) in PRESET_NAMES.into_iter().zip(PRESETS) {
-                    if ui.button(tr(name)).clicked() {
-                        curve.text = text.to_string();
-                        curve.interp = interp;
-                        changed = true;
-                        ui.close();
-                    }
+        |ui, item| match item + first {
+            0 => {
+                if ui.close_button(tr(K::ClearCurveHover)).clicked() {
+                    curve.text.clear();
+                    changed = true;
                 }
-            });
-            let interps = [
-                (AlphaInterp::Step, K::InterpStep),
-                (AlphaInterp::Linear, K::InterpLinear),
-            ];
-            for (interp, label) in interps {
-                if ui
-                    .selectable_label(curve.interp == interp, tr(label))
-                    .clicked()
-                {
+            }
+            1 => {
+                ui.menu_button(egui::RichText::new(presets).small(), |ui| {
+                    for (name, (_, text, interp)) in PRESET_NAMES.into_iter().zip(PRESETS) {
+                        if ui.button(tr(name)).clicked() {
+                            curve.text = text.to_string();
+                            curve.interp = interp;
+                            changed = true;
+                            ui.close();
+                        }
+                    }
+                });
+            }
+            index => {
+                let (interp, label) = if index == 2 {
+                    (AlphaInterp::Step, step)
+                } else {
+                    (AlphaInterp::Linear, linear)
+                };
+                if ui.selectable_label(curve.interp == interp, label).clicked() {
                     curve.interp = interp;
                     changed = true;
                 }

@@ -10,12 +10,13 @@ use egui::{RichText, Ui};
 use std::fmt::Display;
 
 use super::coord_label::show_coord_label;
-use super::double_slider::{VALUE_BOX_W, double_slider_with_inputs};
+use super::double_slider::double_slider_with_inputs;
 use super::metrics::{
     calculate_download_sizes, calculate_selected_2d_elements, calculate_selected_volume_elements,
 };
 use super::role_row::role_row;
 use super::roles::apply_role_change;
+use crate::ui::flow_row::{self, VALUE_BOX_W};
 
 /// Renders the complete dimension sliders section including capacity and bandwidth metrics.
 pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &VariableInfo) {
@@ -153,9 +154,7 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
                     // matching the range rows. The slider runs first so the box
                     // shows the dragged value on the same frame.
                     let index = &mut app.selected.dim_indices[i];
-                    let spacing = ui.spacing().item_spacing.x;
-                    ui.spacing_mut().slider_width =
-                        (ui.available_width() - VALUE_BOX_W - spacing).max(40.0);
+                    ui.spacing_mut().slider_width = flow_row::track_width(ui, VALUE_BOX_W);
                     let s_resp = ui.add(
                         egui::Slider::new(index, 0..=max_index)
                             .localized()

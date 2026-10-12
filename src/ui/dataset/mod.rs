@@ -18,8 +18,6 @@ use crate::ui::panel_layout::{self, Panel};
 
 /// Shortest the scrolled dataset body gets on a very short canvas.
 const MIN_BODY_HEIGHT: f32 = 120.0;
-/// Width of the panel's content; rows stack (`flow_row`) rather than widen it.
-pub(crate) const PANEL_W: f32 = 280.0;
 
 /// Anchored to the canvas area, docked or positioned according to [`panel_layout`].
 pub fn show_dataset_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rect: egui::Rect) {
@@ -52,7 +50,7 @@ pub fn show_dataset_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rect
 
 /// The collapsible "Dataset" header over the scrolled body.
 fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Option<PanelHeader> {
-    ui.set_width(PANEL_W);
+    ui.set_width(panel_layout::PANEL_W);
     let header_id = ui.make_persistent_id("dataset_panel_header");
     let mut header = None;
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)

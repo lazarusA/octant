@@ -84,46 +84,49 @@ fn show_color_range_controls(
         return;
     };
     let color = &mut layer.color;
-    let title = egui::RichText::new(tr(K::ColorRange)).strong();
-    let title_w = flow_row::text_width(ui, title.clone(), egui::TextStyle::Body);
-    let icon_w = icon_button_width(ui, "");
-    let widths = [
-        icon_w,
-        icon_w,
-        flow_row::button_width(ui, tr(K::Categorical)),
-    ];
-    let widths = if categorical {
-        &widths[..]
-    } else {
-        &widths[..2]
-    };
+    let (title, toggle) = (tr(K::ColorRange), tr(K::Categorical));
+    let [title_w, icon_w, toggle_w] =
+        flow_row::cached_widths(ui, ("color_range", id), (title, toggle), |ui| {
+            [
+                flow_row::text_width(ui, title, egui::TextStyle::Body),
+                icon_button_width(ui, ""),
+                flow_row::button_width(ui, toggle, egui::TextStyle::Button),
+            ]
+        });
+    // Item 0 (reset) is the rightmost; Categorical only when honored.
+    let widths = [icon_w, icon_w, toggle_w];
+    let widths = &widths[..if categorical { 3 } else { 2 }];
     let mut reset_range = false;
     flow_row::split(
         ui,
         title_w,
         widths,
         |ui| {
-            ui.label(title);
+            ui.label(egui::RichText::new(title).strong());
         },
-        |ui| {
-            reset_range = ui
-                .icon_button(Icon::Reset, "")
-                .on_hover_text(tr(K::ResetBoundsHover))
-                .clicked();
-            let lock_icon = if color.lock_bounds {
-                Icon::Lock
-            } else {
-                Icon::Unlock
-            };
-            if ui
-                .icon_button(lock_icon, "")
-                .on_hover_text(tr(K::LockBoundsHover))
-                .clicked()
-            {
-                color.lock_bounds = !color.lock_bounds;
+        |ui, item| match item {
+            0 => {
+                reset_range = ui
+                    .icon_button(Icon::Reset, "")
+                    .on_hover_text(tr(K::ResetBoundsHover))
+                    .clicked();
             }
-            if categorical {
-                ui.toggle_value(&mut color.categorical, tr(K::Categorical))
+            1 => {
+                let lock_icon = if color.lock_bounds {
+                    Icon::Lock
+                } else {
+                    Icon::Unlock
+                };
+                if ui
+                    .icon_button(lock_icon, "")
+                    .on_hover_text(tr(K::LockBoundsHover))
+                    .clicked()
+                {
+                    color.lock_bounds = !color.lock_bounds;
+                }
+            }
+            _ => {
+                ui.toggle_value(&mut color.categorical, toggle)
                     .on_hover_text(tr(K::CategoricalHover));
             }
         },
