@@ -123,6 +123,14 @@ impl UiIconExt for Ui {
     }
 }
 
+/// Width of an [`UiIconExt::icon_button`] (or outlined one) labeled `text`
+/// on one line, without allocating it.
+pub fn icon_button_width(ui: &Ui, text: &str) -> f32 {
+    let label = crate::ui::flow_row::text_width(ui, text, egui::TextStyle::Button);
+    let gap = if label > 0.0 { ICON_GAP } else { 0.0 };
+    IconSize::Sm.px() + gap + label + ui.spacing().button_padding.x * 2.0
+}
+
 /// The standard close / clear button widget, shared by [`UiIconExt::close_button`]
 /// and layouts that need its width.
 fn close_button_widget(hover: &str) -> ToolbarButton<'_> {
@@ -141,11 +149,11 @@ fn framed_icon_button(
     outline: Option<Color32>,
 ) -> Response {
     let font_id = egui::TextStyle::Button.resolve(ui.style());
-    let galley = text.into_galley(ui, None, ui.available_width(), font_id);
-
     let icon_size = IconSize::Sm.px();
-    let gap = if galley.is_empty() { 0.0 } else { ICON_GAP };
     let padding = ui.spacing().button_padding;
+    let galley = text.into_galley(ui, None, label_wrap_width(ui), font_id);
+
+    let gap = if galley.is_empty() { 0.0 } else { ICON_GAP };
     let content_size = vec2(
         icon_size + gap + galley.size().x,
         icon_size.max(galley.size().y),
@@ -179,6 +187,19 @@ fn framed_icon_button(
         paint_icon_and_text(ui, icon, origin, content_size.y, galley, gap, color);
     }
     response
+}
+
+/// Width a framed button's label wraps within: what the row leaves once the
+/// icon and padding are placed, or a whole row in a wrapping layout, which
+/// moves the button to a fresh line instead.
+fn label_wrap_width(ui: &Ui) -> f32 {
+    let room = if ui.layout().main_wrap() {
+        ui.max_rect().width()
+    } else {
+        ui.available_width()
+    };
+    let chrome = IconSize::Sm.px() + ICON_GAP + ui.spacing().button_padding.x * 2.0;
+    (room - chrome).max(0.0)
 }
 
 /// Paint an `Sm` icon and its label, both vertically centred in a row of

@@ -63,7 +63,8 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
 /// The collapsible "Settings" header over the scrolled body, which stops
 /// short of the bottom of `canvas`; what the header's buttons asked for.
 fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Option<PanelHeader> {
-    ui.set_max_width(280.0);
+    // A fixed width: rows stack (`flow_row`) rather than widen the panel.
+    ui.set_width(panel_layout::PANEL_W);
     let header_id = ui.make_persistent_id("settings_panel_header");
     let mut header = None;
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)

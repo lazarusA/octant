@@ -11,6 +11,7 @@ pub mod crop_overlay;
 pub mod drag_grip;
 pub mod drop_zone;
 pub mod export_modal;
+pub mod flow_row;
 pub mod fonts;
 pub mod hero;
 pub mod hover;
@@ -27,6 +28,8 @@ pub mod panel_header;
 pub mod panel_layout;
 #[cfg(test)]
 mod panel_layout_tests;
+#[cfg(test)]
+mod panel_width_tests;
 pub mod plot_type;
 pub mod settings;
 pub mod status;

@@ -5,7 +5,8 @@ use crate::app::OctantApp;
 use crate::app::layers::{ColorStyle, LayerId};
 use crate::i18n::{SettingsKey as K, tr};
 use crate::ui::color_picker::{ColorShape, ShapeColorPicker};
-use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::flow_row;
+use crate::ui::icons::{Icon, UiIconExt, icon_button_width};
 use crate::ui::layer_label::LabelEditor;
 use crate::ui::number_input::LocalizedInput;
 
@@ -70,8 +71,8 @@ fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: Laye
     }
 }
 
-/// Min and max inputs with lock and reset; the Categorical toggle when the
-/// plot honors it (`categorical`).
+/// The Color range title row, then the Min and Max inputs and the button
+/// resetting the label and range.
 fn show_color_range_controls(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
@@ -82,37 +83,9 @@ fn show_color_range_controls(
         return;
     };
     let color = &mut layer.color;
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(tr(K::ColorRange)).strong());
-        if !categorical {
-            return;
-        }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.toggle_value(&mut color.categorical, tr(K::Categorical))
-                .on_hover_text(tr(K::CategoricalHover));
-        });
-    });
+    let mut reset_range = color_range_title(ui, color, id, categorical);
     ui.add_space(2.0);
-    let mut reset_range = false;
-    ui.horizontal(|ui| {
-        range_inputs(ui, color);
-        let lock_icon = if color.lock_bounds {
-            Icon::Lock
-        } else {
-            Icon::Unlock
-        };
-        if ui
-            .icon_button(lock_icon, "")
-            .on_hover_text(tr(K::LockBoundsHover))
-            .clicked()
-        {
-            color.lock_bounds = !color.lock_bounds;
-        }
-        reset_range = ui
-            .icon_button(Icon::Reset, "")
-            .on_hover_text(tr(K::ResetBoundsHover))
-            .clicked();
-    });
+    ui.horizontal_wrapped(|ui| range_inputs(ui, color));
     if (color.custom_label.is_some() || color.lock_bounds)
         && ui
             .icon_button(Icon::Reset, tr(K::ResetAllColorbar))
@@ -124,6 +97,67 @@ fn show_color_range_controls(
     }
     if reset_range {
         app.reset_layer_color_range(id);
+    }
+}
+
+/// The Color range title with the reset and lock buttons and the Categorical
+/// toggle (when the plot honors it, `categorical`) at its right end, or
+/// below it when they don't fit. Whether reset was clicked.
+fn color_range_title(
+    ui: &mut egui::Ui,
+    color: &mut ColorStyle,
+    id: LayerId,
+    categorical: bool,
+) -> bool {
+    let (title, toggle) = (tr(K::ColorRange), tr(K::Categorical));
+    let [title_w, icon_w, toggle_w] =
+        flow_row::cached_widths(ui, ("color_range", id), (title, toggle), |ui| {
+            [
+                flow_row::text_width(ui, title, egui::TextStyle::Body),
+                icon_button_width(ui, ""),
+                flow_row::button_width(ui, toggle, egui::TextStyle::Button),
+            ]
+        });
+    // Item 0 (reset) is the rightmost; Categorical only when honored.
+    let widths = [icon_w, icon_w, toggle_w];
+    let widths = &widths[..if categorical { 3 } else { 2 }];
+    let mut reset = false;
+    let title_label = |ui: &mut egui::Ui| {
+        ui.label(egui::RichText::new(title).strong());
+    };
+    flow_row::split(ui, title_w, widths, title_label, |ui, item| {
+        reset |= range_title_item(ui, item, color, toggle);
+    });
+    reset
+}
+
+/// Item `item` of the Color range title: 0 reset (whether clicked), 1 the
+/// bounds lock, 2 the Categorical toggle labeled `toggle`.
+fn range_title_item(ui: &mut egui::Ui, item: usize, color: &mut ColorStyle, toggle: &str) -> bool {
+    match item {
+        0 => ui
+            .icon_button(Icon::Reset, "")
+            .on_hover_text(tr(K::ResetBoundsHover))
+            .clicked(),
+        1 => {
+            let icon = if color.lock_bounds {
+                Icon::Lock
+            } else {
+                Icon::Unlock
+            };
+            let lock = ui
+                .icon_button(icon, "")
+                .on_hover_text(tr(K::LockBoundsHover));
+            if lock.clicked() {
+                color.lock_bounds = !color.lock_bounds;
+            }
+            false
+        }
+        _ => {
+            ui.toggle_value(&mut color.categorical, toggle)
+                .on_hover_text(tr(K::CategoricalHover));
+            false
+        }
     }
 }
 

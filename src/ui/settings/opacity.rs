@@ -3,7 +3,8 @@ use super::support::{OptionSupport, Support};
 use crate::app::OctantApp;
 use crate::app::layers::{AlphaCurveState, LayerId};
 use crate::i18n::{SettingsKey as K, tr};
-use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
+use crate::ui::flow_row::{self, SliderLabel, labeled_slider};
+use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt};
 use crate::ui::number_input::LocalizedInput;
 use crate::utils::colormap::{AlphaInterp, alpha::PRESETS};
 
@@ -74,13 +75,13 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
         return;
     };
     let color = &mut layer.color;
-    let resp = ui
-        .add(
-            egui::Slider::new(&mut color.opacity, 0.0..=1.0)
-                .localized()
-                .text(tr(K::Opacity)),
-        )
-        .on_hover_text(tr(K::OpacityHover));
+    let resp = labeled_slider(
+        ui,
+        "opacity",
+        SliderLabel::After(tr(K::Opacity)),
+        egui::Slider::new(&mut color.opacity, 0.0..=1.0).localized(),
+    )
+    .on_hover_text(tr(K::OpacityHover));
     if resp.double_clicked() {
         color.opacity = 1.0;
     }
@@ -104,40 +105,75 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
 }
 
 /// The alpha curve's title row: clear, presets, and step or linear
-/// interpolation. Whether the curve changed.
+/// interpolation, below the title when they don't fit beside it. Whether the
+/// curve changed.
 fn curve_header(ui: &mut egui::Ui, curve: &mut AlphaCurveState) -> bool {
-    let mut changed = false;
-    ui.horizontal(|ui| {
-        ui.label(tr(K::AlphaCurve));
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if !curve.text.is_empty() && ui.close_button(tr(K::ClearCurveHover)).clicked() {
-                curve.text.clear();
-                changed = true;
-            }
-            ui.menu_button(egui::RichText::new(tr(K::Presets)).small(), |ui| {
-                for (name, (_, text, interp)) in PRESET_NAMES.into_iter().zip(PRESETS) {
-                    if ui.button(tr(name)).clicked() {
-                        curve.text = text.to_string();
-                        curve.interp = interp;
-                        changed = true;
-                        ui.close();
-                    }
-                }
-            });
-            let interps = [
-                (AlphaInterp::Step, K::InterpStep),
-                (AlphaInterp::Linear, K::InterpLinear),
-            ];
-            for (interp, label) in interps {
-                if ui
-                    .selectable_label(curve.interp == interp, tr(label))
-                    .clicked()
-                {
-                    curve.interp = interp;
-                    changed = true;
-                }
-            }
+    let (title, presets) = (tr(K::AlphaCurve), tr(K::Presets));
+    let (step, linear) = (tr(K::InterpStep), tr(K::InterpLinear));
+    let salt = "alpha_curve_header";
+    let [title_w, widths @ ..] =
+        flow_row::cached_widths(ui, salt, (title, presets, step, linear), |ui| {
+            [
+                flow_row::text_width(ui, title, egui::TextStyle::Body),
+                ToolbarButton::side(IconSize::Sm),
+                flow_row::button_width(ui, presets, egui::TextStyle::Small),
+                flow_row::button_width(ui, step, egui::TextStyle::Button),
+                flow_row::button_width(ui, linear, egui::TextStyle::Button),
+            ]
         });
+    // Item 0 (clear, the rightmost) shows only while there is a curve.
+    let first = usize::from(curve.text.is_empty());
+    let mut changed = false;
+    let title_label = |ui: &mut egui::Ui| {
+        ui.label(title);
+    };
+    flow_row::split(ui, title_w, &widths[first..], title_label, |ui, item| {
+        changed |= curve_header_item(ui, item + first, curve);
     });
     changed
+}
+
+/// Item `item` of the alpha curve's title row: 0 clear, 1 presets, 2 step
+/// and 3 linear interpolation. Whether the curve changed.
+fn curve_header_item(ui: &mut egui::Ui, item: usize, curve: &mut AlphaCurveState) -> bool {
+    match item {
+        0 => {
+            let clear = ui.close_button(tr(K::ClearCurveHover)).clicked();
+            if clear {
+                curve.text.clear();
+            }
+            clear
+        }
+        1 => presets_menu(ui, curve),
+        _ => {
+            let (interp, label) = if item == 2 {
+                (AlphaInterp::Step, K::InterpStep)
+            } else {
+                (AlphaInterp::Linear, K::InterpLinear)
+            };
+            let picked = ui
+                .selectable_label(curve.interp == interp, tr(label))
+                .clicked();
+            if picked {
+                curve.interp = interp;
+            }
+            picked
+        }
+    }
+}
+
+/// The Presets menu; whether a preset replaced the curve.
+fn presets_menu(ui: &mut egui::Ui, curve: &mut AlphaCurveState) -> bool {
+    let mut picked = false;
+    ui.menu_button(egui::RichText::new(tr(K::Presets)).small(), |ui| {
+        for (name, (_, text, interp)) in PRESET_NAMES.into_iter().zip(PRESETS) {
+            if ui.button(tr(name)).clicked() {
+                curve.text = text.to_string();
+                curve.interp = interp;
+                picked = true;
+                ui.close();
+            }
+        }
+    });
+    picked
 }

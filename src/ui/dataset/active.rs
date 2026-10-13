@@ -38,7 +38,7 @@ fn show_active_empty(ui: &mut egui::Ui) {
         .corner_radius(6.0)
         .inner_margin(egui::Margin::symmetric(10, 8))
         .show(ui, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.icon_toned(Icon::Info, IconSize::Sm, IconTone::Muted);
                 ui.label(egui::RichText::new(tr(DatasetKey::NoDatasetLoaded)).weak());
             });
@@ -127,7 +127,7 @@ fn show_card_metadata(
         });
     }
 
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         let template = if var_count == 1 {
             tr(DatasetKey::VariableCountOne)
         } else {
@@ -145,7 +145,7 @@ fn show_card_metadata(
 
 fn show_card_buttons(ui: &mut egui::Ui, action: &mut ActiveAction) {
     ui.add_space(4.0);
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         if ui
             .icon_button(Icon::Variables, tr(DatasetKey::InspectVariables))
             .clicked()

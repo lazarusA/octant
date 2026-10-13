@@ -1,6 +1,11 @@
 use crate::app::OctantApp;
 use crate::i18n::{SettingsKey as K, tr};
+use crate::ui::flow_row;
 use crate::ui::icons::{Icon, UiIconExt};
+
+/// Narrowest the export folder field gets beside its label; any narrower
+/// and it moves below the label.
+const MIN_FIELD_W: f32 = 120.0;
 
 pub(crate) fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
     egui::CollapsingHeader::new(tr(K::Export))
@@ -22,12 +27,9 @@ pub(crate) fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
                     });
             });
 
-            ui.horizontal(|ui| {
-                ui.label(tr(K::ExportFolder));
-                ui.text_edit_singleline(&mut app.export_settings.export_dir);
-            });
+            folder_row(ui, &mut app.export_settings.export_dir);
 
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 if ui.icon_button(Icon::Save, tr(K::OpenSaveDialog)).clicked() {
                     app.show_export_modal = true;
                 }
@@ -36,4 +38,23 @@ pub(crate) fn show_export_preferences(app: &mut OctantApp, ui: &mut egui::Ui) {
                 }
             });
         });
+}
+
+/// The export folder's label and a field filling the row, below the label
+/// when the field would be narrower than `MIN_FIELD_W` beside it.
+fn folder_row(ui: &mut egui::Ui, dir: &mut String) {
+    let label = tr(K::ExportFolder);
+    let [label_w] = flow_row::cached_widths(ui, "export_folder", label, |ui| {
+        [flow_row::text_width(ui, label, egui::TextStyle::Body)]
+    });
+    let field = egui::TextEdit::singleline(dir).desired_width(f32::INFINITY);
+    if flow_row::fits(ui, &[label_w, MIN_FIELD_W]) {
+        ui.horizontal(|ui| {
+            ui.label(label);
+            ui.add(field);
+        });
+    } else {
+        ui.label(label);
+        ui.add(field);
+    }
 }

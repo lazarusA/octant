@@ -8,6 +8,10 @@ use crate::app::OctantApp;
 use crate::ui::drag_grip::{self, GripAction};
 use egui::{Pos2, Rect, Vec2};
 
+/// Content width of the Dataset and Settings panels; rows stack (`flow_row`)
+/// rather than widen them.
+pub const PANEL_W: f32 = 280.0;
+
 /// Gap between docked panels, and between the row and the canvas edges.
 pub const GAP: f32 = 8.0;
 

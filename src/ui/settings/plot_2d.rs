@@ -1,5 +1,6 @@
 use crate::app::OctantApp;
 use crate::i18n::{PlotOptionsKey as K, tr};
+use crate::ui::flow_row::{SliderLabel, labeled_slider};
 use crate::ui::number_input::LocalizedInput;
 
 pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -16,15 +17,15 @@ pub(crate) fn show_line_options(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     if app.plot_configs.line.show_points {
         ui.add_space(2.0);
-        ui.horizontal(|ui| {
-            ui.label(tr(K::PointSize));
-            ui.add(
-                egui::Slider::new(&mut app.plot_configs.line.point_size, 2.0..=24.0)
-                    .localized()
-                    .suffix(" px")
-                    .show_value(true),
-            );
-        });
+        labeled_slider(
+            ui,
+            "line_point_size",
+            SliderLabel::Before(tr(K::PointSize)),
+            egui::Slider::new(&mut app.plot_configs.line.point_size, 2.0..=24.0)
+                .localized()
+                .suffix(" px")
+                .show_value(true),
+        );
     }
 
     ui.add_space(2.0);
@@ -159,13 +160,13 @@ fn show_line_profile_slider(app: &mut OctantApp, ui: &mut egui::Ui, has_z_dim: b
     };
     if max_idx > 0 {
         let mut slice_idx = app.plot_configs.line.profile_slice_idx;
-        if ui
-            .add(
-                egui::Slider::new(&mut slice_idx, 0..=max_idx)
-                    .localized()
-                    .text(tr(K::ProfileIndex)),
-            )
-            .changed()
+        if labeled_slider(
+            ui,
+            "profile_index",
+            SliderLabel::After(tr(K::ProfileIndex)),
+            egui::Slider::new(&mut slice_idx, 0..=max_idx).localized(),
+        )
+        .changed()
         {
             app.plot_configs.line.profile_slice_idx = slice_idx;
         }

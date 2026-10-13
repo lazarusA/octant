@@ -148,3 +148,13 @@ fn test_system_locales_map_to_languages() {
         assert_eq!(from_locale(tag), expected, "{tag}");
     }
 }
+
+#[test]
+fn with_language_restores_the_thread_language_after_a_panic() {
+    let english = language();
+    let caught = std::panic::catch_unwind(|| {
+        with_language(Language::Japanese, || panic!("a failing UI test"));
+    });
+    assert!(caught.is_err());
+    assert_eq!(language(), english, "the thread is back in its language");
+}

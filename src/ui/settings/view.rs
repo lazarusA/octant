@@ -5,7 +5,7 @@ use crate::ui::icons::{Icon, UiIconExt};
 
 /// Camera controls for 3D plots and the hover card toggle, for every plot.
 pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support: &OptionSupport) {
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         if support.camera.is_yes() {
             ui.checkbox(&mut app.nav.sphere_auto_rotate, tr(K::AutoRotate));
             if ui

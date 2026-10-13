@@ -1,13 +1,10 @@
 //! Double slider widget with numeric drag inputs.
 
+use crate::ui::flow_row::{self, VALUE_BOX_W};
 use crate::ui::number_input::LocalizedInput;
 use egui::{DragValue, Id, Rect, Sense, Stroke, Ui, Vec2, pos2};
 
 const HANDLE_RADIUS: f32 = 6.0;
-
-/// Width of the right-hand value box on every dimension row, so the boxes
-/// and slider tracks end at the same x on every row. Fits 7 digits.
-pub const VALUE_BOX_W: f32 = 56.0;
 
 /// Double slider with numeric input fields on both sides.
 ///
@@ -33,8 +30,7 @@ pub fn double_slider_with_inputs(
             .inner
             .changed();
 
-        let spacing = ui.spacing().item_spacing.x;
-        let track_width = (ui.available_width() - VALUE_BOX_W - spacing).max(40.0);
+        let track_width = flow_row::track_width(ui, VALUE_BOX_W);
         let (rect, _) = ui.allocate_exact_size(
             Vec2::new(track_width, 2.0 * HANDLE_RADIUS + 4.0),
             Sense::hover(),

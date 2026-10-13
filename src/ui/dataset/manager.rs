@@ -2,8 +2,8 @@ use crate::app::OctantApp;
 use crate::app::StoreKind;
 use crate::data::{DataSourceKind, Dataset};
 use crate::i18n::{DatasetKey, fill, tr};
-use crate::ui::icons::{Icon, IconSize, UiIconExt};
-use std::borrow::Cow;
+use crate::ui::flow_row;
+use crate::ui::icons::{Icon, IconSize, UiIconExt, icon_button_width};
 
 /// Renders the multi-dataset manager list, switching active dataset, and removal.
 pub fn show_dataset_manager(app: &mut OctantApp, ui: &mut egui::Ui) {
@@ -12,24 +12,9 @@ pub fn show_dataset_manager(app: &mut OctantApp, ui: &mut egui::Ui) {
         return;
     }
 
-    ui.horizontal(|ui| {
-        let mut buf = [0u8; 64];
-        let loaded = fill(
-            &mut buf,
-            tr(DatasetKey::LoadedCount),
-            &[&app.dataset_manager.len()],
-        );
-        ui.label(egui::RichText::new(loaded).strong());
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui
-                .icon_button(Icon::Trash, tr(DatasetKey::ClearAll))
-                .on_hover_text(tr(DatasetKey::ClearAllHover))
-                .clicked()
-            {
-                app.clear_all_datasets();
-            }
-        });
-    });
+    if loaded_row(ui, app.dataset_manager.len()) {
+        app.clear_all_datasets();
+    }
 
     ui.add_space(4.0);
 
@@ -51,6 +36,32 @@ pub fn show_dataset_manager(app: &mut OctantApp, ui: &mut egui::Ui) {
     } else if let Some((uri, kind)) = to_activate {
         app.submit_or_activate_source(&uri, Some(kind));
     }
+}
+
+/// The count of `loaded` datasets with Clear All at the row's right end, or
+/// below it when they don't fit; whether Clear All was clicked.
+fn loaded_row(ui: &mut egui::Ui, loaded: usize) -> bool {
+    let mut buf = [0u8; 64];
+    let loaded = fill(&mut buf, tr(DatasetKey::LoadedCount), &[&loaded]);
+    let clear = tr(DatasetKey::ClearAll);
+    let [loaded_w, clear_w] =
+        flow_row::cached_widths(ui, "dataset_loaded_row", (loaded, clear), |ui| {
+            [
+                flow_row::text_width(ui, loaded, egui::TextStyle::Body),
+                icon_button_width(ui, clear),
+            ]
+        });
+    let mut clear_all = false;
+    let count = |ui: &mut egui::Ui| {
+        ui.label(egui::RichText::new(loaded).strong());
+    };
+    flow_row::split(ui, loaded_w, &[clear_w], count, |ui, _| {
+        clear_all = ui
+            .icon_button(Icon::Trash, clear)
+            .on_hover_text(tr(DatasetKey::ClearAllHover))
+            .clicked();
+    });
+    clear_all
 }
 
 fn source_kind_icon(kind: &DataSourceKind) -> Icon {
@@ -75,44 +86,32 @@ fn show_dataset_row(
 ) {
     ui.horizontal(|ui| {
         ui.icon(source_kind_icon(&d.source.kind), IconSize::Xs);
-        let avail_w = (ui.available_width() - 36.0).max(80.0);
-        let approx_chars = ((avail_w - 16.0) / 7.5).floor() as usize;
-        let short_name = truncate_display_name(&d.source.display_name, approx_chars.max(10));
-
-        let btn = egui::Button::new(egui::RichText::new(short_name.as_ref()).strong())
-            .selected(is_active);
-
-        let item_btn = ui.add_sized([avail_w, 20.0], btn);
-        if item_btn
-            .on_hover_ui(|ui| {
-                let mut buf = [0u8; 1024];
-                let args: [&dyn std::fmt::Display; 2] = [&d.source.display_name, &d.source.uri];
-                ui.label(fill(&mut buf, tr(DatasetKey::DatasetRowHover), &args));
-            })
-            .clicked()
-        {
-            *to_activate = Some((
-                d.source.uri.clone(),
-                StoreKind::from_data_source_kind(&d.source.kind),
-            ));
-        }
-
-        if ui
-            .icon_button(Icon::Trash, "")
-            .on_hover_text(tr(DatasetKey::RemoveDatasetHover))
-            .clicked()
-        {
-            *to_delete = Some(d.id.clone());
-        }
+        // The remove button at the right end, then the name filling the rest
+        // of the row, truncated to fit.
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui
+                .icon_button(Icon::Trash, "")
+                .on_hover_text(tr(DatasetKey::RemoveDatasetHover))
+                .clicked()
+            {
+                *to_delete = Some(d.id.clone());
+            }
+            let name = egui::RichText::new(d.source.display_name.as_str()).strong();
+            let btn = egui::Button::new(name).truncate().selected(is_active);
+            let item_btn = ui.add_sized([ui.available_width(), 20.0], btn);
+            if item_btn
+                .on_hover_ui(|ui| {
+                    let mut buf = [0u8; 1024];
+                    let args: [&dyn std::fmt::Display; 2] = [&d.source.display_name, &d.source.uri];
+                    ui.label(fill(&mut buf, tr(DatasetKey::DatasetRowHover), &args));
+                })
+                .clicked()
+            {
+                *to_activate = Some((
+                    d.source.uri.clone(),
+                    StoreKind::from_data_source_kind(&d.source.kind),
+                ));
+            }
+        });
     });
-}
-
-fn truncate_display_name(name: &str, max_chars: usize) -> Cow<'_, str> {
-    if name.chars().count() > max_chars && max_chars > 3 {
-        let mut truncated: String = name.chars().take(max_chars - 3).collect();
-        truncated.push_str("...");
-        Cow::Owned(truncated)
-    } else {
-        Cow::Borrowed(name)
-    }
 }
