@@ -66,7 +66,12 @@ impl TaskExecutor {
     where
         F: FnOnce() + Send + 'static,
     {
-        rayon::spawn(f);
+        if let Err(e) = std::thread::Builder::new()
+            .name("octant-bg-worker".to_string())
+            .spawn(f)
+        {
+            log::warn!("Failed to spawn background worker thread: {e}");
+        }
     }
 
     #[cfg(target_arch = "wasm32")]

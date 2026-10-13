@@ -80,3 +80,31 @@ pub fn open_local_storage(
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
     Err("Local file system is only available on desktop. Please provide a remote HTTP URL or choose a catalog dataset.".into())
 }
+
+pub type ZarrArrayHandle = zarrs::array::Array<dyn zarrs::storage::ReadableStorageTraits>;
+
+/// Opens a normalized array from `storage`, using consolidated metadata if available.
+pub fn open_raw_array(
+    storage: &ReadableWritableListableStorage,
+    clean_name: &str,
+) -> Result<ZarrArrayHandle, crate::data::blocks::BlockStoreError> {
+    let var_path = format!("/{clean_name}");
+    let readable: zarrs::storage::ReadableStorage = storage.clone();
+    if let Ok(group) = zarrs::group::Group::open(storage.clone(), "/")
+        && let Some(zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata {
+            metadata,
+            ..
+        }) = group.consolidated_metadata()
+        && let Some(node_meta) = metadata.get(clean_name).or_else(|| metadata.get(&var_path))
+        && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
+            readable.clone(),
+            &var_path,
+            node_meta,
+        )
+    {
+        Ok(arr)
+    } else {
+        crate::utils::metadata::open_or_instantiate_array_normalized(readable, &var_path)
+            .map_err(|e| format!("{e}").into())
+    }
+}

@@ -4,7 +4,9 @@ use crate::data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 
 use super::types::ChannelColorConfig;
-use super::utils::{compute_channel_normalization, normalize_channel_value, pack_rgb};
+use super::utils::{
+    accumulate_channel_values, finalize_composite_packed_rgb, visible_channel_configs,
+};
 
 /// Slices an N-dimensional `OctantBlock` with unique per-channel color tints additively.
 #[allow(clippy::too_many_arguments)]
@@ -24,19 +26,7 @@ pub fn slice_multichannel_composite_nd(
     }
     let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
     let num_channels = block.shape[c_dim];
-    let mut visible_configs: Vec<(&ChannelColorConfig, usize)> = channel_configs
-        .iter()
-        .filter(|c| c.visible)
-        .filter_map(|c| {
-            let local_c = c.index.checked_sub(c_start)?;
-            if local_c < num_channels {
-                Some((c, local_c))
-            } else {
-                None
-            }
-        })
-        .collect();
-    visible_configs.sort_by_key(|(c, _)| c.index);
+    let visible_configs = visible_channel_configs(channel_configs, c_start, num_channels);
 
     let width = x_range.1.saturating_sub(x_range.0).max(1);
     let height = y_range.1.saturating_sub(y_range.0).max(1);
@@ -72,7 +62,7 @@ pub fn slice_multichannel_composite_nd(
             block.slice_2d_with_ranges(x_dim, y_dim, x_range, y_range, &fixed, 1, &cfg.name, true)
         {
             channel_loaded = true;
-            accumulate_channel_pixels(
+            accumulate_channel_values(
                 &mdata.values,
                 cfg,
                 &mut acc_r,
@@ -87,7 +77,7 @@ pub fn slice_multichannel_composite_nd(
         return None;
     }
 
-    let values = finalize_composite_pixels(plane_size, &acc_r, &acc_g, &acc_b, &any_valid);
+    let values = finalize_composite_packed_rgb(plane_size, &acc_r, &acc_g, &acc_b, &any_valid);
 
     Some(MatrixData::new(
         width,
@@ -98,82 +88,4 @@ pub fn slice_multichannel_composite_nd(
         format!("{} (Multi-Channel Overlay)", block.variable_name),
         anim_extent,
     ))
-}
-
-fn accumulate_channel_pixels(
-    pixels: &[f32],
-    cfg: &ChannelColorConfig,
-    acc_r: &mut [f32],
-    acc_g: &mut [f32],
-    acc_b: &mut [f32],
-    any_valid: &mut [bool],
-) {
-    let (scale, offset, is_i8) = compute_channel_normalization(pixels, cfg.window, 1.0);
-    let col = [
-        cfg.color_rgb[0] as f32,
-        cfg.color_rgb[1] as f32,
-        cfg.color_rgb[2] as f32,
-    ];
-
-    let len = pixels
-        .len()
-        .min(acc_r.len())
-        .min(acc_g.len())
-        .min(acc_b.len())
-        .min(any_valid.len());
-    let p_slice = &pixels[..len];
-    let r_slice = &mut acc_r[..len];
-    let g_slice = &mut acc_g[..len];
-    let b_slice = &mut acc_b[..len];
-    let val_slice = &mut any_valid[..len];
-
-    for ((((raw, r), g), b), valid) in p_slice
-        .iter()
-        .zip(r_slice.iter_mut())
-        .zip(g_slice.iter_mut())
-        .zip(b_slice.iter_mut())
-        .zip(val_slice.iter_mut())
-    {
-        if !raw.is_nan() {
-            let norm = cfg
-                .display
-                .map(normalize_channel_value(*raw, scale, offset, is_i8, 1.0));
-            *r += norm * col[0];
-            *g += norm * col[1];
-            *b += norm * col[2];
-            *valid = true;
-        }
-    }
-}
-
-fn finalize_composite_pixels(
-    plane_size: usize,
-    acc_r: &[f32],
-    acc_g: &[f32],
-    acc_b: &[f32],
-    any_valid: &[bool],
-) -> Vec<f32> {
-    let len = plane_size
-        .min(acc_r.len())
-        .min(acc_g.len())
-        .min(acc_b.len())
-        .min(any_valid.len());
-    let mut values = Vec::with_capacity(plane_size);
-
-    for (((&valid, &r), &g), &b) in any_valid[..len]
-        .iter()
-        .zip(&acc_r[..len])
-        .zip(&acc_g[..len])
-        .zip(&acc_b[..len])
-    {
-        if !valid {
-            values.push(f32::NAN);
-        } else {
-            let r_clamped = r.clamp(0.0, 255.0);
-            let g_clamped = g.clamp(0.0, 255.0);
-            let b_clamped = b.clamp(0.0, 255.0);
-            values.push(pack_rgb(r_clamped, g_clamped, b_clamped));
-        }
-    }
-    values
 }

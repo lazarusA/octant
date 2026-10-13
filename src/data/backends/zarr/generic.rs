@@ -3,20 +3,17 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use super::block::fetch_block_from_cached_array;
+use super::block::{ArrayCachedState, fetch_block_from_cached_array, inherited_attributes};
+pub use super::storage::{ZarrArrayHandle, open_raw_array};
 use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
 use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
-use zarrs::array::Array;
 use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
-use zarrs::group::Group;
-use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata;
-use zarrs::storage::{ReadableStorage, ReadableStorageTraits, ReadableWritableListableStorage};
+use zarrs::storage::ReadableWritableListableStorage;
 
-pub type ZarrArrayHandle = Array<dyn ReadableStorageTraits>;
-pub type CachedArrayEntry = (Arc<ZarrArrayHandle>, Arc<ChunkCacheDecodedLruSizeLimit>);
+pub type CachedArrayEntry = Arc<ArrayCachedState>;
 
 /// Default chunk cache size per array handle (32 MB).
 pub const DEFAULT_CHUNK_CACHE_BYTES: u64 = 32 * 1024 * 1024;
@@ -26,8 +23,30 @@ pub struct GenericZarrBlockStore {
     source_url: String,
     backend_name: &'static str,
     store_type_label: &'static str,
-    array_cache: RwLock<HashMap<String, CachedArrayEntry>>,
+    array_cache: RwLock<HashMap<String, Arc<ArrayCachedState>>>,
     chunk_cache_bytes: u64,
+}
+
+fn compute_chunk_cache_bytes(array: &ZarrArrayHandle, limit: u64) -> u64 {
+    if limit != DEFAULT_CHUNK_CACHE_BYTES {
+        return limit;
+    }
+    let rank = array.shape().len();
+    let chunk_indices = vec![0; rank];
+    let single_chunk_bytes = if let Ok(chunk_dims) = array.chunk_shape(&chunk_indices) {
+        let elem_count = chunk_dims
+            .iter()
+            .try_fold(1u64, |acc, d| acc.checked_mul(d.get()))
+            .unwrap_or(1);
+        let elem_size = match array.data_type().size() {
+            zarrs::array::DataTypeSize::Fixed(s) => (s as u64).max(1),
+            zarrs::array::DataTypeSize::Variable => 4,
+        };
+        elem_count.saturating_mul(elem_size)
+    } else {
+        4 * 1024 * 1024
+    };
+    (single_chunk_bytes.saturating_mul(8)).clamp(64 * 1024 * 1024, 512 * 1024 * 1024)
 }
 
 impl GenericZarrBlockStore {
@@ -71,11 +90,11 @@ impl GenericZarrBlockStore {
         &self.storage
     }
 
-    /// Gets an already-opened `(ZarrArrayHandle, ChunkCacheDecodedLruSizeLimit)` or opens and caches it.
+    /// Gets an already-opened and cached `ArrayCachedState` or opens and caches it.
     pub fn get_or_open_array(
         &self,
         var_name: &str,
-    ) -> Result<(Arc<ZarrArrayHandle>, Arc<ChunkCacheDecodedLruSizeLimit>), BlockStoreError> {
+    ) -> Result<Arc<ArrayCachedState>, BlockStoreError> {
         let clean_name = var_name.trim_matches('/');
         let cache_guard = self.array_cache.read().unwrap_or_else(|p| p.into_inner());
         if let Some(cached) = cache_guard.get(clean_name) {
@@ -83,84 +102,45 @@ impl GenericZarrBlockStore {
         }
         drop(cache_guard);
 
-        let var_path = format!("/{clean_name}");
-        let readable_store: ReadableStorage = self.storage.clone();
-
-        let raw_array = if let Ok(group) = Group::open(self.storage.clone(), "/")
-            && let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata()
-            && let Some(node_meta) = metadata.get(clean_name).or_else(|| metadata.get(&var_path))
-            && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
-                readable_store.clone(),
-                &var_path,
-                node_meta,
-            ) {
-            arr
-        } else {
-            crate::utils::metadata::open_or_instantiate_array_normalized(
-                readable_store.clone(),
-                &var_path,
-            )
-            .map_err(|e| format!("{e}"))?
-        };
-
-        let rank = raw_array.shape().len();
-        let chunk_indices = vec![0; rank];
-        let chunk_shape_opt = raw_array.chunk_shape(&chunk_indices).ok();
-        let single_chunk_bytes = if let Some(ref chunk_dims) = chunk_shape_opt {
-            let elem_count = chunk_dims
-                .iter()
-                .try_fold(1u64, |acc, d| acc.checked_mul(d.get()))
-                .unwrap_or(1);
-            let elem_size = match raw_array.data_type().size() {
-                zarrs::array::DataTypeSize::Fixed(s) => (s as u64).max(1),
-                zarrs::array::DataTypeSize::Variable => 4,
-            };
-            elem_count.saturating_mul(elem_size)
-        } else {
-            4 * 1024 * 1024
-        };
-
-        log::debug!(
-            "[{}] get_or_open_array '{}': shape={:?}, chunk_shape={:?}, dtype={:?}, single_chunk_bytes={} bytes",
-            self.backend_name,
-            var_name,
-            raw_array.shape(),
-            chunk_shape_opt,
-            raw_array.data_type(),
-            single_chunk_bytes
-        );
-
-        let dynamic_cache_bytes = if self.chunk_cache_bytes != DEFAULT_CHUNK_CACHE_BYTES {
-            self.chunk_cache_bytes
-        } else {
-            single_chunk_bytes
-                .saturating_mul(8)
-                .clamp(64 * 1024 * 1024, 512 * 1024 * 1024)
-        };
+        let raw_array = open_raw_array(&self.storage, clean_name)?;
+        let cache_bytes = compute_chunk_cache_bytes(&raw_array, self.chunk_cache_bytes);
+        let attributes = inherited_attributes(&raw_array, &self.storage, clean_name);
+        let is_label_image = crate::data::ome::axes::is_label_image(&attributes);
+        let ome_dim_names =
+            crate::data::ome::axes::block_dimension_names(&attributes, raw_array.shape().len());
 
         let array_arc = Arc::new(raw_array);
         let chunk_cache = Arc::new(ChunkCacheDecodedLruSizeLimit::new(
             array_arc.clone(),
-            dynamic_cache_bytes,
+            cache_bytes,
         ));
-        let tuple = (array_arc, chunk_cache);
+        let cached = Arc::new(ArrayCachedState {
+            array: array_arc,
+            cache: chunk_cache,
+            attributes,
+            is_label_image,
+            ome_dim_names,
+        });
 
         let mut write_guard = self.array_cache.write().unwrap_or_else(|p| p.into_inner());
-        write_guard.insert(clean_name.to_string(), tuple.clone());
-
-        Ok(tuple)
+        write_guard.insert(clean_name.to_string(), cached.clone());
+        Ok(cached)
     }
 
     /// Total number of opened array variables cached in this store handle.
     pub fn cached_arrays_count(&self) -> usize {
-        let cache_guard = self.array_cache.read().unwrap_or_else(|p| p.into_inner());
-        cache_guard.len()
+        self.array_cache
+            .read()
+            .unwrap_or_else(|p| p.into_inner())
+            .len()
     }
 
     /// Clears opened array handles and chunk caches.
     pub fn clear_array_cache(&self) {
-        let mut write_guard = self.array_cache.write().unwrap_or_else(|p| p.into_inner());
-        write_guard.clear();
+        self.array_cache
+            .write()
+            .unwrap_or_else(|p| p.into_inner())
+            .clear();
     }
 }
 
@@ -199,7 +179,6 @@ impl BlockStore for GenericZarrBlockStore {
             name: dataset_name.to_string(),
             store_type: self.store_type_label.to_string(),
             variables,
-            // Read per variable (`variable_coordinates`): datasets open with metadata alone.
             dimension_coordinates: HashMap::new(),
             ome,
         })
@@ -210,10 +189,9 @@ impl BlockStore for GenericZarrBlockStore {
         variable: &VariableInfo,
     ) -> Result<HashMap<String, CoordValues>, BlockStoreError> {
         let url = Some(self.source_url.trim_end_matches('/'));
-        let var = std::slice::from_ref(variable);
         Ok(fetch_all_dimension_coordinates_for_variables(
             self.storage.clone(),
-            var,
+            std::slice::from_ref(variable),
             url,
         ))
     }
@@ -227,10 +205,9 @@ impl BlockStore for GenericZarrBlockStore {
         request: &SliceRequest,
         on_progress: ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
-        let (array, cache) = self.get_or_open_array(&request.variable)?;
+        let cached = self.get_or_open_array(&request.variable)?;
         fetch_block_from_cached_array(
-            &array,
-            &cache,
+            &cached,
             self.storage.clone(),
             &self.source_url,
             request,
@@ -242,19 +219,17 @@ impl BlockStore for GenericZarrBlockStore {
         #[cfg(not(target_arch = "wasm32"))]
         {
             use rayon::prelude::*;
-            let blocks: Result<Vec<OctantBlock>, BlockStoreError> = requests
+            requests
                 .par_iter()
-                .map(|request| self.fetch_block(request))
-                .collect();
-            Ok(BlockResult::new(blocks?))
+                .map(|r| self.fetch_block(r))
+                .collect::<Result<_, _>>()
+                .map(BlockResult::new)
         }
         #[cfg(target_arch = "wasm32")]
-        {
-            let blocks: Result<Vec<OctantBlock>, BlockStoreError> = requests
-                .iter()
-                .map(|request| self.fetch_block(request))
-                .collect();
-            Ok(BlockResult::new(blocks?))
-        }
+        requests
+            .iter()
+            .map(|r| self.fetch_block(r))
+            .collect::<Result<_, _>>()
+            .map(BlockResult::new)
     }
 }

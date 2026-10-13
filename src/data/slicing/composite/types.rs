@@ -60,6 +60,9 @@ impl ChannelDisplay {
     /// Maps a windowed intensity `norm` (0..1) through the family curve, then
     /// inverts it. Every curve keeps 0 at 0 and 1 at 1.
     pub fn map(&self, norm: f32) -> f32 {
+        if self.family == ChannelFamily::Linear && !self.inverted {
+            return norm.clamp(0.0, 1.0);
+        }
         let n = norm.clamp(0.0, 1.0);
         let c = if self.coefficient.is_finite() && self.coefficient > 0.0 {
             self.coefficient
