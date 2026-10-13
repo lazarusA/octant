@@ -110,7 +110,7 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
 fn curve_header(ui: &mut egui::Ui, curve: &mut AlphaCurveState) -> bool {
     let (title, presets) = (tr(K::AlphaCurve), tr(K::Presets));
     let (step, linear) = (tr(K::InterpStep), tr(K::InterpLinear));
-    let salt = ui.id().with("alpha_curve_header");
+    let salt = "alpha_curve_header";
     let [title_w, widths @ ..] =
         flow_row::cached_widths(ui, salt, (title, presets, step, linear), |ui| {
             [

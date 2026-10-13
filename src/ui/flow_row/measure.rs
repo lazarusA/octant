@@ -39,28 +39,31 @@ pub fn checkbox_width(ui: &Ui) -> f32 {
 }
 
 /// The widths `measure` returns for the row `salt` of `ui`, kept in egui
-/// temp memory and measured again only when `key` (the row's text), the
-/// language, the fonts, the UI scale or the spacing and text sizes they are
-/// measured with change.
+/// temp memory and measured again only when `key` (the row's text) or the
+/// `layout_key` change.
 pub fn cached_widths<const N: usize>(
     ui: &Ui,
     salt: impl Hash + std::fmt::Debug,
     key: impl Hash,
     measure: impl FnOnce(&Ui) -> [f32; N],
 ) -> [f32; N] {
-    let ctx = ui.ctx();
-    let key = hash_key((
-        crate::ui::fonts::generation(ctx),
+    let key = hash_key((layout_key(ui), key));
+    let id = Id::new("flow_row_widths").with(ui.id()).with(salt);
+    cached(ui.ctx(), id, key, || measure(ui))
+}
+
+/// What every measured width depends on besides its text: the fonts, the
+/// language, the UI scale and the spacing and text sizes.
+pub(super) fn layout_key(ui: &Ui) -> u64 {
+    hash_key((
+        crate::ui::fonts::generation(ui.ctx()),
         crate::i18n::language(),
         ui.pixels_per_point().to_bits(),
         style_key(ui),
-        key,
-    ));
-    let id = Id::new("flow_row_widths").with(ui.id()).with(salt);
-    cached(ctx, id, key, || measure(ui))
+    ))
 }
 
-/// The spacing and text sizes the widths above are measured with, as bits.
+/// The spacing and text sizes widths are measured with, as bits.
 fn style_key(ui: &Ui) -> [u32; 11] {
     let style = ui.style();
     let spacing = &style.spacing;

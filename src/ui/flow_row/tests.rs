@@ -101,3 +101,57 @@ fn a_slider_under_its_label_stays_there_when_its_value_narrows() {
         "it stays there: {bottoms:?}"
     );
 }
+
+/// The response of a slider labeled "Label" over `value` in a `column` wide
+/// column, one frame.
+fn slider_frame(h: &mut Harness, column: f32, value: &mut f64) -> egui::Response {
+    let mut response = None;
+    h.frame(Vec::new(), &mut |ui: &mut Ui| {
+        ui.allocate_ui(vec2(column, 400.0), |ui| {
+            ui.set_width(column);
+            let slider = egui::Slider::new(&mut *value, 0.0..=1_000_000.0)
+                .localized()
+                .suffix(" units");
+            let label = SliderLabel::After("Label");
+            response = Some(labeled_slider(ui, "kept", label, slider));
+        });
+    });
+    response.expect("the slider is drawn")
+}
+
+#[test]
+fn a_slider_keeps_its_id_when_it_moves_under_its_label() {
+    let mut h = Harness::new(SCREEN);
+    let mut value = 1.0;
+    let beside = slider_frame(&mut h, 400.0, &mut value);
+    let under = slider_frame(&mut h, 120.0, &mut value);
+    assert!(
+        under.rect.top() > beside.rect.top(),
+        "the slider moved under its label"
+    );
+    assert_eq!(beside.id, under.id, "a drag or edit carries on");
+}
+
+#[test]
+fn a_kept_value_box_is_measured_again_when_the_style_changes() {
+    let mut h = Harness::new(SCREEN);
+    let mut value = 999_999.5;
+    let column = 220.0;
+    let wide: Vec<f32> = (0..3)
+        .map(|_| slider_frame(&mut h, column, &mut value).rect.bottom())
+        .collect();
+    assert!(
+        wide[2] > wide[0],
+        "a wide value moves the slider under its label"
+    );
+    value = 1.0;
+    h.ctx
+        .all_styles_mut(|style| style.spacing.item_spacing.x += 0.5);
+    let narrow: Vec<f32> = (0..3)
+        .map(|_| slider_frame(&mut h, column, &mut value).rect.bottom())
+        .collect();
+    assert!(
+        (narrow[2] - wide[0]).abs() < 0.5,
+        "back beside its label: {wide:?} then {narrow:?}"
+    );
+}

@@ -158,8 +158,8 @@ fn format_label(kind: StoreKind) -> DatasetKey {
 }
 
 /// The format select: its selected name is cut to `FORMAT_SELECT_W` (the
-/// full name on hover) so a long one never widens the panel; the list opens
-/// at full width.
+/// full name on hover when cut) so a long one never widens the panel; the
+/// list opens at full width.
 pub(super) fn show_format_selector(app: &mut OctantApp, ui: &mut egui::Ui) {
     ui.horizontal_wrapped(|ui| {
         ui.icon(Icon::Dataset, IconSize::Xs);
@@ -167,9 +167,10 @@ pub(super) fn show_format_selector(app: &mut OctantApp, ui: &mut egui::Ui) {
 
         let mut selected = app.selected.store_kind;
         let name = tr(format_label(selected));
+        let cut = format_name_is_cut(ui, name);
         let size = egui::vec2(FORMAT_SELECT_W, ui.spacing().interact_size.y);
         ui.allocate_ui(size, |ui| {
-            egui::ComboBox::from_id_salt("dataset_store_kind_select")
+            let select = egui::ComboBox::from_id_salt("dataset_store_kind_select")
                 .width(FORMAT_SELECT_W)
                 .truncate()
                 .selected_text(name)
@@ -180,13 +181,28 @@ pub(super) fn show_format_selector(app: &mut OctantApp, ui: &mut egui::Ui) {
                         }
                         ui.selectable_value(&mut selected, *kind, tr(*label));
                     }
-                })
-                .response
-                .on_hover_text(name);
+                });
+            if cut {
+                select.response.on_hover_text(name);
+            }
         });
 
         if selected != app.selected.store_kind {
             app.selected.store_kind = selected;
         }
     });
+}
+
+/// Whether the format select cuts `name`: wider than its room beside the
+/// select's arrow and padding.
+fn format_name_is_cut(ui: &egui::Ui, name: &str) -> bool {
+    let [name_w] = flow_row::cached_widths(ui, "dataset_format_name", name, |ui| {
+        [flow_row::text_width(ui, name, egui::TextStyle::Button)]
+    });
+    let spacing = ui.spacing();
+    let room = FORMAT_SELECT_W
+        - spacing.button_padding.x * 2.0
+        - spacing.icon_spacing
+        - spacing.icon_width;
+    name_w > room
 }
