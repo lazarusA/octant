@@ -101,6 +101,7 @@ fn dataset_text_scripts_are_detected() {
         store_type: "zarr".into(),
         variables: Vec::new(),
         dimension_coordinates: Default::default(),
+        ome: None,
     };
     meta.dimension_coordinates.insert(
         "station".into(),

@@ -80,14 +80,19 @@ impl OctantApp {
             return None;
         }
         let var = selection.variable_info().cloned();
-        let id = self.layers.push(Source::Variable(selection));
+        let id = self.layers.push(Source::for_selection(selection));
+        let is_labels = self
+            .layers
+            .get(id)
+            .is_some_and(|l| l.source.labels().is_some());
         let colormap = self.next_overlay_colormap();
         if let Some(layer) = self.layers.get_mut(id) {
             layer.alignment = alignment;
             layer.color.opacity = OVERLAY_OPACITY;
             layer.color.colormap = colormap;
         }
-        if let Some(var) = var {
+        // Label images draw their own colors, never a composite.
+        if let Some(var) = var.filter(|_| !is_labels) {
             crate::ui::variables_panel::init_layer_composite_defaults(self, id, &var);
         }
         if alignment.is_drawn() {

@@ -41,7 +41,7 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
         assign_euclidean_roles(app, var_info);
     }
 
-    apply_omero_default_z(app, var_info, rank);
+    apply_omero_defaults(app, var_info);
     finalize_active_configs(app, var_info, rank);
     clamp_2d_selection_to_gpu_limits(app, var_info);
     sort_spatial_dims(app);
@@ -94,23 +94,50 @@ fn init_rank1_defaults(
     app.selected.spatial_dims.push(0);
 }
 
-fn apply_omero_default_z(app: &mut OctantApp, var_info: &VariableInfo, rank: usize) {
-    if let Some(dz_str) = var_info.attributes.get("default_z")
-        && let Ok(dz) = dz_str.parse::<usize>()
-        && let Some(z_idx) = (0..rank).find(|&i| {
-            let dim_name = var_info
-                .dimension_names
-                .get(i)
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            crate::data::coordinates::naming::is_spatial_z_name(dim_name)
-        })
+/// The OMERO default plane (`rdefs.defaultZ`) and time point (`defaultT`)
+/// of an OME-Zarr image: z collapses to its plane; time keeps its window,
+/// moved to hold the default step, and playback starts there.
+fn apply_omero_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
+    let Some(ome) = &var_info.ome else {
+        return;
+    };
+    let image = &ome.image;
+    if let (Some(k), Some(c)) = (
+        image.greyscale_channel(),
+        image.axis_of_kind(crate::data::ome::AxisKind::Channel),
+    ) && let Some(&size) = var_info.shape.get(c)
     {
-        let dim_max = var_info.shape[z_idx].saturating_sub(1) as usize;
-        let clamped_dz = dz.min(dim_max);
-        app.selected.dim_indices[z_idx] = clamped_dz;
-        app.selected.dim_ranges[z_idx] = (clamped_dz, clamped_dz);
-        app.selected.dim_config[z_idx].range = (clamped_dz, clamped_dz);
+        let k = k.min((size as usize).saturating_sub(1));
+        app.selected.dim_indices[c] = k;
+        app.selected.dim_ranges[c] = (k, k);
+        app.selected.dim_config[c].range = (k, k);
+    }
+    if let (Some(dz), Some(z)) = (image.default_z, image.z_axis())
+        && let Some(&size) = var_info.shape.get(z)
+    {
+        let dz = dz.min((size as usize).saturating_sub(1));
+        app.selected.dim_indices[z] = dz;
+        app.selected.dim_ranges[z] = (dz, dz);
+        app.selected.dim_config[z].range = (dz, dz);
+    }
+    if let (Some(dt), Some(t)) = (
+        image.default_t,
+        image.axis_of_kind(crate::data::ome::AxisKind::Time),
+    ) && let Some(&size) = var_info.shape.get(t)
+    {
+        let last = (size as usize).saturating_sub(1);
+        let dt = dt.min(last);
+        let (start, end) = app.selected.dim_ranges[t];
+        if dt < start || dt > end {
+            let width = end.saturating_sub(start).min(last);
+            let start = dt.min(last - width);
+            app.selected.dim_ranges[t] = (start, start + width);
+            app.selected.dim_config[t].range = (start, start + width);
+        }
+        app.selected.dim_indices[t] = dt;
+        if app.selected.animated_dim == Some(t) {
+            app.playback.current_timestep = dt;
+        }
     }
 }
 

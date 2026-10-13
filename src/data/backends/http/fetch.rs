@@ -106,12 +106,12 @@ pub(crate) fn get_http_client() -> &'static reqwest::Client {
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn fetch_url_bytes(url: &str) -> Result<Vec<u8>, String> {
     let client = get_http_client();
-    client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?
-        .bytes()
+    let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+    // A missing key (404) is an error, as in the browser, not its error page.
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {} fetching '{}'", resp.status(), url));
+    }
+    resp.bytes()
         .await
         .map(|b| b.to_vec())
         .map_err(|e| e.to_string())

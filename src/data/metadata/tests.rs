@@ -175,3 +175,29 @@ fn test_stored_counts_match_the_tree_after_build_and_filter() {
     assert_counts_match_walk(&filtered);
     assert_eq!(filtered.total_variable_count(), 2);
 }
+
+#[test]
+fn ome_series_names_label_their_folders_and_match_searches() {
+    use std::sync::Arc;
+    let variables: Vec<VariableInfo> = ["0/0", "0/1", "1/0"]
+        .map(|name| VariableInfo {
+            name: name.into(),
+            ..Default::default()
+        })
+        .to_vec();
+    let meta = DatasetMetadata {
+        variables: variables.clone(),
+        ome: Some(Arc::new(crate::data::ome::OmeDataset {
+            group_names: vec![("0".into(), "slide A".into())],
+            ..Default::default()
+        })),
+        ..Default::default()
+    };
+    let tree = meta.build_variable_tree();
+    assert_eq!(tree.subgroups[0].display_name(), "slide A");
+    assert_eq!(tree.subgroups[1].display_name(), "1");
+    let found = tree.filter("slide", &variables).expect("match");
+    assert_eq!(found.subgroups.len(), 1);
+    assert_eq!(found.subgroups[0].label.as_deref(), Some("slide A"));
+    assert_eq!(found.subgroups[0].variable_indices, [0, 1]);
+}

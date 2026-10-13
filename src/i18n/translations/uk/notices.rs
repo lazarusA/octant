@@ -41,5 +41,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "Текст мовою {} у цьому наборі даних може відображатися квадратами. Установіть шрифт, наприклад Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "Метадані OME-Zarr не відповідають специфікації",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Метадані версії {} набору {} не відповідають специфікації; показано те, що вдалося прочитати."
+        }
     })
 }

@@ -4,7 +4,12 @@ use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::i18n::{SettingsKey as K, VariablesKey, tr};
 use crate::ui::hover::composite::composite_labels;
+use crate::ui::icons::{Icon, IconSize, ToolbarButton};
 use crate::utils::stack_str;
+
+/// Auto contrast: the quantiles of each channel's shown values its window spans.
+const AUTO_LOW: f64 = 0.001;
+const AUTO_HIGH: f64 = 0.999;
 
 /// Layer `id`'s composite controls (Multi-Channel bioimaging overlay, CMYK,
 /// or standard 3-band RGB), while its variable has bands to compose.
@@ -93,9 +98,11 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerI
     let Some(layer) = app.layers.get_mut(id) else {
         return;
     };
+    // The 2D composite's channel values, for auto contrast.
+    let probe = layer.data.composite_probe.clone();
     let configs = &mut layer.composite.channel_configs;
     let mut changed = false;
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.label(egui::RichText::new(tr(K::Channels)).small().strong());
         for (label, visible) in [(K::ChannelsAll, true), (K::ChannelsNone, false)] {
             if ui.small_button(tr(label)).clicked() {
@@ -103,20 +110,50 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerI
                 changed = true;
             }
         }
+        let auto = ui
+            .add_enabled(
+                probe.is_some(),
+                egui::Button::new(tr(K::ChannelsAuto)).small(),
+            )
+            .on_hover_text(tr(K::ChannelsAutoHover))
+            .on_disabled_hover_text(tr(K::ChannelsAutoUnavailable));
+        if auto.clicked()
+            && let Some(probe) = &probe
+        {
+            for cfg in configs.iter_mut() {
+                if let Some(window) = probe.channel_quantiles(cfg.index, AUTO_LOW, AUTO_HIGH) {
+                    cfg.window = Some(window);
+                    changed = true;
+                }
+            }
+        }
     });
     egui::ScrollArea::vertical()
-        .max_height(100.0)
+        .max_height(180.0)
         .auto_shrink([false, true])
         .show(ui, |ui| {
-            egui::Grid::new(("multichannel_overlay_grid", id))
-                .num_columns(3)
-                .spacing([6.0, 3.0])
-                .show(ui, |ui| {
-                    for cfg in configs.iter_mut() {
-                        changed |= channel_row(ui, cfg, id);
-                        ui.end_row();
+            for cfg in configs.iter_mut() {
+                let open_id = egui::Id::new(("mc_channel_open", id, cfg.index));
+                let mut open = ui.data(|d| d.get_temp::<bool>(open_id).unwrap_or(false));
+                ui.horizontal(|ui| {
+                    changed |= channel_row(ui, cfg, id);
+                    let chevron = if open {
+                        Icon::ChevronDown
+                    } else {
+                        Icon::ChevronRight
+                    };
+                    let toggle = ToolbarButton::new(chevron, tr(K::ChannelSettingsHover))
+                        .compact(true)
+                        .icon_size(IconSize::Xs);
+                    if ui.add(toggle).clicked() {
+                        open = !open;
+                        ui.data_mut(|d| d.insert_temp(open_id, open));
                     }
                 });
+                if open {
+                    changed |= super::channel_display::channel_detail(ui, cfg, id);
+                }
+            }
         });
     if changed {
         app.load_layer_block(id);

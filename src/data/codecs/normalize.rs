@@ -13,6 +13,7 @@ use zarrs::metadata_ext::codec::blosc::{
 /// and v2 unicode arrays with a null fill (as zarr-python 2 writes them) get an empty one.
 pub fn normalize_v3_array_metadata(mut meta: Value) -> Value {
     fill_v2_unicode_null(&mut meta);
+    repair_v2_numeric(&mut meta);
     let typesize = meta
         .get("data_type")
         .and_then(|d| MetadataV3::deserialize(d).ok())
@@ -60,6 +61,42 @@ fn fill_v2_unicode_null(meta: &mut Value) {
         && meta.get("fill_value").is_some_and(Value::is_null)
     {
         meta["fill_value"] = Value::from("");
+    }
+}
+
+/// Early zarr writers (OME-NGFF 0.1 data among them) store a numeric fill as
+/// text (`"0"`) and no filters as `[]`; v2 wants a number and `null`. Float
+/// fills keep their special text values (`"NaN"`, `"Infinity"`).
+fn repair_v2_numeric(meta: &mut Value) {
+    if meta.get("zarr_format").and_then(Value::as_u64) != Some(2) {
+        return;
+    }
+    if meta
+        .get("filters")
+        .is_some_and(|f| f.as_array().is_some_and(Vec::is_empty))
+    {
+        meta["filters"] = Value::Null;
+    }
+    let kind = meta
+        .get("dtype")
+        .and_then(Value::as_str)
+        .and_then(|d| d.trim_start_matches(['<', '>', '|', '=']).chars().next());
+    let Some(Value::String(text)) = meta.get("fill_value") else {
+        return;
+    };
+    let number = match kind {
+        Some('i') => text.trim().parse::<i64>().ok().map(Value::from),
+        Some('u') => text.trim().parse::<u64>().ok().map(Value::from),
+        Some('f') => text
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .filter(|v| v.is_finite())
+            .map(Value::from),
+        _ => None,
+    };
+    if let Some(number) = number {
+        meta["fill_value"] = number;
     }
 }
 

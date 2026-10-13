@@ -201,6 +201,12 @@ impl crate::app::OctantApp {
     /// Copies the staged selection into the plotted one.
     pub(crate) fn copy_selected_to_plotted(&mut self) {
         self.layers.base.selection_mut().clone_from(&self.selected);
+        // A label image draws as labels, whatever layer shows it; data shown
+        // the other way is dropped, never drawn in the wrong colors.
+        if self.layers.base.source.follow_variable() {
+            self.layers.base.clear_2d();
+            self.layers.base.data.var_key = None;
+        }
     }
 
     /// Copies the plotted selection back into the staged one.

@@ -24,11 +24,20 @@ pub fn overlay_values<'a>(
     for (slot, layer) in out.iter_mut().zip(drawn) {
         let raw = cell_value(layer, cell);
         let var = layer.selection().variable_info();
-        *slot = LayerValue {
-            name: var.map_or(tr(HoverKey::FallbackOverlay), |v| v.leaf_name()),
-            value: HoverValue::from_raw(raw, composite_kind(app, layer)),
-            units: resolve_variable_units(var),
-            swatch: evaluate_color_cpu(raw, &app.get_color_params(layer)),
+        let name = var.map_or(tr(HoverKey::FallbackOverlay), |v| v.leaf_name());
+        *slot = match crate::ui::hover::labels::label_reading(layer, raw) {
+            Some((value, swatch, properties)) => LayerValue {
+                name,
+                value,
+                units: properties,
+                swatch,
+            },
+            None => LayerValue {
+                name,
+                value: HoverValue::from_raw(raw, composite_kind(app, layer)),
+                units: resolve_variable_units(var),
+                swatch: evaluate_color_cpu(raw, &app.get_color_params(layer)),
+            },
         };
         count += 1;
     }

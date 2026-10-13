@@ -13,8 +13,8 @@ Libraries (Boost Software License 1.0).
 
 ## Overview
 
-- MIT License (573)
-- Apache License 2.0 (56)
+- MIT License (576)
+- Apache License 2.0 (57)
 - ISC License (24)
 - BSD 3-Clause "New" or "Revised" License (20)
 - Unicode License v3 (19)
@@ -2242,6 +2242,7 @@ Used by:
 - icechunk 2.2.2 (https://github.com/earth-mover/icechunk)
 - owned_ttf_parser 0.25.1 (https://github.com/alexheretic/owned-ttf-parser)
 - pco 1.0.3 (https://github.com/pcodec/pcodec)
+- pep440_rs 0.7.3 (https://github.com/konstin/pep440-rs)
 - ryu 1.0.23 (https://github.com/dtolnay/ryu)
 - spirv 0.4.0+sdk-1.4.341.0 (https://github.com/gfx-rs/rspirv)
 - sync_wrapper 1.0.2 (https://github.com/Actyx/sync_wrapper)
@@ -9758,6 +9759,7 @@ Used by:
 - object_store 0.14.2 (https://github.com/apache/arrow-rs-object-store)
 - profiling 1.0.18 (https://github.com/aclysma/profiling)
 - type-map 0.5.1 (https://github.com/kardeiz/type-map)
+- validatrix 0.3.1 (https://github.com/clbarnes/validatrix)
 - vsimd 0.8.0 (https://github.com/Nugine/simd)
 - windows-collections 0.3.2 (https://github.com/microsoft/windows-rs)
 - windows-core 0.62.2 (https://github.com/microsoft/windows-rs)
@@ -10036,9 +10038,11 @@ Used by:
 - half 2.7.1 (https://github.com/VoidStarKat/half-rs)
 - ident_case 1.0.1 (https://github.com/TedDriggs/ident_case)
 - linebender_resource_handle 0.1.1 (https://github.com/linebender/raw_resource_handle)
+- ome_zarr_metadata 0.3.1 (https://github.com/zarrs/ome_zarr_metadata)
 - rayon_iter_concurrent_limit 0.2.0 (https://github.com/LDeakin/rayon_iter_concurrent_limit)
 - snappy_src 0.2.7+snappy.1.3.1 (https://github.com/LDeakin/rust_snappy_src)
 - unsafe_cell_slice 0.2.2 (https://github.com/LDeakin/unsafe_cell_slice)
+- unscanny 0.1.0 (https://github.com/typst/unscanny)
 - zarrs 0.23.14 (https://github.com/zarrs/zarrs)
 - zarrs_chunk_grid 0.5.1 (https://github.com/zarrs/zarrs/tree/main/zarrs_chunk_grid)
 - zarrs_chunk_key_encoding 0.2.0 (https://github.com/zarrs/zarrs/tree/main/zarrs_chunk_key_encoding)

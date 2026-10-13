@@ -44,6 +44,8 @@ pub fn draw_canvas_axes(
         y_title: &y_label,
         x_units: x_units.as_deref(),
         y_units: y_units.as_deref(),
+        // OME-Zarr images are rasters: row 0 (the smallest y) at the top.
+        y_down: canvas_plot_type != PlotType::Line && app.is_ome_dataset(),
     };
 
     draw_plot_axes(ui, canvas_rect, plot_rect, &options);

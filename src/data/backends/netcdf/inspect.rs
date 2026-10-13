@@ -66,6 +66,7 @@ pub fn collect_group_variables(
             time_coverage_end,
             temporal_resolution,
             attributes,
+            ome: None,
         });
     }
 
@@ -135,6 +136,7 @@ pub fn inspect_netcdf_file(file_path: &str) -> Result<DatasetMetadata, BlockStor
             time_coverage_end,
             temporal_resolution,
             attributes,
+            ome: None,
         });
     }
 
@@ -164,5 +166,6 @@ pub fn inspect_netcdf_file(file_path: &str) -> Result<DatasetMetadata, BlockStor
         store_type: "NetCDF".to_string(),
         variables,
         dimension_coordinates,
+        ome: None,
     })
 }

@@ -33,6 +33,7 @@ fn make_var(
         time_coverage_end: None,
         file_size,
         attributes: HashMap::new(),
+        ome: None,
     }
 }
 
@@ -186,5 +187,6 @@ pub fn inspect_procedural(uri: &str) -> Result<DatasetMetadata, BlockStoreError>
         store_type: "Procedural / Ground Truth".to_string(),
         variables: vars,
         dimension_coordinates: dim_coords,
+        ome: None,
     })
 }

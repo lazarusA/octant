@@ -9,7 +9,7 @@ pub mod slice_2d;
 pub mod slice_3d;
 
 pub use composite::{
-    ChannelColorConfig, CompositeProbe, DEFAULT_CHANNEL_COLORS, parse_hex_color,
+    ChannelColorConfig, ChannelDisplay, CompositeProbe, DEFAULT_CHANNEL_COLORS, parse_hex_color,
     slice_cmyk_composite, slice_multichannel_composite_nd, slice_multichannel_volume_composite_nd,
     slice_rgb_composite, slice_rgb_composite_nd, slice_rgb_volume_composite_nd,
 };

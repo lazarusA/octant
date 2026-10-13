@@ -68,6 +68,14 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
 
     // Draw Dynamic Plot Axis Lines, Ticks, and Axis Titles
     draw_canvas_axes(app, ui, canvas_rect, uniforms.plot_rect, canvas_plot_type);
+    // Part of the figure: drawn during export capture too
+    crate::ui::scale_bar::draw_scale_bar(
+        app,
+        ui,
+        canvas_rect,
+        uniforms.plot_rect,
+        canvas_plot_type,
+    );
 
     // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle (suppressed during export capture)
     if app.pending_export.is_none() {

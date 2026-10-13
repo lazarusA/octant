@@ -16,6 +16,7 @@ fn meta(names: &[&str]) -> DatasetMetadata {
             })
             .collect(),
         dimension_coordinates: Default::default(),
+        ome: None,
     }
 }
 

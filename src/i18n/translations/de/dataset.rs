@@ -132,5 +132,13 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::BrowserLocalPaths => {
             "Lokale Dateipfade können im Browser aufgrund der Sandbox-Sicherheit nicht direkt gelesen werden.\n\nSo zeigen Sie lokale Datensätze im Browser an:\n1. Stellen Sie Ihr Verzeichnis oder Ihre Datei über einen lokalen HTTP-Server bereit: `npx serve` oder `python3 -m http.server`\n2. Geben Sie die URL ein: `http://localhost:8000/my_dataset`\n\nOder starten Sie die native Desktop-Version von Octant (`cargo run --release`)."
         }
+        DatasetKey::Plate => "Platte",
+        DatasetKey::PlateAcquisition => "Aufnahme",
+        DatasetKey::PlateAllAcquisitions => "Alle",
+        DatasetKey::PlateFields => "Felder:",
+        DatasetKey::PlatePickWell => "Wählen Sie ein Well, um seine Felder zu sehen",
+        DatasetKey::PlateLoadingFields => "Felder des Wells werden gelesen",
+        DatasetKey::PlateNoFields => "Keine Felder in dieser Aufnahme",
+        DatasetKey::CategoryMicroscopy => "Mikroskopie",
     })
 }

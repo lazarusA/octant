@@ -7,6 +7,7 @@ use crate::app::layers::{Layer, LayerId};
 use crate::i18n::{SettingsKey as K, tr};
 use crate::plots::PlotType;
 use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
+use crate::ui::number_input::LocalizedInput;
 
 /// What a row asked for this frame, applied after the list is drawn.
 enum RowAction {
@@ -87,6 +88,10 @@ fn overlay_header(
 /// Layer `id`'s colormap, composite channels and Color menu (which holds
 /// its opacity).
 fn layer_body(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
+    if app.layers.get(id).is_some_and(|l| l.labels().is_some()) {
+        label_body(app, ui, id);
+        return;
+    }
     crate::ui::colormap::show_layer_colormap_button(app, ui, id);
     // A line plot draws one band: no composite.
     let line = id == LayerId::BASE && app.effective_canvas_plot_type() == PlotType::Line;
@@ -97,6 +102,32 @@ fn layer_body(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
         .id_salt(("layer_color_menu", id))
         .default_open(false)
         .show(ui, |ui| super::show_color_menu(app, ui, id));
+}
+
+/// A label image's drawing: whole labels or their boundaries, and opacity.
+fn label_body(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
+    let Some(layer) = app.layers.get_mut(id) else {
+        return;
+    };
+    if let Some(style) = layer.source.labels_mut() {
+        ui.horizontal_wrapped(|ui| {
+            ui.selectable_value(&mut style.outline, false, tr(K::LabelsFill))
+                .on_hover_text(tr(K::LabelsFillHover));
+            ui.selectable_value(&mut style.outline, true, tr(K::LabelsOutline))
+                .on_hover_text(tr(K::LabelsOutlineHover));
+        });
+    }
+    let opacity = &mut layer.color.opacity;
+    let resp = crate::ui::flow_row::labeled_slider(
+        ui,
+        ("label_opacity", id),
+        crate::ui::flow_row::SliderLabel::After(tr(K::Opacity)),
+        egui::Slider::new(opacity, 0.0..=1.0).localized(),
+    )
+    .on_hover_text(tr(K::OpacityHover));
+    if resp.double_clicked() {
+        *opacity = 1.0;
+    }
 }
 
 /// The eye toggle, the name, and the move and remove buttons of `layer`.

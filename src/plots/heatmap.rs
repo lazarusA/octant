@@ -371,6 +371,19 @@ impl HeatmapRenderer {
         );
     }
 
+    /// Binds the data (group 0) and the quad, for pipelines that share them
+    /// (label images, `labels.rs`).
+    pub(crate) fn bind_quad(&self, rpass: &mut wgpu::RenderPass<'static>) {
+        rpass.set_bind_group(0, &self.bind_group, &[]);
+        rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+    }
+
+    /// Draws the quad bound by `bind_quad`.
+    pub(crate) fn draw_quad(&self, rpass: &mut wgpu::RenderPass<'static>) {
+        rpass.draw_indexed(0..self.num_indices, 0, 0..1);
+    }
+
     fn build_quad() -> (Vec<HeatmapVertex>, Vec<u32>) {
         let vertices = vec![
             HeatmapVertex {

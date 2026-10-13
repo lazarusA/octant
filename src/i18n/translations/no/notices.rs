@@ -41,5 +41,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "Tekst på {} i dette datasettet kan vises som bokser. Installer en skrift som Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr-metadata følger ikke spesifikasjonen",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Metadata i versjon {} for {} følger ikke spesifikasjonen; det som kunne leses, vises."
+        }
     })
 }

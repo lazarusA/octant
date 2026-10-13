@@ -127,6 +127,54 @@ pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + '
     }
 }
 
+/// Reads an integer array subset as label ids, kept exact: each value's low
+/// 32 bits are stored as the bits of an `f32` (read back with `f32::to_bits`),
+/// never converted. `None` for non-integer data types.
+pub fn retrieve_array_subset_as_label_bits<TStorage: ?Sized + ReadableStorageTraits + 'static>(
+    array: &Array<TStorage>,
+    cache: Option<&ChunkCacheDecodedLruSizeLimit>,
+    subset: &ArraySubset,
+) -> Result<Option<Vec<f32>>, BlockStoreError> {
+    fn bits<R: SubsetRetriever>(
+        retriever: &R,
+        dt: &DataType,
+        subset: &ArraySubset,
+    ) -> Result<Option<Vec<f32>>, BlockStoreError> {
+        macro_rules! ids {
+            ($t:ty) => {{
+                let vals: Vec<$t> = retriever.retrieve_subset(subset)?;
+                Ok(Some(
+                    vals.into_iter().map(|v| f32::from_bits(v as u32)).collect(),
+                ))
+            }};
+        }
+        if dt.is::<UInt8DataType>() {
+            ids!(u8)
+        } else if dt.is::<UInt16DataType>() {
+            ids!(u16)
+        } else if dt.is::<UInt32DataType>() {
+            ids!(u32)
+        } else if dt.is::<UInt64DataType>() {
+            ids!(u64)
+        } else if dt.is::<Int8DataType>() {
+            ids!(i8)
+        } else if dt.is::<Int16DataType>() {
+            ids!(i16)
+        } else if dt.is::<Int32DataType>() {
+            ids!(i32)
+        } else if dt.is::<Int64DataType>() {
+            ids!(i64)
+        } else {
+            Ok(None)
+        }
+    }
+    let dt = array.data_type();
+    match cache {
+        Some(c) => bits(c, dt, subset),
+        None => bits(array, dt, subset),
+    }
+}
+
 /// Reads an array subset as `f64`, applying CF scale, offset and masking, for coordinates
 /// that need more precision than `f32`. Fails for non-numeric data types.
 pub fn retrieve_array_subset_as_f64<TStorage: ?Sized + ReadableStorageTraits + 'static>(

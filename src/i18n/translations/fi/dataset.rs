@@ -122,5 +122,13 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::BrowserLocalPaths => {
             "Paikallisia tiedostopolkuja ei voi lukea suoraan selaimessa verkon hiekkalaatikon tietoturvan vuoksi.\n\nPaikallisten aineistojen katselu selaimessa:\n1. Jaa kansio tai tiedosto paikallisella HTTP-palvelimella: `npx serve` tai `python3 -m http.server`\n2. Syötä URL: `http://localhost:8000/my_dataset`\n\nTai käytä Octantin natiivia työpöytäversiota (`cargo run --release`)."
         }
+        DatasetKey::Plate => "Levy",
+        DatasetKey::PlateAcquisition => "Kuvaus",
+        DatasetKey::PlateAllAcquisitions => "Kaikki",
+        DatasetKey::PlateFields => "Kentät:",
+        DatasetKey::PlatePickWell => "Valitse kuoppa nähdäksesi sen kentät",
+        DatasetKey::PlateLoadingFields => "Luetaan kuopan kenttiä",
+        DatasetKey::PlateNoFields => "Tässä kuvauksessa ei ole kenttiä",
+        DatasetKey::CategoryMicroscopy => "Mikroskopia",
     })
 }

@@ -33,6 +33,7 @@ impl OctantApp {
             layer.color.range_min = data.min_val;
             layer.color.range_max = data.max_val;
             layer.color.lock_bounds = false;
+            super::greyscale::apply_greyscale_display(layer);
         } else {
             layer.color.global_min = layer.color.global_min.min(data.min_val);
             layer.color.global_max = layer.color.global_max.max(data.max_val);
@@ -62,12 +63,18 @@ impl OctantApp {
             && data.height > 1
             && (self.enable_pyramid_resampling || is_oversized)
         {
+            // Label ids are never averaged: their pyramid keeps one id per cell.
+            let op = if layer.labels().is_some() {
+                crate::data::AggregationOp::Nearest
+            } else {
+                self.pyramid_aggregation_op
+            };
             let pyramid = Arc::new(crate::data::MatrixPyramid::new(
                 &data.values,
                 data.width,
                 data.height,
                 &data.dataset_name,
-                self.pyramid_aggregation_op,
+                op,
                 512,
             ));
             layer.data.resampler.set_pyramid(Some(pyramid.clone()));
@@ -94,6 +101,18 @@ impl OctantApp {
         };
 
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
+            // A label image's colors, built once per variable.
+            if let Some(style) = layer.source.labels() {
+                if is_new_variable || layer.renderers.labels.is_none() {
+                    layer.renderers.labels = Some(Arc::new(crate::plots::LabelRenderer::new(
+                        &wgpu_render_state.device,
+                        wgpu_render_state.target_format,
+                        &style.info,
+                    )));
+                }
+            } else {
+                layer.renderers.labels = None;
+            }
             let same_grid = layer
                 .data
                 .matrix

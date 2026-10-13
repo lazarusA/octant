@@ -13,6 +13,7 @@ mod line_profile_tests;
 pub mod line_series;
 pub mod navigation;
 mod notifications;
+pub mod plate;
 pub mod playback;
 pub mod plot_configs;
 pub mod plot_type;

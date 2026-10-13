@@ -184,5 +184,29 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "Ninguno",
         SettingsKey::ChannelTintHover => "Haga clic para personalizar el tinte del canal",
         SettingsKey::BandNumber => "Banda {}",
+        SettingsKey::ScaleBar => "Barra de escala",
+        SettingsKey::ShowScaleBarHover => "Mostrar la barra de escala",
+        SettingsKey::HideScaleBarHover => "Ocultar la barra de escala",
+        SettingsKey::ChannelsAuto => "Auto",
+        SettingsKey::ChannelsAutoHover => {
+            "Ajustar la ventana de cada canal a los datos mostrados (del 0,1 al 99,9 por ciento de sus valores)"
+        }
+        SettingsKey::ChannelsAutoUnavailable => "El contraste automático lee el corte 2D mostrado",
+        SettingsKey::ChannelSettingsHover => "Ventana, curva e inversión",
+        SettingsKey::ChannelWindow => "Ventana",
+        SettingsKey::ChannelWindowHover => {
+            "Los valores de inicio a fin recorren el canal del negro a su color pleno"
+        }
+        SettingsKey::ChannelInvert => "Invertir",
+        SettingsKey::ChannelCurve => "Curva",
+        SettingsKey::CurveLinear => "Lineal",
+        SettingsKey::CurveLogarithmic => "Logarítmica",
+        SettingsKey::CurveExponential => "Exponencial",
+        SettingsKey::CurvePolynomial => "Polinómica",
+        SettingsKey::ChannelCoefficientHover => "Coeficiente de la curva",
+        SettingsKey::LabelsFill => "Relleno",
+        SettingsKey::LabelsFillHover => "Colorear cada etiqueta entera",
+        SettingsKey::LabelsOutline => "Contorno",
+        SettingsKey::LabelsOutlineHover => "Dibujar solo los bordes entre etiquetas",
     })
 }

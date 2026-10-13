@@ -44,12 +44,14 @@ fn test_colorbar_default_and_custom_label() {
         time_coverage_end: None,
         temporal_resolution: None,
         attributes: attrs,
+        ome: None,
     };
     let meta = DatasetMetadata {
         name: "test_dataset".to_string(),
         store_type: "zarr".to_string(),
         variables: vec![var],
         dimension_coordinates: HashMap::new(),
+        ome: None,
     };
     app.layers.base.selection_mut().metadata = Some(meta);
     app.layers.base.selection_mut().variable_idx = 0;

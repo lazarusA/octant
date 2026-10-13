@@ -86,6 +86,7 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
         time_coverage_end: None,
         file_size: 20 * 32 * 32 * 4,
         attributes: std::collections::HashMap::new(),
+        ome: None,
     });
     app.load_new_metadata(meta);
 

@@ -43,5 +43,11 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "El texto en {} de este conjunto de datos puede verse como recuadros. Instale una fuente como Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => {
+            "Los metadatos OME-Zarr no cumplen la especificación"
+        }
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Los metadatos de la versión {} de {} no siguen la especificación; se muestra lo que se pudo leer."
+        }
     })
 }

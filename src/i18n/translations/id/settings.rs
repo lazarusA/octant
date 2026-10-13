@@ -153,5 +153,31 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "Tidak ada",
         SettingsKey::ChannelTintHover => "Klik untuk menyesuaikan warna rona kanal",
         SettingsKey::BandNumber => "Band {}",
+        SettingsKey::ScaleBar => "Bilah skala",
+        SettingsKey::ShowScaleBarHover => "Tampilkan bilah skala",
+        SettingsKey::HideScaleBarHover => "Sembunyikan bilah skala",
+        SettingsKey::ChannelsAuto => "Otomatis",
+        SettingsKey::ChannelsAutoHover => {
+            "Sesuaikan jendela setiap kanal dengan data yang ditampilkan (0,1 hingga 99,9 persen nilainya)"
+        }
+        SettingsKey::ChannelsAutoUnavailable => {
+            "Kontras otomatis membaca irisan 2D yang ditampilkan"
+        }
+        SettingsKey::ChannelSettingsHover => "Jendela, kurva, dan inversi",
+        SettingsKey::ChannelWindow => "Jendela",
+        SettingsKey::ChannelWindowHover => {
+            "Nilai dari awal hingga akhir membentang dari hitam hingga warna penuh kanal"
+        }
+        SettingsKey::ChannelInvert => "Balik",
+        SettingsKey::ChannelCurve => "Kurva",
+        SettingsKey::CurveLinear => "Linear",
+        SettingsKey::CurveLogarithmic => "Logaritmik",
+        SettingsKey::CurveExponential => "Eksponensial",
+        SettingsKey::CurvePolynomial => "Polinomial",
+        SettingsKey::ChannelCoefficientHover => "Koefisien kurva",
+        SettingsKey::LabelsFill => "Isi",
+        SettingsKey::LabelsFillHover => "Warnai setiap label secara penuh",
+        SettingsKey::LabelsOutline => "Garis tepi",
+        SettingsKey::LabelsOutlineHover => "Gambar hanya batas antar label",
     })
 }

@@ -10,20 +10,15 @@ impl OctantApp {
             .plotted_variable_info()
             .or_else(|| self.selected_variable_info())
         {
+            // OME-Zarr physical voxel size along the named axis.
             let get_scale = |axis_name: &str| -> Option<f32> {
-                for (k, v) in &var.attributes {
-                    let is_match = k.eq_ignore_ascii_case(axis_name)
-                        || (k.len() == 6 + axis_name.len()
-                            && k[..6].eq_ignore_ascii_case("scale_")
-                            && k[6..].eq_ignore_ascii_case(axis_name));
-                    if is_match
-                        && let Ok(val) = v.parse::<f32>()
-                        && val > 0.0
-                    {
-                        return Some(val);
-                    }
-                }
-                None
+                let ome = var.ome.as_ref()?;
+                let axis = var
+                    .dimension_names
+                    .iter()
+                    .position(|d| d.eq_ignore_ascii_case(axis_name))?;
+                let scale = ome.scale(axis)?.abs() as f32;
+                (scale.is_finite() && scale > 0.0).then_some(scale)
             };
 
             let x_name = self.get_spatial_dim_name(0);
@@ -184,7 +179,28 @@ impl OctantApp {
             return 2.0;
         }
         let (w, h) = self.active_data_dimensions_2d();
-        (w as f32 / (h as f32).max(1.0)).max(0.001)
+        let pixels = w as f32 / (h as f32).max(1.0);
+        (pixels * self.pixel_aspect_2d()).max(0.001)
+    }
+
+    /// Physical width over height of one pixel of the plotted OME-Zarr level
+    /// (anisotropic pixels), 1 for other data.
+    fn pixel_aspect_2d(&self) -> f32 {
+        let Some(var) = self.plotted_variable_info() else {
+            return 1.0;
+        };
+        let Some(ome) = &var.ome else {
+            return 1.0;
+        };
+        let step = |axis: usize| {
+            ome.scale(self.get_spatial_dim_index(axis))
+                .map(f64::abs)
+                .filter(|s| s.is_finite() && *s > 0.0)
+        };
+        match (step(0), step(1)) {
+            (Some(sx), Some(sy)) => (sx / sy) as f32,
+            _ => 1.0,
+        }
     }
 
     /// Computes data aspect scaling factors [scale_x, scale_y] to preserve proportional aspect framing.

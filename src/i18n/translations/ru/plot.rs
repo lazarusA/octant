@@ -31,5 +31,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::Requires3D => "Нужны 3D-данные",
         PlotKey::DisabledGpuLimit => "Отключено: {} MB > лимит GPU 128 MB",
         PlotKey::ScalarField => "Скалярное поле",
+        PlotKey::LabelsHeatmapOnly => "Изображения меток рисуются на тепловой карте",
     })
 }

@@ -4,6 +4,10 @@ pub mod common;
 pub mod device;
 pub mod fullscreen;
 pub mod heatmap;
+pub mod label_palette;
+pub mod labels;
+#[cfg(test)]
+mod labels_tests;
 pub mod line;
 pub mod mesh;
 mod mesh_draw;
@@ -26,6 +30,7 @@ pub use coastline::{
 };
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::{HeatmapCallback, HeatmapRenderer};
+pub use labels::{LabelCallback, LabelRenderer};
 pub use line::{LineCallback, LineRenderer, LineShape};
 pub use mesh::Mesh3DRenderer;
 pub use mesh_draw::{
@@ -179,6 +184,14 @@ mod tests {
             (
                 "heatmap",
                 crate::assemble_plot_with_coords_shader!(include_str!("shaders/heatmap.wgsl")),
+            ),
+            (
+                "labels",
+                concat!(
+                    include_str!("shaders/common/coords.wgsl"),
+                    "\n",
+                    include_str!("shaders/labels.wgsl")
+                ),
             ),
             (
                 "volume_hardware_filter",

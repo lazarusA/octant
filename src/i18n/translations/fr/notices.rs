@@ -43,5 +43,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "Le texte en {} de ce jeu de données peut s'afficher sous forme de carrés. Installez une police comme Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "Les métadonnées OME-Zarr ne sont pas conformes",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Les métadonnées en version {} de {} ne suivent pas la spécification ; affichage de ce qui a pu être lu."
+        }
     })
 }

@@ -20,9 +20,15 @@ pub fn fetch_all_dimension_coordinates_for_variables(
     let url_hint = store_url_hint.unwrap_or("local");
     let group_prefixes = group_prefixes(variables);
     for var in variables {
-        add_omero_labels(&mut coords_map, var);
-    }
-    for var in variables {
+        if let Some(ome) = &var.ome {
+            // OME-Zarr images have no coordinate arrays: their metadata places them.
+            let coords =
+                crate::data::ome::coords::level_coordinates(ome, &var.dimension_names, &var.shape);
+            for (name, values) in coords {
+                DimKeys::scoped(var, &name).insert(&mut coords_map, values);
+            }
+            continue;
+        }
         let total_dims = var.dimension_names.len();
         for (i, name) in var.dimension_names.iter().enumerate() {
             let keys = DimKeys::new(var, name);
@@ -72,28 +78,6 @@ fn group_prefixes(variables: &[VariableInfo]) -> Vec<String> {
     prefixes
 }
 
-/// OME-Zarr channel names (`omero_channels`, comma separated) as labels of `var`'s
-/// channel dimensions; empty names are skipped.
-fn add_omero_labels(coords_map: &mut HashMap<String, CoordValues>, var: &VariableInfo) {
-    let Some(ch_str) = var.attributes.get("omero_channels") else {
-        return;
-    };
-    let labels: Vec<String> = ch_str
-        .split(',')
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(str::to_string)
-        .collect();
-    let Some(labels) = CoordValues::from_labels(labels) else {
-        return;
-    };
-    for name in &var.dimension_names {
-        if crate::data::coordinates::naming::is_channel_dim_name(name) {
-            DimKeys::new(var, name).insert(coords_map, labels.clone());
-        }
-    }
-}
-
 /// The keys a variable's dimension coordinate is stored under.
 struct DimKeys<'a> {
     name: &'a str,
@@ -108,6 +92,18 @@ impl<'a> DimKeys<'a> {
         let scoped = var
             .group_path()
             .map(|_| format!("{}/{clean}", var.name.trim().to_lowercase()));
+        Self {
+            name,
+            clean,
+            scoped,
+        }
+    }
+
+    /// Keys always scoped to the variable: an OME-Zarr level's own coordinates
+    /// (each level has its own scale).
+    fn scoped(var: &VariableInfo, name: &'a str) -> Self {
+        let clean = name.trim().to_lowercase();
+        let scoped = Some(format!("{}/{clean}", var.name.trim().to_lowercase()));
         Self {
             name,
             clean,

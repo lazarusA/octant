@@ -168,5 +168,29 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "Нет",
         SettingsKey::ChannelTintHover => "Нажмите, чтобы настроить оттенок канала",
         SettingsKey::BandNumber => "Канал {}",
+        SettingsKey::ScaleBar => "Масштабная линейка",
+        SettingsKey::ShowScaleBarHover => "Показать масштабную линейку",
+        SettingsKey::HideScaleBarHover => "Скрыть масштабную линейку",
+        SettingsKey::ChannelsAuto => "Авто",
+        SettingsKey::ChannelsAutoHover => {
+            "Подогнать окно каждого канала под показанные данные (от 0,1 до 99,9 процента его значений)"
+        }
+        SettingsKey::ChannelsAutoUnavailable => "Автоконтраст читает показанный 2D-срез",
+        SettingsKey::ChannelSettingsHover => "Окно, кривая и инверсия",
+        SettingsKey::ChannelWindow => "Окно",
+        SettingsKey::ChannelWindowHover => {
+            "Значения от начала до конца идут от черного до полного цвета канала"
+        }
+        SettingsKey::ChannelInvert => "Инвертировать",
+        SettingsKey::ChannelCurve => "Кривая",
+        SettingsKey::CurveLinear => "Линейная",
+        SettingsKey::CurveLogarithmic => "Логарифмическая",
+        SettingsKey::CurveExponential => "Экспоненциальная",
+        SettingsKey::CurvePolynomial => "Полиномиальная",
+        SettingsKey::ChannelCoefficientHover => "Коэффициент кривой",
+        SettingsKey::LabelsFill => "Заливка",
+        SettingsKey::LabelsFillHover => "Закрасить каждую метку целиком",
+        SettingsKey::LabelsOutline => "Контур",
+        SettingsKey::LabelsOutlineHover => "Рисовать только границы между метками",
     })
 }

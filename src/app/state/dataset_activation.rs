@@ -42,7 +42,8 @@ impl OctantApp {
                     meta.name,
                     meta.variables.len()
                 );
-                self.layout.show_variables_overlay = true;
+                self.follow_plate(&meta);
+                self.layout.show_variables_overlay = !meta.variables.is_empty();
                 self.load_new_metadata(meta);
                 return true;
             }
@@ -170,12 +171,10 @@ impl OctantApp {
         })
     }
 
-    /// Returns true if the currently plotted variable represents an OME-Zarr / bioimaging dataset with OMERO channels.
+    /// Whether the plotted variable is an OME-Zarr image (bioimaging, never geographic).
     pub fn is_ome_dataset(&self) -> bool {
-        let Some(var) = self.plotted_variable_info() else {
-            return false;
-        };
-        var.attributes.contains_key("omero_channels") || var.attributes.contains_key("omero_colors")
+        self.plotted_variable_info()
+            .is_some_and(|v| v.ome.is_some())
     }
 
     /// Returns true if the active dataset represents a GeoTIFF.
@@ -222,9 +221,13 @@ impl OctantApp {
     }
 }
 
-/// The channel/band dimension of `var`: one named like a channel, else the
-/// first of a variable with 3 or more dimensions.
+/// The channel/band dimension of `var`: an OME-Zarr image's channel axis,
+/// else one named like a channel, else the first of a variable with 3 or
+/// more dimensions.
 pub(crate) fn channel_dim(var: &crate::data::VariableInfo) -> Option<usize> {
+    if let Some(ome) = &var.ome {
+        return ome.image.axis_of_kind(crate::data::ome::AxisKind::Channel);
+    }
     var.dimension_names
         .iter()
         .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))

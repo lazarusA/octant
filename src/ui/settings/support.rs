@@ -48,6 +48,8 @@ pub(crate) struct PlotState {
     pub translucent: bool,
     /// Coastlines fit the data (not microscopy, not a channel overlay).
     pub geographic: bool,
+    /// The x axis has a physical length (an OME-Zarr pixel size).
+    pub physical: bool,
 }
 
 /// Support of every setting whose effect depends on the plot.
@@ -72,6 +74,8 @@ pub(crate) struct OptionSupport {
     pub aggregation: Support,
     /// Auto rotate and reset view.
     pub camera: Support,
+    /// The scale bar of 2D images with a physical pixel size.
+    pub scale_bar: Support,
 }
 
 impl PlotState {
@@ -93,6 +97,7 @@ impl PlotState {
             line_all_series: false,
             translucent: layer.color.is_translucent(),
             geographic: false,
+            physical: false,
         }
     }
 
@@ -107,6 +112,7 @@ impl PlotState {
             line_all_series: app.plot_configs.line.all_series,
             translucent: app.has_color_alpha(),
             geographic: !app.is_ome_dataset() && base.composite.channel_configs.is_empty(),
+            physical: crate::ui::scale_bar::meters_per_pixel(app).is_some(),
         }
     }
 
@@ -124,6 +130,7 @@ impl PlotState {
             // while it is on, the plot type menu keeps to the heatmap.
             aggregation: support_if(self.plot_type == PlotType::Heatmap),
             camera: support_if(self.plot_type.is_3d()),
+            scale_bar: support_if(self.physical && self.plot_type == PlotType::Heatmap),
         }
     }
 

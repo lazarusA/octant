@@ -39,5 +39,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "Text på {} i detta dataset kan visas som rutor. Installera ett typsnitt som Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr-metadata följer inte specifikationen",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Metadata i version {} för {} följer inte specifikationen; det som kunde läsas visas."
+        }
     })
 }

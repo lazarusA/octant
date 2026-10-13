@@ -35,5 +35,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "此数据集中的 {} 文本可能显示为方框。请安装 Noto Sans CJK 等字体。"
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr 元数据不符合规范",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "{} 版本的元数据（{}）不符合规范；仅显示可读取的部分。"
+        }
     })
 }

@@ -168,5 +168,29 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "Жодного",
         SettingsKey::ChannelTintHover => "Клацніть, щоб налаштувати відтінок каналу",
         SettingsKey::BandNumber => "Канал {}",
+        SettingsKey::ScaleBar => "Шкала масштабу",
+        SettingsKey::ShowScaleBarHover => "Показати шкалу масштабу",
+        SettingsKey::HideScaleBarHover => "Сховати шкалу масштабу",
+        SettingsKey::ChannelsAuto => "Авто",
+        SettingsKey::ChannelsAutoHover => {
+            "Підігнати вікно кожного каналу до показаних даних (від 0,1 до 99,9 відсотка його значень)"
+        }
+        SettingsKey::ChannelsAutoUnavailable => "Автоконтраст читає показаний 2D-зріз",
+        SettingsKey::ChannelSettingsHover => "Вікно, крива та інверсія",
+        SettingsKey::ChannelWindow => "Вікно",
+        SettingsKey::ChannelWindowHover => {
+            "Значення від початку до кінця проходять від чорного до повного кольору каналу"
+        }
+        SettingsKey::ChannelInvert => "Інвертувати",
+        SettingsKey::ChannelCurve => "Крива",
+        SettingsKey::CurveLinear => "Лінійна",
+        SettingsKey::CurveLogarithmic => "Логарифмічна",
+        SettingsKey::CurveExponential => "Експоненційна",
+        SettingsKey::CurvePolynomial => "Поліноміальна",
+        SettingsKey::ChannelCoefficientHover => "Коефіцієнт кривої",
+        SettingsKey::LabelsFill => "Заливка",
+        SettingsKey::LabelsFillHover => "Зафарбувати кожну мітку повністю",
+        SettingsKey::LabelsOutline => "Контур",
+        SettingsKey::LabelsOutlineHover => "Малювати лише межі між мітками",
     })
 }

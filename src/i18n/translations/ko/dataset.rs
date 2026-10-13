@@ -126,5 +126,13 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::BrowserLocalPaths => {
             "웹 샌드박스 보안 때문에 브라우저에서는 로컬 파일 경로를 직접 읽을 수 없습니다.\n\n브라우저에서 로컬 데이터셋을 보려면:\n1. 로컬 HTTP 서버로 폴더나 파일을 제공하세요: `npx serve` 또는 `python3 -m http.server`\n2. URL을 입력하세요: `http://localhost:8000/my_dataset`\n\n또는 Octant 데스크톱 버전을 실행하세요 (`cargo run --release`)."
         }
+        DatasetKey::Plate => "플레이트",
+        DatasetKey::PlateAcquisition => "획득",
+        DatasetKey::PlateAllAcquisitions => "전체",
+        DatasetKey::PlateFields => "시야:",
+        DatasetKey::PlatePickWell => "웰을 선택하면 시야가 표시됩니다",
+        DatasetKey::PlateLoadingFields => "웰의 시야를 읽는 중",
+        DatasetKey::PlateNoFields => "이 획득에는 시야가 없습니다",
+        DatasetKey::CategoryMicroscopy => "현미경",
     })
 }

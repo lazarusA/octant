@@ -19,7 +19,8 @@ pub async fn inspect_wasm_remote_zarr(url: &str) -> Result<DatasetMetadata, Stri
 
     let store = WasmZarrBlockStore::get_or_create(clean_url);
 
-    // 1. Try fetching Zarr v2 consolidated `.zmetadata`
+    // 1. Zarr v2 consolidated `.zmetadata`, kept in memory for the steps below
+    let mut consolidated = None;
     let zmetadata_url = format!("{clean_url}/.zmetadata");
     if let Ok(zmetadata_bytes) = fetch_url_bytes(&zmetadata_url).await
         && let Ok(val) = serde_json::from_slice::<serde_json::Value>(&zmetadata_bytes)
@@ -38,6 +39,19 @@ pub async fn inspect_wasm_remote_zarr(url: &str) -> Result<DatasetMetadata, Stri
             }
         }
 
+        consolidated = Some(val);
+    }
+
+    // OME-Zarr images, labels, wells and series (`crate::data::ome`)
+    if let Some(found) = store.discover_ome().await {
+        crate::data::ome::report_warnings(&found, clean_url);
+        let ome = Some(std::sync::Arc::new(found.dataset));
+        return Ok(store
+            .finalize_metadata(found.variables, ome, clean_url)
+            .await);
+    }
+
+    if let Some(val) = consolidated {
         let mut variables = Vec::new();
         if let Some(metadata_obj) = val.get("metadata").and_then(|m| m.as_object()) {
             for (key, val) in metadata_obj {
@@ -132,13 +146,14 @@ pub async fn inspect_wasm_remote_zarr(url: &str) -> Result<DatasetMetadata, Stri
                         time_coverage_end: cf_attrs.time_coverage_end,
                         temporal_resolution: cf_attrs.temporal_resolution,
                         attributes: cf_attrs.attributes,
+                        ome: None,
                     });
                 }
             }
         }
 
         if !variables.is_empty() {
-            return Ok(store.finalize_metadata(variables, clean_url).await);
+            return Ok(store.finalize_metadata(variables, None, clean_url).await);
         }
     }
 
@@ -179,7 +194,7 @@ pub async fn inspect_wasm_remote_zarr(url: &str) -> Result<DatasetMetadata, Stri
             };
 
             if !variables.is_empty() {
-                return Ok(store.finalize_metadata(variables, clean_url).await);
+                return Ok(store.finalize_metadata(variables, None, clean_url).await);
             }
         }
 
@@ -187,44 +202,9 @@ pub async fn inspect_wasm_remote_zarr(url: &str) -> Result<DatasetMetadata, Stri
         if let Ok(arr) = open_or_instantiate_array_normalized(store.memory_store.clone(), "/")
             && let Some(var_info) = variable_info_from_array(&arr, "data")
         {
-            return Ok(store.finalize_metadata(vec![var_info], clean_url).await);
-        }
-    }
-
-    // 3. Fallback: Unconsolidated OME-Zarr root .zattrs and .zgroup
-    let root_zattrs_url = format!("{clean_url}/.zattrs");
-    if let Ok(zattrs_bytes) = fetch_url_bytes(&root_zattrs_url).await
-        && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&zattrs_bytes)
-        && let Some(root_map) = v.as_object()
-    {
-        let _ = store.insert_key_bytes(".zattrs", &zattrs_bytes);
-        let root_zgroup_url = format!("{clean_url}/.zgroup");
-        if let Ok(zgroup_bytes) = fetch_url_bytes(&root_zgroup_url).await {
-            let _ = store.insert_key_bytes(".zgroup", &zgroup_bytes);
-        }
-
-        let normalized = crate::utils::metadata::normalize_ngff_attributes(root_map.clone());
-        if let Ok(root_zattrs) = serde_json::from_value::<crate::utils::metadata::ome::RootZattrs>(
-            serde_json::Value::Object(normalized),
-        ) && let Some(multiscale) = root_zattrs.multiscales.first()
-        {
-            for ds in &multiscale.datasets {
-                let clean_path = ds.path.trim_matches('/');
-                let zarray_url = format!("{clean_url}/{clean_path}/.zarray");
-                if let Ok(zarray_bytes) = fetch_url_bytes(&zarray_url).await {
-                    let _ = store.insert_key_bytes(&format!("{clean_path}/.zarray"), &zarray_bytes);
-                }
-            }
-
-            let variables = crate::utils::metadata::extract_ome_multiscale_variables(
-                store.memory_store.clone(),
-                root_map,
-                "",
-            );
-
-            if !variables.is_empty() {
-                return Ok(store.finalize_metadata(variables, clean_url).await);
-            }
+            return Ok(store
+                .finalize_metadata(vec![var_info], None, clean_url)
+                .await);
         }
     }
 

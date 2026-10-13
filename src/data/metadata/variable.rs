@@ -16,6 +16,8 @@ pub struct VariableInfo {
     pub time_coverage_end: Option<String>,
     pub temporal_resolution: Option<String>,
     pub attributes: HashMap<String, String>,
+    /// The OME-Zarr image and level this variable is, for OME-Zarr stores.
+    pub ome: Option<crate::data::ome::OmeRef>,
 }
 
 impl VariableInfo {
@@ -33,6 +35,16 @@ impl VariableInfo {
         } else {
             None
         }
+    }
+
+    /// The physical unit symbol (`µm`, `s`) of dimension `dim`, for OME-Zarr images.
+    pub fn dimension_unit(&self, dim: &str) -> Option<&str> {
+        let ome = self.ome.as_ref()?;
+        let axis = self
+            .dimension_names
+            .iter()
+            .position(|d| d.eq_ignore_ascii_case(dim))?;
+        ome.image.axes.get(axis)?.unit_symbol()
     }
 
     /// Resolves spatial X, Y, and Z dimension indices for this variable using explicit spatial role configs

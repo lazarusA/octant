@@ -12,13 +12,15 @@ pub mod volume_rgb;
 #[cfg(test)]
 mod cmyk_tests;
 #[cfg(test)]
+mod display_tests;
+#[cfg(test)]
 mod tests;
 
 pub use cmyk::slice_cmyk_composite;
 pub use multichannel::slice_multichannel_composite_nd;
 pub use probe::CompositeProbe;
 pub use rgb::{slice_rgb_composite, slice_rgb_composite_nd};
-pub use types::{ChannelColorConfig, DEFAULT_CHANNEL_COLORS, parse_hex_color};
+pub use types::{ChannelColorConfig, ChannelDisplay, DEFAULT_CHANNEL_COLORS, parse_hex_color};
 pub use utils::{
     compute_channel_normalization, compute_normalization_scale, linear_to_srgb,
     normalize_channel_value, pack_rgb, unpack_rgb,

@@ -13,6 +13,7 @@ pub mod field;
 pub mod format;
 pub mod hit;
 mod hit_cache;
+pub mod labels;
 mod march;
 pub mod overlays;
 pub mod raycast_sphere;
@@ -124,6 +125,15 @@ pub fn show_hover_tooltip(
         hit.point_3d,
     );
 
+    // A label image reads its id, color and properties instead of a value.
+    let (swatch, value, units_str) = match labels::label_reading(&app.layers.base, raw_val) {
+        Some((value, swatch, properties)) => (swatch, value, properties),
+        None => (
+            resolve_hover_color(app, raw_val, py),
+            HoverValue::from_raw(raw_val, composite),
+            units_str,
+        ),
+    };
     paint_hover_card(
         app,
         ctx,
@@ -131,8 +141,8 @@ pub fn show_hover_tooltip(
         hover_pos,
         target_pos,
         canvas_plot_type,
-        resolve_hover_color(app, raw_val, py),
-        HoverValue::from_raw(raw_val, composite),
+        swatch,
+        value,
         var_name,
         var,
         units_str,

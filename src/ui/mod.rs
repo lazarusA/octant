@@ -30,7 +30,9 @@ pub mod panel_layout;
 mod panel_layout_tests;
 #[cfg(test)]
 mod panel_width_tests;
+pub mod plate;
 pub mod plot_type;
+pub mod scale_bar;
 pub mod settings;
 pub mod status;
 pub mod temp_cache;

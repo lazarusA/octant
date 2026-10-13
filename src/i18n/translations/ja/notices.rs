@@ -41,5 +41,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "このデータセットの {} のテキストが四角で表示される場合があります。Noto Sans CJK などのフォントをインストールしてください。"
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr メタデータが仕様に準拠していません",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "バージョン {} のメタデータ（{}）が仕様に従っていません。読み取れた内容を表示します。"
+        }
     })
 }

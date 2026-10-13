@@ -26,6 +26,7 @@ pub fn inspect_tiff(tiff: &TIFF, source_name: &str) -> DatasetMetadata {
         store_type: "GeoTIFF".to_string(),
         variables,
         dimension_coordinates,
+        ome: None,
     }
 }
 
@@ -130,6 +131,7 @@ fn add_raster_variable(
         time_coverage_end: None,
         temporal_resolution: None,
         attributes: info.attributes.clone(),
+        ome: None,
     });
 }
 
@@ -164,6 +166,7 @@ fn add_band_variables(
             time_coverage_end: None,
             temporal_resolution: None,
             attributes: band_attributes,
+            ome: None,
         });
     }
 }

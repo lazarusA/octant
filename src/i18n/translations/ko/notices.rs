@@ -41,5 +41,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "이 데이터셋의 {} 텍스트가 네모로 표시될 수 있습니다. Noto Sans CJK 같은 글꼴을 설치하세요."
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr 메타데이터가 사양을 따르지 않습니다",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "{} 버전 메타데이터({})가 사양을 따르지 않습니다. 읽을 수 있는 내용만 표시합니다."
+        }
     })
 }

@@ -66,8 +66,16 @@ fn inherited_attributes(
         } else {
             format!("/{ancestor}")
         };
-        if let Ok(grp) = zarrs::group::Group::open(store.clone(), &p) {
-            for (k, v) in grp.attributes() {
+        // Groups the web fetched without `.zgroup` still have their attributes.
+        let group_attrs = match zarrs::group::Group::open(store.clone(), &p) {
+            Ok(grp) => Some(grp.attributes().clone()),
+            Err(_) => {
+                let reader = crate::data::ome::MetaReader::direct(store.clone());
+                reader.group_attributes(ancestor).ok().flatten()
+            }
+        };
+        if let Some(group_attrs) = group_attrs {
+            for (k, v) in &group_attrs {
                 attributes
                     .entry(k.clone())
                     .or_insert_with(|| attr_string(v));
@@ -80,13 +88,16 @@ fn inherited_attributes(
     attributes
 }
 
-/// The values of the window `origin..origin + shape` of `array`, through `cache`.
+/// The values of the window `origin..origin + shape` of `array`, through
+/// `cache`; label ids kept bit-exact when `labels` (see
+/// `retrieve_array_subset_as_label_bits`).
 fn read_window(
     array: &ZarrArrayHandle,
     cache: &ChunkCacheDecodedLruSizeLimit,
     variable: &str,
     (origin, shape): (&[usize], &[usize]),
-) -> Result<Vec<f32>, BlockStoreError> {
+    labels: bool,
+) -> Result<(Vec<f32>, bool), BlockStoreError> {
     let ranges: Vec<_> = origin
         .iter()
         .zip(shape)
@@ -98,10 +109,17 @@ fn read_window(
         subset.to_ranges(),
         subset.num_elements(),
     );
-    retrieve_array_subset_as_f32(array, Some(cache), &subset).map_err(|e| {
+    if labels
+        && let Some(ids) =
+            super::slice::retrieve_array_subset_as_label_bits(array, Some(cache), &subset)?
+    {
+        return Ok((ids, true));
+    }
+    let values = retrieve_array_subset_as_f32(array, Some(cache), &subset).map_err(|e| {
         log::error!("[ZarrBlock] Failed to retrieve array subset for '{variable}': {e:?}");
         BlockStoreError::from(e.to_string())
-    })
+    })?;
+    Ok((values, false))
 }
 
 /// Fetches an arbitrary-rank hyperslab from an already-opened `ZarrArrayHandle` through a chunk cache.
@@ -115,12 +133,39 @@ pub fn fetch_block_from_cached_array(
 ) -> Result<OctantBlock, BlockStoreError> {
     let full_shape = array.shape();
     let (mut origin, mut block_shape) = selection_window(request, full_shape)?;
-    let raw_values = read_window(array, cache, &request.variable, (&origin, &block_shape))?;
+    let mut attributes = inherited_attributes(array, &store, &request.variable);
+    let labels = crate::data::ome::axes::is_label_image(&attributes);
+    let (raw_values, ids) = read_window(
+        array,
+        cache,
+        &request.variable,
+        (&origin, &block_shape),
+        labels,
+    )?;
     if let Some(ref mut cb) = on_progress {
         cb((raw_values.len() * std::mem::size_of::<f32>()) as u64);
     }
-
-    let attributes = inherited_attributes(array, &store, &request.variable);
+    if ids {
+        attributes.insert(
+            crate::data::ome::axes::LABEL_BITS_ATTRIBUTE.to_string(),
+            "true".to_string(),
+        );
+    }
+    // OME-Zarr images are rasters stored row 0 at the top, named by their axes
+    // and placed by their metadata: no orientation, no coordinate arrays.
+    if let Some(dim_names) =
+        crate::data::ome::axes::block_dimension_names(&attributes, full_shape.len())
+    {
+        return Ok(OctantBlock::new(
+            request.variable.clone(),
+            block_shape,
+            dim_names,
+            origin,
+            raw_values,
+            HashMap::new(),
+            attributes,
+        ));
+    }
     let mut dim_names = crate::utils::resolve_array_dimension_names(array);
     let window = BlockWindow {
         dim_names: &dim_names,

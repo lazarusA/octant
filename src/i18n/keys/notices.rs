@@ -30,5 +30,8 @@ crate::i18n::keys::define_keys! {
     FontLoadFailedDetail,
     DataFontMissing,
     DataFontMissingDetail,
+    // OME-Zarr metadata
+    OmeMetadataNonConforming,
+    OmeMetadataNonConformingDetail,
     }
 }

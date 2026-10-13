@@ -31,5 +31,7 @@ crate::i18n::keys::define_keys! {
     DisabledGpuLimit,
     // Layers
     ScalarField,
+    // Label images
+    LabelsHeatmapOnly,
     }
 }

@@ -41,5 +41,9 @@ pub fn text(key: NoticesKey) -> &'static str {
         NoticesKey::DataFontMissingDetail => {
             "{} text in this dataset may show as boxes. Install a font such as Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr metadata doesn't conform",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "The version {} metadata of {} doesn't follow the specification; showing what could be read."
+        }
     }
 }

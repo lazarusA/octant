@@ -199,3 +199,21 @@ fn v2_unicode_null_fill_becomes_empty_string() {
     // Numeric arrays keep their missing fill value.
     assert!(v2("<f4", serde_json::Value::Null).is_null());
 }
+
+#[test]
+fn legacy_v2_text_fills_and_empty_filters_are_repaired() {
+    let zarray = |dtype: &str, fill: serde_json::Value| {
+        serde_json::json!({
+            "shape": [2], "chunks": [2], "fill_value": fill, "dtype": dtype,
+            "filters": [], "zarr_format": 2, "compressor": null, "order": "C"
+        })
+    };
+    let fixed = normalize_v3_array_metadata(zarray(">u2", serde_json::json!("0")));
+    assert_eq!(fixed["fill_value"], serde_json::json!(0));
+    assert!(fixed["filters"].is_null());
+    assert!(serde_json::from_value::<zarrs::metadata::ArrayMetadata>(fixed).is_ok());
+    let fixed = normalize_v3_array_metadata(zarray("<f4", serde_json::json!("NaN")));
+    assert_eq!(fixed["fill_value"], serde_json::json!("NaN"));
+    let fixed = normalize_v3_array_metadata(zarray("<i4", serde_json::json!("-3")));
+    assert_eq!(fixed["fill_value"], serde_json::json!(-3));
+}

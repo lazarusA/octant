@@ -242,3 +242,17 @@ fn line_series_colors_keep_the_categorical_toggle() {
     assert!(overridden(line(true, false)), "custom color");
     assert!(overridden(line(true, true)), "custom color");
 }
+
+#[test]
+fn scale_bar_needs_a_physical_heatmap() {
+    let physical = |plot_type| PlotState {
+        physical: true,
+        ..state(plot_type)
+    };
+    assert_eq!(
+        physical(PlotType::Heatmap).support().scale_bar,
+        Support::Yes
+    );
+    assert_eq!(state(PlotType::Heatmap).support().scale_bar, Support::No);
+    assert_eq!(physical(PlotType::Volume).support().scale_bar, Support::No);
+}

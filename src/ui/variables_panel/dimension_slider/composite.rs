@@ -9,22 +9,16 @@ pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
     init_layer_composite_defaults(app, LayerId::BASE, var_info);
 }
 
-/// Initializes layer `id`'s composite for `var_info`: OMERO channel configs
-/// for a channel dimension (multi-channel overlay), RGB on for a 3+ band
-/// GeoTIFF, otherwise off.
+/// Initializes layer `id`'s composite for `var_info`: OME-Zarr channel
+/// configs for a channel dimension (multi-channel overlay), RGB on for a 3+
+/// band GeoTIFF, otherwise off.
 pub fn init_layer_composite_defaults(app: &mut OctantApp, id: LayerId, var_info: &VariableInfo) {
     let rank = var_info.shape.len();
     let is_tiff = app.layer_is_geotiff(id);
-    let has_omero = var_info.attributes.contains_key("omero_channels")
-        || var_info.attributes.contains_key("omero_colors");
     let configs = if is_tiff {
         Vec::new()
     } else {
-        var_info
-            .dimension_names
-            .iter()
-            .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
-            .or((has_omero && rank >= 3).then_some(0))
+        composite_channel_dim(var_info)
             .map(|c| var_info.shape.get(c).copied().unwrap_or(0) as usize)
             .filter(|&channels| channels >= 2)
             .map(|channels| extract_channel_configs(var_info, channels))
@@ -36,71 +30,61 @@ pub fn init_layer_composite_defaults(app: &mut OctantApp, id: LayerId, var_info:
     };
     let composite = &mut layer.composite;
     composite.rgb_channels = [0, 1, 2];
-    composite.enabled = (is_tiff && rank >= 3 && num_bands >= 3) || !configs.is_empty();
+    // A greyscale OME-Zarr image shows one channel; the overlay stays a toggle away.
+    let greyscale = var_info
+        .ome
+        .as_ref()
+        .is_some_and(|o| o.image.greyscale_channel().is_some());
+    composite.enabled =
+        (is_tiff && rank >= 3 && num_bands >= 3) || (!configs.is_empty() && !greyscale);
     composite.channel_configs = configs;
 }
 
+/// The channel dimension a multi-channel overlay runs across: the OME-Zarr
+/// channel axis, else a dimension named like one.
+fn composite_channel_dim(var_info: &VariableInfo) -> Option<usize> {
+    if let Some(ome) = &var_info.ome {
+        return ome.image.axis_of_kind(crate::data::ome::AxisKind::Channel);
+    }
+    var_info
+        .dimension_names
+        .iter()
+        .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
+}
+
+/// One config per channel, from the OME-Zarr `omero` channels when there are
+/// any, else default colors.
 fn extract_channel_configs(
     var_info: &VariableInfo,
     num_ch: usize,
 ) -> Vec<crate::data::slicing::ChannelColorConfig> {
-    let channel_labels: Vec<String> = var_info
-        .attributes
-        .get("omero_channels")
-        .map(|s| s.split(',').map(|c| c.trim().to_string()).collect())
-        .unwrap_or_default();
-
-    let channel_colors: Vec<String> = var_info
-        .attributes
-        .get("omero_colors")
-        .map(|s| s.split(',').map(|c| c.trim().to_string()).collect())
-        .unwrap_or_default();
-
-    let channel_windows: Vec<String> = var_info
-        .attributes
-        .get("omero_windows")
-        .map(|s| s.split(',').map(|c| c.trim().to_string()).collect())
-        .unwrap_or_default();
-
-    let channel_actives: Vec<String> = var_info
-        .attributes
-        .get("omero_actives")
-        .map(|s| s.split(',').map(|c| c.trim().to_string()).collect())
-        .unwrap_or_default();
-
-    let mut configs = Vec::with_capacity(num_ch);
-    for i in 0..num_ch {
-        // Unnamed channels stay empty and are named in the UI language
-        // when drawn ("Channel N").
-        let name = channel_labels.get(i).cloned().unwrap_or_default();
-
-        let color_rgb = channel_colors
-            .get(i)
-            .and_then(|h| crate::data::slicing::parse_hex_color(h))
-            .unwrap_or_else(|| {
+    let channels = var_info
+        .ome
+        .as_ref()
+        .map_or(&[][..], |o| o.image.channels.as_slice());
+    (0..num_ch)
+        .map(|i| match channels.get(i) {
+            // Unnamed channels stay empty and are named in the UI language
+            // when drawn ("Channel N").
+            Some(ch) => crate::data::slicing::ChannelColorConfig {
+                index: i,
+                name: ch.label.clone(),
+                color_rgb: ch.color,
+                visible: ch.active,
+                window: ch.window.map(|w| (w.start, w.end)),
+                display: crate::data::slicing::ChannelDisplay {
+                    range: ch.window.map(|w| (w.min, w.max)),
+                    inverted: ch.inverted,
+                    family: ch.family,
+                    coefficient: ch.coefficient,
+                },
+            },
+            None => crate::data::slicing::ChannelColorConfig::new(
+                i,
+                String::new(),
                 crate::data::slicing::DEFAULT_CHANNEL_COLORS
-                    [i % crate::data::slicing::DEFAULT_CHANNEL_COLORS.len()]
-            });
-
-        let visible = channel_actives
-            .get(i)
-            .map(|a| a.eq_ignore_ascii_case("true"))
-            .unwrap_or(true);
-
-        let window = channel_windows.get(i).and_then(|w_str| {
-            let mut parts = w_str.split(':');
-            let start = parts.next()?.parse::<f32>().ok()?;
-            let end = parts.next()?.parse::<f32>().ok()?;
-            Some((start, end))
-        });
-
-        configs.push(crate::data::slicing::ChannelColorConfig {
-            index: i,
-            name,
-            color_rgb,
-            visible,
-            window,
-        });
-    }
-    configs
+                    [i % crate::data::slicing::DEFAULT_CHANNEL_COLORS.len()],
+            ),
+        })
+        .collect()
 }

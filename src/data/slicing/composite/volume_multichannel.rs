@@ -141,7 +141,9 @@ fn accumulate_channel_voxels(
         .zip(val_slice.iter_mut())
     {
         if !raw.is_nan() {
-            let norm = normalize_channel_value(*raw, scale, offset, is_i8, 1.0);
+            let norm = cfg
+                .display
+                .map(normalize_channel_value(*raw, scale, offset, is_i8, 1.0));
             *r += norm * col[0];
             *g += norm * col[1];
             *b += norm * col[2];

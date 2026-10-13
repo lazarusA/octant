@@ -12,6 +12,8 @@ pub struct PlotAxisOptions<'a> {
     pub y_title: &'a str,
     pub x_units: Option<&'a str>,
     pub y_units: Option<&'a str>,
+    /// Whether y grows downward (raster rows, row 0 at the top) instead of upward.
+    pub y_down: bool,
 }
 
 /// Dynamic plot axis renderer with auto-attaching canvas borders, inward/outward ticks,
@@ -65,13 +67,26 @@ pub fn draw_plot_axes(
     let (y_min, y_max) = min_max(options.y_domain);
     let full_y = (y_max - y_min).max(1e-9);
     let ph = plot_rect.height().max(1.0) as f64;
-    let vis_y_min = y_min + ((plot_rect.bottom() - visible_bottom) as f64 / ph) * full_y;
-    let vis_y_max = y_min + ((plot_rect.bottom() - visible_top) as f64 / ph) * full_y;
+    let (vis_y_min, vis_y_max) = if options.y_down {
+        (
+            y_min + ((visible_top - plot_rect.top()) as f64 / ph) * full_y,
+            y_min + ((visible_bottom - plot_rect.top()) as f64 / ph) * full_y,
+        )
+    } else {
+        (
+            y_min + ((plot_rect.bottom() - visible_bottom) as f64 / ph) * full_y,
+            y_min + ((plot_rect.bottom() - visible_top) as f64 / ph) * full_y,
+        )
+    };
 
     let x_ticks =
         generate_constant_count_ticks(vis_x_min, vis_x_max, options.x_title, options.x_units);
-    let y_ticks =
+    let mut y_ticks =
         generate_constant_count_ticks(vis_y_min, vis_y_max, options.y_title, options.y_units);
+    // Ticks are laid out bottom to top; downward axes start from their top value.
+    if options.y_down {
+        y_ticks.reverse();
+    }
 
     // 1. BOTTOM & TOP X-AXES
     let is_bottom_close_to_nav = (canvas_rect.bottom() - plot_rect.bottom()).abs() < 28.0

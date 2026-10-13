@@ -77,8 +77,24 @@ impl Timeline {
             .filter(|c| c.matches(max_steps));
         let label_at = |i: usize| coords.and_then(|c| c.label(i));
 
+        // An OME-Zarr time axis with a unit reads its physical time ("12 s").
+        let unit = var.and_then(|v| v.dimension_unit(dim));
+        let physical = |step: usize| {
+            unit?;
+            let field = crate::ui::hover::format::format_dimension_coord(
+                meta,
+                var,
+                Some(&app.plotted().store_target),
+                dim,
+                step,
+                max_steps,
+                None,
+            );
+            Some(field.value)
+        };
         let label = |step: usize, coord: Option<&str>| match coord.filter(|c| is_display_coord(c)) {
             Some(coord) => coord.to_owned(),
+            None if unit.is_some() => physical(step).unwrap_or_default(),
             None => crate::utils::units::format_axis_value(
                 step,
                 max_steps,
@@ -97,11 +113,26 @@ impl Timeline {
             end: label(last_step, label_at(last_step)),
             step_size: var
                 .and_then(|v| v.temporal_resolution.clone())
+                .or_else(|| ome_step_size(var?, dim))
                 .unwrap_or_else(|| tr(PlaybackKey::DefaultStepSize).to_owned()),
             step,
             last_step,
         }
     }
+}
+
+/// The time between steps of an OME-Zarr image's animated axis ("2 s").
+fn ome_step_size(var: &crate::data::VariableInfo, dim: &str) -> Option<String> {
+    let unit = var.dimension_unit(dim)?;
+    let axis = var
+        .dimension_names
+        .iter()
+        .position(|d| d.eq_ignore_ascii_case(dim))?;
+    let step = var.ome.as_ref()?.scale(axis)?;
+    Some(format!(
+        "{} {unit}",
+        crate::i18n::number::Num(format_args!("{step}"))
+    ))
 }
 
 /// Name of the plotted animated dimension, or `"step"` without metadata.

@@ -41,5 +41,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "Aineiston teksti ({}) voi näkyä laatikkoina. Asenna fontti, kuten Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr-metatiedot eivät noudata määritystä",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Version {} metatiedot kohteessa {} eivät noudata määritystä; näytetään se, mikä voitiin lukea."
+        }
     })
 }

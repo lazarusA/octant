@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub use crate::data::ome::ChannelFamily;
+
 /// High-contrast default color cycle for multi-channel bioimaging overlay (napari standard).
 pub const DEFAULT_CHANNEL_COLORS: [[u8; 3]; 8] = [
     [0, 255, 0],   // Green
@@ -27,6 +29,52 @@ pub struct ChannelColorConfig {
     pub visible: bool,
     /// Optional custom display window `(start, end)` for intensity normalization.
     pub window: Option<(f32, f32)>,
+    /// How the normalized intensity maps onto the tint (OMERO family, inversion).
+    pub display: ChannelDisplay,
+}
+
+/// How a channel's normalized intensity maps onto its tint, after its window
+/// (OMERO `family`, `coefficient` and `inverted`).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ChannelDisplay {
+    /// The values the window may span (OMERO `min`..`max`), for its slider.
+    pub range: Option<(f32, f32)>,
+    pub inverted: bool,
+    pub family: ChannelFamily,
+    /// The family's curve parameter (exponent, growth), positive.
+    pub coefficient: f32,
+}
+
+impl Default for ChannelDisplay {
+    fn default() -> Self {
+        Self {
+            range: None,
+            inverted: false,
+            family: ChannelFamily::Linear,
+            coefficient: 1.0,
+        }
+    }
+}
+
+impl ChannelDisplay {
+    /// Maps a windowed intensity `norm` (0..1) through the family curve, then
+    /// inverts it. Every curve keeps 0 at 0 and 1 at 1.
+    pub fn map(&self, norm: f32) -> f32 {
+        let n = norm.clamp(0.0, 1.0);
+        let c = if self.coefficient.is_finite() && self.coefficient > 0.0 {
+            self.coefficient
+        } else {
+            1.0
+        };
+        let curved = match self.family {
+            ChannelFamily::Linear => n,
+            ChannelFamily::Polynomial => n.powf(c),
+            ChannelFamily::Exponential => (c * n).exp_m1() / c.exp_m1(),
+            ChannelFamily::Logarithmic => (c.exp_m1() * n).ln_1p() / c,
+        };
+        let curved = curved.clamp(0.0, 1.0);
+        if self.inverted { 1.0 - curved } else { curved }
+    }
 }
 
 impl ChannelColorConfig {
@@ -38,6 +86,7 @@ impl ChannelColorConfig {
             color_rgb,
             visible: true,
             window: None,
+            display: ChannelDisplay::default(),
         }
     }
 }

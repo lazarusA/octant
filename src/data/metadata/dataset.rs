@@ -10,6 +10,8 @@ pub struct DatasetMetadata {
     pub store_type: String,
     pub variables: Vec<VariableInfo>,
     pub dimension_coordinates: HashMap<String, CoordValues>,
+    /// What an OME-Zarr store holds beyond its variables (plates, series names).
+    pub ome: Option<std::sync::Arc<crate::data::ome::OmeDataset>>,
 }
 
 impl DatasetMetadata {
@@ -73,7 +75,13 @@ impl DatasetMetadata {
 
     /// Builds a hierarchical variable tree from the flat `variables` list.
     pub fn build_variable_tree(&self) -> VariableTreeGroup {
-        VariableTreeGroup::build_tree_from_variables(&self.variables)
+        let mut tree = VariableTreeGroup::build_tree_from_variables(&self.variables);
+        if let Some(ome) = &self.ome
+            && !ome.group_names.is_empty()
+        {
+            tree.apply_labels(&|path| ome.group_name(path).map(str::to_string));
+        }
+        tree
     }
 
     /// Builds a hierarchical variable tree from a slice of VariableInfo.

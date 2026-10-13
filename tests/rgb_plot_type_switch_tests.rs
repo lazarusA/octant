@@ -62,6 +62,7 @@ fn setup_rgb_app() -> OctantApp {
         time_coverage_end: None,
         file_size: 3 * 8 * 8 * 4,
         attributes: std::collections::HashMap::new(),
+        ome: None,
     });
 
     app.load_new_metadata(meta);

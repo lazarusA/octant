@@ -180,18 +180,28 @@ impl BlockStore for GenericZarrBlockStore {
 
     fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError> {
         let base_url = self.source_url.trim_end_matches('/');
-        let variables =
-            crate::utils::extract_store_variables_consolidated(self.storage.clone(), base_url)
-                .map_err(|e| e.to_string())?;
-
         let default_name = format!("{}_store", self.backend_name);
         let dataset_name = base_url.split('/').next_back().unwrap_or(&default_name);
+
+        let (variables, ome) = match crate::data::ome::discover_direct(self.storage.clone()) {
+            Some(found) => {
+                crate::data::ome::report_warnings(&found, dataset_name);
+                (found.variables, Some(Arc::new(found.dataset)))
+            }
+            None => (
+                crate::utils::extract_store_variables_consolidated(self.storage.clone(), base_url)
+                    .map_err(|e| e.to_string())?,
+                None,
+            ),
+        };
+
         Ok(DatasetMetadata {
             name: dataset_name.to_string(),
             store_type: self.store_type_label.to_string(),
             variables,
             // Read per variable (`variable_coordinates`): datasets open with metadata alone.
             dimension_coordinates: HashMap::new(),
+            ome,
         })
     }
 

@@ -148,6 +148,28 @@ impl OctantApp {
             .matrix
             .as_ref()
             .map_or(0, |m| m.grid.render_coord_mode());
+        if let (Some(style), Some(labels)) = (layer.labels(), &layer.renderers.labels) {
+            let callback = eframe::egui_wgpu::Callback::new_paint_callback(
+                view.canvas_rect,
+                crate::plots::LabelCallback {
+                    heatmap: renderer.clone(),
+                    labels: labels.clone(),
+                    rect: view.canvas_rect,
+                    pan: view.pan,
+                    zoom: view.zoom,
+                    aspect_scale: view.aspect_scale,
+                    coord_mode,
+                    outline: style.outline,
+                    opacity: layer.color.opacity,
+                },
+            );
+            ui.painter().add(callback);
+            return;
+        }
+        // Label ids are never drawn through a colormap.
+        if layer.labels().is_some() {
+            return;
+        }
         let callback = eframe::egui_wgpu::Callback::new_paint_callback(
             view.canvas_rect,
             crate::plots::HeatmapCallback {

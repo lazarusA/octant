@@ -151,5 +151,31 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "なし",
         SettingsKey::ChannelTintHover => "クリックしてチャンネルの色合いを変更",
         SettingsKey::BandNumber => "バンド {}",
+        SettingsKey::ScaleBar => "スケールバー",
+        SettingsKey::ShowScaleBarHover => "スケールバーを表示",
+        SettingsKey::HideScaleBarHover => "スケールバーを隠す",
+        SettingsKey::ChannelsAuto => "自動",
+        SettingsKey::ChannelsAutoHover => {
+            "各チャンネルのウィンドウを表示中のデータに合わせる（値の 0.1% から 99.9%）"
+        }
+        SettingsKey::ChannelsAutoUnavailable => {
+            "自動コントラストは表示中の 2D スライスを読み取ります"
+        }
+        SettingsKey::ChannelSettingsHover => "ウィンドウ、カーブ、反転",
+        SettingsKey::ChannelWindow => "ウィンドウ",
+        SettingsKey::ChannelWindowHover => {
+            "開始から終了までの値が、黒からチャンネルの最大色までに対応します"
+        }
+        SettingsKey::ChannelInvert => "反転",
+        SettingsKey::ChannelCurve => "カーブ",
+        SettingsKey::CurveLinear => "線形",
+        SettingsKey::CurveLogarithmic => "対数",
+        SettingsKey::CurveExponential => "指数",
+        SettingsKey::CurvePolynomial => "多項式",
+        SettingsKey::ChannelCoefficientHover => "カーブの係数",
+        SettingsKey::LabelsFill => "塗りつぶし",
+        SettingsKey::LabelsFillHover => "各ラベル全体を塗る",
+        SettingsKey::LabelsOutline => "輪郭",
+        SettingsKey::LabelsOutlineHover => "ラベル間の境界だけを描く",
     })
 }

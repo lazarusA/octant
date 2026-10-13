@@ -9,6 +9,7 @@ pub mod coordinates;
 pub mod dataset;
 pub mod metadata;
 pub mod octant_block;
+pub mod ome;
 pub mod procedural;
 pub mod render;
 pub mod slice_request;

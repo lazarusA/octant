@@ -129,5 +129,27 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "无",
         SettingsKey::ChannelTintHover => "点击以自定义通道色调",
         SettingsKey::BandNumber => "波段 {}",
+        SettingsKey::ScaleBar => "比例尺",
+        SettingsKey::ShowScaleBarHover => "显示比例尺",
+        SettingsKey::HideScaleBarHover => "隐藏比例尺",
+        SettingsKey::ChannelsAuto => "自动",
+        SettingsKey::ChannelsAutoHover => {
+            "将每个通道的窗口适配到所显示的数据（其数值的 0.1% 到 99.9%）"
+        }
+        SettingsKey::ChannelsAutoUnavailable => "自动对比度读取所显示的二维切片",
+        SettingsKey::ChannelSettingsHover => "窗口、曲线与反转",
+        SettingsKey::ChannelWindow => "窗口",
+        SettingsKey::ChannelWindowHover => "从起点到终点的数值对应通道从黑色到全色",
+        SettingsKey::ChannelInvert => "反转",
+        SettingsKey::ChannelCurve => "曲线",
+        SettingsKey::CurveLinear => "线性",
+        SettingsKey::CurveLogarithmic => "对数",
+        SettingsKey::CurveExponential => "指数",
+        SettingsKey::CurvePolynomial => "多项式",
+        SettingsKey::ChannelCoefficientHover => "曲线系数",
+        SettingsKey::LabelsFill => "填充",
+        SettingsKey::LabelsFillHover => "为每个标签整体着色",
+        SettingsKey::LabelsOutline => "轮廓",
+        SettingsKey::LabelsOutlineHover => "仅绘制标签之间的边界",
     })
 }

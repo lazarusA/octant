@@ -41,5 +41,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "O texto em {} deste conjunto de dados pode aparecer como quadrados. Instale uma fonte como Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "Os metadados OME-Zarr não estão em conformidade",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Os metadados da versão {} de {} não seguem a especificação; mostrando o que foi possível ler."
+        }
     })
 }
