@@ -180,8 +180,11 @@ impl OctantApp {
     }
 
     /// Marks whether the last fetch of the layers reading blocks like `key`
-    /// (its dataset and variable) failed.
+    /// (its dataset and variable) failed; arrivals clear only failed layers.
     fn mark_failed(&mut self, key: &crate::data::BlockCacheKey, failed: bool) {
+        if !failed && !self.layers.iter().any(|l| l.load.failed) {
+            return;
+        }
         let ids: Vec<LayerId> = self.layers.iter().map(|l| l.id()).collect();
         for id in ids {
             let reads = self.layer_selections(id).is_some_and(|(shown, _)| {

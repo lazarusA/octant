@@ -155,9 +155,9 @@ impl OctantApp {
     }
 
     /// The chunk indices of layer `id` to prefetch, in order: while playing,
-    /// the current chunk and the `budget` after it; while paused, the
-    /// selected range of the animated dimension from the current chunk on,
-    /// at most `budget` chunks.
+    /// `budget` chunks from the current one on (it included); while paused,
+    /// the selected range of the animated dimension from the current chunk
+    /// on, at most `budget` chunks.
     fn collect_lookahead_chunks(
         &self,
         id: LayerId,
