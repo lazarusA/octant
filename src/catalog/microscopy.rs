@@ -109,6 +109,27 @@ pub static MICROSCOPY_CATALOG: &[CatalogEntry] = &[
         store_kind: StoreKind::RemoteZarr,
     },
     CatalogEntry {
+        key: "n4bi-zebrafish-multiview",
+        label: "Zebrafish Light-Sheet Multiview",
+        subtitle: "8 views of 342 x 2048 x 2048 as named series listed on the OME group (OME-Zarr 0.5)",
+        store: "https://radosgw.public.os.wwu.de/n4bi-goe/Zebrafish-XSPIM-multiview.ome.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "muenster-plate-labels",
+        label: "JSC13 Screening Plate with Labels",
+        subtitle: "132 wells of 2 fields, each with a colored label image and properties (OME-Zarr 0.5)",
+        store: "https://radosgw.public.os2.wwu.de/ngff/1904_resaved.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "ssbd-time-lapse-minutes",
+        label: "SSBD Time-Lapse in Minutes",
+        subtitle: "271 time points in minutes, 2 channels, 43 planes (RIKEN SSBD, OME-Zarr 0.5)",
+        store: "https://dmss3gw.riken.jp/ssbd/zarr/v0.5/8b0e0f7f-0ed4-487a-b8d2-cd6744d43c3e.zarr",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
         key: "janelia-hela-fibsem",
         label: "HeLa Cell FIB-SEM (jrc_hela-2)",
         subtitle: "Janelia OpenOrganelle electron microscopy in nanometers, 6 levels",

@@ -17,7 +17,7 @@ When developing and reviewing code in this repository:
    - **Catalog Subsystem (`src/catalog/`)**:
      - `entries.rs`: Built-in static catalog tables (GeoTIFF, Zarr, Icechunk, Procedural).
      - `types.rs`: `CatalogEntry`, `CatalogCategoryFilter`, `CatalogProvider` trait.
-     - `microscopy.rs`: `MICROSCOPY_CATALOG`, the Microscopy category's public OME-Zarr datasets (IDR, EBI, JAX, Janelia; shown with an OME-Zarr badge).
+     - `microscopy.rs`: `MICROSCOPY_CATALOG`, the Microscopy category's public OME-Zarr datasets (IDR, EBI, JAX, Janelia, NFDI4BIOIMAGE at Münster and Göttingen, RIKEN SSBD; shown with an OME-Zarr badge).
      - `tests.rs`: Category totals, unique keys, Microscopy entries open as remote Zarr.
      - `mod.rs`: Re-exports and `get_catalog_entries`.
    - **Data Engine Subsystems (`src/data/`)**:
