@@ -66,40 +66,59 @@ impl ChannelDisplay {
     /// The curve with its coefficient checked, for mapping many intensities.
     pub fn curve(&self) -> ChannelCurve {
         let c = if self.coefficient.is_finite() && self.coefficient > 0.0 {
-            self.coefficient
+            f64::from(self.coefficient)
         } else {
             1.0
         };
+        let top = OMERO_MAX.powf(c);
         ChannelCurve {
             family: self.family,
             inverted: self.inverted,
             c,
-            c_exp_m1: c.exp_m1(),
+            top,
+            exp_span: -(-top).exp_m1(),
         }
     }
 }
 
+/// OMERO's quantum codomain end: the window maps onto `0..=255` before the
+/// family's function (`omero-renderer` `QuantumStrategy.MAX`).
+const OMERO_MAX: f64 = 255.0;
+
 /// A `ChannelDisplay`'s curve, its coefficient checked once per channel.
+///
+/// OMERO's quantization (`Quantization_8_16_bit`) without its 8-bit rounding:
+/// the windowed intensity `n` maps onto `v = 255 n`, then onto
+/// `(f(v) - f(0)) / (f(255) - f(0))` with `f` the family's map: `v^k`
+/// (polynomial), `ln v` with `v <= 0` read as 1 and `k` ignored
+/// (logarithmic), `exp(v^k)` (exponential).
 #[derive(Debug, Clone, Copy)]
 pub struct ChannelCurve {
     family: ChannelFamily,
     inverted: bool,
-    c: f32,
-    c_exp_m1: f32,
+    c: f64,
+    /// `255^k`.
+    top: f64,
+    /// `1 - exp(-255^k)`.
+    exp_span: f64,
 }
 
 impl ChannelCurve {
     /// `ChannelDisplay::map`.
     #[inline]
     pub fn map(&self, norm: f32) -> f32 {
-        let n = norm.clamp(0.0, 1.0);
+        let n = f64::from(norm.clamp(0.0, 1.0));
         let curved = match self.family {
             ChannelFamily::Linear => n,
             ChannelFamily::Polynomial => n.powf(self.c),
-            ChannelFamily::Exponential => (self.c * n).exp_m1() / self.c_exp_m1,
-            ChannelFamily::Logarithmic => (self.c_exp_m1 * n).ln_1p() / self.c,
+            ChannelFamily::Logarithmic => (OMERO_MAX * n).max(1.0).ln() / OMERO_MAX.ln(),
+            ChannelFamily::Exponential => {
+                // (exp(p) - 1) / (exp(top) - 1), kept finite for large `top`.
+                let p = (OMERO_MAX * n).powf(self.c);
+                (p - self.top).exp() * -(-p).exp_m1() / self.exp_span
+            }
         }
-        .clamp(0.0, 1.0);
+        .clamp(0.0, 1.0) as f32;
         if self.inverted { 1.0 - curved } else { curved }
     }
 }

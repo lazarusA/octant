@@ -131,6 +131,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlatePickWell => "选择一个孔以列出其视野",
         DatasetKey::PlateLoadingFields => "正在读取孔的视野",
         DatasetKey::PlateNoFields => "此采集中没有视野",
+        DatasetKey::PlateWellUnreadable => "无法读取孔的视野。点击重试",
         DatasetKey::CategoryMicroscopy => "显微成像",
     })
 }

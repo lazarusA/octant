@@ -15,7 +15,8 @@ use zarrs::storage::{ReadableStorageTraits, StoreKey};
 /// The answer for one key.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Lookup {
-    Found(Vec<u8>),
+    /// The key's bytes, shared (cache hits copy nothing).
+    Found(zarrs::storage::Bytes),
     /// The store has no such key.
     Absent,
     /// Not fetched yet (web only).
@@ -99,7 +100,7 @@ impl<'a> MetaReader<'a> {
         if let Ok(store_key) = StoreKey::new(key)
             && let Ok(Some(bytes)) = self.storage.get(&store_key)
         {
-            return Lookup::Found(bytes.to_vec());
+            return Lookup::Found(bytes);
         }
         let Some(prefetch) = self.prefetch else {
             return Lookup::Absent;

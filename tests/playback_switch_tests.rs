@@ -302,7 +302,7 @@ fn plotted_variable_stays_visible_while_inspecting_and_exploring_another_dataset
         time_coverage_start: None,
         time_coverage_end: None,
         file_size: 20 * 32 * 32 * 4,
-        attributes: std::collections::HashMap::new(),
+        attributes: Default::default(),
         ome: None,
     });
     meta2.variables.push(octant::data::VariableInfo {
@@ -317,7 +317,7 @@ fn plotted_variable_stays_visible_while_inspecting_and_exploring_another_dataset
         time_coverage_start: None,
         time_coverage_end: None,
         file_size: 20 * 32 * 32 * 4,
-        attributes: std::collections::HashMap::new(),
+        attributes: Default::default(),
         ome: None,
     });
 

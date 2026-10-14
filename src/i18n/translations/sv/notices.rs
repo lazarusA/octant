@@ -40,6 +40,7 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "Text på {} i detta dataset kan visas som rutor. Installera ett typsnitt som Noto Sans CJK."
         }
         NoticesKey::OmeMetadataNonConforming => "OME-Zarr-metadata följer inte specifikationen",
+        NoticesKey::LabelIdsBeyond32Bits => "Etikett-id över 32 bitar delar färg med mindre id",
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Metadata i version {} för {} följer inte specifikationen; det som kunde läsas visas."
         }

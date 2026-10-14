@@ -36,6 +36,18 @@ fn v01_without_axes_takes_tczyx_and_downsampling_scales() {
 }
 
 #[test]
+fn unversioned_multiscales_without_axes_are_legacy() {
+    let attrs = json!({ "multiscales": [{ "datasets": [{ "path": "0" }] }] });
+    let found = Fixture::default()
+        .v2_group("", attrs)
+        .v2_array("0", &[2, 8, 8])
+        .discover()
+        .expect("ome");
+    assert_eq!(found.dataset.version, "0.2");
+    assert_eq!(found.variables[0].dimension_names, ["z", "y", "x"]);
+}
+
+#[test]
 fn v03_string_axes_become_typed_axes() {
     let attrs = json!({
         "_creator": { "name": "omero-zarr", "version": "0.1.dev219" },

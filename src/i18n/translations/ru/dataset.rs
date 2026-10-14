@@ -129,6 +129,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlatePickWell => "Выберите лунку, чтобы увидеть ее поля",
         DatasetKey::PlateLoadingFields => "Чтение полей лунки",
         DatasetKey::PlateNoFields => "В этой съемке нет полей",
+        DatasetKey::PlateWellUnreadable => {
+            "Не удалось прочитать поля лунки. Нажмите, чтобы повторить"
+        }
         DatasetKey::CategoryMicroscopy => "Микроскопия",
     })
 }

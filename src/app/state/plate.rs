@@ -19,7 +19,8 @@ use crate::data::ome::{OmePlate, OmeWell};
 pub enum WellFields {
     Loading,
     Ready(Arc<OmeWell>),
-    Failed(String),
+    /// Unreadable (reported once); picking the well again retries.
+    Failed,
 }
 
 /// The plate being browsed.
@@ -36,8 +37,8 @@ pub struct PlateState {
     /// `plate.wells` and its path in the well.
     pub opened: Option<(usize, String)>,
     wells: HashMap<String, WellFields>,
-    tx: Sender<(String, Result<OmeWell, String>)>,
-    rx: Receiver<(String, Result<OmeWell, String>)>,
+    tx: Sender<WellResult>,
+    rx: Receiver<WellResult>,
 }
 
 impl PlateState {
@@ -74,13 +75,27 @@ impl PlateState {
         &self.wells[path]
     }
 
+    /// Reads the fields of the well at `path` again after a failure.
+    pub fn retry_well(&mut self, path: &str) {
+        if self.wells.get(path) == Some(&WellFields::Failed) {
+            self.wells.remove(path);
+        }
+    }
+
     /// Takes the wells whose fields arrived; whether any did.
     pub fn poll(&mut self) -> bool {
         let mut any = false;
         while let Ok((path, result)) = self.rx.try_recv() {
             let fields = match result {
                 Ok(well) => WellFields::Ready(Arc::new(well)),
-                Err(e) => WellFields::Failed(e),
+                Err(e) => {
+                    crate::ui::toast::report(
+                        crate::ui::toast::Severity::Warning,
+                        crate::i18n::tr(crate::i18n::NoticesKey::CouldntLoadData),
+                        e,
+                    );
+                    WellFields::Failed
+                }
             };
             self.wells.insert(path, fields);
             any = true;
@@ -91,6 +106,16 @@ impl PlateState {
     /// Whether a well's fields are still being read.
     pub fn loading(&self) -> bool {
         self.wells.values().any(|w| *w == WellFields::Loading)
+    }
+
+    /// The well index and field path of `target`, a field of this plate.
+    fn field_of(&self, target: &str) -> Option<(usize, String)> {
+        let rest = target.strip_prefix(self.url.as_str())?.trim_matches('/');
+        self.plate.wells.iter().enumerate().find_map(|(i, w)| {
+            let field = rest.strip_prefix(w.path.trim_matches('/'))?;
+            let field = field.strip_prefix('/')?.trim_matches('/');
+            (!field.is_empty()).then(|| (i, field.to_string()))
+        })
     }
 
     /// The URL of field `field` of the well at `well`.
@@ -111,12 +136,26 @@ impl crate::app::OctantApp {
     pub(crate) fn follow_plate(&mut self, metadata: &crate::data::DatasetMetadata) -> bool {
         let target = self.selected.store_target.trim_end_matches('/').to_string();
         if let Some(plate) = metadata.ome.as_ref().and_then(|o| o.plate.clone()) {
-            self.plate = Some(PlateState::new(&target, self.selected.store_kind, plate));
+            match &mut self.plate {
+                // The same plate again keeps the picked well and read fields.
+                Some(open) if open.url == target => {
+                    open.plate = plate;
+                    open.opened = None;
+                }
+                _ => self.plate = Some(PlateState::new(&target, self.selected.store_kind, plate)),
+            }
             self.layout.show_dataset_panel = true;
             return true;
         }
-        if !self.plate.as_ref().is_some_and(|p| p.contains(&target)) {
-            self.plate = None;
+        match &mut self.plate {
+            Some(plate) if plate.contains(&target) => {
+                // Marked once the field has opened, however it was opened.
+                plate.opened = plate.field_of(&target);
+                if let Some((well, _)) = plate.opened {
+                    plate.well = Some(well);
+                }
+            }
+            _ => self.plate = None,
         }
         false
     }
@@ -132,7 +171,6 @@ impl crate::app::OctantApp {
         };
         let url = plate.field_url(path, field);
         let kind = plate.store_kind;
-        plate.opened = Some((well, field.to_string()));
         self.submit_or_activate_source(&url, Some(kind));
     }
 }
@@ -184,16 +222,44 @@ async fn read_well(url: String, path: String) -> Result<OmeWell, String> {
     Ok(crate::data::ome::plate::well_info(&well))
 }
 
-fn fetch_well(url: String, path: String, tx: Sender<(String, Result<OmeWell, String>)>) {
+type WellResult = (String, Result<OmeWell, String>);
+
+/// Sends a well's result once; a read that ends without one (a panic)
+/// sends a failure, so the well never stays loading.
+struct Reply {
+    path: String,
+    tx: Option<Sender<WellResult>>,
+}
+
+impl Reply {
+    fn send(mut self, result: Result<OmeWell, String>) {
+        if let Some(tx) = self.tx.take() {
+            let _ = tx.send((std::mem::take(&mut self.path), result));
+        }
+    }
+}
+
+impl Drop for Reply {
+    fn drop(&mut self) {
+        if let Some(tx) = self.tx.take() {
+            let error = format!("{}: the read stopped", self.path);
+            let _ = tx.send((std::mem::take(&mut self.path), Err(error)));
+        }
+    }
+}
+
+fn fetch_well(url: String, path: String, tx: Sender<WellResult>) {
+    let reply = Reply {
+        path: path.clone(),
+        tx: Some(tx),
+    };
     #[cfg(not(target_arch = "wasm32"))]
     crate::utils::executor::TaskExecutor::spawn_background(move || {
         let rt = crate::utils::executor::get_shared_tokio_rt();
-        let result = rt.block_on(read_well(url, path.clone()));
-        let _ = tx.send((path, result));
+        reply.send(rt.block_on(read_well(url, path)));
     });
     #[cfg(target_arch = "wasm32")]
     wasm_bindgen_futures::spawn_local(async move {
-        let result = read_well(url, path.clone()).await;
-        let _ = tx.send((path, result));
+        reply.send(read_well(url, path).await);
     });
 }

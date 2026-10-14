@@ -157,11 +157,9 @@ pub async fn inspect_wasm_remote_zarr(url: &str) -> Result<DatasetMetadata, Stri
         }
     }
 
-    // 2. Try Zarr v3 `zarr.json` root
-    let root_v3_url = format!("{clean_url}/zarr.json");
-    if let Ok(v3_bytes) = fetch_url_bytes(&root_v3_url).await {
-        let _ = store.insert_key_bytes("zarr.json", &v3_bytes);
-
+    // 2. Zarr v3 `zarr.json` root (the OME-Zarr discovery above already
+    // fetched it into memory when the store has one)
+    if store.has_key("zarr.json") {
         if let Ok(group) = Group::open(store.memory_store.clone(), "/") {
             let variables = if let Some(ConsolidatedMetadata { metadata, .. }) =
                 group.consolidated_metadata()

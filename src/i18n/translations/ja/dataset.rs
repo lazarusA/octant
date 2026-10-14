@@ -135,6 +135,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlatePickWell => "ウェルを選ぶと視野が表示されます",
         DatasetKey::PlateLoadingFields => "ウェルの視野を読み込み中",
         DatasetKey::PlateNoFields => "この取得には視野がありません",
+        DatasetKey::PlateWellUnreadable => "ウェルの視野を読み込めませんでした。クリックして再試行",
         DatasetKey::CategoryMicroscopy => "顕微鏡",
     })
 }

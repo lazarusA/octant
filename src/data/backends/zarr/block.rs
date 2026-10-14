@@ -48,8 +48,22 @@ fn selection_window(
     Ok((origin, block_shape))
 }
 
+/// OME-Zarr group metadata, read by `ome::level` from the groups themselves
+/// and large (a plate lists every well): not copied into blocks.
+const OME_GROUP_KEYS: [&str; 8] = [
+    "ome",
+    "multiscales",
+    "omero",
+    "labels",
+    "image-label",
+    "plate",
+    "well",
+    "bioformats2raw.layout",
+];
+
 /// The array's attributes as text, plus those of its ancestor groups (e.g. DGGS
-/// conventions) when the array has no `dggs` attribute of its own.
+/// conventions, not OME-Zarr metadata) when the array has no `dggs` attribute
+/// of its own.
 pub(crate) fn inherited_attributes(
     array: &ZarrArrayHandle,
     reader: &MetaReader<'_>,
@@ -68,7 +82,10 @@ pub(crate) fn inherited_attributes(
         let Ok(Some(group_attrs)) = reader.group_attributes(ancestor) else {
             continue;
         };
-        for (k, v) in &group_attrs {
+        for (k, v) in group_attrs
+            .iter()
+            .filter(|(k, _)| !OME_GROUP_KEYS.contains(&k.as_str()))
+        {
             attributes
                 .entry(k.clone())
                 .or_insert_with(|| attr_string(v));
@@ -118,7 +135,7 @@ fn read_window(
 pub struct ArrayCachedState {
     pub array: Arc<ZarrArrayHandle>,
     pub cache: Arc<ChunkCacheDecodedLruSizeLimit>,
-    pub attributes: HashMap<String, String>,
+    pub attributes: Arc<HashMap<String, String>>,
     /// Set for OME-Zarr level arrays, whose blocks keep their stored order.
     pub ome: Option<LevelArray>,
 }
@@ -176,7 +193,7 @@ fn orient_and_build_block(
     mut origin: Vec<usize>,
     mut block_shape: Vec<usize>,
     raw_values: Vec<f32>,
-    attributes: HashMap<String, String>,
+    attributes: Arc<HashMap<String, String>>,
 ) -> Result<OctantBlock, BlockStoreError> {
     let full_shape = cached.array.shape();
     let mut dim_names = crate::utils::resolve_array_dimension_names(&cached.array);

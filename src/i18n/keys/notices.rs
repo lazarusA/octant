@@ -33,5 +33,6 @@ crate::i18n::keys::define_keys! {
     // OME-Zarr metadata
     OmeMetadataNonConforming,
     OmeMetadataNonConformingDetail,
+    LabelIdsBeyond32Bits,
     }
 }

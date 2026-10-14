@@ -174,3 +174,34 @@ fn level_coordinates_never_fill_unscoped_keys() {
     assert!(coords.contains_key("1/x"));
     assert!(!coords.contains_key("x"));
 }
+
+#[test]
+fn label_ids_keep_their_low_32_bits() {
+    let ms = json!({
+        "version": "0.4",
+        "axes": [{ "name": "y", "type": "space" }, { "name": "x", "type": "space" }],
+        "datasets": [{ "path": "0", "coordinateTransformations": [{ "type": "scale", "scale": [1.0, 1.0] }] }]
+    });
+    let values: Vec<u8> = [(1u64 << 32) + 5, 7]
+        .iter()
+        .flat_map(|v| v.to_le_bytes())
+        .collect();
+    let f = Fixture::default()
+        .v2_group(
+            "",
+            json!({ "multiscales": [ms], "image-label": { "version": "0.4" } }),
+        )
+        .v2_array_of("0", &[1, 2], "<u8")
+        .bytes("0/0.0", &values);
+    let store = crate::data::backends::zarr::ZarrBlockStore::new(f.memory(), "memory://wide_ids");
+    let request = SliceRequest::new(
+        "0",
+        vec![
+            DimensionSelection::range(0, 1),
+            DimensionSelection::range(0, 2),
+        ],
+    );
+    let block = store.fetch_block(&request).expect("block");
+    let ids: Vec<u32> = block.values.iter().map(|v| v.to_bits()).collect();
+    assert_eq!(ids, [5, 7]);
+}

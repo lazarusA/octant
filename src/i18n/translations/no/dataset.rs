@@ -137,6 +137,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlatePickWell => "Velg en brønn for å se feltene",
         DatasetKey::PlateLoadingFields => "Leser brønnens felt",
         DatasetKey::PlateNoFields => "Ingen felt i dette opptaket",
+        DatasetKey::PlateWellUnreadable => "Kunne ikke lese brønnens felt. Klikk for å prøve igjen",
         DatasetKey::CategoryMicroscopy => "Mikroskopi",
     })
 }

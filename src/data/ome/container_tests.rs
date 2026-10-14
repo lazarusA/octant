@@ -46,6 +46,26 @@ fn bioformats2raw_series_are_probed_and_named() {
 }
 
 #[test]
+fn series_listed_on_the_ome_group_are_not_probed() {
+    let decoy = json!({ "multiscales": [{
+        "version": "0.4",
+        "axes": [{ "name": "y", "type": "space" }, { "name": "x", "type": "space" }],
+        "datasets": [{ "path": "0", "coordinateTransformations": [{ "type": "scale", "scale": [1.0, 1.0] }] }]
+    }]});
+    let fixture = bf2raw(false)
+        .v2_group("OME", json!({ "series": ["0", "1"] }))
+        .v2_group("2", decoy)
+        .v2_array("2/0", &[4, 4]);
+    for found in [
+        fixture.discover().expect("ome"),
+        fixture.discover_prefetched().0.expect("web"),
+    ] {
+        let names: Vec<&str> = found.variables.iter().map(|v| v.name.as_str()).collect();
+        assert_eq!(names, ["0/0", "1/0"]);
+    }
+}
+
+#[test]
 fn plates_list_wells_without_opening_them() {
     let plate = json!({ "plate": {
         "version": "0.4", "name": "screen",

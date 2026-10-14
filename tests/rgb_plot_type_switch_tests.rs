@@ -37,7 +37,7 @@ fn create_rgb_block() -> OctantBlock {
         min_value: 10.0,
         max_value: 255.0,
         coordinates: std::collections::HashMap::new(),
-        attributes: std::collections::HashMap::new(),
+        attributes: Default::default(),
         flipped_dims: Vec::new(),
     }
 }
@@ -61,7 +61,7 @@ fn setup_rgb_app() -> OctantApp {
         time_coverage_start: None,
         time_coverage_end: None,
         file_size: 3 * 8 * 8 * 4,
-        attributes: std::collections::HashMap::new(),
+        attributes: Default::default(),
         ome: None,
     });
 

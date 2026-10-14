@@ -139,6 +139,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlatePickWell => "Choisissez un puits pour voir ses champs",
         DatasetKey::PlateLoadingFields => "Lecture des champs du puits",
         DatasetKey::PlateNoFields => "Aucun champ dans cette acquisition",
+        DatasetKey::PlateWellUnreadable => {
+            "Impossible de lire les champs du puits. Cliquez pour réessayer"
+        }
         DatasetKey::CategoryMicroscopy => "Microscopie",
     })
 }

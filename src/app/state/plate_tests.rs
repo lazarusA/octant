@@ -33,3 +33,21 @@ fn idr_plate_well_lists_its_fields() {
         .expect("well");
     assert_eq!(well.fields.len(), 6);
 }
+
+#[test]
+fn a_read_that_stops_reports_a_failure_and_the_well_can_be_retried() {
+    let mut plate = super::PlateState::new(
+        "https://x/plate.zarr",
+        crate::app::StoreKind::RemoteZarr,
+        std::sync::Arc::default(),
+    );
+    drop(super::Reply {
+        path: "A/1".into(),
+        tx: Some(plate.tx.clone()),
+    });
+    plate.wells.insert("A/1".into(), super::WellFields::Loading);
+    assert!(plate.poll());
+    assert_eq!(plate.wells["A/1"], super::WellFields::Failed);
+    plate.retry_well("A/1");
+    assert!(!plate.wells.contains_key("A/1"));
+}

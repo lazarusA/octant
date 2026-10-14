@@ -126,6 +126,7 @@ crate::i18n::keys::define_keys! {
     PlatePickWell,
     PlateLoadingFields,
     PlateNoFields,
+    PlateWellUnreadable,
     CategoryMicroscopy,
     }
 }

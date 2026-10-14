@@ -46,6 +46,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConforming => {
             "Los metadatos OME-Zarr no cumplen la especificación"
         }
+        NoticesKey::LabelIdsBeyond32Bits => {
+            "Los ids de etiqueta de más de 32 bits comparten colores con ids menores"
+        }
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Los metadatos de la versión {} de {} no siguen la especificación; se muestra lo que se pudo leer."
         }

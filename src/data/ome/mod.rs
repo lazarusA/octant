@@ -22,6 +22,7 @@ pub mod parse;
 pub mod plate;
 pub mod reader;
 pub mod repair;
+mod series;
 pub mod variables;
 
 #[cfg(test)]

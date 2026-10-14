@@ -129,6 +129,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlatePickWell => "Valitse kuoppa nähdäksesi sen kentät",
         DatasetKey::PlateLoadingFields => "Luetaan kuopan kenttiä",
         DatasetKey::PlateNoFields => "Tässä kuvauksessa ei ole kenttiä",
+        DatasetKey::PlateWellUnreadable => {
+            "Kuopan kenttiä ei voitu lukea. Yritä uudelleen napsauttamalla"
+        }
         DatasetKey::CategoryMicroscopy => "Mikroskopia",
     })
 }

@@ -70,8 +70,11 @@ pub(super) fn field_list(ui: &mut egui::Ui, plate: &mut PlateState) -> Option<Pl
             });
             return None;
         }
-        WellFields::Failed(error) => {
-            ui.label(egui::RichText::new(error.as_str()).small().weak());
+        WellFields::Failed => {
+            let retry = egui::RichText::new(tr(DatasetKey::PlateWellUnreadable)).small();
+            if ui.link(retry).clicked() {
+                plate.retry_well(&well.path);
+            }
             return None;
         }
         WellFields::Ready(fields) => std::sync::Arc::clone(fields),

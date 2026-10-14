@@ -133,6 +133,7 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::PlatePickWell => "Pick a well to list its fields",
         DatasetKey::PlateLoadingFields => "Reading the well's fields",
         DatasetKey::PlateNoFields => "No fields in this acquisition",
+        DatasetKey::PlateWellUnreadable => "Couldn't read the well's fields. Click to try again",
         DatasetKey::CategoryMicroscopy => "Microscopy",
     }
 }

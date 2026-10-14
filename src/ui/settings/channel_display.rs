@@ -62,7 +62,8 @@ fn window_inputs(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig) -> bool {
     changed
 }
 
-/// The curve family and, for non-linear curves, its coefficient.
+/// The curve family and, for the curves that use one (polynomial and
+/// exponential; OMERO's logarithmic ignores it), its coefficient.
 fn curve_select(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) -> bool {
     let mut changed = false;
     let name = |family: ChannelFamily| {
@@ -81,7 +82,10 @@ fn curve_select(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) ->
                     .changed();
             }
         });
-    if cfg.display.family != ChannelFamily::Linear {
+    if matches!(
+        cfg.display.family,
+        ChannelFamily::Polynomial | ChannelFamily::Exponential
+    ) {
         changed |= ui
             .add(
                 egui::DragValue::new(&mut cfg.display.coefficient)

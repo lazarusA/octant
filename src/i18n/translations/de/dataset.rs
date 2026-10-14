@@ -139,6 +139,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlatePickWell => "Wählen Sie ein Well, um seine Felder zu sehen",
         DatasetKey::PlateLoadingFields => "Felder des Wells werden gelesen",
         DatasetKey::PlateNoFields => "Keine Felder in dieser Aufnahme",
+        DatasetKey::PlateWellUnreadable => {
+            "Felder des Wells nicht lesbar. Zum erneuten Versuch klicken"
+        }
         DatasetKey::CategoryMicroscopy => "Mikroskopie",
     })
 }

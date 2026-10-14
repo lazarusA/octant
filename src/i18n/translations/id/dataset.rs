@@ -135,6 +135,9 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlatePickWell => "Pilih sumur untuk melihat bidangnya",
         DatasetKey::PlateLoadingFields => "Membaca bidang sumur",
         DatasetKey::PlateNoFields => "Tidak ada bidang dalam akuisisi ini",
+        DatasetKey::PlateWellUnreadable => {
+            "Tidak dapat membaca bidang sumur. Klik untuk mencoba lagi"
+        }
         DatasetKey::CategoryMicroscopy => "Mikroskopi",
     })
 }

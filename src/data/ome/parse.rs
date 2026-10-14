@@ -77,7 +77,8 @@ pub fn parse_group(attrs: &Map<String, Value>, shapes: ShapeLookup<'_>) -> Optio
     })
 }
 
-/// The version a group declares, `"0.4"` when unversioned metadata is free.
+/// The version a group declares; unversioned free metadata is 0.4, or 0.2
+/// when its multiscales name no axes.
 fn declared_version(ome: &Map<String, Value>, namespaced: bool) -> String {
     let as_text = |v: &Value| match v {
         Value::String(s) => Some(s.trim().to_string()),
@@ -93,16 +94,22 @@ fn declared_version(ome: &Map<String, Value>, namespaced: bool) -> String {
     let first_multiscale = ome
         .get("multiscales")
         .and_then(Value::as_array)
-        .and_then(|m| m.first())
-        .and_then(|m| m.get("version"));
+        .and_then(|m| m.first());
+    // Unversioned multiscales without axes are 0.1/0.2 (axes came with 0.3).
+    let unversioned = if first_multiscale.is_some_and(|m| m.get("axes").is_none()) {
+        "0.2"
+    } else {
+        "0.4"
+    };
     first_multiscale
+        .and_then(|m| m.get("version"))
         .or_else(|| {
             ["image-label", "plate", "well"]
                 .iter()
                 .find_map(|k| ome.get(*k)?.get("version"))
         })
         .and_then(as_text)
-        .unwrap_or_else(|| "0.4".into())
+        .unwrap_or_else(|| unversioned.into())
 }
 
 fn field<T: DeserializeOwned>(value: &Value, what: &str, warnings: &mut Vec<String>) -> Option<T> {

@@ -142,7 +142,7 @@ impl GenericZarrBlockStore {
         let cached = ArrayCachedState {
             array,
             cache,
-            attributes,
+            attributes: Arc::new(attributes),
             ome,
         };
         Ok((Arc::new(cached), cache_bytes))

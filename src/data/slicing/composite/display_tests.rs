@@ -28,12 +28,24 @@ fn every_curve_keeps_its_ends_and_rises() {
             let d = display(family, c);
             assert!(d.map(0.0).abs() < 1e-6, "{family:?} {c}");
             assert!((d.map(1.0) - 1.0).abs() < 1e-5, "{family:?} {c}");
-            assert!(d.map(0.25) < d.map(0.75), "{family:?} {c}");
+            // OMERO's exponential stays at 0 until near the top for k > 1.
+            assert!(d.map(0.25) <= d.map(0.75), "{family:?} {c}");
+            assert!(d.map(0.75) < d.map(1.0), "{family:?} {c}");
         }
     }
-    assert!(display(ChannelFamily::Logarithmic, 2.0).map(0.5) > 0.5);
-    assert!(display(ChannelFamily::Exponential, 2.0).map(0.5) < 0.5);
     assert_eq!(display(ChannelFamily::Polynomial, 2.0).map(0.5), 0.25);
+}
+
+#[test]
+fn curves_match_omero_quantization() {
+    // `omero-renderer` maps the window onto 0..=255, then normalizes the
+    // family's function between its values at 0 and 255.
+    let close = |a: f32, b: f32| (a - b).abs() < 1e-5;
+    let log = display(ChannelFamily::Logarithmic, 3.0);
+    assert!(close(log.map(0.5), 0.874_911_7), "k is ignored");
+    assert_eq!(log.map(0.002), 0.0, "below 1 reads as ln 1");
+    let exp = display(ChannelFamily::Exponential, 0.5);
+    assert!(close(exp.map(0.5), 0.009_305_571));
 }
 
 #[test]

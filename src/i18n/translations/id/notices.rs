@@ -42,6 +42,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
             "Teks dalam {} di dataset ini mungkin tampil sebagai kotak. Pasang font seperti Noto Sans CJK."
         }
         NoticesKey::OmeMetadataNonConforming => "Metadata OME-Zarr tidak sesuai spesifikasi",
+        NoticesKey::LabelIdsBeyond32Bits => {
+            "Id label di atas 32 bit berbagi warna dengan id yang lebih kecil"
+        }
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Metadata versi {} dari {} tidak mengikuti spesifikasi; menampilkan yang dapat dibaca."
         }
