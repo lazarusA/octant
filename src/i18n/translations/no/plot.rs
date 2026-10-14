@@ -29,7 +29,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::UnsupportedForGrid => "Støttes ikke for {}-rutenett",
         PlotKey::DisabledAggregation => "Slått av: 2D-aggregering er på",
         PlotKey::Requires3D => "Krever 3D-data",
-        PlotKey::DisabledGpuLimit => "Slått av: {} MB > 128 MB GPU-grense",
+        PlotKey::DisabledGpuLimit => "Slått av: {} MB > {} MB GPU-grense",
         PlotKey::ScalarField => "Skalarfelt",
         PlotKey::LabelsHeatmapOnly => "Etikettbilder tegnes bare på varmekartet",
     })

@@ -47,7 +47,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
             "이 큰 선택 영역 (셀 {}개, {} MB)에서는 3D 구체와 3D 표면 메시를 사용할 수 없습니다. 2D 평면과 1D 선 플롯은 그대로 사용할 수 있습니다."
         }
         VariablesKey::LargeVolumeDisabled => {
-            "이 선택 영역에서는 3D 볼륨과 포인트 클라우드를 사용할 수 없습니다: 볼륨 크기 ({} MB)가 128 MB GPU 저장 버퍼 한도를 넘습니다. 2D 평면, 1D 선, 3D 구체는 그대로 사용할 수 있습니다."
+            "이 선택 영역에서는 3D 볼륨과 포인트 클라우드를 사용할 수 없습니다: 볼륨 크기 ({} MB)가 {} MB GPU 저장 버퍼 한도를 넘습니다. 2D 평면, 1D 선, 3D 구체는 그대로 사용할 수 있습니다."
         }
         VariablesKey::RoleNone => "없음",
         VariablesKey::RoleAnimated => "애니메이션",

@@ -105,7 +105,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "裁剪工具",
         SettingsKey::Aggregation => "2D 聚合",
         SettingsKey::AggregationMandatoryHover => {
-            "必须开启：数组超出单个 GPU 缓冲区上限（128 MB / 33.5M 个单元格）。无法禁用聚合。"
+            "必须开启：数组超出单个 GPU 缓冲区上限（{} MB）。无法禁用聚合。"
         }
         SettingsKey::AggregationHover => "多分辨率金字塔降采样与视口重采样。",
         SettingsKey::AggregationMode => "模式：",

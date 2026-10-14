@@ -137,7 +137,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "Rajaustyökalu",
         SettingsKey::Aggregation => "2D-aggregointi",
         SettingsKey::AggregationMandatoryHover => {
-            "Pakollinen: taulukko ylittää yksittäisen GPU-puskurin rajan (128 MB / 33.5M solua). \
+            "Pakollinen: taulukko ylittää yksittäisen GPU-puskurin rajan ({} MB). \
              Aggregointia ei voi poistaa käytöstä."
         }
         SettingsKey::AggregationHover => {

@@ -131,7 +131,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "Beskärningsverktyg",
         SettingsKey::Aggregation => "2D-aggregering",
         SettingsKey::AggregationMandatoryHover => {
-            "Obligatorisk: matrisen överskrider gränsen för en enskild GPU-buffert (128 MB / 33.5M celler). \
+            "Obligatorisk: matrisen överskrider gränsen för en enskild GPU-buffert ({} MB). \
              Aggregeringen kan inte avaktiveras."
         }
         SettingsKey::AggregationHover => {

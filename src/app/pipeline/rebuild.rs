@@ -80,6 +80,30 @@ impl OctantApp {
         false
     }
 
+    /// Whether the base layer is drawn through a pyramid: Resampling is
+    /// ticked, or its data is too large for one GPU buffer.
+    pub fn base_resampled(&self) -> bool {
+        self.enable_pyramid_resampling || self.layers.base.data.pyramid.is_some()
+    }
+
+    /// Builds each layer's 2D renderers again from the matrix it holds (no
+    /// reload), so a changed Resampling setting or aggregation adds, drops or
+    /// rebuilds its pyramid. Rows and composites never have one.
+    pub fn rebuild_layer_pyramids(&mut self) {
+        let ids: Vec<LayerId> = self.layers.iter().map(Layer::id).collect();
+        for id in ids {
+            let Some(layer) = self.layers.get_mut(id) else {
+                continue;
+            };
+            if layer.composite.enabled || layer.data.matrix.as_ref().is_none_or(|m| m.height < 2) {
+                continue;
+            }
+            if let Some(matrix) = layer.data.matrix.take() {
+                self.rebuild_pipeline_with_matrix_data(id, matrix);
+            }
+        }
+    }
+
     /// Dispatches an asynchronous fetch for the requested coastline LOD
     /// and swaps vertices into GPU buffers when ready without blocking UI frames.
     pub fn reload_coastline_lod(&mut self, lod: crate::plots::CoastlineLod) {

@@ -20,7 +20,8 @@ pub fn normalize_v3_array_metadata(mut meta: Value) -> Value {
         .map(|dt| dt.size());
 
     if let Some(codecs) = meta.get_mut("codecs").and_then(|c| c.as_array_mut()) {
-        let mut normalized_codecs = Vec::with_capacity(codecs.len() + 1);
+        // Each codec with its pipeline stage (`codec_stage`).
+        let mut staged = Vec::with_capacity(codecs.len() + 1);
         let mut has_array_to_bytes = false;
 
         for codec in codecs.iter() {
@@ -33,16 +34,24 @@ pub fn normalize_v3_array_metadata(mut meta: Value) -> Value {
 
             if is_array_to_bytes_codec(name) {
                 has_array_to_bytes = true;
-                normalized_codecs.push(codec.clone());
+                staged.push((1, codec.clone()));
             } else if let Some(normalized) = normalize_single_codec(obj, name, typesize) {
-                normalized_codecs.push(normalized);
+                staged.push((codec_stage(name).unwrap_or(3), normalized));
+            } else {
+                // Kept as written, so `zarrs` decodes it or reports it as
+                // unsupported (never read as raw bytes); a codec it does not
+                // name keeps its side of the array-to-bytes codec.
+                let side = if has_array_to_bytes { 3 } else { 0 };
+                staged.push((codec_stage(name).unwrap_or(side), codec.clone()));
             }
         }
 
-        ensure_array_to_bytes_codec(&mut normalized_codecs, has_array_to_bytes);
-        order_codec_pipeline(&mut normalized_codecs);
-
-        *codecs = normalized_codecs;
+        if !has_array_to_bytes {
+            staged.push((1, default_bytes_codec()));
+        }
+        // Stable: codecs of one stage keep their order.
+        staged.sort_by_key(|(stage, _)| *stage);
+        *codecs = staged.into_iter().map(|(_, codec)| codec).collect();
     }
 
     meta
@@ -84,13 +93,48 @@ fn repair_v2(meta: &mut Value) {
     }
 }
 
-/// Checks if a codec name represents an array-to-bytes transformation.
+/// Checks if a codec name represents an array-to-bytes transformation (the
+/// names `zarrs` registers, with their v2 and numcodecs spellings).
 #[inline]
 pub fn is_array_to_bytes_codec(name: &str) -> bool {
     matches!(
         name,
-        "bytes" | "vlen" | "vlen_v2" | "sharding_indexed" | "pcodec"
+        "bytes"
+            | "vlen"
+            | "vlen_v2"
+            | "zarrs.vlen"
+            | "zarrs.vlen_v2"
+            | "vlen-utf8"
+            | "vlen-bytes"
+            | "vlen-array"
+            | "sharding_indexed"
+            | "pcodec"
+            | "numcodecs.pcodec"
+            | "packbits"
+            | "zfp"
+            | "zarrs.zfp"
+            | "numcodecs.zfpy"
+            | "zarrs.optional"
     )
+}
+
+/// The pipeline stage of a codec `zarrs` names: 0 array-to-array, 1
+/// array-to-bytes, 2 byte shuffles, 3 other bytes-to-bytes (compressors,
+/// checksums); `None` for a codec it does not name.
+fn codec_stage(name: &str) -> Option<u8> {
+    match name {
+        "bitround"
+        | "numcodecs.bitround"
+        | "transpose"
+        | "numcodecs.fixedscaleoffset"
+        | "zarrs.squeeze"
+        | "reshape" => Some(0),
+        name if is_array_to_bytes_codec(name) => Some(1),
+        "numcodecs.shuffle" | "shuffle" => Some(2),
+        "blosc" | "numcodecs.blosc" | "numcodecs.zlib" | "zlib" | "gzip" | "numcodecs.gzip"
+        | "zstd" | "numcodecs.zstd" | "crc32c" | "numcodecs.crc32c" | "fletcher32" => Some(3),
+        _ => None,
+    }
 }
 
 /// Extracts compression level from a configuration object or defaults to 1.
@@ -180,19 +224,12 @@ fn normalize_blosc_codec(
     Some(Value::Object(new_obj))
 }
 
-/// Ensures that an array-to-bytes codec (defaulting to little-endian bytes) is present.
-fn ensure_array_to_bytes_codec(codecs: &mut Vec<Value>, has_array_to_bytes: bool) {
-    if !has_array_to_bytes {
-        codecs.insert(
-            0,
-            serde_json::json!({
-                "name": "bytes",
-                "configuration": {
-                    "endian": "little"
-                }
-            }),
-        );
-    }
+/// The array-to-bytes codec of arrays that name none: little-endian bytes.
+fn default_bytes_codec() -> Value {
+    serde_json::json!({
+        "name": "bytes",
+        "configuration": { "endian": "little" }
+    })
 }
 
 /// Orders codecs into canonical Zarr v3 execution order:
@@ -201,12 +238,8 @@ fn ensure_array_to_bytes_codec(codecs: &mut Vec<Value>, has_array_to_bytes: bool
 /// 3. Bytes-to-Bytes filters (e.g. `numcodecs.shuffle`)
 /// 4. Bytes-to-Bytes compression/checksums (`numcodecs.zlib`, `gzip`, `zstd`, `blosc`, `crc32c`)
 pub fn order_codec_pipeline(codecs: &mut [Value]) {
-    codecs.sort_by_key(
-        |c| match c.get("name").and_then(|n| n.as_str()).unwrap_or("") {
-            "bitround" => 0,
-            name if is_array_to_bytes_codec(name) => 1,
-            "numcodecs.shuffle" | "shuffle" => 2,
-            _ => 3,
-        },
-    );
+    codecs.sort_by_key(|c| {
+        let name = c.get("name").and_then(|n| n.as_str()).unwrap_or("");
+        codec_stage(name).unwrap_or(3)
+    });
 }

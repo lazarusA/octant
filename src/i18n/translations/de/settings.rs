@@ -135,7 +135,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "Zuschnitt",
         SettingsKey::Aggregation => "2D-Aggregation",
         SettingsKey::AggregationMandatoryHover => {
-            "Erforderlich: Das Array überschreitet das Limit eines GPU-Puffers (128 MB / 33,5 Mio. Zellen). \
+            "Erforderlich: Das Array überschreitet das Limit eines GPU-Puffers ({} MB). \
              Die Aggregation kann nicht deaktiviert werden."
         }
         SettingsKey::AggregationHover => {

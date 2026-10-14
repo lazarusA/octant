@@ -27,7 +27,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::UnsupportedForGrid => "{} 격자에서는 지원하지 않음",
         PlotKey::DisabledAggregation => "사용 불가: 2D 집계가 켜져 있음",
         PlotKey::Requires3D => "3D 데이터 필요",
-        PlotKey::DisabledGpuLimit => "사용 불가: {} MB > 128 MB GPU 한도",
+        PlotKey::DisabledGpuLimit => "사용 불가: {} MB > {} MB GPU 한도",
         PlotKey::ScalarField => "스칼라장",
         PlotKey::LabelsHeatmapOnly => "레이블 이미지는 히트맵에만 그려집니다",
     })

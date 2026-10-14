@@ -141,7 +141,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "Outil de recadrage",
         SettingsKey::Aggregation => "Agrégation 2D",
         SettingsKey::AggregationMandatoryHover => {
-            "Obligatoire : le tableau dépasse la limite d'un tampon GPU (128 MB / 33,5 M cellules). \
+            "Obligatoire : le tableau dépasse la limite d'un tampon GPU ({} MB). \
              L'agrégation ne peut pas être désactivée."
         }
         SettingsKey::AggregationHover => {

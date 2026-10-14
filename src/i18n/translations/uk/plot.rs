@@ -29,7 +29,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::UnsupportedForGrid => "Не підтримується для сітки {}",
         PlotKey::DisabledAggregation => "Вимкнено: увімкнено 2D-агрегацію",
         PlotKey::Requires3D => "Потрібні 3D-дані",
-        PlotKey::DisabledGpuLimit => "Вимкнено: {} MB > ліміт GPU 128 MB",
+        PlotKey::DisabledGpuLimit => "Вимкнено: {} MB > ліміт GPU {} MB",
         PlotKey::ScalarField => "Скалярне поле",
         PlotKey::LabelsHeatmapOnly => "Зображення міток малюються лише на тепловій карті",
     })

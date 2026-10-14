@@ -34,14 +34,17 @@ pub mod overlays;
 #[cfg(test)]
 mod overlays_tests;
 mod pipeline;
+#[cfg(test)]
+mod pyramid_tests;
 mod state;
 #[cfg(test)]
 pub(crate) mod test_support;
 mod ui;
 pub(crate) mod window_title;
 
-#[allow(unused_imports)] // used by tests and the library, not the binary
 pub use layers::VariableSelection;
+#[allow(unused_imports)] // used by tests and the library, not the binary
+pub(crate) use pipeline::needs_pyramid;
 pub use state::line_profile::LineLayout;
 pub use state::line_series::{LineColoring, series_line_at, series_t};
 pub use state::plate::{PlateState, WellFields};

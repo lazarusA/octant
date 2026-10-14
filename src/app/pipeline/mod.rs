@@ -8,3 +8,5 @@ pub mod paint;
 pub mod paint_layer;
 pub mod rebuild;
 mod rebuild_2d;
+
+pub(crate) use rebuild_2d::needs_pyramid;

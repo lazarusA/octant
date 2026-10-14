@@ -121,7 +121,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "자르기 도구",
         SettingsKey::Aggregation => "2D 집계",
         SettingsKey::AggregationMandatoryHover => {
-            "필수: 배열이 단일 GPU 버퍼 한도 (128 MB / 셀 3350만 개)를 넘습니다. \
+            "필수: 배열이 단일 GPU 버퍼 한도 ({} MB)를 넘습니다. \
              집계를 끌 수 없습니다."
         }
         SettingsKey::AggregationHover => "다중 해상도 피라미드 다운샘플링 및 뷰포트 리샘플링.",

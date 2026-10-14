@@ -49,7 +49,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
             "この大きな選択範囲 ({} セル、{} MB) では3D球体と3Dサーフェスのメッシュは無効です。2D平面と1Dラインのプロットは引き続き使えます。"
         }
         VariablesKey::LargeVolumeDisabled => {
-            "この選択範囲では3Dボリュームと点群は無効です: ボリュームサイズ ({} MB) が128 MBのGPUストレージバッファ上限を超えています。2D平面、1Dライン、3D球体は引き続き使えます。"
+            "この選択範囲では3Dボリュームと点群は無効です: ボリュームサイズ ({} MB) が{} MBのGPUストレージバッファ上限を超えています。2D平面、1Dライン、3D球体は引き続き使えます。"
         }
         VariablesKey::RoleNone => "なし",
         VariablesKey::RoleAnimated => "アニメーション",

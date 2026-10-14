@@ -13,6 +13,9 @@ impl OctantApp {
             wgpu_render_state: cc.wgpu_render_state.clone(),
             ..Default::default()
         };
+        if let Some(rs) = &cc.wgpu_render_state {
+            crate::plots::limits::set_from_device(&rs.device.limits());
+        }
         app.load_language_pref(cc.storage);
         crate::ui::fonts::FontEngine::init(&cc.egui_ctx);
         crate::ui::number_input::install(&cc.egui_ctx);

@@ -29,7 +29,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::UnsupportedForGrid => "No compatible con la cuadrícula {}",
         PlotKey::DisabledAggregation => "Desactivado: la agregación 2D está activa",
         PlotKey::Requires3D => "Requiere datos 3D",
-        PlotKey::DisabledGpuLimit => "Desactivado: {} MB > límite de GPU de 128 MB",
+        PlotKey::DisabledGpuLimit => "Desactivado: {} MB > límite de GPU de {} MB",
         PlotKey::ScalarField => "Campo escalar",
         PlotKey::LabelsHeatmapOnly => {
             "Las imágenes de etiquetas solo se dibujan en el mapa de calor"

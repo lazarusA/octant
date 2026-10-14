@@ -137,7 +137,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "Ferramenta de recorte",
         SettingsKey::Aggregation => "Agregação 2D",
         SettingsKey::AggregationMandatoryHover => {
-            "Obrigatória: a matriz excede o limite de um único buffer da GPU (128 MB / 33.5M células). \
+            "Obrigatória: a matriz excede o limite de um único buffer da GPU ({} MB). \
              A agregação não pode ser desativada."
         }
         SettingsKey::AggregationHover => {

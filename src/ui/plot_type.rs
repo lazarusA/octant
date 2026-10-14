@@ -79,10 +79,9 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     let is_exploring_new = app.is_exploring_unplotted_variable();
     let total_2d_elements = crate::ui::variables_panel::calculate_selected_2d_elements(app);
     let target_pyramid_disabled = if is_exploring_new {
-        !is_3d_available
-            && total_2d_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
+        !is_3d_available && total_2d_elements > crate::plots::limits::max_storage_elements()
     } else {
-        app.enable_pyramid_resampling
+        app.base_resampled()
     };
 
     let is_volume_allowed = is_3d_available
@@ -100,8 +99,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
         app.layers.base.load.block_key.is_some() || app.block_prefetcher.pending_count() > 0;
     if !is_exploring_new
         && !is_loading
-        && (((app.enable_pyramid_resampling || label_image)
-            && app.selected.plot_type != PlotType::Heatmap)
+        && (((app.base_resampled() || label_image) && app.selected.plot_type != PlotType::Heatmap)
             || ((app.selected.plot_type == PlotType::Volume
                 || app.selected.plot_type == PlotType::PointCloud)
                 && app.layers.base.data.volume.is_none())
@@ -202,7 +200,13 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
                     _ => vol_mb,
                 };
                 let mb = stack_str(&mut mb_buf, format_args!("{mb:.0}"));
-                fill(&mut reason_buf, tr(PlotKey::DisabledGpuLimit), &[&mb])
+                // Volumes, point clouds and meshes keep the default budget.
+                let limit = crate::plots::common::MAX_GPU_STORAGE_BUFFER_BYTES / (1024 * 1024);
+                fill(
+                    &mut reason_buf,
+                    tr(PlotKey::DisabledGpuLimit),
+                    &[&mb, &limit],
+                )
             };
 
             ui.horizontal(|ui| {

@@ -147,7 +147,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "Herramienta de recorte",
         SettingsKey::Aggregation => "Agregación 2D",
         SettingsKey::AggregationMandatoryHover => {
-            "Obligatoria: el arreglo supera el límite de un búfer de GPU (128 MB / 33,5 M celdas). \
+            "Obligatoria: el arreglo supera el límite de un búfer de GPU ({} MB). \
              La agregación no se puede desactivar."
         }
         SettingsKey::AggregationHover => {

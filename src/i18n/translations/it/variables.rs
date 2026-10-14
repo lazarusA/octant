@@ -49,7 +49,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
             "Le mesh 3D Globo e 3D Superficie sono disattivate per questa selezione grande ({} celle, {} MB). I grafici Piano 2D e Linea 1D restano pienamente attivi."
         }
         VariablesKey::LargeVolumeDisabled => {
-            "Volume 3D e Nuvola di punti sono disattivati per questa selezione: la dimensione del volume ({} MB) supera il limite di 128 MB del buffer di archiviazione della GPU. Piano 2D, Linea 1D e Globo 3D restano attivi."
+            "Volume 3D e Nuvola di punti sono disattivati per questa selezione: la dimensione del volume ({} MB) supera il limite di {} MB del buffer di archiviazione della GPU. Piano 2D, Linea 1D e Globo 3D restano attivi."
         }
         VariablesKey::RoleNone => "Nessuna",
         VariablesKey::RoleAnimated => "Animata",

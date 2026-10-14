@@ -43,7 +43,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
             "此大型选区（{} 个单元格，{} MB）已禁用 3D 球面和 3D 曲面网格。2D 平面和 1D 线图仍可使用。"
         }
         VariablesKey::LargeVolumeDisabled => {
-            "此选区已禁用 3D 体渲染和点云：体数据大小（{} MB）超出 128 MB 的 GPU 存储缓冲区上限。2D 平面、1D 线图和 3D 球面仍可使用。"
+            "此选区已禁用 3D 体渲染和点云：体数据大小（{} MB）超出 {} MB 的 GPU 存储缓冲区上限。2D 平面、1D 线图和 3D 球面仍可使用。"
         }
         VariablesKey::RoleNone => "无",
         VariablesKey::RoleAnimated => "动画",

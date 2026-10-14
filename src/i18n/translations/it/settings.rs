@@ -143,7 +143,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "Strumento ritaglio",
         SettingsKey::Aggregation => "Aggregazione 2D",
         SettingsKey::AggregationMandatoryHover => {
-            "Obbligatoria: l'array supera il limite di un singolo buffer GPU (128 MB / 33,5 M celle). \
+            "Obbligatoria: l'array supera il limite di un singolo buffer GPU ({} MB). \
              L'aggregazione non può essere disattivata."
         }
         SettingsKey::AggregationHover => {

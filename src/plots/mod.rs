@@ -8,6 +8,9 @@ mod heatmap_draw;
 pub mod labels;
 #[cfg(test)]
 mod labels_tests;
+pub mod limits;
+#[cfg(test)]
+mod limits_tests;
 pub mod line;
 pub mod mesh;
 mod mesh_draw;

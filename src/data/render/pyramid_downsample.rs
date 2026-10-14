@@ -1,7 +1,6 @@
 //! Downsampling and viewport sampling algorithms for 2D matrix pyramids.
 
-use super::matrix::MatrixData;
-use super::pyramid::{AggregationOp, MatrixPyramid, PyramidLevel};
+use super::pyramid::{AggregationOp, MatrixPyramid};
 #[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
@@ -83,13 +82,18 @@ pub fn downsample_2x2(
     dst
 }
 
-/// Samples a sub-region `[x_min..x_max] x [y_min..y_max]` normalized in `[0.0, 1.0]` at the given target resolution.
+/// Samples a sub-region `[x_min..x_max] x [y_min..y_max]` normalized in
+/// `[0.0, 1.0]` at the given target resolution into `out` (reusing its
+/// allocation), reading level 0 from `base`; returns the sample's width and
+/// height.
 pub fn sample_viewport(
     pyramid: &MatrixPyramid,
+    base: &[f32],
     x_range: (f64, f64),
     y_range: (f64, f64),
     target_res: (usize, usize),
-) -> MatrixData {
+    out: &mut Vec<f32>,
+) -> (usize, usize) {
     let (x_min, x_max) = (
         x_range.0.min(x_range.1).clamp(0.0, 1.0),
         x_range.0.max(x_range.1).clamp(0.0, 1.0),
@@ -106,9 +110,15 @@ pub fn sample_viewport(
     let out_h = target_res.1.clamp(2, 2048);
 
     let level_idx = pyramid.select_level(span_x, out_w);
-    let level: &PyramidLevel = &pyramid.levels[level_idx];
+    let Some(level) = pyramid.levels.get(level_idx) else {
+        out.clear();
+        out.resize(out_w * out_h, f32::NAN);
+        return (out_w, out_h);
+    };
+    let values = pyramid.level_values(level, base);
 
-    let mut out_values = vec![f32::NAN; out_w * out_h];
+    out.clear();
+    out.resize(out_w * out_h, f32::NAN);
 
     let process_sample_row = |(out_y, row): (usize, &mut [f32])| {
         let norm_y = y_min + (out_y as f64 / out_h as f64) * span_y;
@@ -120,29 +130,22 @@ pub fn sample_viewport(
             let src_x = (norm_x * level.width as f64).floor() as usize;
             let src_x = src_x.min(level.width.saturating_sub(1));
 
-            *val = level.values[src_y * level.width + src_x];
+            *val = values
+                .get(src_y * level.width + src_x)
+                .copied()
+                .unwrap_or(f32::NAN);
         }
     };
 
     #[cfg(not(target_arch = "wasm32"))]
-    out_values
-        .par_chunks_mut(out_w)
+    out.par_chunks_mut(out_w)
         .enumerate()
         .for_each(process_sample_row);
 
     #[cfg(target_arch = "wasm32")]
-    out_values
-        .chunks_mut(out_w)
+    out.chunks_mut(out_w)
         .enumerate()
         .for_each(process_sample_row);
 
-    MatrixData::new(
-        out_w,
-        out_h,
-        out_values,
-        pyramid.min_val,
-        pyramid.max_val,
-        pyramid.dataset_name.clone(),
-        1,
-    )
+    (out_w, out_h)
 }

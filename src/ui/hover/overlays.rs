@@ -74,13 +74,9 @@ fn composite_kind(app: &OctantApp, layer: &Layer) -> Option<CompositeKind> {
 /// `layer`'s value at cell `(px, py)` of its full-resolution grid, NaN when
 /// it has no data there.
 fn cell_value(layer: &Layer, (px, py): (usize, usize)) -> f32 {
-    let data = &layer.data;
-    let value = match (&data.pyramid, &data.matrix) {
-        (Some(pyramid), _) => pyramid
-            .levels
-            .first()
-            .and_then(|level| level.values.get(py * pyramid.original_width + px)),
-        (None, Some(matrix)) if px < matrix.width => matrix.values.get(py * matrix.width + px),
+    // The matrix is the full-resolution data, also under a pyramid.
+    let value = match &layer.data.matrix {
+        Some(matrix) if px < matrix.width => matrix.values.get(py * matrix.width + px),
         _ => None,
     };
     value.copied().unwrap_or(f32::NAN)
