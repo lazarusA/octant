@@ -143,6 +143,7 @@ impl OctantApp {
         for res in completed {
             match res.result {
                 Ok(block) => {
+                    self.mark_failed(&res.key, false);
                     let requested = self.layers.find_by_key(&res.key);
                     let shown_in = requested.or_else(|| self.layer_showing_block(&res.key, &block));
 
@@ -161,6 +162,7 @@ impl OctantApp {
                     }
                 }
                 Err(e) => {
+                    self.mark_failed(&res.key, true);
                     self.status_message = format!("Block cache fetch error: {e}");
                     self.notify(
                         crate::ui::toast::Severity::Error,
@@ -174,6 +176,23 @@ impl OctantApp {
         // Whenever worker slots free up, replenish and dispatch remaining chunks in the selection:
         if had_completed {
             self.prefetch_animated_ranges();
+        }
+    }
+
+    /// Marks whether the last fetch of the layers reading blocks like `key`
+    /// (its dataset and variable) failed.
+    fn mark_failed(&mut self, key: &crate::data::BlockCacheKey, failed: bool) {
+        let ids: Vec<LayerId> = self.layers.iter().map(|l| l.id()).collect();
+        for id in ids {
+            let reads = self.layer_selections(id).is_some_and(|(shown, _)| {
+                shown
+                    .variable_info()
+                    .is_some_and(|v| v.name == key.variable_name)
+                    && self.selection_source_id(shown) == key.source_id
+            });
+            if let Some(layer) = self.layers.get_mut(id).filter(|_| reads) {
+                layer.load.failed = failed;
+            }
         }
     }
 

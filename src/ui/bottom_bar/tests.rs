@@ -88,3 +88,18 @@ fn timeline_reads_labels_only_when_there_is_one_per_step() {
     assert_ne!(short.end, "south", "two labels do not name three steps");
     assert_ne!(short.start, "north");
 }
+
+#[test]
+fn the_play_button_shows_buffering_progress_while_it_waits() {
+    use super::items::{LabelBuf, label_for};
+    let mut app = OctantApp::default();
+    let mut buf: LabelBuf = [0; 64];
+    app.playback.is_playing = true;
+    assert_eq!(label_for(&mut buf, BottomBarItem::PlayPause, &app), "");
+    app.playback.buffering = true;
+    app.playback.buffer_progress = (12, 45);
+    crate::i18n::with_language(crate::i18n::Language::English, || {
+        let label = label_for(&mut buf, BottomBarItem::PlayPause, &app);
+        assert_eq!(label, "Buffering 12/45");
+    });
+}

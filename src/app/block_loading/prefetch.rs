@@ -71,7 +71,9 @@ impl OctantApp {
     /// Progressively prefetches lookahead block windows along layer `id`'s
     /// animated dimension.
     pub(crate) fn prefetch_layer_animated_range(&mut self, id: LayerId) {
-        if !self.playback.enable_prefetch {
+        let failed_overlay =
+            id != LayerId::BASE && self.layers.get(id).is_some_and(|l| l.load.failed);
+        if !self.playback.enable_prefetch || failed_overlay {
             return;
         }
         let Some(layer_request) = self.shown_layer_request(id) else {

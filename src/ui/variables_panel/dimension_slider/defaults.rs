@@ -68,10 +68,7 @@ pub(super) fn chunk_window(var_info: &VariableInfo, dim: usize, at: usize) -> (u
         return (0, last);
     }
     let start = (at.min(last) / chunk) * chunk;
-    (
-        start,
-        (start + chunk).min(size).saturating_sub(1).max(start),
-    )
+    (start, (start + chunk).min(size).saturating_sub(1))
 }
 
 fn init_rank1_defaults(

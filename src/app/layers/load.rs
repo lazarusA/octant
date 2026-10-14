@@ -12,4 +12,8 @@ pub struct LoadState {
     /// Step the requested block is shown at when it arrives (playback may
     /// move on meanwhile).
     pub pending_target_step: Option<usize>,
+    /// The layer's last fetch failed: an overlay no longer holds playback
+    /// nor prefetches ahead until one of its blocks arrives (it retries
+    /// once per step).
+    pub failed: bool,
 }

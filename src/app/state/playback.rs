@@ -11,8 +11,10 @@ pub struct PlaybackState {
     /// Seconds of steps loaded ahead, in every drawn animated layer, before
     /// playback starts or resumes after reaching a step not yet loaded.
     pub buffer_secs: f32,
-    /// Whether playback waits for its buffer to fill (`buffer_filled`).
+    /// Whether playback waits for its buffer to fill (`may_show`).
     pub buffering: bool,
+    /// Steps ready ahead and steps wanted while buffering (the indicator).
+    pub buffer_progress: (usize, usize),
 }
 
 impl Default for PlaybackState {
@@ -26,6 +28,7 @@ impl Default for PlaybackState {
             current_timestep: 0,
             buffer_secs: 3.0,
             buffering: false,
+            buffer_progress: (0, 0),
         }
     }
 }

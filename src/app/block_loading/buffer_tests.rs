@@ -146,8 +146,9 @@ fn a_fast_store_plays_without_buffering_once_started() {
     assert_eq!(episodes, 0, "no stall after the start: {log:?}");
 }
 
-#[test]
-fn an_overlay_without_the_step_holds_playback() {
+/// `t2m` plotted from resident blocks with `sst` overlaid, its blocks not
+/// yet loaded; the overlay's id.
+fn overlay_app() -> (OctantApp, crate::app::layers::LayerId) {
     let (mut app, meta) = memory_app();
     make_resident(&mut app, &SliceRequest::full_range("t2m", &[3, 5, 4]));
     let base = selection_of(&mut app, &meta, "t2m");
@@ -161,14 +162,32 @@ fn an_overlay_without_the_step_holds_playback() {
         .expect("sst");
     let id = app.add_overlay(sst).expect("overlay");
     assert!(app.layers.get(id).is_some_and(|l| l.is_drawn()));
-
-    assert!(app.layer_step_resident(crate::app::layers::LayerId::BASE, 1));
-    assert!(!app.step_ready(1), "the overlay lacks step 1");
     app.playback.is_playing = true;
+    (app, id)
+}
+
+#[test]
+fn an_overlay_without_the_step_holds_playback() {
+    let (mut app, _) = overlay_app();
     app.advance_playback(Instant::now());
     assert_eq!(app.playback.current_timestep, 0, "playback waits");
     assert!(app.playback.buffering);
+    // Buffering wants the whole (looping) axis of 3 steps; none is ready.
+    app.advance_playback(Instant::now());
+    assert_eq!(app.playback.buffer_progress, (0, 3));
 
     make_resident(&mut app, &SliceRequest::full_range("sst", &[3, 5, 4]));
-    assert!(app.step_ready(1));
+    app.advance_playback(Instant::now());
+    assert_eq!(app.playback.current_timestep, 1, "both layers hold step 1");
+    assert!(!app.playback.buffering);
+}
+
+#[test]
+fn an_overlay_whose_fetch_failed_no_longer_holds_playback() {
+    let (mut app, id) = overlay_app();
+    if let Some(layer) = app.layers.get_mut(id) {
+        layer.load.failed = true;
+    }
+    app.advance_playback(Instant::now());
+    assert_eq!(app.playback.current_timestep, 1, "the base plays on");
 }

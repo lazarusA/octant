@@ -54,14 +54,9 @@ impl OctantApp {
 
     /// Shows step `next_ts` when every drawn animated layer holds it, else
     /// starts buffering; while buffering, waits until the buffer ahead of it
-    /// is full (`buffer_filled`). Then queues every layer's lookahead.
+    /// is full (`may_show`). Then queues every layer's lookahead.
     fn play_step(&mut self, next_ts: usize) {
-        let ready = if self.playback.buffering {
-            self.buffer_filled(next_ts)
-        } else {
-            self.step_ready(next_ts)
-        };
-        if ready {
+        if self.may_show(next_ts) {
             self.playback.buffering = false;
             self.playback.current_timestep = next_ts;
             self.load_step_blocks();
