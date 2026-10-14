@@ -168,7 +168,6 @@ fn wide_plate() -> crate::app::PlateState {
         columns,
         wells,
         acquisitions,
-        field_count: Some(6),
     };
     crate::app::PlateState::new(
         "https://example.org/plate.zarr",

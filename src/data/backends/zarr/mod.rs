@@ -16,7 +16,7 @@ pub mod store;
 pub mod wasm;
 pub mod zstd_shim;
 
-pub use block::{ArrayCachedState, fetch_block_from_cached_array, fetch_block_with_progress};
+pub use block::{ArrayCachedState, fetch_block_from_cached_array};
 pub use coords::read_coordinate;
 pub use generic::GenericZarrBlockStore;
 pub use slice::{retrieve_array_subset_as_f32, retrieve_array_subset_as_f64};

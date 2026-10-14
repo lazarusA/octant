@@ -60,10 +60,13 @@ fn plates_list_wells_without_opening_them() {
     assert!(found.variables.is_empty());
     let plate = found.dataset.plate.expect("plate");
     assert_eq!(plate.rows, ["A", "B"]);
-    assert_eq!(plate.well_at(1, 1).map(|w| w.path.as_str()), Some("B/2"));
-    assert!(plate.well_at(0, 1).is_none());
+    let wells: Vec<_> = plate
+        .wells
+        .iter()
+        .map(|w| (w.path.as_str(), w.row, w.column))
+        .collect();
+    assert_eq!(wells, [("A/1", 0, 0), ("B/2", 1, 1)]);
     assert_eq!(plate.acquisitions[0].id, 3);
-    assert_eq!(plate.field_count, Some(2));
 }
 
 #[test]

@@ -15,12 +15,11 @@ impl WasmZarrBlockStore {
     /// The OME-Zarr images, labels, wells and series of the store; `None`
     /// when its root is not an OME-Zarr group.
     pub async fn discover_ome(&self) -> Option<Discovery> {
-        let mut prefetch = Prefetch::default();
+        let prefetch = Prefetch::default();
+        // One reader for every walk: keys read in one are not read again.
+        let reader = MetaReader::prefetched(self.memory_store.clone(), &prefetch);
         for _ in 0..MAX_PASSES {
-            let outcome = discover(
-                &MetaReader::prefetched(self.memory_store.clone(), &prefetch),
-                "",
-            );
+            let outcome = discover(&reader, "");
             let wanted = prefetch.take_pending();
             match outcome {
                 Outcome::Found(found) => return Some(found),
@@ -44,13 +43,13 @@ impl WasmZarrBlockStore {
                 match res {
                     Ok(bytes) if self.insert_key_bytes(&key, &bytes).is_ok() => {}
                     Ok(_) => {
-                        prefetch.absent.insert(key);
+                        prefetch.mark_absent(key);
                     }
                     Err(e) => {
                         if !e.contains("HTTP 404") {
                             log::warn!("[WASM Zarr] OME-Zarr metadata '{key}' unreadable: {e}");
                         }
-                        prefetch.absent.insert(key);
+                        prefetch.mark_absent(key);
                     }
                 }
             }

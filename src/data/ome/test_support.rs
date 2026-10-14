@@ -95,10 +95,11 @@ impl Fixture {
     /// asked for. Returns the result and the number of passes.
     pub fn discover_prefetched(&self) -> (Option<Discovery>, usize) {
         let store = Arc::new(MemoryStore::new());
-        let mut prefetch = Prefetch::default();
+        let prefetch = Prefetch::default();
+        let storage: Arc<dyn ReadableStorageTraits> = store.clone();
+        let reader = MetaReader::prefetched(storage, &prefetch);
         for pass in 1..=32 {
-            let storage: Arc<dyn ReadableStorageTraits> = store.clone();
-            let outcome = discover(&MetaReader::prefetched(storage, &prefetch), "");
+            let outcome = discover(&reader, "");
             let wanted = prefetch.take_pending();
             match outcome {
                 Outcome::Found(found) => return (Some(found), pass),
@@ -112,7 +113,7 @@ impl Fixture {
                         .set(&StoreKey::new(&key).expect("key"), bytes.clone().into())
                         .expect("set"),
                     None => {
-                        prefetch.absent.insert(key);
+                        prefetch.mark_absent(key);
                     }
                 }
             }

@@ -81,107 +81,50 @@ fn unit_name(unit: &AxisUnit) -> Option<String> {
     }
 }
 
-/// Short symbols of the spec's units. Units without one keep their name.
-const UNIT_SYMBOLS: &[(&str, &str)] = &[
-    ("angstrom", "Å"),
-    ("attometer", "am"),
-    ("centimeter", "cm"),
-    ("decimeter", "dm"),
-    ("femtometer", "fm"),
-    ("foot", "ft"),
-    ("inch", "in"),
-    ("kilometer", "km"),
-    ("meter", "m"),
-    ("micrometer", "µm"),
-    ("micron", "µm"),
-    ("mile", "mi"),
-    ("millimeter", "mm"),
-    ("nanometer", "nm"),
-    ("picometer", "pm"),
-    ("yard", "yd"),
-    ("attosecond", "as"),
-    ("centisecond", "cs"),
-    ("day", "d"),
-    ("decisecond", "ds"),
-    ("femtosecond", "fs"),
-    ("hour", "h"),
-    ("microsecond", "µs"),
-    ("millisecond", "ms"),
-    ("minute", "min"),
-    ("nanosecond", "ns"),
-    ("picosecond", "ps"),
-    ("second", "s"),
+/// The spec's units: name, short symbol, and meters per unit for lengths.
+/// Units without a symbol keep their name.
+const UNITS: &[(&str, &str, Option<f64>)] = &[
+    ("angstrom", "Å", Some(1e-10)),
+    ("attometer", "am", Some(1e-18)),
+    ("centimeter", "cm", Some(1e-2)),
+    ("decimeter", "dm", Some(1e-1)),
+    ("femtometer", "fm", Some(1e-15)),
+    ("foot", "ft", Some(0.3048)),
+    ("inch", "in", Some(0.0254)),
+    ("kilometer", "km", Some(1e3)),
+    ("meter", "m", Some(1.0)),
+    ("micrometer", "µm", Some(1e-6)),
+    ("micron", "µm", Some(1e-6)),
+    ("mile", "mi", Some(1609.344)),
+    ("millimeter", "mm", Some(1e-3)),
+    ("nanometer", "nm", Some(1e-9)),
+    ("picometer", "pm", Some(1e-12)),
+    ("yard", "yd", Some(0.9144)),
+    ("attosecond", "as", None),
+    ("centisecond", "cs", None),
+    ("day", "d", None),
+    ("decisecond", "ds", None),
+    ("femtosecond", "fs", None),
+    ("hour", "h", None),
+    ("microsecond", "µs", None),
+    ("millisecond", "ms", None),
+    ("minute", "min", None),
+    ("nanosecond", "ns", None),
+    ("picosecond", "ps", None),
+    ("second", "s", None),
 ];
 
+fn unit(name: &str) -> Option<&'static (&'static str, &'static str, Option<f64>)> {
+    let name = name.trim();
+    UNITS.iter().find(|(n, ..)| n.eq_ignore_ascii_case(name))
+}
+
 /// The short symbol of a unit's spec name (`"micrometer"` -> `"µm"`).
-pub fn unit_symbol(unit: &str) -> Option<&'static str> {
-    let unit = unit.trim();
-    UNIT_SYMBOLS
-        .iter()
-        .find(|(name, _)| name.eq_ignore_ascii_case(unit))
-        .map(|(_, symbol)| *symbol)
+pub fn unit_symbol(name: &str) -> Option<&'static str> {
+    unit(name).map(|u| u.1)
 }
 
 /// Meters in one unit of length, for scale bars across units.
-pub fn meters_per_unit(unit: &str) -> Option<f64> {
-    const LENGTHS: &[(&str, f64)] = &[
-        ("angstrom", 1e-10),
-        ("picometer", 1e-12),
-        ("nanometer", 1e-9),
-        ("micrometer", 1e-6),
-        ("micron", 1e-6),
-        ("millimeter", 1e-3),
-        ("centimeter", 1e-2),
-        ("decimeter", 1e-1),
-        ("meter", 1.0),
-        ("kilometer", 1e3),
-        ("inch", 0.0254),
-        ("foot", 0.3048),
-        ("yard", 0.9144),
-        ("mile", 1609.344),
-    ];
-    let unit = unit.trim();
-    LENGTHS
-        .iter()
-        .find(|(name, _)| name.eq_ignore_ascii_case(unit))
-        .map(|(_, m)| *m)
-}
-
-/// The dimension names of an OME-Zarr level array of rank `rank`, from the
-/// attributes it inherits from its image group (`multiscales`, or 0.5's
-/// `ome`, as JSON text); `None` for arrays outside an OME-Zarr image.
-pub fn block_dimension_names(
-    attributes: &std::collections::HashMap<String, String>,
-    rank: usize,
-) -> Option<Vec<String>> {
-    let parse = |key: &str| serde_json::from_str::<serde_json::Value>(attributes.get(key)?).ok();
-    let multiscales = parse("multiscales")
-        .or_else(|| parse("ome").and_then(|ome| ome.get("multiscales").cloned()))?;
-    let axes = multiscales.get(0)?.get("axes").and_then(|a| a.as_array());
-    let names: Vec<String> = axes
-        .into_iter()
-        .flatten()
-        .filter_map(|a| match a {
-            serde_json::Value::String(s) => Some(s.clone()),
-            other => other.get("name")?.as_str().map(str::to_string),
-        })
-        .collect();
-    Some(if names.len() == rank {
-        names
-    } else {
-        default_axis_names(rank)
-    })
-}
-
-/// Block attribute marking values that are label ids stored as `f32` bits.
-pub const LABEL_BITS_ATTRIBUTE: &str = "octant_label_bits";
-
-/// Whether an array's inherited attributes make it a label image
-/// (`image-label`, free or in 0.5's `ome`).
-pub fn is_label_image(attributes: &std::collections::HashMap<String, String>) -> bool {
-    attributes.contains_key("image-label")
-        || attributes
-            .get("ome")
-            .and_then(|ome| serde_json::from_str::<serde_json::Value>(ome).ok())
-            .is_some_and(|ome| ome.get("image-label").is_some())
+pub fn meters_per_unit(name: &str) -> Option<f64> {
+    unit(name)?.2
 }

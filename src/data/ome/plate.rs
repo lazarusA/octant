@@ -28,16 +28,6 @@ pub struct OmePlate {
     pub columns: Vec<String>,
     pub wells: Vec<PlateWell>,
     pub acquisitions: Vec<PlateAcquisition>,
-    pub field_count: Option<u64>,
-}
-
-impl OmePlate {
-    /// The well at `(row, column)`.
-    pub fn well_at(&self, row: usize, column: usize) -> Option<&PlateWell> {
-        self.wells
-            .iter()
-            .find(|w| w.row == row && w.column == column)
-    }
 }
 
 /// One field of view of a well.
@@ -54,9 +44,10 @@ pub struct OmeWell {
 }
 
 impl OmeWell {
-    /// Fields of `acquisition` (all fields when `None` or none are tagged).
-    pub fn fields_of(&self, acquisition: Option<u64>) -> impl Iterator<Item = &WellField> {
-        self.fields.iter().filter(move |f| {
+    /// Fields of `acquisition` (all fields when `None` or none are tagged),
+    /// with their index in `fields`.
+    pub fn fields_of(&self, acquisition: Option<u64>) -> impl Iterator<Item = (usize, &WellField)> {
+        self.fields.iter().enumerate().filter(move |(_, f)| {
             acquisition.is_none() || f.acquisition.is_none() || f.acquisition == acquisition
         })
     }
@@ -107,7 +98,6 @@ pub fn plate_info(plate: &Plate) -> OmePlate {
                 name: a.name.clone(),
             })
             .collect(),
-        field_count: plate.field_count.map(|n| n.get()),
     }
 }
 

@@ -4,9 +4,7 @@ use crate::data::VolumeData;
 use crate::data::octant_block::OctantBlock;
 
 use super::types::ChannelColorConfig;
-use super::utils::{
-    accumulate_channel_values, finalize_composite_packed_rgb, visible_channel_configs,
-};
+use super::utils::{ChannelAccumulator, visible_channel_configs};
 
 /// Slices an N-dimensional `OctantBlock` into a 3D `VolumeData` with unique per-channel color tints additively.
 #[allow(clippy::too_many_arguments)]
@@ -35,56 +33,24 @@ pub fn slice_multichannel_volume_composite_nd(
     let nz = z_range.1.saturating_sub(z_range.0).max(1);
     let total_voxels = nx.checked_mul(ny)?.checked_mul(nz)?;
 
-    if visible_configs.is_empty() {
-        return Some(VolumeData::new(
-            nx,
-            ny,
-            nz,
-            vec![f32::NAN; total_voxels],
-            0.0,
-            16777215.0,
-            dataset_name.to_string(),
-        ));
-    }
-
-    let has_z = z_dim < block.shape.len() && z_dim != c_dim;
-    let eff_z_dim = if has_z { z_dim } else { usize::MAX };
-
-    let mut acc_r = vec![0.0f32; total_voxels];
-    let mut acc_g = vec![0.0f32; total_voxels];
-    let mut acc_b = vec![0.0f32; total_voxels];
-    let mut any_valid = vec![false; total_voxels];
-    let mut channel_loaded = false;
-
-    let mut fixed = fixed_indices.to_vec();
-    if fixed.len() < block.shape.len() {
-        fixed.resize(block.shape.len(), 0);
-    }
-
-    for (cfg, local_c) in visible_configs {
-        fixed[c_dim] = local_c;
-
-        if let Some(vdata) = block.volume_with_ranges(
-            x_dim, y_dim, eff_z_dim, x_range, y_range, z_range, &fixed, &cfg.name, true,
-        ) {
-            channel_loaded = true;
-            accumulate_channel_values(
-                &vdata.values,
-                cfg,
-                &mut acc_r,
-                &mut acc_g,
-                &mut acc_b,
-                &mut any_valid,
-            );
+    let values = if visible_configs.is_empty() {
+        vec![f32::NAN; total_voxels]
+    } else {
+        let has_z = z_dim < block.shape.len() && z_dim != c_dim;
+        let eff_z_dim = if has_z { z_dim } else { usize::MAX };
+        let mut fixed = fixed_indices.to_vec();
+        fixed.resize(fixed.len().max(block.shape.len()), 0);
+        let mut acc = ChannelAccumulator::new(total_voxels);
+        for (cfg, local_c) in visible_configs {
+            fixed[c_dim] = local_c;
+            if let Some(vdata) = block.volume_with_ranges(
+                x_dim, y_dim, eff_z_dim, x_range, y_range, z_range, &fixed, &cfg.name, true,
+            ) {
+                acc.add(&vdata.values, cfg);
+            }
         }
-    }
-
-    if !channel_loaded {
-        return None;
-    }
-
-    let values = finalize_composite_packed_rgb(total_voxels, &acc_r, &acc_g, &acc_b, &any_valid);
-
+        acc.finish()?
+    };
     Some(VolumeData::new(
         nx,
         ny,

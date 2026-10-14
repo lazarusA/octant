@@ -60,22 +60,46 @@ impl ChannelDisplay {
     /// Maps a windowed intensity `norm` (0..1) through the family curve, then
     /// inverts it. Every curve keeps 0 at 0 and 1 at 1.
     pub fn map(&self, norm: f32) -> f32 {
-        if self.family == ChannelFamily::Linear && !self.inverted {
-            return norm.clamp(0.0, 1.0);
-        }
-        let n = norm.clamp(0.0, 1.0);
+        self.curve().map(norm)
+    }
+
+    /// The curve with its coefficient checked, for mapping many intensities.
+    pub fn curve(&self) -> ChannelCurve {
         let c = if self.coefficient.is_finite() && self.coefficient > 0.0 {
             self.coefficient
         } else {
             1.0
         };
+        ChannelCurve {
+            family: self.family,
+            inverted: self.inverted,
+            c,
+            c_exp_m1: c.exp_m1(),
+        }
+    }
+}
+
+/// A `ChannelDisplay`'s curve, its coefficient checked once per channel.
+#[derive(Debug, Clone, Copy)]
+pub struct ChannelCurve {
+    family: ChannelFamily,
+    inverted: bool,
+    c: f32,
+    c_exp_m1: f32,
+}
+
+impl ChannelCurve {
+    /// `ChannelDisplay::map`.
+    #[inline]
+    pub fn map(&self, norm: f32) -> f32 {
+        let n = norm.clamp(0.0, 1.0);
         let curved = match self.family {
             ChannelFamily::Linear => n,
-            ChannelFamily::Polynomial => n.powf(c),
-            ChannelFamily::Exponential => (c * n).exp_m1() / c.exp_m1(),
-            ChannelFamily::Logarithmic => (c.exp_m1() * n).ln_1p() / c,
-        };
-        let curved = curved.clamp(0.0, 1.0);
+            ChannelFamily::Polynomial => n.powf(self.c),
+            ChannelFamily::Exponential => (self.c * n).exp_m1() / self.c_exp_m1,
+            ChannelFamily::Logarithmic => (self.c_exp_m1 * n).ln_1p() / self.c,
+        }
+        .clamp(0.0, 1.0);
         if self.inverted { 1.0 - curved } else { curved }
     }
 }

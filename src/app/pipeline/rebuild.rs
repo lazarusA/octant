@@ -33,7 +33,7 @@ impl OctantApp {
             layer.color.range_min = data.min_val;
             layer.color.range_max = data.max_val;
             layer.color.lock_bounds = false;
-            super::greyscale::apply_greyscale_display(layer);
+            layer.data.greyscale_channel = None;
         } else {
             layer.color.global_min = layer.color.global_min.min(data.min_val);
             layer.color.global_max = layer.color.global_max.max(data.max_val);
@@ -43,6 +43,7 @@ impl OctantApp {
                 layer.color.range_max = data.max_val;
             }
         }
+        super::greyscale::apply_greyscale_display(layer, (data.min_val, data.max_val));
 
         let is_oversized = total_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
         if is_oversized {
@@ -101,17 +102,23 @@ impl OctantApp {
         };
 
         if let Some(wgpu_render_state) = &self.wgpu_render_state {
-            // A label image's colors, built once per variable.
-            if let Some(style) = layer.source.labels() {
-                if is_new_variable || layer.renderers.labels.is_none() {
-                    layer.renderers.labels = Some(Arc::new(crate::plots::LabelRenderer::new(
+            // A label image's colors, built once per variable over one pipeline.
+            let labels = &mut layer.renderers.labels;
+            match (layer.source.labels(), labels.as_deref()) {
+                (None, _) => *labels = None,
+                (Some(style), None) => {
+                    *labels = Some(Arc::new(crate::plots::LabelRenderer::new(
                         &wgpu_render_state.device,
                         wgpu_render_state.target_format,
                         &style.info,
                     )));
                 }
-            } else {
-                layer.renderers.labels = None;
+                (Some(style), Some(old)) if is_new_variable => {
+                    *labels = Some(Arc::new(
+                        old.with_palette(&wgpu_render_state.device, &style.info),
+                    ));
+                }
+                (Some(_), Some(_)) => {}
             }
             let same_grid = layer
                 .data
@@ -123,8 +130,9 @@ impl OctantApp {
                 && layer.data.matrix.as_ref().is_some_and(|m| {
                     m.width == effective_data.width && m.height == effective_data.height
                 });
-            let can_have_3d_surface =
-                total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS;
+            // Label images are drawn only as heatmaps.
+            let can_have_3d_surface = layer.labels().is_none()
+                && total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS;
             let renderers = &mut layer.renderers;
             let surface_renderers_ready =
                 !can_have_3d_surface || (renderers.sphere.is_some() && renderers.surface.is_some());
@@ -189,7 +197,7 @@ impl OctantApp {
                 );
                 renderers.heatmap = Some(Arc::new(renderer));
 
-                if total_elements <= crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
+                if can_have_3d_surface {
                     let coord_x = effective_data.grid.coords_x();
                     let coord_y = effective_data.grid.coords_y();
                     let sphere_renderer = SphereRenderer::new_sphere_with_coords(

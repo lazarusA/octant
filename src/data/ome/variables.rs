@@ -7,8 +7,7 @@ use super::axes::default_axis_names;
 use super::model::{OmeImage, OmeRef};
 use super::reader::{MetaReader, Pending, join};
 use crate::data::metadata::VariableInfo;
-use crate::utils::metadata::open_or_instantiate_array_normalized;
-use crate::utils::units::calculate_variable_size_bytes;
+use crate::utils::metadata::{open_or_instantiate_array_normalized, variable_info_from_array};
 
 /// The variables of `image`'s levels, named `{group}/{level path}`. Levels
 /// whose array cannot be opened are left out.
@@ -57,51 +56,39 @@ fn level_variable(
         Some(array) => array,
         None => open_or_instantiate_array_normalized(reader.storage(), &abs).ok()?,
     };
-    let shape = array.shape().to_vec();
-    if shape.is_empty() {
-        return None;
-    }
-    let zero = vec![0u64; shape.len()];
-    let chunk_shape = array
-        .chunk_shape(&zero)
-        .map(|v| v.into_iter().map(|n| n.get()).collect())
-        .unwrap_or_else(|_| shape.clone());
-    let data_type = format!("{:?}", array.data_type());
-    let dimension_names = if image.axes.len() == shape.len() {
-        image.axes.iter().map(|a| a.name.clone()).collect()
-    } else {
-        default_axis_names(shape.len())
-    };
     let mut attributes = HashMap::new();
     attributes.insert("ome_version".to_string(), version.to_string());
     // Only integer label images draw as labels (their ids are read exactly).
     if image.label_info.is_some() && is_integer(array.data_type()) {
         attributes.insert(LABEL_IMAGE_ATTRIBUTE.to_string(), "true".to_string());
     }
+    let info = variable_info_from_array(&array, path)?;
     Some(VariableInfo {
-        name: path.to_string(),
-        file_size: calculate_variable_size_bytes(&shape, &data_type),
-        data_type,
-        shape,
-        dimension_names,
-        chunk_shape,
-        units: None,
+        dimension_names: level_dimension_names(image, info.shape.len()),
         long_name: image.name.clone(),
-        time_coverage_start: None,
-        time_coverage_end: None,
-        temporal_resolution: None,
         attributes,
         ome: Some(OmeRef {
             image: image.clone(),
             level,
         }),
+        ..info
     })
 }
 
 /// Variable attribute of label images drawn as labels (integer ids).
 pub const LABEL_IMAGE_ATTRIBUTE: &str = "ome_label_image";
 
-fn is_integer(dt: &zarrs::array::DataType) -> bool {
+/// The dimension names of an `image` level array of rank `rank`: the image's
+/// axes, else the default `t, c, z, y, x` tail.
+pub(super) fn level_dimension_names(image: &OmeImage, rank: usize) -> Vec<String> {
+    if image.axes.len() == rank {
+        image.axes.iter().map(|a| a.name.clone()).collect()
+    } else {
+        default_axis_names(rank)
+    }
+}
+
+pub(super) fn is_integer(dt: &zarrs::array::DataType) -> bool {
     use zarrs::array::data_type::*;
     dt.is::<UInt8DataType>()
         || dt.is::<UInt16DataType>()

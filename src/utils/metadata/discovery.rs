@@ -21,19 +21,17 @@ use crate::data::metadata::VariableInfo;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::utils::units::calculate_variable_size_bytes;
 
-/// Format-agnostic store variable metadata extractor.
+/// Format-agnostic store variable metadata extractor (plain Zarr: OME-Zarr
+/// stores are discovered by `crate::data::ome` first).
 pub fn extract_store_variables(
     store: ReadableWritableListableStorage,
     base_url: &str,
 ) -> Result<Vec<VariableInfo>, Box<dyn Error>> {
-    // 1. OME-Zarr images, labels, wells and series (`crate::data::ome`)
-    if let Some(found) = crate::data::ome::discover_direct(store.clone()) {
-        return Ok(found.variables);
-    }
+    let root = Group::open(store.clone(), "/").ok();
 
-    // Consolidated metadata
-    if let Ok(group) = Group::open(store.clone(), "/")
-        && let Some(ConsolidatedMetadata { metadata, .. }) = group.consolidated_metadata()
+    // 1. Consolidated metadata
+    if let Some(ConsolidatedMetadata { metadata, .. }) =
+        root.as_ref().and_then(Group::consolidated_metadata)
     {
         let variables = extract_store_variables_from_consolidated_metadata(&metadata);
         if !variables.is_empty() {
@@ -43,13 +41,12 @@ pub fn extract_store_variables(
 
     // 2. Hierarchical recursive child node discovery via get_child_nodes (fast, zero-chunk listing)
     let mut variables = Vec::new();
-    let root_attrs = Group::open(store.clone(), "/")
-        .ok()
+    let root_attrs: HashMap<String, String> = root
         .map(|g| {
             g.attributes()
                 .iter()
                 .map(|(k, v)| (k.clone(), v.to_string()))
-                .collect::<HashMap<String, String>>()
+                .collect()
         })
         .unwrap_or_default();
 

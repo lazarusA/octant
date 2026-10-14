@@ -7,7 +7,6 @@ use crate::app::layers::{Layer, LayerId};
 use crate::i18n::{SettingsKey as K, tr};
 use crate::plots::PlotType;
 use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
-use crate::ui::number_input::LocalizedInput;
 
 /// What a row asked for this frame, applied after the list is drawn.
 enum RowAction {
@@ -117,17 +116,7 @@ fn label_body(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
                 .on_hover_text(tr(K::LabelsOutlineHover));
         });
     }
-    let opacity = &mut layer.color.opacity;
-    let resp = crate::ui::flow_row::labeled_slider(
-        ui,
-        ("label_opacity", id),
-        crate::ui::flow_row::SliderLabel::After(tr(K::Opacity)),
-        egui::Slider::new(opacity, 0.0..=1.0).localized(),
-    )
-    .on_hover_text(tr(K::OpacityHover));
-    if resp.double_clicked() {
-        *opacity = 1.0;
-    }
+    super::opacity::opacity_slider(ui, id, &mut layer.color.opacity);
 }
 
 /// The eye toggle, the name, and the move and remove buttons of `layer`.

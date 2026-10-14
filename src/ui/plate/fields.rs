@@ -47,20 +47,10 @@ pub(super) fn acquisition_select(ui: &mut egui::Ui, plate: &mut PlateState) {
     });
 }
 
-/// Whether `opened` is field `field` of well `well` of the plate at `url`.
-pub(super) fn is_field(opened: Option<&str>, url: &str, well: &str, field: &str) -> bool {
-    opened
-        .and_then(|o| o.strip_prefix(url))
-        .and_then(|o| o.strip_prefix('/'))
-        .and_then(|o| o.strip_prefix(well))
-        .and_then(|o| o.strip_prefix('/'))
-        == Some(field)
-}
-
 /// The picked well's fields; a click opens one.
 pub(super) fn field_list(ui: &mut egui::Ui, plate: &mut PlateState) -> Option<PlateAction> {
     let layout = std::sync::Arc::clone(&plate.plate);
-    let Some(well) = plate.well.and_then(|i| layout.wells.get(i)) else {
+    let Some((index, well)) = plate.well.and_then(|i| Some((i, layout.wells.get(i)?))) else {
         ui.label(
             egui::RichText::new(tr(DatasetKey::PlatePickWell))
                 .small()
@@ -86,7 +76,10 @@ pub(super) fn field_list(ui: &mut egui::Ui, plate: &mut PlateState) -> Option<Pl
         }
         WellFields::Ready(fields) => std::sync::Arc::clone(fields),
     };
-    let opened = plate.opened.as_deref();
+    let opened = match &plate.opened {
+        Some((w, field)) if *w == index => Some(field.as_str()),
+        _ => None,
+    };
     let mut action = None;
     ui.horizontal_wrapped(|ui| {
         ui.label(well.path.as_str());
@@ -96,9 +89,9 @@ pub(super) fn field_list(ui: &mut egui::Ui, plate: &mut PlateState) -> Option<Pl
                 .weak(),
         );
         let mut any = false;
-        for (n, field) in fields.fields_of(plate.acquisition).enumerate() {
+        for (n, field) in fields.fields_of(plate.acquisition) {
             any = true;
-            let is_open = is_field(opened, &plate.url, &well.path, &field.path);
+            let is_open = opened == Some(field.path.as_str());
             let mut buf = [0u8; 16];
             let label = stack_str(&mut buf, format_args!("{}", n + 1));
             if ui
@@ -106,10 +99,7 @@ pub(super) fn field_list(ui: &mut egui::Ui, plate: &mut PlateState) -> Option<Pl
                 .on_hover_text(field.path.as_str())
                 .clicked()
             {
-                action = Some(PlateAction::OpenField(
-                    well.path.clone(),
-                    field.path.clone(),
-                ));
+                action = Some(PlateAction::OpenField(index, field.path.clone()));
             }
         }
         if !any {

@@ -23,12 +23,29 @@ struct LabelParams {
     _pad: u32,
 }
 
+/// The label shader: the shared data quad (`common/quad.wgsl`) in label colors.
+pub(crate) const LABELS_WGSL: &str = concat!(
+    include_str!("shaders/common/coords.wgsl"),
+    "\n",
+    include_str!("shaders/common/quad.wgsl"),
+    "\n",
+    include_str!("shaders/labels.wgsl"),
+);
+
 /// The pipeline and label colors of one label layer.
 pub struct LabelRenderer {
     pipeline: wgpu::RenderPipeline,
+    layout: wgpu::BindGroupLayout,
     params_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     count: u32,
+}
+
+/// A label layer drawn by a `HeatmapCallback`, over its renderer's data.
+pub struct LabelDraw {
+    pub renderer: Arc<LabelRenderer>,
+    pub outline: bool,
+    pub opacity: f32,
 }
 
 impl LabelRenderer {
@@ -37,15 +54,34 @@ impl LabelRenderer {
         target_format: wgpu::TextureFormat,
         info: &OmeLabelInfo,
     ) -> Self {
-        let source = concat!(
-            include_str!("shaders/common/coords.wgsl"),
-            "\n",
-            include_str!("shaders/labels.wgsl"),
+        let layout = label_bind_group_layout(device);
+        let data_layout = super::common::create_plot_with_coords_bind_group_layout(
+            device,
+            "Label Data Bind Group Layout",
+            wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+            wgpu::ShaderStages::FRAGMENT,
         );
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Label Shader Module"),
-            source: wgpu::ShaderSource::Wgsl(source.into()),
-        });
+        let pipeline = super::heatmap::quad_pipeline(
+            device,
+            target_format,
+            "Label",
+            LABELS_WGSL,
+            &[Some(&data_layout), Some(&layout)],
+        );
+        Self::with_pipeline(device, pipeline, layout, info)
+    }
+
+    /// The same pipeline with `info`'s colors.
+    pub fn with_palette(&self, device: &wgpu::Device, info: &OmeLabelInfo) -> Self {
+        Self::with_pipeline(device, self.pipeline.clone(), self.layout.clone(), info)
+    }
+
+    fn with_pipeline(
+        device: &wgpu::Device,
+        pipeline: wgpu::RenderPipeline,
+        layout: wgpu::BindGroupLayout,
+        info: &OmeLabelInfo,
+    ) -> Self {
         let mut entries = palette_entries(info);
         let count = entries.len() as u32;
         if entries.is_empty() {
@@ -62,7 +98,6 @@ impl LabelRenderer {
         );
         let palette_buffer =
             super::common::create_storage_buffer(device, "Label Palette Buffer", &entries);
-        let layout = label_bind_group_layout(device);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Label Bind Group"),
             layout: &layout,
@@ -77,47 +112,9 @@ impl LabelRenderer {
                 },
             ],
         });
-        let data_layout = super::common::create_plot_with_coords_bind_group_layout(
-            device,
-            "Label Data Bind Group Layout",
-            wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-            wgpu::ShaderStages::FRAGMENT,
-        );
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Label Pipeline Layout"),
-            bind_group_layouts: &[Some(&data_layout), Some(&layout)],
-            immediate_size: 0,
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Label Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[Some(super::heatmap::HeatmapVertex::desc())],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: target_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: Some(super::common::default_depth_stencil_state(
-                false,
-                wgpu::CompareFunction::Always,
-            )),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
         Self {
             pipeline,
+            layout,
             params_buffer,
             bind_group,
             count,
@@ -133,9 +130,7 @@ impl LabelRenderer {
         };
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
     }
-}
 
-impl LabelRenderer {
     /// Draws `heatmap`'s ids in their label colors.
     pub(crate) fn draw(&self, rpass: &mut wgpu::RenderPass<'static>, heatmap: &HeatmapRenderer) {
         rpass.set_pipeline(&self.pipeline);
@@ -163,75 +158,4 @@ fn label_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
             buffer(1, wgpu::BufferBindingType::Storage { read_only: true }),
         ],
     })
-}
-
-impl super::traits::PlotRenderer for LabelRenderer {
-    /// Label ids live in the heatmap renderer's data buffer.
-    fn update_data(&self, _queue: &wgpu::Queue, _data: &crate::data::RenderData) {}
-
-    fn paint(
-        &self,
-        _ui: &mut egui::Ui,
-        _rect: egui::Rect,
-        _params: &super::traits::PlotRenderParams,
-    ) {
-        // Painted through `LabelCallback`.
-    }
-
-    fn inspect_hover(
-        &self,
-        _pointer_pos: egui::Pos2,
-        _rect: egui::Rect,
-        _data: &crate::data::RenderData,
-        _params: &super::traits::PlotRenderParams,
-    ) -> Option<super::traits::HoverSample> {
-        None
-    }
-}
-
-/// Paints a label layer: the heatmap renderer's ids through `labels`.
-pub struct LabelCallback {
-    pub heatmap: Arc<HeatmapRenderer>,
-    pub labels: Arc<LabelRenderer>,
-    pub rect: egui::Rect,
-    pub pan: [f32; 2],
-    pub zoom: f32,
-    pub aspect_scale: [f32; 2],
-    pub coord_mode: u32,
-    pub outline: bool,
-    pub opacity: f32,
-}
-
-impl eframe::egui_wgpu::CallbackTrait for LabelCallback {
-    fn prepare(
-        &self,
-        _device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        _screen_descriptor: &eframe::egui_wgpu::ScreenDescriptor,
-        _encoder: &mut wgpu::CommandEncoder,
-        _callback_resources: &mut eframe::egui_wgpu::CallbackResources,
-    ) -> Vec<wgpu::CommandBuffer> {
-        self.heatmap.update_uniforms(
-            queue,
-            &super::common::PlotColorParams::default(),
-            self.pan,
-            self.zoom,
-            self.aspect_scale,
-            self.coord_mode,
-        );
-        self.labels.update_params(queue, self.outline, self.opacity);
-        Vec::new()
-    }
-
-    fn paint(
-        &self,
-        info: egui::PaintCallbackInfo,
-        rpass: &mut wgpu::RenderPass<'static>,
-        _callback_resources: &eframe::egui_wgpu::CallbackResources,
-    ) {
-        if !super::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
-            return;
-        }
-        self.labels.draw(rpass, &self.heatmap);
-    }
 }

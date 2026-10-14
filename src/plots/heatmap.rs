@@ -50,6 +50,99 @@ pub struct HeatmapUniforms {
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+/// The heatmap shader: the shared data quad (`common/quad.wgsl`) colored
+/// through a colormap.
+pub(crate) const HEATMAP_WGSL: &str = crate::assemble_plot_with_coords_shader!(concat!(
+    include_str!("shaders/common/quad.wgsl"),
+    "\n",
+    include_str!("shaders/heatmap.wgsl")
+));
+
+/// A coordinate lookup table's storage buffer, room for `lut_size` entries
+/// (at least 4096) and holding `coords`' table when given.
+fn coord_lut_buffer(
+    device: &wgpu::Device,
+    label: &str,
+    coords: Option<&[f32]>,
+    lut_size: usize,
+) -> wgpu::Buffer {
+    let mut lut = match coords.filter(|c| !c.is_empty()) {
+        Some(c) => crate::data::coordinates::build_1d_coord_lut(c, lut_size),
+        None => Vec::new(),
+    };
+    lut.resize(lut.len().max(lut_size.max(4096)), 0.0);
+    super::common::create_storage_buffer(device, label, &lut)
+}
+
+/// A pipeline drawing the data quad (`HeatmapVertex`es) with `source`'s
+/// `vs_main` and `fs_main`, alpha blended, without depth testing.
+pub(crate) fn quad_pipeline(
+    device: &wgpu::Device,
+    target_format: wgpu::TextureFormat,
+    name: &str,
+    source: &str,
+    bind_group_layouts: &[Option<&wgpu::BindGroupLayout>],
+) -> wgpu::RenderPipeline {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some(name),
+        source: wgpu::ShaderSource::Wgsl(source.into()),
+    });
+    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some(name),
+        bind_group_layouts,
+        immediate_size: 0,
+    });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some(name),
+        layout: Some(&layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            buffers: &[Some(HeatmapVertex::desc())],
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: target_format,
+                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: Some(super::common::default_depth_stencil_state(
+            false,
+            wgpu::CompareFunction::Always,
+        )),
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    })
+}
+
+/// The data quad, uv (0, 0) at the top left.
+const QUAD_VERTICES: [HeatmapVertex; 4] = [
+    HeatmapVertex {
+        position: [-1.0, 1.0],
+        uv: [0.0, 0.0],
+    },
+    HeatmapVertex {
+        position: [1.0, 1.0],
+        uv: [1.0, 0.0],
+    },
+    HeatmapVertex {
+        position: [-1.0, -1.0],
+        uv: [0.0, 1.0],
+    },
+    HeatmapVertex {
+        position: [1.0, -1.0],
+        uv: [1.0, 1.0],
+    },
+];
+const QUAD_INDICES: [u32; 6] = [0, 2, 1, 1, 2, 3];
+
 pub struct HeatmapRenderer {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
@@ -59,7 +152,6 @@ pub struct HeatmapRenderer {
     coord_y_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    num_indices: u32,
     width: AtomicU32,
     height: AtomicU32,
     lut_size_x: AtomicU32,
@@ -95,35 +187,19 @@ impl HeatmapRenderer {
         coord_x: Option<&[f32]>,
         coord_y: Option<&[f32]>,
     ) -> Self {
-        let shader_source =
-            crate::assemble_plot_with_coords_shader!(include_str!("shaders/heatmap.wgsl"));
-
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Heatmap Shader Module"),
-            source: wgpu::ShaderSource::Wgsl(shader_source.into()),
-        });
-
-        let initial_coord_mode = if coord_x.is_some() || coord_y.is_some() {
-            2
-        } else {
-            0
+        let has_coords = coord_x.is_some() || coord_y.is_some();
+        let lut_size = |n| {
+            if has_coords {
+                crate::data::coordinates::compute_coord_lut_size(n)
+            } else {
+                0
+            }
         };
-
-        let lut_size_x = if initial_coord_mode == 2 {
-            crate::data::coordinates::compute_coord_lut_size(width)
-        } else {
-            0
-        };
-        let lut_size_y = if initial_coord_mode == 2 {
-            crate::data::coordinates::compute_coord_lut_size(height)
-        } else {
-            0
-        };
-
-        let initial_uniforms = HeatmapUniforms {
+        let (lut_size_x, lut_size_y) = (lut_size(width), lut_size(height));
+        let uniforms = HeatmapUniforms {
             pan: [0.0, 0.0],
             zoom: 1.0,
-            coord_mode: initial_coord_mode,
+            coord_mode: if has_coords { 2 } else { 0 },
             aspect_scale: [1.0, 1.0],
             width: width.max(1) as u32,
             height: height.max(1) as u32,
@@ -134,145 +210,65 @@ impl HeatmapRenderer {
             _pad1: 0,
             color: super::common::PlotColorParams::default(),
         };
-
-        let uniform_buffer = super::common::create_uniform_buffer(
-            device,
-            "Heatmap Uniform Buffer",
-            &initial_uniforms,
-        );
-
-        let capacity_elements = (width * height).clamp(
+        let uniform_buffer =
+            super::common::create_uniform_buffer(device, "Heatmap Uniform Buffer", &uniforms);
+        let capacity = (width * height).clamp(
             2048 * 2048,
             crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS,
         );
-        let mut padded_initial = matrix_data.to_vec();
-        if padded_initial.len() < capacity_elements {
-            padded_initial.resize(capacity_elements, 0.0);
-        }
-
-        let data_buffer = super::common::create_storage_buffer(
-            device,
-            "Heatmap Data Storage Buffer",
-            &padded_initial,
-        );
-
-        let mut padded_coords_x = if let Some(cx) = coord_x.filter(|s| !s.is_empty()) {
-            crate::data::coordinates::build_1d_coord_lut(cx, lut_size_x)
-        } else {
-            vec![0.0; 4]
-        };
-        let min_coord_x_capacity = lut_size_x.max(4096);
-        if padded_coords_x.len() < min_coord_x_capacity {
-            padded_coords_x.resize(min_coord_x_capacity, 0.0);
-        }
-
-        let mut padded_coords_y = if let Some(cy) = coord_y.filter(|s| !s.is_empty()) {
-            crate::data::coordinates::build_1d_coord_lut(cy, lut_size_y)
-        } else {
-            vec![0.0; 4]
-        };
-        let min_coord_y_capacity = lut_size_y.max(4096);
-        if padded_coords_y.len() < min_coord_y_capacity {
-            padded_coords_y.resize(min_coord_y_capacity, 0.0);
-        }
-
-        let coord_x_buffer = super::common::create_storage_buffer(
-            device,
-            "Heatmap Coord X Storage Buffer",
-            &padded_coords_x,
-        );
-
-        let coord_y_buffer = super::common::create_storage_buffer(
-            device,
-            "Heatmap Coord Y Storage Buffer",
-            &padded_coords_y,
-        );
-
-        let bind_group_layout = super::common::create_plot_with_coords_bind_group_layout(
+        let mut padded = matrix_data.to_vec();
+        padded.resize(padded.len().max(capacity), 0.0);
+        let data_buffer =
+            super::common::create_storage_buffer(device, "Heatmap Data Storage Buffer", &padded);
+        let coord_x_buffer = coord_lut_buffer(device, "Heatmap Coord X", coord_x, lut_size_x);
+        let coord_y_buffer = coord_lut_buffer(device, "Heatmap Coord Y", coord_y, lut_size_y);
+        let layout = super::common::create_plot_with_coords_bind_group_layout(
             device,
             "Heatmap Bind Group Layout",
             wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
             wgpu::ShaderStages::FRAGMENT,
         );
-
         let bind_group = super::common::create_plot_with_coords_bind_group(
             device,
             "Heatmap Bind Group",
-            &bind_group_layout,
+            &layout,
             &uniform_buffer,
             &data_buffer,
             &coord_x_buffer,
             &coord_y_buffer,
         );
-
         let colormap_layout = super::colormap_atlas::bind_group_layout(device);
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Heatmap Pipeline Layout"),
-            bind_group_layouts: &[Some(&bind_group_layout), Some(&colormap_layout)],
-            immediate_size: 0,
-        });
-
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Heatmap Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[Some(HeatmapVertex::desc())],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: target_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: Some(super::common::default_depth_stencil_state(
-                false,
-                wgpu::CompareFunction::Always,
-            )),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
-
-        let (vertices, indices) = Self::build_quad();
-
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Heatmap Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Heatmap Index Buffer"),
-            contents: bytemuck::cast_slice(&indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
+        let layouts = [Some(&layout), Some(&colormap_layout)];
+        let buffer = |label, contents: &[u8], usage| {
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(label),
+                contents,
+                usage,
+            })
+        };
         Self {
-            render_pipeline,
-            vertex_buffer,
-            index_buffer,
+            render_pipeline: quad_pipeline(
+                device,
+                target_format,
+                "Heatmap",
+                HEATMAP_WGSL,
+                &layouts,
+            ),
+            vertex_buffer: buffer(
+                "Heatmap Vertex Buffer",
+                bytemuck::cast_slice(&QUAD_VERTICES),
+                wgpu::BufferUsages::VERTEX,
+            ),
+            index_buffer: buffer(
+                "Heatmap Index Buffer",
+                bytemuck::cast_slice(&QUAD_INDICES),
+                wgpu::BufferUsages::INDEX,
+            ),
             data_buffer,
             coord_x_buffer,
             coord_y_buffer,
             uniform_buffer,
             bind_group,
-            num_indices: indices.len() as u32,
             width: AtomicU32::new(width as u32),
             height: AtomicU32::new(height as u32),
             lut_size_x: AtomicU32::new(lut_size_x as u32),
@@ -381,32 +377,7 @@ impl HeatmapRenderer {
 
     /// Draws the quad bound by `bind_quad`.
     pub(crate) fn draw_quad(&self, rpass: &mut wgpu::RenderPass<'static>) {
-        rpass.draw_indexed(0..self.num_indices, 0, 0..1);
-    }
-
-    fn build_quad() -> (Vec<HeatmapVertex>, Vec<u32>) {
-        let vertices = vec![
-            HeatmapVertex {
-                position: [-1.0, 1.0],
-                uv: [0.0, 0.0],
-            },
-            HeatmapVertex {
-                position: [1.0, 1.0],
-                uv: [1.0, 0.0],
-            },
-            HeatmapVertex {
-                position: [-1.0, -1.0],
-                uv: [0.0, 1.0],
-            },
-            HeatmapVertex {
-                position: [1.0, -1.0],
-                uv: [1.0, 1.0],
-            },
-        ];
-
-        let indices = vec![0, 2, 1, 1, 2, 3];
-
-        (vertices, indices)
+        rpass.draw_indexed(0..QUAD_INDICES.len() as u32, 0, 0..1);
     }
 }
 
@@ -454,6 +425,8 @@ impl super::traits::PlotRenderer for HeatmapRenderer {
     }
 }
 
+/// Paints a heatmap renderer's data: through its colormap, or for a label
+/// layer (`labels`) in its label colors.
 pub struct HeatmapCallback {
     pub renderer: Arc<HeatmapRenderer>,
     pub color_params: super::common::PlotColorParams,
@@ -462,6 +435,7 @@ pub struct HeatmapCallback {
     pub zoom: f32,
     pub aspect_scale: [f32; 2],
     pub coord_mode: u32,
+    pub labels: Option<super::labels::LabelDraw>,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
@@ -482,6 +456,11 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
             self.aspect_scale,
             self.coord_mode,
         );
+        if let Some(labels) = &self.labels {
+            labels
+                .renderer
+                .update_params(queue, labels.outline, labels.opacity);
+        }
         Vec::new()
     }
 
@@ -494,17 +473,16 @@ impl eframe::egui_wgpu::CallbackTrait for HeatmapCallback {
         if !super::common::setup_viewport_and_scissor(rpass, &self.rect, &info) {
             return;
         }
+        if let Some(labels) = &self.labels {
+            labels.renderer.draw(rpass, &self.renderer);
+            return;
+        }
         if !super::colormap_atlas::bind(rpass, callback_resources) {
             return;
         }
 
         rpass.set_pipeline(&self.renderer.render_pipeline);
-        rpass.set_bind_group(0, &self.renderer.bind_group, &[]);
-        rpass.set_vertex_buffer(0, self.renderer.vertex_buffer.slice(..));
-        rpass.set_index_buffer(
-            self.renderer.index_buffer.slice(..),
-            wgpu::IndexFormat::Uint32,
-        );
-        rpass.draw_indexed(0..self.renderer.num_indices, 0, 0..1);
+        self.renderer.bind_quad(rpass);
+        self.renderer.draw_quad(rpass);
     }
 }

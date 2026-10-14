@@ -21,11 +21,13 @@ pub fn fetch_all_dimension_coordinates_for_variables(
     let group_prefixes = group_prefixes(variables);
     for var in variables {
         if let Some(ome) = &var.ome {
-            // OME-Zarr images have no coordinate arrays: their metadata places them.
+            // OME-Zarr images have no coordinate arrays: their metadata places
+            // them. Each level has its own scale, so its keys are always scoped.
+            let level = var.name.trim().to_lowercase();
             let coords =
                 crate::data::ome::coords::level_coordinates(ome, &var.dimension_names, &var.shape);
             for (name, values) in coords {
-                DimKeys::scoped(var, &name).insert(&mut coords_map, values);
+                coords_map.insert(format!("{level}/{}", name.trim().to_lowercase()), values);
             }
             continue;
         }
@@ -92,18 +94,6 @@ impl<'a> DimKeys<'a> {
         let scoped = var
             .group_path()
             .map(|_| format!("{}/{clean}", var.name.trim().to_lowercase()));
-        Self {
-            name,
-            clean,
-            scoped,
-        }
-    }
-
-    /// Keys always scoped to the variable: an OME-Zarr level's own coordinates
-    /// (each level has its own scale).
-    fn scoped(var: &VariableInfo, name: &'a str) -> Self {
-        let clean = name.trim().to_lowercase();
-        let scoped = Some(format!("{}/{clean}", var.name.trim().to_lowercase()));
         Self {
             name,
             clean,

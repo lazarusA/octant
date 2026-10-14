@@ -225,11 +225,6 @@ impl OctantApp {
 /// else one named like a channel, else the first of a variable with 3 or
 /// more dimensions.
 pub(crate) fn channel_dim(var: &crate::data::VariableInfo) -> Option<usize> {
-    if let Some(ome) = &var.ome {
-        return ome.image.axis_of_kind(crate::data::ome::AxisKind::Channel);
-    }
-    var.dimension_names
-        .iter()
-        .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
-        .or(if var.shape.len() >= 3 { Some(0) } else { None })
+    let first = var.ome.is_none() && var.shape.len() >= 3;
+    var.channel_axis().or(first.then_some(0))
 }

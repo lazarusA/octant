@@ -18,7 +18,8 @@ pub fn init_layer_composite_defaults(app: &mut OctantApp, id: LayerId, var_info:
     let configs = if is_tiff {
         Vec::new()
     } else {
-        composite_channel_dim(var_info)
+        var_info
+            .channel_axis()
             .map(|c| var_info.shape.get(c).copied().unwrap_or(0) as usize)
             .filter(|&channels| channels >= 2)
             .map(|channels| extract_channel_configs(var_info, channels))
@@ -38,18 +39,6 @@ pub fn init_layer_composite_defaults(app: &mut OctantApp, id: LayerId, var_info:
     composite.enabled =
         (is_tiff && rank >= 3 && num_bands >= 3) || (!configs.is_empty() && !greyscale);
     composite.channel_configs = configs;
-}
-
-/// The channel dimension a multi-channel overlay runs across: the OME-Zarr
-/// channel axis, else a dimension named like one.
-fn composite_channel_dim(var_info: &VariableInfo) -> Option<usize> {
-    if let Some(ome) = &var_info.ome {
-        return ome.image.axis_of_kind(crate::data::ome::AxisKind::Channel);
-    }
-    var_info
-        .dimension_names
-        .iter()
-        .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
 }
 
 /// One config per channel, from the OME-Zarr `omero` channels when there are

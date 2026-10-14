@@ -12,7 +12,7 @@ impl OctantApp {
         fallback_len: usize,
     ) -> ((f64, f64), String, Option<String>) {
         let mut bounds = (0.0, fallback_len.saturating_sub(1).max(1) as f64);
-        let mut name = fallback_name.to_string();
+        let mut name = fallback_name;
         let mut units = None;
         // An OME-Zarr axis unit, shown in the title ("y [µm]").
         let mut axis_unit = None;
@@ -35,8 +35,8 @@ impl OctantApp {
             bounds = (start_p as f64, end_p as f64);
 
             if let Some(dim_n) = var.dimension_names.get(dim_idx) {
-                name = dim_n.clone();
-                axis_unit = var.dimension_unit(dim_n).map(str::to_string);
+                name = dim_n;
+                axis_unit = var.dimension_unit(dim_n);
                 if let Some(coord_var) = meta.variables.iter().find(|v| {
                     v.name.eq_ignore_ascii_case(dim_n)
                         || v.name
@@ -52,7 +52,7 @@ impl OctantApp {
                     }
                 }
                 if units.is_none() {
-                    units = axis_unit.clone();
+                    units = axis_unit.map(str::to_owned);
                 }
                 if units.is_none() {
                     units = var
@@ -75,7 +75,7 @@ impl OctantApp {
         let title = match axis_unit {
             Some(unit) => format!("{name} [{unit}]"),
             None => {
-                crate::data::coordinates::naming::format_dimension_axis_title(&name).into_owned()
+                crate::data::coordinates::naming::format_dimension_axis_title(name).into_owned()
             }
         };
         (bounds, title, units)

@@ -152,10 +152,8 @@ fn label_images_are_found_under_their_image() {
     let info = label.label_info.as_ref().expect("label info");
     assert_eq!(info.colors[0], (2, [2, 2, 2, 128]));
     assert_eq!(info.color_of(9), Some([9, 9, 9, 255]));
-    let props = info.properties_of(2).expect("properties");
-    assert!(props.contains(&("class".to_string(), "nucleus".to_string())));
-    assert!(props.contains(&("area".to_string(), "31".to_string())));
-    assert_eq!(info.source_image.as_deref(), Some("../../"));
+    let props = info.properties_line(2).expect("properties");
+    assert!(props.contains("class: nucleus") && props.contains("area: 31"));
 }
 
 fn v05_image() -> Fixture {

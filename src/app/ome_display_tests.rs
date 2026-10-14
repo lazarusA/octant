@@ -109,3 +109,24 @@ fn physical_units_reach_the_dimensions() {
     assert_eq!(var.dimension_unit("t"), Some("s"));
     assert_eq!(var.dimension_unit("c"), None);
 }
+
+#[test]
+fn greyscale_window_follows_the_shown_channel() {
+    let var = image("greyscale");
+    let mut app = defaults_for(&var);
+    let indices = app.selected.dim_indices.clone();
+    let sel = app.layers.base.selection_mut();
+    sel.metadata = Some(crate::data::DatasetMetadata {
+        variables: vec![var],
+        ..Default::default()
+    });
+    sel.dim_indices = indices;
+    let apply = |app: &mut OctantApp| {
+        crate::app::pipeline::greyscale::apply_greyscale_display(&mut app.layers.base, (0.0, 1.0));
+        let c = &app.layers.base.color;
+        (c.range_min, c.range_max, c.reversed, c.lock_bounds)
+    };
+    assert_eq!(apply(&mut app), (10.0, 900.0, true, true));
+    app.layers.base.selection_mut().dim_indices[1] = 0;
+    assert_eq!(apply(&mut app), (0.0, 100.0, false, true));
+}

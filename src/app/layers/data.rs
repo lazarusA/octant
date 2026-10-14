@@ -21,6 +21,8 @@ pub struct LayerData {
     /// `store:variable:2d|3d` of the data last built, to tell a new variable
     /// from another step of the same one.
     pub var_key: Option<String>,
+    /// The greyscale image channel whose window the color style shows.
+    pub greyscale_channel: Option<usize>,
     /// Bumped (`touch_matrix`) whenever `matrix` changes, so caches of data
     /// derived from it (the line plot's GPU payload) know to rebuild.
     pub matrix_version: u64,

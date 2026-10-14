@@ -7,7 +7,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use serde_json::{Map, Value};
 use zarrs::storage::{ReadableStorageTraits, StoreKey};
@@ -25,22 +25,28 @@ pub enum Lookup {
 /// Keys already fetched without success, and keys still needed (web only).
 #[derive(Debug, Default)]
 pub struct Prefetch {
-    pub absent: HashSet<String>,
-    pending: Mutex<BTreeSet<String>>,
+    absent: RefCell<HashSet<String>>,
+    pending: RefCell<BTreeSet<String>>,
 }
 
 impl Prefetch {
     /// The keys needed since the last call, emptying the list.
     pub fn take_pending(&self) -> Vec<String> {
-        let mut pending = self.pending.lock().unwrap_or_else(|p| p.into_inner());
-        std::mem::take(&mut *pending).into_iter().collect()
+        std::mem::take(&mut *self.pending.borrow_mut())
+            .into_iter()
+            .collect()
+    }
+
+    /// Records that the store has no `key` (or it could not be fetched).
+    pub fn mark_absent(&self, key: String) {
+        self.absent.borrow_mut().insert(key);
     }
 }
 
 /// Reads metadata keys from a store, optionally behind a web prefetch. Each
-/// key is read once per walk, and once a group answers in one Zarr format
-/// that format's keys are asked first: a remote store is spared requests
-/// that would fail.
+/// key is read once per reader (the web keeps one across its walks), and once
+/// a group answers in one Zarr format only that format's keys are asked: a
+/// remote store is spared requests that would fail.
 pub struct MetaReader<'a> {
     storage: Arc<dyn ReadableStorageTraits>,
     prefetch: Option<&'a Prefetch>,
@@ -98,11 +104,10 @@ impl<'a> MetaReader<'a> {
         let Some(prefetch) = self.prefetch else {
             return Lookup::Absent;
         };
-        if prefetch.absent.contains(key) {
+        if prefetch.absent.borrow().contains(key) {
             return Lookup::Absent;
         }
-        let mut pending = prefetch.pending.lock().unwrap_or_else(|p| p.into_inner());
-        pending.insert(key.to_string());
+        prefetch.pending.borrow_mut().insert(key.to_string());
         Lookup::Pending
     }
 
@@ -127,24 +132,12 @@ impl<'a> MetaReader<'a> {
     /// A group's attributes: `zarr.json` `attributes` (Zarr v3) or `.zattrs`
     /// (Zarr v2). `Ok(None)` when the group has neither.
     pub fn group_attributes(&self, path: &str) -> Result<Option<Map<String, Value>>, Pending> {
-        let keys = self.ordered(join(path, "zarr.json"), join(path, ".zattrs"));
+        let keys = self.keys(join(path, "zarr.json"), join(path, ".zattrs"));
         match self.first_of(&keys) {
-            Lookup::Found(bytes) => {
-                let Ok(Value::Object(mut doc)) = serde_json::from_slice::<Value>(&bytes) else {
-                    return Ok(None);
-                };
-                let v3 = doc.contains_key("zarr_format") || doc.contains_key("node_type");
-                self.format.set(Some(if v3 { 3 } else { 2 }));
-                let attrs = if v3 {
-                    match doc.remove("attributes") {
-                        Some(Value::Object(a)) => a,
-                        _ => Map::new(),
-                    }
-                } else {
-                    doc
-                };
-                Ok(Some(attrs))
-            }
+            Lookup::Found(bytes) => Ok(attributes_of(&bytes).map(|(attrs, format)| {
+                self.format.set(Some(format));
+                attrs
+            })),
             Lookup::Absent => Ok(None),
             Lookup::Pending => Err(Pending),
         }
@@ -152,7 +145,7 @@ impl<'a> MetaReader<'a> {
 
     /// An array's metadata document (`zarr.json` or `.zarray`).
     pub fn array_metadata(&self, path: &str) -> Result<Option<Value>, Pending> {
-        let keys = self.ordered(join(path, "zarr.json"), join(path, ".zarray"));
+        let keys = self.keys(join(path, "zarr.json"), join(path, ".zarray"));
         match self.first_of(&keys) {
             Lookup::Found(bytes) => Ok(serde_json::from_slice::<Value>(&bytes).ok()),
             Lookup::Absent => Ok(None),
@@ -168,14 +161,31 @@ impl<'a> MetaReader<'a> {
         }))
     }
 
-    /// `[v3, v2]`, or `[v2, v3]` once the store is known to be Zarr v2.
-    fn ordered(&self, v3: String, v2: String) -> [String; 2] {
-        if self.format.get() == Some(2) {
-            [v2, v3]
-        } else {
-            [v3, v2]
+    /// The keys to try: the store's format's alone once known, else both.
+    fn keys(&self, v3: String, v2: String) -> Vec<String> {
+        match self.format.get() {
+            Some(2) => vec![v2],
+            Some(_) => vec![v3],
+            None => vec![v3, v2],
         }
     }
+}
+
+/// The attributes in a group's metadata document and its Zarr format:
+/// `zarr.json` `attributes` (`3`) or the whole `.zattrs` (`2`). `None` when
+/// the document is not a JSON object.
+pub fn attributes_of(bytes: &[u8]) -> Option<(Map<String, Value>, u8)> {
+    let Ok(Value::Object(mut doc)) = serde_json::from_slice::<Value>(bytes) else {
+        return None;
+    };
+    if !doc.contains_key("zarr_format") && !doc.contains_key("node_type") {
+        return Some((doc, 2));
+    }
+    let attrs = match doc.remove("attributes") {
+        Some(Value::Object(a)) => a,
+        _ => Map::new(),
+    };
+    Some((attrs, 3))
 }
 
 /// A read that must wait for keys being fetched.

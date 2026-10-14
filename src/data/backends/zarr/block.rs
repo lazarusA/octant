@@ -7,10 +7,12 @@ use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 use zarrs::storage::ReadableWritableListableStorage;
 
 use super::block_coords::{BlockWindow, block_coordinates};
-use super::generic::{GenericZarrBlockStore, ZarrArrayHandle};
 use super::slice::retrieve_array_subset_as_f32;
+use super::storage::ZarrArrayHandle;
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
+use crate::data::ome::MetaReader;
+use crate::data::ome::level::LevelArray;
 use crate::data::slice_request::{DimensionSelection, SliceRequest};
 use crate::utils::grid::check_and_orient_block_grid;
 use crate::utils::grid_flips::OrientHints;
@@ -50,7 +52,7 @@ fn selection_window(
 /// conventions) when the array has no `dggs` attribute of its own.
 pub(crate) fn inherited_attributes(
     array: &ZarrArrayHandle,
-    store: &ReadableWritableListableStorage,
+    reader: &MetaReader<'_>,
     variable: &str,
 ) -> HashMap<String, String> {
     let mut attributes: HashMap<String, String> = array
@@ -62,28 +64,17 @@ pub(crate) fn inherited_attributes(
         return attributes;
     }
     for ancestor in crate::utils::path::ancestor_paths(variable) {
-        let p = if ancestor.is_empty() {
-            "/".to_string()
-        } else {
-            format!("/{ancestor}")
-        };
         // Groups the web fetched without `.zgroup` still have their attributes.
-        let group_attrs = match zarrs::group::Group::open(store.clone(), &p) {
-            Ok(grp) => Some(grp.attributes().clone()),
-            Err(_) => {
-                let reader = crate::data::ome::MetaReader::direct(store.clone());
-                reader.group_attributes(ancestor).ok().flatten()
-            }
+        let Ok(Some(group_attrs)) = reader.group_attributes(ancestor) else {
+            continue;
         };
-        if let Some(group_attrs) = group_attrs {
-            for (k, v) in &group_attrs {
-                attributes
-                    .entry(k.clone())
-                    .or_insert_with(|| attr_string(v));
-            }
-            if attributes.contains_key("dggs") {
-                break;
-            }
+        for (k, v) in &group_attrs {
+            attributes
+                .entry(k.clone())
+                .or_insert_with(|| attr_string(v));
+        }
+        if attributes.contains_key("dggs") {
+            break;
         }
     }
     attributes
@@ -98,7 +89,7 @@ fn read_window(
     variable: &str,
     (origin, shape): (&[usize], &[usize]),
     labels: bool,
-) -> Result<(Vec<f32>, bool), BlockStoreError> {
+) -> Result<Vec<f32>, BlockStoreError> {
     let ranges: Vec<_> = origin
         .iter()
         .zip(shape)
@@ -114,13 +105,13 @@ fn read_window(
         && let Some(ids) =
             super::slice::retrieve_array_subset_as_label_bits(array, Some(cache), &subset)?
     {
-        return Ok((ids, true));
+        return Ok(ids);
     }
     let values = retrieve_array_subset_as_f32(array, Some(cache), &subset).map_err(|e| {
         log::error!("[ZarrBlock] Failed to retrieve array subset for '{variable}': {e:?}");
         BlockStoreError::from(e.to_string())
     })?;
-    Ok((values, false))
+    Ok(values)
 }
 
 /// Pre-resolved metadata state for a cached Zarr array.
@@ -128,8 +119,8 @@ pub struct ArrayCachedState {
     pub array: Arc<ZarrArrayHandle>,
     pub cache: Arc<ChunkCacheDecodedLruSizeLimit>,
     pub attributes: HashMap<String, String>,
-    pub is_label_image: bool,
-    pub ome_dim_names: Option<Vec<String>>,
+    /// Set for OME-Zarr level arrays, whose blocks keep their stored order.
+    pub ome: Option<LevelArray>,
 }
 
 /// Fetches an arbitrary-rank hyperslab from an already-opened `ZarrArrayHandle` through a chunk cache.
@@ -142,28 +133,22 @@ pub fn fetch_block_from_cached_array(
 ) -> Result<OctantBlock, BlockStoreError> {
     let full_shape = cached.array.shape();
     let (origin, block_shape) = selection_window(request, full_shape)?;
-    let mut attributes = cached.attributes.clone();
-    let (raw_values, ids) = read_window(
+    let attributes = cached.attributes.clone();
+    let raw_values = read_window(
         &cached.array,
         &cached.cache,
         &request.variable,
         (&origin, &block_shape),
-        cached.is_label_image,
+        cached.ome.as_ref().is_some_and(|l| l.labels),
     )?;
     if let Some(ref mut cb) = on_progress {
         cb((raw_values.len() * std::mem::size_of::<f32>()) as u64);
     }
-    if ids {
-        attributes.insert(
-            crate::data::ome::axes::LABEL_BITS_ATTRIBUTE.to_string(),
-            "true".to_string(),
-        );
-    }
-    if let Some(ref dim_names) = cached.ome_dim_names {
+    if let Some(level) = &cached.ome {
         return Ok(OctantBlock::new(
             request.variable.clone(),
             block_shape,
-            dim_names.clone(),
+            level.dim_names.clone(),
             origin,
             raw_values,
             HashMap::new(),
@@ -227,16 +212,4 @@ fn orient_and_build_block(
     );
     block.flipped_dims = flipped_dims;
     Ok(block)
-}
-
-/// Fetches an arbitrary-rank hyperslab described by `request` with progress reporting.
-pub fn fetch_block_with_progress(
-    store: ReadableWritableListableStorage,
-    store_url: &str,
-    request: &SliceRequest,
-    on_progress: ProgressCallback,
-) -> Result<OctantBlock, BlockStoreError> {
-    let dummy_store = GenericZarrBlockStore::new(store.clone(), store_url, "zarr", "Zarr");
-    let cached = dummy_store.get_or_open_array(&request.variable)?;
-    fetch_block_from_cached_array(&cached, store, store_url, request, on_progress)
 }

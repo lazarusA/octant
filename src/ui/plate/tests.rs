@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use super::{cell_side, is_field};
+use super::cell_side;
 use crate::app::OctantApp;
 use crate::app::{PlateState, StoreKind};
 use crate::data::DatasetMetadata;
@@ -13,16 +13,6 @@ fn cells_fill_the_width_within_bounds() {
     assert_eq!(cell_side(18.0 + 12.0 * 20.0, 12), 20.0);
     assert_eq!(cell_side(1000.0, 12), 22.0);
     assert_eq!(cell_side(100.0, 48), 5.0);
-}
-
-#[test]
-fn fields_are_matched_by_url() {
-    let url = "https://x/plate.zarr";
-    let opened = Some("https://x/plate.zarr/A/1/0");
-    assert!(is_field(opened, url, "A/1", "0"));
-    assert!(!is_field(opened, url, "A/1", "1"));
-    assert!(!is_field(opened, url, "A/10", "0"));
-    assert!(!is_field(None, url, "A/1", "0"));
 }
 
 #[test]

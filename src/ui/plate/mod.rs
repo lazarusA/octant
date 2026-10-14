@@ -6,8 +6,6 @@ mod fields;
 #[cfg(test)]
 mod tests;
 
-#[cfg(test)]
-use fields::is_field;
 use fields::{acquisition_select, field_list};
 
 use crate::app::OctantApp;
@@ -24,7 +22,8 @@ const NAMED_CELL: f32 = 14.0;
 /// What the browser asked for this frame, applied after it is drawn.
 pub(super) enum PlateAction {
     PickWell(usize),
-    OpenField(String, String),
+    /// Field path of the well at an index.
+    OpenField(usize, String),
 }
 
 /// The plate browser, while a plate is open.
@@ -49,7 +48,7 @@ pub fn show_plate_browser(app: &mut OctantApp, ui: &mut egui::Ui) {
                 plate.well = Some(i);
             }
         }
-        Some(PlateAction::OpenField(well, field)) => app.open_plate_field(&well, &field),
+        Some(PlateAction::OpenField(well, field)) => app.open_plate_field(well, &field),
         None => {}
     }
 }
@@ -104,7 +103,7 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
             muted,
         );
     }
-    let opened_well = plate.opened.as_deref();
+    let opened_well = plate.opened.as_ref().map(|(well, _)| *well);
     let mut action = None;
     for (i, well) in layout.wells.iter().enumerate() {
         if well.row >= rows || well.column >= columns {
@@ -122,13 +121,7 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
             visuals.widgets.inactive.bg_fill
         };
         painter.rect_filled(r, 2.0, fill);
-        let opened = opened_well.is_some_and(|url| {
-            url.strip_prefix(plate.url.as_str())
-                .and_then(|rest| rest.strip_prefix('/'))
-                .and_then(|rest| rest.strip_prefix(well.path.as_str()))
-                .is_some_and(|rest| rest.starts_with('/'))
-        });
-        if opened {
+        if opened_well == Some(i) {
             painter.rect_stroke(r, 2.0, visuals.selection.stroke, egui::StrokeKind::Inside);
         }
         if response.clicked() {

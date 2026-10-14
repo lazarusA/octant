@@ -24,6 +24,8 @@ const TARGET_SHARE: f32 = 0.18;
 const TARGET_MIN: f32 = 60.0;
 const TARGET_MAX: f32 = 160.0;
 const MARGIN: f32 = 16.0;
+/// Extra lift above the bottom margin, clearing the plot's bottom edge.
+const BOTTOM_LIFT: f32 = 12.0;
 const BAR_HEIGHT: f32 = 4.0;
 const PAD: f32 = 6.0;
 
@@ -111,7 +113,10 @@ pub fn draw_scale_bar(
         inner_w + 2.0 * PAD,
         galley.size().y + BAR_HEIGHT + 3.0 * PAD,
     );
-    let min = egui::pos2(area.left() + MARGIN, area.bottom() - MARGIN - size.y - 12.0);
+    let min = egui::pos2(
+        area.left() + MARGIN,
+        area.bottom() - MARGIN - BOTTOM_LIFT - size.y,
+    );
     let frame = egui::Rect::from_min_size(min, size);
     let painter = ui.painter().with_clip_rect(canvas_rect);
     painter.rect_filled(frame, 4.0, visuals.extreme_bg_color.gamma_multiply(0.75));

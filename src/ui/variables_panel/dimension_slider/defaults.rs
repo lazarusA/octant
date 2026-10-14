@@ -105,20 +105,11 @@ fn apply_omero_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
     if let (Some(k), Some(c)) = (
         image.greyscale_channel(),
         image.axis_of_kind(crate::data::ome::AxisKind::Channel),
-    ) && let Some(&size) = var_info.shape.get(c)
-    {
-        let k = k.min((size as usize).saturating_sub(1));
-        app.selected.dim_indices[c] = k;
-        app.selected.dim_ranges[c] = (k, k);
-        app.selected.dim_config[c].range = (k, k);
+    ) {
+        pin_dim(app, var_info, c, k);
     }
-    if let (Some(dz), Some(z)) = (image.default_z, image.z_axis())
-        && let Some(&size) = var_info.shape.get(z)
-    {
-        let dz = dz.min((size as usize).saturating_sub(1));
-        app.selected.dim_indices[z] = dz;
-        app.selected.dim_ranges[z] = (dz, dz);
-        app.selected.dim_config[z].range = (dz, dz);
+    if let (Some(dz), Some(z)) = (image.default_z, image.z_axis()) {
+        pin_dim(app, var_info, z, dz);
     }
     if let (Some(dt), Some(t)) = (
         image.default_t,
@@ -139,6 +130,17 @@ fn apply_omero_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
             app.playback.current_timestep = dt;
         }
     }
+}
+
+/// Pins dimension `dim` of the selection to index `k`, clamped into its size.
+fn pin_dim(app: &mut OctantApp, var_info: &VariableInfo, dim: usize, k: usize) {
+    let Some(&size) = var_info.shape.get(dim) else {
+        return;
+    };
+    let k = k.min((size as usize).saturating_sub(1));
+    app.selected.dim_indices[dim] = k;
+    app.selected.dim_ranges[dim] = (k, k);
+    app.selected.dim_config[dim].range = (k, k);
 }
 
 fn finalize_active_configs(app: &mut OctantApp, var_info: &VariableInfo, rank: usize) {

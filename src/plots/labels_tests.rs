@@ -20,7 +20,9 @@ fn label_pipeline_validates_against_heatmap_data() {
     };
     let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
     let heatmap = std::sync::Arc::new(super::HeatmapRenderer::new(&device, format, &ids, 2, 2));
-    let labels = std::sync::Arc::new(super::LabelRenderer::new(&device, format, &info));
+    // A second palette over the same pipeline, as a new label variable gets.
+    let labels = super::LabelRenderer::new(&device, format, &Default::default());
+    let labels = labels.with_palette(&device, &info);
     let target = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("label test target"),
         size: wgpu::Extent3d {

@@ -38,10 +38,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
         .or_else(|| app.plotted_variable_info());
 
     // Label images hold ids, which only the heatmap's label colors read.
-    let label_image = target_var.is_some_and(|v| {
-        v.attributes
-            .contains_key(crate::data::ome::variables::LABEL_IMAGE_ATTRIBUTE)
-    });
+    let label_image = target_var.is_some_and(crate::data::VariableInfo::is_label_image);
     let (is_3d_available, is_size_allowed, vol_mb) = if let Some(v) = target_var {
         let has_3d = v.shape.len() >= 3 || v.dimension_names.len() >= 3;
         let vol_elements = crate::ui::variables_panel::calculate_selected_volume_elements(app);

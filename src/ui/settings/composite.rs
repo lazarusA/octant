@@ -99,7 +99,7 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerI
         return;
     };
     // The 2D composite's channel values, for auto contrast.
-    let probe = layer.data.composite_probe.clone();
+    let probe = layer.data.composite_probe.as_ref();
     let configs = &mut layer.composite.channel_configs;
     let mut changed = false;
     ui.horizontal_wrapped(|ui| {
@@ -118,7 +118,7 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerI
             .on_hover_text(tr(K::ChannelsAutoHover))
             .on_disabled_hover_text(tr(K::ChannelsAutoUnavailable));
         if auto.clicked()
-            && let Some(probe) = &probe
+            && let Some(probe) = probe
         {
             for cfg in configs.iter_mut() {
                 if let Some(window) = probe.channel_quantiles(cfg.index, AUTO_LOW, AUTO_HIGH) {

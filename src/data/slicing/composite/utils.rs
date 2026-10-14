@@ -115,78 +115,58 @@ pub fn visible_channel_configs(
     visible
 }
 
-/// Accumulates a single channel's normalized and tinted values into RGB and validity buffers.
-pub fn accumulate_channel_values(
-    values: &[f32],
-    cfg: &ChannelColorConfig,
-    acc_r: &mut [f32],
-    acc_g: &mut [f32],
-    acc_b: &mut [f32],
-    any_valid: &mut [bool],
-) {
-    let (scale, offset, is_i8) = compute_channel_normalization(values, cfg.window, 1.0);
-    let col = [
-        cfg.color_rgb[0] as f32,
-        cfg.color_rgb[1] as f32,
-        cfg.color_rgb[2] as f32,
-    ];
-
-    let len = values
-        .len()
-        .min(acc_r.len())
-        .min(acc_g.len())
-        .min(acc_b.len())
-        .min(any_valid.len());
-
-    for ((((raw, r), g), b), valid) in values[..len]
-        .iter()
-        .zip(&mut acc_r[..len])
-        .zip(&mut acc_g[..len])
-        .zip(&mut acc_b[..len])
-        .zip(&mut any_valid[..len])
-    {
-        if !raw.is_nan() {
-            let norm = cfg
-                .display
-                .map(normalize_channel_value(*raw, scale, offset, is_i8, 1.0));
-            *r += norm * col[0];
-            *g += norm * col[1];
-            *b += norm * col[2];
-            *valid = true;
-        }
-    }
+/// Channels added up in their tints, then packed into 24-bit TrueColor.
+pub struct ChannelAccumulator {
+    rgb: Vec<[f32; 3]>,
+    valid: Vec<bool>,
+    loaded: bool,
 }
 
-/// Finalizes accumulated RGB components into 24-bit TrueColor packed floats or `NAN`.
-pub fn finalize_composite_packed_rgb(
-    total: usize,
-    acc_r: &[f32],
-    acc_g: &[f32],
-    acc_b: &[f32],
-    any_valid: &[bool],
-) -> Vec<f32> {
-    let len = total
-        .min(acc_r.len())
-        .min(acc_g.len())
-        .min(acc_b.len())
-        .min(any_valid.len());
-    let mut values = Vec::with_capacity(total);
-
-    for (((&valid, &r), &g), &b) in any_valid[..len]
-        .iter()
-        .zip(&acc_r[..len])
-        .zip(&acc_g[..len])
-        .zip(&acc_b[..len])
-    {
-        if !valid {
-            values.push(f32::NAN);
-        } else {
-            values.push(pack_rgb(
-                r.clamp(0.0, 255.0),
-                g.clamp(0.0, 255.0),
-                b.clamp(0.0, 255.0),
-            ));
+impl ChannelAccumulator {
+    /// An accumulator of `len` cells.
+    pub fn new(len: usize) -> Self {
+        Self {
+            rgb: vec![[0.0; 3]; len],
+            valid: vec![false; len],
+            loaded: false,
         }
     }
-    values
+
+    /// Adds one channel's values, normalized by its window and display curve
+    /// and tinted by its color.
+    pub fn add(&mut self, values: &[f32], cfg: &ChannelColorConfig) {
+        self.loaded = true;
+        let (scale, offset, is_i8) = compute_channel_normalization(values, cfg.window, 1.0);
+        let curve = cfg.display.curve();
+        let tint = cfg.color_rgb.map(f32::from);
+        for ((raw, rgb), valid) in values.iter().zip(&mut self.rgb).zip(&mut self.valid) {
+            if !raw.is_nan() {
+                let norm = curve.map(normalize_channel_value(*raw, scale, offset, is_i8, 1.0));
+                for (acc, t) in rgb.iter_mut().zip(tint) {
+                    *acc += norm * t;
+                }
+                *valid = true;
+            }
+        }
+    }
+
+    /// The packed colors, `NAN` where no channel had a value; `None` when no
+    /// channel was added.
+    pub fn finish(self) -> Option<Vec<f32>> {
+        if !self.loaded {
+            return None;
+        }
+        let pack = |([r, g, b], valid): ([f32; 3], bool)| {
+            if valid {
+                pack_rgb(
+                    r.clamp(0.0, 255.0),
+                    g.clamp(0.0, 255.0),
+                    b.clamp(0.0, 255.0),
+                )
+            } else {
+                f32::NAN
+            }
+        };
+        Some(self.rgb.into_iter().zip(self.valid).map(pack).collect())
+    }
 }

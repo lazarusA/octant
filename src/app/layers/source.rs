@@ -69,7 +69,12 @@ impl Source {
 
     /// The source for `selection`: a label image when its variable is one.
     pub fn for_selection(selection: VariableSelection) -> Self {
-        match label_info_of(&selection) {
+        let info = label_info_of(&selection);
+        Self::with_labels(selection, info)
+    }
+
+    fn with_labels(selection: VariableSelection, info: Option<Arc<OmeLabelInfo>>) -> Self {
+        match info {
             Some(info) => Self::Labels(selection, LabelStyle::new(info)),
             None => Self::Variable(selection),
         }
@@ -81,20 +86,14 @@ impl Source {
     pub fn follow_variable(&mut self) -> bool {
         let was_labels = self.labels().is_some();
         let info = label_info_of(self.selection());
-        match (std::mem::take(self), info) {
-            (Self::Labels(selection, style), Some(info)) if style.info == info => {
-                *self = Self::Labels(selection, style);
+        *self = match (std::mem::take(self), info) {
+            (Self::Labels(selection, style), Some(info)) if Arc::ptr_eq(&style.info, &info) => {
+                Self::Labels(selection, style)
             }
-            (source, info) => {
-                let selection = match source {
-                    Self::Variable(s) | Self::Labels(s, _) => s,
-                };
-                *self = match info {
-                    Some(info) => Self::Labels(selection, LabelStyle::new(info)),
-                    None => Self::Variable(selection),
-                };
+            (Self::Variable(selection) | Self::Labels(selection, _), info) => {
+                Self::with_labels(selection, info)
             }
-        }
+        };
         was_labels != self.labels().is_some()
     }
 }
@@ -102,13 +101,10 @@ impl Source {
 /// The label info of the selection's variable, for an OME-Zarr label image
 /// of integer ids.
 fn label_info_of(selection: &VariableSelection) -> Option<Arc<OmeLabelInfo>> {
-    let var = selection
-        .metadata
-        .as_ref()?
+    let metadata = selection.metadata.as_ref()?;
+    metadata
         .variables
-        .get(selection.variable_idx)?;
-    var.attributes
-        .contains_key(crate::data::ome::variables::LABEL_IMAGE_ATTRIBUTE)
-        .then_some(())?;
-    var.ome.as_ref()?.image.label_info.clone()
+        .get(selection.variable_idx)?
+        .label_info()
+        .cloned()
 }

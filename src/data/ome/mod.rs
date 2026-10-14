@@ -14,6 +14,7 @@ pub mod coords;
 pub mod discover;
 pub mod image;
 pub mod legacy;
+pub mod level;
 pub mod model;
 pub mod ome_xml;
 pub mod omero;

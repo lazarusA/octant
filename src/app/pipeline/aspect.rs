@@ -5,48 +5,15 @@ use crate::app::OctantApp;
 impl OctantApp {
     /// Computes the 3D bounding aspect ratio `(aspect_x, aspect_y, aspect_z)` for 3D plots.
     pub fn get_3d_aspect_ratio(&self) -> (f32, f32, f32) {
-        let (mut scale_x, mut scale_y, mut scale_z) = (1.0f32, 1.0f32, 1.0f32);
-        if let Some(var) = self
+        let x_idx = self.get_spatial_dim_index(0);
+        let y_idx = self.get_spatial_dim_index(1);
+        let z_idx = self.get_spatial_dim_index(2);
+        // OME-Zarr physical voxel size along each spatial axis.
+        let var = self
             .plotted_variable_info()
-            .or_else(|| self.selected_variable_info())
-        {
-            // OME-Zarr physical voxel size along the named axis.
-            let get_scale = |axis_name: &str| -> Option<f32> {
-                let ome = var.ome.as_ref()?;
-                let axis = var
-                    .dimension_names
-                    .iter()
-                    .position(|d| d.eq_ignore_ascii_case(axis_name))?;
-                let scale = ome.scale(axis)?.abs() as f32;
-                (scale.is_finite() && scale > 0.0).then_some(scale)
-            };
-
-            let x_name = self.get_spatial_dim_name(0);
-            let y_name = self.get_spatial_dim_name(1);
-            let z_name = self.get_spatial_dim_name(2);
-
-            if let Some(sx) = x_name
-                .as_deref()
-                .and_then(get_scale)
-                .or_else(|| get_scale("x"))
-            {
-                scale_x = sx;
-            }
-            if let Some(sy) = y_name
-                .as_deref()
-                .and_then(get_scale)
-                .or_else(|| get_scale("y"))
-            {
-                scale_y = sy;
-            }
-            if let Some(sz) = z_name
-                .as_deref()
-                .and_then(get_scale)
-                .or_else(|| get_scale("z"))
-            {
-                scale_z = sz;
-            }
-        }
+            .or_else(|| self.selected_variable_info());
+        let scale = |idx: usize| var.and_then(|v| v.ome_scale(idx)).map_or(1.0, |s| s as f32);
+        let (scale_x, scale_y, scale_z) = (scale(x_idx), scale(y_idx), scale(z_idx));
 
         let z_mult = self.plot_configs.volume.z_scale.clamp(0.01, 50.0);
 
@@ -59,11 +26,6 @@ impl OctantApp {
         }
 
         let sel_ranges = &self.selected.dim_ranges;
-
-        let x_idx = self.get_spatial_dim_index(0);
-        let y_idx = self.get_spatial_dim_index(1);
-        let z_idx = self.get_spatial_dim_index(2);
-
         let get_extent = |dim: usize| -> usize {
             if let Some(&(start, end)) = sel_ranges.get(dim) {
                 (end + 1).saturating_sub(start).max(1)
@@ -189,14 +151,7 @@ impl OctantApp {
         let Some(var) = self.plotted_variable_info() else {
             return 1.0;
         };
-        let Some(ome) = &var.ome else {
-            return 1.0;
-        };
-        let step = |axis: usize| {
-            ome.scale(self.get_spatial_dim_index(axis))
-                .map(f64::abs)
-                .filter(|s| s.is_finite() && *s > 0.0)
-        };
+        let step = |axis: usize| var.ome_scale(self.get_spatial_dim_index(axis));
         match (step(0), step(1)) {
             (Some(sx), Some(sy)) => (sx / sy) as f32,
             _ => 1.0,

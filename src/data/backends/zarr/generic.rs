@@ -1,10 +1,10 @@
 //! Generic `GenericZarrBlockStore` implementation over `ReadableWritableListableStorage`.
 
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 
 use super::block::{ArrayCachedState, fetch_block_from_cached_array, inherited_attributes};
-pub use super::storage::{ZarrArrayHandle, open_raw_array};
+use super::storage::{ZarrArrayHandle, open_raw_array};
 use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
 use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
@@ -13,24 +13,27 @@ use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 use zarrs::storage::ReadableWritableListableStorage;
 
-pub type CachedArrayEntry = Arc<ArrayCachedState>;
+/// Decoded chunk bytes the open arrays of one store may hold together: the
+/// least recently used arrays are closed beyond it (an OME-Zarr image opens
+/// one array per level, each with its own chunk cache).
+const OPEN_ARRAYS_BUDGET: u64 = 1024 * 1024 * 1024;
 
-/// Default chunk cache size per array handle (32 MB).
-pub const DEFAULT_CHUNK_CACHE_BYTES: u64 = 32 * 1024 * 1024;
+/// Open arrays with the size of their chunk caches, least recently used first.
+type OpenArrays = Vec<(String, u64, Arc<ArrayCachedState>)>;
 
 pub struct GenericZarrBlockStore {
     storage: ReadableWritableListableStorage,
     source_url: String,
     backend_name: &'static str,
     store_type_label: &'static str,
-    array_cache: RwLock<HashMap<String, Arc<ArrayCachedState>>>,
-    chunk_cache_bytes: u64,
+    open_arrays: Mutex<OpenArrays>,
+    /// Held while an array is opened, so concurrent block fetches (prefetch
+    /// workers) share one array and its chunk cache instead of each opening it.
+    opening: Mutex<()>,
 }
 
-fn compute_chunk_cache_bytes(array: &ZarrArrayHandle, limit: u64) -> u64 {
-    if limit != DEFAULT_CHUNK_CACHE_BYTES {
-        return limit;
-    }
+/// The chunk cache size of `array`: eight chunks, within 64-512 MB.
+fn chunk_cache_bytes(array: &ZarrArrayHandle) -> u64 {
     let rank = array.shape().len();
     let chunk_indices = vec![0; rank];
     let single_chunk_bytes = if let Ok(chunk_dims) = array.chunk_shape(&chunk_indices) {
@@ -56,29 +59,13 @@ impl GenericZarrBlockStore {
         backend_name: &'static str,
         store_type_label: &'static str,
     ) -> Self {
-        Self::with_chunk_cache_limit(
-            storage,
-            source_url,
-            backend_name,
-            store_type_label,
-            DEFAULT_CHUNK_CACHE_BYTES,
-        )
-    }
-
-    pub fn with_chunk_cache_limit(
-        storage: ReadableWritableListableStorage,
-        source_url: impl Into<String>,
-        backend_name: &'static str,
-        store_type_label: &'static str,
-        chunk_cache_bytes: u64,
-    ) -> Self {
         Self {
             storage,
             source_url: source_url.into(),
             backend_name,
             store_type_label,
-            array_cache: RwLock::new(HashMap::new()),
-            chunk_cache_bytes,
+            open_arrays: Mutex::default(),
+            opening: Mutex::default(),
         }
     }
 
@@ -90,57 +77,75 @@ impl GenericZarrBlockStore {
         &self.storage
     }
 
-    /// Gets an already-opened and cached `ArrayCachedState` or opens and caches it.
+    /// The opened array `var_name` with its chunk cache, opened on first use.
     pub fn get_or_open_array(
         &self,
         var_name: &str,
     ) -> Result<Arc<ArrayCachedState>, BlockStoreError> {
         let clean_name = var_name.trim_matches('/');
-        let cache_guard = self.array_cache.read().unwrap_or_else(|p| p.into_inner());
-        if let Some(cached) = cache_guard.get(clean_name) {
-            return Ok(cached.clone());
+        if let Some(open) = self.open_array(clean_name) {
+            return Ok(open);
         }
-        drop(cache_guard);
-
-        let raw_array = open_raw_array(&self.storage, clean_name)?;
-        let cache_bytes = compute_chunk_cache_bytes(&raw_array, self.chunk_cache_bytes);
-        let attributes = inherited_attributes(&raw_array, &self.storage, clean_name);
-        let is_label_image = crate::data::ome::axes::is_label_image(&attributes);
-        let ome_dim_names =
-            crate::data::ome::axes::block_dimension_names(&attributes, raw_array.shape().len());
-
-        let array_arc = Arc::new(raw_array);
-        let chunk_cache = Arc::new(ChunkCacheDecodedLruSizeLimit::new(
-            array_arc.clone(),
-            cache_bytes,
-        ));
-        let cached = Arc::new(ArrayCachedState {
-            array: array_arc,
-            cache: chunk_cache,
-            attributes,
-            is_label_image,
-            ome_dim_names,
-        });
-
-        let mut write_guard = self.array_cache.write().unwrap_or_else(|p| p.into_inner());
-        write_guard.insert(clean_name.to_string(), cached.clone());
+        let _opening = self.opening.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(open) = self.open_array(clean_name) {
+            return Ok(open);
+        }
+        let (cached, cache_bytes) = self.open(clean_name)?;
+        let mut open = self.open_arrays.lock().unwrap_or_else(|p| p.into_inner());
+        open.push((clean_name.to_string(), cache_bytes, cached.clone()));
+        while open.len() > 1 && open.iter().map(|(_, b, _)| b).sum::<u64>() > OPEN_ARRAYS_BUDGET {
+            open.remove(0);
+        }
         Ok(cached)
     }
 
-    /// Total number of opened array variables cached in this store handle.
-    pub fn cached_arrays_count(&self) -> usize {
-        self.array_cache
-            .read()
-            .unwrap_or_else(|p| p.into_inner())
-            .len()
+    /// An array already open, marked most recently used.
+    fn open_array(&self, name: &str) -> Option<Arc<ArrayCachedState>> {
+        let mut open = self.open_arrays.lock().unwrap_or_else(|p| p.into_inner());
+        let i = open.iter().position(|(n, _, _)| n == name)?;
+        let entry = open.remove(i);
+        let cached = entry.2.clone();
+        open.push(entry);
+        Some(cached)
     }
 
-    /// Clears opened array handles and chunk caches.
-    pub fn clear_array_cache(&self) {
-        self.array_cache
-            .write()
-            .unwrap_or_else(|p| p.into_inner())
-            .clear();
+    /// The store's OME-Zarr variables with their discovery, else its plain
+    /// Zarr variables.
+    fn store_variables(
+        &self,
+    ) -> Result<(Vec<VariableInfo>, Option<crate::data::ome::Discovery>), BlockStoreError> {
+        if let Some(mut found) = crate::data::ome::discover_direct(self.storage.clone()) {
+            return Ok((std::mem::take(&mut found.variables), Some(found)));
+        }
+        let url = self.source_url.trim_end_matches('/');
+        let vars = crate::utils::extract_store_variables_consolidated(self.storage.clone(), url)
+            .map_err(|e| e.to_string())?;
+        Ok((vars, None))
+    }
+
+    fn open(&self, name: &str) -> Result<(Arc<ArrayCachedState>, u64), BlockStoreError> {
+        let raw_array = open_raw_array(&self.storage, name)?;
+        let cache_bytes = chunk_cache_bytes(&raw_array);
+        let reader = crate::data::ome::MetaReader::direct(self.storage.clone());
+        let attributes = inherited_attributes(&raw_array, &reader, name);
+        let ome = crate::data::ome::level::level_array(
+            &reader,
+            name,
+            raw_array.shape().len(),
+            raw_array.data_type(),
+        );
+        let array = Arc::new(raw_array);
+        let cache = Arc::new(ChunkCacheDecodedLruSizeLimit::new(
+            array.clone(),
+            cache_bytes,
+        ));
+        let cached = ArrayCachedState {
+            array,
+            cache,
+            attributes,
+            ome,
+        };
+        Ok((Arc::new(cached), cache_bytes))
     }
 }
 
@@ -150,11 +155,7 @@ impl BlockStore for GenericZarrBlockStore {
     }
 
     fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
-        let vars = crate::utils::extract_store_variables_consolidated(
-            self.storage.clone(),
-            &self.source_url,
-        )
-        .map_err(|e| e.to_string())?;
+        let (vars, _) = self.store_variables()?;
         Ok(vars.into_iter().map(|v| v.name).collect())
     }
 
@@ -163,17 +164,11 @@ impl BlockStore for GenericZarrBlockStore {
         let default_name = format!("{}_store", self.backend_name);
         let dataset_name = base_url.split('/').next_back().unwrap_or(&default_name);
 
-        let (variables, ome) = match crate::data::ome::discover_direct(self.storage.clone()) {
-            Some(found) => {
-                crate::data::ome::report_warnings(&found, dataset_name);
-                (found.variables, Some(Arc::new(found.dataset)))
-            }
-            None => (
-                crate::utils::extract_store_variables_consolidated(self.storage.clone(), base_url)
-                    .map_err(|e| e.to_string())?,
-                None,
-            ),
-        };
+        let (variables, found) = self.store_variables()?;
+        let ome = found.map(|found| {
+            crate::data::ome::report_warnings(&found, dataset_name);
+            Arc::new(found.dataset)
+        });
 
         Ok(DatasetMetadata {
             name: dataset_name.to_string(),

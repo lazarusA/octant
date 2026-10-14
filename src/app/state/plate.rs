@@ -32,8 +32,9 @@ pub struct PlateState {
     pub well: Option<usize>,
     /// The acquisition whose fields are listed (`None`: all).
     pub acquisition: Option<u64>,
-    /// The URL of the field shown as the active dataset.
-    pub opened: Option<String>,
+    /// The field shown as the active dataset: its well's index into
+    /// `plate.wells` and its path in the well.
+    pub opened: Option<(usize, String)>,
     wells: HashMap<String, WellFields>,
     tx: Sender<(String, Result<OmeWell, String>)>,
     rx: Receiver<(String, Result<OmeWell, String>)>,
@@ -120,19 +121,23 @@ impl crate::app::OctantApp {
         false
     }
 
-    /// Opens field `field` of the plate's well `well` as the active dataset.
-    pub(crate) fn open_plate_field(&mut self, well: &str, field: &str) {
+    /// Opens field `field` of the plate's well at index `well` as the active
+    /// dataset.
+    pub(crate) fn open_plate_field(&mut self, well: usize, field: &str) {
         let Some(plate) = &mut self.plate else {
             return;
         };
-        let url = plate.field_url(well, field);
+        let Some(path) = plate.plate.wells.get(well).map(|w| w.path.as_str()) else {
+            return;
+        };
+        let url = plate.field_url(path, field);
         let kind = plate.store_kind;
-        plate.opened = Some(url.clone());
+        plate.opened = Some((well, field.to_string()));
         self.submit_or_activate_source(&url, Some(kind));
     }
 }
 
-/// The well group's metadata: `zarr.json` (Zarr v3) or `.zattrs` (Zarr v2).
+/// The well group's attributes: `zarr.json` (Zarr v3) or `.zattrs` (Zarr v2).
 async fn well_attributes(
     url: &str,
     path: &str,
@@ -142,15 +147,9 @@ async fn well_attributes(
         let key = format!("{url}/{path}/{name}");
         match read_bytes(&key).await {
             Ok(bytes) => {
-                let mut doc: serde_json::Map<String, serde_json::Value> =
-                    serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
-                if name == "zarr.json" {
-                    return match doc.remove("attributes") {
-                        Some(serde_json::Value::Object(attrs)) => Ok(attrs),
-                        _ => Ok(serde_json::Map::new()),
-                    };
-                }
-                return Ok(doc);
+                return crate::data::ome::reader::attributes_of(&bytes)
+                    .map(|(attrs, _)| attrs)
+                    .ok_or_else(|| format!("{key}: not a JSON object"));
             }
             Err(e) => last_error = e,
         }

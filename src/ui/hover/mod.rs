@@ -107,8 +107,12 @@ pub fn show_hover_tooltip(
     let canvas_plot_type = app.effective_canvas_plot_type();
     let flat = hit.point_3d.is_none() && canvas_plot_type != PlotType::Line;
     let pixel = flat.then_some((px, py));
-    let composite =
-        composite::composite_rows(app, ctx, meta, var, units_str, pixel, &mut dim_entries);
+    // A label image reads its id, color and properties instead of a value.
+    let label = labels::label_reading(&app.layers.base, raw_val);
+    let composite = match label {
+        Some(_) => None,
+        None => composite::composite_rows(app, ctx, meta, var, units_str, pixel, &mut dim_entries),
+    };
     if canvas_plot_type == PlotType::Line {
         draw_line_guidelines_and_reticle(app, ctx, ui, rect, px, raw_val);
     }
@@ -125,8 +129,7 @@ pub fn show_hover_tooltip(
         hit.point_3d,
     );
 
-    // A label image reads its id, color and properties instead of a value.
-    let (swatch, value, units_str) = match labels::label_reading(&app.layers.base, raw_val) {
+    let (swatch, value, units_str) = match label {
         Some((value, swatch, properties)) => (swatch, value, properties),
         None => (
             resolve_hover_color(app, raw_val, py),

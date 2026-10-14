@@ -10,11 +10,8 @@ pub fn render_entry_card(
     trimmed_url: &str,
     is_mobile: bool,
 ) -> bool {
-    let ome = crate::catalog::MICROSCOPY_CATALOG
-        .iter()
-        .any(|e| e.key == entry.key);
     let (badge_icon, badge_name, badge_tone) = match entry.store_kind {
-        StoreKind::RemoteZarr if ome => (Icon::Globe, "OME-Zarr", IconTone::Success),
+        StoreKind::RemoteZarr if entry.is_ome() => (Icon::Globe, "OME-Zarr", IconTone::Success),
         StoreKind::RemoteZarr => (Icon::Globe, "Zarr", IconTone::Accent),
         StoreKind::RemoteIcechunk => (Icon::Icechunk, "Icechunk", IconTone::Info),
         StoreKind::RemoteGeoTiff | StoreKind::LocalGeoTiff => {

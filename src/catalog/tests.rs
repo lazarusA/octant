@@ -47,3 +47,13 @@ fn microscopy_entries_are_remote_ome_zarr() {
         );
     }
 }
+
+#[test]
+fn only_microscopy_entries_are_ome() {
+    for &category in &CATEGORIES {
+        let ome = category == CatalogCategoryFilter::Microscopy;
+        for e in get_catalog_entries(category) {
+            assert_eq!(e.is_ome(), ome, "{}", e.key);
+        }
+    }
+}

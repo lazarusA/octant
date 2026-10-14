@@ -70,10 +70,6 @@ pub struct OmeChannel {
 pub struct OmeLabelInfo {
     /// `(label value, RGBA)`, sorted by value.
     pub colors: Vec<(u64, [u8; 4])>,
-    /// `(label value, [(property, value)])`, sorted by value.
-    pub properties: Vec<(u64, Vec<(String, String)>)>,
-    /// The image the labels annotate, relative to the label group (`../..`).
-    pub source_image: Option<String>,
     /// `(label value, "key: value, ...")`, sorted by value: the properties as
     /// the hover card shows them, written once.
     pub properties_text: Vec<(u64, String)>,
@@ -94,14 +90,6 @@ impl OmeLabelInfo {
             .binary_search_by_key(&value, |(v, _)| *v)
             .ok()
             .map(|i| self.properties_text[i].1.as_str())
-    }
-
-    /// The properties recorded for `value`.
-    pub fn properties_of(&self, value: u64) -> Option<&[(String, String)]> {
-        self.properties
-            .binary_search_by_key(&value, |(v, _)| *v)
-            .ok()
-            .map(|i| self.properties[i].1.as_slice())
     }
 }
 
@@ -142,10 +130,10 @@ impl OmeImage {
 
     /// Index of the z axis: the third-last space axis, when there are three.
     pub fn z_axis(&self) -> Option<usize> {
-        let space: Vec<usize> = (0..self.axes.len())
+        (0..self.axes.len())
+            .rev()
             .filter(|&i| self.axes[i].kind == AxisKind::Space)
-            .collect();
-        (space.len() >= 3).then(|| space[space.len() - 3])
+            .nth(2)
     }
 }
 

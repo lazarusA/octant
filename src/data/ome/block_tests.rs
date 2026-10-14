@@ -90,3 +90,87 @@ fn channel_labels_need_every_channel_named() {
     // Index-only x (no unit, scale 1, no translation) gets no coordinate.
     assert!(!named.contains_key("0/x"));
 }
+
+#[test]
+fn arrays_under_a_non_ome_multiscales_group_stay_plain_zarr() {
+    // ndpyramid-style pyramid: a `multiscales` list without axes, levels
+    // holding variables rather than arrays.
+    let f = Fixture::default()
+        .v2_group(
+            "",
+            json!({ "multiscales": [{ "datasets": [{ "path": "0" }] }] }),
+        )
+        .v2_group("0", json!({}))
+        .v2_array("0/tas", &[2, 2])
+        .json(
+            "0/tas/.zattrs",
+            json!({ "_ARRAY_DIMENSIONS": ["lat", "lon"] }),
+        );
+    let store = crate::data::backends::zarr::ZarrBlockStore::new(f.memory(), "memory://ndpyr");
+    let request = SliceRequest::new(
+        "0/tas",
+        vec![
+            DimensionSelection::range(0, 2),
+            DimensionSelection::range(0, 2),
+        ],
+    );
+    let block = store.fetch_block(&request).expect("block");
+    assert_eq!(block.dimension_names, ["lat", "lon"]);
+}
+
+#[test]
+fn unreadable_image_label_reads_plain_values() {
+    let ms = json!({
+        "version": "0.4",
+        "axes": [{ "name": "y", "type": "space" }, { "name": "x", "type": "space" }],
+        "datasets": [{ "path": "0", "coordinateTransformations": [{ "type": "scale", "scale": [1.0, 1.0] }] }]
+    });
+    let values: Vec<u8> = [5u16, 0].iter().flat_map(|v| v.to_le_bytes()).collect();
+    let f = Fixture::default()
+        .v2_group(
+            "",
+            json!({ "multiscales": [ms], "image-label": { "colors": "not a list" } }),
+        )
+        .v2_array("0", &[1, 2])
+        .bytes("0/0.0", &values);
+    let store = crate::data::backends::zarr::ZarrBlockStore::new(f.memory(), "memory://badlabel");
+    let meta = store.inspect().expect("inspect");
+    assert!(
+        meta.variables[0]
+            .ome
+            .as_ref()
+            .is_some_and(|o| o.image.label_info.is_none())
+    );
+    let request = SliceRequest::new(
+        "0",
+        vec![
+            DimensionSelection::range(0, 1),
+            DimensionSelection::range(0, 2),
+        ],
+    );
+    let block = store.fetch_block(&request).expect("block");
+    assert_eq!(&block.values[..], &[5.0, 0.0]);
+}
+
+#[test]
+fn level_coordinates_never_fill_unscoped_keys() {
+    let ms = json!({
+        "version": "0.4",
+        "axes": [{ "name": "y", "type": "space" }, { "name": "x", "type": "space" }],
+        "datasets": [
+            { "path": "0", "coordinateTransformations": [{ "type": "scale", "scale": [1.0, 1.0] }] },
+            { "path": "1", "coordinateTransformations": [{ "type": "scale", "scale": [2.0, 2.0] }] }
+        ]
+    });
+    let f = Fixture::default()
+        .v2_group("", json!({ "multiscales": [ms] }))
+        .v2_array("0", &[4, 4])
+        .v2_array("1", &[2, 2]);
+    let store = crate::data::backends::zarr::ZarrBlockStore::new(f.memory(), "memory://ome_scoped");
+    let meta = store.inspect().expect("inspect");
+    let coords = store
+        .variable_coordinates(&meta.variables[1])
+        .expect("coords");
+    assert!(coords.contains_key("1/x"));
+    assert!(!coords.contains_key("x"));
+}

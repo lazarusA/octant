@@ -12,8 +12,7 @@ use zarrs::metadata_ext::codec::blosc::{
 /// non-standard or Python numcodecs codecs gets conforming codecs in a valid pipeline order,
 /// and v2 unicode arrays with a null fill (as zarr-python 2 writes them) get an empty one.
 pub fn normalize_v3_array_metadata(mut meta: Value) -> Value {
-    fill_v2_unicode_null(&mut meta);
-    repair_v2_numeric(&mut meta);
+    repair_v2(&mut meta);
     let typesize = meta
         .get("data_type")
         .and_then(|d| MetadataV3::deserialize(d).ok())
@@ -49,25 +48,13 @@ pub fn normalize_v3_array_metadata(mut meta: Value) -> Value {
     meta
 }
 
-/// zarr-python 2 and xarray write `"fill_value": null` for NumPy unicode (`<U`, `>U`)
-/// arrays, which `zarrs` rejects; an empty string is the fill those writers mean.
-fn fill_v2_unicode_null(meta: &mut Value) {
-    let is_unicode = meta
-        .get("dtype")
-        .and_then(Value::as_str)
-        .is_some_and(|d| d.starts_with("<U") || d.starts_with(">U"));
-    if is_unicode
-        && meta.get("zarr_format").and_then(Value::as_u64) == Some(2)
-        && meta.get("fill_value").is_some_and(Value::is_null)
-    {
-        meta["fill_value"] = Value::from("");
-    }
-}
-
-/// Early zarr writers (OME-NGFF 0.1 data among them) store a numeric fill as
-/// text (`"0"`) and no filters as `[]`; v2 wants a number and `null`. Float
-/// fills keep their special text values (`"NaN"`, `"Infinity"`).
-fn repair_v2_numeric(meta: &mut Value) {
+/// Repairs v2 metadata that early writers produce and `zarrs` rejects:
+/// zarr-python 2 and xarray write `"fill_value": null` for NumPy unicode
+/// (`<U`, `>U`) arrays, meaning an empty string; early zarr writers (OME-NGFF
+/// 0.1 data among them) store a numeric fill as text (`"0"`) and no filters
+/// as `[]`, where v2 wants a number and `null`. Float fills keep their
+/// special text values (`"NaN"`, `"Infinity"`).
+fn repair_v2(meta: &mut Value) {
     if meta.get("zarr_format").and_then(Value::as_u64) != Some(2) {
         return;
     }
@@ -77,26 +64,24 @@ fn repair_v2_numeric(meta: &mut Value) {
     {
         meta["filters"] = Value::Null;
     }
-    let kind = meta
-        .get("dtype")
-        .and_then(Value::as_str)
-        .and_then(|d| d.trim_start_matches(['<', '>', '|', '=']).chars().next());
-    let Some(Value::String(text)) = meta.get("fill_value") else {
-        return;
-    };
-    let number = match kind {
-        Some('i') => text.trim().parse::<i64>().ok().map(Value::from),
-        Some('u') => text.trim().parse::<u64>().ok().map(Value::from),
-        Some('f') => text
-            .trim()
-            .parse::<f64>()
-            .ok()
-            .filter(|v| v.is_finite())
-            .map(Value::from),
+    let dtype = meta.get("dtype").and_then(Value::as_str).unwrap_or("");
+    let kind = dtype
+        .trim_start_matches(['<', '>', '|', '='])
+        .chars()
+        .next();
+    let unicode = dtype.starts_with("<U") || dtype.starts_with(">U");
+    let fill = match (kind, meta.get("fill_value")) {
+        (_, Some(Value::Null)) if unicode => Some(Value::from("")),
+        (Some('i'), Some(Value::String(t))) => t.trim().parse::<i64>().ok().map(Value::from),
+        (Some('u'), Some(Value::String(t))) => t.trim().parse::<u64>().ok().map(Value::from),
+        (Some('f'), Some(Value::String(t))) => {
+            let v = t.trim().parse::<f64>().ok().filter(|v| v.is_finite());
+            v.map(Value::from)
+        }
         _ => None,
     };
-    if let Some(number) = number {
-        meta["fill_value"] = number;
+    if let Some(fill) = fill {
+        meta["fill_value"] = fill;
     }
 }
 

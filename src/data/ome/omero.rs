@@ -3,8 +3,7 @@
 //! `ome_zarr_metadata` types only a channel's `color` and `window` and keeps
 //! the rest (`label`, `active`, `inverted`, `family`, `coefficient`) as untyped
 //! JSON, and fails a whole `omero` object over one malformed channel; channels
-//! are therefore read here, leniently, from the raw JSON (the crate still
-//! validates them, reporting what does not conform).
+//! are therefore read here, leniently, from the raw JSON only.
 
 use serde_json::Value;
 

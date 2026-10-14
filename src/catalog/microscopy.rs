@@ -13,6 +13,16 @@ macro_rules! idr {
     };
 }
 
+impl CatalogEntry {
+    /// Whether this entry is one of `MICROSCOPY_CATALOG`'s OME-Zarr datasets
+    /// (by address, so it costs no scan).
+    pub fn is_ome(&self) -> bool {
+        MICROSCOPY_CATALOG
+            .as_ptr_range()
+            .contains(&std::ptr::from_ref(self))
+    }
+}
+
 pub static MICROSCOPY_CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
         key: "idr0062-nuclei-labels",

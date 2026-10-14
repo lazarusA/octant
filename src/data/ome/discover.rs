@@ -1,13 +1,13 @@
 //! Walks an OME-Zarr store from its root: images and their label images,
 //! wells and their fields, plates, and `bioformats2raw` series.
 
-use std::collections::HashMap;
+use std::cell::Cell;
 use std::sync::Arc;
 
 use super::image::image_from_group;
 use super::model::OmeImage;
 use super::ome_xml::series_names;
-use super::parse::{ParsedGroup, level_paths, parse_group};
+use super::parse::{ParsedGroup, parse_group};
 use super::plate::{OmeDataset, plate_info, well_info};
 use super::reader::{Lookup, MetaReader, Pending, join};
 use super::variables::image_variables;
@@ -85,20 +85,23 @@ impl Walk<'_, '_> {
         path: &str,
         attrs: &serde_json::Map<String, serde_json::Value>,
     ) -> Option<ParsedGroup> {
-        let mut shapes = HashMap::new();
-        for level in level_paths(attrs) {
-            match self.reader.array_shape(&join(path, &level)) {
-                Err(Pending) => self.pending = true,
-                Ok(Some(shape)) => {
-                    shapes.insert(level, shape);
-                }
-                Ok(None) => {}
+        // Level shapes are read only for metadata that needs them (legacy
+        // versions, missing transforms).
+        let waiting = Cell::new(false);
+        let reader = self.reader;
+        let shapes = |level: &str| match reader.array_shape(&join(path, level)) {
+            Ok(shape) => shape,
+            Err(Pending) => {
+                waiting.set(true);
+                None
             }
-        }
-        if self.pending {
+        };
+        let parsed = parse_group(attrs, &shapes);
+        if waiting.get() {
+            self.pending = true;
             return None;
         }
-        let parsed = parse_group(attrs, &|p| shapes.get(p.trim_matches('/')).cloned())?;
+        let parsed = parsed?;
         let at = if path.is_empty() { "/" } else { path };
         self.found
             .warnings
@@ -151,15 +154,14 @@ impl Walk<'_, '_> {
     }
 
     fn add_image(&mut self, image: OmeImage, version: &str, depth: usize) {
-        let labels: Vec<String> = image.labels.clone();
-        let group = image.group.clone();
         let image = Arc::new(image);
         match image_variables(self.reader, &image, version) {
             Ok(vars) => self.found.variables.extend(vars),
             Err(Pending) => self.pending = true,
         }
-        for label in labels {
-            self.visit(&join(&join(&group, "labels"), &label), None, depth + 1);
+        let labels = join(&image.group, "labels");
+        for label in &image.labels {
+            self.visit(&join(&labels, label), None, depth + 1);
         }
     }
 
@@ -188,7 +190,11 @@ impl Walk<'_, '_> {
     fn visit_series(&mut self, path: &str, listed: Option<&[String]>, depth: usize) {
         let series = match listed {
             Some(listed) => listed.to_vec(),
-            None => self.probe_series(path),
+            None => match self.probe_series(path) {
+                Some(series) => series,
+                // Series are visited once probing is done, not on every pass.
+                None => return,
+            },
         };
         // Names only matter once there is a series (an HCS plate has none).
         let names = if series.is_empty() {
@@ -204,9 +210,9 @@ impl Walk<'_, '_> {
         }
     }
 
-    /// Groups `0`, `1`, ... up to the first one missing. On the web, the next
-    /// [`SERIES_BATCH`] groups are asked for together.
-    fn probe_series(&mut self, path: &str) -> Vec<String> {
+    /// Groups `0`, `1`, ... up to the first one missing; `None` while some
+    /// are still being fetched (web), the next [`SERIES_BATCH`] together.
+    fn probe_series(&mut self, path: &str) -> Option<Vec<String>> {
         let mut series = Vec::new();
         for i in 0..MAX_SERIES {
             match self.reader.group_attributes(&join(path, &i.to_string())) {
@@ -217,11 +223,11 @@ impl Walk<'_, '_> {
                     for next in i + 1..i + SERIES_BATCH {
                         let _ = self.reader.group_attributes(&join(path, &next.to_string()));
                     }
-                    break;
+                    return None;
                 }
             }
         }
-        series
+        Some(series)
     }
 
     /// Series names from `OME/METADATA.ome.xml`, by series index.

@@ -30,7 +30,7 @@ pub use coastline::{
 };
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
 pub use heatmap::{HeatmapCallback, HeatmapRenderer};
-pub use labels::{LabelCallback, LabelRenderer};
+pub use labels::{LabelDraw, LabelRenderer};
 pub use line::{LineCallback, LineRenderer, LineShape};
 pub use mesh::Mesh3DRenderer;
 pub use mesh_draw::{
@@ -181,18 +181,8 @@ mod tests {
                 "surface",
                 crate::assemble_plot_with_coords_shader!(include_str!("shaders/surface.wgsl")),
             ),
-            (
-                "heatmap",
-                crate::assemble_plot_with_coords_shader!(include_str!("shaders/heatmap.wgsl")),
-            ),
-            (
-                "labels",
-                concat!(
-                    include_str!("shaders/common/coords.wgsl"),
-                    "\n",
-                    include_str!("shaders/labels.wgsl")
-                ),
-            ),
+            ("heatmap", super::heatmap::HEATMAP_WGSL),
+            ("labels", super::labels::LABELS_WGSL),
             (
                 "volume_hardware_filter",
                 crate::plots::volume::pipeline::SHADER_HARDWARE_FILTER,

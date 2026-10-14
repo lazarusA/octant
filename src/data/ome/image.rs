@@ -113,37 +113,24 @@ fn label_info(label: &ImageLabel) -> OmeLabelInfo {
         .collect();
     colors.sort_by_key(|(v, _)| *v);
     colors.dedup_by_key(|(v, _)| *v);
-    let mut properties: Vec<(u64, Vec<(String, String)>)> = label
+    let mut properties_text: Vec<(u64, String)> = label
         .properties
         .iter()
         .flatten()
         .map(|p| {
-            let fields = p
+            let fields: Vec<String> = p
                 .properties
                 .iter()
-                .map(|(k, v)| (k.clone(), property_text(v)))
+                .map(|(k, v)| format!("{k}: {}", property_text(v)))
                 .collect();
-            (p.label_value, fields)
+            (p.label_value, fields.join(", "))
         })
         .collect();
-    properties.sort_by_key(|(v, _)| *v);
-    properties.dedup_by_key(|(v, _)| *v);
-    let properties_text = properties
-        .iter()
-        .map(|(v, fields)| {
-            let line: Vec<String> = fields.iter().map(|(k, x)| format!("{k}: {x}")).collect();
-            (*v, line.join(", "))
-        })
-        .collect();
+    properties_text.sort_by_key(|(v, _)| *v);
+    properties_text.dedup_by_key(|(v, _)| *v);
     OmeLabelInfo {
         colors,
-        properties,
         properties_text,
-        source_image: label
-            .source
-            .as_ref()
-            .and_then(|s| s.image.as_ref())
-            .map(|p| p.to_string_lossy().into_owned()),
     }
 }
 
