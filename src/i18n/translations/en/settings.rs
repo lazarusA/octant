@@ -125,7 +125,7 @@ pub fn text(key: SettingsKey) -> &'static str {
         SettingsKey::CropTool => "Crop Tool",
         SettingsKey::Aggregation => "2D Aggregation",
         SettingsKey::AggregationMandatoryHover => {
-            "Mandatory: Array exceeds single GPU buffer limit (128 MB / 33.5M cells). \
+            "Mandatory: Array exceeds single GPU buffer limit ({} MB). \
              Aggregation cannot be disabled."
         }
         SettingsKey::AggregationHover => {

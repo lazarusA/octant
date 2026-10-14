@@ -29,7 +29,7 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::UnsupportedForGrid => "Não suportado para grade {}",
         PlotKey::DisabledAggregation => "Desativado: a Agregação 2D está ativada",
         PlotKey::Requires3D => "Requer dados 3D",
-        PlotKey::DisabledGpuLimit => "Desativado: {} MB > limite de 128 MB da GPU",
+        PlotKey::DisabledGpuLimit => "Desativado: {} MB > limite de {} MB da GPU",
         PlotKey::ScalarField => "Campo escalar",
         PlotKey::LabelsHeatmapOnly => "Imagens de rótulos são desenhadas só no mapa de calor",
     })

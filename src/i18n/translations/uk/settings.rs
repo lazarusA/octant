@@ -137,7 +137,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "Обрізання",
         SettingsKey::Aggregation => "2D-агрегація",
         SettingsKey::AggregationMandatoryHover => {
-            "Обов'язково: масив перевищує ліміт одного буфера GPU (128 MB / 33.5M комірок). \
+            "Обов'язково: масив перевищує ліміт одного буфера GPU ({} MB). \
              Агрегацію не можна вимкнути."
         }
         SettingsKey::AggregationHover => {

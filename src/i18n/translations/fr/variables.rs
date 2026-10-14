@@ -47,7 +47,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
             "Les maillages Globe 3D et Surface 3D sont désactivés pour cette grande sélection ({} cellules, {} MB). Les graphiques Plan 2D et Ligne 1D restent entièrement disponibles."
         }
         VariablesKey::LargeVolumeDisabled => {
-            "Volume 3D et Nuage de points sont désactivés pour cette sélection : la taille du volume ({} MB) dépasse la limite de 128 MB du tampon de stockage GPU. Plan 2D, Ligne 1D et Globe 3D restent disponibles."
+            "Volume 3D et Nuage de points sont désactivés pour cette sélection : la taille du volume ({} MB) dépasse la limite de {} MB du tampon de stockage GPU. Plan 2D, Ligne 1D et Globe 3D restent disponibles."
         }
         VariablesKey::RoleNone => "Aucun",
         VariablesKey::RoleAnimated => "Animé",

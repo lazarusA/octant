@@ -49,7 +49,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
             "Las mallas de Globo 3D y Superficie 3D están desactivadas para esta selección grande ({} celdas, {} MB). Los gráficos de Plano 2D y Línea 1D siguen plenamente activos."
         }
         VariablesKey::LargeVolumeDisabled => {
-            "Volumen 3D y Nube de puntos están desactivados para esta selección: el tamaño del volumen ({} MB) supera el límite de 128 MB del búfer de almacenamiento de la GPU. Plano 2D, Línea 1D y Globo 3D siguen activos."
+            "Volumen 3D y Nube de puntos están desactivados para esta selección: el tamaño del volumen ({} MB) supera el límite de {} MB del búfer de almacenamiento de la GPU. Plano 2D, Línea 1D y Globo 3D siguen activos."
         }
         VariablesKey::RoleNone => "Ninguno",
         VariablesKey::RoleAnimated => "Animado",

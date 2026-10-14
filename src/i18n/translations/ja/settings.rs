@@ -121,7 +121,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "切り抜きツール",
         SettingsKey::Aggregation => "2D集約",
         SettingsKey::AggregationMandatoryHover => {
-            "必須: 配列が単一GPUバッファの上限 (128 MB / 3350万セル) を超えています。集約は無効にできません。"
+            "必須: 配列が単一GPUバッファの上限 ({} MB) を超えています。集約は無効にできません。"
         }
         SettingsKey::AggregationHover => {
             "多解像度ピラミッドによる縮小とビューポートの再サンプリング。"

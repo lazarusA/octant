@@ -47,7 +47,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
             "3D-pallon ja 3D-pinnan verkot on poistettu käytöstä tälle suurelle valinnalle ({} solua, {} MB). 2D-taso- ja 1D-viivakuvaajat toimivat täysin."
         }
         VariablesKey::LargeVolumeDisabled => {
-            "3D-tilavuus ja pistepilvi on poistettu käytöstä tälle valinnalle: tilavuuden koko ({} MB) ylittää 128 MB:n GPU-tallennuspuskurin rajan. 2D-taso, 1D-viiva ja 3D-pallo ovat käytössä."
+            "3D-tilavuus ja pistepilvi on poistettu käytöstä tälle valinnalle: tilavuuden koko ({} MB) ylittää {} MB:n GPU-tallennuspuskurin rajan. 2D-taso, 1D-viiva ja 3D-pallo ovat käytössä."
         }
         VariablesKey::RoleNone => "Ei",
         VariablesKey::RoleAnimated => "Animoitu",

@@ -51,7 +51,7 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
             "Mesh Bola 3D & Permukaan 3D dinonaktifkan untuk pilihan besar ini ({} sel, {} MB). Plot Bidang 2D dan Garis 1D tetap aktif sepenuhnya."
         }
         VariablesKey::LargeVolumeDisabled => {
-            "Volume 3D & Awan Titik dinonaktifkan untuk pilihan ini: ukuran volume ({} MB) melebihi batas buffer penyimpanan GPU 128 MB. Bidang 2D, Garis 1D, dan Bola 3D tetap aktif."
+            "Volume 3D & Awan Titik dinonaktifkan untuk pilihan ini: ukuran volume ({} MB) melebihi batas buffer penyimpanan GPU {} MB. Bidang 2D, Garis 1D, dan Bola 3D tetap aktif."
         }
         VariablesKey::RoleNone => "Tidak ada",
         VariablesKey::RoleAnimated => "Animasi",

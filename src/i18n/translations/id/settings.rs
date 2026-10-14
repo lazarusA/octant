@@ -123,7 +123,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CropTool => "Alat Potong",
         SettingsKey::Aggregation => "Agregasi 2D",
         SettingsKey::AggregationMandatoryHover => {
-            "Wajib: larik melebihi batas satu buffer GPU (128 MB / 33,5 juta sel). Agregasi tidak dapat dinonaktifkan."
+            "Wajib: larik melebihi batas satu buffer GPU ({} MB). Agregasi tidak dapat dinonaktifkan."
         }
         SettingsKey::AggregationHover => {
             "Downsampling piramida multi-resolusi dan resampling viewport."
