@@ -87,7 +87,8 @@ impl OctantApp {
             return;
         };
 
-        // Cache MISS: dispatch async prefetch request for current chunk and launch background prefetching in parallel.
+        // Cache MISS: request the current chunk; the lookahead follows once it
+        // arrives (`poll_block_prefetch_results`).
         // Playback may move on meanwhile; the block is shown at this step.
         if let Some(layer) = self.layers.get_mut(id) {
             layer.load.pending_target_step = Some(step);
