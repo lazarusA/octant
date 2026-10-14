@@ -4,15 +4,17 @@ use wgpu::util::DeviceExt;
 
 use crate::i18n::{NoticesKey, filled, tr};
 
-/// Maximum buffer size for GPU storage buffers in bytes (128 MiB default WebGPU/Metal limit).
+/// WebGPU's default storage binding size (128 MiB), kept as the budget of
+/// volumes and point clouds (built together), default selections, batching
+/// (animated steps per block, volume slabs) and 1D selections. Whether a 2D heatmap uploads
+/// whole is the device's own limit, `limits::max_storage_bytes`.
 pub const MAX_GPU_STORAGE_BUFFER_BYTES: usize = 128 * 1024 * 1024;
-/// Maximum number of f32 elements that fit in a single GPU storage buffer.
+/// [`MAX_GPU_STORAGE_BUFFER_BYTES`] in `f32` values.
 pub const MAX_GPU_STORAGE_BUFFER_ELEMENTS: usize =
     MAX_GPU_STORAGE_BUFFER_BYTES / std::mem::size_of::<f32>();
-
-/// Maximum buffer size for GPU vertex / index buffers in bytes (256 MiB default wgpu limit).
-pub const MAX_GPU_BUFFER_BYTES: usize = 256 * 1024 * 1024;
-/// Maximum number of 2D cells that fit in 3D Surface / Sphere GPU storage buffer (33.5M cells / 128 MiB).
+/// The most 2D cells the sphere and surface are built for. They are built
+/// with every 2D plot, next to the heatmap, so they keep the default budget
+/// whatever the device allows.
 pub const MAX_2D_SURFACE_ELEMENTS: usize = MAX_GPU_STORAGE_BUFFER_ELEMENTS;
 
 /// Standard GPU color, clipping, and range uniforms struct shared across all plots.

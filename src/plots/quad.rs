@@ -183,7 +183,9 @@ pub(crate) fn coord_lut_buffer(
 /// most the storage limit unless the data is larger) so smaller data later
 /// fits in place.
 pub(crate) fn data_buffer(device: &wgpu::Device, data: &[f32], cells: usize) -> wgpu::Buffer {
-    let capacity = cells.clamp(2048 * 2048, super::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS);
+    let capacity = cells
+        .max(2048 * 2048)
+        .min(super::limits::max_storage_elements().max(cells));
     storage_buffer_at_least(device, "Heatmap Data Storage Buffer", data, capacity)
 }
 

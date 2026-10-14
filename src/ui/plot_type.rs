@@ -79,8 +79,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     let is_exploring_new = app.is_exploring_unplotted_variable();
     let total_2d_elements = crate::ui::variables_panel::calculate_selected_2d_elements(app);
     let target_pyramid_disabled = if is_exploring_new {
-        !is_3d_available
-            && total_2d_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
+        !is_3d_available && total_2d_elements > crate::plots::limits::max_storage_elements()
     } else {
         app.base_resampled()
     };
@@ -201,7 +200,13 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
                     _ => vol_mb,
                 };
                 let mb = stack_str(&mut mb_buf, format_args!("{mb:.0}"));
-                fill(&mut reason_buf, tr(PlotKey::DisabledGpuLimit), &[&mb])
+                // Volumes, point clouds and meshes keep the default budget.
+                let limit = crate::plots::common::MAX_GPU_STORAGE_BUFFER_BYTES / (1024 * 1024);
+                fill(
+                    &mut reason_buf,
+                    tr(PlotKey::DisabledGpuLimit),
+                    &[&mb, &limit],
+                )
             };
 
             ui.horizontal(|ui| {

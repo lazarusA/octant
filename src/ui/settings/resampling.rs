@@ -1,6 +1,6 @@
 use crate::app::OctantApp;
 use crate::data::AggregationOp;
-use crate::i18n::{SettingsKey as K, tr};
+use crate::i18n::{SettingsKey as K, fill, tr};
 
 /// Each aggregation, its name and what it does.
 const AGGREGATIONS: [(AggregationOp, K, K); 4] = [
@@ -32,7 +32,10 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         );
         let resp = ui.add_enabled(!is_oversized, checkbox);
         if is_oversized {
-            resp.on_hover_text(tr(K::AggregationMandatoryHover));
+            let mut buf = [0; 256];
+            let limit = crate::plots::limits::max_storage_mb();
+            let text = fill(&mut buf, tr(K::AggregationMandatoryHover), &[&limit]);
+            resp.on_hover_text(text);
         } else {
             resp.on_hover_text(tr(K::AggregationHover));
         }

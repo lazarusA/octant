@@ -5,7 +5,8 @@ use super::rebuild::follow_variable;
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId};
 use crate::data::MatrixData;
-use crate::plots::common::{MAX_2D_SURFACE_ELEMENTS, MAX_GPU_STORAGE_BUFFER_ELEMENTS};
+use crate::plots::common::MAX_2D_SURFACE_ELEMENTS;
+use crate::plots::limits::max_storage_elements;
 use crate::plots::{
     Coastline3DRenderer, CoastlineLod, CoastlineRenderer, HeatmapRenderer, LabelRenderer,
     LineRenderer, PlotType, SphereRenderer, SurfaceRenderer,
@@ -112,9 +113,10 @@ fn shown_data(
 }
 
 /// Whether a layer of `cells` 2D cells is resampled through a pyramid: when
-/// Resampling is ticked (`enabled`), or when it does not fit one GPU buffer.
+/// Resampling is ticked (`enabled`), or when it does not fit one GPU storage
+/// buffer (`limits::max_storage_elements`, the device's own limit).
 pub(crate) fn needs_pyramid(enabled: bool, cells: usize) -> bool {
-    enabled || cells > MAX_GPU_STORAGE_BUFFER_ELEMENTS
+    enabled || cells > max_storage_elements()
 }
 
 /// Keeps the layer's label colors, then writes `shown` into its renderers

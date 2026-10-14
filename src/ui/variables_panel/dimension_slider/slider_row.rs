@@ -65,7 +65,7 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
     ui.add_space(4.0);
 
     let total_2d_elements = calculate_selected_2d_elements(app);
-    let large_2d = if total_2d_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+    let large_2d = if total_2d_elements > crate::plots::limits::max_storage_elements() {
         Some((Icon::Bolt, IconTone::Info, K::LargeSelectionPyramid))
     } else if total_2d_elements > crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
         Some((Icon::Info, IconTone::Warning, K::LargeSelectionNoMeshes))
@@ -84,7 +84,14 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
         let mut buf = [0; 24];
         let vol_mb = megabytes(&mut buf, total_vol_elements);
         let key = K::LargeVolumeDisabled;
-        banner(ui, Icon::Warning, IconTone::Warning, key, &[&vol_mb]);
+        let limit = crate::plots::common::MAX_GPU_STORAGE_BUFFER_BYTES / (1024 * 1024);
+        banner(
+            ui,
+            Icon::Warning,
+            IconTone::Warning,
+            key,
+            &[&vol_mb, &limit],
+        );
     }
 
     for i in 0..rank {

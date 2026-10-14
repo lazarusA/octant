@@ -6,7 +6,7 @@ use crate::app::layers::LayerId;
 use crate::app::pipeline::needs_pyramid;
 use crate::app::test_support::{make_resident, memory_app, selection_of};
 use crate::data::SliceRequest;
-use crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
+use crate::plots::limits::max_storage_elements;
 
 /// `t2m` plotted from resident blocks with `sst` added as an overlay.
 fn app_with_overlay() -> (OctantApp, LayerId) {
@@ -35,8 +35,8 @@ fn has_pyramid(app: &OctantApp, id: LayerId) -> bool {
 
 #[test]
 fn only_ticked_or_oversized_data_is_resampled() {
-    assert!(!needs_pyramid(false, MAX_GPU_STORAGE_BUFFER_ELEMENTS));
-    assert!(needs_pyramid(false, MAX_GPU_STORAGE_BUFFER_ELEMENTS + 1));
+    assert!(!needs_pyramid(false, max_storage_elements()));
+    assert!(needs_pyramid(false, max_storage_elements() + 1));
     assert!(needs_pyramid(true, 4));
 }
 
