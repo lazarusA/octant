@@ -42,27 +42,6 @@ fn step_request(var: &str, t: usize) -> SliceRequest {
     )
 }
 
-/// Fetches steps `first..first + n` of `var` with `threads` fetching at once;
-/// returns frames per second.
-fn fetch_rate(store: &StoreHandle, var: &str, first: usize, n: usize, threads: usize) -> f64 {
-    let next = std::sync::atomic::AtomicUsize::new(first);
-    let started = Instant::now();
-    std::thread::scope(|s| {
-        for _ in 0..threads {
-            s.spawn(|| {
-                loop {
-                    let t = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    if t >= first + n {
-                        return;
-                    }
-                    store.fetch(&step_request(var, t)).expect("block");
-                }
-            });
-        }
-    });
-    n as f64 / started.elapsed().as_secs_f64()
-}
-
 #[test]
 #[ignore = "reads remote stores"]
 fn playback_bench_raw_fetch() {
@@ -79,8 +58,10 @@ fn playback_bench_raw_fetch() {
     let mut first = 100;
     for threads in [1, 3, 6, 12, 24, 48] {
         let n = (threads * 3).max(8);
-        let rate = fetch_rate(&store, BASE, first, n, threads);
-        eprintln!("{threads:>2} at once: {rate:5.1} frames/s ({n} frames)");
+        let fps = rate(first, n, threads, |t| {
+            store.fetch(&step_request(BASE, t)).expect("block");
+        });
+        eprintln!("{threads:>2} at once: {fps:5.1} frames/s ({n} frames)");
         first += n;
     }
 }
@@ -140,17 +121,19 @@ fn overlay_step(app: &OctantApp, id: LayerId) -> usize {
         .unwrap_or(usize::MAX)
 }
 
-/// Plays at `fps` for `secs`; reports the steps reached, the frames the
-/// overlay lagged and the slowest frame (projection on the UI thread).
-fn play(app: &mut OctantApp, id: LayerId, fps: f32, secs: u64) {
+/// Plays at `fps` for `secs`, buffering `buffer_secs` (0 shows each step as
+/// it arrives); reports the steps reached, the stalls (pauses over two
+/// frames), the longest run of steps without one, the frames the overlay
+/// lagged and the slowest frame (projection on the UI thread).
+fn play(app: &mut OctantApp, id: LayerId, fps: f32, buffer_secs: f32, secs: u64) {
     app.playback.playback_fps = fps;
-    app.playback.is_playing = true;
-    app.prefetch_animated_ranges();
+    app.playback.buffer_secs = buffer_secs;
+    app.toggle_playback();
     let frame_dur = Duration::from_secs_f32(1.0 / fps);
     let started = Instant::now();
     let (mut frames, mut lagging, mut slowest) = (0u32, 0u32, Duration::ZERO);
     let mut last_move = Instant::now();
-    let mut stalls = Duration::ZERO;
+    let (mut stalled, mut stalls, mut run, mut longest) = (Duration::ZERO, 0u32, 0u32, 0u32);
     let mut last_step = app.playback.current_timestep;
     while started.elapsed() < Duration::from_secs(secs) {
         let t0 = Instant::now();
@@ -164,8 +147,12 @@ fn play(app: &mut OctantApp, id: LayerId, fps: f32, secs: u64) {
         if step != last_step {
             let gap = last_move.elapsed();
             if gap > frame_dur * 2 {
-                stalls += gap - frame_dur;
+                stalled += gap - frame_dur;
+                stalls += 1;
+                run = 0;
             }
+            run += 1;
+            longest = longest.max(run);
             last_move = Instant::now();
             last_step = step;
         }
@@ -174,14 +161,11 @@ fn play(app: &mut OctantApp, id: LayerId, fps: f32, secs: u64) {
     }
     let elapsed = started.elapsed().as_secs_f64();
     eprintln!(
-        "{fps:>4} fps target: reached step {}, {:.1} steps/s, stalled {:?}, overlay behind {:.0}% of frames, slowest frame {:?}, {} cached, {} pending",
+        "{fps:>4} fps, {buffer_secs} s buffer: reached step {}, {:.1} steps/s, {stalls} stalls ({stalled:.1?}), longest run {longest} steps, overlay behind {:.0}% of frames, slowest frame {:?}",
         app.playback.current_timestep,
         app.playback.current_timestep as f64 / elapsed,
-        stalls,
         100.0 * f64::from(lagging) / f64::from(frames.max(1)),
         slowest,
-        app.block_cache.cached_count(),
-        app.block_prefetcher.pending_count(),
     );
 }
 
@@ -189,9 +173,9 @@ fn play(app: &mut OctantApp, id: LayerId, fps: f32, secs: u64) {
 #[ignore = "reads remote stores"]
 fn playback_bench_two_layers() {
     let (store, meta) = open();
-    for fps in [4.0, 10.0] {
+    for buffer_secs in [0.0, 3.0] {
         let (mut app, id) = two_layer_app(store.clone(), &meta);
-        play(&mut app, id, fps, 30);
+        play(&mut app, id, 10.0, buffer_secs, 30);
     }
 }
 

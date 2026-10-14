@@ -99,16 +99,21 @@ impl OctantApp {
     /// The step layer `id` shows: the shared current step, which an overlay
     /// with a shorter animated dimension clamps into its own extent.
     pub(crate) fn layer_step(&self, id: LayerId) -> usize {
+        self.layer_step_at(id, self.playback.current_timestep)
+    }
+
+    /// The step layer `id` shows while the shared step is `step`.
+    pub(crate) fn layer_step_at(&self, id: LayerId, step: usize) -> usize {
         if id == LayerId::BASE {
-            return self.playback.current_timestep;
+            return step;
         }
         let extent = self
             .layer_animated_dim(id)
             .and_then(|dim| self.layer_variable_info(id)?.shape.get(dim).copied())
             .unwrap_or(0) as usize;
         match extent {
-            0 => self.playback.current_timestep,
-            n => self.playback.current_timestep.min(n - 1),
+            0 => step,
+            n => step.min(n - 1),
         }
     }
 

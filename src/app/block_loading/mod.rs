@@ -3,6 +3,9 @@
 pub(crate) mod block_axes;
 #[cfg(test)]
 mod block_axes_tests;
+mod buffer;
+#[cfg(test)]
+mod buffer_tests;
 pub mod coordinates;
 pub mod handles;
 #[cfg(test)]

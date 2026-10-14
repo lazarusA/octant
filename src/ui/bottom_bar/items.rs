@@ -140,6 +140,13 @@ fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Tim
                         .localized()
                         .suffix(" FPS"),
                 );
+                ui.label(egui::RichText::new(tr(K::PlaybackBuffer)).strong());
+                ui.add(
+                    egui::Slider::new(&mut app.playback.buffer_secs, 0.0..=10.0)
+                        .localized()
+                        .step_by(0.5)
+                        .suffix(" s"),
+                );
             });
         return;
     }
@@ -151,13 +158,7 @@ fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Tim
         Item::Prev => app.step_prev(),
         Item::Next => app.step_next(),
         Item::Last => app.request_step_or_load(tl.last_step),
-        Item::PlayPause => {
-            app.playback.is_playing = !app.playback.is_playing;
-            app.playback.last_step_time = web_time::Instant::now();
-            if app.playback.is_playing {
-                app.prefetch_animated_ranges();
-            }
-        }
+        Item::PlayPause => app.toggle_playback(),
         Item::Loop => app.playback.loop_playback = !app.playback.loop_playback,
         Item::Crop => app.show_crop_overlay = !app.show_crop_overlay,
         Item::Save => app.show_export_modal = true,

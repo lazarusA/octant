@@ -52,12 +52,21 @@ impl OctantApp {
         }
     }
 
-    /// Shows step `next_ts` when the base layer holds it (with the animated
-    /// overlays), then queues every layer's lookahead.
+    /// Shows step `next_ts` when every drawn animated layer holds it, else
+    /// starts buffering; while buffering, waits until the buffer ahead of it
+    /// is full (`buffer_filled`). Then queues every layer's lookahead.
     fn play_step(&mut self, next_ts: usize) {
-        if self.layer_step_resident(crate::app::layers::LayerId::BASE, next_ts) {
+        let ready = if self.playback.buffering {
+            self.buffer_filled(next_ts)
+        } else {
+            self.step_ready(next_ts)
+        };
+        if ready {
+            self.playback.buffering = false;
             self.playback.current_timestep = next_ts;
             self.load_step_blocks();
+        } else {
+            self.playback.buffering = true;
         }
         self.prefetch_animated_ranges();
     }

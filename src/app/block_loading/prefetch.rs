@@ -114,7 +114,8 @@ impl OctantApp {
     }
 
     /// The lookahead's workers and its chunk budget for chunks of `cs` steps
-    /// and `chunk_bytes`: the playing lookahead, else the paused range's.
+    /// and `chunk_bytes`: the playing lookahead (the buffer's steps at least,
+    /// the animated layers sharing the cache), else the paused range's.
     /// Foreground requests (each layer's shown block) never take the
     /// lookahead's workers.
     fn prefetch_pacing(&self, cs: usize, chunk_bytes: usize) -> (usize, usize) {
@@ -122,7 +123,10 @@ impl OctantApp {
             adaptive_concurrency(chunk_bytes, self.prefetch_threads) + self.foreground_requests();
         let cache_bytes = self.block_cache.max_bytes();
         let budget = if self.playback.is_playing {
-            playing_lookahead(self.block_window_size, cs, chunk_bytes, cache_bytes)
+            // At least the buffer, within this layer's share of the cache.
+            let window = self.block_window_size.max(self.buffer_target_steps());
+            let share = cache_bytes / self.animated_layer_count();
+            playing_lookahead(window, cs, chunk_bytes, share)
         } else {
             range_budget(chunk_bytes, cache_bytes)
         };
