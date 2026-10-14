@@ -29,6 +29,10 @@ impl OctantApp {
         self.selected.metadata = None;
         self.cached_variable_tree = None;
         self.layout.variable_search.clear();
+        // No plate field is shown until one arrives (`follow_plate`).
+        if let Some(plate) = &mut self.plate {
+            plate.opened = None;
+        }
         self.bump_metadata_generation();
     }
 

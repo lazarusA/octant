@@ -2,7 +2,7 @@
 
 use super::WasmZarrBlockStore;
 use crate::data::backends::coord_bounds::CoordPreload;
-use crate::data::backends::http::fetch_url_bytes;
+use crate::data::backends::http::{fetch_url_bytes, is_not_found};
 use crate::data::blocks::{BlockRequest, BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
 use crate::utils::metadata::open_or_instantiate_array_normalized;
@@ -82,8 +82,8 @@ impl WasmZarrBlockStore {
                         cb(chunk_bytes.len() as u64);
                     }
                 }
-                Err(err) if err.contains("HTTP 404") => {
-                    log::warn!("[WASM Zarr] Chunk not found (HTTP 404 / sparse chunk): {url}");
+                Err(err) if is_not_found(&err) => {
+                    log::warn!("[WASM Zarr] Chunk not found (sparse chunk): {url}");
                 }
                 Err(err) => {
                     log::error!("[WASM Zarr] Failed to fetch chunk '{url}': {err}");

@@ -55,9 +55,11 @@ impl<'a> DimContext<'a> {
                 .find(|v| v.name.eq_ignore_ascii_case(name))
         });
         // Units only come from a variable that *is* this dimension.
+        // Or the axis unit of an OME-Zarr image.
         let units = coord_var
             .or(var.filter(|v| v.name.eq_ignore_ascii_case(name)))
-            .and_then(|v| attr(v, &v.units, "units"));
+            .and_then(|v| attr(v, &v.units, "units"))
+            .or_else(|| var.and_then(|v| v.dimension_unit(name)));
         let inherited = |pick: fn(&'a VariableInfo) -> Option<&'a str>| {
             coord_var.and_then(pick).or_else(|| var.and_then(pick))
         };

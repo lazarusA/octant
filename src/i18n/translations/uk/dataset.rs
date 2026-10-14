@@ -120,5 +120,16 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::BrowserLocalPaths => {
             "Браузер не може читати локальні шляхи до файлів напряму через обмеження безпеки веб-пісочниці.\n\nЩоб переглянути локальні набори даних у браузері:\n1. Роздайте каталог або файл через локальний HTTP-сервер: `npx serve` або `python3 -m http.server`\n2. Введіть URL: `http://localhost:8000/my_dataset`\n\nАбо запустіть нативну настільну версію Octant (`cargo run --release`)."
         }
+        DatasetKey::Plate => "Планшет",
+        DatasetKey::PlateAcquisition => "Знімання",
+        DatasetKey::PlateAllAcquisitions => "Усі",
+        DatasetKey::PlateFields => "Поля:",
+        DatasetKey::PlatePickWell => "Виберіть лунку, щоб побачити її поля",
+        DatasetKey::PlateLoadingFields => "Читання полів лунки",
+        DatasetKey::PlateNoFields => "У цьому зніманні немає полів",
+        DatasetKey::PlateWellUnreadable => {
+            "Не вдалося прочитати поля лунки. Натисніть, щоб повторити"
+        }
+        DatasetKey::CategoryMicroscopy => "Мікроскопія",
     })
 }

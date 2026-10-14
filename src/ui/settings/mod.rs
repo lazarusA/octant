@@ -1,3 +1,4 @@
+mod channel_display;
 mod clipping;
 mod coastline;
 pub(crate) mod composite;

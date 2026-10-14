@@ -51,6 +51,7 @@ fn metadata(labels: Option<&[&str]>) -> DatasetMetadata {
             ..Default::default()
         }],
         dimension_coordinates,
+        ome: None,
     }
 }
 

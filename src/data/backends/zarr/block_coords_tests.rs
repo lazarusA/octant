@@ -8,7 +8,6 @@ use zarrs::array::{ArrayBuilder, ArraySubset, DataType, FillValue};
 use zarrs::metadata::v3::MetadataV3;
 use zarrs::storage::store::MemoryStore;
 
-use super::block::fetch_block_with_progress;
 use super::block_coords::window_coords;
 use crate::data::CoordValues;
 use crate::data::slice_request::{DimensionSelection, SliceRequest};
@@ -133,8 +132,7 @@ fn uneven_south_to_north_rows_get_coordinates_in_data_order() {
         ["lat", "lon"],
     );
     let request = SliceRequest::full_range("t2m", &[5, 4]);
-    let block = fetch_block_with_progress(store, "block_coords_store", &request, None)
-        .expect("fetch block");
+    let block = fetch(store, "block_coords_store", &request).expect("fetch block");
     // Rows flip so north is first; the per-row latitudes follow them.
     assert_eq!(block.coordinates["lat"], [50.0, 10.0, 0.0, -20.0, -60.0]);
     assert_eq!(block.coordinates["lon"], [0.0, 30.0]);
@@ -164,8 +162,7 @@ fn a_one_row_edge_block_flips_with_its_whole_latitude() {
             DimensionSelection::range(0, 2),
         ],
     );
-    let block =
-        fetch_block_with_progress(store, "edge_block_store", &request, None).expect("fetch block");
+    let block = fetch(store, "edge_block_store", &request).expect("fetch block");
     assert_eq!(
         block.flipped_dims,
         ["lat"],
@@ -178,8 +175,7 @@ fn a_one_row_edge_block_flips_with_its_whole_latitude() {
 fn generic_dimensions_flip_with_the_spatial_coordinates_they_hold() {
     let store = store_with(&[-10.0, 0.0, 10.0], &[0.0, 10.0], ["dim_0", "dim_1"]);
     let request = SliceRequest::full_range("t2m", &[3, 2]);
-    let block = fetch_block_with_progress(store, "generic_dims_store", &request, None)
-        .expect("fetch block");
+    let block = fetch(store, "generic_dims_store", &request).expect("fetch block");
     assert_eq!(block.flipped_dims, ["dim_0"]);
     assert_eq!(
         block.coordinates["dim_0"],
@@ -205,7 +201,7 @@ fn string_attributes_reach_blocks_without_json_quotes() {
     let ink = builder.build(store.clone(), "/ink").expect("build ink");
     ink.store_metadata().expect("ink metadata");
     let request = SliceRequest::full_range("ink", &[4, 1, 1]);
-    let block = fetch_block_with_progress(store, "ink_store", &request, None).expect("fetch");
+    let block = fetch(store, "ink_store", &request).expect("fetch");
     assert_eq!(block.attributes["color_space"], "cmyk");
     assert!(crate::data::slicing::composite::cmyk::is_cmyk_block(
         &block, 0
@@ -234,11 +230,21 @@ fn fixed_index_dimensions_read_no_coordinates() {
             DimensionSelection::range(0, 2),
         ];
         let request = SliceRequest::new("tas", sels);
-        fetch_block_with_progress(store.clone(), "fixed_dims_store", &request, None).expect("fetch")
+        fetch(store.clone(), "fixed_dims_store", &request).expect("fetch")
     };
     // A fixed step reads no time axis; a range of steps does.
     let block = at_step(DimensionSelection::index(1));
     assert!(!block.coordinates.contains_key("time") && block.coordinates.contains_key("lat"));
     let block = at_step(DimensionSelection::range(0, 3));
     assert!(block.coordinates.contains_key("time"));
+}
+
+/// The block `request` reads from `store`.
+fn fetch(
+    store: zarrs::storage::ReadableWritableListableStorage,
+    url: &str,
+    request: &SliceRequest,
+) -> Result<crate::data::octant_block::OctantBlock, crate::data::blocks::BlockStoreError> {
+    use crate::data::blocks::BlockStore;
+    super::GenericZarrBlockStore::new(store, url, "zarr", "Zarr").fetch_block(request)
 }

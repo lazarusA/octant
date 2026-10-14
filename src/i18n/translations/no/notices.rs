@@ -41,5 +41,14 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "Tekst på {} i dette datasettet kan vises som bokser. Installer en skrift som Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr-metadata følger ikke spesifikasjonen",
+        NoticesKey::LabelIdsBeyond32Bits => "Etikett-id over 32 biter deler farge med mindre id",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Metadata i versjon {} for {} følger ikke spesifikasjonen; det som kunne leses, vises."
+        }
+        NoticesKey::PlateWellStopped => "Brønn {}: lesingen ble avbrutt",
+        NoticesKey::PlateWellNotJson => "Brønn {}: metadataene er ikke gyldig JSON",
+        NoticesKey::PlateWellNotOme => "Brønn {}: ikke en OME-Zarr-brønn",
+        NoticesKey::PlateWellNoMetadata => "Brønn {}: ingen brønnmetadata",
     })
 }

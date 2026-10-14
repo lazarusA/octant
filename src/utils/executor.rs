@@ -51,22 +51,45 @@ pub fn catch_panic<T>(f: impl FnOnce() -> Result<T, String>) -> Result<T, String
 /// Helper struct for spawning background worker tasks.
 pub struct TaskExecutor;
 
-impl TaskExecutor {
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn spawn<F, T>(f: F) -> std::thread::JoinHandle<T>
-    where
-        F: FnOnce() -> T + Send + 'static,
-        T: Send + 'static,
-    {
-        std::thread::spawn(f)
-    }
+/// Background workers kept apart from rayon's global pool, which the UI and
+/// slicers use: blocking reads (prefetch, coordinates, plate wells) never
+/// starve it, and threads are reused instead of spawned per task.
+#[cfg(not(target_arch = "wasm32"))]
+fn background_pool() -> Option<&'static rayon::ThreadPool> {
+    static POOL: OnceLock<Option<rayon::ThreadPool>> = OnceLock::new();
+    POOL.get_or_init(|| {
+        let cores = std::thread::available_parallelism().map_or(4, usize::from);
+        rayon::ThreadPoolBuilder::new()
+            .num_threads((cores * 4).clamp(16, 64))
+            .thread_name(|i| format!("octant-bg-{i}"))
+            .build()
+            .inspect_err(|e| log::warn!("Failed to build the background pool: {e}"))
+            .ok()
+    })
+    .as_ref()
+}
 
+impl TaskExecutor {
+    /// Runs `f` on the background pool, else on a new thread, else inline,
+    /// so the task is never lost.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn spawn_background<F>(f: F)
     where
         F: FnOnce() + Send + 'static,
     {
-        rayon::spawn(f);
+        if let Some(pool) = background_pool() {
+            pool.spawn(f);
+            return;
+        }
+        let slot = Arc::new(std::sync::Mutex::new(Some(f)));
+        let worker = Arc::clone(&slot);
+        let spawned = std::thread::Builder::new()
+            .name("octant-bg-worker".to_string())
+            .spawn(move || run_once(&worker));
+        if let Err(e) = spawned {
+            log::warn!("Failed to spawn background worker thread, running inline: {e}");
+            run_once(&slot);
+        }
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -75,5 +98,14 @@ impl TaskExecutor {
         F: FnOnce() + 'static,
     {
         f();
+    }
+}
+
+/// Takes the task out of `slot` and runs it, once.
+#[cfg(not(target_arch = "wasm32"))]
+fn run_once<F: FnOnce()>(slot: &std::sync::Mutex<Option<F>>) {
+    let task = slot.lock().unwrap_or_else(|p| p.into_inner()).take();
+    if let Some(task) = task {
+        task();
     }
 }

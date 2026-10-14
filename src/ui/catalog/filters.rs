@@ -1,6 +1,7 @@
 use crate::app::OctantApp;
 use crate::catalog::{
-    CatalogCategoryFilter, GEOTIFF_CATALOG, ICECHUNK_CATALOG, PROCEDURAL_CATALOG, ZARR_CATALOG,
+    CatalogCategoryFilter as F, GEOTIFF_CATALOG, ICECHUNK_CATALOG, MICROSCOPY_CATALOG,
+    PROCEDURAL_CATALOG, ZARR_CATALOG,
 };
 use crate::i18n::{DatasetKey, tr};
 use crate::ui::icons::UiIconExt;
@@ -12,25 +13,34 @@ pub fn render_search_and_filters(
     is_mobile: bool,
     total_count: usize,
 ) {
-    let zarr_count = ZARR_CATALOG.len();
-    let icechunk_count = ICECHUNK_CATALOG.len();
-    let geotiff_count = GEOTIFF_CATALOG.len();
-    let procedural_count = PROCEDURAL_CATALOG.len();
-
     ui.search_field(
         &mut app.layout.catalog_search_query,
         tr(DatasetKey::CatalogSearchHint),
         None,
     );
-
     ui.add_space(4.0);
-
-    // Filter categories row with stack-formatted labels
     let spacing = if is_mobile {
         egui::vec2(4.0, 4.0)
     } else {
         egui::vec2(6.0, 4.0)
     };
+    // Each category with its name (format names stay untranslated) and count.
+    let categories = [
+        (F::All, tr(DatasetKey::CategoryAll), total_count),
+        (F::Zarr, "Zarr", ZARR_CATALOG.len()),
+        (F::Icechunk, "Icechunk", ICECHUNK_CATALOG.len()),
+        (F::GeoTiff, "GeoTIFF / COG", GEOTIFF_CATALOG.len()),
+        (
+            F::Microscopy,
+            tr(DatasetKey::CategoryMicroscopy),
+            MICROSCOPY_CATALOG.len(),
+        ),
+        (
+            F::Procedural,
+            tr(DatasetKey::CategoryProcedural),
+            PROCEDURAL_CATALOG.len(),
+        ),
+    ];
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = spacing;
         ui.label(
@@ -38,49 +48,10 @@ pub fn render_search_and_filters(
                 .strong()
                 .small(),
         );
-
-        let mut buf_all = [0u8; 64];
-        let mut buf_zarr = [0u8; 32];
-        let mut buf_ice = [0u8; 32];
-        let mut buf_geo = [0u8; 32];
-        let mut buf_proc = [0u8; 64];
-
-        ui.selectable_value(
-            &mut app.layout.catalog_category_filter,
-            CatalogCategoryFilter::All,
-            stack_str(
-                &mut buf_all,
-                format_args!("{} ({total_count})", tr(DatasetKey::CategoryAll)),
-            ),
-        );
-        ui.selectable_value(
-            &mut app.layout.catalog_category_filter,
-            CatalogCategoryFilter::Zarr,
-            stack_str(&mut buf_zarr, format_args!("Zarr ({zarr_count})")),
-        );
-        ui.selectable_value(
-            &mut app.layout.catalog_category_filter,
-            CatalogCategoryFilter::Icechunk,
-            stack_str(&mut buf_ice, format_args!("Icechunk ({icechunk_count})")),
-        );
-        ui.selectable_value(
-            &mut app.layout.catalog_category_filter,
-            CatalogCategoryFilter::GeoTiff,
-            stack_str(
-                &mut buf_geo,
-                format_args!("GeoTIFF / COG ({geotiff_count})"),
-            ),
-        );
-        ui.selectable_value(
-            &mut app.layout.catalog_category_filter,
-            CatalogCategoryFilter::Procedural,
-            stack_str(
-                &mut buf_proc,
-                format_args!(
-                    "{} ({procedural_count})",
-                    tr(DatasetKey::CategoryProcedural)
-                ),
-            ),
-        );
+        let mut buf = [0u8; 64];
+        for (filter, name, count) in categories {
+            let label = stack_str(&mut buf, format_args!("{name} ({count})"));
+            ui.selectable_value(&mut app.layout.catalog_category_filter, filter, label);
+        }
     });
 }

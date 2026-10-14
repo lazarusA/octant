@@ -164,5 +164,29 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "Ingen",
         SettingsKey::ChannelTintHover => "Klikk for å endre kanalens fargetone",
         SettingsKey::BandNumber => "Bånd {}",
+        SettingsKey::ScaleBar => "Målestokk",
+        SettingsKey::ShowScaleBarHover => "Vis målestokken",
+        SettingsKey::HideScaleBarHover => "Skjul målestokken",
+        SettingsKey::ChannelsAuto => "Auto",
+        SettingsKey::ChannelsAutoHover => {
+            "Tilpass hver kanals visningsområde til de viste dataene (0,1 til 99,9 prosent av verdiene)"
+        }
+        SettingsKey::ChannelsAutoUnavailable => "Automatisk kontrast virker på et 2D-snitt",
+        SettingsKey::ChannelSettingsHover => "Visningsområde, kurve og invertering",
+        SettingsKey::ChannelWindow => "Visningsområde",
+        SettingsKey::ChannelWindowHover => {
+            "Verdier fra start til slutt går fra svart til kanalens fulle farge"
+        }
+        SettingsKey::ChannelInvert => "Inverter",
+        SettingsKey::ChannelCurve => "Kurve",
+        SettingsKey::CurveLinear => "Lineær",
+        SettingsKey::CurveLogarithmic => "Logaritmisk",
+        SettingsKey::CurveExponential => "Eksponentiell",
+        SettingsKey::CurvePolynomial => "Polynomisk",
+        SettingsKey::ChannelCoefficientHover => "Kurvens koeffisient",
+        SettingsKey::LabelsFill => "Fyll",
+        SettingsKey::LabelsFillHover => "Fargelegg hver etikett helt",
+        SettingsKey::LabelsOutline => "Kontur",
+        SettingsKey::LabelsOutlineHover => "Tegn bare grensene mellom etiketter",
     })
 }

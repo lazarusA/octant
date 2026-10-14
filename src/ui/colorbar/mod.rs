@@ -41,7 +41,10 @@ pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas: e
         };
         let custom_line = i == 0 && app.line_custom_colored();
         let Some(id) = layer
-            .filter(|l| l.is_drawn() && !l.composite.enabled && !custom_line)
+            // Composites and label images draw their own colors: no colorbar.
+            .filter(|l| {
+                l.is_drawn() && !l.composite.enabled && l.labels().is_none() && !custom_line
+            })
             .map(|l| l.id())
         else {
             continue;

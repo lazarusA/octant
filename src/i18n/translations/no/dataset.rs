@@ -130,5 +130,14 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::BrowserLocalPaths => {
             "Lokale filbaner kan ikke leses direkte i en nettleser på grunn av nettleserens sikkerhetssandkasse.\n\nSlik viser du lokale datasett i nettleseren:\n1. Server mappen eller filen med en lokal HTTP-server: `npx serve` eller `python3 -m http.server`\n2. Skriv inn URL-en: `http://localhost:8000/my_dataset`\n\nEller kjør den native skrivebordsversjonen av Octant (`cargo run --release`)."
         }
+        DatasetKey::Plate => "Plate",
+        DatasetKey::PlateAcquisition => "Opptak",
+        DatasetKey::PlateAllAcquisitions => "Alle",
+        DatasetKey::PlateFields => "Felt:",
+        DatasetKey::PlatePickWell => "Velg en brønn for å se feltene",
+        DatasetKey::PlateLoadingFields => "Leser brønnens felt",
+        DatasetKey::PlateNoFields => "Ingen felt i dette opptaket",
+        DatasetKey::PlateWellUnreadable => "Kunne ikke lese brønnens felt. Klikk for å prøve igjen",
+        DatasetKey::CategoryMicroscopy => "Mikroskopi",
     })
 }

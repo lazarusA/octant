@@ -183,5 +183,6 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits + 'stat
         time_coverage_end: cf_attrs.time_coverage_end,
         temporal_resolution: cf_attrs.temporal_resolution,
         attributes: cf_attrs.attributes,
+        ome: None,
     })
 }

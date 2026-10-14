@@ -132,5 +132,16 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::BrowserLocalPaths => {
             "I percorsi di file locali non possono essere letti direttamente nel browser per via della sandbox di sicurezza web.\n\nPer visualizzare set di dati locali nel browser:\n1. Servi la cartella o il file con un server HTTP locale: `npx serve` o `python3 -m http.server`\n2. Inserisci l'URL: `http://localhost:8000/my_dataset`\n\nOppure usa la versione desktop nativa di Octant (`cargo run --release`)."
         }
+        DatasetKey::Plate => "Piastra",
+        DatasetKey::PlateAcquisition => "Acquisizione",
+        DatasetKey::PlateAllAcquisitions => "Tutte",
+        DatasetKey::PlateFields => "Campi:",
+        DatasetKey::PlatePickWell => "Scegli un pozzetto per vederne i campi",
+        DatasetKey::PlateLoadingFields => "Lettura dei campi del pozzetto",
+        DatasetKey::PlateNoFields => "Nessun campo in questa acquisizione",
+        DatasetKey::PlateWellUnreadable => {
+            "Impossibile leggere i campi del pozzetto. Clicca per riprovare"
+        }
+        DatasetKey::CategoryMicroscopy => "Microscopia",
     })
 }

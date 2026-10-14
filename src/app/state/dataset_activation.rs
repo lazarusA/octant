@@ -42,7 +42,8 @@ impl OctantApp {
                     meta.name,
                     meta.variables.len()
                 );
-                self.layout.show_variables_overlay = true;
+                self.follow_plate(&meta);
+                self.layout.show_variables_overlay = !meta.variables.is_empty();
                 self.load_new_metadata(meta);
                 return true;
             }
@@ -56,11 +57,18 @@ impl OctantApp {
         if let Some(removed) = self.dataset_manager.remove(dataset_id) {
             crate::data::backends::coord_bounds::evict_coord_values(Some(&removed.source.uri));
             self.coordinate_loader.forget(&removed.id);
-            let is_active = self.selected.metadata.as_ref().is_some_and(|_| {
-                self.selected.store_target == removed.source.uri || dataset_id == removed.id
-            });
+            let is_active = self.selected.metadata.is_some()
+                && same_target(&self.selected.store_target, &removed.source.uri);
             if is_active {
                 self.clear_active_metadata();
+            }
+            // The plate browser goes with its plate, not with one of its fields.
+            if self
+                .plate
+                .as_ref()
+                .is_some_and(|p| p.url == removed.source.uri.trim_end_matches('/'))
+            {
+                self.plate = None;
             }
             self.status_message = format!("Removed dataset '{}'", removed.source.display_name);
         }
@@ -72,6 +80,7 @@ impl OctantApp {
         crate::data::backends::coord_bounds::evict_coord_values(None);
         self.coordinate_loader = crate::data::blocks::CoordinateLoader::default();
         self.clear_active_metadata();
+        self.plate = None;
         self.status_message = "Cleared all datasets from Dataset Manager".to_string();
     }
 
@@ -170,12 +179,10 @@ impl OctantApp {
         })
     }
 
-    /// Returns true if the currently plotted variable represents an OME-Zarr / bioimaging dataset with OMERO channels.
+    /// Whether the plotted variable is an OME-Zarr image (bioimaging, never geographic).
     pub fn is_ome_dataset(&self) -> bool {
-        let Some(var) = self.plotted_variable_info() else {
-            return false;
-        };
-        var.attributes.contains_key("omero_channels") || var.attributes.contains_key("omero_colors")
+        self.plotted_variable_info()
+            .is_some_and(|v| v.ome.is_some())
     }
 
     /// Returns true if the active dataset represents a GeoTIFF.
@@ -222,11 +229,17 @@ impl OctantApp {
     }
 }
 
-/// The channel/band dimension of `var`: one named like a channel, else the
-/// first of a variable with 3 or more dimensions.
+/// The channel/band dimension of `var`: an OME-Zarr image's channel axis,
+/// else one named like a channel, else the first of a variable with 3 or
+/// more dimensions.
 pub(crate) fn channel_dim(var: &crate::data::VariableInfo) -> Option<usize> {
-    var.dimension_names
-        .iter()
-        .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
-        .or(if var.shape.len() >= 3 { Some(0) } else { None })
+    let first = var.ome.is_none() && var.shape.len() >= 3;
+    var.channel_axis().or(first.then_some(0))
+}
+
+/// Whether two dataset targets name the same store (ignoring surrounding
+/// whitespace, trailing slashes and a leading `~`).
+fn same_target(a: &str, b: &str) -> bool {
+    let clean = |t: &str| crate::utils::expand_tilde_str(t.trim().trim_end_matches('/'));
+    clean(a).trim_end_matches('/') == clean(b).trim_end_matches('/')
 }

@@ -127,6 +127,62 @@ pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + '
     }
 }
 
+/// Reads an integer array subset as label ids, kept exact: each value's low
+/// 32 bits are stored as the bits of an `f32` (read back with `f32::to_bits`),
+/// never converted. 64-bit ids beyond 32 bits share colors with the ids of
+/// their low bits, reported once. `None` for non-integer data types.
+pub fn retrieve_array_subset_as_label_bits<TStorage: ?Sized + ReadableStorageTraits + 'static>(
+    array: &Array<TStorage>,
+    cache: Option<&ChunkCacheDecodedLruSizeLimit>,
+    subset: &ArraySubset,
+) -> Result<Option<Vec<f32>>, BlockStoreError> {
+    fn bits<R: SubsetRetriever>(
+        retriever: &R,
+        dt: &DataType,
+        subset: &ArraySubset,
+    ) -> Result<Option<Vec<f32>>, BlockStoreError> {
+        macro_rules! ids {
+            ($t:ty) => {
+                ids!($t, |_| false)
+            };
+            // `$wide`: whether an id does not fit 32 bits (64-bit types).
+            ($t:ty, $wide:expr) => {{
+                let vals: Vec<$t> = retriever.retrieve_subset(subset)?;
+                if vals.iter().copied().any($wide) {
+                    report_wide_label_ids();
+                }
+                Ok(Some(
+                    vals.into_iter().map(|v| f32::from_bits(v as u32)).collect(),
+                ))
+            }};
+        }
+        if dt.is::<UInt8DataType>() {
+            ids!(u8)
+        } else if dt.is::<UInt16DataType>() {
+            ids!(u16)
+        } else if dt.is::<UInt32DataType>() {
+            ids!(u32)
+        } else if dt.is::<UInt64DataType>() {
+            ids!(u64, |v: u64| u32::try_from(v).is_err())
+        } else if dt.is::<Int8DataType>() {
+            ids!(i8)
+        } else if dt.is::<Int16DataType>() {
+            ids!(i16)
+        } else if dt.is::<Int32DataType>() {
+            ids!(i32)
+        } else if dt.is::<Int64DataType>() {
+            ids!(i64, |v: i64| u32::try_from(v).is_err())
+        } else {
+            Ok(None)
+        }
+    }
+    let dt = array.data_type();
+    match cache {
+        Some(c) => bits(c, dt, subset),
+        None => bits(array, dt, subset),
+    }
+}
+
 /// Reads an array subset as `f64`, applying CF scale, offset and masking, for coordinates
 /// that need more precision than `f32`. Fails for non-numeric data types.
 pub fn retrieve_array_subset_as_f64<TStorage: ?Sized + ReadableStorageTraits + 'static>(
@@ -176,4 +232,16 @@ pub fn retrieve_array_subset_as_f64<TStorage: ?Sized + ReadableStorageTraits + '
         }
     }
     Ok(values)
+}
+
+/// Reports, once per session, label ids that do not fit 32 bits.
+fn report_wide_label_ids() {
+    static REPORTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if !REPORTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        crate::ui::toast::report(
+            crate::ui::toast::Severity::Warning,
+            crate::i18n::tr(crate::i18n::NoticesKey::LabelIdsBeyond32Bits),
+            "",
+        );
+    }
 }

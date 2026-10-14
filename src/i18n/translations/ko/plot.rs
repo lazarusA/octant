@@ -29,5 +29,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::Requires3D => "3D 데이터 필요",
         PlotKey::DisabledGpuLimit => "사용 불가: {} MB > 128 MB GPU 한도",
         PlotKey::ScalarField => "스칼라장",
+        PlotKey::LabelsHeatmapOnly => "레이블 이미지는 히트맵에만 그려집니다",
     })
 }

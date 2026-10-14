@@ -133,5 +133,28 @@ crate::i18n::keys::define_keys! {
     ChannelsNone,
     ChannelTintHover,
     BandNumber,
+    // Scale bar
+    ScaleBar,
+    ShowScaleBarHover,
+    HideScaleBarHover,
+    // Channel display (OMERO window, curve, inversion)
+    ChannelsAuto,
+    ChannelsAutoHover,
+    ChannelsAutoUnavailable,
+    ChannelSettingsHover,
+    ChannelWindow,
+    ChannelWindowHover,
+    ChannelInvert,
+    ChannelCurve,
+    CurveLinear,
+    CurveLogarithmic,
+    CurveExponential,
+    CurvePolynomial,
+    ChannelCoefficientHover,
+    // Label images
+    LabelsFill,
+    LabelsFillHover,
+    LabelsOutline,
+    LabelsOutlineHover,
     }
 }

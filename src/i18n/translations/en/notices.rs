@@ -41,5 +41,16 @@ pub fn text(key: NoticesKey) -> &'static str {
         NoticesKey::DataFontMissingDetail => {
             "{} text in this dataset may show as boxes. Install a font such as Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr metadata doesn't conform",
+        NoticesKey::LabelIdsBeyond32Bits => {
+            "Label ids beyond 32 bits share colors with smaller ids"
+        }
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "The version {} metadata of {} doesn't follow the specification; showing what could be read."
+        }
+        NoticesKey::PlateWellStopped => "Well {}: the read stopped before finishing",
+        NoticesKey::PlateWellNotJson => "Well {}: its metadata is not valid JSON",
+        NoticesKey::PlateWellNotOme => "Well {}: not an OME-Zarr well",
+        NoticesKey::PlateWellNoMetadata => "Well {}: no well metadata",
     }
 }

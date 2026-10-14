@@ -75,6 +75,7 @@ fn test_multichannel_additive_composite() {
             color_rgb: [0, 0, 255], // Blue
             visible: true,
             window: Some((0.0, 1.0)),
+            display: Default::default(),
         },
         ChannelColorConfig {
             index: 1,
@@ -82,6 +83,7 @@ fn test_multichannel_additive_composite() {
             color_rgb: [255, 255, 0], // Yellow
             visible: true,
             window: Some((0.0, 1.0)),
+            display: Default::default(),
         },
     ];
 
@@ -183,6 +185,7 @@ fn test_multichannel_volume_additive_composite() {
             color_rgb: [255, 0, 0],
             visible: true,
             window: Some((0.0, 1.0)),
+            display: Default::default(),
         },
         ChannelColorConfig {
             index: 1,
@@ -190,6 +193,7 @@ fn test_multichannel_volume_additive_composite() {
             color_rgb: [0, 255, 0],
             visible: true,
             window: Some((0.0, 1.0)),
+            display: Default::default(),
         },
     ];
 
@@ -249,6 +253,7 @@ fn test_multichannel_composite_with_offset_channels() {
             color_rgb: [0, 0, 255],
             visible: true,
             window: Some((0.0, 1.0)),
+            display: Default::default(),
         },
         ChannelColorConfig {
             index: 1,
@@ -256,6 +261,7 @@ fn test_multichannel_composite_with_offset_channels() {
             color_rgb: [0, 255, 0],
             visible: true,
             window: Some((0.0, 1.0)),
+            display: Default::default(),
         },
         ChannelColorConfig {
             index: 2,
@@ -263,6 +269,7 @@ fn test_multichannel_composite_with_offset_channels() {
             color_rgb: [0, 255, 255], // Cyan
             visible: true,
             window: Some((0.0, 1.0)),
+            display: Default::default(),
         },
         ChannelColorConfig {
             index: 3,
@@ -270,6 +277,7 @@ fn test_multichannel_composite_with_offset_channels() {
             color_rgb: [255, 0, 255], // Magenta
             visible: true,
             window: Some((0.0, 1.0)),
+            display: Default::default(),
         },
     ];
 
@@ -333,6 +341,7 @@ fn test_multichannel_volume_with_offset_channels() {
             color_rgb: [0, 0, 255],
             visible: true,
             window: Some((0.0, 1.0)),
+            display: Default::default(),
         },
         ChannelColorConfig {
             index: 2,
@@ -340,6 +349,7 @@ fn test_multichannel_volume_with_offset_channels() {
             color_rgb: [255, 0, 0],
             visible: true,
             window: Some((0.0, 1.0)),
+            display: Default::default(),
         },
     ];
 
@@ -387,6 +397,7 @@ fn test_multichannel_composite_none_selected() {
         color_rgb: [0, 0, 255],
         visible: false, // None visible
         window: None,
+        display: Default::default(),
     }];
 
     let composite =
@@ -417,6 +428,7 @@ fn test_multichannel_volume_none_selected() {
         color_rgb: [0, 0, 255],
         visible: false,
         window: None,
+        display: Default::default(),
     }];
 
     let vdata = super::slice_multichannel_volume_composite_nd(

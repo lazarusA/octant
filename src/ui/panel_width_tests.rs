@@ -143,6 +143,39 @@ fn dimensions_panel_keeps_its_narrowest_width_in_every_language() {
     );
 }
 
+/// A 384-well plate (16 x 24) with two long-named acquisitions.
+fn wide_plate() -> crate::app::PlateState {
+    use crate::data::ome::plate::{PlateAcquisition, PlateWell};
+    let rows: Vec<String> = (b'A'..=b'P').map(|c| char::from(c).to_string()).collect();
+    let columns: Vec<String> = (1..=24).map(|c| c.to_string()).collect();
+    let wells = (0..16)
+        .flat_map(|r| (0..24).map(move |c| (r, c)))
+        .map(|(row, column)| PlateWell {
+            path: format!("{}/{}", rows[row], columns[column]),
+            row,
+            column,
+        })
+        .collect();
+    let acquisitions = (0..2)
+        .map(|id| PlateAcquisition {
+            id,
+            name: Some(format!("Measurement {id} (2012-07-31_10-41-12)")),
+        })
+        .collect();
+    let plate = crate::data::ome::OmePlate {
+        name: Some("A screen with a long plate name to wrap".into()),
+        rows,
+        columns,
+        wells,
+        acquisitions,
+    };
+    crate::app::PlateState::new(
+        "https://example.org/plate.zarr",
+        crate::app::StoreKind::RemoteZarr,
+        std::sync::Arc::new(plate),
+    )
+}
+
 #[test]
 fn dataset_panel_keeps_its_width_in_every_language() {
     let limit = PANEL_W + frame_margins() + SLACK;
@@ -152,6 +185,7 @@ fn dataset_panel_keeps_its_width_in_every_language() {
         ("empty", false, false),
         ("loaded", true, false),
         ("loading", true, true),
+        ("plate", false, false),
     ] {
         for &lang in Language::ALL {
             let mut app = if loaded {
@@ -161,6 +195,9 @@ fn dataset_panel_keeps_its_width_in_every_language() {
             };
             app.layout.show_dataset_panel = true;
             app.is_loading = loading;
+            if case == "plate" {
+                app.plate = Some(wide_plate());
+            }
             let mut run = |ui: &mut Ui| show_dataset_window(&mut app, ui.ctx(), SCREEN);
             let width = area_width(lang, "octant_dataset_area", &open, &mut run);
             if width > limit {

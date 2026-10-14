@@ -62,6 +62,21 @@ impl Layer {
         self.source.selection_mut()
     }
 
+    /// The label style, when the layer shows an OME-Zarr label image.
+    pub fn labels(&self) -> Option<&super::LabelStyle> {
+        self.source.labels()
+    }
+
+    /// How this layer's pyramid aggregates cells: `chosen`, except for label
+    /// images, whose ids are never averaged (one id per cell).
+    pub fn pyramid_op(&self, chosen: crate::data::AggregationOp) -> crate::data::AggregationOp {
+        if self.labels().is_some() {
+            crate::data::AggregationOp::Nearest
+        } else {
+            chosen
+        }
+    }
+
     /// How volume values reach the GPU: packed RGB in composite mode.
     pub fn volume_encoding(&self) -> VolumeEncoding {
         if self.composite.enabled {
@@ -76,6 +91,7 @@ impl Layer {
         self.data.matrix = None;
         self.data.touch_matrix();
         self.renderers.heatmap = None;
+        self.renderers.labels = None;
         self.renderers.sphere = None;
         self.renderers.surface = None;
         self.renderers.line = None;

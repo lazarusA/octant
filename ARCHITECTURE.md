@@ -387,6 +387,7 @@ Non-Eulerian data (such as ocean drifter trajectories, atmospheric weather ballo
 - **Done: 1D Line Profiles & Multi-Series**: Multi-series line plots (`All Lines Series`) with custom series colorbars and strided hover sampling.
 - **Done: Shared Colormap Atlas**: 256×K RGBA8 texture atlas shared across CPU evaluation and all GPU pipelines at `@group(1)`.
 - **Done: Order-Independent Transparency (OIT)**: Weighted blended transparency for overlapping meshes and translucent point clouds.
+- **Done: OME-Zarr (0.1-0.5)**: `src/data/ome/` reads images, label images, plates, wells and `bioformats2raw` series through `ome_zarr_metadata`, with physical coordinates and units, OMERO channel display, label overlays (`Source::Labels`) and a plate browser. Every resolution level is still its own variable.
 - **Done: Modular State & Canvas Engine**: Decomposed app states (`NavigationState`, `PlaybackState`, `PlotConfigs`, `UiLayoutState`), decoupled canvas engine (`src/app/canvas/`), and polymorphic plot controllers (`src/app/controllers/`).
 
 ### Next Roadmap Objectives
@@ -395,9 +396,14 @@ Non-Eulerian data (such as ocean drifter trajectories, atmospheric weather ballo
 2. **Cross-Dataset Geographic Overlays**:
    - Render `Alignment::Geo` overlays with normalized longitude conventions and bounding box placement.
 3. **Multi-Scale Viewport Level-of-Detail**:
-   - Progressive multiscale loading for large-scale OME-NGFF and GeoTIFF overviews.
-4. **Derived Sources & Operations (`Source::Derived`)**:
+   - Progressive multiscale loading for large-scale OME-NGFF and GeoTIFF overviews, shared with the spatial geo pyramids.
+   - OME-Zarr images become one variable whose level follows the zoom (today each level is a separate variable, `OmeRef::level`), loading coarse levels first; plate thumbnails come from each field's coarsest level.
+4. **OME-Zarr Follow-ups**:
+   - OME-Zarr 0.6 coordinate systems and transformations (RFC-5: named `coordinateSystems`, affine and sequence transforms), through `ome_zarr_metadata`'s `next` feature once the specification settles.
+   - 3D label volumes: label images drawn in the volume renderer (today label images draw on the heatmap only).
+   - Plate thumbnails in the plate browser's well grid.
+5. **Derived Sources & Operations (`Source::Derived`)**:
    - CPU/GPU algebraic expressions and vector field synthesis across variables (e.g. wind speed magnitude $\sqrt{u^2 + v^2}$ or vorticity $\nabla \times \vec{v}$).
-5. **Lagrangian Trajectory & Vector Streamline Subsystem**:
+6. **Lagrangian Trajectory & Vector Streamline Subsystem**:
    - Generalize `Source` in `src/app/layers/source.rs` from `Source::Variable(VariableSelection)` to `Source::Trajectory(TrajectorySelection)`.
    - Implement `TrajectoryRenderer` and `TrajectoryController` with GPU vertex pulling for high-performance particle paths.

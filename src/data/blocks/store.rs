@@ -61,6 +61,7 @@ pub trait BlockStore: MaybeSendSync {
             store_type: self.backend_name().to_string(),
             variables: var_infos,
             dimension_coordinates: std::collections::HashMap::new(),
+            ome: None,
         })
     }
 

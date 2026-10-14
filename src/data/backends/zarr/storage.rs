@@ -2,6 +2,7 @@
 
 use std::error::Error;
 use std::sync::Arc;
+use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 use zarrs::storage::ReadableWritableListableStorage;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -79,4 +80,38 @@ pub fn open_local_storage(
     _path: &str,
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
     Err("Local file system is only available on desktop. Please provide a remote HTTP URL or choose a catalog dataset.".into())
+}
+
+pub type ZarrArrayHandle = zarrs::array::Array<dyn zarrs::storage::ReadableStorageTraits>;
+
+/// The root group's consolidated metadata, if it has any.
+pub fn root_consolidated(
+    storage: &ReadableWritableListableStorage,
+) -> Option<ConsolidatedMetadataMetadata> {
+    let group = zarrs::group::Group::open(storage.clone(), "/").ok()?;
+    group.consolidated_metadata().map(|c| c.metadata)
+}
+
+/// Opens a normalized array from `storage`, from the root's `consolidated`
+/// metadata when it lists the array.
+pub fn open_raw_array(
+    storage: &ReadableWritableListableStorage,
+    clean_name: &str,
+    consolidated: Option<&ConsolidatedMetadataMetadata>,
+) -> Result<ZarrArrayHandle, crate::data::blocks::BlockStoreError> {
+    let var_path = format!("/{clean_name}");
+    let readable: zarrs::storage::ReadableStorage = storage.clone();
+    if let Some(node_meta) =
+        consolidated.and_then(|m| m.get(clean_name).or_else(|| m.get(&var_path)))
+        && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
+            readable.clone(),
+            &var_path,
+            node_meta,
+        )
+    {
+        Ok(arr)
+    } else {
+        crate::utils::metadata::open_or_instantiate_array_normalized(readable, &var_path)
+            .map_err(|e| format!("{e}").into())
+    }
 }

@@ -126,5 +126,14 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::BrowserLocalPaths => {
             "Direct local file paths cannot be read in a browser due to web sandbox security.\n\nTo view local datasets in the browser:\n1. Serve your directory or file with a local HTTP server: `npx serve` or `python3 -m http.server`\n2. Enter the URL: `http://localhost:8000/my_dataset`\n\nOr run the native desktop version of Octant (`cargo run --release`)."
         }
+        DatasetKey::Plate => "Plate",
+        DatasetKey::PlateAcquisition => "Acquisition",
+        DatasetKey::PlateAllAcquisitions => "All",
+        DatasetKey::PlateFields => "Fields:",
+        DatasetKey::PlatePickWell => "Pick a well to list its fields",
+        DatasetKey::PlateLoadingFields => "Reading the well's fields",
+        DatasetKey::PlateNoFields => "No fields in this acquisition",
+        DatasetKey::PlateWellUnreadable => "Couldn't read the well's fields. Click to try again",
+        DatasetKey::CategoryMicroscopy => "Microscopy",
     }
 }

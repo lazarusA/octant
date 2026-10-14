@@ -24,5 +24,15 @@ pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support
             }))
             .clicked()
             .then(|| app.layout.show_hover_card = !app.layout.show_hover_card);
+        if support.scale_bar.is_yes() {
+            ui.selectable_label(app.layout.show_scale_bar, tr(K::ScaleBar))
+                .on_hover_text(tr(if app.layout.show_scale_bar {
+                    K::HideScaleBarHover
+                } else {
+                    K::ShowScaleBarHover
+                }))
+                .clicked()
+                .then(|| app.layout.show_scale_bar = !app.layout.show_scale_bar);
+        }
     });
 }

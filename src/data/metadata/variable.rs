@@ -1,6 +1,9 @@
 //! Variable metadata and spatial role resolution.
 
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use crate::data::ome::OmeLabelInfo;
 
 #[derive(Debug, Clone, Default)]
 pub struct VariableInfo {
@@ -16,6 +19,8 @@ pub struct VariableInfo {
     pub time_coverage_end: Option<String>,
     pub temporal_resolution: Option<String>,
     pub attributes: HashMap<String, String>,
+    /// The OME-Zarr image and level this variable is, for OME-Zarr stores.
+    pub ome: Option<crate::data::ome::OmeRef>,
 }
 
 impl VariableInfo {
@@ -33,6 +38,55 @@ impl VariableInfo {
         } else {
             None
         }
+    }
+
+    /// Index of dimension `dim`, matched ASCII case-insensitively.
+    pub fn dimension_index(&self, dim: &str) -> Option<usize> {
+        self.dimension_names
+            .iter()
+            .position(|d| d.eq_ignore_ascii_case(dim))
+    }
+
+    /// The physical unit symbol (`µm`, `s`) of dimension `dim`, for OME-Zarr images.
+    pub fn dimension_unit(&self, dim: &str) -> Option<&str> {
+        let ome = self.ome.as_ref()?;
+        ome.image
+            .axes
+            .get(self.dimension_index(dim)?)?
+            .unit_symbol()
+    }
+
+    /// The physical step between indices of dimension `axis` (positive and
+    /// finite), for OME-Zarr images.
+    pub fn ome_scale(&self, axis: usize) -> Option<f64> {
+        let scale = self.ome.as_ref()?.scale(axis)?.abs();
+        (scale.is_finite() && scale > 0.0).then_some(scale)
+    }
+
+    /// Whether this is an OME-Zarr label image (segmentation ids).
+    pub fn is_label_image(&self) -> bool {
+        self.ome.as_ref().is_some_and(|o| o.labels)
+    }
+
+    /// A label image's colors and properties.
+    pub fn label_info(&self) -> Option<&Arc<OmeLabelInfo>> {
+        self.ome
+            .as_ref()
+            .filter(|o| o.labels)?
+            .image
+            .label_info
+            .as_ref()
+    }
+
+    /// The dimension a multi-channel overlay runs across: the OME-Zarr
+    /// channel axis, else a dimension named like a channel.
+    pub fn channel_axis(&self) -> Option<usize> {
+        if let Some(ome) = &self.ome {
+            return ome.image.axis_of_kind(crate::data::ome::AxisKind::Channel);
+        }
+        self.dimension_names
+            .iter()
+            .position(|d| crate::data::coordinates::naming::is_channel_dim_name(d))
     }
 
     /// Resolves spatial X, Y, and Z dimension indices for this variable using explicit spatial role configs

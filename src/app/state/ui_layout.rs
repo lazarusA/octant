@@ -17,6 +17,8 @@ pub struct UiLayoutState {
     pub variable_search: String,
     pub show_bottom_bar: bool,
     pub show_hover_card: bool,
+    /// Scale bar on 2D plots of images with a physical pixel size.
+    pub show_scale_bar: bool,
     pub settings_overlay_width: f32,
     pub panel_positions: crate::ui::panel_layout::PanelPositions,
     pub theme_preference: egui::ThemePreference,
@@ -48,6 +50,7 @@ impl Default for UiLayoutState {
             variable_search: String::new(),
             show_bottom_bar: true,
             show_hover_card: true,
+            show_scale_bar: true,
             settings_overlay_width: 0.0,
             panel_positions: Default::default(),
             theme_preference: egui::ThemePreference::System,

@@ -35,5 +35,14 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "此数据集中的 {} 文本可能显示为方框。请安装 Noto Sans CJK 等字体。"
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr 元数据不符合规范",
+        NoticesKey::LabelIdsBeyond32Bits => "超过 32 位的标签 ID 与较小的 ID 共用颜色",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "{} 版本的元数据（{}）不符合规范；仅显示可读取的部分。"
+        }
+        NoticesKey::PlateWellStopped => "孔 {}：读取中断",
+        NoticesKey::PlateWellNotJson => "孔 {}：元数据不是有效的 JSON",
+        NoticesKey::PlateWellNotOme => "孔 {}：不是 OME-Zarr 孔",
+        NoticesKey::PlateWellNoMetadata => "孔 {}：没有孔的元数据",
     })
 }

@@ -29,5 +29,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::Requires3D => "Kräver 3D-data",
         PlotKey::DisabledGpuLimit => "Avaktiverad: {} MB > GPU-gränsen 128 MB",
         PlotKey::ScalarField => "Skalärfält",
+        PlotKey::LabelsHeatmapOnly => "Etikettbilder ritas bara på värmekartan",
     })
 }

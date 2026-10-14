@@ -19,6 +19,7 @@ fn test_init_dimension_defaults_2d_dataset() {
         time_coverage_end: None,
         file_size: 100 * 200 * 4,
         attributes: HashMap::new(),
+        ome: None,
     };
 
     octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
@@ -52,6 +53,7 @@ fn test_init_dimension_defaults_3d_dataset() {
         time_coverage_end: None,
         file_size: 10 * 20 * 30 * 4,
         attributes: HashMap::new(),
+        ome: None,
     };
 
     octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
@@ -93,6 +95,7 @@ fn test_init_dimension_defaults_4d_dataset() {
         time_coverage_end: None,
         file_size: 10 * 5 * 20 * 30 * 4,
         attributes: HashMap::new(),
+        ome: None,
     };
 
     octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
@@ -329,6 +332,7 @@ fn test_calculate_max_animated_steps_small_and_large_datasets() {
         time_coverage_end: None,
         file_size: 100 * 50 * 50 * 4,
         attributes: HashMap::new(),
+        ome: None,
     };
 
     let dim_config = vec![
@@ -379,6 +383,7 @@ fn test_calculate_max_animated_steps_small_and_large_datasets() {
         time_coverage_end: None,
         file_size: 500 * 2048 * 2048 * 4,
         attributes: HashMap::new(),
+        ome: None,
     };
     let large_ranges = vec![(0, 499), (0, 2047), (0, 2047)];
 
@@ -421,6 +426,7 @@ fn test_format_byte_size_and_calculate_download_sizes() {
         time_coverage_end: None,
         file_size: 100 * 1000 * 1000 * 4,
         attributes: HashMap::new(),
+        ome: None,
     };
 
     let dim_config = vec![
@@ -473,12 +479,14 @@ fn test_selected_volume_elements_and_limit() {
         time_coverage_end: None,
         file_size: 50 * 1000 * 1000 * 4,
         attributes: HashMap::new(),
+        ome: None,
     };
     app.selected.metadata = Some(DatasetMetadata {
         name: "test_ds".to_string(),
         store_type: "zarr".to_string(),
         variables: vec![var_info.clone()],
         dimension_coordinates: HashMap::new(),
+        ome: None,
     });
     app.selected.variable_idx = 0;
     app.selected.dim_ranges = vec![(0, 49), (0, 999), (0, 999)];
@@ -953,6 +961,7 @@ fn test_2d_and_3d_selected_elements_and_limits() {
         time_coverage_end: None,
         file_size: 100 * 2000 * 3000 * 4,
         attributes: HashMap::new(),
+        ome: None,
     };
 
     let metadata = octant::data::DatasetMetadata {
@@ -960,6 +969,7 @@ fn test_2d_and_3d_selected_elements_and_limits() {
         store_type: "zarr".to_string(),
         variables: vec![var_info.clone()],
         dimension_coordinates: HashMap::new(),
+        ome: None,
     };
     app.selected.metadata = Some(metadata);
     app.selected.variable_idx = 0;

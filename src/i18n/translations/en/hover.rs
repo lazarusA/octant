@@ -17,5 +17,6 @@ pub fn text(key: HoverKey) -> &'static str {
         HoverKey::AxisYLatitude => "Y / Latitude",
         HoverKey::AxisZDepth => "Z / Depth",
         HoverKey::DropDataset => "Drop dataset to visualize (.nc, .h5, .zarr, .icechunk, .tif)",
+        HoverKey::LabelN => "label {}",
     }
 }

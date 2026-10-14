@@ -23,6 +23,10 @@ mod floating;
 mod floating_tests;
 pub mod layers;
 #[cfg(test)]
+mod ome_display_tests;
+#[cfg(test)]
+mod ome_labels_tests;
+#[cfg(test)]
 mod overlay_composite_tests;
 #[cfg(test)]
 mod overlay_state_tests;
@@ -40,4 +44,5 @@ pub(crate) mod window_title;
 pub use layers::VariableSelection;
 pub use state::line_profile::LineLayout;
 pub use state::line_series::{LineColoring, series_line_at, series_t};
+pub use state::plate::{PlateState, WellFields};
 pub use state::{AnimationRole, DimConfig, OctantApp, SpatialRole, StoreKind};

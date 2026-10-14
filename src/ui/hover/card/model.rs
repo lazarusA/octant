@@ -11,6 +11,8 @@ pub enum HoverValue {
     Scalar(f32),
     /// A composite pixel: the card names the band combination instead of a number.
     Composite(CompositeKind),
+    /// A label image's id ("label 12"); its properties take the units' place.
+    Label(u32),
     NoData,
 }
 
@@ -32,13 +34,16 @@ impl HoverValue {
         match *self {
             Self::NoData => crate::i18n::tr(crate::i18n::HoverKey::NoData),
             Self::Composite(kind) => kind.label(),
+            Self::Label(id) => {
+                crate::i18n::fill(buf, crate::i18n::tr(crate::i18n::HoverKey::LabelN), &[&id])
+            }
             Self::Scalar(v) => format_scalar(buf, v),
         }
     }
 
-    /// Units only make sense next to a number.
+    /// Units only make sense next to a number (a label's properties next to it).
     pub fn shows_units(&self) -> bool {
-        matches!(self, Self::Scalar(_))
+        matches!(self, Self::Scalar(_) | Self::Label(_))
     }
 }
 

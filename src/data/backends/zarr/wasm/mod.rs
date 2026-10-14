@@ -10,9 +10,11 @@ use crate::data::blocks::BlockStoreError;
 use zarrs::storage::store::MemoryStore;
 use zarrs::storage::{ReadableWritableListableStorage, StoreKey, WritableStorageTraits};
 
+mod consolidated;
 pub mod coord_paths;
 pub mod inspect;
 pub mod loader;
+pub mod ome;
 pub mod preload;
 pub mod store;
 
@@ -20,6 +22,9 @@ pub use inspect::inspect_wasm_remote_zarr;
 #[cfg(target_arch = "wasm32")]
 pub(crate) use loader::CONCURRENT_FETCHES;
 pub use loader::load_one_wasm_with_progress;
+
+/// Metadata keys fetched at once while discovering OME-Zarr stores.
+pub(crate) const CONCURRENT_METADATA_FETCHES: usize = 16;
 
 #[cfg(target_arch = "wasm32")]
 thread_local! {

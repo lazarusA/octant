@@ -16,6 +16,7 @@ impl WasmZarrBlockStore {
     pub async fn finalize_metadata(
         &self,
         variables: Vec<VariableInfo>,
+        ome: Option<std::sync::Arc<crate::data::ome::OmeDataset>>,
         clean_url: &str,
     ) -> DatasetMetadata {
         let dataset_name = clean_url
@@ -29,6 +30,7 @@ impl WasmZarrBlockStore {
             store_type: "zarr".to_string(),
             variables,
             dimension_coordinates: HashMap::new(),
+            ome,
         };
 
         let mut guard = self.metadata.write().unwrap_or_else(|p| p.into_inner());

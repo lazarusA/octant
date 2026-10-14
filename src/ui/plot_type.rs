@@ -37,6 +37,8 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
         .selected_variable_info()
         .or_else(|| app.plotted_variable_info());
 
+    // Label images hold ids, which only the heatmap's label colors read.
+    let label_image = target_var.is_some_and(crate::data::VariableInfo::is_label_image);
     let (is_3d_available, is_size_allowed, vol_mb) = if let Some(v) = target_var {
         let has_3d = v.shape.len() >= 3 || v.dimension_names.len() >= 3;
         let vol_elements = crate::ui::variables_panel::calculate_selected_volume_elements(app);
@@ -98,7 +100,8 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
         app.layers.base.load.block_key.is_some() || app.block_prefetcher.pending_count() > 0;
     if !is_exploring_new
         && !is_loading
-        && ((app.enable_pyramid_resampling && app.selected.plot_type != PlotType::Heatmap)
+        && (((app.enable_pyramid_resampling || label_image)
+            && app.selected.plot_type != PlotType::Heatmap)
             || ((app.selected.plot_type == PlotType::Volume
                 || app.selected.plot_type == PlotType::PointCloud)
                 && app.layers.base.data.volume.is_none())
@@ -162,7 +165,8 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     for (plot_type, icon, label, enabled) in plot_items {
         let is_supported = supported_plots.is_none_or(|plots| plots.contains(&plot_type));
-        let is_enabled = enabled && is_supported;
+        let labels_only = label_image && plot_type != PlotType::Heatmap;
+        let is_enabled = enabled && is_supported && !labels_only;
         let is_selected = app.selected.plot_type == plot_type;
 
         if is_enabled {
@@ -178,7 +182,9 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
         } else {
             let mut reason_buf = [0; 256];
             let mut mb_buf = [0; 24];
-            let reason = if !is_supported {
+            let reason = if labels_only {
+                tr(PlotKey::LabelsHeatmapOnly)
+            } else if !is_supported {
                 fill(
                     &mut reason_buf,
                     tr(PlotKey::UnsupportedForGrid),

@@ -118,5 +118,15 @@ crate::i18n::keys::define_keys! {
     HeroLoaded,
     // Errors
     BrowserLocalPaths,
+    // OME-Zarr plates
+    Plate,
+    PlateAcquisition,
+    PlateAllAcquisitions,
+    PlateFields,
+    PlatePickWell,
+    PlateLoadingFields,
+    PlateNoFields,
+    PlateWellUnreadable,
+    CategoryMicroscopy,
     }
 }

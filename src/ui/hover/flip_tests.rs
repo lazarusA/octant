@@ -11,7 +11,7 @@ use zarrs::storage::store::MemoryStore;
 use super::enrich::stored_offset;
 use super::entries_2d::resolve_2d_plot_entries;
 use crate::app::OctantApp;
-use crate::data::backends::zarr::{GenericZarrBlockStore, fetch_block_with_progress};
+use crate::data::backends::zarr::GenericZarrBlockStore;
 use crate::data::blocks::BlockStore;
 use crate::data::slice_request::SliceRequest;
 
@@ -50,7 +50,7 @@ fn plotted_grid(store_url: &str, lat: &[f64]) -> OctantApp {
         .expect("t2m variable");
     meta.dimension_coordinates = zarr.variable_coordinates(var).expect("coordinates");
     let request = SliceRequest::full_range("t2m", &[5, 4]);
-    let block = fetch_block_with_progress(store, store_url, &request, None).expect("block");
+    let block = zarr.fetch_block(&request).expect("block");
     let mut app = OctantApp::default();
     *app.layers.base.selection_mut() = VariableSelection {
         metadata: Some(meta),

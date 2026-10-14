@@ -41,5 +41,16 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "이 데이터셋의 {} 텍스트가 네모로 표시될 수 있습니다. Noto Sans CJK 같은 글꼴을 설치하세요."
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr 메타데이터가 사양을 따르지 않습니다",
+        NoticesKey::LabelIdsBeyond32Bits => {
+            "32비트를 넘는 레이블 ID는 더 작은 ID와 색을 공유합니다"
+        }
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "{} 버전 메타데이터({})가 사양을 따르지 않습니다. 읽을 수 있는 내용만 표시합니다."
+        }
+        NoticesKey::PlateWellStopped => "웰 {}: 읽기가 중단되었습니다",
+        NoticesKey::PlateWellNotJson => "웰 {}: 메타데이터를 JSON으로 읽을 수 없습니다",
+        NoticesKey::PlateWellNotOme => "웰 {}: OME-Zarr 웰로 읽을 수 없습니다",
+        NoticesKey::PlateWellNoMetadata => "웰 {}: 웰 메타데이터가 없습니다",
     })
 }

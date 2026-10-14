@@ -41,5 +41,16 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "O texto em {} deste conjunto de dados pode aparecer como quadrados. Instale uma fonte como Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "Os metadados OME-Zarr não estão em conformidade",
+        NoticesKey::LabelIdsBeyond32Bits => {
+            "Ids de rótulo acima de 32 bits compartilham cores com ids menores"
+        }
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Os metadados da versão {} de {} não seguem a especificação; mostrando o que foi possível ler."
+        }
+        NoticesKey::PlateWellStopped => "Poço {}: a leitura foi interrompida",
+        NoticesKey::PlateWellNotJson => "Poço {}: os metadados não são JSON válido",
+        NoticesKey::PlateWellNotOme => "Poço {}: não é um poço OME-Zarr",
+        NoticesKey::PlateWellNoMetadata => "Poço {}: sem metadados de poço",
     })
 }

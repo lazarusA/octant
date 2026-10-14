@@ -4677,6 +4677,8 @@ dependencies = [
  "md-5",
  "netcdf",
  "object_store",
+ "ome_zarr_metadata",
+ "quick-xml",
  "rayon",
  "reqwest",
  "ruzstd 0.9.0",
@@ -4698,6 +4700,21 @@ dependencies = [
  "zarrs_metadata",
  "zarrs_object_store",
  "zarrs_plugin",
+]
+
+[[package]]
+name = "ome_zarr_metadata"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d81eb5a8bdffef08c3e61095a2e8ccf7d8346ea00be2e5a2ffdba861f2d957d3"
+dependencies = [
+ "monostate",
+ "paste",
+ "pep440_rs",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "validatrix",
 ]
 
 [[package]]
@@ -4922,6 +4939,18 @@ dependencies = [
  "kurbo",
  "linebender_resource_handle",
  "smallvec",
+]
+
+[[package]]
+name = "pep440_rs"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31095ca1f396e3de32745f42b20deef7bc09077f918b085307e8eab6ddd8fb9c"
+dependencies = [
+ "once_cell",
+ "serde",
+ "unicode-width",
+ "unscanny",
 ]
 
 [[package]]
@@ -7003,6 +7032,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6659959f702dcdaad77bd6e42a9409a32ceccc06943ec93c8a4306be00eb6cf1"
 
 [[package]]
+name = "unscanny"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9df2af067a7953e9c3831320f35c1cc0600c30d44d9f7a12b01db1cd88d6b47"
+
+[[package]]
 name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7049,6 +7084,15 @@ dependencies = [
  "js-sys",
  "serde_core",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "validatrix"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd957910025504fc944e3efdb6298bad3b1783e44b814fb72854de37445567a0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

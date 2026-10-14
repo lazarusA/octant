@@ -118,7 +118,8 @@ fn test_3d_time_lat_lon_defaults_and_plot_switch() {
         time_coverage_start: None,
         time_coverage_end: None,
         file_size: 10 * 32 * 64 * 4,
-        attributes: std::collections::HashMap::new(),
+        attributes: Default::default(),
+        ome: None,
     });
     app.load_new_metadata(meta);
 

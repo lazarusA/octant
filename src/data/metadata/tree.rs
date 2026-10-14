@@ -8,6 +8,8 @@ pub struct VariableTreeGroup {
     pub name: String,
     /// Full path of this group (e.g. "atmosphere/forecast" or "" for root).
     pub full_path: String,
+    /// A name to show instead of `name` (an OME-Zarr series' name).
+    pub label: Option<String>,
     /// Indices of variables directly belonging to this group (into `DatasetMetadata::variables`).
     pub variable_indices: Vec<usize>,
     /// Child subgroups.
@@ -30,6 +32,7 @@ impl VariableTreeGroup {
             total_count: variable_indices.len() + nested,
             name,
             full_path,
+            label: None,
             variable_indices,
             subgroups,
         }
@@ -63,7 +66,11 @@ impl VariableTreeGroup {
         variables: &[VariableInfo],
     ) -> Option<VariableTreeGroup> {
         let group_matches = self.name.to_lowercase().contains(query_lower)
-            || self.full_path.to_lowercase().contains(query_lower);
+            || self.full_path.to_lowercase().contains(query_lower)
+            || self
+                .label
+                .as_deref()
+                .is_some_and(|l| l.to_lowercase().contains(query_lower));
 
         let mut filtered_vars = Vec::new();
         for &idx in &self.variable_indices {
@@ -91,14 +98,29 @@ impl VariableTreeGroup {
         }
 
         if !filtered_vars.is_empty() || !filtered_subgroups.is_empty() {
-            Some(VariableTreeGroup::new(
+            let mut group = VariableTreeGroup::new(
                 self.name.clone(),
                 self.full_path.clone(),
                 filtered_vars,
                 filtered_subgroups,
-            ))
+            );
+            group.label = self.label.clone();
+            Some(group)
         } else {
             None
+        }
+    }
+
+    /// The name a folder shows: its label, else its path segment.
+    pub fn display_name(&self) -> &str {
+        self.label.as_deref().unwrap_or(&self.name)
+    }
+
+    /// Labels every group `label_of` names, by full path.
+    pub fn apply_labels(&mut self, label_of: &impl Fn(&str) -> Option<String>) {
+        self.label = label_of(&self.full_path);
+        for sub in &mut self.subgroups {
+            sub.apply_labels(label_of);
         }
     }
 

@@ -29,8 +29,8 @@ pub struct OctantBlock {
     /// Coordinate metadata keyed by dimension name.
     pub coordinates: HashMap<String, Vec<f64>>,
 
-    /// Source attributes.
-    pub attributes: HashMap<String, String>,
+    /// Source attributes, shared by every block of an array.
+    pub attributes: Arc<HashMap<String, String>>,
 
     pub min_value: f32,
     pub max_value: f32,
@@ -49,7 +49,7 @@ impl OctantBlock {
         origin: Vec<usize>,
         values: impl Into<Arc<[f32]>>,
         coordinates: HashMap<String, Vec<f64>>,
-        attributes: HashMap<String, String>,
+        attributes: impl Into<Arc<HashMap<String, String>>>,
     ) -> Self {
         let values: Arc<[f32]> = values.into();
         debug_assert_eq!(
@@ -73,7 +73,7 @@ impl OctantBlock {
             values,
             strides,
             coordinates,
-            attributes,
+            attributes: attributes.into(),
             min_value,
             max_value,
             flipped_dims: Vec::new(),

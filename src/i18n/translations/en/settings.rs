@@ -156,5 +156,29 @@ pub fn text(key: SettingsKey) -> &'static str {
         SettingsKey::ChannelsNone => "None",
         SettingsKey::ChannelTintHover => "Click to customize channel tint color",
         SettingsKey::BandNumber => "Band {}",
+        SettingsKey::ScaleBar => "Scale Bar",
+        SettingsKey::ShowScaleBarHover => "Show the scale bar",
+        SettingsKey::HideScaleBarHover => "Hide the scale bar",
+        SettingsKey::ChannelsAuto => "Auto",
+        SettingsKey::ChannelsAutoHover => {
+            "Fit every channel's display range to the shown data (0.1 to 99.9 percent of its values)"
+        }
+        SettingsKey::ChannelsAutoUnavailable => "Auto contrast works on a 2D slice",
+        SettingsKey::ChannelSettingsHover => "Display range, curve and inversion",
+        SettingsKey::ChannelWindow => "Display range",
+        SettingsKey::ChannelWindowHover => {
+            "Values from start to end span the channel from black to its full color"
+        }
+        SettingsKey::ChannelInvert => "Invert",
+        SettingsKey::ChannelCurve => "Curve",
+        SettingsKey::CurveLinear => "Linear",
+        SettingsKey::CurveLogarithmic => "Logarithmic",
+        SettingsKey::CurveExponential => "Exponential",
+        SettingsKey::CurvePolynomial => "Polynomial",
+        SettingsKey::ChannelCoefficientHover => "Coefficient of the curve",
+        SettingsKey::LabelsFill => "Fill",
+        SettingsKey::LabelsFillHover => "Color every label whole",
+        SettingsKey::LabelsOutline => "Outline",
+        SettingsKey::LabelsOutlineHover => "Draw only the boundaries between labels",
     }
 }

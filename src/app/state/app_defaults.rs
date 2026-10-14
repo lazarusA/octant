@@ -31,6 +31,7 @@ impl Default for OctantApp {
             prefetch_threads: 16,
 
             playback: super::PlaybackState::default(),
+            plate: None,
             metadata_rx: None,
 
             layout: super::UiLayoutState::default(),

@@ -12,6 +12,13 @@ impl OctantApp {
     /// loads with `load_selected_variable_block` and may run past that range.
     pub fn plot_selection(&mut self) {
         self.block_prefetcher.abort();
+        // Label images hold ids, which only the heatmap's label colors read.
+        if self
+            .selected_variable_info()
+            .is_some_and(crate::data::VariableInfo::is_label_image)
+        {
+            self.switch_plot_type(crate::plots::PlotType::Heatmap);
+        }
         if let Some(anim_dim) = self.selected.animated_dim
             && let Some(&(start, end)) = self.selected.dim_ranges.get(anim_dim)
         {

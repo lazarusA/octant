@@ -29,5 +29,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::Requires3D => "需要 3D 数据",
         PlotKey::DisabledGpuLimit => "已禁用：{} MB > 128 MB GPU 上限",
         PlotKey::ScalarField => "标量场",
+        PlotKey::LabelsHeatmapOnly => "标签图像仅在热图上绘制",
     })
 }

@@ -41,5 +41,16 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "Text in {} in diesem Datensatz wird eventuell als Kästchen angezeigt. Installieren Sie eine Schriftart wie Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr-Metadaten sind nicht konform",
+        NoticesKey::LabelIdsBeyond32Bits => {
+            "Label-IDs über 32 Bit teilen sich Farben mit kleineren IDs"
+        }
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Die Metadaten der Version {} von {} folgen nicht der Spezifikation; angezeigt wird, was gelesen werden konnte."
+        }
+        NoticesKey::PlateWellStopped => "Well {}: das Lesen wurde abgebrochen",
+        NoticesKey::PlateWellNotJson => "Well {}: die Metadaten sind kein gültiges JSON",
+        NoticesKey::PlateWellNotOme => "Well {}: kein OME-Zarr-Well",
+        NoticesKey::PlateWellNoMetadata => "Well {}: keine Well-Metadaten",
     })
 }

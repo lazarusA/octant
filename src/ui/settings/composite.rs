@@ -2,9 +2,15 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::data::slicing::{ChannelColorConfig, CompositeProbe};
 use crate::i18n::{SettingsKey as K, VariablesKey, tr};
 use crate::ui::hover::composite::composite_labels;
+use crate::ui::icons::{Icon, IconSize, ToolbarButton};
 use crate::utils::stack_str;
+
+/// Auto contrast: the quantiles of each channel's shown values its window spans.
+const AUTO_LOW: f64 = 0.001;
+const AUTO_HIGH: f64 = 0.999;
 
 /// Layer `id`'s composite controls (Multi-Channel bioimaging overlay, CMYK,
 /// or standard 3-band RGB), while its variable has bands to compose.
@@ -89,13 +95,39 @@ pub(super) fn get_selected_channel_range(app: &OctantApp, id: LayerId) -> (usize
     }
 }
 
+/// Layer `id`'s multi-channel overlay: the channel buttons, then one row per
+/// channel with its display settings behind a chevron; reloads the layer
+/// when a channel settles on a change.
 fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     let Some(layer) = app.layers.get_mut(id) else {
         return;
     };
+    // The 2D composite's channel values, for auto contrast.
+    let probe = layer.data.composite_probe.as_ref();
     let configs = &mut layer.composite.channel_configs;
+    let mut changed = channel_buttons(ui, configs, probe);
+    egui::ScrollArea::vertical()
+        .max_height(180.0)
+        .auto_shrink([false, true])
+        .show(ui, |ui| {
+            for cfg in configs.iter_mut() {
+                changed |= channel_entry(ui, cfg, id);
+            }
+        });
+    if changed {
+        app.load_layer_block(id);
+    }
+}
+
+/// Show all channels, none, or set every window from the shown values
+/// (Auto, while the composite's values are known). Whether any changed.
+fn channel_buttons(
+    ui: &mut egui::Ui,
+    configs: &mut [ChannelColorConfig],
+    probe: Option<&CompositeProbe>,
+) -> bool {
     let mut changed = false;
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.label(egui::RichText::new(tr(K::Channels)).small().strong());
         for (label, visible) in [(K::ChannelsAll, true), (K::ChannelsNone, false)] {
             if ui.small_button(tr(label)).clicked() {
@@ -103,33 +135,57 @@ fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerI
                 changed = true;
             }
         }
+        let auto = ui
+            .add_enabled(
+                probe.is_some(),
+                egui::Button::new(tr(K::ChannelsAuto)).small(),
+            )
+            .on_hover_text(tr(K::ChannelsAutoHover))
+            .on_disabled_hover_text(tr(K::ChannelsAutoUnavailable));
+        if auto.clicked()
+            && let Some(probe) = probe
+        {
+            for cfg in configs.iter_mut() {
+                if let Some(window) = probe.channel_quantiles(cfg.index, AUTO_LOW, AUTO_HIGH) {
+                    cfg.window = Some(window);
+                    changed = true;
+                }
+            }
+        }
     });
-    egui::ScrollArea::vertical()
-        .max_height(100.0)
-        .auto_shrink([false, true])
-        .show(ui, |ui| {
-            egui::Grid::new(("multichannel_overlay_grid", id))
-                .num_columns(3)
-                .spacing([6.0, 3.0])
-                .show(ui, |ui| {
-                    for cfg in configs.iter_mut() {
-                        changed |= channel_row(ui, cfg, id);
-                        ui.end_row();
-                    }
-                });
-        });
-    if changed {
-        app.load_layer_block(id);
+    changed
+}
+
+/// One channel's row and, when its chevron is open, its display settings.
+/// Whether the layer should reload.
+fn channel_entry(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) -> bool {
+    let open_id = egui::Id::new(("mc_channel_open", id, cfg.index));
+    let mut open = ui.data(|d| d.get_temp::<bool>(open_id).unwrap_or(false));
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        changed = channel_row(ui, cfg, id);
+        let chevron = if open {
+            Icon::ChevronDown
+        } else {
+            Icon::ChevronRight
+        };
+        let toggle = ToolbarButton::new(chevron, tr(K::ChannelSettingsHover))
+            .compact(true)
+            .icon_size(IconSize::Xs);
+        if ui.add(toggle).clicked() {
+            open = !open;
+            ui.data_mut(|d| d.insert_temp(open_id, open));
+        }
+    });
+    if open {
+        changed |= super::channel_display::channel_detail(ui, cfg, id);
     }
+    changed
 }
 
 /// One channel of layer `id`'s multi-channel overlay: visibility, tint and
 /// "N: name". Whether the channel changed.
-fn channel_row(
-    ui: &mut egui::Ui,
-    cfg: &mut crate::data::slicing::ChannelColorConfig,
-    id: LayerId,
-) -> bool {
+fn channel_row(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) -> bool {
     let mut changed = ui.checkbox(&mut cfg.visible, "").changed();
     let [r, g, b] = cfg.color_rgb.map(|c| c as f32 / 255.0);
     let mut color = [r, g, b, 1.0];

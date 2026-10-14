@@ -21,6 +21,8 @@ pub struct LayerData {
     /// `store:variable:2d|3d` of the data last built, to tell a new variable
     /// from another step of the same one.
     pub var_key: Option<String>,
+    /// The greyscale image channel whose window the color style shows.
+    pub greyscale_channel: Option<usize>,
     /// Bumped (`touch_matrix`) whenever `matrix` changes, so caches of data
     /// derived from it (the line plot's GPU payload) know to rebuild.
     pub matrix_version: u64,
@@ -42,12 +44,15 @@ impl LayerData {
     /// Full-resolution `(width, height)` of the 2D data (before any pyramid
     /// resampling), or 1024 x 1024 when there is none.
     pub fn dimensions_2d(&self) -> (usize, usize) {
+        self.shown_dimensions_2d().unwrap_or((1024, 1024))
+    }
+
+    /// The width and height of the 2D data shown, `None` before any arrives.
+    pub fn shown_dimensions_2d(&self) -> Option<(usize, usize)> {
         if let Some(pyr) = &self.pyramid {
-            (pyr.original_width, pyr.original_height)
-        } else if let Some(m) = &self.matrix {
-            (m.width, m.height)
+            Some((pyr.original_width, pyr.original_height))
         } else {
-            (1024, 1024)
+            self.matrix.as_ref().map(|m| (m.width, m.height))
         }
     }
 }

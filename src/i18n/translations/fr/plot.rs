@@ -31,5 +31,8 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::Requires3D => "Nécessite des données 3D",
         PlotKey::DisabledGpuLimit => "Désactivé : {} MB > limite GPU de 128 MB",
         PlotKey::ScalarField => "Champ scalaire",
+        PlotKey::LabelsHeatmapOnly => {
+            "Les images d'étiquettes ne s'affichent que sur la carte de chaleur"
+        }
     })
 }

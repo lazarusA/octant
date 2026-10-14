@@ -166,5 +166,31 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "Keine",
         SettingsKey::ChannelTintHover => "Klicken, um die Tönung des Kanals anzupassen",
         SettingsKey::BandNumber => "Band {}",
+        SettingsKey::ScaleBar => "Maßstabsleiste",
+        SettingsKey::ShowScaleBarHover => "Maßstabsleiste einblenden",
+        SettingsKey::HideScaleBarHover => "Maßstabsleiste ausblenden",
+        SettingsKey::ChannelsAuto => "Auto",
+        SettingsKey::ChannelsAutoHover => {
+            "Anzeigebereich jedes Kanals an die angezeigten Daten anpassen (0,1 bis 99,9 Prozent seiner Werte)"
+        }
+        SettingsKey::ChannelsAutoUnavailable => {
+            "Der automatische Kontrast funktioniert auf einem 2D-Schnitt"
+        }
+        SettingsKey::ChannelSettingsHover => "Anzeigebereich, Kurve und Invertierung",
+        SettingsKey::ChannelWindow => "Anzeigebereich",
+        SettingsKey::ChannelWindowHover => {
+            "Werte von Anfang bis Ende reichen von Schwarz bis zur vollen Kanalfarbe"
+        }
+        SettingsKey::ChannelInvert => "Invertieren",
+        SettingsKey::ChannelCurve => "Kurve",
+        SettingsKey::CurveLinear => "Linear",
+        SettingsKey::CurveLogarithmic => "Logarithmisch",
+        SettingsKey::CurveExponential => "Exponentiell",
+        SettingsKey::CurvePolynomial => "Polynomial",
+        SettingsKey::ChannelCoefficientHover => "Koeffizient der Kurve",
+        SettingsKey::LabelsFill => "Füllung",
+        SettingsKey::LabelsFillHover => "Jedes Label ganz einfärben",
+        SettingsKey::LabelsOutline => "Kontur",
+        SettingsKey::LabelsOutlineHover => "Nur die Grenzen zwischen Labels zeichnen",
     })
 }

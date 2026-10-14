@@ -176,5 +176,31 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "Nessuno",
         SettingsKey::ChannelTintHover => "Clicca per personalizzare la tinta del canale",
         SettingsKey::BandNumber => "Banda {}",
+        SettingsKey::ScaleBar => "Barra di scala",
+        SettingsKey::ShowScaleBarHover => "Mostra la barra di scala",
+        SettingsKey::HideScaleBarHover => "Nascondi la barra di scala",
+        SettingsKey::ChannelsAuto => "Auto",
+        SettingsKey::ChannelsAutoHover => {
+            "Adatta l'intervallo di visualizzazione di ogni canale ai dati mostrati (dallo 0,1 al 99,9 per cento dei suoi valori)"
+        }
+        SettingsKey::ChannelsAutoUnavailable => {
+            "Il contrasto automatico funziona su una sezione 2D"
+        }
+        SettingsKey::ChannelSettingsHover => "Intervallo di visualizzazione, curva e inversione",
+        SettingsKey::ChannelWindow => "Intervallo di visualizzazione",
+        SettingsKey::ChannelWindowHover => {
+            "I valori dall'inizio alla fine vanno dal nero al colore pieno del canale"
+        }
+        SettingsKey::ChannelInvert => "Inverti",
+        SettingsKey::ChannelCurve => "Curva",
+        SettingsKey::CurveLinear => "Lineare",
+        SettingsKey::CurveLogarithmic => "Logaritmica",
+        SettingsKey::CurveExponential => "Esponenziale",
+        SettingsKey::CurvePolynomial => "Polinomiale",
+        SettingsKey::ChannelCoefficientHover => "Coefficiente della curva",
+        SettingsKey::LabelsFill => "Riempimento",
+        SettingsKey::LabelsFillHover => "Colora ogni etichetta per intero",
+        SettingsKey::LabelsOutline => "Contorno",
+        SettingsKey::LabelsOutlineHover => "Disegna solo i bordi tra le etichette",
     })
 }

@@ -15,6 +15,9 @@ pub(crate) fn local_channel(channel: usize, start: usize, count: usize) -> usize
     }
 }
 
+/// Pixels `CompositeProbe::channel_quantiles` reads at most.
+const QUANTILE_SAMPLES: usize = 1 << 20;
+
 /// The block window a 2D composite was sliced from. It shares the block's value buffer, so
 /// keeping it costs a few small index vectors.
 #[derive(Clone, Debug)]
@@ -102,5 +105,30 @@ impl CompositeProbe {
             offset = offset.checked_add(idx.checked_mul(stride)?)?;
         }
         self.values.get(offset).copied()
+    }
+
+    /// The `lo` and `hi` quantiles (0..1) of global channel `channel` over the
+    /// composite's window, from at most [`QUANTILE_SAMPLES`] evenly spaced
+    /// pixels; `None` without finite values.
+    pub fn channel_quantiles(&self, channel: usize, lo: f64, hi: f64) -> Option<(f32, f32)> {
+        let width = self.x_range.1.saturating_sub(self.x_range.0);
+        let height = self.y_range.1.saturating_sub(self.y_range.0);
+        let total = width.checked_mul(height)?;
+        let step = ((total as f64 / QUANTILE_SAMPLES as f64).sqrt().ceil() as usize).max(1);
+        let mut values: Vec<f32> = (0..height)
+            .step_by(step)
+            .flat_map(|py| (0..width).step_by(step).map(move |px| (px, py)))
+            .filter_map(|(px, py)| self.sample(channel, px, py))
+            .filter(|v| v.is_finite())
+            .collect();
+        if values.is_empty() {
+            return None;
+        }
+        let last = values.len() - 1;
+        let at = |q: f64| ((q.clamp(0.0, 1.0) * last as f64).round() as usize).min(last);
+        let (lo_i, hi_i) = (at(lo), at(hi));
+        let (_, &mut low, _) = values.select_nth_unstable_by(lo_i, f32::total_cmp);
+        let (_, &mut high, _) = values.select_nth_unstable_by(hi_i, f32::total_cmp);
+        Some((low, high.max(low)))
     }
 }

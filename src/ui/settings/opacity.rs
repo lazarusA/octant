@@ -75,16 +75,7 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
         return;
     };
     let color = &mut layer.color;
-    let resp = labeled_slider(
-        ui,
-        "opacity",
-        SliderLabel::After(tr(K::Opacity)),
-        egui::Slider::new(&mut color.opacity, 0.0..=1.0).localized(),
-    )
-    .on_hover_text(tr(K::OpacityHover));
-    if resp.double_clicked() {
-        color.opacity = 1.0;
-    }
+    opacity_slider(ui, id, &mut color.opacity);
     ui.add_space(4.0);
     let curve = &mut color.alpha;
     let mut changed = curve_header(ui, curve);
@@ -101,6 +92,20 @@ fn show_opacity_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     }
     if changed {
         app.apply_alpha_curve(id);
+    }
+}
+
+/// Layer `id`'s opacity slider; a double-click resets it to opaque.
+pub(super) fn opacity_slider(ui: &mut egui::Ui, id: LayerId, opacity: &mut f32) {
+    let resp = labeled_slider(
+        ui,
+        ("opacity", id),
+        SliderLabel::After(tr(K::Opacity)),
+        egui::Slider::new(opacity, 0.0..=1.0).localized(),
+    )
+    .on_hover_text(tr(K::OpacityHover));
+    if resp.double_clicked() {
+        *opacity = 1.0;
     }
 }
 

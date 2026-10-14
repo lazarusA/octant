@@ -109,6 +109,6 @@ fn either_tag_marks_cmyk_inks() {
     assert!(!tags(&[("photometric", "rgb")]));
 
     let mut block = ink_block(false);
-    block.attributes.insert("color_space".into(), "cmyk".into());
+    std::sync::Arc::make_mut(&mut block.attributes).insert("color_space".into(), "cmyk".into());
     assert!(is_cmyk_block(&block, 0));
 }

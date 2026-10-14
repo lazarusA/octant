@@ -130,5 +130,16 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::BrowserLocalPaths => {
             "Las rutas de archivos locales no se pueden leer en un navegador debido al aislamiento de seguridad web.\n\nPara ver conjuntos de datos locales en el navegador:\n1. Sirva su directorio o archivo con un servidor HTTP local: `npx serve` o `python3 -m http.server`\n2. Introduzca la URL: `http://localhost:8000/my_dataset`\n\nO ejecute la versión nativa de escritorio de Octant (`cargo run --release`)."
         }
+        DatasetKey::Plate => "Placa",
+        DatasetKey::PlateAcquisition => "Adquisición",
+        DatasetKey::PlateAllAcquisitions => "Todas",
+        DatasetKey::PlateFields => "Campos:",
+        DatasetKey::PlatePickWell => "Elija un pocillo para ver sus campos",
+        DatasetKey::PlateLoadingFields => "Leyendo los campos del pocillo",
+        DatasetKey::PlateNoFields => "No hay campos en esta adquisición",
+        DatasetKey::PlateWellUnreadable => {
+            "No se pudieron leer los campos del pocillo. Haga clic para reintentar"
+        }
+        DatasetKey::CategoryMicroscopy => "Microscopía",
     })
 }

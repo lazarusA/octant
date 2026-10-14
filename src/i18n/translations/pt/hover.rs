@@ -19,5 +19,6 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
         HoverKey::DropDataset => {
             "Solte um conjunto de dados para visualizar (.nc, .h5, .zarr, .icechunk, .tif)"
         }
+        HoverKey::LabelN => "rótulo {}",
     })
 }

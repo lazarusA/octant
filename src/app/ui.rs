@@ -31,7 +31,8 @@ impl eframe::App for OctantApp {
                 self.is_loading = false;
                 match result {
                     Ok((metadata, store_handle)) => {
-                        if metadata.variables.is_empty() {
+                        let is_plate = self.follow_plate(&metadata);
+                        if metadata.variables.is_empty() && !is_plate {
                             self.status_message =
                                 format!("No variables discovered in '{}'", metadata.name);
                             self.notify(Severity::Warning, tr(N::NoVariablesFound), &metadata.name);
@@ -45,7 +46,7 @@ impl eframe::App for OctantApp {
                         self.layout.hero_state.loading = false;
                         self.layout.hero_state.loaded = true;
                         self.layout.hero_state.source_label = metadata.name.clone();
-                        self.layout.show_variables_overlay = true;
+                        self.layout.show_variables_overlay = !metadata.variables.is_empty();
 
                         let source_id = self.selected_source_id();
                         let mut dataset = crate::data::Dataset::new(
@@ -73,6 +74,7 @@ impl eframe::App for OctantApp {
         if metadata_done {
             self.metadata_rx = None;
         }
+        self.poll_plate(&ctx);
 
         // 1. Drain completed block-cache prefetch results and arrived coordinates.
         self.poll_block_prefetch_results();

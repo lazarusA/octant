@@ -1,15 +1,18 @@
 //! Zarr block retrieval, slicing, and coordinate binding routines.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use zarrs::array::ArraySubset;
 use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 use zarrs::storage::ReadableWritableListableStorage;
 
 use super::block_coords::{BlockWindow, block_coordinates};
-use super::generic::{GenericZarrBlockStore, ZarrArrayHandle};
 use super::slice::retrieve_array_subset_as_f32;
+use super::storage::ZarrArrayHandle;
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
+use crate::data::ome::MetaReader;
+use crate::data::ome::level::LevelArray;
 use crate::data::slice_request::{DimensionSelection, SliceRequest};
 use crate::utils::grid::check_and_orient_block_grid;
 use crate::utils::grid_flips::OrientHints;
@@ -45,11 +48,25 @@ fn selection_window(
     Ok((origin, block_shape))
 }
 
+/// OME-Zarr group metadata, read by `ome::level` from the groups themselves
+/// and large (a plate lists every well): not copied into blocks.
+const OME_GROUP_KEYS: [&str; 8] = [
+    "ome",
+    "multiscales",
+    "omero",
+    "labels",
+    "image-label",
+    "plate",
+    "well",
+    "bioformats2raw.layout",
+];
+
 /// The array's attributes as text, plus those of its ancestor groups (e.g. DGGS
-/// conventions) when the array has no `dggs` attribute of its own.
-fn inherited_attributes(
+/// conventions, not OME-Zarr metadata) when the array has no `dggs` attribute
+/// of its own.
+pub(super) fn inherited_attributes(
     array: &ZarrArrayHandle,
-    store: &ReadableWritableListableStorage,
+    reader: &MetaReader<'_>,
     variable: &str,
 ) -> HashMap<String, String> {
     let mut attributes: HashMap<String, String> = array
@@ -61,31 +78,34 @@ fn inherited_attributes(
         return attributes;
     }
     for ancestor in crate::utils::path::ancestor_paths(variable) {
-        let p = if ancestor.is_empty() {
-            "/".to_string()
-        } else {
-            format!("/{ancestor}")
+        // Groups the web fetched without `.zgroup` still have their attributes.
+        let Ok(Some(group_attrs)) = reader.group_attributes(ancestor) else {
+            continue;
         };
-        if let Ok(grp) = zarrs::group::Group::open(store.clone(), &p) {
-            for (k, v) in grp.attributes() {
-                attributes
-                    .entry(k.clone())
-                    .or_insert_with(|| attr_string(v));
-            }
-            if attributes.contains_key("dggs") {
-                break;
-            }
+        for (k, v) in group_attrs
+            .iter()
+            .filter(|(k, _)| !OME_GROUP_KEYS.contains(&k.as_str()))
+        {
+            attributes
+                .entry(k.clone())
+                .or_insert_with(|| attr_string(v));
+        }
+        if attributes.contains_key("dggs") {
+            break;
         }
     }
     attributes
 }
 
-/// The values of the window `origin..origin + shape` of `array`, through `cache`.
+/// The values of the window `origin..origin + shape` of `array`, through
+/// `cache`; label ids kept bit-exact when `labels` (see
+/// `retrieve_array_subset_as_label_bits`).
 fn read_window(
     array: &ZarrArrayHandle,
     cache: &ChunkCacheDecodedLruSizeLimit,
     variable: &str,
     (origin, shape): (&[usize], &[usize]),
+    labels: bool,
 ) -> Result<Vec<f32>, BlockStoreError> {
     let ranges: Vec<_> = origin
         .iter()
@@ -98,30 +118,78 @@ fn read_window(
         subset.to_ranges(),
         subset.num_elements(),
     );
-    retrieve_array_subset_as_f32(array, Some(cache), &subset).map_err(|e| {
+    if labels
+        && let Some(ids) =
+            super::slice::retrieve_array_subset_as_label_bits(array, Some(cache), &subset)?
+    {
+        return Ok(ids);
+    }
+    let values = retrieve_array_subset_as_f32(array, Some(cache), &subset).map_err(|e| {
         log::error!("[ZarrBlock] Failed to retrieve array subset for '{variable}': {e:?}");
         BlockStoreError::from(e.to_string())
-    })
+    })?;
+    Ok(values)
+}
+
+/// Pre-resolved metadata state for a cached Zarr array.
+pub(super) struct ArrayCachedState {
+    pub array: Arc<ZarrArrayHandle>,
+    pub cache: Arc<ChunkCacheDecodedLruSizeLimit>,
+    pub attributes: Arc<HashMap<String, String>>,
+    /// Set for OME-Zarr level arrays, whose blocks keep their stored order.
+    pub ome: Option<LevelArray>,
 }
 
 /// Fetches an arbitrary-rank hyperslab from an already-opened `ZarrArrayHandle` through a chunk cache.
-pub fn fetch_block_from_cached_array(
-    array: &ZarrArrayHandle,
-    cache: &ChunkCacheDecodedLruSizeLimit,
-    store: ReadableWritableListableStorage,
+pub(super) fn fetch_block_from_cached_array(
+    cached: &ArrayCachedState,
+    store: &ReadableWritableListableStorage,
     store_url: &str,
     request: &SliceRequest,
     mut on_progress: ProgressCallback,
 ) -> Result<OctantBlock, BlockStoreError> {
-    let full_shape = array.shape();
-    let (mut origin, mut block_shape) = selection_window(request, full_shape)?;
-    let raw_values = read_window(array, cache, &request.variable, (&origin, &block_shape))?;
+    let (origin, block_shape) = selection_window(request, cached.array.shape())?;
+    let raw_values = read_window(
+        &cached.array,
+        &cached.cache,
+        &request.variable,
+        (&origin, &block_shape),
+        cached.ome.as_ref().is_some_and(|l| l.labels),
+    )?;
     if let Some(ref mut cb) = on_progress {
         cb((raw_values.len() * std::mem::size_of::<f32>()) as u64);
     }
+    if let Some(level) = &cached.ome {
+        return Ok(OctantBlock::new(
+            request.variable.clone(),
+            block_shape,
+            level.dim_names.clone(),
+            origin,
+            raw_values,
+            HashMap::new(),
+            cached.attributes.clone(),
+        ));
+    }
+    orient_and_build_block(
+        cached,
+        (store, store_url),
+        request,
+        (origin, block_shape),
+        raw_values,
+    )
+}
 
-    let attributes = inherited_attributes(array, &store, &request.variable);
-    let mut dim_names = crate::utils::resolve_array_dimension_names(array);
+/// The block of `raw_values` at the window `(origin, shape)`, with its
+/// coordinates read from `store`, oriented north-up and west-left.
+fn orient_and_build_block(
+    cached: &ArrayCachedState,
+    (store, store_url): (&ReadableWritableListableStorage, &str),
+    request: &SliceRequest,
+    (mut origin, mut block_shape): (Vec<usize>, Vec<usize>),
+    raw_values: Vec<f32>,
+) -> Result<OctantBlock, BlockStoreError> {
+    let full_shape = cached.array.shape();
+    let mut dim_names = crate::utils::resolve_array_dimension_names(&cached.array);
     let window = BlockWindow {
         dim_names: &dim_names,
         full_shape,
@@ -129,9 +197,9 @@ pub fn fetch_block_from_cached_array(
         block_shape: &block_shape,
         selections: &request.selections,
     };
-    let mut coords = block_coordinates(&store, store_url, &request.variable, &window);
+    let mut coords = block_coordinates(store, store_url, &request.variable, &window);
     let hints = OrientHints {
-        attributes: array.attributes(),
+        attributes: cached.array.attributes(),
         lat_extent: coords.lat_extent,
         lon_extent: coords.lon_extent,
     };
@@ -150,27 +218,8 @@ pub fn fetch_block_from_cached_array(
         origin,
         raw_values,
         coords.coordinates,
-        attributes,
+        cached.attributes.clone(),
     );
     block.flipped_dims = flipped_dims;
     Ok(block)
-}
-
-/// Fetches an arbitrary-rank hyperslab described by `request` with progress reporting.
-pub fn fetch_block_with_progress(
-    store: ReadableWritableListableStorage,
-    store_url: &str,
-    request: &SliceRequest,
-    on_progress: ProgressCallback,
-) -> Result<OctantBlock, BlockStoreError> {
-    let dummy_store = GenericZarrBlockStore::new(store.clone(), store_url, "zarr", "Zarr");
-    let (cached_array, cache) = dummy_store.get_or_open_array(&request.variable)?;
-    fetch_block_from_cached_array(
-        &cached_array,
-        &cache,
-        store,
-        store_url,
-        request,
-        on_progress,
-    )
 }

@@ -140,6 +140,7 @@ pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, 
                         time_coverage_end: None,
                         temporal_resolution: None,
                         attributes: HashMap::new(),
+                        ome: None,
                     });
                 }
             }
@@ -164,6 +165,7 @@ pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, 
         store_type: "icechunk".to_string(),
         variables,
         dimension_coordinates: HashMap::new(),
+        ome: None,
     };
 
     *store

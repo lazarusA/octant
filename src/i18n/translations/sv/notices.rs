@@ -39,5 +39,14 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "Text på {} i detta dataset kan visas som rutor. Installera ett typsnitt som Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr-metadata följer inte specifikationen",
+        NoticesKey::LabelIdsBeyond32Bits => "Etikett-id över 32 bitar delar färg med mindre id",
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Metadata i version {} för {} följer inte specifikationen; det som kunde läsas visas."
+        }
+        NoticesKey::PlateWellStopped => "Brunn {}: läsningen avbröts",
+        NoticesKey::PlateWellNotJson => "Brunn {}: metadata är inte giltig JSON",
+        NoticesKey::PlateWellNotOme => "Brunn {}: inte en OME-Zarr-brunn",
+        NoticesKey::PlateWellNoMetadata => "Brunn {}: inga brunnsmetadata",
     })
 }

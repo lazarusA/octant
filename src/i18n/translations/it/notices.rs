@@ -41,5 +41,16 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "Il testo in {} di questo set di dati potrebbe apparire come riquadri. Installa un font come Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "I metadati OME-Zarr non sono conformi",
+        NoticesKey::LabelIdsBeyond32Bits => {
+            "Gli id delle etichette oltre 32 bit condividono i colori con id minori"
+        }
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "I metadati della versione {} di {} non seguono la specifica; viene mostrato ciò che è stato possibile leggere."
+        }
+        NoticesKey::PlateWellStopped => "Pozzetto {}: la lettura si è interrotta",
+        NoticesKey::PlateWellNotJson => "Pozzetto {}: i metadati non sono JSON valido",
+        NoticesKey::PlateWellNotOme => "Pozzetto {}: non è un pozzetto OME-Zarr",
+        NoticesKey::PlateWellNoMetadata => "Pozzetto {}: nessun metadato del pozzetto",
     })
 }

@@ -17,6 +17,8 @@ pub enum CatalogCategoryFilter {
     Zarr,
     Icechunk,
     GeoTiff,
+    /// Bioimaging OME-Zarr datasets.
+    Microscopy,
     Procedural,
 }
 

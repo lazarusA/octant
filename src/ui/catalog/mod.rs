@@ -11,7 +11,6 @@ pub use header::render_header;
 pub use list::{contains_ignore_ascii_case, render_entries_list};
 
 use crate::app::OctantApp;
-use crate::catalog::{GEOTIFF_CATALOG, ICECHUNK_CATALOG, PROCEDURAL_CATALOG, ZARR_CATALOG};
 
 /// Render the responsive, centered Dataset Catalog modal dialog.
 pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
@@ -60,10 +59,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                 .inner_margin(egui::Margin::symmetric(14, 12))
                 .corner_radius(8.0)
                 .show(ui, |ui| {
-                    let total_count = ZARR_CATALOG.len()
-                        + ICECHUNK_CATALOG.len()
-                        + GEOTIFF_CATALOG.len()
-                        + PROCEDURAL_CATALOG.len();
+                    let total_count = crate::catalog::total_entries();
 
                     render_header(ui, total_count, &mut should_close);
                     ui.add_space(8.0);

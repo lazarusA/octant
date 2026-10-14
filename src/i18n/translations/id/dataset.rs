@@ -128,5 +128,16 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::BrowserLocalPaths => {
             "Jalur berkas lokal tidak dapat dibaca langsung di browser karena keamanan sandbox web.\n\nUntuk melihat dataset lokal di browser:\n1. Sajikan direktori atau berkas Anda dengan server HTTP lokal: `npx serve` atau `python3 -m http.server`\n2. Masukkan URL: `http://localhost:8000/my_dataset`\n\nAtau jalankan versi desktop native Octant (`cargo run --release`)."
         }
+        DatasetKey::Plate => "Pelat",
+        DatasetKey::PlateAcquisition => "Akuisisi",
+        DatasetKey::PlateAllAcquisitions => "Semua",
+        DatasetKey::PlateFields => "Bidang pandang:",
+        DatasetKey::PlatePickWell => "Pilih sumur untuk melihat bidang pandangnya",
+        DatasetKey::PlateLoadingFields => "Membaca bidang pandang sumur",
+        DatasetKey::PlateNoFields => "Tidak ada bidang pandang dalam akuisisi ini",
+        DatasetKey::PlateWellUnreadable => {
+            "Tidak dapat membaca bidang pandang sumur. Klik untuk mencoba lagi"
+        }
+        DatasetKey::CategoryMicroscopy => "Mikroskopi",
     })
 }

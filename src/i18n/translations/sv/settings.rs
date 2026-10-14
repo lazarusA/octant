@@ -162,5 +162,29 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "Inga",
         SettingsKey::ChannelTintHover => "Klicka för att anpassa kanalens färgton",
         SettingsKey::BandNumber => "Band {}",
+        SettingsKey::ScaleBar => "Skalstreck",
+        SettingsKey::ShowScaleBarHover => "Visa skalstrecket",
+        SettingsKey::HideScaleBarHover => "Dölj skalstrecket",
+        SettingsKey::ChannelsAuto => "Auto",
+        SettingsKey::ChannelsAutoHover => {
+            "Anpassa varje kanals visningsintervall till visade data (0,1 till 99,9 procent av dess värden)"
+        }
+        SettingsKey::ChannelsAutoUnavailable => "Automatisk kontrast fungerar på ett 2D-snitt",
+        SettingsKey::ChannelSettingsHover => "Visningsintervall, kurva och invertering",
+        SettingsKey::ChannelWindow => "Visningsintervall",
+        SettingsKey::ChannelWindowHover => {
+            "Värden från start till slut går från svart till kanalens fulla färg"
+        }
+        SettingsKey::ChannelInvert => "Invertera",
+        SettingsKey::ChannelCurve => "Kurva",
+        SettingsKey::CurveLinear => "Linjär",
+        SettingsKey::CurveLogarithmic => "Logaritmisk",
+        SettingsKey::CurveExponential => "Exponentiell",
+        SettingsKey::CurvePolynomial => "Polynomisk",
+        SettingsKey::ChannelCoefficientHover => "Kurvans koefficient",
+        SettingsKey::LabelsFill => "Fyllning",
+        SettingsKey::LabelsFillHover => "Färga varje etikett helt",
+        SettingsKey::LabelsOutline => "Kontur",
+        SettingsKey::LabelsOutlineHover => "Rita bara gränserna mellan etiketter",
     })
 }

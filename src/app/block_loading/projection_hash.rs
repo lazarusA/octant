@@ -14,6 +14,8 @@ pub fn compute_composite_hash(composite: &CompositeStyle, is_geotiff: bool) -> u
         if !is_geotiff && !composite.channel_configs.is_empty() {
             for c in &composite.channel_configs {
                 (c.index, c.visible, c.color_rgb).hash(&mut hasher);
+                let d = &c.display;
+                (d.inverted, d.family, d.coefficient.to_bits()).hash(&mut hasher);
                 if let Some((s, e)) = c.window {
                     (s.to_bits(), e.to_bits()).hash(&mut hasher);
                 }

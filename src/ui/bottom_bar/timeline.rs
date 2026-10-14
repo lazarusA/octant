@@ -75,33 +75,66 @@ impl Timeline {
         let coords = meta
             .and_then(|m| m.get_dim_coords(var.map(|v| v.name.as_str()), dim))
             .filter(|c| c.matches(max_steps));
-        let label_at = |i: usize| coords.and_then(|c| c.label(i));
-
-        let label = |step: usize, coord: Option<&str>| match coord.filter(|c| is_display_coord(c)) {
-            Some(coord) => coord.to_owned(),
-            None => crate::utils::units::format_axis_value(
-                step,
-                max_steps,
-                var.map(|_| dim),
-                var.and_then(|v| v.units.as_deref()),
-                var.and_then(|v| v.time_coverage_start.as_deref()),
-                var.and_then(|v| v.temporal_resolution.as_deref()),
-                Some(&app.plotted().store_target),
-            ),
-        };
-
+        let label =
+            |i: usize| step_label(app, var, dim, i, max_steps, coords.and_then(|c| c.label(i)));
         let step = app.playback.current_timestep;
         Self {
-            current: label(step, label_at(step)),
-            start: label(0, label_at(0)),
-            end: label(last_step, label_at(last_step)),
+            current: label(step),
+            start: label(0),
+            end: label(last_step),
             step_size: var
                 .and_then(|v| v.temporal_resolution.clone())
+                .or_else(|| ome_step_size(var?, dim))
                 .unwrap_or_else(|| tr(PlaybackKey::DefaultStepSize).to_owned()),
             step,
             last_step,
         }
     }
+}
+
+/// The label of step `step` of `max_steps` along `dim`: its coordinate
+/// `coord` when that reads well as-is, else a formatted axis value (an
+/// OME-Zarr time axis with a unit reads its physical time, "12 s").
+fn step_label(
+    app: &OctantApp,
+    var: Option<&crate::data::VariableInfo>,
+    dim: &str,
+    step: usize,
+    max_steps: usize,
+    coord: Option<&str>,
+) -> String {
+    if let Some(coord) = coord.filter(|c| is_display_coord(c)) {
+        return coord.to_owned();
+    }
+    let target = Some(app.plotted().store_target.as_str());
+    if var.and_then(|v| v.dimension_unit(dim)).is_some() {
+        let meta = app.plotted().metadata.as_ref();
+        return crate::ui::hover::format::format_dimension_coord(
+            meta, var, target, dim, step, max_steps, None,
+        )
+        .value;
+    }
+    crate::utils::units::format_axis_value(
+        step,
+        max_steps,
+        var.map(|_| dim),
+        var.and_then(|v| v.units.as_deref()),
+        var.and_then(|v| v.time_coverage_start.as_deref()),
+        var.and_then(|v| v.temporal_resolution.as_deref()),
+        target,
+    )
+}
+
+/// The time between steps of an OME-Zarr image's animated axis ("2 s").
+fn ome_step_size(var: &crate::data::VariableInfo, dim: &str) -> Option<String> {
+    let unit = var.dimension_unit(dim)?;
+    // Scales are stored as `f32`: shown at that precision (0.1, not
+    // 0.10000000149011612).
+    let step = var.ome_scale(var.dimension_index(dim)?)? as f32;
+    Some(format!(
+        "{} {unit}",
+        crate::i18n::number::Num(format_args!("{step}"))
+    ))
 }
 
 /// Name of the plotted animated dimension, or `"step"` without metadata.

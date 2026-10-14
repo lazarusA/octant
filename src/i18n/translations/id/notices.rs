@@ -41,5 +41,16 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "Teks dalam {} di dataset ini mungkin tampil sebagai kotak. Pasang font seperti Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "Metadata OME-Zarr tidak sesuai spesifikasi",
+        NoticesKey::LabelIdsBeyond32Bits => {
+            "ID label di atas 32 bit berbagi warna dengan ID yang lebih kecil"
+        }
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Metadata versi {} dari {} tidak mengikuti spesifikasi; menampilkan yang dapat dibaca."
+        }
+        NoticesKey::PlateWellStopped => "Sumur {}: pembacaan terhenti",
+        NoticesKey::PlateWellNotJson => "Sumur {}: metadatanya bukan JSON yang valid",
+        NoticesKey::PlateWellNotOme => "Sumur {}: bukan sumur OME-Zarr",
+        NoticesKey::PlateWellNoMetadata => "Sumur {}: tidak ada metadata sumur",
     })
 }

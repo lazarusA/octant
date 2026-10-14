@@ -37,6 +37,8 @@ pub struct OctantApp {
 
     // Animation & Playback Controls
     pub playback: super::PlaybackState,
+    /// The OME-Zarr plate being browsed, while a plate or one of its fields is open.
+    pub plate: Option<super::plate::PlateState>,
     pub metadata_rx: Option<
         std::sync::mpsc::Receiver<Result<(DatasetMetadata, crate::data::StoreHandle), String>>,
     >,

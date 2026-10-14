@@ -19,5 +19,6 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
         HoverKey::DropDataset => {
             "Відпустіть набір даних для візуалізації (.nc, .h5, .zarr, .icechunk, .tif)"
         }
+        HoverKey::LabelN => "мітка {}",
     })
 }

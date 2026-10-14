@@ -47,11 +47,18 @@ fn render_subgroup(
 ) {
     let count = subgroup.total_variable_count();
     let path = &subgroup.full_path;
-    render_folder(ui, path, ctx.search_active, &subgroup.name, count, |ui| {
-        // Direct variables first, then deeper subgroups (at most 100 each).
-        render_variable_list(ui, &subgroup.variable_indices, ctx);
-        render_subgroups(ui, &subgroup.subgroups, ctx);
-    });
+    render_folder(
+        ui,
+        path,
+        ctx.search_active,
+        subgroup.display_name(),
+        count,
+        |ui| {
+            // Direct variables first, then deeper subgroups (at most 100 each).
+            render_variable_list(ui, &subgroup.variable_indices, ctx);
+            render_subgroups(ui, &subgroup.subgroups, ctx);
+        },
+    );
 }
 
 fn render_subgroups(

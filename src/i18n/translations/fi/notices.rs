@@ -41,5 +41,16 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::DataFontMissingDetail => {
             "Aineiston teksti ({}) voi näkyä laatikkoina. Asenna fontti, kuten Noto Sans CJK."
         }
+        NoticesKey::OmeMetadataNonConforming => "OME-Zarr-metatiedot eivät noudata määritystä",
+        NoticesKey::LabelIdsBeyond32Bits => {
+            "Yli 32-bittiset tunnisteet jakavat värin pienempien kanssa"
+        }
+        NoticesKey::OmeMetadataNonConformingDetail => {
+            "Version {} metatiedot kohteessa {} eivät noudata määritystä; näytetään se, mikä voitiin lukea."
+        }
+        NoticesKey::PlateWellStopped => "Kuoppa {}: lukeminen keskeytyi",
+        NoticesKey::PlateWellNotJson => "Kuoppa {}: metatiedot eivät ole kelvollista JSONia",
+        NoticesKey::PlateWellNotOme => "Kuoppa {}: ei ole OME-Zarr-kuoppa",
+        NoticesKey::PlateWellNoMetadata => "Kuoppa {}: ei kuopan metatietoja",
     })
 }

@@ -6,9 +6,10 @@ use crate::app::layers::Layer;
 use crate::app::overlays::MAX_OVERLAYS;
 use crate::i18n::{HoverKey, tr};
 use crate::plots::PlotType;
-use crate::ui::hover::card::{HoverValue, LayerValue};
+use crate::ui::hover::card::LayerValue;
 use crate::ui::hover::composite::CompositeKind;
 use crate::ui::hover::entries::resolve_variable_units;
+use crate::ui::hover::labels::layer_reading;
 use crate::utils::colormap::evaluate_color_cpu;
 
 /// Fills `out` with each drawn overlay's value at base cell `cell`, topmost
@@ -24,11 +25,16 @@ pub fn overlay_values<'a>(
     for (slot, layer) in out.iter_mut().zip(drawn) {
         let raw = cell_value(layer, cell);
         let var = layer.selection().variable_info();
+        let name = var.map_or(tr(HoverKey::FallbackOverlay), |v| v.leaf_name());
+        let units = resolve_variable_units(var);
+        let swatch = || evaluate_color_cpu(raw, &app.get_color_params(layer));
+        let composite = composite_kind(app, layer);
+        let (value, swatch, units) = layer_reading(layer, raw, composite, units, swatch);
         *slot = LayerValue {
-            name: var.map_or(tr(HoverKey::FallbackOverlay), |v| v.leaf_name()),
-            value: HoverValue::from_raw(raw, composite_kind(app, layer)),
-            units: resolve_variable_units(var),
-            swatch: evaluate_color_cpu(raw, &app.get_color_params(layer)),
+            name,
+            value,
+            units,
+            swatch,
         };
         count += 1;
     }

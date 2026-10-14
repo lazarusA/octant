@@ -60,7 +60,7 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
                     mdata.width,
                     mdata.height,
                     &mdata.dataset_name,
-                    app.pyramid_aggregation_op,
+                    app.layers.base.pyramid_op(app.pyramid_aggregation_op),
                     512,
                 ));
                 app.layers

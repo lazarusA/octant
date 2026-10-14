@@ -2,6 +2,7 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::data::ome::OmeChannel;
 use crate::i18n::{SettingsKey, tr};
 use crate::utils::stack_str;
 
@@ -30,8 +31,8 @@ pub(super) fn show_standard_rgb_controls(app: &mut OctantApp, ui: &mut egui::Ui,
     let mut selected = layer.composite.rgb_channels.map(|b| b.clamp(min_b, max_b));
     let names = app
         .layer_variable_info(id)
-        .and_then(|v| v.attributes.get("omero_channels"))
-        .map(String::as_str);
+        .and_then(|v| v.ome.as_ref())
+        .map_or(&[][..], |o| o.image.channels.as_slice());
 
     let spacing = ui.spacing().item_spacing.x;
     let per_channel = RGB_LABEL_W + spacing + RGB_MIN_COMBO_W + spacing;
@@ -74,7 +75,7 @@ fn rgb_channel_select(
     idx: usize,
     salt: (&str, LayerId),
     band: &mut usize,
-    names: Option<&str>,
+    names: &[OmeChannel],
     bands: std::ops::RangeInclusive<usize>,
     inline: bool,
 ) {
@@ -107,11 +108,15 @@ fn rgb_channel_select(
         });
 }
 
-/// "N: name" from the comma-separated `names` attribute, else "Band N",
-/// written into `buf` without allocating.
-fn band_title<'a>(buf: &'a mut [u8; 96], names: Option<&str>, band: usize) -> &'a str {
+/// "N: name" from the OME-Zarr channel labels, else "Band N", written into
+/// `buf` without allocating.
+fn band_title<'a>(buf: &'a mut [u8; 96], names: &[OmeChannel], band: usize) -> &'a str {
     let number = band + 1;
-    match names.and_then(|n| n.split(',').nth(band)).map(str::trim) {
+    match names
+        .get(band)
+        .map(|c| c.label.as_str())
+        .filter(|n| !n.is_empty())
+    {
         Some(name) => stack_str(buf, format_args!("{number}: {name}")),
         None => crate::i18n::fill(buf, tr(SettingsKey::BandNumber), &[&number]),
     }

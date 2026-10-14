@@ -13,6 +13,7 @@ pub mod field;
 pub mod format;
 pub mod hit;
 mod hit_cache;
+pub mod labels;
 mod march;
 pub mod overlays;
 pub mod raycast_sphere;
@@ -53,7 +54,7 @@ use crate::app::overlays::MAX_OVERLAYS;
 use crate::data::{DatasetMetadata, VariableInfo};
 use crate::plots::PlotType;
 use crate::utils::colormap::evaluate_color_cpu;
-use card::{Anchoring, HoverCard, HoverValue, LayerValue};
+use card::{Anchoring, HoverCard, LayerValue};
 use egui::{Color32, Pos2, Rect};
 use entries::{resolve_cell_value_and_dim_entries, resolve_variable_units};
 
@@ -65,80 +66,48 @@ pub fn show_hover_tooltip(
     response: &egui::Response,
     rect: Rect,
 ) {
-    let Some(hover_pos) = response.hover_pos() else {
+    let Some(hover_pos) = response.hover_pos().filter(|_| app.layout.show_hover_card) else {
         return;
     };
-    if !app.layout.show_hover_card {
-        return;
-    }
-
-    let matrix = app
-        .layers
-        .base
-        .data
-        .matrix
-        .as_ref()
-        .filter(|m| m.width > 0 && m.height > 0 && !m.values.is_empty());
+    let base = &app.layers.base;
+    let matrix =
+        (base.data.matrix.as_ref()).filter(|m| m.width > 0 && m.height > 0 && !m.values.is_empty());
     let sampler = VolumeSampler::from_app(app, matrix);
-    if matrix.is_none() && sampler.is_none() {
-        return;
-    }
-
-    let Some((camera, hit)) =
-        hit_cache::resolve_hit(app, ctx, matrix, sampler.as_ref(), rect, hover_pos)
-    else {
+    let sampler = sampler.as_ref();
+    let hit = (matrix.is_some() || sampler.is_some())
+        .then(|| hit_cache::resolve_hit(app, ctx, matrix, sampler, rect, hover_pos));
+    let Some((camera, hit)) = hit.flatten() else {
         return;
     };
-
-    let (meta, var, var_name, units_str) = resolve_hover_target_info(app);
-    let (raw_val, mut dim_entries, px, py) = resolve_cell_value_and_dim_entries(
-        app,
-        matrix,
-        meta,
-        var,
-        sampler.as_ref(),
-        hit.norm_x,
-        hit.norm_y,
-        hit.geo_coords,
-        hit.point_3d,
-    );
-
-    let canvas_plot_type = app.effective_canvas_plot_type();
-    let flat = hit.point_3d.is_none() && canvas_plot_type != PlotType::Line;
-    let pixel = flat.then_some((px, py));
-    let composite =
-        composite::composite_rows(app, ctx, meta, var, units_str, pixel, &mut dim_entries);
-    if canvas_plot_type == PlotType::Line {
+    let (meta, var, var_name, units) = resolve_hover_target_info(app);
+    let (raw_val, mut fields, px, py) =
+        resolve_cell_value_and_dim_entries(app, matrix, meta, var, sampler, &hit);
+    let point = hit.point_3d;
+    let plot_type = app.effective_canvas_plot_type();
+    let pixel = (point.is_none() && plot_type != PlotType::Line).then_some((px, py));
+    // A label image reads its id, color and properties instead of a value.
+    let composite = match base.labels() {
+        Some(_) => None,
+        None => composite::composite_rows(app, ctx, meta, var, units, pixel, &mut fields),
+    };
+    if plot_type == PlotType::Line {
         draw_line_guidelines_and_reticle(app, ctx, ui, rect, px, raw_val);
     }
-
-    let transform_2d = Transform2D::from_app(app, rect);
-    let target_pos = resolve_target_screen_pos(
-        app,
-        matrix,
-        &camera,
-        sampler.as_ref(),
-        &transform_2d,
-        px,
-        py,
-        hit.point_3d,
-    );
-
-    paint_hover_card(
-        app,
-        ctx,
-        rect,
-        hover_pos,
-        target_pos,
-        canvas_plot_type,
-        resolve_hover_color(app, raw_val, py),
-        HoverValue::from_raw(raw_val, composite),
-        var_name,
-        var,
-        units_str,
-        pixel,
-        &dim_entries,
-    );
+    let transform = Transform2D::from_app(app, rect);
+    let target =
+        resolve_target_screen_pos(app, matrix, &camera, sampler, &transform, px, py, point);
+    let swatch = || resolve_hover_color(app, raw_val, py);
+    let (value, swatch, units) = labels::layer_reading(base, raw_val, composite, units, swatch);
+    let long_name = var.and_then(|v| v.long_name.as_deref());
+    let card = HoverCard {
+        title: HoverCard::title_for(var_name, long_name),
+        value,
+        units,
+        swatch,
+        layers: &[],
+        fields: &fields,
+    };
+    paint_hover_card(app, ctx, rect, (hover_pos, target), plot_type, pixel, card);
 }
 
 fn resolve_hover_target_info(
@@ -185,43 +154,24 @@ fn resolve_hover_color(app: &OctantApp, raw_val: f32, line: usize) -> Color32 {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Shows `card` with the overlays' rows at `pixel`, its leader running
+/// from the pointer to the hovered data point's screen position.
 fn paint_hover_card(
     app: &OctantApp,
     ctx: &egui::Context,
     rect: Rect,
-    hover_pos: Pos2,
-    target_pos: Option<Pos2>,
-    canvas_plot_type: PlotType,
-    swatch: Color32,
-    value: HoverValue,
-    var_name: &str,
-    var: Option<&VariableInfo>,
-    units: &str,
+    (hover_pos, target_pos): (Pos2, Option<Pos2>),
+    plot_type: PlotType,
     pixel: Option<(usize, usize)>,
-    fields: &[HoverField],
+    card: HoverCard,
 ) {
     let mut rows = [LayerValue::EMPTY; MAX_OVERLAYS];
-    let layers = overlays::hover_rows(app, canvas_plot_type, pixel, &mut rows);
-    let title = HoverCard::title_for(var_name, var.and_then(|v| v.long_name.as_deref()));
-    let anchoring = if canvas_plot_type == PlotType::Line {
+    let layers = overlays::hover_rows(app, plot_type, pixel, &mut rows);
+    let anchoring = if plot_type == PlotType::Line {
         Anchoring::FollowPointer
     } else {
         Anchoring::Connected
     };
-    card::show_card(
-        ctx,
-        rect,
-        hover_pos,
-        target_pos,
-        anchoring,
-        &HoverCard {
-            title,
-            value,
-            units,
-            swatch,
-            layers,
-            fields,
-        },
-    );
+    let card = HoverCard { layers, ..card };
+    card::show_card(ctx, rect, hover_pos, target_pos, anchoring, &card);
 }

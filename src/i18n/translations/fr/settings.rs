@@ -178,5 +178,31 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "Aucun",
         SettingsKey::ChannelTintHover => "Cliquez pour personnaliser la teinte du canal",
         SettingsKey::BandNumber => "Bande {}",
+        SettingsKey::ScaleBar => "Barre d'échelle",
+        SettingsKey::ShowScaleBarHover => "Afficher la barre d'échelle",
+        SettingsKey::HideScaleBarHover => "Masquer la barre d'échelle",
+        SettingsKey::ChannelsAuto => "Auto",
+        SettingsKey::ChannelsAutoHover => {
+            "Ajuster la plage d'affichage de chaque canal aux données affichées (de 0,1 à 99,9 pour cent de ses valeurs)"
+        }
+        SettingsKey::ChannelsAutoUnavailable => {
+            "Le contraste automatique fonctionne sur une coupe 2D"
+        }
+        SettingsKey::ChannelSettingsHover => "Plage d'affichage, courbe et inversion",
+        SettingsKey::ChannelWindow => "Plage d'affichage",
+        SettingsKey::ChannelWindowHover => {
+            "Les valeurs du début à la fin vont du noir à la pleine couleur du canal"
+        }
+        SettingsKey::ChannelInvert => "Inverser",
+        SettingsKey::ChannelCurve => "Courbe",
+        SettingsKey::CurveLinear => "Linéaire",
+        SettingsKey::CurveLogarithmic => "Logarithmique",
+        SettingsKey::CurveExponential => "Exponentielle",
+        SettingsKey::CurvePolynomial => "Polynomiale",
+        SettingsKey::ChannelCoefficientHover => "Coefficient de la courbe",
+        SettingsKey::LabelsFill => "Remplissage",
+        SettingsKey::LabelsFillHover => "Remplir chaque étiquette en entier",
+        SettingsKey::LabelsOutline => "Contour",
+        SettingsKey::LabelsOutlineHover => "Dessiner seulement les bords entre étiquettes",
     })
 }

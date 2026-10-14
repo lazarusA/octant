@@ -79,6 +79,11 @@ fn show_dataset_body(app: &mut OctantApp, ui: &mut egui::Ui) {
     section(ui, tr(DatasetKey::ActiveDataset));
     active::show_active_dataset(app, ui);
 
+    if app.plate.is_some() {
+        section(ui, tr(DatasetKey::Plate));
+        crate::ui::plate::show_plate_browser(app, ui);
+    }
+
     section(ui, tr(DatasetKey::OpenSource));
     intake::show_source_intake(app, ui);
 

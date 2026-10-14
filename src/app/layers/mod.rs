@@ -29,7 +29,7 @@ pub use layer::{LABEL_BUF, Layer};
 pub use load::LoadState;
 pub use renderers::LayerRenderers;
 pub use selection::VariableSelection;
-pub use source::Source;
+pub use source::{LabelStyle, Source};
 pub use stack::LayerStack;
 pub use style::{AlphaCurveState, ColorStyle, CompositeStyle};
 pub use window::{follow_base_window, overlay_selection};
