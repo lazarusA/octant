@@ -13,6 +13,8 @@ pub mod double_slider;
 pub mod metrics;
 mod role_row;
 pub mod roles;
+#[cfg(test)]
+mod roles_tests;
 pub mod slider_row;
 
 pub use crate::utils::format_byte_size;

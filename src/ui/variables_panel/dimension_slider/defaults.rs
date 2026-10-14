@@ -49,24 +49,29 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
 
 fn init_initial_ranges(app: &mut OctantApp, var_info: &VariableInfo, rank: usize) {
     for i in 0..rank {
-        let dim_size = var_info.shape[i] as usize;
-        let dim_name = var_info
-            .dimension_names
-            .get(i)
-            .map(|s| s.as_str())
-            .unwrap_or("");
-        let is_channel = crate::data::coordinates::naming::is_channel_dim_name(dim_name);
-
-        let chunk_size = var_info.chunk_shape.get(i).copied().unwrap_or(0) as usize;
-        let range_end = if is_channel {
-            dim_size.saturating_sub(1)
-        } else if chunk_size > 0 {
-            chunk_size.min(dim_size).saturating_sub(1)
-        } else {
-            dim_size.saturating_sub(1)
-        };
-        app.selected.dim_ranges.push((0, range_end));
+        app.selected.dim_ranges.push(chunk_window(var_info, i, 0));
     }
+}
+
+/// The default range of dimension `dim`: the chunk holding index `at`, or the
+/// whole dimension for a channel axis or an array without chunks.
+pub(super) fn chunk_window(var_info: &VariableInfo, dim: usize, at: usize) -> (usize, usize) {
+    let size = var_info.shape.get(dim).copied().unwrap_or(0) as usize;
+    let last = size.saturating_sub(1);
+    let name = var_info
+        .dimension_names
+        .get(dim)
+        .map(|s| s.as_str())
+        .unwrap_or("");
+    let chunk = var_info.chunk_shape.get(dim).copied().unwrap_or(0) as usize;
+    if chunk == 0 || crate::data::coordinates::naming::is_channel_dim_name(name) {
+        return (0, last);
+    }
+    let start = (at.min(last) / chunk) * chunk;
+    (
+        start,
+        (start + chunk).min(size).saturating_sub(1).max(start),
+    )
 }
 
 fn init_rank1_defaults(

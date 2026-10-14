@@ -50,21 +50,20 @@ pub fn apply_role_change(
         app.selected.dim_config[dim].active = true;
     }
 
+    // A dimension that becomes spatial spans the chunk holding its index,
+    // like every default range; one that stays spatial (this runs every
+    // frame) keeps the range it has.
     if spatial != SpatialRole::None
-        && let Some(dim_size) = app
+        && spatial != old_spatial
+        && let Some(&(st, en)) = app.selected.dim_ranges.get(dim)
+        && st == en
+        && let Some(var_info) = app
             .selected
             .metadata
             .as_ref()
             .and_then(|meta| meta.variables.get(app.selected.variable_idx))
-            .and_then(|v_info| v_info.shape.get(dim).copied())
     {
-        let dim_sz = dim_size as usize;
-        if dim < app.selected.dim_ranges.len() {
-            let (st, en) = app.selected.dim_ranges[dim];
-            if st == en {
-                app.selected.dim_ranges[dim] = (0, dim_sz.saturating_sub(1));
-            }
-        }
+        app.selected.dim_ranges[dim] = super::defaults::chunk_window(var_info, dim, st);
     }
 
     app.selected.spatial_dims.clear();
