@@ -12,6 +12,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::Crop => "Recadrer",
         PlaybackKey::CropHover => "Lignes de recadrage (C)",
         PlaybackKey::PlaybackSpeed => "Vitesse de lecture",
+        PlaybackKey::PlaybackBuffer => "Mise en mémoire tampon",
         PlaybackKey::SaveExportHover => {
             "Enregistrer / exporter la figure (Cmd+S pour un enregistrement rapide, Cmd+Shift+S pour les paramètres)"
         }

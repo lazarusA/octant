@@ -12,6 +12,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::Crop => "裁剪",
         PlaybackKey::CropHover => "裁剪辅助线 (C)",
         PlaybackKey::PlaybackSpeed => "播放速度",
+        PlaybackKey::PlaybackBuffer => "播放前缓冲",
         PlaybackKey::SaveExportHover => "保存 / 导出图像（Cmd+S 快速保存，Cmd+Shift+S 打开设置）",
         PlaybackKey::CollapsedHint => "播放（点击或拖动以展开）",
         PlaybackKey::TimelineDetails => "时间轴详情",

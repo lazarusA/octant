@@ -12,6 +12,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::Crop => "자르기",
         PlaybackKey::CropHover => "자르기 안내선 (C)",
         PlaybackKey::PlaybackSpeed => "재생 속도",
+        PlaybackKey::PlaybackBuffer => "재생 전 버퍼링",
         PlaybackKey::SaveExportHover => {
             "그림 저장 / 내보내기 (Cmd+S: 빠른 저장, Cmd+Shift+S: 설정)"
         }

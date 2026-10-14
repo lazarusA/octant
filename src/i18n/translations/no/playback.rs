@@ -12,6 +12,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::Crop => "Beskjær",
         PlaybackKey::CropHover => "Hjelpelinjer for beskjæring (C)",
         PlaybackKey::PlaybackSpeed => "Avspillingshastighet",
+        PlaybackKey::PlaybackBuffer => "Buffer før avspilling",
         PlaybackKey::SaveExportHover => {
             "Lagre / eksporter figur (Cmd+S for hurtiglagring, Cmd+Shift+S for innstillinger)"
         }

@@ -12,6 +12,7 @@ pub fn text(key: PlaybackKey) -> &'static str {
         PlaybackKey::Crop => "Crop",
         PlaybackKey::CropHover => "Crop Guiding Lines (C)",
         PlaybackKey::PlaybackSpeed => "Playback Speed",
+        PlaybackKey::PlaybackBuffer => "Buffer Before Playing",
         PlaybackKey::SaveExportHover => {
             "Save / Export Figure (Cmd+S for Quick Save, Cmd+Shift+S for Settings)"
         }

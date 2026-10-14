@@ -12,6 +12,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::Crop => "Ritaglia",
         PlaybackKey::CropHover => "Linee guida di ritaglio (C)",
         PlaybackKey::PlaybackSpeed => "Velocità di riproduzione",
+        PlaybackKey::PlaybackBuffer => "Buffer prima della riproduzione",
         PlaybackKey::SaveExportHover => {
             "Salva / esporta figura (Cmd+S per il salvataggio rapido, Cmd+Shift+S per le impostazioni)"
         }
