@@ -3,6 +3,8 @@
 pub mod blusc_plugin;
 pub mod normalize;
 #[cfg(test)]
+mod pipeline_tests;
+#[cfg(test)]
 mod tests;
 pub mod zstd_plugin;
 

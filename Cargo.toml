@@ -69,7 +69,7 @@ fontdb = { version = "0.24", default-features = false, features = ["std", "fs", 
 # Only for `cargo run --features font-tools --bin subset_fonts`.
 allsorts = { version = "0.17", default-features = false, features = ["flate2_rust"], optional = true }
 crc32fast = "1.5"
-zarrs = { version = "0.23", features = ["blosc", "zstd", "sharding", "gzip", "zlib", "crc32c", "async", "filesystem"] }
+zarrs = { version = "0.23", features = ["blosc", "zstd", "sharding", "gzip", "zlib", "crc32c", "async", "filesystem", "pcodec"] }
 zarrs_object_store = { version = "0.7", features = ["http"] }
 zarrs_icechunk = "0.5"
 icechunk = "2.1.2"
