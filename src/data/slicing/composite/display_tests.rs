@@ -37,9 +37,9 @@ fn every_curve_keeps_its_ends_and_rises() {
 }
 
 #[test]
-fn curves_match_omero_quantization() {
-    // `omero-renderer` maps the window onto 0..=255, then normalizes the
-    // family's function between its values at 0 and 255.
+fn curves_match_omero_rendering() {
+    // The window maps onto 0..=255, then the family's function is
+    // normalized between its values at 0 and 255.
     let close = |a: f32, b: f32| (a - b).abs() < 1e-5;
     let log = display(ChannelFamily::Logarithmic, 3.0);
     assert!(close(log.map(0.5), 0.874_911_7), "k is ignored");

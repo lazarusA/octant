@@ -81,17 +81,25 @@ impl ChannelDisplay {
     }
 }
 
-/// OMERO's quantum codomain end: the window maps onto `0..=255` before the
-/// family's function (`omero-renderer` `QuantumStrategy.MAX`).
+/// The end of the range the window maps onto before the family's function,
+/// as OMERO renders channels (`0..=255`).
 const OMERO_MAX: f64 = 255.0;
 
 /// A `ChannelDisplay`'s curve, its coefficient checked once per channel.
 ///
-/// OMERO's quantization (`Quantization_8_16_bit`) without its 8-bit rounding:
-/// the windowed intensity `n` maps onto `v = 255 n`, then onto
+/// The curves of OMERO's channel rendering, without its 8-bit rounding: the
+/// windowed intensity `n` maps onto `v = 255 n`, then onto
 /// `(f(v) - f(0)) / (f(255) - f(0))` with `f` the family's map: `v^k`
 /// (polynomial), `ln v` with `v <= 0` read as 1 and `k` ignored
 /// (logarithmic), `exp(v^k)` (exponential).
+///
+/// References: the `omero` metadata (`window`, `family`, `coefficient`,
+/// `inverted`) of the OME-NGFF specification,
+/// <https://ngff.openmicroscopy.org/0.5/#omero-md>; the families as the
+/// OMERO API documents them (`QuantumMap` and its `PolynomialMap`,
+/// `LogarithmicMap`, `ExponentialMap`),
+/// <https://docs.openmicroscopy.org/omero-renderer/5.6.1/javadoc/omeis/providers/re/quantum/QuantumMap.html>.
+/// No publication states the formulas in full; they are written out above.
 #[derive(Debug, Clone, Copy)]
 pub struct ChannelCurve {
     family: ChannelFamily,
