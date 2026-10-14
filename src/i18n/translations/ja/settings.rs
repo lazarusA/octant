@@ -156,15 +156,13 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::HideScaleBarHover => "スケールバーを隠す",
         SettingsKey::ChannelsAuto => "自動",
         SettingsKey::ChannelsAutoHover => {
-            "各チャンネルのウィンドウを表示中のデータに合わせる（値の 0.1% から 99.9%）"
+            "各チャンネルの表示範囲を表示中のデータに合わせる（値の 0.1% から 99.9%）"
         }
-        SettingsKey::ChannelsAutoUnavailable => {
-            "自動コントラストは表示中の 2D スライスを読み取ります"
-        }
-        SettingsKey::ChannelSettingsHover => "ウィンドウ、カーブ、反転",
-        SettingsKey::ChannelWindow => "ウィンドウ",
+        SettingsKey::ChannelsAutoUnavailable => "自動コントラストは 2D スライスで機能します",
+        SettingsKey::ChannelSettingsHover => "表示範囲、カーブ、反転",
+        SettingsKey::ChannelWindow => "表示範囲",
         SettingsKey::ChannelWindowHover => {
-            "開始から終了までの値が、黒からチャンネルの最大色までに対応します"
+            "開始から終了までの値が、黒からチャンネル本来の色までに対応します"
         }
         SettingsKey::ChannelInvert => "反転",
         SettingsKey::ChannelCurve => "カーブ",

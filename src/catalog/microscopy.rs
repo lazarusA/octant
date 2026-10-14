@@ -14,12 +14,10 @@ macro_rules! idr {
 }
 
 impl CatalogEntry {
-    /// Whether this entry is one of `MICROSCOPY_CATALOG`'s OME-Zarr datasets
-    /// (by address, so it costs no scan).
+    /// Whether this entry is one of `MICROSCOPY_CATALOG`'s OME-Zarr datasets,
+    /// found by its key (keys are unique across the catalog).
     pub fn is_ome(&self) -> bool {
-        MICROSCOPY_CATALOG
-            .as_ptr_range()
-            .contains(&std::ptr::from_ref(self))
+        MICROSCOPY_CATALOG.iter().any(|e| e.key == self.key)
     }
 }
 

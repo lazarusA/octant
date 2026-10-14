@@ -127,3 +127,19 @@ fn label_colors_match_the_shader() {
     assert_eq!(hashed[3], 255);
     assert_eq!(label_color(&info, 8), Some(hashed), "stable");
 }
+
+#[test]
+fn label_pyramids_never_average_ids() {
+    use crate::data::AggregationOp;
+    let (mut app, meta) = ome_app();
+    let id = label_overlay(&mut app, &meta);
+    let labels = app.layers.get(id).expect("layer");
+    assert_eq!(
+        labels.pyramid_op(AggregationOp::Mean),
+        AggregationOp::Nearest
+    );
+    assert_eq!(
+        app.layers.base.pyramid_op(AggregationOp::Mean),
+        AggregationOp::Mean
+    );
+}

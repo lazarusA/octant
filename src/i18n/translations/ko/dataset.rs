@@ -134,6 +134,6 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlateLoadingFields => "웰의 시야를 읽는 중",
         DatasetKey::PlateNoFields => "이 획득에는 시야가 없습니다",
         DatasetKey::PlateWellUnreadable => "웰의 시야를 읽을 수 없습니다. 클릭하여 다시 시도",
-        DatasetKey::CategoryMicroscopy => "현미경",
+        DatasetKey::CategoryMicroscopy => "현미경 이미지",
     })
 }

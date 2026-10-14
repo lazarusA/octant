@@ -64,7 +64,7 @@ const OME_GROUP_KEYS: [&str; 8] = [
 /// The array's attributes as text, plus those of its ancestor groups (e.g. DGGS
 /// conventions, not OME-Zarr metadata) when the array has no `dggs` attribute
 /// of its own.
-pub(crate) fn inherited_attributes(
+pub(super) fn inherited_attributes(
     array: &ZarrArrayHandle,
     reader: &MetaReader<'_>,
     variable: &str,
@@ -132,7 +132,7 @@ fn read_window(
 }
 
 /// Pre-resolved metadata state for a cached Zarr array.
-pub struct ArrayCachedState {
+pub(super) struct ArrayCachedState {
     pub array: Arc<ZarrArrayHandle>,
     pub cache: Arc<ChunkCacheDecodedLruSizeLimit>,
     pub attributes: Arc<HashMap<String, String>>,
@@ -141,16 +141,14 @@ pub struct ArrayCachedState {
 }
 
 /// Fetches an arbitrary-rank hyperslab from an already-opened `ZarrArrayHandle` through a chunk cache.
-pub fn fetch_block_from_cached_array(
+pub(super) fn fetch_block_from_cached_array(
     cached: &ArrayCachedState,
-    store: ReadableWritableListableStorage,
+    store: &ReadableWritableListableStorage,
     store_url: &str,
     request: &SliceRequest,
     mut on_progress: ProgressCallback,
 ) -> Result<OctantBlock, BlockStoreError> {
-    let full_shape = cached.array.shape();
-    let (origin, block_shape) = selection_window(request, full_shape)?;
-    let attributes = cached.attributes.clone();
+    let (origin, block_shape) = selection_window(request, cached.array.shape())?;
     let raw_values = read_window(
         &cached.array,
         &cached.cache,
@@ -169,31 +167,26 @@ pub fn fetch_block_from_cached_array(
             origin,
             raw_values,
             HashMap::new(),
-            attributes,
+            cached.attributes.clone(),
         ));
     }
     orient_and_build_block(
         cached,
-        store,
-        store_url,
+        (store, store_url),
         request,
-        origin,
-        block_shape,
+        (origin, block_shape),
         raw_values,
-        attributes,
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+/// The block of `raw_values` at the window `(origin, shape)`, with its
+/// coordinates read from `store`, oriented north-up and west-left.
 fn orient_and_build_block(
     cached: &ArrayCachedState,
-    store: ReadableWritableListableStorage,
-    store_url: &str,
+    (store, store_url): (&ReadableWritableListableStorage, &str),
     request: &SliceRequest,
-    mut origin: Vec<usize>,
-    mut block_shape: Vec<usize>,
+    (mut origin, mut block_shape): (Vec<usize>, Vec<usize>),
     raw_values: Vec<f32>,
-    attributes: Arc<HashMap<String, String>>,
 ) -> Result<OctantBlock, BlockStoreError> {
     let full_shape = cached.array.shape();
     let mut dim_names = crate::utils::resolve_array_dimension_names(&cached.array);
@@ -204,7 +197,7 @@ fn orient_and_build_block(
         block_shape: &block_shape,
         selections: &request.selections,
     };
-    let mut coords = block_coordinates(&store, store_url, &request.variable, &window);
+    let mut coords = block_coordinates(store, store_url, &request.variable, &window);
     let hints = OrientHints {
         attributes: cached.array.attributes(),
         lat_extent: coords.lat_extent,
@@ -225,7 +218,7 @@ fn orient_and_build_block(
         origin,
         raw_values,
         coords.coordinates,
-        attributes,
+        cached.attributes.clone(),
     );
     block.flipped_dims = flipped_dims;
     Ok(block)

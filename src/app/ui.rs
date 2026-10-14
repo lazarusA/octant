@@ -74,13 +74,7 @@ impl eframe::App for OctantApp {
         if metadata_done {
             self.metadata_rx = None;
         }
-        if let Some(plate) = &mut self.plate {
-            if plate.poll() {
-                ctx.request_repaint();
-            } else if plate.loading() {
-                ctx.request_repaint_after(std::time::Duration::from_millis(50));
-            }
-        }
+        self.poll_plate(&ctx);
 
         // 1. Drain completed block-cache prefetch results and arrived coordinates.
         self.poll_block_prefetch_results();

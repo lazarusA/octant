@@ -33,10 +33,9 @@ const PAD: f32 = 6.0;
 /// axis has a length unit.
 pub(crate) fn meters_per_pixel(app: &OctantApp) -> Option<f64> {
     let var = app.plotted_variable_info()?;
-    let ome = var.ome.as_ref()?;
     let x = app.get_spatial_dim_index(0);
-    let unit = ome.image.axes.get(x)?.unit.as_deref()?;
-    let meters = meters_per_unit(unit)? * ome.scale(x)?.abs();
+    let unit = var.ome.as_ref()?.image.axes.get(x)?.unit.as_deref()?;
+    let meters = meters_per_unit(unit)? * var.ome_scale(x)?;
     (meters.is_finite() && meters > 0.0).then_some(meters)
 }
 
@@ -77,12 +76,14 @@ pub fn draw_scale_bar(
     let Some(meters_per_px) = meters_per_pixel(app) else {
         return;
     };
-    let (width_px, _) = app.active_data_dimensions_2d();
+    // No bar until data arrives: the placeholder size would mislead.
+    let Some((width_px, _)) = app.layers.base.data.shown_dimensions_2d() else {
+        return;
+    };
     if width_px == 0 || plot_rect.width() <= 0.0 {
         return;
     }
-    let points_per_px = plot_rect.width() as f64 / width_px as f64;
-    let meters_per_point = meters_per_px / points_per_px;
+    let meters_per_point = meters_per_px * width_px as f64 / plot_rect.width() as f64;
     let target = (canvas_rect.width() * TARGET_SHARE).clamp(TARGET_MIN, TARGET_MAX);
     let Some((meters, value, symbol)) = nice_length(target as f64 * meters_per_point) else {
         return;
@@ -92,7 +93,6 @@ pub fn draw_scale_bar(
     if bar_w < 1.0 || area.width() < bar_w + 2.0 * MARGIN + 2.0 * PAD {
         return;
     }
-
     let mut buf = [0u8; 32];
     let label = stack_str(
         &mut buf,
@@ -101,6 +101,12 @@ pub fn draw_scale_bar(
             crate::i18n::number::Num(format_args!("{value}"))
         ),
     );
+    paint_bar(ui, canvas_rect, area, bar_w, label);
+}
+
+/// Paints a bar `bar_w` points long, labeled `label`, framed in the
+/// bottom-left corner of `area`.
+fn paint_bar(ui: &egui::Ui, canvas_rect: egui::Rect, area: egui::Rect, bar_w: f32, label: &str) {
     let visuals = ui.visuals();
     let text_color = visuals.text_color();
     let galley = ui.painter().layout_no_wrap(
@@ -108,9 +114,8 @@ pub fn draw_scale_bar(
         egui::FontId::proportional(11.0),
         text_color,
     );
-    let inner_w = bar_w.max(galley.size().x);
     let size = egui::vec2(
-        inner_w + 2.0 * PAD,
+        bar_w.max(galley.size().x) + 2.0 * PAD,
         galley.size().y + BAR_HEIGHT + 3.0 * PAD,
     );
     let min = egui::pos2(

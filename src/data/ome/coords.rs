@@ -8,11 +8,11 @@ use crate::data::CoordValues;
 
 /// `(dimension name, coordinate)` for every axis of `ome` that has one, for a
 /// level of shape `shape` with dimensions `dims`.
-pub fn level_coordinates(
+pub fn level_coordinates<'d>(
     ome: &OmeRef,
-    dims: &[String],
+    dims: &'d [String],
     shape: &[u64],
-) -> Vec<(String, CoordValues)> {
+) -> Vec<(&'d str, CoordValues)> {
     let image = &ome.image;
     let Some(level) = ome.level() else {
         return Vec::new();
@@ -25,13 +25,14 @@ pub fn level_coordinates(
         let len = len as usize;
         match axis.kind {
             AxisKind::Channel => {
-                let labels: Vec<String> = image.channels.iter().map(|c| c.label.clone()).collect();
                 // Labels only when every channel has one, so they stay aligned.
-                if labels.len() == len
-                    && labels.iter().all(|l| !l.is_empty())
-                    && let Some(values) = CoordValues::from_labels(labels)
+                let channels = &image.channels;
+                if channels.len() == len
+                    && channels.iter().all(|c| !c.label.is_empty())
+                    && let Some(values) =
+                        CoordValues::from_labels(channels.iter().map(|c| c.label.clone()).collect())
                 {
-                    out.push((dim.clone(), values));
+                    out.push((dim.as_str(), values));
                 }
             }
             AxisKind::Space | AxisKind::Time => {
@@ -39,7 +40,7 @@ pub fn level_coordinates(
                 let start = level.translation.get(i).copied().unwrap_or(0.0);
                 let physical = axis.unit.is_some() || step != 1.0 || start != 0.0;
                 if physical && step.is_finite() && step != 0.0 && start.is_finite() && len > 0 {
-                    out.push((dim.clone(), CoordValues::Regular { start, step, len }));
+                    out.push((dim.as_str(), CoordValues::Regular { start, step, len }));
                 }
             }
             AxisKind::Other => {}

@@ -3,23 +3,27 @@
 /// A greyscale OME-Zarr image (`model: "greyscale"`) shows its channel in
 /// gray, through the channel's window (locked) and inversion, set again
 /// whenever another channel is shown.
-/// `data_range` is the shown slice's, for channels without a window.
+/// `step` is the layer's step, the channel shown when the channel axis is
+/// the animated one; `data_range` is the shown data's, for channels without
+/// a window.
 pub(crate) fn apply_greyscale_display(
     layer: &mut crate::app::layers::Layer,
+    step: usize,
     data_range: (f32, f32),
 ) {
     let display = {
         let sel = layer.selection();
-        sel.metadata
-            .as_ref()
-            .and_then(|m| m.variables.get(sel.variable_idx))
-            .and_then(|v| {
-                let image = &v.ome.as_ref()?.image;
-                let c = image.axis_of_kind(crate::data::ome::AxisKind::Channel)?;
-                let channel = *sel.dim_indices.get(c)?;
-                let display = crate::data::ome::model::greyscale_display(image, channel)?;
-                Some((channel, display))
-            })
+        sel.variable_info().and_then(|v| {
+            let image = &v.ome.as_ref()?.image;
+            let c = image.axis_of_kind(crate::data::ome::AxisKind::Channel)?;
+            let channel = if sel.animated_dim == Some(c) {
+                step
+            } else {
+                *sel.dim_indices.get(c)?
+            };
+            let display = crate::data::ome::model::greyscale_display(image, channel)?;
+            Some((channel, display))
+        })
     };
     let Some((channel, (window, inverted))) = display else {
         return;

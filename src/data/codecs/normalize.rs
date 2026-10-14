@@ -69,9 +69,8 @@ fn repair_v2(meta: &mut Value) {
         .trim_start_matches(['<', '>', '|', '='])
         .chars()
         .next();
-    let unicode = dtype.starts_with("<U") || dtype.starts_with(">U");
     let fill = match (kind, meta.get("fill_value")) {
-        (_, Some(Value::Null)) if unicode => Some(Value::from("")),
+        (Some('U'), Some(Value::Null)) => Some(Value::from("")),
         (Some('i'), Some(Value::String(t))) => t.trim().parse::<i64>().ok().map(Value::from),
         (Some('u'), Some(Value::String(t))) => t.trim().parse::<u64>().ok().map(Value::from),
         (Some('f'), Some(Value::String(t))) => {

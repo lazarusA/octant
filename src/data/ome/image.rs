@@ -27,8 +27,7 @@ pub fn image_from_group(group: &str, parsed: &ParsedGroup) -> Option<OmeImage> {
         .iter()
         .map(|d| level(multiscale, &d.path, &d.coordinate_transformations, rank))
         .collect();
-    let defaults = omero::render_defaults(parsed.omero.as_ref());
-    Some(OmeImage {
+    let mut image = OmeImage {
         group: group.trim_matches('/').to_string(),
         name: multiscale
             .name
@@ -38,16 +37,15 @@ pub fn image_from_group(group: &str, parsed: &ParsedGroup) -> Option<OmeImage> {
         axes,
         levels,
         channels: omero::channels(parsed.omero.as_ref()),
-        default_t: defaults.default_t,
-        default_z: defaults.default_z,
-        greyscale: defaults.greyscale,
-        labels: Vec::new(),
         label_info: parsed
             .fields
             .image_label
             .as_ref()
             .map(|l| Arc::new(label_info(l))),
-    })
+        ..OmeImage::default()
+    };
+    omero::apply_render_defaults(parsed.omero.as_ref(), &mut image);
+    Some(image)
 }
 
 /// The image name OMERO records (`omero.name`).

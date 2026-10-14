@@ -49,30 +49,39 @@ pub fn is_ome_attributes(attrs: &Map<String, Value>) -> bool {
 }
 
 /// Parses a group's attributes; `None` when they are not OME-Zarr.
-pub fn parse_group(attrs: &Map<String, Value>, shapes: ShapeLookup<'_>) -> Option<ParsedGroup> {
-    if !is_ome_attributes(attrs) {
+pub fn parse_group(mut attrs: Map<String, Value>, shapes: ShapeLookup<'_>) -> Option<ParsedGroup> {
+    if !is_ome_attributes(&attrs) {
         return None;
     }
-    let namespaced = attrs.get("ome").and_then(Value::as_object);
-    let mut ome = namespaced.cloned().unwrap_or_else(|| attrs.clone());
+    // 0.5 keeps its fields in `ome`; some writers leave `omero` beside it.
+    let namespaced = attrs.get("ome").is_some_and(Value::is_object);
+    let (mut ome, outer_omero) = match attrs.remove("ome") {
+        Some(Value::Object(ome)) => (ome, attrs.remove("omero")),
+        other => {
+            if let Some(other) = other {
+                attrs.insert("ome".into(), other);
+            }
+            (attrs, None)
+        }
+    };
     let mut warnings = Vec::new();
-    let version = declared_version(&ome, namespaced.is_some());
-    let old = namespaced.is_none() && legacy::is_legacy(&version);
+    let version = declared_version(&ome, namespaced);
+    let old = !namespaced && legacy::is_legacy(&version);
     if old {
         legacy::name_axes(&mut ome, shapes);
     }
-    if namespaced.is_some() && version != "0.5" {
+    if namespaced && version != "0.5" {
         warnings.push(format!("version {version} read as 0.5"));
     }
-    repair::repair(&mut ome, shapes, namespaced.is_some(), old, &mut warnings);
-    let fields = fields(&ome, namespaced.is_some(), &mut warnings);
+    repair::repair(&mut ome, shapes, namespaced, old, &mut warnings);
+    let fields = fields(&ome, namespaced, &mut warnings);
     if let Err(e) = fields.validate() {
         warnings.push(e.to_string());
     }
     Some(ParsedGroup {
         version,
         fields,
-        omero: ome.get("omero").or_else(|| attrs.get("omero")).cloned(),
+        omero: ome.remove("omero").or(outer_omero),
         warnings,
     })
 }
@@ -80,15 +89,10 @@ pub fn parse_group(attrs: &Map<String, Value>, shapes: ShapeLookup<'_>) -> Optio
 /// The version a group declares; unversioned free metadata is 0.4, or 0.2
 /// when its multiscales name no axes.
 fn declared_version(ome: &Map<String, Value>, namespaced: bool) -> String {
-    let as_text = |v: &Value| match v {
-        Value::String(s) => Some(s.trim().to_string()),
-        Value::Number(n) => Some(n.to_string()),
-        _ => None,
-    };
     if namespaced {
         return ome
             .get("version")
-            .and_then(as_text)
+            .and_then(json_text)
             .unwrap_or_else(|| "0.5".into());
     }
     let first_multiscale = ome
@@ -108,8 +112,17 @@ fn declared_version(ome: &Map<String, Value>, namespaced: bool) -> String {
                 .iter()
                 .find_map(|k| ome.get(*k)?.get("version"))
         })
-        .and_then(as_text)
+        .and_then(json_text)
         .unwrap_or_else(|| unversioned.into())
+}
+
+/// A JSON string (trimmed, non-empty) or number, as text.
+pub(super) fn json_text(v: &Value) -> Option<String> {
+    match v {
+        Value::String(s) if !s.trim().is_empty() => Some(s.trim().to_string()),
+        Value::Number(n) => Some(n.to_string()),
+        _ => None,
+    }
 }
 
 fn field<T: DeserializeOwned>(value: &Value, what: &str, warnings: &mut Vec<String>) -> Option<T> {

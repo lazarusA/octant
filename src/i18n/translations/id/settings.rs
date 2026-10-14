@@ -158,17 +158,15 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::HideScaleBarHover => "Sembunyikan bilah skala",
         SettingsKey::ChannelsAuto => "Otomatis",
         SettingsKey::ChannelsAutoHover => {
-            "Sesuaikan jendela setiap kanal dengan data yang ditampilkan (0,1 hingga 99,9 persen nilainya)"
+            "Sesuaikan rentang tampilan setiap kanal dengan data yang ditampilkan (0,1 hingga 99,9 persen nilainya)"
         }
-        SettingsKey::ChannelsAutoUnavailable => {
-            "Kontras otomatis membaca irisan 2D yang ditampilkan"
-        }
-        SettingsKey::ChannelSettingsHover => "Jendela, kurva, dan inversi",
-        SettingsKey::ChannelWindow => "Jendela",
+        SettingsKey::ChannelsAutoUnavailable => "Kontras otomatis bekerja pada irisan 2D",
+        SettingsKey::ChannelSettingsHover => "Rentang tampilan, kurva, dan inversi",
+        SettingsKey::ChannelWindow => "Rentang tampilan",
         SettingsKey::ChannelWindowHover => {
             "Nilai dari awal hingga akhir membentang dari hitam hingga warna penuh kanal"
         }
-        SettingsKey::ChannelInvert => "Balik",
+        SettingsKey::ChannelInvert => "Inversi",
         SettingsKey::ChannelCurve => "Kurva",
         SettingsKey::CurveLinear => "Linear",
         SettingsKey::CurveLogarithmic => "Logaritmik",

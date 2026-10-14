@@ -129,13 +129,13 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "ブラウザーではWebのサンドボックスによる制限のため、ローカルファイルのパスを直接読み込めません。\n\nブラウザーでローカルのデータセットを表示するには:\n1. ローカルHTTPサーバーでフォルダーまたはファイルを配信します: `npx serve` または `python3 -m http.server`\n2. URLを入力します: `http://localhost:8000/my_dataset`\n\nまたは、Octantのネイティブデスクトップ版を実行してください (`cargo run --release`)。"
         }
         DatasetKey::Plate => "プレート",
-        DatasetKey::PlateAcquisition => "取得",
+        DatasetKey::PlateAcquisition => "撮像",
         DatasetKey::PlateAllAcquisitions => "すべて",
         DatasetKey::PlateFields => "視野:",
         DatasetKey::PlatePickWell => "ウェルを選ぶと視野が表示されます",
         DatasetKey::PlateLoadingFields => "ウェルの視野を読み込み中",
-        DatasetKey::PlateNoFields => "この取得には視野がありません",
+        DatasetKey::PlateNoFields => "この撮像には視野がありません",
         DatasetKey::PlateWellUnreadable => "ウェルの視野を読み込めませんでした。クリックして再試行",
-        DatasetKey::CategoryMicroscopy => "顕微鏡",
+        DatasetKey::CategoryMicroscopy => "顕微鏡画像",
     })
 }

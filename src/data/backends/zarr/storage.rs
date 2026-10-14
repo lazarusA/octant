@@ -2,6 +2,7 @@
 
 use std::error::Error;
 use std::sync::Arc;
+use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 use zarrs::storage::ReadableWritableListableStorage;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -83,19 +84,25 @@ pub fn open_local_storage(
 
 pub type ZarrArrayHandle = zarrs::array::Array<dyn zarrs::storage::ReadableStorageTraits>;
 
-/// Opens a normalized array from `storage`, using consolidated metadata if available.
+/// The root group's consolidated metadata, if it has any.
+pub fn root_consolidated(
+    storage: &ReadableWritableListableStorage,
+) -> Option<ConsolidatedMetadataMetadata> {
+    let group = zarrs::group::Group::open(storage.clone(), "/").ok()?;
+    group.consolidated_metadata().map(|c| c.metadata)
+}
+
+/// Opens a normalized array from `storage`, from the root's `consolidated`
+/// metadata when it lists the array.
 pub fn open_raw_array(
     storage: &ReadableWritableListableStorage,
     clean_name: &str,
+    consolidated: Option<&ConsolidatedMetadataMetadata>,
 ) -> Result<ZarrArrayHandle, crate::data::blocks::BlockStoreError> {
     let var_path = format!("/{clean_name}");
     let readable: zarrs::storage::ReadableStorage = storage.clone();
-    if let Ok(group) = zarrs::group::Group::open(storage.clone(), "/")
-        && let Some(zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadata {
-            metadata,
-            ..
-        }) = group.consolidated_metadata()
-        && let Some(node_meta) = metadata.get(clean_name).or_else(|| metadata.get(&var_path))
+    if let Some(node_meta) =
+        consolidated.and_then(|m| m.get(clean_name).or_else(|| m.get(&var_path)))
         && let Some(arr) = crate::utils::metadata::instantiate_array_from_node_metadata(
             readable.clone(),
             &var_path,

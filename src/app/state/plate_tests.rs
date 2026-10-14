@@ -1,6 +1,6 @@
 //! Reading a well's fields: Zarr v2 wells have no `zarr.json`.
 
-use super::read_well;
+use super::fetch::read_well;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
@@ -41,7 +41,7 @@ fn a_read_that_stops_reports_a_failure_and_the_well_can_be_retried() {
         crate::app::StoreKind::RemoteZarr,
         std::sync::Arc::default(),
     );
-    drop(super::Reply {
+    drop(super::fetch::Reply {
         path: "A/1".into(),
         tx: Some(plate.tx.clone()),
     });

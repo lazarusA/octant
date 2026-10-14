@@ -43,7 +43,7 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::OmeMetadataNonConforming => "Метадані OME-Zarr не відповідають специфікації",
         NoticesKey::LabelIdsBeyond32Bits => {
-            "Ідентифікатори міток довші за 32 біти мають спільні кольори з меншими"
+            "Ідентифікатори міток ширші за 32 біти мають спільні кольори з меншими"
         }
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Метадані версії {} набору {} не відповідають специфікації; показано те, що вдалося прочитати."

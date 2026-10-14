@@ -4,7 +4,7 @@ use crate::data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 
 use super::types::ChannelColorConfig;
-use super::utils::{ChannelAccumulator, visible_channel_configs};
+use super::utils::blend_channels;
 
 /// Slices an N-dimensional `OctantBlock` with unique per-channel color tints additively.
 #[allow(clippy::too_many_arguments)]
@@ -22,30 +22,20 @@ pub fn slice_multichannel_composite_nd(
     if block.shape.len() < 2 || c_dim >= block.shape.len() {
         return None;
     }
-    let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
-    let num_channels = block.shape[c_dim];
-    let visible_configs = visible_channel_configs(channel_configs, c_start, num_channels);
-
     let width = x_range.1.saturating_sub(x_range.0).max(1);
     let height = y_range.1.saturating_sub(y_range.0).max(1);
-    let plane_size = width.checked_mul(height)?;
-
-    let values = if visible_configs.is_empty() {
-        vec![f32::NAN; plane_size]
-    } else {
-        let mut fixed = fixed_indices.to_vec();
-        fixed.resize(fixed.len().max(block.shape.len()), 0);
-        let mut acc = ChannelAccumulator::new(plane_size);
-        for (cfg, local_c) in visible_configs {
-            fixed[c_dim] = local_c;
-            if let Some(mdata) = block
-                .slice_2d_with_ranges(x_dim, y_dim, x_range, y_range, &fixed, 1, &cfg.name, true)
-            {
-                acc.add(&mdata.values, cfg);
-            }
-        }
-        acc.finish()?
-    };
+    let values = blend_channels(
+        block,
+        c_dim,
+        fixed_indices,
+        channel_configs,
+        width.checked_mul(height)?,
+        |fixed, cfg| {
+            let data = block
+                .slice_2d_with_ranges(x_dim, y_dim, x_range, y_range, fixed, 1, &cfg.name, true)?;
+            Some(data.values)
+        },
+    )?;
     Some(MatrixData::new(
         width,
         height,

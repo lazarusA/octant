@@ -43,7 +43,7 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::OmeMetadataNonConforming => "Metadata OME-Zarr tidak sesuai spesifikasi",
         NoticesKey::LabelIdsBeyond32Bits => {
-            "Id label di atas 32 bit berbagi warna dengan id yang lebih kecil"
+            "ID label di atas 32 bit berbagi warna dengan ID yang lebih kecil"
         }
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Metadata versi {} dari {} tidak mengikuti spesifikasi; menampilkan yang dapat dibaca."

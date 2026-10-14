@@ -173,11 +173,11 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::HideScaleBarHover => "Сховати шкалу масштабу",
         SettingsKey::ChannelsAuto => "Авто",
         SettingsKey::ChannelsAutoHover => {
-            "Підігнати вікно кожного каналу до показаних даних (від 0,1 до 99,9 відсотка його значень)"
+            "Підігнати діапазон відображення кожного каналу до показаних даних (від 0,1 до 99,9 відсотка його значень)"
         }
-        SettingsKey::ChannelsAutoUnavailable => "Автоконтраст читає показаний 2D-зріз",
-        SettingsKey::ChannelSettingsHover => "Вікно, крива та інверсія",
-        SettingsKey::ChannelWindow => "Вікно",
+        SettingsKey::ChannelsAutoUnavailable => "Автоконтраст працює на 2D-зрізі",
+        SettingsKey::ChannelSettingsHover => "Діапазон відображення, крива та інверсія",
+        SettingsKey::ChannelWindow => "Діапазон відображення",
         SettingsKey::ChannelWindowHover => {
             "Значення від початку до кінця проходять від чорного до повного кольору каналу"
         }

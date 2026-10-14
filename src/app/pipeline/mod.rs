@@ -7,3 +7,4 @@ pub(crate) mod greyscale;
 pub mod paint;
 pub mod paint_layer;
 pub mod rebuild;
+mod rebuild_2d;

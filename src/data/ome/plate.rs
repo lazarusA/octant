@@ -60,7 +60,8 @@ pub struct OmeDataset {
     pub version: String,
     pub plate: Option<Arc<OmePlate>>,
     pub well: Option<Arc<OmeWell>>,
-    /// `(group path, name)`: names of `bioformats2raw` series groups.
+    /// `(group path, name)`: names of `bioformats2raw` series groups, sorted
+    /// by path.
     pub group_names: Vec<(String, String)>,
 }
 
@@ -68,18 +69,19 @@ impl OmeDataset {
     /// The name of the group at `path`.
     pub fn group_name(&self, path: &str) -> Option<&str> {
         let path = path.trim_matches('/');
-        self.group_names
-            .iter()
-            .find(|(p, _)| p == path)
-            .map(|(_, n)| n.as_str())
+        let i = self
+            .group_names
+            .binary_search_by(|(p, _)| p.as_str().cmp(path))
+            .ok()?;
+        Some(self.group_names[i].1.as_str())
     }
 }
 
-pub fn plate_info(plate: &Plate) -> OmePlate {
+pub(super) fn plate_info(plate: Plate) -> OmePlate {
     OmePlate {
-        name: plate.name.clone(),
-        rows: plate.rows.iter().map(|r| r.name.clone()).collect(),
-        columns: plate.columns.iter().map(|c| c.name.clone()).collect(),
+        name: plate.name,
+        rows: plate.rows.into_iter().map(|r| r.name).collect(),
+        columns: plate.columns.into_iter().map(|c| c.name).collect(),
         wells: plate
             .wells
             .iter()
@@ -91,17 +93,17 @@ pub fn plate_info(plate: &Plate) -> OmePlate {
             .collect(),
         acquisitions: plate
             .acquisitions
-            .iter()
+            .into_iter()
             .flatten()
             .map(|a| PlateAcquisition {
                 id: a.id,
-                name: a.name.clone(),
+                name: a.name,
             })
             .collect(),
     }
 }
 
-pub fn well_info(well: &Well) -> OmeWell {
+pub fn well_info(well: Well) -> OmeWell {
     OmeWell {
         fields: well
             .images

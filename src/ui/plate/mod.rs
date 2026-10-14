@@ -31,18 +31,12 @@ pub fn show_plate_browser(app: &mut OctantApp, ui: &mut egui::Ui) {
     let Some(plate) = &mut app.plate else {
         return;
     };
-    let mut action = None;
     if let Some(name) = plate.plate.name.as_deref() {
         ui.label(egui::RichText::new(name).strong());
     }
-    if let Some(a) = well_grid(ui, plate) {
-        action = Some(a);
-    }
+    let picked = well_grid(ui, plate);
     acquisition_select(ui, plate);
-    if let Some(a) = field_list(ui, plate) {
-        action = Some(a);
-    }
-    match action {
+    match field_list(ui, plate).or(picked) {
         Some(PlateAction::PickWell(i)) => {
             if let Some(plate) = &mut app.plate {
                 plate.well = Some(i);
@@ -58,6 +52,23 @@ pub(crate) fn cell_side(width: f32, columns: usize) -> f32 {
     ((width - ROW_NAME_W) / columns.max(1) as f32).clamp(CELL_MIN, CELL_MAX)
 }
 
+/// Where a plate's wells are drawn: the grid's rect and its cell side.
+struct Grid {
+    rect: egui::Rect,
+    side: f32,
+}
+
+impl Grid {
+    /// The cell of row `r`, column `c` (row 0 holds the column names).
+    fn cell(&self, r: usize, c: usize) -> egui::Rect {
+        let offset = egui::vec2(
+            ROW_NAME_W + self.side * c as f32,
+            self.side * (r + 1) as f32,
+        );
+        egui::Rect::from_min_size(self.rect.min + offset, egui::Vec2::splat(self.side))
+    }
+}
+
 /// The wells on their grid; a click picks one.
 fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
     let layout = &plate.plate;
@@ -66,54 +77,21 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
         return None;
     }
     let side = cell_side(ui.available_width(), columns);
-    let label_every = if side >= NAMED_CELL {
-        1
-    } else {
-        (NAMED_CELL / side).ceil() as usize
-    };
     let size = egui::vec2(ROW_NAME_W + side * columns as f32, side * (rows + 1) as f32);
     let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
-    let painter = ui.painter_at(rect);
-    let visuals = ui.visuals();
-    let font = egui::FontId::proportional((side * 0.6).clamp(7.0, 11.0));
-    let muted = visuals.weak_text_color();
-    let cell = |r: usize, c: usize| {
-        egui::Rect::from_min_size(
-            rect.min + egui::vec2(ROW_NAME_W + side * c as f32, side * (r + 1) as f32),
-            egui::vec2(side, side),
-        )
-    };
-    for (c, column) in layout.columns.iter().enumerate().step_by(label_every) {
-        let at = cell(0, c).center() - egui::vec2(0.0, side);
-        painter.text(
-            at,
-            egui::Align2::CENTER_CENTER,
-            column.as_str(),
-            font.clone(),
-            muted,
-        );
-    }
-    for (r, row) in layout.rows.iter().enumerate() {
-        let at = egui::pos2(rect.min.x + ROW_NAME_W * 0.5, cell(r, 0).center().y);
-        painter.text(
-            at,
-            egui::Align2::CENTER_CENTER,
-            row.as_str(),
-            font.clone(),
-            muted,
-        );
-    }
+    let grid = Grid { rect, side };
+    grid_names(ui, &grid, layout);
     let opened_well = plate.opened.as_ref().map(|(well, _)| *well);
+    let painter = ui.painter_at(rect);
     let mut action = None;
     for (i, well) in layout.wells.iter().enumerate() {
         if well.row >= rows || well.column >= columns {
             continue;
         }
-        let r = cell(well.row, well.column).shrink(1.0);
-        let id = ui.id().with(("plate_well", i));
-        let response = ui.interact(r, id, egui::Sense::click());
-        let picked = plate.well == Some(i);
-        let fill = if picked {
+        let r = grid.cell(well.row, well.column).shrink(1.0);
+        let response = ui.interact(r, ui.id().with(("plate_well", i)), egui::Sense::click());
+        let visuals = ui.visuals();
+        let fill = if plate.well == Some(i) {
             visuals.selection.bg_fill
         } else if response.hovered() {
             visuals.widgets.hovered.bg_fill
@@ -130,4 +108,28 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
         response.on_hover_text(well.path.as_str());
     }
     action
+}
+
+/// The column names above the grid and the row names left of it, every few
+/// only when cells are too small to name each.
+fn grid_names(ui: &egui::Ui, grid: &Grid, layout: &crate::data::ome::OmePlate) {
+    let side = grid.side;
+    let every = if side >= NAMED_CELL {
+        1
+    } else {
+        (NAMED_CELL / side).ceil() as usize
+    };
+    let painter = ui.painter_at(grid.rect);
+    let font = egui::FontId::proportional((side * 0.6).clamp(7.0, 11.0));
+    let muted = ui.visuals().weak_text_color();
+    let name = |at: egui::Pos2, text: &str| {
+        painter.text(at, egui::Align2::CENTER_CENTER, text, font.clone(), muted);
+    };
+    for (c, column) in layout.columns.iter().enumerate().step_by(every) {
+        name(grid.cell(0, c).center() - egui::vec2(0.0, side), column);
+    }
+    for (r, row) in layout.rows.iter().enumerate().step_by(every) {
+        let y = grid.cell(r, 0).center().y;
+        name(egui::pos2(grid.rect.min.x + ROW_NAME_W * 0.5, y), row);
+    }
 }

@@ -1,6 +1,8 @@
 //! `bioformats2raw` containers: their series, listed or probed, and the
 //! series names of `OME/METADATA.ome.xml`.
 
+use std::collections::HashMap;
+
 use super::discover::Walk;
 use super::ome_xml::series_names;
 use super::reader::{Lookup, Pending, join};
@@ -23,7 +25,7 @@ impl Walk<'_, '_> {
                     self.pending = true;
                     return;
                 }
-                Ok(attrs) => attrs.as_ref().and_then(series_of),
+                Ok(attrs) => attrs.as_deref().and_then(series_of),
             },
         };
         let series = match listed {
@@ -35,14 +37,14 @@ impl Walk<'_, '_> {
             },
         };
         // Names only matter once there is a series (an HCS plate has none).
-        let names = if series.is_empty() {
-            Vec::new()
+        let mut names = if series.is_empty() {
+            HashMap::new()
         } else {
             self.series_names(path)
         };
         for (i, group) in series.iter().enumerate() {
             let group = join(path, group);
-            let name = names.get(i).cloned().flatten();
+            let name = names.remove(&i);
             self.name_group(&group, name.as_deref());
             self.visit(&group, name.as_deref(), depth + 1);
         }
@@ -53,13 +55,13 @@ impl Walk<'_, '_> {
     fn probe_series(&mut self, path: &str) -> Option<Vec<String>> {
         let mut series = Vec::new();
         for i in 0..MAX_SERIES {
-            match self.reader.group_attributes(&join(path, &i.to_string())) {
-                Ok(Some(_)) => series.push(i.to_string()),
-                Ok(None) => break,
+            match self.reader.has_group(&join(path, &i.to_string())) {
+                Ok(true) => series.push(i.to_string()),
+                Ok(false) => break,
                 Err(Pending) => {
                     self.pending = true;
                     for next in i + 1..i + SERIES_BATCH {
-                        let _ = self.reader.group_attributes(&join(path, &next.to_string()));
+                        let _ = self.reader.has_group(&join(path, &next.to_string()));
                     }
                     return None;
                 }
@@ -69,14 +71,14 @@ impl Walk<'_, '_> {
     }
 
     /// Series names from `OME/METADATA.ome.xml`, by series index.
-    fn series_names(&mut self, path: &str) -> Vec<Option<String>> {
+    fn series_names(&mut self, path: &str) -> HashMap<usize, String> {
         match self.reader.get(&join(path, "OME/METADATA.ome.xml")) {
             Lookup::Found(xml) => series_names(&xml),
             Lookup::Pending => {
                 self.pending = true;
-                Vec::new()
+                HashMap::new()
             }
-            Lookup::Absent => Vec::new(),
+            Lookup::Absent => HashMap::new(),
         }
     }
 

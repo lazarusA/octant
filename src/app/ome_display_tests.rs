@@ -121,12 +121,19 @@ fn greyscale_window_follows_the_shown_channel() {
         ..Default::default()
     });
     sel.dim_indices = indices;
-    let apply = |app: &mut OctantApp| {
-        crate::app::pipeline::greyscale::apply_greyscale_display(&mut app.layers.base, (0.0, 1.0));
+    let apply = |app: &mut OctantApp, step| {
+        crate::app::pipeline::greyscale::apply_greyscale_display(
+            &mut app.layers.base,
+            step,
+            (0.0, 1.0),
+        );
         let c = &app.layers.base.color;
         (c.range_min, c.range_max, c.reversed, c.lock_bounds)
     };
-    assert_eq!(apply(&mut app), (10.0, 900.0, true, true));
+    assert_eq!(apply(&mut app, 0), (10.0, 900.0, true, true));
     app.layers.base.selection_mut().dim_indices[1] = 0;
-    assert_eq!(apply(&mut app), (0.0, 100.0, false, true));
+    assert_eq!(apply(&mut app, 0), (0.0, 100.0, false, true));
+    // Played across channels, the step is the channel shown.
+    app.layers.base.selection_mut().animated_dim = Some(1);
+    assert_eq!(apply(&mut app, 1), (10.0, 900.0, true, true));
 }

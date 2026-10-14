@@ -172,22 +172,20 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "Ei mitään",
         SettingsKey::ChannelTintHover => "Mukauta kanavan sävyä napsauttamalla",
         SettingsKey::BandNumber => "Kaista {}",
-        SettingsKey::ScaleBar => "Mittakaava",
-        SettingsKey::ShowScaleBarHover => "Näytä mittakaava",
-        SettingsKey::HideScaleBarHover => "Piilota mittakaava",
+        SettingsKey::ScaleBar => "Mittakaavajana",
+        SettingsKey::ShowScaleBarHover => "Näytä mittakaavajana",
+        SettingsKey::HideScaleBarHover => "Piilota mittakaavajana",
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
-            "Sovita jokaisen kanavan ikkuna näytettyyn dataan (0,1-99,9 prosenttia sen arvoista)"
+            "Sovita jokaisen kanavan näyttöalue näytettyyn dataan (0,1-99,9 prosenttia sen arvoista)"
         }
-        SettingsKey::ChannelsAutoUnavailable => {
-            "Automaattinen kontrasti lukee näytetyn 2D-leikkeen"
-        }
-        SettingsKey::ChannelSettingsHover => "Ikkuna, käyrä ja käänteistys",
-        SettingsKey::ChannelWindow => "Ikkuna",
+        SettingsKey::ChannelsAutoUnavailable => "Automaattinen kontrasti toimii 2D-leikkeessä",
+        SettingsKey::ChannelSettingsHover => "Näyttöalue, käyrä ja käänteisyys",
+        SettingsKey::ChannelWindow => "Näyttöalue",
         SettingsKey::ChannelWindowHover => {
             "Arvot alusta loppuun kulkevat mustasta kanavan täyteen väriin"
         }
-        SettingsKey::ChannelInvert => "Käännä",
+        SettingsKey::ChannelInvert => "Käänteinen",
         SettingsKey::ChannelCurve => "Käyrä",
         SettingsKey::CurveLinear => "Lineaarinen",
         SettingsKey::CurveLogarithmic => "Logaritminen",

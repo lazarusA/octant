@@ -11,7 +11,6 @@ use std::sync::Arc;
 use bytemuck::{Pod, Zeroable};
 
 use super::heatmap::HeatmapRenderer;
-pub use super::label_palette::{label_color, label_hash, palette_entries};
 use crate::data::ome::OmeLabelInfo;
 
 #[repr(C)]
@@ -34,6 +33,8 @@ pub(crate) const LABELS_WGSL: &str = concat!(
 
 /// The pipeline and label colors of one label layer.
 pub struct LabelRenderer {
+    /// The label metadata whose colors `bind_group` holds.
+    info: Arc<OmeLabelInfo>,
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
     params_buffer: wgpu::Buffer,
@@ -52,7 +53,7 @@ impl LabelRenderer {
     pub fn new(
         device: &wgpu::Device,
         target_format: wgpu::TextureFormat,
-        info: &OmeLabelInfo,
+        info: &Arc<OmeLabelInfo>,
     ) -> Self {
         let layout = label_bind_group_layout(device);
         let data_layout = super::common::create_plot_with_coords_bind_group_layout(
@@ -61,7 +62,7 @@ impl LabelRenderer {
             wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
             wgpu::ShaderStages::FRAGMENT,
         );
-        let pipeline = super::heatmap::quad_pipeline(
+        let pipeline = super::quad::quad_pipeline(
             device,
             target_format,
             "Label",
@@ -72,15 +73,31 @@ impl LabelRenderer {
     }
 
     /// The same pipeline with `info`'s colors.
-    pub fn with_palette(&self, device: &wgpu::Device, info: &OmeLabelInfo) -> Self {
+    pub fn with_palette(&self, device: &wgpu::Device, info: &Arc<OmeLabelInfo>) -> Self {
         Self::with_pipeline(device, self.pipeline.clone(), self.layout.clone(), info)
+    }
+
+    /// Keeps `slot` drawing `info`: the pipeline is built once, and the
+    /// palette again only when the label metadata changes (not per level).
+    pub fn sync(
+        slot: &mut Option<Arc<Self>>,
+        info: Option<&Arc<OmeLabelInfo>>,
+        device: &wgpu::Device,
+        target_format: wgpu::TextureFormat,
+    ) {
+        *slot = match (info, slot.take()) {
+            (None, _) => None,
+            (Some(info), Some(old)) if Arc::ptr_eq(&old.info, info) => Some(old),
+            (Some(info), Some(old)) => Some(Arc::new(old.with_palette(device, info))),
+            (Some(info), None) => Some(Arc::new(Self::new(device, target_format, info))),
+        };
     }
 
     fn with_pipeline(
         device: &wgpu::Device,
         pipeline: wgpu::RenderPipeline,
         layout: wgpu::BindGroupLayout,
-        info: &OmeLabelInfo,
+        info: &Arc<OmeLabelInfo>,
     ) -> Self {
         let mut entries = palette_entries(info);
         let count = entries.len() as u32;
@@ -113,6 +130,7 @@ impl LabelRenderer {
             ],
         });
         Self {
+            info: Arc::clone(info),
             pipeline,
             layout,
             params_buffer,
@@ -158,4 +176,41 @@ fn label_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
             buffer(1, wgpu::BufferBindingType::Storage { read_only: true }),
         ],
     })
+}
+
+// Label colors on the CPU, exactly as `labels.wgsl` draws them: the palette
+// uploaded to the GPU, and the color of one label for the hover.
+
+/// `(id, RGBA packed red-first)` of every color with a 32-bit id, sorted.
+pub fn palette_entries(info: &OmeLabelInfo) -> Vec<[u32; 2]> {
+    info.colors
+        .iter()
+        .filter_map(|&(id, rgba)| Some([u32::try_from(id).ok()?, u32::from_le_bytes(rgba)]))
+        .collect()
+}
+
+/// PCG hash of a label id, as `labels.wgsl` computes it.
+fn label_hash(v: u32) -> u32 {
+    let state = v.wrapping_mul(747_796_405).wrapping_add(2_891_336_453);
+    let word = ((state >> ((state >> 28) + 4)) ^ state).wrapping_mul(277_803_737);
+    (word >> 22) ^ word
+}
+
+/// The color `labels.wgsl` draws label `id` with (before opacity): its
+/// recorded color, else one from its hash; `None` for the background (0).
+pub fn label_color(info: &OmeLabelInfo, id: u32) -> Option<[u8; 4]> {
+    if id == 0 {
+        return None;
+    }
+    if let Some(rgba) = info.color_of(u64::from(id)) {
+        return Some(rgba);
+    }
+    let hue = (label_hash(id) & 0xFFFF) as f32 / 65535.0;
+    let (s, v) = (0.65f32, 0.95f32);
+    let channel = |k: f32| {
+        let p = (((hue + k / 6.0).fract() * 6.0 - 3.0).abs() - 1.0).clamp(0.0, 1.0);
+        let c = v * (1.0 + (p - 1.0) * s);
+        (c * 255.0).round().clamp(0.0, 255.0) as u8
+    };
+    Some([channel(5.0), channel(3.0), channel(1.0), 255])
 }

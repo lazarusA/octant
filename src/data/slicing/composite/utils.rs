@@ -29,13 +29,13 @@ pub fn compute_channel_normalization(
     target_max: f32,
 ) -> (f32, f32, bool) {
     if let Some((w_start, w_end)) = window {
-        let is_i8 = (-128.0..0.0).contains(&w_start) && w_end <= 127.0;
+        // A window is in raw values: never read them as int8 bit patterns.
         let scale = if w_end > w_start {
             target_max / (w_end - w_start)
         } else {
             0.0
         };
-        (scale, w_start, is_i8)
+        (scale, w_start, false)
     } else {
         let (min_v, max_v) = crate::utils::compute_finite_min_max(values);
         let is_i8 = (-128.0..0.0).contains(&min_v) && max_v <= 127.0;
@@ -94,7 +94,7 @@ pub fn unpack_rgb(packed: f32) -> (f32, f32, f32) {
 }
 
 /// Filters and sorts visible channel configurations overlapping `[c_start, c_start + num_channels)`.
-pub fn visible_channel_configs(
+fn visible_channel_configs(
     configs: &[ChannelColorConfig],
     c_start: usize,
     num_channels: usize,
@@ -115,8 +115,40 @@ pub fn visible_channel_configs(
     visible
 }
 
+/// The packed tints of `block`'s visible channels (along `c_dim`, from
+/// `configs`) blended over `len` cells, NaN everywhere when none is visible.
+/// `read` reads one channel's `len` values, given `fixed_indices` pointing
+/// at it and its config; `None` when no channel could be read.
+pub fn blend_channels<V: AsRef<[f32]>>(
+    block: &crate::data::octant_block::OctantBlock,
+    c_dim: usize,
+    fixed_indices: &[usize],
+    configs: &[ChannelColorConfig],
+    len: usize,
+    mut read: impl FnMut(&[usize], &ChannelColorConfig) -> Option<V>,
+) -> Option<Vec<f32>> {
+    let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
+    let num_channels = block.shape.get(c_dim).copied().unwrap_or(0);
+    let visible = visible_channel_configs(configs, c_start, num_channels);
+    if visible.is_empty() {
+        return Some(vec![f32::NAN; len]);
+    }
+    let mut fixed = fixed_indices.to_vec();
+    fixed.resize(fixed.len().max(block.shape.len()), 0);
+    let mut acc = ChannelAccumulator::new(len);
+    for (cfg, local_c) in visible {
+        if let Some(slot) = fixed.get_mut(c_dim) {
+            *slot = local_c;
+        }
+        if let Some(values) = read(&fixed, cfg) {
+            acc.add(values.as_ref(), cfg);
+        }
+    }
+    acc.finish()
+}
+
 /// Channels added up in their tints, then packed into 24-bit TrueColor.
-pub struct ChannelAccumulator {
+struct ChannelAccumulator {
     rgb: Vec<[f32; 3]>,
     valid: Vec<bool>,
     loaded: bool,
@@ -124,7 +156,7 @@ pub struct ChannelAccumulator {
 
 impl ChannelAccumulator {
     /// An accumulator of `len` cells.
-    pub fn new(len: usize) -> Self {
+    fn new(len: usize) -> Self {
         Self {
             rgb: vec![[0.0; 3]; len],
             valid: vec![false; len],
@@ -134,7 +166,7 @@ impl ChannelAccumulator {
 
     /// Adds one channel's values, normalized by its window and display curve
     /// and tinted by its color.
-    pub fn add(&mut self, values: &[f32], cfg: &ChannelColorConfig) {
+    fn add(&mut self, values: &[f32], cfg: &ChannelColorConfig) {
         self.loaded = true;
         let (scale, offset, is_i8) = compute_channel_normalization(values, cfg.window, 1.0);
         let curve = cfg.display.curve();
@@ -152,7 +184,7 @@ impl ChannelAccumulator {
 
     /// The packed colors, `NAN` where no channel had a value; `None` when no
     /// channel was added.
-    pub fn finish(self) -> Option<Vec<f32>> {
+    fn finish(self) -> Option<Vec<f32>> {
         if !self.loaded {
             return None;
         }

@@ -10,30 +10,23 @@ use crate::data::metadata::VariableInfo;
 use crate::utils::metadata::{open_or_instantiate_array_normalized, variable_info_from_array};
 
 /// The variables of `image`'s levels, named `{group}/{level path}`. Levels
-/// whose array cannot be opened are left out.
-pub fn image_variables(
+/// whose array cannot be opened are left out; no array is built while any
+/// level's metadata is still being fetched.
+pub(super) fn image_variables(
     reader: &MetaReader<'_>,
     image: &Arc<OmeImage>,
-    version: &str,
 ) -> Result<Vec<VariableInfo>, Pending> {
-    let mut variables = Vec::with_capacity(image.levels.len());
-    let mut waiting = false;
+    let mut found = Vec::with_capacity(image.levels.len());
     for (level, info) in image.levels.iter().enumerate() {
         let path = join(&image.group, &info.path);
-        match reader.array_metadata(&path) {
-            Err(Pending) => waiting = true,
-            Ok(None) => {}
-            Ok(Some(meta)) => {
-                if let Some(var) = level_variable(reader, image, level, &path, meta, version) {
-                    variables.push(var);
-                }
-            }
+        if let Some(meta) = reader.array_metadata(&path)? {
+            found.push((level, path, meta));
         }
     }
-    if waiting {
-        return Err(Pending);
-    }
-    Ok(variables)
+    Ok(found
+        .into_iter()
+        .filter_map(|(level, path, meta)| level_variable(reader, image, level, &path, &meta))
+        .collect())
 }
 
 /// The level array at `path`, built from its metadata document `meta`
@@ -43,12 +36,11 @@ fn level_variable(
     image: &Arc<OmeImage>,
     level: usize,
     path: &str,
-    meta: serde_json::Value,
-    version: &str,
+    meta: &serde_json::Value,
 ) -> Option<VariableInfo> {
     let abs = format!("/{path}");
     let built = serde_json::from_value::<zarrs::metadata::ArrayMetadata>(
-        crate::utils::metadata::normalize_v3_array_metadata(meta),
+        crate::utils::metadata::normalize_v3_array_metadata(meta.clone()),
     )
     .ok()
     .and_then(|m| zarrs::array::Array::new_with_metadata(reader.storage(), &abs, m).ok());
@@ -56,46 +48,45 @@ fn level_variable(
         Some(array) => array,
         None => open_or_instantiate_array_normalized(reader.storage(), &abs).ok()?,
     };
-    let mut attributes = HashMap::new();
-    attributes.insert("ome_version".to_string(), version.to_string());
-    // Only integer label images draw as labels (their ids are read exactly).
-    if image.label_info.is_some() && is_integer(array.data_type()) {
-        attributes.insert(LABEL_IMAGE_ATTRIBUTE.to_string(), "true".to_string());
-    }
     let info = variable_info_from_array(&array, path)?;
+    let names = image.axes.iter().map(|a| a.name.as_str());
     Some(VariableInfo {
-        dimension_names: level_dimension_names(image, info.shape.len()),
+        dimension_names: level_dimension_names(names, info.shape.len()),
         long_name: image.name.clone(),
-        attributes,
+        attributes: HashMap::new(),
         ome: Some(OmeRef {
             image: image.clone(),
             level,
+            labels: draws_as_labels(image.label_info.is_some(), array.data_type()),
         }),
         ..info
     })
 }
 
-/// Variable attribute of label images drawn as labels (integer ids).
-pub const LABEL_IMAGE_ATTRIBUTE: &str = "ome_label_image";
-
-/// The dimension names of an `image` level array of rank `rank`: the image's
-/// axes, else the default `t, c, z, y, x` tail.
-pub(super) fn level_dimension_names(image: &OmeImage, rank: usize) -> Vec<String> {
-    if image.axes.len() == rank {
-        image.axes.iter().map(|a| a.name.clone()).collect()
+/// The dimension names of a level array of rank `rank`: the image's axis
+/// names, else the default `t, c, z, y, x` tail.
+pub(super) fn level_dimension_names<'n>(
+    names: impl ExactSizeIterator<Item = &'n str>,
+    rank: usize,
+) -> Vec<String> {
+    if names.len() == rank {
+        names.map(str::to_string).collect()
     } else {
         default_axis_names(rank)
     }
 }
 
-pub(super) fn is_integer(dt: &zarrs::array::DataType) -> bool {
+/// Whether a level draws as labels: only integer label images do (their ids
+/// are read exactly).
+pub(super) fn draws_as_labels(image_label: bool, dt: &zarrs::array::DataType) -> bool {
     use zarrs::array::data_type::*;
-    dt.is::<UInt8DataType>()
-        || dt.is::<UInt16DataType>()
-        || dt.is::<UInt32DataType>()
-        || dt.is::<UInt64DataType>()
-        || dt.is::<Int8DataType>()
-        || dt.is::<Int16DataType>()
-        || dt.is::<Int32DataType>()
-        || dt.is::<Int64DataType>()
+    image_label
+        && (dt.is::<UInt8DataType>()
+            || dt.is::<UInt16DataType>()
+            || dt.is::<UInt32DataType>()
+            || dt.is::<UInt64DataType>()
+            || dt.is::<Int8DataType>()
+            || dt.is::<Int16DataType>()
+            || dt.is::<Int32DataType>()
+            || dt.is::<Int64DataType>())
 }

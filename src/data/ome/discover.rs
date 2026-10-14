@@ -4,9 +4,11 @@
 use std::cell::Cell;
 use std::sync::Arc;
 
+use serde_json::{Map, Value};
+
 use super::image::image_from_group;
 use super::model::OmeImage;
-use super::parse::{ParsedGroup, parse_group};
+use super::parse::{ParsedGroup, is_ome_attributes, parse_group};
 use super::plate::{OmeDataset, plate_info, well_info};
 use super::reader::{MetaReader, Pending, join};
 use super::variables::image_variables;
@@ -38,7 +40,7 @@ pub enum Outcome {
 pub fn discover(reader: &MetaReader<'_>, root: &str) -> Outcome {
     let attrs = match reader.group_attributes(root) {
         Err(Pending) => return Outcome::Pending,
-        Ok(Some(attrs)) if super::parse::is_ome_attributes(&attrs) => attrs,
+        Ok(Some(attrs)) if is_ome_attributes(&attrs) => attrs,
         Ok(_) => return Outcome::NotOme,
     };
     let mut walk = Walk {
@@ -47,7 +49,10 @@ pub fn discover(reader: &MetaReader<'_>, root: &str) -> Outcome {
         pending: false,
     };
     walk.visit_attrs(root, attrs, None, 0);
-    let found = walk.found;
+    let mut found = walk.found;
+    // Sorted for `OmeDataset::group_name`'s binary search.
+    found.dataset.group_names.sort_by(|a, b| a.0.cmp(&b.0));
+    found.dataset.group_names.dedup_by(|a, b| a.0 == b.0);
     let empty =
         found.variables.is_empty() && found.dataset.plate.is_none() && found.dataset.well.is_none();
     if walk.pending {
@@ -75,11 +80,10 @@ impl Walk<'_, '_> {
         }
     }
 
-    fn parse(
-        &mut self,
-        path: &str,
-        attrs: &serde_json::Map<String, serde_json::Value>,
-    ) -> Option<ParsedGroup> {
+    fn parse(&mut self, path: &str, attrs: Arc<Map<String, Value>>) -> Option<ParsedGroup> {
+        if !is_ome_attributes(&attrs) {
+            return None;
+        }
         // Level shapes are read only for metadata that needs them (legacy
         // versions, missing transforms).
         let waiting = Cell::new(false);
@@ -91,7 +95,7 @@ impl Walk<'_, '_> {
                 None
             }
         };
-        let parsed = parse_group(attrs, &shapes);
+        let parsed = parse_group(Arc::unwrap_or_clone(attrs), &shapes);
         if waiting.get() {
             self.pending = true;
             return None;
@@ -110,14 +114,14 @@ impl Walk<'_, '_> {
     fn visit_attrs(
         &mut self,
         path: &str,
-        attrs: serde_json::Map<String, serde_json::Value>,
+        attrs: Arc<Map<String, Value>>,
         name: Option<&str>,
         depth: usize,
     ) {
         if depth > MAX_DEPTH {
             return;
         }
-        let Some(parsed) = self.parse(path, &attrs) else {
+        let Some(mut parsed) = self.parse(path, attrs) else {
             return;
         };
         if let Some(layout) = &parsed.fields.bioformats2raw {
@@ -130,14 +134,14 @@ impl Walk<'_, '_> {
             if image.label_info.is_none() {
                 image.labels = self.label_names(path);
             }
-            self.add_image(image, &parsed.version, depth);
+            self.add_image(image, depth);
         }
-        if let Some(plate) = &parsed.fields.plate
+        if let Some(plate) = parsed.fields.plate.take()
             && self.found.dataset.plate.is_none()
         {
             self.found.dataset.plate = Some(Arc::new(plate_info(plate)));
         }
-        if let Some(well) = &parsed.fields.well {
+        if let Some(well) = parsed.fields.well.take() {
             let well = well_info(well);
             for field in &well.fields {
                 self.visit(&join(path, &field.path), None, depth + 1);
@@ -148,9 +152,9 @@ impl Walk<'_, '_> {
         }
     }
 
-    fn add_image(&mut self, image: OmeImage, version: &str, depth: usize) {
+    fn add_image(&mut self, image: OmeImage, depth: usize) {
         let image = Arc::new(image);
-        match image_variables(self.reader, &image, version) {
+        match image_variables(self.reader, &image) {
             Ok(vars) => self.found.variables.extend(vars),
             Err(Pending) => self.pending = true,
         }
@@ -171,7 +175,7 @@ impl Walk<'_, '_> {
             Ok(Some(attrs)) => attrs,
             Ok(None) => return Vec::new(),
         };
-        self.parse(&path, &attrs)
+        self.parse(&path, attrs)
             .and_then(|p| p.fields.labels)
             .unwrap_or_default()
             .into_iter()

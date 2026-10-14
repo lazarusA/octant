@@ -150,18 +150,18 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::ChannelsNone => "없음",
         SettingsKey::ChannelTintHover => "클릭하여 채널 색조를 지정하세요",
         SettingsKey::BandNumber => "밴드 {}",
-        SettingsKey::ScaleBar => "축척 막대",
-        SettingsKey::ShowScaleBarHover => "축척 막대 표시",
-        SettingsKey::HideScaleBarHover => "축척 막대 숨기기",
+        SettingsKey::ScaleBar => "스케일 바",
+        SettingsKey::ShowScaleBarHover => "스케일 바 표시",
+        SettingsKey::HideScaleBarHover => "스케일 바 숨기기",
         SettingsKey::ChannelsAuto => "자동",
         SettingsKey::ChannelsAutoHover => {
-            "각 채널의 창을 표시된 데이터에 맞춤(값의 0.1%에서 99.9%)"
+            "각 채널의 표시 범위를 표시된 데이터에 맞춤(값의 0.1%에서 99.9%)"
         }
-        SettingsKey::ChannelsAutoUnavailable => "자동 대비는 표시된 2D 단면을 읽습니다",
-        SettingsKey::ChannelSettingsHover => "창, 곡선 및 반전",
-        SettingsKey::ChannelWindow => "창",
+        SettingsKey::ChannelsAutoUnavailable => "자동 대비는 2D 단면에서 작동합니다",
+        SettingsKey::ChannelSettingsHover => "표시 범위, 곡선 및 반전",
+        SettingsKey::ChannelWindow => "표시 범위",
         SettingsKey::ChannelWindowHover => {
-            "시작부터 끝까지의 값이 검정에서 채널의 전체 색까지 대응합니다"
+            "시작부터 끝까지의 값이 검정에서 채널 고유의 색까지 대응합니다"
         }
         SettingsKey::ChannelInvert => "반전",
         SettingsKey::ChannelCurve => "곡선",

@@ -124,7 +124,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::BrowserLocalPaths => {
             "出于网页沙盒安全限制，浏览器无法直接读取本地文件路径。\n\n要在浏览器中查看本地数据集：\n1. 用本地 HTTP 服务器提供目录或文件：`npx serve` 或 `python3 -m http.server`\n2. 输入 URL：`http://localhost:8000/my_dataset`\n\n或者运行 Octant 的原生桌面版本 (`cargo run --release`)。"
         }
-        DatasetKey::Plate => "板",
+        DatasetKey::Plate => "孔板",
         DatasetKey::PlateAcquisition => "采集",
         DatasetKey::PlateAllAcquisitions => "全部",
         DatasetKey::PlateFields => "视野：",

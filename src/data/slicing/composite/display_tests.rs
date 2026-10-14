@@ -26,14 +26,17 @@ fn every_curve_keeps_its_ends_and_rises() {
     ] {
         for c in [0.5, 1.0, 3.0] {
             let d = display(family, c);
-            assert!(d.map(0.0).abs() < 1e-6, "{family:?} {c}");
-            assert!((d.map(1.0) - 1.0).abs() < 1e-5, "{family:?} {c}");
+            assert!(d.curve().map(0.0).abs() < 1e-6, "{family:?} {c}");
+            assert!((d.curve().map(1.0) - 1.0).abs() < 1e-5, "{family:?} {c}");
             // OMERO's exponential stays at 0 until near the top for k > 1.
-            assert!(d.map(0.25) <= d.map(0.75), "{family:?} {c}");
-            assert!(d.map(0.75) < d.map(1.0), "{family:?} {c}");
+            assert!(d.curve().map(0.25) <= d.curve().map(0.75), "{family:?} {c}");
+            assert!(d.curve().map(0.75) < d.curve().map(1.0), "{family:?} {c}");
         }
     }
-    assert_eq!(display(ChannelFamily::Polynomial, 2.0).map(0.5), 0.25);
+    assert_eq!(
+        display(ChannelFamily::Polynomial, 2.0).curve().map(0.5),
+        0.25
+    );
 }
 
 #[test]
@@ -42,10 +45,10 @@ fn curves_match_omero_rendering() {
     // normalized between its values at 0 and 255.
     let close = |a: f32, b: f32| (a - b).abs() < 1e-5;
     let log = display(ChannelFamily::Logarithmic, 3.0);
-    assert!(close(log.map(0.5), 0.874_911_7), "k is ignored");
-    assert_eq!(log.map(0.002), 0.0, "below 1 reads as ln 1");
+    assert!(close(log.curve().map(0.5), 0.874_911_7), "k is ignored");
+    assert_eq!(log.curve().map(0.002), 0.0, "below 1 reads as ln 1");
     let exp = display(ChannelFamily::Exponential, 0.5);
-    assert!(close(exp.map(0.5), 0.009_305_571));
+    assert!(close(exp.curve().map(0.5), 0.009_305_571));
 }
 
 #[test]
@@ -54,9 +57,9 @@ fn inversion_follows_the_curve() {
         inverted: true,
         ..display(ChannelFamily::Polynomial, 2.0)
     };
-    assert_eq!(d.map(0.0), 1.0);
-    assert_eq!(d.map(0.5), 0.75);
-    assert_eq!(d.map(2.0), 0.0);
+    assert_eq!(d.curve().map(0.0), 1.0);
+    assert_eq!(d.curve().map(0.5), 0.75);
+    assert_eq!(d.curve().map(2.0), 0.0);
 }
 
 /// One channel `(c, y, x) = (1, 1, 2)` holding 0 and 10.
@@ -102,4 +105,15 @@ fn quantiles_read_the_composite_window() {
     let (lo, hi) = probe.channel_quantiles(0, 0.1, 0.9).expect("quantiles");
     assert!((9.0..=11.0).contains(&lo) && (88.0..=90.0).contains(&hi));
     assert_eq!(probe.channel_quantiles(3, 0.0, 1.0), None);
+}
+
+#[test]
+fn windows_starting_below_zero_read_raw_values() {
+    use crate::data::slicing::composite::{compute_channel_normalization, normalize_channel_value};
+    let (scale, offset, is_i8) = compute_channel_normalization(&[], Some((-5.0, 100.0)), 1.0);
+    assert!(!is_i8);
+    let at = |raw| normalize_channel_value(raw, scale, offset, is_i8, 1.0);
+    assert_eq!(at(-5.0), 0.0);
+    assert!((at(47.5) - 0.5).abs() < 1e-6);
+    assert_eq!(at(200.0), 1.0);
 }

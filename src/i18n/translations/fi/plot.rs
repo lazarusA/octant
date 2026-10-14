@@ -31,6 +31,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::Requires3D => "Vaatii 3D-datan",
         PlotKey::DisabledGpuLimit => "Pois käytöstä: {} MB > 128 MB:n GPU-raja",
         PlotKey::ScalarField => "Skalaarikenttä",
-        PlotKey::LabelsHeatmapOnly => "Tunnistekuvat piirretään lämpökarttaan",
+        PlotKey::LabelsHeatmapOnly => "Tunnistekuvat piirretään vain lämpökarttaan",
     })
 }

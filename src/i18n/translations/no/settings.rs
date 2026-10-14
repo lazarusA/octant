@@ -169,11 +169,11 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::HideScaleBarHover => "Skjul målestokken",
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
-            "Tilpass hver kanals vindu til de viste dataene (0,1 til 99,9 prosent av verdiene)"
+            "Tilpass hver kanals visningsområde til de viste dataene (0,1 til 99,9 prosent av verdiene)"
         }
-        SettingsKey::ChannelsAutoUnavailable => "Automatisk kontrast leser det viste 2D-snittet",
-        SettingsKey::ChannelSettingsHover => "Vindu, kurve og invertering",
-        SettingsKey::ChannelWindow => "Vindu",
+        SettingsKey::ChannelsAutoUnavailable => "Automatisk kontrast virker på et 2D-snitt",
+        SettingsKey::ChannelSettingsHover => "Visningsområde, kurve og invertering",
+        SettingsKey::ChannelWindow => "Visningsområde",
         SettingsKey::ChannelWindowHover => {
             "Verdier fra start til slutt går fra svart til kanalens fulle farge"
         }

@@ -63,6 +63,14 @@ impl OctantApp {
             if is_active {
                 self.clear_active_metadata();
             }
+            // The plate browser goes with its plate, not with one of its fields.
+            if self
+                .plate
+                .as_ref()
+                .is_some_and(|p| p.url == removed.source.uri.trim_end_matches('/'))
+            {
+                self.plate = None;
+            }
             self.status_message = format!("Removed dataset '{}'", removed.source.display_name);
         }
     }
@@ -73,6 +81,7 @@ impl OctantApp {
         crate::data::backends::coord_bounds::evict_coord_values(None);
         self.coordinate_loader = crate::data::blocks::CoordinateLoader::default();
         self.clear_active_metadata();
+        self.plate = None;
         self.status_message = "Cleared all datasets from Dataset Manager".to_string();
     }
 

@@ -4,7 +4,7 @@
 use futures::StreamExt;
 
 use super::{CONCURRENT_METADATA_FETCHES, WasmZarrBlockStore};
-use crate::data::backends::http::fetch_url_bytes;
+use crate::data::backends::http::{fetch_url_bytes, is_missing};
 use crate::data::ome::{Discovery, MetaReader, Outcome, Prefetch, discover};
 
 /// Walks before giving up (each nesting level of a store takes about one).
@@ -29,24 +29,15 @@ impl WasmZarrBlockStore {
             }
             let base = self.base_url.trim_end_matches('/');
             let mut fetches = futures::stream::iter(wanted)
-                .map(|key| async move {
-                    let url = format!("{base}/{key}");
-                    let res = match fetch_url_bytes(&url).await {
-                        // A failed request (not a missing key) is tried again once.
-                        Err(e) if !e.contains("HTTP 404") => fetch_url_bytes(&url).await,
-                        res => res,
-                    };
-                    (key, res)
-                })
+                .map(|key| fetch_key(base, key))
                 .buffer_unordered(CONCURRENT_METADATA_FETCHES);
             while let Some((key, res)) = fetches.next().await {
                 match res {
                     Ok(bytes) if self.insert_key_bytes(&key, &bytes).is_ok() => {}
-                    Ok(_) => {
-                        prefetch.mark_absent(key);
-                    }
-                    Err(e) => {
-                        if !e.contains("HTTP 404") {
+                    res => {
+                        if let Err(e) = res
+                            && !is_missing(&e)
+                        {
                             log::warn!("[WASM Zarr] OME-Zarr metadata '{key}' unreadable: {e}");
                         }
                         prefetch.mark_absent(key);
@@ -60,4 +51,15 @@ impl WasmZarrBlockStore {
         );
         None
     }
+}
+
+/// The bytes of `key` under `base`; a failed request (not a missing key) is
+/// tried again once.
+async fn fetch_key(base: &str, key: String) -> (String, Result<Vec<u8>, String>) {
+    let url = format!("{base}/{key}");
+    let res = match fetch_url_bytes(&url).await {
+        Err(e) if !is_missing(&e) => fetch_url_bytes(&url).await,
+        res => res,
+    };
+    (key, res)
 }

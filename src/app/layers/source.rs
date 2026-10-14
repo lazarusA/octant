@@ -86,14 +86,12 @@ impl Source {
     pub fn follow_variable(&mut self) -> bool {
         let was_labels = self.labels().is_some();
         let info = label_info_of(self.selection());
-        *self = match (std::mem::take(self), info) {
-            (Self::Labels(selection, style), Some(info)) if Arc::ptr_eq(&style.info, &info) => {
-                Self::Labels(selection, style)
-            }
-            (Self::Variable(selection) | Self::Labels(selection, _), info) => {
-                Self::with_labels(selection, info)
-            }
-        };
+        if let (Some(style), Some(info)) = (self.labels(), &info)
+            && Arc::ptr_eq(&style.info, info)
+        {
+            return false;
+        }
+        *self = Self::with_labels(std::mem::take(self.selection_mut()), info);
         was_labels != self.labels().is_some()
     }
 }
@@ -101,10 +99,5 @@ impl Source {
 /// The label info of the selection's variable, for an OME-Zarr label image
 /// of integer ids.
 fn label_info_of(selection: &VariableSelection) -> Option<Arc<OmeLabelInfo>> {
-    let metadata = selection.metadata.as_ref()?;
-    metadata
-        .variables
-        .get(selection.variable_idx)?
-        .label_info()
-        .cloned()
+    selection.variable_info()?.label_info().cloned()
 }

@@ -4,7 +4,7 @@ pub mod common;
 pub mod device;
 pub mod fullscreen;
 pub mod heatmap;
-pub mod label_palette;
+mod heatmap_draw;
 pub mod labels;
 #[cfg(test)]
 mod labels_tests;
@@ -15,6 +15,7 @@ pub mod oit;
 pub mod point_cloud;
 mod point_cloud_draw;
 mod point_cloud_types;
+mod quad;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) mod test_gpu;
 pub mod traits;
@@ -29,7 +30,8 @@ pub use coastline::{
     load_coastline_sync,
 };
 pub use common::{Mesh3DUniformParams, Mesh3DUniforms, MeshVertex3D, PlotColorParams};
-pub use heatmap::{HeatmapCallback, HeatmapRenderer};
+pub use heatmap::HeatmapRenderer;
+pub use heatmap_draw::HeatmapCallback;
 pub use labels::{LabelDraw, LabelRenderer};
 pub use line::{LineCallback, LineRenderer, LineShape};
 pub use mesh::Mesh3DRenderer;

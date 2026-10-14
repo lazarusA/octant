@@ -13,8 +13,15 @@ fn names_follow_image_ids() {
 </ome:OME>"#;
     let names = series_names(xml);
     assert_eq!(names.len(), 2);
-    assert_eq!(names[0].as_deref(), Some("first"));
-    assert_eq!(names[1].as_deref(), Some("second & last"));
+    assert_eq!(names[&0], "first");
+    assert_eq!(names[&1], "second & last");
+}
+
+#[test]
+fn huge_ids_allocate_nothing_extra() {
+    let names = series_names(br#"<OME><Image ID="Image:1048575" Name="far"/></OME>"#);
+    assert_eq!(names.len(), 1);
+    assert_eq!(names[&1048575], "far");
 }
 
 #[test]

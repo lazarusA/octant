@@ -123,12 +123,12 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Браузер не может читать локальные файлы напрямую из-за ограничений безопасности веб-песочницы.\n\nЧтобы открыть локальные наборы данных в браузере:\n1. Раздайте папку или файл через локальный HTTP-сервер: `npx serve` или `python3 -m http.server`\n2. Введите URL: `http://localhost:8000/my_dataset`\n\nИли запустите настольную версию Octant (`cargo run --release`)."
         }
         DatasetKey::Plate => "Планшет",
-        DatasetKey::PlateAcquisition => "Съемка",
+        DatasetKey::PlateAcquisition => "Съёмка",
         DatasetKey::PlateAllAcquisitions => "Все",
         DatasetKey::PlateFields => "Поля:",
-        DatasetKey::PlatePickWell => "Выберите лунку, чтобы увидеть ее поля",
+        DatasetKey::PlatePickWell => "Выберите лунку, чтобы увидеть её поля",
         DatasetKey::PlateLoadingFields => "Чтение полей лунки",
-        DatasetKey::PlateNoFields => "В этой съемке нет полей",
+        DatasetKey::PlateNoFields => "В этой съёмке нет полей",
         DatasetKey::PlateWellUnreadable => {
             "Не удалось прочитать поля лунки. Нажмите, чтобы повторить"
         }

@@ -161,11 +161,11 @@ pub fn text(key: SettingsKey) -> &'static str {
         SettingsKey::HideScaleBarHover => "Hide the scale bar",
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
-            "Fit every channel's window to the shown data (0.1 to 99.9 percent of its values)"
+            "Fit every channel's display range to the shown data (0.1 to 99.9 percent of its values)"
         }
-        SettingsKey::ChannelsAutoUnavailable => "Auto contrast reads the shown 2D slice",
-        SettingsKey::ChannelSettingsHover => "Window, curve and inversion",
-        SettingsKey::ChannelWindow => "Window",
+        SettingsKey::ChannelsAutoUnavailable => "Auto contrast works on a 2D slice",
+        SettingsKey::ChannelSettingsHover => "Display range, curve and inversion",
+        SettingsKey::ChannelWindow => "Display range",
         SettingsKey::ChannelWindowHover => {
             "Values from start to end span the channel from black to its full color"
         }

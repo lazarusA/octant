@@ -83,3 +83,13 @@ fn opened_fields_are_marked_on_arrival_and_the_plate_kept_when_reopened() {
     let plate = app.plate.as_ref().expect("plate");
     assert_eq!((plate.well, plate.opened.as_ref()), (Some(0), None));
 }
+
+#[test]
+fn clearing_the_datasets_closes_the_plate() {
+    let mut app = OctantApp::default();
+    app.selected.store_target = "https://x/plate.zarr".into();
+    app.follow_plate(&plate_metadata());
+    assert!(app.plate.is_some());
+    app.clear_all_datasets();
+    assert!(app.plate.is_none());
+}

@@ -67,6 +67,16 @@ impl Layer {
         self.source.labels()
     }
 
+    /// How this layer's pyramid aggregates cells: `chosen`, except for label
+    /// images, whose ids are never averaged (one id per cell).
+    pub fn pyramid_op(&self, chosen: crate::data::AggregationOp) -> crate::data::AggregationOp {
+        if self.labels().is_some() {
+            crate::data::AggregationOp::Nearest
+        } else {
+            chosen
+        }
+    }
+
     /// How volume values reach the GPU: packed RGB in composite mode.
     pub fn volume_encoding(&self) -> VolumeEncoding {
         if self.composite.enabled {

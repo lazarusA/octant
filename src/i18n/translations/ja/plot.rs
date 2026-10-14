@@ -29,6 +29,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::Requires3D => "3Dデータが必要です",
         PlotKey::DisabledGpuLimit => "無効: {} MB > GPU上限 128 MB",
         PlotKey::ScalarField => "スカラー場",
-        PlotKey::LabelsHeatmapOnly => "ラベル画像はヒートマップに描画されます",
+        PlotKey::LabelsHeatmapOnly => "ラベル画像はヒートマップにのみ描画されます",
     })
 }

@@ -177,11 +177,11 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::HideScaleBarHover => "Ocultar a barra de escala",
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
-            "Ajustar a janela de cada canal aos dados mostrados (de 0,1 a 99,9 por cento dos seus valores)"
+            "Ajustar a faixa de exibição de cada canal aos dados mostrados (de 0,1 a 99,9 por cento dos seus valores)"
         }
-        SettingsKey::ChannelsAutoUnavailable => "O contraste automático lê o corte 2D mostrado",
-        SettingsKey::ChannelSettingsHover => "Janela, curva e inversão",
-        SettingsKey::ChannelWindow => "Janela",
+        SettingsKey::ChannelsAutoUnavailable => "O contraste automático funciona em um corte 2D",
+        SettingsKey::ChannelSettingsHover => "Faixa de exibição, curva e inversão",
+        SettingsKey::ChannelWindow => "Faixa de exibição",
         SettingsKey::ChannelWindowHover => {
             "Os valores do início ao fim vão do preto até a cor plena do canal"
         }

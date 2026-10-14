@@ -7,20 +7,12 @@
 
 use serde_json::Value;
 
-use super::model::{ChannelFamily, ChannelWindow, OmeChannel};
+use super::model::{ChannelFamily, ChannelWindow, OmeChannel, OmeImage};
+use super::parse::json_text;
 use crate::data::slicing::{DEFAULT_CHANNEL_COLORS, parse_hex_color};
 
-/// The image-wide rendering defaults (`omero.rdefs`).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct RenderDefaults {
-    pub default_t: Option<usize>,
-    pub default_z: Option<usize>,
-    /// `model: "greyscale"`.
-    pub greyscale: bool,
-}
-
 /// Every channel of `omero`, in order.
-pub fn channels(omero: Option<&Value>) -> Vec<OmeChannel> {
+pub(super) fn channels(omero: Option<&Value>) -> Vec<OmeChannel> {
     let Some(list) = omero
         .and_then(|o| o.get("channels"))
         .and_then(Value::as_array)
@@ -33,28 +25,18 @@ pub fn channels(omero: Option<&Value>) -> Vec<OmeChannel> {
         .collect()
 }
 
-/// The `rdefs` of `omero`.
-pub fn render_defaults(omero: Option<&Value>) -> RenderDefaults {
+/// Sets the image-wide rendering defaults (`omero.rdefs`) of `image`.
+pub(super) fn apply_render_defaults(omero: Option<&Value>, image: &mut OmeImage) {
     let Some(rdefs) = omero.and_then(|o| o.get("rdefs")) else {
-        return RenderDefaults::default();
+        return;
     };
     let index = |key: &str| rdefs.get(key).and_then(Value::as_u64).map(|v| v as usize);
-    RenderDefaults {
-        default_t: index("defaultT"),
-        default_z: index("defaultZ"),
-        greyscale: rdefs
-            .get("model")
-            .and_then(Value::as_str)
-            .is_some_and(|m| m.trim().eq_ignore_ascii_case("greyscale")),
-    }
-}
-
-fn text(v: Option<&Value>) -> Option<String> {
-    match v? {
-        Value::String(s) if !s.trim().is_empty() => Some(s.trim().to_string()),
-        Value::Number(n) => Some(n.to_string()),
-        _ => None,
-    }
+    image.default_t = index("defaultT");
+    image.default_z = index("defaultZ");
+    image.greyscale = rdefs
+        .get("model")
+        .and_then(Value::as_str)
+        .is_some_and(|m| m.trim().eq_ignore_ascii_case("greyscale"));
 }
 
 fn number(v: Option<&Value>) -> Option<f32> {
@@ -68,8 +50,10 @@ fn channel(c: &Value, index: usize) -> OmeChannel {
         .and_then(parse_hex_color)
         .unwrap_or(DEFAULT_CHANNEL_COLORS[index % DEFAULT_CHANNEL_COLORS.len()]);
     OmeChannel {
-        label: text(c.get("label"))
-            .or_else(|| text(c.get("name")))
+        label: c
+            .get("label")
+            .and_then(json_text)
+            .or_else(|| c.get("name").and_then(json_text))
             .unwrap_or_default(),
         color,
         active: c.get("active").and_then(Value::as_bool).unwrap_or(true),

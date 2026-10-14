@@ -118,17 +118,8 @@ fn test_volume_target_pos_and_entries_without_matrix_data() {
         hover_pos,
     );
 
-    let (raw_val, entries, px, py) = resolve_cell_value_and_dim_entries(
-        &app,
-        None,
-        None,
-        None,
-        sampler.as_ref(),
-        hit.norm_x,
-        hit.norm_y,
-        hit.geo_coords,
-        hit.point_3d,
-    );
+    let (raw_val, entries, px, py) =
+        resolve_cell_value_and_dim_entries(&app, None, None, None, sampler.as_ref(), &hit);
 
     assert!((10.0..=80.0).contains(&raw_val));
     assert_eq!(

@@ -140,7 +140,7 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlateLoadingFields => "Lettura dei campi del pozzetto",
         DatasetKey::PlateNoFields => "Nessun campo in questa acquisizione",
         DatasetKey::PlateWellUnreadable => {
-            "Impossibile leggere i campi del pozzetto. Fai clic per riprovare"
+            "Impossibile leggere i campi del pozzetto. Clicca per riprovare"
         }
         DatasetKey::CategoryMicroscopy => "Microscopia",
     })

@@ -173,13 +173,13 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::HideScaleBarHover => "Скрыть масштабную линейку",
         SettingsKey::ChannelsAuto => "Авто",
         SettingsKey::ChannelsAutoHover => {
-            "Подогнать окно каждого канала под показанные данные (от 0,1 до 99,9 процента его значений)"
+            "Подогнать диапазон отображения каждого канала под показанные данные (от 0,1 до 99,9 процента его значений)"
         }
-        SettingsKey::ChannelsAutoUnavailable => "Автоконтраст читает показанный 2D-срез",
-        SettingsKey::ChannelSettingsHover => "Окно, кривая и инверсия",
-        SettingsKey::ChannelWindow => "Окно",
+        SettingsKey::ChannelsAutoUnavailable => "Автоконтраст работает на 2D-срезе",
+        SettingsKey::ChannelSettingsHover => "Диапазон отображения, кривая и инверсия",
+        SettingsKey::ChannelWindow => "Диапазон отображения",
         SettingsKey::ChannelWindowHover => {
-            "Значения от начала до конца идут от черного до полного цвета канала"
+            "Значения от начала до конца идут от чёрного до полного цвета канала"
         }
         SettingsKey::ChannelInvert => "Инвертировать",
         SettingsKey::ChannelCurve => "Кривая",

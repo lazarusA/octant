@@ -11,19 +11,19 @@
 
 pub mod axes;
 pub mod coords;
-pub mod discover;
-pub mod image;
-pub mod legacy;
+mod discover;
+mod image;
+mod legacy;
 pub mod level;
 pub mod model;
-pub mod ome_xml;
-pub mod omero;
+mod ome_xml;
+mod omero;
 pub mod parse;
 pub mod plate;
 pub mod reader;
-pub mod repair;
+mod repair;
 mod series;
-pub mod variables;
+mod variables;
 
 #[cfg(test)]
 mod block_tests;
@@ -44,11 +44,9 @@ use std::sync::Arc;
 
 use zarrs::storage::ReadableStorageTraits;
 
-pub use axes::{AxisKind, OmeAxis};
+pub use axes::AxisKind;
 pub use discover::{Discovery, Outcome, discover};
-pub use model::{
-    ChannelFamily, ChannelWindow, OmeChannel, OmeImage, OmeLabelInfo, OmeLevel, OmeRef,
-};
+pub use model::{ChannelFamily, ChannelWindow, OmeChannel, OmeLabelInfo, OmeRef};
 pub use plate::{OmeDataset, OmePlate, OmeWell};
 pub use reader::{MetaReader, Prefetch};
 

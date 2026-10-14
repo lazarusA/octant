@@ -51,34 +51,14 @@ pub(super) fn acquisition_select(ui: &mut egui::Ui, plate: &mut PlateState) {
 pub(super) fn field_list(ui: &mut egui::Ui, plate: &mut PlateState) -> Option<PlateAction> {
     let layout = std::sync::Arc::clone(&plate.plate);
     let Some((index, well)) = plate.well.and_then(|i| Some((i, layout.wells.get(i)?))) else {
-        ui.label(
-            egui::RichText::new(tr(DatasetKey::PlatePickWell))
-                .small()
-                .weak(),
-        );
+        ui.label(muted(DatasetKey::PlatePickWell));
         return None;
     };
-    let fields = match plate.well_fields(&well.path) {
-        WellFields::Loading => {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label(
-                    egui::RichText::new(tr(DatasetKey::PlateLoadingFields))
-                        .small()
-                        .weak(),
-                );
-            });
-            return None;
-        }
-        WellFields::Failed => {
-            let retry = egui::RichText::new(tr(DatasetKey::PlateWellUnreadable)).small();
-            if ui.link(retry).clicked() {
-                plate.retry_well(&well.path);
-            }
-            return None;
-        }
-        WellFields::Ready(fields) => std::sync::Arc::clone(fields),
+    let WellFields::Ready(fields) = plate.well_fields(&well.path) else {
+        well_status(ui, plate, &well.path);
+        return None;
     };
+    let fields = std::sync::Arc::clone(fields);
     let opened = match &plate.opened {
         Some((w, field)) if *w == index => Some(field.as_str()),
         _ => None,
@@ -86,11 +66,7 @@ pub(super) fn field_list(ui: &mut egui::Ui, plate: &mut PlateState) -> Option<Pl
     let mut action = None;
     ui.horizontal_wrapped(|ui| {
         ui.label(well.path.as_str());
-        ui.label(
-            egui::RichText::new(tr(DatasetKey::PlateFields))
-                .small()
-                .weak(),
-        );
+        ui.label(muted(DatasetKey::PlateFields));
         let mut any = false;
         for (n, field) in fields.fields_of(plate.acquisition) {
             any = true;
@@ -106,12 +82,29 @@ pub(super) fn field_list(ui: &mut egui::Ui, plate: &mut PlateState) -> Option<Pl
             }
         }
         if !any {
-            ui.label(
-                egui::RichText::new(tr(DatasetKey::PlateNoFields))
-                    .small()
-                    .weak(),
-            );
+            ui.label(muted(DatasetKey::PlateNoFields));
         }
     });
     action
+}
+
+/// A note in small, weak text.
+fn muted(key: DatasetKey) -> egui::RichText {
+    egui::RichText::new(tr(key)).small().weak()
+}
+
+/// The well at `path` while its fields load, or a link retrying it when
+/// they could not be read.
+fn well_status(ui: &mut egui::Ui, plate: &mut PlateState, path: &str) {
+    if matches!(plate.well_fields(path), WellFields::Failed) {
+        let retry = egui::RichText::new(tr(DatasetKey::PlateWellUnreadable)).small();
+        if ui.link(retry).clicked() {
+            plate.retry_well(path);
+        }
+    } else {
+        ui.horizontal(|ui| {
+            ui.spinner();
+            ui.label(muted(DatasetKey::PlateLoadingFields));
+        });
+    }
 }

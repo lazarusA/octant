@@ -1,5 +1,17 @@
 //! HTTP byte fetching and range requests.
 
+/// Whether `err`, from the fetches below, is an HTTP 404: the key is absent.
+pub fn is_not_found(err: &str) -> bool {
+    err.starts_with("HTTP 404 ")
+}
+
+/// Whether a metadata key looks absent: [`is_not_found`], or the 403 S3
+/// answers for a missing key without list access. Not for chunks, where a 403
+/// may be a store the user cannot read and must not show as empty data.
+pub fn is_missing(err: &str) -> bool {
+    is_not_found(err) || err.starts_with("HTTP 403 ")
+}
+
 /// Fetches raw bytes from a remote URL using browser `window.fetch()`.
 #[cfg(target_arch = "wasm32")]
 pub async fn fetch_url_bytes(url: &str) -> Result<Vec<u8>, String> {
@@ -143,4 +155,18 @@ pub async fn fetch_url_byte_range(url: &str, offset: u64, length: u64) -> Result
         }
     }
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_missing;
+
+    #[test]
+    fn missing_keys_are_404_and_403() {
+        assert!(is_missing("HTTP 404 fetching 'a/.zattrs'"));
+        assert!(is_missing("HTTP 403 Forbidden fetching 'a/0.0'"));
+        assert!(!is_missing("HTTP 500 fetching 'a/0.0'"));
+        assert!(!is_missing("Network fetch failed for 'a/0.0'"));
+        assert!(!super::is_not_found("HTTP 403 Forbidden fetching 'a/0.0'"));
+    }
 }

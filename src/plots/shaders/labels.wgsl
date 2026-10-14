@@ -39,7 +39,7 @@ fn label_at(uv: vec2<f32>) -> u32 {
     return label_buffer[quad_cell(uv, arrayLength(&label_buffer))];
 }
 
-// PCG hash, mirrored by `label_hash` in `label_palette.rs`.
+// PCG hash, mirrored by `label_hash` in `labels.rs`.
 fn label_hash(v: u32) -> u32 {
     let state = v * 747796405u + 2891336453u;
     let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
@@ -77,9 +77,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // One screen pixel in uv, taken before any branch (uniform control flow).
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
-    if (outside_quad(in.uv)) {
-        discard;
-    }
+    // 0 outside the image, discarded with the background.
     let id = label_at(in.uv);
     if (id == 0u) {
         discard;

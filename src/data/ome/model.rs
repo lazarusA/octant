@@ -153,6 +153,8 @@ pub fn greyscale_display(
 pub struct OmeRef {
     pub image: Arc<OmeImage>,
     pub level: usize,
+    /// An integer label image, drawn as labels (ids read exactly).
+    pub labels: bool,
 }
 
 impl OmeRef {

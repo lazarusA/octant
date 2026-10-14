@@ -16,7 +16,7 @@ pub(crate) fn local_channel(channel: usize, start: usize, count: usize) -> usize
 }
 
 /// Pixels `CompositeProbe::channel_quantiles` reads at most.
-pub const QUANTILE_SAMPLES: usize = 1 << 20;
+const QUANTILE_SAMPLES: usize = 1 << 20;
 
 /// The block window a 2D composite was sliced from. It shares the block's value buffer, so
 /// keeping it costs a few small index vectors.

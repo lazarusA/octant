@@ -1,6 +1,6 @@
 //! Zarr backend implementations and storage abstractions.
 
-pub mod block;
+mod block;
 mod block_coords;
 #[cfg(test)]
 mod block_coords_tests;
@@ -16,7 +16,6 @@ pub mod store;
 pub mod wasm;
 pub mod zstd_shim;
 
-pub use block::{ArrayCachedState, fetch_block_from_cached_array};
 pub use coords::read_coordinate;
 pub use generic::GenericZarrBlockStore;
 pub use slice::{retrieve_array_subset_as_f32, retrieve_array_subset_as_f64};

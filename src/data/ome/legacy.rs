@@ -30,22 +30,22 @@ pub fn name_axes(ome: &mut Map<String, Value>, shapes: ShapeLookup<'_>) {
         {
             continue;
         }
-        let rank = dataset_paths(multiscale)
-            .first()
-            .and_then(|p| shapes(p))
+        let rank = first_path(multiscale)
+            .and_then(|p| shapes(&p))
             .map_or(0, |s| s.len());
         multiscale.insert("axes".into(), json!(default_axis_names(rank)));
     }
 }
 
-fn dataset_paths(multiscale: &Map<String, Value>) -> Vec<String> {
-    let datasets = multiscale.get("datasets").and_then(Value::as_array);
-    datasets
-        .into_iter()
-        .flatten()
-        .filter_map(|d| d.get("path").and_then(Value::as_str))
-        .map(|p| p.trim_matches('/').to_string())
-        .collect()
+/// The path of the first dataset of `multiscale`, the base level.
+fn first_path(multiscale: &Map<String, Value>) -> Option<String> {
+    let first = multiscale.get("datasets")?.as_array()?.first()?;
+    dataset_path(first.as_object()?)
+}
+
+fn dataset_path(dataset: &Map<String, Value>) -> Option<String> {
+    let path = dataset.get("path")?.as_str()?;
+    Some(path.trim_matches('/').to_string())
 }
 
 /// Gives each dataset without `coordinateTransformations` a scale: how much
@@ -56,21 +56,21 @@ pub fn fill_missing_scales(
     axis_names: &[String],
     shapes: ShapeLookup<'_>,
 ) -> bool {
-    let paths = dataset_paths(multiscale);
-    let base = paths.first().and_then(|p| shapes(p)).unwrap_or_default();
+    let base = first_path(multiscale)
+        .and_then(|p| shapes(&p))
+        .unwrap_or_default();
     let Some(datasets) = multiscale.get_mut("datasets").and_then(Value::as_array_mut) else {
         return false;
     };
     let mut changed = false;
-    for (dataset, path) in datasets
-        .iter_mut()
-        .filter_map(Value::as_object_mut)
-        .zip(&paths)
-    {
+    // Each dataset with its own path: one without stays unscaled.
+    for dataset in datasets.iter_mut().filter_map(Value::as_object_mut) {
         if dataset.contains_key("coordinateTransformations") {
             continue;
         }
-        let shape = shapes(path).unwrap_or_default();
+        let shape = dataset_path(dataset)
+            .and_then(|p| shapes(&p))
+            .unwrap_or_default();
         let scale: Vec<f64> = axis_names
             .iter()
             .enumerate()

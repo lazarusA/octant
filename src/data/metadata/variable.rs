@@ -65,14 +65,17 @@ impl VariableInfo {
 
     /// Whether this is an OME-Zarr label image (segmentation ids).
     pub fn is_label_image(&self) -> bool {
-        self.attributes
-            .contains_key(crate::data::ome::variables::LABEL_IMAGE_ATTRIBUTE)
+        self.ome.as_ref().is_some_and(|o| o.labels)
     }
 
     /// A label image's colors and properties.
     pub fn label_info(&self) -> Option<&Arc<OmeLabelInfo>> {
-        self.is_label_image().then_some(())?;
-        self.ome.as_ref()?.image.label_info.as_ref()
+        self.ome
+            .as_ref()
+            .filter(|o| o.labels)?
+            .image
+            .label_info
+            .as_ref()
     }
 
     /// The dimension a multi-channel overlay runs across: the OME-Zarr

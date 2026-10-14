@@ -4,10 +4,9 @@
 
 use zarrs::array::DataType;
 
-use super::image::image_from_group;
-use super::parse::parse_group;
+use super::parse::{is_ome_attributes, parse_group};
 use super::reader::{MetaReader, join};
-use super::variables::{is_integer, level_dimension_names};
+use super::variables::{draws_as_labels, level_dimension_names};
 
 /// How the blocks of an OME-Zarr level array are read.
 #[derive(Debug, Clone, PartialEq)]
@@ -31,18 +30,31 @@ pub fn level_array(
         let Ok(Some(attrs)) = reader.group_attributes(group) else {
             continue;
         };
+        if !is_ome_attributes(&attrs) {
+            continue;
+        }
         let shapes = |p: &str| reader.array_shape(&join(group, p)).ok().flatten();
-        let Some(image) = parse_group(&attrs, &shapes).and_then(|g| image_from_group(group, &g))
-        else {
+        let Some(parsed) = parse_group(std::sync::Arc::unwrap_or_clone(attrs), &shapes) else {
             continue;
         };
+        let Some(multiscale) = parsed.fields.multiscales.as_ref().and_then(|m| m.first()) else {
+            continue;
+        };
+        if multiscale.datasets.is_empty() {
+            continue;
+        }
         let relative = path[group.len()..].trim_matches('/');
-        if !image.levels.iter().any(|l| l.path == relative) {
+        if !multiscale
+            .datasets
+            .iter()
+            .any(|d| d.path.trim_matches('/') == relative)
+        {
             return None;
         }
+        let names = multiscale.axes.iter().map(|a| a.name.as_str());
         return Some(LevelArray {
-            dim_names: level_dimension_names(&image, rank),
-            labels: image.label_info.is_some() && is_integer(data_type),
+            dim_names: level_dimension_names(names, rank),
+            labels: draws_as_labels(parsed.fields.image_label.is_some(), data_type),
         });
     }
     None

@@ -134,12 +134,12 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::HideScaleBarHover => "隐藏比例尺",
         SettingsKey::ChannelsAuto => "自动",
         SettingsKey::ChannelsAutoHover => {
-            "将每个通道的窗口适配到所显示的数据（其数值的 0.1% 到 99.9%）"
+            "将每个通道的显示范围适配到所显示的数据（其数值的 0.1% 到 99.9%）"
         }
-        SettingsKey::ChannelsAutoUnavailable => "自动对比度读取所显示的二维切片",
-        SettingsKey::ChannelSettingsHover => "窗口、曲线与反转",
-        SettingsKey::ChannelWindow => "窗口",
-        SettingsKey::ChannelWindowHover => "从起点到终点的数值对应通道从黑色到全色",
+        SettingsKey::ChannelsAutoUnavailable => "自动对比度适用于二维切片",
+        SettingsKey::ChannelSettingsHover => "显示范围、曲线与反转",
+        SettingsKey::ChannelWindow => "显示范围",
+        SettingsKey::ChannelWindowHover => "从起点到终点的数值对应从黑色到通道本色",
         SettingsKey::ChannelInvert => "反转",
         SettingsKey::ChannelCurve => "曲线",
         SettingsKey::CurveLinear => "线性",

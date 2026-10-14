@@ -183,11 +183,13 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::HideScaleBarHover => "Masquer la barre d'échelle",
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
-            "Ajuster la fenêtre de chaque canal aux données affichées (de 0,1 à 99,9 pour cent de ses valeurs)"
+            "Ajuster la plage d'affichage de chaque canal aux données affichées (de 0,1 à 99,9 pour cent de ses valeurs)"
         }
-        SettingsKey::ChannelsAutoUnavailable => "Le contraste automatique lit la coupe 2D affichée",
-        SettingsKey::ChannelSettingsHover => "Fenêtre, courbe et inversion",
-        SettingsKey::ChannelWindow => "Fenêtre",
+        SettingsKey::ChannelsAutoUnavailable => {
+            "Le contraste automatique fonctionne sur une coupe 2D"
+        }
+        SettingsKey::ChannelSettingsHover => "Plage d'affichage, courbe et inversion",
+        SettingsKey::ChannelWindow => "Plage d'affichage",
         SettingsKey::ChannelWindowHover => {
             "Les valeurs du début à la fin vont du noir à la pleine couleur du canal"
         }
@@ -199,7 +201,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::CurvePolynomial => "Polynomiale",
         SettingsKey::ChannelCoefficientHover => "Coefficient de la courbe",
         SettingsKey::LabelsFill => "Remplissage",
-        SettingsKey::LabelsFillHover => "Colorier chaque étiquette entière",
+        SettingsKey::LabelsFillHover => "Remplir chaque étiquette en entier",
         SettingsKey::LabelsOutline => "Contour",
         SettingsKey::LabelsOutlineHover => "Dessiner seulement les bords entre étiquettes",
     })

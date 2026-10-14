@@ -57,12 +57,6 @@ impl Default for ChannelDisplay {
 }
 
 impl ChannelDisplay {
-    /// Maps a windowed intensity `norm` (0..1) through the family curve, then
-    /// inverts it. Every curve keeps 0 at 0 and 1 at 1.
-    pub fn map(&self, norm: f32) -> f32 {
-        self.curve().map(norm)
-    }
-
     /// The curve with its coefficient checked, for mapping many intensities.
     pub fn curve(&self) -> ChannelCurve {
         let c = if self.coefficient.is_finite() && self.coefficient > 0.0 {
@@ -112,7 +106,8 @@ pub struct ChannelCurve {
 }
 
 impl ChannelCurve {
-    /// `ChannelDisplay::map`.
+    /// Maps a windowed intensity `norm` (0..1) through the family curve, then
+    /// inverts it. Every curve keeps 0 at 0 and 1 at 1.
     #[inline]
     pub fn map(&self, norm: f32) -> f32 {
         let n = f64::from(norm.clamp(0.0, 1.0));

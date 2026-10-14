@@ -167,11 +167,11 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::HideScaleBarHover => "Dölj skalstrecket",
         SettingsKey::ChannelsAuto => "Auto",
         SettingsKey::ChannelsAutoHover => {
-            "Anpassa varje kanals fönster till de visade data (0,1 till 99,9 procent av dess värden)"
+            "Anpassa varje kanals visningsintervall till visade data (0,1 till 99,9 procent av dess värden)"
         }
-        SettingsKey::ChannelsAutoUnavailable => "Automatisk kontrast läser det visade 2D-snittet",
-        SettingsKey::ChannelSettingsHover => "Fönster, kurva och invertering",
-        SettingsKey::ChannelWindow => "Fönster",
+        SettingsKey::ChannelsAutoUnavailable => "Automatisk kontrast fungerar på ett 2D-snitt",
+        SettingsKey::ChannelSettingsHover => "Visningsintervall, kurva och invertering",
+        SettingsKey::ChannelWindow => "Visningsintervall",
         SettingsKey::ChannelWindowHover => {
             "Värden från start till slut går från svart till kanalens fulla färg"
         }

@@ -14,7 +14,7 @@ use zarrs::storage::{ReadableStorageTraits, StoreKey};
 
 /// The answer for one key.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Lookup {
+pub(super) enum Lookup {
     /// The key's bytes, shared (cache hits copy nothing).
     Found(zarrs::storage::Bytes),
     /// The store has no such key.
@@ -44,14 +44,21 @@ impl Prefetch {
     }
 }
 
+/// Group attributes by group path, parsed once per reader.
+type Groups = RefCell<HashMap<String, Option<Arc<Map<String, Value>>>>>;
+/// Array metadata documents by array path, parsed once per reader.
+type Arrays = RefCell<HashMap<String, Option<Arc<Value>>>>;
+
 /// Reads metadata keys from a store, optionally behind a web prefetch. Each
-/// key is read once per reader (the web keeps one across its walks), and once
-/// a group answers in one Zarr format only that format's keys are asked: a
-/// remote store is spared requests that would fail.
+/// key is read and parsed once per reader (the web keeps one across its
+/// walks), and once a group answers in one Zarr format only that format's
+/// keys are asked: a remote store is spared requests that would fail.
 pub struct MetaReader<'a> {
     storage: Arc<dyn ReadableStorageTraits>,
     prefetch: Option<&'a Prefetch>,
     seen: RefCell<HashMap<String, Lookup>>,
+    groups: Groups,
+    arrays: Arrays,
     /// The store's Zarr format, once a group answered (`2` or `3`).
     format: Cell<Option<u8>>,
 }
@@ -59,20 +66,21 @@ pub struct MetaReader<'a> {
 impl<'a> MetaReader<'a> {
     /// A reader answering every key from `storage` (desktop).
     pub fn direct(storage: Arc<dyn ReadableStorageTraits>) -> Self {
-        Self {
-            storage,
-            prefetch: None,
-            seen: RefCell::default(),
-            format: Cell::new(None),
-        }
+        Self::new(storage, None)
     }
 
     /// A reader over keys prefetched into `storage` (web).
     pub fn prefetched(storage: Arc<dyn ReadableStorageTraits>, prefetch: &'a Prefetch) -> Self {
+        Self::new(storage, Some(prefetch))
+    }
+
+    fn new(storage: Arc<dyn ReadableStorageTraits>, prefetch: Option<&'a Prefetch>) -> Self {
         Self {
             storage,
-            prefetch: Some(prefetch),
+            prefetch,
             seen: RefCell::default(),
+            groups: RefCell::default(),
+            arrays: RefCell::default(),
             format: Cell::new(None),
         }
     }
@@ -82,7 +90,7 @@ impl<'a> MetaReader<'a> {
         self.storage.clone()
     }
 
-    pub fn get(&self, key: &str) -> Lookup {
+    pub(super) fn get(&self, key: &str) -> Lookup {
         let key = key.trim_start_matches('/');
         if let Some(known) = self.seen.borrow().get(key) {
             return known.clone();
@@ -114,7 +122,7 @@ impl<'a> MetaReader<'a> {
 
     /// The first of `keys` the store has. Once one is pending, the rest are
     /// asked too, so the web fetches them together rather than one per pass.
-    pub fn first_of(&self, keys: &[String]) -> Lookup {
+    fn first_of(&self, keys: &[String]) -> Lookup {
         let mut pending = false;
         for key in keys {
             match self.get(key) {
@@ -130,28 +138,55 @@ impl<'a> MetaReader<'a> {
         }
     }
 
-    /// A group's attributes: `zarr.json` `attributes` (Zarr v3) or `.zattrs`
-    /// (Zarr v2). `Ok(None)` when the group has neither.
-    pub fn group_attributes(&self, path: &str) -> Result<Option<Map<String, Value>>, Pending> {
+    /// Whether the store has a group (or array) metadata document at `path`,
+    /// without parsing it.
+    pub fn has_group(&self, path: &str) -> Result<bool, Pending> {
         let keys = self.keys(join(path, "zarr.json"), join(path, ".zattrs"));
         match self.first_of(&keys) {
-            Lookup::Found(bytes) => Ok(attributes_of(&bytes).map(|(attrs, format)| {
-                self.format.set(Some(format));
-                attrs
-            })),
-            Lookup::Absent => Ok(None),
+            Lookup::Found(_) => Ok(true),
+            Lookup::Absent => Ok(false),
             Lookup::Pending => Err(Pending),
         }
     }
 
-    /// An array's metadata document (`zarr.json` or `.zarray`).
-    pub fn array_metadata(&self, path: &str) -> Result<Option<Value>, Pending> {
-        let keys = self.keys(join(path, "zarr.json"), join(path, ".zarray"));
-        match self.first_of(&keys) {
-            Lookup::Found(bytes) => Ok(serde_json::from_slice::<Value>(&bytes).ok()),
-            Lookup::Absent => Ok(None),
-            Lookup::Pending => Err(Pending),
+    /// A group's attributes: `zarr.json` `attributes` (Zarr v3) or `.zattrs`
+    /// (Zarr v2). `Ok(None)` when the group has neither.
+    pub fn group_attributes(&self, path: &str) -> Result<Option<Arc<Map<String, Value>>>, Pending> {
+        let path = path.trim_matches('/');
+        if let Some(known) = self.groups.borrow().get(path) {
+            return Ok(known.clone());
         }
+        let keys = self.keys(join(path, "zarr.json"), join(path, ".zattrs"));
+        let attrs = match self.first_of(&keys) {
+            Lookup::Found(bytes) => attributes_of(&bytes).map(|(attrs, format)| {
+                self.format.set(Some(format));
+                Arc::new(attrs)
+            }),
+            Lookup::Absent => None,
+            Lookup::Pending => return Err(Pending),
+        };
+        self.groups
+            .borrow_mut()
+            .insert(path.to_string(), attrs.clone());
+        Ok(attrs)
+    }
+
+    /// An array's metadata document (`zarr.json` or `.zarray`).
+    pub fn array_metadata(&self, path: &str) -> Result<Option<Arc<Value>>, Pending> {
+        let path = path.trim_matches('/');
+        if let Some(known) = self.arrays.borrow().get(path) {
+            return Ok(known.clone());
+        }
+        let keys = self.keys(join(path, "zarr.json"), join(path, ".zarray"));
+        let meta = match self.first_of(&keys) {
+            Lookup::Found(bytes) => serde_json::from_slice::<Value>(&bytes).ok().map(Arc::new),
+            Lookup::Absent => None,
+            Lookup::Pending => return Err(Pending),
+        };
+        self.arrays
+            .borrow_mut()
+            .insert(path.to_string(), meta.clone());
+        Ok(meta)
     }
 
     /// The shape an array's metadata declares.

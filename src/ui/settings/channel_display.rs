@@ -15,7 +15,8 @@ const FAMILIES: [(ChannelFamily, K); 4] = [
 ];
 
 /// The window, curve and inversion of channel `cfg` of layer `id`. Whether
-/// anything changed.
+/// the layer should reload: values apply every frame, but a dragged value
+/// reloads only once its drag stops (see [`settled`]).
 pub(super) fn channel_detail(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) -> bool {
     let mut changed = false;
     ui.indent(("mc_channel_detail", id, cfg.index), |ui| {
@@ -34,36 +35,38 @@ pub(super) fn channel_detail(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id
     changed
 }
 
+/// Whether an edit of `response`'s value should reload the layer: when its
+/// drag stops, or when it changed without a drag (typing, arrow keys), so a
+/// drag does not re-project the composite every frame.
+fn settled(response: &egui::Response) -> bool {
+    response.drag_stopped() || (response.changed() && !response.dragged())
+}
+
+/// A localized input of `value` within `range`.
+fn input(value: &mut f32, speed: f32, range: std::ops::RangeInclusive<f32>) -> impl egui::Widget {
+    egui::DragValue::new(value)
+        .localized()
+        .speed(speed)
+        .range(range)
+}
+
 /// Start and end of the window, within the values it may span (OMERO
-/// `min`..`max`, else the window itself).
+/// `min`..`max`, else the window itself). Whether the layer should reload.
 fn window_inputs(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig) -> bool {
     let (lo, hi) = cfg.display.range.or(cfg.window).unwrap_or((0.0, 1.0));
     let (mut start, mut end) = cfg.window.unwrap_or((lo, hi));
     let speed = ((hi - lo).abs() / 200.0).max(1e-4);
-    let mut changed = ui
-        .add(
-            egui::DragValue::new(&mut start)
-                .localized()
-                .speed(speed)
-                .range(lo.min(end)..=end),
-        )
-        .changed();
-    changed |= ui
-        .add(
-            egui::DragValue::new(&mut end)
-                .localized()
-                .speed(speed)
-                .range(start..=hi.max(start)),
-        )
-        .changed();
-    if changed {
+    let a = ui.add(input(&mut start, speed, lo.min(end)..=end));
+    let b = ui.add(input(&mut end, speed, start..=hi.max(start)));
+    if a.changed() || b.changed() {
         cfg.window = Some((start, end));
     }
-    changed
+    settled(&a) || settled(&b)
 }
 
 /// The curve family and, for the curves that use one (polynomial and
-/// exponential; OMERO's logarithmic ignores it), its coefficient.
+/// exponential; OMERO's logarithmic ignores it), its coefficient. Whether
+/// the layer should reload.
 fn curve_select(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) -> bool {
     let mut changed = false;
     let name = |family: ChannelFamily| {
@@ -86,15 +89,10 @@ fn curve_select(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) ->
         cfg.display.family,
         ChannelFamily::Polynomial | ChannelFamily::Exponential
     ) {
-        changed |= ui
-            .add(
-                egui::DragValue::new(&mut cfg.display.coefficient)
-                    .localized()
-                    .speed(0.05)
-                    .range(0.05..=10.0),
-            )
-            .on_hover_text(tr(K::ChannelCoefficientHover))
-            .changed();
+        let response = ui
+            .add(input(&mut cfg.display.coefficient, 0.05, 0.05..=10.0))
+            .on_hover_text(tr(K::ChannelCoefficientHover));
+        changed |= settled(&response);
     }
     changed
 }
