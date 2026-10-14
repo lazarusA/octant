@@ -13,6 +13,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::CropHover => "Líneas guía de recorte (C)",
         PlaybackKey::PlaybackSpeed => "Velocidad de reproducción",
         PlaybackKey::PlaybackBuffer => "Búfer antes de reproducir",
+        PlaybackKey::Buffering => "Almacenando en búfer {}/{}",
         PlaybackKey::SaveExportHover => {
             "Guardar / exportar figura (Cmd+S para guardado rápido, Cmd+Shift+S para ajustes)"
         }

@@ -13,6 +13,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::CropHover => "Напрямні лінії обрізання (C)",
         PlaybackKey::PlaybackSpeed => "Швидкість відтворення",
         PlaybackKey::PlaybackBuffer => "Буферизація перед відтворенням",
+        PlaybackKey::Buffering => "Буферизація {}/{}",
         PlaybackKey::SaveExportHover => {
             "Зберегти / експортувати рисунок (Cmd+S - швидке збереження, Cmd+Shift+S - налаштування)"
         }

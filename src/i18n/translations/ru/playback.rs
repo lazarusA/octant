@@ -13,6 +13,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::CropHover => "Направляющие обрезки (C)",
         PlaybackKey::PlaybackSpeed => "Скорость воспроизведения",
         PlaybackKey::PlaybackBuffer => "Буферизация перед воспроизведением",
+        PlaybackKey::Buffering => "Буферизация {}/{}",
         PlaybackKey::SaveExportHover => {
             "Сохранить / экспортировать рисунок (Cmd+S - быстрое сохранение, Cmd+Shift+S - настройки)"
         }

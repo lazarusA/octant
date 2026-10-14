@@ -14,6 +14,7 @@ crate::i18n::keys::define_keys! {
     CropHover,
     PlaybackSpeed,
     PlaybackBuffer,
+    Buffering,
     SaveExportHover,
     CollapsedHint,
     // Timeline details popover
