@@ -12,6 +12,8 @@ pub mod load;
 pub mod pacing;
 #[cfg(test)]
 mod pacing_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod playback_bench_tests;
 pub mod prefetch;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod prefetch_network_tests;
