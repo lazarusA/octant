@@ -6,13 +6,9 @@ use crate::app::layers::VariableSelection;
 
 impl Default for OctantApp {
     fn default() -> Self {
-        // The block cache's default budget: 1 GB on the desktop, 512 MB in
-        // the browser, whose WebAssembly memory (4 GB at most) also holds
-        // the plotted layers and their pyramids.
-        #[cfg(not(target_arch = "wasm32"))]
+        // The block cache's default budget (1 GB), on the desktop and in the
+        // browser: it bounds how much of a selected range prefetch keeps.
         let default_cache_mb = 1024;
-        #[cfg(target_arch = "wasm32")]
-        let default_cache_mb = 512;
 
         Self {
             selected: VariableSelection::default(),

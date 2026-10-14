@@ -12,6 +12,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::Crop => "Rajaa",
         PlaybackKey::CropHover => "Rajauksen apuviivat (C)",
         PlaybackKey::PlaybackSpeed => "Toistonopeus",
+        PlaybackKey::PlaybackBuffer => "Puskurointi ennen toistoa",
+        PlaybackKey::Buffering => "Puskuroidaan {}/{}",
         PlaybackKey::SaveExportHover => {
             "Tallenna / vie kuva (Cmd+S pikatallennus, Cmd+Shift+S asetukset)"
         }

@@ -11,15 +11,15 @@ use crate::ui::number_input::LocalizedInput;
 use crate::ui::toolbar::{BarItem, ItemWidths, SEPARATOR_WIDTH};
 use crate::utils::stack_str;
 
-/// Stack buffer for the "N FPS" label.
-type FpsBuf = [u8; 16];
+/// Stack buffer for the "N FPS" and buffering labels.
+pub(super) type LabelBuf = [u8; 64];
 
 /// Items preceded by a separator, opening a new group.
 fn opens_group(item: Item) -> bool {
     matches!(item, Item::DateInfo | Item::Crop)
 }
 
-fn fps_label<'a>(buf: &'a mut FpsBuf, app: &OctantApp) -> &'a str {
+fn fps_label<'a>(buf: &'a mut LabelBuf, app: &OctantApp) -> &'a str {
     let fps = app.playback.playback_fps.round() as u32;
     stack_str(buf, format_args!("{fps} FPS"))
 }
@@ -29,7 +29,7 @@ fn fps_label<'a>(buf: &'a mut FpsBuf, app: &OctantApp) -> &'a str {
 fn button<'a>(
     item: Item,
     app: &OctantApp,
-    fps: &'a str,
+    label: &'a str,
     compact: bool,
 ) -> Option<ToolbarButton<'a>> {
     let icon_only = |icon, label| Some(ToolbarButton::new(icon, label).compact(true));
@@ -39,6 +39,10 @@ fn button<'a>(
         Item::Prev => icon_only(Icon::StepBackward, tr(K::PreviousStep)),
         Item::Next => icon_only(Icon::StepForward, tr(K::NextStep)),
         Item::Last => icon_only(Icon::SeekEnd, tr(K::LastStep)),
+        // Waiting for the buffer: its progress, and a click still pauses.
+        Item::PlayPause if is_buffering(app) => {
+            labelled(Icon::Hourglass, label).map(|b| b.hover(tr(K::Pause)))
+        }
         Item::PlayPause if app.playback.is_playing => labelled(Icon::Pause, tr(K::Pause)),
         Item::PlayPause => labelled(Icon::Play, tr(K::Play)),
         Item::Loop => {
@@ -47,7 +51,7 @@ fn button<'a>(
         Item::Crop => labelled(Icon::Scissors, tr(K::Crop))
             .map(|b| b.toggled(app.show_crop_overlay).hover(tr(K::CropHover))),
         // Collapsed, the FPS value itself becomes the tooltip.
-        Item::Fps => labelled(Icon::Gauge, fps).map(|b| {
+        Item::Fps => labelled(Icon::Gauge, label).map(|b| {
             let b = b.owns_popup();
             if compact {
                 b
@@ -62,12 +66,20 @@ fn button<'a>(
     }
 }
 
-/// The "N FPS" label for the FPS item; other items need no label buffer.
-fn label_for<'a>(buf: &'a mut FpsBuf, item: Item, app: &OctantApp) -> &'a str {
-    if item == Item::Fps {
-        fps_label(buf, app)
-    } else {
-        ""
+fn is_buffering(app: &OctantApp) -> bool {
+    app.playback.is_playing && app.playback.buffering
+}
+
+/// The "N FPS" label of the FPS item and the "Buffering n/m" label of the
+/// play button while it buffers; other items need no label buffer.
+pub(super) fn label_for<'a>(buf: &'a mut LabelBuf, item: Item, app: &OctantApp) -> &'a str {
+    match item {
+        Item::Fps => fps_label(buf, app),
+        Item::PlayPause if is_buffering(app) => {
+            let (ready, wanted) = app.playback.buffer_progress;
+            crate::i18n::fill(buf, tr(K::Buffering), &[&ready, &wanted])
+        }
+        _ => "",
     }
 }
 
@@ -81,11 +93,11 @@ pub(super) fn item_widths(item: Item, app: &OctantApp, tl: &Timeline, ui: &egui:
     } else {
         0.0
     };
-    let mut buf = FpsBuf::default();
-    let fps = label_for(&mut buf, item, app);
-    let (full, compact) = match button(item, app, fps, false) {
+    let mut buf: LabelBuf = [0; 64];
+    let label = label_for(&mut buf, item, app);
+    let (full, compact) = match button(item, app, label, false) {
         Some(full) => {
-            let compact = button(item, app, fps, true).map_or(0.0, |b| b.width(ui));
+            let compact = button(item, app, label, true).map_or(0.0, |b| b.width(ui));
             (full.width(ui), compact)
         }
         None => labels::widths(item, tl, ui),
@@ -117,9 +129,9 @@ pub(super) fn show_item(
     // A fixed id per item, so items hiding elsewhere in the bar never shift
     // this one's auto ids (which would drop drags or close its popup).
     ui.push_id(("bottom_bar_item", item.index()), |ui| {
-        let mut buf = FpsBuf::default();
-        let fps = label_for(&mut buf, item, app);
-        match button(item, app, fps, compact) {
+        let mut buf: LabelBuf = [0; 64];
+        let label = label_for(&mut buf, item, app);
+        match button(item, app, label, compact) {
             Some(btn) => {
                 let response = ui.add(btn);
                 on_click(item, &response, app, tl);
@@ -140,6 +152,13 @@ fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Tim
                         .localized()
                         .suffix(" FPS"),
                 );
+                ui.label(egui::RichText::new(tr(K::PlaybackBuffer)).strong());
+                ui.add(
+                    egui::Slider::new(&mut app.playback.buffer_secs, 0.0..=10.0)
+                        .localized()
+                        .step_by(0.5)
+                        .suffix(" s"),
+                );
             });
         return;
     }
@@ -151,13 +170,7 @@ fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Tim
         Item::Prev => app.step_prev(),
         Item::Next => app.step_next(),
         Item::Last => app.request_step_or_load(tl.last_step),
-        Item::PlayPause => {
-            app.playback.is_playing = !app.playback.is_playing;
-            app.playback.last_step_time = web_time::Instant::now();
-            if app.playback.is_playing {
-                app.prefetch_animated_ranges();
-            }
-        }
+        Item::PlayPause => app.toggle_playback(),
         Item::Loop => app.playback.loop_playback = !app.playback.loop_playback,
         Item::Crop => app.show_crop_overlay = !app.show_crop_overlay,
         Item::Save => app.show_export_modal = true,

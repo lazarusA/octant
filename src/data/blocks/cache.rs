@@ -83,22 +83,40 @@ impl BlockCache {
         anim_dim: Option<usize>,
         timestep: usize,
     ) -> bool {
-        self.entries.iter().any(|(key, block)| {
-            if key.source_id == source_id && key.variable_name == variable_name {
-                if !selections_match_except_anim(&key.selections, requested_selections, anim_dim) {
-                    return false;
-                }
+        self.covered_until(
+            source_id,
+            variable_name,
+            requested_selections,
+            anim_dim,
+            timestep,
+        )
+        .is_some()
+    }
 
-                if let Some(dim) = anim_dim {
-                    let origin = block.origin.get(dim).copied().unwrap_or(0);
-                    let extent = block.shape.get(dim).copied().unwrap_or(0);
-                    timestep >= origin && timestep < origin + extent
-                } else {
-                    true
-                }
-            } else {
-                false
+    /// Where a resident block covering `timestep` (as [`covers`](Self::covers))
+    /// ends along `anim_dim`: the first step after it (`usize::MAX` without
+    /// an animated dimension). No hit/miss accounting.
+    pub fn covered_until(
+        &self,
+        source_id: &str,
+        variable_name: &str,
+        requested_selections: &[DimensionSelection],
+        anim_dim: Option<usize>,
+        timestep: usize,
+    ) -> Option<usize> {
+        self.entries.iter().find_map(|(key, block)| {
+            if key.source_id != source_id
+                || key.variable_name != variable_name
+                || !selections_match_except_anim(&key.selections, requested_selections, anim_dim)
+            {
+                return None;
             }
+            let Some(dim) = anim_dim else {
+                return Some(usize::MAX);
+            };
+            let origin = block.origin.get(dim).copied().unwrap_or(0);
+            let end = origin + block.shape.get(dim).copied().unwrap_or(0);
+            (origin..end).contains(&timestep).then_some(end)
         })
     }
 

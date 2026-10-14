@@ -1,5 +1,6 @@
 use super::pacing::{
-    PrefetchDispatchParams, adaptive_concurrency, adaptive_lookahead, estimate_chunk_bytes,
+    PrefetchDispatchParams, adaptive_concurrency, estimate_chunk_bytes, paused_chunks,
+    playing_chunks, playing_lookahead, range_budget,
 };
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
@@ -70,7 +71,9 @@ impl OctantApp {
     /// Progressively prefetches lookahead block windows along layer `id`'s
     /// animated dimension.
     pub(crate) fn prefetch_layer_animated_range(&mut self, id: LayerId) {
-        if !self.playback.enable_prefetch {
+        let failed_overlay =
+            id != LayerId::BASE && self.layers.get(id).is_some_and(|l| l.load.failed);
+        if !self.playback.enable_prefetch || failed_overlay {
             return;
         }
         let Some(layer_request) = self.shown_layer_request(id) else {
@@ -97,16 +100,9 @@ impl OctantApp {
             &base_req.selections,
         );
         let cs = window_step.max(1);
-        let chunk_bytes = estimate_chunk_bytes(base_req, anim_dim, cs);
-        let max_concurrent = adaptive_concurrency(chunk_bytes, self.prefetch_threads);
-        let lookahead = adaptive_lookahead(
-            self.block_window_size,
-            cs,
-            chunk_bytes,
-            self.block_cache.max_bytes(),
-        );
-
-        let chunk_indices = self.collect_lookahead_chunks(id, anim_dim, cs, full_extent, lookahead);
+        let (max_concurrent, budget) =
+            self.prefetch_pacing(cs, estimate_chunk_bytes(base_req, anim_dim, cs));
+        let chunk_indices = self.collect_lookahead_chunks(id, anim_dim, cs, full_extent, budget);
         let params = PrefetchDispatchParams {
             cs,
             full_extent,
@@ -119,52 +115,73 @@ impl OctantApp {
         self.dispatch_lookahead_chunks(&chunk_indices, params);
     }
 
-    /// Collects the ordered sequence of chunk indices of layer `id` to prefetch.
+    /// The lookahead's workers and its chunk budget for chunks of `cs` steps
+    /// and `chunk_bytes`: the playing lookahead (the buffer's steps at least,
+    /// the animated layers sharing the cache), else the paused range's.
+    /// Foreground requests (each layer's shown block) never take the
+    /// lookahead's workers.
+    fn prefetch_pacing(&self, cs: usize, chunk_bytes: usize) -> (usize, usize) {
+        let max_concurrent =
+            adaptive_concurrency(chunk_bytes, self.prefetch_threads) + self.foreground_requests();
+        let budget = if self.playback.is_playing {
+            self.playing_lookahead_chunks(cs, chunk_bytes)
+        } else {
+            range_budget(chunk_bytes, self.block_cache.max_bytes())
+        };
+        (max_concurrent, budget)
+    }
+
+    /// Chunks of `cs` steps (`chunk_bytes` each) one layer queues while
+    /// playing, the current one included: it and the buffer's steps after it
+    /// (the buffer counts from the next step) at least, within the layer's
+    /// share of the cache. The buffer waits for no more than this holds.
+    pub(crate) fn playing_lookahead_chunks(&self, cs: usize, chunk_bytes: usize) -> usize {
+        let window = self.block_window_size.max(self.buffer_target_steps() + cs);
+        let share = self.block_cache.max_bytes() / self.animated_layer_count();
+        playing_lookahead(window, cs, chunk_bytes, share)
+    }
+
+    /// Layers whose shown block is being fetched.
+    fn foreground_requests(&self) -> usize {
+        self.layers
+            .iter()
+            .filter(|l| {
+                l.load
+                    .block_key
+                    .as_ref()
+                    .is_some_and(|k| self.block_prefetcher.is_pending(k))
+            })
+            .count()
+    }
+
+    /// The chunk indices of layer `id` to prefetch, in order: while playing,
+    /// `budget` chunks from the current one on (it included); while paused,
+    /// the selected range of the animated dimension from the current chunk
+    /// on, at most `budget` chunks.
     fn collect_lookahead_chunks(
         &self,
         id: LayerId,
         anim_dim: usize,
         cs: usize,
         full_extent: usize,
-        lookahead: usize,
+        budget: usize,
     ) -> Vec<usize> {
         let Some((shown, _)) = self.layer_selections(id) else {
             return Vec::new();
         };
-        let current_chunk = self.layer_step(id) / cs;
-        let max_dataset_chunk = full_extent.saturating_sub(1) / cs;
-        let is_spatial = shown
-            .dim_config
-            .get(anim_dim)
-            .is_some_and(|c| c.spatial != crate::app::SpatialRole::None);
-
-        let mut indices = Vec::new();
+        let current = self.layer_step(id) / cs;
+        let last_step = full_extent.saturating_sub(1);
+        let max_chunk = last_step / cs;
         if self.playback.is_playing {
-            let max_lookahead = (current_chunk + lookahead).min(max_dataset_chunk);
-            indices.extend(current_chunk..=max_lookahead);
-            if self.playback.loop_playback && current_chunk + lookahead >= max_dataset_chunk {
-                let wrap_end = lookahead.saturating_sub(1).min(max_dataset_chunk);
-                for c in 0..=wrap_end {
-                    if !indices.contains(&c) {
-                        indices.push(c);
-                    }
-                }
-            }
-            indices.truncate(lookahead + 1);
-        } else if is_spatial {
-            let (r_start, r_end) = shown
-                .dim_ranges
-                .get(anim_dim)
-                .copied()
-                .unwrap_or((0, full_extent.saturating_sub(1)));
-            let (first, last) = (r_start / cs, r_end.min(full_extent.saturating_sub(1)) / cs);
-            indices.extend((first..=last).filter(|&c| c != current_chunk));
-            indices.truncate(lookahead);
-        } else {
-            let max_paused = (current_chunk + lookahead.min(2)).min(max_dataset_chunk);
-            indices.extend(current_chunk..=max_paused);
+            return playing_chunks(current, max_chunk, budget, self.playback.loop_playback);
         }
-        indices
+        let (start, end) = shown
+            .dim_ranges
+            .get(anim_dim)
+            .copied()
+            .unwrap_or((0, last_step));
+        let range = (start.min(last_step) / cs, end.min(last_step) / cs);
+        paused_chunks(current, range, max_chunk, budget)
     }
 
     /// Dispatches candidate prefetch requests up to the dynamic concurrency limit.

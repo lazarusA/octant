@@ -12,6 +12,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::Crop => "切り抜き",
         PlaybackKey::CropHover => "切り抜きガイド線 (C)",
         PlaybackKey::PlaybackSpeed => "再生速度",
+        PlaybackKey::PlaybackBuffer => "再生前のバッファ",
+        PlaybackKey::Buffering => "バッファリング中 {}/{}",
         PlaybackKey::SaveExportHover => {
             "図を保存 / エクスポート (Cmd+S でクイック保存、Cmd+Shift+S で設定)"
         }

@@ -12,6 +12,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::Crop => "Potong",
         PlaybackKey::CropHover => "Garis Panduan Potong (C)",
         PlaybackKey::PlaybackSpeed => "Kecepatan Putar",
+        PlaybackKey::PlaybackBuffer => "Buffer Sebelum Putar",
+        PlaybackKey::Buffering => "Memuat buffer {}/{}",
         PlaybackKey::SaveExportHover => {
             "Simpan / Ekspor Gambar (Cmd+S untuk Simpan Cepat, Cmd+Shift+S untuk Pengaturan)"
         }

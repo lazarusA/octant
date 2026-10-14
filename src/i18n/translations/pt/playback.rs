@@ -12,6 +12,8 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::Crop => "Recortar",
         PlaybackKey::CropHover => "Linhas-guia de recorte (C)",
         PlaybackKey::PlaybackSpeed => "Velocidade de reprodução",
+        PlaybackKey::PlaybackBuffer => "Buffer antes de reproduzir",
+        PlaybackKey::Buffering => "Carregando buffer {}/{}",
         PlaybackKey::SaveExportHover => {
             "Salvar / exportar figura (Cmd+S para salvar rápido, Cmd+Shift+S para configurações)"
         }

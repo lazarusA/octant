@@ -56,12 +56,7 @@ impl OctantApp {
             AppAction::ToggleLineAllSeries => {
                 self.plot_configs.line.all_series = !self.plot_configs.line.all_series;
             }
-            AppAction::TogglePlayback => {
-                self.playback.is_playing = !self.playback.is_playing;
-                if self.playback.is_playing {
-                    self.prefetch_animated_ranges();
-                }
-            }
+            AppAction::TogglePlayback => self.toggle_playback(),
 
             AppAction::UpdateColorBounds { min, max } => {
                 self.layers.base.color.range_min = min;
