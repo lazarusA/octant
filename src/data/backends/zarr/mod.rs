@@ -10,6 +10,7 @@ mod coords_numeric_tests;
 #[cfg(test)]
 mod coords_tests;
 pub mod generic;
+mod open_arrays;
 pub mod slice;
 pub mod storage;
 pub mod store;

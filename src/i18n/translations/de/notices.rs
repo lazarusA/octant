@@ -48,5 +48,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Die Metadaten der Version {} von {} folgen nicht der Spezifikation; angezeigt wird, was gelesen werden konnte."
         }
+        NoticesKey::PlateWellStopped => "Well {}: das Lesen wurde abgebrochen",
+        NoticesKey::PlateWellNotJson => "Well {}: die Metadaten sind kein gültiges JSON",
+        NoticesKey::PlateWellNotOme => "Well {}: kein OME-Zarr-Well",
+        NoticesKey::PlateWellNoMetadata => "Well {}: keine Well-Metadaten",
     })
 }

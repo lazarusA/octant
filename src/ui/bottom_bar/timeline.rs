@@ -128,7 +128,9 @@ fn step_label(
 /// The time between steps of an OME-Zarr image's animated axis ("2 s").
 fn ome_step_size(var: &crate::data::VariableInfo, dim: &str) -> Option<String> {
     let unit = var.dimension_unit(dim)?;
-    let step = var.ome_scale(var.dimension_index(dim)?)?;
+    // Scales are stored as `f32`: shown at that precision (0.1, not
+    // 0.10000000149011612).
+    let step = var.ome_scale(var.dimension_index(dim)?)? as f32;
     Some(format!(
         "{} {unit}",
         crate::i18n::number::Num(format_args!("{step}"))

@@ -1,10 +1,11 @@
 //! Generic `GenericZarrBlockStore` implementation over `ReadableWritableListableStorage`.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 
 use super::block::{ArrayCachedState, fetch_block_from_cached_array, inherited_attributes};
-use super::storage::{ZarrArrayHandle, open_raw_array, root_consolidated};
+use super::open_arrays::{OpenArrays, chunk_cache_bytes};
+use super::storage::{open_raw_array, root_consolidated};
 use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
 use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
@@ -14,52 +15,13 @@ use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 use zarrs::storage::ReadableWritableListableStorage;
 
-/// Decoded chunk bytes the open arrays of one store may hold together: the
-/// least recently used arrays are closed beyond it (an OME-Zarr image opens
-/// one array per level, each with its own chunk cache).
-#[cfg(not(target_arch = "wasm32"))]
-const OPEN_ARRAYS_BUDGET: u64 = 1024 * 1024 * 1024;
-#[cfg(target_arch = "wasm32")]
-const OPEN_ARRAYS_BUDGET: u64 = 256 * 1024 * 1024;
-
-/// Open arrays with the size of their chunk caches, least recently used first.
-type OpenArrays = Vec<(String, u64, Arc<ArrayCachedState>)>;
-
 pub struct GenericZarrBlockStore {
     storage: ReadableWritableListableStorage,
     source_url: String,
     backend_name: &'static str,
     store_type_label: &'static str,
-    open_arrays: Mutex<OpenArrays>,
-    /// One lock per array being opened, so concurrent block fetches (prefetch
-    /// workers) share one array and its chunk cache instead of each opening
-    /// it, while different arrays open in parallel.
-    opening: Mutex<HashMap<String, Arc<Mutex<()>>>>,
-    consolidated: OnceLock<ConsolidatedMetadataMetadata>,
-}
-
-/// The chunk cache size of `array`: eight chunks within 64-512 MB, at most all its chunks.
-fn chunk_cache_bytes(array: &ZarrArrayHandle) -> u64 {
-    let elem_size = match array.data_type().size() {
-        zarrs::array::DataTypeSize::Fixed(s) => (s as u64).max(1),
-        zarrs::array::DataTypeSize::Variable => 4,
-    };
-    let shape = array.shape();
-    let Ok(chunk) = array.chunk_shape(&vec![0; shape.len()]) else {
-        return 64 * 1024 * 1024;
-    };
-    // Every chunk decodes whole, so the array's size rounds up to chunks.
-    let (mut one_chunk, mut whole) = (Some(elem_size), Some(elem_size));
-    for (&d, c) in shape.iter().zip(chunk.iter()) {
-        let c = c.get();
-        one_chunk = one_chunk.and_then(|v| v.checked_mul(c));
-        whole = whole.and_then(|v| v.checked_mul(d.div_ceil(c).checked_mul(c)?));
-    }
-    let (one_chunk, whole) = (one_chunk.unwrap_or(u64::MAX), whole.unwrap_or(u64::MAX));
-    one_chunk
-        .saturating_mul(8)
-        .clamp(64 * 1024 * 1024, 512 * 1024 * 1024)
-        .min(whole)
+    open_arrays: OpenArrays,
+    consolidated: OnceLock<Option<ConsolidatedMetadataMetadata>>,
 }
 
 impl GenericZarrBlockStore {
@@ -74,8 +36,7 @@ impl GenericZarrBlockStore {
             source_url: source_url.into(),
             backend_name,
             store_type_label,
-            open_arrays: Mutex::default(),
-            opening: Mutex::default(),
+            open_arrays: OpenArrays::default(),
             consolidated: OnceLock::new(),
         }
     }
@@ -90,50 +51,27 @@ impl GenericZarrBlockStore {
 
     /// The opened array `var_name` with its chunk cache, opened on first use.
     fn get_or_open_array(&self, var_name: &str) -> Result<Arc<ArrayCachedState>, BlockStoreError> {
-        let name = var_name.trim_matches('/');
-        if let Some(open) = self.open_array(name) {
-            return Ok(open);
-        }
-        let slot = {
-            let mut opening = self.opening.lock().unwrap_or_else(|p| p.into_inner());
-            opening.entry(name.to_string()).or_default().clone()
-        };
-        let _opening = slot.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(open) = self.open_array(name) {
-            return Ok(open);
-        }
-        let opened = self.open(name).map(|(cached, cache_bytes)| {
-            let mut open = self.open_arrays.lock().unwrap_or_else(|p| p.into_inner());
-            open.push((name.to_string(), cache_bytes, cached.clone()));
-            while open.len() > 1 && open.iter().map(|(_, b, _)| b).sum::<u64>() > OPEN_ARRAYS_BUDGET
-            {
-                open.remove(0);
-            }
-            cached
-        });
-        // Removed once the array is listed open: later callers find it there.
-        let mut opening = self.opening.lock().unwrap_or_else(|p| p.into_inner());
-        opening.remove(name);
-        opened
+        self.open_arrays
+            .get_or_open(var_name.trim_matches('/'), |name| self.open(name))
     }
 
-    /// An array already open, marked most recently used.
-    fn open_array(&self, name: &str) -> Option<Arc<ArrayCachedState>> {
-        let mut open = self.open_arrays.lock().unwrap_or_else(|p| p.into_inner());
-        let i = open.iter().position(|(n, _, _)| n == name)?;
-        let entry = open.remove(i);
-        let cached = entry.2.clone();
-        open.push(entry);
-        Some(cached)
-    }
-
-    /// The root's consolidated metadata, kept once found (a browser store fills in later).
+    /// The root's consolidated metadata, read once on the desktop; a browser
+    /// store fills in later, so there only a found one is kept.
     fn consolidated(&self) -> Option<&ConsolidatedMetadataMetadata> {
-        if let Some(found) = self.consolidated.get() {
-            return Some(found);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.consolidated
+                .get_or_init(|| root_consolidated(&self.storage))
+                .as_ref()
         }
-        let found = root_consolidated(&self.storage)?;
-        Some(self.consolidated.get_or_init(|| found))
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(found) = self.consolidated.get().and_then(Option::as_ref) {
+                return Some(found);
+            }
+            let found = root_consolidated(&self.storage)?;
+            self.consolidated.get_or_init(|| Some(found)).as_ref()
+        }
     }
 
     /// The store's OME-Zarr variables with their discovery, else its plain

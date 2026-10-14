@@ -48,5 +48,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Метадані версії {} набору {} не відповідають специфікації; показано те, що вдалося прочитати."
         }
+        NoticesKey::PlateWellStopped => "Лунка {}: читання перервано",
+        NoticesKey::PlateWellNotJson => "Лунка {}: метадані не є коректним JSON",
+        NoticesKey::PlateWellNotOme => "Лунка {}: це не лунка OME-Zarr",
+        NoticesKey::PlateWellNoMetadata => "Лунка {}: немає метаданих лунки",
     })
 }

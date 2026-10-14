@@ -48,5 +48,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Version {} metatiedot kohteessa {} eivät noudata määritystä; näytetään se, mikä voitiin lukea."
         }
+        NoticesKey::PlateWellStopped => "Kuoppa {}: lukeminen keskeytyi",
+        NoticesKey::PlateWellNotJson => "Kuoppa {}: metatiedot eivät ole kelvollista JSONia",
+        NoticesKey::PlateWellNotOme => "Kuoppa {}: ei ole OME-Zarr-kuoppa",
+        NoticesKey::PlateWellNoMetadata => "Kuoppa {}: ei kuopan metatietoja",
     })
 }

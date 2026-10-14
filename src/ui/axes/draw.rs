@@ -1,9 +1,10 @@
 //! Dynamic plot axis rendering on egui canvas.
 
-use egui::{FontId, Pos2, Rect, Stroke};
+use egui::{Color32, FontId, Painter, Pos2, Rect, Stroke, Visuals};
 
-use super::segments::{draw_tick_label, draw_x_ticks, draw_y_ticks, is_near_corner};
-use super::ticks::generate_constant_count_ticks;
+use super::segments::{draw_x_ticks, draw_y_ticks};
+use super::ticks::{TickMark, generate_constant_count_ticks};
+use super::title::draw_x_title;
 
 pub struct PlotAxisOptions<'a> {
     pub x_domain: (f64, f64),
@@ -24,45 +25,26 @@ pub fn draw_plot_axes(
     plot_rect: Rect,
     options: &PlotAxisOptions<'_>,
 ) {
-    let painter = ui.painter();
-    let visuals = ui.visuals();
-    let line_color = visuals
-        .widgets
-        .noninteractive
-        .fg_stroke
-        .color
-        .linear_multiply(0.85);
-    let text_color = visuals.text_color();
-    let stroke = Stroke::new(1.5, line_color);
-    let secondary_stroke = Stroke::new(1.0, line_color.linear_multiply(0.5));
-    let font_id = FontId::proportional(11.0);
-    let title_font_id = FontId::proportional(12.0);
-    let tick_len = 6.0;
-
-    let visible_left = plot_rect
-        .left()
-        .clamp(canvas_rect.left(), canvas_rect.right());
-    let visible_right = plot_rect
-        .right()
-        .clamp(canvas_rect.left(), canvas_rect.right());
-    let visible_top = plot_rect
-        .top()
-        .clamp(canvas_rect.top(), canvas_rect.bottom());
-    let visible_bottom = plot_rect
-        .bottom()
-        .clamp(canvas_rect.top(), canvas_rect.bottom());
-
-    let vis_w = visible_right - visible_left;
-    let vis_h = visible_bottom - visible_top;
-    if vis_w <= 1.0 || vis_h <= 1.0 {
+    let visible = plot_rect.intersect(canvas_rect);
+    if visible.width() <= 1.0 || visible.height() <= 1.0 {
         return;
     }
+    let (x_ticks, y_ticks) = visible_ticks(plot_rect, visible, options);
+    let axes = Axes::new(ui.painter(), ui.visuals(), canvas_rect, plot_rect, visible);
+    axes.draw_x(&x_ticks, options.x_title);
+    axes.draw_y(&y_ticks);
+}
 
+/// The ticks of the data's visible part: x left to right, y bottom to top.
+fn visible_ticks(
+    plot_rect: Rect,
+    visible: Rect,
+    options: &PlotAxisOptions<'_>,
+) -> ([TickMark; 7], [TickMark; 7]) {
     let (x_min, x_max) = min_max(options.x_domain);
     let full_x = (x_max - x_min).max(1e-9);
     let pw = plot_rect.width().max(1.0) as f64;
-    let vis_x_min = x_min + ((visible_left - plot_rect.left()) as f64 / pw) * full_x;
-    let vis_x_max = x_min + ((visible_right - plot_rect.left()) as f64 / pw) * full_x;
+    let x_at = |screen_x: f32| x_min + ((screen_x - plot_rect.left()) as f64 / pw) * full_x;
 
     let (y_min, y_max) = min_max(options.y_domain);
     let full_y = (y_max - y_min).max(1e-9);
@@ -77,136 +59,21 @@ pub fn draw_plot_axes(
                 1.0 - from_top
             } * full_y
     };
-
-    let x_ticks =
-        generate_constant_count_ticks(vis_x_min, vis_x_max, options.x_title, options.x_units);
-    // Ticks are laid out bottom to top.
-    let y_ticks = generate_constant_count_ticks(
-        y_at(visible_bottom),
-        y_at(visible_top),
-        options.y_title,
-        options.y_units,
-    );
-
-    // 1. BOTTOM & TOP X-AXES
-    let is_bottom_close_to_nav = (canvas_rect.bottom() - plot_rect.bottom()).abs() < 28.0
-        || plot_rect.bottom() >= canvas_rect.bottom() - 15.0;
-    let is_bottom_inside = !is_bottom_close_to_nav
-        && plot_rect.bottom() >= canvas_rect.top()
-        && plot_rect.bottom() <= canvas_rect.bottom();
-    let (bottom_axis_y, b_tick_dir) = if is_bottom_inside {
-        (plot_rect.bottom(), 1.0)
-    } else {
-        (canvas_rect.bottom() - 1.0, -1.0)
-    };
-
-    painter.line_segment(
-        [
-            Pos2::new(visible_left.round(), bottom_axis_y.round()),
-            Pos2::new(visible_right.round(), bottom_axis_y.round()),
-        ],
-        stroke,
-    );
-
-    let is_top_inside = plot_rect.top() >= canvas_rect.top()
-        && plot_rect.top() <= canvas_rect.bottom()
-        && (plot_rect.top() - canvas_rect.top()).abs() > 20.0;
-    let (top_axis_y, t_tick_dir) = if is_top_inside {
-        (plot_rect.top(), -1.0)
-    } else {
-        (canvas_rect.top() + 1.0, 1.0)
-    };
-
-    painter.line_segment(
-        [
-            Pos2::new(visible_left.round(), top_axis_y.round()),
-            Pos2::new(visible_right.round(), top_axis_y.round()),
-        ],
-        secondary_stroke,
-    );
-
-    draw_x_ticks(
-        painter,
-        visuals,
-        &x_ticks,
-        visible_left,
-        vis_w,
-        bottom_axis_y,
-        top_axis_y,
-        b_tick_dir,
-        t_tick_dir,
-        tick_len,
-        canvas_rect,
-        stroke,
-        secondary_stroke,
-        &font_id,
-        text_color,
-    );
-
-    draw_x_title(
-        painter,
-        visuals,
-        options.x_title,
-        visible_left,
-        visible_right,
-        bottom_axis_y,
-        b_tick_dir,
-        tick_len,
-        canvas_rect,
-        &title_font_id,
-        text_color,
-    );
-
-    // 2. RIGHT & LEFT Y-AXES
-    let is_right_inside =
-        plot_rect.right() >= canvas_rect.left() && plot_rect.right() <= canvas_rect.right() - 20.0;
-    let (right_axis_x, r_tick_dir) = if is_right_inside {
-        (plot_rect.right(), 1.0)
-    } else {
-        (canvas_rect.right() - 1.0, -1.0)
-    };
-
-    painter.line_segment(
-        [
-            Pos2::new(right_axis_x.round(), visible_top.round()),
-            Pos2::new(right_axis_x.round(), visible_bottom.round()),
-        ],
-        stroke,
-    );
-
-    let is_left_inside =
-        plot_rect.left() >= canvas_rect.left() + 20.0 && plot_rect.left() <= canvas_rect.right();
-    let (left_axis_x, l_tick_dir) = if is_left_inside {
-        (plot_rect.left(), -1.0)
-    } else {
-        (canvas_rect.left() + 1.0, 1.0)
-    };
-
-    painter.line_segment(
-        [
-            Pos2::new(left_axis_x.round(), visible_top.round()),
-            Pos2::new(left_axis_x.round(), visible_bottom.round()),
-        ],
-        secondary_stroke,
-    );
-
-    draw_y_ticks(
-        painter,
-        visuals,
-        &y_ticks,
-        visible_bottom,
-        vis_h,
-        right_axis_x,
-        left_axis_x,
-        r_tick_dir,
-        l_tick_dir,
-        tick_len,
-        canvas_rect,
-        stroke,
-        secondary_stroke,
-        &font_id,
-        text_color,
-    );
+    let (x_title, y_title) = (options.x_title, options.y_title);
+    (
+        generate_constant_count_ticks(
+            x_at(visible.left()),
+            x_at(visible.right()),
+            x_title,
+            options.x_units,
+        ),
+        generate_constant_count_ticks(
+            y_at(visible.bottom()),
+            y_at(visible.top()),
+            y_title,
+            options.y_units,
+        ),
+    )
 }
 
 #[inline]
@@ -214,50 +81,181 @@ fn min_max(domain: (f64, f64)) -> (f64, f64) {
     (domain.0.min(domain.1), domain.0.max(domain.1))
 }
 
-#[allow(clippy::too_many_arguments)]
-fn draw_x_title(
-    painter: &egui::Painter,
-    visuals: &egui::Visuals,
-    title: &str,
-    visible_left: f32,
-    visible_right: f32,
-    bottom_axis_y: f32,
-    b_tick_dir: f32,
+/// The four axes of a plot on its canvas, with their theme-aware style.
+struct Axes<'a> {
+    painter: &'a Painter,
+    visuals: &'a Visuals,
+    canvas: Rect,
+    plot: Rect,
+    /// The part of the plot inside the canvas.
+    visible: Rect,
+    stroke: Stroke,
+    secondary: Stroke,
+    font: FontId,
+    title_font: FontId,
+    text: Color32,
     tick_len: f32,
-    canvas_rect: Rect,
-    title_font_id: &FontId,
-    text_color: egui::Color32,
-) {
-    if title.is_empty() {
-        return;
-    }
-    let title_x = ((visible_left + visible_right) * 0.5).round();
-    let (title_y, title_align, title_use_pill) = if b_tick_dir > 0.0 {
-        (
-            bottom_axis_y + tick_len + 20.0,
-            egui::Align2::CENTER_TOP,
-            false,
-        )
-    } else {
-        (
-            bottom_axis_y - tick_len - 28.0,
-            egui::Align2::CENTER_BOTTOM,
-            true,
-        )
-    };
-    if title_y >= canvas_rect.top() && title_y <= canvas_rect.bottom() {
-        let title_pos = Pos2::new(title_x, title_y);
-        if !is_near_corner(title_pos, canvas_rect) {
-            draw_tick_label(
-                visuals,
-                painter,
-                title_pos,
-                title,
-                title_font_id,
-                text_color,
-                title_align,
-                title_use_pill,
-            );
+}
+
+impl<'a> Axes<'a> {
+    fn new(
+        painter: &'a Painter,
+        visuals: &'a Visuals,
+        canvas: Rect,
+        plot: Rect,
+        visible: Rect,
+    ) -> Self {
+        let line = visuals
+            .widgets
+            .noninteractive
+            .fg_stroke
+            .color
+            .linear_multiply(0.85);
+        Self {
+            painter,
+            visuals,
+            canvas,
+            plot,
+            visible,
+            stroke: Stroke::new(1.5, line),
+            secondary: Stroke::new(1.0, line.linear_multiply(0.5)),
+            font: FontId::proportional(11.0),
+            title_font: FontId::proportional(12.0),
+            text: visuals.text_color(),
+            tick_len: 6.0,
         }
+    }
+
+    /// Where the bottom and top x axes sit, with their ticks' directions: on
+    /// the plot's edges, else on the canvas's.
+    fn x_axes(&self) -> ((f32, f32), (f32, f32)) {
+        let (canvas, plot) = (self.canvas, self.plot);
+        let close_to_nav = (canvas.bottom() - plot.bottom()).abs() < 28.0
+            || plot.bottom() >= canvas.bottom() - 15.0;
+        let bottom_inside =
+            !close_to_nav && plot.bottom() >= canvas.top() && plot.bottom() <= canvas.bottom();
+        let bottom = if bottom_inside {
+            (plot.bottom(), 1.0)
+        } else {
+            (canvas.bottom() - 1.0, -1.0)
+        };
+        let top_inside = plot.top() >= canvas.top()
+            && plot.top() <= canvas.bottom()
+            && (plot.top() - canvas.top()).abs() > 20.0;
+        let top = if top_inside {
+            (plot.top(), -1.0)
+        } else {
+            (canvas.top() + 1.0, 1.0)
+        };
+        (bottom, top)
+    }
+
+    /// The bottom and top x axes, their ticks and the x title.
+    fn draw_x(&self, ticks: &[TickMark; 7], title: &str) {
+        let (canvas, visible) = (self.canvas, self.visible);
+        let ((bottom_y, b_dir), (top_y, t_dir)) = self.x_axes();
+        self.line(
+            visible.left(),
+            bottom_y,
+            visible.right(),
+            bottom_y,
+            self.stroke,
+        );
+        self.line(
+            visible.left(),
+            top_y,
+            visible.right(),
+            top_y,
+            self.secondary,
+        );
+        draw_x_ticks(
+            self.painter,
+            self.visuals,
+            ticks,
+            visible.left(),
+            visible.width(),
+            bottom_y,
+            top_y,
+            b_dir,
+            t_dir,
+            self.tick_len,
+            canvas,
+            self.stroke,
+            self.secondary,
+            &self.font,
+            self.text,
+        );
+        draw_x_title(
+            self.painter,
+            self.visuals,
+            title,
+            visible.left(),
+            visible.right(),
+            bottom_y,
+            b_dir,
+            self.tick_len,
+            canvas,
+            &self.title_font,
+            self.text,
+        );
+    }
+
+    /// The right and left y axes and their ticks.
+    fn draw_y(&self, ticks: &[TickMark; 7]) {
+        let (canvas, plot, visible) = (self.canvas, self.plot, self.visible);
+        let right_inside = plot.right() >= canvas.left() && plot.right() <= canvas.right() - 20.0;
+        let (right_x, r_dir) = if right_inside {
+            (plot.right(), 1.0)
+        } else {
+            (canvas.right() - 1.0, -1.0)
+        };
+        let left_inside = plot.left() >= canvas.left() + 20.0 && plot.left() <= canvas.right();
+        let (left_x, l_dir) = if left_inside {
+            (plot.left(), -1.0)
+        } else {
+            (canvas.left() + 1.0, 1.0)
+        };
+        self.line(
+            right_x,
+            visible.top(),
+            right_x,
+            visible.bottom(),
+            self.stroke,
+        );
+        self.line(
+            left_x,
+            visible.top(),
+            left_x,
+            visible.bottom(),
+            self.secondary,
+        );
+        draw_y_ticks(
+            self.painter,
+            self.visuals,
+            ticks,
+            visible.bottom(),
+            visible.height(),
+            right_x,
+            left_x,
+            r_dir,
+            l_dir,
+            self.tick_len,
+            canvas,
+            self.stroke,
+            self.secondary,
+            &self.font,
+            self.text,
+        );
+    }
+
+    /// A pixel-snapped axis line.
+    fn line(&self, x0: f32, y0: f32, x1: f32, y1: f32, stroke: Stroke) {
+        self.painter.line_segment(
+            [
+                Pos2::new(x0.round(), y0.round()),
+                Pos2::new(x1.round(), y1.round()),
+            ],
+            stroke,
+        );
     }
 }

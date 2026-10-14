@@ -46,5 +46,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Metadata i versjon {} for {} følger ikke spesifikasjonen; det som kunne leses, vises."
         }
+        NoticesKey::PlateWellStopped => "Brønn {}: lesingen ble avbrutt",
+        NoticesKey::PlateWellNotJson => "Brønn {}: metadataene er ikke gyldig JSON",
+        NoticesKey::PlateWellNotOme => "Brønn {}: ikke en OME-Zarr-brønn",
+        NoticesKey::PlateWellNoMetadata => "Brønn {}: ingen brønnmetadata",
     })
 }

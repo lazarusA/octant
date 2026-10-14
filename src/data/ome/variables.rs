@@ -1,9 +1,7 @@
 //! One `VariableInfo` per resolution level of an OME-Zarr image.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::axes::default_axis_names;
 use super::model::{OmeImage, OmeRef};
 use super::reader::{MetaReader, Pending, join};
 use crate::data::metadata::VariableInfo;
@@ -11,17 +9,24 @@ use crate::utils::metadata::{open_or_instantiate_array_normalized, variable_info
 
 /// The variables of `image`'s levels, named `{group}/{level path}`. Levels
 /// whose array cannot be opened are left out; no array is built while any
-/// level's metadata is still being fetched.
+/// level's metadata is still being fetched, but every missing level is asked
+/// for in the same pass.
 pub(super) fn image_variables(
     reader: &MetaReader<'_>,
     image: &Arc<OmeImage>,
 ) -> Result<Vec<VariableInfo>, Pending> {
     let mut found = Vec::with_capacity(image.levels.len());
+    let mut pending = false;
     for (level, info) in image.levels.iter().enumerate() {
         let path = join(&image.group, &info.path);
-        if let Some(meta) = reader.array_metadata(&path)? {
-            found.push((level, path, meta));
+        match reader.array_metadata(&path) {
+            Ok(Some(meta)) => found.push((level, path, meta)),
+            Ok(None) => {}
+            Err(Pending) => pending = true,
         }
+    }
+    if pending {
+        return Err(Pending);
     }
     Ok(found
         .into_iter()
@@ -30,7 +35,8 @@ pub(super) fn image_variables(
 }
 
 /// The level array at `path`, built from its metadata document `meta`
-/// (already read: no further request), else opened from the store.
+/// (already read: no further request), else opened from the store. An array
+/// whose rank differs from the image's axes stays a plain Zarr variable.
 fn level_variable(
     reader: &MetaReader<'_>,
     image: &Arc<OmeImage>,
@@ -50,10 +56,17 @@ fn level_variable(
     };
     let info = variable_info_from_array(&array, path)?;
     let names = image.axes.iter().map(|a| a.name.as_str());
+    let Some(dimension_names) = level_dimension_names(names, info.shape.len()) else {
+        log::warn!(
+            "OME-Zarr level '{path}' has {} dimensions but its image lists {} axes; read as plain Zarr",
+            info.shape.len(),
+            image.axes.len()
+        );
+        return Some(info);
+    };
     Some(VariableInfo {
-        dimension_names: level_dimension_names(names, info.shape.len()),
-        long_name: image.name.clone(),
-        attributes: HashMap::new(),
+        dimension_names,
+        long_name: info.long_name.or_else(|| image.name.clone()),
         ome: Some(OmeRef {
             image: image.clone(),
             level,
@@ -64,16 +77,13 @@ fn level_variable(
 }
 
 /// The dimension names of a level array of rank `rank`: the image's axis
-/// names, else the default `t, c, z, y, x` tail.
+/// names, `None` when their count differs from the rank (the axes' units,
+/// scales and kinds would then land on the wrong dimensions).
 pub(super) fn level_dimension_names<'n>(
     names: impl ExactSizeIterator<Item = &'n str>,
     rank: usize,
-) -> Vec<String> {
-    if names.len() == rank {
-        names.map(str::to_string).collect()
-    } else {
-        default_axis_names(rank)
-    }
+) -> Option<Vec<String>> {
+    (names.len() == rank).then(|| names.map(str::to_string).collect())
 }
 
 /// Whether a level draws as labels: only integer label images do (their ids

@@ -1,49 +1,10 @@
+pub use super::quad::HeatmapUniforms;
 use super::quad::{
-    QUAD_INDICES, coord_lut, coord_lut_buffer, data_buffer, quad_buffers, quad_pipeline,
+    FULL_TILE, QUAD_INDICES, coord_lut, coord_lut_buffer, data_buffer, quad_buffers, quad_pipeline,
 };
-use bytemuck::{Pod, Zeroable};
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub struct HeatmapUniforms {
-    pub pan: [f32; 2],
-    pub zoom: f32,
-    pub coord_mode: u32,
-    pub aspect_scale: [f32; 2],
-    pub width: u32,
-    pub height: u32,
-    pub tile_bounds: [f32; 4],
-    pub lut_size_x: u32,
-    pub lut_size_y: u32,
-    pub _pad0: u32,
-    pub _pad1: u32,
-    pub color: super::common::PlotColorParams,
-}
 
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicU32, Ordering};
-
-/// Tile bounds covering the whole data.
-const FULL_TILE: [f32; 4] = [0.0, 0.0, 1.0, 1.0];
-
-impl Default for HeatmapUniforms {
-    fn default() -> Self {
-        Self {
-            pan: [0.0, 0.0],
-            zoom: 1.0,
-            coord_mode: 0,
-            aspect_scale: [1.0, 1.0],
-            width: 1,
-            height: 1,
-            tile_bounds: FULL_TILE,
-            lut_size_x: 0,
-            lut_size_y: 0,
-            _pad0: 0,
-            _pad1: 0,
-            color: super::common::PlotColorParams::default(),
-        }
-    }
-}
 
 /// The heatmap shader: the shared data quad (`common/quad.wgsl`) colored
 /// through a colormap.
@@ -143,14 +104,10 @@ impl HeatmapRenderer {
         let colormap_layout = super::colormap_atlas::bind_group_layout(device);
         let layouts = [Some(&layout), Some(&colormap_layout)];
         let (vertex_buffer, index_buffer) = quad_buffers(device, "Heatmap");
+        let render_pipeline =
+            quad_pipeline(device, target_format, "Heatmap", HEATMAP_WGSL, &layouts);
         Self {
-            render_pipeline: quad_pipeline(
-                device,
-                target_format,
-                "Heatmap",
-                HEATMAP_WGSL,
-                &layouts,
-            ),
+            render_pipeline,
             vertex_buffer,
             index_buffer,
             data_buffer,

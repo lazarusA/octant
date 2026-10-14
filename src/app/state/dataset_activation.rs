@@ -57,9 +57,8 @@ impl OctantApp {
         if let Some(removed) = self.dataset_manager.remove(dataset_id) {
             crate::data::backends::coord_bounds::evict_coord_values(Some(&removed.source.uri));
             self.coordinate_loader.forget(&removed.id);
-            let is_active = self.selected.metadata.as_ref().is_some_and(|_| {
-                self.selected.store_target == removed.source.uri || dataset_id == removed.id
-            });
+            let is_active = self.selected.metadata.is_some()
+                && same_target(&self.selected.store_target, &removed.source.uri);
             if is_active {
                 self.clear_active_metadata();
             }
@@ -236,4 +235,11 @@ impl OctantApp {
 pub(crate) fn channel_dim(var: &crate::data::VariableInfo) -> Option<usize> {
     let first = var.ome.is_none() && var.shape.len() >= 3;
     var.channel_axis().or(first.then_some(0))
+}
+
+/// Whether two dataset targets name the same store (ignoring surrounding
+/// whitespace, trailing slashes and a leading `~`).
+fn same_target(a: &str, b: &str) -> bool {
+    let clean = |t: &str| crate::utils::expand_tilde_str(t.trim().trim_end_matches('/'));
+    clean(a).trim_end_matches('/') == clean(b).trim_end_matches('/')
 }

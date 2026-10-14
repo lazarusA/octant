@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 
-use fetch::{WellResult, fetch_well};
+use fetch::{WellResult, ZarrV2, fetch_well};
 
 use super::StoreKind;
 use crate::data::ome::{OmePlate, OmeWell};
@@ -41,6 +41,8 @@ pub struct PlateState {
     /// `plate.wells` and its path in the well.
     pub opened: Option<(usize, String)>,
     wells: HashMap<String, WellFields>,
+    /// Whether the wells answered as Zarr v2, once one did.
+    zarr_v2: ZarrV2,
     tx: Sender<WellResult>,
     rx: Receiver<WellResult>,
 }
@@ -56,6 +58,7 @@ impl PlateState {
             acquisition: None,
             opened: None,
             wells: HashMap::new(),
+            zarr_v2: ZarrV2::default(),
             tx,
             rx,
         }
@@ -74,7 +77,12 @@ impl PlateState {
     pub fn well_fields(&mut self, path: &str) -> &WellFields {
         if !self.wells.contains_key(path) {
             self.wells.insert(path.to_string(), WellFields::Loading);
-            fetch_well(self.url.clone(), path.to_string(), self.tx.clone());
+            fetch_well(
+                self.url.clone(),
+                path.to_string(),
+                self.zarr_v2.clone(),
+                self.tx.clone(),
+            );
         }
         &self.wells[path]
     }

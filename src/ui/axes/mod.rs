@@ -5,6 +5,7 @@ mod segments;
 #[cfg(test)]
 mod tests;
 mod ticks;
+mod title;
 
 pub use draw::{PlotAxisOptions, draw_plot_axes};
 pub use ticks::TickMark;

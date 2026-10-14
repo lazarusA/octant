@@ -48,5 +48,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "バージョン {} のメタデータ（{}）が仕様に従っていません。読み取れた内容を表示します。"
         }
+        NoticesKey::PlateWellStopped => "ウェル {}：読み込みが中断されました",
+        NoticesKey::PlateWellNotJson => "ウェル {}：メタデータが有効な JSON ではありません",
+        NoticesKey::PlateWellNotOme => "ウェル {}：OME-Zarr のウェルではありません",
+        NoticesKey::PlateWellNoMetadata => "ウェル {}：ウェルのメタデータがありません",
     })
 }

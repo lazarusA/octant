@@ -5,19 +5,20 @@ use futures::StreamExt;
 
 use super::{CONCURRENT_METADATA_FETCHES, WasmZarrBlockStore};
 use crate::data::backends::http::{fetch_url_bytes, is_missing};
+use crate::data::ome::direct::MAX_PASSES;
 use crate::data::ome::{Discovery, MetaReader, Outcome, Prefetch, discover};
-
-/// Walks before giving up (each nesting level of a store takes about one).
-/// (A container of 4096 series takes 64 passes to probe.)
-const MAX_PASSES: usize = 96;
 
 impl WasmZarrBlockStore {
     /// The OME-Zarr images, labels, wells and series of the store; `None`
-    /// when its root is not an OME-Zarr group.
-    pub async fn discover_ome(&self) -> Option<Discovery> {
+    /// when its root is not an OME-Zarr group. With the store's Zarr `format`
+    /// known, only that format's keys are asked.
+    pub async fn discover_ome(&self, format: Option<u8>) -> Option<Discovery> {
         let prefetch = Prefetch::default();
         // One reader for every walk: keys read in one are not read again.
         let reader = MetaReader::prefetched(self.memory_store.clone(), &prefetch);
+        if let Some(format) = format {
+            reader.assume_format(format);
+        }
         for _ in 0..MAX_PASSES {
             let outcome = discover(&reader, "");
             let wanted = prefetch.take_pending();

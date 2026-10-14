@@ -15,8 +15,8 @@ const FAMILIES: [(ChannelFamily, K); 4] = [
 ];
 
 /// The window, curve and inversion of channel `cfg` of layer `id`. Whether
-/// the layer should reload: values apply every frame, but a dragged value
-/// reloads only once its drag stops (see [`settled`]).
+/// the layer should reload: a dragged value reloads at most every
+/// [`DRAG_RELOAD_SECS`] and once more when its drag stops (see [`settled`]).
 pub(super) fn channel_detail(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) -> bool {
     let mut changed = false;
     ui.indent(("mc_channel_detail", id, cfg.index), |ui| {
@@ -35,11 +35,30 @@ pub(super) fn channel_detail(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id
     changed
 }
 
+/// The shortest time between reloads while a value is dragged.
+const DRAG_RELOAD_SECS: f64 = 0.1;
+
 /// Whether an edit of `response`'s value should reload the layer: when its
-/// drag stops, or when it changed without a drag (typing, arrow keys), so a
-/// drag does not re-project the composite every frame.
-fn settled(response: &egui::Response) -> bool {
-    response.drag_stopped() || (response.changed() && !response.dragged())
+/// drag stops, when it changed without a drag (typing, arrow keys), and
+/// while dragged at most every [`DRAG_RELOAD_SECS`], so the image follows
+/// the drag without re-projecting the composite every frame.
+fn settled(ui: &egui::Ui, response: &egui::Response) -> bool {
+    if response.drag_stopped() || (response.changed() && !response.dragged()) {
+        return true;
+    }
+    if !response.changed() {
+        return false;
+    }
+    let now = ui.input(|i| i.time);
+    let id = response.id.with("last_drag_reload");
+    if ui
+        .data(|d| d.get_temp::<f64>(id))
+        .is_some_and(|last| now - last < DRAG_RELOAD_SECS)
+    {
+        return false;
+    }
+    ui.data_mut(|d| d.insert_temp(id, now));
+    true
 }
 
 /// A localized input of `value` within `range`.
@@ -61,7 +80,7 @@ fn window_inputs(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig) -> bool {
     if a.changed() || b.changed() {
         cfg.window = Some((start, end));
     }
-    settled(&a) || settled(&b)
+    settled(ui, &a) || settled(ui, &b)
 }
 
 /// The curve family and, for the curves that use one (polynomial and
@@ -92,7 +111,7 @@ fn curve_select(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) ->
         let response = ui
             .add(input(&mut cfg.display.coefficient, 0.05, 0.05..=10.0))
             .on_hover_text(tr(K::ChannelCoefficientHover));
-        changed |= settled(&response);
+        changed |= settled(ui, &response);
     }
     changed
 }

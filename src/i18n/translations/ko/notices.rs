@@ -48,5 +48,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "{} 버전 메타데이터({})가 사양을 따르지 않습니다. 읽을 수 있는 내용만 표시합니다."
         }
+        NoticesKey::PlateWellStopped => "웰 {}: 읽기가 중단되었습니다",
+        NoticesKey::PlateWellNotJson => "웰 {}: 메타데이터를 JSON으로 읽을 수 없습니다",
+        NoticesKey::PlateWellNotOme => "웰 {}: OME-Zarr 웰로 읽을 수 없습니다",
+        NoticesKey::PlateWellNoMetadata => "웰 {}: 웰 메타데이터가 없습니다",
     })
 }

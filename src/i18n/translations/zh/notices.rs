@@ -40,5 +40,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "{} 版本的元数据（{}）不符合规范；仅显示可读取的部分。"
         }
+        NoticesKey::PlateWellStopped => "孔 {}：读取中断",
+        NoticesKey::PlateWellNotJson => "孔 {}：元数据不是有效的 JSON",
+        NoticesKey::PlateWellNotOme => "孔 {}：不是 OME-Zarr 孔",
+        NoticesKey::PlateWellNoMetadata => "孔 {}：没有孔的元数据",
     })
 }

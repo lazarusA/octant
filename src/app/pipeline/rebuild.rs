@@ -37,49 +37,17 @@ pub(super) fn follow_variable(
 impl OctantApp {
     /// Rebuilds or updates layer `id`'s GPU buffers for 3D volume data.
     pub fn rebuild_pipeline_with_volume_data(&mut self, id: LayerId, data: VolumeData) {
-        if data.values.len() > MAX_GPU_STORAGE_BUFFER_ELEMENTS {
-            use crate::i18n::{NoticesKey, filled, tr};
-            let len = data.values.len();
-            let detail = filled(
-                tr(NoticesKey::VolumeBufferTooLargeDetail),
-                &[&len, &(len * 4), &MAX_GPU_STORAGE_BUFFER_BYTES],
-            );
-            let title = tr(NoticesKey::VolumeTooLargeForGpu);
-            self.notify(crate::ui::toast::Severity::Error, title, detail);
+        if !self.volume_fits_gpu(data.values.len()) {
             return;
         }
         let step = self.layer_step(id);
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
-
-        let mut upload_later = false;
-        if let Some(rs) = &self.wgpu_render_state {
-            let encoding = layer.volume_encoding();
-            let renderers = &mut layer.renderers;
-            let same_dimensions = layer.data.volume.as_ref().is_some_and(|v| {
-                v.width == data.width && v.height == data.height && v.depth == data.depth
-            }) && renderers
-                .volume
-                .as_ref()
-                .is_some_and(|r| r.encoding() == encoding);
-
-            if same_dimensions && renderers.point_cloud.is_some() {
-                // Uploaded before the next paint, to the renderer on screen.
-                upload_later = true;
-            } else {
-                let (w, h) = (data.width as u32, data.height as u32);
-                let (device, format) = (&rs.device, rs.target_format);
-                let volume =
-                    VolumeRenderer::new(device, &rs.queue, format, &data.values, w, h, encoding);
-                let point_cloud = PointCloudRenderer::new(device, format, &data.values, w, h);
-                renderers.volume = volume.map(Arc::new);
-                renderers.point_cloud = Some(Arc::new(point_cloud));
-                // New renderers start from `data`: nothing is pending.
-                renderers.volume_dirty = None;
-                renderers.point_cloud_dirty = None;
-            }
-        }
+        let upload_later = self
+            .wgpu_render_state
+            .as_ref()
+            .is_some_and(|rs| rebuild_volume_renderers(layer, rs, &data));
         follow_variable(
             layer,
             "3d",
@@ -96,6 +64,22 @@ impl OctantApp {
         }
     }
 
+    /// Whether a volume of `len` values fits a GPU storage buffer, else
+    /// reports that it does not.
+    fn volume_fits_gpu(&mut self, len: usize) -> bool {
+        if len <= MAX_GPU_STORAGE_BUFFER_ELEMENTS {
+            return true;
+        }
+        use crate::i18n::{NoticesKey, filled, tr};
+        let detail = filled(
+            tr(NoticesKey::VolumeBufferTooLargeDetail),
+            &[&len, &(len * 4), &MAX_GPU_STORAGE_BUFFER_BYTES],
+        );
+        let title = tr(NoticesKey::VolumeTooLargeForGpu);
+        self.notify(crate::ui::toast::Severity::Error, title, detail);
+        false
+    }
+
     /// Dispatches an asynchronous fetch for the requested coastline LOD
     /// and swaps vertices into GPU buffers when ready without blocking UI frames.
     pub fn reload_coastline_lod(&mut self, lod: crate::plots::CoastlineLod) {
@@ -108,4 +92,36 @@ impl OctantApp {
         crate::plots::fetch_coastline_async(lod, tx);
         log::info!("Coastline LOD fetch requested for {:?}", lod);
     }
+}
+
+/// Builds `layer`'s volume and point cloud renderers for `data`, unless they
+/// already have its dimensions and encoding: whether `data` is then uploaded
+/// later instead (before the next paint, to the renderer on screen).
+fn rebuild_volume_renderers(
+    layer: &mut Layer,
+    rs: &eframe::egui_wgpu::RenderState,
+    data: &VolumeData,
+) -> bool {
+    let encoding = layer.volume_encoding();
+    let renderers = &mut layer.renderers;
+    let same_dimensions =
+        layer.data.volume.as_ref().is_some_and(|v| {
+            v.width == data.width && v.height == data.height && v.depth == data.depth
+        }) && renderers
+            .volume
+            .as_ref()
+            .is_some_and(|r| r.encoding() == encoding);
+    if same_dimensions && renderers.point_cloud.is_some() {
+        return true;
+    }
+    let (w, h) = (data.width as u32, data.height as u32);
+    let (device, format) = (&rs.device, rs.target_format);
+    let volume = VolumeRenderer::new(device, &rs.queue, format, &data.values, w, h, encoding);
+    let point_cloud = PointCloudRenderer::new(device, format, &data.values, w, h);
+    renderers.volume = volume.map(Arc::new);
+    renderers.point_cloud = Some(Arc::new(point_cloud));
+    // New renderers start from `data`: nothing is pending.
+    renderers.volume_dirty = None;
+    renderers.point_cloud_dirty = None;
+    false
 }

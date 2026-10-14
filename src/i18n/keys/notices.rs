@@ -34,5 +34,10 @@ crate::i18n::keys::define_keys! {
     OmeMetadataNonConforming,
     OmeMetadataNonConformingDetail,
     LabelIdsBeyond32Bits,
+    // Plate wells
+    PlateWellStopped,
+    PlateWellNotJson,
+    PlateWellNotOme,
+    PlateWellNoMetadata,
     }
 }

@@ -5,12 +5,13 @@
 //! - `model.rs`, `axes.rs`, `omero.rs`, `image.rs`: Octant's own view of an
 //!   image (axes and units, levels with scale and translation, channels).
 //! - `plate.rs`: plates, wells and what a store holds beyond its images.
-//! - `reader.rs`, `discover.rs`, `variables.rs`: walking a store (desktop
-//!   directly, web in prefetch passes), with `ome_xml.rs` naming
+//! - `reader.rs`, `discover.rs`, `direct.rs`, `variables.rs`: walking a store
+//!   in passes, each pass's missing keys read concurrently, with `ome_xml.rs` naming
 //!   `bioformats2raw` series.
 
 pub mod axes;
 pub mod coords;
+pub mod direct;
 mod discover;
 mod image;
 mod legacy;
@@ -53,6 +54,11 @@ pub use reader::{MetaReader, Prefetch};
 /// Walks a store that answers every key directly (desktop); `None` when its
 /// root is not an OME-Zarr group.
 pub fn discover_direct(storage: Arc<dyn ReadableStorageTraits>) -> Option<Discovery> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        direct::discover_concurrent(storage)
+    }
+    #[cfg(target_arch = "wasm32")]
     match discover(&MetaReader::direct(storage), "") {
         Outcome::Found(found) => Some(found),
         Outcome::NotOme | Outcome::Pending => None,

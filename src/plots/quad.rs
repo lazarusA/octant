@@ -4,6 +4,47 @@
 
 use bytemuck::{Pod, Zeroable};
 
+/// The data quad's uniforms (`QuadUniforms` of `shaders/common/quad.wgsl`),
+/// shared by the heatmap and label pipelines.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub struct HeatmapUniforms {
+    pub pan: [f32; 2],
+    pub zoom: f32,
+    pub coord_mode: u32,
+    pub aspect_scale: [f32; 2],
+    pub width: u32,
+    pub height: u32,
+    pub tile_bounds: [f32; 4],
+    pub lut_size_x: u32,
+    pub lut_size_y: u32,
+    pub _pad0: u32,
+    pub _pad1: u32,
+    pub color: super::common::PlotColorParams,
+}
+
+/// Tile bounds covering the whole data.
+pub(crate) const FULL_TILE: [f32; 4] = [0.0, 0.0, 1.0, 1.0];
+
+impl Default for HeatmapUniforms {
+    fn default() -> Self {
+        Self {
+            pan: [0.0, 0.0],
+            zoom: 1.0,
+            coord_mode: 0,
+            aspect_scale: [1.0, 1.0],
+            width: 1,
+            height: 1,
+            tile_bounds: FULL_TILE,
+            lut_size_x: 0,
+            lut_size_y: 0,
+            _pad0: 0,
+            _pad1: 0,
+            color: super::common::PlotColorParams::default(),
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct HeatmapVertex {

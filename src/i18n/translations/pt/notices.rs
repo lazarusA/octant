@@ -48,5 +48,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Os metadados da versão {} de {} não seguem a especificação; mostrando o que foi possível ler."
         }
+        NoticesKey::PlateWellStopped => "Poço {}: a leitura foi interrompida",
+        NoticesKey::PlateWellNotJson => "Poço {}: os metadados não são JSON válido",
+        NoticesKey::PlateWellNotOme => "Poço {}: não é um poço OME-Zarr",
+        NoticesKey::PlateWellNoMetadata => "Poço {}: sem metadados de poço",
     })
 }

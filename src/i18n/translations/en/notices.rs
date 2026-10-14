@@ -48,5 +48,9 @@ pub fn text(key: NoticesKey) -> &'static str {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "The version {} metadata of {} doesn't follow the specification; showing what could be read."
         }
+        NoticesKey::PlateWellStopped => "Well {}: the read stopped before finishing",
+        NoticesKey::PlateWellNotJson => "Well {}: its metadata is not valid JSON",
+        NoticesKey::PlateWellNotOme => "Well {}: not an OME-Zarr well",
+        NoticesKey::PlateWellNoMetadata => "Well {}: no well metadata",
     }
 }

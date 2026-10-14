@@ -48,5 +48,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "I metadati della versione {} di {} non seguono la specifica; viene mostrato ciò che è stato possibile leggere."
         }
+        NoticesKey::PlateWellStopped => "Pozzetto {}: la lettura si è interrotta",
+        NoticesKey::PlateWellNotJson => "Pozzetto {}: i metadati non sono JSON valido",
+        NoticesKey::PlateWellNotOme => "Pozzetto {}: non è un pozzetto OME-Zarr",
+        NoticesKey::PlateWellNoMetadata => "Pozzetto {}: nessun metadato del pozzetto",
     })
 }

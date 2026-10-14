@@ -50,5 +50,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Les métadonnées en version {} de {} ne suivent pas la spécification ; affichage de ce qui a pu être lu."
         }
+        NoticesKey::PlateWellStopped => "Puits {} : la lecture s'est interrompue",
+        NoticesKey::PlateWellNotJson => "Puits {} : ses métadonnées ne sont pas un JSON valide",
+        NoticesKey::PlateWellNotOme => "Puits {} : pas un puits OME-Zarr",
+        NoticesKey::PlateWellNoMetadata => "Puits {} : aucune métadonnée de puits",
     })
 }

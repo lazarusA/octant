@@ -85,6 +85,11 @@ impl<'a> MetaReader<'a> {
         }
     }
 
+    /// Asks only Zarr `format`'s keys (`2` or `3`), as once a group answered.
+    pub fn assume_format(&self, format: u8) {
+        self.format.set(Some(format));
+    }
+
     /// The storage arrays are opened from.
     pub fn storage(&self) -> Arc<dyn ReadableStorageTraits> {
         self.storage.clone()

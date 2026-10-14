@@ -52,5 +52,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Los metadatos de la versión {} de {} no siguen la especificación; se muestra lo que se pudo leer."
         }
+        NoticesKey::PlateWellStopped => "Pocillo {}: la lectura se interrumpió",
+        NoticesKey::PlateWellNotJson => "Pocillo {}: sus metadatos no son JSON válido",
+        NoticesKey::PlateWellNotOme => "Pocillo {}: no es un pocillo OME-Zarr",
+        NoticesKey::PlateWellNoMetadata => "Pocillo {}: no hay metadatos de pocillo",
     })
 }

@@ -171,7 +171,7 @@ pub fn retrieve_array_subset_as_label_bits<TStorage: ?Sized + ReadableStorageTra
         } else if dt.is::<Int32DataType>() {
             ids!(i32)
         } else if dt.is::<Int64DataType>() {
-            ids!(i64, |v: i64| i32::try_from(v).is_err())
+            ids!(i64, |v: i64| u32::try_from(v).is_err())
         } else {
             Ok(None)
         }

@@ -48,5 +48,9 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::OmeMetadataNonConformingDetail => {
             "Metadata versi {} dari {} tidak mengikuti spesifikasi; menampilkan yang dapat dibaca."
         }
+        NoticesKey::PlateWellStopped => "Sumur {}: pembacaan terhenti",
+        NoticesKey::PlateWellNotJson => "Sumur {}: metadatanya bukan JSON yang valid",
+        NoticesKey::PlateWellNotOme => "Sumur {}: bukan sumur OME-Zarr",
+        NoticesKey::PlateWellNoMetadata => "Sumur {}: tidak ada metadata sumur",
     })
 }

@@ -51,9 +51,11 @@ pub fn level_array(
         {
             return None;
         }
+        // A level whose rank differs from the axes is read as plain Zarr,
+        // as its variable is.
         let names = multiscale.axes.iter().map(|a| a.name.as_str());
-        return Some(LevelArray {
-            dim_names: level_dimension_names(names, rank),
+        return level_dimension_names(names, rank).map(|dim_names| LevelArray {
+            dim_names,
             labels: draws_as_labels(parsed.fields.image_label.is_some(), data_type),
         });
     }

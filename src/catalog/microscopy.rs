@@ -15,9 +15,13 @@ macro_rules! idr {
 
 impl CatalogEntry {
     /// Whether this entry is one of `MICROSCOPY_CATALOG`'s OME-Zarr datasets,
-    /// found by its key (keys are unique across the catalog).
+    /// found by its key (keys are unique across the catalog) in a set built
+    /// once, since every card asks each frame.
     pub fn is_ome(&self) -> bool {
-        MICROSCOPY_CATALOG.iter().any(|e| e.key == self.key)
+        static KEYS: std::sync::OnceLock<std::collections::HashSet<&'static str>> =
+            std::sync::OnceLock::new();
+        KEYS.get_or_init(|| MICROSCOPY_CATALOG.iter().map(|e| e.key).collect())
+            .contains(self.key)
     }
 }
 
