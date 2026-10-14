@@ -71,8 +71,8 @@ impl OctantApp {
     }
 
     /// Steps the buffer wants ahead of `next`: `buffer_target_steps`, every
-    /// step left to play, or as many as half the cache holds, whichever is
-    /// fewest.
+    /// step left to play, or as many as each layer's playing lookahead holds
+    /// after its current chunk, whichever is fewest.
     fn buffer_wanted(
         &self,
         requests: &[(LayerId, LayerRequest)],
@@ -84,11 +84,16 @@ impl OctantApp {
         } else {
             total.saturating_sub(next)
         };
-        let step_bytes: usize = requests
+        let capacity = requests
             .iter()
-            .filter_map(|(_, r)| Some(estimate_chunk_bytes(&r.request, r.anim_dim?, 1)))
-            .sum();
-        let capacity = self.block_cache.max_bytes() / 2 / step_bytes.max(1);
+            .filter_map(|(_, r)| {
+                let dim = r.anim_dim?;
+                let cs = (r.var.chunk_shape.get(dim).copied().unwrap_or(1) as usize).max(1);
+                let bytes = estimate_chunk_bytes(&r.request, dim, cs);
+                Some((self.playing_lookahead_chunks(cs, bytes) - 1) * cs)
+            })
+            .min()
+            .unwrap_or(usize::MAX);
         self.buffer_target_steps().min(left).min(capacity).max(1)
     }
 

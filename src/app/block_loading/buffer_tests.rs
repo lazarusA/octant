@@ -136,6 +136,23 @@ fn playback_buffers_then_plays_a_whole_buffer_without_skipping() {
 }
 
 #[test]
+fn a_buffer_longer_than_the_lookahead_window_still_fills() {
+    // 10 steps of buffer, a 4-step window: the lookahead must still reach
+    // the buffer's last step, which counts from the step after the current.
+    let mut app = slow_app(Duration::from_millis(5));
+    app.block_window_size = 4;
+    app.playback.playback_fps = 50.0;
+    app.playback.buffer_secs = 0.2;
+    assert_eq!(app.buffer_target_steps(), 10);
+    let log = play_to_end(&mut app);
+    assert_eq!(
+        log.last().map(|&(s, _)| s),
+        Some(NT - 1),
+        "plays to the end"
+    );
+}
+
+#[test]
 fn a_fast_store_plays_without_buffering_once_started() {
     let mut app = slow_app(Duration::ZERO);
     app.prefetch_threads = 16;

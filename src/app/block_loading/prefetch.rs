@@ -123,16 +123,22 @@ impl OctantApp {
     fn prefetch_pacing(&self, cs: usize, chunk_bytes: usize) -> (usize, usize) {
         let max_concurrent =
             adaptive_concurrency(chunk_bytes, self.prefetch_threads) + self.foreground_requests();
-        let cache_bytes = self.block_cache.max_bytes();
         let budget = if self.playback.is_playing {
-            // At least the buffer, within this layer's share of the cache.
-            let window = self.block_window_size.max(self.buffer_target_steps());
-            let share = cache_bytes / self.animated_layer_count();
-            playing_lookahead(window, cs, chunk_bytes, share)
+            self.playing_lookahead_chunks(cs, chunk_bytes)
         } else {
-            range_budget(chunk_bytes, cache_bytes)
+            range_budget(chunk_bytes, self.block_cache.max_bytes())
         };
         (max_concurrent, budget)
+    }
+
+    /// Chunks of `cs` steps (`chunk_bytes` each) one layer queues while
+    /// playing, the current one included: it and the buffer's steps after it
+    /// (the buffer counts from the next step) at least, within the layer's
+    /// share of the cache. The buffer waits for no more than this holds.
+    pub(crate) fn playing_lookahead_chunks(&self, cs: usize, chunk_bytes: usize) -> usize {
+        let window = self.block_window_size.max(self.buffer_target_steps() + cs);
+        let share = self.block_cache.max_bytes() / self.animated_layer_count();
+        playing_lookahead(window, cs, chunk_bytes, share)
     }
 
     /// Layers whose shown block is being fetched.
