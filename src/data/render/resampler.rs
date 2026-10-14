@@ -11,12 +11,15 @@
 
 use std::sync::Arc;
 
-use super::{matrix::MatrixData, pyramid::MatrixPyramid};
+use super::pyramid::MatrixPyramid;
 
-/// A sampled viewport tile along with its normalized bounds in the source dataset.
-#[derive(Debug, Clone)]
-pub struct ResampledTile {
-    pub data: MatrixData,
+/// A sampled viewport tile, borrowed from the resampler's buffer, along with
+/// its normalized bounds in the source dataset.
+#[derive(Debug, Clone, Copy)]
+pub struct ResampledTile<'a> {
+    pub values: &'a [f32],
+    pub width: usize,
+    pub height: usize,
     pub tile_bounds: [f32; 4], // [u_min, v_min, u_max, v_max]
 }
 
@@ -36,15 +39,14 @@ pub struct ViewportResampler {
     pub pyramid: Option<Arc<MatrixPyramid>>,
     pub last_request: Option<ViewportRequest>,
     pub max_resolution: usize,
+    /// The last tile's values: one buffer reused by every resample, so
+    /// zooming does not allocate a tile each time.
+    tile: Vec<f32>,
 }
 
 impl Default for ViewportResampler {
     fn default() -> Self {
-        Self {
-            pyramid: None,
-            last_request: None,
-            max_resolution: 2048,
-        }
+        Self::new(None)
     }
 }
 
@@ -54,10 +56,15 @@ impl ViewportResampler {
             pyramid,
             last_request: None,
             max_resolution: 2048,
+            tile: Vec::new(),
         }
     }
 
+    /// Resamples `pyramid` from now on (`None`: none, freeing the tile).
     pub fn set_pyramid(&mut self, pyramid: Option<Arc<MatrixPyramid>>) {
+        if pyramid.is_none() {
+            self.tile = Vec::new();
+        }
         self.pyramid = pyramid;
         self.last_request = None;
     }
@@ -118,14 +125,16 @@ impl ViewportResampler {
         ((u_min, u_max), (v_min, v_max))
     }
 
-    /// Resamples the visible viewport with a buffer margin at the optimal pyramid LOD level.
+    /// Resamples the visible viewport with a buffer margin at the optimal
+    /// pyramid LOD level; `base` is the full matrix the pyramid was built from.
     pub fn resample_if_needed(
         &mut self,
+        base: &[f32],
         visible_u: (f64, f64),
         visible_v: (f64, f64),
         target_width: usize,
         target_height: usize,
-    ) -> Option<ResampledTile> {
+    ) -> Option<ResampledTile<'_>> {
         let pyramid = self.pyramid.as_ref()?;
 
         let target_w = target_width.clamp(16, self.max_resolution);
@@ -174,10 +183,12 @@ impl ViewportResampler {
             }
         }
 
-        let sampled = pyramid.sample_viewport(
+        let (width, height) = pyramid.sample_into(
+            base,
             (tile_u_min, tile_u_max),
             (tile_v_min, tile_v_max),
             (target_w, target_h),
+            &mut self.tile,
         );
         let tile_bounds = [
             tile_u_min as f32,
@@ -188,7 +199,9 @@ impl ViewportResampler {
         self.last_request = Some(req);
 
         Some(ResampledTile {
-            data: sampled,
+            values: &self.tile,
+            width,
+            height,
             tile_bounds,
         })
     }

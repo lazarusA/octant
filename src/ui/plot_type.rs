@@ -82,7 +82,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
         !is_3d_available
             && total_2d_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
     } else {
-        app.enable_pyramid_resampling
+        app.base_resampled()
     };
 
     let is_volume_allowed = is_3d_available
@@ -100,8 +100,7 @@ fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
         app.layers.base.load.block_key.is_some() || app.block_prefetcher.pending_count() > 0;
     if !is_exploring_new
         && !is_loading
-        && (((app.enable_pyramid_resampling || label_image)
-            && app.selected.plot_type != PlotType::Heatmap)
+        && (((app.base_resampled() || label_image) && app.selected.plot_type != PlotType::Heatmap)
             || ((app.selected.plot_type == PlotType::Volume
                 || app.selected.plot_type == PlotType::PointCloud)
                 && app.layers.base.data.volume.is_none())

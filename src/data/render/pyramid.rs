@@ -57,7 +57,9 @@ impl MatrixPyramid {
             + std::mem::size_of::<Self>()
     }
 
-    /// Builds a full multi-resolution pyramid from raw 2D matrix data.
+    /// Builds a multi-resolution pyramid of the 2D matrix `values`. Level 0
+    /// is the matrix itself and holds no copy of it: sampling reads it from
+    /// the caller (`sample_viewport`'s `base`), which keeps the matrix.
     pub fn new(
         values: &[f32],
         width: usize,
@@ -69,17 +71,14 @@ impl MatrixPyramid {
         let dataset_name = dataset_name.into();
         let (min_val, max_val) = crate::utils::compute_finite_min_max(values);
 
-        let mut levels = Vec::new();
-
-        // Level 0: Full native resolution
-        levels.push(PyramidLevel {
+        let mut levels = vec![PyramidLevel {
             level_idx: 0,
             width,
             height,
-            values: values.to_vec(),
+            values: Vec::new(),
             scale_x: 1.0,
             scale_y: 1.0,
-        });
+        }];
 
         let mut current_w = width;
         let mut current_h = height;
@@ -91,29 +90,24 @@ impl MatrixPyramid {
             if next_w == current_w && next_h == current_h {
                 break;
             }
-
-            let Some(prev_level) = levels.last() else {
+            let Some(prev) = levels.last() else {
                 break;
             };
-            let next_values = pyramid_downsample::downsample_2x2(
-                &prev_level.values,
-                prev_level.width,
-                prev_level.height,
-                next_w,
-                next_h,
-                op,
-            );
-
-            let scale_x = width as f64 / next_w as f64;
-            let scale_y = height as f64 / next_h as f64;
+            let src = if prev.level_idx == 0 {
+                values
+            } else {
+                &prev.values
+            };
+            let next_values =
+                pyramid_downsample::downsample_2x2(src, current_w, current_h, next_w, next_h, op);
 
             levels.push(PyramidLevel {
                 level_idx: levels.len(),
                 width: next_w,
                 height: next_h,
                 values: next_values,
-                scale_x,
-                scale_y,
+                scale_x: width as f64 / next_w as f64,
+                scale_y: height as f64 / next_h as f64,
             });
 
             current_w = next_w;
@@ -127,6 +121,15 @@ impl MatrixPyramid {
             min_val,
             max_val,
             dataset_name,
+        }
+    }
+
+    /// The values of `level`: `base` (the full matrix) for level 0.
+    pub fn level_values<'a>(&'a self, level: &'a PyramidLevel, base: &'a [f32]) -> &'a [f32] {
+        if level.level_idx == 0 {
+            base
+        } else {
+            &level.values
         }
     }
 
@@ -165,13 +168,39 @@ impl MatrixPyramid {
         best_level.min(self.levels.len() - 1)
     }
 
-    /// Samples a sub-region `[x_min..x_max] x [y_min..y_max]` normalized in `[0.0, 1.0]` at the given target resolution.
+    /// Samples a sub-region `[x_min..x_max] x [y_min..y_max]` normalized in
+    /// `[0.0, 1.0]` at the given target resolution; `base` is the full matrix
+    /// the pyramid was built from.
     pub fn sample_viewport(
         &self,
+        base: &[f32],
         x_range: (f64, f64),
         y_range: (f64, f64),
         target_res: (usize, usize),
     ) -> MatrixData {
-        pyramid_downsample::sample_viewport(self, x_range, y_range, target_res)
+        let mut values = Vec::new();
+        let (w, h) = self.sample_into(base, x_range, y_range, target_res, &mut values);
+        MatrixData::new(
+            w,
+            h,
+            values,
+            self.min_val,
+            self.max_val,
+            self.dataset_name.clone(),
+            1,
+        )
+    }
+
+    /// Samples like `sample_viewport` into `out`, reusing its allocation;
+    /// returns the sample's width and height.
+    pub fn sample_into(
+        &self,
+        base: &[f32],
+        x_range: (f64, f64),
+        y_range: (f64, f64),
+        target_res: (usize, usize),
+        out: &mut Vec<f32>,
+    ) -> (usize, usize) {
+        pyramid_downsample::sample_viewport(self, base, x_range, y_range, target_res, out)
     }
 }

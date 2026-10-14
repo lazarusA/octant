@@ -28,15 +28,9 @@ pub(crate) fn resolve_2d_plot_entries(
         .grid
         .find_cell_from_norm(norm_x, norm_y, orig_w, orig_h);
 
-    let val = if let Some(pyr) = &app.layers.base.data.pyramid
-        && let Some(base_lvl) = pyr.levels.first()
-    {
-        let idx = py * orig_w + px;
-        base_lvl.values.get(idx).copied().unwrap_or(f32::NAN)
-    } else {
-        let idx = py * matrix.width + px;
-        matrix.values.get(idx).copied().unwrap_or(f32::NAN)
-    };
+    // The matrix is the full-resolution data, also under a pyramid.
+    let idx = py * matrix.width + px;
+    let val = matrix.values.get(idx).copied().unwrap_or(f32::NAN);
 
     // A composite mixes every channel, so no single band is selected.
     let mut used_dims: HashSet<usize> = composite_channel_dim(app).into_iter().collect();

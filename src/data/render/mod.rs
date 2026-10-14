@@ -4,6 +4,8 @@ pub mod matrix;
 pub mod payload;
 pub mod pyramid;
 pub mod pyramid_downsample;
+#[cfg(test)]
+mod pyramid_tests;
 pub mod resampler;
 pub mod volume;
 

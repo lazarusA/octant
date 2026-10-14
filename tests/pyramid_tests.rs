@@ -104,13 +104,13 @@ fn test_sample_viewport() {
     let pyramid = MatrixPyramid::new(&values, width, height, "viewport", AggregationOp::Mean, 256);
 
     // Sample the top-left subregion [0.0..0.1] x [0.0..0.1]
-    let sample = pyramid.sample_viewport((0.0, 0.1), (0.0, 0.1), (50, 50));
+    let sample = pyramid.sample_viewport(&values, (0.0, 0.1), (0.0, 0.1), (50, 50));
     assert_eq!(sample.width, 50);
     assert_eq!(sample.height, 50);
     assert_eq!(sample.values[0], 100.0);
 
     // Sample the bottom-right subregion [0.5..1.0] x [0.5..1.0]
-    let sample_br = pyramid.sample_viewport((0.5, 1.0), (0.5, 1.0), (50, 50));
+    let sample_br = pyramid.sample_viewport(&values, (0.5, 1.0), (0.5, 1.0), (50, 50));
     assert_eq!(sample_br.width, 50);
     assert_eq!(sample_br.height, 50);
     assert_eq!(sample_br.values[0], 0.0);
@@ -172,19 +172,19 @@ fn test_resample_if_needed_aspect_ratio_and_lod() {
     assert_eq!(th, 1000);
 
     // Initial resample
-    let sample1 = resampler.resample_if_needed((0.0, 1.0), (0.0, 1.0), tw, th);
+    let sample1 = resampler.resample_if_needed(&values, (0.0, 1.0), (0.0, 1.0), tw, th);
     assert!(sample1.is_some());
     let s1 = sample1.unwrap();
-    assert_eq!(s1.data.width, 2000);
-    assert_eq!(s1.data.height, 1000);
+    assert_eq!(s1.width, 2000);
+    assert_eq!(s1.height, 1000);
     assert_eq!(s1.tile_bounds, [0.0, 0.0, 1.0, 1.0]);
 
     // Identical visible span should skip
-    let sample2 = resampler.resample_if_needed((0.0, 1.0), (0.0, 1.0), tw, th);
+    let sample2 = resampler.resample_if_needed(&values, (0.0, 1.0), (0.0, 1.0), tw, th);
     assert!(sample2.is_none());
 
     // Zoom in 10x (visible 0.45..0.55) -> extracts high-res sub-tile with bounds
-    let sample3 = resampler.resample_if_needed((0.45, 0.55), (0.45, 0.55), tw, th);
+    let sample3 = resampler.resample_if_needed(&values, (0.45, 0.55), (0.45, 0.55), tw, th);
     assert!(sample3.is_some());
     let s3 = sample3.unwrap();
     assert!(s3.tile_bounds[0] <= 0.45 && s3.tile_bounds[2] >= 0.55);

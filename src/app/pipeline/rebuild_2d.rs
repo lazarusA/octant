@@ -24,14 +24,15 @@ impl OctantApp {
         let range = (data.min_val, data.max_val);
         let is_new_variable = follow_variable(layer, "2d", Layer::clear_3d, step, range);
         let total_elements = data.width.saturating_mul(data.height);
-        self.enable_pyramid_resampling |= total_elements > MAX_GPU_STORAGE_BUFFER_ELEMENTS;
         if is_base && data.height == 1 {
             let line = &mut self.plot_configs.line;
             line.all_series = false;
             line.profile_dim_idx = 0;
             line.profile_slice_idx = 0;
         }
-        let pyramid = (self.enable_pyramid_resampling).then_some(self.pyramid_aggregation_op);
+        // Decided per layer: only this layer's own size forces resampling.
+        let resample = needs_pyramid(self.enable_pyramid_resampling, total_elements);
+        let pyramid = resample.then_some(self.pyramid_aggregation_op);
         let shown = shown_data(layer, &data, pyramid, &self.nav);
         if let Some(rs) = &self.wgpu_render_state {
             // Coastlines follow the base layer's grid.
@@ -107,7 +108,13 @@ fn shown_data(
     );
     let target =
         crate::data::ViewportResampler::compute_target_resolution(data.width, data.height, 2048);
-    pyramid.sample_viewport(u, v, target)
+    pyramid.sample_viewport(&data.values, u, v, target)
+}
+
+/// Whether a layer of `cells` 2D cells is resampled through a pyramid: when
+/// Resampling is ticked (`enabled`), or when it does not fit one GPU buffer.
+pub(crate) fn needs_pyramid(enabled: bool, cells: usize) -> bool {
+    enabled || cells > MAX_GPU_STORAGE_BUFFER_ELEMENTS
 }
 
 /// Keeps the layer's label colors, then writes `shown` into its renderers

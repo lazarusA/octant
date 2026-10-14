@@ -14,17 +14,20 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
     let prev_resampling = app.enable_pyramid_resampling;
     let prev_op = app.pyramid_aggregation_op;
 
-    let is_oversized = app.layers.base.data.matrix.as_ref().is_some_and(|m| {
-        m.width * m.height > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS
-    });
-
-    if is_oversized {
-        app.enable_pyramid_resampling = true;
-    }
+    // A base layer too large for one GPU buffer is always resampled: shown
+    // ticked and locked, without changing the setting other layers follow.
+    let is_oversized = app
+        .layers
+        .base
+        .data
+        .matrix
+        .as_ref()
+        .is_some_and(|m| crate::app::needs_pyramid(false, m.width.saturating_mul(m.height)));
+    let mut resampling = app.enable_pyramid_resampling || is_oversized;
 
     ui.horizontal(|ui| {
         let checkbox = egui::Checkbox::new(
-            &mut app.enable_pyramid_resampling,
+            &mut resampling,
             egui::RichText::new(tr(K::Aggregation)).strong(),
         );
         let resp = ui.add_enabled(!is_oversized, checkbox);
@@ -34,7 +37,10 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
             resp.on_hover_text(tr(K::AggregationHover));
         }
     });
-    if app.enable_pyramid_resampling {
+    if !is_oversized {
+        app.enable_pyramid_resampling = resampling;
+    }
+    if resampling {
         ui.horizontal(|ui| {
             ui.label(tr(K::AggregationMode));
             egui::ComboBox::from_id_salt("settings_resampling_mode_dropdown")
@@ -48,32 +54,12 @@ pub(crate) fn show_resampling_controls(app: &mut OctantApp, ui: &mut egui::Ui) {
         });
     }
 
-    if (app.enable_pyramid_resampling != prev_resampling || app.pyramid_aggregation_op != prev_op)
-        && let Some(mdata) = &app.layers.base.data.matrix
-    {
+    if app.enable_pyramid_resampling != prev_resampling || app.pyramid_aggregation_op != prev_op {
         if app.enable_pyramid_resampling {
             // Aggregation is heatmap only; keep a staged plot type in line.
             app.selected.plot_type = crate::plots::PlotType::Heatmap;
-            if mdata.height > 1 {
-                let pyramid = std::sync::Arc::new(crate::data::MatrixPyramid::new(
-                    &mdata.values,
-                    mdata.width,
-                    mdata.height,
-                    &mdata.dataset_name,
-                    app.layers.base.pyramid_op(app.pyramid_aggregation_op),
-                    512,
-                ));
-                app.layers
-                    .base
-                    .data
-                    .resampler
-                    .set_pyramid(Some(pyramid.clone()));
-                app.layers.base.data.pyramid = Some(pyramid);
-            }
-        } else {
-            app.layers.base.data.pyramid = None;
-            app.layers.base.data.resampler.set_pyramid(None);
         }
+        app.rebuild_layer_pyramids();
     }
 }
 
