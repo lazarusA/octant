@@ -11,7 +11,11 @@ pub struct VariableInfo {
     pub data_type: String,
     pub shape: Vec<u64>,
     pub dimension_names: Vec<String>,
+    /// The read unit: a sharded array's inner chunks, else its chunks.
     pub chunk_shape: Vec<u64>,
+    /// The shard (stored object) shape of a sharded array; `None` when
+    /// it is not sharded.
+    pub shard_shape: Option<Vec<u64>>,
     pub file_size: u64,
     pub units: Option<String>,
     pub long_name: Option<String>,

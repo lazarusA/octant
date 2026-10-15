@@ -128,6 +128,7 @@ fn test_dimension_slider_defaults_with_dggs_custom_dim_name() {
         attributes: attrs,
         ome: None,
         multiscale: None,
+        shard_shape: None,
     };
 
     init_variable_dimension_defaults(&mut app, &var_info);

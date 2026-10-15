@@ -163,11 +163,19 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits + 'stat
         cf_attrs.resolve_dimension_names(array.dimension_names().as_deref(), shape.len());
 
     let zero_idx = vec![0u64; shape.len()];
-    let chunk_shape = array
+    let outer = array
         .chunk_shape(&zero_idx)
         .ok()
         .map(|cs| cs.iter().map(|v| v.get()).collect::<Vec<u64>>())
         .unwrap_or_else(|| shape.clone());
+    // A sharded array reads by its inner chunks.
+    let inner = zarrs::array::ArrayShardedExt::effective_subchunk_shape(array)
+        .map(|cs| cs.iter().map(|v| v.get()).collect::<Vec<u64>>())
+        .filter(|inner| inner.len() == outer.len());
+    let (chunk_shape, shard_shape) = match inner {
+        Some(inner) => (inner, Some(outer)),
+        None => (outer, None),
+    };
     let file_size = calculate_variable_size_bytes(&shape, &data_type);
 
     Some(VariableInfo {
@@ -176,6 +184,7 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits + 'stat
         shape,
         dimension_names,
         chunk_shape,
+        shard_shape,
         file_size,
         units: cf_attrs.units,
         long_name: cf_attrs.long_name,

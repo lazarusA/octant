@@ -21,6 +21,7 @@ fn test_init_dimension_defaults_2d_dataset() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        shard_shape: None,
     };
 
     octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
@@ -56,6 +57,7 @@ fn test_init_dimension_defaults_3d_dataset() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        shard_shape: None,
     };
 
     octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
@@ -99,6 +101,7 @@ fn test_init_dimension_defaults_4d_dataset() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        shard_shape: None,
     };
 
     octant::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var_info);
@@ -337,6 +340,7 @@ fn test_calculate_max_animated_steps_small_and_large_datasets() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        shard_shape: None,
     };
 
     let dim_config = vec![
@@ -389,6 +393,7 @@ fn test_calculate_max_animated_steps_small_and_large_datasets() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        shard_shape: None,
     };
     let large_ranges = vec![(0, 499), (0, 2047), (0, 2047)];
 
@@ -433,6 +438,7 @@ fn test_format_byte_size_and_calculate_download_sizes() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        shard_shape: None,
     };
 
     let dim_config = vec![
@@ -487,6 +493,7 @@ fn test_selected_volume_elements_and_limit() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        shard_shape: None,
     };
     app.selected.metadata = Some(DatasetMetadata {
         name: "test_ds".to_string(),
@@ -970,6 +977,7 @@ fn test_2d_and_3d_selected_elements_and_limits() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        shard_shape: None,
     };
 
     let metadata = octant::data::DatasetMetadata {

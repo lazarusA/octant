@@ -228,6 +228,7 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
                         attributes: cf_attrs.attributes,
                         ome: None,
                         multiscale: None,
+                        shard_shape: None,
                     });
                 }
             }

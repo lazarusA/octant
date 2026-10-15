@@ -68,6 +68,7 @@ pub fn collect_group_variables(
             attributes,
             ome: None,
             multiscale: None,
+            shard_shape: None,
         });
     }
 
@@ -139,6 +140,7 @@ pub fn inspect_netcdf_file(file_path: &str) -> Result<DatasetMetadata, BlockStor
             attributes,
             ome: None,
             multiscale: None,
+            shard_shape: None,
         });
     }
 

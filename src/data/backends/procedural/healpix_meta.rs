@@ -29,6 +29,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             attributes: global_attrs.clone(),
             ome: None,
             multiscale: None,
+            shard_shape: None,
         },
         VariableInfo {
             name: "mslp".to_string(),
@@ -45,6 +46,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             attributes: global_attrs.clone(),
             ome: None,
             multiscale: None,
+            shard_shape: None,
         },
         VariableInfo {
             name: "lat".to_string(),
@@ -61,6 +63,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             attributes: global_attrs.clone(),
             ome: None,
             multiscale: None,
+            shard_shape: None,
         },
         VariableInfo {
             name: "lon".to_string(),
@@ -77,6 +80,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             attributes: global_attrs.clone(),
             ome: None,
             multiscale: None,
+            shard_shape: None,
         },
         VariableInfo {
             name: "ring".to_string(),
@@ -93,6 +97,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             attributes: global_attrs,
             ome: None,
             multiscale: None,
+            shard_shape: None,
         },
     ];
 
