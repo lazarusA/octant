@@ -1,63 +1,12 @@
 //! Plotting multiscale variables: the plot reads the level that fits the
 //! canvas while the UI stays on level 0, and overlays follow that level.
 
-use std::sync::Arc;
-
-use serde_json::json;
-use zarrs::storage::store::MemoryStore;
-use zarrs::storage::{StoreKey, WritableStorageTraits};
-
 use crate::app::OctantApp;
 use crate::app::layers::{LayerId, LevelChoice};
 use crate::app::multiscale::{at_base, at_level, same_variable};
-use crate::app::test_support::{TARGET, poll_until, register_store, selection_of, write_array};
+use crate::app::test_support::{poll_until, pyramid_app, selection_of};
 use crate::data::DatasetMetadata;
 use crate::plots::PlotType;
-
-fn put_json(store: &MemoryStore, key: &str, value: serde_json::Value) {
-    let bytes = serde_json::to_vec(&value).expect("json");
-    store
-        .set(&StoreKey::new(key).expect("key"), bytes.into())
-        .expect("set");
-}
-
-/// A GeoZarr pyramid: `t2m` and `sst(time, lat, lon)` at 3x64x64 (level 0),
-/// 3x32x32 and 3x16x16, each level a child group of the root's layout.
-fn pyramid_app() -> (OctantApp, DatasetMetadata) {
-    let store = Arc::new(MemoryStore::new());
-    let layout: Vec<_> = (0..3)
-        .map(|l| match l {
-            0 => json!({ "asset": "0" }),
-            _ => json!({
-                "asset": l.to_string(), "derived_from": (l - 1).to_string(),
-                "transform": { "scale": [1.0, 2.0, 2.0] }
-            }),
-        })
-        .collect();
-    let group = |attrs| json!({ "zarr_format": 3, "node_type": "group", "attributes": attrs });
-    put_json(
-        &store,
-        "zarr.json",
-        group(json!({ "multiscales": { "layout": layout } })),
-    );
-    for l in 0..3u64 {
-        put_json(&store, &format!("{l}/zarr.json"), group(json!({})));
-        let n = 64 >> l;
-        for name in ["t2m", "sst"] {
-            let path = format!("{l}/{name}");
-            write_array(
-                &store,
-                &path,
-                &["time", "lat", "lon"],
-                &[3, n, n],
-                &[1, n, n],
-            );
-        }
-    }
-    let mut app = OctantApp::default();
-    let meta = register_store(&mut app, store, TARGET);
-    (app, meta)
-}
 
 /// Stages `name` of the pyramid (level 0) on a canvas of `px` pixels.
 fn stage(app: &mut OctantApp, meta: &DatasetMetadata, name: &str, px: u32) {

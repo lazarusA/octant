@@ -14,6 +14,8 @@ mod open_tests;
 #[cfg(test)]
 mod search_tests;
 #[cfg(test)]
+mod stack_tests;
+#[cfg(test)]
 mod tests;
 
 pub use search::SearchCache;

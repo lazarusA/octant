@@ -3,9 +3,12 @@
 
 use std::sync::Arc;
 
+use serde_json::json;
+
 use zarrs::array::{ArrayBuilder, ArraySubset, DataType, FillValue};
 use zarrs::metadata::v3::MetadataV3;
 use zarrs::storage::store::MemoryStore;
+use zarrs::storage::{StoreKey, WritableStorageTraits};
 
 use crate::app::layers::VariableSelection;
 use crate::app::{AnimationRole, OctantApp, SpatialRole, StoreKind};
@@ -147,4 +150,49 @@ pub(crate) fn poll_until(app: &mut OctantApp, done: impl Fn(&OctantApp) -> bool)
         app.poll_block_prefetch_results();
         std::thread::yield_now();
     }
+}
+
+fn put_json(store: &MemoryStore, key: &str, value: serde_json::Value) {
+    let bytes = serde_json::to_vec(&value).expect("json");
+    store
+        .set(&StoreKey::new(key).expect("key"), bytes.into())
+        .expect("set");
+}
+
+/// A GeoZarr pyramid: `t2m` and `sst(time, lat, lon)` at 3x64x64 (level 0),
+/// 3x32x32 and 3x16x16, each level a child group of the root's layout.
+pub(crate) fn pyramid_app() -> (OctantApp, DatasetMetadata) {
+    let store = Arc::new(MemoryStore::new());
+    let layout: Vec<_> = (0..3)
+        .map(|l| match l {
+            0 => json!({ "asset": "0" }),
+            _ => json!({
+                "asset": l.to_string(), "derived_from": (l - 1).to_string(),
+                "transform": { "scale": [1.0, 2.0, 2.0] }
+            }),
+        })
+        .collect();
+    let group = |attrs| json!({ "zarr_format": 3, "node_type": "group", "attributes": attrs });
+    put_json(
+        &store,
+        "zarr.json",
+        group(json!({ "multiscales": { "layout": layout } })),
+    );
+    for l in 0..3u64 {
+        put_json(&store, &format!("{l}/zarr.json"), group(json!({})));
+        let n = 64 >> l;
+        for name in ["t2m", "sst"] {
+            let path = format!("{l}/{name}");
+            write_array(
+                &store,
+                &path,
+                &["time", "lat", "lon"],
+                &[3, n, n],
+                &[1, n, n],
+            );
+        }
+    }
+    let mut app = OctantApp::default();
+    let meta = register_store(&mut app, store, TARGET);
+    (app, meta)
 }

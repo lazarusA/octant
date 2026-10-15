@@ -16,17 +16,17 @@ use crate::ui::variables_panel::show_variable_controls;
 use egui::epaint::ClippedShape;
 use egui::{Id, Pos2, Rect, Ui, pos2};
 
-const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1200.0, 2400.0));
+pub(super) const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1200.0, 2400.0));
 /// A canvas too narrow for the Dimensions panel's full width beside the
 /// Settings panel, so it takes its narrowest.
-const NARROW: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(420.0, 2400.0));
+pub(super) const NARROW: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(420.0, 2400.0));
 /// The Dimensions panel's narrowest content width.
-const DIMENSIONS_MIN_W: f32 = 220.0;
+pub(super) const DIMENSIONS_MIN_W: f32 = 220.0;
 /// Frames for a panel to settle: an area lends its content last frame's
 /// size, and the scrolled Settings body follows a frame behind it.
 const SETTLE: usize = 8;
 /// Rounding of measured against drawn widths.
-const SLACK: f32 = 1.0;
+pub(super) const SLACK: f32 = 1.0;
 
 const PLOT_TYPES: [PlotType; 6] = [
     PlotType::Heatmap,
@@ -76,7 +76,12 @@ fn text_center(shapes: &[ClippedShape], label: &str) -> Option<Pos2> {
 /// Width of the area `id` that `run` shows in `lang`, with the app's fonts
 /// for it (the CJK fallbacks draw Chinese, Japanese and Korean at their real
 /// widths), after opening the collapsed sections titled `open`.
-fn area_width(lang: Language, id: &str, open: &[Key], run: &mut impl FnMut(&mut Ui)) -> f32 {
+pub(super) fn area_width(
+    lang: Language,
+    id: &str,
+    open: &[Key],
+    run: &mut impl FnMut(&mut Ui),
+) -> f32 {
     with_language(lang, || {
         let mut h = Harness::new(SCREEN);
         FontEngine::on_language_changed(&h.ctx, lang);
@@ -92,7 +97,7 @@ fn area_width(lang: Language, id: &str, open: &[Key], run: &mut impl FnMut(&mut 
 }
 
 /// Horizontal margins of the popup frame both panels draw in.
-fn frame_margins() -> f32 {
+pub(super) fn frame_margins() -> f32 {
     egui::Frame::popup(&egui::Style::default())
         .total_margin()
         .sum()
