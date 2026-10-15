@@ -4,6 +4,7 @@
 
 use crate::app::OctantApp;
 use crate::data::{DatasetMetadata, VariableInfo};
+use crate::i18n::{HoverKey, fill, tr};
 use crate::ui::hover::enrich::{flipped_offset, is_flipped};
 use crate::ui::hover::field::HoverField;
 use crate::ui::hover::format::format_dimension_coord;
@@ -14,7 +15,8 @@ pub struct DetailCell {
     pub value: f32,
     /// The cell's center on the quad (`0..1` from its left and top edges).
     pub center: (f32, f32),
-    /// The tile's level variable.
+    /// The tile's level and its variable.
+    pub level: usize,
     pub var_idx: usize,
     /// Its x and y dimensions and the cell's index along each.
     pub x: (usize, usize),
@@ -61,6 +63,7 @@ pub fn detail_cell(app: &OctantApp, norm_x: f32, norm_y: f32) -> Option<DetailCe
     Some(DetailCell {
         value,
         center,
+        level: tile.level,
         var_idx: tile.var_idx,
         x: index(0, px, w),
         y: index(1, py, h),
@@ -89,4 +92,18 @@ pub fn detail_fields(
         ))
     };
     Some((field(cell.y)?, field(cell.x)?))
+}
+
+/// The level row of a multiscale plot's hover: the tile's level under the
+/// pointer (`cell`), else the plotted one, of the stack's level count.
+pub fn level_field(app: &OctantApp, cell: Option<&DetailCell>) -> Option<HoverField> {
+    let shown = app.plotted().variable_info()?.multiscale.as_ref()?;
+    let level = cell.map_or(shown.level, |c| c.level);
+    let mut buf = [0; 64];
+    let value = fill(
+        &mut buf,
+        tr(HoverKey::LevelOfTotal),
+        &[&level, &shown.set.len()],
+    );
+    Some(HoverField::new(tr(HoverKey::Level), value))
 }

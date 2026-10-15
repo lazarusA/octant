@@ -98,9 +98,17 @@ pub fn show_hover_tooltip(
     let target =
         resolve_target_screen_pos(app, matrix, &camera, sampler, &transform, px, py, point);
     // Over a multiscale plot's detail tile, the reticle sits on its cell.
-    let tile_cell = (plot_type == PlotType::Heatmap && point.is_none())
+    let heatmap = plot_type == PlotType::Heatmap && point.is_none();
+    let tile_cell = heatmap
         .then(|| detail::detail_cell(app, hit.norm_x, hit.norm_y))
         .flatten();
+    // The level read under the pointer, for a multiscale plot.
+    if let Some(level) = heatmap
+        .then(|| detail::level_field(app, tile_cell.as_ref()))
+        .flatten()
+    {
+        fields.push(level);
+    }
     let target = tile_cell.map_or(target, |c| {
         Some(transform.norm_to_screen(c.center.0, c.center.1))
     });
