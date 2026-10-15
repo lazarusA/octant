@@ -47,6 +47,8 @@ fn tile_cells_widen_align_and_stay_in_the_window() {
     assert_eq!(axis.cells(&s, 0, (16.0, 32.0), 0.25, 1), Some(12..36));
     assert_eq!(axis.cells(&s, 0, (16.0, 32.0), 0.25, 16), Some(0..48));
     assert_eq!(axis.cells(&s, 1, (16.0, 32.0), 0.0, 1), Some(8..16));
+    // A chunk (a shard) of the whole axis is not read for a small window.
+    assert_eq!(axis.cells(&s, 0, (16.0, 20.0), 0.0, 64), Some(16..20));
     // A plotted window of level-2 cells 8..=11 (level-0 32..48).
     let part = Axis::plotted(&s, 2, 0, (8, 11), false).expect("axis");
     assert_eq!(part.cells(&s, 0, (32.0, 40.0), 0.25, 16), Some(32..48));

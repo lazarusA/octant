@@ -152,3 +152,77 @@ fn levels_of_another_rank_stay_apart() {
     let r = vars[0].multiscale.as_ref().expect("linked");
     assert_eq!(r.set.len(), 2);
 }
+
+/// The EOPF Sentinel-2 L2A `measurements/reflectance` layout (explorer
+/// store, January 2026), trimmed to four levels: `scale` is written
+/// relative to the finest level whatever `derived_from` names, translations
+/// shift cell centres, and bands start at the level of their resolution.
+fn eopf_reflectance() -> serde_json::Value {
+    let level = |asset: &str, from: Option<&str>, step: f64, n: u64| {
+        let mut entry = json!({
+            "asset": asset,
+            "spatial:shape": [n, n],
+            "spatial:transform": [step, 0.0, 600000.0, 0.0, -step, 5600040.0]
+        });
+        if let Some(from) = from {
+            let s = step / 10.0;
+            entry["derived_from"] = from.into();
+            entry["transform"] =
+                json!({ "scale": [s, s], "translation": [(s - 1.0) * 5.0, (s - 1.0) * 5.0] });
+        }
+        entry
+    };
+    json!({
+        "zarr_conventions": [{ "name": "multiscales" }, { "name": "spatial:" }, { "name": "proj:" }],
+        "spatial:dimensions": ["y", "x"],
+        "spatial:registration": "pixel",
+        "proj:code": "EPSG:32636",
+        "multiscales": {
+            "layout": [
+                level("r10m", None, 10.0, 10980),
+                level("r20m", Some("r10m"), 20.0, 5490),
+                level("r60m", Some("r10m"), 60.0, 1830),
+                level("r120m", Some("r60m"), 120.0, 915)
+            ],
+            "resampling_method": "average"
+        }
+    })
+}
+
+#[test]
+fn eopf_bands_stack_from_their_finest_level() {
+    let yx = ["y", "x"];
+    let mut vars = vec![
+        var("r10m/b02", &[10980, 10980], &yx),
+        var("r20m/b02", &[5490, 5490], &yx),
+        var("r20m/b05", &[5490, 5490], &yx),
+        var("r60m/b02", &[1830, 1830], &yx),
+        var("r60m/b05", &[1830, 1830], &yx),
+        var("r60m/b01", &[1830, 1830], &yx),
+        var("r120m/b02", &[915, 915], &yx),
+        var("r120m/b05", &[915, 915], &yx),
+        var("r120m/b01", &[915, 915], &yx),
+        var("r10m/spatial_ref", &[], &[]),
+        var("r20m/spatial_ref", &[], &[]),
+    ];
+    link(eopf_reflectance(), &mut vars);
+    let factors = |i: usize| {
+        let r = vars[i].multiscale.as_ref().expect("linked");
+        let set = &r.set;
+        let f: Vec<f64> = set.levels.iter().map(|l| l.factor[1]).collect();
+        (set.base().path.clone(), f)
+    };
+    // Cumulative `scale`s read through the affines: 120 m is 12x 10 m, not 72x.
+    assert_eq!(factors(0), ("r10m/b02".into(), vec![1.0, 2.0, 6.0, 12.0]));
+    assert_eq!(factors(2), ("r20m/b05".into(), vec![1.0, 3.0, 6.0]));
+    assert_eq!(factors(5), ("r60m/b01".into(), vec![1.0, 2.0]));
+    let offsets = &vars[6]
+        .multiscale
+        .as_ref()
+        .expect("linked")
+        .info()
+        .expect("level")
+        .offset;
+    assert_eq!(offsets, &[0.0, 0.0], "the affines share their corner");
+    assert!(vars[9].multiscale.is_none(), "scalars form no stack");
+}

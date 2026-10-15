@@ -147,17 +147,18 @@ fn the_hover_reads_the_tile_where_it_is_drawn() {
     let mut app = plotted();
     let coarse_under = |app: &OctantApp| {
         let m = app.layers.base.data.matrix.as_ref().expect("matrix");
-        m.values[4 * m.width + 4]
+        m.values[6 * m.width + 6]
     };
     assert!(crate::ui::hover::detail::detail_cell(&app, 0.5, 0.5).is_none());
 
     rest_at(&mut app, 4.0);
-    let cell = crate::ui::hover::detail::detail_cell(&app, 0.25, 0.25).expect("over the tile");
+    // At 4x the view shows level-0 cells 24..40 along each axis.
+    let cell = crate::ui::hover::detail::detail_cell(&app, 0.4, 0.4).expect("over the tile");
     // Level 0 holds 0, 1, 2, ... row by row; the plot may show `lat` north-up.
     let flipped = app.layers.base.data.flipped_dims.iter().any(|d| d == "lat");
-    let row = if flipped { 63 - 16 } else { 16 };
-    assert_eq!((cell.x.1, cell.y.1), (16, row));
-    assert_eq!(cell.value, (row * 64 + 16) as f32);
+    let row = if flipped { 63 - 25 } else { 25 };
+    assert_eq!((cell.x.1, cell.y.1), (25, row));
+    assert_eq!(cell.value, (row * 64 + 25) as f32);
     assert_ne!(cell.value, coarse_under(&app), "not the coarse cell");
 
     let meta = app.plotted().metadata.clone();
@@ -168,14 +169,14 @@ fn the_hover_reads_the_tile_where_it_is_drawn() {
         &matrix,
         meta.as_ref(),
         var.as_ref(),
-        0.25,
-        0.25,
+        0.4,
+        0.4,
         None,
     );
     assert_eq!(val, cell.value);
     let shown: Vec<String> = fields.iter().map(|f| format!("{f:?}")).collect();
     // Shown counted from 1 out of level 0's 64.
-    let (row, col) = (format!("{} / 64", row + 1), "17 / 64");
+    let (row, col) = (format!("{} / 64", row + 1), "26 / 64");
     let has = |text: &str| shown.iter().any(|f| f.contains(text));
     assert!(has(&row) && has(col), "level-0 indices: {shown:?}");
 }
