@@ -180,3 +180,35 @@ fn the_hover_reads_the_tile_where_it_is_drawn() {
     let has = |text: &str| shown.iter().any(|f| f.contains(text));
     assert!(has(&row) && has(col), "level-0 indices: {shown:?}");
 }
+
+#[test]
+fn georeferenced_regular_grids_get_tiles_too() {
+    // Projected x/y coordinates (EOPF's UTM metres) make a regional grid.
+    let mut app = plotted();
+    if let Some(matrix) = app.layers.base.data.matrix.as_mut() {
+        matrix.grid = crate::data::CoordinateGrid::RegionalRegular {
+            lon_bounds: (30.0, 31.0),
+            lat_bounds: (50.0, 51.0),
+        };
+    }
+    rest_at(&mut app, 4.0);
+    assert_eq!(tile_level(&app), Some(0));
+}
+
+#[test]
+fn the_hover_names_the_level_under_the_pointer() {
+    use crate::i18n::{HoverKey, Language, translate};
+    use crate::ui::hover::detail::{detail_cell, level_field};
+    let mut app = plotted();
+    let value = |cell| level_field(&app, cell).map(|f| (f.label.to_string(), f.value));
+    let label = translate(Language::English, HoverKey::Level).to_string();
+    assert_eq!(
+        value(None),
+        Some((label.clone(), "2 of 3".into())),
+        "the plotted level"
+    );
+    rest_at(&mut app, 4.0);
+    let cell = detail_cell(&app, 0.4, 0.4).expect("over the tile");
+    let value = level_field(&app, Some(&cell)).map(|f| f.value);
+    assert_eq!(value.as_deref(), Some("0 of 3"), "the tile's level");
+}
