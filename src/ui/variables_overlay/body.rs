@@ -5,6 +5,7 @@ use super::nav::SearchJump;
 use super::search;
 use super::tree::{VariableTreeContext, render_tree_group};
 use crate::app::OctantApp;
+use crate::app::layers::LevelChoice;
 use crate::i18n::{DatasetKey, VariablesKey, fill, tr};
 use crate::ui::icons::{Icon, UiIconExt};
 
@@ -40,8 +41,8 @@ pub(super) fn show_list(
         }
         return;
     }
-    if let Some(idx) = show_tree(ui, app, search_id, jump) {
-        apply_selection(app, idx);
+    if let Some((idx, level)) = show_tree(ui, app, search_id, jump) {
+        apply_selection(app, idx, level);
     }
 }
 
@@ -73,7 +74,7 @@ fn show_tree(
     app: &mut OctantApp,
     search_id: egui::Id,
     jump: Option<SearchJump>,
-) -> Option<usize> {
+) -> Option<(usize, LevelChoice)> {
     let metadata = app.selected.metadata.as_ref()?;
     let tree = app
         .cached_variable_tree
@@ -109,18 +110,32 @@ fn show_tree(
     let mut tree_ctx = VariableTreeContext {
         variables: &metadata.variables,
         selected_idx: app.selected.variable_idx,
+        selected_level: app.selected.level,
         search_active,
         newly_selected_idx: None,
+        newly_selected_level: LevelChoice::Auto,
         search_id,
         search_jump: jump,
     };
     render_tree_group(ui, root, &mut tree_ctx);
-    tree_ctx.newly_selected_idx
+    let level = tree_ctx.newly_selected_level;
+    tree_ctx.newly_selected_idx.map(|idx| (idx, level))
 }
 
-/// Select variable `idx`: reset its colorbar label and dimension defaults, open its
-/// controls and read its coordinates in the background.
-fn apply_selection(app: &mut OctantApp, idx: usize) {
+/// Select variable `idx` at `level`: reset its colorbar label and dimension defaults,
+/// open its controls and read its coordinates in the background. Another level of
+/// the multiscale variable already selected keeps its dimensions.
+fn apply_selection(app: &mut OctantApp, idx: usize, level: LevelChoice) {
+    let other_level = app.selected.variable_idx == idx
+        && app
+            .selected
+            .variable_info()
+            .is_some_and(|v| v.multiscale.is_some());
+    app.selected.level = level;
+    if other_level {
+        app.layout.show_variable_controls = true;
+        return;
+    }
     app.selected.variable_idx = idx;
     app.reset_colorbar_label();
     app.request_variable_coordinates(idx);

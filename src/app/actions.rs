@@ -29,6 +29,7 @@ impl OctantApp {
             AppAction::SelectVariable(idx) => {
                 self.layout.show_hero = false;
                 self.selected.variable_idx = idx;
+                self.selected.level = crate::app::layers::LevelChoice::Auto;
                 self.request_variable_coordinates(idx);
                 if let Some(meta) = self.selected.metadata.clone()
                     && let Some(var_info) = meta.variables.get(idx).cloned()

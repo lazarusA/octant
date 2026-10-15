@@ -44,6 +44,10 @@ fn render_variable_row(
     idx: usize,
     ctx: &mut VariableTreeContext<'_>,
 ) {
+    if let Some(r) = var_info.multiscale.as_ref().filter(|r| r.is_base()) {
+        super::stack::render_stack_row(ui, var_info, &r.set, idx, ctx);
+        return;
+    }
     let is_selected = ctx.selected_idx == idx;
     let units = var_info.units.as_deref().unwrap_or("");
 
@@ -91,6 +95,7 @@ fn render_variable_row(
 
     if clicked {
         ctx.newly_selected_idx = Some(idx);
+        ctx.newly_selected_level = crate::app::layers::LevelChoice::Auto;
     }
 }
 

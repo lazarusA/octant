@@ -155,8 +155,8 @@ fn keys_continue_from_a_mouse_click() {
 /// drawn row missing from the list would show up as a gap.
 fn assert_nav_order_matches_drawing(ctx: &egui::Context, search: bool) {
     let f = frame(ctx, Vec::new(), search);
-    let (_, root) = fixture();
-    let ids = visible_row_ids(ctx, &root, search);
+    let (variables, root) = fixture();
+    let ids = visible_row_ids(ctx, &root, &variables, search);
     let rects: Vec<egui::Rect> = ids
         .iter()
         .map(|&id| ctx.read_response(id).expect("listed row was drawn").rect)

@@ -5,8 +5,9 @@
 //! navigation key is pressed; idle frames allocate nothing.
 
 use super::item::MAX_ITEMS_PER_LEVEL;
+use super::stack::{stack_levels, stack_state};
 use super::tree::VariableTreeContext;
-use crate::data::VariableTreeGroup;
+use crate::data::{VariableInfo, VariableTreeGroup};
 use crate::ui::key_focus;
 use egui::collapsing_header::CollapsingState;
 use egui::{Context, Id, Key, Modifiers};
@@ -17,9 +18,11 @@ use egui::{Context, Id, Key, Modifiers};
 pub enum NodeKey<'a> {
     Folder(&'a str),
     Variable(usize),
+    /// Level `.1` of the multiscale variable whose level 0 is variable `.0`.
+    Level(usize, usize),
 }
 
-fn base_id() -> Id {
+pub(super) fn base_id() -> Id {
     Id::new("octant_variables_tree")
 }
 
@@ -61,16 +64,30 @@ struct Row<'a> {
 }
 
 /// Visible rows in display order, mirroring `tree::render_tree_group`.
-fn visible_rows<'a>(ctx: &Context, root: &'a VariableTreeGroup, search: bool) -> Vec<Row<'a>> {
+fn visible_rows<'a>(
+    ctx: &Context,
+    root: &'a VariableTreeGroup,
+    variables: &[VariableInfo],
+    search: bool,
+) -> Vec<Row<'a>> {
     let mut rows = Vec::new();
     let vars = |rows: &mut Vec<Row<'a>>, indices: &[usize], parent| {
         for &idx in indices.iter().take(MAX_ITEMS_PER_LEVEL) {
-            let key = NodeKey::Variable(idx);
+            let levels = stack_levels(variables, idx);
+            let open = levels.map(|_| stack_state(ctx, idx, search).is_open());
             rows.push(Row {
-                key,
+                key: NodeKey::Variable(idx),
                 parent,
-                open: None,
+                open,
             });
+            if let (Some(true), Some(levels)) = (open, levels) {
+                let me = Some(rows.len() - 1);
+                rows.extend((0..levels).map(|level| Row {
+                    key: NodeKey::Level(idx, level),
+                    parent: me,
+                    open: None,
+                }));
+            }
         }
     };
     if !root.variable_indices.is_empty() {
@@ -114,18 +131,25 @@ fn visible_rows<'a>(ctx: &Context, root: &'a VariableTreeGroup, search: bool) ->
 
 /// Row ids in navigation order, for checking it against the drawn order.
 #[cfg(test)]
-pub fn visible_row_ids(ctx: &Context, root: &VariableTreeGroup, search: bool) -> Vec<Id> {
-    let rows = visible_rows(ctx, root, search);
+pub fn visible_row_ids(
+    ctx: &Context,
+    root: &VariableTreeGroup,
+    variables: &[VariableInfo],
+    search: bool,
+) -> Vec<Id> {
+    let rows = visible_rows(ctx, root, variables, search);
     rows.iter().map(|r| row_id(r.key, search)).collect()
 }
 
 fn set_open(ctx: &Context, key: NodeKey<'_>, search: bool, open: bool) {
-    if let NodeKey::Folder(path) = key {
-        let mut state = folder_state(ctx, path, search);
-        state.set_open(open);
-        state.store(ctx);
-        ctx.request_repaint();
-    }
+    let mut state = match key {
+        NodeKey::Folder(path) => folder_state(ctx, path, search),
+        NodeKey::Variable(idx) => stack_state(ctx, idx, search),
+        NodeKey::Level(..) => return,
+    };
+    state.set_open(open);
+    state.store(ctx);
+    ctx.request_repaint();
 }
 
 const NAV_KEYS: [Key; 7] = [
@@ -158,7 +182,7 @@ pub fn handle_keys(ui: &egui::Ui, root: &VariableTreeGroup, tree: &mut VariableT
         return;
     }
 
-    let rows = visible_rows(ctx, root, search);
+    let rows = visible_rows(ctx, root, tree.variables, search);
     let is_focused = |id| match focused {
         Some(f) => f == id,
         None => ctx.memory(|m| m.had_focus_last_frame(id)),
@@ -203,7 +227,7 @@ fn jump_from_search(
     jump: SearchJump,
 ) {
     let search = tree.search_active;
-    let rows = visible_rows(ctx, root, search);
+    let rows = visible_rows(ctx, root, tree.variables, search);
     let target = match jump {
         SearchJump::FirstRow => rows.first(),
         SearchJump::FirstVariable => rows.iter().find(|r| matches!(r.key, NodeKey::Variable(_))),
@@ -220,5 +244,6 @@ fn jump_from_search(
         && root.total_variable_count() == 1
     {
         tree.newly_selected_idx = Some(idx);
+        tree.newly_selected_level = crate::app::layers::LevelChoice::Auto;
     }
 }

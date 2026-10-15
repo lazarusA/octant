@@ -4,6 +4,7 @@ mod item;
 mod nav;
 mod row;
 mod search;
+mod stack;
 mod tree;
 
 #[cfg(test)]

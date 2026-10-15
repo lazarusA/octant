@@ -22,6 +22,7 @@ impl OctantApp {
         }
         self.set_active_metadata(meta);
         self.selected.variable_idx = 0;
+        self.selected.level = crate::app::layers::LevelChoice::Auto;
     }
 
     /// Drop the active dataset (loading, failed, removed or cleared).

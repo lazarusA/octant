@@ -62,8 +62,10 @@ pub(super) fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool
         let mut tree_ctx = VariableTreeContext {
             variables: &variables,
             selected_idx: usize::MAX,
+            selected_level: Default::default(),
             search_active,
             newly_selected_idx: None,
+            newly_selected_level: Default::default(),
             search_id: search.id,
             search_jump: jump,
         };
