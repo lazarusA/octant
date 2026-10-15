@@ -17,6 +17,7 @@ mod block_loading;
 pub mod canvas;
 pub mod controllers;
 mod data_loading;
+pub(crate) mod detail;
 mod export_lifecycle;
 mod floating;
 #[cfg(test)]

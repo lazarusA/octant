@@ -13,6 +13,9 @@ pub struct LayerRenderers {
     pub heatmap: Option<Arc<HeatmapRenderer>>,
     /// The label colors of a label image, drawn over the heatmap's data.
     pub labels: Option<Arc<LabelRenderer>>,
+    /// A multiscale heatmap's detail tile (`app::detail`) and the cells its
+    /// data buffer holds.
+    pub detail: Option<(Arc<HeatmapRenderer>, usize)>,
     pub line: Option<Arc<LineRenderer>>,
     pub sphere: Option<Arc<SphereRenderer>>,
     pub surface: Option<Arc<SurfaceRenderer>>,

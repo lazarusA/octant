@@ -215,6 +215,7 @@ impl OctantApp {
             aspect_scale: gpu_aspect_scale,
         };
         self.refresh_resampled_tiles(canvas_plot_type, &view);
+        self.refresh_detail(canvas_plot_type, &view);
         for layer in self.layers.iter().filter(|l| l.is_drawn()) {
             self.paint_layer(ui, layer, canvas_plot_type, &view);
         }

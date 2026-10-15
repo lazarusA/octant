@@ -28,6 +28,8 @@ pub struct LayerData {
     pub matrix_version: u64,
     /// Bumped (`touch_volume`) whenever `volume` changes.
     pub volume_version: u64,
+    /// The finer level's tile drawn over a multiscale heatmap (base layer).
+    pub detail: crate::app::detail::DetailState,
 }
 
 impl LayerData {

@@ -142,6 +142,7 @@ impl OctantApp {
 
         for res in completed {
             match res.result {
+                _ if self.take_detail_result(&res.key, &res.result) => {}
                 Ok(block) => {
                     self.mark_failed(&res.key, false);
                     let requested = self.layers.find_by_key(&res.key);

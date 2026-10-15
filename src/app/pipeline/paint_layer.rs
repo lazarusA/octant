@@ -148,30 +148,41 @@ impl OctantApp {
             .matrix
             .as_ref()
             .map_or(0, |m| m.grid.render_coord_mode());
-        let labels = match (layer.labels(), &layer.renderers.labels) {
-            (None, _) => None,
-            (Some(style), Some(labels)) => Some(crate::plots::LabelDraw {
+        let labels = || match (layer.labels(), &layer.renderers.labels) {
+            (None, _) => Some(None),
+            (Some(style), Some(labels)) => Some(Some(crate::plots::LabelDraw {
                 renderer: labels.clone(),
                 outline: style.outline,
                 opacity: layer.color.opacity,
-            }),
+            })),
             // Label ids are never drawn through a colormap.
-            (Some(_), None) => return,
+            (Some(_), None) => None,
         };
-        let callback = eframe::egui_wgpu::Callback::new_paint_callback(
-            view.canvas_rect,
-            crate::plots::HeatmapCallback {
-                renderer: renderer.clone(),
-                color_params: self.get_color_params(layer),
-                rect: view.canvas_rect,
-                pan: view.pan,
-                zoom: view.zoom,
-                aspect_scale: view.aspect_scale,
-                coord_mode,
-                labels,
-            },
-        );
-        ui.painter().add(callback);
+        let Some(label_draw) = labels() else {
+            return;
+        };
+        let color_params = self.get_color_params(layer);
+        let callback =
+            |renderer: &std::sync::Arc<crate::plots::HeatmapRenderer>, coord_mode, labels| {
+                eframe::egui_wgpu::Callback::new_paint_callback(
+                    view.canvas_rect,
+                    crate::plots::HeatmapCallback {
+                        renderer: renderer.clone(),
+                        color_params,
+                        rect: view.canvas_rect,
+                        pan: view.pan,
+                        zoom: view.zoom,
+                        aspect_scale: view.aspect_scale,
+                        coord_mode,
+                        labels,
+                    },
+                )
+            };
+        ui.painter().add(callback(renderer, coord_mode, label_draw));
+        // A multiscale heatmap's finer tile, over its coarse plot.
+        if let (Some(_), Some((detail, _))) = (&layer.data.detail.tile, &layer.renderers.detail) {
+            ui.painter().add(callback(detail, 0, labels().flatten()));
+        }
     }
 }
 
