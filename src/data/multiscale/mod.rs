@@ -27,6 +27,8 @@ pub mod types;
 #[cfg(test)]
 mod geozarr_tests;
 #[cfg(test)]
+mod pick_tests;
+#[cfg(test)]
 mod tests;
 
 use std::sync::Arc;

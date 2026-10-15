@@ -16,7 +16,13 @@ use crate::data::{BlockCacheKey, DataSource, Dataset, DatasetMetadata, SliceRequ
 pub(crate) const TARGET: &str = "memory://overlay";
 
 /// Writes `name` (`dims`, `shape`, chunked by `chunks`) holding `0, 1, 2, ...`.
-fn write_array(store: &Arc<MemoryStore>, name: &str, dims: &[&str], shape: &[u64], chunks: &[u64]) {
+pub(crate) fn write_array(
+    store: &Arc<MemoryStore>,
+    name: &str,
+    dims: &[&str],
+    shape: &[u64],
+    chunks: &[u64],
+) {
     let f32_dt = DataType::from_metadata(&MetadataV3::new("float32")).expect("float32");
     let mut builder = ArrayBuilder::new(
         shape.to_vec(),
@@ -66,6 +72,15 @@ pub(crate) fn add_memory_dataset(app: &mut OctantApp, target: &str) -> DatasetMe
         );
     }
 
+    register_store(app, store, target)
+}
+
+/// Registers `store` as a Zarr dataset under `target`; returns its metadata.
+pub(crate) fn register_store(
+    app: &mut OctantApp,
+    store: Arc<MemoryStore>,
+    target: &str,
+) -> DatasetMetadata {
     let zarr = GenericZarrBlockStore::new(store, target, "zarr", "Zarr");
     let meta = zarr.inspect().expect("inspect");
     let source_id = StoreKind::make_source_id(StoreKind::RemoteZarr, target);
