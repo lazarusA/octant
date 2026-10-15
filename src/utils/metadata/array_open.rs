@@ -184,5 +184,6 @@ pub fn variable_info_from_array<TStorage: ?Sized + ReadableStorageTraits + 'stat
         temporal_resolution: cf_attrs.temporal_resolution,
         attributes: cf_attrs.attributes,
         ome: None,
+        multiscale: None,
     })
 }

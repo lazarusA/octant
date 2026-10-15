@@ -132,6 +132,7 @@ fn add_raster_variable(
         temporal_resolution: None,
         attributes: info.attributes.clone(),
         ome: None,
+        multiscale: None,
     });
 }
 
@@ -167,6 +168,7 @@ fn add_band_variables(
             temporal_resolution: None,
             attributes: band_attributes,
             ome: None,
+            multiscale: None,
         });
     }
 }

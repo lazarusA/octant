@@ -28,6 +28,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             file_size: (12 * 8 * npix * 4) as u64,
             attributes: global_attrs.clone(),
             ome: None,
+            multiscale: None,
         },
         VariableInfo {
             name: "mslp".to_string(),
@@ -43,6 +44,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             file_size: (12 * npix * 4) as u64,
             attributes: global_attrs.clone(),
             ome: None,
+            multiscale: None,
         },
         VariableInfo {
             name: "lat".to_string(),
@@ -58,6 +60,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             file_size: (npix * 4) as u64,
             attributes: global_attrs.clone(),
             ome: None,
+            multiscale: None,
         },
         VariableInfo {
             name: "lon".to_string(),
@@ -73,6 +76,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             file_size: (npix * 4) as u64,
             attributes: global_attrs.clone(),
             ome: None,
+            multiscale: None,
         },
         VariableInfo {
             name: "ring".to_string(),
@@ -88,6 +92,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             file_size: (npix * 4) as u64,
             attributes: global_attrs,
             ome: None,
+            multiscale: None,
         },
     ];
 

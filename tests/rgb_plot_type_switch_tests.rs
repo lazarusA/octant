@@ -63,6 +63,7 @@ fn setup_rgb_app() -> OctantApp {
         file_size: 3 * 8 * 8 * 4,
         attributes: Default::default(),
         ome: None,
+        multiscale: None,
     });
 
     app.load_new_metadata(meta);

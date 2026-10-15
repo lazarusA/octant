@@ -141,6 +141,7 @@ pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, 
                         temporal_resolution: None,
                         attributes: HashMap::new(),
                         ome: None,
+                        multiscale: None,
                     });
                 }
             }

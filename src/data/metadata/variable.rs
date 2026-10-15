@@ -21,6 +21,9 @@ pub struct VariableInfo {
     pub attributes: HashMap<String, String>,
     /// The OME-Zarr image and level this variable is, for OME-Zarr stores.
     pub ome: Option<crate::data::ome::OmeRef>,
+    /// The multiscale stack and level this variable is, when its format
+    /// groups it with other resolutions of the same data.
+    pub multiscale: Option<crate::data::multiscale::LevelRef>,
 }
 
 impl VariableInfo {

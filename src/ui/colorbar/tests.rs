@@ -45,6 +45,7 @@ fn test_colorbar_default_and_custom_label() {
         temporal_resolution: None,
         attributes: attrs,
         ome: None,
+        multiscale: None,
     };
     let meta = DatasetMetadata {
         name: "test_dataset".to_string(),

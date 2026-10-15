@@ -120,6 +120,7 @@ fn test_3d_time_lat_lon_defaults_and_plot_switch() {
         file_size: 10 * 32 * 64 * 4,
         attributes: Default::default(),
         ome: None,
+        multiscale: None,
     });
     app.load_new_metadata(meta);
 

@@ -127,6 +127,7 @@ fn test_dimension_slider_defaults_with_dggs_custom_dim_name() {
         temporal_resolution: None,
         attributes: attrs,
         ome: None,
+        multiscale: None,
     };
 
     init_variable_dimension_defaults(&mut app, &var_info);

@@ -53,6 +53,7 @@ fn consolidated_variable(
         temporal_resolution: cf_attrs.temporal_resolution,
         attributes: cf_attrs.attributes,
         ome: None,
+        multiscale: None,
     })
 }
 
