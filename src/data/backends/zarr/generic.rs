@@ -3,7 +3,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
-use super::block::{ArrayCachedState, fetch_block_from_cached_array, inherited_attributes};
+use super::block::{
+    ArrayCachedState, ArrayReader, fetch_block_from_cached_array, inherited_attributes,
+};
 use super::open_arrays::{OpenArrays, chunk_cache_bytes};
 use super::storage::{open_raw_array, root_consolidated};
 use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
@@ -11,9 +13,14 @@ use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCall
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
+use zarrs::array::ArrayShardedReadableExtCache;
 use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 use zarrs::storage::ReadableWritableListableStorage;
+
+/// What a sharded array's open state counts against the open arrays'
+/// budget: its shard indexes, not decoded chunks.
+const SHARD_INDEX_BYTES: u64 = 4 * 1024 * 1024;
 
 pub struct GenericZarrBlockStore {
     storage: ReadableWritableListableStorage,
@@ -93,7 +100,13 @@ impl GenericZarrBlockStore {
 
     fn open(&self, name: &str) -> Result<(Arc<ArrayCachedState>, u64), BlockStoreError> {
         let raw_array = open_raw_array(&self.storage, name, self.consolidated())?;
-        let cache_bytes = chunk_cache_bytes(&raw_array);
+        let sharded = zarrs::array::ArrayShardedExt::is_sharded(&raw_array);
+        // A sharded array keeps shard indexes, not decoded shards.
+        let cache_bytes = if sharded {
+            SHARD_INDEX_BYTES
+        } else {
+            chunk_cache_bytes(&raw_array)
+        };
         let reader = crate::data::ome::MetaReader::direct(self.storage.clone());
         let attributes = inherited_attributes(&raw_array, &reader, name);
         let ome = crate::data::ome::level::level_array(
@@ -103,11 +116,14 @@ impl GenericZarrBlockStore {
             raw_array.data_type(),
         );
         let array = Arc::new(raw_array);
+        let reader = if sharded {
+            ArrayReader::Sharded(ArrayShardedReadableExtCache::new(&array))
+        } else {
+            let cache = ChunkCacheDecodedLruSizeLimit::new(array.clone(), cache_bytes);
+            ArrayReader::Cached(Arc::new(cache))
+        };
         let cached = ArrayCachedState {
-            cache: Arc::new(ChunkCacheDecodedLruSizeLimit::new(
-                array.clone(),
-                cache_bytes,
-            )),
+            reader,
             array,
             attributes: Arc::new(attributes),
             ome,

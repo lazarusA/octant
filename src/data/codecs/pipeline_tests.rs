@@ -84,7 +84,11 @@ fn pcodec_chunks_read_back_through_normalized_metadata() {
 
     let opened = crate::utils::metadata::open_or_instantiate_array_normalized(store, "a")
         .expect("open array");
-    let read = crate::data::backends::zarr::retrieve_array_subset_as_f32(&opened, None, &subset)
-        .expect("read values");
+    let read = crate::data::backends::zarr::retrieve_array_subset_as_f32(
+        &opened,
+        crate::data::backends::zarr::ChunkReader::Direct,
+        &subset,
+    )
+    .expect("read values");
     assert_eq!(read, values);
 }

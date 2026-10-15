@@ -5,6 +5,7 @@ use crate::data::blocks::BlockStoreError;
 use zarrs::array::chunk_cache::{ChunkCache, ChunkCacheDecodedLruSizeLimit};
 use zarrs::array::data_type::*;
 use zarrs::array::{Array, ArraySubset, CodecOptions, DataType, FromArrayBytes};
+use zarrs::array::{ArrayShardedReadableExt, ArrayShardedReadableExtCache};
 use zarrs::storage::ReadableStorageTraits;
 
 trait SubsetRetriever {
@@ -30,6 +31,35 @@ impl SubsetRetriever for ChunkCacheDecodedLruSizeLimit {
         subset: &ArraySubset,
     ) -> Result<T, BlockStoreError> {
         self.retrieve_array_subset(subset, &CodecOptions::default())
+            .map_err(|e| format!("{e}").into())
+    }
+}
+
+/// How an array's subsets are read.
+#[derive(Clone, Copy)]
+pub enum ChunkReader<'a> {
+    /// Straight from the store, whole chunks at a time.
+    Direct,
+    /// Through a cache of decoded chunks.
+    Cached(&'a ChunkCacheDecodedLruSizeLimit),
+    /// A sharded array: only the inner chunks a subset touches, located
+    /// through the shard indexes the cache keeps.
+    Sharded(&'a ArrayShardedReadableExtCache),
+}
+
+/// A sharded array read through its shard indexes.
+struct Sharded<'a, TStorage: ?Sized> {
+    array: &'a Array<TStorage>,
+    cache: &'a ArrayShardedReadableExtCache,
+}
+
+impl<TStorage: ?Sized + ReadableStorageTraits + 'static> SubsetRetriever for Sharded<'_, TStorage> {
+    fn retrieve_subset<T: FromArrayBytes>(
+        &self,
+        subset: &ArraySubset,
+    ) -> Result<T, BlockStoreError> {
+        self.array
+            .retrieve_array_subset_sharded_opt(self.cache, subset, &CodecOptions::default())
             .map_err(|e| format!("{e}").into())
     }
 }
@@ -113,17 +143,20 @@ fn decode_other<R: SubsetRetriever>(
     }
 }
 
-/// Dtype-conversion and calibration helper for reading array subsets as f32 through an optional chunk cache.
+/// Dtype-conversion and calibration helper for reading array subsets as f32 through `reader`.
 pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + 'static>(
     array: &Array<TStorage>,
-    cache: Option<&ChunkCacheDecodedLruSizeLimit>,
+    reader: ChunkReader<'_>,
     subset: &ArraySubset,
 ) -> Result<Vec<f32>, BlockStoreError> {
     let dt = array.data_type();
     let calibration = DataCalibration::from_json_map(array.attributes());
-    match cache {
-        Some(c) => decode_with(c, dt, &calibration, subset),
-        None => decode_with(array, dt, &calibration, subset),
+    match reader {
+        ChunkReader::Direct => decode_with(array, dt, &calibration, subset),
+        ChunkReader::Cached(c) => decode_with(c, dt, &calibration, subset),
+        ChunkReader::Sharded(cache) => {
+            decode_with(&Sharded { array, cache }, dt, &calibration, subset)
+        }
     }
 }
 
@@ -133,7 +166,7 @@ pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + '
 /// their low bits, reported once. `None` for non-integer data types.
 pub fn retrieve_array_subset_as_label_bits<TStorage: ?Sized + ReadableStorageTraits + 'static>(
     array: &Array<TStorage>,
-    cache: Option<&ChunkCacheDecodedLruSizeLimit>,
+    reader: ChunkReader<'_>,
     subset: &ArraySubset,
 ) -> Result<Option<Vec<f32>>, BlockStoreError> {
     fn bits<R: SubsetRetriever>(
@@ -177,9 +210,10 @@ pub fn retrieve_array_subset_as_label_bits<TStorage: ?Sized + ReadableStorageTra
         }
     }
     let dt = array.data_type();
-    match cache {
-        Some(c) => bits(c, dt, subset),
-        None => bits(array, dt, subset),
+    match reader {
+        ChunkReader::Direct => bits(array, dt, subset),
+        ChunkReader::Cached(c) => bits(c, dt, subset),
+        ChunkReader::Sharded(cache) => bits(&Sharded { array, cache }, dt, subset),
     }
 }
 
