@@ -20,5 +20,7 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
             "Déposez un jeu de données à visualiser (.nc, .h5, .zarr, .icechunk, .tif)"
         }
         HoverKey::LabelN => "étiquette {}",
+        HoverKey::Level => "niveau",
+        HoverKey::LevelOfTotal => "{} sur {}",
     })
 }

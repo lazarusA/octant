@@ -21,5 +21,8 @@ crate::i18n::keys::define_keys! {
     DropDataset,
     // Label images
     LabelN,
+    // Multiscale levels
+    Level,
+    LevelOfTotal,
     }
 }

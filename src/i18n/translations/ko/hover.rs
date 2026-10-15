@@ -18,5 +18,7 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
         HoverKey::AxisZDepth => "Z / 깊이",
         HoverKey::DropDataset => "데이터셋을 놓아 시각화 (.nc, .h5, .zarr, .icechunk, .tif)",
         HoverKey::LabelN => "레이블 {}",
+        HoverKey::Level => "단계",
+        HoverKey::LevelOfTotal => "{}/{}",
     })
 }

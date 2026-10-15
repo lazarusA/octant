@@ -18,5 +18,7 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
         HoverKey::AxisZDepth => "Z / 深度",
         HoverKey::DropDataset => "拖放数据集以可视化 (.nc, .h5, .zarr, .icechunk, .tif)",
         HoverKey::LabelN => "标签 {}",
+        HoverKey::Level => "级别",
+        HoverKey::LevelOfTotal => "{}/{}",
     })
 }

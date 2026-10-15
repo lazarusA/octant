@@ -20,5 +20,7 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
             "Відпустіть набір даних для візуалізації (.nc, .h5, .zarr, .icechunk, .tif)"
         }
         HoverKey::LabelN => "мітка {}",
+        HoverKey::Level => "рівень",
+        HoverKey::LevelOfTotal => "{} з {}",
     })
 }

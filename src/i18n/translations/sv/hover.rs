@@ -20,5 +20,7 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
             "Släpp ett dataset för att visualisera (.nc, .h5, .zarr, .icechunk, .tif)"
         }
         HoverKey::LabelN => "etikett {}",
+        HoverKey::Level => "nivå",
+        HoverKey::LevelOfTotal => "{} av {}",
     })
 }
