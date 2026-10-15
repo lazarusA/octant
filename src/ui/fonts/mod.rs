@@ -52,6 +52,16 @@ static GENERATION: AtomicU64 = AtomicU64::new(0);
 /// in use: egui installs new fonts at the start of the next pass.
 const ACTIVE_FROM: &str = "octant_fonts_active_from";
 
+/// Serializes tests that rebuild fonts (each rebuild bumps the process-wide
+/// generation) with tests whose cached widths key on the generation
+/// (`flow_row`), which a rebuild on another thread would otherwise make
+/// measure again mid-test.
+#[cfg(test)]
+pub(crate) fn test_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    LOCK.lock().unwrap_or_else(|p| p.into_inner())
+}
+
 /// The font definitions' generation, changing whenever they are rebuilt;
 /// `u64::MAX` while `ctx`'s new definitions wait for the next pass, so
 /// nothing measured with its old fonts is kept under the new generation.

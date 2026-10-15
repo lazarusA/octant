@@ -82,6 +82,7 @@ pub(super) fn area_width(
     open: &[Key],
     run: &mut impl FnMut(&mut Ui),
 ) -> f32 {
+    let _fonts = crate::ui::fonts::test_lock();
     with_language(lang, || {
         let mut h = Harness::new(SCREEN);
         FontEngine::on_language_changed(&h.ctx, lang);
