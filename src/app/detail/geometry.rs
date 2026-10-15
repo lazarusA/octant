@@ -55,8 +55,9 @@ impl Axis {
     }
 
     /// The cells of `level` covering `visible` widened by `margin` of its
-    /// span on each side, aligned outward to `chunk` cells, and never past
-    /// the plotted window (a tile draws only inside the plotted quad).
+    /// span on each side, aligned outward to `chunk` cells when that at
+    /// most doubles them, and never past the plotted window (a tile draws
+    /// only inside the plotted quad).
     pub fn cells(
         &self,
         set: &Multiscale,
@@ -75,10 +76,18 @@ impl Axis {
         let at = |x: f64| (x - off) / f;
         let inside_start = (at(self.lo) - EPS).ceil().max(0.0) as u64;
         let inside_end = ((at(self.hi) + EPS).floor().max(0.0) as u64).min(len);
+        let raw = (
+            (at(visible.0 - pad) + EPS).floor().max(0.0) as u64,
+            (at(visible.1 + pad) - EPS).ceil().max(0.0) as u64,
+        );
         let chunk = chunk.max(1);
-        let start = ((at(visible.0 - pad) + EPS).floor().max(0.0) as u64) / chunk * chunk;
-        let end = ((at(visible.1 + pad) - EPS).ceil().max(0.0) as u64).div_ceil(chunk) * chunk;
-        let (start, end) = (start.max(inside_start), end.min(inside_end));
+        let inside = |(s, e): (u64, u64)| (s.max(inside_start), e.min(inside_end));
+        let raw = inside(raw);
+        let aligned = inside((raw.0 / chunk * chunk, raw.1.div_ceil(chunk) * chunk));
+        // Chunks far larger than the window (a shard holding a whole level)
+        // would read far more than the view: then the window as it is.
+        let wide = aligned.1.saturating_sub(aligned.0) > 2 * raw.1.saturating_sub(raw.0).max(1);
+        let (start, end) = if wide { raw } else { aligned };
         (end > start).then_some(start..end)
     }
 
