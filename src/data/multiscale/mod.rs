@@ -6,6 +6,9 @@
 //!   checked by `Multiscale::new`; `LevelRef` on `VariableInfo::multiscale`.
 //! - `mapping.rs`: index ranges between level 0 and any level, the same for
 //!   every dimension.
+//! - `pick.rs`: `fit_level`, the finest level meeting a plot's
+//!   `ResolutionDemand` (screen pixels per dimension, dimensions kept whole,
+//!   a cell budget); `pinned_level` for a level the user chose.
 //! - Adapters, each computing only factors and offsets: `ome.rs` (OME-Zarr
 //!   `multiscales`), `geozarr.rs` (zarr-conventions `multiscales` `layout`
 //!   v0.1 with `spatial:transform`), `geotiff.rs` (reduced-resolution IFDs).
@@ -18,6 +21,7 @@ pub mod geozarr;
 pub mod geozarr_layout;
 mod mapping;
 pub mod ome;
+pub mod pick;
 pub mod types;
 
 #[cfg(test)]
@@ -29,6 +33,7 @@ use std::sync::Arc;
 
 use crate::data::metadata::VariableInfo;
 
+pub use pick::{DimDemand, ResolutionDemand, fit_level, pinned_level};
 pub use types::{LevelRef, Multiscale, MultiscaleError, MultiscaleKind, ScaleLevel};
 
 /// Points every variable of `set`'s levels at its level. Variables already
