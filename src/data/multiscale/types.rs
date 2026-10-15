@@ -153,10 +153,42 @@ impl Multiscale {
         self.levels.iter().position(|l| l.path == path)
     }
 
+    /// The group the stack is listed in: the parent of the group its levels
+    /// share when they are arrays of one group (an OME-Zarr image, a pyramid
+    /// of array assets), else the deepest group above all of them (levels in
+    /// sibling groups, GeoTIFF overviews).
+    pub fn display_group(&self) -> &str {
+        let base = parent(&self.base().path);
+        if self.levels.iter().all(|l| parent(&l.path) == base) {
+            return parent(base);
+        }
+        let mut common = base;
+        while !self.levels.iter().all(|l| within(parent(&l.path), common)) {
+            common = parent(common);
+        }
+        common
+    }
+
     /// Index of dimension `name`, matched ASCII case-insensitively.
     pub fn dim_index(&self, name: &str) -> Option<usize> {
         self.dims.iter().position(|d| d.eq_ignore_ascii_case(name))
     }
+}
+
+/// The group holding `path` (`""` at the root).
+fn parent(path: &str) -> &str {
+    path.trim_matches('/')
+        .rsplit_once('/')
+        .map_or("", |(g, _)| g)
+}
+
+/// Whether `path` is `group` or inside it.
+fn within(path: &str, group: &str) -> bool {
+    group.is_empty()
+        || path == group
+        || path
+            .strip_prefix(group)
+            .is_some_and(|rest| rest.starts_with('/'))
 }
 
 /// Checks level `l` (`level`) against the level before it (`prev`).

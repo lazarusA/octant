@@ -77,6 +77,7 @@ impl VariableTreeGroup {
             if let Some(var) = variables.get(idx)
                 && (group_matches
                     || var.name.to_lowercase().contains(query_lower)
+                    || var.display_name().to_lowercase().contains(query_lower)
                     || var
                         .long_name
                         .as_deref()
@@ -131,11 +132,19 @@ impl VariableTreeGroup {
             ..Default::default()
         };
 
+        // Coarser levels of a multiscale stack are listed under its level 0,
+        // which sits in the group its levels share.
         for (idx, var) in variables.iter().enumerate() {
-            let clean_name = var.name.trim_start_matches('/').trim_end_matches('/');
-            let segments: Vec<&str> = clean_name.split('/').filter(|s| !s.is_empty()).collect();
+            if var.is_coarser_level() {
+                continue;
+            }
+            let segments: Vec<&str> = var
+                .display_group()
+                .split('/')
+                .filter(|s| !s.is_empty())
+                .collect();
 
-            if segments.len() <= 1 {
+            if segments.is_empty() {
                 // Root-level variable
                 root.variable_indices.push(idx);
             } else {
@@ -143,7 +152,7 @@ impl VariableTreeGroup {
                 let mut current_group = &mut root;
                 let mut current_path = String::new();
 
-                for &seg in &segments[..segments.len() - 1] {
+                for &seg in &segments {
                     if !current_path.is_empty() {
                         current_path.push('/');
                     }

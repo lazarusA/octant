@@ -43,6 +43,30 @@ impl VariableInfo {
         }
     }
 
+    /// Whether this is a level other than 0 of a multiscale stack: listed
+    /// under its stack's level 0, not on its own.
+    pub fn is_coarser_level(&self) -> bool {
+        self.multiscale.as_ref().is_some_and(|r| !r.is_base())
+    }
+
+    /// The name the variable is listed under: its stack's for level 0 of a
+    /// multiscale stack, else its leaf name.
+    pub fn display_name(&self) -> &str {
+        match &self.multiscale {
+            Some(r) if r.is_base() && !r.set.name.is_empty() => &r.set.name,
+            _ => self.leaf_name(),
+        }
+    }
+
+    /// The group the variable is listed in: its stack's for level 0 of a
+    /// multiscale stack, else its own.
+    pub fn display_group(&self) -> &str {
+        match &self.multiscale {
+            Some(r) if r.is_base() => r.set.display_group(),
+            _ => self.group_path().unwrap_or(""),
+        }
+    }
+
     /// Index of dimension `dim`, matched ASCII case-insensitively.
     pub fn dimension_index(&self, dim: &str) -> Option<usize> {
         self.dimension_names
