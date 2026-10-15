@@ -15,6 +15,10 @@
 //! dropped when the plot (selection, step) changes.
 
 mod geometry;
+#[cfg(test)]
+mod geometry_tests;
+#[cfg(test)]
+mod tests;
 mod tile;
 mod want;
 
