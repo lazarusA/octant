@@ -20,6 +20,11 @@ mod mapping;
 pub mod ome;
 pub mod types;
 
+#[cfg(test)]
+mod geozarr_tests;
+#[cfg(test)]
+mod tests;
+
 use std::sync::Arc;
 
 use crate::data::metadata::VariableInfo;
