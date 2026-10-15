@@ -215,7 +215,11 @@ impl OctantApp {
             aspect_scale: gpu_aspect_scale,
         };
         self.refresh_resampled_tiles(canvas_plot_type, &view);
-        self.refresh_detail(canvas_plot_type, &view);
+        let now = ui.input(|i| i.time);
+        if let Some(wait) = self.refresh_detail(canvas_plot_type, &view, now) {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_secs_f64(wait.max(0.0)));
+        }
         for layer in self.layers.iter().filter(|l| l.is_drawn()) {
             self.paint_layer(ui, layer, canvas_plot_type, &view);
         }

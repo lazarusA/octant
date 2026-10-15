@@ -4,6 +4,7 @@ pub mod camera;
 pub mod card;
 pub mod composite;
 mod composite_bands;
+pub mod detail;
 pub mod enrich;
 pub mod entries;
 pub mod entries_1d;
@@ -96,6 +97,13 @@ pub fn show_hover_tooltip(
     let transform = Transform2D::from_app(app, rect);
     let target =
         resolve_target_screen_pos(app, matrix, &camera, sampler, &transform, px, py, point);
+    // Over a multiscale plot's detail tile, the reticle sits on its cell.
+    let tile_cell = (plot_type == PlotType::Heatmap && point.is_none())
+        .then(|| detail::detail_cell(app, hit.norm_x, hit.norm_y))
+        .flatten();
+    let target = tile_cell.map_or(target, |c| {
+        Some(transform.norm_to_screen(c.center.0, c.center.1))
+    });
     let swatch = || resolve_hover_color(app, raw_val, py);
     let (value, swatch, units) = labels::layer_reading(base, raw_val, composite, units, swatch);
     let long_name = var.and_then(|v| v.long_name.as_deref());

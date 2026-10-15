@@ -5,14 +5,35 @@
 //!
 //! - `geometry.rs`: the plotted and visible windows on level 0's grid, the
 //!   finer level's cells covering them, and where those sit on the quad.
-//! - `want.rs`: the finer level the resting view asks for.
-//! - `tile.rs`: slicing an arrived block into the tile and uploading it to
+//! - `want.rs`: the finer level the resting view asks for; stale tiles.
+//! - `tile.rs`: requesting a tile (cache first) and slicing an arrived block into the tile and uploading it to
 //!   the base layer's detail renderer, painted after its heatmap.
 //!
-//! A tile is asked for only while the view rests (`view_interacting` off)
-//! and playback is stopped, on regular grids without composites; it is
-//! kept while it still covers the view at the level the view wants, and
-//! dropped when the plot (selection, step) changes.
+//! A tile is asked for only once the view rests (`view_interacting` off and
+//! the view unchanged for `SETTLE` seconds, so the frames between mouse
+//! wheel ticks ask nothing) and playback is stopped, on regular grids
+//! without composites; it is kept while it still covers the view at the
+//! level the view wants, and dropped when the plot (selection, step)
+//! changes. The hover reads it where it is drawn (`ui/hover/detail.rs`).
+//!
+//! Not yet: overlays. They read their stack's level on the base level's
+//! grid and get no tile, so they stay coarse over a sharp base. What it needs:
+//! 1. Per-layer refresh: `DetailState` already lives on each layer's
+//!    `LayerData`; take a `LayerId` in `refresh_detail`, `detail_context`,
+//!    `detail_want`, `plan_detail` and `show_detail` (now the base layer's),
+//!    and refresh every drawn overlay after the base in `paint_active_plot`.
+//! 2. The same grid: an overlay's tile reads the level of its own stack
+//!    matching the base tile's level (`multiscale::level_matching` against
+//!    the base tile's level selection) over the base tile's cells, only
+//!    while the overlay's alignment is `SameGrid`, so both tiles line up
+//!    cell for cell.
+//! 3. Drawing needs nothing new: `LayerRenderers::detail` is per layer and
+//!    `paint_heatmap` draws a layer's tile right after its heatmap, so the
+//!    order stays base, base tile, overlay, overlay tile.
+//! 4. Hover: `ui/hover/overlays.rs` `hover_rows` reads each overlay's matrix
+//!    at the base cell; it should read the overlay's tile under the pointer
+//!    as `ui/hover/detail.rs` does for the base.
+//! 5. Cost: one more fetch per drawn overlay for every resting view.
 
 mod geometry;
 #[cfg(test)]
@@ -27,8 +48,8 @@ use std::hash::{Hash, Hasher};
 use crate::app::OctantApp;
 use crate::app::layers::LevelChoice;
 use crate::app::pipeline::paint_layer::CanvasView;
+use crate::data::BlockCacheKey;
 use crate::data::multiscale::Multiscale;
-use crate::data::{BlockCacheKey, BlockRequest};
 use crate::plots::PlotType;
 pub(crate) use geometry::Axis;
 use geometry::covers;
@@ -37,13 +58,20 @@ use geometry::covers;
 /// keep it.
 const MARGIN: f64 = 0.25;
 
+/// Seconds a view stays unchanged before it counts as resting: longer than
+/// the frames between mouse wheel ticks.
+const SETTLE: f64 = 0.15;
+
 /// The base layer's detail tile, the one being fetched, and the view the
 /// last decision was made for.
 #[derive(Default)]
 pub struct DetailState {
     pub tile: Option<DetailTile>,
     pub pending: Option<PendingDetail>,
+    /// The view last decided for.
     view: Option<ViewKey>,
+    /// The latest view and the egui time it first showed.
+    seen: Option<(ViewKey, f64)>,
 }
 
 impl DetailState {
@@ -53,9 +81,17 @@ impl DetailState {
 }
 
 /// What a tile shows and where.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct DetailTile {
     pub level: usize,
+    /// The level's variable (index into the dataset's variables).
+    pub var_idx: usize,
+    /// Its x and y dimensions, and the level cells where the tile starts
+    /// along them.
+    pub dims: [usize; 2],
+    pub origin: [u64; 2],
+    /// The tile's values, kept for the hover once it is shown.
+    pub matrix: Option<std::sync::Arc<crate::data::MatrixData>>,
     /// The plot it belongs to (`OctantApp::detail_context`).
     pub context: u64,
     /// Level-0 positions it covers along x and y.
@@ -99,38 +135,21 @@ struct Want {
 
 impl OctantApp {
     /// Keeps the base layer's detail tile in line with the view: drops it
-    /// when the plot changed, and once the view rests asks for the visible
-    /// window at a finer level when the plotted one is coarser than the screen.
-    pub(crate) fn refresh_detail(&mut self, plot_type: PlotType, view: &CanvasView) {
+    /// when the plot changed, and once the view has rested `SETTLE` seconds
+    /// (egui time `now`) asks for the visible window at a finer level when
+    /// the plotted one is coarser than the screen. Returns how long to wait
+    /// before the view counts as resting, for a repaint then.
+    pub(crate) fn refresh_detail(
+        &mut self,
+        plot_type: PlotType,
+        view: &CanvasView,
+        now: f64,
+    ) -> Option<f64> {
         let context = self.detail_context(plot_type);
-        let pending_lost = self
-            .layers
-            .base
-            .data
-            .detail
-            .pending
-            .as_ref()
-            .is_some_and(|p| {
-                !self.block_prefetcher.is_pending(&p.key) && !self.block_cache.contains(&p.key)
-            });
-        let state = &mut self.layers.base.data.detail;
-        let Some(context) = context else {
-            state.clear();
-            return;
-        };
-        if pending_lost
-            || state
-                .pending
-                .as_ref()
-                .is_some_and(|p| p.tile.context != context)
-        {
-            state.pending = None;
-        }
-        if state.tile.as_ref().is_some_and(|t| t.context != context) {
-            state.tile = None;
-        }
+        let pending_lost = self.drop_stale_detail(context);
+        let context = context?;
         if self.nav.view_interacting {
-            return;
+            return None;
         }
         let key = ViewKey {
             pan: view.pan,
@@ -139,10 +158,28 @@ impl OctantApp {
             px: self.layout.canvas_px,
             context,
         };
+        let state = &mut self.layers.base.data.detail;
+        match state.seen {
+            Some((seen, since)) if seen == key && now - since >= SETTLE => {}
+            Some((seen, since)) if seen == key => return Some(SETTLE - (now - since)),
+            _ => {
+                // Wheel ticks arrive frames apart: wait until the view stays.
+                state.seen = Some((key, now));
+                return Some(SETTLE);
+            }
+        }
         if state.view == Some(key) && !pending_lost {
-            return;
+            return None;
         }
         state.view = Some(key);
+        self.decide_detail(view, context);
+        None
+    }
+
+    /// Asks for the tile the resting `view` wants, unless the tile shown or
+    /// pending already covers it at that level; drops both when the plotted
+    /// level fits the view.
+    fn decide_detail(&mut self, view: &CanvasView, context: u64) {
         let Some(want) = self.detail_want(view, context) else {
             let state = &mut self.layers.base.data.detail;
             state.tile = None;
@@ -187,44 +224,5 @@ impl OctantApp {
         self.playback.current_timestep.hash(&mut h);
         base.data.flipped_dims.hash(&mut h);
         Some(h.finish())
-    }
-
-    /// Asks for `want`'s tile: shown at once from the block cache, else
-    /// fetched and shown when it arrives (`accept_detail_block`).
-    fn request_detail(&mut self, want: &Want) {
-        let Some((pending, slice, handle)) = self.plan_detail(want) else {
-            return;
-        };
-        if let Some(block) = self.block_cache.get(&pending.key) {
-            self.show_detail(pending, &block);
-            return;
-        }
-        self.layers.base.data.detail.pending = Some(pending);
-        self.block_prefetcher
-            .request(BlockRequest::new(handle, slice), &self.block_cache);
-    }
-
-    /// Takes a fetch result when it is the pending tile's (shown and cached,
-    /// or dropped with a log when the fetch failed); whether it was.
-    pub(crate) fn take_detail_result(
-        &mut self,
-        key: &BlockCacheKey,
-        result: &Result<crate::data::OctantBlock, String>,
-    ) -> bool {
-        let state = &mut self.layers.base.data.detail;
-        if state.pending.as_ref().is_none_or(|p| &p.key != key) {
-            return false;
-        }
-        let Some(pending) = state.pending.take() else {
-            return false;
-        };
-        match result {
-            Ok(block) => {
-                self.block_cache.put(key.clone(), block.clone());
-                self.show_detail(pending, block);
-            }
-            Err(e) => log::warn!("Detail tile of '{}' failed: {e}", key.variable_name),
-        }
-        true
     }
 }

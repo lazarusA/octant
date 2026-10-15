@@ -9,7 +9,7 @@ use crate::app::OctantApp;
 use crate::app::block_loading::block_axes;
 use crate::app::layers::LayerId;
 use crate::app::multiscale::{at_base, at_level};
-use crate::data::{BlockCacheKey, OctantBlock, SliceRequest, StoreHandle};
+use crate::data::{BlockCacheKey, BlockRequest, OctantBlock, SliceRequest, StoreHandle};
 use crate::plots::HeatmapRenderer;
 
 impl OctantApp {
@@ -30,10 +30,12 @@ impl OctantApp {
         };
         let var = sel.variable_info()?.clone();
         let mut cover = [(0.0, 0.0); 2];
+        let mut origin = [0; 2];
         for (i, axis) in want.axes.iter().enumerate() {
             let chunk = var.chunk_shape.get(axis.dim).copied().unwrap_or(1);
             let cells = axis.cells(&want.set, want.level, want.visible[i], MARGIN, chunk)?;
             cover[i] = axis.cover(&want.set, want.level, &cells)?;
+            origin[i] = cells.start;
             *sel.dim_ranges.get_mut(axis.dim)? = (cells.start as usize, cells.end as usize - 1);
         }
         let step = self.playback.current_timestep;
@@ -52,6 +54,10 @@ impl OctantApp {
             key: BlockCacheKey::new(source_id, &slice),
             tile: DetailTile {
                 level: want.level,
+                var_idx: sel.variable_idx,
+                dims: [want.axes[0].dim, want.axes[1].dim],
+                origin,
+                matrix: None,
                 context: want.context,
                 cover,
                 uv: [u0, v0, u1, v1],
@@ -109,9 +115,12 @@ impl OctantApp {
         ) else {
             return;
         };
+        self.request_detail_coordinates(pending.tile.var_idx);
+        let mut tile = pending.tile;
         let Some(rs) = &self.wgpu_render_state else {
             // Headless: the tile is decided, nothing draws it.
-            self.layers.base.data.detail.tile = Some(pending.tile);
+            tile.matrix = Some(Arc::new(matrix));
+            self.layers.base.data.detail.tile = Some(tile);
             return;
         };
         let (w, h) = (matrix.width, matrix.height);
@@ -130,7 +139,55 @@ impl OctantApp {
                 renderer
             }
         };
-        renderer.update_data_and_dimensions(&rs.queue, &matrix.values, w, h, pending.tile.uv);
-        self.layers.base.data.detail.tile = Some(pending.tile);
+        renderer.update_data_and_dimensions(&rs.queue, &matrix.values, w, h, tile.uv);
+        tile.matrix = Some(Arc::new(matrix));
+        self.layers.base.data.detail.tile = Some(tile);
+    }
+
+    /// Reads the coordinates of the tile's level variable `idx` in the
+    /// background (once per variable), for the hover.
+    fn request_detail_coordinates(&mut self, idx: usize) {
+        if let Some((source_id, store, var)) = self.coordinate_request(self.plotted(), idx) {
+            self.coordinate_loader.request(&source_id, store, var);
+        }
+    }
+
+    /// Asks for `want`'s tile: shown at once from the block cache, else
+    /// fetched and shown when it arrives (`accept_detail_block`).
+    pub(super) fn request_detail(&mut self, want: &Want) {
+        let Some((pending, slice, handle)) = self.plan_detail(want) else {
+            return;
+        };
+        if let Some(block) = self.block_cache.get(&pending.key) {
+            self.show_detail(pending, &block);
+            return;
+        }
+        self.layers.base.data.detail.pending = Some(pending);
+        self.block_prefetcher
+            .request(BlockRequest::new(handle, slice), &self.block_cache);
+    }
+
+    /// Takes a fetch result when it is the pending tile's (shown and cached,
+    /// or dropped with a log when the fetch failed); whether it was.
+    pub(crate) fn take_detail_result(
+        &mut self,
+        key: &BlockCacheKey,
+        result: &Result<crate::data::OctantBlock, String>,
+    ) -> bool {
+        let state = &mut self.layers.base.data.detail;
+        if state.pending.as_ref().is_none_or(|p| &p.key != key) {
+            return false;
+        }
+        let Some(pending) = state.pending.take() else {
+            return false;
+        };
+        match result {
+            Ok(block) => {
+                self.block_cache.put(key.clone(), block.clone());
+                self.show_detail(pending, block);
+            }
+            Err(e) => log::warn!("Detail tile of '{}' failed: {e}", key.variable_name),
+        }
+        true
     }
 }

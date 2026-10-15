@@ -35,7 +35,7 @@ impl OctantApp {
 
     /// The dataset, open store and variable `idx` of `selection`, whose
     /// coordinates a request reads.
-    fn coordinate_request(
+    pub(crate) fn coordinate_request(
         &self,
         selection: &VariableSelection,
         idx: usize,

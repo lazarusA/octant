@@ -1,6 +1,6 @@
 //! The finer level a resting view asks for: the finest level of the plotted
 //! multiscale variable with no more cells than screen pixels over the
-//! visible window.
+//! visible window; and dropping what the plot no longer wants.
 
 use super::Want;
 use super::geometry::{Axis, pixels_over};
@@ -63,5 +63,32 @@ impl OctantApp {
             axes,
             visible,
         })
+    }
+
+    /// Drops what no longer belongs to the plot (`context`, `None` when the
+    /// base layer can have no tile) and a pending fetch that was lost (an
+    /// abort); whether one was lost.
+    pub(super) fn drop_stale_detail(&mut self, context: Option<u64>) -> bool {
+        let state = &self.layers.base.data.detail;
+        let lost = state.pending.as_ref().is_some_and(|p| {
+            !self.block_prefetcher.is_pending(&p.key) && !self.block_cache.contains(&p.key)
+        });
+        let state = &mut self.layers.base.data.detail;
+        let Some(context) = context else {
+            state.clear();
+            return lost;
+        };
+        if lost
+            || state
+                .pending
+                .as_ref()
+                .is_some_and(|p| p.tile.context != context)
+        {
+            state.pending = None;
+        }
+        if state.tile.as_ref().is_some_and(|t| t.context != context) {
+            state.tile = None;
+        }
+        lost
     }
 }
