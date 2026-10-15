@@ -13,7 +13,11 @@
 //! Every level stays a variable of its own, with its own coordinates; a
 //! stack only groups them.
 
+pub mod geotiff;
+pub mod geozarr;
+pub mod geozarr_layout;
 mod mapping;
+pub mod ome;
 pub mod types;
 
 use std::sync::Arc;
@@ -33,5 +37,24 @@ pub fn link(set: Multiscale, variables: &mut [VariableInfo]) {
                 level,
             });
         }
+    }
+}
+
+/// Links `levels` as a stack when they form one; otherwise logs why and
+/// leaves the variables as they are.
+pub(crate) fn try_link(
+    name: String,
+    dims: Vec<String>,
+    levels: Vec<ScaleLevel>,
+    kind: MultiscaleKind,
+    variables: &mut [VariableInfo],
+) {
+    let Some(first) = levels.first().map(|l| l.path.clone()) else {
+        return;
+    };
+    match Multiscale::new(name, dims, levels, kind) {
+        Ok(set) => link(set, variables),
+        Err(MultiscaleError::TooFewLevels) => {}
+        Err(e) => log::warn!("The levels of '{first}' are not a multiscale stack: {e}"),
     }
 }

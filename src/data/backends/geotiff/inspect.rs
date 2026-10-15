@@ -11,6 +11,7 @@ use super::bands::{
     GdalItem, add_gdal_attributes, band_labels, default_band_name, parse_gdal_metadata,
 };
 use super::coords::GeoSpatialBounds;
+use crate::data::multiscale::geotiff as multiscale;
 
 /// Build `DatasetMetadata` from parsed `TIFF` structure.
 pub fn inspect_tiff(tiff: &TIFF, source_name: &str) -> DatasetMetadata {
@@ -20,6 +21,7 @@ pub fn inspect_tiff(tiff: &TIFF, source_name: &str) -> DatasetMetadata {
     for (ifd_idx, ifd) in tiff.ifds().iter().enumerate() {
         inspect_single_ifd(ifd_idx, ifd, &mut variables, &mut dimension_coordinates);
     }
+    multiscale::link_overviews(&mut variables, &overview_ifds(tiff.ifds()));
 
     DatasetMetadata {
         name: source_name.to_string(),
@@ -28,6 +30,22 @@ pub fn inspect_tiff(tiff: &TIFF, source_name: &str) -> DatasetMetadata {
         dimension_coordinates,
         ome: None,
     }
+}
+
+/// The IFDs that are reduced-resolution overviews of IFD 0 (masks excluded).
+fn overview_ifds(ifds: &[ImageFileDirectory]) -> Vec<usize> {
+    let shape = |ifd: &ImageFileDirectory| multiscale::IfdShape {
+        new_subfile_type: ifd.new_subfile_type(),
+        width: ifd.image_width() as u64,
+        height: ifd.image_height() as u64,
+        samples: ifd.samples_per_pixel() as u64,
+    };
+    let Some(base) = ifds.first().map(shape) else {
+        return Vec::new();
+    };
+    (1..ifds.len())
+        .filter(|&i| multiscale::is_overview(&base, &shape(&ifds[i])))
+        .collect()
 }
 
 /// What every variable of one IFD shares.
@@ -53,11 +71,7 @@ impl IfdInfo {
         let mut attributes = extract_ifd_attributes(ifd);
         add_gdal_attributes(&mut attributes, &gdal, None);
         Self {
-            prefix: if ifd_idx == 0 {
-                String::new()
-            } else {
-                format!("overview_{ifd_idx}/")
-            },
+            prefix: multiscale::ifd_prefix(ifd_idx),
             width,
             height,
             samples: ifd.samples_per_pixel() as u64,

@@ -83,8 +83,11 @@ impl GenericZarrBlockStore {
             return Ok((std::mem::take(&mut found.variables), Some(found)));
         }
         let url = self.source_url.trim_end_matches('/');
-        let vars = crate::utils::extract_store_variables_consolidated(self.storage.clone(), url)
-            .map_err(|e| e.to_string())?;
+        let mut vars =
+            crate::utils::extract_store_variables_consolidated(self.storage.clone(), url)
+                .map_err(|e| e.to_string())?;
+        let reader = crate::data::ome::MetaReader::direct(self.storage.clone());
+        crate::data::multiscale::geozarr::link_pyramids(&reader, &mut vars);
         Ok((vars, None))
     }
 
