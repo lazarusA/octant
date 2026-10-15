@@ -21,9 +21,11 @@ use super::palette::apply_colormap_into;
 use region::read_region;
 use request::{palette_channel, parse_slice_request};
 
-/// Fetch and decode an `OctantBlock` from an IFD for a given `SliceRequest`.
+/// Fetch and decode an `OctantBlock` from an IFD (whose bounds are
+/// `geo_bounds`, `GeoSpatialBounds::of_ifd_in`) for a given `SliceRequest`.
 pub async fn fetch_geotiff_block(
     ifd: &ImageFileDirectory,
+    geo_bounds: &GeoSpatialBounds,
     endianness: Endianness,
     request: &SliceRequest,
     reader: &dyn AsyncFileReader,
@@ -119,7 +121,6 @@ pub async fn fetch_geotiff_block(
         )
     };
 
-    let geo_bounds = GeoSpatialBounds::from_ifd(ifd);
     let mut coords = HashMap::new();
     coords.insert(
         "x".into(),

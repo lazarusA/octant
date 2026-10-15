@@ -25,7 +25,8 @@ pub async fn load_one_geotiff_wasm_with_progress(
         let guard = store.inner.read().unwrap_or_else(|p| p.into_inner());
         guard.as_ref().map(|s| {
             (
-                s.resolve_ifd(&request.slice.variable).cloned(),
+                s.resolve_ifd(&request.slice.variable)
+                    .map(|(ifd, bounds)| (ifd.clone(), bounds)),
                 s.tiff.endianness(),
                 s.reader.clone(),
                 s.decoder_registry.clone(),
@@ -33,9 +34,9 @@ pub async fn load_one_geotiff_wasm_with_progress(
         })
     };
 
-    let (ifd, endianness, reader, decoder_registry) = match cached {
-        Some((Some(ifd), endianness, reader, decoder_registry)) => {
-            (ifd, endianness, reader, decoder_registry)
+    let (resolved, endianness, reader, decoder_registry) = match cached {
+        Some((Some(resolved), endianness, reader, decoder_registry)) => {
+            (resolved, endianness, reader, decoder_registry)
         }
         Some((None, _, _, _)) => {
             return Err(
@@ -47,9 +48,9 @@ pub async fn load_one_geotiff_wasm_with_progress(
             let geo_store = GeoTiffBlockStore::from_reader(source_uri, reader)
                 .await
                 .map_err(|e| e.to_string())?;
-            let ifd = geo_store
+            let resolved = geo_store
                 .resolve_ifd(&request.slice.variable)
-                .cloned()
+                .map(|(ifd, bounds)| (ifd.clone(), bounds))
                 .ok_or_else(|| {
                     format!("Variable '{}' not found in GeoTIFF", request.slice.variable)
                 })?;
@@ -58,12 +59,14 @@ pub async fn load_one_geotiff_wasm_with_progress(
             let dec = geo_store.decoder_registry.clone();
             let mut guard = store.inner.write().unwrap_or_else(|p| p.into_inner());
             *guard = Some(geo_store);
-            (ifd, endianness, r, dec)
+            (resolved, endianness, r, dec)
         }
     };
+    let (ifd, bounds) = resolved;
 
     super::super::slicing::fetch_geotiff_block(
         &ifd,
+        &bounds,
         endianness,
         &request.slice,
         reader.as_ref(),

@@ -26,6 +26,24 @@ pub struct GeoSpatialBounds {
 }
 
 impl GeoSpatialBounds {
+    /// The bounds of IFD `idx` of `ifds`: its own, else, for an overview of
+    /// IFD 0 without georeferencing of its own (the norm in COGs), IFD 0's:
+    /// an overview spans the full image's extent, so its pixel centers follow
+    /// from that extent and its own size.
+    pub fn of_ifd_in(ifds: &[ImageFileDirectory], idx: usize) -> Option<Self> {
+        let own = Self::from_ifd(ifds.get(idx)?);
+        if idx == 0 || own.georeferenced {
+            return Some(own);
+        }
+        let base = Self::from_ifd(ifds.first()?);
+        let overview = crate::data::multiscale::geotiff::overview_ifds(ifds).contains(&idx);
+        Some(if overview && base.georeferenced {
+            base
+        } else {
+            own
+        })
+    }
+
     /// Extract spatial bounds from an IFD's GeoTIFF tags.
     pub fn from_ifd(ifd: &ImageFileDirectory) -> Self {
         let size = (ifd.image_width() as f64, ifd.image_height() as f64);

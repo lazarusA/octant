@@ -6,6 +6,8 @@
 //! An overview covers the base image's extent, so its factor along each
 //! dimension is the base length over its own, with no offset.
 
+use async_tiff::ImageFileDirectory;
+
 use crate::data::metadata::VariableInfo;
 
 use super::types::{MultiscaleKind, ScaleLevel};
@@ -35,6 +37,22 @@ pub fn is_overview(base: &IfdShape, ifd: &IfdShape) -> bool {
         Some(t) => t & REDUCED_RESOLUTION != 0 && t & MASK == 0 && smaller,
         None => smaller && ifd.samples == base.samples,
     }
+}
+
+/// The IFDs that are reduced-resolution overviews of IFD 0 (masks excluded).
+pub fn overview_ifds(ifds: &[ImageFileDirectory]) -> Vec<usize> {
+    let shape = |ifd: &ImageFileDirectory| IfdShape {
+        new_subfile_type: ifd.new_subfile_type(),
+        width: ifd.image_width() as u64,
+        height: ifd.image_height() as u64,
+        samples: ifd.samples_per_pixel() as u64,
+    };
+    let Some(base) = ifds.first().map(shape) else {
+        return Vec::new();
+    };
+    (1..ifds.len())
+        .filter(|&i| is_overview(&base, &shape(&ifds[i])))
+        .collect()
 }
 
 /// The variable prefix of IFD `ifd_idx` (empty for IFD 0).

@@ -18,10 +18,18 @@ pub fn inspect_tiff(tiff: &TIFF, source_name: &str) -> DatasetMetadata {
     let mut variables = Vec::new();
     let mut dimension_coordinates = HashMap::new();
 
-    for (ifd_idx, ifd) in tiff.ifds().iter().enumerate() {
-        inspect_single_ifd(ifd_idx, ifd, &mut variables, &mut dimension_coordinates);
+    let ifds = tiff.ifds();
+    for (ifd_idx, ifd) in ifds.iter().enumerate() {
+        let bounds = GeoSpatialBounds::of_ifd_in(ifds, ifd_idx).unwrap_or_default();
+        inspect_single_ifd(
+            ifd_idx,
+            ifd,
+            bounds,
+            &mut variables,
+            &mut dimension_coordinates,
+        );
     }
-    multiscale::link_overviews(&mut variables, &overview_ifds(tiff.ifds()));
+    multiscale::link_overviews(&mut variables, &multiscale::overview_ifds(ifds));
 
     DatasetMetadata {
         name: source_name.to_string(),
@@ -30,22 +38,6 @@ pub fn inspect_tiff(tiff: &TIFF, source_name: &str) -> DatasetMetadata {
         dimension_coordinates,
         ome: None,
     }
-}
-
-/// The IFDs that are reduced-resolution overviews of IFD 0 (masks excluded).
-fn overview_ifds(ifds: &[ImageFileDirectory]) -> Vec<usize> {
-    let shape = |ifd: &ImageFileDirectory| multiscale::IfdShape {
-        new_subfile_type: ifd.new_subfile_type(),
-        width: ifd.image_width() as u64,
-        height: ifd.image_height() as u64,
-        samples: ifd.samples_per_pixel() as u64,
-    };
-    let Some(base) = ifds.first().map(shape) else {
-        return Vec::new();
-    };
-    (1..ifds.len())
-        .filter(|&i| multiscale::is_overview(&base, &shape(&ifds[i])))
-        .collect()
 }
 
 /// What every variable of one IFD shares.
@@ -62,7 +54,7 @@ struct IfdInfo {
 }
 
 impl IfdInfo {
-    fn new(ifd_idx: usize, ifd: &ImageFileDirectory) -> Self {
+    fn new(ifd_idx: usize, ifd: &ImageFileDirectory, geo_bounds: GeoSpatialBounds) -> Self {
         let (width, height) = (ifd.image_width() as u64, ifd.image_height() as u64);
         let gdal = ifd
             .gdal_metadata()
@@ -79,7 +71,7 @@ impl IfdInfo {
             chunk_shape: extract_chunk_shape(ifd, width, height),
             gdal,
             attributes,
-            geo_bounds: GeoSpatialBounds::from_ifd(ifd),
+            geo_bounds,
         }
     }
 
@@ -91,10 +83,11 @@ impl IfdInfo {
 fn inspect_single_ifd(
     ifd_idx: usize,
     ifd: &ImageFileDirectory,
+    bounds: GeoSpatialBounds,
     variables: &mut Vec<VariableInfo>,
     dimension_coordinates: &mut HashMap<String, CoordValues>,
 ) {
-    let info = IfdInfo::new(ifd_idx, ifd);
+    let info = IfdInfo::new(ifd_idx, ifd, bounds);
     add_raster_variable(ifd, &info, variables, dimension_coordinates);
     let labels = band_labels(ifd, &info.gdal, info.samples as usize, false);
     add_band_variables(&info, labels.as_deref(), variables, dimension_coordinates);
