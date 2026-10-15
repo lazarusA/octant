@@ -206,7 +206,9 @@ impl OctantApp {
     fn detail_context(&self, plot_type: PlotType) -> Option<u64> {
         let base = &self.layers.base;
         let plotted = base.selection();
-        let regular = base.data.matrix.as_ref()?.grid.render_coord_mode() == 0;
+        // Global (0) and regional (1) regular grids draw cells evenly over
+        // the quad, as tiles do; coordinate lookups (2) and HEALPix don't.
+        let regular = matches!(base.data.matrix.as_ref()?.grid.render_coord_mode(), 0 | 1);
         let readable = plot_type == PlotType::Heatmap
             && regular
             && !self.playback.is_playing
