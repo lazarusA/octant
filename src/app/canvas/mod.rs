@@ -17,6 +17,10 @@ use crate::app::OctantApp;
 /// Renders the central plotting canvas or the hero landing view when inactive.
 pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::Rect) {
     let ctx = ui.ctx().clone();
+    let px = canvas_rect.size() * ctx.pixels_per_point();
+    if px.x >= 1.0 && px.y >= 1.0 {
+        app.layout.canvas_px = [px.x.round() as u32, px.y.round() as u32];
+    }
 
     // Check screenshot / export requests requiring the canvas rect
     if let Some(ref mut req) = app.pending_export

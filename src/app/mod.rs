@@ -22,6 +22,7 @@ mod floating;
 #[cfg(test)]
 mod floating_tests;
 pub mod layers;
+pub(crate) mod multiscale;
 #[cfg(test)]
 mod ome_display_tests;
 #[cfg(test)]

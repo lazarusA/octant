@@ -129,8 +129,11 @@ impl OctantApp {
     /// Returns true if the user is currently browsing/configuring a variable or dataset that has not been plotted yet.
     #[inline]
     pub fn is_exploring_unplotted_variable(&self) -> bool {
-        self.plotted().metadata.is_none()
-            || self.plotted().variable_idx != self.selected.variable_idx
+        let Some(meta) = self.plotted().metadata.as_ref() else {
+            return true;
+        };
+        let (shown, staged) = (self.plotted().variable_idx, self.selected.variable_idx);
+        !crate::app::multiscale::same_variable(meta, shown, staged)
             || self.plotted().store_target != self.selected.store_target
     }
 

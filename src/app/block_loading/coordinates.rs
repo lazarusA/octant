@@ -18,11 +18,16 @@ impl OctantApp {
     }
 
     /// Reads the coordinates of layer `id`'s staged variable in the background,
-    /// once per variable (the base layer's is the selected one).
+    /// once per variable (the base layer's is the selected one, at the level
+    /// it reads).
     pub(crate) fn request_layer_coordinates(&mut self, id: LayerId) {
-        let request = self
-            .layer_selections(id)
-            .and_then(|(_, staged)| self.coordinate_request(staged, staged.variable_idx));
+        let request = self.layer_selections(id).and_then(|(_, staged)| {
+            let idx = match id {
+                LayerId::BASE => self.resolve_level(staged).map(|l| l.variable_idx),
+                _ => None,
+            };
+            self.coordinate_request(staged, idx.unwrap_or(staged.variable_idx))
+        });
         if let Some((source_id, store, variable)) = request {
             self.coordinate_loader.request(&source_id, store, variable);
         }

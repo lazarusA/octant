@@ -21,6 +21,9 @@ pub struct UiLayoutState {
     pub show_scale_bar: bool,
     pub settings_overlay_width: f32,
     pub panel_positions: crate::ui::panel_layout::PanelPositions,
+    /// The canvas size in physical pixels, recorded every frame: the level
+    /// of a multiscale variable a plot reads fits it.
+    pub canvas_px: [u32; 2],
     pub theme_preference: egui::ThemePreference,
     pub enforce_data_aspect_ratio: bool,
     pub show_colorbar: bool,
@@ -53,6 +56,7 @@ impl Default for UiLayoutState {
             show_scale_bar: true,
             settings_overlay_width: 0.0,
             panel_positions: Default::default(),
+            canvas_px: [1920, 1080],
             theme_preference: egui::ThemePreference::System,
             enforce_data_aspect_ratio: true,
             show_colorbar: true,

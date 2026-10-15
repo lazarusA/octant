@@ -198,9 +198,13 @@ impl crate::app::OctantApp {
         self.layers.base.selection()
     }
 
-    /// Copies the staged selection into the plotted one.
+    /// Copies the staged selection into the plotted one, on the level it
+    /// reads for a multiscale variable.
     pub(crate) fn copy_selected_to_plotted(&mut self) {
-        self.layers.base.selection_mut().clone_from(&self.selected);
+        match self.resolve_level(&self.selected) {
+            Some(level) => *self.layers.base.selection_mut() = level,
+            None => self.layers.base.selection_mut().clone_from(&self.selected),
+        }
         // A label image draws as labels, whatever layer shows it; data shown
         // the other way is dropped, never drawn in the wrong colors.
         if self.layers.base.source.follow_variable() {
@@ -209,8 +213,12 @@ impl crate::app::OctantApp {
         }
     }
 
-    /// Copies the plotted selection back into the staged one.
+    /// Copies the plotted selection back into the staged one, on level 0 of
+    /// a multiscale variable.
     pub(crate) fn copy_plotted_to_selected(&mut self) {
-        self.selected.clone_from(self.layers.base.selection());
+        match crate::app::multiscale::at_base(self.layers.base.selection()) {
+            Some(base) => self.selected = base,
+            None => self.selected.clone_from(self.layers.base.selection()),
+        }
     }
 }
