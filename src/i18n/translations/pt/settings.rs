@@ -152,6 +152,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggMaxHover => "Preserva valores extremos altos.",
         SettingsKey::AggMinHover => "Preserva valores extremos baixos.",
         SettingsKey::AggNearestHover => "Seleção rápida do ponto mais próximo, sem interpolação.",
+        SettingsKey::ResolutionLevel => "Nível de resolução",
+        SettingsKey::ResolutionLevelHover => {
+            "O nível dos dados multiescala que o gráfico lê. Auto lê o nível mais fino que cabe na tela."
+        }
         SettingsKey::CmykAutoMapped => {
             "Canais mapeados automaticamente: C (1), M (2), Y (3), K (4)"
         }

@@ -160,6 +160,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggNearestHover => {
             "Sélection rapide du point le plus proche, sans interpolation."
         }
+        SettingsKey::ResolutionLevel => "Niveau de résolution",
+        SettingsKey::ResolutionLevelHover => {
+            "Le niveau des données multi-échelles que lit le graphique. Auto lit le niveau le plus fin qui tient dans le canevas."
+        }
         SettingsKey::CmykAutoMapped => {
             "Canaux attribués automatiquement : C (1), M (2), Y (3), K (4)"
         }

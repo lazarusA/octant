@@ -117,6 +117,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggMaxHover => "保留极高值。",
         SettingsKey::AggMinHover => "保留极低值。",
         SettingsKey::AggNearestHover => "快速选取最近点，不进行插值。",
+        SettingsKey::ResolutionLevel => "分辨率级别",
+        SettingsKey::ResolutionLevelHover => {
+            "图表读取的多尺度数据级别。自动会读取适合画布的最高分辨率级别。"
+        }
         SettingsKey::CmykAutoMapped => "自动映射的通道：C (1)、M (2)、Y (3)、K (4)",
         SettingsKey::MultiChannelOverlay => "多通道叠加",
         SettingsKey::MultiChannelOverlayHover => "以相加方式叠加多个通道，每个通道使用各自的色调。",

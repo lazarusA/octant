@@ -56,5 +56,9 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::RoleGrid => "Сітка",
         VariablesKey::Index => "Індекс:",
         VariablesKey::ChannelN => "Канал {}",
+        VariablesKey::LevelN => "Рівень {}",
+        VariablesKey::LevelAuto => "Авто",
+        VariablesKey::LevelOf => "Рівень {} з {}",
+        VariablesKey::AutoLevelOf => "Авто, рівень {} з {}",
     })
 }

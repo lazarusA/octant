@@ -135,6 +135,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggMaxHover => "極端に高い値を保持します。",
         SettingsKey::AggMinHover => "極端に低い値を保持します。",
         SettingsKey::AggNearestHover => "補間せずに最も近い点を高速に選びます。",
+        SettingsKey::ResolutionLevel => "解像度レベル",
+        SettingsKey::ResolutionLevelHover => {
+            "プロットが使う解像度レベルです。自動では画面に収まる最も細かいレベルを使います。"
+        }
         SettingsKey::CmykAutoMapped => "自動割り当てチャンネル: C (1)、M (2)、Y (3)、K (4)",
         SettingsKey::MultiChannelOverlay => "マルチチャンネル重ね合わせ",
         SettingsKey::MultiChannelOverlayHover => {

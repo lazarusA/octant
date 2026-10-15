@@ -54,5 +54,9 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::RoleGrid => "격자",
         VariablesKey::Index => "인덱스:",
         VariablesKey::ChannelN => "채널 {}",
+        VariablesKey::LevelN => "단계 {}",
+        VariablesKey::LevelAuto => "자동",
+        VariablesKey::LevelOf => "단계 {}/{}",
+        VariablesKey::AutoLevelOf => "자동, 단계 {}/{}",
     })
 }
