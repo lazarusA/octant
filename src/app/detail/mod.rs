@@ -6,8 +6,10 @@
 //! - `geometry.rs`: the plotted and visible windows on level 0's grid, the
 //!   finer level's cells covering them, and where those sit on the quad.
 //! - `want.rs`: the finer level the resting view asks for; stale tiles.
-//! - `tile.rs`: requesting a tile (cache first) and slicing an arrived block into the tile and uploading it to
-//!   the base layer's detail renderer, painted after its heatmap.
+//! - `tile.rs`: requesting a tile (cache first), slicing an arrived block
+//!   into it and uploading it to its layer's detail renderer, painted right
+//!   after that layer's heatmap (base, base tile, overlay, overlay tile).
+//! - `follow.rs`: overlays' tiles, which follow the base layer's.
 //!
 //! A tile is asked for only once the view rests (`view_interacting` off and
 //! the view unchanged for `SETTLE` seconds, so the frames between mouse
@@ -16,25 +18,14 @@
 //! level the view wants, and dropped when the plot (selection, step)
 //! changes. The hover reads it where it is drawn (`ui/hover/detail.rs`).
 //!
-//! Not yet: overlays. They read their stack's level on the base level's
-//! grid and get no tile, so they stay coarse over a sharp base. What it needs:
-//! 1. Per-layer refresh: `DetailState` already lives on each layer's
-//!    `LayerData`; take a `LayerId` in `refresh_detail`, `detail_context`,
-//!    `detail_want`, `plan_detail` and `show_detail` (now the base layer's),
-//!    and refresh every drawn overlay after the base in `paint_active_plot`.
-//! 2. The same grid: an overlay's tile reads the level of its own stack
-//!    matching the base tile's level (`multiscale::level_matching` against
-//!    the base tile's level selection) over the base tile's cells, only
-//!    while the overlay's alignment is `SameGrid`, so both tiles line up
-//!    cell for cell.
-//! 3. Drawing needs nothing new: `LayerRenderers::detail` is per layer and
-//!    `paint_heatmap` draws a layer's tile right after its heatmap, so the
-//!    order stays base, base tile, overlay, overlay tile.
-//! 4. Hover: `ui/hover/overlays.rs` `hover_rows` reads each overlay's matrix
-//!    at the base cell; it should read the overlay's tile under the pointer
-//!    as `ui/hover/detail.rs` does for the base.
-//! 5. Cost: one more fetch per drawn overlay for every resting view.
+//! Each drawn overlay whose variable is multiscale reads, as soon as the
+//! base layer asks for a tile, the level of its own stack on the base
+//! tile's grid (`multiscale::level_matching`) over the same cells, so both
+//! tiles line up cell for cell at the same place on the quad; an overlay
+//! whose stack has no such level gets none. The hover's overlay rows read
+//! an overlay's tile under the pointer (`ui/hover/overlays.rs`).
 
+mod follow;
 mod geometry;
 #[cfg(test)]
 mod geometry_tests;
@@ -72,6 +63,9 @@ pub struct DetailState {
     view: Option<ViewKey>,
     /// The latest view and the egui time it first showed.
     seen: Option<(ViewKey, f64)>,
+    /// An overlay's: the base tile and overlay selection last followed
+    /// (`follow.rs`).
+    follows: Option<u64>,
 }
 
 impl DetailState {
@@ -90,6 +84,8 @@ pub struct DetailTile {
     /// along them.
     pub dims: [usize; 2],
     pub origin: [u64; 2],
+    /// The level cells where it ends (exclusive) along them.
+    pub end: [u64; 2],
     /// The tile's values, kept for the hover once it is shown.
     pub matrix: Option<std::sync::Arc<crate::data::MatrixData>>,
     /// The plot it belongs to (`OctantApp::detail_context`).
@@ -102,6 +98,8 @@ pub struct DetailTile {
 
 /// A tile being fetched, with what slicing its block needs.
 pub struct PendingDetail {
+    /// The layer the tile is for.
+    pub layer: crate::app::layers::LayerId,
     pub key: BlockCacheKey,
     pub tile: DetailTile,
     /// The level's dimension names, roles, indices and ranges.
@@ -138,8 +136,21 @@ impl OctantApp {
     /// when the plot changed, and once the view has rested `SETTLE` seconds
     /// (egui time `now`) asks for the visible window at a finer level when
     /// the plotted one is coarser than the screen. Returns how long to wait
-    /// before the view counts as resting, for a repaint then.
+    /// before the view counts as resting, for a repaint then. Overlays'
+    /// tiles follow the base layer's.
     pub(crate) fn refresh_detail(
+        &mut self,
+        plot_type: PlotType,
+        view: &CanvasView,
+        now: f64,
+    ) -> Option<f64> {
+        let wait = self.refresh_base_detail(plot_type, view, now);
+        self.follow_detail_overlays();
+        wait
+    }
+
+    /// The base layer's part of [`Self::refresh_detail`].
+    fn refresh_base_detail(
         &mut self,
         plot_type: PlotType,
         view: &CanvasView,

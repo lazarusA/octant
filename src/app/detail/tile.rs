@@ -1,6 +1,6 @@
 //! A detail tile's request and its upload: the level's selection over the
-//! tile's cells, then its block sliced like a plotted one and drawn by the
-//! base layer's detail renderer at the tile's place on the plotted quad.
+//! tile's cells, then its block sliced like a plotted one and drawn by its
+//! layer's detail renderer at the tile's place on the plotted quad.
 
 use std::sync::Arc;
 
@@ -31,14 +31,42 @@ impl OctantApp {
         let var = sel.variable_info()?.clone();
         let mut cover = [(0.0, 0.0); 2];
         let mut origin = [0; 2];
+        let mut end = [0; 2];
         for (i, axis) in want.axes.iter().enumerate() {
             let chunk = var.chunk_shape.get(axis.dim).copied().unwrap_or(1);
             let cells = axis.cells(&want.set, want.level, want.visible[i], MARGIN, chunk)?;
             cover[i] = axis.cover(&want.set, want.level, &cells)?;
             origin[i] = cells.start;
+            end[i] = cells.end;
             *sel.dim_ranges.get_mut(axis.dim)? = (cells.start as usize, cells.end as usize - 1);
         }
-        let step = self.playback.current_timestep;
+        let (u0, u1) = want.axes[0].quad_fraction(cover[0]);
+        let (v0, v1) = want.axes[1].quad_fraction(cover[1]);
+        let tile = DetailTile {
+            level: want.level,
+            var_idx: sel.variable_idx,
+            dims: [want.axes[0].dim, want.axes[1].dim],
+            origin,
+            end,
+            matrix: None,
+            context: want.context,
+            cover,
+            uv: [u0, v0, u1, v1],
+        };
+        self.plan_tile(LayerId::BASE, sel, tile)
+    }
+
+    /// The request reading `tile` for layer `id` from `sel` (the tile's
+    /// level, its x and y ranges set), at the layer's current step of an
+    /// animated dimension.
+    pub(super) fn plan_tile(
+        &self,
+        id: LayerId,
+        mut sel: crate::app::layers::VariableSelection,
+        tile: DetailTile,
+    ) -> Option<(PendingDetail, SliceRequest, StoreHandle)> {
+        let var = sel.variable_info()?.clone();
+        let step = self.layer_step(id);
         if let Some(a) = sel.animated_dim {
             let last = (var.shape.get(a).copied().unwrap_or(1) as usize).saturating_sub(1);
             let step = step.min(last);
@@ -48,20 +76,10 @@ impl OctantApp {
         let slice = sel.slice_request(&var.name, &var.shape, None);
         let source_id = self.selection_source_id(&sel);
         let handle = self.resolve_store_handle(&source_id, &sel.store_target, sel.store_kind)?;
-        let (u0, u1) = want.axes[0].quad_fraction(cover[0]);
-        let (v0, v1) = want.axes[1].quad_fraction(cover[1]);
         let pending = PendingDetail {
+            layer: id,
             key: BlockCacheKey::new(source_id, &slice),
-            tile: DetailTile {
-                level: want.level,
-                var_idx: sel.variable_idx,
-                dims: [want.axes[0].dim, want.axes[1].dim],
-                origin,
-                matrix: None,
-                context: want.context,
-                cover,
-                uv: [u0, v0, u1, v1],
-            },
+            tile,
             dims: var.dimension_names,
             config: sel.dim_config,
             indices: sel.dim_indices,
@@ -75,8 +93,12 @@ impl OctantApp {
     /// Slices `block` into `pending`'s tile and draws it; nothing when the
     /// block runs in another orientation than the plot.
     pub(super) fn show_detail(&mut self, pending: PendingDetail, block: &OctantBlock) {
+        let id = pending.layer;
+        let Some(layer) = self.layers.get(id) else {
+            return;
+        };
         let same_flips = {
-            let flips = &self.layers.base.data.flipped_dims;
+            let flips = &layer.data.flipped_dims;
             flips.len() == block.flipped_dims.len()
                 && block.flipped_dims.iter().all(|f| flips.contains(f))
         };
@@ -102,7 +124,7 @@ impl OctantApp {
         );
         let (_, local_x) = block_axes::dim_bounds(block, &pending.dims, bx, &pending.ranges);
         let (_, local_y) = block_axes::dim_bounds(block, &pending.dims, by, &pending.ranges);
-        let extent = self.layer_animated_dim_extent(LayerId::BASE);
+        let extent = self.layer_animated_dim_extent(id);
         let Some(matrix) = block.slice_2d_with_ranges(
             bx,
             by,
@@ -115,17 +137,23 @@ impl OctantApp {
         ) else {
             return;
         };
-        self.request_detail_coordinates(pending.tile.var_idx);
+        if id == LayerId::BASE {
+            self.request_detail_coordinates(pending.tile.var_idx);
+        }
         let mut tile = pending.tile;
-        let Some(rs) = &self.wgpu_render_state else {
+        let rs = self.wgpu_render_state.clone();
+        let Some(layer) = self.layers.get_mut(id) else {
+            return;
+        };
+        let Some(rs) = rs else {
             // Headless: the tile is decided, nothing draws it.
             tile.matrix = Some(Arc::new(matrix));
-            self.layers.base.data.detail.tile = Some(tile);
+            layer.data.detail.tile = Some(tile);
             return;
         };
         let (w, h) = (matrix.width, matrix.height);
         let cells = w.saturating_mul(h);
-        let renderers = &mut self.layers.base.renderers;
+        let renderers = &mut layer.renderers;
         let renderer = match &renderers.detail {
             Some((renderer, capacity)) if *capacity >= cells => renderer.clone(),
             _ => {
@@ -141,7 +169,7 @@ impl OctantApp {
         };
         renderer.update_data_and_dimensions(&rs.queue, &matrix.values, w, h, tile.uv);
         tile.matrix = Some(Arc::new(matrix));
-        self.layers.base.data.detail.tile = Some(tile);
+        layer.data.detail.tile = Some(tile);
     }
 
     /// Reads the coordinates of the tile's level variable `idx` in the
@@ -155,14 +183,22 @@ impl OctantApp {
     /// Asks for `want`'s tile: shown at once from the block cache, else
     /// fetched and shown when it arrives (`accept_detail_block`).
     pub(super) fn request_detail(&mut self, want: &Want) {
-        let Some((pending, slice, handle)) = self.plan_detail(want) else {
-            return;
-        };
+        if let Some(plan) = self.plan_detail(want) {
+            self.request_tile(plan);
+        }
+    }
+
+    /// Shows a planned tile at once from the block cache, else fetches it.
+    pub(super) fn request_tile(&mut self, plan: (PendingDetail, SliceRequest, StoreHandle)) {
+        let (pending, slice, handle) = plan;
         if let Some(block) = self.block_cache.get(&pending.key) {
             self.show_detail(pending, &block);
             return;
         }
-        self.layers.base.data.detail.pending = Some(pending);
+        let Some(layer) = self.layers.get_mut(pending.layer) else {
+            return;
+        };
+        layer.data.detail.pending = Some(pending);
         self.block_prefetcher
             .request(BlockRequest::new(handle, slice), &self.block_cache);
     }
@@ -174,11 +210,21 @@ impl OctantApp {
         key: &BlockCacheKey,
         result: &Result<crate::data::OctantBlock, String>,
     ) -> bool {
-        let state = &mut self.layers.base.data.detail;
-        if state.pending.as_ref().is_none_or(|p| &p.key != key) {
+        let waiting = |l: &crate::app::layers::Layer| {
+            l.data
+                .detail
+                .pending
+                .as_ref()
+                .is_some_and(|p| &p.key == key)
+        };
+        let Some(id) = self.layers.iter().find(|l| waiting(l)).map(|l| l.id()) else {
             return false;
-        }
-        let Some(pending) = state.pending.take() else {
+        };
+        let Some(pending) = self
+            .layers
+            .get_mut(id)
+            .and_then(|l| l.data.detail.pending.take())
+        else {
             return false;
         };
         match result {
