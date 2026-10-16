@@ -59,3 +59,20 @@ fn overlay_colorbars_fill_top_right_left_then_bottom_and_reuse_freed_slots() {
     let fifth = stack.push(Source::default());
     assert_eq!(slot_of(&stack, fifth), Some(Slot::Bottom(2)));
 }
+
+#[test]
+fn a_dimension_without_a_range_reads_index_0_not_all_of_it() {
+    use crate::data::DimensionSelection;
+    let selection = crate::app::layers::VariableSelection {
+        dim_ranges: vec![(1, 2)],
+        ..Default::default()
+    };
+    let request = selection.slice_request("t2m", &[5, 750_000], None);
+    assert_eq!(
+        request.selections,
+        [
+            DimensionSelection::Range { start: 1, end: 3 },
+            DimensionSelection::Index(0)
+        ]
+    );
+}

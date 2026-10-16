@@ -76,13 +76,22 @@ impl VariableSelection {
 
     /// The request reading `var_name` (of `shape`) over the selected ranges:
     /// collapsed dimensions as one index, `composite_dim` (the channels of a
-    /// composite) whole.
+    /// composite) whole. A dimension without a range (ranges of another
+    /// variable) reads index 0, never the whole dimension, and is logged.
     pub fn slice_request(
         &self,
         var_name: &str,
         shape: &[u64],
         composite_dim: Option<usize>,
     ) -> SliceRequest {
+        if self.dim_ranges.len() < shape.len() {
+            log::warn!(
+                "Request for '{var_name}' has {} ranges for {} dimensions; \
+                 the missing ones read index 0",
+                self.dim_ranges.len(),
+                shape.len()
+            );
+        }
         let selections = shape
             .iter()
             .enumerate()
@@ -94,11 +103,7 @@ impl VariableSelection {
                         end: dim_size,
                     };
                 }
-                let (mut start, mut end) = self
-                    .dim_ranges
-                    .get(i)
-                    .copied()
-                    .unwrap_or((0, dim_size.saturating_sub(1)));
+                let (mut start, mut end) = self.dim_ranges.get(i).copied().unwrap_or((0, 0));
                 if start > end {
                     std::mem::swap(&mut start, &mut end);
                 }
