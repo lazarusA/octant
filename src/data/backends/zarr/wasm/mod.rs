@@ -16,7 +16,7 @@ pub mod loader;
 pub mod ome;
 pub mod partial_store;
 pub mod preload;
-mod shard_fetch;
+pub(crate) mod shard_fetch;
 pub mod shard_plan;
 #[cfg(test)]
 mod shard_tests;

@@ -75,6 +75,11 @@ impl ShardIndexSpec {
         })
     }
 
+    /// The spec of an opened array (see [`ShardIndexSpec::of`]).
+    pub fn of_array<S: ?Sized>(array: &zarrs::array::Array<S>) -> Option<Self> {
+        Self::of(&serde_json::to_value(array.metadata()).ok()?)
+    }
+
     /// Inner chunks per shard along each dimension.
     pub fn grid(&self) -> Vec<u64> {
         self.shard
@@ -145,6 +150,22 @@ pub fn parse_index(spec: &ShardIndexSpec, index: &[u8]) -> Option<Vec<Option<(u6
             })
             .collect(),
     )
+}
+
+/// The byte ranges (within the shard) of the inner chunks of shard
+/// `shard_indices` that `window` touches, from its index `entries`; empty
+/// chunks have none.
+pub fn window_ranges(
+    spec: &ShardIndexSpec,
+    shard_indices: &[u64],
+    window: &[Range<u64>],
+    entries: &[Option<(u64, u64)>],
+) -> Vec<Range<u64>> {
+    spec.inner_chunks(shard_indices, window)
+        .into_iter()
+        .filter_map(|i| entries.get(i as usize).copied().flatten())
+        .map(|(offset, len)| offset..offset + len)
+        .collect()
 }
 
 /// `ranges` (`offset..end`) merged where under `MERGE_GAP` apart, each

@@ -28,10 +28,7 @@ impl WasmZarrBlockStore {
         .map_err(|e| format!("Failed to open array '{clean_var}': {e}"))?;
         // A sharded array with a plain index: its index and the subset's
         // inner chunks, by range.
-        let spec = serde_json::to_value(array.metadata())
-            .ok()
-            .and_then(|m| super::shard_plan::ShardIndexSpec::of(&m));
-        if let Some(spec) = spec {
+        if let Some(spec) = super::shard_plan::ShardIndexSpec::of_array(&array) {
             let shards = self.shards_of(&array, clean_var, subset);
             return self
                 .fetch_shard_parts(&spec, &shards, &subset.to_ranges(), &mut on_progress)
@@ -89,6 +86,7 @@ impl WasmZarrBlockStore {
                     key,
                     url,
                     indices: indices.to_vec(),
+                    span: None,
                 }
             })
             .collect()
