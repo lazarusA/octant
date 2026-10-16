@@ -16,7 +16,11 @@ pub mod loader;
 pub mod ome;
 pub mod partial_store;
 pub mod preload;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod range_server;
 pub(crate) mod shard_fetch;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod shard_fetch_tests;
 pub mod shard_plan;
 #[cfg(test)]
 mod shard_tests;

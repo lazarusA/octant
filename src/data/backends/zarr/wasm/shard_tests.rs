@@ -10,14 +10,14 @@ use zarrs::storage::store::MemoryStore;
 use zarrs::storage::{Bytes, ReadableStorageTraits, StoreKey, WritableStorageTraits};
 
 use super::partial_store::PartialStore;
-use super::shard_plan::{ShardIndexSpec, merge, parse_index};
+use super::shard_plan::{ShardIndexSpec, merge, parse_index, window_ranges};
 use crate::data::backends::zarr::GenericZarrBlockStore;
 use crate::data::blocks::BlockStore;
 use crate::data::{DimensionSelection, SliceRequest};
 
 /// `v` (64 x 64 `float32`, `0, 1, 2, ...`) in 32 x 32 shards of 8 x 8
 /// inner chunks, index at the end with a checksum (zarrs' default).
-fn source() -> Arc<MemoryStore> {
+pub(super) fn source() -> Arc<MemoryStore> {
     let store = Arc::new(MemoryStore::new());
     let f32_dt = DataType::from_metadata(&MetadataV3::new("float32")).expect("float32");
     let mut builder = ArrayBuilder::new(vec![64, 64], vec![32, 32], f32_dt, FillValue::from(0f32));
@@ -35,11 +35,11 @@ fn key(k: &str) -> StoreKey {
     StoreKey::new(k).expect("key")
 }
 
-fn whole(store: &MemoryStore, k: &str) -> Bytes {
+pub(super) fn whole(store: &MemoryStore, k: &str) -> Bytes {
     store.get(&key(k)).expect("get").expect("value")
 }
 
-fn spec_of(store: &MemoryStore) -> ShardIndexSpec {
+pub(super) fn spec_of(store: &MemoryStore) -> ShardIndexSpec {
     let meta: serde_json::Value =
         serde_json::from_slice(&whole(store, "v/zarr.json")).expect("json");
     ShardIndexSpec::of(&meta).expect("plain index")
@@ -121,12 +121,7 @@ fn blocks_decode_from_the_index_and_the_window_chunks() {
     let shard_key = key("v/c/0/1");
     parts.insert_part(&shard_key, size, index_range.start, index.clone());
     let entries = parse_index(&spec, &index).expect("index");
-    let ranges: Vec<_> = spec
-        .inner_chunks(&[0, 1], &window)
-        .into_iter()
-        .filter_map(|i| entries[i as usize])
-        .map(|(o, l)| o..o + l)
-        .collect();
+    let ranges = window_ranges(&spec, &[0, 1], &window, &entries);
     // The index and 4 of the shard's 16 inner chunks (merging may read the
     // small gaps between them in one request).
     let needed: u64 = index.len() as u64 + ranges.iter().map(|r| r.end - r.start).sum::<u64>();
