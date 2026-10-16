@@ -5,7 +5,9 @@ use std::sync::{Arc, RwLock};
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::{Mutex, OnceLock};
 
-use icechunk_format::manifest::{Manifest, ManifestRef};
+use icechunk_format::manifest::ManifestRef;
+
+use super::manifest_cache::ManifestCache;
 
 use crate::data::DatasetMetadata;
 use crate::data::backends::zarr::WasmZarrBlockStore;
@@ -34,7 +36,7 @@ pub struct WasmIcechunkBlockStore {
     pub base_url: String,
     pub inner: Arc<WasmZarrBlockStore>,
     pub array_manifests: RwLock<HashMap<String, ArrayManifestInfo>>,
-    pub cached_manifests: RwLock<HashMap<String, Arc<Manifest>>>,
+    pub cached_manifests: Arc<ManifestCache>,
 }
 
 impl WasmIcechunkBlockStore {
@@ -54,7 +56,7 @@ impl WasmIcechunkBlockStore {
                     base_url: clean_url.clone(),
                     inner,
                     array_manifests: RwLock::new(HashMap::new()),
-                    cached_manifests: RwLock::new(HashMap::new()),
+                    cached_manifests: ManifestCache::new(),
                 });
                 map.insert(clean_url, new_store.clone());
                 new_store
@@ -78,7 +80,7 @@ impl WasmIcechunkBlockStore {
                 base_url: clean_url.clone(),
                 inner,
                 array_manifests: RwLock::new(HashMap::new()),
-                cached_manifests: RwLock::new(HashMap::new()),
+                cached_manifests: ManifestCache::new(),
             });
             guard.insert(clean_url, new_store.clone());
             new_store
