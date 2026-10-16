@@ -8,16 +8,21 @@ use crate::i18n::{SettingsKey, VariablesKey, fill, tr};
 /// The level select, while the plot shows a multiscale variable. Changing it
 /// plots again; it is disabled while another variable is staged.
 pub(crate) fn show_level_select(app: &mut OctantApp, ui: &mut egui::Ui) {
-    let Some(set) = app
+    let Some(levels) = app
         .plotted()
         .variable_info()
         .and_then(|v| v.multiscale.as_ref())
-        .map(|r| r.set.clone())
+        .map(|r| r.set.len())
     else {
         return;
     };
     let staged = !app.is_exploring_unplotted_variable();
-    let current = app.selected.level;
+    // While another variable is staged, the plot's own choice.
+    let current = if staged {
+        app.selected.level
+    } else {
+        app.plotted().level
+    };
     let mut chosen = current;
     ui.add_enabled_ui(staged, |ui| {
         ui.horizontal(|ui| {
@@ -32,7 +37,7 @@ pub(crate) fn show_level_select(app: &mut OctantApp, ui: &mut egui::Ui) {
                         LevelChoice::Auto,
                         tr(VariablesKey::LevelAuto),
                     );
-                    for level in 0..set.len() {
+                    for level in 0..levels {
                         let mut buf = [0; 64];
                         let text = choice_text(&mut buf, LevelChoice::Pinned(level));
                         ui.selectable_value(&mut chosen, LevelChoice::Pinned(level), text);
