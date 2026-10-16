@@ -17,7 +17,7 @@ use crate::data::ome::MetaReader;
 use crate::data::ome::reader::join;
 
 use super::geozarr_layout::{Entry, Layout};
-use super::types::ScaleLevel;
+use super::types::{ScaleLevel, volume_of};
 
 /// Links the levels of every GeoZarr pyramid among `variables`. Groups are
 /// looked for at each variable's group and that group's parent (a level is
@@ -147,7 +147,7 @@ fn stack_levels<'l>(
         .iter()
         .filter_map(|entry| Some((entry, find(entry)?)))
         .collect();
-    held.sort_by_key(|(_, v)| std::cmp::Reverse(v.shape.iter().product::<u64>()));
+    held.sort_by_key(|(_, v)| std::cmp::Reverse(volume_of(&v.shape)));
     let &(base, base_var) = held.first()?;
     let mut levels: Vec<ScaleLevel> = held
         .iter()

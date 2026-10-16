@@ -215,3 +215,11 @@ impl LevelRef {
         self.level == 0
     }
 }
+
+/// The cells of `shape`, `u64::MAX` past it (for ordering levels by size).
+pub(super) fn volume_of(shape: &[u64]) -> u64 {
+    shape
+        .iter()
+        .try_fold(1u64, |n, &d| n.checked_mul(d))
+        .unwrap_or(u64::MAX)
+}

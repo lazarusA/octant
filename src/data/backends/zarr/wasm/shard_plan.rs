@@ -21,6 +21,8 @@ pub struct ShardIndexSpec {
     /// The index sits at the end of the shard (else at its start).
     pub at_end: bool,
     pub checksum: bool,
+    /// Inner chunks per shard: the index's entries.
+    entries: u64,
 }
 
 impl ShardIndexSpec {
@@ -47,11 +49,18 @@ impl ShardIndexSpec {
             .get("index_location")
             .and_then(Value::as_str)
             .is_none_or(|l| l == "end");
+        // An index too large to address is read by whole shards.
+        let entries = shard
+            .iter()
+            .zip(&inner)
+            .try_fold(1u64, |n, (&s, &c)| n.checked_mul(s.div_ceil(c)))?;
+        entries.checked_mul(16)?.checked_add(4)?;
         Some(Self {
             inner,
             shard,
             at_end,
             checksum,
+            entries,
         })
     }
 
@@ -69,10 +78,9 @@ impl ShardIndexSpec {
             .collect()
     }
 
-    /// The index's length in bytes.
+    /// The index's length in bytes (`of` checked that it fits).
     pub fn index_len(&self) -> u64 {
-        let entries: u64 = self.grid().iter().product();
-        entries * 16 + if self.checksum { 4 } else { 0 }
+        self.entries * 16 + if self.checksum { 4 } else { 0 }
     }
 
     /// The index's byte range in a shard of `size` bytes.
@@ -113,39 +121,30 @@ impl ShardIndexSpec {
     }
 }
 
-/// The `(offset, length)` of every inner chunk in `index` (its entries
-/// read little endian; empty chunks `None`).
-pub fn parse_index(spec: &ShardIndexSpec, index: &[u8]) -> Option<Vec<Option<(u64, u64)>>> {
-    let entries = spec.grid().iter().product::<u64>() as usize;
-    let body = index.get(..entries * 16)?;
-    let (entries, _) = body.as_chunks::<16>();
-    Some(
-        entries
-            .iter()
-            .map(|e| {
-                let (offset, len) = e.split_at(8);
-                let word = |b: &[u8]| b.iter().rev().fold(0u64, |w, &x| (w << 8) | u64::from(x));
-                let (offset, len) = (word(offset), word(len));
-                (offset != u64::MAX || len != u64::MAX).then_some((offset, len))
-            })
-            .collect(),
-    )
+/// The `(offset, length)` of inner chunk `i` in shard index `index` (two
+/// little-endian words per chunk); `None` for an empty chunk or one past
+/// the index.
+pub fn chunk_entry(index: &[u8], i: u64) -> Option<(u64, u64)> {
+    let (words, _) = index.as_chunks::<8>();
+    let at = usize::try_from(i).ok()?.checked_mul(2)?;
+    let offset = u64::from_le_bytes(*words.get(at)?);
+    let len = u64::from_le_bytes(*words.get(at + 1)?);
+    (offset != u64::MAX || len != u64::MAX).then_some((offset, len))
 }
 
 /// The byte ranges (within the shard of `size` bytes) of the inner chunks
-/// of shard `shard_indices` that `window` touches, from its index
-/// `entries`; empty chunks and entries past the shard (a corrupt index)
-/// have none.
+/// of shard `shard_indices` that `window` touches, read from its `index`;
+/// empty chunks and entries past the shard (a corrupt index) have none.
 pub fn window_ranges(
     spec: &ShardIndexSpec,
     shard_indices: &[u64],
     window: &[Range<u64>],
-    entries: &[Option<(u64, u64)>],
+    index: &[u8],
     size: u64,
 ) -> Vec<Range<u64>> {
     spec.inner_chunks(shard_indices, window)
         .into_iter()
-        .filter_map(|i| entries.get(i as usize).copied().flatten())
+        .filter_map(|i| chunk_entry(index, i))
         .filter_map(|(offset, len)| Some(offset..offset.checked_add(len).filter(|&e| e <= size)?))
         .collect()
 }

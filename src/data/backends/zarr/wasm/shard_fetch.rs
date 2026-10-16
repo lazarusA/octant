@@ -12,7 +12,7 @@ use zarrs::storage::{Bytes, ReadableStorageTraits, StoreKey};
 
 use super::WasmZarrBlockStore;
 use super::loader::CONCURRENT_FETCHES;
-use super::shard_plan::{ShardIndexSpec, merge, parse_index, window_ranges};
+use super::shard_plan::{ShardIndexSpec, merge, window_ranges};
 use crate::data::backends::http::{fetch_url_byte_range, fetch_url_size, is_not_found};
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
 
@@ -54,10 +54,11 @@ impl WasmZarrBlockStore {
             let Some((key, size, index)) = index? else {
                 continue;
             };
-            let Some(entries) = parse_index(spec, &index) else {
+            // A short index would read its missing entries as empty chunks.
+            if (index.len() as u64) < spec.index_len() {
                 return Err(format!("Unreadable shard index of '{}'", shard.url).into());
-            };
-            let ranges = window_ranges(spec, &shard.indices, window, &entries, size)
+            }
+            let ranges = window_ranges(spec, &shard.indices, window, &index, size)
                 .into_iter()
                 .filter(|r| !self.partial_store.holds(&key, r.start, r.end))
                 .collect();

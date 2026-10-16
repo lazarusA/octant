@@ -100,7 +100,7 @@ fn base_levels(variables: &[VariableInfo], base: usize, overviews: &[usize]) -> 
         })
         .filter(|o| o.shape.len() == v.shape.len())
         .collect();
-    found.sort_by_key(|o| std::cmp::Reverse(o.shape.iter().product::<u64>()));
+    found.sort_by_key(|o| std::cmp::Reverse(super::types::volume_of(&o.shape)));
     std::iter::once(v)
         .chain(found)
         .map(|o| ScaleLevel {
