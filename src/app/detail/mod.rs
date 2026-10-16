@@ -61,6 +61,9 @@ const SETTLE: f64 = 0.15;
 pub struct DetailState {
     pub tile: Option<DetailTile>,
     pub pending: Option<PendingDetail>,
+    /// A tile the prefetcher refused while every worker was busy, asked
+    /// again once one frees up (`retry_refused_details`).
+    refused: Option<TilePlan>,
     /// The view last decided for.
     view: Option<ViewKey>,
     /// The latest view and the egui time it first showed.
@@ -73,6 +76,12 @@ pub struct DetailState {
 impl DetailState {
     pub fn clear(&mut self) {
         *self = Self::default();
+    }
+
+    /// Drops the tile being fetched or waiting for a worker.
+    fn drop_request(&mut self) {
+        self.pending = None;
+        self.refused = None;
     }
 }
 
@@ -112,6 +121,13 @@ pub struct PendingDetail {
     pub anim_dim: Option<usize>,
     pub step: usize,
 }
+
+/// A tile's fetch: what slicing its block needs, its request and store.
+type TilePlan = (
+    PendingDetail,
+    crate::data::SliceRequest,
+    crate::data::StoreHandle,
+);
 
 /// The view a decision was made for.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -196,7 +212,7 @@ impl OctantApp {
         let Some(want) = self.detail_want(view, context) else {
             let state = &mut self.layers.base.data.detail;
             state.tile = None;
-            state.pending = None;
+            state.drop_request();
             return;
         };
         let state = &self.layers.base.data.detail;

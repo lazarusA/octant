@@ -5,11 +5,10 @@
 
 use std::hash::{Hash, Hasher};
 
-use super::{DetailTile, PendingDetail};
+use super::{DetailTile, TilePlan};
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::app::multiscale::{at_base, at_level, level_matching};
-use crate::data::{SliceRequest, StoreHandle};
 
 impl OctantApp {
     /// Keeps every overlay's tile on the base layer's latest one (pending,
@@ -34,7 +33,7 @@ impl OctantApp {
                 continue;
             };
             if lost {
-                state.pending = None;
+                state.drop_request();
                 state.follows = None;
             }
             let Some(context) = context else {
@@ -48,7 +47,7 @@ impl OctantApp {
                 continue;
             }
             state.follows = Some(context);
-            state.pending = None;
+            state.drop_request();
             let plan = target
                 .as_ref()
                 .and_then(|(tile, _)| self.plan_overlay_tile(id, tile, context));
@@ -88,12 +87,7 @@ impl OctantApp {
 
     /// Overlay `id`'s tile over the base tile `base`'s cells: the level of
     /// its stack on the base tile's grid, `None` when its stack has none.
-    fn plan_overlay_tile(
-        &self,
-        id: LayerId,
-        base: &DetailTile,
-        context: u64,
-    ) -> Option<(PendingDetail, SliceRequest, StoreHandle)> {
+    fn plan_overlay_tile(&self, id: LayerId, base: &DetailTile, context: u64) -> Option<TilePlan> {
         let plotted = self.plotted();
         let base_var = plotted.metadata.as_ref()?.variables.get(base.var_idx)?;
         let sel = self.layers.get(id)?.selection();

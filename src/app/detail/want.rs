@@ -78,13 +78,12 @@ impl OctantApp {
             state.clear();
             return lost;
         };
-        if lost
-            || state
-                .pending
-                .as_ref()
-                .is_some_and(|p| p.tile.context != context)
-        {
-            state.pending = None;
+        let asked = state
+            .pending
+            .as_ref()
+            .or(state.refused.as_ref().map(|r| &r.0));
+        if lost || asked.is_some_and(|p| p.tile.context != context) {
+            state.drop_request();
         }
         if state.tile.as_ref().is_some_and(|t| t.context != context) {
             state.tile = None;

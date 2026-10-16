@@ -4,21 +4,18 @@
 
 use std::sync::Arc;
 
-use super::{DetailTile, MARGIN, PendingDetail, Want};
+use super::{DetailTile, MARGIN, PendingDetail, TilePlan, Want};
 use crate::app::OctantApp;
 use crate::app::block_loading::block_axes;
 use crate::app::layers::LayerId;
 use crate::app::multiscale::{at_base, at_level};
-use crate::data::{BlockCacheKey, BlockRequest, OctantBlock, SliceRequest, StoreHandle};
+use crate::data::{BlockCacheKey, BlockRequest, OctantBlock};
 use crate::plots::HeatmapRenderer;
 
 impl OctantApp {
     /// `want`'s tile: the request reading its cells (the current step of an
     /// animated dimension) and the store it reads from.
-    pub(super) fn plan_detail(
-        &self,
-        want: &Want,
-    ) -> Option<(PendingDetail, SliceRequest, StoreHandle)> {
+    pub(super) fn plan_detail(&self, want: &Want) -> Option<TilePlan> {
         let plotted = self.plotted();
         let base = match want.from {
             0 => plotted.clone(),
@@ -64,7 +61,7 @@ impl OctantApp {
         id: LayerId,
         mut sel: crate::app::layers::VariableSelection,
         tile: DetailTile,
-    ) -> Option<(PendingDetail, SliceRequest, StoreHandle)> {
+    ) -> Option<TilePlan> {
         let var = sel.variable_info()?.clone();
         let step = self.layer_step(id);
         if let Some(a) = sel.animated_dim {
@@ -189,18 +186,39 @@ impl OctantApp {
     }
 
     /// Shows a planned tile at once from the block cache, else fetches it.
-    pub(super) fn request_tile(&mut self, plan: (PendingDetail, SliceRequest, StoreHandle)) {
+    pub(super) fn request_tile(&mut self, plan: TilePlan) {
         let (pending, slice, handle) = plan;
         if let Some(block) = self.block_cache.get(&pending.key) {
             self.show_detail(pending, &block);
             return;
         }
+        let request = BlockRequest::new(handle.clone(), slice.clone());
+        // Taken, or already fetched for another request (a layer's block).
+        let taken = self.block_prefetcher.request(request, &self.block_cache)
+            || self.block_prefetcher.is_pending(&pending.key);
         let Some(layer) = self.layers.get_mut(pending.layer) else {
             return;
         };
-        layer.data.detail.pending = Some(pending);
-        self.block_prefetcher
-            .request(BlockRequest::new(handle, slice), &self.block_cache);
+        let state = &mut layer.data.detail;
+        state.drop_request();
+        if taken {
+            state.pending = Some(pending);
+        } else {
+            state.refused = Some((pending, slice, handle));
+        }
+    }
+
+    /// Asks again for the tiles refused while every worker was busy; called
+    /// once fetches complete.
+    pub(crate) fn retry_refused_details(&mut self) {
+        let plans: Vec<TilePlan> = self
+            .layers
+            .iter_mut()
+            .filter_map(|l| l.data.detail.refused.take())
+            .collect();
+        for plan in plans {
+            self.request_tile(plan);
+        }
     }
 
     /// Takes a fetch result when it is the pending tile's (shown and cached,

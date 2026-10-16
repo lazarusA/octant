@@ -141,8 +141,13 @@ impl OctantApp {
         let had_completed = !completed.is_empty();
 
         for res in completed {
+            // A detail tile and a layer may wait on one fetch: both take it.
+            if self.take_detail_result(&res.key, &res.result)
+                && self.layers.find_by_key(&res.key).is_none()
+            {
+                continue;
+            }
             match res.result {
-                _ if self.take_detail_result(&res.key, &res.result) => {}
                 Ok(block) => {
                     self.mark_failed(&res.key, false);
                     let requested = self.layers.find_by_key(&res.key);
@@ -174,8 +179,10 @@ impl OctantApp {
             }
         }
 
-        // Whenever worker slots free up, replenish and dispatch remaining chunks in the selection:
+        // Whenever worker slots free up, refused detail tiles first, then
+        // the remaining chunks in the selection:
         if had_completed {
+            self.retry_refused_details();
             self.prefetch_animated_ranges();
         }
     }
