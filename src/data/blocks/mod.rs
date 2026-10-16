@@ -4,6 +4,7 @@ pub mod cache;
 pub mod coord_loader;
 pub mod key;
 pub mod loader;
+pub mod memory_budget;
 pub mod prefetch;
 pub mod request;
 pub mod store;

@@ -9,6 +9,8 @@ use crate::data::DatasetMetadata;
 use crate::data::blocks::BlockStoreError;
 use zarrs::storage::{ReadableWritableListableStorage, StoreKey, WritableStorageTraits};
 
+#[cfg(test)]
+mod budget_tests;
 mod consolidated;
 pub mod coord_paths;
 pub mod inspect;
@@ -65,7 +67,7 @@ impl WasmZarrBlockStore {
             if let Some(store) = map.get(&clean_url) {
                 store.clone()
             } else {
-                let partial_store = Arc::new(PartialStore::new());
+                let partial_store = PartialStore::new();
                 let memory_store: ReadableWritableListableStorage = partial_store.clone();
                 let generic_store = crate::data::backends::zarr::GenericZarrBlockStore::new(
                     memory_store.clone(),
@@ -95,7 +97,7 @@ impl WasmZarrBlockStore {
         if let Some(store) = guard.get(&clean_url) {
             store.clone()
         } else {
-            let partial_store = Arc::new(PartialStore::new());
+            let partial_store = PartialStore::new();
             let memory_store: ReadableWritableListableStorage = partial_store.clone();
             let generic_store = crate::data::backends::zarr::GenericZarrBlockStore::new(
                 memory_store.clone(),
@@ -117,7 +119,7 @@ impl WasmZarrBlockStore {
     }
 
     pub fn open_local_notice(path: &str) -> Arc<Self> {
-        let partial_store = Arc::new(PartialStore::new());
+        let partial_store = PartialStore::new();
         let memory_store: ReadableWritableListableStorage = partial_store.clone();
         let generic_store = crate::data::backends::zarr::GenericZarrBlockStore::new(
             memory_store.clone(),
@@ -142,6 +144,15 @@ impl WasmZarrBlockStore {
         let bytes_vec = zarrs::storage::Bytes::from(bytes.to_vec());
         self.memory_store
             .set(&store_key, bytes_vec)
+            .map_err(|e| format!("{e}").into())
+    }
+
+    /// Stores a downloaded data chunk under `key`; the memory budget may drop
+    /// it once no load holds it (`blocks::memory_budget`).
+    pub fn insert_chunk_bytes(&self, key: &str, bytes: Vec<u8>) -> Result<(), BlockStoreError> {
+        let store_key = StoreKey::new(key.trim_start_matches('/')).map_err(|e| format!("{e}"))?;
+        self.partial_store
+            .insert_chunk(&store_key, zarrs::storage::Bytes::from(bytes))
             .map_err(|e| format!("{e}").into())
     }
 

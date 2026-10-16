@@ -50,19 +50,23 @@ pub async fn load_one_icechunk_wasm_with_progress(
         subset.to_ranges()
     );
 
-    // Asynchronously download any missing chunks for this slice via manifests
-    if let Err(e) = store
+    // Asynchronously download any missing chunks for this slice via manifests, kept
+    // until decoded
+    let _chunks = match store
         .preload_chunks_for_subset(&request.slice.variable, &subset, on_progress)
         .await
     {
-        log::error!(
-            "[WASM Icechunk] Failed downloading chunks for '{}': {e}",
-            request.slice.variable
-        );
-        return Err(e);
-    }
+        Ok(lease) => lease,
+        Err(e) => {
+            log::error!(
+                "[WASM Icechunk] Failed downloading chunks for '{}': {e}",
+                request.slice.variable
+            );
+            return Err(e);
+        }
+    };
 
-    store.preload_block_coordinates(&request.slice).await;
+    let _coords = store.preload_block_coordinates(&request.slice).await;
 
     // Decode slice synchronously from in-memory chunks
     match store.fetch_block_with_progress(&request.slice, None) {

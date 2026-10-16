@@ -1,6 +1,7 @@
 //! Async chunk preloading and progress reporting for WebAssembly Zarr.
 
 use super::WasmZarrBlockStore;
+use super::partial_store::{Lease, array_prefixes};
 use crate::data::backends::coord_bounds::CoordPreload;
 use crate::data::backends::http::{fetch_url_bytes, is_not_found};
 use crate::data::blocks::{BlockRequest, BlockStore, BlockStoreError, ProgressCallback};
@@ -8,33 +9,45 @@ use crate::data::octant_block::OctantBlock;
 use crate::utils::metadata::open_or_instantiate_array_normalized;
 use futures::StreamExt;
 use zarrs::array::ArraySubset;
+use zarrs::storage::StoreKey;
 
 /// Chunk requests kept in flight while preloading.
 pub(crate) const CONCURRENT_FETCHES: usize = 64;
 
 impl WasmZarrBlockStore {
-    /// Computes and fetches all required chunk files for an array slice into memory.
+    /// Computes and fetches all required chunk files for an array slice into
+    /// memory; the lease keeps them until the caller has decoded them,
+    /// whatever other loads fetch meanwhile.
     pub async fn preload_chunks_for_subset(
         &self,
         var_name: &str,
         subset: &ArraySubset,
         mut on_progress: ProgressCallback<'_>,
-    ) -> Result<(), BlockStoreError> {
+    ) -> Result<Lease, BlockStoreError> {
         let clean_var = var_name.trim_matches('/');
         let array = open_or_instantiate_array_normalized(
             self.memory_store.clone(),
             &format!("/{clean_var}"),
         )
         .map_err(|e| format!("Failed to open array '{clean_var}': {e}"))?;
+        let shards = self.shards_of(&array, clean_var, subset);
+        let keys = shards
+            .iter()
+            .filter_map(|s| StoreKey::new(&s.key).ok())
+            .collect();
+        let lease = self.partial_store.lease(keys, Vec::new());
         // A sharded array with a plain index: its index and the subset's
         // inner chunks, by range.
         if let Some(spec) = super::shard_plan::ShardIndexSpec::of_array(&array) {
-            let shards = self.shards_of(&array, clean_var, subset);
-            return self
-                .fetch_shard_parts(&spec, &shards, &subset.to_ranges(), &mut on_progress)
-                .await;
+            self.fetch_shard_parts(&spec, &shards, &subset.to_ranges(), &mut on_progress)
+                .await?;
+            return Ok(lease);
         }
-        let missing = self.missing_chunks(&array, clean_var, subset);
+        let missing: Vec<(String, String)> = shards
+            .into_iter()
+            .filter(|c| !self.has_key(&c.key))
+            .map(|c| (c.key, c.url))
+            .collect();
         if !missing.is_empty() {
             log::info!(
                 "[WASM Zarr] Preloading {} chunk(s) concurrently for '{clean_var}'",
@@ -42,21 +55,7 @@ impl WasmZarrBlockStore {
             );
             self.fetch_chunks(&missing, &mut on_progress).await?;
         }
-        Ok(())
-    }
-
-    /// Store keys and URLs of the chunks of `subset` not yet in memory.
-    fn missing_chunks<S: ?Sized + zarrs::storage::ReadableStorageTraits + 'static>(
-        &self,
-        array: &zarrs::array::Array<S>,
-        clean_var: &str,
-        subset: &ArraySubset,
-    ) -> Vec<(String, String)> {
-        self.shards_of(array, clean_var, subset)
-            .into_iter()
-            .filter(|c| !self.has_key(&c.key))
-            .map(|c| (c.key, c.url))
-            .collect()
+        Ok(lease)
     }
 
     /// The chunks (shards, for a sharded array) `subset` touches, with their
@@ -105,9 +104,10 @@ impl WasmZarrBlockStore {
         while let Some((key, url, res)) = fetches.next().await {
             match res {
                 Ok(chunk_bytes) => {
-                    self.insert_key_bytes(key, &chunk_bytes)?;
+                    let len = chunk_bytes.len() as u64;
+                    self.insert_chunk_bytes(key, chunk_bytes)?;
                     if let Some(cb) = on_progress.as_mut() {
-                        cb(chunk_bytes.len() as u64);
+                        cb(len);
                     }
                 }
                 Err(err) if is_not_found(&err) => {
@@ -123,18 +123,23 @@ impl WasmZarrBlockStore {
     }
 
     /// Preloads the coordinate arrays a block for `request` reads (those of its
-    /// range-selected dimensions), so its coordinates decode from memory.
+    /// range-selected dimensions), so its coordinates decode from memory; the
+    /// lease keeps them until the block is decoded.
     pub async fn preload_block_coordinates(
         &self,
         request: &crate::data::slice_request::SliceRequest,
-    ) {
-        for (path, len) in super::coord_paths::block_coordinate_arrays(&self.memory_store, request)
-        {
+    ) -> Lease {
+        let arrays = super::coord_paths::block_coordinate_arrays(&self.memory_store, request);
+        let lease = self
+            .partial_store
+            .lease(Vec::new(), array_prefixes(&arrays));
+        for (path, len) in arrays {
             let state = self.preload_coordinate_chunks_1d(&path, len).await;
             if state != CoordPreload::Complete {
                 log::warn!("[WASM Zarr] Coordinate '{path}' {state:?}");
             }
         }
+        lease
     }
 }
 
@@ -196,19 +201,22 @@ pub async fn load_one_wasm_with_progress(
         subset.to_ranges()
     );
 
-    // Asynchronously download any missing chunks for this slice
-    if let Err(e) = store
+    // Asynchronously download any missing chunks for this slice, kept until decoded
+    let _chunks = match store
         .preload_chunks_for_subset(&request.slice.variable, &subset, on_progress)
         .await
     {
-        log::error!(
-            "[WASM Zarr] Failed downloading chunks for '{}': {e}",
-            request.slice.variable
-        );
-        return Err(e);
-    }
+        Ok(lease) => lease,
+        Err(e) => {
+            log::error!(
+                "[WASM Zarr] Failed downloading chunks for '{}': {e}",
+                request.slice.variable
+            );
+            return Err(e);
+        }
+    };
 
-    store.preload_block_coordinates(&request.slice).await;
+    let _coords = store.preload_block_coordinates(&request.slice).await;
 
     // Now decode the slice synchronously from in-memory chunks
     match store.fetch_block_with_progress(&request.slice, None) {

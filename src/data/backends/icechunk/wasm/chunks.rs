@@ -67,9 +67,10 @@ impl WasmIcechunkBlockStore {
         while let Some((key, bytes)) = fetches.next().await {
             match bytes? {
                 Some(bytes) => {
-                    self.inner.insert_key_bytes(&key, &bytes)?;
+                    let len = bytes.len() as u64;
+                    self.inner.insert_chunk_bytes(&key, bytes)?;
                     if let Some(cb) = on_progress.as_mut() {
-                        cb(bytes.len() as u64);
+                        cb(len);
                     }
                 }
                 None => log::debug!("[WASM Icechunk] Chunk {key} not in manifests (sparse fill)"),
