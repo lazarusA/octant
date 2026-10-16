@@ -18,6 +18,8 @@ pub mod partial_store;
 pub mod preload;
 mod shard_fetch;
 pub mod shard_plan;
+#[cfg(test)]
+mod shard_tests;
 pub mod store;
 
 pub use inspect::inspect_wasm_remote_zarr;
