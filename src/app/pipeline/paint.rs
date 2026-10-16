@@ -225,7 +225,9 @@ impl OctantApp {
         }
 
         // --- Coastline overlay ---
-        if self.show_coastlines && canvas_plot_type.draws_coastlines() {
+        // Coastlines only over geographic data (the setting stays on for when
+        // a geographic plot returns).
+        if self.draws_coastlines(canvas_plot_type) {
             if let Some(cr) = self.coastline_renderer.as_ref().map(Arc::clone) {
                 // Theme-aware default: white in dark mode, dark gray in light mode
                 let line_color = self.coastline_color.unwrap_or_else(|| {

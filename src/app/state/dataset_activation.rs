@@ -185,6 +185,18 @@ impl OctantApp {
             .is_some_and(|v| v.ome.is_some())
     }
 
+    /// Whether the plot may be geographic: not an OME-Zarr image and no
+    /// channel overlay. Decides whether coastlines are offered and drawn.
+    pub fn plot_is_geographic(&self) -> bool {
+        !self.is_ome_dataset() && self.layers.base.composite.channel_configs.is_empty()
+    }
+
+    /// Whether coastlines are drawn over a `plot_type` plot: switched on, a
+    /// plot type that draws them, and geographic data.
+    pub fn draws_coastlines(&self, plot_type: crate::plots::PlotType) -> bool {
+        self.show_coastlines && plot_type.draws_coastlines() && self.plot_is_geographic()
+    }
+
     /// Returns true if the active dataset represents a GeoTIFF.
     pub fn is_geotiff(&self) -> bool {
         self.layer_is_geotiff(LayerId::BASE)

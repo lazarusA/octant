@@ -111,7 +111,7 @@ impl PlotState {
             line_custom_color: app.plot_configs.line.use_custom_color,
             line_all_series: app.plot_configs.line.all_series,
             translucent: app.has_color_alpha(),
-            geographic: !app.is_ome_dataset() && base.composite.channel_configs.is_empty(),
+            geographic: app.plot_is_geographic(),
             physical: crate::ui::scale_bar::meters_per_pixel(app).is_some(),
         }
     }

@@ -151,3 +151,13 @@ fn at(cell: (usize, usize)) -> HoverAt {
         norm: (-1.0, -1.0),
     }
 }
+
+#[test]
+fn coastlines_are_not_drawn_over_an_ome_image() {
+    let (mut app, _) = ome_app();
+    app.show_coastlines = true;
+    assert!(!app.draws_coastlines(crate::plots::PlotType::Heatmap));
+    let (mut geo, _) = crate::app::test_support::memory_app();
+    geo.show_coastlines = true;
+    assert!(geo.draws_coastlines(crate::plots::PlotType::Heatmap));
+}
