@@ -15,10 +15,25 @@ use super::manifests::manifests_for;
 use super::store::WasmIcechunkBlockStore;
 use crate::data::backends::http::{fetch_url_byte_range, fetch_url_bytes};
 use crate::data::backends::zarr::wasm::CONCURRENT_FETCHES;
+use crate::data::backends::zarr::wasm::shard_plan::ShardIndexSpec;
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
 use crate::utils::remote::s3_to_https;
 
-type NodeId = ObjectId<8, NodeTag>;
+pub(super) type NodeId = ObjectId<8, NodeTag>;
+/// Manifests with the chunk extents they cover, newest first.
+pub(super) type Manifests = Vec<(ManifestExtents, Arc<Manifest>)>;
+
+/// Where a chunk's bytes are.
+pub(super) enum ChunkSource {
+    /// Stored in the manifest itself.
+    Inline(Vec<u8>),
+    /// `length` bytes at `offset` of the object at `url`.
+    Range {
+        url: String,
+        offset: u64,
+        length: u64,
+    },
+}
 
 impl WasmIcechunkBlockStore {
     /// Downloads every chunk of `subset` of `array` (at `clean_var`) not yet in memory,
@@ -31,13 +46,17 @@ impl WasmIcechunkBlockStore {
         subset: &ArraySubset,
         on_progress: &mut ProgressCallback<'_>,
     ) -> Result<(), BlockStoreError> {
+        if let Some(spec) = ShardIndexSpec::of_array(array) {
+            return self
+                .fetch_shard_parts(array, clean_var, subset, &spec, on_progress)
+                .await;
+        }
         let missing = self.missing_chunks(array, subset);
         if missing.is_empty() {
             return Ok(());
         }
-        let (node_id, refs) = self.manifest_refs(clean_var)?;
         let indices: Vec<ChunkIndices> = missing.iter().map(|(_, i)| i.clone()).collect();
-        let manifests = self.load_manifests(&manifests_for(&refs, &indices)).await?;
+        let (node_id, manifests) = self.manifests_holding(clean_var, &indices).await?;
         let (node_id, manifests) = (&node_id, &manifests);
         let mut fetches = futures::stream::iter(missing)
             .map(|(key, indices)| async move {
@@ -59,6 +78,18 @@ impl WasmIcechunkBlockStore {
         Ok(())
     }
 
+    /// The node of array `clean_var` and the manifests listing any of
+    /// `indices`, newest first.
+    pub(super) async fn manifests_holding(
+        &self,
+        clean_var: &str,
+        indices: &[ChunkIndices],
+    ) -> Result<(NodeId, Manifests), BlockStoreError> {
+        let (node_id, refs) = self.manifest_refs(clean_var)?;
+        let manifests = self.load_manifests(&manifests_for(&refs, indices)).await?;
+        Ok((node_id, manifests))
+    }
+
     /// The node and manifest references recorded for array `clean_var`.
     fn manifest_refs(
         &self,
@@ -78,10 +109,7 @@ impl WasmIcechunkBlockStore {
 
     /// The manifests of `refs` (in their order) with the extents they cover, fetched
     /// concurrently once and cached.
-    async fn load_manifests(
-        &self,
-        refs: &[&ManifestRef],
-    ) -> Result<Vec<(ManifestExtents, Arc<Manifest>)>, BlockStoreError> {
+    async fn load_manifests(&self, refs: &[&ManifestRef]) -> Result<Manifests, BlockStoreError> {
         let loaded: Vec<_> = futures::stream::iter(refs.iter().copied())
             .map(|r| async move { (r.extents.clone(), self.load_manifest(r).await) })
             .buffered(CONCURRENT_FETCHES)
@@ -142,29 +170,54 @@ impl WasmIcechunkBlockStore {
     }
 }
 
-/// The bytes of the chunk at `indices`, from the newest manifest covering and listing it;
+/// Where the chunk at `indices` is, from the newest manifest covering and listing it;
 /// `None` for sparse chunks.
+pub(super) fn locate_chunk(
+    manifests: &[(ManifestExtents, Arc<Manifest>)],
+    node_id: &NodeId,
+    indices: &ChunkIndices,
+    base_url: &str,
+) -> Option<ChunkSource> {
+    let covering = manifests
+        .iter()
+        .filter(|(extents, _)| extents.contains(&indices.0));
+    covering.into_iter().find_map(|(_, manifest)| {
+        match manifest.get_chunk_payload(node_id, indices) {
+            Ok(ChunkPayload::Virtual(v)) => Some(ChunkSource::Range {
+                url: s3_to_https(v.location.url()),
+                offset: v.offset,
+                length: v.length,
+            }),
+            Ok(ChunkPayload::Ref(r)) => Some(ChunkSource::Range {
+                url: format!("{base_url}/chunks/{}", r.id),
+                offset: r.offset,
+                length: r.length,
+            }),
+            Ok(ChunkPayload::Inline(bytes)) => Some(ChunkSource::Inline(bytes.to_vec())),
+            _ => None,
+        }
+    })
+}
+
+/// The bytes of the chunk at `indices`; `None` for sparse chunks.
 async fn fetch_chunk(
     manifests: &[(ManifestExtents, Arc<Manifest>)],
     node_id: &NodeId,
     indices: &ChunkIndices,
     base_url: &str,
 ) -> Result<Option<Vec<u8>>, BlockStoreError> {
-    let covering = manifests
-        .iter()
-        .filter(|(extents, _)| extents.contains(&indices.0));
-    for (_, manifest) in covering {
-        let (url, offset, length) = match manifest.get_chunk_payload(node_id, indices) {
-            Ok(ChunkPayload::Virtual(v)) => (s3_to_https(v.location.url()), v.offset, v.length),
-            Ok(ChunkPayload::Ref(r)) => (format!("{base_url}/chunks/{}", r.id), r.offset, r.length),
-            Ok(ChunkPayload::Inline(bytes)) => return Ok(Some(bytes.to_vec())),
-            _ => continue,
-        };
-        log::info!("[WASM Icechunk] Fetching chunk from '{url}' (offset: {offset}, len: {length})");
-        let bytes = fetch_url_byte_range(&url, offset, length)
-            .await
-            .map_err(|e| format!("Failed fetching chunk from '{url}': {e}"))?;
-        return Ok(Some(bytes));
-    }
-    Ok(None)
+    let (url, offset, length) = match locate_chunk(manifests, node_id, indices, base_url) {
+        None => return Ok(None),
+        Some(ChunkSource::Inline(bytes)) => return Ok(Some(bytes)),
+        Some(ChunkSource::Range {
+            url,
+            offset,
+            length,
+        }) => (url, offset, length),
+    };
+    log::info!("[WASM Icechunk] Fetching chunk from '{url}' (offset: {offset}, len: {length})");
+    let bytes = fetch_url_byte_range(&url, offset, length)
+        .await
+        .map_err(|e| format!("Failed fetching chunk from '{url}': {e}"))?;
+    Ok(Some(bytes))
 }

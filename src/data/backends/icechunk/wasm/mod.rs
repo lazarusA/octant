@@ -11,6 +11,8 @@ pub mod inspect;
 pub mod loader;
 pub mod manifests;
 pub mod preload;
+#[cfg(target_arch = "wasm32")]
+mod shards;
 pub mod store;
 #[cfg(test)]
 mod tests;
