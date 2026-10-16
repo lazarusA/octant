@@ -11,7 +11,7 @@ use zarrs::storage::store::MemoryStore;
 use zarrs::storage::{Bytes, ReadableStorageTraits, StoreKey, WritableStorageTraits};
 
 use super::partial_store::PartialStore;
-use super::shard_plan::{ShardIndexSpec, merge, window_ranges};
+use super::shard_plan::{ShardIndexSpec, chunk_entry, merge, window_ranges};
 
 /// `v` (64 x 64 `float32`, `0, 1, 2, ...`) in 32 x 32 shards of 8 x 8
 /// inner chunks, index at the end with a checksum (zarrs' default).
@@ -113,10 +113,18 @@ fn partial_objects_answer_only_what_they_hold() {
 #[test]
 fn entries_past_the_shard_are_dropped() {
     let spec = spec_of(&source());
-    let mut entries = vec![None; 16];
-    entries[5] = Some((100, 50));
-    entries[6] = Some((u64::MAX - 1, 10)); // overflows
-    entries[9] = Some((990, 20)); // ends past a 1000-byte shard
-    let ranges = window_ranges(&spec, &[0, 1], &[10..20, 40..50], &entries, 1000);
+    // Every entry empty, then the window's chunks 5, 6 and 9 set.
+    let mut index = vec![0xFF; 16 * 16];
+    let mut set = |i: usize, offset: u64, len: u64| {
+        index[16 * i..16 * i + 8].copy_from_slice(&offset.to_le_bytes());
+        index[16 * i + 8..16 * i + 16].copy_from_slice(&len.to_le_bytes());
+    };
+    set(5, 100, 50);
+    set(6, u64::MAX - 1, 10); // overflows
+    set(9, 990, 20); // ends past a 1000-byte shard
+    assert_eq!(chunk_entry(&index, 5), Some((100, 50)));
+    assert_eq!(chunk_entry(&index, 10), None, "empty");
+    assert_eq!(chunk_entry(&index, 16), None, "past the index");
+    let ranges = window_ranges(&spec, &[0, 1], &[10..20, 40..50], &index, 1000);
     assert_eq!(ranges, vec![100..150]);
 }

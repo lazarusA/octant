@@ -10,7 +10,7 @@ use zarrs::storage::store::MemoryStore;
 use super::WasmZarrBlockStore;
 use super::range_server::RangeServer;
 use super::shard_fetch::ShardRef;
-use super::shard_plan::{merge, parse_index, window_ranges};
+use super::shard_plan::{merge, window_ranges};
 use super::shard_tests::{source, source_at, spec_of, whole};
 use crate::data::backends::zarr::GenericZarrBlockStore;
 use crate::data::blocks::BlockStore;
@@ -61,9 +61,8 @@ fn planned(src: &MemoryStore, shard: &[u8]) -> u64 {
     let spec = spec_of(src);
     let range = spec.index_range(shard.len() as u64);
     let index = &shard[range.start as usize..range.end as usize];
-    let entries = parse_index(&spec, index).expect("index");
     let window = [10..20, 40..50];
-    let ranges = window_ranges(&spec, &[0, 1], &window, &entries, shard.len() as u64);
+    let ranges = window_ranges(&spec, &[0, 1], &window, index, shard.len() as u64);
     let chunks: u64 = merge(ranges).iter().map(|r| r.end - r.start).sum();
     spec.index_len() + chunks
 }
@@ -132,6 +131,23 @@ fn a_missing_shard_is_empty() {
     ));
     assert!(fetched.is_ok());
     assert_eq!(server.sent(), 0);
+}
+
+#[test]
+fn a_short_index_is_an_error_not_an_empty_window() {
+    // An object smaller than the shard index: no entry may read as empty.
+    let objects = HashMap::from([("v/c/0/1".to_string(), vec![0u8; 100])]);
+    let server = RangeServer::start(objects);
+    let src = source();
+    let store = WasmZarrBlockStore::get_or_create(&format!("{}/short", server.base));
+    let shard = shard_ref(format!("{}/v/c/0/1", server.base), None);
+    let fetched = get_shared_tokio_rt().block_on(store.fetch_shard_parts(
+        &spec_of(&src),
+        &[shard],
+        &[10..20, 40..50],
+        &mut None,
+    ));
+    assert!(fetched.is_err());
 }
 
 #[test]
