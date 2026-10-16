@@ -85,7 +85,9 @@ fn answer(mut stream: TcpStream, objects: &HashMap<String, Vec<u8>>, sent: &Atom
         "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     );
+    // Counted before the client can read the body, so a test reading `sent`
+    // right after its fetch sees every byte.
+    sent.fetch_add(body.len() as u64, Ordering::SeqCst);
     let _ = stream.write_all(reply.as_bytes());
     let _ = stream.write_all(body);
-    sent.fetch_add(body.len() as u64, Ordering::SeqCst);
 }
