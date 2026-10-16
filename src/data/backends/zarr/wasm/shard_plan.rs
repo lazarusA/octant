@@ -28,46 +28,26 @@ impl ShardIndexSpec {
     /// `sharding_indexed` with a plain index; `None` for anything else
     /// (read by whole shards).
     pub fn of(meta: &Value) -> Option<Self> {
-        let codecs = meta.get("codecs")?.as_array()?;
-        let [sharding] = codecs.as_slice() else {
+        let [sharding] = meta.get("codecs")?.as_array()?.as_slice() else {
             return None;
         };
-        if sharding.get("name")?.as_str()? != "sharding_indexed" {
-            return None;
-        }
+        let (inner, shard) = crate::utils::metadata::sharding::sharding_shapes(meta)?;
         let config = sharding.get("configuration")?;
-        let shape = |v: Option<&Value>| -> Option<Vec<u64>> {
-            v?.as_array()?.iter().map(Value::as_u64).collect()
+        let is = |c: &Value, name: &str| c.get("name").and_then(Value::as_str) == Some(name);
+        let bytes_le = |c: &Value| {
+            let endian = c.pointer("/configuration/endian").and_then(Value::as_str);
+            is(c, "bytes") && endian.is_none_or(|e| e == "little")
         };
-        let inner = shape(config.get("chunk_shape"))?;
-        let shard = shape(
-            meta.get("chunk_grid")?
-                .get("configuration")?
-                .get("chunk_shape"),
-        )?;
-        let index_codecs = config.get("index_codecs")?.as_array()?;
-        let name = |c: &Value| c.get("name").and_then(Value::as_str).map(str::to_string);
-        let little = |c: &Value| {
-            let endian = c.get("configuration").and_then(|c| c.get("endian"));
-            endian.is_none_or(|e| e.as_str() == Some("little"))
-        };
-        let checksum = match index_codecs.as_slice() {
-            [b] if name(b).as_deref() == Some("bytes") && little(b) => false,
-            [b, c]
-                if name(b).as_deref() == Some("bytes")
-                    && little(b)
-                    && name(c).as_deref() == Some("crc32c") =>
-            {
-                true
-            }
+        let checksum = match config.get("index_codecs")?.as_array()?.as_slice() {
+            [b] if bytes_le(b) => false,
+            [b, c] if bytes_le(b) && is(c, "crc32c") => true,
             _ => return None,
         };
         let at_end = config
             .get("index_location")
             .and_then(Value::as_str)
             .is_none_or(|l| l == "end");
-        let valid = inner.len() == shard.len() && inner.iter().all(|&c| c > 0);
-        valid.then_some(Self {
+        Some(Self {
             inner,
             shard,
             at_end,

@@ -29,7 +29,13 @@ impl WasmIcechunkBlockStore {
             return Ok(());
         };
         let grid: Vec<Vec<u64>> = chunks.indices().into_iter().map(|i| i.to_vec()).collect();
-        let indices: Vec<ChunkIndices> = grid.iter().map(|g| chunk_indices(g)).collect();
+        let Some(indices) = grid
+            .iter()
+            .map(|g| chunk_indices(g))
+            .collect::<Option<Vec<_>>>()
+        else {
+            return Err("Chunk index beyond Icechunk's 32-bit indices".into());
+        };
         let (node_id, manifests) = self.manifests_holding(clean_var, &indices).await?;
         let mut shards = Vec::with_capacity(grid.len());
         for (shard, at) in grid.into_iter().zip(&indices) {
@@ -59,7 +65,9 @@ impl WasmIcechunkBlockStore {
     }
 }
 
-/// Icechunk's indices of the chunk at grid position `grid`.
-fn chunk_indices(grid: &[u64]) -> ChunkIndices {
-    ChunkIndices(grid.iter().map(|&x| x as u32).collect())
+/// Icechunk's indices of the chunk at grid position `grid`; `None` past
+/// its 32-bit indices.
+fn chunk_indices(grid: &[u64]) -> Option<ChunkIndices> {
+    let indices = grid.iter().map(|&x| u32::try_from(x).ok());
+    Some(ChunkIndices(indices.collect::<Option<_>>()?))
 }

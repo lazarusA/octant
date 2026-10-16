@@ -11,6 +11,7 @@ mod coords_numeric_tests;
 mod coords_tests;
 pub mod generic;
 mod open_arrays;
+mod reader;
 #[cfg(test)]
 mod sharding_tests;
 pub mod slice;
