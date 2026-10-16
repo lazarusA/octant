@@ -3,17 +3,6 @@
 use std::fmt;
 use std::sync::Arc;
 
-/// Where a stack's levels were described.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MultiscaleKind {
-    /// OME-Zarr `multiscales` (`datasets` with per-axis scale and translation).
-    Ome,
-    /// The zarr-conventions `multiscales` `layout` used by GeoZarr pyramids.
-    GeoZarr,
-    /// A (Cloud Optimized) GeoTIFF's reduced-resolution IFDs.
-    GeoTiffOverviews,
-}
-
 /// One resolution level: its variable, its shape, and where its cells lie
 /// on the finest level's index grid.
 ///
@@ -40,7 +29,6 @@ pub struct Multiscale {
     /// Dimension names, shared by every level.
     pub dims: Vec<String>,
     pub levels: Vec<ScaleLevel>,
-    pub kind: MultiscaleKind,
 }
 
 /// Why levels do not form a multiscale stack.
@@ -90,7 +78,7 @@ impl fmt::Display for MultiscaleError {
 }
 
 /// Tolerance for factors read from floating-point metadata.
-const EPS: f64 = 1e-6;
+pub(super) const EPS: f64 = 1e-6;
 
 impl Multiscale {
     /// A stack of `levels`, finest first, after checking that they are one:
@@ -101,7 +89,6 @@ impl Multiscale {
         name: String,
         dims: Vec<String>,
         levels: Vec<ScaleLevel>,
-        kind: MultiscaleKind,
     ) -> Result<Self, MultiscaleError> {
         if levels.len() < 2 {
             return Err(MultiscaleError::TooFewLevels);
@@ -122,12 +109,7 @@ impl Multiscale {
         for (l, pair) in levels.windows(2).enumerate() {
             check_step(l + 1, &pair[0], &pair[1], base)?;
         }
-        Ok(Self {
-            name,
-            dims,
-            levels,
-            kind,
-        })
+        Ok(Self { name, dims, levels })
     }
 
     pub fn len(&self) -> usize {

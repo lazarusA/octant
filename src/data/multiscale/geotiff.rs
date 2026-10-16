@@ -10,7 +10,7 @@ use async_tiff::ImageFileDirectory;
 
 use crate::data::metadata::VariableInfo;
 
-use super::types::{MultiscaleKind, ScaleLevel};
+use super::types::ScaleLevel;
 
 /// `NewSubfileType` bit: a reduced-resolution version of another image.
 const REDUCED_RESOLUTION: u32 = 1;
@@ -26,32 +26,40 @@ pub struct IfdShape {
     pub samples: u64,
 }
 
-/// Whether `ifd` is a reduced-resolution overview of `base`: flagged as
-/// one by `NewSubfileType` and not a mask; files without the tag count an
-/// IFD with the base's samples and a smaller size in both directions.
+/// Whether `ifd` is a reduced-resolution overview of `base`: smaller in
+/// both directions with the base's samples, and when `NewSubfileType` is
+/// set, flagged as reduced resolution and not a mask.
 pub fn is_overview(base: &IfdShape, ifd: &IfdShape) -> bool {
     let smaller = ifd.width <= base.width
         && ifd.height <= base.height
         && (ifd.width, ifd.height) != (base.width, base.height);
-    match ifd.new_subfile_type {
-        Some(t) => t & REDUCED_RESOLUTION != 0 && t & MASK == 0 && smaller,
-        None => smaller && ifd.samples == base.samples,
+    let flagged = ifd
+        .new_subfile_type
+        .is_none_or(|t| t & REDUCED_RESOLUTION != 0 && t & MASK == 0);
+    smaller && flagged && ifd.samples == base.samples
+}
+
+fn shape(ifd: &ImageFileDirectory) -> IfdShape {
+    IfdShape {
+        new_subfile_type: ifd.new_subfile_type(),
+        width: ifd.image_width() as u64,
+        height: ifd.image_height() as u64,
+        samples: ifd.samples_per_pixel() as u64,
+    }
+}
+
+/// Whether IFD `idx` is a reduced-resolution overview of IFD 0.
+pub fn is_overview_of(ifds: &[ImageFileDirectory], idx: usize) -> bool {
+    match (ifds.first(), ifds.get(idx)) {
+        (Some(base), Some(ifd)) if idx > 0 => is_overview(&shape(base), &shape(ifd)),
+        _ => false,
     }
 }
 
 /// The IFDs that are reduced-resolution overviews of IFD 0 (masks excluded).
 pub fn overview_ifds(ifds: &[ImageFileDirectory]) -> Vec<usize> {
-    let shape = |ifd: &ImageFileDirectory| IfdShape {
-        new_subfile_type: ifd.new_subfile_type(),
-        width: ifd.image_width() as u64,
-        height: ifd.image_height() as u64,
-        samples: ifd.samples_per_pixel() as u64,
-    };
-    let Some(base) = ifds.first().map(shape) else {
-        return Vec::new();
-    };
     (1..ifds.len())
-        .filter(|&i| is_overview(&base, &shape(&ifds[i])))
+        .filter(|&i| is_overview_of(ifds, i))
         .collect()
 }
 
@@ -76,13 +84,7 @@ pub fn link_overviews(variables: &mut [VariableInfo], overviews: &[usize]) {
         let levels = base_levels(variables, base, overviews);
         let v = &variables[base];
         let (name, dims) = (v.name.clone(), v.dimension_names.clone());
-        super::try_link(
-            name,
-            dims,
-            levels,
-            MultiscaleKind::GeoTiffOverviews,
-            variables,
-        );
+        super::try_link(name, dims, levels, variables);
     }
 }
 

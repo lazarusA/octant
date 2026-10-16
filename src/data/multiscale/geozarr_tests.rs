@@ -8,7 +8,6 @@ use zarrs::storage::ReadableStorageTraits;
 use super::geozarr::link_pyramids;
 use super::geozarr_layout::Layout;
 use super::tests::var;
-use super::types::MultiscaleKind;
 use crate::data::metadata::VariableInfo;
 use crate::data::ome::MetaReader;
 use crate::data::ome::test_support::Fixture;
@@ -54,7 +53,7 @@ fn link(attrs: Value, vars: &mut [VariableInfo]) {
 fn assert_halving(vars: &[VariableInfo]) {
     for (i, v) in vars.iter().enumerate() {
         let r = v.multiscale.as_ref().expect("linked");
-        assert_eq!((r.level, r.set.kind), (i / 2, MultiscaleKind::GeoZarr));
+        assert_eq!(r.level, i / 2);
         assert_eq!(r.set.name, v.leaf_name());
         let lvl = r.info().expect("level");
         let f = (1u64 << r.level) as f64;
@@ -96,6 +95,37 @@ fn chained_transforms_without_affines() {
     ]);
     let mut vars = pyramid_vars();
     link(json!({ "multiscales": { "layout": entries } }), &mut vars);
+    assert_halving(&vars);
+}
+
+#[test]
+fn derived_from_cycles_fall_back_to_the_shapes() {
+    let entries = json!([
+        { "asset": "0", "derived_from": "2", "transform": { "scale": [1.0, 2.0, 2.0] } },
+        { "asset": "1", "derived_from": "0", "transform": { "scale": [1.0, 2.0, 2.0] } },
+        { "asset": "2", "derived_from": "1", "transform": { "scale": [1.0, 2.0, 2.0] } }
+    ]);
+    let mut vars = pyramid_vars();
+    link(json!({ "multiscales": { "layout": entries } }), &mut vars);
+    // The chain loops: factors come from the level shapes instead.
+    assert_halving(&vars);
+}
+
+#[test]
+fn node_registered_affines_locate_cell_centres() {
+    // Each level's affine names its first cell's centre: the corners align.
+    let entries = (0..3)
+        .map(|l| {
+            let cell = (1u64 << l) as f64;
+            let mut e = entry(l, cell, 0.0);
+            e["spatial:transform"] = json!([cell, 0.0, cell / 2.0, 0.0, -cell, 32.0 - cell / 2.0]);
+            e
+        })
+        .collect();
+    let mut attrs = root(entries);
+    attrs["spatial:registration"] = json!("node");
+    let mut vars = pyramid_vars();
+    link(attrs, &mut vars);
     assert_halving(&vars);
 }
 

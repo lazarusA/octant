@@ -1,7 +1,7 @@
 //! Detail tile placement on level 0's grid and on the plotted quad.
 
 use super::geometry::{Axis, covers, pixels_over};
-use crate::data::multiscale::{Multiscale, MultiscaleKind, ScaleLevel};
+use crate::data::multiscale::{Multiscale, ScaleLevel};
 
 /// One axis of 64 cells at level 0, 32 at level 1, 16 at level 2.
 fn stack() -> Multiscale {
@@ -13,13 +13,7 @@ fn stack() -> Multiscale {
             offset: vec![0.0],
         })
         .collect();
-    Multiscale::new(
-        "v".into(),
-        vec!["x".into()],
-        levels,
-        MultiscaleKind::GeoZarr,
-    )
-    .expect("stack")
+    Multiscale::new("v".into(), vec!["x".into()], levels).expect("stack")
 }
 
 #[test]

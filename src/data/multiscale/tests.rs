@@ -1,7 +1,7 @@
 //! Stack validation, index mapping, and the OME-Zarr and GeoTIFF adapters.
 
 use super::geotiff::{IfdShape, is_overview, link_overviews};
-use super::types::{Multiscale, MultiscaleError, MultiscaleKind, ScaleLevel};
+use super::types::{Multiscale, MultiscaleError, ScaleLevel};
 use crate::data::metadata::VariableInfo;
 
 pub(super) fn var(name: &str, shape: &[u64], dims: &[&str]) -> VariableInfo {
@@ -24,7 +24,7 @@ fn level(path: &str, shape: &[u64], factor: &[f64], offset: &[f64]) -> ScaleLeve
 
 fn stack(levels: Vec<ScaleLevel>) -> Result<Multiscale, MultiscaleError> {
     let dims = vec!["time".to_string(), "y".to_string(), "x".to_string()];
-    Multiscale::new("t2m".into(), dims, levels, MultiscaleKind::GeoZarr)
+    Multiscale::new("t2m".into(), dims, levels)
 }
 
 fn three_levels() -> Multiscale {
@@ -105,8 +105,7 @@ fn offsets_and_fractional_factors_map() {
             &[0.0, -0.5],
         ),
     ];
-    let s =
-        Multiscale::new("b".into(), dims, levels, MultiscaleKind::GeoTiffOverviews).expect("stack");
+    let s = Multiscale::new("b".into(), dims, levels).expect("stack");
     assert_eq!(s.to_level(1, 0, 0..1001), Some(0..501));
     assert_eq!(s.to_level(1, 1, 0..2001), Some(0..1001));
     // Level cell 0 starts half a level-0 cell before level 0.
@@ -138,7 +137,6 @@ fn ome_images_become_stacks() {
         .map(|v| v.multiscale.as_ref())
         .collect();
     let set = &refs[0].expect("linked").set;
-    assert_eq!(set.kind, MultiscaleKind::Ome);
     assert_eq!(set.name, "cells");
     assert_eq!(set.dims, ["c", "z", "y", "x"]);
     for (l, r) in refs.iter().enumerate() {
@@ -167,6 +165,10 @@ fn overviews_are_reduced_resolution_ifds_but_not_masks() {
     assert!(!is_overview(&base, &ifd(Some(5), 100, 50, 1)));
     assert!(!is_overview(&base, &ifd(Some(4), 200, 100, 1)));
     assert!(!is_overview(&base, &ifd(Some(0), 100, 50, 3)));
+    assert!(
+        !is_overview(&base, &ifd(Some(1), 100, 50, 1)),
+        "other samples"
+    );
     // Without the tag: smaller pages with the same samples.
     assert!(is_overview(&base, &ifd(None, 100, 50, 3)));
     assert!(!is_overview(&base, &ifd(None, 100, 50, 1)));
@@ -188,7 +190,6 @@ fn geotiff_variables_stack_with_their_overviews() {
     let band = vars[1].multiscale.as_ref().expect("band stack");
     let paths: Vec<&str> = band.set.levels.iter().map(|l| l.path.as_str()).collect();
     assert_eq!(paths, ["band_1", "overview_1/band_1", "overview_3/band_1"]);
-    assert_eq!(band.set.kind, MultiscaleKind::GeoTiffOverviews);
     assert!(vars[4].multiscale.is_none());
     assert_eq!(vars[5].multiscale.as_ref().map(|r| r.level), Some(2));
     let raster = vars[2].multiscale.as_ref().expect("raster stack");

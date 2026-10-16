@@ -1,7 +1,7 @@
 //! Level choice from a plot's demand.
 
 use super::pick::{DimDemand, ResolutionDemand, fit_level, pinned_level};
-use super::types::{Multiscale, MultiscaleKind, ScaleLevel};
+use super::types::{Multiscale, ScaleLevel};
 
 /// `(time, y, x)` at 4x64x64, 4x32x32, 4x16x16, then 2x8x8 (time halved).
 fn stack() -> Multiscale {
@@ -18,7 +18,7 @@ fn stack() -> Multiscale {
         level("3", [2, 8, 8], [2.0, 8.0, 8.0]),
     ];
     let dims = ["time", "y", "x"].map(String::from).to_vec();
-    Multiscale::new("v".into(), dims, levels, MultiscaleKind::GeoZarr).expect("stack")
+    Multiscale::new("v".into(), dims, levels).expect("stack")
 }
 
 fn demand(time: DimDemand, px: u32, max: Option<u64>) -> ResolutionDemand {

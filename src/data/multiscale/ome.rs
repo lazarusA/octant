@@ -8,7 +8,7 @@
 use crate::data::metadata::VariableInfo;
 use crate::data::ome::model::{OmeImage, OmeLevel};
 
-use super::types::{MultiscaleKind, ScaleLevel};
+use super::types::ScaleLevel;
 
 /// Links the level variables of `image` (as built by OME discovery, each
 /// with its `OmeRef`) as one stack. Levels that fell back to plain Zarr are
@@ -50,13 +50,7 @@ pub fn link_image(image: &OmeImage, variables: &mut [VariableInfo]) {
         });
     }
     let dims = variables[base_var].dimension_names.clone();
-    super::try_link(
-        stack_name(image),
-        dims,
-        levels,
-        MultiscaleKind::Ome,
-        variables,
-    );
+    super::try_link(stack_name(image), dims, levels, variables);
 }
 
 /// The image's name, else its group's last segment.

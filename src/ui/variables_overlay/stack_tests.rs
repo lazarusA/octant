@@ -7,7 +7,7 @@ use super::nav::{NodeKey, row_id, visible_row_ids};
 use super::stack::stack_state;
 use super::tree::{VariableTreeContext, render_tree_group};
 use crate::app::layers::LevelChoice;
-use crate::data::multiscale::{Multiscale, MultiscaleKind, ScaleLevel, link};
+use crate::data::multiscale::{Multiscale, ScaleLevel, link};
 use crate::data::{VariableInfo, VariableTreeGroup};
 use crate::ui::key_focus;
 
@@ -37,7 +37,7 @@ fn fixture() -> (Vec<VariableInfo>, VariableTreeGroup) {
         })
         .collect();
     let dims = vec!["y".into(), "x".into()];
-    let set = Multiscale::new("t2m".into(), dims, levels, MultiscaleKind::GeoZarr);
+    let set = Multiscale::new("t2m".into(), dims, levels);
     link(set.expect("stack"), &mut variables);
     let root = VariableTreeGroup::build_tree_from_variables(&variables);
     (variables, root)

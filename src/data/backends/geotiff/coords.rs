@@ -36,7 +36,7 @@ impl GeoSpatialBounds {
             return Some(own);
         }
         let base = Self::from_ifd(ifds.first()?);
-        let overview = crate::data::multiscale::geotiff::overview_ifds(ifds).contains(&idx);
+        let overview = crate::data::multiscale::geotiff::is_overview_of(ifds, idx);
         Some(if overview && base.georeferenced {
             base
         } else {

@@ -1,7 +1,7 @@
 //! Where a stack is listed: once, under its level 0, in the group its levels share.
 
 use super::tests::var;
-use super::types::{Multiscale, MultiscaleKind, ScaleLevel};
+use super::types::{Multiscale, ScaleLevel};
 use crate::data::VariableTreeGroup;
 use crate::data::metadata::VariableInfo;
 
@@ -21,7 +21,7 @@ fn stacked(name: &str, paths: &[&str], vars: &mut [VariableInfo]) {
         })
         .collect();
     let dims = vec!["y".into(), "x".into()];
-    let set = Multiscale::new(name.into(), dims, levels, MultiscaleKind::GeoZarr);
+    let set = Multiscale::new(name.into(), dims, levels);
     super::link(set.expect("stack"), vars);
 }
 

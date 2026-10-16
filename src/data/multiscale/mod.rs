@@ -38,7 +38,7 @@ use std::sync::Arc;
 use crate::data::metadata::VariableInfo;
 
 pub use pick::{DimDemand, ResolutionDemand, fit_level, pinned_level};
-pub use types::{LevelRef, Multiscale, MultiscaleError, MultiscaleKind, ScaleLevel};
+pub use types::{LevelRef, Multiscale, MultiscaleError, ScaleLevel};
 
 /// Points every variable of `set`'s levels at its level. Variables already
 /// in another stack keep it.
@@ -60,15 +60,11 @@ pub(crate) fn try_link(
     name: String,
     dims: Vec<String>,
     levels: Vec<ScaleLevel>,
-    kind: MultiscaleKind,
     variables: &mut [VariableInfo],
 ) {
-    let Some(first) = levels.first().map(|l| l.path.clone()) else {
-        return;
-    };
-    match Multiscale::new(name, dims, levels, kind) {
+    match Multiscale::new(name.clone(), dims, levels) {
         Ok(set) => link(set, variables),
         Err(MultiscaleError::TooFewLevels) => {}
-        Err(e) => log::warn!("The levels of '{first}' are not a multiscale stack: {e}"),
+        Err(e) => log::warn!("The levels of '{name}' are not a multiscale stack: {e}"),
     }
 }

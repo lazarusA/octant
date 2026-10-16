@@ -46,7 +46,15 @@ enum Fit {
     Fits,
 }
 
-fn fit(set: &Multiscale, level: usize, window: &[Range<u64>], demand: &ResolutionDemand) -> Fit {
+/// How `level` fits `demand` over `window`; `pixels` false ignores the
+/// `Pixels` demands (a pinned level keeps only the budget).
+fn fit(
+    set: &Multiscale,
+    level: usize,
+    window: &[Range<u64>],
+    demand: &ResolutionDemand,
+    pixels: bool,
+) -> Fit {
     let Some(lvl) = set.level(level) else {
         return Fit::Excluded;
     };
@@ -56,7 +64,10 @@ fn fit(set: &Multiscale, level: usize, window: &[Range<u64>], demand: &Resolutio
         let Some(base) = window.get(d) else {
             continue;
         };
-        let full = lvl.factor.get(d).is_some_and(|f| (f - 1.0).abs() < 1e-6);
+        let full = lvl
+            .factor
+            .get(d)
+            .is_some_and(|f| (f - 1.0).abs() < super::types::EPS);
         let cells = match set.to_level(level, d, base.clone()) {
             Some(r) => r.end - r.start,
             None => return Fit::Excluded,
@@ -64,8 +75,8 @@ fn fit(set: &Multiscale, level: usize, window: &[Range<u64>], demand: &Resolutio
         elements = elements.saturating_mul(cells.max(1));
         match *want {
             DimDemand::Full if !full => return Fit::Excluded,
-            DimDemand::Full | DimDemand::Any => {}
-            DimDemand::Pixels(px) => fits &= cells <= u64::from(px.max(1)),
+            DimDemand::Pixels(px) if pixels => fits &= cells <= u64::from(px.max(1)),
+            DimDemand::Full | DimDemand::Any | DimDemand::Pixels(_) => {}
         }
     }
     if demand.max_elements.is_some_and(|max| elements > max) {
@@ -80,7 +91,7 @@ fn fit(set: &Multiscale, level: usize, window: &[Range<u64>], demand: &Resolutio
 pub fn fit_level(set: &Multiscale, window: &[Range<u64>], demand: &ResolutionDemand) -> usize {
     let mut coarsest = 0;
     for level in 0..set.len() {
-        match fit(set, level, window, demand) {
+        match fit(set, level, window, demand, true) {
             Fit::Fits => return level,
             Fit::TooFine => coarsest = level,
             Fit::Excluded => {}
@@ -100,20 +111,9 @@ pub fn pinned_level(
     demand: &ResolutionDemand,
 ) -> usize {
     let pinned = pinned.min(set.len().saturating_sub(1));
-    let budget_only = ResolutionDemand {
-        dims: demand
-            .dims
-            .iter()
-            .map(|&d| match d {
-                DimDemand::Pixels(_) => DimDemand::Any,
-                other => other,
-            })
-            .collect(),
-        max_elements: demand.max_elements,
-    };
     let mut coarsest = None;
     for level in pinned..set.len() {
-        match fit(set, level, window, &budget_only) {
+        match fit(set, level, window, demand, false) {
             Fit::Fits => return level,
             Fit::TooFine => coarsest = Some(level),
             Fit::Excluded => {}
@@ -123,7 +123,7 @@ pub fn pinned_level(
     coarsest.unwrap_or_else(|| {
         (0..pinned)
             .rev()
-            .find(|&l| fit(set, l, window, &budget_only) != Fit::Excluded)
+            .find(|&l| fit(set, l, window, demand, false) != Fit::Excluded)
             .unwrap_or(0)
     })
 }

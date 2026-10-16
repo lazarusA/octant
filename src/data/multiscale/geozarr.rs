@@ -17,24 +17,14 @@ use crate::data::ome::MetaReader;
 use crate::data::ome::reader::join;
 
 use super::geozarr_layout::{Entry, Layout};
-use super::types::{MultiscaleKind, ScaleLevel};
+use super::types::ScaleLevel;
 
 /// Links the levels of every GeoZarr pyramid among `variables`. Groups are
 /// looked for at each variable's group and that group's parent (a level is
 /// a child group or an array of the pyramid's group); attributes the reader
 /// cannot answer are skipped.
 pub fn link_pyramids(reader: &MetaReader<'_>, variables: &mut [VariableInfo]) {
-    let mut groups: Vec<String> = Vec::new();
-    for v in variables.iter() {
-        let group = v.group_path().unwrap_or("").to_string();
-        let parent = group.rsplit_once('/').map_or("", |(p, _)| p).to_string();
-        for g in [group, parent] {
-            if !groups.contains(&g) {
-                groups.push(g);
-            }
-        }
-    }
-    for group in groups {
+    for group in pyramid_groups(variables) {
         let Ok(Some(attrs)) = reader.group_attributes(&group) else {
             continue;
         };
@@ -42,6 +32,45 @@ pub fn link_pyramids(reader: &MetaReader<'_>, variables: &mut [VariableInfo]) {
             link_layout(&group, &layout, variables);
         }
     }
+}
+
+/// [`link_pyramids`] over `storage`, the groups' attributes read
+/// concurrently on the desktop (a `zarr.json`, then a `.zattrs`, per group).
+pub fn link_pyramids_in(
+    storage: std::sync::Arc<dyn zarrs::storage::ReadableStorageTraits>,
+    variables: &mut [VariableInfo],
+) {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let groups = pyramid_groups(variables);
+        crate::data::ome::direct::walk_concurrent(storage, 3, |reader| {
+            // Every group asked, so one walk names all the keys it needs.
+            let pending = groups
+                .iter()
+                .filter(|g| reader.group_attributes(g).is_err())
+                .count();
+            link_pyramids(reader, variables);
+            (pending == 0).then_some(())
+        });
+    }
+    #[cfg(target_arch = "wasm32")]
+    link_pyramids(&MetaReader::direct(storage), variables);
+}
+
+/// The groups a pyramid of `variables` may be described at: each
+/// variable's group and that group's parent.
+fn pyramid_groups(variables: &[VariableInfo]) -> Vec<String> {
+    let mut groups: Vec<String> = Vec::new();
+    for v in variables {
+        let group = v.group_path().unwrap_or("");
+        let parent = group.rsplit_once('/').map_or("", |(p, _)| p);
+        for g in [group, parent] {
+            if !groups.iter().any(|known| known == g) {
+                groups.push(g.to_string());
+            }
+        }
+    }
+    groups
 }
 
 /// Links one stack per array name in `layout`'s levels, each from the
@@ -75,13 +104,7 @@ pub fn link_layout(group: &str, layout: &Layout, variables: &mut [VariableInfo])
             (true, false) => leaf(group),
             (true, true) => base.asset.as_str(),
         };
-        super::try_link(
-            label.to_string(),
-            dims,
-            levels,
-            MultiscaleKind::GeoZarr,
-            variables,
-        );
+        super::try_link(label.to_string(), dims, levels, variables);
     }
 }
 

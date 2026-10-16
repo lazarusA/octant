@@ -67,14 +67,6 @@ impl Layout {
         })
     }
 
-    /// The finest level: the first entry derived from none, else the first.
-    pub fn base(&self) -> Option<&Entry> {
-        self.entries
-            .iter()
-            .find(|e| e.derived_from.is_none())
-            .or_else(|| self.entries.first())
-    }
-
     fn find(&self, asset: &str) -> Option<&Entry> {
         self.entries.iter().find(|e| e.asset == asset)
     }
@@ -98,11 +90,9 @@ impl Layout {
         };
         for step in steps.into_iter().rev() {
             let scale = step.scale.as_ref().filter(|s| s.len() == rank)?;
-            let zeros = vec![0.0; rank];
             let shift = step.translation.as_ref().filter(|t| t.len() == rank);
-            let shift = shift.unwrap_or(&zeros);
             for d in 0..rank {
-                chain.offset[d] += shift[d] * chain.factor[d];
+                chain.offset[d] += shift.map_or(0.0, |t| t[d]) * chain.factor[d];
                 chain.factor[d] *= scale[d];
             }
         }
