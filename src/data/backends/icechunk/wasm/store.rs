@@ -86,6 +86,22 @@ impl WasmIcechunkBlockStore {
             new_store
         }
     }
+
+    /// Drops the store of `url`, and the Zarr store it reads through, from
+    /// their registries (its dataset closed).
+    pub fn release(url: &str) {
+        let clean_url = url.trim_start_matches("icechunk+").trim_end_matches('/');
+        #[cfg(target_arch = "wasm32")]
+        let _released = WASM_ICECHUNK_STORES.with(|stores| stores.borrow_mut().remove(clean_url));
+        #[cfg(not(target_arch = "wasm32"))]
+        let _released = WASM_ICECHUNK_STORES_DESKTOP.get().and_then(|stores| {
+            stores
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .remove(clean_url)
+        });
+        WasmZarrBlockStore::release(clean_url);
+    }
 }
 
 impl BlockStore for WasmIcechunkBlockStore {

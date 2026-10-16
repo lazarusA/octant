@@ -191,3 +191,17 @@ fn test_prefetcher_active_bytes_retire_on_drain() {
     // Release worker thread so it terminates cleanly
     let _ = release_tx.send(());
 }
+
+#[test]
+fn removing_a_source_drops_only_its_blocks() {
+    let mut cache = BlockCache::new(1024 * 1024);
+    cache.put(test_key("closed", "temperature", 0), test_block(0));
+    cache.put(test_key("closed", "temperature", 2), test_block(2));
+    let kept = test_key("open", "temperature", 0);
+    cache.put(kept.clone(), test_block(0));
+    let one_block = cache.current_bytes() / 3;
+    cache.remove_source("closed");
+    assert_eq!(cache.cached_count(), 1);
+    assert!(cache.contains(&kept));
+    assert_eq!(cache.current_bytes(), one_block);
+}

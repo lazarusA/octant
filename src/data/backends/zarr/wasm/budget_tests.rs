@@ -107,3 +107,12 @@ fn a_dropped_store_no_longer_counts() {
     assert_eq!(budget.held(), 0);
 }
 
+#[test]
+fn a_released_url_opens_a_fresh_store() {
+    use super::WasmZarrBlockStore;
+    let url = "memory://released/";
+    let open = WasmZarrBlockStore::get_or_create(url);
+    assert!(Arc::ptr_eq(&open, &WasmZarrBlockStore::get_or_create(url)));
+    WasmZarrBlockStore::release(url);
+    assert!(!Arc::ptr_eq(&open, &WasmZarrBlockStore::get_or_create(url)));
+}

@@ -60,6 +60,20 @@ impl WasmGeoTiffBlockStore {
         }
     }
 
+    /// Drops the store of `url` from the registry (its dataset closed).
+    pub fn release(url: &str) {
+        let clean_url = url.trim();
+        #[cfg(target_arch = "wasm32")]
+        let _released = WASM_GEOTIFF_STORES.with(|stores| stores.borrow_mut().remove(clean_url));
+        #[cfg(not(target_arch = "wasm32"))]
+        let _released = WASM_GEOTIFF_STORES_DESKTOP.get().and_then(|stores| {
+            stores
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .remove(clean_url)
+        });
+    }
+
     fn spawn_loader(url: &str) -> Arc<Self> {
         let inner = Arc::new(RwLock::new(None));
         let load_error = Arc::new(RwLock::new(None));

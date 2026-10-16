@@ -118,6 +118,22 @@ impl WasmZarrBlockStore {
         }
     }
 
+    /// Drops the store of `url` from the registry (its dataset closed):
+    /// its metadata and downloaded chunks go once the loads still running
+    /// on it finish.
+    pub fn release(url: &str) {
+        let clean_url = url.trim_end_matches('/');
+        #[cfg(target_arch = "wasm32")]
+        let _released = WASM_STORES.with(|stores| stores.borrow_mut().remove(clean_url));
+        #[cfg(not(target_arch = "wasm32"))]
+        let _released = WASM_STORES_DESKTOP.get().and_then(|stores| {
+            stores
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .remove(clean_url)
+        });
+    }
+
     pub fn open_local_notice(path: &str) -> Arc<Self> {
         let partial_store = PartialStore::new();
         let memory_store: ReadableWritableListableStorage = partial_store.clone();

@@ -6,6 +6,7 @@ mod app_defaults;
 pub mod app_state;
 pub mod colormap_state;
 pub mod dataset_activation;
+mod dataset_release;
 pub mod dimension_state;
 pub mod line_profile;
 #[cfg(test)]
