@@ -41,12 +41,12 @@ pub(crate) fn same_variable(meta: &DatasetMetadata, a: usize, b: usize) -> bool 
     a == b || stack_base_index(meta, a) == stack_base_index(meta, b)
 }
 
-/// Variable `idx` of `meta` on the grid the `base` selection reads: the
-/// level of its stack with the same factor and length as the base's level
+/// Variable `idx` of `meta` on the grid of the `base` variable: the level
+/// of its stack with the same factor, offset and length as the base's level
 /// along every dimension named like one of the base's, else its stack's
 /// level 0 (overlays follow the level the base layer reads).
 pub(crate) fn level_matching(
-    base: &VariableSelection,
+    base: Option<&VariableInfo>,
     meta: &DatasetMetadata,
     idx: usize,
 ) -> usize {
@@ -54,7 +54,7 @@ pub(crate) fn level_matching(
         return idx;
     };
     let fallback = stack_base_index(meta, idx);
-    let Some(theirs) = base.variable_info().and_then(|v| v.multiscale.as_ref()) else {
+    let Some(theirs) = base.and_then(|v| v.multiscale.as_ref()) else {
         return fallback;
     };
     let Some(target) = theirs.info() else {
@@ -64,6 +64,7 @@ pub(crate) fn level_matching(
         set.set.dims.iter().enumerate().all(|(d, name)| {
             theirs.set.dim_index(name).is_none_or(|b| {
                 (level.factor[d] - target.factor[b]).abs() < 1e-6
+                    && (level.offset[d] - target.offset[b]).abs() < 1e-6
                     && level.shape[d] == target.shape[b]
             })
         })
@@ -132,6 +133,17 @@ pub(crate) fn at_base(selection: &VariableSelection) -> Option<VariableSelection
     Some(moved)
 }
 
+/// `selection`, of any level of a stack (or of no stack, as level 0),
+/// moved onto its `level`.
+pub(crate) fn to_level(selection: &VariableSelection, level: usize) -> Option<VariableSelection> {
+    match (at_base(selection), level) {
+        (Some(base), 0) => Some(base),
+        (Some(base), level) => at_level(&base, level),
+        (None, 0) => Some(selection.clone()),
+        (None, level) => at_level(selection, level),
+    }
+}
+
 /// Maps every range and index of `selection` (and of its dimension
 /// configs) with `range` and `index`; a collapsed range stays one index.
 fn map_dims(
@@ -176,6 +188,17 @@ impl OctantApp {
             LevelChoice::Auto => fit_level(set, &window, &demand),
             LevelChoice::Pinned(level) => pinned_level(set, level, &window, &demand),
         })
+    }
+
+    /// The index of the variable `selection` reads (its level's, for a
+    /// stack's level 0), without moving the selection there.
+    pub(crate) fn level_variable_idx(&self, selection: &VariableSelection) -> usize {
+        let level = self.selection_level(selection).filter(|&l| l > 0);
+        let idx = level.and_then(|l| {
+            let set = &base_ref(selection.variable_info()?)?.set;
+            variable_index(selection.metadata.as_ref()?, &set.level(l)?.path)
+        });
+        idx.unwrap_or(selection.variable_idx)
     }
 
     /// `selection` moved onto the level it reads; `None` when it reads its

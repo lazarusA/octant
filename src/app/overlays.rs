@@ -68,7 +68,11 @@ impl OctantApp {
             self.notify(Severity::Warning, tr(PlotKey::OverlayCantAdd), reason);
             return None;
         }
-        let var_idx = level_matching(self.plotted(), self.selected.metadata.as_ref()?, var_idx);
+        let var_idx = level_matching(
+            self.plotted().variable_info(),
+            self.selected.metadata.as_ref()?,
+            var_idx,
+        );
         let selection = overlay_selection(self.plotted(), &self.selected, var_idx)?;
         let name = selection.variable_info().map_or("", |v| v.name.as_str());
         let alignment = classify(self.plotted(), &selection);
@@ -175,7 +179,7 @@ impl OctantApp {
             };
             let overlay = layer.selection_mut();
             let level = overlay.metadata.as_ref().map_or(overlay.variable_idx, |m| {
-                level_matching(base.selection(), m, overlay.variable_idx)
+                level_matching(base.selection().variable_info(), m, overlay.variable_idx)
             });
             let relevelled = level != overlay.variable_idx;
             overlay.variable_idx = level;

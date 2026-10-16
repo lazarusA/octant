@@ -208,6 +208,12 @@ impl HeatmapRenderer {
         );
     }
 
+    /// The values its data buffer holds: data of up to this many cells is
+    /// uploaded in place.
+    pub fn capacity(&self) -> usize {
+        (self.data_buffer.size() / 4) as usize
+    }
+
     /// Binds the data (group 0) and the quad, for pipelines that share them
     /// (label images, `labels.rs`).
     pub(crate) fn bind_quad(&self, rpass: &mut wgpu::RenderPass<'static>) {

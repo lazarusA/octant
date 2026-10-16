@@ -45,11 +45,21 @@ pub(super) fn frame_at(
     zoom: f32,
     seconds: f64,
 ) -> Option<f64> {
+    frame_with(app, plot_type, &view(zoom), seconds)
+}
+
+/// One frame showing `view`, `seconds` after the last.
+fn frame_with(
+    app: &mut OctantApp,
+    plot_type: PlotType,
+    view: &CanvasView,
+    seconds: f64,
+) -> Option<f64> {
     let now = CLOCK.with(|c| {
         c.set(c.get() + seconds);
         c.get()
     });
-    app.refresh_detail(plot_type, &view(zoom), now)
+    app.refresh_detail(plot_type, view, now)
 }
 
 /// Rests at `zoom` (two frames past the settle time) and waits for the
@@ -249,9 +259,33 @@ fn a_layer_waiting_on_the_tile_fetch_gets_the_block_too() {
     let mut app = plotted();
     frame_at(&mut app, PlotType::Heatmap, 4.0, 1.0);
     frame_at(&mut app, PlotType::Heatmap, 4.0, 1.0);
-    let key = app.layers.base.data.detail.pending.as_ref().map(|p| p.key.clone());
+    let key = app
+        .layers
+        .base
+        .data
+        .detail
+        .pending
+        .as_ref()
+        .map(|p| p.key.clone());
     // The base layer asks for the same block (one fetch serves both).
     app.layers.base.load.block_key = Some(key.expect("tile fetch"));
     poll_until(&mut app, |app| app.layers.base.load.block_key.is_none());
     assert_eq!(tile_level(&app), Some(0), "the tile is shown too");
+}
+
+#[test]
+fn a_small_pan_keeps_the_tile() {
+    let mut app = plotted();
+    rest_at(&mut app, 4.0);
+    let before = app.layers.base.data.detail.tile.clone().expect("tile");
+    let panned = CanvasView {
+        pan: [0.02, -0.02],
+        ..view(4.0)
+    };
+    frame_with(&mut app, PlotType::Heatmap, &panned, 1.0);
+    frame_with(&mut app, PlotType::Heatmap, &panned, 1.0);
+    let state = &app.layers.base.data.detail;
+    assert!(state.pending.is_none(), "nothing asked: the tile covers it");
+    let after = state.tile.as_ref().expect("kept");
+    assert_eq!((after.origin, after.end), (before.origin, before.end));
 }

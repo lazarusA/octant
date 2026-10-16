@@ -5,114 +5,97 @@
 
 use std::hash::{Hash, Hasher};
 
-use super::{DetailTile, TilePlan};
+use super::{DetailTile, TilePlan, plot_hash};
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
-use crate::app::multiscale::{at_base, at_level, level_matching};
+use crate::app::multiscale::{level_matching, to_level};
 
 impl OctantApp {
     /// Keeps every overlay's tile on the base layer's latest one (pending,
     /// else shown): asks again when that tile or the overlay's selection
-    /// changes, drops tiles of a selection the overlay no longer shows and
-    /// every overlay tile once the base layer has none.
+    /// changes; a tile stays drawn until its replacement arrives unless the
+    /// overlay's selection changed, and every overlay tile goes once the
+    /// base layer has none.
     pub(super) fn follow_detail_overlays(&mut self) {
-        let base = &self.layers.base.data.detail;
-        let target = base
-            .pending
-            .as_ref()
-            .map(|p| &p.tile)
-            .or(base.tile.as_ref());
-        let target = target.map(|t| (t.clone(), tile_key(t)));
-        let ids: Vec<LayerId> = self.layers.overlays().iter().map(|l| l.id()).collect();
-        for id in ids {
-            let lost = self.overlay_pending_lost(id);
-            let context = target
-                .as_ref()
-                .and_then(|(_, k)| self.overlay_context(id, *k));
+        let target = self.base_target_tile().map(tile_key);
+        for i in 0..self.layers.overlays().len() {
+            let Some(id) = self.layers.overlays().get(i).map(|l| l.id()) else {
+                break;
+            };
+            let own = self.overlay_context(id);
+            let lost = self.layers.get(id).is_some_and(|l| self.fetch_lost(l));
             let Some(state) = self.layers.get_mut(id).map(|l| &mut l.data.detail) else {
+                continue;
+            };
+            let (Some(own), Some(base_key)) = (own, target) else {
+                state.clear();
                 continue;
             };
             if lost {
                 state.drop_request();
                 state.follows = None;
             }
-            let Some(context) = context else {
-                state.clear();
-                continue;
-            };
-            if state.tile.as_ref().is_some_and(|t| t.context != context) {
+            if state.tile.as_ref().is_some_and(|t| t.context != own) {
                 state.tile = None;
             }
-            if state.follows == Some(context) {
+            let follows = own ^ base_key.rotate_left(1);
+            if state.follows == Some(follows) {
                 continue;
             }
-            state.follows = Some(context);
+            state.follows = Some(follows);
             state.drop_request();
-            let plan = target
-                .as_ref()
-                .and_then(|(tile, _)| self.plan_overlay_tile(id, tile, context));
-            if let Some(plan) = plan {
+            if let Some(plan) = self.plan_overlay_tile(id, own) {
                 self.request_tile(plan);
             }
         }
     }
 
-    /// What overlay `id`'s tile depends on: the base tile (`base_key`) and
-    /// the overlay's selection and step; `None` when it is not drawn.
-    fn overlay_context(&self, id: LayerId, base_key: u64) -> Option<u64> {
+    /// The base layer's tile being fetched, else shown.
+    fn base_target_tile(&self) -> Option<&DetailTile> {
+        let base = &self.layers.base.data.detail;
+        base.pending
+            .as_ref()
+            .map(|p| &p.tile)
+            .or(base.tile.as_ref())
+    }
+
+    /// What overlay `id`'s tile shows: its selection and step; `None` when
+    /// it is not drawn.
+    fn overlay_context(&self, id: LayerId) -> Option<u64> {
         let layer = self.layers.get(id).filter(|l| l.is_drawn())?;
-        let sel = layer.selection();
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        base_key.hash(&mut h);
-        sel.metadata_generation.hash(&mut h);
-        sel.variable_idx.hash(&mut h);
-        sel.dim_ranges.hash(&mut h);
-        sel.dim_indices.hash(&mut h);
-        self.layer_step(id).hash(&mut h);
-        layer.data.flipped_dims.hash(&mut h);
-        Some(h.finish())
+        Some(plot_hash(
+            layer.selection(),
+            self.layer_step(id),
+            &layer.data.flipped_dims,
+        ))
     }
 
-    /// Whether overlay `id`'s fetch was lost (aborted, neither pending nor
-    /// cached).
-    fn overlay_pending_lost(&self, id: LayerId) -> bool {
-        let pending = self
-            .layers
-            .get(id)
-            .and_then(|l| l.data.detail.pending.as_ref());
-        pending.is_some_and(|p| {
-            !self.block_prefetcher.is_pending(&p.key) && !self.block_cache.contains(&p.key)
-        })
-    }
-
-    /// Overlay `id`'s tile over the base tile `base`'s cells: the level of
-    /// its stack on the base tile's grid, `None` when its stack has none.
-    fn plan_overlay_tile(&self, id: LayerId, base: &DetailTile, context: u64) -> Option<TilePlan> {
-        let plotted = self.plotted();
-        let base_var = plotted.metadata.as_ref()?.variables.get(base.var_idx)?;
+    /// Overlay `id`'s tile over the base tile's cells: the level of its
+    /// stack on the base tile's grid, `None` when its stack has none.
+    fn plan_overlay_tile(&self, id: LayerId, context: u64) -> Option<TilePlan> {
+        let base = self.base_target_tile()?;
+        let base_var = self
+            .plotted()
+            .metadata
+            .as_ref()?
+            .variables
+            .get(base.var_idx)?;
         let sel = self.layers.get(id)?.selection();
         let meta = sel.metadata.as_ref()?;
-        let mut at_tile = plotted.clone();
-        at_tile.variable_idx = base.var_idx;
-        let idx = level_matching(&at_tile, meta, sel.variable_idx);
+        let idx = level_matching(Some(base_var), meta, sel.variable_idx);
         let level = meta.variables.get(idx)?.multiscale.as_ref()?.level;
-        let level0 = match at_base(sel) {
-            Some(moved) => moved,
-            None => sel.clone(),
-        };
-        let mut moved = match level {
-            0 => level0,
-            level => at_level(&level0, level)?,
-        };
-        let var = moved.variable_info()?.clone();
+        let mut moved = to_level(sel, level)?;
+        let var = moved.variable_info()?;
         let mut dims = [0; 2];
         for (i, &bd) in base.dims.iter().enumerate() {
             let name = base_var.dimension_names.get(bd)?;
             let d = var.dimension_names.iter().position(|n| n == name)?;
             // The same grid: the base level's length along the dimension.
             (var.shape.get(d) == base_var.shape.get(bd)).then_some(())?;
-            *moved.dim_ranges.get_mut(d)? = (base.origin[i] as usize, base.end[i] as usize - 1);
             dims[i] = d;
+        }
+        for (i, &d) in dims.iter().enumerate() {
+            *moved.dim_ranges.get_mut(d)? = (base.origin[i] as usize, base.end[i] as usize - 1);
         }
         let tile = DetailTile {
             level,

@@ -180,7 +180,7 @@ impl OctantApp {
             };
         ui.painter().add(callback(renderer, coord_mode, label_draw));
         // A multiscale heatmap's finer tile, over its coarse plot.
-        if let (Some(_), Some((detail, _))) = (&layer.data.detail.tile, &layer.renderers.detail) {
+        if let (Some(_), Some(detail)) = (&layer.data.detail.tile, &layer.renderers.detail) {
             ui.painter().add(callback(detail, 0, labels().flatten()));
         }
     }

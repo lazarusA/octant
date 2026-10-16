@@ -69,8 +69,8 @@ impl Axis {
         let lvl = set.level(level)?;
         let (f, off, len) = (
             *lvl.factor.get(self.dim)?,
-            lvl.offset[self.dim],
-            lvl.shape[self.dim],
+            *lvl.offset.get(self.dim)?,
+            *lvl.shape.get(self.dim)?,
         );
         let pad = (visible.1 - visible.0) * margin;
         let at = |x: f64| (x - off) / f;
@@ -94,7 +94,7 @@ impl Axis {
     /// Level-0 positions of `level`'s cells `cells`.
     pub fn cover(&self, set: &Multiscale, level: usize, cells: &Range<u64>) -> Option<(f64, f64)> {
         let lvl = set.level(level)?;
-        let (f, off) = (*lvl.factor.get(self.dim)?, lvl.offset[self.dim]);
+        let (f, off) = (*lvl.factor.get(self.dim)?, *lvl.offset.get(self.dim)?);
         Some((off + cells.start as f64 * f, off + cells.end as f64 * f))
     }
 

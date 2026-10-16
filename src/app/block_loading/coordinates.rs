@@ -23,10 +23,10 @@ impl OctantApp {
     pub(crate) fn request_layer_coordinates(&mut self, id: LayerId) {
         let request = self.layer_selections(id).and_then(|(_, staged)| {
             let idx = match id {
-                LayerId::BASE => self.resolve_level(staged).map(|l| l.variable_idx),
-                _ => None,
+                LayerId::BASE => self.level_variable_idx(staged),
+                _ => staged.variable_idx,
             };
-            self.coordinate_request(staged, idx.unwrap_or(staged.variable_idx))
+            self.coordinate_request(staged, idx)
         });
         if let Some((source_id, store, variable)) = request {
             self.coordinate_loader.request(&source_id, store, variable);

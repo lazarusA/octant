@@ -44,8 +44,7 @@ use crate::app::pipeline::paint_layer::CanvasView;
 use crate::data::BlockCacheKey;
 use crate::data::multiscale::Multiscale;
 use crate::plots::PlotType;
-pub(crate) use geometry::Axis;
-use geometry::covers;
+use geometry::{Axis, covers};
 
 /// Share of the visible span a tile reads beyond each side, so small pans
 /// keep it.
@@ -142,7 +141,6 @@ struct ViewKey {
 /// What the view asks for: a finer level over the visible window.
 struct Want {
     set: std::sync::Arc<Multiscale>,
-    from: usize,
     level: usize,
     context: u64,
     axes: [Axis; 2],
@@ -229,6 +227,14 @@ impl OctantApp {
         self.request_detail(&want);
     }
 
+    /// Whether `layer`'s tile fetch was lost (aborted: neither pending nor
+    /// cached).
+    fn fetch_lost(&self, layer: &crate::app::layers::Layer) -> bool {
+        layer.data.detail.pending.as_ref().is_some_and(|p| {
+            !self.block_prefetcher.is_pending(&p.key) && !self.block_cache.contains(&p.key)
+        })
+    }
+
     /// The plot a tile belongs to, when the base layer can have one: a
     /// heatmap at rest reading a level of a multiscale variable chosen by
     /// Auto, on a regular grid, without composite.
@@ -244,16 +250,20 @@ impl OctantApp {
             && !base.composite.enabled
             && plotted.level == LevelChoice::Auto
             && plotted.variable_info()?.multiscale.is_some();
-        if !readable {
-            return None;
-        }
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        plotted.metadata_generation.hash(&mut h);
-        plotted.variable_idx.hash(&mut h);
-        plotted.dim_ranges.hash(&mut h);
-        plotted.dim_indices.hash(&mut h);
-        self.playback.current_timestep.hash(&mut h);
-        base.data.flipped_dims.hash(&mut h);
-        Some(h.finish())
+        let step = self.playback.current_timestep;
+        readable.then(|| plot_hash(plotted, step, &base.data.flipped_dims))
     }
+}
+
+/// What a plotted selection shows at `step` with `flips`: a tile is kept
+/// while it stays the same.
+fn plot_hash(sel: &crate::app::layers::VariableSelection, step: usize, flips: &[String]) -> u64 {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    sel.metadata_generation.hash(&mut h);
+    sel.variable_idx.hash(&mut h);
+    sel.dim_ranges.hash(&mut h);
+    sel.dim_indices.hash(&mut h);
+    step.hash(&mut h);
+    flips.hash(&mut h);
+    h.finish()
 }

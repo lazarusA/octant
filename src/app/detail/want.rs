@@ -36,19 +36,7 @@ impl OctantApp {
         let visible = [axes[0].visible(u), axes[1].visible(v)];
         let [px_w, px_h] = self.layout.canvas_px;
         let px = [pixels_over(px_w, u), pixels_over(px_h, v)];
-        let window: Vec<_> = (0..var.shape.len())
-            .map(|d| match [x, y].iter().position(|&s| s == d) {
-                Some(i) => {
-                    let (lo, hi) = visible[i];
-                    lo.floor().max(0.0) as u64..hi.ceil().max(lo.floor() + 1.0) as u64
-                }
-                None => {
-                    let (s, e) = plotted.dim_ranges.get(d).copied().unwrap_or((0, 0));
-                    set.to_base(r.level, d, s as u64..e as u64 + 1)
-                        .unwrap_or(0..1)
-                }
-            })
-            .collect();
+        let window = level0_window(plotted, set, r.level, [x, y], visible);
         let demand = crate::app::controllers::controller_for(PlotType::Heatmap).resolution_demand(
             var,
             &plotted.dim_config,
@@ -57,7 +45,6 @@ impl OctantApp {
         let level = fit_level(set, &window, &demand);
         (level < r.level).then(|| Want {
             set: set.clone(),
-            from: r.level,
             level,
             context,
             axes,
@@ -69,10 +56,7 @@ impl OctantApp {
     /// base layer can have no tile) and a pending fetch that was lost (an
     /// abort); whether one was lost.
     pub(super) fn drop_stale_detail(&mut self, context: Option<u64>) -> bool {
-        let state = &self.layers.base.data.detail;
-        let lost = state.pending.as_ref().is_some_and(|p| {
-            !self.block_prefetcher.is_pending(&p.key) && !self.block_cache.contains(&p.key)
-        });
+        let lost = self.fetch_lost(&self.layers.base);
         let state = &mut self.layers.base.data.detail;
         let Some(context) = context else {
             state.clear();
@@ -90,4 +74,29 @@ impl OctantApp {
         }
         lost
     }
+}
+
+/// The level-0 window the view shows: the `visible` positions along the x
+/// and y dimensions `xy`, the plotted window (read at `level`) along the
+/// others.
+fn level0_window(
+    plotted: &crate::app::layers::VariableSelection,
+    set: &crate::data::multiscale::Multiscale,
+    level: usize,
+    xy: [usize; 2],
+    visible: [(f64, f64); 2],
+) -> Vec<std::ops::Range<u64>> {
+    (0..set.dims.len())
+        .map(|d| match xy.iter().position(|&s| s == d) {
+            Some(i) => {
+                let (lo, hi) = visible[i];
+                lo.floor().max(0.0) as u64..hi.ceil().max(lo.floor() + 1.0) as u64
+            }
+            None => {
+                let (s, e) = plotted.dim_ranges.get(d).copied().unwrap_or((0, 0));
+                set.to_base(level, d, s as u64..e as u64 + 1)
+                    .unwrap_or(0..1)
+            }
+        })
+        .collect()
 }

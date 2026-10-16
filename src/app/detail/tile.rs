@@ -8,23 +8,15 @@ use super::{DetailTile, MARGIN, PendingDetail, TilePlan, Want};
 use crate::app::OctantApp;
 use crate::app::block_loading::block_axes;
 use crate::app::layers::LayerId;
-use crate::app::multiscale::{at_base, at_level};
-use crate::data::{BlockCacheKey, BlockRequest, OctantBlock};
+use crate::app::multiscale::to_level;
+use crate::data::{BlockCacheKey, BlockRequest, MatrixData, OctantBlock};
 use crate::plots::HeatmapRenderer;
 
 impl OctantApp {
     /// `want`'s tile: the request reading its cells (the current step of an
     /// animated dimension) and the store it reads from.
     pub(super) fn plan_detail(&self, want: &Want) -> Option<TilePlan> {
-        let plotted = self.plotted();
-        let base = match want.from {
-            0 => plotted.clone(),
-            _ => at_base(plotted)?,
-        };
-        let mut sel = match want.level {
-            0 => base,
-            level => at_level(&base, level)?,
-        };
+        let mut sel = to_level(self.plotted(), want.level)?;
         let var = sel.variable_info()?.clone();
         let mut cover = [(0.0, 0.0); 2];
         let mut origin = [0; 2];
@@ -90,83 +82,69 @@ impl OctantApp {
     /// Slices `block` into `pending`'s tile and draws it; nothing when the
     /// block runs in another orientation than the plot.
     pub(super) fn show_detail(&mut self, pending: PendingDetail, block: &OctantBlock) {
-        let id = pending.layer;
-        let Some(layer) = self.layers.get(id) else {
+        let Some(matrix) = self.slice_tile(&pending, block) else {
+            log::debug!("Detail tile of '{}' skipped", block.variable_name);
             return;
         };
-        let same_flips = {
-            let flips = &layer.data.flipped_dims;
-            flips.len() == block.flipped_dims.len()
-                && block.flipped_dims.iter().all(|f| flips.contains(f))
-        };
-        if !same_flips || block.dimension_names != pending.dims {
-            log::debug!(
-                "Detail tile of '{}' skipped: block orientation differs",
-                block.variable_name
-            );
-            return;
+        if pending.layer == LayerId::BASE {
+            self.request_detail_coordinates(pending.tile.var_idx);
         }
-        let (bx, by, _) = Self::resolve_spatial_axes(
-            block.rank(),
-            &block.dimension_names,
-            &pending.dims,
-            &pending.config,
-        );
+        let rs = self.wgpu_render_state.clone();
+        let Some(layer) = self.layers.get_mut(pending.layer) else {
+            return;
+        };
+        let mut tile = pending.tile;
+        // Headless, the tile is decided and nothing draws it.
+        if let Some(rs) = rs {
+            let (w, h) = (matrix.width, matrix.height);
+            let renderer = match &layer.renderers.detail {
+                Some(r) if r.capacity() >= w.saturating_mul(h) => r.clone(),
+                _ => Arc::new(HeatmapRenderer::new(
+                    &rs.device,
+                    rs.target_format,
+                    &matrix.values,
+                    w,
+                    h,
+                )),
+            };
+            renderer.update_data_and_dimensions(&rs.queue, &matrix.values, w, h, tile.uv);
+            layer.renderers.detail = Some(renderer);
+        }
+        tile.matrix = Some(Arc::new(matrix));
+        layer.data.detail.tile = Some(tile);
+    }
+
+    /// `block` sliced into `pending`'s tile like a plotted block; `None` when
+    /// it runs in another orientation than its layer's plot.
+    fn slice_tile(&self, pending: &PendingDetail, block: &OctantBlock) -> Option<MatrixData> {
+        let flips = &self.layers.get(pending.layer)?.data.flipped_dims;
+        let same_flips = flips.len() == block.flipped_dims.len()
+            && block.flipped_dims.iter().all(|f| flips.contains(f));
+        if !same_flips || block.dimension_names != pending.dims {
+            return None;
+        }
+        let (dims, ranges) = (&pending.dims, &pending.ranges);
+        let (bx, by, _) =
+            Self::resolve_spatial_axes(block.rank(), &block.dimension_names, dims, &pending.config);
         let fixed = block_axes::fixed_indices(
             block,
-            &pending.dims,
+            dims,
             pending.anim_dim,
             &pending.indices,
             pending.step,
         );
-        let (_, local_x) = block_axes::dim_bounds(block, &pending.dims, bx, &pending.ranges);
-        let (_, local_y) = block_axes::dim_bounds(block, &pending.dims, by, &pending.ranges);
-        let extent = self.layer_animated_dim_extent(id);
-        let Some(matrix) = block.slice_2d_with_ranges(
+        let (_, local_x) = block_axes::dim_bounds(block, dims, bx, ranges);
+        let (_, local_y) = block_axes::dim_bounds(block, dims, by, ranges);
+        block.slice_2d_with_ranges(
             bx,
             by,
             block.oriented_range(bx, local_x),
             block.oriented_range(by, local_y),
             &fixed,
-            extent,
+            self.layer_animated_dim_extent(pending.layer),
             &block.variable_name,
             false,
-        ) else {
-            return;
-        };
-        if id == LayerId::BASE {
-            self.request_detail_coordinates(pending.tile.var_idx);
-        }
-        let mut tile = pending.tile;
-        let rs = self.wgpu_render_state.clone();
-        let Some(layer) = self.layers.get_mut(id) else {
-            return;
-        };
-        let Some(rs) = rs else {
-            // Headless: the tile is decided, nothing draws it.
-            tile.matrix = Some(Arc::new(matrix));
-            layer.data.detail.tile = Some(tile);
-            return;
-        };
-        let (w, h) = (matrix.width, matrix.height);
-        let cells = w.saturating_mul(h);
-        let renderers = &mut layer.renderers;
-        let renderer = match &renderers.detail {
-            Some((renderer, capacity)) if *capacity >= cells => renderer.clone(),
-            _ => {
-                let renderer =
-                    HeatmapRenderer::new(&rs.device, rs.target_format, &matrix.values, w, h);
-                let renderer = Arc::new(renderer);
-                let capacity = cells
-                    .max(2048 * 2048)
-                    .min(crate::plots::limits::max_storage_elements().max(cells));
-                renderers.detail = Some((renderer.clone(), capacity));
-                renderer
-            }
-        };
-        renderer.update_data_and_dimensions(&rs.queue, &matrix.values, w, h, tile.uv);
-        tile.matrix = Some(Arc::new(matrix));
-        layer.data.detail.tile = Some(tile);
+        )
     }
 
     /// Reads the coordinates of the tile's level variable `idx` in the
