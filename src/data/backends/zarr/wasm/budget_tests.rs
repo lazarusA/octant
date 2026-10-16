@@ -128,8 +128,9 @@ fn a_trim_that_frees_nothing_waits_for_a_release() {
     store.insert_chunk(&key("w/c/0"), bytes(KB)).expect("w");
     assert!(has(&store, "w/c/0"));
     drop(lease);
-    // Released leases count as just used: the older chunk goes first.
-    assert!(!has(&store, "w/c/0") && !has(&store, "v/c/0"));
-    assert!(has(&store, "v/c/1"));
+    // Released leases count as just used: the older chunk goes first, then
+    // one of the two released together (they tie, in no set order).
+    assert!(!has(&store, "w/c/0"));
+    assert!(has(&store, "v/c/0") != has(&store, "v/c/1"));
     assert_eq!(budget.held(), 6 * KB);
 }
