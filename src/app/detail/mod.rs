@@ -26,6 +26,8 @@
 //! an overlay's tile under the pointer (`ui/hover/overlays.rs`).
 
 mod follow;
+#[cfg(test)]
+mod follow_tests;
 mod geometry;
 #[cfg(test)]
 mod geometry_tests;

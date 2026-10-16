@@ -9,7 +9,7 @@ use crate::app::test_support::{poll_until, pyramid_app, selection_of};
 use crate::plots::PlotType;
 
 /// `t2m` plotted on a 20 px canvas: level 2 (16 x 16 of the 64 x 64 level 0).
-fn plotted() -> OctantApp {
+pub(super) fn plotted() -> OctantApp {
     let (mut app, meta) = pyramid_app();
     app.layout.canvas_px = [20, 20];
     app.selected = selection_of(&mut app, &meta, "0/t2m");
@@ -18,7 +18,7 @@ fn plotted() -> OctantApp {
     app
 }
 
-fn view(zoom: f32) -> CanvasView {
+pub(super) fn view(zoom: f32) -> CanvasView {
     let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(20.0, 20.0));
     CanvasView {
         canvas_rect: rect,
@@ -29,7 +29,7 @@ fn view(zoom: f32) -> CanvasView {
     }
 }
 
-fn tile_level(app: &OctantApp) -> Option<usize> {
+pub(super) fn tile_level(app: &OctantApp) -> Option<usize> {
     app.layers.base.data.detail.tile.as_ref().map(|t| t.level)
 }
 
@@ -39,7 +39,12 @@ thread_local! {
 }
 
 /// One frame at `zoom`, `seconds` after the last.
-fn frame_at(app: &mut OctantApp, plot_type: PlotType, zoom: f32, seconds: f64) -> Option<f64> {
+pub(super) fn frame_at(
+    app: &mut OctantApp,
+    plot_type: PlotType,
+    zoom: f32,
+    seconds: f64,
+) -> Option<f64> {
     let now = CLOCK.with(|c| {
         c.set(c.get() + seconds);
         c.get()
@@ -49,7 +54,7 @@ fn frame_at(app: &mut OctantApp, plot_type: PlotType, zoom: f32, seconds: f64) -
 
 /// Rests at `zoom` (two frames past the settle time) and waits for the
 /// tile's block when one is asked.
-fn rest_at(app: &mut OctantApp, zoom: f32) {
+pub(super) fn rest_at(app: &mut OctantApp, zoom: f32) {
     frame_at(app, PlotType::Heatmap, zoom, 1.0);
     frame_at(app, PlotType::Heatmap, zoom, 1.0);
     if app.layers.base.data.detail.pending.is_some() {
