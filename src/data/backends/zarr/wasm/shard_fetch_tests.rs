@@ -4,10 +4,13 @@
 
 use std::collections::HashMap;
 
+use zarrs::array::codec::ShardingIndexLocation;
+use zarrs::storage::store::MemoryStore;
+
 use super::WasmZarrBlockStore;
 use super::range_server::RangeServer;
 use super::shard_fetch::ShardRef;
-use super::shard_tests::{source, spec_of, whole};
+use super::shard_tests::{source, source_at, spec_of, whole};
 use crate::data::backends::zarr::GenericZarrBlockStore;
 use crate::data::blocks::BlockStore;
 use crate::data::{DimensionSelection, SliceRequest};
@@ -16,13 +19,18 @@ use crate::utils::executor::get_shared_tokio_rt;
 /// Bytes packed before the shard in the Icechunk-like object.
 const PAD: usize = 1000;
 
-/// Rows 10..20, columns 40..50 of `v` read from `shard` (shard (0, 1)) into a
-/// fresh store named `name`; the bytes the server sent.
-fn read_window(server: &RangeServer, name: &str, shard: ShardRef) -> (Vec<f32>, u64) {
-    let src = source();
-    let spec = spec_of(&src);
+/// Rows 10..20, columns 40..50 of `v` (as `src` stores it) read from
+/// `shard` (shard (0, 1)) into a fresh store named `name`; the bytes the
+/// server sent.
+fn read_window(
+    server: &RangeServer,
+    name: &str,
+    shard: ShardRef,
+    src: &MemoryStore,
+) -> (Vec<f32>, u64) {
+    let spec = spec_of(src);
     let store = WasmZarrBlockStore::get_or_create(&format!("{}/{name}", server.base));
-    let meta = whole(&src, "v/zarr.json");
+    let meta = whole(src, "v/zarr.json");
     store
         .insert_key_bytes("v/zarr.json", &meta)
         .expect("metadata");
@@ -76,7 +84,7 @@ fn shard_ref(url: String, span: Option<std::ops::Range<u64>>) -> ShardRef {
 fn a_whole_object_shard_is_read_by_its_index_and_window_chunks() {
     let (server, len) = server_with_shard();
     let url = format!("{}/v/c/0/1", server.base);
-    let (values, sent) = read_window(&server, "zarr", shard_ref(url, None));
+    let (values, sent) = read_window(&server, "zarr", shard_ref(url, None), &source());
     assert_eq!(values, expected());
     assert!((sent as usize) * 2 < len, "{sent} of {len} bytes sent");
 }
@@ -86,7 +94,7 @@ fn a_packed_shard_is_read_within_its_span() {
     let (server, len) = server_with_shard();
     let span = PAD as u64..(PAD + len) as u64;
     let url = format!("{}/pack", server.base);
-    let (values, sent) = read_window(&server, "icechunk", shard_ref(url, Some(span)));
+    let (values, sent) = read_window(&server, "icechunk", shard_ref(url, Some(span)), &source());
     assert_eq!(values, expected());
     assert!((sent as usize) * 2 < len, "{sent} of {len} bytes sent");
 }
@@ -105,4 +113,36 @@ fn a_missing_shard_is_empty() {
     ));
     assert!(fetched.is_ok());
     assert_eq!(server.sent(), 0);
+}
+
+#[test]
+fn an_index_at_the_start_is_read_by_its_size_and_a_range() {
+    let src = source_at(ShardingIndexLocation::Start);
+    let shard = whole(&src, "v/c/0/1").to_vec();
+    let len = shard.len();
+    let server = RangeServer::start(HashMap::from([("v/c/0/1".to_string(), shard)]));
+    let url = format!("{}/v/c/0/1", server.base);
+    let (values, sent) = read_window(&server, "start", shard_ref(url, None), &src);
+    assert_eq!(values, expected());
+    assert!((sent as usize) * 2 < len, "{sent} of {len} bytes sent");
+}
+
+#[test]
+fn a_window_already_held_sends_nothing() {
+    let (server, _) = server_with_shard();
+    let src = source();
+    let store = WasmZarrBlockStore::get_or_create(&format!("{}/again", server.base));
+    let url = format!("{}/v/c/0/1", server.base);
+    let (spec, shards) = (spec_of(&src), [shard_ref(url, None)]);
+    let window = [10..20, 40..50];
+    let fetch = || {
+        get_shared_tokio_rt()
+            .block_on(store.fetch_shard_parts(&spec, &shards, &window, &mut None))
+            .expect("fetch");
+    };
+    fetch();
+    // The size, the index and one merged range of the window's chunks.
+    assert_eq!(server.requests(), 3);
+    fetch();
+    assert_eq!(server.requests(), 3, "held: no request");
 }

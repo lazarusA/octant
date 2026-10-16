@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use zarrs::array::codec::{ShardingCodecBuilder, ShardingIndexLocation};
 use zarrs::array::{ArrayBuilder, ArraySubset, DataType, FillValue};
 use zarrs::metadata::v3::MetadataV3;
 use zarrs::storage::byte_range::ByteRange;
@@ -10,18 +11,25 @@ use zarrs::storage::store::MemoryStore;
 use zarrs::storage::{Bytes, ReadableStorageTraits, StoreKey, WritableStorageTraits};
 
 use super::partial_store::PartialStore;
-use super::shard_plan::{ShardIndexSpec, merge, parse_index, window_ranges};
-use crate::data::backends::zarr::GenericZarrBlockStore;
-use crate::data::blocks::BlockStore;
-use crate::data::{DimensionSelection, SliceRequest};
+use super::shard_plan::{ShardIndexSpec, merge, window_ranges};
 
 /// `v` (64 x 64 `float32`, `0, 1, 2, ...`) in 32 x 32 shards of 8 x 8
 /// inner chunks, index at the end with a checksum (zarrs' default).
 pub(super) fn source() -> Arc<MemoryStore> {
+    source_at(ShardingIndexLocation::End)
+}
+
+/// [`source`] with its shard indexes at `location`.
+pub(super) fn source_at(location: ShardingIndexLocation) -> Arc<MemoryStore> {
     let store = Arc::new(MemoryStore::new());
     let f32_dt = DataType::from_metadata(&MetadataV3::new("float32")).expect("float32");
+    let eight = std::num::NonZeroU64::new(8).expect("8");
+    let inner = vec![eight, eight];
+    let sharding = ShardingCodecBuilder::new(inner, &f32_dt)
+        .index_location(location)
+        .build_arc();
     let mut builder = ArrayBuilder::new(vec![64, 64], vec![32, 32], f32_dt, FillValue::from(0f32));
-    builder.subchunk_shape(vec![8, 8]);
+    builder.array_to_bytes_codec(sharding);
     builder.dimension_names(Some(["row", "col"]));
     let array = builder.build(store.clone(), "/v").expect("build");
     array.store_metadata().expect("metadata");
@@ -103,45 +111,12 @@ fn partial_objects_answer_only_what_they_hold() {
 }
 
 #[test]
-fn blocks_decode_from_the_index_and_the_window_chunks() {
-    let src = source();
-    let spec = spec_of(&src);
-    let parts = Arc::new(PartialStore::new());
-    for k in ["zarr.json", "v/zarr.json"] {
-        if let Ok(Some(bytes)) = src.get(&key(k)) {
-            parts.set(&key(k), bytes).expect("metadata");
-        }
-    }
-    // What the browser fetches for rows 10..20, columns 40..50: shard (0, 1).
-    let window = [10..20, 40..50];
-    let shard = whole(&src, "v/c/0/1");
-    let size = shard.len() as u64;
-    let index_range = spec.index_range(size);
-    let index = shard.slice(index_range.start as usize..index_range.end as usize);
-    let shard_key = key("v/c/0/1");
-    parts.insert_part(&shard_key, size, index_range.start, index.clone());
-    let entries = parse_index(&spec, &index).expect("index");
-    let ranges = window_ranges(&spec, &[0, 1], &window, &entries);
-    // The index and 4 of the shard's 16 inner chunks (merging may read the
-    // small gaps between them in one request).
-    let needed: u64 = index.len() as u64 + ranges.iter().map(|r| r.end - r.start).sum::<u64>();
-    assert!(needed * 2 < size, "{needed} of {size} bytes needed");
-    for r in merge(ranges) {
-        let piece = shard.slice(r.start as usize..r.end as usize);
-        parts.insert_part(&shard_key, size, r.start, piece);
-    }
-
-    let store = GenericZarrBlockStore::new(parts, "memory://parts", "zarr", "Zarr");
-    let request = SliceRequest {
-        variable: "v".into(),
-        selections: vec![
-            DimensionSelection::Range { start: 10, end: 20 },
-            DimensionSelection::Range { start: 40, end: 50 },
-        ],
-    };
-    let block = store.fetch_block(&request).expect("block");
-    let expected: Vec<f32> = (10..20)
-        .flat_map(|r| (40..50).map(move |c| (r * 64 + c) as f32))
-        .collect();
-    assert_eq!(&block.values[..], &expected[..]);
+fn entries_past_the_shard_are_dropped() {
+    let spec = spec_of(&source());
+    let mut entries = vec![None; 16];
+    entries[5] = Some((100, 50));
+    entries[6] = Some((u64::MAX - 1, 10)); // overflows
+    entries[9] = Some((990, 20)); // ends past a 1000-byte shard
+    let ranges = window_ranges(&spec, &[0, 1], &[10..20, 40..50], &entries, 1000);
+    assert_eq!(ranges, vec![100..150]);
 }
