@@ -21,7 +21,8 @@ struct Parts {
 }
 
 impl Parts {
-    /// The bytes of `range` (of `self.size`) when one piece holds them.
+    /// The bytes of `range` (of `self.size`) when one piece holds them
+    /// (zarrs reads each inner chunk whole, within one fetched range).
     fn read(&self, range: ByteRange) -> Option<Bytes> {
         let want = range.to_range(self.size);
         self.pieces.iter().find_map(|(offset, bytes)| {
@@ -53,18 +54,15 @@ impl PartialStore {
         Self::default()
     }
 
-    /// Adds `bytes` at `offset` of the object `key` of `size` bytes.
+    /// Adds `bytes` at `offset` of the object `key` of `size` bytes, unless
+    /// a piece already holds them (two loads fetched the same range).
     pub fn insert_part(&self, key: &StoreKey, size: u64, offset: u64, bytes: Bytes) {
         let mut parts = self.parts.write().unwrap_or_else(|p| p.into_inner());
         let entry = parts.entry(key.clone()).or_default();
         entry.size = size;
-        entry.pieces.push((offset, bytes));
-    }
-
-    /// The size of the partly held object `key`.
-    pub fn part_size(&self, key: &StoreKey) -> Option<u64> {
-        let parts = self.parts.read().unwrap_or_else(|p| p.into_inner());
-        parts.get(key).map(|p| p.size)
+        if !entry.holds(offset, offset + bytes.len() as u64) {
+            entry.pieces.push((offset, bytes));
+        }
     }
 
     /// Whether bytes `start..end` of the object `key` are held.
@@ -101,10 +99,11 @@ impl ReadableStorageTraits for PartialStore {
     }
 
     fn size_key(&self, key: &StoreKey) -> Result<Option<u64>, StorageError> {
-        match self.whole.size_key(key)? {
-            Some(size) => Ok(Some(size)),
-            None => Ok(self.part_size(key)),
+        if let Some(size) = self.whole.size_key(key)? {
+            return Ok(Some(size));
         }
+        let parts = self.parts.read().unwrap_or_else(|p| p.into_inner());
+        Ok(parts.get(key).map(|p| p.size))
     }
 
     fn supports_get_partial(&self) -> bool {
@@ -122,10 +121,12 @@ impl WritableStorageTraits for PartialStore {
 
     fn set_partial_many(
         &self,
-        key: &StoreKey,
-        offset_values: zarrs::storage::OffsetBytesIterator<Bytes>,
+        _key: &StoreKey,
+        _offset_values: zarrs::storage::OffsetBytesIterator<Bytes>,
     ) -> Result<(), StorageError> {
-        self.whole.set_partial_many(key, offset_values)
+        Err(StorageError::Other(
+            "partial writes are not supported".into(),
+        ))
     }
 
     fn erase(&self, key: &StoreKey) -> Result<(), StorageError> {

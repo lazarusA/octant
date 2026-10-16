@@ -1,5 +1,5 @@
 //! Fetching the parts of shards a window needs into the browser's store:
-//! each shard's index (one suffix or prefix range), then the byte ranges of
+//! each shard's index (its size, then one range), then the byte ranges of
 //! the inner chunks the window touches, never the whole shard. A shard is
 //! a whole object (Zarr) or a span of one (Icechunk packs chunks into
 //! larger objects and its manifests give each one's offset and length).
@@ -13,7 +13,7 @@ use zarrs::storage::{Bytes, ReadableStorageTraits, StoreKey};
 use super::WasmZarrBlockStore;
 use super::loader::CONCURRENT_FETCHES;
 use super::shard_plan::{ShardIndexSpec, merge, parse_index, window_ranges};
-use crate::data::backends::http::{fetch_url_byte_range, fetch_url_tail, is_not_found};
+use crate::data::backends::http::{fetch_url_byte_range, fetch_url_size, is_not_found};
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
 
 /// One shard a window touches: its store key, URL and grid indices.
@@ -35,7 +35,8 @@ impl ShardRef {
 
 impl WasmZarrBlockStore {
     /// Fetches the index and the window's inner chunks of every shard in
-    /// `shards` not yet held. A shard the server lacks (404) is empty.
+    /// `shards` not yet held, the indexes concurrently, then the chunks. A
+    /// shard the server lacks (404) is empty.
     pub(crate) async fn fetch_shard_parts(
         &self,
         spec: &ShardIndexSpec,
@@ -43,16 +44,20 @@ impl WasmZarrBlockStore {
         window: &[Range<u64>],
         on_progress: &mut ProgressCallback<'_>,
     ) -> Result<(), BlockStoreError> {
+        let indexes: Vec<_> = futures::stream::iter(shards)
+            .map(|shard| async move { (shard, self.shard_index(spec, shard).await) })
+            .buffer_unordered(CONCURRENT_FETCHES)
+            .collect()
+            .await;
         let mut wanted: Vec<(&ShardRef, StoreKey, u64, Range<u64>)> = Vec::new();
-        for shard in shards {
-            let key = StoreKey::new(&shard.key).map_err(|e| format!("{e}"))?;
-            let Some((size, index)) = self.shard_index(spec, &key, shard).await? else {
+        for (shard, index) in indexes {
+            let Some((key, size, index)) = index? else {
                 continue;
             };
             let Some(entries) = parse_index(spec, &index) else {
                 return Err(format!("Unreadable shard index of '{}'", shard.url).into());
             };
-            let ranges = window_ranges(spec, &shard.indices, window, &entries)
+            let ranges = window_ranges(spec, &shard.indices, window, &entries, size)
                 .into_iter()
                 .filter(|r| !self.partial_store.holds(&key, r.start, r.end))
                 .collect();
@@ -78,48 +83,44 @@ impl WasmZarrBlockStore {
         Ok(())
     }
 
-    /// The size and index of `shard` (store key `key`), held or fetched;
-    /// `None` for a shard the server lacks.
+    /// The store key, size and index of `shard`, held or fetched (its size
+    /// from its span, else a `HEAD` request; then the index by a plain
+    /// range, which needs no CORS preflight); `None` for a shard the server
+    /// lacks.
     async fn shard_index(
         &self,
         spec: &ShardIndexSpec,
-        key: &StoreKey,
         shard: &ShardRef,
-    ) -> Result<Option<(u64, Vec<u8>)>, BlockStoreError> {
-        let len = spec.index_len();
-        if let Ok(Some(size)) = self.partial_store.size_key(key) {
+    ) -> Result<Option<(StoreKey, u64, Bytes)>, BlockStoreError> {
+        let key = StoreKey::new(&shard.key).map_err(|e| format!("{e}"))?;
+        if let Ok(Some(size)) = self.partial_store.size_key(&key) {
             let range = spec.index_range(size);
-            if let Ok(Some(index)) = self
-                .partial_store
-                .get_partial(key, ByteRange::FromStart(range.start, Some(len)))
-            {
-                return Ok(Some((size, index.to_vec())));
+            let held = ByteRange::FromStart(range.start, Some(range.end - range.start));
+            if let Ok(Some(index)) = self.partial_store.get_partial(&key, held) {
+                return Ok(Some((key, size, index)));
             }
         }
         let url = shard.url.as_str();
-        let fetched = match (&shard.span, spec.at_end) {
-            (Some(span), _) => {
-                let size = span.end - span.start;
-                let range = spec.index_range(size);
-                let from = span.start + range.start;
-                let index = fetch_url_byte_range(url, from, range.end - range.start).await;
-                index.map(|b| (b, size))
-            }
-            (None, true) => fetch_url_tail(url, len).await,
-            // A prefix index: the size comes from the tail's Content-Range.
-            (None, false) => match fetch_url_tail(url, 1).await {
-                Ok((_, size)) => fetch_url_byte_range(url, 0, len).await.map(|b| (b, size)),
-                Err(e) => Err(e),
-            },
+        let size = match &shard.span {
+            Some(span) => Ok(span.end - span.start),
+            None => fetch_url_size(url).await,
         };
-        let (index, size) = match fetched {
+        let fetched = match size {
+            Ok(size) => {
+                let range = spec.index_range(size);
+                let from = shard.base() + range.start;
+                let index = fetch_url_byte_range(url, from, range.end - range.start).await;
+                index.map(|b| (size, range.start, Bytes::from(b)))
+            }
+            Err(e) => Err(e),
+        };
+        let (size, start, index) = match fetched {
             Ok(found) => found,
             Err(e) if is_not_found(&e) => return Ok(None),
             Err(e) => return Err(format!("Failed to fetch the index of '{url}': {e}").into()),
         };
-        let start = spec.index_range(size).start;
         self.partial_store
-            .insert_part(key, size, start, Bytes::from(index.clone()));
-        Ok(Some((size, index)))
+            .insert_part(&key, size, start, index.clone());
+        Ok(Some((key, size, index)))
     }
 }

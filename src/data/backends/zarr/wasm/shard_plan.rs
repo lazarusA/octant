@@ -152,19 +152,21 @@ pub fn parse_index(spec: &ShardIndexSpec, index: &[u8]) -> Option<Vec<Option<(u6
     )
 }
 
-/// The byte ranges (within the shard) of the inner chunks of shard
-/// `shard_indices` that `window` touches, from its index `entries`; empty
-/// chunks have none.
+/// The byte ranges (within the shard of `size` bytes) of the inner chunks
+/// of shard `shard_indices` that `window` touches, from its index
+/// `entries`; empty chunks and entries past the shard (a corrupt index)
+/// have none.
 pub fn window_ranges(
     spec: &ShardIndexSpec,
     shard_indices: &[u64],
     window: &[Range<u64>],
     entries: &[Option<(u64, u64)>],
+    size: u64,
 ) -> Vec<Range<u64>> {
     spec.inner_chunks(shard_indices, window)
         .into_iter()
         .filter_map(|i| entries.get(i as usize).copied().flatten())
-        .map(|(offset, len)| offset..offset + len)
+        .filter_map(|(offset, len)| Some(offset..offset.checked_add(len).filter(|&e| e <= size)?))
         .collect()
 }
 
