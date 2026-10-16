@@ -123,7 +123,11 @@ pub fn show_hover_tooltip(
         layers: &[],
         fields: &fields,
     };
-    paint_hover_card(app, ctx, rect, (hover_pos, target), plot_type, pixel, card);
+    let at = pixel.map(|cell| overlays::HoverAt {
+        cell,
+        norm: (hit.norm_x, hit.norm_y),
+    });
+    paint_hover_card(app, ctx, rect, (hover_pos, target), plot_type, at, card);
 }
 
 fn resolve_hover_target_info(
@@ -170,7 +174,7 @@ fn resolve_hover_color(app: &OctantApp, raw_val: f32, line: usize) -> Color32 {
     }
 }
 
-/// Shows `card` with the overlays' rows at `pixel`, its leader running
+/// Shows `card` with the overlays' rows at `at`, its leader running
 /// from the pointer to the hovered data point's screen position.
 fn paint_hover_card(
     app: &OctantApp,
@@ -178,11 +182,11 @@ fn paint_hover_card(
     rect: Rect,
     (hover_pos, target_pos): (Pos2, Option<Pos2>),
     plot_type: PlotType,
-    pixel: Option<(usize, usize)>,
+    at: Option<overlays::HoverAt>,
     card: HoverCard,
 ) {
     let mut rows = [LayerValue::EMPTY; MAX_OVERLAYS];
-    let layers = overlays::hover_rows(app, plot_type, pixel, &mut rows);
+    let layers = overlays::hover_rows(app, plot_type, at, &mut rows);
     let anchoring = if plot_type == PlotType::Line {
         Anchoring::FollowPointer
     } else {

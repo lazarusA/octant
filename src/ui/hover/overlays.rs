@@ -8,22 +8,35 @@ use crate::i18n::{HoverKey, tr};
 use crate::plots::PlotType;
 use crate::ui::hover::card::LayerValue;
 use crate::ui::hover::composite::CompositeKind;
+use crate::ui::hover::detail::tile_reading;
 use crate::ui::hover::entries::resolve_variable_units;
 use crate::ui::hover::labels::layer_reading;
 use crate::utils::colormap::evaluate_color_cpu;
 
-/// Fills `out` with each drawn overlay's value at base cell `cell`, topmost
-/// first; returns how many it wrote. Overlays share the base grid
-/// (`Alignment::SameGrid`), so the cell indexes them alike.
+/// Where the hover reads overlays: the base layer's cell and the point on
+/// the plotted quad (`0..1` from its left and top edges).
+#[derive(Debug, Clone, Copy)]
+pub struct HoverAt {
+    pub cell: (usize, usize),
+    pub norm: (f32, f32),
+}
+
+/// Fills `out` with each drawn overlay's value at `at`, topmost first;
+/// returns how many it wrote. Overlays share the base grid
+/// (`Alignment::SameGrid`), so the base cell indexes them alike; an
+/// overlay's detail tile under the point is read instead.
 pub fn overlay_values<'a>(
     app: &'a OctantApp,
-    cell: (usize, usize),
+    at: HoverAt,
     out: &mut [LayerValue<'a>; MAX_OVERLAYS],
 ) -> usize {
     let drawn = app.layers.overlays().iter().rev().filter(|l| l.is_drawn());
     let mut count = 0;
     for (slot, layer) in out.iter_mut().zip(drawn) {
-        let raw = cell_value(layer, cell);
+        let tile = layer.data.detail.tile.as_ref();
+        let raw = tile
+            .and_then(|t| tile_reading(t, at.norm.0, at.norm.1))
+            .map_or_else(|| cell_value(layer, at.cell), |r| r.value);
         let var = layer.selection().variable_info();
         let name = var.map_or(tr(HoverKey::FallbackOverlay), |v| v.leaf_name());
         let units = resolve_variable_units(var);
@@ -42,16 +55,16 @@ pub fn overlay_values<'a>(
 }
 
 /// The overlay rows of the hover card, written into `out`: each drawn
-/// overlay's reading at heatmap cell `pixel`, since overlays share the
+/// overlay's reading at `at` on the heatmap, since overlays share the
 /// heatmap's grid; none on other plots.
 pub fn hover_rows<'a, 'o>(
     app: &'a OctantApp,
     plot_type: PlotType,
-    pixel: Option<(usize, usize)>,
+    at: Option<HoverAt>,
     out: &'o mut [LayerValue<'a>; MAX_OVERLAYS],
 ) -> &'o [LayerValue<'a>] {
-    let count = match pixel {
-        Some(cell) if plot_type == PlotType::Heatmap => overlay_values(app, cell, out),
+    let count = match at {
+        Some(at) if plot_type == PlotType::Heatmap => overlay_values(app, at, out),
         _ => 0,
     };
     out.get(..count).unwrap_or_default()

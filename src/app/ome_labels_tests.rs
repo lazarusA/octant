@@ -13,7 +13,7 @@ use crate::data::blocks::BlockStore;
 use crate::data::ome::test_support::Fixture;
 use crate::data::{DataSource, Dataset, DatasetMetadata, SliceRequest, StoreHandle};
 use crate::ui::hover::card::{HoverValue, LayerValue};
-use crate::ui::hover::overlays::overlay_values;
+use crate::ui::hover::overlays::{HoverAt, overlay_values};
 
 /// Label ids past `f32`'s exact integers, and one past 2^31.
 const IDS: [u32; 4] = [0, 7, 16_777_217, 3_000_000_000];
@@ -95,7 +95,7 @@ fn hovering_a_label_reads_its_id_color_and_properties() {
     let (mut app, meta) = ome_app();
     label_overlay(&mut app, &meta);
     let mut rows = [LayerValue::EMPTY; crate::app::overlays::MAX_OVERLAYS];
-    assert_eq!(overlay_values(&app, (1, 0), &mut rows), 1);
+    assert_eq!(overlay_values(&app, at((1, 0)), &mut rows), 1);
     assert_eq!(rows[0].value, HoverValue::Label(7));
     assert_eq!(rows[0].units, "class: nucleus");
     let opacity = app.layers.overlays()[0].color.opacity;
@@ -104,9 +104,9 @@ fn hovering_a_label_reads_its_id_color_and_properties() {
         rows[0].swatch,
         egui::Color32::from_rgba_unmultiplied(255, 0, 0, alpha)
     );
-    overlay_values(&app, (1, 1), &mut rows);
+    overlay_values(&app, at((1, 1)), &mut rows);
     assert_eq!(rows[0].value, HoverValue::Label(3_000_000_000));
-    overlay_values(&app, (0, 0), &mut rows);
+    overlay_values(&app, at((0, 0)), &mut rows);
     assert_eq!(rows[0].value, HoverValue::NoData, "label 0 is background");
 }
 
@@ -142,4 +142,12 @@ fn label_pyramids_never_average_ids() {
         app.layers.base.pyramid_op(AggregationOp::Mean),
         AggregationOp::Mean
     );
+}
+
+/// The hover at base cell `cell`, off any detail tile.
+fn at(cell: (usize, usize)) -> HoverAt {
+    HoverAt {
+        cell,
+        norm: (-1.0, -1.0),
+    }
 }
