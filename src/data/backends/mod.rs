@@ -16,3 +16,11 @@ pub use icechunk::IcechunkBlockStore;
 pub use netcdf::NetCdfBlockStore;
 pub use procedural::ProceduralBlockStore;
 pub use zarr::{GenericZarrBlockStore, WasmZarrBlockStore, ZarrBlockStore};
+
+/// Lets go of what the browser's stores keep for the dataset at `uri`, once
+/// it is closed: metadata, headers, downloaded chunks and manifests.
+pub fn release_stores(uri: &str) {
+    WasmZarrBlockStore::release(uri);
+    icechunk::wasm::WasmIcechunkBlockStore::release(uri);
+    geotiff::WasmGeoTiffBlockStore::release(uri);
+}

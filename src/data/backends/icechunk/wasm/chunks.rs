@@ -67,9 +67,10 @@ impl WasmIcechunkBlockStore {
         while let Some((key, bytes)) = fetches.next().await {
             match bytes? {
                 Some(bytes) => {
-                    self.inner.insert_key_bytes(&key, &bytes)?;
+                    let len = bytes.len() as u64;
+                    self.inner.insert_chunk_bytes(&key, bytes)?;
                     if let Some(cb) = on_progress.as_mut() {
-                        cb(bytes.len() as u64);
+                        cb(len);
                     }
                 }
                 None => log::debug!("[WASM Icechunk] Chunk {key} not in manifests (sparse fill)"),
@@ -124,13 +125,7 @@ impl WasmIcechunkBlockStore {
     /// The manifest `man_ref` points to, from the cache or fetched and decoded.
     async fn load_manifest(&self, man_ref: &ManifestRef) -> Result<Arc<Manifest>, BlockStoreError> {
         let id = man_ref.object_id.to_string();
-        let cached = self
-            .cached_manifests
-            .read()
-            .unwrap_or_else(|p| p.into_inner())
-            .get(&id)
-            .cloned();
-        if let Some(m) = cached {
+        if let Some(m) = self.cached_manifests.get(&id) {
             return Ok(m);
         }
         let url = format!("{}/manifests/{id}", self.base_url);
@@ -139,13 +134,11 @@ impl WasmIcechunkBlockStore {
             .await
             .map_err(|e| format!("Failed fetching manifest '{url}': {e}"))?;
         let (_spec, decompressed) = decompress_icechunk_file(&raw)?;
+        let bytes = decompressed.len() as u64;
         let decoded = Manifest::from_buffer(decompressed)
             .map_err(|e| format!("Failed parsing Icechunk manifest '{id}': {e:?}"))?;
         let m = Arc::new(decoded);
-        self.cached_manifests
-            .write()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(id, m.clone());
+        self.cached_manifests.insert(id, m.clone(), bytes);
         Ok(m)
     }
 

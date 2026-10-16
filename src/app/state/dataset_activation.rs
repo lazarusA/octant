@@ -1,4 +1,4 @@
-//! Dataset activation, removal, export requests, and RGB/CMYK channel introspection.
+//! Dataset activation, export requests, and RGB/CMYK channel introspection.
 
 use super::app_state::OctantApp;
 use super::store_kind::StoreKind;
@@ -49,39 +49,6 @@ impl OctantApp {
             }
         }
         false
-    }
-
-    /// Removes a dataset from `dataset_manager` by ID.
-    /// If it is currently active, resets active dataset metadata and variable tree.
-    pub fn remove_dataset(&mut self, dataset_id: &str) {
-        if let Some(removed) = self.dataset_manager.remove(dataset_id) {
-            crate::data::backends::coord_bounds::evict_coord_values(Some(&removed.source.uri));
-            self.coordinate_loader.forget(&removed.id);
-            let is_active = self.selected.metadata.is_some()
-                && same_target(&self.selected.store_target, &removed.source.uri);
-            if is_active {
-                self.clear_active_metadata();
-            }
-            // The plate browser goes with its plate, not with one of its fields.
-            if self
-                .plate
-                .as_ref()
-                .is_some_and(|p| p.url == removed.source.uri.trim_end_matches('/'))
-            {
-                self.plate = None;
-            }
-            self.status_message = format!("Removed dataset '{}'", removed.source.display_name);
-        }
-    }
-
-    /// Clears all datasets from `dataset_manager` and resets active dataset state.
-    pub fn clear_all_datasets(&mut self) {
-        self.dataset_manager.clear();
-        crate::data::backends::coord_bounds::evict_coord_values(None);
-        self.coordinate_loader = crate::data::blocks::CoordinateLoader::default();
-        self.clear_active_metadata();
-        self.plate = None;
-        self.status_message = "Cleared all datasets from Dataset Manager".to_string();
     }
 
     /// Triggers an export request for the canvas / figure.
@@ -251,7 +218,7 @@ pub(crate) fn channel_dim(var: &crate::data::VariableInfo) -> Option<usize> {
 
 /// Whether two dataset targets name the same store (ignoring surrounding
 /// whitespace, trailing slashes and a leading `~`).
-fn same_target(a: &str, b: &str) -> bool {
+pub(super) fn same_target(a: &str, b: &str) -> bool {
     let clean = |t: &str| crate::utils::expand_tilde_str(t.trim().trim_end_matches('/'));
     clean(a).trim_end_matches('/') == clean(b).trim_end_matches('/')
 }

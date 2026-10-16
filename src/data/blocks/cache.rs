@@ -8,8 +8,7 @@ use crate::data::{octant_block::OctantBlock, slice_request::DimensionSelection};
 
 /// LRU cache of resident N-dimensional OctantBlocks, budgeted by bytes.
 ///
-/// `access_order.front()` is the least recently used block.
-/// `access_order.back()` is the most recently used block.
+/// `access_order.front()` is the least recently used block, `back()` the most recent.
 pub struct BlockCache {
     pub(crate) entries: HashMap<BlockCacheKey, OctantBlock>,
     pub(crate) access_order: VecDeque<BlockCacheKey>,
@@ -188,6 +187,14 @@ impl BlockCache {
         }
     }
 
+    /// Drops every block of the source `source_id` (its dataset closed).
+    pub fn remove_source(&mut self, source_id: &str) {
+        for (_, block) in self.entries.extract_if(|k, _| k.source_id == source_id) {
+            self.current_bytes = self.current_bytes.saturating_sub(block.bytes_size());
+        }
+        self.access_order.retain(|k| k.source_id != source_id);
+    }
+
     pub fn clear(&mut self) {
         self.entries.clear();
         self.access_order.clear();
@@ -220,12 +227,9 @@ impl BlockCache {
     }
 
     pub fn hit_rate(&self) -> f32 {
-        let total = self.hits + self.misses;
-
-        if total == 0 {
-            100.0
-        } else {
-            self.hits as f32 / total as f32 * 100.0
+        match self.hits + self.misses {
+            0 => 100.0,
+            total => self.hits as f32 / total as f32 * 100.0,
         }
     }
 

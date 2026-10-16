@@ -44,7 +44,7 @@ impl WasmIcechunkBlockStore {
                 None => {}
                 Some(ChunkSource::Inline(bytes)) => {
                     if !self.inner.has_key(&key) {
-                        self.inner.insert_key_bytes(&key, &bytes)?;
+                        self.inner.insert_chunk_bytes(&key, bytes)?;
                     }
                 }
                 Some(ChunkSource::Range {

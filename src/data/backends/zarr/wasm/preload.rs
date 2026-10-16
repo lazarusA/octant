@@ -45,9 +45,12 @@ impl WasmZarrBlockStore {
         variable: &VariableInfo,
     ) -> HashMap<String, CoordValues> {
         let mut incomplete = Vec::new();
-        for (path, len) in
-            super::coord_paths::variable_coordinate_arrays(&self.memory_store, variable)
-        {
+        let arrays = super::coord_paths::variable_coordinate_arrays(&self.memory_store, variable);
+        // Kept until read below, whatever other loads fetch meanwhile.
+        let _lease = self
+            .partial_store
+            .lease(Vec::new(), super::partial_store::array_prefixes(&arrays));
+        for (path, len) in arrays {
             let state = self.preload_coordinate_chunks_1d(&path, len).await;
             if state != CoordPreload::Complete {
                 incomplete.push((path, state));
@@ -81,7 +84,7 @@ impl WasmZarrBlockStore {
         }
         let subset = ArraySubset::new_with_ranges(&[0..count]);
         match Box::pin(self.preload_chunks_for_subset(coord_name, &subset, None)).await {
-            Ok(()) => CoordPreload::Complete,
+            Ok(_) => CoordPreload::Complete,
             Err(e) => {
                 log::error!("[WASM Zarr] Coordinate '{coord_name}' partly loaded: {e}");
                 CoordPreload::Partial

@@ -9,6 +9,7 @@ pub mod discovery;
 pub mod header;
 pub mod inspect;
 pub mod loader;
+pub mod manifest_cache;
 pub mod manifests;
 pub mod preload;
 #[cfg(target_arch = "wasm32")]
