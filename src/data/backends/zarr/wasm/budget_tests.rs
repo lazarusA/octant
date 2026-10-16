@@ -116,3 +116,20 @@ fn a_released_url_opens_a_fresh_store() {
     WasmZarrBlockStore::release(url);
     assert!(!Arc::ptr_eq(&open, &WasmZarrBlockStore::get_or_create(url)));
 }
+
+#[test]
+fn a_trim_that_frees_nothing_waits_for_a_release() {
+    let budget = budget();
+    let store = PartialStore::with_budget(budget.clone());
+    let lease = store.lease(vec![key("v/c/0"), key("v/c/1")], Vec::new());
+    store.insert_chunk(&key("v/c/0"), bytes(6 * KB)).expect("0");
+    store.insert_chunk(&key("v/c/1"), bytes(6 * KB)).expect("1");
+    // Leases alone are past the budget: a little more does not trim again.
+    store.insert_chunk(&key("w/c/0"), bytes(KB)).expect("w");
+    assert!(has(&store, "w/c/0"));
+    drop(lease);
+    // Released leases count as just used: the older chunk goes first.
+    assert!(!has(&store, "w/c/0") && !has(&store, "v/c/0"));
+    assert!(has(&store, "v/c/1"));
+    assert_eq!(budget.held(), 6 * KB);
+}

@@ -32,18 +32,18 @@ impl OctantApp {
 
     /// Clears all datasets from `dataset_manager` and resets active dataset state.
     pub fn clear_all_datasets(&mut self) {
-        let sources: Vec<_> = self
+        let sources: Vec<(String, String)> = self
             .dataset_manager
             .iter()
-            .map(|d| d.source.clone())
+            .map(|d| (d.source.id.clone(), d.source.uri.clone()))
             .collect();
         self.dataset_manager.clear();
         crate::data::backends::coord_bounds::evict_coord_values(None);
         self.coordinate_loader = crate::data::blocks::CoordinateLoader::default();
         self.clear_active_metadata();
         self.plate = None;
-        for source in &sources {
-            self.release_dataset_memory(&source.id, &source.uri);
+        for (id, uri) in &sources {
+            self.release_dataset_memory(id, uri);
         }
         self.status_message = "Cleared all datasets from Dataset Manager".to_string();
     }

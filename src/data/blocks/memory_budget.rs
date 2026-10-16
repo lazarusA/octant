@@ -28,6 +28,10 @@ pub struct MemoryBudget {
     limit: u64,
     trim_to: u64,
     held: AtomicU64,
+    /// Held bytes after a trim that could not get under the limit (what is
+    /// left is in use); 0 when the last trim did. No trim runs again until
+    /// something in use is let go or another `limit / 8` is held.
+    stuck_at: AtomicU64,
     /// Orders uses: each use takes the next tick.
     clock: AtomicU64,
     holders: Mutex<Vec<Weak<dyn Evictable>>>,
@@ -40,6 +44,7 @@ impl MemoryBudget {
             limit,
             trim_to: trim_to.min(limit),
             held: AtomicU64::new(0),
+            stuck_at: AtomicU64::new(0),
             clock: AtomicU64::new(0),
             holders: Mutex::new(Vec::new()),
         })
@@ -87,7 +92,9 @@ impl MemoryBudget {
     /// Once past the limit, drops the least recently used objects the
     /// holders let go, until at most `trim_to` bytes are held.
     pub fn trim(&self) {
-        if self.held() <= self.limit {
+        let held = self.held();
+        let stuck_at = self.stuck_at.load(Ordering::Relaxed);
+        if held <= self.limit || (stuck_at > 0 && held < stuck_at + self.limit / 8) {
             return;
         }
         let holders: Vec<Arc<dyn Evictable>> = {
@@ -106,5 +113,15 @@ impl MemoryBudget {
             }
             self.released(holders[i].evict(&key));
         }
+        let left = self.held();
+        let stuck = if left > self.limit { left } else { 0 };
+        self.stuck_at.store(stuck, Ordering::Relaxed);
+    }
+
+    /// Trims once objects in use were let go (a lease released), even if
+    /// the last trim could not.
+    pub fn trim_after_release(&self) {
+        self.stuck_at.store(0, Ordering::Relaxed);
+        self.trim();
     }
 }

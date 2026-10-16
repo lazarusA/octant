@@ -1,7 +1,6 @@
 //! Decoded Icechunk manifests by object id, counted against the
-//! [`MemoryBudget`]. Dropping one is safe at any time: a load holds the
-//! manifests it reads through their `Arc`, and a later load fetches a
-//! dropped one again.
+//! [`MemoryBudget`]. Only manifests no load holds (through their `Arc`) are
+//! dropped, and a later load fetches a dropped one again.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -69,15 +68,23 @@ impl ManifestCache {
 impl Evictable for ManifestCache {
     fn evictable(&self, holder: usize, out: &mut Vec<(u64, usize, String)>) {
         let entries = self.entries.read().unwrap_or_else(|p| p.into_inner());
+        // A manifest a load still holds would stay in memory uncounted.
         out.extend(
             entries
                 .iter()
+                .filter(|(_, c)| Arc::strong_count(&c.manifest) == 1)
                 .map(|(id, c)| (c.last_used.load(Ordering::Relaxed), holder, id.clone())),
         );
     }
 
     fn evict(&self, key: &str) -> u64 {
         let mut entries = self.entries.write().unwrap_or_else(|p| p.into_inner());
+        if entries
+            .get(key)
+            .is_none_or(|c| Arc::strong_count(&c.manifest) > 1)
+        {
+            return 0;
+        }
         entries.remove(key).map_or(0, |c| c.bytes)
     }
 }

@@ -75,10 +75,12 @@ impl PartialStore {
     /// load then fetches again).
     pub fn insert_chunk(&self, key: &StoreKey, bytes: Bytes) -> Result<(), StorageError> {
         let len = bytes.len() as u64;
-        self.whole.set(key, bytes)?;
         let tick = self.budget.tick();
         let freed = {
+            // Under the lock, so that an eviction of `key` cannot erase the
+            // new bytes while they are counted.
             let mut held = self.held_mut();
+            self.whole.set(key, bytes)?;
             let freed = held.forget(key);
             held.uses.insert(
                 key.clone(),
@@ -143,7 +145,7 @@ impl PartialStore {
                 }
             }
         }
-        self.budget.trim();
+        self.budget.trim_after_release();
     }
 }
 
