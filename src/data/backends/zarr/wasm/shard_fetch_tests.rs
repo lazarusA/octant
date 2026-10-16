@@ -10,6 +10,7 @@ use zarrs::storage::store::MemoryStore;
 use super::WasmZarrBlockStore;
 use super::range_server::RangeServer;
 use super::shard_fetch::ShardRef;
+use super::shard_plan::{merge, parse_index, window_ranges};
 use super::shard_tests::{source, source_at, spec_of, whole};
 use crate::data::backends::zarr::GenericZarrBlockStore;
 use crate::data::blocks::BlockStore;
@@ -53,13 +54,29 @@ fn read_window(
     (block.values.to_vec(), sent)
 }
 
+/// The bytes reading the window must fetch from `shard` (of `src`): its
+/// index and the merged ranges of the window's inner chunks. Where zarrs
+/// placed those chunks varies, so this is read from the shard's index.
+fn planned(src: &MemoryStore, shard: &[u8]) -> u64 {
+    let spec = spec_of(src);
+    let range = spec.index_range(shard.len() as u64);
+    let index = &shard[range.start as usize..range.end as usize];
+    let entries = parse_index(&spec, index).expect("index");
+    let window = [10..20, 40..50];
+    let ranges = window_ranges(&spec, &[0, 1], &window, &entries, shard.len() as u64);
+    let chunks: u64 = merge(ranges).iter().map(|r| r.end - r.start).sum();
+    spec.index_len() + chunks
+}
+
 fn expected() -> Vec<f32> {
     (10..20)
         .flat_map(|r| (40..50).map(move |c| (r * 64 + c) as f32))
         .collect()
 }
 
-fn server_with_shard() -> (RangeServer, usize) {
+/// A server holding shard (0, 1) of [`source`] alone and packed at
+/// `PAD..` of a larger object; the shard.
+fn server_with_shard() -> (RangeServer, Vec<u8>) {
     let shard = whole(&source(), "v/c/0/1").to_vec();
     let mut packed = vec![0xAB; PAD];
     packed.extend_from_slice(&shard);
@@ -68,7 +85,7 @@ fn server_with_shard() -> (RangeServer, usize) {
         ("v/c/0/1".to_string(), shard.clone()),
         ("pack".to_string(), packed),
     ]);
-    (RangeServer::start(objects), shard.len())
+    (RangeServer::start(objects), shard)
 }
 
 fn shard_ref(url: String, span: Option<std::ops::Range<u64>>) -> ShardRef {
@@ -82,21 +99,23 @@ fn shard_ref(url: String, span: Option<std::ops::Range<u64>>) -> ShardRef {
 
 #[test]
 fn a_whole_object_shard_is_read_by_its_index_and_window_chunks() {
-    let (server, len) = server_with_shard();
+    let (server, shard) = server_with_shard();
     let url = format!("{}/v/c/0/1", server.base);
-    let (values, sent) = read_window(&server, "zarr", shard_ref(url, None), &source());
+    let src = source();
+    let (values, sent) = read_window(&server, "zarr", shard_ref(url, None), &src);
     assert_eq!(values, expected());
-    assert!((sent as usize) * 2 < len, "{sent} of {len} bytes sent");
+    assert_eq!(sent, planned(&src, &shard));
 }
 
 #[test]
 fn a_packed_shard_is_read_within_its_span() {
-    let (server, len) = server_with_shard();
-    let span = PAD as u64..(PAD + len) as u64;
+    let (server, shard) = server_with_shard();
+    let span = PAD as u64..(PAD + shard.len()) as u64;
     let url = format!("{}/pack", server.base);
-    let (values, sent) = read_window(&server, "icechunk", shard_ref(url, Some(span)), &source());
+    let src = source();
+    let (values, sent) = read_window(&server, "icechunk", shard_ref(url, Some(span)), &src);
     assert_eq!(values, expected());
-    assert!((sent as usize) * 2 < len, "{sent} of {len} bytes sent");
+    assert_eq!(sent, planned(&src, &shard));
 }
 
 #[test]
@@ -119,12 +138,12 @@ fn a_missing_shard_is_empty() {
 fn an_index_at_the_start_is_read_by_its_size_and_a_range() {
     let src = source_at(ShardingIndexLocation::Start);
     let shard = whole(&src, "v/c/0/1").to_vec();
-    let len = shard.len();
-    let server = RangeServer::start(HashMap::from([("v/c/0/1".to_string(), shard)]));
+    let objects = HashMap::from([("v/c/0/1".to_string(), shard.clone())]);
+    let server = RangeServer::start(objects);
     let url = format!("{}/v/c/0/1", server.base);
     let (values, sent) = read_window(&server, "start", shard_ref(url, None), &src);
     assert_eq!(values, expected());
-    assert!((sent as usize) * 2 < len, "{sent} of {len} bytes sent");
+    assert_eq!(sent, planned(&src, &shard));
 }
 
 #[test]
