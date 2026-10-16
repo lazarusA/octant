@@ -25,6 +25,8 @@
 //! whose stack has no such level gets none. The hover's overlay rows read
 //! an overlay's tile under the pointer (`ui/hover/overlays.rs`).
 
+#[cfg(test)]
+mod fetch_tests;
 mod follow;
 #[cfg(test)]
 mod follow_tests;
@@ -36,10 +38,7 @@ mod tests;
 mod tile;
 mod want;
 
-use std::hash::{Hash, Hasher};
-
 use crate::app::OctantApp;
-use crate::app::layers::LevelChoice;
 use crate::app::pipeline::paint_layer::CanvasView;
 use crate::data::BlockCacheKey;
 use crate::data::multiscale::Multiscale;
@@ -226,44 +225,4 @@ impl OctantApp {
         }
         self.request_detail(&want);
     }
-
-    /// Whether `layer`'s tile fetch was lost (aborted: neither pending nor
-    /// cached).
-    fn fetch_lost(&self, layer: &crate::app::layers::Layer) -> bool {
-        layer.data.detail.pending.as_ref().is_some_and(|p| {
-            !self.block_prefetcher.is_pending(&p.key) && !self.block_cache.contains(&p.key)
-        })
-    }
-
-    /// The plot a tile belongs to, when the base layer can have one: a
-    /// heatmap at rest reading a level of a multiscale variable chosen by
-    /// Auto, on a regular grid, without composite.
-    fn detail_context(&self, plot_type: PlotType) -> Option<u64> {
-        let base = &self.layers.base;
-        let plotted = base.selection();
-        // Global (0) and regional (1) regular grids draw cells evenly over
-        // the quad, as tiles do; coordinate lookups (2) and HEALPix don't.
-        let regular = matches!(base.data.matrix.as_ref()?.grid.render_coord_mode(), 0 | 1);
-        let readable = plot_type == PlotType::Heatmap
-            && regular
-            && !self.playback.is_playing
-            && !base.composite.enabled
-            && plotted.level == LevelChoice::Auto
-            && plotted.variable_info()?.multiscale.is_some();
-        let step = self.playback.current_timestep;
-        readable.then(|| plot_hash(plotted, step, &base.data.flipped_dims))
-    }
-}
-
-/// What a plotted selection shows at `step` with `flips`: a tile is kept
-/// while it stays the same.
-fn plot_hash(sel: &crate::app::layers::VariableSelection, step: usize, flips: &[String]) -> u64 {
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    sel.metadata_generation.hash(&mut h);
-    sel.variable_idx.hash(&mut h);
-    sel.dim_ranges.hash(&mut h);
-    sel.dim_indices.hash(&mut h);
-    step.hash(&mut h);
-    flips.hash(&mut h);
-    h.finish()
 }

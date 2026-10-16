@@ -13,7 +13,7 @@ use crate::data::ome::MetaReader;
 use crate::data::ome::test_support::Fixture;
 
 /// A level entry as topozarr writes it: `scale` relative to `derived_from`.
-fn entry(level: usize, cell: f64, translation: f64) -> Value {
+pub(super) fn entry(level: usize, cell: f64, translation: f64) -> Value {
     let size = 32 / (1u64 << level);
     let affine = json!([cell, 0.0, -0.5, 0.0, -cell, 31.5]);
     if level == 0 {
@@ -26,7 +26,7 @@ fn entry(level: usize, cell: f64, translation: f64) -> Value {
     })
 }
 
-fn root(entries: Vec<Value>) -> Value {
+pub(super) fn root(entries: Vec<Value>) -> Value {
     json!({
         "zarr_conventions": [{ "name": "multiscales" }, { "name": "spatial:" }],
         "spatial:dimensions": ["y", "x"],
@@ -34,7 +34,7 @@ fn root(entries: Vec<Value>) -> Value {
     })
 }
 
-fn pyramid_vars() -> Vec<VariableInfo> {
+pub(super) fn pyramid_vars() -> Vec<VariableInfo> {
     let mut vars = Vec::new();
     for l in 0..3u64 {
         let n = 32 >> l;
@@ -44,13 +44,13 @@ fn pyramid_vars() -> Vec<VariableInfo> {
     vars
 }
 
-fn link(attrs: Value, vars: &mut [VariableInfo]) {
+pub(super) fn link(attrs: Value, vars: &mut [VariableInfo]) {
     let store = Fixture::default().v3_group("", attrs).memory();
     let storage: Arc<dyn ReadableStorageTraits> = store;
     link_pyramids(&MetaReader::direct(storage), vars);
 }
 
-fn assert_halving(vars: &[VariableInfo]) {
+pub(super) fn assert_halving(vars: &[VariableInfo]) {
     for (i, v) in vars.iter().enumerate() {
         let r = v.multiscale.as_ref().expect("linked");
         assert_eq!(r.level, i / 2);
@@ -95,37 +95,6 @@ fn chained_transforms_without_affines() {
     ]);
     let mut vars = pyramid_vars();
     link(json!({ "multiscales": { "layout": entries } }), &mut vars);
-    assert_halving(&vars);
-}
-
-#[test]
-fn derived_from_cycles_fall_back_to_the_shapes() {
-    let entries = json!([
-        { "asset": "0", "derived_from": "2", "transform": { "scale": [1.0, 2.0, 2.0] } },
-        { "asset": "1", "derived_from": "0", "transform": { "scale": [1.0, 2.0, 2.0] } },
-        { "asset": "2", "derived_from": "1", "transform": { "scale": [1.0, 2.0, 2.0] } }
-    ]);
-    let mut vars = pyramid_vars();
-    link(json!({ "multiscales": { "layout": entries } }), &mut vars);
-    // The chain loops: factors come from the level shapes instead.
-    assert_halving(&vars);
-}
-
-#[test]
-fn node_registered_affines_locate_cell_centres() {
-    // Each level's affine names its first cell's centre: the corners align.
-    let entries = (0..3)
-        .map(|l| {
-            let cell = (1u64 << l) as f64;
-            let mut e = entry(l, cell, 0.0);
-            e["spatial:transform"] = json!([cell, 0.0, cell / 2.0, 0.0, -cell, 32.0 - cell / 2.0]);
-            e
-        })
-        .collect();
-    let mut attrs = root(entries);
-    attrs["spatial:registration"] = json!("node");
-    let mut vars = pyramid_vars();
-    link(attrs, &mut vars);
     assert_halving(&vars);
 }
 

@@ -25,6 +25,8 @@ pub mod pick;
 pub mod types;
 
 #[cfg(test)]
+mod geozarr_chain_tests;
+#[cfg(test)]
 mod geozarr_tests;
 #[cfg(test)]
 mod listing_tests;

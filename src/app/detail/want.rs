@@ -1,10 +1,14 @@
 //! The finer level a resting view asks for: the finest level of the plotted
 //! multiscale variable with no more cells than screen pixels over the
-//! visible window; and dropping what the plot no longer wants.
+//! visible window; the plot a tile belongs to (`plot_hash`), and dropping
+//! what the plot no longer wants.
+
+use std::hash::{Hash, Hasher};
 
 use super::Want;
 use super::geometry::{Axis, pixels_over};
 use crate::app::OctantApp;
+use crate::app::layers::LevelChoice;
 use crate::app::pipeline::paint_layer::CanvasView;
 use crate::data::multiscale::fit_level;
 use crate::plots::PlotType;
@@ -50,6 +54,33 @@ impl OctantApp {
             axes,
             visible,
         })
+    }
+
+    /// Whether `layer`'s tile fetch was lost (aborted: neither pending nor
+    /// cached).
+    pub(super) fn fetch_lost(&self, layer: &crate::app::layers::Layer) -> bool {
+        layer.data.detail.pending.as_ref().is_some_and(|p| {
+            !self.block_prefetcher.is_pending(&p.key) && !self.block_cache.contains(&p.key)
+        })
+    }
+
+    /// The plot a tile belongs to, when the base layer can have one: a
+    /// heatmap at rest reading a level of a multiscale variable chosen by
+    /// Auto, on a regular grid, without composite.
+    pub(super) fn detail_context(&self, plot_type: PlotType) -> Option<u64> {
+        let base = &self.layers.base;
+        let plotted = base.selection();
+        // Global (0) and regional (1) regular grids draw cells evenly over
+        // the quad, as tiles do; coordinate lookups (2) and HEALPix don't.
+        let regular = matches!(base.data.matrix.as_ref()?.grid.render_coord_mode(), 0 | 1);
+        let readable = plot_type == PlotType::Heatmap
+            && regular
+            && !self.playback.is_playing
+            && !base.composite.enabled
+            && plotted.level == LevelChoice::Auto
+            && plotted.variable_info()?.multiscale.is_some();
+        let step = self.playback.current_timestep;
+        readable.then(|| plot_hash(plotted, step, &base.data.flipped_dims))
     }
 
     /// Drops what no longer belongs to the plot (`context`, `None` when the
@@ -99,4 +130,21 @@ fn level0_window(
             }
         })
         .collect()
+}
+
+/// What a plotted selection shows at `step` with `flips`: a tile is kept
+/// while it stays the same.
+pub(super) fn plot_hash(
+    sel: &crate::app::layers::VariableSelection,
+    step: usize,
+    flips: &[String],
+) -> u64 {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    sel.metadata_generation.hash(&mut h);
+    sel.variable_idx.hash(&mut h);
+    sel.dim_ranges.hash(&mut h);
+    sel.dim_indices.hash(&mut h);
+    step.hash(&mut h);
+    flips.hash(&mut h);
+    h.finish()
 }

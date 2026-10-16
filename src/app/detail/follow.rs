@@ -5,7 +5,8 @@
 
 use std::hash::{Hash, Hasher};
 
-use super::{DetailTile, TilePlan, plot_hash};
+use super::want::plot_hash;
+use super::{DetailTile, TilePlan};
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::app::multiscale::{level_matching, to_level};
