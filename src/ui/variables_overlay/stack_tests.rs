@@ -3,7 +3,8 @@
 
 use egui::{Event, Key, PointerButton, Pos2, RawInput, pos2};
 
-use super::nav::{NodeKey, row_id, visible_row_ids};
+use super::nav::{NodeKey, row_id};
+use super::rows::visible_row_ids;
 use super::stack::stack_state;
 use super::tree::{VariableTreeContext, render_tree_group};
 use crate::app::layers::LevelChoice;
@@ -66,17 +67,15 @@ fn frame(ctx: &egui::Context, events: Vec<Event>) -> Frame {
             selected_idx: usize::MAX,
             selected_level: LevelChoice::Auto,
             search_active: false,
-            newly_selected_idx: None,
-            newly_selected_level: LevelChoice::Auto,
+            newly_selected: None,
             search_id: egui::Id::new("search"),
             search_jump: None,
         };
         render_tree_group(ui, &root, &mut tree);
-        let level = tree.newly_selected_level;
         out = Some(Frame {
             origin,
             row_step,
-            selected: tree.newly_selected_idx.map(|idx| (idx, level)),
+            selected: tree.newly_selected,
         });
     });
     output.textures_delta.clear();
@@ -177,4 +176,27 @@ fn navigation_lists_the_drawn_level_rows() {
         let top = f.origin.y + f.row_step * i as f32;
         assert!((rect.top() - top).abs() < 0.5, "row {i} at {}", rect.top());
     }
+}
+
+#[test]
+fn choosing_a_level_keeps_or_resets_the_dimensions() {
+    use crate::app::test_support::{pyramid_app, selection_of};
+    let (mut app, meta) = pyramid_app();
+    let index = |name: &str| {
+        meta.variables
+            .iter()
+            .position(|v| v.name.trim_matches('/') == name)
+            .expect("variable")
+    };
+    app.selected = selection_of(&mut app, &meta, "0/t2m");
+    app.selected.dim_ranges[0] = (1, 1);
+    // Another level of the selected stack keeps its window.
+    super::body::apply_selection(&mut app, index("0/t2m"), LevelChoice::Pinned(1));
+    assert_eq!(app.selected.level, LevelChoice::Pinned(1));
+    assert_eq!(app.selected.dim_ranges[0], (1, 1));
+    // A level of another stack takes that variable's defaults, keeping the level.
+    super::body::apply_selection(&mut app, index("0/sst"), LevelChoice::Pinned(2));
+    assert_eq!(app.selected.variable_idx, index("0/sst"));
+    assert_eq!(app.selected.level, LevelChoice::Pinned(2));
+    assert_eq!(app.selected.dim_ranges[1..], [(0, 63), (0, 63)]);
 }

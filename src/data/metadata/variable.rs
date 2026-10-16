@@ -47,6 +47,11 @@ impl VariableInfo {
         }
     }
 
+    /// The stack this variable is level 0 of.
+    pub fn stack_base(&self) -> Option<&crate::data::multiscale::LevelRef> {
+        self.multiscale.as_ref().filter(|r| r.is_base())
+    }
+
     /// Whether this is a level other than 0 of a multiscale stack: listed
     /// under its stack's level 0, not on its own.
     pub fn is_coarser_level(&self) -> bool {
@@ -56,8 +61,8 @@ impl VariableInfo {
     /// The name the variable is listed under: its stack's for level 0 of a
     /// multiscale stack, else its leaf name.
     pub fn display_name(&self) -> &str {
-        match &self.multiscale {
-            Some(r) if r.is_base() && !r.set.name.is_empty() => &r.set.name,
+        match self.stack_base() {
+            Some(r) if !r.set.name.is_empty() => &r.set.name,
             _ => self.leaf_name(),
         }
     }
@@ -65,9 +70,9 @@ impl VariableInfo {
     /// The group the variable is listed in: its stack's for level 0 of a
     /// multiscale stack, else its own.
     pub fn display_group(&self) -> &str {
-        match &self.multiscale {
-            Some(r) if r.is_base() => r.set.display_group(),
-            _ => self.group_path().unwrap_or(""),
+        match self.stack_base() {
+            Some(r) => r.set.display_group(),
+            None => self.group_path().unwrap_or(""),
         }
     }
 

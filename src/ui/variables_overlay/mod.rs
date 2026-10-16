@@ -3,6 +3,7 @@ mod focus;
 mod item;
 mod nav;
 mod row;
+mod rows;
 mod search;
 mod stack;
 mod tree;

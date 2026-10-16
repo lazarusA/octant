@@ -12,9 +12,8 @@ pub struct VariableTreeContext<'a> {
     /// The staged level choice, for a multiscale variable.
     pub selected_level: LevelChoice,
     pub search_active: bool,
-    pub newly_selected_idx: Option<usize>,
-    /// The level chosen with `newly_selected_idx`.
-    pub newly_selected_level: LevelChoice,
+    /// The variable clicked or entered this frame, and its level choice.
+    pub newly_selected: Option<(usize, LevelChoice)>,
     /// Search field to return focus to from the first row or on Escape.
     pub search_id: egui::Id,
     /// Pending focus jump requested by a key in the search field.

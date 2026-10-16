@@ -2,7 +2,8 @@
 //! harness in `tests.rs`. Fixture rows with every folder open:
 //! `/` > lat(0), ocean > sst(1), ocean/deep > temp(2), land > lai(3).
 
-use super::nav::{NodeKey, folder_id, folder_state, row_id, visible_row_ids};
+use super::nav::{NodeKey, folder_id, folder_state, row_id};
+use super::rows::visible_row_ids;
 use super::tests::{click, fixture, focus, focused, frame, is_open, press};
 use egui::Key;
 

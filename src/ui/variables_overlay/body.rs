@@ -112,20 +112,18 @@ fn show_tree(
         selected_idx: app.selected.variable_idx,
         selected_level: app.selected.level,
         search_active,
-        newly_selected_idx: None,
-        newly_selected_level: LevelChoice::Auto,
+        newly_selected: None,
         search_id,
         search_jump: jump,
     };
     render_tree_group(ui, root, &mut tree_ctx);
-    let level = tree_ctx.newly_selected_level;
-    tree_ctx.newly_selected_idx.map(|idx| (idx, level))
+    tree_ctx.newly_selected
 }
 
 /// Select variable `idx` at `level`: reset its colorbar label and dimension defaults,
 /// open its controls and read its coordinates in the background. Another level of
 /// the multiscale variable already selected keeps its dimensions.
-fn apply_selection(app: &mut OctantApp, idx: usize, level: LevelChoice) {
+pub(super) fn apply_selection(app: &mut OctantApp, idx: usize, level: LevelChoice) {
     let other_level = app.selected.variable_idx == idx
         && app
             .selected

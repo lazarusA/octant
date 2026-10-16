@@ -105,6 +105,48 @@ pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + '
     }
 }
 
+/// [`retrieve_array_subset_as_label_bits`] through `retriever`.
+fn label_bits<R: SubsetRetriever>(
+    retriever: &R,
+    dt: &DataType,
+    subset: &ArraySubset,
+) -> Result<Option<Vec<f32>>, BlockStoreError> {
+    macro_rules! ids {
+        ($t:ty) => {
+            ids!($t, |_| false)
+        };
+        // `$wide`: whether an id does not fit 32 bits (64-bit types).
+        ($t:ty, $wide:expr) => {{
+            let vals: Vec<$t> = retriever.retrieve_subset(subset)?;
+            if vals.iter().copied().any($wide) {
+                report_wide_label_ids();
+            }
+            Ok(Some(
+                vals.into_iter().map(|v| f32::from_bits(v as u32)).collect(),
+            ))
+        }};
+    }
+    if dt.is::<UInt8DataType>() {
+        ids!(u8)
+    } else if dt.is::<UInt16DataType>() {
+        ids!(u16)
+    } else if dt.is::<UInt32DataType>() {
+        ids!(u32)
+    } else if dt.is::<UInt64DataType>() {
+        ids!(u64, |v: u64| u32::try_from(v).is_err())
+    } else if dt.is::<Int8DataType>() {
+        ids!(i8)
+    } else if dt.is::<Int16DataType>() {
+        ids!(i16)
+    } else if dt.is::<Int32DataType>() {
+        ids!(i32)
+    } else if dt.is::<Int64DataType>() {
+        ids!(i64, |v: i64| u32::try_from(v).is_err())
+    } else {
+        Ok(None)
+    }
+}
+
 /// Reads an integer array subset as label ids, kept exact: each value's low
 /// 32 bits are stored as the bits of an `f32` (read back with `f32::to_bits`),
 /// never converted. 64-bit ids beyond 32 bits share colors with the ids of
@@ -114,51 +156,11 @@ pub fn retrieve_array_subset_as_label_bits<TStorage: ?Sized + ReadableStorageTra
     reader: ChunkReader<'_>,
     subset: &ArraySubset,
 ) -> Result<Option<Vec<f32>>, BlockStoreError> {
-    fn bits<R: SubsetRetriever>(
-        retriever: &R,
-        dt: &DataType,
-        subset: &ArraySubset,
-    ) -> Result<Option<Vec<f32>>, BlockStoreError> {
-        macro_rules! ids {
-            ($t:ty) => {
-                ids!($t, |_| false)
-            };
-            // `$wide`: whether an id does not fit 32 bits (64-bit types).
-            ($t:ty, $wide:expr) => {{
-                let vals: Vec<$t> = retriever.retrieve_subset(subset)?;
-                if vals.iter().copied().any($wide) {
-                    report_wide_label_ids();
-                }
-                Ok(Some(
-                    vals.into_iter().map(|v| f32::from_bits(v as u32)).collect(),
-                ))
-            }};
-        }
-        if dt.is::<UInt8DataType>() {
-            ids!(u8)
-        } else if dt.is::<UInt16DataType>() {
-            ids!(u16)
-        } else if dt.is::<UInt32DataType>() {
-            ids!(u32)
-        } else if dt.is::<UInt64DataType>() {
-            ids!(u64, |v: u64| u32::try_from(v).is_err())
-        } else if dt.is::<Int8DataType>() {
-            ids!(i8)
-        } else if dt.is::<Int16DataType>() {
-            ids!(i16)
-        } else if dt.is::<Int32DataType>() {
-            ids!(i32)
-        } else if dt.is::<Int64DataType>() {
-            ids!(i64, |v: i64| u32::try_from(v).is_err())
-        } else {
-            Ok(None)
-        }
-    }
     let dt = array.data_type();
     match reader {
-        ChunkReader::Direct => bits(array, dt, subset),
-        ChunkReader::Cached(c) => bits(c, dt, subset),
-        ChunkReader::Sharded(cache) => bits(&Sharded { array, cache }, dt, subset),
+        ChunkReader::Direct => label_bits(array, dt, subset),
+        ChunkReader::Cached(c) => label_bits(c, dt, subset),
+        ChunkReader::Sharded(cache) => label_bits(&Sharded { array, cache }, dt, subset),
     }
 }
 

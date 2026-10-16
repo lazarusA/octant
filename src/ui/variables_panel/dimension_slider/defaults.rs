@@ -43,7 +43,7 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
 
     apply_omero_defaults(app, var_info);
     finalize_active_configs(app, var_info, rank);
-    if var_info.multiscale.as_ref().is_some_and(|r| r.is_base()) {
+    if var_info.stack_base().is_some() {
         whole_spatial_extent(app, var_info);
     } else {
         clamp_2d_selection_to_gpu_limits(app, var_info);

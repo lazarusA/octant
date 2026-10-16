@@ -70,23 +70,50 @@ pub fn show_hover_tooltip(
     let Some(hover_pos) = response.hover_pos().filter(|_| app.layout.show_hover_card) else {
         return;
     };
-    let base = &app.layers.base;
-    let matrix =
-        (base.data.matrix.as_ref()).filter(|m| m.width > 0 && m.height > 0 && !m.values.is_empty());
+    let matrix = (app.layers.base.data.matrix.as_ref())
+        .filter(|m| m.width > 0 && m.height > 0 && !m.values.is_empty());
     let sampler = VolumeSampler::from_app(app, matrix);
     let sampler = sampler.as_ref();
     let hit = (matrix.is_some() || sampler.is_some())
         .then(|| hit_cache::resolve_hit(app, ctx, matrix, sampler, rect, hover_pos));
-    let Some((camera, hit)) = hit.flatten() else {
-        return;
-    };
+    if let Some((camera, hit)) = hit.flatten() {
+        let sample = HoverSample {
+            matrix,
+            sampler,
+            camera,
+            hit,
+        };
+        show_sample(app, ctx, ui, rect, hover_pos, &sample);
+    }
+}
+
+/// What the pointer hovers: the plotted data, the hit and the camera it was
+/// resolved with.
+struct HoverSample<'a> {
+    matrix: Option<&'a crate::data::MatrixData>,
+    sampler: Option<&'a VolumeSampler<'a>>,
+    camera: Camera3D,
+    hit: HitResult,
+}
+
+/// The hover card of `sample`, with its leader to the hovered point.
+fn show_sample(
+    app: &OctantApp,
+    ctx: &egui::Context,
+    ui: &mut egui::Ui,
+    rect: Rect,
+    hover_pos: Pos2,
+    sample: &HoverSample,
+) {
+    let (matrix, sampler, hit) = (sample.matrix, sample.sampler, &sample.hit);
     let (meta, var, var_name, units) = resolve_hover_target_info(app);
     let (raw_val, mut fields, px, py) =
-        resolve_cell_value_and_dim_entries(app, matrix, meta, var, sampler, &hit);
+        resolve_cell_value_and_dim_entries(app, matrix, meta, var, sampler, hit);
     let point = hit.point_3d;
     let plot_type = app.effective_canvas_plot_type();
     let pixel = (point.is_none() && plot_type != PlotType::Line).then_some((px, py));
     // A label image reads its id, color and properties instead of a value.
+    let base = &app.layers.base;
     let composite = match base.labels() {
         Some(_) => None,
         None => composite::composite_rows(app, ctx, meta, var, units, pixel, &mut fields),
@@ -95,23 +122,12 @@ pub fn show_hover_tooltip(
         draw_line_guidelines_and_reticle(app, ctx, ui, rect, px, raw_val);
     }
     let transform = Transform2D::from_app(app, rect);
-    let target =
-        resolve_target_screen_pos(app, matrix, &camera, sampler, &transform, px, py, point);
-    // Over a multiscale plot's detail tile, the reticle sits on its cell.
-    let heatmap = plot_type == PlotType::Heatmap && point.is_none();
-    let tile_cell = heatmap
-        .then(|| detail::detail_cell(app, hit.norm_x, hit.norm_y))
-        .flatten();
-    // The level read under the pointer, for a multiscale plot.
-    if let Some(level) = heatmap
-        .then(|| detail::level_field(app, tile_cell.as_ref()))
-        .flatten()
-    {
-        fields.push(level);
+    let camera = &sample.camera;
+    let mut target =
+        resolve_target_screen_pos(app, matrix, camera, sampler, &transform, px, py, point);
+    if plot_type == PlotType::Heatmap && point.is_none() {
+        target = detail_overrides(app, hit, &transform, target, &mut fields);
     }
-    let target = tile_cell.map_or(target, |c| {
-        Some(transform.norm_to_screen(c.center.0, c.center.1))
-    });
     let swatch = || resolve_hover_color(app, raw_val, py);
     let (value, swatch, units) = labels::layer_reading(base, raw_val, composite, units, swatch);
     let long_name = var.and_then(|v| v.long_name.as_deref());
@@ -123,11 +139,27 @@ pub fn show_hover_tooltip(
         layers: &[],
         fields: &fields,
     };
-    let at = pixel.map(|cell| overlays::HoverAt {
-        cell,
-        norm: (hit.norm_x, hit.norm_y),
-    });
+    let norm = (hit.norm_x, hit.norm_y);
+    let at = pixel.map(|cell| overlays::HoverAt { cell, norm });
     paint_hover_card(app, ctx, rect, (hover_pos, target), plot_type, at, card);
+}
+
+/// Over a multiscale heatmap: the level row read under the pointer, and the
+/// reticle on the detail tile's cell when a tile is drawn there.
+fn detail_overrides(
+    app: &OctantApp,
+    hit: &HitResult,
+    transform: &Transform2D,
+    target: Option<Pos2>,
+    fields: &mut Vec<HoverField>,
+) -> Option<Pos2> {
+    let tile_cell = detail::detail_cell(app, hit.norm_x, hit.norm_y);
+    if let Some(level) = detail::level_field(app, tile_cell.as_ref()) {
+        fields.push(level);
+    }
+    tile_cell.map_or(target, |c| {
+        Some(transform.norm_to_screen(c.center.0, c.center.1))
+    })
 }
 
 fn resolve_hover_target_info(

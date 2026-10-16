@@ -69,23 +69,21 @@ fn level_row(
 }
 
 fn select(ctx: &mut VariableTreeContext<'_>, idx: usize, level: LevelChoice) {
-    ctx.newly_selected_idx = Some(idx);
-    ctx.newly_selected_level = level;
+    ctx.newly_selected = Some((idx, level));
 }
 
 /// `shape` as `a x b x c`, in `buf`.
 fn shape_text<'b>(buf: &'b mut [u8], shape: &[u64]) -> &'b str {
-    use std::io::Write;
-    let len = buf.len();
-    let mut cursor = std::io::Cursor::new(&mut buf[..]);
-    for (i, n) in shape.iter().enumerate() {
-        let sep = if i == 0 { "" } else { " x " };
-        if write!(cursor, "{sep}{n}").is_err() {
-            break;
+    struct Shape<'s>(&'s [u64]);
+    impl std::fmt::Display for Shape<'_> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            for (i, n) in self.0.iter().enumerate() {
+                write!(f, "{}{n}", if i == 0 { "" } else { " x " })?;
+            }
+            Ok(())
         }
     }
-    let end = (cursor.position() as usize).min(len);
-    std::str::from_utf8(&buf[..end]).unwrap_or("")
+    crate::utils::stack_str::stack_str(buf, format_args!("{}", Shape(shape)))
 }
 
 /// Whether a multiscale variable's levels are folded down: closed until
@@ -97,6 +95,5 @@ pub fn stack_state(ctx: &Context, idx: usize, search_active: bool) -> Collapsing
 
 /// The levels of variable `idx` when it is level 0 of a multiscale stack.
 pub(super) fn stack_levels(variables: &[VariableInfo], idx: usize) -> Option<usize> {
-    let r = variables.get(idx)?.multiscale.as_ref()?;
-    r.is_base().then(|| r.set.len())
+    Some(variables.get(idx)?.stack_base()?.set.len())
 }

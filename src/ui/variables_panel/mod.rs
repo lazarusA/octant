@@ -91,11 +91,12 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> GripAction {
 /// level of the plotted level count (and whether Auto chose it), or the
 /// staged choice before it is plotted.
 fn level_note(app: &OctantApp, ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) {
-    if !var_info.multiscale.as_ref().is_some_and(|r| r.is_base()) {
+    if var_info.stack_base().is_none() {
         return;
     }
     let choice = app.selected.level;
-    let shown = (!app.is_exploring_unplotted_variable())
+    // The plotted level, while the staged choice is the one plotted.
+    let shown = (!app.is_exploring_unplotted_variable() && app.plotted().level == choice)
         .then(|| app.plotted().variable_info()?.multiscale.as_ref())
         .flatten();
     let mut buf = [0; 128];

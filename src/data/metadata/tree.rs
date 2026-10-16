@@ -75,17 +75,7 @@ impl VariableTreeGroup {
         let mut filtered_vars = Vec::new();
         for &idx in &self.variable_indices {
             if let Some(var) = variables.get(idx)
-                && (group_matches
-                    || var.name.to_lowercase().contains(query_lower)
-                    || var.display_name().to_lowercase().contains(query_lower)
-                    || var
-                        .long_name
-                        .as_deref()
-                        .is_some_and(|l| l.to_lowercase().contains(query_lower))
-                    || var
-                        .units
-                        .as_deref()
-                        .is_some_and(|u| u.to_lowercase().contains(query_lower)))
+                && (group_matches || var_matches(var, query_lower))
             {
                 filtered_vars.push(idx);
             }
@@ -125,6 +115,32 @@ impl VariableTreeGroup {
         }
     }
 
+    /// The subgroup at `path` (`a/b/c`), created where missing; `self` for
+    /// an empty path.
+    fn group_at(&mut self, path: &str) -> &mut Self {
+        let mut group = self;
+        let mut full_path = String::new();
+        for seg in path.split('/').filter(|s| !s.is_empty()) {
+            if !full_path.is_empty() {
+                full_path.push('/');
+            }
+            full_path.push_str(seg);
+            let i = match group.subgroups.iter().position(|g| g.name == seg) {
+                Some(i) => i,
+                None => {
+                    group.subgroups.push(VariableTreeGroup {
+                        name: seg.to_string(),
+                        full_path: full_path.clone(),
+                        ..Default::default()
+                    });
+                    group.subgroups.len() - 1
+                }
+            };
+            group = &mut group.subgroups[i];
+        }
+        group
+    }
+
     /// Builds a hierarchical variable tree from a slice of VariableInfo.
     pub fn build_tree_from_variables(variables: &[VariableInfo]) -> VariableTreeGroup {
         let mut root = VariableTreeGroup {
@@ -135,51 +151,24 @@ impl VariableTreeGroup {
         // Coarser levels of a multiscale stack are listed under its level 0,
         // which sits in the group its levels share.
         for (idx, var) in variables.iter().enumerate() {
-            if var.is_coarser_level() {
-                continue;
-            }
-            let segments: Vec<&str> = var
-                .display_group()
-                .split('/')
-                .filter(|s| !s.is_empty())
-                .collect();
-
-            if segments.is_empty() {
-                // Root-level variable
-                root.variable_indices.push(idx);
-            } else {
-                // Nested variable: traverse / insert subgroups
-                let mut current_group = &mut root;
-                let mut current_path = String::new();
-
-                for &seg in &segments {
-                    if !current_path.is_empty() {
-                        current_path.push('/');
-                    }
-                    current_path.push_str(seg);
-
-                    let pos = current_group.subgroups.iter().position(|g| g.name == seg);
-
-                    let sub_idx = match pos {
-                        Some(p) => p,
-                        None => {
-                            current_group.subgroups.push(VariableTreeGroup {
-                                name: seg.to_string(),
-                                full_path: current_path.clone(),
-                                ..Default::default()
-                            });
-                            current_group.subgroups.len() - 1
-                        }
-                    };
-
-                    current_group = &mut current_group.subgroups[sub_idx];
-                }
-
-                current_group.variable_indices.push(idx);
+            if !var.is_coarser_level() {
+                root.group_at(var.display_group())
+                    .variable_indices
+                    .push(idx);
             }
         }
 
         root.recount();
         root
     }
+}
+
+/// Whether `var`'s name, listed name, long name or units contain
+/// `query_lower` (lowercase).
+fn var_matches(var: &VariableInfo, query_lower: &str) -> bool {
+    let has = |text: &str| text.to_lowercase().contains(query_lower);
+    has(&var.name)
+        || has(var.display_name())
+        || var.long_name.as_deref().is_some_and(has)
+        || var.units.as_deref().is_some_and(has)
 }

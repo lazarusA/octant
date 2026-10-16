@@ -12,13 +12,8 @@ use std::ops::Range;
 
 use crate::app::layers::{LevelChoice, VariableSelection};
 use crate::app::{DimConfig, OctantApp};
-use crate::data::multiscale::{LevelRef, fit_level, pinned_level};
+use crate::data::multiscale::{fit_level, pinned_level};
 use crate::data::{DatasetMetadata, VariableInfo};
-
-/// The level-0 stack variable `var` is level 0 of.
-fn base_ref(var: &VariableInfo) -> Option<&LevelRef> {
-    var.multiscale.as_ref().filter(|r| r.is_base())
-}
 
 /// The index of variable `path` in `meta`.
 fn variable_index(meta: &DatasetMetadata, path: &str) -> Option<usize> {
@@ -93,7 +88,7 @@ fn window(selection: &VariableSelection, shape: &[u64]) -> Vec<Range<u64>> {
 /// variable is missing.
 pub(crate) fn at_level(selection: &VariableSelection, level: usize) -> Option<VariableSelection> {
     let var = selection.variable_info()?;
-    let set = base_ref(var)?.set.clone();
+    let set = var.stack_base()?.set.clone();
     let meta = selection.metadata.as_ref()?;
     let idx = variable_index(meta, &set.level(level)?.path)?;
     let mut moved = selection.clone();
@@ -139,7 +134,7 @@ pub(crate) fn at_level_named(
     selection: &VariableSelection,
     path: &str,
 ) -> Option<VariableSelection> {
-    let set = &base_ref(selection.variable_info()?)?.set;
+    let set = &selection.variable_info()?.stack_base()?.set;
     let path = path.trim_matches('/');
     let level = set
         .levels
@@ -195,7 +190,7 @@ impl OctantApp {
     /// one within the memory budget.
     pub(crate) fn selection_level(&self, selection: &VariableSelection) -> Option<usize> {
         let var = selection.variable_info()?;
-        let set = &base_ref(var)?.set;
+        let set = &var.stack_base()?.set;
         let demand = crate::app::controllers::controller_for(selection.plot_type)
             .resolution_demand(var, &selection.dim_config, self.layout.canvas_px);
         let window = window(selection, &var.shape);
@@ -210,7 +205,7 @@ impl OctantApp {
     pub(crate) fn level_variable_idx(&self, selection: &VariableSelection) -> usize {
         let level = self.selection_level(selection).filter(|&l| l > 0);
         let idx = level.and_then(|l| {
-            let set = &base_ref(selection.variable_info()?)?.set;
+            let set = &selection.variable_info()?.stack_base()?.set;
             variable_index(selection.metadata.as_ref()?, &set.level(l)?.path)
         });
         idx.unwrap_or(selection.variable_idx)
