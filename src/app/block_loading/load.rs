@@ -215,7 +215,7 @@ impl OctantApp {
             layer.load.block_key = None;
         }
         if id == LayerId::BASE {
-            self.sync_plotted_state_from_selected();
+            self.sync_plotted_state_for(Some(&block.variable_name));
         }
         let Some(layer) = self.layers.get_mut(id) else {
             return false;

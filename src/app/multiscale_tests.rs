@@ -123,3 +123,15 @@ fn overlays_follow_the_base_level() {
     assert_eq!(name, Some("1/sst"));
     assert_ne!(id, LayerId::BASE);
 }
+
+#[test]
+fn a_block_arriving_after_a_resize_plots_its_own_level() {
+    let (mut app, meta) = pyramid_app();
+    stage(&mut app, &meta, "0/t2m", 20);
+    app.plot_selection();
+    // The canvas grows while level 2's block is fetched: Auto would now
+    // read level 0, but the block that arrives is level 2's.
+    app.layout.canvas_px = [500, 500];
+    poll_until(&mut app, |app| app.layers.base.data.matrix.is_some());
+    assert_eq!(plotted_name(&app), "2/t2m");
+}

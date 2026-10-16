@@ -133,6 +133,21 @@ pub(crate) fn at_base(selection: &VariableSelection) -> Option<VariableSelection
     Some(moved)
 }
 
+/// `selection` (of a stack's level 0) moved onto the level whose variable
+/// is `path`; `None` when that is level 0 or no level of the stack.
+pub(crate) fn at_level_named(
+    selection: &VariableSelection,
+    path: &str,
+) -> Option<VariableSelection> {
+    let set = &base_ref(selection.variable_info()?)?.set;
+    let path = path.trim_matches('/');
+    let level = set
+        .levels
+        .iter()
+        .position(|l| l.path.trim_matches('/') == path)?;
+    (level > 0).then(|| at_level(selection, level)).flatten()
+}
+
 /// `selection`, of any level of a stack (or of no stack, as level 0),
 /// moved onto its `level`.
 pub(crate) fn to_level(selection: &VariableSelection, level: usize) -> Option<VariableSelection> {

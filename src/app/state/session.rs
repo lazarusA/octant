@@ -147,8 +147,14 @@ impl OctantApp {
 
     /// Synchronizes all plotted configuration fields from the current UI selection.
     pub fn sync_plotted_state_from_selected(&mut self) {
+        self.sync_plotted_state_for(None);
+    }
+
+    /// [`Self::sync_plotted_state_from_selected`] for the block of variable
+    /// `shown` (a level of a multiscale stack) that arrived.
+    pub(crate) fn sync_plotted_state_for(&mut self, shown: Option<&str>) {
         let is_new_var = self.is_exploring_unplotted_variable();
-        self.copy_selected_to_plotted();
+        self.copy_selected_to_plotted(shown);
 
         if is_new_var {
             self.enable_pyramid_resampling = false;

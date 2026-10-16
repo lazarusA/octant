@@ -106,7 +106,7 @@ impl OctantApp {
         };
         layer.load.pending_target_step = None;
         if id == LayerId::BASE {
-            self.sync_plotted_state_from_selected();
+            self.sync_plotted_state_for(Some(&block.variable_name));
         }
         let since = self.layers.get(id).map_or(0, |l| l.data.volume_allocations);
         self.apply_block_projection(id, block);

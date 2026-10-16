@@ -198,10 +198,16 @@ impl crate::app::OctantApp {
         self.layers.base.selection()
     }
 
-    /// Copies the staged selection into the plotted one, on the level it
-    /// reads for a multiscale variable.
-    pub(crate) fn copy_selected_to_plotted(&mut self) {
-        match self.resolve_level(&self.selected) {
+    /// Copies the staged selection into the plotted one, on the level of
+    /// its stack whose variable is `shown` (a block that arrived, which may
+    /// be another level than the canvas asks for now), else the level it
+    /// reads.
+    pub(crate) fn copy_selected_to_plotted(&mut self, shown: Option<&str>) {
+        let moved = match shown {
+            Some(path) => crate::app::multiscale::at_level_named(&self.selected, path),
+            None => self.resolve_level(&self.selected),
+        };
+        match moved {
             Some(level) => *self.layers.base.selection_mut() = level,
             None => self.layers.base.selection_mut().clone_from(&self.selected),
         }
