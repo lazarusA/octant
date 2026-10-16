@@ -155,7 +155,10 @@ impl Walk<'_, '_> {
     fn add_image(&mut self, image: OmeImage, depth: usize) {
         let image = Arc::new(image);
         match image_variables(self.reader, &image) {
-            Ok(vars) => self.found.variables.extend(vars),
+            Ok(mut vars) => {
+                crate::data::multiscale::ome::link_image(&image, &mut vars);
+                self.found.variables.extend(vars);
+            }
             Err(Pending) => self.pending = true,
         }
         let labels = join(&image.group, "labels");

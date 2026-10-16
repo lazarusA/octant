@@ -3,7 +3,9 @@ mod focus;
 mod item;
 mod nav;
 mod row;
+mod rows;
 mod search;
+mod stack;
 mod tree;
 
 #[cfg(test)]
@@ -12,6 +14,8 @@ mod nav_tests;
 mod open_tests;
 #[cfg(test)]
 mod search_tests;
+#[cfg(test)]
+mod stack_tests;
 #[cfg(test)]
 mod tests;
 

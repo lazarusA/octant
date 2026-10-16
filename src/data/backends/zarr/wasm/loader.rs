@@ -26,6 +26,14 @@ impl WasmZarrBlockStore {
             &format!("/{clean_var}"),
         )
         .map_err(|e| format!("Failed to open array '{clean_var}': {e}"))?;
+        // A sharded array with a plain index: its index and the subset's
+        // inner chunks, by range.
+        if let Some(spec) = super::shard_plan::ShardIndexSpec::of_array(&array) {
+            let shards = self.shards_of(&array, clean_var, subset);
+            return self
+                .fetch_shard_parts(&spec, &shards, &subset.to_ranges(), &mut on_progress)
+                .await;
+        }
         let missing = self.missing_chunks(&array, clean_var, subset);
         if !missing.is_empty() {
             log::info!(
@@ -44,13 +52,28 @@ impl WasmZarrBlockStore {
         clean_var: &str,
         subset: &ArraySubset,
     ) -> Vec<(String, String)> {
+        self.shards_of(array, clean_var, subset)
+            .into_iter()
+            .filter(|c| !self.has_key(&c.key))
+            .map(|c| (c.key, c.url))
+            .collect()
+    }
+
+    /// The chunks (shards, for a sharded array) `subset` touches, with their
+    /// store keys and URLs.
+    fn shards_of<S: ?Sized + zarrs::storage::ReadableStorageTraits + 'static>(
+        &self,
+        array: &zarrs::array::Array<S>,
+        clean_var: &str,
+        subset: &ArraySubset,
+    ) -> Vec<super::shard_fetch::ShardRef> {
         let Ok(Some(chunks)) = array.chunks_in_array_subset(subset) else {
             return Vec::new();
         };
         chunks
             .indices()
             .into_iter()
-            .filter_map(|indices| {
+            .map(|indices| {
                 let key = array.chunk_key(&indices).as_str().to_string();
                 let key =
                     if clean_var.is_empty() || clean_var == "data" || key.starts_with(clean_var) {
@@ -59,7 +82,12 @@ impl WasmZarrBlockStore {
                         format!("{clean_var}/{key}")
                     };
                 let url = format!("{}/{}", self.base_url, key);
-                (!self.has_key(&key)).then_some((key, url))
+                super::shard_fetch::ShardRef {
+                    key,
+                    url,
+                    indices: indices.to_vec(),
+                    span: None,
+                }
             })
             .collect()
     }

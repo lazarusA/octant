@@ -7,7 +7,6 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::data::DatasetMetadata;
 use crate::data::blocks::BlockStoreError;
-use zarrs::storage::store::MemoryStore;
 use zarrs::storage::{ReadableWritableListableStorage, StoreKey, WritableStorageTraits};
 
 mod consolidated;
@@ -15,13 +14,23 @@ pub mod coord_paths;
 pub mod inspect;
 pub mod loader;
 pub mod ome;
+pub mod partial_store;
 pub mod preload;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod range_server;
+pub(crate) mod shard_fetch;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod shard_fetch_tests;
+pub mod shard_plan;
+#[cfg(test)]
+mod shard_tests;
 pub mod store;
 
 pub use inspect::inspect_wasm_remote_zarr;
 #[cfg(target_arch = "wasm32")]
 pub(crate) use loader::CONCURRENT_FETCHES;
 pub use loader::load_one_wasm_with_progress;
+use partial_store::PartialStore;
 
 /// Metadata keys fetched at once while discovering OME-Zarr stores.
 pub(crate) const CONCURRENT_METADATA_FETCHES: usize = 16;
@@ -40,6 +49,8 @@ static WASM_STORES_DESKTOP: OnceLock<Mutex<HashMap<String, Arc<WasmZarrBlockStor
 pub struct WasmZarrBlockStore {
     pub base_url: String,
     pub memory_store: ReadableWritableListableStorage,
+    /// The same store, with the parts of shards fetched by range.
+    pub partial_store: Arc<PartialStore>,
     pub metadata: RwLock<Option<DatasetMetadata>>,
     pub is_local_notice: bool,
     pub generic_store: crate::data::backends::zarr::GenericZarrBlockStore,
@@ -54,7 +65,8 @@ impl WasmZarrBlockStore {
             if let Some(store) = map.get(&clean_url) {
                 store.clone()
             } else {
-                let memory_store: ReadableWritableListableStorage = Arc::new(MemoryStore::new());
+                let partial_store = Arc::new(PartialStore::new());
+                let memory_store: ReadableWritableListableStorage = partial_store.clone();
                 let generic_store = crate::data::backends::zarr::GenericZarrBlockStore::new(
                     memory_store.clone(),
                     &clean_url,
@@ -64,6 +76,7 @@ impl WasmZarrBlockStore {
                 let new_store = Arc::new(Self {
                     base_url: clean_url.clone(),
                     memory_store,
+                    partial_store,
                     metadata: RwLock::new(None),
                     is_local_notice: false,
                     generic_store,
@@ -82,7 +95,8 @@ impl WasmZarrBlockStore {
         if let Some(store) = guard.get(&clean_url) {
             store.clone()
         } else {
-            let memory_store: ReadableWritableListableStorage = Arc::new(MemoryStore::new());
+            let partial_store = Arc::new(PartialStore::new());
+            let memory_store: ReadableWritableListableStorage = partial_store.clone();
             let generic_store = crate::data::backends::zarr::GenericZarrBlockStore::new(
                 memory_store.clone(),
                 &clean_url,
@@ -92,6 +106,7 @@ impl WasmZarrBlockStore {
             let new_store = Arc::new(Self {
                 base_url: clean_url.clone(),
                 memory_store,
+                partial_store,
                 metadata: RwLock::new(None),
                 is_local_notice: false,
                 generic_store,
@@ -102,7 +117,8 @@ impl WasmZarrBlockStore {
     }
 
     pub fn open_local_notice(path: &str) -> Arc<Self> {
-        let memory_store: ReadableWritableListableStorage = Arc::new(MemoryStore::new());
+        let partial_store = Arc::new(PartialStore::new());
+        let memory_store: ReadableWritableListableStorage = partial_store.clone();
         let generic_store = crate::data::backends::zarr::GenericZarrBlockStore::new(
             memory_store.clone(),
             path,
@@ -112,6 +128,7 @@ impl WasmZarrBlockStore {
         Arc::new(Self {
             base_url: path.to_string(),
             memory_store,
+            partial_store,
             metadata: RwLock::new(None),
             is_local_notice: true,
             generic_store,

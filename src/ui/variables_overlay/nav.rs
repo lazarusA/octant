@@ -4,7 +4,8 @@
 //! specific row. The visible row list is only built on frames where a
 //! navigation key is pressed; idle frames allocate nothing.
 
-use super::item::MAX_ITEMS_PER_LEVEL;
+use super::rows::{Row, visible_rows};
+use super::stack::stack_state;
 use super::tree::VariableTreeContext;
 use crate::data::VariableTreeGroup;
 use crate::ui::key_focus;
@@ -17,9 +18,11 @@ use egui::{Context, Id, Key, Modifiers};
 pub enum NodeKey<'a> {
     Folder(&'a str),
     Variable(usize),
+    /// Level `.1` of the multiscale variable whose level 0 is variable `.0`.
+    Level(usize, usize),
 }
 
-fn base_id() -> Id {
+pub(super) fn base_id() -> Id {
     Id::new("octant_variables_tree")
 }
 
@@ -40,7 +43,7 @@ pub fn folder_state(ctx: &Context, full_path: &str, search_active: bool) -> Coll
     CollapsingState::load_with_default_open(ctx, id, search_active)
 }
 
-fn is_folder_open(ctx: &Context, full_path: &str, search_active: bool) -> bool {
+pub(super) fn is_folder_open(ctx: &Context, full_path: &str, search_active: bool) -> bool {
     folder_state(ctx, full_path, search_active).is_open()
 }
 
@@ -53,79 +56,15 @@ pub enum SearchJump {
     FirstVariable,
 }
 
-#[derive(Clone, Copy)]
-struct Row<'a> {
-    key: NodeKey<'a>,
-    parent: Option<usize>,
-    open: Option<bool>,
-}
-
-/// Visible rows in display order, mirroring `tree::render_tree_group`.
-fn visible_rows<'a>(ctx: &Context, root: &'a VariableTreeGroup, search: bool) -> Vec<Row<'a>> {
-    let mut rows = Vec::new();
-    let vars = |rows: &mut Vec<Row<'a>>, indices: &[usize], parent| {
-        for &idx in indices.iter().take(MAX_ITEMS_PER_LEVEL) {
-            let key = NodeKey::Variable(idx);
-            rows.push(Row {
-                key,
-                parent,
-                open: None,
-            });
-        }
-    };
-    if !root.variable_indices.is_empty() {
-        if root.subgroups.is_empty() {
-            vars(&mut rows, &root.variable_indices, None);
-        } else {
-            let open = is_folder_open(ctx, "", search);
-            rows.push(Row {
-                key: NodeKey::Folder(""),
-                parent: None,
-                open: Some(open),
-            });
-            if open {
-                let me = Some(rows.len() - 1);
-                vars(&mut rows, &root.variable_indices, me);
-            }
-        }
-    }
-    let mut stack: Vec<(&VariableTreeGroup, Option<usize>)> = Vec::new();
-    let push_groups = |stack: &mut Vec<_>, groups: &'a [VariableTreeGroup], parent| {
-        let shown = &groups[..groups.len().min(MAX_ITEMS_PER_LEVEL)];
-        stack.extend(shown.iter().rev().map(|g| (g, parent)));
-    };
-    push_groups(&mut stack, &root.subgroups, None);
-    while let Some((group, parent)) = stack.pop() {
-        let open = is_folder_open(ctx, &group.full_path, search);
-        let key = NodeKey::Folder(&group.full_path);
-        rows.push(Row {
-            key,
-            parent,
-            open: Some(open),
-        });
-        if open {
-            let me = Some(rows.len() - 1);
-            vars(&mut rows, &group.variable_indices, me);
-            push_groups(&mut stack, &group.subgroups, me);
-        }
-    }
-    rows
-}
-
-/// Row ids in navigation order, for checking it against the drawn order.
-#[cfg(test)]
-pub fn visible_row_ids(ctx: &Context, root: &VariableTreeGroup, search: bool) -> Vec<Id> {
-    let rows = visible_rows(ctx, root, search);
-    rows.iter().map(|r| row_id(r.key, search)).collect()
-}
-
 fn set_open(ctx: &Context, key: NodeKey<'_>, search: bool, open: bool) {
-    if let NodeKey::Folder(path) = key {
-        let mut state = folder_state(ctx, path, search);
-        state.set_open(open);
-        state.store(ctx);
-        ctx.request_repaint();
-    }
+    let mut state = match key {
+        NodeKey::Folder(path) => folder_state(ctx, path, search),
+        NodeKey::Variable(idx) => stack_state(ctx, idx, search),
+        NodeKey::Level(..) => return,
+    };
+    state.set_open(open);
+    state.store(ctx);
+    ctx.request_repaint();
 }
 
 const NAV_KEYS: [Key; 7] = [
@@ -158,7 +97,7 @@ pub fn handle_keys(ui: &egui::Ui, root: &VariableTreeGroup, tree: &mut VariableT
         return;
     }
 
-    let rows = visible_rows(ctx, root, search);
+    let rows = visible_rows(ctx, root, tree.variables, search);
     let is_focused = |id| match focused {
         Some(f) => f == id,
         None => ctx.memory(|m| m.had_focus_last_frame(id)),
@@ -203,7 +142,7 @@ fn jump_from_search(
     jump: SearchJump,
 ) {
     let search = tree.search_active;
-    let rows = visible_rows(ctx, root, search);
+    let rows = visible_rows(ctx, root, tree.variables, search);
     let target = match jump {
         SearchJump::FirstRow => rows.first(),
         SearchJump::FirstVariable => rows.iter().find(|r| matches!(r.key, NodeKey::Variable(_))),
@@ -219,6 +158,6 @@ fn jump_from_search(
         && search
         && root.total_variable_count() == 1
     {
-        tree.newly_selected_idx = Some(idx);
+        tree.newly_selected = Some((idx, crate::app::layers::LevelChoice::Auto));
     }
 }

@@ -5,6 +5,7 @@ pub(crate) mod composite;
 mod composite_rgb;
 mod export;
 mod layers;
+mod levels;
 mod opacity;
 #[cfg(test)]
 mod panel_tests;
@@ -112,6 +113,7 @@ fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
     if support.aggregation != Support::No {
         section(ui, tr(K::SectionResolution));
         gated(ui, support.aggregation, |ui| {
+            levels::show_level_select(app, ui);
             resampling::show_resampling_controls(app, ui);
         });
     }

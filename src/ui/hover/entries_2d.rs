@@ -1,5 +1,6 @@
 use crate::app::OctantApp;
 use crate::data::{CoordinateGrid, DatasetMetadata, MatrixData, VariableInfo};
+use crate::ui::hover::detail::{DetailCell, detail_fields};
 use crate::ui::hover::enrich::{
     enrich_entries_with_animated_and_collapsed_dims, get_dimension_origin_and_full_len,
     stored_offset,
@@ -28,9 +29,14 @@ pub(crate) fn resolve_2d_plot_entries(
         .grid
         .find_cell_from_norm(norm_x, norm_y, orig_w, orig_h);
 
-    // The matrix is the full-resolution data, also under a pyramid.
+    // The matrix is the full-resolution data, also under a pyramid; a
+    // multiscale plot's detail tile, where it is drawn, is finer still.
     let idx = py * matrix.width + px;
-    let val = matrix.values.get(idx).copied().unwrap_or(f32::NAN);
+    let detail = super::detail::detail_cell(app, norm_x, norm_y);
+    let val = detail.map_or_else(
+        || matrix.values.get(idx).copied().unwrap_or(f32::NAN),
+        |d| d.value,
+    );
 
     // A composite mixes every channel, so no single band is selected.
     let mut used_dims: HashSet<usize> = composite_channel_dim(app).into_iter().collect();
@@ -44,6 +50,7 @@ pub(crate) fn resolve_2d_plot_entries(
         orig_h,
         geo_coords,
         &mut used_dims,
+        detail.as_ref(),
     );
 
     (val, entries, px, py)
@@ -70,6 +77,7 @@ fn resolve_2d_dim_entries(
     orig_h: usize,
     geo_coords: Option<(f32, f32)>,
     used_dims: &mut HashSet<usize>,
+    detail: Option<&DetailCell>,
 ) -> Vec<HoverField> {
     if let CoordinateGrid::Healpix { nside, .. } = &app
         .layers
@@ -118,24 +126,30 @@ fn resolve_2d_dim_entries(
         let global_x = (origin_x + x_offset).min(full_x_len.saturating_sub(1));
         let global_y = (origin_y + y_offset).min(full_y_len.saturating_sub(1));
 
-        let loc_y = format_dimension_coord(
-            meta,
-            Some(v),
-            Some(&app.plotted().store_target),
-            &dim_y_name,
-            global_y,
-            full_y_len,
-            geo_y,
-        );
-        let loc_x = format_dimension_coord(
-            meta,
-            Some(v),
-            Some(&app.plotted().store_target),
-            &dim_x_name,
-            global_x,
-            full_x_len,
-            geo_x,
-        );
+        let tile_fields = detail.and_then(|d| detail_fields(app, meta, d));
+        let (loc_y, loc_x) = tile_fields.unwrap_or_else(|| {
+            let store = Some(app.plotted().store_target.as_str());
+            (
+                format_dimension_coord(
+                    meta,
+                    Some(v),
+                    store,
+                    &dim_y_name,
+                    global_y,
+                    full_y_len,
+                    geo_y,
+                ),
+                format_dimension_coord(
+                    meta,
+                    Some(v),
+                    store,
+                    &dim_x_name,
+                    global_x,
+                    full_x_len,
+                    geo_x,
+                ),
+            )
+        });
 
         let mut list = vec![loc_y, loc_x];
         enrich_entries_with_animated_and_collapsed_dims(app, meta, Some(v), &mut list, used_dims);

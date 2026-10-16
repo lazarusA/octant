@@ -34,6 +34,8 @@ fn make_var(
         file_size,
         attributes: HashMap::new(),
         ome: None,
+        multiscale: None,
+        shard_shape: None,
     }
 }
 

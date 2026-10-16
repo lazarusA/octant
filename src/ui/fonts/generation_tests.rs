@@ -5,6 +5,7 @@ use crate::i18n::Language;
 
 #[test]
 fn a_font_rebuild_is_pending_only_in_its_own_context() {
+    let _fonts = crate::ui::fonts::test_lock();
     let run = |ctx: &egui::Context| {
         let mut output = ctx.run_ui(egui::RawInput::default(), |_| {});
         output.textures_delta.clear();

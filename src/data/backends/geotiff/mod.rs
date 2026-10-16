@@ -5,6 +5,7 @@ pub mod blit;
 pub mod coords;
 pub mod decode;
 mod ifd_check;
+mod ifd_fields;
 pub mod inspect;
 pub mod palette;
 pub mod reader;

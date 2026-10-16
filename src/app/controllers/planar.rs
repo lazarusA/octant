@@ -1,7 +1,10 @@
 //! 2D and 1D planar pan/zoom plot controllers.
 
 use super::traits::PlotController;
+use crate::app::DimConfig;
 use crate::app::state::NavigationState;
+use crate::data::VariableInfo;
+use crate::data::multiscale::{DimDemand, ResolutionDemand};
 use crate::plots::PlotType;
 use crate::utils::apply_zoom_pan_at_point;
 
@@ -11,6 +14,26 @@ pub struct HeatmapController;
 impl PlotController for HeatmapController {
     fn plot_type(&self) -> PlotType {
         PlotType::Heatmap
+    }
+
+    /// No more cells than canvas pixels along x and y (each cell at least a
+    /// pixel when the whole window shows), within one GPU buffer; other
+    /// dimensions whole.
+    fn resolution_demand(
+        &self,
+        var: &VariableInfo,
+        dim_config: &[DimConfig],
+        canvas_px: [u32; 2],
+    ) -> ResolutionDemand {
+        let mut demand = ResolutionDemand::finest(var.shape.len());
+        if let (Some(x), Some(y), _) = var.resolve_spatial_dim_indices(dim_config)
+            && x != y
+        {
+            demand.dims[x] = DimDemand::Pixels(canvas_px[0]);
+            demand.dims[y] = DimDemand::Pixels(canvas_px[1]);
+            demand.max_elements = Some(crate::plots::limits::max_storage_elements() as u64);
+        }
+        demand
     }
 
     fn reset_view(&self, nav: &mut NavigationState) {

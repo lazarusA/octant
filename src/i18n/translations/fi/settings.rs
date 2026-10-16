@@ -154,6 +154,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggMaxHover => "Säilyttää äärimmäiset suuret arvot.",
         SettingsKey::AggMinHover => "Säilyttää äärimmäiset pienet arvot.",
         SettingsKey::AggNearestHover => "Nopea lähimmän pisteen valinta ilman interpolointia.",
+        SettingsKey::ResolutionLevel => "Resoluutiotaso",
+        SettingsKey::ResolutionLevelHover => {
+            "Monitasoisen datan taso, jonka kuvaaja lukee. Auto lukee tarkimman tason, joka mahtuu piirtoalueelle."
+        }
         SettingsKey::CmykAutoMapped => {
             "Automaattisesti kohdistetut kanavat: C (1), M (2), Y (3), K (4)"
         }

@@ -29,6 +29,8 @@ pub mod panel_layout;
 #[cfg(test)]
 mod panel_layout_tests;
 #[cfg(test)]
+mod panel_width_multiscale_tests;
+#[cfg(test)]
 mod panel_width_tests;
 pub mod plate;
 pub mod plot_type;

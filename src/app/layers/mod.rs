@@ -28,7 +28,7 @@ pub use id::LayerId;
 pub use layer::{LABEL_BUF, Layer};
 pub use load::LoadState;
 pub use renderers::LayerRenderers;
-pub use selection::VariableSelection;
+pub use selection::{LevelChoice, VariableSelection};
 pub use source::{LabelStyle, Source};
 pub use stack::LayerStack;
 pub use style::{AlphaCurveState, ColorStyle, CompositeStyle};

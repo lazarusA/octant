@@ -32,10 +32,16 @@ impl OctantApp {
         source_id_or(selection, &self.selected_source_id())
     }
 
-    /// The request of layer `id`'s staged selection (the next plot); `None`
-    /// while its variable index is invalid.
+    /// The request of layer `id`'s staged selection (the next plot), on the
+    /// level it reads when the base layer stages a multiscale variable;
+    /// `None` while its variable index is invalid.
     pub(crate) fn staged_layer_request(&self, id: LayerId) -> Option<LayerRequest> {
         let (_, staged) = self.layer_selections(id)?;
+        if id == LayerId::BASE
+            && let Some(level) = self.resolve_level(staged)
+        {
+            return self.selection_request(id, &level, level.variable_info()?);
+        }
         self.selection_request(id, staged, staged.variable_info()?)
     }
 

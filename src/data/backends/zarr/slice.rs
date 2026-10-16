@@ -2,37 +2,12 @@
 
 use crate::data::DataCalibration;
 use crate::data::blocks::BlockStoreError;
-use zarrs::array::chunk_cache::{ChunkCache, ChunkCacheDecodedLruSizeLimit};
 use zarrs::array::data_type::*;
-use zarrs::array::{Array, ArraySubset, CodecOptions, DataType, FromArrayBytes};
+use zarrs::array::{Array, ArraySubset, DataType};
 use zarrs::storage::ReadableStorageTraits;
 
-trait SubsetRetriever {
-    fn retrieve_subset<T: FromArrayBytes>(
-        &self,
-        subset: &ArraySubset,
-    ) -> Result<T, BlockStoreError>;
-}
-
-impl<TStorage: ?Sized + ReadableStorageTraits + 'static> SubsetRetriever for Array<TStorage> {
-    fn retrieve_subset<T: FromArrayBytes>(
-        &self,
-        subset: &ArraySubset,
-    ) -> Result<T, BlockStoreError> {
-        self.retrieve_array_subset(subset)
-            .map_err(|e| format!("{e}").into())
-    }
-}
-
-impl SubsetRetriever for ChunkCacheDecodedLruSizeLimit {
-    fn retrieve_subset<T: FromArrayBytes>(
-        &self,
-        subset: &ArraySubset,
-    ) -> Result<T, BlockStoreError> {
-        self.retrieve_array_subset(subset, &CodecOptions::default())
-            .map_err(|e| format!("{e}").into())
-    }
-}
+pub use super::reader::ChunkReader;
+use super::reader::{Sharded, SubsetRetriever};
 
 fn decode_with<R: SubsetRetriever>(
     retriever: &R,
@@ -113,17 +88,62 @@ fn decode_other<R: SubsetRetriever>(
     }
 }
 
-/// Dtype-conversion and calibration helper for reading array subsets as f32 through an optional chunk cache.
+/// Dtype-conversion and calibration helper for reading array subsets as f32 through `reader`.
 pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + 'static>(
     array: &Array<TStorage>,
-    cache: Option<&ChunkCacheDecodedLruSizeLimit>,
+    reader: ChunkReader<'_>,
     subset: &ArraySubset,
 ) -> Result<Vec<f32>, BlockStoreError> {
     let dt = array.data_type();
     let calibration = DataCalibration::from_json_map(array.attributes());
-    match cache {
-        Some(c) => decode_with(c, dt, &calibration, subset),
-        None => decode_with(array, dt, &calibration, subset),
+    match reader {
+        ChunkReader::Direct => decode_with(array, dt, &calibration, subset),
+        ChunkReader::Cached(c) => decode_with(c, dt, &calibration, subset),
+        ChunkReader::Sharded(cache) => {
+            decode_with(&Sharded { array, cache }, dt, &calibration, subset)
+        }
+    }
+}
+
+/// [`retrieve_array_subset_as_label_bits`] through `retriever`.
+fn label_bits<R: SubsetRetriever>(
+    retriever: &R,
+    dt: &DataType,
+    subset: &ArraySubset,
+) -> Result<Option<Vec<f32>>, BlockStoreError> {
+    macro_rules! ids {
+        ($t:ty) => {
+            ids!($t, |_| false)
+        };
+        // `$wide`: whether an id does not fit 32 bits (64-bit types).
+        ($t:ty, $wide:expr) => {{
+            let vals: Vec<$t> = retriever.retrieve_subset(subset)?;
+            if vals.iter().copied().any($wide) {
+                report_wide_label_ids();
+            }
+            Ok(Some(
+                vals.into_iter().map(|v| f32::from_bits(v as u32)).collect(),
+            ))
+        }};
+    }
+    if dt.is::<UInt8DataType>() {
+        ids!(u8)
+    } else if dt.is::<UInt16DataType>() {
+        ids!(u16)
+    } else if dt.is::<UInt32DataType>() {
+        ids!(u32)
+    } else if dt.is::<UInt64DataType>() {
+        ids!(u64, |v: u64| u32::try_from(v).is_err())
+    } else if dt.is::<Int8DataType>() {
+        ids!(i8)
+    } else if dt.is::<Int16DataType>() {
+        ids!(i16)
+    } else if dt.is::<Int32DataType>() {
+        ids!(i32)
+    } else if dt.is::<Int64DataType>() {
+        ids!(i64, |v: i64| u32::try_from(v).is_err())
+    } else {
+        Ok(None)
     }
 }
 
@@ -133,53 +153,14 @@ pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + '
 /// their low bits, reported once. `None` for non-integer data types.
 pub fn retrieve_array_subset_as_label_bits<TStorage: ?Sized + ReadableStorageTraits + 'static>(
     array: &Array<TStorage>,
-    cache: Option<&ChunkCacheDecodedLruSizeLimit>,
+    reader: ChunkReader<'_>,
     subset: &ArraySubset,
 ) -> Result<Option<Vec<f32>>, BlockStoreError> {
-    fn bits<R: SubsetRetriever>(
-        retriever: &R,
-        dt: &DataType,
-        subset: &ArraySubset,
-    ) -> Result<Option<Vec<f32>>, BlockStoreError> {
-        macro_rules! ids {
-            ($t:ty) => {
-                ids!($t, |_| false)
-            };
-            // `$wide`: whether an id does not fit 32 bits (64-bit types).
-            ($t:ty, $wide:expr) => {{
-                let vals: Vec<$t> = retriever.retrieve_subset(subset)?;
-                if vals.iter().copied().any($wide) {
-                    report_wide_label_ids();
-                }
-                Ok(Some(
-                    vals.into_iter().map(|v| f32::from_bits(v as u32)).collect(),
-                ))
-            }};
-        }
-        if dt.is::<UInt8DataType>() {
-            ids!(u8)
-        } else if dt.is::<UInt16DataType>() {
-            ids!(u16)
-        } else if dt.is::<UInt32DataType>() {
-            ids!(u32)
-        } else if dt.is::<UInt64DataType>() {
-            ids!(u64, |v: u64| u32::try_from(v).is_err())
-        } else if dt.is::<Int8DataType>() {
-            ids!(i8)
-        } else if dt.is::<Int16DataType>() {
-            ids!(i16)
-        } else if dt.is::<Int32DataType>() {
-            ids!(i32)
-        } else if dt.is::<Int64DataType>() {
-            ids!(i64, |v: i64| u32::try_from(v).is_err())
-        } else {
-            Ok(None)
-        }
-    }
     let dt = array.data_type();
-    match cache {
-        Some(c) => bits(c, dt, subset),
-        None => bits(array, dt, subset),
+    match reader {
+        ChunkReader::Direct => label_bits(array, dt, subset),
+        ChunkReader::Cached(c) => label_bits(c, dt, subset),
+        ChunkReader::Sharded(cache) => label_bits(&Sharded { array, cache }, dt, subset),
     }
 }
 

@@ -6,7 +6,7 @@ use crate::app::test_support::{make_resident, memory_app, poll_until, selection_
 use crate::data::{DatasetMetadata, SliceRequest};
 use crate::ui::hover::card::{HoverValue, LayerValue};
 use crate::ui::hover::composite::CompositeKind;
-use crate::ui::hover::overlays::overlay_values;
+use crate::ui::hover::overlays::{HoverAt, overlay_values};
 
 fn index_of(meta: &DatasetMetadata, name: &str) -> usize {
     meta.variables
@@ -69,8 +69,16 @@ fn turning_an_overlay_composite_off_reloads_only_that_overlay() {
 fn a_composite_overlay_row_names_its_composite() {
     let (app, id) = app_with_rgb_overlay();
     let mut rows = [LayerValue::EMPTY; MAX_OVERLAYS];
-    assert_eq!(overlay_values(&app, (1, 1), &mut rows), 1);
+    assert_eq!(overlay_values(&app, at((1, 1)), &mut rows), 1);
     assert_eq!(rows[0].name, "rgb");
     assert_eq!(rows[0].value, HoverValue::Composite(CompositeKind::Overlay));
     assert!(app.layers.get(id).is_some_and(|l| l.composite.enabled));
+}
+
+/// The hover at base cell `cell`, off any detail tile.
+fn at(cell: (usize, usize)) -> HoverAt {
+    HoverAt {
+        cell,
+        norm: (-1.0, -1.0),
+    }
 }

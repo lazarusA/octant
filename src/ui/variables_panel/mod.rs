@@ -14,7 +14,8 @@ pub use dimension_slider::{
 pub use info::show_variable_info;
 
 use crate::app::OctantApp;
-use crate::i18n::{VariablesKey, tr};
+use crate::app::layers::LevelChoice;
+use crate::i18n::{VariablesKey, fill, tr};
 use crate::ui::drag_grip::GripAction;
 use crate::ui::flow_row;
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt, icon_button_width};
@@ -70,6 +71,7 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> GripAction {
             app.revert_selected_state_to_plotted();
         }
     }
+    level_note(app, ui, &var_info);
     if plot_row(app, ui) {
         app.plot_from_panel();
     }
@@ -85,6 +87,39 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> GripAction {
     header.grip
 }
 
+/// The level a multiscale variable reads, under its header: the plotted
+/// level of the plotted level count (and whether Auto chose it), or the
+/// staged choice before it is plotted.
+fn level_note(app: &OctantApp, ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) {
+    if var_info.stack_base().is_none() {
+        return;
+    }
+    let choice = app.selected.level;
+    // The plotted level, while the staged choice is the one plotted.
+    let shown = (!app.is_exploring_unplotted_variable() && app.plotted().level == choice)
+        .then(|| app.plotted().variable_info()?.multiscale.as_ref())
+        .flatten();
+    let mut buf = [0; 128];
+    let text = match (shown, choice) {
+        (Some(r), LevelChoice::Auto) => fill(
+            &mut buf,
+            tr(VariablesKey::AutoLevelOf),
+            &[&r.level, &r.set.len()],
+        ),
+        (Some(r), LevelChoice::Pinned(_)) => fill(
+            &mut buf,
+            tr(VariablesKey::LevelOf),
+            &[&r.level, &r.set.len()],
+        ),
+        (None, LevelChoice::Auto) => tr(VariablesKey::LevelAuto),
+        (None, LevelChoice::Pinned(level)) => fill(&mut buf, tr(VariablesKey::LevelN), &[&level]),
+    };
+    ui.horizontal(|ui| {
+        ui.icon_toned(Icon::Layers, IconSize::Xs, IconTone::Muted);
+        ui.label(egui::RichText::new(text).small().weak());
+    });
+}
+
 /// The header's first row: the variable's name, expanding to its details,
 /// the drag grip and the close button, and what those two asked for.
 fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> PanelHeader {
@@ -93,9 +128,10 @@ fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> PanelH
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, false)
         .show_header(ui, |ui| {
             ui.icon(Icon::VariableDoc, IconSize::Sm);
-            let name = match var_info.group_path() {
-                Some(group) => format!("{} ({})", var_info.leaf_name(), group),
-                None => var_info.name.clone(),
+            let (leaf, group) = (var_info.display_name(), var_info.display_group());
+            let name = match group {
+                "" => leaf.to_string(),
+                group => format!("{leaf} ({group})"),
             };
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 header = panel_header::buttons(ui, tr(VariablesKey::CloseDimensionPanel));

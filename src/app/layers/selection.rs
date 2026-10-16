@@ -6,6 +6,16 @@ use crate::data::DatasetMetadata;
 use crate::data::slice_request::{DimensionSelection, SliceRequest};
 use crate::plots::PlotType;
 
+/// Which level of a multiscale variable a plot reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LevelChoice {
+    /// The level the plot type asks for (`PlotController::resolution_demand`).
+    #[default]
+    Auto,
+    /// This level, or a coarser one when it exceeds the memory budget.
+    Pinned(usize),
+}
+
 /// A dataset variable with its dimension roles, indices and ranges.
 #[derive(Debug, Clone)]
 pub struct VariableSelection {
@@ -27,6 +37,10 @@ pub struct VariableSelection {
     /// Dimension assigned Animated.
     pub animated_dim: Option<usize>,
     pub plot_type: PlotType,
+    /// The level read when the variable is a multiscale stack's level 0;
+    /// dimension indices and ranges stay on level 0 (the plotted copy holds
+    /// the level's own, `app::multiscale`).
+    pub level: LevelChoice,
 }
 
 /// The store opened on first launch.
@@ -47,6 +61,7 @@ impl Default for VariableSelection {
             spatial_dims: Vec::new(),
             animated_dim: None,
             plot_type: PlotType::Heatmap,
+            level: LevelChoice::Auto,
         }
     }
 }
@@ -61,13 +76,22 @@ impl VariableSelection {
 
     /// The request reading `var_name` (of `shape`) over the selected ranges:
     /// collapsed dimensions as one index, `composite_dim` (the channels of a
-    /// composite) whole.
+    /// composite) whole. A dimension without a range (ranges of another
+    /// variable) reads index 0, never the whole dimension, and is logged.
     pub fn slice_request(
         &self,
         var_name: &str,
         shape: &[u64],
         composite_dim: Option<usize>,
     ) -> SliceRequest {
+        if self.dim_ranges.len() < shape.len() {
+            log::warn!(
+                "Request for '{var_name}' has {} ranges for {} dimensions; \
+                 the missing ones read index 0",
+                self.dim_ranges.len(),
+                shape.len()
+            );
+        }
         let selections = shape
             .iter()
             .enumerate()
@@ -79,11 +103,7 @@ impl VariableSelection {
                         end: dim_size,
                     };
                 }
-                let (mut start, mut end) = self
-                    .dim_ranges
-                    .get(i)
-                    .copied()
-                    .unwrap_or((0, dim_size.saturating_sub(1)));
+                let (mut start, mut end) = self.dim_ranges.get(i).copied().unwrap_or((0, 0));
                 if start > end {
                     std::mem::swap(&mut start, &mut end);
                 }

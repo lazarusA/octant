@@ -152,6 +152,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggMaxHover => "Сохраняет экстремально высокие значения.",
         SettingsKey::AggMinHover => "Сохраняет экстремально низкие значения.",
         SettingsKey::AggNearestHover => "Быстрый выбор ближайшей точки без интерполяции.",
+        SettingsKey::ResolutionLevel => "Уровень разрешения",
+        SettingsKey::ResolutionLevelHover => {
+            "Уровень многомасштабных данных, который читает график. Авто читает самый подробный уровень, умещающийся на холсте."
+        }
         SettingsKey::CmykAutoMapped => "Каналы назначены автоматически: C (1), M (2), Y (3), K (4)",
         SettingsKey::MultiChannelOverlay => "Наложение каналов",
         SettingsKey::MultiChannelOverlayHover => {

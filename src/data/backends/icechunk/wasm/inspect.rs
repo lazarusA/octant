@@ -141,12 +141,18 @@ pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, 
                         temporal_resolution: None,
                         attributes: HashMap::new(),
                         ome: None,
+                        multiscale: None,
+                        shard_shape: None,
                     });
                 }
             }
             NodeData::Group => {}
         }
     }
+
+    // Every node's `zarr.json` is in memory: GeoZarr pyramids read their groups' layouts.
+    let reader = crate::data::ome::MetaReader::direct(store.inner.memory_store.clone());
+    crate::data::multiscale::geozarr::link_pyramids(&reader, &mut variables);
 
     *store
         .array_manifests

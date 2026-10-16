@@ -215,12 +215,19 @@ impl OctantApp {
             aspect_scale: gpu_aspect_scale,
         };
         self.refresh_resampled_tiles(canvas_plot_type, &view);
+        let now = ui.input(|i| i.time);
+        if let Some(wait) = self.refresh_detail(canvas_plot_type, &view, now) {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_secs_f64(wait.max(0.0)));
+        }
         for layer in self.layers.iter().filter(|l| l.is_drawn()) {
             self.paint_layer(ui, layer, canvas_plot_type, &view);
         }
 
         // --- Coastline overlay ---
-        if self.show_coastlines && canvas_plot_type.draws_coastlines() {
+        // Coastlines only over geographic data (the setting stays on for when
+        // a geographic plot returns).
+        if self.draws_coastlines(canvas_plot_type) {
             if let Some(cr) = self.coastline_renderer.as_ref().map(Arc::clone) {
                 // Theme-aware default: white in dark mode, dark gray in light mode
                 let line_color = self.coastline_color.unwrap_or_else(|| {

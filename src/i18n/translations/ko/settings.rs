@@ -134,6 +134,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggMaxHover => "극단적으로 높은 값을 보존합니다.",
         SettingsKey::AggMinHover => "극단적으로 낮은 값을 보존합니다.",
         SettingsKey::AggNearestHover => "보간 없이 가장 가까운 점을 빠르게 선택합니다.",
+        SettingsKey::ResolutionLevel => "해상도 단계",
+        SettingsKey::ResolutionLevelHover => {
+            "플롯이 읽는 해상도 단계입니다. 자동은 화면에 맞는 가장 세밀한 단계를 읽습니다."
+        }
         SettingsKey::CmykAutoMapped => "자동 매핑된 채널: C (1), M (2), Y (3), K (4)",
         SettingsKey::MultiChannelOverlay => "다중 채널 오버레이",
         SettingsKey::MultiChannelOverlayHover => {

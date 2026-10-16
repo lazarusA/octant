@@ -43,8 +43,30 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
 
     apply_omero_defaults(app, var_info);
     finalize_active_configs(app, var_info, rank);
-    clamp_2d_selection_to_gpu_limits(app, var_info);
+    if var_info.stack_base().is_some() {
+        whole_spatial_extent(app, var_info);
+    } else {
+        clamp_2d_selection_to_gpu_limits(app, var_info);
+    }
     sort_spatial_dims(app);
+}
+
+/// A multiscale variable shows its whole x and y extent: the plot reads it
+/// at a level that fits (`app::multiscale`), so level 0's size never limits it.
+fn whole_spatial_extent(app: &mut OctantApp, var_info: &VariableInfo) {
+    for (d, config) in app.selected.dim_config.iter_mut().enumerate() {
+        if !matches!(config.spatial, SpatialRole::X | SpatialRole::Y) {
+            continue;
+        }
+        let last = var_info
+            .shape
+            .get(d)
+            .map_or(0, |&n| (n as usize).saturating_sub(1));
+        config.range = (0, last);
+        if let Some(range) = app.selected.dim_ranges.get_mut(d) {
+            *range = (0, last);
+        }
+    }
 }
 
 fn init_initial_ranges(app: &mut OctantApp, var_info: &VariableInfo, rank: usize) {

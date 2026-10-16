@@ -1,6 +1,9 @@
 //! Traits for plot-type specific controllers.
 
+use crate::app::DimConfig;
 use crate::app::state::NavigationState;
+use crate::data::VariableInfo;
+use crate::data::multiscale::{DimDemand, ResolutionDemand};
 use crate::plots::PlotType;
 
 /// Polymorphic plot controller defining navigation, camera interactions, and capabilities.
@@ -42,6 +45,28 @@ pub trait PlotController: Send + Sync {
     /// Whether this plot type supports categorical color maps.
     fn draws_categories(&self) -> bool {
         self.plot_type().draws_categories()
+    }
+
+    /// What this plot needs from a multiscale variable `var` with dimension
+    /// roles `dim_config`, drawn on a canvas of `canvas_px` physical pixels
+    /// (`crate::data::multiscale::fit_level` picks the level from it). By
+    /// default level 0, or the finest level whose window fits one GPU
+    /// storage buffer when level 0's does not.
+    fn resolution_demand(
+        &self,
+        var: &VariableInfo,
+        dim_config: &[DimConfig],
+        _canvas_px: [u32; 2],
+    ) -> ResolutionDemand {
+        let mut demand = ResolutionDemand::finest(var.shape.len());
+        let (x, y, z) = var.resolve_spatial_dim_indices(dim_config);
+        for d in [x, y, z].into_iter().flatten() {
+            if let Some(slot) = demand.dims.get_mut(d) {
+                *slot = DimDemand::Any;
+            }
+        }
+        demand.max_elements = Some(crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS as u64);
+        demand
     }
 
     /// Minimum zoom level allowed for this plot type.

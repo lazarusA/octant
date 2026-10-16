@@ -7,7 +7,7 @@ use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 use zarrs::storage::ReadableWritableListableStorage;
 
 use super::block_coords::{BlockWindow, block_coordinates};
-use super::slice::retrieve_array_subset_as_f32;
+use super::slice::{ChunkReader, retrieve_array_subset_as_f32};
 use super::storage::ZarrArrayHandle;
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
@@ -17,6 +17,7 @@ use crate::data::slice_request::{DimensionSelection, SliceRequest};
 use crate::utils::grid::check_and_orient_block_grid;
 use crate::utils::grid_flips::OrientHints;
 use crate::utils::metadata::attr_string;
+use zarrs::array::ArrayShardedReadableExtCache;
 
 /// The clamped `(origin, shape)` window of every dimension selected by `request`.
 fn selection_window(
@@ -98,11 +99,11 @@ pub(super) fn inherited_attributes(
 }
 
 /// The values of the window `origin..origin + shape` of `array`, through
-/// `cache`; label ids kept bit-exact when `labels` (see
+/// `reader`; label ids kept bit-exact when `labels` (see
 /// `retrieve_array_subset_as_label_bits`).
 fn read_window(
     array: &ZarrArrayHandle,
-    cache: &ChunkCacheDecodedLruSizeLimit,
+    reader: ChunkReader<'_>,
     variable: &str,
     (origin, shape): (&[usize], &[usize]),
     labels: bool,
@@ -120,21 +121,38 @@ fn read_window(
     );
     if labels
         && let Some(ids) =
-            super::slice::retrieve_array_subset_as_label_bits(array, Some(cache), &subset)?
+            super::slice::retrieve_array_subset_as_label_bits(array, reader, &subset)?
     {
         return Ok(ids);
     }
-    let values = retrieve_array_subset_as_f32(array, Some(cache), &subset).map_err(|e| {
+    let values = retrieve_array_subset_as_f32(array, reader, &subset).map_err(|e| {
         log::error!("[ZarrBlock] Failed to retrieve array subset for '{variable}': {e:?}");
         BlockStoreError::from(e.to_string())
     })?;
     Ok(values)
 }
 
+/// How an opened array is read: through a cache of decoded chunks, or for
+/// a sharded array, by the inner chunks a window touches (a decoded chunk
+/// would be a whole shard).
+pub(super) enum ArrayReader {
+    Cached(Arc<ChunkCacheDecodedLruSizeLimit>),
+    Sharded(ArrayShardedReadableExtCache),
+}
+
+impl ArrayReader {
+    pub(super) fn chunk_reader(&self) -> ChunkReader<'_> {
+        match self {
+            Self::Cached(cache) => ChunkReader::Cached(cache),
+            Self::Sharded(cache) => ChunkReader::Sharded(cache),
+        }
+    }
+}
+
 /// Pre-resolved metadata state for a cached Zarr array.
 pub(super) struct ArrayCachedState {
     pub array: Arc<ZarrArrayHandle>,
-    pub cache: Arc<ChunkCacheDecodedLruSizeLimit>,
+    pub reader: ArrayReader,
     pub attributes: Arc<HashMap<String, String>>,
     /// Set for OME-Zarr level arrays, whose blocks keep their stored order.
     pub ome: Option<LevelArray>,
@@ -151,7 +169,7 @@ pub(super) fn fetch_block_from_cached_array(
     let (origin, block_shape) = selection_window(request, cached.array.shape())?;
     let raw_values = read_window(
         &cached.array,
-        &cached.cache,
+        cached.reader.chunk_reader(),
         &request.variable,
         (&origin, &block_shape),
         cached.ome.as_ref().is_some_and(|l| l.labels),

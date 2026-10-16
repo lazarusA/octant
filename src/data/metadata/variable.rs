@@ -11,7 +11,11 @@ pub struct VariableInfo {
     pub data_type: String,
     pub shape: Vec<u64>,
     pub dimension_names: Vec<String>,
+    /// The read unit: a sharded array's inner chunks, else its chunks.
     pub chunk_shape: Vec<u64>,
+    /// The shard (stored object) shape of a sharded array; `None` when
+    /// it is not sharded.
+    pub shard_shape: Option<Vec<u64>>,
     pub file_size: u64,
     pub units: Option<String>,
     pub long_name: Option<String>,
@@ -21,6 +25,9 @@ pub struct VariableInfo {
     pub attributes: HashMap<String, String>,
     /// The OME-Zarr image and level this variable is, for OME-Zarr stores.
     pub ome: Option<crate::data::ome::OmeRef>,
+    /// The multiscale stack and level this variable is, when its format
+    /// groups it with other resolutions of the same data.
+    pub multiscale: Option<crate::data::multiscale::LevelRef>,
 }
 
 impl VariableInfo {
@@ -37,6 +44,35 @@ impl VariableInfo {
             Some(&clean[..pos])
         } else {
             None
+        }
+    }
+
+    /// The stack this variable is level 0 of.
+    pub fn stack_base(&self) -> Option<&crate::data::multiscale::LevelRef> {
+        self.multiscale.as_ref().filter(|r| r.is_base())
+    }
+
+    /// Whether this is a level other than 0 of a multiscale stack: listed
+    /// under its stack's level 0, not on its own.
+    pub fn is_coarser_level(&self) -> bool {
+        self.multiscale.as_ref().is_some_and(|r| !r.is_base())
+    }
+
+    /// The name the variable is listed under: its stack's for level 0 of a
+    /// multiscale stack, else its leaf name.
+    pub fn display_name(&self) -> &str {
+        match self.stack_base() {
+            Some(r) if !r.set.name.is_empty() => &r.set.name,
+            _ => self.leaf_name(),
+        }
+    }
+
+    /// The group the variable is listed in: its stack's for level 0 of a
+    /// multiscale stack, else its own.
+    pub fn display_group(&self) -> &str {
+        match self.stack_base() {
+            Some(r) => r.set.display_group(),
+            None => self.group_path().unwrap_or(""),
         }
     }
 

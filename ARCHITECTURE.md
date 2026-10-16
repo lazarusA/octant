@@ -388,6 +388,7 @@ Non-Eulerian data (such as ocean drifter trajectories, atmospheric weather ballo
 - **Done: Shared Colormap Atlas**: 256×K RGBA8 texture atlas shared across CPU evaluation and all GPU pipelines at `@group(1)`.
 - **Done: Order-Independent Transparency (OIT)**: Weighted blended transparency for overlapping meshes and translucent point clouds.
 - **Done: OME-Zarr (0.1-0.5)**: `src/data/ome/` reads images, label images, plates, wells and `bioformats2raw` series through `ome_zarr_metadata`, with physical coordinates and units, OMERO channel display, label overlays (`Source::Labels`) and a plate browser. Every resolution level is still its own variable.
+- **Done: Multiscale Heatmaps**: `src/data/multiscale/` stacks a variable's resolution levels from OME-Zarr, GeoZarr (zarr-conventions `multiscales`) and GeoTIFF overviews; the variable tree shows one row per stack, the plot reads the level that fits the canvas (or a pinned one), and a resting zoomed view loads a finer detail tile (`src/app/detail/`), overlays included. Sharded Zarr and Icechunk arrays read only the inner chunks a window touches, on the desktop and the web.
 - **Done: Modular State & Canvas Engine**: Decomposed app states (`NavigationState`, `PlaybackState`, `PlotConfigs`, `UiLayoutState`), decoupled canvas engine (`src/app/canvas/`), and polymorphic plot controllers (`src/app/controllers/`).
 
 ### Next Roadmap Objectives
@@ -395,13 +396,13 @@ Non-Eulerian data (such as ocean drifter trajectories, atmospheric weather ballo
    - Extend overlays beyond heatmaps to 3D volumes (multi-channel texture raymarching) and surfaces.
 2. **Cross-Dataset Geographic Overlays**:
    - Render `Alignment::Geo` overlays with normalized longitude conventions and bounding box placement.
-3. **Multi-Scale Viewport Level-of-Detail**:
-   - Progressive multiscale loading for large-scale OME-NGFF and GeoTIFF overviews, shared with the spatial geo pyramids.
-   - OME-Zarr images become one variable whose level follows the zoom (today each level is a separate variable, `OmeRef::level`), loading coarse levels first; plate thumbnails come from each field's coarsest level.
+3. **Multiscale Follow-ups** (revisit later):
+   - **Chunk tiles**: today a resting view loads one detail block for the visible window. Load one tile per chunk instead, each with its own block cache entry, refining progressively from coarse to fine as they arrive, so panning reuses the chunks already loaded; the renderer draws many tiles (instanced quads or a tile atlas). Worth doing only if one block per view proves too slow when panning very large images.
+   - **Other plot types**: level choice beyond the heatmap, through each controller's `PlotController::resolution_demand` (no new interface): volumes on x, y and z within `MAX_GPU_STORAGE_BUFFER_BYTES` (OME-Zarr z-pyramids then work), surface and sphere on vertex count, point clouds on point count, and line plots over time on `Pixels(plot width)` along `t` where a dataset has time-coarsened levels. Today they read level 0 unless its window exceeds one GPU storage buffer.
 4. **OME-Zarr Follow-ups**:
    - OME-Zarr 0.6 coordinate systems and transformations (RFC-5: named `coordinateSystems`, affine and sequence transforms), through `ome_zarr_metadata`'s `next` feature once the specification settles.
    - 3D label volumes: label images drawn in the volume renderer (today label images draw on the heatmap only).
-   - Plate thumbnails in the plate browser's well grid.
+   - Plate thumbnails in the plate browser's well grid, from each field's coarsest level.
 5. **Derived Sources & Operations (`Source::Derived`)**:
    - CPU/GPU algebraic expressions and vector field synthesis across variables (e.g. wind speed magnitude $\sqrt{u^2 + v^2}$ or vorticity $\nabla \times \vec{v}$).
 6. **Lagrangian Trajectory & Vector Streamline Subsystem**:

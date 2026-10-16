@@ -7,7 +7,7 @@ use crate::app::overlays::MAX_OVERLAYS;
 use crate::app::test_support::{make_resident, memory_app, poll_until, selection_of};
 use crate::data::{DatasetMetadata, SliceRequest};
 use crate::ui::hover::card::LayerValue;
-use crate::ui::hover::overlays::overlay_values;
+use crate::ui::hover::overlays::{HoverAt, overlay_values};
 use crate::utils::colormap::registry;
 
 fn index_of(meta: &DatasetMetadata, name: &str) -> usize {
@@ -129,7 +129,7 @@ fn the_hover_reads_each_drawn_overlay_at_the_base_cell() {
         layer.visible = false;
     }
     let mut rows = [LayerValue::EMPTY; MAX_OVERLAYS];
-    let count = overlay_values(&app, (2, 3), &mut rows);
+    let count = overlay_values(&app, at((2, 3)), &mut rows);
     assert_eq!(count, 1, "hidden overlays have no row");
     let matrix = app.layers.get(id).and_then(|l| l.data.matrix.as_ref());
     let expected = matrix.and_then(|m| m.values.get(3 * m.width + 2)).copied();
@@ -226,4 +226,12 @@ fn new_overlays_take_unused_colormaps_of_the_set() {
         registry::find(OVERLAY_COLORMAPS[0]),
         "freed maps are reused"
     );
+}
+
+/// The hover at base cell `cell`, off any detail tile.
+fn at(cell: (usize, usize)) -> HoverAt {
+    HoverAt {
+        cell,
+        norm: (-1.0, -1.0),
+    }
 }

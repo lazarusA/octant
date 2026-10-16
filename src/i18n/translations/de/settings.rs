@@ -150,6 +150,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggMaxHover => "Erhält extreme Höchstwerte.",
         SettingsKey::AggMinHover => "Erhält extreme Tiefstwerte.",
         SettingsKey::AggNearestHover => "Schnelle Auswahl des nächsten Punkts ohne Interpolation.",
+        SettingsKey::ResolutionLevel => "Auflösungsstufe",
+        SettingsKey::ResolutionLevelHover => {
+            "Die Stufe der Multiskalen-Daten, die der Plot liest. Auto liest die feinste Stufe, die auf die Zeichenfläche passt."
+        }
         SettingsKey::CmykAutoMapped => "Automatisch zugeordnete Kanäle: C (1), M (2), Y (3), K (4)",
         SettingsKey::MultiChannelOverlay => "Mehrkanal-Überlagerung",
         SettingsKey::MultiChannelOverlayHover => {

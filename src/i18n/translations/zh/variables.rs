@@ -50,5 +50,9 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::RoleGrid => "网格",
         VariablesKey::Index => "索引：",
         VariablesKey::ChannelN => "通道 {}",
+        VariablesKey::LevelN => "第 {} 级",
+        VariablesKey::LevelAuto => "自动",
+        VariablesKey::LevelOf => "第 {} 级（共 {} 级）",
+        VariablesKey::AutoLevelOf => "自动，第 {} 级（共 {} 级）",
     })
 }

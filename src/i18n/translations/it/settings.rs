@@ -160,6 +160,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggNearestHover => {
             "Selezione rapida del punto più vicino senza interpolazione."
         }
+        SettingsKey::ResolutionLevel => "Livello di risoluzione",
+        SettingsKey::ResolutionLevelHover => {
+            "Il livello dei dati multiscala letto dal grafico. Auto legge il livello più fine che entra nell'area di disegno."
+        }
         SettingsKey::CmykAutoMapped => "Canali assegnati in automatico: C (1), M (2), Y (3), K (4)",
         SettingsKey::MultiChannelOverlay => "Sovrapposizione multicanale",
         SettingsKey::MultiChannelOverlayHover => {

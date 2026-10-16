@@ -52,5 +52,9 @@ pub fn text(key: VariablesKey) -> &'static str {
         VariablesKey::RoleGrid => "Grid",
         VariablesKey::Index => "Index:",
         VariablesKey::ChannelN => "Channel {}",
+        VariablesKey::LevelN => "Level {}",
+        VariablesKey::LevelAuto => "Auto",
+        VariablesKey::LevelOf => "Level {} of {}",
+        VariablesKey::AutoLevelOf => "Auto, level {} of {}",
     }
 }

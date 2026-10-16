@@ -56,5 +56,9 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::RoleGrid => "Rutnät",
         VariablesKey::Index => "Index:",
         VariablesKey::ChannelN => "Kanal {}",
+        VariablesKey::LevelN => "Nivå {}",
+        VariablesKey::LevelAuto => "Auto",
+        VariablesKey::LevelOf => "Nivå {} av {}",
+        VariablesKey::AutoLevelOf => "Auto, nivå {} av {}",
     })
 }

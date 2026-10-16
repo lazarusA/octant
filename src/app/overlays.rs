@@ -5,6 +5,7 @@ use crate::app::OctantApp;
 use crate::app::layers::{
     Alignment, LayerId, Source, classify, follow_base_window, overlay_selection,
 };
+use crate::app::multiscale::{level_matching, same_variable};
 use crate::i18n::{PlotKey, tr};
 use crate::ui::toast::Severity;
 use crate::utils::colormap::registry;
@@ -50,10 +51,11 @@ impl OctantApp {
             let staged = &self.selected;
             let shown = self.layers.iter().any(|layer| {
                 let s = layer.selection();
-                s.variable_idx == var_idx
-                    && s.store_kind == staged.store_kind
+                s.store_kind == staged.store_kind
                     && s.store_target == staged.store_target
-                    && s.metadata.is_some()
+                    && s.metadata
+                        .as_ref()
+                        .is_some_and(|m| same_variable(m, s.variable_idx, var_idx))
             });
             shown.then(|| tr(PlotKey::OverlayAlreadyLayer))
         })
@@ -66,6 +68,11 @@ impl OctantApp {
             self.notify(Severity::Warning, tr(PlotKey::OverlayCantAdd), reason);
             return None;
         }
+        let var_idx = level_matching(
+            self.plotted().variable_info(),
+            self.selected.metadata.as_ref()?,
+            var_idx,
+        );
         let selection = overlay_selection(self.plotted(), &self.selected, var_idx)?;
         let name = selection.variable_info().map_or("", |v| v.name.as_str());
         let alignment = classify(self.plotted(), &selection);
@@ -170,7 +177,13 @@ impl OctantApp {
             let Some((base, layer)) = self.layers.base_and_overlay_mut(id) else {
                 continue;
             };
-            let moved = follow_base_window(base.selection(), layer.selection_mut());
+            let overlay = layer.selection_mut();
+            let level = overlay.metadata.as_ref().map_or(overlay.variable_idx, |m| {
+                level_matching(base.selection().variable_info(), m, overlay.variable_idx)
+            });
+            let relevelled = level != overlay.variable_idx;
+            overlay.variable_idx = level;
+            let moved = follow_base_window(base.selection(), overlay) || relevelled;
             layer.alignment = classify(base.selection(), layer.selection());
             if moved {
                 layer.clear_2d();

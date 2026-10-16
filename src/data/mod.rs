@@ -8,6 +8,7 @@ pub mod codecs;
 pub mod coordinates;
 pub mod dataset;
 pub mod metadata;
+pub mod multiscale;
 pub mod octant_block;
 pub mod ome;
 pub mod procedural;

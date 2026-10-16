@@ -29,6 +29,7 @@ pub fn overlay_selection(
         spatial_dims: Vec::new(),
         animated_dim: None,
         plot_type: PlotType::Heatmap,
+        level: Default::default(),
     };
     follow_base_window(base, &mut selection);
     Some(selection)

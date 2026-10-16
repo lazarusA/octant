@@ -78,6 +78,7 @@ fn grip_drags_dataset_panel_and_double_click_docks_it() {
 
 #[test]
 fn the_format_select_keeps_its_width_whatever_format_it_shows() {
+    let _fonts = crate::ui::fonts::test_lock();
     use crate::i18n::{Language, with_language};
     use crate::ui::fonts::FontEngine;
 

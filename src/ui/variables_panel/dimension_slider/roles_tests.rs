@@ -25,6 +25,8 @@ fn era5_like(time_chunk: u64) -> OctantApp {
         temporal_resolution: None,
         attributes: HashMap::new(),
         ome: None,
+        multiscale: None,
+        shard_shape: None,
     };
     let mut app = OctantApp::default();
     app.selected.metadata = Some(DatasetMetadata {

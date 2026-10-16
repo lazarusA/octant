@@ -67,6 +67,8 @@ pub fn collect_group_variables(
             temporal_resolution,
             attributes,
             ome: None,
+            multiscale: None,
+            shard_shape: None,
         });
     }
 
@@ -137,6 +139,8 @@ pub fn inspect_netcdf_file(file_path: &str) -> Result<DatasetMetadata, BlockStor
             temporal_resolution,
             attributes,
             ome: None,
+            multiscale: None,
+            shard_shape: None,
         });
     }
 

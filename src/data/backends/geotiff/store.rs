@@ -13,6 +13,7 @@ use crate::data::metadata::DatasetMetadata;
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 
+use super::coords::GeoSpatialBounds;
 use super::decode::create_decoder_registry;
 use super::inspect::inspect_tiff;
 use super::reader::{MemoryTiffReader, create_async_reader};
@@ -133,18 +134,17 @@ impl GeoTiffBlockStore {
         })
     }
 
-    pub(crate) fn resolve_ifd(&self, var: &str) -> Option<&async_tiff::ImageFileDirectory> {
-        if var.starts_with("overview_") {
-            let idx = var
-                .strip_prefix("overview_")?
-                .split('/')
-                .next()?
-                .parse::<usize>()
-                .ok()?;
-            self.tiff.ifds().get(idx)
-        } else {
-            self.tiff.ifds().first()
-        }
+    /// The IFD variable `var` reads and its bounds.
+    pub(crate) fn resolve_ifd(
+        &self,
+        var: &str,
+    ) -> Option<(&async_tiff::ImageFileDirectory, GeoSpatialBounds)> {
+        let idx = match var.strip_prefix("overview_") {
+            Some(rest) => rest.split('/').next()?.parse::<usize>().ok()?,
+            None => 0,
+        };
+        let ifds = self.tiff.ifds();
+        Some((ifds.get(idx)?, GeoSpatialBounds::of_ifd_in(ifds, idx)?))
     }
 }
 
@@ -169,7 +169,7 @@ impl BlockStore for GeoTiffBlockStore {
         req: &SliceRequest,
         _on_progress: ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
-        let ifd = self
+        let (ifd, bounds) = self
             .resolve_ifd(&req.variable)
             .ok_or_else(|| format!("Variable '{}' not found in TIFF", req.variable))?;
         #[cfg(not(target_arch = "wasm32"))]
@@ -178,6 +178,7 @@ impl BlockStore for GeoTiffBlockStore {
             rt.block_on(async {
                 fetch_geotiff_block(
                     ifd,
+                    &bounds,
                     self.tiff.endianness(),
                     req,
                     self.reader.as_ref(),
@@ -191,6 +192,7 @@ impl BlockStore for GeoTiffBlockStore {
             futures::executor::block_on(async {
                 fetch_geotiff_block(
                     ifd,
+                    &bounds,
                     self.tiff.endianness(),
                     req,
                     self.reader.as_ref(),

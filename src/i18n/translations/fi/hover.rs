@@ -20,5 +20,7 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
             "Pudota aineisto visualisoitavaksi (.nc, .h5, .zarr, .icechunk, .tif)"
         }
         HoverKey::LabelN => "tunniste {}",
+        HoverKey::Level => "taso",
+        HoverKey::LevelOfTotal => "{}/{}",
     })
 }

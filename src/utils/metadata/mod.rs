@@ -4,6 +4,7 @@ pub mod array_open;
 pub mod cf;
 pub mod discovery;
 pub mod node_info;
+pub mod sharding;
 #[cfg(test)]
 mod tests;
 

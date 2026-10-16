@@ -13,6 +13,27 @@ pub(super) fn discover_concurrent(
     storage: std::sync::Arc<dyn zarrs::storage::ReadableStorageTraits>,
 ) -> Option<super::Discovery> {
     use super::discover::{Outcome, discover};
+    let found = walk_concurrent(storage, MAX_PASSES, |reader| match discover(reader, "") {
+        Outcome::Found(found) => Some(Some(found)),
+        Outcome::NotOme => Some(None),
+        Outcome::Pending => None,
+    });
+    if found.is_none() {
+        log::warn!("OME-Zarr discovery did not settle");
+    }
+    found.flatten()
+}
+
+/// Runs `walk` over the keys of `storage` read so far until it settles
+/// (`Some`), reading the keys each walk still needs concurrently before the
+/// next; `None` when it has not settled after `passes` walks or needs no
+/// more keys.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn walk_concurrent<T>(
+    storage: std::sync::Arc<dyn zarrs::storage::ReadableStorageTraits>,
+    passes: usize,
+    mut walk: impl FnMut(&super::reader::MetaReader<'_>) -> Option<T>,
+) -> Option<T> {
     use super::reader::{MetaReader, Prefetch};
     use rayon::prelude::*;
     use std::sync::Arc;
@@ -22,14 +43,11 @@ pub(super) fn discover_concurrent(
     let prefetch = Prefetch::default();
     // One reader for every walk: keys read in one are not read again.
     let reader = MetaReader::prefetched(memory.clone(), &prefetch);
-    for _ in 0..MAX_PASSES {
-        let outcome = discover(&reader, "");
+    for _ in 0..passes {
+        let settled = walk(&reader);
         let wanted = prefetch.take_pending();
-        match outcome {
-            Outcome::Found(found) => return Some(found),
-            Outcome::NotOme => return None,
-            Outcome::Pending if wanted.is_empty() => return None,
-            Outcome::Pending => {}
+        if settled.is_some() || wanted.is_empty() {
+            return settled;
         }
         let read: Vec<_> = wanted
             .into_par_iter()
@@ -51,6 +69,5 @@ pub(super) fn discover_concurrent(
             }
         }
     }
-    log::warn!("OME-Zarr discovery did not settle");
     None
 }

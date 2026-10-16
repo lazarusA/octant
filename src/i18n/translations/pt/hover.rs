@@ -20,5 +20,7 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
             "Solte um conjunto de dados para visualizar (.nc, .h5, .zarr, .icechunk, .tif)"
         }
         HoverKey::LabelN => "rótulo {}",
+        HoverKey::Level => "nível",
+        HoverKey::LevelOfTotal => "{} de {}",
     })
 }

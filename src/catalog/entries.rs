@@ -126,6 +126,20 @@ pub static ZARR_CATALOG: &[CatalogEntry] = &[
         store: "https://data.dynamical.org/noaa/gefs/forecast-35-day/latest.zarr",
         store_kind: StoreKind::RemoteZarr,
     },
+    CatalogEntry {
+        key: "eopf-s2-l2a-krasnokutsk",
+        label: "Sentinel-2 L2A: Krasnokuts'k (GeoZarr)",
+        subtitle: "EOPF reflectance pyramid, 10 m to 720 m in six levels (multiscales, Zarr v3), 20 January 2026",
+        store: "https://s3.explorer.eopf.copernicus.eu/esa-zarr-sentinel-explorer-fra/tests-output/sentinel-2-l2a/S2C_MSIL2A_20260120T084301_N0511_R064_T36UXA_20260120T122910.zarr/measurements/reflectance",
+        store_kind: StoreKind::RemoteZarr,
+    },
+    CatalogEntry {
+        key: "eopf-s2-l2a-hvolsvollur",
+        label: "Sentinel-2 L2A: Hvolsvöllur (GeoZarr)",
+        subtitle: "EOPF reflectance pyramid, 10 m to 720 m in six levels (multiscales, Zarr v3), 20 January 2026",
+        store: "https://s3.explorer.eopf.copernicus.eu/esa-zarr-sentinel-explorer-fra/tests-output/sentinel-2-l2a/S2B_MSIL2A_20260120T125339_N0511_R138_T27VWL_20260120T131151.zarr/measurements/reflectance",
+        store_kind: StoreKind::RemoteZarr,
+    },
 ];
 
 pub static ICECHUNK_CATALOG: &[CatalogEntry] = &[

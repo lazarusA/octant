@@ -137,6 +137,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggMaxHover => "Mempertahankan nilai tinggi ekstrem.",
         SettingsKey::AggMinHover => "Mempertahankan nilai rendah ekstrem.",
         SettingsKey::AggNearestHover => "Pemilihan titik terdekat yang cepat tanpa interpolasi.",
+        SettingsKey::ResolutionLevel => "Level resolusi",
+        SettingsKey::ResolutionLevelHover => {
+            "Level data multiskala yang dibaca plot. Otomatis membaca level terhalus yang muat di kanvas."
+        }
         SettingsKey::CmykAutoMapped => "Kanal dipetakan otomatis: C (1), M (2), Y (3), K (4)",
         SettingsKey::MultiChannelOverlay => "Tumpukan Multi-Kanal",
         SettingsKey::MultiChannelOverlayHover => {

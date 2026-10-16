@@ -62,8 +62,9 @@ pub(super) fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool
         let mut tree_ctx = VariableTreeContext {
             variables: &variables,
             selected_idx: usize::MAX,
+            selected_level: Default::default(),
             search_active,
-            newly_selected_idx: None,
+            newly_selected: None,
             search_id: search.id,
             search_jump: jump,
         };
@@ -72,7 +73,7 @@ pub(super) fn frame(ctx: &egui::Context, events: Vec<Event>, search_active: bool
             origin,
             row_step,
             ocean_id: folder_id("ocean", search_active),
-            selected: tree_ctx.newly_selected_idx,
+            selected: tree_ctx.newly_selected.map(|(idx, _)| idx),
             search_id: search.id,
         });
     });

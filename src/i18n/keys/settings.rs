@@ -120,6 +120,8 @@ crate::i18n::keys::define_keys! {
     AggMaxHover,
     AggMinHover,
     AggNearestHover,
+    ResolutionLevel,
+    ResolutionLevelHover,
     // Composites
     CmykAutoMapped,
     MultiChannelOverlay,

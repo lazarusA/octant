@@ -56,5 +56,9 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::RoleGrid => "Griglia",
         VariablesKey::Index => "Indice:",
         VariablesKey::ChannelN => "Canale {}",
+        VariablesKey::LevelN => "Livello {}",
+        VariablesKey::LevelAuto => "Auto",
+        VariablesKey::LevelOf => "Livello {} di {}",
+        VariablesKey::AutoLevelOf => "Auto, livello {} di {}",
     })
 }

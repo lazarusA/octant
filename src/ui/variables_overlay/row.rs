@@ -19,8 +19,16 @@ const ICON: IconSize = IconSize::Sm;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RowKind {
-    Folder { open: bool },
+    Folder {
+        open: bool,
+    },
     Variable,
+    /// A multiscale variable, its levels folded down when open.
+    Stack {
+        open: bool,
+    },
+    /// One level of a multiscale variable.
+    Level,
 }
 
 impl RowKind {
@@ -29,14 +37,20 @@ impl RowKind {
             RowKind::Folder { open: true } => Icon::FolderOpen,
             RowKind::Folder { open: false } => Icon::Folder,
             RowKind::Variable => Icon::VariableDoc,
+            RowKind::Stack { .. } => Icon::Layers,
+            RowKind::Level => Icon::Bullet,
         }
     }
 
     pub fn chevron(self) -> Option<Icon> {
         match self {
-            RowKind::Folder { open: true } => Some(Icon::ChevronDown),
-            RowKind::Folder { open: false } => Some(Icon::ChevronRight),
-            RowKind::Variable => None,
+            RowKind::Folder { open: true } | RowKind::Stack { open: true } => {
+                Some(Icon::ChevronDown)
+            }
+            RowKind::Folder { open: false } | RowKind::Stack { open: false } => {
+                Some(Icon::ChevronRight)
+            }
+            RowKind::Variable | RowKind::Level => None,
         }
     }
 }
@@ -59,6 +73,12 @@ pub fn allocate_row(ui: &mut Ui, id: Id) -> Response {
         resp.scroll_to_me(None);
     }
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// Whether `pos` falls on the chevron slot of a row at `rect` (a stack's
+/// chevron folds its levels instead of selecting it).
+pub fn in_chevron_slot(rect: Rect, pos: egui::Pos2) -> bool {
+    pos.x < rect.left() + PAD_X + CHEVRON.px() + GAP
 }
 
 /// Text and icon colors of one row for its hover, focus and selection state.
@@ -85,7 +105,7 @@ pub fn paint_row(
         RowKind::Folder { .. } => {
             egui::WidgetInfo::labeled(egui::WidgetType::CollapsingHeader, true, label)
         }
-        RowKind::Variable => {
+        RowKind::Variable | RowKind::Stack { .. } | RowKind::Level => {
             egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, selected, label)
         }
     });

@@ -198,6 +198,7 @@ fn dataset_text_reads_new_labels_only_once() {
 
 #[test]
 fn fonts_loaded_off_frame_are_installed_by_the_next_frame() {
+    let _fonts = crate::ui::fonts::test_lock();
     use std::sync::atomic::Ordering;
     let ctx = egui::Context::default();
     super::fonts_arrived(&ctx);

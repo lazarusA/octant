@@ -87,6 +87,8 @@ fn test_3d_time_series_volume_playback_switch_to_2d_and_back() {
         file_size: 20 * 32 * 32 * 4,
         attributes: Default::default(),
         ome: None,
+        multiscale: None,
+        shard_shape: None,
     });
     app.load_new_metadata(meta);
 

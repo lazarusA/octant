@@ -70,6 +70,11 @@ pub fn variable_info_from_node_metadata_with_parent_attributes(
                 .and_then(|c| c.as_array())
                 .map(|arr| arr.iter().filter_map(|e| e.as_u64()).collect())
                 .unwrap_or_else(|| shape.clone());
+            // A sharded array reads by its inner chunks.
+            let (chunk_shape, shard_shape) = match super::sharding::sharding_shapes(&val) {
+                Some((inner, shard)) => (inner, Some(shard)),
+                None => (chunk_shape, None),
+            };
 
             let mut cf_attrs = val
                 .get("attributes")
@@ -102,6 +107,7 @@ pub fn variable_info_from_node_metadata_with_parent_attributes(
                 shape,
                 dimension_names,
                 chunk_shape,
+                shard_shape,
                 file_size,
                 units: cf_attrs.units,
                 long_name: cf_attrs.long_name,
@@ -110,6 +116,7 @@ pub fn variable_info_from_node_metadata_with_parent_attributes(
                 temporal_resolution: cf_attrs.temporal_resolution,
                 attributes: cf_attrs.attributes,
                 ome: None,
+                multiscale: None,
             })
         }
         _ => None,

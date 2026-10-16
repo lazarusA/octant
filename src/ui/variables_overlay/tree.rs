@@ -1,6 +1,7 @@
 use super::item::{MAX_ITEMS_PER_LEVEL, render_variable_list, truncation_note};
 use super::nav::{self, NodeKey, SearchJump, folder_state, row_id};
 use super::row::{RowKind, allocate_row, paint_row};
+use crate::app::layers::LevelChoice;
 use crate::data::{VariableInfo, VariableTreeGroup};
 use crate::i18n::VariablesKey;
 use crate::utils::stack_str;
@@ -8,8 +9,11 @@ use crate::utils::stack_str;
 pub struct VariableTreeContext<'a> {
     pub variables: &'a [VariableInfo],
     pub selected_idx: usize,
+    /// The staged level choice, for a multiscale variable.
+    pub selected_level: LevelChoice,
     pub search_active: bool,
-    pub newly_selected_idx: Option<usize>,
+    /// The variable clicked or entered this frame, and its level choice.
+    pub newly_selected: Option<(usize, LevelChoice)>,
     /// Search field to return focus to from the first row or on Escape.
     pub search_id: egui::Id,
     /// Pending focus jump requested by a key in the search field.

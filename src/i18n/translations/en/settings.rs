@@ -140,6 +140,10 @@ pub fn text(key: SettingsKey) -> &'static str {
         SettingsKey::AggMaxHover => "Preserves extreme high values.",
         SettingsKey::AggMinHover => "Preserves extreme low values.",
         SettingsKey::AggNearestHover => "Fast nearest point selection without interpolation.",
+        SettingsKey::ResolutionLevel => "Resolution level",
+        SettingsKey::ResolutionLevelHover => {
+            "The level of the multiscale data the plot reads. Auto reads the finest level that fits the canvas."
+        }
         SettingsKey::CmykAutoMapped => "Auto-mapped channels: C (1), M (2), Y (3), K (4)",
         SettingsKey::MultiChannelOverlay => "Multi-Channel Overlay",
         SettingsKey::MultiChannelOverlayHover => {

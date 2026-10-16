@@ -141,17 +141,18 @@ impl OctantApp {
         playing_lookahead(window, cs, chunk_bytes, share)
     }
 
-    /// Layers whose shown block is being fetched.
+    /// Blocks being fetched to be shown: layers' and detail tiles'.
     fn foreground_requests(&self) -> usize {
+        let pending = |k: Option<&crate::data::BlockCacheKey>| {
+            usize::from(k.is_some_and(|k| self.block_prefetcher.is_pending(k)))
+        };
         self.layers
             .iter()
-            .filter(|l| {
-                l.load
-                    .block_key
-                    .as_ref()
-                    .is_some_and(|k| self.block_prefetcher.is_pending(k))
+            .map(|l| {
+                pending(l.load.block_key.as_ref())
+                    + pending(l.data.detail.pending.as_ref().map(|p| &p.key))
             })
-            .count()
+            .sum()
     }
 
     /// The chunk indices of layer `id` to prefetch, in order: while playing,

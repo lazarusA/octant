@@ -146,6 +146,10 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::AggMaxHover => "Bevarar extremt höga värden.",
         SettingsKey::AggMinHover => "Bevarar extremt låga värden.",
         SettingsKey::AggNearestHover => "Snabbt val av närmaste punkt utan interpolering.",
+        SettingsKey::ResolutionLevel => "Upplösningsnivå",
+        SettingsKey::ResolutionLevelHover => {
+            "Nivån i flerskaliga data som diagrammet läser. Auto läser den finaste nivån som får plats på ytan."
+        }
         SettingsKey::CmykAutoMapped => "Automatiskt mappade kanaler: C (1), M (2), Y (3), K (4)",
         SettingsKey::MultiChannelOverlay => "Flerkanalsöverlägg",
         SettingsKey::MultiChannelOverlayHover => {

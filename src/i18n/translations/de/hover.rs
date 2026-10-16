@@ -20,5 +20,7 @@ pub fn text(key: HoverKey) -> Option<&'static str> {
             "Datensatz zum Visualisieren ablegen (.nc, .h5, .zarr, .icechunk, .tif)"
         }
         HoverKey::LabelN => "Label {}",
+        HoverKey::Level => "Stufe",
+        HoverKey::LevelOfTotal => "{} von {}",
     })
 }

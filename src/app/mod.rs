@@ -17,11 +17,15 @@ mod block_loading;
 pub mod canvas;
 pub mod controllers;
 mod data_loading;
+pub(crate) mod detail;
 mod export_lifecycle;
 mod floating;
 #[cfg(test)]
 mod floating_tests;
 pub mod layers;
+pub(crate) mod multiscale;
+#[cfg(test)]
+mod multiscale_tests;
 #[cfg(test)]
 mod ome_display_tests;
 #[cfg(test)]

@@ -46,5 +46,10 @@ crate::i18n::keys::define_keys! {
     RoleGrid,
     Index,
     ChannelN,
+    // Multiscale levels
+    LevelN,
+    LevelAuto,
+    LevelOf,
+    AutoLevelOf,
     }
 }

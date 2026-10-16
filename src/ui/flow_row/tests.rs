@@ -35,6 +35,7 @@ fn two_items(column: f32, width: f32) -> [Rect; 2] {
 
 #[test]
 fn items_fit_on_one_row_with_item_0_rightmost() {
+    let _fonts = crate::ui::fonts::test_lock();
     let [first, second] = two_items(300.0, 100.0);
     assert_eq!(first.top(), second.top(), "one row");
     assert!(first.left() > second.right(), "item 0 is the rightmost");
@@ -42,6 +43,7 @@ fn items_fit_on_one_row_with_item_0_rightmost() {
 
 #[test]
 fn stacked_items_keep_their_reading_order() {
+    let _fonts = crate::ui::fonts::test_lock();
     let [first, second] = two_items(150.0, 100.0);
     assert!(first.top() > second.bottom(), "item 0 goes below item 1");
     assert!(
@@ -52,6 +54,7 @@ fn stacked_items_keep_their_reading_order() {
 
 #[test]
 fn a_wide_value_box_is_learned_and_stays_in_the_row() {
+    let _fonts = crate::ui::fonts::test_lock();
     let column = 160.0;
     let mut value = 123_456.75_f64;
     let mut right = 0.0;
@@ -70,6 +73,7 @@ fn a_wide_value_box_is_learned_and_stays_in_the_row() {
 
 #[test]
 fn a_slider_under_its_label_stays_there_when_its_value_narrows() {
+    let _fonts = crate::ui::fonts::test_lock();
     let column = 220.0;
     let mut h = Harness::new(SCREEN);
     let mut value = 999_999.5_f64;
@@ -121,6 +125,7 @@ fn slider_frame(h: &mut Harness, column: f32, value: &mut f64) -> egui::Response
 
 #[test]
 fn a_slider_keeps_its_id_when_it_moves_under_its_label() {
+    let _fonts = crate::ui::fonts::test_lock();
     let mut h = Harness::new(SCREEN);
     let mut value = 1.0;
     let beside = slider_frame(&mut h, 400.0, &mut value);
@@ -134,6 +139,7 @@ fn a_slider_keeps_its_id_when_it_moves_under_its_label() {
 
 #[test]
 fn a_kept_value_box_is_measured_again_when_the_style_changes() {
+    let _fonts = crate::ui::fonts::test_lock();
     let mut h = Harness::new(SCREEN);
     let mut value = 999_999.5;
     let column = 220.0;
