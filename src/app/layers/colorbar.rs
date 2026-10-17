@@ -1,5 +1,6 @@
-//! Where a layer's colorbar sits on the canvas: its default slot, its
-//! orientation and, once dragged, its own position. Kept for the session only.
+//! Where a layer's colorbar sits on the canvas: whether it is shown, its
+//! default slot, its orientation and, once dragged, its own position. Kept
+//! for the session only.
 
 use egui::Pos2;
 
@@ -62,6 +63,9 @@ pub struct ColorbarPlacement {
     /// The dragged panel's pivot point as a fraction of the canvas (so it
     /// keeps its place when the canvas resizes); `None` sits in `slot`.
     pub pos: Option<Pos2>,
+    /// Unticked in its Color window, shown again from the layer's entry in
+    /// Settings' Layers menu.
+    pub shown: bool,
 }
 
 impl ColorbarPlacement {
@@ -71,6 +75,7 @@ impl ColorbarPlacement {
             slot,
             orientation: slot.default_orientation(),
             pos: None,
+            shown: true,
         }
     }
 }

@@ -35,7 +35,6 @@ fn with_catalog(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
 fn panels_draw_over_colorbars_even_after_a_colorbar_click() {
     let mut app = OctantApp::default();
     app.layout.show_settings_panel = true;
-    app.layout.show_colorbar = true;
     let at = crate::ui::drag_grip::to_fraction(pos2(300.0, 200.0), SCREEN);
     app.layers.base.colorbar.pos = Some(at);
     let mut h = Harness::new(SCREEN);
@@ -57,7 +56,6 @@ fn panels_draw_over_colorbars_even_after_a_colorbar_click() {
 #[test]
 fn the_catalog_backdrop_covers_colorbars() {
     let mut app = OctantApp::default();
-    app.layout.show_colorbar = true;
     let mut h = Harness::new(SCREEN);
     h.settle(3, &mut with_catalog(&mut app));
     let at = h.area(colorbar_id()).center();

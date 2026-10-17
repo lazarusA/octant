@@ -154,6 +154,19 @@ fn clicking_the_bar_opens_the_picker_on_its_layer() {
 }
 
 #[test]
+fn a_hidden_colorbar_is_not_drawn() {
+    let mut app = OctantApp::default();
+    app.layers.base.colorbar.shown = false;
+    let mut h = Harness::new(SCREEN);
+    let shapes = h.settle(3, &mut run(&mut app));
+    assert!(
+        !shapes
+            .iter()
+            .any(|c| matches!(&c.shape, egui::Shape::Mesh(m) if m.vertices.len() >= 256))
+    );
+}
+
+#[test]
 fn the_close_button_in_the_corner_closes_the_color_window() {
     let mut app = OctantApp::default();
     let mut h = harness(&mut app);

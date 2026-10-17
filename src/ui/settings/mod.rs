@@ -5,6 +5,8 @@ pub(crate) mod composite;
 mod composite_rgb;
 mod export;
 mod layers;
+#[cfg(test)]
+mod layers_tests;
 mod levels;
 mod opacity;
 #[cfg(test)]

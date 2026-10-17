@@ -1,9 +1,12 @@
 use super::support::OptionSupport;
 use crate::app::OctantApp;
-use crate::i18n::{SettingsKey as K, tr};
+use crate::i18n::{ColormapKey, SettingsKey as K, tr};
+use crate::ui::flow_row::{SliderLabel, labeled_slider};
 use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::number_input::LocalizedInput;
 
-/// Camera controls for 3D plots and the hover card toggle, for every plot.
+/// Camera controls for 3D plots and the hover card and scale bar toggles,
+/// for every plot, then the colorbars' box transparency while one shows.
 pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support: &OptionSupport) {
     ui.horizontal_wrapped(|ui| {
         if support.camera.is_yes() {
@@ -35,4 +38,18 @@ pub(crate) fn show_view_controls(app: &mut OctantApp, ui: &mut egui::Ui, support
                 .then(|| app.layout.show_scale_bar = !app.layout.show_scale_bar);
         }
     });
+    let colorbars = app
+        .layers
+        .iter()
+        .any(|l| l.colorbar.shown && crate::ui::colorbar::can_show(app, l.id()));
+    if colorbars {
+        labeled_slider(
+            ui,
+            "colorbar_transparency",
+            SliderLabel::After(tr(ColormapKey::BoxTransparency)),
+            egui::Slider::new(&mut app.layout.colorbar_transparency, 0.0..=1.0)
+                .localized()
+                .custom_formatter(|n, _| format!("{:.0}%", n * 100.0)),
+        );
+    }
 }

@@ -16,7 +16,6 @@ use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::UiIconExt;
-use crate::ui::number_input::LocalizedInput;
 use crate::utils::colormap::registry;
 
 /// Persistent (per-session) picker UI state.
@@ -26,7 +25,7 @@ pub struct PickerState {
     pub cache: search::FilterCache,
     pub swatches: swatch::SwatchAtlas,
     pub editor: editor::EditorState,
-    /// Height of everything below the list (editor, colorbar options) last frame.
+    /// Height of everything below the list (the editor) last frame.
     pub below_list_height: f32,
     /// Row hovered last frame; `preview_colormap` itself resets every frame.
     pub last_hovered: Option<u32>,
@@ -88,8 +87,8 @@ fn panel_scroll_area(max_height: f32) -> egui::ScrollArea {
 }
 
 /// Lays out the panel so everything fits in `max_height`: the colormap list
-/// takes whatever height is left after the controls above it and the editor and
-/// colorbar options below it (measured on the previous frame).
+/// takes whatever height is left after the controls above it and the editor
+/// below it (measured on the previous frame).
 fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
     ui.set_width(POPUP_WIDTH);
     let top = ui.cursor().min.y;
@@ -122,8 +121,6 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
     let below_start = ui.cursor().min.y;
     ui.separator();
     editor::show(app, ui);
-    ui.separator();
-    show_colorbar_options(app, ui);
     let measured = ui.cursor().min.y - below_start;
     if (measured - below).abs() > 0.5 {
         // The editor opened or closed: resize the list on the next frame.
@@ -165,18 +162,6 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
             });
         });
     });
-}
-
-fn show_colorbar_options(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.checkbox(&mut app.layout.show_colorbar, tr(K::ShowColorbar));
-    if app.layout.show_colorbar {
-        ui.add(
-            egui::Slider::new(&mut app.layout.colorbar_transparency, 0.0..=1.0)
-                .localized()
-                .custom_formatter(|n, _| format!("{:.0}%", n * 100.0)),
-        );
-        ui.label(egui::RichText::new(tr(K::BoxTransparency)));
-    }
 }
 
 /// Makes `id` the picked layer's colormap, leaving RGB composite mode if needed.

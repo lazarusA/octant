@@ -32,18 +32,15 @@ use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 
 /// Shows a colorbar on `canvas` for the base layer and each drawn overlay
-/// that has one (`can_show`).
+/// that has one (`can_show`) and has not hidden it.
 pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas: egui::Rect) {
-    if !app.layout.show_colorbar {
-        return;
-    }
     for i in 0..=app.layers.overlays().len() {
         let layer = match i {
             0 => Some(&app.layers.base),
             n => app.layers.overlays().get(n - 1),
         };
         let Some(id) = layer
-            .filter(|l| l.is_drawn() && can_show(app, l.id()))
+            .filter(|l| l.is_drawn() && l.colorbar.shown && can_show(app, l.id()))
             .map(|l| l.id())
         else {
             continue;

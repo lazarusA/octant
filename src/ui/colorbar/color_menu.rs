@@ -1,12 +1,13 @@
 //! A colorbar's Color window, opened by the cog in its top-left corner:
 //! the layer's Color menu (label, range, scale, NaN and clip colors,
-//! opacity and alpha curve) beside the panel, until the cog or its close button (top-right) closes it. A
+//! opacity and alpha curve) and its Show Colorbar checkbox beside the
+//! panel, until the cog or its close button (top-right) closes it. A
 //! floating area rather than an egui popup, so the scale select and color
 //! pickers inside it do not close it.
 
 use crate::app::OctantApp;
 use crate::app::layers::{BarOrientation, LayerId};
-use crate::i18n::{SettingsKey as K, tr};
+use crate::i18n::{ColormapKey, SettingsKey as K, tr};
 use crate::ui::icons::{IconSize, ToolbarButton, UiIconExt};
 use crate::ui::panel_layout::{GAP, PANEL_W};
 use egui::{Align2, Rect, Vec2};
@@ -63,12 +64,26 @@ pub(super) fn show(
                 egui::ScrollArea::vertical()
                     .id_salt(("colorbar_color_menu_scroll", id))
                     .max_height(max_height)
-                    .show(ui, |ui| crate::ui::settings::show_color_menu(app, ui, id));
+                    .show(ui, |ui| {
+                        crate::ui::settings::show_color_menu(app, ui, id);
+                        ui.separator();
+                        show_colorbar_checkbox(app, ui, id);
+                    });
                 close = close_button(ui, top);
             });
         });
-    if close {
+    // Hiding the colorbar closes its window too.
+    if close || app.layers.get(id).is_some_and(|l| !l.colorbar.shown) {
         set_open(ctx, id, false);
+    }
+}
+
+/// Layer `id`'s Show Colorbar checkbox: unticked, the colorbar and this
+/// window close, until the layer's entry in Settings' Layers menu shows it
+/// again.
+fn show_colorbar_checkbox(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
+    if let Some(layer) = app.layers.get_mut(id) {
+        ui.checkbox(&mut layer.colorbar.shown, tr(ColormapKey::ShowColorbar));
     }
 }
 

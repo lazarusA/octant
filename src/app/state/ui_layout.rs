@@ -26,7 +26,6 @@ pub struct UiLayoutState {
     pub canvas_px: [u32; 2],
     pub theme_preference: egui::ThemePreference,
     pub enforce_data_aspect_ratio: bool,
-    pub show_colorbar: bool,
     pub colorbar_transparency: f32,
 
     // Modal windows
@@ -59,7 +58,6 @@ impl Default for UiLayoutState {
             canvas_px: [1920, 1080],
             theme_preference: egui::ThemePreference::System,
             enforce_data_aspect_ratio: true,
-            show_colorbar: true,
             colorbar_transparency: 0.0,
             show_catalog_window: false,
             show_about_window: false,
