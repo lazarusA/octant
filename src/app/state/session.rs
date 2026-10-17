@@ -19,6 +19,7 @@ impl OctantApp {
         app.load_language_pref(cc.storage);
         crate::ui::fonts::FontEngine::init(&cc.egui_ctx);
         crate::ui::number_input::install(&cc.egui_ctx);
+        crate::ui::theme::install(&cc.egui_ctx);
         app.load_colormap_prefs(cc.storage);
 
         #[cfg(not(target_arch = "wasm32"))]

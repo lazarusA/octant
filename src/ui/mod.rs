@@ -42,6 +42,7 @@ pub mod temp_cache;
 pub(crate) mod test_input;
 #[cfg(test)]
 pub(crate) mod test_render;
+pub mod theme;
 pub mod toast;
 pub mod toolbar;
 pub mod top_bar;
