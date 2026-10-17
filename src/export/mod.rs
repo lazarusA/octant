@@ -1,6 +1,8 @@
 //! Figure and Canvas Export Subsystem.
 
 pub mod clipboard;
+#[cfg(target_arch = "wasm32")]
+mod download;
 pub mod raster;
 pub mod vector;
 
@@ -32,6 +34,16 @@ impl ExportFormat {
             Self::Webp => "webp",
             Self::Svg => "svg",
             Self::Pdf => "pdf",
+        }
+    }
+
+    pub fn mime(self) -> &'static str {
+        match self {
+            Self::Png => "image/png",
+            Self::Jpeg => "image/jpeg",
+            Self::Webp => "image/webp",
+            Self::Svg => "image/svg+xml",
+            Self::Pdf => "application/pdf",
         }
     }
 
@@ -236,13 +248,25 @@ pub fn encode_figure(
 }
 
 /// Helper to write an exported file safely to disk (creates directories if missing).
-pub fn save_exported_file(data: &[u8], path: &Path) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| crate::i18n::filled(tr(ExportKey::CreateDirFailed), &[&e]))?;
+/// The web has no filesystem: there the browser downloads it under the path's file name.
+pub fn save_exported_file(data: &[u8], path: &Path, format: ExportFormat) -> Result<(), String> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let name = path.file_name().map(|s| s.to_string_lossy());
+        let name = name.as_deref().unwrap_or(tr(ExportKey::FallbackFilename));
+        download::download(data, name, format.mime())
+            .map_err(|e| crate::i18n::filled(tr(ExportKey::WriteFileFailed), &[&e]))
     }
-    std::fs::write(path, data)
-        .map_err(|e| crate::i18n::filled(tr(ExportKey::WriteFileFailed), &[&e]))
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let _ = format;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| crate::i18n::filled(tr(ExportKey::CreateDirFailed), &[&e]))?;
+        }
+        std::fs::write(path, data)
+            .map_err(|e| crate::i18n::filled(tr(ExportKey::WriteFileFailed), &[&e]))
+    }
 }
 
 #[cfg(test)]
