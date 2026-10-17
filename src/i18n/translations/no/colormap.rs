@@ -12,7 +12,6 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::FilterAll => "Alle",
         ColormapKey::FamilyCustom => "Egendefinert",
         ColormapKey::FamilyTitle => "Familie: {}",
-        ColormapKey::Colormap => "Fargekart",
         ColormapKey::Smooth => "Glatt",
         ColormapKey::SmoothHover => {
             "Bland fargene i paletten til en sammenhengende gradient (Oklab)"
@@ -21,6 +20,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::SearchHint => "Søk etter fargekart...",
         ColormapKey::NoMatches => "Ingen fargekart samsvarer",
         ColormapKey::ShowColorbar => "Vis fargeskala",
+        ColormapKey::ChangeColormapHover => "Klikk for å bytte fargekart",
         ColormapKey::BoxTransparency => "Boksens gjennomsiktighet",
         ColormapKey::CustomColormap => "Egendefinert fargekart",
         ColormapKey::Name => "Navn",

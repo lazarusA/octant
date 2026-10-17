@@ -1,6 +1,6 @@
-//! A colormap hovered in an overlay's picker (Settings' Layers menu)
-//! previews on that overlay's colorbar in the same frame, and the base
-//! layer's colorbar keeps its own.
+//! A colormap hovered in an overlay's picker (opened by clicking its
+//! colorbar) previews on that overlay's colorbar in the same frame, and the
+//! base layer's colorbar keeps its own.
 
 use super::OctantApp;
 use crate::app::layers::{LayerId, Source};
@@ -50,36 +50,40 @@ impl Painted {
         painted
     }
 
-    /// The colors of the bar inside the colorbar panel of `id`.
-    fn bar_colors(&self, h: &Harness, id: LayerId) -> Vec<Color32> {
+    /// The bar inside the colorbar panel of `id`: its rect and colors.
+    fn bar(&self, h: &Harness, id: LayerId) -> &(Rect, Vec<Color32>) {
         let panel = h.area(egui::Id::unique(("octant_colorbar_overlay", id)));
         self.bars
             .iter()
             .find(|(rect, _)| panel.contains_rect(*rect))
-            .map(|(_, colors)| colors.clone())
             .expect("the colorbar paints its bar")
+    }
+
+    fn bar_rect(&self, h: &Harness, id: LayerId) -> Rect {
+        self.bar(h, id).0
+    }
+
+    fn bar_colors(&self, h: &Harness, id: LayerId) -> Vec<Color32> {
+        self.bar(h, id).1.clone()
     }
 }
 
 #[test]
 fn hovering_a_colormap_in_an_overlay_picker_previews_on_its_colorbar() {
+    // Other tests add custom maps, which would change the colors compared.
+    let _registry = crate::utils::colormap::registry::test_lock();
     let mut app = OctantApp::default();
     app.layout.show_settings_panel = true;
-    app.layout.show_colorbar = true;
     let overlay = app.layers.push(Source::default());
     let mut h = Harness::new(SCREEN);
     // Past the areas' fade-in, so colors compare at full opacity.
     let painted = Painted::of(&h.settle(SETTLE_FRAMES, &mut run(&mut app)));
     let base_before = painted.bar_colors(&h, LayerId::BASE);
     let overlay_before = painted.bar_colors(&h, overlay);
-    // The Layers menu lists the topmost overlay first.
-    let layer_swatches = painted.swatches;
-    let swatch = layer_swatches
-        .iter()
-        .min_by(|a, b| a.min.y.total_cmp(&b.min.y))
-        .expect("the Layers menu shows each layer's swatch")
-        .center();
-    h.click(swatch, &mut run(&mut app));
+    let bar = painted.bar_rect(&h, overlay);
+    // Swatches painted before the picker opened are not its rows.
+    let earlier = painted.swatches;
+    h.click(bar.center(), &mut run(&mut app));
     assert_eq!(app.colormaps.target, Some(overlay));
     let mut painted = Painted::of(&h.settle(SETTLE_FRAMES, &mut run(&mut app)));
 
@@ -88,7 +92,7 @@ fn hovering_a_colormap_in_an_overlay_picker_previews_on_its_colorbar() {
     let rows: Vec<Rect> = painted
         .swatches
         .iter()
-        .filter(|r| !layer_swatches.contains(r) && r.min.y > swatch.y)
+        .filter(|r| !earlier.contains(r))
         .copied()
         .collect();
     let mut previewed = None;

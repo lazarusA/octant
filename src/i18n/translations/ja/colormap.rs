@@ -12,7 +12,6 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::FilterAll => "すべて",
         ColormapKey::FamilyCustom => "カスタム",
         ColormapKey::FamilyTitle => "ファミリー: {}",
-        ColormapKey::Colormap => "カラーマップ",
         ColormapKey::Smooth => "滑らか",
         ColormapKey::SmoothHover => {
             "このパレットの色を連続したグラデーションに混ぜ合わせます (Oklab)"
@@ -21,6 +20,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::SearchHint => "カラーマップを検索...",
         ColormapKey::NoMatches => "一致するカラーマップはありません",
         ColormapKey::ShowColorbar => "カラーバーを表示",
+        ColormapKey::ChangeColormapHover => "クリックでカラーマップを変更",
         ColormapKey::BoxTransparency => "枠の透過",
         ColormapKey::CustomColormap => "カスタムカラーマップ",
         ColormapKey::Name => "名前",

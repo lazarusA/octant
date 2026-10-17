@@ -16,7 +16,6 @@ crate::i18n::keys::define_keys! {
     FamilyCustom,
     FamilyTitle,
     // Picker: active row, search and list
-    Colormap,
     Smooth,
     SmoothHover,
     Reversed,
@@ -24,6 +23,7 @@ crate::i18n::keys::define_keys! {
     NoMatches,
     // Picker: colorbar options
     ShowColorbar,
+    ChangeColormapHover,
     BoxTransparency,
     // Custom colormap editor
     CustomColormap,

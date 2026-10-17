@@ -1,6 +1,6 @@
 //! The colorbar controls driven headlessly: shown only while hovered and
 //! never during export; the grip drags and resets the panel, the flip turns
-//! it.
+//! it, and a click on the bar opens the colormap picker.
 
 use super::controls;
 use super::show_colorbar_overlay;
@@ -105,4 +105,32 @@ fn the_flip_turns_the_bar() {
     let panel = panel(&h);
     assert!(panel.height() > panel.width(), "vertical panel: {panel:?}");
     assert!(SCREEN.contains_rect(panel));
+}
+
+/// The bar of panel `panel` in `shapes`: the mesh of many vertices inside it.
+fn bar(shapes: &[ClippedShape], panel: Rect) -> Rect {
+    shapes
+        .iter()
+        .find_map(|c| match &c.shape {
+            egui::Shape::Mesh(mesh) if mesh.vertices.len() >= 256 => {
+                let points: Vec<_> = mesh.vertices.iter().map(|v| v.pos).collect();
+                Some(Rect::from_points(&points)).filter(|r| panel.contains_rect(*r))
+            }
+            _ => None,
+        })
+        .expect("the panel paints its bar")
+}
+
+#[test]
+fn clicking_the_bar_opens_the_picker_on_its_layer() {
+    let mut app = OctantApp::default();
+    let overlay = app.layers.push(crate::app::layers::Source::default());
+    let mut h = Harness::new(SCREEN);
+    let shapes = h.settle(3, &mut run(&mut app));
+    let panel = h.area(egui::Id::unique(("octant_colorbar_overlay", overlay)));
+    let bar = bar(&shapes, panel);
+    h.click(bar.center(), &mut run(&mut app));
+    assert_eq!(app.colormaps.target, Some(overlay));
+    let popup = egui::Id::unique(("colorbar_bar", overlay)).with("popup");
+    assert!(egui::Popup::is_id_open(&h.ctx, popup));
 }

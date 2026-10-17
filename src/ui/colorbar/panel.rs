@@ -1,6 +1,6 @@
-//! One layer's colorbar panel: editable title, the bar, clip triangles,
-//! range inputs and its drag and flip controls, placed by its
-//! `ColorbarPlacement`.
+//! One layer's colorbar panel: editable title, the bar (a click opens the
+//! colormap picker), clip triangles, range inputs and its drag and flip
+//! controls, placed by its `ColorbarPlacement`.
 
 use super::axis::BarAxis;
 use super::bars::{self, BarColors, BarStyle};
@@ -141,7 +141,8 @@ fn vertical_bar(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId, len: f32) {
 }
 
 /// The bar on `axis` with its ticks, clip triangles, range inputs and the
-/// value tooltip of `response`.
+/// value tooltip of `response` (the bar's row); a click on the bar opens
+/// the layer's colormap picker.
 fn bar_row(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
@@ -149,11 +150,19 @@ fn bar_row(
     axis: BarAxis,
     response: egui::Response,
 ) {
+    let bar_id = egui::Id::unique(super::salt("colorbar_bar", id));
+    let bar = ui
+        .interact(axis.rect, bar_id, egui::Sense::click())
+        .on_hover_cursor(egui::CursorIcon::PointingHand);
+    // Before the bar paints, so a colormap hovered in the picker previews
+    // on it this frame.
+    crate::ui::colormap::show_picker_popup(app, &bar, id);
+    let hovered = if bar.hovered() { bar } else { response };
     if id == LayerId::BASE && app.line_series_colored() {
-        series_bar_row(app, ui, axis, response);
+        series_bar_row(app, ui, axis, hovered);
         return;
     }
-    let hover = paint_bar(app, ui, id, axis, response.hover_pos());
+    let hover = paint_bar(app, ui, id, axis, hovered.hover_pos());
     let Some(layer) = app.layers.get_mut(id) else {
         return;
     };
@@ -163,7 +172,17 @@ fn bar_row(
     if let Some(value) = hover {
         let mut buf = [0u8; TICK_BUF + 48];
         let text = crate::i18n::fill(&mut buf, tr(K::HoveredValue), &[&ScientificTick(value)]);
-        response.on_hover_text(text);
+        let on_bar = hovered.id == bar_id;
+        hovered.on_hover_ui(|ui| {
+            ui.label(text);
+            if on_bar {
+                ui.label(
+                    egui::RichText::new(tr(K::ChangeColormapHover))
+                        .small()
+                        .weak(),
+                );
+            }
+        });
     }
 }
 

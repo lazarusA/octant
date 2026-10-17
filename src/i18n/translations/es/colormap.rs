@@ -12,7 +12,6 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::FilterAll => "Todos",
         ColormapKey::FamilyCustom => "Personalizados",
         ColormapKey::FamilyTitle => "Familia: {}",
-        ColormapKey::Colormap => "Mapa de color",
         ColormapKey::Smooth => "Suavizar",
         ColormapKey::SmoothHover => {
             "Fundir los colores de esta paleta en un degradado continuo (Oklab)"
@@ -21,6 +20,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::SearchHint => "Buscar mapas de color...",
         ColormapKey::NoMatches => "Ningún mapa de color coincide",
         ColormapKey::ShowColorbar => "Mostrar barra de color",
+        ColormapKey::ChangeColormapHover => "Haga clic para cambiar el mapa de color",
         ColormapKey::BoxTransparency => "Transparencia del recuadro",
         ColormapKey::CustomColormap => "Mapa de color personalizado",
         ColormapKey::Name => "Nombre",

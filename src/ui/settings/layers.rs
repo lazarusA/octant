@@ -1,6 +1,7 @@
 //! The Layers menu: one entry per layer, topmost overlay first and the base
 //! layer last. Each has its header (visibility, order and remove for
-//! overlays), colormap, composite channels and its own Color menu.
+//! overlays), composite channels and its own Color menu; the colormap is
+//! picked by clicking the layer's colorbar.
 
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId};
@@ -84,14 +85,13 @@ fn overlay_header(
     action
 }
 
-/// Layer `id`'s colormap, composite channels and Color menu (which holds
-/// its opacity).
+/// Layer `id`'s composite channels and Color menu (which holds its
+/// opacity).
 fn layer_body(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     if app.layers.get(id).is_some_and(|l| l.labels().is_some()) {
         label_body(app, ui, id);
         return;
     }
-    crate::ui::colormap::show_layer_colormap_button(app, ui, id);
     // A line plot draws one band: no composite.
     let line = id == LayerId::BASE && app.effective_canvas_plot_type() == PlotType::Line;
     if !line {

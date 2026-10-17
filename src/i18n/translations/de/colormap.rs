@@ -12,7 +12,6 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::FilterAll => "Alle",
         ColormapKey::FamilyCustom => "Eigene",
         ColormapKey::FamilyTitle => "Familie: {}",
-        ColormapKey::Colormap => "Farbtabelle",
         ColormapKey::Smooth => "Glatt",
         ColormapKey::SmoothHover => {
             "Die Farben dieser Palette zu einem stetigen Verlauf mischen (Oklab)"
@@ -21,6 +20,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::SearchHint => "Farbtabellen suchen...",
         ColormapKey::NoMatches => "Keine passenden Farbtabellen",
         ColormapKey::ShowColorbar => "Farbleiste zeigen",
+        ColormapKey::ChangeColormapHover => "Klicken, um die Farbtabelle zu ändern",
         ColormapKey::BoxTransparency => "Kastentransparenz",
         ColormapKey::CustomColormap => "Eigene Farbtabelle",
         ColormapKey::Name => "Name",
