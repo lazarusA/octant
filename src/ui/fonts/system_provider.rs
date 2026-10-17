@@ -50,11 +50,10 @@ pub fn follow(ctx: &egui::Context, lang: Language) -> bool {
 
 /// The shared provider for `font`'s locale, started on first use.
 fn provider(font: CjkFont) -> Arc<SystemFontProvider> {
+    let start = || Arc::new(SystemFontProvider::new().with_locale(Some(locale(font))));
     let mut providers = PROVIDERS.lock().unwrap_or_else(|p| p.into_inner());
-    let slot = &mut providers[store::index(font)];
-    Arc::clone(
-        slot.get_or_insert_with(|| {
-            Arc::new(SystemFontProvider::new().with_locale(Some(locale(font))))
-        }),
-    )
+    match providers.get_mut(store::index(font)) {
+        Some(slot) => Arc::clone(slot.get_or_insert_with(start)),
+        None => start(),
+    }
 }
