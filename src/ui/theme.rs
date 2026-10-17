@@ -5,7 +5,7 @@
 //! neutral gray against the panels. Selection, hover and press outlines keep
 //! egui's colors for contrast.
 
-use egui::{Color32, Theme};
+use egui::{Color32, Theme, Visuals};
 
 /// Cool near-black for the dark theme's canvas, bars and landing screen,
 /// matching the web loading screen (`--bg-color` in `index.html`). Dark gray
@@ -36,37 +36,42 @@ const DARK_HOVERED_TEXT: Color32 = Color32::from_rgb(0xDD, 0xE0, 0xE3);
 /// which glows on the dark panels).
 const DARK_STRONG_TEXT: Color32 = Color32::from_rgb(0xE6, 0xE8, 0xEB);
 
-/// Installs the dark theme's surfaces, borders, widget fills and text colors.
+/// Installs Octant's dark visuals.
 pub fn install(ctx: &egui::Context) {
-    ctx.style_mut_of(Theme::Dark, |style| {
-        let visuals = &mut style.visuals;
-        visuals.panel_fill = DARK_PANEL_FILL;
-        visuals.window_fill = DARK_WINDOW_FILL;
-        visuals.window_stroke.color = DARK_STROKE;
-        visuals.extreme_bg_color = DARK_EXTREME_BG;
+    ctx.style_mut_of(Theme::Dark, |style| style.visuals = dark_visuals());
+}
 
-        let w = &mut visuals.widgets;
-        // egui gives non-interactive frames the window's fill.
-        w.noninteractive.bg_fill = DARK_WINDOW_FILL;
-        w.noninteractive.weak_bg_fill = DARK_WINDOW_FILL;
-        w.noninteractive.bg_stroke.color = DARK_STROKE;
-        w.noninteractive.fg_stroke.color = DARK_TEXT;
+/// egui's dark visuals with Octant's surfaces, borders, widget fills and text
+/// colors; tests and review sheets draw with these, as the app does.
+pub fn dark_visuals() -> Visuals {
+    let mut visuals = Visuals::dark();
+    visuals.panel_fill = DARK_PANEL_FILL;
+    visuals.window_fill = DARK_WINDOW_FILL;
+    visuals.window_stroke.color = DARK_STROKE;
+    visuals.extreme_bg_color = DARK_EXTREME_BG;
 
-        w.inactive.weak_bg_fill = Color32::from_rgb(0x2F, 0x32, 0x36);
-        w.inactive.bg_fill = Color32::from_rgb(0x39, 0x3C, 0x40);
-        w.inactive.fg_stroke.color = DARK_BUTTON_TEXT;
+    let w = &mut visuals.widgets;
+    // egui gives non-interactive frames the window's fill.
+    w.noninteractive.bg_fill = DARK_WINDOW_FILL;
+    w.noninteractive.weak_bg_fill = DARK_WINDOW_FILL;
+    w.noninteractive.bg_stroke.color = DARK_STROKE;
+    w.noninteractive.fg_stroke.color = DARK_TEXT;
 
-        w.hovered.weak_bg_fill = Color32::from_rgb(0x3D, 0x40, 0x44);
-        w.hovered.bg_fill = Color32::from_rgb(0x43, 0x46, 0x4B);
-        w.hovered.fg_stroke.color = DARK_HOVERED_TEXT;
+    w.inactive.weak_bg_fill = Color32::from_rgb(0x2F, 0x32, 0x36);
+    w.inactive.bg_fill = Color32::from_rgb(0x39, 0x3C, 0x40);
+    w.inactive.fg_stroke.color = DARK_BUTTON_TEXT;
 
-        w.active.weak_bg_fill = Color32::from_rgb(0x25, 0x28, 0x2C);
-        w.active.bg_fill = Color32::from_rgb(0x34, 0x37, 0x3B);
-        w.active.fg_stroke.color = DARK_STRONG_TEXT;
+    w.hovered.weak_bg_fill = Color32::from_rgb(0x3D, 0x40, 0x44);
+    w.hovered.bg_fill = Color32::from_rgb(0x43, 0x46, 0x4B);
+    w.hovered.fg_stroke.color = DARK_HOVERED_TEXT;
 
-        w.open.weak_bg_fill = Color32::from_rgb(0x2A, 0x2D, 0x31);
-        w.open.bg_fill = DARK_WINDOW_FILL;
-        w.open.bg_stroke.color = DARK_STROKE;
-        w.open.fg_stroke.color = DARK_BUTTON_TEXT;
-    });
+    w.active.weak_bg_fill = Color32::from_rgb(0x25, 0x28, 0x2C);
+    w.active.bg_fill = Color32::from_rgb(0x34, 0x37, 0x3B);
+    w.active.fg_stroke.color = DARK_STRONG_TEXT;
+
+    w.open.weak_bg_fill = Color32::from_rgb(0x2A, 0x2D, 0x31);
+    w.open.bg_fill = DARK_WINDOW_FILL;
+    w.open.bg_stroke.color = DARK_STROKE;
+    w.open.fg_stroke.color = DARK_BUTTON_TEXT;
+    visuals
 }
