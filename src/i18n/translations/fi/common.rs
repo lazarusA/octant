@@ -5,7 +5,6 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::Dataset => "Aineisto",
         CommonKey::Variables => "Muuttujat",
         CommonKey::Dimensions => "Ulottuvuudet",
-        CommonKey::Colormaps => "Värikartat",
         CommonKey::Settings => "Asetukset",
         CommonKey::About => "Tietoja",
         CommonKey::Cache => "Välimuisti",

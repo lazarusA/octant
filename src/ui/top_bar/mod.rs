@@ -20,7 +20,6 @@ const ALL_ITEMS: [TopBarItem; ITEM_COUNT] = [
     TopBarItem::Variables,
     TopBarItem::Dimensions,
     TopBarItem::PlotType,
-    TopBarItem::Colormap,
     TopBarItem::Settings,
     TopBarItem::Status,
     TopBarItem::Cache,

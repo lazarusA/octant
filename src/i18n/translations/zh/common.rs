@@ -5,7 +5,6 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::Dataset => "数据集",
         CommonKey::Variables => "变量",
         CommonKey::Dimensions => "维度",
-        CommonKey::Colormaps => "色图",
         CommonKey::Settings => "设置",
         CommonKey::About => "关于",
         CommonKey::Cache => "缓存",

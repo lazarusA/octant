@@ -5,7 +5,6 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::Dataset => "Набор данных",
         CommonKey::Variables => "Переменные",
         CommonKey::Dimensions => "Измерения",
-        CommonKey::Colormaps => "Цветовые шкалы",
         CommonKey::Settings => "Настройки",
         CommonKey::About => "О программе",
         CommonKey::Cache => "Кэш",

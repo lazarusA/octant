@@ -5,7 +5,7 @@ use crate::app::OctantApp;
 use crate::i18n::{CommonKey, tr};
 use crate::ui::icons::{Icon, TOOLBAR_ITEM_HEIGHT, ToolbarButton};
 use crate::ui::toolbar::{ItemWidths, SEPARATOR_WIDTH};
-use crate::ui::{cache, colormap, plot_type};
+use crate::ui::{cache, plot_type};
 
 const BRAND_LABEL: &str = "Octant";
 
@@ -17,7 +17,6 @@ fn label(item: TopBarItem, app: &OctantApp) -> &'static str {
         TopBarItem::Variables => tr(CommonKey::Variables),
         TopBarItem::Dimensions => tr(CommonKey::Dimensions),
         TopBarItem::PlotType => app.selected.plot_type.display_name(),
-        TopBarItem::Colormap => tr(CommonKey::Colormaps),
         TopBarItem::Settings => tr(CommonKey::Settings),
         TopBarItem::Status => "",
         TopBarItem::Cache => tr(CommonKey::Cache),
@@ -132,7 +131,6 @@ pub(super) fn show_item(item: TopBarItem, compact: bool, app: &mut OctantApp, ui
             }
         }
         TopBarItem::PlotType => plot_type::show_plot_type_menu(app, ui, compact),
-        TopBarItem::Colormap => colormap::show_colormap_menu(app, ui, compact),
         TopBarItem::Settings => {
             if ui.add(button(Icon::Settings, item, app, compact)).clicked() {
                 app.layout.show_settings_panel = !app.layout.show_settings_panel;

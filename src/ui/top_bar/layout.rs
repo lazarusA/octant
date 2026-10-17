@@ -11,7 +11,6 @@ pub(super) enum TopBarItem {
     Variables,
     Dimensions,
     PlotType,
-    Colormap,
     Settings,
     Status,
     Cache,
@@ -19,15 +18,14 @@ pub(super) enum TopBarItem {
     Theme,
 }
 
-pub(super) const ITEM_COUNT: usize = 11;
+pub(super) const ITEM_COUNT: usize = 10;
 
 /// Items drawn left-aligned after the brand header.
-pub(super) const LEFT_ITEMS: [TopBarItem; 6] = [
+pub(super) const LEFT_ITEMS: [TopBarItem; 5] = [
     TopBarItem::Dataset,
     TopBarItem::Variables,
     TopBarItem::Dimensions,
     TopBarItem::PlotType,
-    TopBarItem::Colormap,
     TopBarItem::Settings,
 ];
 
@@ -39,7 +37,6 @@ pub(super) const COLLAPSE_ORDER: [TopBarItem; ITEM_COUNT] = [
     TopBarItem::Theme,
     TopBarItem::Cache,
     TopBarItem::Settings,
-    TopBarItem::Colormap,
     TopBarItem::PlotType,
     TopBarItem::Dimensions,
     TopBarItem::Variables,
