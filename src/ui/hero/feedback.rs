@@ -68,7 +68,7 @@ pub fn render_idle_hint(ui: &mut egui::Ui) {
         egui::RichText::new(text)
             .monospace()
             .size(SMALL_FONT)
-            .color(ui.visuals().strong_text_color()),
+            .color(ui.visuals().weak_text_color()),
     );
 }
 
