@@ -170,7 +170,7 @@ pub fn sheet_dir() -> PathBuf {
     dir
 }
 
-/// Default dark and light visuals, in sheet column order.
+/// The app's dark and light visuals, in sheet column order.
 pub fn themes() -> [Visuals; 2] {
-    [Visuals::dark(), Visuals::light()]
+    [crate::ui::theme::dark_visuals(), Visuals::light()]
 }

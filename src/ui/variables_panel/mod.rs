@@ -46,12 +46,10 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
-            egui::Frame::popup(ui.style())
-                .stroke(egui::Stroke::NONE)
-                .show(ui, |ui| {
-                    ui.set_width(panel_w);
-                    grip = show_panel(app, ui);
-                });
+            egui::Frame::popup(ui.style()).show(ui, |ui| {
+                ui.set_width(panel_w);
+                grip = show_panel(app, ui);
+            });
         });
     let rect = area_resp.response.rect;
     panel_layout::apply_grip(app, Panel::Dimensions, grip, rect, canvas_rect);

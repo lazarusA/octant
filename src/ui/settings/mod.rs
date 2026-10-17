@@ -46,9 +46,7 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
-            egui::Frame::popup(ui.style())
-                .stroke(egui::Stroke::NONE)
-                .show(ui, |ui| header = show_panel(app, ui, canvas_rect));
+            egui::Frame::popup(ui.style()).show(ui, |ui| header = show_panel(app, ui, canvas_rect));
         });
 
     // Store width for next frame so Variable Controls can position to the right.

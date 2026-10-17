@@ -68,7 +68,7 @@ fn contrast(a: Color32, b: Color32) -> f32 {
 
 #[test]
 fn test_tones_meet_non_text_contrast_in_both_themes() {
-    for visuals in [Visuals::dark(), Visuals::light()] {
+    for visuals in [crate::ui::theme::dark_visuals(), Visuals::light()] {
         for tone in IconTone::ALL {
             let ratio = contrast(tone.color(&visuals), visuals.panel_fill);
             assert!(
@@ -83,7 +83,7 @@ fn test_tones_meet_non_text_contrast_in_both_themes() {
 
 #[test]
 fn test_tone_rgb_matches_visuals_color() {
-    for visuals in [Visuals::dark(), Visuals::light()] {
+    for visuals in [crate::ui::theme::dark_visuals(), Visuals::light()] {
         for tone in IconTone::ALL {
             if let Some(rgb) = tone.rgb(visuals.dark_mode) {
                 assert_eq!(rgb, tone.color(&visuals), "{} drifted", tone.name());
@@ -98,7 +98,8 @@ fn test_tone_rgb_matches_visuals_color() {
 fn every_icon_stays_inside_its_box() {
     for &(size, ppp) in &sheet::COLUMNS {
         for &icon in Icon::ALL {
-            let (prims, _) = sheet::tessellate(&[icon], size, ppp, &Visuals::dark());
+            let (prims, _) =
+                sheet::tessellate(&[icon], size, ppp, &crate::ui::theme::dark_visuals());
             // Allow one point of anti-aliasing feather around the box.
             let bounds = sheet::tile_rect(0, size).expand(1.0);
             for prim in &prims {

@@ -31,7 +31,7 @@ fn metrics_snap_to_whole_pixels_and_pick_style() {
 
 #[test]
 fn side_faces_differ_from_front_in_both_themes() {
-    for visuals in [Visuals::dark(), Visuals::light()] {
+    for visuals in [crate::ui::theme::dark_visuals(), Visuals::light()] {
         let faces = face_colors(&visuals, visuals.strong_text_color());
         assert_ne!(faces[0], faces[1]);
         assert_ne!(faces[1], faces[2]);
@@ -42,7 +42,7 @@ fn side_faces_differ_from_front_in_both_themes() {
 #[test]
 fn wordmark_paints_at_every_size_and_theme() {
     let ctx = egui::Context::default();
-    for visuals in [Visuals::dark(), Visuals::light()] {
+    for visuals in [crate::ui::theme::dark_visuals(), Visuals::light()] {
         ctx.set_visuals(visuals);
         for cell in [5.0, 6.0, 7.0] {
             let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {

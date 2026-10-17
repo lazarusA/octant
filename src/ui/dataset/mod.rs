@@ -33,9 +33,7 @@ pub fn show_dataset_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rect
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
-            egui::Frame::popup(ui.style())
-                .stroke(egui::Stroke::NONE)
-                .show(ui, |ui| header = show_panel(app, ui, canvas_rect));
+            egui::Frame::popup(ui.style()).show(ui, |ui| header = show_panel(app, ui, canvas_rect));
         });
 
     let rect = area_resp.response.rect;
