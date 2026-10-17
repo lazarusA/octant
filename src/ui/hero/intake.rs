@@ -80,18 +80,17 @@ pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
     frame.end(ui);
 }
 
-/// Longest input placeholder that fits in `text_w`.
+/// Input placeholder for `text_w`: the long one wherever the medium one would
+/// fit, so the hint fills the field as typed text does (egui cuts it at the
+/// edge with an ellipsis), else the short one.
 fn intake_hint(ui: &egui::Ui, text_w: f32) -> &'static str {
-    fit_text(
-        ui,
-        &[
-            tr(DatasetKey::HeroInputHintLong),
-            tr(DatasetKey::HeroInputHintMedium),
-            tr(DatasetKey::HeroInputHintShort),
-        ],
-        BODY_FONT,
-        text_w,
-    )
+    let medium = tr(DatasetKey::HeroInputHintMedium);
+    let short = tr(DatasetKey::HeroInputHintShort);
+    if fit_text(ui, &[medium, short], BODY_FONT, text_w) == medium {
+        tr(DatasetKey::HeroInputHintLong)
+    } else {
+        short
+    }
 }
 
 /// Frameless load button with a drop-tray glyph; returns `true` when clicked.
