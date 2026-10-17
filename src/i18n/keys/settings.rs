@@ -15,6 +15,7 @@ crate::i18n::keys::define_keys! {
     ReasonAlwaysBlends,
     // Panel and sections
     CloseSettingsHover,
+    CloseColorHover,
     SectionOverlays,
     SectionResolution,
     SectionView,
@@ -30,7 +31,6 @@ crate::i18n::keys::define_keys! {
     MoveUpHover,
     NoVariable,
     // Colorbar label and range
-    ColorbarLabel,
     ResetLabelHover,
     ColorRange,
     Categorical,

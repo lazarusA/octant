@@ -45,7 +45,6 @@ pub(crate) fn show_color_settings(
 }
 
 fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
-    ui.label(egui::RichText::new(tr(K::ColorbarLabel)).strong());
     let Some(layer) = app.layers.get(id) else {
         return;
     };

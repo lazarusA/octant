@@ -21,6 +21,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::NoMatches => "一致するカラーマップはありません",
         ColormapKey::ShowColorbar => "カラーバーを表示",
         ColormapKey::ChangeColormapHover => "クリックでカラーマップを変更",
+        ColormapKey::ColorSettingsHover => "色の設定",
         ColormapKey::BoxTransparency => "枠の透過",
         ColormapKey::CustomColormap => "カスタムカラーマップ",
         ColormapKey::Name => "名前",

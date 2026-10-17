@@ -19,6 +19,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::NoMatches => "没有匹配的色图",
         ColormapKey::ShowColorbar => "显示色标",
         ColormapKey::ChangeColormapHover => "点击更改色图",
+        ColormapKey::ColorSettingsHover => "颜色设置",
         ColormapKey::BoxTransparency => "背景框透明",
         ColormapKey::CustomColormap => "自定义色图",
         ColormapKey::Name => "名称",

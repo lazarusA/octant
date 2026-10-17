@@ -19,6 +19,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::NoMatches => "Немає відповідних колірних шкал",
         ColormapKey::ShowColorbar => "Показати кольорову смугу",
         ColormapKey::ChangeColormapHover => "Натисніть, щоб змінити колірну шкалу",
+        ColormapKey::ColorSettingsHover => "Налаштування кольору",
         ColormapKey::BoxTransparency => "Прозорість рамки",
         ColormapKey::CustomColormap => "Власна колірна шкала",
         ColormapKey::Name => "Назва",

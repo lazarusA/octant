@@ -21,6 +21,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         }
         SettingsKey::ReasonAlwaysBlends => "Этот алгоритм всегда смешивает вдоль луча.",
         SettingsKey::CloseSettingsHover => "Закрыть настройки",
+        SettingsKey::CloseColorHover => "Закрыть настройки цвета",
         SettingsKey::SectionOverlays => "Наложения",
         SettingsKey::SectionResolution => "Разрешение",
         SettingsKey::SectionView => "Вид",
@@ -34,7 +35,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::MoveDownHover => "Переместить вниз",
         SettingsKey::MoveUpHover => "Переместить вверх",
         SettingsKey::NoVariable => "(нет переменной)",
-        SettingsKey::ColorbarLabel => "Подпись легенды",
         SettingsKey::ResetLabelHover => "Сбросить подпись легенды к умолчанию",
         SettingsKey::ColorRange => "Диапазон цвета",
         SettingsKey::Categorical => "Категориальная",

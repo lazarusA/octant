@@ -21,9 +21,10 @@ crate::i18n::keys::define_keys! {
     Reversed,
     SearchHint,
     NoMatches,
-    // Picker: colorbar options
+    // Picker and colorbar: colorbar options
     ShowColorbar,
     ChangeColormapHover,
+    ColorSettingsHover,
     BoxTransparency,
     // Custom colormap editor
     CustomColormap,

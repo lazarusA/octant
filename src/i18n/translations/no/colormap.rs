@@ -21,6 +21,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::NoMatches => "Ingen fargekart samsvarer",
         ColormapKey::ShowColorbar => "Vis fargeskala",
         ColormapKey::ChangeColormapHover => "Klikk for å bytte fargekart",
+        ColormapKey::ColorSettingsHover => "Fargeinnstillinger",
         ColormapKey::BoxTransparency => "Boksens gjennomsiktighet",
         ColormapKey::CustomColormap => "Egendefinert fargekart",
         ColormapKey::Name => "Navn",

@@ -19,6 +19,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::NoMatches => "Tidak ada peta warna yang cocok",
         ColormapKey::ShowColorbar => "Tampilkan Bilah Warna",
         ColormapKey::ChangeColormapHover => "Klik untuk mengganti peta warna",
+        ColormapKey::ColorSettingsHover => "Pengaturan Warna",
         ColormapKey::BoxTransparency => "Transparansi kotak",
         ColormapKey::CustomColormap => "Peta warna kustom",
         ColormapKey::Name => "Nama",

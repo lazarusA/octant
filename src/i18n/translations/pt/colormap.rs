@@ -21,6 +21,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::NoMatches => "Nenhum mapa de cores corresponde",
         ColormapKey::ShowColorbar => "Mostrar barra de cores",
         ColormapKey::ChangeColormapHover => "Clique para alterar o mapa de cores",
+        ColormapKey::ColorSettingsHover => "Configurações de cor",
         ColormapKey::BoxTransparency => "Transparência da caixa",
         ColormapKey::CustomColormap => "Mapa de cores personalizado",
         ColormapKey::Name => "Nome",

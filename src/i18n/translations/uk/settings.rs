@@ -19,6 +19,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         }
         SettingsKey::ReasonAlwaysBlends => "Цей алгоритм завжди змішує вздовж променя.",
         SettingsKey::CloseSettingsHover => "Закрити налаштування",
+        SettingsKey::CloseColorHover => "Закрити налаштування кольору",
         SettingsKey::SectionOverlays => "Накладання",
         SettingsKey::SectionResolution => "Роздільність",
         SettingsKey::SectionView => "Вигляд",
@@ -32,7 +33,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::MoveDownHover => "Перемістити нижче",
         SettingsKey::MoveUpHover => "Перемістити вище",
         SettingsKey::NoVariable => "(немає змінної)",
-        SettingsKey::ColorbarLabel => "Підпис кольорової смуги",
         SettingsKey::ResetLabelHover => "Скинути підпис кольорової смуги до типового",
         SettingsKey::ColorRange => "Діапазон кольорів",
         SettingsKey::Categorical => "Категоріальна",

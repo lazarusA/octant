@@ -19,6 +19,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::NoMatches => "Inga färgkartor matchar",
         ColormapKey::ShowColorbar => "Visa färgskala",
         ColormapKey::ChangeColormapHover => "Klicka för att byta färgkarta",
+        ColormapKey::ColorSettingsHover => "Färginställningar",
         ColormapKey::BoxTransparency => "Rutans transparens",
         ColormapKey::CustomColormap => "Anpassad färgkarta",
         ColormapKey::Name => "Namn",

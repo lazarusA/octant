@@ -19,6 +19,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::NoMatches => "일치하는 컬러맵이 없습니다",
         ColormapKey::ShowColorbar => "컬러바 표시",
         ColormapKey::ChangeColormapHover => "클릭하여 컬러맵 변경",
+        ColormapKey::ColorSettingsHover => "색상 설정",
         ColormapKey::BoxTransparency => "상자 투명도",
         ColormapKey::CustomColormap => "사용자 컬러맵",
         ColormapKey::Name => "이름",

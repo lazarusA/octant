@@ -1,7 +1,8 @@
 //! The Layers menu: one entry per layer, topmost overlay first and the base
 //! layer last. Each has its header (visibility, order and remove for
-//! overlays), composite channels and its own Color menu; the colormap is
-//! picked by clicking the layer's colorbar.
+//! overlays) and its composite channels; the colorbar holds the colormap
+//! and Color menu, so only layers without a colorbar keep their Color menu
+//! here.
 
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId};
@@ -85,8 +86,8 @@ fn overlay_header(
     action
 }
 
-/// Layer `id`'s composite channels and Color menu (which holds its
-/// opacity).
+/// Layer `id`'s composite channels and, when it has no colorbar to open it
+/// from, its Color menu (which holds its opacity).
 fn layer_body(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     if app.layers.get(id).is_some_and(|l| l.labels().is_some()) {
         label_body(app, ui, id);
@@ -96,6 +97,9 @@ fn layer_body(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     let line = id == LayerId::BASE && app.effective_canvas_plot_type() == PlotType::Line;
     if !line {
         super::composite::show_composite_controls(app, ui, id);
+    }
+    if crate::ui::colorbar::can_show(app, id) {
+        return;
     }
     egui::CollapsingHeader::new(tr(K::Color))
         .id_salt(("layer_color_menu", id))

@@ -23,6 +23,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         }
         SettingsKey::ReasonAlwaysBlends => "Questo algoritmo fonde sempre lungo il raggio.",
         SettingsKey::CloseSettingsHover => "Chiudi impostazioni",
+        SettingsKey::CloseColorHover => "Chiudi impostazioni colore",
         SettingsKey::SectionOverlays => "Sovrapposizioni",
         SettingsKey::SectionResolution => "Risoluzione",
         SettingsKey::SectionView => "Vista",
@@ -38,7 +39,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::MoveDownHover => "Sposta giù",
         SettingsKey::MoveUpHover => "Sposta su",
         SettingsKey::NoVariable => "(nessuna variabile)",
-        SettingsKey::ColorbarLabel => "Etichetta della barra",
         SettingsKey::ResetLabelHover => "Reimposta l'etichetta della barra dei colori",
         SettingsKey::ColorRange => "Intervallo di colore",
         SettingsKey::Categorical => "Categoriale",

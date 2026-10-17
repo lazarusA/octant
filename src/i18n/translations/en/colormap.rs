@@ -21,6 +21,7 @@ pub fn text(key: ColormapKey) -> &'static str {
         ColormapKey::NoMatches => "No colormaps match",
         ColormapKey::ShowColorbar => "Show Colorbar",
         ColormapKey::ChangeColormapHover => "Click to change the colormap",
+        ColormapKey::ColorSettingsHover => "Color settings",
         ColormapKey::BoxTransparency => "Box transparency",
         ColormapKey::CustomColormap => "Custom colormap",
         ColormapKey::Name => "Name",

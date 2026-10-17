@@ -1,7 +1,9 @@
-//! A colorbar panel's drag grip and orientation flip, in its top-right
-//! corner while the pointer is over the panel (or the grip is held), and
-//! never during export.
+//! A colorbar panel's controls: the cog opening its Color window in the
+//! top-left corner, the drag grip and orientation flip in the top-right one;
+//! shown while the pointer is over the panel (or the grip is held, or the
+//! Color window is open), and never during export.
 
+use super::color_menu;
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::i18n::{ColormapKey as K, tr};
@@ -25,9 +27,18 @@ pub fn rects(panel: Rect) -> [Rect; 2] {
     [grip, flip]
 }
 
+/// The cog's rect in panel `panel`'s top-left corner.
+pub fn cog_rect(panel: Rect) -> Rect {
+    Rect::from_min_size(
+        egui::pos2(panel.min.x + INSET, panel.min.y + INSET),
+        Vec2::splat(CONTROL),
+    )
+}
+
 /// Draws layer `id`'s controls on panel `panel` (pivot `pivot`, on
-/// `canvas`): dragging the grip moves the panel, double-clicking it puts the
-/// panel back in its slot, and the flip switches its orientation.
+/// `canvas`): the cog opens and closes the Color window, dragging the grip
+/// moves the panel, double-clicking it puts the panel back in its slot, and
+/// the flip switches its orientation.
 pub fn show(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
@@ -37,8 +48,17 @@ pub fn show(
 ) {
     let dragging_key = egui::Id::unique(super::salt("colorbar_dragging", id));
     let dragging = ui.data(|d| d.get_temp::<bool>(dragging_key).unwrap_or(false));
-    if app.pending_export.is_some() || !(dragging || ui.rect_contains_pointer(panel)) {
+    let color_open = color_menu::is_open(ui.ctx(), id);
+    if app.pending_export.is_some() || !(dragging || color_open || ui.rect_contains_pointer(panel))
+    {
         return;
+    }
+    let cog = ToolbarButton::new(Icon::Settings, tr(K::ColorSettingsHover))
+        .compact(true)
+        .icon_size(IconSize::Xs)
+        .active(color_open);
+    if ui.put(cog_rect(panel), cog).clicked() {
+        color_menu::set_open(ui.ctx(), id, !color_open);
     }
     let [grip_rect, flip_rect] = rects(panel);
     let grip = ui.put(grip_rect, drag_grip::button(IconSize::Xs));

@@ -1,12 +1,12 @@
 //! One layer's colorbar panel: editable title, the bar (a click opens the
-//! colormap picker), clip triangles, range inputs and its drag and flip
-//! controls, placed by its `ColorbarPlacement`.
+//! colormap picker), clip triangles, range inputs and its controls, placed
+//! by its `ColorbarPlacement`, and its Color window.
 
 use super::axis::BarAxis;
 use super::bars::{self, BarColors, BarStyle};
 use super::handles::{VERTICAL_END_ROOM, draw_clip_triangles, draw_end_range_inputs};
 use super::ticks::{ScientificTick, TICK_BUF};
-use super::{controls, layout, series};
+use super::{color_menu, controls, layout, series};
 use crate::app::OctantApp;
 use crate::app::layers::{BarOrientation, LayerId};
 use crate::i18n::{ColormapKey as K, tr};
@@ -34,7 +34,7 @@ pub fn show(app: &mut OctantApp, ctx: &egui::Context, id: LayerId, canvas: Rect)
     let bar_len = layout::bar_length(orientation, width, canvas);
 
     let frame = panel_frame(ctx, app.layout.colorbar_transparency);
-    egui::Area::new(egui::Id::unique(super::salt("octant_colorbar_overlay", id)))
+    let shown = egui::Area::new(egui::Id::unique(super::salt("octant_colorbar_overlay", id)))
         .order(egui::Order::Middle)
         .pivot(pivot)
         .fixed_pos(point)
@@ -46,6 +46,7 @@ pub fn show(app: &mut OctantApp, ctx: &egui::Context, id: LayerId, canvas: Rect)
             });
             controls::show(app, ui, id, shown.response.rect, (pivot, canvas));
         });
+    color_menu::show(app, ctx, id, (shown.response.rect, orientation), canvas);
 }
 
 /// The window frame of a colorbar panel, its fill, outline and shadow

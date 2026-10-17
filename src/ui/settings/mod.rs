@@ -91,9 +91,10 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Opt
     header
 }
 
-/// The plot's own options, then the Layers menu (each layer's composite and
-/// Color menu), overlays, resolution, view and export sections. Sections and settings the plot has no use for
-/// are left out (`support`).
+/// The plot's own options, then the Layers menu (each layer's composite, and
+/// the Color menu of layers without a colorbar), overlays, resolution, view
+/// and export sections. Sections and settings the plot has no use for are
+/// left out (`support`).
 fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
     let plot_type = app.effective_canvas_plot_type();
     ui.label(egui::RichText::new(plot_type.display_name()).small().weak());
@@ -122,8 +123,9 @@ fn show_settings_body(app: &mut OctantApp, ui: &mut egui::Ui) {
 }
 
 /// Layer `id`'s Color menu: label, range, scale, NaN and clip colors, then
-/// opacity and alpha curve, as far as the layer's plot honors them.
-fn show_color_menu(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
+/// opacity and alpha curve, as far as the layer's plot honors them. Opened
+/// from the layer's colorbar, or in the Layers menu for layers without one.
+pub(crate) fn show_color_menu(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     let support = PlotState::of_layer(app, id).support();
     clipping::show_color_settings(app, ui, id, &support);
     ui.add_space(4.0);

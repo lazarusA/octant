@@ -19,6 +19,7 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::NoMatches => "Ei vastaavia värikarttoja",
         ColormapKey::ShowColorbar => "Näytä väripalkki",
         ColormapKey::ChangeColormapHover => "Vaihda värikartta napsauttamalla",
+        ColormapKey::ColorSettingsHover => "Väriasetukset",
         ColormapKey::BoxTransparency => "Laatikon läpinäkyvyys",
         ColormapKey::CustomColormap => "Mukautettu värikartta",
         ColormapKey::Name => "Nimi",
