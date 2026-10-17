@@ -254,8 +254,10 @@ pub fn save_exported_file(data: &[u8], path: &Path, format: ExportFormat) -> Res
     {
         let name = path.file_name().map(|s| s.to_string_lossy());
         let name = name.as_deref().unwrap_or(tr(ExportKey::FallbackFilename));
-        download::download(data, name, format.mime())
-            .map_err(|e| crate::i18n::filled(tr(ExportKey::WriteFileFailed), &[&e]))
+        download::download(data, name, format.mime()).map_err(|e| {
+            log::error!("Browser download of {name} failed: {e}");
+            crate::i18n::filled(tr(ExportKey::WriteFileFailed), &[&name])
+        })
     }
     #[cfg(not(target_arch = "wasm32"))]
     {

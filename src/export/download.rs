@@ -22,16 +22,27 @@ pub fn download(data: &[u8], filename: &str, mime: &str) -> Result<(), String> {
         .map_err(|_| "not an anchor element")?;
     anchor.set_href(&url);
     anchor.set_download(filename);
+    // Attached while clicked: some browsers ignore clicks on detached anchors.
+    let body = document.body();
+    if let Some(body) = &body {
+        body.append_child(&anchor).map_err(js_err)?;
+    }
     anchor.click();
+    if body.is_some() {
+        anchor.remove();
+    }
 
     // Revoked later: some browsers (Safari) cancel a download whose URL is
     // revoked while the click is still being handled.
     let revoke = wasm_bindgen::closure::Closure::once_into_js(move || {
         let _ = web_sys::Url::revoke_object_url(&url);
     });
-    window
+    // The download has started: failing to schedule the revoke only keeps the URL.
+    if let Err(e) = window
         .set_timeout_with_callback_and_timeout_and_arguments_0(revoke.unchecked_ref(), REVOKE_MS)
-        .map_err(js_err)?;
+    {
+        log::warn!("Could not schedule revoking the download URL: {e:?}");
+    }
     Ok(())
 }
 
