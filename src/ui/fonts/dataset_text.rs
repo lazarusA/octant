@@ -94,16 +94,6 @@ impl DatasetText {
         self.chars.len()
     }
 
-    /// The Han characters met so far.
-    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
-    pub fn han_chars(&self) -> BTreeSet<char> {
-        self.chars
-            .iter()
-            .copied()
-            .filter(|&c| script_of(c) == Some(Script::Han))
-            .collect()
-    }
-
     /// The characters by the font that draws them (`CjkFont::ALL` order):
     /// kana Japanese, Hangul Korean, Han and CJK symbols `han_font`.
     #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]

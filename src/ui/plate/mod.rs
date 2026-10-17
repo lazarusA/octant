@@ -89,7 +89,11 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
             continue;
         }
         let r = grid.cell(well.row, well.column).shrink(1.0);
-        let response = ui.interact(r, ui.id().with(("plate_well", i)), egui::Sense::click());
+        let response = ui.interact(
+            r,
+            ui.scope_id().with(("plate_well", i)),
+            egui::Sense::click(),
+        );
         let visuals = ui.visuals();
         let fill = if plate.well == Some(i) {
             visuals.selection.bg_fill

@@ -45,7 +45,7 @@ pub(super) fn cached_label(
         // Numbers, dates and fallbacks are written in the UI language.
         crate::i18n::language(),
     ));
-    let id = egui::Id::new(("dim_coord_label", dim));
+    let id = egui::Id::unique(("dim_coord_label", dim));
     cached(ctx, id, key, || {
         format_label(app, var, dim, range).map(Arc::from)
     })

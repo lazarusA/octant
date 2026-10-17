@@ -17,7 +17,7 @@ impl Default for DropZoneWarningState {
 
 /// Triggers an interactive warning on all active drop zones and requests a repaint.
 pub fn trigger_drop_zone_warning(ctx: &egui::Context) {
-    let id = egui::Id::new("drop_zone_warning_state");
+    let id = egui::Id::unique("drop_zone_warning_state");
     ctx.data_mut(|d| {
         d.insert_temp(
             id,
@@ -31,7 +31,7 @@ pub fn trigger_drop_zone_warning(ctx: &egui::Context) {
 
 /// Clears any active warning state on drop zones.
 pub fn clear_drop_zone_warning(ctx: &egui::Context) {
-    let id = egui::Id::new("drop_zone_warning_state");
+    let id = egui::Id::unique("drop_zone_warning_state");
     ctx.data_mut(|d| {
         d.remove_temp::<DropZoneWarningState>(id);
     });
@@ -47,7 +47,7 @@ pub fn show_drop_zone(
     let size = egui::vec2(width, height);
     let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
 
-    let warning_id = egui::Id::new("drop_zone_warning_state");
+    let warning_id = egui::Id::unique("drop_zone_warning_state");
     let active_warning: Option<DropZoneWarningState> = ui.ctx().data(|d| d.get_temp(warning_id));
     let is_warning_active = active_warning
         .as_ref()

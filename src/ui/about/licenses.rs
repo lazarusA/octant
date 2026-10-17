@@ -42,7 +42,7 @@ fn wrapped(
     text: &'static str,
     columns: usize,
 ) -> Arc<Vec<VisualLine>> {
-    let id = egui::Id::new(("about_license_wrapped", salt));
+    let id = egui::Id::unique(("about_license_wrapped", salt));
     let cached: Option<Wrapped> = ui.data(|d| d.get_temp(id));
     if let Some(w) = cached.filter(|w| w.columns == columns) {
         return w.lines;

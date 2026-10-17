@@ -76,6 +76,7 @@ impl OctantApp {
             },
             canvas_rect_in_points: egui::Rect::NOTHING,
             pixels_per_point: 1.0,
+            screenshot: Default::default(),
         });
     }
 

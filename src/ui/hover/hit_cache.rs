@@ -67,7 +67,7 @@ pub fn resolve_hit(
         resolve_hit_coordinates(app, matrix, &camera, sampler, transform, rect, hover_pos)
     };
     let hit = match mesh_hit_key(app, rect, hover_pos) {
-        Some(key) => cached(ctx, egui::Id::new("hover_mesh_hit"), key, resolve),
+        Some(key) => cached(ctx, egui::Id::unique("hover_mesh_hit"), key, resolve),
         None => resolve(),
     };
     hit.is_valid.then_some((camera, hit))

@@ -103,10 +103,10 @@ pub fn paint_row(
     // so idle frames don't allocate the label.
     resp.widget_info(|| match kind {
         RowKind::Folder { .. } => {
-            egui::WidgetInfo::labeled(egui::WidgetType::CollapsingHeader, true, label)
+            egui::WidgetInfo::labeled(egui::Role::DisclosureTriangle, true, label)
         }
         RowKind::Variable | RowKind::Stack { .. } | RowKind::Level => {
-            egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, selected, label)
+            egui::WidgetInfo::selected(egui::Role::Button, true, selected, label)
         }
     });
 

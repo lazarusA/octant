@@ -28,7 +28,12 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
     {
         req.canvas_rect_in_points = canvas_rect;
         req.pixels_per_point = ctx.pixels_per_point();
-        ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+        let slot = std::sync::Arc::clone(&req.screenshot);
+        let repaint = ctx.clone();
+        ctx.request_screenshot(move |image| {
+            *slot.lock().unwrap_or_else(|p| p.into_inner()) = Some(image);
+            repaint.request_repaint();
+        });
         ctx.request_repaint();
     }
 

@@ -37,12 +37,6 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "No se pudo cargar una fuente",
         NoticesKey::FontLoadFailedDetail => "El texto en {} puede verse como recuadros: {}",
-        NoticesKey::DataFontMissing => {
-            "Falta una fuente para parte del texto del conjunto de datos"
-        }
-        NoticesKey::DataFontMissingDetail => {
-            "El texto en {} de este conjunto de datos puede verse como recuadros. Instale una fuente como Noto Sans CJK."
-        }
         NoticesKey::OmeMetadataNonConforming => {
             "Los metadatos OME-Zarr no cumplen la especificación"
         }

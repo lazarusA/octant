@@ -86,7 +86,7 @@ fn the_grip_drags_the_settings_panel_and_double_click_docks_it() {
         .collect();
     assert_eq!(dots.len(), 6, "the grip is always shown");
     let grip = (dots.iter().fold(Vec2::ZERO, |sum, p| sum + p.to_vec2()) / 6.0).to_pos2();
-    let panel = |h: &Harness| h.area(Id::new("octant_settings_area"));
+    let panel = |h: &Harness| h.area(Id::unique("octant_settings_area"));
     let docked = panel(&h);
 
     let delta = Vec2::new(300.0, 200.0);

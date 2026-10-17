@@ -29,7 +29,7 @@ pub fn show(
     let mut dismissed = None;
     let mut clicked = None;
     let width = WIDTH.min(canvas.width() - 2.0 * GAP).max(120.0);
-    egui::Area::new(Id::new("octant_toasts"))
+    egui::Area::new(Id::unique("octant_toasts"))
         .order(Order::Foreground)
         .fade_in(false)
         .pivot(Align2::RIGHT_BOTTOM)

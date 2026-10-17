@@ -37,10 +37,6 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "글꼴을 불러올 수 없습니다",
         NoticesKey::FontLoadFailedDetail => "{} 텍스트가 네모로 표시될 수 있습니다: {}",
-        NoticesKey::DataFontMissing => "데이터셋의 일부 텍스트에 사용할 글꼴이 없습니다",
-        NoticesKey::DataFontMissingDetail => {
-            "이 데이터셋의 {} 텍스트가 네모로 표시될 수 있습니다. Noto Sans CJK 같은 글꼴을 설치하세요."
-        }
         NoticesKey::OmeMetadataNonConforming => "OME-Zarr 메타데이터가 사양을 따르지 않습니다",
         NoticesKey::LabelIdsBeyond32Bits => {
             "32비트를 넘는 레이블 ID는 더 작은 ID와 색을 공유합니다"

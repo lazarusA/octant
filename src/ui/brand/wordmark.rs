@@ -84,7 +84,7 @@ impl Widget for Wordmark {
         let ppp = ui.ctx().pixels_per_point();
         let m = Metrics::new(self.cell, ppp);
         let (rect, response) = ui.allocate_exact_size(m.size(), Sense::hover());
-        response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, "Octant"));
+        response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, "Octant"));
         if ui.is_rect_visible(rect) {
             let origin = pos2(
                 (rect.min.x * ppp).round() / ppp,

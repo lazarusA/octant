@@ -63,7 +63,7 @@ impl LabelEditor {
             .desired_width(self.width);
         if !self.framed {
             field = field
-                .horizontal_align(egui::Align::Center)
+                .align(egui::Align2::CENTER_TOP)
                 .frame(egui::Frame::NONE);
         }
         let response = ui.add(field);

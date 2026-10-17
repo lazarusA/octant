@@ -48,7 +48,7 @@ pub fn cached_widths<const N: usize>(
     measure: impl FnOnce(&Ui) -> [f32; N],
 ) -> [f32; N] {
     let key = hash_key((layout_key(ui), key));
-    let id = Id::new("flow_row_widths").with(ui.id()).with(salt);
+    let id = Id::unique("flow_row_widths").with(ui.scope_id()).with(salt);
     cached(ui.ctx(), id, key, || measure(ui))
 }
 

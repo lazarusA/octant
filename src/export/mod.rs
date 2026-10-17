@@ -182,7 +182,13 @@ pub struct PendingExportRequest {
     pub output_path: Option<PathBuf>,
     pub canvas_rect_in_points: egui::Rect,
     pub pixels_per_point: f32,
+    /// Filled by the screenshot callback once the frame's pixels are read.
+    pub screenshot: ScreenshotSlot,
 }
+
+/// Where a requested screenshot lands; egui calls back outside the frame.
+pub type ScreenshotSlot =
+    std::sync::Arc<std::sync::Mutex<Option<std::sync::Arc<egui::ColorImage>>>>;
 
 impl PendingExportRequest {
     /// Computes the pixel-space crop rectangle `(crop_x, crop_y, crop_w, crop_h)` clamped to source bounds.

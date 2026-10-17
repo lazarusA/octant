@@ -68,7 +68,7 @@ fn frame(ctx: &egui::Context, events: Vec<Event>) -> Frame {
             selected_level: LevelChoice::Auto,
             search_active: false,
             newly_selected: None,
-            search_id: egui::Id::new("search"),
+            search_id: egui::Id::unique("search"),
             search_jump: None,
         };
         render_tree_group(ui, &root, &mut tree);

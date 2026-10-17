@@ -7,11 +7,12 @@
 //! the fonts out of the `.wasm`.
 //!
 //! Datasets can hold CJK text the subsets don't cover (variable names,
-//! attributes, labels). `watch_dataset` reads each dataset's text once; the
-//! desktop then loads the system's own CJK fonts it needs (`system.rs`),
-//! tried before the subsets so one font draws all CJK text; the web build
-//! fetches the slices of the Noto fonts those characters are in
-//! (`web_slices.rs`, built by `tools/cjk_slices`).
+//! attributes, labels). `watch_dataset` reads each dataset's text once and
+//! picks the font for its Han characters; on the desktop, eframe's system
+//! font provider draws what the subsets lack, asked for that font's locale
+//! (`system_provider.rs`); the web build fetches the slices of the Noto
+//! fonts those characters are in (`web_slices.rs`, built by
+//! `tools/cjk_slices`).
 
 mod cjk;
 mod dataset_text;
@@ -23,7 +24,7 @@ pub mod slice_index;
 mod slice_index_tests;
 mod store;
 #[cfg(not(target_arch = "wasm32"))]
-mod system;
+mod system_provider;
 #[cfg(test)]
 mod tests;
 #[cfg(target_arch = "wasm32")]
@@ -41,8 +42,8 @@ use crate::i18n::Language;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-/// Set when fonts finish loading outside the UI frame (the desktop font
-/// thread, web fetches); the next frame reinstalls them on the UI thread.
+/// Set when fonts finish loading outside the UI frame (web fetches); the
+/// next frame reinstalls them on the UI thread.
 static FONTS_ARRIVED: AtomicBool = AtomicBool::new(false);
 
 /// Bumped whenever the font definitions are rebuilt, so text measured with
@@ -66,7 +67,7 @@ pub(crate) fn test_lock() -> std::sync::MutexGuard<'static, ()> {
 /// `u64::MAX` while `ctx`'s new definitions wait for the next pass, so
 /// nothing measured with its old fonts is kept under the new generation.
 pub fn generation(ctx: &egui::Context) -> u64 {
-    let active_from = ctx.data(|d| d.get_temp::<u64>(egui::Id::new(ACTIVE_FROM)));
+    let active_from = ctx.data(|d| d.get_temp::<u64>(egui::Id::unique(ACTIVE_FROM)));
     if active_from.is_some_and(|pass| ctx.cumulative_pass_nr() < pass) {
         return u64::MAX;
     }
@@ -87,6 +88,10 @@ impl FontEngine {
     /// its font when it isn't loaded yet.
     pub fn on_language_changed(ctx: &egui::Context, lang: Language) {
         apply(ctx, lang);
+        #[cfg(not(target_arch = "wasm32"))]
+        if system_provider::follow(ctx, lang) {
+            rebuilt(ctx);
+        }
         #[cfg(target_arch = "wasm32")]
         if let Some(font) = CjkFont::for_language(lang) {
             web::fetch_ui_font(ctx.clone(), font);
@@ -97,7 +102,8 @@ impl FontEngine {
     /// frame, and makes the staged dataset's CJK text drawable when the
     /// dataset, its coordinate labels or the UI language change (a key
     /// comparison otherwise): reads what is new in it (`DatasetText`), puts
-    /// the font for its Han characters first, and loads the fonts it needs.
+    /// the font for its Han characters first, and (on the web) fetches the
+    /// fonts it needs.
     pub fn watch_dataset(ctx: &egui::Context, app: &OctantApp) {
         if FONTS_ARRIVED.swap(false, Ordering::AcqRel) {
             apply(ctx, crate::i18n::language());
@@ -128,9 +134,11 @@ impl FontEngine {
         let han = scripts.han_font(lang, crate::i18n::locale::system_language());
         if store::set_data_first(han) {
             apply(ctx, lang);
+            #[cfg(not(target_arch = "wasm32"))]
+            if system_provider::follow(ctx, lang) {
+                rebuilt(ctx);
+            }
         }
-        #[cfg(not(target_arch = "wasm32"))]
-        system::request(ctx, scripts.needed(han), han, text.han_chars());
         #[cfg(target_arch = "wasm32")]
         web_slices::request_dataset(ctx, text, generation, han, lang);
     }
@@ -139,23 +147,21 @@ impl FontEngine {
 /// Called by font loaders that finish outside the UI frame: the next frame
 /// reinstalls the fonts on the UI thread, so a rebuild never overwrites one
 /// made for a language switch in between.
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
 fn fonts_arrived(ctx: &egui::Context) {
     FONTS_ARRIVED.store(true, Ordering::Release);
     ctx.request_repaint();
 }
 
 /// Rebuilds egui's font definitions: its defaults, then every loaded CJK
-/// font as a fallback in `lang`'s order (each script's system font before
-/// its subset). Rebuilding the atlas is costly, so this only runs when the
+/// font as a fallback in `lang`'s order. Rebuilding the atlas is costly, so this only runs when the
 /// language changes, a font arrives or a dataset changes the order.
 fn apply(ctx: &egui::Context, lang: Language) {
     let mut fonts = egui::FontDefinitions::default();
     for font in CjkFont::fallback_order(lang, store::data_first()) {
-        // A system font draws all of its script; the subset and the slices
-        // fetched for dataset text fill in.
-        let system = store::system(font).map(|data| (font.system_key().to_owned(), data));
-        let subset = Some((font.key().to_owned(), store::subset(font)));
-        for (key, data) in system.into_iter().chain(subset).chain(store::slices(font)) {
+        // The slices fetched for dataset text (web) follow the subset.
+        let subset = (font.key().to_owned(), store::subset(font));
+        for (key, data) in std::iter::once(subset).chain(store::slices(font)) {
             for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
                 fonts.families.entry(family).or_default().push(key.clone());
             }
@@ -163,7 +169,13 @@ fn apply(ctx: &egui::Context, lang: Language) {
         }
     }
     ctx.set_fonts(fonts);
+    rebuilt(ctx);
+}
+
+/// Records that `ctx`'s fonts change from its next pass (new definitions or
+/// font providers), so text measured with the old ones is measured again.
+fn rebuilt(ctx: &egui::Context) {
     GENERATION.fetch_add(1, Ordering::AcqRel);
     let active_from = ctx.cumulative_pass_nr() + 1;
-    ctx.data_mut(|d| d.insert_temp(egui::Id::new(ACTIVE_FROM), active_from));
+    ctx.data_mut(|d| d.insert_temp(egui::Id::unique(ACTIVE_FROM), active_from));
 }

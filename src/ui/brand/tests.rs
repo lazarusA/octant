@@ -75,7 +75,7 @@ fn wordmark_contact_sheet() {
     for (col, visuals) in themes().iter().enumerate() {
         for (row, &(cell, ppp)) in CASES.iter().enumerate() {
             let (prims, atlas) = tessellate_pass(vec2(w_pt, h_pt), ppp, visuals, |ctx| {
-                egui::Area::new(egui::Id::new("wordmark"))
+                egui::Area::new(egui::Id::unique("wordmark"))
                     .fixed_pos(pos2(12.0, 12.0))
                     .fade_in(false)
                     .show(ctx, |ui| ui.add(Wordmark::new(cell)));

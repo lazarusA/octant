@@ -37,10 +37,6 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "Não foi possível carregar uma fonte",
         NoticesKey::FontLoadFailedDetail => "O texto em {} pode aparecer como quadrados: {}",
-        NoticesKey::DataFontMissing => "Falta uma fonte para parte do texto do conjunto de dados",
-        NoticesKey::DataFontMissingDetail => {
-            "O texto em {} deste conjunto de dados pode aparecer como quadrados. Instale uma fonte como Noto Sans CJK."
-        }
         NoticesKey::OmeMetadataNonConforming => "Os metadados OME-Zarr não estão em conformidade",
         NoticesKey::LabelIdsBeyond32Bits => {
             "Ids de rótulo acima de 32 bits compartilham cores com ids menores"

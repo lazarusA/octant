@@ -50,7 +50,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
     app.layout.variables_overlay_width = width;
 
     let mut header = None;
-    let area_resp = egui::Area::new(egui::Id::new("octant_variables_area"))
+    let area_resp = egui::Area::new(egui::Id::unique("octant_variables_area"))
         .fixed_pos(origin)
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
@@ -141,5 +141,5 @@ fn dataset_key(app: &OctantApp) -> Option<egui::Id> {
     app.selected
         .metadata
         .as_ref()
-        .map(|_| egui::Id::new(("variables_dataset", app.selected.metadata_generation)))
+        .map(|_| egui::Id::unique(("variables_dataset", app.selected.metadata_generation)))
 }

@@ -56,7 +56,7 @@ fn show_collapsed_strip(ui: &mut egui::Ui) -> bool {
     let resp = ui
         .interact(
             full_rect,
-            ui.id().with("collapsed_bottom_bar_interact"),
+            ui.scope_id().with("collapsed_bottom_bar_interact"),
             egui::Sense::click_and_drag(),
         )
         .on_hover_cursor(egui::CursorIcon::PointingHand);

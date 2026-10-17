@@ -32,7 +32,7 @@ fn harness(app: &mut OctantApp) -> Harness {
 
 /// The base layer's colorbar panel.
 fn panel(h: &Harness) -> Rect {
-    h.area(egui::Id::new(("octant_colorbar_overlay", LayerId::BASE)))
+    h.area(egui::Id::unique(("octant_colorbar_overlay", LayerId::BASE)))
 }
 
 /// How many circles `shapes` holds (the grip's dots).
@@ -66,6 +66,7 @@ fn controls_hide_during_export() {
         output_path: None,
         canvas_rect_in_points: Rect::NOTHING,
         pixels_per_point: 1.0,
+        screenshot: Default::default(),
     });
     let inside = h.pointer(panel(&h).center(), None, &mut run(&mut app));
     assert_eq!(circles(&inside), 0);

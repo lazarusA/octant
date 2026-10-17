@@ -5,8 +5,8 @@ use crate::i18n::{ExportKey, filled, tr};
 use crate::ui::toast::{Notice, Severity, ToastAction};
 
 impl OctantApp {
-    /// Processes in-flight export and screenshot events dispatched by the frame lifecycle.
-    pub(crate) fn process_pending_export(&mut self, ctx: &egui::Context) {
+    /// Encodes the pending export once its screenshot has arrived.
+    pub(crate) fn process_pending_export(&mut self) {
         let Some(req) = self.pending_export.take() else {
             return;
         };
@@ -16,16 +16,13 @@ impl OctantApp {
             return;
         }
 
-        let screenshot = ctx.input(|i| {
-            i.raw.events.iter().find_map(|e| match e {
-                egui::Event::Screenshot { image, .. } => Some(image.clone()),
-                _ => None,
-            })
-        });
-
+        let screenshot = req
+            .screenshot
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .take();
         let Some(image) = screenshot else {
             self.pending_export = Some(req);
-            ctx.request_repaint();
             return;
         };
 

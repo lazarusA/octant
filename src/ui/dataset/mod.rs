@@ -28,7 +28,7 @@ pub fn show_dataset_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rect
 
     let origin = panel_layout::origin(app, Panel::Dataset, canvas_rect);
     let mut header = None;
-    let area_resp = egui::Area::new(egui::Id::new("octant_dataset_area"))
+    let area_resp = egui::Area::new(egui::Id::unique("octant_dataset_area"))
         .fixed_pos(origin)
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)

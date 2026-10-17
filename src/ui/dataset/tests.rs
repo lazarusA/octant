@@ -23,7 +23,7 @@ fn dataset_panel_renders_at_docked_origin_when_open() {
     let mut h = Harness::new(CANVAS);
     h.settle(3, &mut run(&mut app));
 
-    let panel_rect = h.area(Id::new("octant_dataset_area"));
+    let panel_rect = h.area(Id::unique("octant_dataset_area"));
     let expected_origin = panel_layout::origin(&app, Panel::Dataset, CANVAS);
     assert_eq!(panel_rect.min, expected_origin);
     assert!(app.layout.dataset_overlay_width > 0.0);
@@ -39,7 +39,7 @@ fn dataset_panel_hidden_when_flag_is_false() {
     assert_eq!(app.layout.dataset_overlay_width, 0.0);
     assert!(
         h.ctx
-            .memory(|m| m.area_rect(Id::new("octant_dataset_area")))
+            .memory(|m| m.area_rect(Id::unique("octant_dataset_area")))
             .is_none()
     );
 }
@@ -59,7 +59,7 @@ fn grip_drags_dataset_panel_and_double_click_docks_it() {
         .collect();
     assert_eq!(dots.len(), 6, "the dataset panel grip is shown");
     let grip = (dots.iter().fold(Vec2::ZERO, |sum, p| sum + p.to_vec2()) / 6.0).to_pos2();
-    let panel = |h: &Harness| h.area(Id::new("octant_dataset_area"));
+    let panel = |h: &Harness| h.area(Id::unique("octant_dataset_area"));
     let docked = panel(&h);
 
     let delta = Vec2::new(240.0, 160.0);

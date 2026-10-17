@@ -24,7 +24,7 @@ fn settled_height(ctx: &egui::Context, app: &mut OctantApp, canvas: Rect) -> f32
         let mut output = ctx.run_ui(input, |ui| show_settings_window(app, ui.ctx(), canvas));
         output.textures_delta.clear();
     }
-    ctx.memory(|m| m.area_rect(Id::new("octant_settings_area")))
+    ctx.memory(|m| m.area_rect(Id::unique("octant_settings_area")))
         .map_or(0.0, |r| r.height())
 }
 

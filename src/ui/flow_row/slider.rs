@@ -49,7 +49,7 @@ pub fn labeled_slider(
     let [label_w] = cached_widths(ui, &salt, text, |ui| {
         [text_width(ui, text, TextStyle::Body)]
     });
-    let id = ui.id().with(&salt);
+    let id = ui.scope_id().with(&salt);
     let value = ValueBox::load(ui, id.with("value_w"));
     let spacing = ui.spacing().item_spacing.x;
     let slider_w = ui.spacing().slider_width;
@@ -83,7 +83,7 @@ fn stacked(ui: &mut Ui, text: &str, slider: Slider<'_>, id: Id, value: ValueBox)
     let label = ui.label(text);
     let track = track_width(ui, value.width);
     let response = ui
-        .scope_builder(UiBuilder::new().id(id), |ui| {
+        .scope_builder(UiBuilder::new().scope_id(id), |ui| {
             ui.spacing_mut().slider_width = track;
             ui.add(slider)
         })
@@ -95,7 +95,7 @@ fn stacked(ui: &mut Ui, text: &str, slider: Slider<'_>, id: Id, value: ValueBox)
 
 /// `slider` under the fixed `id`, wherever the layout puts it.
 fn add_slider(ui: &mut Ui, id: Id, slider: Slider<'_>) -> Response {
-    ui.scope_builder(UiBuilder::new().id(id), |ui| ui.add(slider))
+    ui.scope_builder(UiBuilder::new().scope_id(id), |ui| ui.add(slider))
         .inner
 }
 

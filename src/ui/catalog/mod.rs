@@ -29,7 +29,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     let mut should_close = ctx.input(|i| i.key_pressed(egui::Key::Escape));
 
     // 1. Scrim / Backdrop overlay: dims background and dismisses modal on click outside
-    let backdrop_id = egui::Id::new("catalog_modal_backdrop");
+    let backdrop_id = egui::Id::unique("catalog_modal_backdrop");
     egui::Area::new(backdrop_id)
         .fixed_pos(screen_rect.min)
         .order(egui::Order::Middle)
@@ -47,7 +47,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
         });
 
     // 2. Centered Modal Dialog Card
-    let modal_id = egui::Id::new("catalog_modal_dialog");
+    let modal_id = egui::Id::unique("catalog_modal_dialog");
     egui::Area::new(modal_id)
         .fixed_pos(modal_rect.min)
         .order(egui::Order::Foreground)

@@ -41,7 +41,7 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
     let panel_w = PANEL_MAX_W.min(room).max(PANEL_MIN_W);
 
     let mut grip = GripAction::None;
-    let area_resp = egui::Area::new(egui::Id::new("octant_variables_panel"))
+    let area_resp = egui::Area::new(egui::Id::unique("octant_variables_panel"))
         .fixed_pos(origin)
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)

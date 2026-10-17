@@ -33,7 +33,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
         return;
     }
 
-    let storage_id = egui::Id::new(("about_window", "active_tab"));
+    let storage_id = egui::Id::unique(("about_window", "active_tab"));
     let mut active_tab: AboutTab = ctx
         .data(|d| d.get_temp(storage_id))
         .unwrap_or(AboutTab::About);

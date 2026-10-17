@@ -8,7 +8,7 @@ use egui::{Context, Id, Key, Response};
 
 /// Stable id of sample chip `i`, so focus can move to it by index.
 pub fn chip_id(i: usize) -> Id {
-    Id::new(("hero_sample_chip", i))
+    Id::unique(("hero_sample_chip", i))
 }
 
 /// Down in the intake field moves focus to the first chip.

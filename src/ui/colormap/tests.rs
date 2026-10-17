@@ -92,7 +92,9 @@ fn panel_fits_its_height_with_the_editor_open_or_closed() {
     let ctx = egui::Context::default();
     let mut app = crate::app::OctantApp::default();
     for editor_open in [false, true] {
-        for max_height in [500.0_f32, 600.0, 700.0, 900.0] {
+        // Below 600 px the list is at its minimum with the editor open and the
+        // panel scrolls instead.
+        for max_height in [600.0_f32, 700.0, 900.0] {
             app.colormaps.picker.below_list_height = 0.0;
             let mut last_total = 0.0;
             // A few frames: the editor's open animation and the height measured
@@ -138,7 +140,7 @@ fn panel_heights(contents: &[f32], max_height: f32) -> Vec<f32> {
             ..Default::default()
         };
         let mut output = ctx.run_ui(input, |ui| {
-            let area = egui::Area::new(egui::Id::new("colormap_panel_test"))
+            let area = egui::Area::new(egui::Id::unique("colormap_panel_test"))
                 .fixed_pos(egui::Pos2::ZERO)
                 .show(ui.ctx(), |ui| {
                     super::panel_scroll_area(max_height).show(ui, |ui| {

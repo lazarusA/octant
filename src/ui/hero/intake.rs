@@ -37,7 +37,7 @@ pub fn intake_row(ui: &mut egui::Ui, app: &mut OctantApp) {
                     .id(super::focus::intake_id())
                     .hint_text(hint_text)
                     .font(egui::FontId::monospace(BODY_FONT))
-                    .vertical_align(egui::Align::Center)
+                    .align(egui::Align2::LEFT_CENTER)
                     .min_size(egui::vec2(0.0, 22.0))
                     .frame(egui::Frame::NONE)
                     .margin(egui::Margin::symmetric(EDIT_MARGIN_X, 2))

@@ -41,7 +41,7 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
 
     let origin = panel_layout::origin(app, Panel::Settings, canvas_rect);
     let mut header = None;
-    let area_resp = egui::Area::new(egui::Id::new("octant_settings_area"))
+    let area_resp = egui::Area::new(egui::Id::unique("octant_settings_area"))
         .fixed_pos(origin)
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)

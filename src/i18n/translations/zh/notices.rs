@@ -31,10 +31,6 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::LinePayloadTooLargeDetail => "线条占用 {} 字节；此 GPU 最多可绑定 {}。",
         NoticesKey::FontLoadFailed => "无法加载字体",
         NoticesKey::FontLoadFailedDetail => "{} 文本可能显示为方框：{}",
-        NoticesKey::DataFontMissing => "数据集中部分文本缺少字体",
-        NoticesKey::DataFontMissingDetail => {
-            "此数据集中的 {} 文本可能显示为方框。请安装 Noto Sans CJK 等字体。"
-        }
         NoticesKey::OmeMetadataNonConforming => "OME-Zarr 元数据不符合规范",
         NoticesKey::LabelIdsBeyond32Bits => "超过 32 位的标签 ID 与较小的 ID 共用颜色",
         NoticesKey::OmeMetadataNonConformingDetail => {

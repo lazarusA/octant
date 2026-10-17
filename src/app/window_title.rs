@@ -17,7 +17,7 @@ pub fn title_in(lang: Language) -> String {
 /// set in; call every frame (the title is only rebuilt on a change).
 pub fn sync(ctx: &egui::Context) {
     let lang = crate::i18n::language();
-    let id = egui::Id::new("window_title_language");
+    let id = egui::Id::unique("window_title_language");
     if ctx.data(|d| d.get_temp::<Language>(id)) == Some(lang) {
         return;
     }

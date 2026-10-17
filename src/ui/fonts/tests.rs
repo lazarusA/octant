@@ -131,30 +131,6 @@ fn han_text_uses_the_ui_then_system_then_dataset_font() {
     );
     assert_eq!(with_kana.han_font(Language::English, None), CjkFont::Jp);
     assert_eq!(han_only.han_font(Language::German, None), CjkFont::Sc);
-    // Kana needs the Japanese font even when Han text goes to Chinese.
-    assert_eq!(with_kana.needed(CjkFont::Sc), [true, true, false]);
-    assert_eq!(han_only.needed(CjkFont::Kr), [false, false, true]);
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[test]
-fn system_fonts_draw_their_script_when_installed() {
-    for font in CjkFont::ALL {
-        assert!(!super::system::families(font).is_empty());
-        // Only machines with a CJK font installed check one.
-        let Some(data) = super::system::load(font) else {
-            continue;
-        };
-        let face = skrifa::FontRef::from_index(&data.font, data.index).expect("system font parses");
-        let sample = match font {
-            CjkFont::Kr => '\u{D55C}',
-            _ => '\u{4E2D}',
-        };
-        assert!(
-            face.charmap().map(sample).is_some(),
-            "{font:?} lacks {sample}"
-        );
-    }
 }
 
 #[test]
@@ -229,12 +205,14 @@ fn label_arrays_shared_between_keys_are_read_once() {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
-fn font_coverage_is_checked_per_character() {
-    let data = egui::FontData::from_static(super::store::bundled(CjkFont::Sc));
-    let mut chars: std::collections::BTreeSet<char> = CjkFont::Sc.required_chars();
-    chars.retain(|&c| super::scan::script_of(c) == Some(super::scan::Script::Han));
-    assert!(super::system::covers(&data, &chars));
-    // A rare ideograph the UI subset was never cut to.
-    chars.insert('\u{9F98}');
-    assert!(!super::system::covers(&data, &chars));
+fn system_fonts_follow_the_ui_languages_han_font() {
+    use super::system_provider::{follow, han_font, locale};
+    let _fonts = crate::ui::fonts::test_lock();
+    assert_eq!(han_font(Language::Japanese), CjkFont::Jp);
+    assert_eq!(locale(CjkFont::Sc), "zh-Hans");
+    let ctx = egui::Context::default();
+    assert!(follow(&ctx, Language::Korean));
+    // The same font again changes nothing; another language does.
+    assert!(!follow(&ctx, Language::Korean));
+    assert!(follow(&ctx, Language::Japanese));
 }
