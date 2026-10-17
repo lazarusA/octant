@@ -2,7 +2,9 @@
 
 use crate::app::OctantApp;
 use crate::i18n::{ExportKey, filled, tr};
-use crate::ui::toast::{Notice, Severity, ToastAction};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::ui::toast::ToastAction;
+use crate::ui::toast::{Notice, Severity};
 
 impl OctantApp {
     /// Encodes the pending export once its screenshot has arrived.
@@ -71,7 +73,7 @@ impl OctantApp {
                     }
                     self.status_message = "Copied figure to clipboard".to_string();
                 } else if let Some(ref path) = req.output_path {
-                    if let Err(e) = crate::export::save_exported_file(&data, path) {
+                    if let Err(e) = crate::export::save_exported_file(&data, path, req.format) {
                         self.status_message = format!("Export error: {}", e);
                         self.notify(Severity::Error, tr(ExportKey::ExportFailed), e);
                     } else {
@@ -80,10 +82,11 @@ impl OctantApp {
                             .map(|s| s.to_string_lossy().to_string())
                             .unwrap_or_else(|| tr(ExportKey::FallbackFilename).to_string());
                         self.status_message = format!("Saved figure to {}", path.display());
-                        self.push_notice(
-                            Notice::new(Severity::Success, tr(ExportKey::Saved), filename)
-                                .with_action(ToastAction::RevealFile(path.clone())),
-                        );
+                        let notice = Notice::new(Severity::Success, tr(ExportKey::Saved), filename);
+                        // The browser keeps its downloads: there is no file to reveal.
+                        #[cfg(not(target_arch = "wasm32"))]
+                        let notice = notice.with_action(ToastAction::RevealFile(path.clone()));
+                        self.push_notice(notice);
                     }
                 }
             }
