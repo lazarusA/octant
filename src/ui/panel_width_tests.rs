@@ -1,4 +1,5 @@
-//! The Dataset, Settings and Dimensions panels keep their width in every language:
+//! The Dataset, Settings and Dimensions panels (and the colorbar's Color
+//! window, `colorbar/color_menu_tests.rs`) keep their width in every language:
 //! rows whose translations run longer stack (`flow_row`) instead of
 //! widening the panel or spilling past its edge.
 
@@ -28,7 +29,7 @@ const SETTLE: usize = 8;
 /// Rounding of measured against drawn widths.
 pub(super) const SLACK: f32 = 1.0;
 
-const PLOT_TYPES: [PlotType; 6] = [
+pub(super) const PLOT_TYPES: [PlotType; 6] = [
     PlotType::Heatmap,
     PlotType::Line,
     PlotType::Volume,
@@ -39,7 +40,7 @@ const PLOT_TYPES: [PlotType; 6] = [
 
 /// `t2m` plotted as `plot_type` from resident blocks, staged in the
 /// Dimensions panel, with every optional setting row showing.
-fn plotted(plot_type: PlotType) -> OctantApp {
+pub(super) fn plotted(plot_type: PlotType) -> OctantApp {
     let (mut app, meta) = memory_app();
     make_resident(&mut app, &SliceRequest::full_range("t2m", &[3, 5, 4]));
     let base = selection_of(&mut app, &meta, "t2m");
@@ -82,6 +83,16 @@ pub(super) fn area_width(
     open: &[Key],
     run: &mut impl FnMut(&mut Ui),
 ) -> f32 {
+    area_width_of(lang, Id::unique(id), open, run)
+}
+
+/// `area_width` of the area with egui id `id`.
+pub(super) fn area_width_of(
+    lang: Language,
+    id: Id,
+    open: &[Key],
+    run: &mut impl FnMut(&mut Ui),
+) -> f32 {
     let _fonts = crate::ui::fonts::test_lock();
     with_language(lang, || {
         let mut h = Harness::new(SCREEN);
@@ -93,7 +104,7 @@ pub(super) fn area_width(
                 shapes = h.settle(SETTLE, run);
             }
         }
-        h.area(Id::unique(id)).width()
+        h.area(id).width()
     })
 }
 

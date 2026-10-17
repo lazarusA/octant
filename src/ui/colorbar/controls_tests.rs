@@ -1,9 +1,10 @@
-//! The colorbar controls driven headlessly: shown only while hovered and
-//! never during export; the grip drags and resets the panel, the flip turns
-//! it.
+//! The colorbar controls driven headlessly: shown only while hovered (or
+//! the Color window is open) and never during export; the cog opens and
+//! closes the Color window, the grip drags and resets the panel, the flip
+//! turns it, and a click on the bar opens the colormap picker.
 
-use super::controls;
 use super::show_colorbar_overlay;
+use super::{color_menu, controls};
 use crate::app::OctantApp;
 use crate::app::layers::{BarOrientation, LayerId};
 use crate::ui::test_input::Harness;
@@ -11,12 +12,6 @@ use egui::epaint::ClippedShape;
 use egui::{Rect, Ui, Vec2, pos2};
 
 const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1200.0, 900.0));
-
-fn app() -> OctantApp {
-    let mut app = OctantApp::default();
-    app.layout.show_colorbar = true;
-    app
-}
 
 /// One frame of `app`'s colorbars.
 fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
@@ -45,7 +40,7 @@ fn circles(shapes: &[ClippedShape]) -> usize {
 
 #[test]
 fn controls_show_only_while_the_panel_is_hovered() {
-    let mut app = app();
+    let mut app = OctantApp::default();
     let mut h = harness(&mut app);
     let away = h.pointer(pos2(5.0, 5.0), None, &mut run(&mut app));
     assert_eq!(circles(&away), 0);
@@ -55,7 +50,7 @@ fn controls_show_only_while_the_panel_is_hovered() {
 
 #[test]
 fn controls_hide_during_export() {
-    let mut app = app();
+    let mut app = OctantApp::default();
     let mut h = harness(&mut app);
     app.pending_export = Some(crate::export::PendingExportRequest {
         format: Default::default(),
@@ -74,7 +69,7 @@ fn controls_hide_during_export() {
 
 #[test]
 fn dragging_the_grip_moves_the_panel_and_double_click_resets_it() {
-    let mut app = app();
+    let mut app = OctantApp::default();
     let mut h = harness(&mut app);
     let before = panel(&h);
     let [grip, _] = controls::rects(before);
@@ -93,7 +88,7 @@ fn dragging_the_grip_moves_the_panel_and_double_click_resets_it() {
 
 #[test]
 fn the_flip_turns_the_bar() {
-    let mut app = app();
+    let mut app = OctantApp::default();
     let mut h = harness(&mut app);
     let [_, flip] = controls::rects(panel(&h));
     h.click(flip.center(), &mut run(&mut app));
@@ -105,4 +100,85 @@ fn the_flip_turns_the_bar() {
     let panel = panel(&h);
     assert!(panel.height() > panel.width(), "vertical panel: {panel:?}");
     assert!(SCREEN.contains_rect(panel));
+}
+
+/// The bar of panel `panel` in `shapes`: the mesh of many vertices inside it.
+fn bar(shapes: &[ClippedShape], panel: Rect) -> Rect {
+    shapes
+        .iter()
+        .find_map(|c| match &c.shape {
+            egui::Shape::Mesh(mesh) if mesh.vertices.len() >= 256 => {
+                let points: Vec<_> = mesh.vertices.iter().map(|v| v.pos).collect();
+                Some(Rect::from_points(&points)).filter(|r| panel.contains_rect(*r))
+            }
+            _ => None,
+        })
+        .expect("the panel paints its bar")
+}
+
+#[test]
+fn the_cog_opens_the_color_window_and_stays_while_it_is_open() {
+    let mut app = OctantApp::default();
+    let mut h = harness(&mut app);
+    let menu = color_menu::area_id(LayerId::BASE);
+    h.pointer(panel(&h).center(), None, &mut run(&mut app));
+    let cog = controls::cog_rect(panel(&h));
+    h.click(cog.center(), &mut run(&mut app));
+    assert!(color_menu::is_open(&h.ctx, LayerId::BASE));
+    h.settle(3, &mut run(&mut app));
+    let window = h.area(menu);
+    assert!(window.is_positive(), "{window:?}");
+    assert!(
+        window.max.y <= panel(&h).min.y,
+        "above the bottom bar: {window:?}"
+    );
+
+    // Away from the panel the cog stays, so a click closes the window.
+    h.pointer(pos2(5.0, 5.0), None, &mut run(&mut app));
+    h.click(cog.center(), &mut run(&mut app));
+    assert!(!color_menu::is_open(&h.ctx, LayerId::BASE));
+}
+
+#[test]
+fn clicking_the_bar_opens_the_picker_on_its_layer() {
+    let mut app = OctantApp::default();
+    let overlay = app.layers.push(crate::app::layers::Source::default());
+    let mut h = Harness::new(SCREEN);
+    let shapes = h.settle(3, &mut run(&mut app));
+    let panel = h.area(egui::Id::unique(("octant_colorbar_overlay", overlay)));
+    let bar = bar(&shapes, panel);
+    h.click(bar.center(), &mut run(&mut app));
+    assert_eq!(app.colormaps.target, Some(overlay));
+    let popup = egui::Id::unique(("colorbar_bar", overlay)).with("popup");
+    assert!(egui::Popup::is_id_open(&h.ctx, popup));
+}
+
+#[test]
+fn a_hidden_colorbar_is_not_drawn() {
+    let mut app = OctantApp::default();
+    app.layers.base.colorbar.shown = false;
+    let mut h = Harness::new(SCREEN);
+    let shapes = h.settle(3, &mut run(&mut app));
+    assert!(
+        !shapes
+            .iter()
+            .any(|c| matches!(&c.shape, egui::Shape::Mesh(m) if m.vertices.len() >= 256))
+    );
+}
+
+#[test]
+fn the_close_button_in_the_corner_closes_the_color_window() {
+    let mut app = OctantApp::default();
+    let mut h = harness(&mut app);
+    color_menu::set_open(&h.ctx, LayerId::BASE, true);
+    h.settle(3, &mut run(&mut app));
+    let window = h.area(color_menu::area_id(LayerId::BASE));
+    let margin = egui::Frame::popup(&egui::Style::default()).total_margin();
+    let side = crate::ui::icons::ToolbarButton::side(crate::ui::icons::IconSize::Sm);
+    let close = pos2(
+        window.max.x - margin.right - side / 2.0,
+        window.min.y + margin.top + side / 2.0,
+    );
+    h.click(close, &mut run(&mut app));
+    assert!(!color_menu::is_open(&h.ctx, LayerId::BASE));
 }

@@ -1,10 +1,12 @@
 //! The Layers menu: one entry per layer, topmost overlay first and the base
 //! layer last. Each has its header (visibility, order and remove for
-//! overlays), colormap, composite channels and its own Color menu.
+//! overlays, and a colormap button showing a hidden colorbar) and its
+//! composite channels; the colorbar holds the colormap and Color menu, so
+//! only layers without a colorbar keep their Color menu here.
 
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId};
-use crate::i18n::{SettingsKey as K, tr};
+use crate::i18n::{ColormapKey, SettingsKey as K, tr};
 use crate::plots::PlotType;
 use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
 
@@ -13,6 +15,7 @@ enum RowAction {
     ToggleVisible(LayerId),
     Move(LayerId, bool),
     Remove(LayerId),
+    ShowColorbar(LayerId),
 }
 
 /// The collapsible Layers menu: open by default, and opened again after a
@@ -41,7 +44,9 @@ fn show_layer_entries(app: &mut OctantApp, ui: &mut egui::Ui) {
         ui.separator();
     }
     ui.push_id(("layer_entry", LayerId::BASE), |ui| {
-        base_header(app, ui);
+        if let Some(a) = base_header(app, ui) {
+            action = Some(a);
+        }
         layer_body(app, ui, LayerId::BASE);
     });
     match action {
@@ -53,18 +58,44 @@ fn show_layer_entries(app: &mut OctantApp, ui: &mut egui::Ui) {
             app.layers.move_overlay(id, up);
         }
         Some(RowAction::Remove(id)) => app.remove_overlay(id),
+        Some(RowAction::ShowColorbar(id)) => {
+            if let Some(layer) = app.layers.get_mut(id) {
+                layer.colorbar.shown = true;
+            }
+        }
         None => {}
     }
 }
 
-/// The base layer's name; it decides the canvas.
-fn base_header(app: &OctantApp, ui: &mut egui::Ui) {
+/// The base layer's name (it decides the canvas) and its colormap button.
+fn base_header(app: &OctantApp, ui: &mut egui::Ui) -> Option<RowAction> {
     ui.horizontal(|ui| {
-        let name = layer_name(app, LayerId::BASE);
-        ui.add(egui::Label::new(egui::RichText::new(name).strong()).truncate())
-            .on_hover_text(tr(K::BaseLayerHover));
-        ui.label(egui::RichText::new(tr(K::BaseTag)).small().weak());
-    });
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let action = show_colorbar_button(app, ui, LayerId::BASE);
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                let name = layer_name(app, LayerId::BASE);
+                ui.add(egui::Label::new(egui::RichText::new(name).strong()).truncate())
+                    .on_hover_text(tr(K::BaseLayerHover));
+                ui.label(egui::RichText::new(tr(K::BaseTag)).small().weak());
+            });
+            action
+        })
+        .inner
+    })
+    .inner
+}
+
+/// The colormap button of layer `id` while it has a colorbar it hid; a
+/// click shows the colorbar again.
+fn show_colorbar_button(app: &OctantApp, ui: &mut egui::Ui, id: LayerId) -> Option<RowAction> {
+    let hidden = app.layers.get(id).is_some_and(|l| !l.colorbar.shown);
+    if !hidden || !crate::ui::colorbar::can_show(app, id) {
+        return None;
+    }
+    let button = small(Icon::Colormap, tr(ColormapKey::ShowColorbar));
+    ui.add(button)
+        .clicked()
+        .then_some(RowAction::ShowColorbar(id))
 }
 
 /// Overlay `id`'s header (`index` of `count` in drawing order) and why it
@@ -84,18 +115,20 @@ fn overlay_header(
     action
 }
 
-/// Layer `id`'s colormap, composite channels and Color menu (which holds
-/// its opacity).
+/// Layer `id`'s composite channels and, when it has no colorbar to open it
+/// from, its Color menu (which holds its opacity).
 fn layer_body(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     if app.layers.get(id).is_some_and(|l| l.labels().is_some()) {
         label_body(app, ui, id);
         return;
     }
-    crate::ui::colormap::show_layer_colormap_button(app, ui, id);
     // A line plot draws one band: no composite.
     let line = id == LayerId::BASE && app.effective_canvas_plot_type() == PlotType::Line;
     if !line {
         super::composite::show_composite_controls(app, ui, id);
+    }
+    if crate::ui::colorbar::can_show(app, id) {
+        return;
     }
     egui::CollapsingHeader::new(tr(K::Color))
         .id_salt(("layer_color_menu", id))
@@ -119,7 +152,8 @@ fn label_body(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     super::opacity::opacity_slider(ui, id, &mut layer.color.opacity);
 }
 
-/// The eye toggle, the name, and the move and remove buttons of `layer`.
+/// The eye toggle, the name, and the colormap, move and remove buttons of
+/// `layer`.
 fn name_row(
     app: &OctantApp,
     ui: &mut egui::Ui,
@@ -150,6 +184,9 @@ fn name_row(
                 if ui.add_enabled(enabled, small(icon, hover)).clicked() {
                     action = Some(RowAction::Move(id, up));
                 }
+            }
+            if let Some(a) = show_colorbar_button(app, ui, id) {
+                action = Some(a);
             }
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 let name = egui::RichText::new(layer_name(app, id)).strong();

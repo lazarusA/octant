@@ -12,7 +12,6 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::FilterAll => "Tutte",
         ColormapKey::FamilyCustom => "Personalizzate",
         ColormapKey::FamilyTitle => "Famiglia: {}",
-        ColormapKey::Colormap => "Mappa di colore",
         ColormapKey::Smooth => "Sfumata",
         ColormapKey::SmoothHover => {
             "Fondi i colori di questa tavolozza in un gradiente continuo (Oklab)"
@@ -21,6 +20,8 @@ pub fn text(key: ColormapKey) -> Option<&'static str> {
         ColormapKey::SearchHint => "Cerca mappe di colore...",
         ColormapKey::NoMatches => "Nessuna mappa di colore corrispondente",
         ColormapKey::ShowColorbar => "Mostra barra dei colori",
+        ColormapKey::ChangeColormapHover => "Clicca per cambiare la mappa di colore",
+        ColormapKey::ColorSettingsHover => "Impostazioni colore",
         ColormapKey::BoxTransparency => "Trasparenza del riquadro",
         ColormapKey::CustomColormap => "Mappa di colore personalizzata",
         ColormapKey::Name => "Nome",

@@ -5,7 +5,6 @@ pub fn text(key: CommonKey) -> &'static str {
         CommonKey::Dataset => "Dataset",
         CommonKey::Variables => "Variables",
         CommonKey::Dimensions => "Dimensions",
-        CommonKey::Colormaps => "Colormaps",
         CommonKey::Settings => "Settings",
         CommonKey::About => "About",
         CommonKey::Cache => "Cache",

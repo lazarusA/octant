@@ -5,7 +5,6 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::Dataset => "Dataset",
         CommonKey::Variables => "Variabler",
         CommonKey::Dimensions => "Dimensioner",
-        CommonKey::Colormaps => "Färgkartor",
         CommonKey::Settings => "Inställningar",
         CommonKey::About => "Om",
         CommonKey::Cache => "Cache",

@@ -5,7 +5,6 @@ crate::i18n::keys::define_keys! {
     Dataset,
     Variables,
     Dimensions,
-    Colormaps,
     Settings,
     About,
     Cache,

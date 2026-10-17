@@ -1,6 +1,6 @@
-//! Colormap picker: toolbar popup with search, kind/family filters, gradient
-//! swatches for every registered colormap, reverse and smooth toggles, and the
-//! custom colormap editor.
+//! Colormap picker: the popup a colorbar's bar opens, with search,
+//! kind/family filters, gradient swatches for every registered colormap,
+//! reverse and smooth toggles, and the custom colormap editor.
 
 pub mod editor;
 pub mod filters;
@@ -15,8 +15,7 @@ mod tests;
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::i18n::{ColormapKey as K, tr};
-use crate::ui::icons::{Icon, ToolbarButton, UiIconExt};
-use crate::ui::number_input::LocalizedInput;
+use crate::ui::icons::UiIconExt;
 use crate::utils::colormap::registry;
 
 /// Persistent (per-session) picker UI state.
@@ -26,7 +25,7 @@ pub struct PickerState {
     pub cache: search::FilterCache,
     pub swatches: swatch::SwatchAtlas,
     pub editor: editor::EditorState,
-    /// Height of everything below the list (editor, colorbar options) last frame.
+    /// Height of everything below the list (the editor) last frame.
     pub below_list_height: f32,
     /// Row hovered last frame; `preview_colormap` itself resets every frame.
     pub last_hovered: Option<u32>,
@@ -39,60 +38,33 @@ const POPUP_MARGIN: f32 = 16.0;
 const MIN_POPUP_HEIGHT: f32 = 160.0;
 const ACTIVE_SWATCH_WIDTH: f32 = 120.0;
 
-pub fn show_colormap_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
-    let button_response = ui.add(
-        ToolbarButton::new(Icon::Colormap, tr(K::Colormap))
-            .compact(compact)
-            .owns_popup(),
-    );
-    if button_response.clicked() {
-        // The toolbar's picker edits the base layer.
-        app.colormaps.target = None;
-    }
-    // Pinned below the button: egui otherwise re-picks the side every frame from
-    // the content size, so expanding the editor would jump the panel right or up.
-    // The height is capped to the space below the button and scrolls instead.
-    let viewport = ui.ctx().input(|i| i.viewport_rect());
-    let max_height =
-        (viewport.max.y - button_response.rect.max.y - POPUP_MARGIN).max(MIN_POPUP_HEIGHT);
-    egui::Popup::from_toggle_button_response(&button_response)
-        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-        .align(egui::RectAlign::BOTTOM_START)
-        .align_alternatives(&[])
-        .show(|ui| {
-            panel_scroll_area(max_height)
-                .show(ui, |ui| render_colormap_contents(app, ui, max_height));
-        });
-}
-
-/// Swatch button showing layer `id`'s colormap across the available width;
-/// it opens the picker on that layer (`ColormapState::target`).
-pub fn show_layer_colormap_button(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
-    let Some(style) = app.layers.get(id).map(|l| &l.color) else {
-        return;
-    };
-    let (shown, reversed) = (style.shown_row(style.colormap), style.reversed);
-    let (rect, response) =
-        ui.allocate_exact_size(egui::vec2(ui.available_width(), 14.0), egui::Sense::click());
-    app.colormaps.picker.swatches.ensure(ui.ctx());
-    app.colormaps
-        .picker
-        .swatches
-        .paint(ui, rect, shown, reversed);
-    if response.hovered() {
-        let stroke = ui.visuals().widgets.hovered.fg_stroke;
-        ui.painter()
-            .rect_stroke(rect, 2.0, stroke, egui::StrokeKind::Outside);
-    }
-    let response = response.on_hover_text(tr(K::Colormap));
-    if response.clicked() {
+/// The picker for layer `id`, opened and closed by clicking `anchor` (its
+/// colorbar's bar): below it when the bar sits in the upper half of the
+/// window, else above it.
+pub fn show_picker_popup(app: &mut OctantApp, anchor: &egui::Response, id: LayerId) {
+    if anchor.clicked() {
         app.colormaps.target = Some(id);
     }
-    let viewport = ui.ctx().input(|i| i.viewport_rect());
-    let max_height = (viewport.max.y - response.rect.max.y - POPUP_MARGIN).max(MIN_POPUP_HEIGHT);
-    egui::Popup::from_toggle_button_response(&response)
+    // The side follows the bar, not the content: egui otherwise re-picks it
+    // every frame from the content size, so expanding the editor would jump
+    // the panel. The height is capped to the room on that side and scrolls.
+    let viewport = anchor.ctx.input(|i| i.viewport_rect());
+    let below = anchor.rect.center().y < viewport.center().y;
+    let (align, room) = if below {
+        (
+            egui::RectAlign::BOTTOM_START,
+            viewport.max.y - anchor.rect.max.y,
+        )
+    } else {
+        (
+            egui::RectAlign::TOP_START,
+            anchor.rect.min.y - viewport.min.y,
+        )
+    };
+    let max_height = (room - POPUP_MARGIN).max(MIN_POPUP_HEIGHT);
+    egui::Popup::from_toggle_button_response(anchor)
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-        .align(egui::RectAlign::BOTTOM_START)
+        .align(align)
         .align_alternatives(&[])
         .show(|ui| {
             panel_scroll_area(max_height)
@@ -115,8 +87,8 @@ fn panel_scroll_area(max_height: f32) -> egui::ScrollArea {
 }
 
 /// Lays out the panel so everything fits in `max_height`: the colormap list
-/// takes whatever height is left after the controls above it and the editor and
-/// colorbar options below it (measured on the previous frame).
+/// takes whatever height is left after the controls above it and the editor
+/// below it (measured on the previous frame).
 fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
     ui.set_width(POPUP_WIDTH);
     let top = ui.cursor().min.y;
@@ -149,8 +121,6 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
     let below_start = ui.cursor().min.y;
     ui.separator();
     editor::show(app, ui);
-    ui.separator();
-    show_colorbar_options(app, ui);
     let measured = ui.cursor().min.y - below_start;
     if (measured - below).abs() > 0.5 {
         // The editor opened or closed: resize the list on the next frame.
@@ -192,18 +162,6 @@ fn show_active_row(app: &mut OctantApp, ui: &mut egui::Ui) {
             });
         });
     });
-}
-
-fn show_colorbar_options(app: &mut OctantApp, ui: &mut egui::Ui) {
-    ui.checkbox(&mut app.layout.show_colorbar, tr(K::ShowColorbar));
-    if app.layout.show_colorbar {
-        ui.add(
-            egui::Slider::new(&mut app.layout.colorbar_transparency, 0.0..=1.0)
-                .localized()
-                .custom_formatter(|n, _| format!("{:.0}%", n * 100.0)),
-        );
-        ui.label(egui::RichText::new(tr(K::BoxTransparency)));
-    }
 }
 
 /// Makes `id` the picked layer's colormap, leaving RGB composite mode if needed.

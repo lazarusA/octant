@@ -5,7 +5,6 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::Dataset => "데이터셋",
         CommonKey::Variables => "변수",
         CommonKey::Dimensions => "차원",
-        CommonKey::Colormaps => "컬러맵",
         CommonKey::Settings => "설정",
         CommonKey::About => "정보",
         CommonKey::Cache => "캐시",

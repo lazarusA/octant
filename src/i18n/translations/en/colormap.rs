@@ -12,7 +12,6 @@ pub fn text(key: ColormapKey) -> &'static str {
         ColormapKey::FilterAll => "All",
         ColormapKey::FamilyCustom => "Custom",
         ColormapKey::FamilyTitle => "Family: {}",
-        ColormapKey::Colormap => "Colormap",
         ColormapKey::Smooth => "Smooth",
         ColormapKey::SmoothHover => {
             "Blend this palette's colors into a continuous gradient (Oklab)"
@@ -21,6 +20,8 @@ pub fn text(key: ColormapKey) -> &'static str {
         ColormapKey::SearchHint => "Search colormaps...",
         ColormapKey::NoMatches => "No colormaps match",
         ColormapKey::ShowColorbar => "Show Colorbar",
+        ColormapKey::ChangeColormapHover => "Click to change the colormap",
+        ColormapKey::ColorSettingsHover => "Color settings",
         ColormapKey::BoxTransparency => "Box transparency",
         ColormapKey::CustomColormap => "Custom colormap",
         ColormapKey::Name => "Name",

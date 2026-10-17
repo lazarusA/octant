@@ -17,6 +17,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         }
         SettingsKey::ReasonAlwaysBlends => "Dieser Algorithmus mischt immer entlang des Strahls.",
         SettingsKey::CloseSettingsHover => "Einstellungen schließen",
+        SettingsKey::CloseColorHover => "Farbeinstellungen schließen",
         SettingsKey::SectionOverlays => "Überlagerungen",
         SettingsKey::SectionResolution => "Auflösung",
         SettingsKey::SectionView => "Ansicht",
@@ -30,7 +31,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::MoveDownHover => "Nach unten",
         SettingsKey::MoveUpHover => "Nach oben",
         SettingsKey::NoVariable => "(keine Variable)",
-        SettingsKey::ColorbarLabel => "Farbleistentitel",
         SettingsKey::ResetLabelHover => "Titel der Farbleiste zurücksetzen",
         SettingsKey::ColorRange => "Farbbereich",
         SettingsKey::Categorical => "Kategorisch",

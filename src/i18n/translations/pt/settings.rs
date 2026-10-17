@@ -21,6 +21,7 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         }
         SettingsKey::ReasonAlwaysBlends => "Este algoritmo sempre mistura ao longo do raio.",
         SettingsKey::CloseSettingsHover => "Fechar configurações",
+        SettingsKey::CloseColorHover => "Fechar configurações de cor",
         SettingsKey::SectionOverlays => "Sobreposições",
         SettingsKey::SectionResolution => "Resolução",
         SettingsKey::SectionView => "Visualização",
@@ -34,7 +35,6 @@ pub fn text(key: SettingsKey) -> Option<&'static str> {
         SettingsKey::MoveDownHover => "Mover para baixo",
         SettingsKey::MoveUpHover => "Mover para cima",
         SettingsKey::NoVariable => "(sem variável)",
-        SettingsKey::ColorbarLabel => "Rótulo da barra de cores",
         SettingsKey::ResetLabelHover => "Redefinir o rótulo da barra de cores para o padrão",
         SettingsKey::ColorRange => "Intervalo de cores",
         SettingsKey::Categorical => "Categórico",
