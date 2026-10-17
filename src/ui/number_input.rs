@@ -34,3 +34,9 @@ impl LocalizedInput for egui::Slider<'_> {
         self.custom_parser(number::parse)
     }
 }
+
+impl LocalizedInput for egui::RangeSlider<'_> {
+    fn localized(self) -> Self {
+        self.custom_parser(number::parse)
+    }
+}
