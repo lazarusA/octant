@@ -27,7 +27,7 @@ pub fn render_crop_toolbar(
         (box_rect.top() - 38.0).max(canvas_rect.top() + 8.0),
     );
 
-    egui::Area::new(egui::Id::new("octant_crop_toolbar"))
+    egui::Area::new(egui::Id::unique("octant_crop_toolbar"))
         .fixed_pos(toolbar_pos)
         .order(egui::Order::Foreground)
         .show(ui.ctx(), |ui| {

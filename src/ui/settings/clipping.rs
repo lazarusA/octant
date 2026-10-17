@@ -50,7 +50,7 @@ fn show_colorbar_label_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: Laye
         return;
     };
     let editor = LabelEditor {
-        id: egui::Id::new(("settings_colorbar_label", id)),
+        id: egui::Id::unique(("settings_colorbar_label", id)),
         width: 170.0,
         framed: true,
     };

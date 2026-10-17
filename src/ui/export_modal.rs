@@ -14,7 +14,7 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
     let mut should_close = false;
 
     egui::Window::new(tr(ExportKey::DialogTitle))
-        .id(egui::Id::new("export_modal_window"))
+        .id(egui::Id::unique("export_modal_window"))
         .title_bar(false)
         .resizable(false)
         .collapsible(false)

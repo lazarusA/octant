@@ -39,10 +39,6 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::FontLoadFailedDetail => {
             "Le texte en {} peut s'afficher sous forme de carrés : {}"
         }
-        NoticesKey::DataFontMissing => "Aucune police pour une partie du texte du jeu de données",
-        NoticesKey::DataFontMissingDetail => {
-            "Le texte en {} de ce jeu de données peut s'afficher sous forme de carrés. Installez une police comme Noto Sans CJK."
-        }
         NoticesKey::OmeMetadataNonConforming => "Les métadonnées OME-Zarr ne sont pas conformes",
         NoticesKey::LabelIdsBeyond32Bits => {
             "Les identifiants d'étiquette au-delà de 32 bits partagent les couleurs d'identifiants plus petits"

@@ -76,15 +76,6 @@ impl CjkFont {
         }
     }
 
-    /// The name in egui's font definitions of the system font found for it.
-    pub fn system_key(self) -> &'static str {
-        match self {
-            CjkFont::Sc => "system-sc",
-            CjkFont::Jp => "system-jp",
-            CjkFont::Kr => "system-kr",
-        }
-    }
-
     /// The fonts in the order egui tries them: the UI language's own first,
     /// else `data_first` (the one chosen for a dataset's Han text).
     pub fn fallback_order(lang: Language, data_first: Option<CjkFont>) -> [CjkFont; 3] {

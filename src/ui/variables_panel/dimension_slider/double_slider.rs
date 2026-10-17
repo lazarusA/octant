@@ -20,7 +20,7 @@ pub fn double_slider_with_inputs(
     max: usize,
 ) -> bool {
     let mut changed = false;
-    let base_id = ui.id().with("double_slider").with(id_source);
+    let base_id = ui.scope_id().with("double_slider").with(id_source);
 
     ui.horizontal(|ui| {
         changed |= ui

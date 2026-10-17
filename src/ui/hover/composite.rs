@@ -96,7 +96,7 @@ pub fn composite_labels(
         (c.index, &c.name, c.visible).hash(&mut hasher);
     }
     let key = hasher.finish();
-    let id = egui::Id::new("composite_labels");
+    let id = egui::Id::unique("composite_labels");
     if let Some((cached_key, labels)) = ctx.data(|d| d.get_temp::<(u64, Arc<CompositeLabels>)>(id))
         && cached_key == key
     {

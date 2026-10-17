@@ -10,7 +10,7 @@ const CUBE_SIZE: f32 = 42.0;
 /// The cube with its filled octant, which a click moves on to the next one
 /// (the landing screen's order: one axis flips per step).
 pub(super) fn show_octant_cube(ui: &mut egui::Ui) {
-    let id = egui::Id::new(("about_octant", "step"));
+    let id = egui::Id::unique(("about_octant", "step"));
     let step = ui.data(|d| d.get_temp::<usize>(id)).unwrap_or(0) % SEQUENCE.len();
 
     let response = draw_octant_widget(ui, CUBE_SIZE, SEQUENCE[step], 0.0, 1.0)

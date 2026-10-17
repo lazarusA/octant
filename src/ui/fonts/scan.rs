@@ -88,27 +88,4 @@ impl Scripts {
                 CjkFont::Sc
             })
     }
-
-    /// The fonts this text needs, by `CjkFont::ALL` index: Japanese for
-    /// kana, Korean for Hangul, and `han_font` for Han characters (the
-    /// desktop adds the Chinese font when `han_font` lacks some of them,
-    /// `system::request`).
-    pub fn needed(self, han_font: CjkFont) -> [bool; 3] {
-        let mut needed = [false; 3];
-        let mut need = |font: CjkFont| {
-            if let Some(slot) = CjkFont::ALL.iter().position(|&f| f == font) {
-                needed[slot] = true;
-            }
-        };
-        if self.kana {
-            need(CjkFont::Jp);
-        }
-        if self.hangul {
-            need(CjkFont::Kr);
-        }
-        if self.han {
-            need(han_font);
-        }
-        needed
-    }
 }

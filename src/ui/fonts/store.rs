@@ -1,15 +1,11 @@
-//! Where each CJK font's bytes come from: bundled in the binary, (on the
-//! web) fetched once and kept for the session, or (on the desktop) the
-//! system's own font, loaded when a dataset's text needs it.
+//! Where each CJK font's bytes come from: bundled in the binary or (on the
+//! web) fetched once and kept for the session.
 
 use super::CjkFont;
 use std::sync::{Arc, Mutex};
 
 /// Translation subsets fetched at runtime (web), by `CjkFont::ALL` index.
 static FETCHED: Mutex<[Option<Arc<egui::FontData>>; 3]> = Mutex::new([None, None, None]);
-
-/// System fonts loaded for dataset text (desktop), by `CjkFont::ALL` index.
-static SYSTEM: Mutex<[Option<Arc<egui::FontData>>; 3]> = Mutex::new([None, None, None]);
 
 /// Font slices fetched for dataset text (web): font, slice number, data.
 static SLICES: Mutex<Vec<(CjkFont, u16, Arc<egui::FontData>)>> = Mutex::new(Vec::new());
@@ -22,21 +18,6 @@ static DATA_FIRST: Mutex<Option<CjkFont>> = Mutex::new(None);
 /// bundled one.
 pub fn subset(font: CjkFont) -> Arc<egui::FontData> {
     fetched(font).unwrap_or_else(|| Arc::new(egui::FontData::from_static(bundled(font))))
-}
-
-/// The system font loaded for `font`, if any.
-pub fn system(font: CjkFont) -> Option<Arc<egui::FontData>> {
-    let slots = SYSTEM.lock().unwrap_or_else(|p| p.into_inner());
-    slots.get(index(font)).and_then(Clone::clone)
-}
-
-/// Keeps `data`, the system font found for `font`.
-#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
-pub fn set_system(font: CjkFont, data: Arc<egui::FontData>) {
-    let mut slots = SYSTEM.lock().unwrap_or_else(|p| p.into_inner());
-    if let Some(slot) = slots.get_mut(index(font)) {
-        *slot = Some(data);
-    }
 }
 
 /// The slices of `font` fetched so far, by slice number, with their names

@@ -27,6 +27,9 @@ fn main() -> eframe::Result<()> {
         wgpu_options: plots::device::wgpu_configuration(),
         // Persistence stores colormap preferences only; keep window geometry unmanaged.
         persist_window: false,
+        // `ui::fonts` installs its own system font provider, asking for the
+        // locale of the Han font it picks rather than the system's.
+        system_font_fallback: false,
         ..Default::default()
     };
 

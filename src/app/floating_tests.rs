@@ -52,7 +52,7 @@ impl Painted {
 
     /// The colors of the bar inside the colorbar panel of `id`.
     fn bar_colors(&self, h: &Harness, id: LayerId) -> Vec<Color32> {
-        let panel = h.area(egui::Id::new(("octant_colorbar_overlay", id)));
+        let panel = h.area(egui::Id::unique(("octant_colorbar_overlay", id)));
         self.bars
             .iter()
             .find(|(rect, _)| panel.contains_rect(*rect))

@@ -52,7 +52,7 @@ impl Timeline {
     /// Cached labels for the current frame. A cache hit only bumps an `Arc`
     /// refcount; labels are rebuilt when the key changes (e.g. each new step).
     pub fn cached(app: &OctantApp, ctx: &egui::Context) -> Arc<Self> {
-        let id = egui::Id::new(("bottom_bar", "timeline"));
+        let id = egui::Id::unique(("bottom_bar", "timeline"));
         let key = TimelineKey::from_app(app);
         if let Some((cached_key, timeline)) =
             ctx.data(|d| d.get_temp::<(TimelineKey, Arc<Self>)>(id))

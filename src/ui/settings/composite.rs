@@ -159,7 +159,7 @@ fn channel_buttons(
 /// One channel's row and, when its chevron is open, its display settings.
 /// Whether the layer should reload.
 fn channel_entry(ui: &mut egui::Ui, cfg: &mut ChannelColorConfig, id: LayerId) -> bool {
-    let open_id = egui::Id::new(("mc_channel_open", id, cfg.index));
+    let open_id = egui::Id::unique(("mc_channel_open", id, cfg.index));
     let mut open = ui.data(|d| d.get_temp::<bool>(open_id).unwrap_or(false));
     let mut changed = false;
     ui.horizontal(|ui| {

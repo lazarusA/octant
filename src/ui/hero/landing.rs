@@ -29,7 +29,7 @@ pub fn show_hero_landing(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
 
     // Check warning state from drop handler
-    let warning_id = egui::Id::new("drop_zone_warning_state");
+    let warning_id = egui::Id::unique("drop_zone_warning_state");
     let active_warning: Option<crate::ui::drop_zone::DropZoneWarningState> =
         ui.ctx().data(|d| d.get_temp(warning_id));
     let is_warning_active = active_warning

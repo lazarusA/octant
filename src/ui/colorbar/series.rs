@@ -125,7 +125,7 @@ fn draw_labels(ui: &egui::Ui, axis: BarAxis, ticks: &[SeriesTick], color: egui::
 /// formatted only when the hovered line or the labels' inputs change.
 pub(super) fn show_hover_text(app: &OctantApp, response: egui::Response, series: &Series, t: f32) {
     let line = series_line_at(t, series.n, series.categorical);
-    let id = egui::Id::new("colorbar_series_hover");
+    let id = egui::Id::unique("colorbar_series_hover");
     let text: Arc<str> = cached(&response.ctx, id, (series.labels_key, line), || {
         let plotted = app.plotted();
         let meta = plotted.metadata.as_ref();
@@ -154,7 +154,7 @@ fn labels_key(app: &OctantApp, n: usize) -> u64 {
 /// change (kept in egui temp memory).
 fn ticks(app: &OctantApp, ctx: &egui::Context, series: &Series) -> Arc<[SeriesTick]> {
     let (n, categorical) = (series.n, series.categorical);
-    let id = egui::Id::new("colorbar_series_ticks");
+    let id = egui::Id::unique("colorbar_series_ticks");
     cached(ctx, id, (series.labels_key, categorical), || {
         let plotted = app.plotted();
         let meta = plotted.metadata.as_ref();

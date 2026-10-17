@@ -12,7 +12,7 @@ use egui::{Id, Rect, Ui, pos2};
 const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1240.0, 930.0));
 
 fn colorbar_id() -> Id {
-    Id::new(("octant_colorbar_overlay", LayerId::BASE))
+    Id::unique(("octant_colorbar_overlay", LayerId::BASE))
 }
 
 /// One frame of the colorbars under the Settings panel.
@@ -41,7 +41,7 @@ fn panels_draw_over_colorbars_even_after_a_colorbar_click() {
     let mut h = Harness::new(SCREEN);
     h.settle(3, &mut with_settings(&mut app));
     let colorbar = h.area(colorbar_id());
-    let settings = h.area(Id::new("octant_settings_area"));
+    let settings = h.area(Id::unique("octant_settings_area"));
     let overlap = colorbar.intersect(settings);
     assert!(overlap.is_positive(), "{colorbar:?} vs {settings:?}");
 
@@ -50,7 +50,7 @@ fn panels_draw_over_colorbars_even_after_a_colorbar_click() {
     h.click(only_bar, &mut with_settings(&mut app));
     assert_eq!(
         h.top_at(overlap.center()),
-        Some(Id::new("octant_settings_area"))
+        Some(Id::unique("octant_settings_area"))
     );
 }
 
@@ -69,5 +69,5 @@ fn the_catalog_backdrop_covers_colorbars() {
     h.click(at, &mut with_catalog(&mut app));
     app.layout.show_catalog_window = true;
     h.settle(3, &mut with_catalog(&mut app));
-    assert_eq!(h.top_at(at), Some(Id::new("catalog_modal_backdrop")));
+    assert_eq!(h.top_at(at), Some(Id::unique("catalog_modal_backdrop")));
 }

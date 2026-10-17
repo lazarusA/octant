@@ -7,17 +7,17 @@ use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 use crate::utils::stack_str;
 
 pub fn show_icons_tab(ui: &mut egui::Ui) {
-    let search_id = egui::Id::new(("about_icons", "search_query"));
+    let search_id = egui::Id::unique(("about_icons", "search_query"));
     // Move the query out of egui's temp storage (and back at the end) instead
     // of cloning it every frame.
     let mut search_query: String = ui
         .ctx()
         .data_mut(|d| std::mem::take(d.get_temp_mut_or_default::<String>(search_id)));
 
-    let cat_id = egui::Id::new(("about_icons", "category_filter"));
+    let cat_id = egui::Id::unique(("about_icons", "category_filter"));
     let mut selected_cat: usize = ui.ctx().data(|d| d.get_temp(cat_id)).unwrap_or(0);
 
-    let copied_id = egui::Id::new(("about_icons", "copied_feedback"));
+    let copied_id = egui::Id::unique(("about_icons", "copied_feedback"));
     let copied_feedback: Option<(String, web_time::Instant)> =
         ui.ctx().data(|d| d.get_temp(copied_id));
 

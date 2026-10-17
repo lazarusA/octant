@@ -37,10 +37,6 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         }
         NoticesKey::FontLoadFailed => "フォントを読み込めませんでした",
         NoticesKey::FontLoadFailedDetail => "{} のテキストが四角で表示される場合があります: {}",
-        NoticesKey::DataFontMissing => "データセットの一部のテキストにフォントがありません",
-        NoticesKey::DataFontMissingDetail => {
-            "このデータセットの {} のテキストが四角で表示される場合があります。Noto Sans CJK などのフォントをインストールしてください。"
-        }
         NoticesKey::OmeMetadataNonConforming => "OME-Zarr メタデータが仕様に準拠していません",
         NoticesKey::LabelIdsBeyond32Bits => {
             "32 ビットを超えるラベル ID は小さい ID と色を共有します"

@@ -16,7 +16,7 @@ const QUADRANT: egui::Vec2 = vec2(380.0, 300.0);
 const PPP: f32 = 2.0;
 
 fn paint_background(ctx: &egui::Context, size: egui::Vec2) {
-    let bg = ctx.layer_painter(LayerId::new(Order::Background, Id::new("bg")));
+    let bg = ctx.layer_painter(LayerId::new(Order::Background, Id::unique("bg")));
     for i in 0..19 {
         let t = i as f32 / 18.0;
         let c = Color32::from_rgb((40.0 + 200.0 * t) as u8, 90, (220.0 - 180.0 * t) as u8);

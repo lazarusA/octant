@@ -25,7 +25,7 @@ impl<'a> ShapeColorPicker<'a> {
         shape: ColorShape,
     ) -> Self {
         Self {
-            id_salt: egui::Id::new(id_salt),
+            id_salt: egui::Id::unique(id_salt),
             color,
             shape,
             size: None,

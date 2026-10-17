@@ -14,7 +14,7 @@ fn license_viewer_contact_sheet() {
     let mut sheet = image::RgbaImage::new(2 * w as u32, h as u32);
     for (column, visuals) in themes().iter().enumerate() {
         let (prims, atlas) = tessellate_pass(SIZE, PPP, visuals, |ctx| {
-            egui::Area::new(egui::Id::new("license_sheet"))
+            egui::Area::new(egui::Id::unique("license_sheet"))
                 .fixed_pos(egui::pos2(12.0, 12.0))
                 .fade_in(false)
                 .show(ctx, |ui| {

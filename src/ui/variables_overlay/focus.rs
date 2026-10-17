@@ -4,11 +4,11 @@
 use egui::{Context, Id};
 
 fn pending_id() -> Id {
-    Id::new("octant_variables_focus_on_open")
+    Id::unique("octant_variables_focus_on_open")
 }
 
 fn shown_id() -> Id {
-    Id::new("octant_variables_shown_dataset")
+    Id::unique("octant_variables_shown_dataset")
 }
 
 /// Track which dataset the overlay shows (`None` while closed, loading or

@@ -9,7 +9,7 @@ const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(400.0, 100.0));
 
 fn editor() -> LabelEditor {
     LabelEditor {
-        id: egui::Id::new("test_label"),
+        id: egui::Id::unique("test_label"),
         width: 200.0,
         framed: true,
     }

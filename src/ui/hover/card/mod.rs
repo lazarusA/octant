@@ -40,7 +40,10 @@ pub fn show_card(
     anchoring: Anchoring,
     card: &HoverCard,
 ) {
-    let painter = ctx.layer_painter(LayerId::new(Order::Tooltip, Id::new("octant_hover_card")));
+    let painter = ctx.layer_painter(LayerId::new(
+        Order::Tooltip,
+        Id::unique("octant_hover_card"),
+    ));
     let visuals = &ctx.style_of(ctx.theme()).visuals;
 
     let mut buf = [0u8; 32];

@@ -22,8 +22,8 @@ exclude = [
 ]
 
 [dependencies]
-egui = "0.36.2"
-eframe = { version = "0.36.2", features = ["persistence", "wgpu"] }
+egui = { version = "0.37.0", features = ["default_fonts"] }
+eframe = { version = "0.37.0", features = ["persistence", "wgpu"] }
 wgpu = { version = "30.0.1", features = ["webgpu", "webgl"] }
 bytemuck = { version = "1.25", features = ["derive"] }
 glam = { version = "0.33", features = ["bytemuck"] }
@@ -62,10 +62,9 @@ rayon = "1.10"
 reqwest = { version = "0.13", features = ["blocking", "json"] }
 md-5 = "0.11"
 sys-locale = "0.3"
-# System CJK fonts for text in datasets (desktop only).
-# Checks whether a system font covers a dataset's Han characters (egui uses it already).
-skrifa = "0.44"
-fontdb = { version = "0.24", default-features = false, features = ["std", "fs", "fontconfig"] }
+# System fonts for characters no loaded font draws, asked for the Han font's
+# locale (`ui/fonts/system_provider.rs`); eframe's own instance is turned off.
+egui_system_font_provider = "0.37.0"
 # Only for `cargo run --features font-tools --bin subset_fonts`.
 allsorts = { version = "0.17", default-features = false, features = ["flate2_rust"], optional = true }
 crc32fast = "1.5"
@@ -101,6 +100,8 @@ required-features = ["font-tools"]
 
 [dev-dependencies]
 blusc = "0.0.6"
+# Checks that the bundled CJK subsets cover their translations.
+skrifa = "0.44"
 
 [patch.crates-io]
 blusc = { git = "https://github.com/lazarusA/blusc", branch = "la/fix_linker" }

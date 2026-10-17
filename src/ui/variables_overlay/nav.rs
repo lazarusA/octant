@@ -23,7 +23,7 @@ pub enum NodeKey<'a> {
 }
 
 pub(super) fn base_id() -> Id {
-    Id::new("octant_variables_tree")
+    Id::unique("octant_variables_tree")
 }
 
 /// Open/closed state id of a folder. Search keeps its own state, so results

@@ -34,7 +34,7 @@ pub fn show(app: &mut OctantApp, ctx: &egui::Context, id: LayerId, canvas: Rect)
     let bar_len = layout::bar_length(orientation, width, canvas);
 
     let frame = panel_frame(ctx, app.layout.colorbar_transparency);
-    egui::Area::new(egui::Id::new(super::salt("octant_colorbar_overlay", id)))
+    egui::Area::new(egui::Id::unique(super::salt("octant_colorbar_overlay", id)))
         .order(egui::Order::Middle)
         .pivot(pivot)
         .fixed_pos(point)
@@ -100,7 +100,7 @@ fn title_row(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId, side: f32) {
         let width = (avail - 2.0 * side).clamp(avail.min(60.0), 320.0);
         ui.add_space(((avail - width) / 2.0).max(0.0));
         let editor = LabelEditor {
-            id: egui::Id::new(super::salt("colorbar_title", id)),
+            id: egui::Id::unique(super::salt("colorbar_title", id)),
             width,
             framed: false,
         };

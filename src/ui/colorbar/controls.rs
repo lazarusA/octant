@@ -35,7 +35,7 @@ pub fn show(
     panel: Rect,
     (pivot, canvas): (Align2, Rect),
 ) {
-    let dragging_key = egui::Id::new(super::salt("colorbar_dragging", id));
+    let dragging_key = egui::Id::unique(super::salt("colorbar_dragging", id));
     let dragging = ui.data(|d| d.get_temp::<bool>(dragging_key).unwrap_or(false));
     if app.pending_export.is_some() || !(dragging || ui.rect_contains_pointer(panel)) {
         return;

@@ -35,10 +35,6 @@ pub fn text(key: NoticesKey) -> Option<&'static str> {
         NoticesKey::LinePayloadTooLargeDetail => "Linjerna tar {} byte; denna GPU binder högst {}.",
         NoticesKey::FontLoadFailed => "Kunde inte läsa in ett typsnitt",
         NoticesKey::FontLoadFailedDetail => "Text på {} kan visas som rutor: {}",
-        NoticesKey::DataFontMissing => "Inget typsnitt för en del av datasetets text",
-        NoticesKey::DataFontMissingDetail => {
-            "Text på {} i detta dataset kan visas som rutor. Installera ett typsnitt som Noto Sans CJK."
-        }
         NoticesKey::OmeMetadataNonConforming => "OME-Zarr-metadata följer inte specifikationen",
         NoticesKey::LabelIdsBeyond32Bits => "Etikett-id över 32 bitar delar färg med mindre id",
         NoticesKey::OmeMetadataNonConformingDetail => {

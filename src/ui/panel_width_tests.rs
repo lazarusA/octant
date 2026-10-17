@@ -93,7 +93,7 @@ pub(super) fn area_width(
                 shapes = h.settle(SETTLE, run);
             }
         }
-        h.area(Id::new(id)).width()
+        h.area(Id::unique(id)).width()
     })
 }
 

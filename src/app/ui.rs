@@ -139,7 +139,7 @@ impl eframe::App for OctantApp {
         }
 
         // Process in-flight export / screenshot requests
-        self.process_pending_export(&ctx);
+        self.process_pending_export();
 
         // Global Drag-and-Drop handler for files and directories
         let dropped_file = ctx.input(|i| i.raw.dropped_files.first().cloned());

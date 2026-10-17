@@ -35,7 +35,7 @@ mod tests {
     #[test]
     fn values_are_made_once_per_key() {
         let ctx = egui::Context::default();
-        let id = egui::Id::new("temp_cache_test");
+        let id = egui::Id::unique("temp_cache_test");
         let mut made = 0;
         let mut get = |key: u32| {
             cached(&ctx, id, key, || {
