@@ -14,10 +14,10 @@ crate::i18n::keys::define_keys! {
     QuickSave,
     ExportDialog,
     ToggleCrop,
-    ToggleDataset,
-    ToggleVariables,
-    ToggleDimensions,
-    ToggleSettings,
+    GoToDataset,
+    GoToVariables,
+    GoToDimensions,
+    GoToSettings,
     SearchVariables,
     ClosePanel,
     NextRegion,
@@ -42,5 +42,6 @@ crate::i18n::keys::define_keys! {
     ScopeHero,
     PlotTypePicker,
     PlotStaged,
+    GoToColorbar,
     }
 }

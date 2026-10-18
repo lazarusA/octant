@@ -14,10 +14,10 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::QuickSave => "図を保存",
         KeymapKey::ExportDialog => "設定を選んで図を書き出す",
         KeymapKey::ToggleCrop => "切り抜き枠の表示切り替え",
-        KeymapKey::ToggleDataset => "データセットパネルの表示切り替え",
-        KeymapKey::ToggleVariables => "変数パネルの表示切り替え",
-        KeymapKey::ToggleDimensions => "次元パネルの表示切り替え",
-        KeymapKey::ToggleSettings => "設定パネルの表示切り替え",
+        KeymapKey::GoToDataset => "データセットパネルへ移動",
+        KeymapKey::GoToVariables => "変数パネルへ移動",
+        KeymapKey::GoToDimensions => "次元パネルへ移動",
+        KeymapKey::GoToSettings => "設定パネルへ移動",
         KeymapKey::SearchVariables => "変数を検索",
         KeymapKey::ClosePanel => "パネルを閉じる",
         KeymapKey::NextRegion => "次の領域へ移動",
@@ -42,5 +42,6 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "スタート画面で",
         KeymapKey::PlotTypePicker => "プロットの種類を選ぶ",
         KeymapKey::PlotStaged => "選んだ変数をプロット",
+        KeymapKey::GoToColorbar => "次のカラーバーへ移動",
     })
 }

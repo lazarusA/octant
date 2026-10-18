@@ -104,7 +104,7 @@ fn show_panel(
                 search.request_focus();
             }
             if let Some(header) = &mut header {
-                header.entry = Some(search.id);
+                header.entry = Some(search.id.into());
             }
             let jump = search_jump(ui, &search);
             let max_height = list_height

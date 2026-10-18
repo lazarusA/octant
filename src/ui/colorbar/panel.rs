@@ -34,7 +34,7 @@ pub fn show(app: &mut OctantApp, ctx: &egui::Context, id: LayerId, canvas: Rect)
     let bar_len = layout::bar_length(orientation, width, canvas);
 
     let frame = panel_frame(ctx, app.layout.colorbar_transparency);
-    let shown = egui::Area::new(egui::Id::unique(super::salt("octant_colorbar_overlay", id)))
+    let shown = egui::Area::new(super::area_id(id))
         .order(egui::Order::Middle)
         .pivot(pivot)
         .fixed_pos(point)

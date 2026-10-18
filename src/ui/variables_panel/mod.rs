@@ -18,6 +18,8 @@ use crate::app::layers::LevelChoice;
 use crate::i18n::{VariablesKey, fill, tr};
 use crate::ui::flow_row;
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt, icon_button_width};
+use crate::ui::keyboard::keymap::{self, Action};
+use crate::ui::keyboard::labels;
 use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
 
@@ -66,10 +68,14 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> PanelHeader {
         ui.label(tr(VariablesKey::NoVariableSelected));
         return PanelHeader::default();
     };
-    let header = header_row(ui, &var_info);
+    let mut header = header_row(ui, &var_info);
     level_note(app, ui, &var_info);
-    if plot_row(app, ui) {
-        app.plot_from_panel();
+    // Keyboard focus enters the panel at Plot Data.
+    if let Some(plot) = plot_row(app, ui) {
+        header.entry = Some(plot.id.into());
+        if plot.clicked() {
+            app.plot_from_panel();
+        }
     }
 
     ui.add_space(4.0);
@@ -144,8 +150,9 @@ fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> PanelH
 /// (highlighted while on; disabled with the reason while the staged variable
 /// can't be overlaid), then "Plot Data", which adds the variable as an
 /// overlay while the toggle is on; stacked, Plot Data below, when the two
-/// don't fit side by side. Whether Plot Data was clicked.
-fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
+/// don't fit side by side. Plot Data's response, its tooltip naming its
+/// shortcut.
+fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> Option<egui::Response> {
     let unavailable = app.overlay_unavailable_for(app.selected.variable_idx);
     if unavailable.is_some() {
         app.layout.plot_as_overlay = false;
@@ -161,7 +168,7 @@ fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
     let widths = flow_row::cached_widths(ui, "plot_row", (plot_text, overlay_text), |ui| {
         [icon_button_width(ui, plot_text), toggle(false).width(ui)]
     });
-    let mut plot = false;
+    let mut plot = None;
     flow_row::right_aligned(ui, &widths, |ui, item| {
         if item == 0 {
             let hover = if app.layout.plot_as_overlay {
@@ -169,10 +176,9 @@ fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
             } else {
                 tr(VariablesKey::PlotDataHover)
             };
-            plot = ui
-                .outlined_icon_button(plot_icon, plot_text, IconTone::Default)
-                .on_hover_text(hover)
-                .clicked();
+            let keys = keymap::shortcut_of(Action::PlotStaged);
+            let button = ui.outlined_icon_button(plot_icon, plot_text, IconTone::Default);
+            plot = Some(button.on_hover_ui(|ui| labels::tooltip(ui, hover, keys)));
             return;
         }
         let response = ui.add_enabled(unavailable.is_none(), toggle(app.layout.plot_as_overlay));

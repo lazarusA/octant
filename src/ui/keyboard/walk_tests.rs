@@ -13,11 +13,11 @@ use crate::ui::panel_width_tests::plotted;
 use crate::ui::test_input::Harness;
 use egui::{Id, Key, Modifiers, Rect, Ui, pos2};
 
-const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1600.0, 1000.0));
+pub(super) const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1600.0, 1000.0));
 
 /// One frame drawn in the app's order, with a stand-in for the canvas
 /// (painting it needs a GPU).
-fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
+pub(super) fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
     |ui| {
         let ctx = ui.ctx().clone();
         dispatch(app, &ctx, true);
@@ -37,7 +37,7 @@ fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
 }
 
 /// A plotted heatmap of `t2m`, animated along its time steps.
-fn app(panels_open: bool) -> OctantApp {
+pub(super) fn app(panels_open: bool) -> OctantApp {
     let mut app = plotted(PlotType::Heatmap);
     for panel in Panel::ALL {
         *app.layout.panel_shown_mut(panel) = panels_open;

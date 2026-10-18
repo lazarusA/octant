@@ -14,10 +14,10 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::QuickSave => "Spara figuren",
         KeymapKey::ExportDialog => "Exportera figuren med inställningar",
         KeymapKey::ToggleCrop => "Visa/dölj beskärningen",
-        KeymapKey::ToggleDataset => "Visa/dölj datasetpanelen",
-        KeymapKey::ToggleVariables => "Visa/dölj variabelpanelen",
-        KeymapKey::ToggleDimensions => "Visa/dölj dimensionspanelen",
-        KeymapKey::ToggleSettings => "Visa/dölj inställningar",
+        KeymapKey::GoToDataset => "Gå till datasetpanelen",
+        KeymapKey::GoToVariables => "Gå till variabelpanelen",
+        KeymapKey::GoToDimensions => "Gå till dimensionspanelen",
+        KeymapKey::GoToSettings => "Gå till inställningar",
         KeymapKey::SearchVariables => "Sök variabler",
         KeymapKey::ClosePanel => "Stäng panelen",
         KeymapKey::NextRegion => "Gå till nästa område",
@@ -46,5 +46,6 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "På startskärmen",
         KeymapKey::PlotTypePicker => "Välj diagramtyp",
         KeymapKey::PlotStaged => "Rita den valda variabeln",
+        KeymapKey::GoToColorbar => "Gå till nästa färgskala",
     })
 }

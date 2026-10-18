@@ -25,10 +25,9 @@ impl Gate {
         let focused = ctx.memory(|m| m.focused());
         let panel = focus::escaped_layer(ctx)
             .and_then(|layer| Panel::ALL.into_iter().find(|p| p.area_id() == layer.id));
-        let free = focused.is_none_or(|id| id == crate::app::canvas::canvas_id())
-            && !egui::Popup::is_any_open(ctx)
-            && !modal_open(app);
-        let canvas = free && plot_shown;
+        let free = !ctx.text_edit_focused() && !egui::Popup::is_any_open(ctx) && !modal_open(app);
+        let idle = focused.is_none_or(|id| id == crate::app::canvas::canvas_id());
+        let canvas = free && idle && plot_shown;
         // The landing screen's own widgets (the URL field) let Escape go;
         // its sample chips keep it, and so keep focus.
         let hero = app.layout.show_hero
@@ -89,7 +88,12 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
         Action::QuickSave => app.quick_save_canvas(),
         Action::ExportDialog => app.show_export_modal = true,
         Action::ToggleCrop => app.show_crop_overlay = !app.show_crop_overlay,
-        Action::TogglePanel(panel) => app.toggle_panel(ctx, panel),
+        Action::GoToPanel(panel) => app.go_to_panel(ctx, panel),
+        Action::GoToColorbar => {
+            if !app.hero_shown() {
+                crate::ui::colorbar::focus_next(app, ctx);
+            }
+        }
         Action::SearchVariables => {
             app.set_panel_open(ctx, Panel::Variables, true);
             crate::ui::variables_overlay::focus_search(ctx);

@@ -45,26 +45,6 @@ const CMD_SHIFT: Modifiers = Modifiers::COMMAND.plus(Modifiers::SHIFT);
 pub const TABLE: &[Shortcut] = &[
     global(Action::QuickSave, Key::S, Modifiers::COMMAND),
     global(Action::ExportDialog, Key::S, CMD_SHIFT),
-    global(
-        Action::TogglePanel(Panel::Dataset),
-        Key::Num1,
-        Modifiers::COMMAND,
-    ),
-    global(
-        Action::TogglePanel(Panel::Variables),
-        Key::Num2,
-        Modifiers::COMMAND,
-    ),
-    global(
-        Action::TogglePanel(Panel::Dimensions),
-        Key::Num3,
-        Modifiers::COMMAND,
-    ),
-    global(
-        Action::TogglePanel(Panel::Settings),
-        Key::Num4,
-        Modifiers::COMMAND,
-    ),
     global(Action::SearchVariables, Key::K, Modifiers::COMMAND),
     global(Action::PlotStaged, Key::Enter, Modifiers::COMMAND),
     Shortcut {
@@ -108,6 +88,11 @@ pub const TABLE: &[Shortcut] = &[
     free(Action::ShowShortcuts, Key::Questionmark),
     free(Action::ToggleHero, Key::H),
     free(Action::PlotTypePicker, Key::P),
+    free(Action::GoToPanel(Panel::Dataset), Key::D),
+    free(Action::GoToPanel(Panel::Variables), Key::V),
+    free(Action::GoToPanel(Panel::Dimensions), Key::A),
+    free(Action::GoToPanel(Panel::Settings), Key::S),
+    free(Action::GoToColorbar, Key::B),
     Shortcut {
         action: Action::LeaveHero,
         keys: Keys::One(Key::Escape),

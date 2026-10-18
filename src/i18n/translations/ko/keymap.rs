@@ -14,10 +14,10 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::QuickSave => "그림 저장",
         KeymapKey::ExportDialog => "설정을 골라 그림 내보내기",
         KeymapKey::ToggleCrop => "자르기 상자 표시/숨기기",
-        KeymapKey::ToggleDataset => "데이터셋 패널 표시/숨기기",
-        KeymapKey::ToggleVariables => "변수 패널 표시/숨기기",
-        KeymapKey::ToggleDimensions => "차원 패널 표시/숨기기",
-        KeymapKey::ToggleSettings => "설정 패널 표시/숨기기",
+        KeymapKey::GoToDataset => "데이터셋 패널로 이동",
+        KeymapKey::GoToVariables => "변수 패널로 이동",
+        KeymapKey::GoToDimensions => "차원 패널로 이동",
+        KeymapKey::GoToSettings => "설정 패널로 이동",
         KeymapKey::SearchVariables => "변수 검색",
         KeymapKey::ClosePanel => "패널 닫기",
         KeymapKey::NextRegion => "다음 영역으로 이동",
@@ -42,5 +42,6 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "시작 화면에서",
         KeymapKey::PlotTypePicker => "플롯 종류 선택",
         KeymapKey::PlotStaged => "선택한 변수 플롯",
+        KeymapKey::GoToColorbar => "다음 컬러바로 이동",
     })
 }

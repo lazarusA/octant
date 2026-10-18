@@ -8,6 +8,8 @@
 mod bindings;
 pub mod dispatch;
 pub mod focus;
+#[cfg(test)]
+mod goto_tests;
 pub mod help;
 #[cfg(test)]
 mod help_tests;

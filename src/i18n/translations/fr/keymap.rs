@@ -14,10 +14,10 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::QuickSave => "Enregistrer la figure",
         KeymapKey::ExportDialog => "Exporter la figure avec réglages",
         KeymapKey::ToggleCrop => "Afficher ou masquer le recadrage",
-        KeymapKey::ToggleDataset => "Afficher ou masquer le panneau Jeu de données",
-        KeymapKey::ToggleVariables => "Afficher ou masquer le panneau Variables",
-        KeymapKey::ToggleDimensions => "Afficher ou masquer le panneau Dimensions",
-        KeymapKey::ToggleSettings => "Afficher ou masquer les paramètres",
+        KeymapKey::GoToDataset => "Aller au panneau Jeu de données",
+        KeymapKey::GoToVariables => "Aller au panneau Variables",
+        KeymapKey::GoToDimensions => "Aller au panneau Dimensions",
+        KeymapKey::GoToSettings => "Aller aux paramètres",
         KeymapKey::SearchVariables => "Rechercher des variables",
         KeymapKey::ClosePanel => "Fermer le panneau",
         KeymapKey::NextRegion => "Aller à la zone suivante",
@@ -46,5 +46,6 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "Sur l'écran d'accueil",
         KeymapKey::PlotTypePicker => "Choisir le type de graphique",
         KeymapKey::PlotStaged => "Tracer la variable sélectionnée",
+        KeymapKey::GoToColorbar => "Aller à la barre de couleurs suivante",
     })
 }

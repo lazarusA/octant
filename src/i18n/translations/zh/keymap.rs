@@ -14,10 +14,10 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::QuickSave => "保存图像",
         KeymapKey::ExportDialog => "按设置导出图像",
         KeymapKey::ToggleCrop => "显示/隐藏裁剪框",
-        KeymapKey::ToggleDataset => "显示/隐藏数据集面板",
-        KeymapKey::ToggleVariables => "显示/隐藏变量面板",
-        KeymapKey::ToggleDimensions => "显示/隐藏维度面板",
-        KeymapKey::ToggleSettings => "显示/隐藏设置面板",
+        KeymapKey::GoToDataset => "转到数据集面板",
+        KeymapKey::GoToVariables => "转到变量面板",
+        KeymapKey::GoToDimensions => "转到维度面板",
+        KeymapKey::GoToSettings => "转到设置面板",
         KeymapKey::SearchVariables => "搜索变量",
         KeymapKey::ClosePanel => "关闭面板",
         KeymapKey::NextRegion => "移到下一个区域",
@@ -42,5 +42,6 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "在起始页",
         KeymapKey::PlotTypePicker => "选择绘图类型",
         KeymapKey::PlotStaged => "绘制所选变量",
+        KeymapKey::GoToColorbar => "转到下一个色标",
     })
 }

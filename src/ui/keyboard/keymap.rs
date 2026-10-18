@@ -12,7 +12,11 @@ pub enum Action {
     QuickSave,
     ExportDialog,
     ToggleCrop,
-    TogglePanel(Panel),
+    /// Opens a panel and moves focus into it; moves focus into it when it
+    /// is open; closes it when focus is already inside.
+    GoToPanel(Panel),
+    /// Moves focus to the next colorbar's bar.
+    GoToColorbar,
     SearchVariables,
     /// Closes the panel keyboard focus was in.
     ClosePanel,
@@ -61,13 +65,15 @@ pub enum Scope {
     /// Escape in a floating panel, once the widget focused there let it go
     /// and no popup took it (`focus::escaped_layer`).
     Panel,
-    /// Single keys while nothing or the canvas holds focus and no popup or
-    /// modal window is open.
+    /// Single keys while no text field takes the keys and no popup or
+    /// modal window is open, wherever focus is.
     Free,
     /// Escape on the landing screen while a plot waits behind it, once no
     /// widget kept Escape for itself.
     Hero,
-    /// [`Scope::Free`] keys on a shown plot.
+    /// Single keys on a shown plot while nothing or the canvas holds focus
+    /// (a focused widget may read arrows, Space or Enter itself) and no popup
+    /// or modal window is open.
     Canvas,
     /// Canvas keys of a plot with an animated dimension.
     Playback,

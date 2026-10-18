@@ -95,9 +95,16 @@ fn show_input_bar(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
     }
 }
 
+/// The source field's id: where keyboard focus enters the Dataset panel.
+pub fn source_field_id() -> egui::Id {
+    egui::Id::unique("dataset_source_field")
+}
+
 /// The source field, `width` wide; whether Enter submitted it.
 fn source_field(ui: &mut egui::Ui, target: &mut String, width: f32) -> bool {
-    let edit = egui::TextEdit::singleline(target).hint_text(tr(DatasetKey::TargetPathHint));
+    let edit = egui::TextEdit::singleline(target)
+        .id(source_field_id())
+        .hint_text(tr(DatasetKey::TargetPathHint));
     let response = ui.add_sized([width, 22.0], edit);
     response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))
 }

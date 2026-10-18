@@ -14,10 +14,10 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::QuickSave => "Abbildung speichern",
         KeymapKey::ExportDialog => "Abbildung mit Einstellungen exportieren",
         KeymapKey::ToggleCrop => "Zuschnitt ein-/ausblenden",
-        KeymapKey::ToggleDataset => "Datensatz-Bedienfeld ein-/ausblenden",
-        KeymapKey::ToggleVariables => "Variablen-Bedienfeld ein-/ausblenden",
-        KeymapKey::ToggleDimensions => "Dimensionen-Bedienfeld ein-/ausblenden",
-        KeymapKey::ToggleSettings => "Einstellungen ein-/ausblenden",
+        KeymapKey::GoToDataset => "Zum Datensatz-Bedienfeld",
+        KeymapKey::GoToVariables => "Zum Variablen-Bedienfeld",
+        KeymapKey::GoToDimensions => "Zum Dimensionen-Bedienfeld",
+        KeymapKey::GoToSettings => "Zu den Einstellungen",
         KeymapKey::SearchVariables => "Variablen suchen",
         KeymapKey::ClosePanel => "Bedienfeld schließen",
         KeymapKey::NextRegion => "Zum nächsten Bereich",
@@ -44,5 +44,6 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "Auf der Startseite",
         KeymapKey::PlotTypePicker => "Darstellungsart wählen",
         KeymapKey::PlotStaged => "Gewählte Variable darstellen",
+        KeymapKey::GoToColorbar => "Zur nächsten Farbskala",
     })
 }

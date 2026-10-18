@@ -48,6 +48,20 @@ impl OctantApp {
         self.layout.show_hero = !self.layout.show_hero;
     }
 
+    /// Takes keyboard focus to `panel`: opens it (focus entering it), moves
+    /// focus into it when it is open, and closes it when focus already is.
+    pub fn go_to_panel(&mut self, ctx: &egui::Context, panel: Panel) {
+        if !self.layout.panel_shown(panel) {
+            return self.set_panel_open(ctx, panel, true);
+        }
+        let layer = egui::LayerId::new(egui::Order::Foreground, panel.area_id());
+        if focus::in_layer(ctx, layer) {
+            return self.set_panel_open(ctx, panel, false);
+        }
+        windows::remember_opener(ctx, panel.area_id());
+        regions::enter(ctx, Region::of(panel));
+    }
+
     pub fn toggle_panel(&mut self, ctx: &egui::Context, panel: Panel) {
         let open = !self.layout.panel_shown(panel);
         self.set_panel_open(ctx, panel, open);

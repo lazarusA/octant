@@ -14,10 +14,10 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::QuickSave => "Salvar a figura",
         KeymapKey::ExportDialog => "Exportar a figura com configurações",
         KeymapKey::ToggleCrop => "Mostrar ou ocultar o recorte",
-        KeymapKey::ToggleDataset => "Mostrar ou ocultar o painel Conjunto de dados",
-        KeymapKey::ToggleVariables => "Mostrar ou ocultar o painel Variáveis",
-        KeymapKey::ToggleDimensions => "Mostrar ou ocultar o painel Dimensões",
-        KeymapKey::ToggleSettings => "Mostrar ou ocultar as configurações",
+        KeymapKey::GoToDataset => "Ir para o painel Conjunto de dados",
+        KeymapKey::GoToVariables => "Ir para o painel Variáveis",
+        KeymapKey::GoToDimensions => "Ir para o painel Dimensões",
+        KeymapKey::GoToSettings => "Ir para as configurações",
         KeymapKey::SearchVariables => "Pesquisar variáveis",
         KeymapKey::ClosePanel => "Fechar o painel",
         KeymapKey::NextRegion => "Ir para a próxima área",
@@ -42,5 +42,6 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "Na tela inicial",
         KeymapKey::PlotTypePicker => "Escolher o tipo de gráfico",
         KeymapKey::PlotStaged => "Plotar a variável selecionada",
+        KeymapKey::GoToColorbar => "Ir para a próxima barra de cores",
     })
 }

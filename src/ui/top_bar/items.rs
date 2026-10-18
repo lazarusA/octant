@@ -159,7 +159,7 @@ fn panel_button(
     let mut btn = ToolbarButton::new(icon, label(item, app))
         .compact(compact)
         .active(app.layout.panel_shown(panel))
-        .shortcut(Action::TogglePanel(panel));
+        .shortcut(Action::GoToPanel(panel));
     if panel == Panel::Dimensions {
         btn = btn.hover(tr(CommonKey::ToggleVariableControlsHover));
     }

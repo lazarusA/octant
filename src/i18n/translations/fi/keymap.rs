@@ -14,10 +14,10 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::QuickSave => "Tallenna kuva",
         KeymapKey::ExportDialog => "Vie kuva asetuksineen",
         KeymapKey::ToggleCrop => "Näytä/piilota rajaus",
-        KeymapKey::ToggleDataset => "Näytä/piilota aineistopaneeli",
-        KeymapKey::ToggleVariables => "Näytä/piilota muuttujapaneeli",
-        KeymapKey::ToggleDimensions => "Näytä/piilota ulottuvuuspaneeli",
-        KeymapKey::ToggleSettings => "Näytä/piilota asetukset",
+        KeymapKey::GoToDataset => "Siirry aineistopaneeliin",
+        KeymapKey::GoToVariables => "Siirry muuttujapaneeliin",
+        KeymapKey::GoToDimensions => "Siirry ulottuvuuspaneeliin",
+        KeymapKey::GoToSettings => "Siirry asetuksiin",
         KeymapKey::SearchVariables => "Hae muuttujia",
         KeymapKey::ClosePanel => "Sulje paneeli",
         KeymapKey::NextRegion => "Siirry seuraavaan alueeseen",
@@ -42,5 +42,6 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "Aloitusnäkymässä",
         KeymapKey::PlotTypePicker => "Valitse kuvaajan tyyppi",
         KeymapKey::PlotStaged => "Piirrä valittu muuttuja",
+        KeymapKey::GoToColorbar => "Siirry seuraavaan väriasteikkoon",
     })
 }

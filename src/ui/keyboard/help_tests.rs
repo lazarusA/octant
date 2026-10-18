@@ -37,9 +37,9 @@ fn keys_read_with_each_platforms_modifier_names() {
         let shortcut = shortcut_of(action).expect("bound");
         write_keys(&mut buf, shortcut, mac).to_owned()
     };
-    let dataset = Action::TogglePanel(Panel::Dataset);
-    assert_eq!(keys(dataset, true), "Cmd+1");
-    assert_eq!(keys(dataset, false), "Ctrl+1");
+    assert_eq!(keys(Action::SearchVariables, true), "Cmd+K");
+    assert_eq!(keys(Action::SearchVariables, false), "Ctrl+K");
+    assert_eq!(keys(Action::GoToPanel(Panel::Dataset), false), "D");
     assert_eq!(keys(Action::ExportDialog, false), "Ctrl+Shift+S");
     assert_eq!(keys(Action::Canvas(CanvasAction::ZoomIn), false), "+ / =");
     with_language(Language::English, || {

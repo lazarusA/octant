@@ -79,7 +79,7 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Opt
                 tr(CommonKey::Settings),
                 tr(K::CloseSettingsHover),
             );
-            header = Some(title);
+            header = Some(title.entering_body());
         })
         .body(|ui| {
             // Scroll the body rather than run past the canvas bottom.

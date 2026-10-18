@@ -14,10 +14,10 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::QuickSave => "Зберегти рисунок",
         KeymapKey::ExportDialog => "Експортувати рисунок із налаштуваннями",
         KeymapKey::ToggleCrop => "Показати/сховати рамку обрізання",
-        KeymapKey::ToggleDataset => "Показати/сховати панель набору даних",
-        KeymapKey::ToggleVariables => "Показати/сховати панель змінних",
-        KeymapKey::ToggleDimensions => "Показати/сховати панель вимірів",
-        KeymapKey::ToggleSettings => "Показати/сховати налаштування",
+        KeymapKey::GoToDataset => "Перейти до панелі набору даних",
+        KeymapKey::GoToVariables => "Перейти до панелі змінних",
+        KeymapKey::GoToDimensions => "Перейти до панелі вимірів",
+        KeymapKey::GoToSettings => "Перейти до налаштувань",
         KeymapKey::SearchVariables => "Шукати змінні",
         KeymapKey::ClosePanel => "Закрити панель",
         KeymapKey::NextRegion => "Перейти до наступної області",
@@ -44,5 +44,6 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "На початковому екрані",
         KeymapKey::PlotTypePicker => "Вибрати тип графіка",
         KeymapKey::PlotStaged => "Побудувати вибрану змінну",
+        KeymapKey::GoToColorbar => "Перейти до наступної кольорової шкали",
     })
 }

@@ -1,5 +1,5 @@
 //! How shortcuts read: what each does and where it works, translated, and
-//! its keys (`Cmd+1`, `Ctrl+1`, `Shift+Arrows`) written into a stack
+//! its keys (`Cmd+K`, `Ctrl+K`, `Shift+Arrows`) written into a stack
 //! buffer. Key and modifier names stay English, as printed on keyboards.
 
 use super::keymap::{Action, CanvasAction, Keys, Scope, Shortcut};
@@ -17,10 +17,11 @@ pub fn describe(action: Action) -> K {
         Action::QuickSave => K::QuickSave,
         Action::ExportDialog => K::ExportDialog,
         Action::ToggleCrop => K::ToggleCrop,
-        Action::TogglePanel(Panel::Dataset) => K::ToggleDataset,
-        Action::TogglePanel(Panel::Variables) => K::ToggleVariables,
-        Action::TogglePanel(Panel::Dimensions) => K::ToggleDimensions,
-        Action::TogglePanel(Panel::Settings) => K::ToggleSettings,
+        Action::GoToPanel(Panel::Dataset) => K::GoToDataset,
+        Action::GoToPanel(Panel::Variables) => K::GoToVariables,
+        Action::GoToPanel(Panel::Dimensions) => K::GoToDimensions,
+        Action::GoToPanel(Panel::Settings) => K::GoToSettings,
+        Action::GoToColorbar => K::GoToColorbar,
         Action::SearchVariables => K::SearchVariables,
         Action::ClosePanel => K::ClosePanel,
         Action::NextRegion => K::NextRegion,

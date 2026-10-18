@@ -14,10 +14,10 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::QuickSave => "Simpan gambar",
         KeymapKey::ExportDialog => "Ekspor gambar dengan pengaturan",
         KeymapKey::ToggleCrop => "Tampilkan/sembunyikan kotak potong",
-        KeymapKey::ToggleDataset => "Tampilkan/sembunyikan panel Dataset",
-        KeymapKey::ToggleVariables => "Tampilkan/sembunyikan panel Variabel",
-        KeymapKey::ToggleDimensions => "Tampilkan/sembunyikan panel Dimensi",
-        KeymapKey::ToggleSettings => "Tampilkan/sembunyikan Pengaturan",
+        KeymapKey::GoToDataset => "Ke panel Dataset",
+        KeymapKey::GoToVariables => "Ke panel Variabel",
+        KeymapKey::GoToDimensions => "Ke panel Dimensi",
+        KeymapKey::GoToSettings => "Ke Pengaturan",
         KeymapKey::SearchVariables => "Cari variabel",
         KeymapKey::ClosePanel => "Tutup panel",
         KeymapKey::NextRegion => "Pindah ke area berikutnya",
@@ -42,5 +42,6 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "Di layar awal",
         KeymapKey::PlotTypePicker => "Pilih jenis plot",
         KeymapKey::PlotStaged => "Plot variabel yang dipilih",
+        KeymapKey::GoToColorbar => "Ke bilah warna berikutnya",
     })
 }

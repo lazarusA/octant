@@ -21,6 +21,33 @@ pub enum Region {
     BottomBar,
 }
 
+/// Where keyboard focus enters a region.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Entry {
+    At(Id),
+    /// The widget drawn right after this one, as Tab from it would reach:
+    /// a panel's first control, whatever its body shows.
+    After(Id),
+}
+
+impl From<Id> for Entry {
+    fn from(id: Id) -> Self {
+        Entry::At(id)
+    }
+}
+
+impl Entry {
+    fn focus(self, ctx: &Context) {
+        match self {
+            Entry::At(id) => focus::request(ctx, id),
+            Entry::After(id) => {
+                focus::request(ctx, id);
+                focus::advance_next_frame(ctx);
+            }
+        }
+    }
+}
+
 /// Regions, in the order the variants are declared: visual order.
 const COUNT: usize = 8;
 
@@ -42,7 +69,7 @@ const PARTS: usize = 5;
 /// A region as drawn: where focus enters it, and the areas it covers.
 #[derive(Clone, Copy, Default)]
 struct Slot {
-    entry: Option<Id>,
+    entry: Option<Entry>,
     parts: [Option<(LayerId, Rect)>; PARTS],
 }
 
@@ -93,7 +120,14 @@ pub fn enter_when_drawn(ctx: &Context, region: Region) {
 
 /// Records that `region` drew over `area` of `layer` this frame; its first
 /// registered `entry` is where focus enters it.
-pub fn register(ctx: &Context, region: Region, entry: Id, layer: LayerId, area: Rect) {
+pub fn register(
+    ctx: &Context,
+    region: Region,
+    entry: impl Into<Entry>,
+    layer: LayerId,
+    area: Rect,
+) {
+    let entry = entry.into();
     let enter = ctx.data_mut(|d| {
         let regions = d.get_temp_mut_or_default::<Regions>(regions_id());
         let slot = &mut regions.drawing[region as usize];
@@ -108,7 +142,7 @@ pub fn register(ctx: &Context, region: Region, entry: Id, layer: LayerId, area: 
         enter
     });
     if enter {
-        focus::request(ctx, entry);
+        entry.focus(ctx);
     }
 }
 
@@ -133,14 +167,14 @@ pub fn cycle(ctx: &Context, forward: bool) {
         (false, None) => COUNT - k,
     };
     let target = (1..=COUNT).map(nth).find_map(|i| slots[i].entry);
-    if let Some(id) = target {
-        focus::request(ctx, id);
+    if let Some(entry) = target {
+        entry.focus(ctx);
     }
 }
 
 /// Focuses `region`'s entry, when it was drawn last frame.
 pub fn enter(ctx: &Context, region: Region) {
-    if let Some(id) = drawn(ctx)[region as usize].entry {
-        focus::request(ctx, id);
+    if let Some(entry) = drawn(ctx)[region as usize].entry {
+        entry.focus(ctx);
     }
 }

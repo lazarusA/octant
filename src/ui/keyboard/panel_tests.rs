@@ -34,14 +34,17 @@ fn a_shortcut_opens_a_panel_and_escape_closes_it() {
     let mut app = OctantApp::default();
     let mut h = Harness::new(SCREEN);
     h.settle(2, &mut run(&mut app));
-    press(&mut h, &mut app, Key::Num4, Modifiers::COMMAND);
+    press(&mut h, &mut app, Key::S, Modifiers::NONE);
     assert!(app.layout.show_settings_panel);
     assert!(focus_in_settings(&h), "focus enters the opened panel");
     press(&mut h, &mut app, Key::Escape, Modifiers::NONE);
     assert!(!app.layout.show_settings_panel);
-    press(&mut h, &mut app, Key::Num4, Modifiers::COMMAND);
-    press(&mut h, &mut app, Key::Num4, Modifiers::COMMAND);
-    assert!(!app.layout.show_settings_panel, "the shortcut toggles");
+    press(&mut h, &mut app, Key::S, Modifiers::NONE);
+    press(&mut h, &mut app, Key::S, Modifiers::NONE);
+    assert!(
+        !app.layout.show_settings_panel,
+        "from inside, the key closes it"
+    );
 }
 
 #[test]
@@ -68,7 +71,9 @@ fn a_focused_grip_moves_its_panel_and_enter_docks_it() {
     let mut app = OctantApp::default();
     let mut h = Harness::new(SCREEN);
     h.settle(2, &mut run(&mut app));
-    press(&mut h, &mut app, Key::Num4, Modifiers::COMMAND);
+    press(&mut h, &mut app, Key::S, Modifiers::NONE);
+    // Focus enters at the first setting; the grip is just before it.
+    press(&mut h, &mut app, Key::Tab, Modifiers::SHIFT);
     let docked = h.area(Panel::Settings.area_id()).min;
     press(&mut h, &mut app, Key::ArrowRight, Modifiers::NONE);
     press(&mut h, &mut app, Key::ArrowDown, Modifiers::NONE);

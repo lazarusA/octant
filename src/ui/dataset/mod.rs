@@ -70,6 +70,10 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui, canvas: egui::Rect) -> Opt
                 .id_salt("dataset_panel_scroll")
                 .max_height(max_height)
                 .show(ui, |ui| show_dataset_body(app, ui));
+            // Keyboard focus enters at the source field.
+            if let Some(header) = &mut header {
+                header.entry = Some(intake::source_field_id().into());
+            }
         });
     header
 }

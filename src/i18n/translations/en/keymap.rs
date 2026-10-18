@@ -14,10 +14,10 @@ pub fn text(key: KeymapKey) -> &'static str {
         KeymapKey::QuickSave => "Save the figure",
         KeymapKey::ExportDialog => "Export the figure with settings",
         KeymapKey::ToggleCrop => "Show or hide the crop box",
-        KeymapKey::ToggleDataset => "Show or hide the Dataset panel",
-        KeymapKey::ToggleVariables => "Show or hide the Variables panel",
-        KeymapKey::ToggleDimensions => "Show or hide the Dimensions panel",
-        KeymapKey::ToggleSettings => "Show or hide the Settings panel",
+        KeymapKey::GoToDataset => "Go to the Dataset panel",
+        KeymapKey::GoToVariables => "Go to the Variables panel",
+        KeymapKey::GoToDimensions => "Go to the Dimensions panel",
+        KeymapKey::GoToSettings => "Go to the Settings panel",
         KeymapKey::SearchVariables => "Search variables",
         KeymapKey::ClosePanel => "Close the panel",
         KeymapKey::NextRegion => "Move to the next area",
@@ -42,5 +42,6 @@ pub fn text(key: KeymapKey) -> &'static str {
         KeymapKey::ScopeHero => "On the landing screen",
         KeymapKey::PlotTypePicker => "Choose the plot type",
         KeymapKey::PlotStaged => "Plot the selected variable",
+        KeymapKey::GoToColorbar => "Go to the next colorbar",
     }
 }
