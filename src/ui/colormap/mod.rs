@@ -17,7 +17,7 @@ use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::UiIconExt;
-use crate::ui::keyboard::focus;
+use crate::ui::keyboard::{focus, windows};
 use crate::utils::colormap::registry;
 
 /// Persistent (per-session) picker UI state.
@@ -58,7 +58,7 @@ pub fn show_picker_popup(app: &mut OctantApp, anchor: &egui::Response, id: Layer
     }
     // Focus returns to the bar once the picker closes.
     let popup_id = egui::Popup::default_response_id(anchor);
-    focus::follow_window(
+    windows::follow_window(
         &anchor.ctx,
         popup_id,
         egui::Popup::is_id_open(&anchor.ctx, popup_id),

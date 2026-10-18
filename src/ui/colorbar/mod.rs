@@ -14,6 +14,8 @@ mod controls;
 #[cfg(test)]
 mod controls_tests;
 pub mod handles;
+#[cfg(test)]
+mod keys_tests;
 mod layout;
 #[cfg(test)]
 mod layout_tests;

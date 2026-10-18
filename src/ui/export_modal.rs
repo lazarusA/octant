@@ -2,14 +2,14 @@ use crate::app::OctantApp;
 use crate::export::{ExportFormat, ExportTarget};
 use crate::i18n::{CommonKey, ExportKey, tr};
 use crate::ui::icons::{Icon, UiIconExt};
-use crate::ui::keyboard::focus;
+use crate::ui::keyboard::windows;
 use crate::ui::number_input::LocalizedInput;
 use std::path::PathBuf;
 
 /// Shows the floating modal dialog for saving and exporting the canvas/figure.
 pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
     let window_id = egui::Id::unique("export_modal_window");
-    let opened = focus::follow_window(ctx, window_id, app.show_export_modal);
+    let opened = windows::follow_window(ctx, window_id, app.show_export_modal);
     if !app.show_export_modal {
         return;
     }
@@ -24,7 +24,7 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
         .default_width(380.0)
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
-            focus::trap(ui, opened);
+            windows::trap(ui, opened);
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new(tr(ExportKey::DialogTitle)).strong());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

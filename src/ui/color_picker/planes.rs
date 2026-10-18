@@ -2,8 +2,8 @@
 //! dragged or clicked with the pointer, and moved with the arrow keys while
 //! focused (the plane in both directions, the strips left and right).
 
-use crate::ui::keyboard::{focus, keymap};
-use egui::{Color32, Key, Pos2, Rect, Response, Shape, Stroke, Ui, Vec2, ecolor::Hsva};
+use crate::ui::keyboard::focus;
+use egui::{Color32, Pos2, Rect, Response, Shape, Stroke, Ui, Vec2, ecolor::Hsva};
 
 /// How far one arrow press moves a value along its 0..1 range.
 const KEY_STEP: f32 = 0.01;
@@ -14,13 +14,7 @@ fn arrow(response: &Response) -> Option<Vec2> {
         return None;
     }
     focus::claim_arrows(&response.ctx, response.id);
-    let arrows = [
-        Key::ArrowLeft,
-        Key::ArrowRight,
-        Key::ArrowUp,
-        Key::ArrowDown,
-    ];
-    keymap::arrow_direction(focus::pressed(&response.ctx, arrows)?)
+    focus::pressed_arrow(&response.ctx)
 }
 
 /// Where the pointer drags or clicks `response`, as fractions of its rect.

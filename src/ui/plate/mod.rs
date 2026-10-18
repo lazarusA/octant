@@ -10,8 +10,7 @@ use fields::{acquisition_select, field_list};
 
 use crate::app::OctantApp;
 use crate::app::PlateState;
-use crate::ui::keyboard::{focus, keymap};
-use egui::Key;
+use crate::ui::keyboard::focus;
 
 /// Width of the row names column.
 const ROW_NAME_W: f32 = 18.0;
@@ -104,13 +103,7 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
         }
         response.on_hover_text(well.path.as_str());
     }
-    let arrows = [
-        Key::ArrowLeft,
-        Key::ArrowRight,
-        Key::ArrowUp,
-        Key::ArrowDown,
-    ];
-    let step = focus::pressed(ui.ctx(), arrows).and_then(keymap::arrow_direction);
+    let step = focus::pressed_arrow(ui.ctx());
     if let Some(next) = focused
         .zip(step)
         .and_then(|(at, d)| neighbor(layout, at, d))

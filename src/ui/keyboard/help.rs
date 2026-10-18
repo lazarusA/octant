@@ -2,9 +2,9 @@
 //! every shortcut of the keymap with what it does, grouped by where it
 //! works. A modal window; Escape or its close button closes it.
 
-use super::focus;
 use super::keymap::TABLE;
 use super::labels::{self, KeysBuf, SCOPES};
+use super::windows;
 use crate::app::OctantApp;
 use crate::i18n::{KeymapKey as K, tr};
 use crate::ui::icons::UiIconExt;
@@ -16,7 +16,7 @@ const KEYS_W: f32 = 130.0;
 
 pub fn show(app: &mut OctantApp, ctx: &egui::Context) {
     let id = egui::Id::unique("keyboard_shortcuts_window");
-    let opened = focus::follow_window(ctx, id, app.layout.show_shortcuts);
+    let opened = windows::follow_window(ctx, id, app.layout.show_shortcuts);
     if !app.layout.show_shortcuts {
         return;
     }
@@ -30,7 +30,7 @@ pub fn show(app: &mut OctantApp, ctx: &egui::Context) {
         .collapsible(false)
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(ctx, |ui| {
-            focus::trap(ui, opened);
+            windows::trap(ui, opened);
             ui.set_width(WIDTH);
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new(tr(K::Title)).strong());

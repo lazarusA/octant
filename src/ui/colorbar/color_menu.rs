@@ -9,7 +9,7 @@ use crate::app::OctantApp;
 use crate::app::layers::{BarOrientation, LayerId};
 use crate::i18n::{ColormapKey, SettingsKey as K, tr};
 use crate::ui::icons::{IconSize, ToolbarButton, UiIconExt};
-use crate::ui::keyboard::focus;
+use crate::ui::keyboard::{focus, windows};
 use crate::ui::panel_layout::{GAP, PANEL_W};
 use egui::{Align2, Rect, Vec2};
 
@@ -46,7 +46,7 @@ pub(super) fn show(
 ) {
     let open = is_open(ctx, id);
     // Focus returns to the cog once the window closes.
-    focus::follow_window(ctx, area_id(id), open);
+    windows::follow_window(ctx, area_id(id), open);
     if app.pending_export.is_some() || !open {
         return;
     }

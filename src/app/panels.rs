@@ -3,8 +3,8 @@
 //! and returns to what opened it when it closes.
 
 use super::OctantApp;
-use crate::ui::keyboard::focus;
 use crate::ui::keyboard::regions::{self, Region};
+use crate::ui::keyboard::{focus, windows};
 use crate::ui::panel_layout::Panel;
 
 impl OctantApp {
@@ -17,7 +17,7 @@ impl OctantApp {
         }
         *shown = open;
         if open {
-            focus::remember_opener(ctx, panel.area_id());
+            windows::remember_opener(ctx, panel.area_id());
             if focus::visible(ctx) {
                 regions::enter_when_drawn(ctx, Region::of(panel));
             }
@@ -27,7 +27,7 @@ impl OctantApp {
         if exploring && !self.layout.show_variables_overlay && !self.layout.show_variable_controls {
             self.revert_selected_state_to_plotted();
         }
-        focus::return_to_opener(ctx, panel.area_id());
+        windows::return_to_opener(ctx, panel.area_id());
     }
 
     pub fn toggle_panel(&mut self, ctx: &egui::Context, panel: Panel) {

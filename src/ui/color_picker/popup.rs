@@ -3,7 +3,7 @@
 use super::planes;
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::{Icon, UiIconExt};
-use crate::ui::keyboard::focus;
+use crate::ui::keyboard::windows;
 use crate::ui::number_input::LocalizedInput;
 use egui::{Color32, Pos2, Rect, Vec2, ecolor::Hsva};
 
@@ -27,7 +27,7 @@ pub(crate) fn show_clean_color_picker_popup(
         .data(|d| d.get_temp::<bool>(popup_open_id))
         .unwrap_or(false);
     // Focus returns to the swatch once the popup closes.
-    focus::follow_window(ui.ctx(), popup_area_id, is_open);
+    windows::follow_window(ui.ctx(), popup_area_id, is_open);
     if !is_open {
         return;
     }

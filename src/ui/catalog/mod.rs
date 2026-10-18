@@ -13,12 +13,12 @@ pub use header::render_header;
 pub use list::{contains_ignore_ascii_case, render_entries_list};
 
 use crate::app::OctantApp;
-use crate::ui::keyboard::focus;
+use crate::ui::keyboard::windows;
 
 /// Render the responsive, centered Dataset Catalog modal dialog.
 pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
     let modal_id = egui::Id::unique("catalog_modal_dialog");
-    let opened = focus::follow_window(ctx, modal_id, app.layout.show_catalog_window);
+    let opened = windows::follow_window(ctx, modal_id, app.layout.show_catalog_window);
     if !app.layout.show_catalog_window {
         return;
     }
@@ -61,7 +61,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
         .fixed_pos(modal_rect.min)
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
-            focus::trap(ui, opened);
+            windows::trap(ui, opened);
             ui.set_width(modal_w);
             ui.set_height(modal_h);
 

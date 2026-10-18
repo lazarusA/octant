@@ -16,7 +16,7 @@ pub use types::AboutTab;
 use crate::app::OctantApp;
 use crate::i18n::{AboutKey, CommonKey, KeymapKey, tr};
 use crate::ui::icons::UiIconExt;
-use crate::ui::keyboard::focus;
+use crate::ui::keyboard::windows;
 use icons::show_icons_tab;
 use overview::show_overview_tab;
 
@@ -31,7 +31,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
         app.layout.show_about_window = true;
     }
     let key = egui::Id::unique("about_window");
-    let opened = focus::follow_window(ctx, key, app.layout.show_about_window);
+    let opened = windows::follow_window(ctx, key, app.layout.show_about_window);
     if !app.layout.show_about_window {
         return;
     }
@@ -63,7 +63,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
         .order(egui::Order::Foreground)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
-            focus::trap(ui, opened);
+            windows::trap(ui, opened);
             egui::Frame::default()
                 .inner_margin(egui::Margin::symmetric(14, 8))
                 .show(ui, |ui| {

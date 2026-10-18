@@ -6,8 +6,8 @@
 
 use crate::i18n::{CommonKey, tr};
 use crate::ui::icons::{Icon, IconSize, ToolbarButton};
-use crate::ui::keyboard::{focus, keymap};
-use egui::{CursorIcon, Key, Pos2, Rect, Response, Sense, Vec2};
+use crate::ui::keyboard::focus;
+use egui::{CursorIcon, Pos2, Rect, Response, Sense, Vec2};
 
 /// How far one arrow key press moves a panel, in points.
 const NUDGE: f32 = 16.0;
@@ -54,14 +54,7 @@ fn arrow_nudge(response: &Response) -> Option<Vec2> {
         return None;
     }
     focus::claim_arrows_only(&response.ctx, response.id);
-    let arrows = [
-        Key::ArrowLeft,
-        Key::ArrowRight,
-        Key::ArrowUp,
-        Key::ArrowDown,
-    ];
-    let key = focus::pressed(&response.ctx, arrows)?;
-    keymap::arrow_direction(key).map(|d| d * NUDGE)
+    focus::pressed_arrow(&response.ctx).map(|d| d * NUDGE)
 }
 
 /// `point` as a fraction of `canvas`, clamped into it.
