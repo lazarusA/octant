@@ -1,15 +1,12 @@
 struct Uniforms {
-    rotation_y: f32,
-    rotation_x: f32,
+    camera: Camera,
     aspect_x: f32,
     aspect_y: f32,
     aspect_z: f32,
-    zoom: f32,
     point_size: f32,
     width: u32,
     height: u32,
     depth: u32,
-    screen_aspect: f32,
     shift_x: u32,
     shift_y: u32,
     shift_z: u32,
@@ -92,43 +89,11 @@ fn vs_main(
 
     let center_3d = vec3<f32>(norm_x, norm_y, norm_z);
 
-    // 3D Camera rotation around Y and X axes
-    let cy = cos(uniforms.rotation_y);
-    let sy = sin(uniforms.rotation_y);
-    let cx = cos(uniforms.rotation_x);
-    let sx = sin(uniforms.rotation_x);
-
-    let center_y_rot = vec3<f32>(
-        cy * center_3d.x + sy * center_3d.z,
-        center_3d.y,
-        -sy * center_3d.x + cy * center_3d.z
-    );
-
-    let center_rot = vec3<f32>(
-        center_y_rot.x,
-        cx * center_y_rot.y - sx * center_y_rot.z,
-        sx * center_y_rot.y + cx * center_y_rot.z
-    );
-
     // Offset square point billboard quad parallel to camera view plane
     let p_size = clamp(uniforms.point_size, 0.002, 0.2);
-    let corner_pos = center_rot + vec3<f32>(model.position.x * p_size, model.position.y * p_size, 0.0);
-
-    // Perspective projection transformation using dynamic zoom & screen aspect ratio
-    let cam_dist = clamp(uniforms.zoom, 0.1, 10.0);
-    let cam_z = corner_pos.z - cam_dist;
-    let dist_positive = max(-cam_z, 0.001);
-    let fov_scale = 1.6;
-    let screen_asp = max(uniforms.screen_aspect, 0.1);
-    let proj_x = (corner_pos.x * fov_scale) / screen_asp;
-    let proj_y = corner_pos.y * fov_scale;
-
-    // Linear depth projection mapped to [0.0, 1.0] for hardware depth testing
-    let z_near = CAMERA_Z_NEAR;
-    let z_far = CAMERA_Z_FAR;
-    let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
-
-    out.position = vec4<f32>(proj_x, proj_y, proj_z, dist_positive);
+    let center_view = camera_view(uniforms.camera, center_3d);
+    let corner_pos = center_view + vec3<f32>(model.position.x * p_size, model.position.y * p_size, 0.0);
+    out.position = camera_project(uniforms.camera, corner_pos);
     return out;
 }
 
@@ -163,5 +128,5 @@ fn fs_opaque(in: VertexOutput) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_oit(in: VertexOutput) -> OitOutput {
-    return oit_accumulate(shade(in), in.position.z);
+    return oit_accumulate(shade(in), in.position.z, uniforms.camera);
 }

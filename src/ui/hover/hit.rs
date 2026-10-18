@@ -97,7 +97,7 @@ fn hit_3d_volume(
     let Some(sampler) = sampler else {
         return HitResult::invalid();
     };
-    let (_, world_ray) = camera.cast_ray(hover_pos);
+    let world_ray = camera.cast_ray(hover_pos);
     let aspects = app.get_3d_aspect_ratio();
     if let Some((hit_x, hit_y, hit_z, hit_val)) = sampler.march_ray(app, &world_ray, aspects, true)
     {

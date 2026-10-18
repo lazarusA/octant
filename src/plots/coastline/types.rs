@@ -87,10 +87,7 @@ pub struct CoastlineUniforms {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Coastline3DUniforms {
-    pub rotation_y: f32,
-    pub rotation_x: f32,
-    pub aspect_ratio: f32,
-    pub zoom: f32,
+    pub camera: crate::plots::camera::CameraUniform,
     pub displacement_strength: f32,
     pub plot_kind: u32,
     pub plot_mode: u32,
@@ -113,10 +110,7 @@ pub struct Coastline3DUniforms {
 
 #[derive(Copy, Clone, Debug)]
 pub struct Coastline3DParams {
-    pub rotation_y: f32,
-    pub rotation_x: f32,
-    pub aspect_ratio: f32,
-    pub zoom: f32,
+    pub camera: crate::plots::camera::CameraUniform,
     pub displacement_strength: f32,
     pub plot_kind: u32,
     pub plot_mode: u32,

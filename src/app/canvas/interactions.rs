@@ -1,10 +1,16 @@
-//! Mouse and gesture interaction handling for the main plotting canvas.
+//! Mouse, trackpad and touch interaction handling for the main plotting canvas.
 
 use crate::app::OctantApp;
-use crate::app::controllers::controller_for;
+use crate::app::controllers::{PlotController, controller_for};
 use crate::plots::PlotType;
+use egui::PointerButton;
 
 /// Dispatches zoom, pan, rotation, and reset interactions for 2D and 3D canvas plots.
+///
+/// One finger or the primary button drags (pans in 2D, orbits in 3D); two
+/// fingers pinch to zoom about their center and pan as they move; the
+/// secondary or middle button, or Shift, drags to pan in 3D too; the wheel,
+/// a trackpad pinch or Ctrl/Cmd+wheel zoom about the pointer.
 pub fn handle_canvas_interactions(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
@@ -20,19 +26,39 @@ pub fn handle_canvas_interactions(
         ui.ctx().request_repaint();
     }
 
-    if response.dragged() {
-        app.nav.view_interacting = true;
-        controller.handle_drag(&mut app.nav, response.drag_delta());
-    }
+    let (touch, zoom, scroll, shift) = ui.input(|i| {
+        (
+            i.multi_touch(),
+            i.zoom_delta(),
+            i.smooth_scroll_delta.y,
+            i.modifiers.shift,
+        )
+    });
 
-    if response.hovered() {
-        let scroll = ui.input(|i| i.smooth_scroll_delta.y);
-        if scroll != 0.0 {
-            let mouse_pos = response.hover_pos().unwrap_or_else(|| canvas_rect.center());
-            controller.handle_scroll(&mut app.nav, scroll, mouse_pos, canvas_rect.center());
-            app.nav.view_interacting = true;
+    if let Some(touch) = touch {
+        // The first finger also drives the pointer: its drag is part of the
+        // gesture, never an orbit or pan of its own.
+        let on_canvas = canvas_rect.contains(touch.start_pos)
+            && ui.ctx().layer_id_at(touch.start_pos) == Some(response.layer_id);
+        if on_canvas {
+            let nav = &mut app.nav;
+            if touch.zoom_delta != 1.0 {
+                controller.handle_zoom(nav, touch.zoom_delta, touch.center_pos, canvas_rect);
+            }
+            if touch.translation_delta != egui::Vec2::ZERO {
+                controller.handle_pan(nav, touch.translation_delta, canvas_rect);
+            }
+            nav.view_interacting = true;
             ui.ctx().request_repaint();
         }
+    } else {
+        pointer_interactions(
+            app,
+            controller,
+            response,
+            canvas_rect,
+            (zoom, scroll, shift),
+        );
     }
 
     if app.nav.view_interacting {
@@ -45,5 +71,44 @@ pub fn handle_canvas_interactions(
     if app.nav.sphere_auto_rotate && canvas_plot_type.is_3d() {
         app.nav.sphere_rotation_y += ui.ctx().input(|i| i.stable_dt).min(0.1) * 0.15;
         ui.ctx().request_repaint();
+    }
+}
+
+/// One pointer's drags, wheel scrolling and trackpad zoom (`input`: zoom
+/// factor, scroll points, Shift held).
+fn pointer_interactions(
+    app: &mut OctantApp,
+    controller: &dyn PlotController,
+    response: &egui::Response,
+    canvas_rect: egui::Rect,
+    (zoom, scroll, shift): (f32, f32, bool),
+) {
+    let nav = &mut app.nav;
+    if response.dragged() {
+        nav.view_interacting = true;
+        let delta = response.drag_delta();
+        let pans = shift
+            || response.dragged_by(PointerButton::Secondary)
+            || response.dragged_by(PointerButton::Middle);
+        if pans {
+            controller.handle_pan(nav, delta, canvas_rect);
+        } else {
+            controller.handle_drag(nav, delta);
+        }
+    }
+
+    if response.hovered() {
+        let pointer = response.hover_pos().unwrap_or_else(|| canvas_rect.center());
+        if scroll != 0.0 {
+            controller.handle_scroll(nav, scroll, pointer, canvas_rect);
+            nav.view_interacting = true;
+        }
+        if zoom != 1.0 {
+            controller.handle_zoom(nav, zoom, pointer, canvas_rect);
+            nav.view_interacting = true;
+        }
+        if nav.view_interacting {
+            response.ctx.request_repaint();
+        }
     }
 }

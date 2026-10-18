@@ -7,6 +7,8 @@ macro_rules! volume_shader {
         concat!(
             include_str!("../shaders/colormaps/mod.wgsl"),
             "\n",
+            include_str!("../shaders/common/camera3d.wgsl"),
+            "\n",
             include_str!("../shaders/volume/bindings.wgsl"),
             "\n",
             $filter,

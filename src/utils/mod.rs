@@ -32,7 +32,7 @@ pub use executor::{TokioBlockOn, get_shared_tokio_rt};
 pub use grid::check_and_orient_axes_with_coords;
 pub use math::{
     apply_zoom_pan_at_point, calculate_3d_depth, compute_finite_min_max, ease_in_out_cubic, lerp3,
-    xorshift64_f32,
+    scroll_zoom_factor, xorshift64_f32,
 };
 pub use metadata::{
     default_dimension_names_for_rank, discover_arrays_via_http_metadata, extract_store_variables,

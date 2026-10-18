@@ -55,7 +55,7 @@ impl eframe::egui_wgpu::CallbackTrait for PointCloudCallback {
     ) -> Vec<wgpu::CommandBuffer> {
         super::colormap_atlas::prepare(device, queue, callback_resources);
         let mut params = self.params;
-        params.screen_aspect = super::common::compute_aspect_ratio(&self.rect);
+        params.camera.aspect = super::common::compute_aspect_ratio(&self.rect).max(0.01);
         self.renderer.update_uniforms(queue, &params);
         if self.transparency == Transparency::Oit
             && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)

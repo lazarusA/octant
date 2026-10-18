@@ -2,6 +2,8 @@
 
 mod axes;
 mod interactions;
+#[cfg(test)]
+mod interactions_tests;
 mod overlays;
 mod viewport;
 

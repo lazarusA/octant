@@ -21,17 +21,14 @@ impl PointCloudVertex {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct PointCloudUniforms {
-    pub rotation_y: f32,
-    pub rotation_x: f32,
+    pub camera: super::camera::CameraUniform,
     pub aspect_x: f32,
     pub aspect_y: f32,
     pub aspect_z: f32,
-    pub zoom: f32,
     pub point_size: f32,
     pub width: u32,
     pub height: u32,
     pub depth: u32,
-    pub screen_aspect: f32,
     pub shift_x: u32,
     pub shift_y: u32,
     pub shift_z: u32,
@@ -43,16 +40,13 @@ pub struct PointCloudUniforms {
 #[derive(Copy, Clone, Debug)]
 pub struct PointCloudUniformParams {
     pub color: super::common::PlotColorParams,
-    pub rot_y: f32,
-    pub rot_x: f32,
+    pub camera: super::camera::CameraUniform,
     pub aspect_x: f32,
     pub aspect_y: f32,
     pub aspect_z: f32,
-    pub zoom: f32,
     pub point_size: f32,
     pub width: u32,
     pub height: u32,
-    pub screen_aspect: f32,
     pub shift_x: u32,
     pub shift_y: u32,
     pub shift_z: u32,

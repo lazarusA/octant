@@ -1,6 +1,7 @@
 //! Test-only offscreen rendering of volume renderers for the GPU tests.
 
 use super::{VolumeEncoding, VolumeRenderer, VolumeUniformParams};
+use crate::plots::camera::{CameraUniform, OrbitCamera};
 use crate::plots::common::PlotColorParams;
 use crate::utils::colormap::registry;
 use eframe::egui_wgpu::CallbackResources;
@@ -34,6 +35,18 @@ pub(super) fn atlas(device: &wgpu::Device, queue: &wgpu::Queue) -> CallbackResou
     resources
 }
 
+/// The test camera turned by `rotation_y` and looking at `target`.
+pub(super) fn camera(rotation_y: f32, target: [f32; 3]) -> CameraUniform {
+    OrbitCamera {
+        rotation_x: 0.4,
+        rotation_y,
+        distance: 2.5,
+        target,
+        aspect: 1.0,
+    }
+    .uniform()
+}
+
 pub(super) fn params(algorithm: u32, quality: f32, shift_x: u32) -> VolumeUniformParams {
     VolumeUniformParams {
         color: PlotColorParams {
@@ -42,19 +55,16 @@ pub(super) fn params(algorithm: u32, quality: f32, shift_x: u32) -> VolumeUnifor
             cmax: 1.0,
             ..Default::default()
         },
-        rot_y: 0.6,
-        rot_x: 0.4,
+        camera: camera(0.6, [0.0; 3]),
         aspect_x: 1.0,
         aspect_y: 1.0,
         aspect_z: 1.0,
-        zoom: 2.5,
         opacity_scale: 3.0,
         quality,
         algorithm,
         isovalue: 0.5,
         isorange: 0.1,
         attenuation: 0.0,
-        screen_aspect: 1.0,
         shift_x,
         shift_y: 0,
         shift_z: 0,

@@ -203,7 +203,7 @@ pub fn raycast_surface(
     camera: &Camera3D,
     hover_pos: Pos2,
 ) -> Option<(f32, f32, Option<(f32, f32)>)> {
-    let (_, world_ray) = camera.cast_ray(hover_pos);
+    let world_ray = camera.cast_ray(hover_pos);
     let (px, py) = SurfaceField::new(app, matrix).hit(&world_ray)?;
 
     let (nx, ny) = matrix

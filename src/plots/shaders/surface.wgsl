@@ -1,8 +1,5 @@
 struct Uniforms {
-    rotation_y: f32,
-    rotation_x: f32,
-    aspect_ratio: f32,
-    zoom: f32,
+    camera: Camera,
     displacement_strength: f32,
     surface_mode: u32,
     width: u32,
@@ -153,10 +150,10 @@ fn vs_main(
         normal_3d = model.raw_normal;
     }
 
-    let pos_rot = rotate_camera_yx(pos_3d, uniforms.rotation_y, uniforms.rotation_x);
-    let norm_rot = rotate_normal_yx(normal_3d, uniforms.rotation_y, uniforms.rotation_x);
+    let pos_rot = camera_view(uniforms.camera, pos_3d);
+    let norm_rot = camera_view_normal(uniforms.camera, normal_3d);
 
-    out.position = project_perspective(pos_rot, uniforms.aspect_ratio, uniforms.zoom, 1.6, 0.1);
+    out.position = camera_project(uniforms.camera, pos_rot);
     out.uv = model.uv;
     out.val = raw_val;
     out.rgb = unpack_composite_rgb(raw_val);
@@ -199,5 +196,5 @@ fn fs_opaque(in: VertexOutput) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_oit(in: VertexOutput) -> OitOutput {
-    return oit_accumulate(shade(in), in.position.z);
+    return oit_accumulate(shade(in), in.position.z, uniforms.camera);
 }

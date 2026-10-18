@@ -60,10 +60,7 @@ impl Coastline3DRenderer {
         });
 
         let uniforms = Coastline3DUniforms {
-            rotation_y: 0.0,
-            rotation_x: 0.0,
-            aspect_ratio: 1.0,
-            zoom: 2.5,
+            camera: crate::plots::camera::OrbitCamera::default().uniform(),
             displacement_strength: 0.0,
             plot_kind: 0,
             plot_mode: 0,
@@ -310,10 +307,7 @@ impl eframe::egui_wgpu::CallbackTrait for Coastline3DCallback {
     ) -> Vec<wgpu::CommandBuffer> {
         let p = self.params;
         let uniforms = Coastline3DUniforms {
-            rotation_y: p.rotation_y,
-            rotation_x: p.rotation_x,
-            aspect_ratio: p.aspect_ratio.max(0.1),
-            zoom: p.zoom,
+            camera: p.camera,
             displacement_strength: p.displacement_strength,
             plot_kind: p.plot_kind,
             plot_mode: p.plot_mode,

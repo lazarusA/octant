@@ -1,7 +1,7 @@
 //! GPU tests: renders small volumes offscreen and compares the images.
 //! Skipped (with a note) when no adapter is available.
 
-use super::gpu_render::{atlas, gpu, params, render_sized, renderer_n};
+use super::gpu_render::{atlas, camera, gpu, params, render_sized, renderer_n};
 use super::{VolumeRenderer, VolumeUniformParams};
 use crate::utils::colormap::registry;
 
@@ -175,7 +175,15 @@ fn gpu_frame_cache_rerenders_only_on_change() {
     let base = params(0, 1.0, 0);
     assert!(frame(&base, [32, 32]), "first frame renders");
     assert!(!frame(&base, [32, 32]), "unchanged view reuses the frame");
-    let turned = VolumeUniformParams { rot_y: 1.0, ..base };
+    let panned = VolumeUniformParams {
+        camera: camera(0.6, [0.1, 0.0, 0.0]),
+        ..base
+    };
+    assert!(frame(&panned, [32, 32]), "pan re-renders");
+    let turned = VolumeUniformParams {
+        camera: camera(1.0, [0.0; 3]),
+        ..base
+    };
     assert!(frame(&turned, [32, 32]), "camera change re-renders");
     assert!(frame(&turned, [16, 16]), "size change re-renders");
     renderer.update_data(&queue, &data);

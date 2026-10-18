@@ -25,17 +25,37 @@ pub trait PlotController: Send + Sync {
     /// Resets pan, zoom, or camera angle to initial defaults.
     fn reset_view(&self, nav: &mut NavigationState);
 
-    /// Handles mouse dragging (orbiting in 3D, translation pan in 2D/1D).
+    /// Handles a one-finger or primary button drag of `delta` screen points
+    /// (orbiting in 3D, panning in 2D/1D).
     fn handle_drag(&self, nav: &mut NavigationState, delta: egui::Vec2);
 
-    /// Handles scroll wheel zoom events.
+    /// Moves the picture `delta` screen points with the pointer on canvas
+    /// `rect`: two-finger drags, and in 3D secondary button or Shift drags.
+    fn handle_pan(&self, nav: &mut NavigationState, delta: egui::Vec2, _rect: egui::Rect) {
+        self.handle_drag(nav, delta);
+    }
+
+    /// Zooms by `factor` (above 1 magnifies) about `anchor` on canvas `rect`,
+    /// keeping what is under it in place.
+    fn handle_zoom(
+        &self,
+        nav: &mut NavigationState,
+        factor: f32,
+        anchor: egui::Pos2,
+        rect: egui::Rect,
+    );
+
+    /// Handles `scroll` points of mouse wheel scrolling over `mouse_pos`.
     fn handle_scroll(
         &self,
         nav: &mut NavigationState,
         scroll: f32,
         mouse_pos: egui::Pos2,
-        center: egui::Pos2,
-    );
+        rect: egui::Rect,
+    ) {
+        let factor = crate::utils::scroll_zoom_factor(scroll);
+        self.handle_zoom(nav, factor, mouse_pos, rect);
+    }
 
     /// Whether this plot type supports coastline overlays.
     fn draws_coastlines(&self) -> bool {
@@ -69,12 +89,11 @@ pub trait PlotController: Send + Sync {
         demand
     }
 
-    /// Minimum zoom level allowed for this plot type.
+    /// Minimum zoom level allowed for this plot type (in 3D, the closest
+    /// camera distance).
     fn min_zoom(&self) -> f32 {
-        if self.plot_type() == PlotType::Sphere {
-            1.1
-        } else if self.is_3d() {
-            0.2
+        if self.is_3d() {
+            crate::plots::camera::min_distance(self.plot_type())
         } else {
             0.1
         }

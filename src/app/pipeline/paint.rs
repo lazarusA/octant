@@ -73,19 +73,19 @@ impl OctantApp {
 
         crate::plots::VolumeUniformParams {
             color: ctx.color,
-            rot_y: self.nav.sphere_rotation_y,
-            rot_x: self.nav.sphere_rotation_x,
+            camera: self
+                .nav
+                .orbit_camera(PlotType::Volume, screen_aspect)
+                .uniform(),
             aspect_x: ctx.aspect_x,
             aspect_y: ctx.aspect_y,
             aspect_z: ctx.aspect_z,
-            zoom: self.nav.sphere_zoom,
             opacity_scale: self.plot_configs.volume.opacity,
             quality: self.plot_configs.volume.quality,
             algorithm: self.plot_configs.volume.algorithm,
             isovalue: self.plot_configs.volume.isovalue,
             isorange: self.plot_configs.volume.isorange,
             attenuation: self.plot_configs.volume.attenuation,
-            screen_aspect,
             shift_x: ctx.shift_x,
             shift_y: ctx.shift_y,
             shift_z: ctx.shift_z,
@@ -104,16 +104,16 @@ impl OctantApp {
 
         crate::plots::PointCloudUniformParams {
             color: ctx.color,
-            rot_y: self.nav.sphere_rotation_y,
-            rot_x: self.nav.sphere_rotation_x,
+            camera: self
+                .nav
+                .orbit_camera(PlotType::PointCloud, screen_aspect)
+                .uniform(),
             aspect_x: ctx.aspect_x,
             aspect_y: ctx.aspect_y,
             aspect_z: ctx.aspect_z,
-            zoom: self.nav.sphere_zoom,
             point_size: self.plot_configs.point_cloud.point_size,
             width: ctx.width,
             height: ctx.height,
-            screen_aspect,
             shift_x: ctx.shift_x,
             shift_y: ctx.shift_y,
             shift_z: ctx.shift_z,
@@ -128,6 +128,11 @@ impl OctantApp {
         aspect_ratio: f32,
     ) -> crate::plots::Mesh3DUniformParams {
         let (mode, displacement_strength, flip_height) = self.plot_configs.mesh.heights(sphere);
+        let plot_type = if sphere {
+            PlotType::Sphere
+        } else {
+            PlotType::Surface
+        };
         let (coord_mode, has_reference_globe, lon_bounds, lat_bounds) = layer
             .data
             .matrix
@@ -149,10 +154,7 @@ impl OctantApp {
 
         crate::plots::Mesh3DUniformParams {
             color: self.get_color_params(layer),
-            rotation_y: self.nav.sphere_rotation_y,
-            rotation_x: self.nav.sphere_rotation_x,
-            aspect_ratio,
-            zoom: self.nav.sphere_zoom,
+            camera: self.nav.orbit_camera(plot_type, aspect_ratio).uniform(),
             displacement_strength,
             mode,
             coord_mode,
@@ -293,10 +295,7 @@ impl OctantApp {
                     crate::plots::Coastline3DCallback {
                         renderer,
                         params: crate::plots::Coastline3DParams {
-                            rotation_y: mesh_params.rotation_y,
-                            rotation_x: mesh_params.rotation_x,
-                            aspect_ratio: mesh_params.aspect_ratio,
-                            zoom: mesh_params.zoom,
+                            camera: mesh_params.camera,
                             displacement_strength: mesh_params.displacement_strength,
                             plot_kind: u32::from(sphere),
                             plot_mode: mesh_params.mode,
