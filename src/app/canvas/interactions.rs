@@ -2,13 +2,30 @@
 
 use crate::app::OctantApp;
 use crate::app::controllers::{PlotController, controller_for};
+use crate::app::state::NavigationState;
 use crate::plots::PlotType;
 use egui::PointerButton;
+
+/// How long after the first finger lands a second one still makes the touch
+/// a pinch, undoing what the first finger's drag did meanwhile: fingers
+/// never land at the same moment.
+const PINCH_GRACE: f64 = 0.3;
+
+/// One touch on the canvas, in egui temp memory until every finger lifts.
+#[derive(Clone)]
+enum TouchGesture {
+    /// The view when the first finger landed.
+    Started(NavigationState),
+    /// Two fingers touched: nothing drags until every finger lifts.
+    Pinched,
+}
 
 /// Dispatches zoom, pan, rotation, and reset interactions for 2D and 3D canvas plots.
 ///
 /// One finger or the primary button drags (pans in 2D, orbits in 3D); two
-/// fingers pinch to zoom about their center and pan as they move; the
+/// fingers pinch to zoom about their center and pan as they move (a second
+/// finger landing within `PINCH_GRACE` undoes the first one's drag, and
+/// nothing drags until both lift); the
 /// secondary or middle button, or Shift, drags to pan in 3D too; the wheel,
 /// a trackpad pinch or Ctrl/Cmd+wheel zoom about the pointer.
 pub fn handle_canvas_interactions(
@@ -26,23 +43,7 @@ pub fn handle_canvas_interactions(
         ui.ctx().request_repaint();
     }
 
-    if let Some(touch) = ui.input(|i| i.multi_touch()) {
-        // The first finger also drives the pointer: its drag is part of the
-        // gesture, never an orbit or pan of its own.
-        let on_canvas = canvas_rect.contains(touch.start_pos)
-            && ui.ctx().layer_id_at(touch.start_pos) == Some(response.layer_id);
-        if on_canvas {
-            let nav = &mut app.nav;
-            if touch.zoom_delta != 1.0 {
-                controller.handle_zoom(nav, touch.zoom_delta, touch.center_pos, canvas_rect);
-            }
-            if touch.translation_delta != egui::Vec2::ZERO {
-                controller.handle_pan(nav, touch.translation_delta, canvas_rect);
-            }
-            nav.view_interacting = true;
-            ui.ctx().request_repaint();
-        }
-    } else {
+    if !touch_interactions(app, ui, controller, response, canvas_rect) {
         pointer_interactions(app, controller, response, canvas_rect);
     }
 
@@ -57,6 +58,56 @@ pub fn handle_canvas_interactions(
         app.nav.sphere_rotation_y += ui.ctx().input(|i| i.stable_dt).min(0.1) * 0.15;
         ui.ctx().request_repaint();
     }
+}
+
+/// Two-finger pinches and pans; whether the touch is (or was) a pinch, so
+/// one-finger drags are ignored.
+fn touch_interactions(
+    app: &mut OctantApp,
+    ui: &egui::Ui,
+    controller: &dyn PlotController,
+    response: &egui::Response,
+    canvas_rect: egui::Rect,
+) -> bool {
+    let (touching, landed, now, touch) = ui.input(|i| {
+        let landed = i.pointer.press_start_time();
+        (i.any_touches(), landed, i.time, i.multi_touch())
+    });
+    let id = response.id.with("touch_gesture");
+    if !touching {
+        ui.data_mut(|d| d.remove::<TouchGesture>(id));
+        return false;
+    }
+    let gesture = ui.data(|d| d.get_temp::<TouchGesture>(id));
+    // The first finger also drives the pointer: its drag is part of the
+    // gesture, never an orbit or pan of its own.
+    let Some(pinch) = touch.filter(|t| {
+        canvas_rect.contains(t.start_pos)
+            && ui.ctx().layer_id_at(t.start_pos) == Some(response.layer_id)
+    }) else {
+        if gesture.is_none() {
+            ui.data_mut(|d| d.insert_temp(id, TouchGesture::Started(app.nav.clone())));
+        }
+        return matches!(gesture, Some(TouchGesture::Pinched)) || touch.is_some();
+    };
+    if !matches!(gesture, Some(TouchGesture::Pinched)) {
+        if let Some(TouchGesture::Started(view)) = gesture
+            && landed.is_some_and(|t| now - t <= PINCH_GRACE)
+        {
+            app.nav = view;
+        }
+        ui.data_mut(|d| d.insert_temp(id, TouchGesture::Pinched));
+    }
+    let nav = &mut app.nav;
+    if pinch.zoom_delta != 1.0 {
+        controller.handle_zoom(nav, pinch.zoom_delta, pinch.center_pos, canvas_rect);
+    }
+    if pinch.translation_delta != egui::Vec2::ZERO {
+        controller.handle_pan(nav, pinch.translation_delta, canvas_rect);
+    }
+    nav.view_interacting = true;
+    ui.ctx().request_repaint();
+    true
 }
 
 /// One pointer's drags, wheel scrolling and trackpad zoom.
