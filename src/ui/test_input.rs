@@ -1,11 +1,11 @@
 //! Headless egui frames for UI tests: a context with its own clock (so
-//! double-clicks and fades follow the frames), pointer moves, clicks,
-//! drags and touch taps, and the areas' rects. Each call takes the frame's
-//! UI as a closure; build it per call (`&mut run(&mut app)`) so the app
-//! stays free between frames.
+//! double-clicks and fades follow the frames), key presses, pointer moves,
+//! clicks, drags and touch taps, and the areas' rects. Each call takes the
+//! frame's UI as a closure; build it per call (`&mut run(&mut app)`) so the
+//! app stays free between frames.
 
 use egui::epaint::ClippedShape;
-use egui::{Event, Id, PointerButton, Pos2, RawInput, Rect, TouchPhase, Ui, Vec2};
+use egui::{Event, Id, Key, Modifiers, PointerButton, Pos2, RawInput, Rect, TouchPhase, Ui, Vec2};
 
 /// One frame's time step.
 const FRAME: f64 = 1.0 / 60.0;
@@ -63,6 +63,23 @@ impl Harness {
         let mut events = vec![Event::PointerMoved(pos)];
         events.extend(pressed.map(|pressed| primary(pos, pressed)));
         self.frame(events, run)
+    }
+
+    /// Presses `key` with `modifiers` held for one frame; the frame's shapes.
+    pub fn key(
+        &mut self,
+        key: Key,
+        modifiers: Modifiers,
+        run: &mut impl FnMut(&mut Ui),
+    ) -> Vec<ClippedShape> {
+        let press = Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers,
+        };
+        self.frame(vec![press], run)
     }
 
     /// Hovers `pos`, then presses and releases there.

@@ -115,28 +115,7 @@ impl eframe::App for OctantApp {
             && self.layers.base.data.volume.is_none())
             || self.layout.show_hero;
 
-        // Keyboard Shortcuts for Figure Export & Crop Tool
-        if ui.input_mut(|i| {
-            i.consume_key(egui::Modifiers::COMMAND, egui::Key::S)
-                || i.consume_key(egui::Modifiers::CTRL, egui::Key::S)
-        }) {
-            self.quick_save_canvas();
-        }
-
-        if ui.input_mut(|i| {
-            i.consume_key(
-                egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
-                egui::Key::S,
-            ) || i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::S)
-        }) {
-            self.show_export_modal = true;
-        }
-
-        if !ctx.egui_wants_keyboard_input()
-            && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::C))
-        {
-            self.show_crop_overlay = !self.show_crop_overlay;
-        }
+        crate::ui::keyboard::dispatch(self, &ctx, !is_hero_active);
 
         // Process in-flight export / screenshot requests
         self.process_pending_export();
@@ -186,5 +165,6 @@ impl eframe::App for OctantApp {
 
         // 4. Drawing Canvas Area with Aspect Data Ratio
         super::canvas::render_canvas(self, ui, canvas_rect);
+        crate::ui::keyboard::focus::end_frame(&ctx);
     }
 }

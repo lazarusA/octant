@@ -18,7 +18,7 @@ pub mod hover;
 pub use hover as hover_tooltip;
 pub mod dataset;
 pub mod icons;
-pub mod key_focus;
+pub mod keyboard;
 pub mod language_picker;
 pub mod layer_label;
 #[cfg(test)]

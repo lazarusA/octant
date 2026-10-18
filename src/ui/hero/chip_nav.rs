@@ -3,7 +3,7 @@
 //! them, Up or Escape returns to the field, Enter/Space loads the sample.
 
 use super::focus::intake_id;
-use crate::ui::key_focus;
+use crate::ui::keyboard::focus as key_focus;
 use egui::{Context, Id, Key, Response};
 
 /// Stable id of sample chip `i`, so focus can move to it by index.

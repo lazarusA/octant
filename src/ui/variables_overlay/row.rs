@@ -2,7 +2,7 @@
 //! `[chevron] [icon] name  detail`, where every pixel of the row is a hit target.
 
 use crate::ui::icons::{Icon, IconSize, IconTone};
-use crate::ui::key_focus;
+use crate::ui::keyboard::focus as key_focus;
 use egui::{
     Color32, Id, Rect, Response, Sense, TextStyle, TextWrapMode, Ui, WidgetText, pos2, vec2,
 };
@@ -131,9 +131,7 @@ fn paint_background(ui: &Ui, resp: &Response, selected: bool) -> RowColors {
         let fill = visuals.widgets.hovered.weak_bg_fill;
         ui.painter().rect_filled(resp.rect, radius, fill);
     }
-    if resp.has_focus() {
-        key_focus::paint_focus_ring(ui, resp.rect, radius);
-    }
+    key_focus::paint_ring(ui, resp, radius);
 
     let muted = IconTone::Muted.color(visuals);
     let text = if selected {

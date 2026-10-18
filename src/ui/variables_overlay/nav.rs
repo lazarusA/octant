@@ -8,7 +8,7 @@ use super::rows::{Row, visible_rows};
 use super::stack::stack_state;
 use super::tree::VariableTreeContext;
 use crate::data::VariableTreeGroup;
-use crate::ui::key_focus;
+use crate::ui::keyboard::focus as key_focus;
 use egui::collapsing_header::CollapsingState;
 use egui::{Context, Id, Key, Modifiers};
 

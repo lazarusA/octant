@@ -24,7 +24,7 @@ pub use search::SearchCache;
 use crate::app::OctantApp;
 use crate::i18n::{CommonKey, VariablesKey, tr};
 use crate::ui::icons::{Icon, UiIconExt};
-use crate::ui::key_focus;
+use crate::ui::keyboard::focus as key_focus;
 use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
 use nav::SearchJump;

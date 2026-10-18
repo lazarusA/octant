@@ -15,6 +15,13 @@ pub use viewport::ViewportUniforms;
 pub use viewport::compute_viewport_uniforms;
 
 use crate::app::OctantApp;
+use crate::ui::keyboard::{focus, regions};
+
+/// The canvas's widget id: keyboard shortcuts on the plot work while it (or
+/// nothing) holds focus.
+pub fn canvas_id() -> egui::Id {
+    egui::Id::unique("octant_canvas")
+}
 
 /// Renders the central plotting canvas or the hero landing view when inactive.
 pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::Rect) {
@@ -51,7 +58,8 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
         return;
     }
 
-    let response = ui.allocate_rect(canvas_rect, egui::Sense::drag());
+    let response = ui.interact(canvas_rect, canvas_id(), egui::Sense::drag());
+    regions::register(regions::Region::Canvas, &response, canvas_rect);
 
     let canvas_bg = ui.style().visuals.panel_fill;
     ui.painter().rect_filled(canvas_rect, 0.0, canvas_bg);
@@ -91,6 +99,7 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
     // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle (suppressed during export capture)
     if app.pending_export.is_none() {
         crate::ui::hover_tooltip::show_hover_tooltip(app, &ctx, ui, &response, canvas_rect);
+        focus::paint_ring(ui, &response, 0.0);
     }
 
     // Render interactive ROI crop box, capture flash, and drag cue
