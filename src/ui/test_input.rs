@@ -5,7 +5,7 @@
 //! stays free between frames.
 
 use egui::epaint::ClippedShape;
-use egui::{Event, Id, PointerButton, Pos2, RawInput, Rect, Ui, Vec2};
+use egui::{Event, Id, PointerButton, Pos2, RawInput, Rect, TouchPhase, Ui, Vec2};
 
 /// One frame's time step.
 const FRAME: f64 = 1.0 / 60.0;
@@ -97,10 +97,35 @@ impl Harness {
         self.frame(Vec::new(), run);
     }
 
+    /// One frame of `(finger, phase, position)` touches, the way eframe
+    /// reports them: finger 0 also drives the pointer, pressed when it lands
+    /// and released (and gone) when it lifts.
+    pub fn touch(&mut self, touches: &[(u64, TouchPhase, Pos2)], run: &mut impl FnMut(&mut Ui)) {
+        let mut events = Vec::new();
+        for &(finger, phase, pos) in touches {
+            events.push(Event::Touch {
+                device_id: egui::TouchDeviceId(0),
+                id: egui::TouchId(finger),
+                phase,
+                pos,
+                force: None,
+            });
+            if finger != 0 {
+                continue;
+            }
+            match phase {
+                TouchPhase::Start => events.extend([Event::PointerMoved(pos), primary(pos, true)]),
+                TouchPhase::Move => events.push(Event::PointerMoved(pos)),
+                TouchPhase::End | TouchPhase::Cancel => {
+                    events.extend([primary(pos, false), Event::PointerGone]);
+                }
+            }
+        }
+        self.frame(events, run);
+    }
+
     /// Two fingers side by side about `center`, `from` apart, spreading to
-    /// `to` apart while their center moves by `shift`, over ten frames, the
-    /// way a touch screen reports them: the first finger also drives the
-    /// pointer.
+    /// `to` apart while their center moves by `shift`, over ten frames.
     pub fn pinch(
         &mut self,
         center: Pos2,
@@ -108,35 +133,16 @@ impl Harness {
         shift: Vec2,
         run: &mut impl FnMut(&mut Ui),
     ) {
-        let fingers = |t: f32| {
+        let both = |t: f32, phase| {
             let half = Vec2::X * (from + (to - from) * t) / 2.0;
             let mid = center + shift * t;
-            [mid - half, mid + half]
+            [(0, phase, mid - half), (1, phase, mid + half)]
         };
-        let touches = |t: f32, phase| {
-            let [a, b] = fingers(t);
-            [(0, a), (1, b)].map(|(id, pos)| Event::Touch {
-                device_id: egui::TouchDeviceId(0),
-                id: egui::TouchId(id),
-                phase,
-                pos,
-                force: None,
-            })
-        };
-        let first = fingers(0.0)[0];
-        let mut down = touches(0.0, egui::TouchPhase::Start).to_vec();
-        down.extend([Event::PointerMoved(first), primary(first, true)]);
-        self.frame(down, run);
+        self.touch(&both(0.0, TouchPhase::Start), run);
         for step in 1..=10 {
-            let t = step as f32 / 10.0;
-            let mut moved = touches(t, egui::TouchPhase::Move).to_vec();
-            moved.push(Event::PointerMoved(fingers(t)[0]));
-            self.frame(moved, run);
+            self.touch(&both(step as f32 / 10.0, TouchPhase::Move), run);
         }
-        let last = fingers(1.0)[0];
-        let mut up = touches(1.0, egui::TouchPhase::End).to_vec();
-        up.extend([primary(last, false), Event::PointerGone]);
-        self.frame(up, run);
+        self.touch(&both(1.0, TouchPhase::End), run);
         self.frame(Vec::new(), run);
     }
 
