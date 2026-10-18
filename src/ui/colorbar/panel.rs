@@ -20,8 +20,8 @@ const BAR_THICKNESS: f32 = 13.0;
 const HORIZONTAL_ROW_H: f32 = 38.0;
 /// Room left of a vertical bar's center, so its range inputs fit.
 const VERTICAL_BAR_X: f32 = 30.0;
-/// Room each side of a horizontal panel's title for the controls.
-const TITLE_SIDE: f32 = 44.0;
+/// Vertical margin inside a panel's frame.
+const MARGIN_Y: i8 = 8;
 
 /// Draws layer `id`'s colorbar panel on `canvas`.
 pub fn show(app: &mut OctantApp, ctx: &egui::Context, id: LayerId, canvas: Rect) {
@@ -62,7 +62,7 @@ fn panel_frame(ctx: &egui::Context, transparency: f32) -> egui::Frame {
         .fill(visuals.window_fill.linear_multiply(alpha))
         .stroke(egui::Stroke::new(visuals.window_stroke.width, stroke_color))
         .shadow(shadow)
-        .inner_margin(egui::Margin::symmetric(layout::MARGIN_X, 8))
+        .inner_margin(egui::Margin::symmetric(layout::MARGIN_X, MARGIN_Y))
 }
 
 /// The title over a horizontal bar `bar_len` long, or the controls' room,
@@ -76,27 +76,31 @@ fn contents(
 ) {
     match orientation {
         BarOrientation::Horizontal => ui.vertical_centered(|ui| {
-            title_row(app, ui, id, TITLE_SIDE);
+            // The controls sit beside the title, never over the bar.
+            let below_controls = controls::REACH - f32::from(MARGIN_Y);
+            title_row(app, ui, id, controls::SIDE_ROOM, below_controls);
             ui.add_space(3.0);
             horizontal_bar(app, ui, id, bar_len);
         }),
         BarOrientation::Vertical => ui.vertical(|ui| {
             // Room for the controls above the title.
             ui.add_space(controls::CONTROL);
-            title_row(app, ui, id, 0.0);
+            title_row(app, ui, id, 0.0, 0.0);
             vertical_bar(app, ui, id, bar_len);
         }),
     };
 }
 
 /// The editable title: the custom label, or the variable name and units;
-/// centered, at most 320 wide, `side` clear on either side.
-fn title_row(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId, side: f32) {
+/// centered, at most 320 wide, `side` clear on either side, at least
+/// `min_height` tall.
+fn title_row(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId, side: f32, min_height: f32) {
     let Some(layer) = app.layers.get(id) else {
         return;
     };
     let mut edited = None;
     ui.horizontal(|ui| {
+        ui.set_min_height(min_height);
         let avail = ui.available_width();
         let width = (avail - 2.0 * side).clamp(avail.min(60.0), 320.0);
         ui.add_space(((avail - width) / 2.0).max(0.0));
@@ -142,8 +146,8 @@ fn vertical_bar(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId, len: f32) {
 }
 
 /// The bar on `axis` with its ticks, clip triangles, range inputs and the
-/// value tooltip of `response` (the bar's row); a click on the bar opens
-/// the layer's colormap picker.
+/// value tooltip of `response` (the bar's row); the bar is outlined while
+/// hovered and a click on it opens the layer's colormap picker.
 fn bar_row(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
@@ -158,12 +162,15 @@ fn bar_row(
     // Before the bar paints, so a colormap hovered in the picker previews
     // on it this frame.
     crate::ui::colormap::show_picker_popup(app, &bar, id);
-    let hovered = if bar.hovered() { bar } else { response };
+    let on_bar = bar.hovered();
+    let hovered = if on_bar { bar } else { response };
     if id == LayerId::BASE && app.line_series_colored() {
         series_bar_row(app, ui, axis, hovered);
+        outline(ui, axis, on_bar);
         return;
     }
     let hover = paint_bar(app, ui, id, axis, hovered.hover_pos());
+    outline(ui, axis, on_bar);
     let Some(layer) = app.layers.get_mut(id) else {
         return;
     };
@@ -171,20 +178,34 @@ fn bar_row(
     draw_clip_triangles(ui, axis, color, id);
     draw_end_range_inputs(ui, axis, color);
     if let Some(value) = hover {
-        let mut buf = [0u8; TICK_BUF + 48];
-        let text = crate::i18n::fill(&mut buf, tr(K::HoveredValue), &[&ScientificTick(value)]);
-        let on_bar = hovered.id == bar_id;
-        hovered.on_hover_ui(|ui| {
-            ui.label(text);
-            if on_bar {
-                ui.label(
-                    egui::RichText::new(tr(K::ChangeColormapHover))
-                        .small()
-                        .weak(),
-                );
-            }
-        });
+        value_tooltip(hovered, value, on_bar);
     }
+}
+
+/// Outlines the bar on `axis` while it is hovered (`on`), as clickable.
+fn outline(ui: &egui::Ui, axis: BarAxis, on: bool) {
+    if on {
+        let stroke = ui.visuals().widgets.hovered.fg_stroke;
+        ui.painter()
+            .rect_stroke(axis.rect, 2.0, stroke, egui::StrokeKind::Outside);
+    }
+}
+
+/// The hovered `value` as `response`'s tooltip, with the click hint while
+/// over the bar (`on_bar`).
+fn value_tooltip(response: egui::Response, value: f32, on_bar: bool) {
+    let mut buf = [0u8; TICK_BUF + 48];
+    let text = crate::i18n::fill(&mut buf, tr(K::HoveredValue), &[&ScientificTick(value)]);
+    response.on_hover_ui(|ui| {
+        ui.label(text);
+        if on_bar {
+            ui.label(
+                egui::RichText::new(tr(K::ChangeColormapHover))
+                    .small()
+                    .weak(),
+            );
+        }
+    });
 }
 
 /// The series bar of a line plot colored by series: no range inputs or clip
