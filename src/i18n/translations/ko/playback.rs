@@ -10,7 +10,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::NextStep => "다음 스텝",
         PlaybackKey::LastStep => "마지막 스텝",
         PlaybackKey::Crop => "자르기",
-        PlaybackKey::CropHover => "자르기 안내선 (C)",
+        PlaybackKey::CropHover => "자르기 안내선",
         PlaybackKey::PlaybackSpeed => "재생 속도",
         PlaybackKey::PlaybackBuffer => "재생 전 버퍼링",
         PlaybackKey::Buffering => "버퍼링 중 {}/{}",

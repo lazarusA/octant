@@ -14,7 +14,7 @@ pub mod types;
 pub use types::AboutTab;
 
 use crate::app::OctantApp;
-use crate::i18n::{AboutKey, CommonKey, tr};
+use crate::i18n::{AboutKey, CommonKey, KeymapKey, tr};
 use crate::ui::icons::UiIconExt;
 use crate::ui::keyboard::focus;
 use icons::show_icons_tab;
@@ -52,6 +52,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     };
 
     let mut open = true;
+    let mut shortcuts = false;
     let response = egui::Window::new(title)
         .title_bar(false)
         .default_size(default_size)
@@ -65,12 +66,15 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
             focus::trap(ui, opened);
             egui::Frame::default()
                 .inner_margin(egui::Margin::symmetric(14, 8))
-                .show(ui, |ui| open = window_body(ui, &mut active_tab));
+                .show(ui, |ui| {
+                    open = window_body(ui, &mut active_tab, &mut shortcuts)
+                });
         });
 
     ctx.data_mut(|d| d.insert_temp(storage_id, active_tab));
     let rect = response.map(|r| r.response.rect);
-    app.layout.show_about_window = open && !dismissed(ctx, rect);
+    app.layout.show_about_window = open && !shortcuts && !dismissed(ctx, rect);
+    app.layout.show_shortcuts |= shortcuts;
 }
 
 /// Default, minimum and maximum window size. Both tabs share one width so
@@ -88,9 +92,10 @@ fn window_sizes(tab: AboutTab, screen: egui::Vec2) -> (egui::Vec2, egui::Vec2, e
     )
 }
 
-/// Tab bar, active tab content and footer. Returns `false` once the close
-/// button is clicked.
-fn window_body(ui: &mut egui::Ui, active_tab: &mut AboutTab) -> bool {
+/// Tab bar, active tab content and footer, whose link sets `shortcuts` to
+/// open the keyboard shortcut list. Returns `false` once the close button is
+/// clicked.
+fn window_body(ui: &mut egui::Ui, active_tab: &mut AboutTab, shortcuts: &mut bool) -> bool {
     let mut open = true;
     ui.horizontal(|ui| {
         let mut label_buf = [0; 64];
@@ -121,7 +126,10 @@ fn window_body(ui: &mut egui::Ui, active_tab: &mut AboutTab) -> bool {
     ui.add_space(6.0);
     ui.separator();
     ui.add_space(4.0);
-    ui.small(tr(AboutKey::Licensed));
+    ui.horizontal_wrapped(|ui| {
+        ui.small(tr(AboutKey::Licensed));
+        *shortcuts = ui.link(tr(KeymapKey::Title)).clicked();
+    });
     open
 }
 

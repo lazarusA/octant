@@ -12,6 +12,7 @@ use egui::Context;
 pub struct Gate {
     /// The panel Escape closes.
     panel: Option<Panel>,
+    free: bool,
     canvas: bool,
     playback: bool,
 }
@@ -28,6 +29,7 @@ impl Gate {
         let canvas = free && plot_shown;
         Self {
             panel,
+            free,
             canvas,
             playback: canvas && app.has_animated_dimension(),
         }
@@ -37,6 +39,7 @@ impl Gate {
         match scope {
             Scope::Global => true,
             Scope::Panel => self.panel.is_some(),
+            Scope::Free => self.free,
             Scope::Canvas => self.canvas,
             Scope::Playback => self.playback,
         }
@@ -49,6 +52,7 @@ fn modal_open(app: &OctantApp) -> bool {
     layout.show_catalog_window
         || layout.show_about_window
         || layout.show_icon_gallery_window
+        || layout.show_shortcuts
         || app.show_export_modal
 }
 
@@ -88,6 +92,7 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
         Action::FirstStep => app.step_first(),
         Action::LastStep => app.step_last(),
         Action::ToggleLoop => app.playback.loop_playback = !app.playback.loop_playback,
+        Action::ShowShortcuts => app.layout.show_shortcuts = true,
         // Regions hold focus outside modal windows only.
         Action::NextRegion | Action::PreviousRegion | Action::FocusTopBar if modal_open(app) => {}
         Action::NextRegion => regions::cycle(ctx, true),

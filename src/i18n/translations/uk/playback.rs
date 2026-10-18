@@ -10,7 +10,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::NextStep => "Наступний крок",
         PlaybackKey::LastStep => "Останній крок",
         PlaybackKey::Crop => "Обрізати",
-        PlaybackKey::CropHover => "Напрямні лінії обрізання (C)",
+        PlaybackKey::CropHover => "Напрямні лінії обрізання",
         PlaybackKey::PlaybackSpeed => "Швидкість відтворення",
         PlaybackKey::PlaybackBuffer => "Буферизація перед відтворенням",
         PlaybackKey::Buffering => "Буферизація {}/{}",

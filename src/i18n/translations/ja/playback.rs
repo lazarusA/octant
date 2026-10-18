@@ -10,7 +10,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::NextStep => "次のステップ",
         PlaybackKey::LastStep => "最後のステップ",
         PlaybackKey::Crop => "切り抜き",
-        PlaybackKey::CropHover => "切り抜きガイド線 (C)",
+        PlaybackKey::CropHover => "切り抜きガイド線",
         PlaybackKey::PlaybackSpeed => "再生速度",
         PlaybackKey::PlaybackBuffer => "再生前のバッファ",
         PlaybackKey::Buffering => "バッファリング中 {}/{}",

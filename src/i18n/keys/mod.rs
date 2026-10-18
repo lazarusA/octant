@@ -25,6 +25,7 @@ mod common;
 mod dataset;
 mod export;
 mod hover;
+mod keymap;
 mod notices;
 mod playback;
 mod plot;
@@ -38,6 +39,7 @@ pub use common::CommonKey;
 pub use dataset::DatasetKey;
 pub use export::ExportKey;
 pub use hover::HoverKey;
+pub use keymap::KeymapKey;
 pub use notices::NoticesKey;
 pub use playback::PlaybackKey;
 pub use plot::PlotKey;
@@ -58,6 +60,7 @@ pub enum Key {
     Colormap(ColormapKey),
     Export(ExportKey),
     Hover(HoverKey),
+    Keymap(KeymapKey),
     About(AboutKey),
     Notices(NoticesKey),
 }
@@ -128,6 +131,12 @@ impl From<AboutKey> for Key {
     }
 }
 
+impl From<KeymapKey> for Key {
+    fn from(key: KeymapKey) -> Self {
+        Key::Keymap(key)
+    }
+}
+
 impl From<NoticesKey> for Key {
     fn from(key: NoticesKey) -> Self {
         Key::Notices(key)
@@ -151,6 +160,7 @@ impl Key {
             .chain(ExportKey::ALL.iter().copied().map(Key::from))
             .chain(HoverKey::ALL.iter().copied().map(Key::from))
             .chain(AboutKey::ALL.iter().copied().map(Key::from))
+            .chain(KeymapKey::ALL.iter().copied().map(Key::from))
             .chain(NoticesKey::ALL.iter().copied().map(Key::from))
     }
 }

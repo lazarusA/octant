@@ -10,7 +10,7 @@ pub fn text(key: PlaybackKey) -> &'static str {
         PlaybackKey::NextStep => "Next Step",
         PlaybackKey::LastStep => "Last Step",
         PlaybackKey::Crop => "Crop",
-        PlaybackKey::CropHover => "Crop Guiding Lines (C)",
+        PlaybackKey::CropHover => "Crop Guiding Lines",
         PlaybackKey::PlaybackSpeed => "Playback Speed",
         PlaybackKey::PlaybackBuffer => "Buffer Before Playing",
         PlaybackKey::Buffering => "Buffering {}/{}",

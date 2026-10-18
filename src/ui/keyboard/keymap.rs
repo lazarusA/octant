@@ -24,6 +24,7 @@ pub enum Action {
     FirstStep,
     LastStep,
     ToggleLoop,
+    ShowShortcuts,
     /// Run by the canvas as it draws, knowing the plot's geometry.
     Canvas(CanvasAction),
 }
@@ -51,8 +52,10 @@ pub enum Scope {
     /// Escape in a floating panel, once the widget focused there let it go
     /// and no popup took it (`focus::escaped_layer`).
     Panel,
-    /// Single keys on a shown plot: only while nothing or the canvas holds
-    /// focus and no popup or modal window is open.
+    /// Single keys while nothing or the canvas holds focus and no popup or
+    /// modal window is open.
+    Free,
+    /// [`Scope::Free`] keys on a shown plot.
     Canvas,
     /// Canvas keys of a plot with an animated dimension.
     Playback,
@@ -167,7 +170,18 @@ pub const TABLE: &[Shortcut] = &[
     playback(Action::FirstStep, Key::Home),
     playback(Action::LastStep, Key::End),
     playback(Action::ToggleLoop, Key::L),
+    Shortcut {
+        action: Action::ShowShortcuts,
+        keys: Keys::One(Key::Questionmark),
+        mods: Modifiers::NONE,
+        scope: Scope::Free,
+    },
 ];
+
+/// The first shortcut bound to `action`, as tooltips name it.
+pub fn shortcut_of(action: Action) -> Option<&'static Shortcut> {
+    TABLE.iter().find(|s| s.action == action)
+}
 
 /// An arrow key's direction on screen (y down).
 pub fn arrow_direction(key: Key) -> Option<Vec2> {

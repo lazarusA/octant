@@ -11,6 +11,7 @@
 use super::Icon;
 use super::style::{ICON_GAP, IconSize, IconTone};
 use crate::ui::keyboard::focus;
+use crate::ui::keyboard::keymap::Action;
 use egui::{Galley, Rect, Response, Sense, TextStyle, Ui, Widget, WidgetText, pos2, vec2};
 use std::sync::Arc;
 
@@ -35,6 +36,8 @@ pub struct ToolbarButton<'a> {
     switch: Option<bool>,
     icon_size: IconSize,
     sense: Sense,
+    /// The keymap action whose keys the tooltip names.
+    shortcut: Option<Action>,
 }
 
 impl<'a> ToolbarButton<'a> {
@@ -49,7 +52,15 @@ impl<'a> ToolbarButton<'a> {
             switch: None,
             icon_size: IconSize::Md,
             sense: Sense::click(),
+            shortcut: None,
         }
+    }
+
+    /// Name `action`'s keys in the tooltip, which then shows even beside
+    /// the label.
+    pub fn shortcut(mut self, action: Action) -> Self {
+        self.shortcut = Some(action);
+        self
     }
 
     /// Hide the label and show it as the hover tooltip instead.
@@ -203,23 +214,13 @@ impl Widget for ToolbarButton<'_> {
             }
         }
 
-        let name = if self.label.is_empty() {
-            self.hover.unwrap_or_default()
-        } else {
-            self.label
+        let tip = super::button_tip::Tip {
+            label: self.label,
+            hover: self.hover,
+            compact: self.compact,
+            switch: self.switch,
+            shortcut: self.shortcut,
         };
-        response.widget_info(|| match self.switch {
-            Some(on) => egui::WidgetInfo::selected(egui::Role::Button, true, on, name),
-            None => egui::WidgetInfo::labeled(egui::Role::Button, true, name),
-        });
-        let Some(tip) = self.hover.or(self.compact.then_some(self.label)) else {
-            return response;
-        };
-        // Keyboard focus shows the tooltip a pointer would, so an icon-only
-        // button still says what it does.
-        if focus::shows_tooltip(&response) {
-            response.show_tooltip_text(tip);
-        }
-        response.on_hover_text(tip)
+        tip.attach(response)
     }
 }

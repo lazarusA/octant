@@ -7,6 +7,7 @@ use super::timeline::Timeline;
 use crate::app::OctantApp;
 use crate::i18n::{CommonKey, PlaybackKey as K, tr};
 use crate::ui::icons::{Icon, ToolbarButton};
+use crate::ui::keyboard::keymap::Action;
 use crate::ui::number_input::LocalizedInput;
 use crate::ui::toolbar::roving::{BarNav, Stop};
 use crate::ui::toolbar::{BarItem, ItemWidths, SEPARATOR_WIDTH};
@@ -33,24 +34,35 @@ fn button<'a>(
     label: &'a str,
     compact: bool,
 ) -> Option<ToolbarButton<'a>> {
-    let icon_only = |icon, label| Some(ToolbarButton::new(icon, label).compact(true));
+    let icon_only = |icon, label, action| {
+        Some(
+            ToolbarButton::new(icon, label)
+                .compact(true)
+                .shortcut(action),
+        )
+    };
     let labelled = |icon, label| Some(ToolbarButton::new(icon, label).compact(compact));
+    let play = |icon, label| labelled(icon, label).map(|b| b.shortcut(Action::PlayPause));
     match item {
-        Item::First => icon_only(Icon::SeekStart, tr(K::FirstStep)),
-        Item::Prev => icon_only(Icon::StepBackward, tr(K::PreviousStep)),
-        Item::Next => icon_only(Icon::StepForward, tr(K::NextStep)),
-        Item::Last => icon_only(Icon::SeekEnd, tr(K::LastStep)),
+        Item::First => icon_only(Icon::SeekStart, tr(K::FirstStep), Action::FirstStep),
+        Item::Prev => icon_only(Icon::StepBackward, tr(K::PreviousStep), Action::StepPrev),
+        Item::Next => icon_only(Icon::StepForward, tr(K::NextStep), Action::StepNext),
+        Item::Last => icon_only(Icon::SeekEnd, tr(K::LastStep), Action::LastStep),
         // Waiting for the buffer: its progress, and a click still pauses.
         Item::PlayPause if is_buffering(app) => {
-            labelled(Icon::Hourglass, label).map(|b| b.hover(tr(K::Pause)))
+            play(Icon::Hourglass, label).map(|b| b.hover(tr(K::Pause)))
         }
-        Item::PlayPause if app.playback.is_playing => labelled(Icon::Pause, tr(K::Pause)),
-        Item::PlayPause => labelled(Icon::Play, tr(K::Play)),
-        Item::Loop => {
-            labelled(Icon::Loop, tr(K::Loop)).map(|b| b.toggled(app.playback.loop_playback))
-        }
-        Item::Crop => labelled(Icon::Scissors, tr(K::Crop))
-            .map(|b| b.toggled(app.show_crop_overlay).hover(tr(K::CropHover))),
+        Item::PlayPause if app.playback.is_playing => play(Icon::Pause, tr(K::Pause)),
+        Item::PlayPause => play(Icon::Play, tr(K::Play)),
+        Item::Loop => labelled(Icon::Loop, tr(K::Loop)).map(|b| {
+            b.toggled(app.playback.loop_playback)
+                .shortcut(Action::ToggleLoop)
+        }),
+        Item::Crop => labelled(Icon::Scissors, tr(K::Crop)).map(|b| {
+            b.toggled(app.show_crop_overlay)
+                .hover(tr(K::CropHover))
+                .shortcut(Action::ToggleCrop)
+        }),
         // Collapsed, the FPS value itself becomes the tooltip.
         Item::Fps => labelled(Icon::Gauge, label).map(|b| {
             let b = b.owns_popup();

@@ -34,6 +34,8 @@ pub struct UiLayoutState {
     pub show_catalog_window: bool,
     pub show_about_window: bool,
     pub show_icon_gallery_window: bool,
+    /// The keyboard shortcut list.
+    pub show_shortcuts: bool,
     pub catalog_search_query: String,
     pub catalog_category_filter: crate::catalog::CatalogCategoryFilter,
 }
@@ -64,6 +66,7 @@ impl Default for UiLayoutState {
             show_catalog_window: false,
             show_about_window: false,
             show_icon_gallery_window: false,
+            show_shortcuts: false,
             catalog_search_query: String::new(),
             catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
         }
@@ -99,6 +102,7 @@ impl UiLayoutState {
         self.show_catalog_window = false;
         self.show_about_window = false;
         self.show_icon_gallery_window = false;
+        self.show_shortcuts = false;
     }
 }
 

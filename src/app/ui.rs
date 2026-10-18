@@ -157,6 +157,7 @@ impl eframe::App for OctantApp {
         crate::ui::about::show_about_window(self, &ctx);
         crate::ui::about::show_icon_gallery_window(self, &ctx);
         crate::ui::export_modal::show_export_modal(self, &ctx);
+        crate::ui::keyboard::help::show(self, &ctx);
 
         // Overlays anchor relative to the remaining canvas rect
         let canvas_rect = ui.available_rect_before_wrap();

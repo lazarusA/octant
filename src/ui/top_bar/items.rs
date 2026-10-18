@@ -4,6 +4,7 @@ use super::layout::TopBarItem;
 use crate::app::OctantApp;
 use crate::i18n::{CommonKey, tr};
 use crate::ui::icons::{Icon, TOOLBAR_ITEM_HEIGHT, ToolbarButton};
+use crate::ui::keyboard::keymap::Action;
 use crate::ui::panel_layout::Panel;
 use crate::ui::toolbar::roving::{BarNav, Stop};
 use crate::ui::toolbar::{ItemWidths, SEPARATOR_WIDTH};
@@ -153,7 +154,8 @@ fn panel_button(
 ) -> (egui::Response, Stop) {
     let mut btn = ToolbarButton::new(icon, label(item, app))
         .compact(compact)
-        .active(app.layout.panel_shown(panel));
+        .active(app.layout.panel_shown(panel))
+        .shortcut(Action::TogglePanel(panel));
     if panel == Panel::Dimensions {
         btn = btn.hover(tr(CommonKey::ToggleVariableControlsHover));
     }

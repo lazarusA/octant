@@ -10,7 +10,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::NextStep => "Langkah Berikutnya",
         PlaybackKey::LastStep => "Langkah Terakhir",
         PlaybackKey::Crop => "Potong",
-        PlaybackKey::CropHover => "Garis Panduan Potong (C)",
+        PlaybackKey::CropHover => "Garis Panduan Potong",
         PlaybackKey::PlaybackSpeed => "Kecepatan Putar",
         PlaybackKey::PlaybackBuffer => "Buffer Sebelum Putar",
         PlaybackKey::Buffering => "Memuat buffer {}/{}",
