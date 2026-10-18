@@ -42,7 +42,5 @@ crate::i18n::keys::define_keys! {
     ScopeHero,
     PlotTypePicker,
     PlotStaged,
-    PickerTitle,
-    PickerHint,
     }
 }

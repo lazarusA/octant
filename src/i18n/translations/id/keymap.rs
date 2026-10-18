@@ -42,7 +42,5 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "Di layar awal",
         KeymapKey::PlotTypePicker => "Pilih jenis plot",
         KeymapKey::PlotStaged => "Plot variabel yang dipilih",
-        KeymapKey::PickerTitle => "Jenis Plot",
-        KeymapKey::PickerHint => "Tekan 1-6, atau pindah dengan panah lalu tekan Enter",
     })
 }

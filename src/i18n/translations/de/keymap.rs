@@ -44,7 +44,5 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "Auf der Startseite",
         KeymapKey::PlotTypePicker => "Darstellungsart wählen",
         KeymapKey::PlotStaged => "Gewählte Variable darstellen",
-        KeymapKey::PickerTitle => "Darstellungsart",
-        KeymapKey::PickerHint => "1-6 drücken oder mit den Pfeiltasten wählen und Enter drücken",
     })
 }

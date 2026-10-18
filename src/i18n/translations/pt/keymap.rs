@@ -42,7 +42,5 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "Na tela inicial",
         KeymapKey::PlotTypePicker => "Escolher o tipo de gráfico",
         KeymapKey::PlotStaged => "Plotar a variável selecionada",
-        KeymapKey::PickerTitle => "Tipo de gráfico",
-        KeymapKey::PickerHint => "Pressione 1-6, ou mova-se com as setas e pressione Enter",
     })
 }

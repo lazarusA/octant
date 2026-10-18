@@ -42,7 +42,5 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "在起始页",
         KeymapKey::PlotTypePicker => "选择绘图类型",
         KeymapKey::PlotStaged => "绘制所选变量",
-        KeymapKey::PickerTitle => "绘图类型",
-        KeymapKey::PickerHint => "按 1-6，或用方向键移动后按 Enter",
     })
 }

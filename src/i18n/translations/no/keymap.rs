@@ -42,7 +42,5 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "På startskjermen",
         KeymapKey::PlotTypePicker => "Velg plottype",
         KeymapKey::PlotStaged => "Plott den valgte variabelen",
-        KeymapKey::PickerTitle => "Plottype",
-        KeymapKey::PickerHint => "Trykk 1-6, eller flytt med piltastene og trykk Enter",
     })
 }

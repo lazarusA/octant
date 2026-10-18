@@ -46,7 +46,5 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "På startskärmen",
         KeymapKey::PlotTypePicker => "Välj diagramtyp",
         KeymapKey::PlotStaged => "Rita den valda variabeln",
-        KeymapKey::PickerTitle => "Diagramtyp",
-        KeymapKey::PickerHint => "Tryck 1-6, eller flytta med piltangenterna och tryck Enter",
     })
 }

@@ -42,7 +42,5 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "시작 화면에서",
         KeymapKey::PlotTypePicker => "플롯 종류 선택",
         KeymapKey::PlotStaged => "선택한 변수 플롯",
-        KeymapKey::PickerTitle => "플롯 종류",
-        KeymapKey::PickerHint => "1-6을 누르거나 화살표로 이동한 뒤 Enter",
     })
 }

@@ -5,6 +5,8 @@
 pub mod options;
 pub mod picker;
 #[cfg(test)]
+mod sheet;
+#[cfg(test)]
 mod tests;
 
 use crate::app::OctantApp;

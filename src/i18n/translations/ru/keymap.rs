@@ -46,7 +46,5 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "На начальном экране",
         KeymapKey::PlotTypePicker => "Выбрать тип графика",
         KeymapKey::PlotStaged => "Построить выбранную переменную",
-        KeymapKey::PickerTitle => "Тип графика",
-        KeymapKey::PickerHint => "Нажмите 1-6 или выберите стрелками и нажмите Enter",
     })
 }

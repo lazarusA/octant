@@ -42,7 +42,5 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "Nella schermata iniziale",
         KeymapKey::PlotTypePicker => "Scegli il tipo di grafico",
         KeymapKey::PlotStaged => "Disegna la variabile selezionata",
-        KeymapKey::PickerTitle => "Tipo di grafico",
-        KeymapKey::PickerHint => "Premi 1-6, oppure muoviti con le frecce e premi Invio",
     })
 }

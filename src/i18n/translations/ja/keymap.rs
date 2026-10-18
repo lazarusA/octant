@@ -42,7 +42,5 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "スタート画面で",
         KeymapKey::PlotTypePicker => "プロットの種類を選ぶ",
         KeymapKey::PlotStaged => "選んだ変数をプロット",
-        KeymapKey::PickerTitle => "プロットの種類",
-        KeymapKey::PickerHint => "1-6 を押すか、矢印キーで選んで Enter",
     })
 }

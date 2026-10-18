@@ -46,7 +46,5 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ScopeHero => "Sur l'écran d'accueil",
         KeymapKey::PlotTypePicker => "Choisir le type de graphique",
         KeymapKey::PlotStaged => "Tracer la variable sélectionnée",
-        KeymapKey::PickerTitle => "Type de graphique",
-        KeymapKey::PickerHint => "Appuyez sur 1-6, ou déplacez-vous avec les flèches puis Entrée",
     })
 }

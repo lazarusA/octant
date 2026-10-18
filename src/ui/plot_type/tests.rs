@@ -63,12 +63,23 @@ fn arrows_and_enter_pick_and_escape_changes_nothing() {
     assert!(!app.layout.show_plot_picker);
     assert_eq!(app.selected.plot_type, PlotType::Heatmap);
 
-    // Focus starts on the current type; Down moves to the next one.
+    // Focus starts on the current type; Right moves to the next tile.
     press(&mut h, &mut app, Key::P);
-    press(&mut h, &mut app, Key::ArrowDown);
+    press(&mut h, &mut app, Key::ArrowRight);
     press(&mut h, &mut app, Key::Enter);
     assert_eq!(app.selected.plot_type, PlotType::Line);
     assert!(!app.layout.show_plot_picker);
+}
+
+#[test]
+fn a_click_outside_closes_the_picker() {
+    let mut app = plotted(PlotType::Heatmap);
+    let mut h = Harness::new(SCREEN);
+    h.settle(2, &mut run(&mut app));
+    press(&mut h, &mut app, Key::P);
+    h.click(pos2(5.0, 5.0), &mut run(&mut app));
+    assert!(!app.layout.show_plot_picker);
+    assert_eq!(app.selected.plot_type, PlotType::Heatmap);
 }
 
 #[test]
