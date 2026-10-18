@@ -23,7 +23,7 @@ pub fn show(app: &mut OctantApp, ctx: &egui::Context) {
     let mac = labels::is_mac(ctx);
     let max_height = ctx.viewport_rect().height() * 0.7;
     let mut open = true;
-    egui::Window::new(tr(K::Title))
+    let window = egui::Window::new(tr(K::Title))
         .id(id)
         .title_bar(false)
         .resizable(false)
@@ -43,7 +43,8 @@ pub fn show(app: &mut OctantApp, ctx: &egui::Context) {
                 .max_height(max_height)
                 .show(ui, |ui| shortcut_list(ui, mac));
         });
-    if !open || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+    let dismissed = window.is_some_and(|w| windows::dismissed(ctx, w.response.rect));
+    if !open || dismissed {
         app.layout.show_shortcuts = false;
     }
 }
@@ -60,7 +61,7 @@ fn shortcut_list(ui: &mut egui::Ui, mac: bool) {
                 let keys = labels::write_keys(&mut buf, shortcut, mac);
                 let keys = egui::Label::new(egui::RichText::new(keys).monospace().strong());
                 ui.add_sized([KEYS_W, ui.spacing().interact_size.y], keys);
-                ui.add(egui::Label::new(tr(labels::describe(shortcut.action))).wrap());
+                ui.add(egui::Label::new(tr(shortcut.label)).wrap());
             });
         }
     }

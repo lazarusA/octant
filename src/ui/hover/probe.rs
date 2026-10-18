@@ -16,9 +16,7 @@ pub fn position(ctx: &Context) -> Option<Pos2> {
 /// Starts the probe at `at`, or stops it.
 pub fn toggle(ctx: &Context, at: Pos2) {
     ctx.data_mut(|d| {
-        if d.get_temp::<Pos2>(probe_id()).is_some() {
-            d.remove::<Pos2>(probe_id());
-        } else {
+        if d.remove_temp::<Pos2>(probe_id()).is_none() {
             d.insert_temp(probe_id(), at);
         }
     });

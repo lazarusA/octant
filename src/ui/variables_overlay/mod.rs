@@ -19,7 +19,7 @@ mod stack_tests;
 #[cfg(test)]
 mod tests;
 
-pub use focus::request_search as focus_search;
+pub use focus::focus_search;
 pub use search::SearchCache;
 
 use crate::app::OctantApp;

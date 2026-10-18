@@ -8,15 +8,6 @@ use egui::{Color32, Pos2, Rect, Response, Shape, Stroke, Ui, Vec2, ecolor::Hsva}
 /// How far one arrow press moves a value along its 0..1 range.
 const KEY_STEP: f32 = 0.01;
 
-/// The arrow pressed on focused `response`, as a direction (y down).
-fn arrow(response: &Response) -> Option<Vec2> {
-    if !response.has_focus() {
-        return None;
-    }
-    focus::claim_arrows(&response.ctx, response.id);
-    focus::pressed_arrow(&response.ctx)
-}
-
 /// Where the pointer drags or clicks `response`, as fractions of its rect.
 fn pointer_at(ui: &Ui, response: &Response) -> Option<Vec2> {
     if !(response.dragged() || response.clicked()) {
@@ -71,7 +62,7 @@ pub(super) fn sv_plane(ui: &mut Ui, hsva: &mut Hsva, width: f32) -> bool {
         hsva.v = 1.0 - at.y;
         changed = true;
     }
-    if let Some(d) = arrow(&response) {
+    if let Some(d) = focus::arrow_on(&response) {
         hsva.s = (hsva.s + d.x * KEY_STEP).clamp(0.0, 1.0);
         hsva.v = (hsva.v - d.y * KEY_STEP).clamp(0.0, 1.0);
         changed = true;
@@ -114,7 +105,7 @@ fn strip(ui: &mut Ui, value: &mut f32, width: f32) -> (bool, Response) {
         *value = at.x;
         changed = true;
     }
-    if let Some(d) = arrow(&response) {
+    if let Some(d) = focus::arrow_on(&response) {
         *value = (*value + d.x * KEY_STEP).clamp(0.0, 1.0);
         changed = true;
     }
@@ -144,28 +135,7 @@ pub(super) fn hue_strip(ui: &mut Ui, hsva: &mut Hsva, width: f32) -> bool {
 pub(super) fn alpha_strip(ui: &mut Ui, hsva: &mut Hsva, width: f32) -> bool {
     let (changed, response) = strip(ui, &mut hsva.a, width);
     let rect = response.rect;
-    let grid = 5.0;
-    let mut x = rect.min.x;
-    while x < rect.max.x {
-        let col = ((x - rect.min.x) / grid) as usize;
-        let mut y = rect.min.y;
-        while y < rect.max.y {
-            let row = ((y - rect.min.y) / grid) as usize;
-            let gray = if (row + col).is_multiple_of(2) {
-                180
-            } else {
-                240
-            };
-            let cell = Rect::from_min_max(
-                Pos2::new(x, y),
-                Pos2::new((x + grid).min(rect.max.x), (y + grid).min(rect.max.y)),
-            );
-            ui.painter()
-                .rect_filled(cell, 0.0, Color32::from_gray(gray));
-            y += grid;
-        }
-        x += grid;
-    }
+    crate::ui::colorbar::checker::paint_checker(ui.painter(), rect, ui.visuals().dark_mode);
     let clear = Color32::from(Hsva::new(hsva.h, hsva.s, hsva.v, 0.0));
     let opaque = Color32::from(Hsva::new(hsva.h, hsva.s, hsva.v, 1.0));
     gradient(ui, rect, [clear, opaque, opaque, clear]);

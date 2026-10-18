@@ -135,8 +135,8 @@ fn row(
         let pos = egui::pos2(name_x, rect.center().y - galley.size().y / 2.0);
         ui.painter().galley(pos, galley, text_color);
     }
-    let response = response.on_hover_ui(|ui| {
+    focus::tooltip_ui(response, |ui| {
         registry::with_entry(id, |e| label::hover_details(ui, e));
-    });
-    response.on_hover_cursor(egui::CursorIcon::PointingHand)
+    })
+    .on_hover_cursor(egui::CursorIcon::PointingHand)
 }

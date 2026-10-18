@@ -59,16 +59,19 @@ pub fn show_plot_type_picker(app: &mut OctantApp, ctx: &egui::Context) {
             let fill = ui.visuals().window_fill.gamma_multiply(FILL_ALPHA);
             egui::Frame::window(ui.style()).fill(fill).show(ui, |ui| {
                 ui.set_width(WIDTH);
-                picked = contents(ui, &options, current, opened);
+                // Focus starts on the current type, else the first pickable.
+                let pickable = |o: &PlotOption| o.blocked.is_none();
+                let start = options
+                    .iter()
+                    .position(|o| o.plot_type == current && pickable(o))
+                    .or_else(|| options.iter().position(pickable));
+                if let Some(index) = start.filter(|_| opened) {
+                    focus::request(ui.ctx(), tile_id(index));
+                }
+                picked = tiles(ui, &options, current);
             });
         });
-    let outside = ctx.input(|i| {
-        i.pointer.primary_clicked()
-            && i.pointer
-                .interact_pos()
-                .is_some_and(|p| !area.response.rect.contains(p))
-    });
-    let mut close = outside || ctx.input(|i| i.key_pressed(Key::Escape));
+    let mut close = windows::dismissed(ctx, area.response.rect);
     if let Some(plot_type) = picked.or_else(|| digit_pick(ctx, &options)) {
         app.switch_plot_type(plot_type);
         close = true;
@@ -88,50 +91,28 @@ fn digit_pick(ctx: &egui::Context, options: &[PlotOption; 6]) -> Option<PlotType
         .map(|o| o.plot_type)
 }
 
-/// The row of tiles, focus starting on the `current` type once the picker
-/// `opened`; the type a tile's click (or Enter) picked.
-fn contents(
-    ui: &mut Ui,
-    options: &[PlotOption; 6],
-    current: PlotType,
-    opened: bool,
-) -> Option<PlotType> {
-    let start = options
-        .iter()
-        .position(|o| o.plot_type == current && o.blocked.is_none())
-        .or_else(|| options.iter().position(|o| o.blocked.is_none()));
-    if let Some(index) = start.filter(|_| opened) {
-        focus::request(ui.ctx(), tile_id(index));
-    }
-    tiles(ui, options, current)
-}
-
-/// The tiles, and the arrows moving focus between the pickable ones; the
-/// type a tile's click (or Enter) picked.
+/// The tiles, the arrows moving focus between the pickable ones; the type
+/// a tile's click (or Enter) picked.
 fn tiles(ui: &mut Ui, options: &[PlotOption; 6], current: PlotType) -> Option<PlotType> {
-    let (mut focused, mut picked) = (None, None);
+    let (mut picked, mut arrow) = (None, None);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = GAP;
         for (index, option) in options.iter().enumerate() {
             let response = tile(ui, index, *option, option.plot_type == current);
-            focused = focused.or(response.has_focus().then_some(index));
+            arrow = arrow.or(focus::arrow_on(&response).map(|d| (index, d.x + d.y)));
             if response.clicked() {
                 picked = Some(option.plot_type);
             }
         }
     });
-    if let Some(at) = focused {
-        focus::claim_arrows(ui.ctx(), tile_id(at));
-        let step = focus::pressed_arrow(ui.ctx()).map(|d| d.x + d.y);
-        let pickable = |&i: &usize| options[i].blocked.is_none();
-        let next = match step {
-            Some(s) if s > 0.0 => (at + 1..options.len()).find(pickable),
-            Some(s) if s < 0.0 => (0..at).rev().find(pickable),
-            _ => None,
-        };
-        if let Some(next) = next {
-            focus::request(ui.ctx(), tile_id(next));
-        }
+    let pickable = |&i: &usize| options[i].blocked.is_none();
+    let next = match arrow {
+        Some((at, step)) if step > 0.0 => (at + 1..options.len()).find(pickable),
+        Some((at, step)) if step < 0.0 => (0..at).rev().find(pickable),
+        _ => None,
+    };
+    if let Some(next) = next {
+        focus::request(ui.ctx(), tile_id(next));
     }
     picked
 }
@@ -172,11 +153,7 @@ fn tile(ui: &mut Ui, index: usize, option: PlotOption, selected: bool) -> Respon
     ui.painter()
         .text(corner, Align2::RIGHT_BOTTOM, digit, small, weak);
     focus::paint_ring(ui, &response, radius);
-    let tip = |ui: &mut Ui| tooltip(ui, option);
-    if focus::shows_tooltip(&response) {
-        response.show_tooltip_ui(tip);
-    }
-    response.on_hover_ui(tip)
+    focus::tooltip_ui(response, |ui| tooltip(ui, option))
 }
 
 /// A tile's tooltip: the type's name, and why it cannot be picked.

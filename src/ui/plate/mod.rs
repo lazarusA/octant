@@ -85,8 +85,7 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
     grid_names(ui, &grid, layout);
     let painter = ui.painter_at(rect);
     let well_id = |i: usize| ui.scope_id().with(("plate_well", i));
-    let mut action = None;
-    let mut focused = None;
+    let (mut action, mut arrow) = (None, None);
     for (i, well) in layout.wells.iter().enumerate() {
         if well.row >= rows || well.column >= columns {
             continue;
@@ -94,20 +93,15 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
         let cell = grid.cell(well.row, well.column).shrink(1.0);
         let response = ui.interact(cell, well_id(i), egui::Sense::click());
         paint_well(ui, &painter, plate, i, &response);
-        if response.has_focus() {
-            focused = Some(i);
-            focus::claim_arrows(ui.ctx(), response.id);
-        }
+        arrow = arrow.or(focus::arrow_on(&response).map(|d| (i, d)));
         if response.clicked() {
             action = Some(PlateAction::PickWell(i));
         }
-        response.on_hover_text(well.path.as_str());
+        focus::tooltip_ui(response, |ui| {
+            ui.label(well.path.as_str());
+        });
     }
-    let step = focus::pressed_arrow(ui.ctx());
-    if let Some(next) = focused
-        .zip(step)
-        .and_then(|(at, d)| neighbor(layout, at, d))
-    {
+    if let Some(next) = arrow.and_then(|(at, d)| neighbor(layout, at, d)) {
         focus::request(ui.ctx(), well_id(next));
     }
     action

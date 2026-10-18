@@ -87,10 +87,7 @@ pub(super) fn show(
     let sense = egui::Sense::focusable_noninteractive();
     let date = ui.interact(drawn.response.rect, ui.scope_id().with("date_info"), sense);
     focus::paint_ring(ui, &date, 2.0);
-    if focus::shows_tooltip(&date) {
-        date.show_tooltip_ui(|ui| timeline_details(ui, tl, app));
-    }
-    Some(date.on_hover_ui(|ui| timeline_details(ui, tl, app)))
+    Some(focus::tooltip_ui(date, |ui| timeline_details(ui, tl, app)))
 }
 
 /// Popover body; formatted only while it is shown.

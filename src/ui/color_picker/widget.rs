@@ -68,7 +68,7 @@ impl<'a> ShapeColorPicker<'a> {
         };
 
         let style = ui.style();
-        let keyboard_focus = resp.has_focus() && crate::ui::keyboard::focus::visible(ui.ctx());
+        let keyboard_focus = crate::ui::keyboard::focus::keyboard_focused(&resp);
         let stroke = if resp.hovered() || keyboard_focus {
             egui::Stroke::new(1.5_f32, style.visuals.widgets.active.fg_stroke.color)
         } else {

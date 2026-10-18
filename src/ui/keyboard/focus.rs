@@ -84,6 +84,16 @@ pub fn pressed_arrow(ctx: &Context) -> Option<egui::Vec2> {
     super::keymap::arrow_direction(pressed(ctx, ARROWS)?)
 }
 
+/// The arrow pressed on `response` while it holds focus, keeping the arrows
+/// from egui's own focus moves (Escape still drops focus).
+pub fn arrow_on(response: &Response) -> Option<egui::Vec2> {
+    if !response.has_focus() {
+        return None;
+    }
+    claim_arrows_only(&response.ctx, response.id);
+    pressed_arrow(&response.ctx)
+}
+
 fn visible_id() -> Id {
     Id::unique("keyboard_focus_visible")
 }
@@ -130,17 +140,25 @@ pub fn advance_next_frame(ctx: &Context) {
     ctx.request_repaint();
 }
 
-/// Whether `response` should show its tooltip for keyboard focus: focused
-/// by keys and not hovered (the pointer shows it then).
-pub fn shows_tooltip(response: &Response) -> bool {
-    response.has_focus() && !response.hovered() && visible(&response.ctx)
+/// Whether `response` holds focus the keyboard gave it.
+pub fn keyboard_focused(response: &Response) -> bool {
+    response.has_focus() && visible(&response.ctx)
+}
+
+/// `add_contents` as `response`'s tooltip, on hover and under keyboard
+/// focus, so a widget that says what it is only on hover still says it.
+pub fn tooltip_ui(response: Response, add_contents: impl Fn(&mut Ui)) -> Response {
+    if keyboard_focused(&response) && !response.hovered() {
+        response.show_tooltip_ui(&add_contents);
+    }
+    response.on_hover_ui(add_contents)
 }
 
 /// Keyboard focus outline drawn inside `response`'s rect while it holds
 /// keyboard focus, shared by every custom widget so focus looks the same
 /// everywhere.
 pub fn paint_ring(ui: &Ui, response: &Response, radius: impl Into<egui::CornerRadius>) {
-    if response.has_focus() && visible(ui.ctx()) {
+    if keyboard_focused(response) {
         let stroke = ui.visuals().widgets.hovered.bg_stroke;
         ui.painter()
             .rect_stroke(response.rect, radius, stroke, egui::StrokeKind::Inside);

@@ -49,7 +49,7 @@ impl Entry {
 }
 
 /// Regions, in the order the variants are declared: visual order.
-const COUNT: usize = 8;
+const COUNT: usize = Region::BottomBar as usize + 1;
 
 impl Region {
     pub fn of(panel: Panel) -> Self {

@@ -5,7 +5,7 @@ use crate::app::OctantApp;
 use crate::i18n::{CommonKey, tr};
 use crate::ui::icons::{Icon, TOOLBAR_ITEM_HEIGHT, ToolbarButton};
 use crate::ui::keyboard::keymap::{self, Action};
-use crate::ui::keyboard::labels;
+use crate::ui::keyboard::{focus, labels};
 use crate::ui::panel_layout::Panel;
 use crate::ui::toolbar::roving::{BarNav, Stop};
 use crate::ui::toolbar::{ItemWidths, SEPARATOR_WIDTH};
@@ -83,13 +83,14 @@ pub(super) fn item_widths(item: TopBarItem, app: &OctantApp, ui: &egui::Ui) -> I
 /// Octant logo (toggles the hero view) and, unless compact, the brand label
 /// (opens About). Right-clicking the logo also opens About.
 fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool, nav: &mut BarNav) {
-    let icon_resp =
-        crate::ui::hero::draw_octant_widget(ui, TOOLBAR_ITEM_HEIGHT, [-1.0, -1.0, -1.0], 0.0, 1.0)
-            .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_ui(|ui| {
-                let keys = keymap::shortcut_of(Action::ToggleHero);
-                labels::tooltip(ui, tr(CommonKey::ToggleHeroHover), keys);
-            });
+    let logo =
+        crate::ui::hero::draw_octant_widget(ui, TOOLBAR_ITEM_HEIGHT, [-1.0, -1.0, -1.0], 0.0, 1.0);
+    focus::paint_ring(ui, &logo, 4.0);
+    let icon_resp = focus::tooltip_ui(logo, |ui| {
+        let keys = keymap::shortcut_of(Action::ToggleHero);
+        labels::tooltip(ui, tr(CommonKey::ToggleHeroHover), keys);
+    })
+    .on_hover_cursor(egui::CursorIcon::PointingHand);
     if icon_resp.clicked() {
         app.toggle_hero();
     }
@@ -99,10 +100,12 @@ fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool, nav: &mut B
     nav.push(&icon_resp, Stop::Button);
 
     if !compact {
-        let label_resp = ui
-            .add(egui::Label::new(brand_label_text()).sense(egui::Sense::click()))
-            .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text(tr(CommonKey::AboutOctantHover));
+        let label = ui.add(egui::Label::new(brand_label_text()).sense(egui::Sense::click()));
+        focus::paint_ring(ui, &label, 4.0);
+        let label_resp = focus::tooltip_ui(label, |ui| {
+            ui.label(tr(CommonKey::AboutOctantHover));
+        })
+        .on_hover_cursor(egui::CursorIcon::PointingHand);
         if label_resp.clicked() {
             app.layout.show_about_window = !app.layout.show_about_window;
         }

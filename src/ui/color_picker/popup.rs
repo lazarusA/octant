@@ -23,9 +23,17 @@ pub(crate) fn show_clean_color_picker_popup(
     popup_area_id: egui::Id,
     anchor_pos: Pos2,
 ) {
-    let mut is_open = ui
+    let was_open = ui
         .data(|d| d.get_temp::<bool>(popup_open_id))
         .unwrap_or(false);
+    // One popup at a time: another opening (a select) closes the picker.
+    let ctx = ui.ctx();
+    let other_popup =
+        || egui::Popup::is_any_open(ctx) && !egui::Popup::is_id_open(ctx, popup_area_id);
+    let mut is_open = was_open && !other_popup();
+    if was_open && !is_open {
+        ui.data_mut(|d| d.insert_temp(popup_open_id, false));
+    }
     // Focus returns to the swatch once the popup closes.
     windows::follow_window(ui.ctx(), popup_area_id, is_open);
     if !is_open {
@@ -134,13 +142,7 @@ pub(crate) fn show_clean_color_picker_popup(
                 }
             });
 
-            let clicked_outside = ui.input(|i| {
-                i.pointer.any_pressed()
-                    && i.pointer
-                        .interact_pos()
-                        .is_some_and(|pos| !frame_resp.response.rect.contains(pos))
-            });
-            if clicked_outside || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            if windows::popup_dismissed(ui.ctx(), frame_resp.response.rect) {
                 is_open = false;
             }
         });
@@ -152,7 +154,6 @@ pub(crate) fn show_clean_color_picker_popup(
     });
 }
 
-/// A 0-255 channel input, reading typed numbers in the UI language.
 /// The R, G, B and A labels in their colors.
 const CHANNELS: [(&str, Color32); 4] = [
     ("R", Color32::from_rgb(255, 100, 100)),
@@ -182,6 +183,7 @@ fn channel_inputs(ui: &mut egui::Ui, space: ColorGammaSpace, rgba: &mut [f32; 4]
     changed
 }
 
+/// A 0-255 channel input, reading typed numbers in the UI language.
 fn byte_drag(value: &mut u8) -> egui::DragValue<'_> {
     egui::DragValue::new(value)
         .localized()

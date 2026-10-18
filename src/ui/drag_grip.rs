@@ -38,23 +38,15 @@ pub fn action(response: &Response) -> GripAction {
     } else if response.hovered() {
         response.ctx.set_cursor_icon(CursorIcon::Grab);
     }
-    // Clicks never focus a grip, so a focused one clicked is Enter or Space.
-    if response.double_clicked() || (response.clicked() && response.has_focus()) {
+    // A click that no mouse button made is Enter or Space.
+    let keyed = response.clicked() && !response.clicked_by(egui::PointerButton::Primary);
+    if response.double_clicked() || keyed {
         GripAction::Reset
     } else if response.dragged() {
         GripAction::Moved(response.drag_delta())
     } else {
-        arrow_nudge(response).map_or(GripAction::None, GripAction::Moved)
+        focus::arrow_on(response).map_or(GripAction::None, |d| GripAction::Moved(d * NUDGE))
     }
-}
-
-/// The move an arrow key asks of a focused grip.
-fn arrow_nudge(response: &Response) -> Option<Vec2> {
-    if !response.has_focus() {
-        return None;
-    }
-    focus::claim_arrows_only(&response.ctx, response.id);
-    focus::pressed_arrow(&response.ctx).map(|d| d * NUDGE)
 }
 
 /// `point` as a fraction of `canvas`, clamped into it.

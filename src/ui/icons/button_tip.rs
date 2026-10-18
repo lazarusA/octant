@@ -6,7 +6,7 @@
 use crate::ui::keyboard::focus;
 use crate::ui::keyboard::keymap::{self, Action};
 use crate::ui::keyboard::labels;
-use egui::{Response, Ui};
+use egui::Response;
 
 pub(super) struct Tip<'a> {
     pub label: &'a str,
@@ -34,12 +34,6 @@ impl Tip<'_> {
         let Some(tip) = self.hover.or(labelled.then_some(self.label)) else {
             return response;
         };
-        let tooltip = |ui: &mut Ui| labels::tooltip(ui, tip, keys);
-        // Keyboard focus shows the tooltip a pointer would, so an icon-only
-        // button still says what it does.
-        if focus::shows_tooltip(&response) {
-            response.show_tooltip_ui(tooltip);
-        }
-        response.on_hover_ui(tooltip)
+        focus::tooltip_ui(response, |ui| labels::tooltip(ui, tip, keys))
     }
 }

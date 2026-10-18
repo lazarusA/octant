@@ -57,10 +57,11 @@ fn target(ctx: &Context, ids: &[u32], focused: Option<u32>) -> Option<usize> {
         return None;
     }
     focus::claim_arrows(ctx, id);
+    let keys = [Key::ArrowUp, Key::ArrowDown, Key::Home, Key::End];
+    let key = focus::pressed(ctx, keys)?;
     let at = ids.iter().position(|&i| i == colormap)?;
     let last = ids.len().checked_sub(1)?;
-    let keys = [Key::ArrowUp, Key::ArrowDown, Key::Home, Key::End];
-    match focus::pressed(ctx, keys)? {
+    match key {
         Key::ArrowUp => at.checked_sub(1),
         Key::ArrowDown => (at < last).then_some(at + 1),
         Key::Home => Some(0),

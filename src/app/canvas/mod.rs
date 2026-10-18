@@ -56,6 +56,8 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
         let canvas_bg = ui.visuals().panel_fill;
         ui.painter().rect_filled(canvas_rect, 0.0, canvas_bg);
         crate::ui::hero::show_hero_landing(app, ui);
+        // No plot to probe until it shows again.
+        crate::ui::hover::probe::stop(&ctx);
         return;
     }
 

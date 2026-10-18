@@ -12,7 +12,7 @@ mod timeline;
 
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
-use crate::ui::keyboard::regions::Region;
+use crate::ui::keyboard::regions::{self, Region};
 use crate::ui::number_input::LocalizedInput;
 use crate::ui::toolbar::ItemWidths;
 use crate::ui::toolbar::roving::{BarNav, Stop};
@@ -81,9 +81,13 @@ fn show_collapsed_strip(ui: &mut egui::Ui) -> bool {
         });
     });
 
-    let mut nav = BarNav::default();
-    nav.push(&resp, Stop::Button);
-    nav.finish(ui, Region::BottomBar);
+    regions::register(
+        ui.ctx(),
+        Region::BottomBar,
+        resp.id,
+        ui.layer_id(),
+        ui.max_rect(),
+    );
     resp.clicked() || (resp.dragged() && resp.drag_delta().y < -1.0)
 }
 

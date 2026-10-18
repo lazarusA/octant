@@ -58,3 +58,18 @@ pub fn trap(ui: &Ui, opened: bool) {
         }
     });
 }
+
+/// Whether the modal window drawn at `rect` is dismissed this frame: by
+/// Escape, or a press outside it. Not while a popup of its own (a select's
+/// list, drawn outside it) is open: that takes the press or Escape.
+pub fn dismissed(ctx: &Context, rect: egui::Rect) -> bool {
+    !egui::Popup::is_any_open(ctx) && popup_dismissed(ctx, rect)
+}
+
+/// [`dismissed`] for a popup drawn at `rect`, itself the open popup.
+pub fn popup_dismissed(ctx: &Context, rect: egui::Rect) -> bool {
+    ctx.input(|i| {
+        let outside = i.pointer.interact_pos().is_some_and(|p| !rect.contains(p));
+        i.key_pressed(egui::Key::Escape) || (i.pointer.primary_pressed() && outside)
+    })
+}

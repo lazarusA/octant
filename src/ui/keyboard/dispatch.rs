@@ -25,17 +25,17 @@ impl Gate {
         let focused = ctx.memory(|m| m.focused());
         let panel = focus::escaped_layer(ctx)
             .and_then(|layer| Panel::ALL.into_iter().find(|p| p.area_id() == layer.id));
-        let free = !ctx.text_edit_focused() && !egui::Popup::is_any_open(ctx) && !modal_open(app);
+        let unblocked = !egui::Popup::is_any_open(ctx) && !modal_open(app);
+        let free = unblocked && !ctx.text_edit_focused();
         let idle = focused.is_none_or(|id| id == crate::app::canvas::canvas_id());
         let canvas = free && idle && plot_shown;
         // The landing screen's own widgets (the URL field) let Escape go;
         // its sample chips keep it, and so keep focus.
-        let hero = app.layout.show_hero
+        let hero = unblocked
+            && app.layout.show_hero
             && app.has_plot()
             && panel.is_none()
-            && focused.is_none()
-            && !egui::Popup::is_any_open(ctx)
-            && !modal_open(app);
+            && focused.is_none();
         Self {
             panel,
             free,
@@ -73,6 +73,9 @@ fn modal_open(app: &OctantApp) -> bool {
 pub fn dispatch(app: &mut OctantApp, ctx: &Context, plot_shown: bool) {
     focus::begin_frame(ctx);
     regions::begin_frame(ctx);
+    if !keymap::any_pressed(ctx) {
+        return;
+    }
     let gate = Gate::new(app, ctx, plot_shown);
     let here =
         |s: &&keymap::Shortcut| gate.allows(s.scope) && !matches!(s.action, Action::Canvas(_));

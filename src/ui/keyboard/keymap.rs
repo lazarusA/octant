@@ -3,6 +3,7 @@
 //! table of shortcuts is `bindings::TABLE`; the dispatcher, the canvas and
 //! the shortcut list all read it, so a key is bound in one place.
 
+use crate::i18n::KeymapKey;
 use crate::ui::panel_layout::Panel;
 use egui::{Context, Event, Key, Modifiers, Vec2};
 
@@ -95,6 +96,8 @@ pub struct Shortcut {
     pub keys: Keys,
     pub mods: Modifiers,
     pub scope: Scope,
+    /// What the shortcut list says it does.
+    pub label: KeymapKey,
 }
 
 pub use super::bindings::TABLE;
@@ -131,10 +134,7 @@ impl Keys {
 /// without it; every other key needs its exact modifiers, so Cmd+Shift+S
 /// never counts as Cmd+S.
 fn modifiers_match(key: Key, pressed: Modifiers, wanted: Modifiers) -> bool {
-    let shift_free = matches!(
-        key,
-        Key::Plus | Key::Equals | Key::Minus | Key::Questionmark | Key::Comma | Key::Period
-    );
+    let shift_free = matches!(key, Key::Plus | Key::Questionmark);
     let pressed = if shift_free {
         Modifiers {
             shift: wanted.shift,
@@ -163,6 +163,15 @@ pub fn take(ctx: &Context, shortcut: &Shortcut) -> Option<Vec2> {
         })?;
         i.events.remove(at);
         Some(direction)
+    })
+}
+
+/// Whether a key was pressed this frame: shortcuts are looked up only then.
+pub fn any_pressed(ctx: &Context) -> bool {
+    ctx.input(|i| {
+        i.events
+            .iter()
+            .any(|e| matches!(e, Event::Key { pressed: true, .. }))
     })
 }
 

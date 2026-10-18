@@ -16,7 +16,7 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
 
     let mut should_close = false;
 
-    egui::Window::new(tr(ExportKey::DialogTitle))
+    let window = egui::Window::new(tr(ExportKey::DialogTitle))
         .id(window_id)
         .title_bar(false)
         .resizable(false)
@@ -146,7 +146,8 @@ pub fn show_export_modal(app: &mut OctantApp, ctx: &egui::Context) {
             });
         });
 
-    if should_close || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+    let dismissed = window.is_some_and(|w| windows::dismissed(ctx, w.response.rect));
+    if should_close || dismissed {
         app.show_export_modal = false;
     }
 }

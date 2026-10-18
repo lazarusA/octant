@@ -73,7 +73,8 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
 
     ctx.data_mut(|d| d.insert_temp(storage_id, active_tab));
     let rect = response.map(|r| r.response.rect);
-    app.layout.show_about_window = open && !shortcuts && !dismissed(ctx, rect);
+    let dismissed = rect.is_some_and(|r| windows::dismissed(ctx, r));
+    app.layout.show_about_window = open && !shortcuts && !dismissed;
     app.layout.show_shortcuts |= shortcuts;
 }
 
@@ -131,18 +132,6 @@ fn window_body(ui: &mut egui::Ui, active_tab: &mut AboutTab, shortcuts: &mut boo
         *shortcuts = ui.link(tr(KeymapKey::Title)).clicked();
     });
     open
-}
-
-/// True when Escape is pressed or the primary button goes down outside the
-/// window `rect`.
-fn dismissed(ctx: &egui::Context, rect: Option<egui::Rect>) -> bool {
-    ctx.input(|i| {
-        let clicked_outside = i.pointer.primary_pressed()
-            && rect
-                .zip(i.pointer.interact_pos())
-                .is_some_and(|(r, pos)| !r.contains(pos));
-        i.key_pressed(egui::Key::Escape) || clicked_outside
-    })
 }
 
 pub fn show_icon_gallery_window(app: &mut OctantApp, ctx: &egui::Context) {

@@ -33,13 +33,7 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
 
     // Escape, or a click outside the dialog (read from the pointer: the
     // dialog is modal, so nothing under it takes clicks).
-    let mut should_close = ctx.input(|i| {
-        let outside = i.pointer.primary_clicked()
-            && i.pointer
-                .interact_pos()
-                .is_some_and(|p| !modal_rect.contains(p));
-        i.key_pressed(egui::Key::Escape) || outside
-    });
+    let mut should_close = windows::dismissed(ctx, modal_rect);
 
     // 1. Scrim / Backdrop overlay: dims the background
     let backdrop_id = egui::Id::unique("catalog_modal_backdrop");

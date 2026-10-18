@@ -19,7 +19,7 @@ use crate::i18n::{VariablesKey, fill, tr};
 use crate::ui::flow_row;
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt, icon_button_width};
 use crate::ui::keyboard::keymap::{self, Action};
-use crate::ui::keyboard::labels;
+use crate::ui::keyboard::{focus, labels};
 use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
 
@@ -178,7 +178,9 @@ fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> Option<egui::Response> {
             };
             let keys = keymap::shortcut_of(Action::PlotStaged);
             let button = ui.outlined_icon_button(plot_icon, plot_text, IconTone::Default);
-            plot = Some(button.on_hover_ui(|ui| labels::tooltip(ui, hover, keys)));
+            plot = Some(focus::tooltip_ui(button, |ui| {
+                labels::tooltip(ui, hover, keys)
+            }));
             return;
         }
         let response = ui.add_enabled(unavailable.is_none(), toggle(app.layout.plot_as_overlay));

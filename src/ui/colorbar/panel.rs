@@ -162,7 +162,7 @@ fn bar_row(
     // on it this frame.
     crate::ui::colormap::show_picker_popup(app, &bar, id);
     let on_bar = bar.hovered();
-    let outlined = on_bar || (bar.has_focus() && crate::ui::keyboard::focus::visible(ui.ctx()));
+    let outlined = on_bar || crate::ui::keyboard::focus::keyboard_focused(&bar);
     let hovered = if on_bar { bar } else { response };
     if id == LayerId::BASE && app.line_series_colored() {
         series_bar_row(app, ui, axis, hovered);

@@ -53,7 +53,6 @@ struct Facts {
     surface_fits: bool,
     supported: Option<&'static [PlotType]>,
     grid_name: &'static str,
-    discrete: bool,
     aggregated: bool,
 }
 
@@ -80,52 +79,35 @@ impl Facts {
             label_image: var.is_some_and(crate::data::VariableInfo::is_label_image),
             has_3d,
             volume_mb: megabytes(volume),
-            volume_fits: var.is_some()
-                && volume <= crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS,
+            volume_fits: volume <= crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS,
             surface_mb: megabytes(surface),
             surface_fits: surface <= MAX_2D_SURFACE_ELEMENTS,
             supported,
             grid_name,
-            discrete,
             aggregated,
-        }
-    }
-
-    fn allows(&self, plot_type: PlotType) -> bool {
-        match plot_type {
-            PlotType::Heatmap => true,
-            PlotType::Line => !self.aggregated,
-            PlotType::Sphere | PlotType::Surface => self.surface_fits && !self.aggregated,
-            PlotType::Volume | PlotType::PointCloud => {
-                let supported = self
-                    .supported
-                    .is_none_or(|p| p.contains(&PlotType::Volume) && !self.discrete);
-                self.has_3d
-                    && !self.aggregated
-                    && (self.volume_fits || self.volume_mb == 0.0)
-                    && supported
-            }
         }
     }
 
     /// Why `plot_type` cannot be picked, `None` when it can.
     fn blocked(&self, plot_type: PlotType) -> Option<Blocked> {
-        let supported = self.supported.is_none_or(|p| p.contains(&plot_type));
         let volumetric = matches!(plot_type, PlotType::Volume | PlotType::PointCloud);
+        let surface = matches!(plot_type, PlotType::Sphere | PlotType::Surface);
         Some(if self.label_image && plot_type != PlotType::Heatmap {
             Blocked::LabelsOnly
-        } else if !supported {
+        } else if !self.supported.is_none_or(|p| p.contains(&plot_type)) {
             Blocked::Unsupported(self.grid_name)
-        } else if self.allows(plot_type) {
+        } else if plot_type == PlotType::Heatmap {
             return None;
         } else if self.aggregated {
             Blocked::Aggregation
         } else if volumetric && !self.has_3d {
             Blocked::Requires3D
-        } else if volumetric {
+        } else if volumetric && !self.volume_fits {
             Blocked::GpuLimit(self.volume_mb)
-        } else {
+        } else if surface && !self.surface_fits {
             Blocked::GpuLimit(self.surface_mb)
+        } else {
+            return None;
         })
     }
 }

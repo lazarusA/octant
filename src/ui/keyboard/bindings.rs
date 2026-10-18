@@ -1,102 +1,60 @@
-//! Every keyboard shortcut in one table: which keys do what, and where.
+//! Every keyboard shortcut in one table: which keys do what, where, and how
+//! the shortcut list describes it.
 
-use super::keymap::{Action, CanvasAction, Keys, Scope, Shortcut};
+use super::keymap::Action::{self, *};
+use super::keymap::CanvasAction::*;
+use super::keymap::Keys::{self, *};
+use super::keymap::{Scope, Shortcut};
+use crate::i18n::KeymapKey as K;
 use crate::ui::panel_layout::Panel;
 use egui::{Key, Modifiers};
 
-const fn global(action: Action, key: Key, mods: Modifiers) -> Shortcut {
-    Shortcut {
-        action,
-        keys: Keys::One(key),
-        mods,
-        scope: Scope::Global,
-    }
-}
+const NONE: Modifiers = Modifiers::NONE;
+const CMD: Modifiers = Modifiers::COMMAND;
+const SHIFT: Modifiers = Modifiers::SHIFT;
+const CMD_SHIFT: Modifiers = CMD.plus(SHIFT);
 
-const fn canvas(action: Action, keys: Keys) -> Shortcut {
+const fn s(scope: Scope, action: Action, keys: Keys, mods: Modifiers, label: K) -> Shortcut {
     Shortcut {
         action,
         keys,
-        mods: Modifiers::NONE,
-        scope: Scope::Canvas,
+        mods,
+        scope,
+        label,
     }
 }
 
-const fn playback(action: Action, key: Key) -> Shortcut {
-    Shortcut {
-        action,
-        keys: Keys::One(key),
-        mods: Modifiers::NONE,
-        scope: Scope::Playback,
-    }
-}
-
-const fn free(action: Action, key: Key) -> Shortcut {
-    Shortcut {
-        action,
-        keys: Keys::One(key),
-        mods: Modifiers::NONE,
-        scope: Scope::Free,
-    }
-}
-
-const CMD_SHIFT: Modifiers = Modifiers::COMMAND.plus(Modifiers::SHIFT);
-
+#[rustfmt::skip]
 pub const TABLE: &[Shortcut] = &[
-    global(Action::QuickSave, Key::S, Modifiers::COMMAND),
-    global(Action::ExportDialog, Key::S, CMD_SHIFT),
-    global(Action::SearchVariables, Key::K, Modifiers::COMMAND),
-    global(Action::PlotStaged, Key::Enter, Modifiers::COMMAND),
-    Shortcut {
-        action: Action::ClosePanel,
-        keys: Keys::One(Key::Escape),
-        mods: Modifiers::NONE,
-        scope: Scope::Panel,
-    },
-    global(Action::NextRegion, Key::F6, Modifiers::NONE),
-    global(Action::PreviousRegion, Key::F6, Modifiers::SHIFT),
-    global(Action::FocusTopBar, Key::F10, Modifiers::NONE),
-    canvas(Action::ToggleCrop, Keys::One(Key::C)),
-    canvas(Action::Canvas(CanvasAction::Move), Keys::Arrows),
-    Shortcut {
-        mods: Modifiers::SHIFT,
-        ..canvas(Action::Canvas(CanvasAction::MoveAlt), Keys::Arrows)
-    },
-    canvas(
-        Action::Canvas(CanvasAction::ZoomIn),
-        Keys::Either(Key::Plus, Key::Equals),
-    ),
-    canvas(Action::Canvas(CanvasAction::ZoomOut), Keys::One(Key::Minus)),
-    canvas(
-        Action::Canvas(CanvasAction::ResetView),
-        Keys::One(Key::Num0),
-    ),
-    canvas(
-        Action::Canvas(CanvasAction::ToggleProbe),
-        Keys::One(Key::Enter),
-    ),
-    canvas(
-        Action::Canvas(CanvasAction::LeaveProbe),
-        Keys::One(Key::Escape),
-    ),
-    playback(Action::PlayPause, Key::Space),
-    playback(Action::StepPrev, Key::Comma),
-    playback(Action::StepNext, Key::Period),
-    playback(Action::FirstStep, Key::Home),
-    playback(Action::LastStep, Key::End),
-    playback(Action::ToggleLoop, Key::L),
-    free(Action::ShowShortcuts, Key::Questionmark),
-    free(Action::ToggleHero, Key::H),
-    free(Action::PlotTypePicker, Key::P),
-    free(Action::GoToPanel(Panel::Dataset), Key::D),
-    free(Action::GoToPanel(Panel::Variables), Key::V),
-    free(Action::GoToPanel(Panel::Dimensions), Key::A),
-    free(Action::GoToPanel(Panel::Settings), Key::S),
-    free(Action::GoToColorbar, Key::B),
-    Shortcut {
-        action: Action::LeaveHero,
-        keys: Keys::One(Key::Escape),
-        mods: Modifiers::NONE,
-        scope: Scope::Hero,
-    },
+    s(Scope::Global, QuickSave, One(Key::S), CMD, K::QuickSave),
+    s(Scope::Global, ExportDialog, One(Key::S), CMD_SHIFT, K::ExportDialog),
+    s(Scope::Global, SearchVariables, One(Key::K), CMD, K::SearchVariables),
+    s(Scope::Global, PlotStaged, One(Key::Enter), CMD, K::PlotStaged),
+    s(Scope::Global, NextRegion, One(Key::F6), NONE, K::NextRegion),
+    s(Scope::Global, PreviousRegion, One(Key::F6), SHIFT, K::PreviousRegion),
+    s(Scope::Global, FocusTopBar, One(Key::F10), NONE, K::FocusTopBar),
+    s(Scope::Panel, ClosePanel, One(Key::Escape), NONE, K::ClosePanel),
+    s(Scope::Free, ShowShortcuts, One(Key::Questionmark), NONE, K::ShowShortcuts),
+    s(Scope::Free, ToggleHero, One(Key::H), NONE, K::ToggleHero),
+    s(Scope::Free, PlotTypePicker, One(Key::P), NONE, K::PlotTypePicker),
+    s(Scope::Free, GoToPanel(Panel::Dataset), One(Key::D), NONE, K::GoToDataset),
+    s(Scope::Free, GoToPanel(Panel::Variables), One(Key::V), NONE, K::GoToVariables),
+    s(Scope::Free, GoToPanel(Panel::Dimensions), One(Key::A), NONE, K::GoToDimensions),
+    s(Scope::Free, GoToPanel(Panel::Settings), One(Key::S), NONE, K::GoToSettings),
+    s(Scope::Free, GoToColorbar, One(Key::B), NONE, K::GoToColorbar),
+    s(Scope::Hero, LeaveHero, One(Key::Escape), NONE, K::LeaveHero),
+    s(Scope::Canvas, ToggleCrop, One(Key::C), NONE, K::ToggleCrop),
+    s(Scope::Canvas, Canvas(Move), Arrows, NONE, K::Move),
+    s(Scope::Canvas, Canvas(MoveAlt), Arrows, SHIFT, K::MoveAlt),
+    s(Scope::Canvas, Canvas(ZoomIn), Either(Key::Plus, Key::Equals), NONE, K::ZoomIn),
+    s(Scope::Canvas, Canvas(ZoomOut), One(Key::Minus), NONE, K::ZoomOut),
+    s(Scope::Canvas, Canvas(ResetView), One(Key::Num0), NONE, K::ResetView),
+    s(Scope::Canvas, Canvas(ToggleProbe), One(Key::Enter), NONE, K::ToggleProbe),
+    s(Scope::Canvas, Canvas(LeaveProbe), One(Key::Escape), NONE, K::LeaveProbe),
+    s(Scope::Playback, PlayPause, One(Key::Space), NONE, K::PlayPause),
+    s(Scope::Playback, StepPrev, One(Key::Comma), NONE, K::StepPrev),
+    s(Scope::Playback, StepNext, One(Key::Period), NONE, K::StepNext),
+    s(Scope::Playback, FirstStep, One(Key::Home), NONE, K::FirstStep),
+    s(Scope::Playback, LastStep, One(Key::End), NONE, K::LastStep),
+    s(Scope::Playback, ToggleLoop, One(Key::L), NONE, K::ToggleLoop),
 ];

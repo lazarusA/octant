@@ -2,51 +2,14 @@
 //! its keys (`Cmd+K`, `Ctrl+K`, `Shift+Arrows`) written into a stack
 //! buffer. Key and modifier names stay English, as printed on keyboards.
 
-use super::keymap::{Action, CanvasAction, Keys, Scope, Shortcut};
+use super::keymap::{Keys, Scope, Shortcut};
 use crate::i18n::{KeymapKey as K, tr};
-use crate::ui::panel_layout::Panel;
 use crate::utils::stack_str;
 use egui::{Key, ModifierNames, Modifiers};
 use std::fmt;
 
 /// Stack buffer for a shortcut's keys.
 pub type KeysBuf = [u8; 48];
-
-pub fn describe(action: Action) -> K {
-    match action {
-        Action::QuickSave => K::QuickSave,
-        Action::ExportDialog => K::ExportDialog,
-        Action::ToggleCrop => K::ToggleCrop,
-        Action::GoToPanel(Panel::Dataset) => K::GoToDataset,
-        Action::GoToPanel(Panel::Variables) => K::GoToVariables,
-        Action::GoToPanel(Panel::Dimensions) => K::GoToDimensions,
-        Action::GoToPanel(Panel::Settings) => K::GoToSettings,
-        Action::GoToColorbar => K::GoToColorbar,
-        Action::SearchVariables => K::SearchVariables,
-        Action::ClosePanel => K::ClosePanel,
-        Action::NextRegion => K::NextRegion,
-        Action::PreviousRegion => K::PreviousRegion,
-        Action::FocusTopBar => K::FocusTopBar,
-        Action::PlayPause => K::PlayPause,
-        Action::StepPrev => K::StepPrev,
-        Action::StepNext => K::StepNext,
-        Action::FirstStep => K::FirstStep,
-        Action::LastStep => K::LastStep,
-        Action::ToggleLoop => K::ToggleLoop,
-        Action::ShowShortcuts => K::ShowShortcuts,
-        Action::ToggleHero => K::ToggleHero,
-        Action::LeaveHero => K::LeaveHero,
-        Action::PlotTypePicker => K::PlotTypePicker,
-        Action::PlotStaged => K::PlotStaged,
-        Action::Canvas(CanvasAction::Move) => K::Move,
-        Action::Canvas(CanvasAction::MoveAlt) => K::MoveAlt,
-        Action::Canvas(CanvasAction::ZoomIn) => K::ZoomIn,
-        Action::Canvas(CanvasAction::ZoomOut) => K::ZoomOut,
-        Action::Canvas(CanvasAction::ResetView) => K::ResetView,
-        Action::Canvas(CanvasAction::ToggleProbe) => K::ToggleProbe,
-        Action::Canvas(CanvasAction::LeaveProbe) => K::LeaveProbe,
-    }
-}
 
 /// Every scope, in the order the shortcut list shows them.
 pub const SCOPES: [Scope; 6] = [
