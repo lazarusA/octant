@@ -4,11 +4,14 @@
 use super::keymap::{self, Action, Scope, TABLE};
 use super::{focus, regions};
 use crate::app::OctantApp;
+use crate::ui::panel_layout::Panel;
 use egui::Context;
 
 /// Which scopes are active this frame.
 #[derive(Clone, Copy, Debug)]
 pub struct Gate {
+    /// The panel Escape closes.
+    panel: Option<Panel>,
     canvas: bool,
 }
 
@@ -16,10 +19,22 @@ impl Gate {
     /// `plot_shown`: a plot fills the canvas (the landing screen is not up).
     pub fn new(app: &OctantApp, ctx: &Context, plot_shown: bool) -> Self {
         let focused = ctx.memory(|m| m.focused());
+        let no_popup = !egui::Popup::is_any_open(ctx);
+        // egui dropped focus on Escape before the app ran; a widget that
+        // keeps Escape for itself (a tree row) keeps focus instead.
+        let panel = (focused.is_none() && no_popup)
+            .then(|| focus::last(ctx))
+            .flatten()
+            .and_then(|last| {
+                Panel::ALL
+                    .into_iter()
+                    .find(|p| p.area_id() == last.layer.id)
+            });
         let free = focused.is_none_or(|id| id == crate::app::canvas::canvas_id())
-            && !egui::Popup::is_any_open(ctx)
+            && no_popup
             && !modal_open(app);
         Self {
+            panel,
             canvas: free && plot_shown,
         }
     }
@@ -27,6 +42,7 @@ impl Gate {
     pub fn allows(self, scope: Scope) -> bool {
         match scope {
             Scope::Global => true,
+            Scope::Panel => self.panel.is_some(),
             Scope::Canvas => self.canvas,
         }
     }
@@ -49,16 +65,26 @@ pub fn dispatch(app: &mut OctantApp, ctx: &Context, plot_shown: bool) {
     let gate = Gate::new(app, ctx, plot_shown);
     for shortcut in TABLE.iter().filter(|s| gate.allows(s.scope)) {
         if keymap::take(ctx, shortcut).is_some() {
-            run(app, ctx, shortcut.action);
+            run(app, ctx, gate, shortcut.action);
         }
     }
 }
 
-fn run(app: &mut OctantApp, ctx: &Context, action: Action) {
+fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
     match action {
         Action::QuickSave => app.quick_save_canvas(),
         Action::ExportDialog => app.show_export_modal = true,
         Action::ToggleCrop => app.show_crop_overlay = !app.show_crop_overlay,
+        Action::TogglePanel(panel) => app.toggle_panel(ctx, panel),
+        Action::SearchVariables => {
+            app.set_panel_open(ctx, Panel::Variables, true);
+            crate::ui::variables_overlay::focus_search(ctx);
+        }
+        Action::ClosePanel => {
+            if let Some(panel) = gate.panel {
+                app.set_panel_open(ctx, panel, false);
+            }
+        }
         // Regions hold focus outside modal windows only.
         Action::NextRegion | Action::PreviousRegion | Action::FocusTopBar if modal_open(app) => {}
         Action::NextRegion => regions::cycle(ctx, true),

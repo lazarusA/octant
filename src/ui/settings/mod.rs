@@ -43,7 +43,7 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
 
     let origin = panel_layout::origin(app, Panel::Settings, canvas_rect);
     let mut header = None;
-    let area_resp = egui::Area::new(egui::Id::unique("octant_settings_area"))
+    let area_resp = egui::Area::new(Panel::Settings.area_id())
         .fixed_pos(origin)
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
@@ -52,13 +52,15 @@ pub fn show_settings_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rec
         });
 
     // Store width for next frame so Variable Controls can position to the right.
-    let rect = area_resp.response.rect;
-    app.layout.settings_overlay_width = rect.width();
+    app.layout.settings_overlay_width = area_resp.response.rect.width();
     if let Some(header) = header {
-        panel_layout::apply_grip(app, Panel::Settings, header.grip, rect, canvas_rect);
-        if header.close {
-            app.layout.show_settings_panel = false;
-        }
+        panel_layout::finish(
+            app,
+            Panel::Settings,
+            header,
+            &area_resp.response,
+            canvas_rect,
+        );
     }
 }
 

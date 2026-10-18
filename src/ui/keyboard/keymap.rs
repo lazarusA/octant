@@ -2,6 +2,7 @@
 //! works. The dispatcher, the canvas and the shortcut list all read it, so a
 //! key is bound in one place.
 
+use crate::ui::panel_layout::Panel;
 use egui::{Context, Event, Key, Modifiers, Vec2};
 
 /// What a shortcut does.
@@ -10,6 +11,10 @@ pub enum Action {
     QuickSave,
     ExportDialog,
     ToggleCrop,
+    TogglePanel(Panel),
+    SearchVariables,
+    /// Closes the panel keyboard focus was in.
+    ClosePanel,
     NextRegion,
     PreviousRegion,
     FocusTopBar,
@@ -20,6 +25,9 @@ pub enum Action {
 pub enum Scope {
     /// Modifier shortcuts and function keys: always, also while typing.
     Global,
+    /// Escape in a floating panel, once the widget focused there let it go
+    /// and no popup took it.
+    Panel,
     /// Single keys on a shown plot: only while nothing or the canvas holds
     /// focus and no popup or modal window is open.
     Canvas,
@@ -66,26 +74,58 @@ const CMD_SHIFT: Modifiers = Modifiers::COMMAND.plus(Modifiers::SHIFT);
 pub const TABLE: &[Shortcut] = &[
     global(Action::QuickSave, Key::S, Modifiers::COMMAND),
     global(Action::ExportDialog, Key::S, CMD_SHIFT),
+    global(
+        Action::TogglePanel(Panel::Dataset),
+        Key::Num1,
+        Modifiers::COMMAND,
+    ),
+    global(
+        Action::TogglePanel(Panel::Variables),
+        Key::Num2,
+        Modifiers::COMMAND,
+    ),
+    global(
+        Action::TogglePanel(Panel::Dimensions),
+        Key::Num3,
+        Modifiers::COMMAND,
+    ),
+    global(
+        Action::TogglePanel(Panel::Settings),
+        Key::Num4,
+        Modifiers::COMMAND,
+    ),
+    global(Action::SearchVariables, Key::K, Modifiers::COMMAND),
+    Shortcut {
+        action: Action::ClosePanel,
+        keys: Keys::One(Key::Escape),
+        mods: Modifiers::NONE,
+        scope: Scope::Panel,
+    },
     global(Action::NextRegion, Key::F6, Modifiers::NONE),
     global(Action::PreviousRegion, Key::F6, Modifiers::SHIFT),
     global(Action::FocusTopBar, Key::F10, Modifiers::NONE),
     canvas(Action::ToggleCrop, Keys::One(Key::C)),
 ];
 
+/// An arrow key's direction on screen (y down).
+pub fn arrow_direction(key: Key) -> Option<Vec2> {
+    match key {
+        Key::ArrowLeft => Some(-Vec2::X),
+        Key::ArrowRight => Some(Vec2::X),
+        Key::ArrowUp => Some(-Vec2::Y),
+        Key::ArrowDown => Some(Vec2::Y),
+        _ => None,
+    }
+}
+
 impl Keys {
-    /// Whether `key` is one of these keys: the arrow's direction (y down),
-    /// zero for the others.
+    /// Whether `key` is one of these keys: the arrow's direction, zero for
+    /// the others.
     fn direction(self, key: Key) -> Option<Vec2> {
         match self {
             Keys::One(k) => (k == key).then_some(Vec2::ZERO),
             Keys::Either(a, b) => (a == key || b == key).then_some(Vec2::ZERO),
-            Keys::Arrows => match key {
-                Key::ArrowLeft => Some(-Vec2::X),
-                Key::ArrowRight => Some(Vec2::X),
-                Key::ArrowUp => Some(-Vec2::Y),
-                Key::ArrowDown => Some(Vec2::Y),
-                _ => None,
-            },
+            Keys::Arrows => arrow_direction(key),
         }
     }
 }

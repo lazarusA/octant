@@ -1,11 +1,16 @@
 //! The grip that moves a floating panel (colorbars, the Variables, Settings
 //! and Dimensions panels): a `Grip` icon button that senses drags, read into
 //! a `GripAction`, and dragged positions kept as fractions of the canvas so
-//! a panel keeps its place when the canvas resizes.
+//! a panel keeps its place when the canvas resizes. A focused grip moves its
+//! panel with the arrow keys, and Enter puts it back, as a double-click.
 
 use crate::i18n::{CommonKey, tr};
 use crate::ui::icons::{Icon, IconSize, ToolbarButton};
-use egui::{CursorIcon, Pos2, Rect, Response, Sense, Vec2};
+use crate::ui::keyboard::{focus, keymap};
+use egui::{CursorIcon, Key, Pos2, Rect, Response, Sense, Vec2};
+
+/// How far one arrow key press moves a panel, in points.
+const NUDGE: f32 = 16.0;
 
 /// What the grip asks of its panel this frame.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -33,13 +38,30 @@ pub fn action(response: &Response) -> GripAction {
     } else if response.hovered() {
         response.ctx.set_cursor_icon(CursorIcon::Grab);
     }
-    if response.double_clicked() {
+    // Clicks never focus a grip, so a focused one clicked is Enter or Space.
+    if response.double_clicked() || (response.clicked() && response.has_focus()) {
         GripAction::Reset
     } else if response.dragged() {
         GripAction::Moved(response.drag_delta())
     } else {
-        GripAction::None
+        arrow_nudge(response).map_or(GripAction::None, GripAction::Moved)
     }
+}
+
+/// The move an arrow key asks of a focused grip.
+fn arrow_nudge(response: &Response) -> Option<Vec2> {
+    if !response.has_focus() {
+        return None;
+    }
+    focus::claim_arrows_only(&response.ctx, response.id);
+    let arrows = [
+        Key::ArrowLeft,
+        Key::ArrowRight,
+        Key::ArrowUp,
+        Key::ArrowDown,
+    ];
+    let key = focus::pressed(&response.ctx, arrows)?;
+    keymap::arrow_direction(key).map(|d| d * NUDGE)
 }
 
 /// `point` as a fraction of `canvas`, clamped into it.

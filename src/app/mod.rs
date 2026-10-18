@@ -37,6 +37,7 @@ mod overlay_state_tests;
 pub mod overlays;
 #[cfg(test)]
 mod overlays_tests;
+mod panels;
 mod pipeline;
 #[cfg(test)]
 mod pyramid_tests;

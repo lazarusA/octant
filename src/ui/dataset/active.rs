@@ -17,7 +17,7 @@ pub fn show_active_dataset(app: &mut OctantApp, ui: &mut egui::Ui) {
 
     let action = show_active_card(ui, store_kind, target, name, var_count, store_type);
     if action.inspect_variables {
-        app.layout.show_variables_overlay = true;
+        app.set_panel_open(ui.ctx(), crate::ui::panel_layout::Panel::Variables, true);
     }
     if action.reload {
         let reload_target = app.selected.store_target.clone();

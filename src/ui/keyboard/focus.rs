@@ -34,13 +34,27 @@ pub fn request(ctx: &Context, id: Id) {
     ctx.request_repaint();
 }
 
-/// Call every frame the widget `id` holds focus: keeps the arrow keys
-/// claimed, and cancels egui's spatial move on frames where the filter is
-/// not in place yet.
+/// Call every frame the widget `id` holds focus: keeps the arrow keys and
+/// Escape claimed, and cancels egui's spatial move on frames where the
+/// filter is not in place yet.
 pub fn claim_arrows(ctx: &Context, id: Id) {
+    claim(ctx, id, ARROW_FILTER);
+}
+
+/// [`claim_arrows`] leaving Escape to egui, which then drops focus: for a
+/// panel's grip, so Escape closes the panel.
+pub fn claim_arrows_only(ctx: &Context, id: Id) {
+    let filter = EventFilter {
+        escape: false,
+        ..ARROW_FILTER
+    };
+    claim(ctx, id, filter);
+}
+
+fn claim(ctx: &Context, id: Id, filter: EventFilter) {
     let arrow = ctx.input(|i| ARROWS.iter().any(|&k| i.key_pressed(k)));
     ctx.memory_mut(|m| {
-        m.set_focus_lock_filter(id, ARROW_FILTER);
+        m.set_focus_lock_filter(id, filter);
         if arrow {
             m.move_focus(FocusDirection::None);
         }
@@ -118,6 +132,34 @@ pub fn paint_ring(ui: &Ui, response: &Response, radius: impl Into<egui::CornerRa
         let stroke = ui.visuals().widgets.hovered.bg_stroke;
         ui.painter()
             .rect_stroke(response.rect, radius, stroke, egui::StrokeKind::Inside);
+    }
+}
+
+fn opener_id(key: Id) -> Id {
+    key.with("keyboard_opener")
+}
+
+/// Remembers the widget holding keyboard focus as what opened `key` (a panel
+/// or window), so focus returns to it when that closes.
+pub fn remember_opener(ctx: &Context, key: Id) {
+    let opener = visible(ctx).then(|| ctx.memory(|m| m.focused())).flatten();
+    ctx.data_mut(|d| match opener {
+        Some(id) => {
+            d.insert_temp(opener_id(key), id);
+        }
+        None => d.remove::<Id>(opener_id(key)),
+    });
+}
+
+/// Focuses the widget that opened `key` again, while the keyboard is in use.
+pub fn return_to_opener(ctx: &Context, key: Id) {
+    let opener = ctx.data_mut(|d| {
+        let opener = d.get_temp::<Id>(opener_id(key));
+        d.remove::<Id>(opener_id(key));
+        opener
+    });
+    if let Some(id) = opener.filter(|_| visible(ctx)) {
+        request(ctx, id);
     }
 }
 

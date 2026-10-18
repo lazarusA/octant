@@ -2,20 +2,37 @@
 //! through and F10 jumps into: egui's Tab follows drawing order (the bottom
 //! bar is drawn before the panels above it), so regions are the way across.
 //! Each region registers the widget focus enters it at while it draws; the
-//! jump reads what the last frame registered.
+//! jump reads what the last frame registered, and a region about to appear
+//! (a panel just opened) takes focus once it draws.
 
 use super::focus;
+use crate::ui::panel_layout::Panel;
 use egui::{Context, Id, LayerId, Rect};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Region {
     TopBar,
+    Dataset,
+    Variables,
+    Settings,
+    Dimensions,
     Canvas,
     BottomBar,
 }
 
 /// Regions, in the order the variants are declared: visual order.
-const COUNT: usize = 3;
+const COUNT: usize = 7;
+
+impl Region {
+    pub fn of(panel: Panel) -> Self {
+        match panel {
+            Panel::Dataset => Region::Dataset,
+            Panel::Variables => Region::Variables,
+            Panel::Settings => Region::Settings,
+            Panel::Dimensions => Region::Dimensions,
+        }
+    }
+}
 
 /// Parts one region may span (the colorbars: the base layer's and four
 /// overlays').
@@ -41,6 +58,8 @@ impl Slot {
 struct Regions {
     drawing: [Slot; COUNT],
     drawn: [Slot; COUNT],
+    /// A region to focus once it draws, and the pass that asked.
+    pending: Option<(Region, u64)>,
 }
 
 fn regions_id() -> Id {
@@ -50,22 +69,46 @@ fn regions_id() -> Id {
 /// Call once per frame before any region draws: what the last frame drew
 /// becomes what jumps read.
 pub fn begin_frame(ctx: &Context) {
+    let pass = ctx.cumulative_pass_nr();
     ctx.data_mut(|d| {
         let regions = d.get_temp_mut_or_default::<Regions>(regions_id());
         regions.drawn = std::mem::take(&mut regions.drawing);
+        // A region that did not draw in the pass after it was asked for
+        // (a panel without content) gives up its claim.
+        if regions.pending.is_some_and(|(_, asked)| asked + 1 < pass) {
+            regions.pending = None;
+        }
+    });
+}
+
+/// Focuses `region` where it is entered once it draws (this frame or the
+/// next): a panel opening by keyboard.
+pub fn enter_when_drawn(ctx: &Context, region: Region) {
+    let pass = ctx.cumulative_pass_nr();
+    ctx.data_mut(|d| {
+        d.get_temp_mut_or_default::<Regions>(regions_id()).pending = Some((region, pass))
     });
 }
 
 /// Records that `region` drew over `area` of `layer` this frame; its first
 /// registered `entry` is where focus enters it.
 pub fn register(ctx: &Context, region: Region, entry: Id, layer: LayerId, area: Rect) {
-    ctx.data_mut(|d| {
-        let slot = &mut d.get_temp_mut_or_default::<Regions>(regions_id()).drawing[region as usize];
+    let enter = ctx.data_mut(|d| {
+        let regions = d.get_temp_mut_or_default::<Regions>(regions_id());
+        let slot = &mut regions.drawing[region as usize];
         slot.entry.get_or_insert(entry);
         if let Some(free) = slot.parts.iter_mut().find(|p| p.is_none()) {
             *free = Some((layer, area));
         }
+        let enter = regions.pending.is_some_and(|(r, _)| r == region);
+        if enter {
+            regions.pending = None;
+        }
+        enter
     });
+    if enter {
+        focus::request(ctx, entry);
+    }
 }
 
 fn drawn(ctx: &Context) -> [Slot; COUNT] {

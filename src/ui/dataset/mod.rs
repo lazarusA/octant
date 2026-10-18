@@ -28,7 +28,7 @@ pub fn show_dataset_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rect
 
     let origin = panel_layout::origin(app, Panel::Dataset, canvas_rect);
     let mut header = None;
-    let area_resp = egui::Area::new(egui::Id::unique("octant_dataset_area"))
+    let area_resp = egui::Area::new(Panel::Dataset.area_id())
         .fixed_pos(origin)
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
@@ -36,13 +36,15 @@ pub fn show_dataset_window(app: &mut OctantApp, ctx: &egui::Context, canvas_rect
             egui::Frame::popup(ui.style()).show(ui, |ui| header = show_panel(app, ui, canvas_rect));
         });
 
-    let rect = area_resp.response.rect;
-    app.layout.dataset_overlay_width = rect.width();
+    app.layout.dataset_overlay_width = area_resp.response.rect.width();
     if let Some(header) = header {
-        panel_layout::apply_grip(app, Panel::Dataset, header.grip, rect, canvas_rect);
-        if header.close {
-            app.layout.show_dataset_panel = false;
-        }
+        panel_layout::finish(
+            app,
+            Panel::Dataset,
+            header,
+            &area_resp.response,
+            canvas_rect,
+        );
     }
 }
 

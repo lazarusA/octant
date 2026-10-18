@@ -16,7 +16,6 @@ pub use info::show_variable_info;
 use crate::app::OctantApp;
 use crate::app::layers::LevelChoice;
 use crate::i18n::{VariablesKey, fill, tr};
-use crate::ui::drag_grip::GripAction;
 use crate::ui::flow_row;
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt, icon_button_width};
 use crate::ui::panel_header::{self, PanelHeader};
@@ -40,35 +39,34 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
     let room = canvas_rect.right() - origin.x - 24.0;
     let panel_w = PANEL_MAX_W.min(room).max(PANEL_MIN_W);
 
-    let mut grip = GripAction::None;
-    let area_resp = egui::Area::new(egui::Id::unique("octant_variables_panel"))
+    let mut header = PanelHeader::default();
+    let area_resp = egui::Area::new(Panel::Dimensions.area_id())
         .fixed_pos(origin)
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.set_width(panel_w);
-                grip = show_panel(app, ui);
+                header = show_panel(app, ui);
             });
         });
-    let rect = area_resp.response.rect;
-    panel_layout::apply_grip(app, Panel::Dimensions, grip, rect, canvas_rect);
+    panel_layout::finish(
+        app,
+        Panel::Dimensions,
+        header,
+        &area_resp.response,
+        canvas_rect,
+    );
 }
 
 /// The staged variable's header, Plot Data row and dimension sliders; what
-/// the header's grip asked for.
-fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> GripAction {
+/// the header's buttons asked for.
+fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> PanelHeader {
     let Some(var_info) = app.selected.variable_info().cloned() else {
         ui.label(tr(VariablesKey::NoVariableSelected));
-        return GripAction::None;
+        return PanelHeader::default();
     };
     let header = header_row(ui, &var_info);
-    if header.close {
-        app.layout.show_variable_controls = false;
-        if !app.layout.show_variables_overlay {
-            app.revert_selected_state_to_plotted();
-        }
-    }
     level_note(app, ui, &var_info);
     if plot_row(app, ui) {
         app.plot_from_panel();
@@ -82,7 +80,7 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> GripAction {
         .show(ui, |ui| {
             show_dimension_sliders(app, ui, &var_info);
         });
-    header.grip
+    header
 }
 
 /// The level a multiscale variable reads, under its header: the plotted

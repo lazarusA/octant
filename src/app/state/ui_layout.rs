@@ -1,5 +1,7 @@
 //! egui layout, panel toggles, theme, and modal window states.
 
+use crate::ui::panel_layout::Panel;
+
 #[derive(Clone, Debug)]
 pub struct UiLayoutState {
     pub show_dataset_panel: bool,
@@ -69,6 +71,25 @@ impl Default for UiLayoutState {
 }
 
 impl UiLayoutState {
+    /// Whether `panel` is open.
+    pub fn panel_shown(&self, panel: Panel) -> bool {
+        match panel {
+            Panel::Dataset => self.show_dataset_panel,
+            Panel::Variables => self.show_variables_overlay,
+            Panel::Settings => self.show_settings_panel,
+            Panel::Dimensions => self.show_variable_controls,
+        }
+    }
+
+    pub(crate) fn panel_shown_mut(&mut self, panel: Panel) -> &mut bool {
+        match panel {
+            Panel::Dataset => &mut self.show_dataset_panel,
+            Panel::Variables => &mut self.show_variables_overlay,
+            Panel::Settings => &mut self.show_settings_panel,
+            Panel::Dimensions => &mut self.show_variable_controls,
+        }
+    }
+
     /// Opens the Settings panel and closes Dataset, Variables, Controls, and Catalog.
     pub fn open_only_settings_panel(&mut self) {
         self.show_settings_panel = true;

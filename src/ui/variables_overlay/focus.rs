@@ -32,6 +32,11 @@ pub fn note_shown(ctx: &Context, dataset: Option<Id>) {
     });
 }
 
+/// Focus the search field once the overlay's body next draws.
+pub fn request_search(ctx: &Context) {
+    ctx.data_mut(|d| d.insert_temp(pending_id(), true));
+}
+
 /// Take the pending focus request. It stays pending while the overlay body
 /// is collapsed, so the search field is focused once it is first shown.
 pub fn take_open_focus(ctx: &Context) -> bool {

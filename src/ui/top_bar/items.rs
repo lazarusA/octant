@@ -4,6 +4,7 @@ use super::layout::TopBarItem;
 use crate::app::OctantApp;
 use crate::i18n::{CommonKey, tr};
 use crate::ui::icons::{Icon, TOOLBAR_ITEM_HEIGHT, ToolbarButton};
+use crate::ui::panel_layout::Panel;
 use crate::ui::toolbar::roving::{BarNav, Stop};
 use crate::ui::toolbar::{ItemWidths, SEPARATOR_WIDTH};
 use crate::ui::{cache, plot_type};
@@ -118,38 +119,16 @@ pub(super) fn show_item(
         TopBarItem::Brand => return show_brand(app, ui, compact, nav),
         // Drawn by `show_contents`, which owns the fetch progress snapshot.
         TopBarItem::Status => return,
-        TopBarItem::Dataset => {
-            let response = ui.add(button(Icon::Dataset, item, app, compact));
-            if response.clicked() {
-                app.layout.show_dataset_panel = !app.layout.show_dataset_panel;
-            }
-            (response, Stop::Button)
-        }
+        TopBarItem::Dataset => panel_button(Panel::Dataset, Icon::Dataset, item, app, ui, compact),
         TopBarItem::Variables => {
-            let response = ui.add(button(Icon::Variables, item, app, compact));
-            if response.clicked() {
-                app.layout.show_variables_overlay = !app.layout.show_variables_overlay;
-                revert_if_panels_closed(app);
-            }
-            (response, Stop::Button)
+            panel_button(Panel::Variables, Icon::Variables, item, app, ui, compact)
         }
         TopBarItem::Dimensions => {
-            let btn = button(Icon::Dimensions, item, app, compact)
-                .hover(tr(CommonKey::ToggleVariableControlsHover));
-            let response = ui.add(btn);
-            if response.clicked() {
-                app.layout.show_variable_controls = !app.layout.show_variable_controls;
-                revert_if_panels_closed(app);
-            }
-            (response, Stop::Button)
+            panel_button(Panel::Dimensions, Icon::Dimensions, item, app, ui, compact)
         }
         TopBarItem::PlotType => menu(plot_type::show_plot_type_menu(app, ui, compact)),
         TopBarItem::Settings => {
-            let response = ui.add(button(Icon::Settings, item, app, compact));
-            if response.clicked() {
-                app.layout.show_settings_panel = !app.layout.show_settings_panel;
-            }
-            (response, Stop::Button)
+            panel_button(Panel::Settings, Icon::Settings, item, app, ui, compact)
         }
         TopBarItem::Cache => menu(cache::show_cache_menu(app, ui, compact)),
         TopBarItem::Language => menu(crate::ui::language_picker::show_language_menu(ui, compact)),
@@ -163,27 +142,26 @@ fn menu(response: egui::Response) -> (egui::Response, Stop) {
     (response, stop)
 }
 
-fn button(icon: Icon, item: TopBarItem, app: &OctantApp, compact: bool) -> ToolbarButton<'static> {
-    ToolbarButton::new(icon, label(item, app))
+/// The button of `item` toggling `panel`, marked while it is open.
+fn panel_button(
+    panel: Panel,
+    icon: Icon,
+    item: TopBarItem,
+    app: &mut OctantApp,
+    ui: &mut egui::Ui,
+    compact: bool,
+) -> (egui::Response, Stop) {
+    let mut btn = ToolbarButton::new(icon, label(item, app))
         .compact(compact)
-        .active(is_panel_open(item, app))
-}
-
-/// Whether the panel or overlay toggled by a panel button is currently shown.
-fn is_panel_open(item: TopBarItem, app: &OctantApp) -> bool {
-    match item {
-        TopBarItem::Dataset => app.layout.show_dataset_panel,
-        TopBarItem::Variables => app.layout.show_variables_overlay,
-        TopBarItem::Dimensions => app.layout.show_variable_controls,
-        TopBarItem::Settings => app.layout.show_settings_panel,
-        _ => false,
+        .active(app.layout.panel_shown(panel));
+    if panel == Panel::Dimensions {
+        btn = btn.hover(tr(CommonKey::ToggleVariableControlsHover));
     }
-}
-
-fn revert_if_panels_closed(app: &mut OctantApp) {
-    if !app.layout.show_variables_overlay && !app.layout.show_variable_controls {
-        app.revert_selected_state_to_plotted();
+    let response = ui.add(btn);
+    if response.clicked() {
+        app.toggle_panel(ui.ctx(), panel);
     }
+    (response, Stop::Button)
 }
 
 fn show_theme_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) -> egui::Response {
