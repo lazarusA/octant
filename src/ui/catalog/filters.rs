@@ -15,14 +15,7 @@ pub fn render_search_and_filters(
     total_count: usize,
     opened: bool,
 ) {
-    let search = ui.search_field_response(
-        &mut app.layout.catalog_search_query,
-        tr(DatasetKey::CatalogSearchHint),
-        None,
-    );
-    if opened {
-        search.request_focus();
-    }
+    search_field(app, ui, opened);
     ui.add_space(4.0);
     let spacing = if is_mobile {
         egui::vec2(4.0, 4.0)
@@ -59,4 +52,16 @@ pub fn render_search_and_filters(
             ui.selectable_value(&mut app.layout.catalog_category_filter, filter, label);
         }
     });
+}
+
+/// The catalog's search field, focused once the catalog `opened`.
+fn search_field(app: &mut OctantApp, ui: &mut egui::Ui, opened: bool) {
+    let search = ui.search_field_response(
+        &mut app.layout.catalog_search_query,
+        tr(DatasetKey::CatalogSearchHint),
+        None,
+    );
+    if opened {
+        search.request_focus();
+    }
 }

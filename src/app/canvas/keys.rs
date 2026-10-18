@@ -12,7 +12,7 @@ use crate::ui::hover::probe;
 use crate::ui::keyboard::dispatch::Gate;
 use crate::ui::keyboard::focus;
 use crate::ui::keyboard::keymap::{self, Action, CanvasAction, Scope};
-use egui::{Rect, Vec2};
+use egui::{Rect, Response, Vec2};
 
 /// Points one arrow press pans a plot or orbits a 3D one.
 const STEP: f32 = 40.0;
@@ -42,70 +42,109 @@ pub fn handle_canvas_keys(
     if response.has_focus() {
         focus::claim_arrows(ctx, response.id);
     }
-    let acted = std::cell::Cell::new(false);
-    let take = |action| {
-        let taken = keymap::take_action(ctx, Action::Canvas(action), |s| gate.allows(s));
-        acted.set(acted.get() || taken.is_some());
-        taken
+    let take = |action| keymap::take_action(ctx, Action::Canvas(action), |s| gate.allows(s));
+    let canvas = Canvas {
+        ctx,
+        rect: canvas_rect,
+        plot_type,
+        probe: probe::position(ctx),
     };
-    let controller = controller_for(plot_type);
-    let probe_at = probe::position(ctx);
-    let mut moved = false;
+    let probed = canvas.probe_keys(&take, response);
+    let (acted, moved) = canvas.view_keys(app, &take);
+    app.nav.view_interacting |= moved;
+    if probed || acted {
+        ctx.request_repaint();
+    }
+}
 
-    if take(CanvasAction::ToggleProbe).is_some() {
-        let start = response.hover_pos().unwrap_or_else(|| canvas_rect.center());
-        probe::toggle(ctx, start);
-    }
-    if take(CanvasAction::LeaveProbe).is_some() {
-        match probe_at {
-            Some(_) => probe::stop(ctx),
-            None => response.surrender_focus(),
+/// Where the canvas keys act this frame.
+struct Canvas<'a> {
+    ctx: &'a egui::Context,
+    rect: Rect,
+    plot_type: PlotType,
+    /// The probe's position, while it is on.
+    probe: Option<egui::Pos2>,
+}
+
+impl Canvas<'_> {
+    /// Enter starts or stops the probe; Escape stops it, else lets the
+    /// canvas go. Whether either was pressed.
+    fn probe_keys(
+        &self,
+        take: &impl Fn(CanvasAction) -> Option<Vec2>,
+        response: &Response,
+    ) -> bool {
+        let toggle = take(CanvasAction::ToggleProbe).is_some();
+        if toggle {
+            let start = response.hover_pos().unwrap_or_else(|| self.rect.center());
+            probe::toggle(self.ctx, start);
         }
+        let leave = take(CanvasAction::LeaveProbe).is_some();
+        if leave {
+            match self.probe {
+                Some(_) => probe::stop(self.ctx),
+                None => response.surrender_focus(),
+            }
+        }
+        toggle || leave
     }
-    for (action, alt) in [(CanvasAction::Move, false), (CanvasAction::MoveAlt, true)] {
-        let Some(direction) = take(action) else {
-            continue;
-        };
+
+    /// The arrows, zoom and reset keys; whether any was pressed, and
+    /// whether the view moved.
+    fn view_keys(
+        &self,
+        app: &mut OctantApp,
+        take: &impl Fn(CanvasAction) -> Option<Vec2>,
+    ) -> (bool, bool) {
+        let (mut acted, mut moved) = (false, false);
+        for (action, alt) in [(CanvasAction::Move, false), (CanvasAction::MoveAlt, true)] {
+            if let Some(direction) = take(action) {
+                acted = true;
+                moved |= self.arrow(app, direction, alt);
+            }
+        }
+        let zooms = [
+            (CanvasAction::ZoomIn, ZOOM),
+            (CanvasAction::ZoomOut, 1.0 / ZOOM),
+        ];
+        for (action, factor) in zooms {
+            if take(action).is_some() {
+                let anchor = self.probe.unwrap_or_else(|| self.rect.center());
+                controller_for(self.plot_type).handle_zoom(&mut app.nav, factor, anchor, self.rect);
+                (acted, moved) = (true, true);
+            }
+        }
+        if take(CanvasAction::ResetView).is_some() {
+            controller_for(self.plot_type).reset_view(&mut app.nav);
+            (acted, moved) = (true, true);
+        }
+        (acted, moved)
+    }
+
+    /// An arrow press (`alt` with Shift) in `direction`: moves the crop box,
+    /// else the probe, else the view; whether the view moved.
+    fn arrow(&self, app: &mut OctantApp, direction: Vec2, alt: bool) -> bool {
+        let controller = controller_for(self.plot_type);
         if app.show_crop_overlay {
-            crate::ui::crop_overlay::keys::nudge(
-                &mut app.roi_crop_box,
-                direction,
-                alt,
-                canvas_rect,
-            );
-        } else if probe_at.is_some() {
-            let step = probe_step(app, canvas_rect, plot_type) * if alt { FAST } else { 1.0 };
-            probe::step(ctx, direction * step, canvas_rect);
-        } else if plot_type.is_3d() && !alt {
+            crate::ui::crop_overlay::keys::nudge(&mut app.roi_crop_box, direction, alt, self.rect);
+            false
+        } else if self.probe.is_some() {
+            let step = probe_step(app, self.rect, self.plot_type) * if alt { FAST } else { 1.0 };
+            probe::step(self.ctx, direction * step, self.rect);
+            false
+        } else if self.plot_type.is_3d() && !alt {
             // The view turns toward the arrow, as dragging the other way.
             controller.handle_drag(&mut app.nav, -direction * STEP);
-            moved = true;
+            true
         } else {
-            let far = if alt && !plot_type.is_3d() { FAST } else { 1.0 };
-            controller.handle_pan(&mut app.nav, -direction * STEP * far, canvas_rect);
-            moved = true;
+            let far = if alt && !self.plot_type.is_3d() {
+                FAST
+            } else {
+                1.0
+            };
+            controller.handle_pan(&mut app.nav, -direction * STEP * far, self.rect);
+            true
         }
-    }
-
-    let anchor = probe_at.unwrap_or_else(|| canvas_rect.center());
-    for (action, factor) in [
-        (CanvasAction::ZoomIn, ZOOM),
-        (CanvasAction::ZoomOut, 1.0 / ZOOM),
-    ] {
-        if take(action).is_some() {
-            controller.handle_zoom(&mut app.nav, factor, anchor, canvas_rect);
-            moved = true;
-        }
-    }
-    if take(CanvasAction::ResetView).is_some() {
-        controller.reset_view(&mut app.nav);
-        moved = true;
-    }
-    if moved {
-        app.nav.view_interacting = true;
-    }
-    if acted.get() {
-        ctx.request_repaint();
     }
 }
 

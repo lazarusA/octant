@@ -62,10 +62,9 @@ impl<'a> ShapeColorPicker<'a> {
     /// Displays the color picker widget at a specified pre-calculated `Rect`.
     pub fn show_at(self, ui: &mut egui::Ui, rect: Rect) -> egui::Response {
         let resp = ui.interact(rect, self.id_salt.with("btn"), egui::Sense::click());
-        let resp = if let Some(tip) = self.tooltip {
-            resp.on_hover_text(tip)
-        } else {
-            resp
+        let resp = match self.tooltip {
+            Some(tip) => resp.on_hover_text(tip),
+            None => resp,
         };
 
         let style = ui.style();

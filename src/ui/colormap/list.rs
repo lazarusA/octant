@@ -24,8 +24,40 @@ const PAD_RIGHT: f32 = 6.0;
 const GAP: f32 = 8.0;
 
 pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
-    let active = app.picker_style().colormap;
-    let reversed = app.picker_style().reversed;
+    let style = (app.picker_style().colormap, app.picker_style().reversed);
+    let Some(picked) = rows(&mut app.colormaps.picker, ui, max_height, style) else {
+        return;
+    };
+    // A row focused by keyboard previews as a hovered one.
+    if let Some(shown) = picked.hovered.or(picked.keyboard) {
+        app.preview_colormap = Some(shown);
+    }
+    // Repaint only when the hovered row changes, not every frame it stays hovered.
+    if picked.hovered != app.colormaps.picker.last_hovered {
+        app.colormaps.picker.last_hovered = picked.hovered;
+        ui.ctx().request_repaint();
+    }
+    if let Some(id) = picked.clicked {
+        super::select_colormap(app, id);
+    }
+}
+
+/// What the rows reported this frame.
+struct Picked {
+    hovered: Option<u32>,
+    /// The row holding keyboard focus, while the keyboard is in use.
+    keyboard: Option<u32>,
+    clicked: Option<u32>,
+}
+
+/// The matching rows, the active colormap's (`active`, drawn `reversed`)
+/// marked; `None` when nothing matches.
+fn rows(
+    picker: &mut super::PickerState,
+    ui: &mut egui::Ui,
+    max_height: f32,
+    (active, reversed): (u32, bool),
+) -> Option<Picked> {
     let super::PickerState {
         filter,
         cache,
@@ -34,62 +66,42 @@ pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
         drawn_rows,
         enter_list,
         ..
-    } = &mut app.colormaps.picker;
+    } = picker;
     let ids = cache.ids(filter);
     if ids.is_empty() {
         ui.label(egui::RichText::new(tr(K::NoMatches)).small().weak());
-        return;
+        return None;
     }
-
-    let ctx = ui.ctx().clone();
-    let target =
-        keys::target(&ctx, ids, *focused_row).or_else(|| std::mem::take(enter_list).then_some(0));
-    let mut area = egui::ScrollArea::vertical()
+    let area = egui::ScrollArea::vertical()
         .id_salt(("colormap_list", 0))
         .max_height(max_height)
         .auto_shrink([false, true]);
-    if let Some(index) = target {
-        let step = ROW_HEIGHT + ui.spacing().item_spacing.y;
-        if let Some(offset) = keys::offset_showing(index, step, max_height, drawn_rows) {
-            area = area.vertical_scroll_offset(offset);
-        }
-        if let Some(&id) = ids.get(index) {
-            focus::request(&ctx, keys::row_id(id));
-        }
-    }
+    let step = ROW_HEIGHT + ui.spacing().item_spacing.y;
+    let keyed = keys::Rows {
+        ids,
+        drawn: drawn_rows.clone(),
+        step,
+        view: max_height,
+    };
+    let area = keyed.follow_keys(ui.ctx(), area, *focused_row, std::mem::take(enter_list));
 
-    let mut hovered = None;
-    let mut clicked = None;
+    let (mut hovered, mut clicked) = (None, None);
     *focused_row = None;
     area.show_rows(ui, ROW_HEIGHT, ids.len(), |ui, range| {
         *drawn_rows = range.clone();
         for &id in ids.get(range).unwrap_or_default() {
             let response = row(ui, swatches, id, id == active, reversed);
-            if response.hovered() {
-                hovered = Some(id);
-            }
-            if response.has_focus() {
-                *focused_row = Some(id);
-            }
-            if response.clicked() {
-                clicked = Some(id);
-            }
+            hovered = hovered.or(response.hovered().then_some(id));
+            *focused_row = focused_row.or(response.has_focus().then_some(id));
+            clicked = clicked.or(response.clicked().then_some(id));
         }
     });
-
-    // A row focused by keyboard previews as a hovered one.
-    let keyboard = focused_row.filter(|_| focus::visible(&ctx));
-    if let Some(shown) = hovered.or(keyboard) {
-        app.preview_colormap = Some(shown);
-    }
-    // Repaint only when the hovered row changes, not every frame it stays hovered.
-    if hovered != app.colormaps.picker.last_hovered {
-        app.colormaps.picker.last_hovered = hovered;
-        ui.ctx().request_repaint();
-    }
-    if let Some(id) = clicked {
-        super::select_colormap(app, id);
-    }
+    let keyboard = focused_row.filter(|_| focus::visible(ui.ctx()));
+    Some(Picked {
+        hovered,
+        keyboard,
+        clicked,
+    })
 }
 
 fn row(

@@ -84,7 +84,6 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
     let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
     let grid = Grid { rect, side };
     grid_names(ui, &grid, layout);
-    let opened_well = plate.opened.as_ref().map(|(well, _)| *well);
     let painter = ui.painter_at(rect);
     let well_id = |i: usize| ui.scope_id().with(("plate_well", i));
     let mut action = None;
@@ -93,24 +92,12 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
         if well.row >= rows || well.column >= columns {
             continue;
         }
-        let r = grid.cell(well.row, well.column).shrink(1.0);
-        let response = ui.interact(r, well_id(i), egui::Sense::click());
+        let cell = grid.cell(well.row, well.column).shrink(1.0);
+        let response = ui.interact(cell, well_id(i), egui::Sense::click());
+        paint_well(ui, &painter, plate, i, &response);
         if response.has_focus() {
             focused = Some(i);
             focus::claim_arrows(ui.ctx(), response.id);
-        }
-        focus::paint_ring(ui, &response, 2.0);
-        let visuals = ui.visuals();
-        let fill = if plate.well == Some(i) {
-            visuals.selection.bg_fill
-        } else if response.hovered() {
-            visuals.widgets.hovered.bg_fill
-        } else {
-            visuals.widgets.inactive.bg_fill
-        };
-        painter.rect_filled(r, 2.0, fill);
-        if opened_well == Some(i) {
-            painter.rect_stroke(r, 2.0, visuals.selection.stroke, egui::StrokeKind::Inside);
         }
         if response.clicked() {
             action = Some(PlateAction::PickWell(i));
@@ -131,6 +118,36 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
         focus::request(ui.ctx(), well_id(next));
     }
     action
+}
+
+/// Well `i`'s cell: picked, hovered or plain fill, the opened well's
+/// outline and the keyboard focus ring.
+fn paint_well(
+    ui: &egui::Ui,
+    painter: &egui::Painter,
+    plate: &PlateState,
+    i: usize,
+    response: &egui::Response,
+) {
+    let visuals = ui.visuals();
+    let fill = if plate.well == Some(i) {
+        visuals.selection.bg_fill
+    } else if response.hovered() {
+        visuals.widgets.hovered.bg_fill
+    } else {
+        visuals.widgets.inactive.bg_fill
+    };
+    let cell = response.rect;
+    painter.rect_filled(cell, 2.0, fill);
+    if plate.opened.as_ref().is_some_and(|(well, _)| *well == i) {
+        painter.rect_stroke(
+            cell,
+            2.0,
+            visuals.selection.stroke,
+            egui::StrokeKind::Inside,
+        );
+    }
+    focus::paint_ring(ui, response, 2.0);
 }
 
 /// The well next to well `at` in `direction` along its row or column: the
