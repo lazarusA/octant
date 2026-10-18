@@ -9,8 +9,9 @@ use crate::ui::icons::{Icon, IconSize, UiIconExt};
 pub struct PanelHeader {
     pub close: bool,
     pub grip: GripAction,
-    /// The grip's widget, where keyboard focus enters the panel.
-    pub grip_id: Option<egui::Id>,
+    /// Where keyboard focus enters the panel: its grip, unless the panel
+    /// names another widget.
+    pub entry: Option<egui::Id>,
 }
 
 impl Default for PanelHeader {
@@ -18,7 +19,7 @@ impl Default for PanelHeader {
         Self {
             close: false,
             grip: GripAction::None,
-            grip_id: None,
+            entry: None,
         }
     }
 }
@@ -40,6 +41,6 @@ pub fn buttons(ui: &mut egui::Ui, close_hover: &str) -> PanelHeader {
     PanelHeader {
         close,
         grip: drag_grip::action(&grip),
-        grip_id: Some(grip.id),
+        entry: Some(grip.id),
     }
 }

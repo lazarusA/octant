@@ -75,7 +75,8 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
 
 /// Collapsible "Variables" header with the search field and list (at most
 /// `list_height` tall, shorter rather than past the bottom of `canvas`);
-/// returns what the header's close button and grip asked for.
+/// returns what the header's close button and grip asked for, keyboard
+/// focus entering at the search field.
 fn show_panel(
     ui: &mut egui::Ui,
     app: &mut OctantApp,
@@ -101,6 +102,9 @@ fn show_panel(
             );
             if focus::take_open_focus(ui.ctx()) {
                 search.request_focus();
+            }
+            if let Some(header) = &mut header {
+                header.entry = Some(search.id);
             }
             let jump = search_jump(ui, &search);
             let max_height = list_height

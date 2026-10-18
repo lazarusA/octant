@@ -131,8 +131,8 @@ fn apply_grip(app: &mut OctantApp, panel: Panel, action: GripAction, rect: Rect,
 }
 
 /// After `panel` drew as `area` on `canvas`: applies what its `header`'s
-/// grip asked, registers it as a keyboard region entered at the grip, and
-/// closes it when its close button was clicked.
+/// grip asked, registers it as a keyboard region entered at the header's
+/// `entry`, and closes it when its close button was clicked.
 pub fn finish(
     app: &mut OctantApp,
     panel: Panel,
@@ -141,11 +141,11 @@ pub fn finish(
     canvas: Rect,
 ) {
     apply_grip(app, panel, header.grip, area.rect, canvas);
-    if let Some(grip) = header.grip_id {
+    if let Some(entry) = header.entry {
         regions::register(
             &area.ctx,
             Region::of(panel),
-            grip,
+            entry,
             area.layer_id,
             Rect::EVERYTHING,
         );
