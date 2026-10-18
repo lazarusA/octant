@@ -13,6 +13,8 @@ pub struct Gate {
     /// The panel Escape closes.
     panel: Option<Panel>,
     free: bool,
+    /// Escape on the landing screen returns to the plot.
+    hero: bool,
     canvas: bool,
     playback: bool,
 }
@@ -27,9 +29,18 @@ impl Gate {
             && !egui::Popup::is_any_open(ctx)
             && !modal_open(app);
         let canvas = free && plot_shown;
+        // The landing screen's own widgets (the URL field) let Escape go;
+        // its sample chips keep it, and so keep focus.
+        let hero = app.layout.show_hero
+            && app.has_plot()
+            && panel.is_none()
+            && focused.is_none()
+            && !egui::Popup::is_any_open(ctx)
+            && !modal_open(app);
         Self {
             panel,
             free,
+            hero,
             canvas,
             playback: canvas && app.has_animated_dimension(),
         }
@@ -40,6 +51,7 @@ impl Gate {
             Scope::Global => true,
             Scope::Panel => self.panel.is_some(),
             Scope::Free => self.free,
+            Scope::Hero => self.hero,
             Scope::Canvas => self.canvas,
             Scope::Playback => self.playback,
         }
@@ -53,6 +65,7 @@ fn modal_open(app: &OctantApp) -> bool {
         || layout.show_about_window
         || layout.show_icon_gallery_window
         || layout.show_shortcuts
+        || layout.show_plot_picker
         || app.show_export_modal
 }
 
@@ -93,6 +106,19 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
         Action::LastStep => app.step_last(),
         Action::ToggleLoop => app.playback.loop_playback = !app.playback.loop_playback,
         Action::ShowShortcuts => app.layout.show_shortcuts = true,
+        Action::ToggleHero => app.toggle_hero(),
+        Action::LeaveHero => app.layout.show_hero = false,
+        Action::PlotTypePicker => {
+            let shown = app
+                .selected_variable_info()
+                .or_else(|| app.plotted_variable_info());
+            app.layout.show_plot_picker = shown.is_some();
+        }
+        Action::PlotStaged => {
+            if app.selected.variable_info().is_some() {
+                app.plot_from_panel();
+            }
+        }
         // Regions hold focus outside modal windows only.
         Action::NextRegion | Action::PreviousRegion | Action::FocusTopBar if modal_open(app) => {}
         Action::NextRegion => regions::cycle(ctx, true),

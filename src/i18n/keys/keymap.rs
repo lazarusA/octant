@@ -37,5 +37,12 @@ crate::i18n::keys::define_keys! {
     ToggleProbe,
     LeaveProbe,
     ShowShortcuts,
+    ToggleHero,
+    LeaveHero,
+    ScopeHero,
+    PlotTypePicker,
+    PlotStaged,
+    PickerTitle,
+    PickerHint,
     }
 }

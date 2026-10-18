@@ -36,6 +36,8 @@ pub struct UiLayoutState {
     pub show_icon_gallery_window: bool,
     /// The keyboard shortcut list.
     pub show_shortcuts: bool,
+    /// The centered plot type picker.
+    pub show_plot_picker: bool,
     pub catalog_search_query: String,
     pub catalog_category_filter: crate::catalog::CatalogCategoryFilter,
 }
@@ -67,6 +69,7 @@ impl Default for UiLayoutState {
             show_about_window: false,
             show_icon_gallery_window: false,
             show_shortcuts: false,
+            show_plot_picker: false,
             catalog_search_query: String::new(),
             catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
         }
@@ -103,6 +106,7 @@ impl UiLayoutState {
         self.show_about_window = false;
         self.show_icon_gallery_window = false;
         self.show_shortcuts = false;
+        self.show_plot_picker = false;
     }
 }
 

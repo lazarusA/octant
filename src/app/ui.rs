@@ -111,9 +111,7 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
-        let is_hero_active = (self.layers.base.data.matrix.is_none()
-            && self.layers.base.data.volume.is_none())
-            || self.layout.show_hero;
+        let is_hero_active = self.hero_shown();
 
         crate::ui::keyboard::dispatch(self, &ctx, !is_hero_active);
 
@@ -158,6 +156,7 @@ impl eframe::App for OctantApp {
         crate::ui::about::show_icon_gallery_window(self, &ctx);
         crate::ui::export_modal::show_export_modal(self, &ctx);
         crate::ui::keyboard::help::show(self, &ctx);
+        crate::ui::plot_type::picker::show_plot_type_picker(self, &ctx);
 
         // Overlays anchor relative to the remaining canvas rect
         let canvas_rect = ui.available_rect_before_wrap();

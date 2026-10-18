@@ -41,5 +41,12 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ToggleProbe => "Läs värden med piltangenterna",
         KeymapKey::LeaveProbe => "Sluta läsa värden",
         KeymapKey::ShowShortcuts => "Visa kortkommandon",
+        KeymapKey::ToggleHero => "Visa startskärmen, eller diagrammet igen",
+        KeymapKey::LeaveHero => "Tillbaka till diagrammet",
+        KeymapKey::ScopeHero => "På startskärmen",
+        KeymapKey::PlotTypePicker => "Välj diagramtyp",
+        KeymapKey::PlotStaged => "Rita den valda variabeln",
+        KeymapKey::PickerTitle => "Diagramtyp",
+        KeymapKey::PickerHint => "Tryck 1-6, eller flytta med piltangenterna och tryck Enter",
     })
 }

@@ -3,10 +3,9 @@
 //! compact button, its hover text, and the keys of its shortcut), shown on
 //! hover and while it holds keyboard focus.
 
-use crate::i18n::{KeymapKey, tr};
 use crate::ui::keyboard::focus;
-use crate::ui::keyboard::keymap::{self, Action, Shortcut};
-use crate::ui::keyboard::labels::{self, KeysBuf};
+use crate::ui::keyboard::keymap::{self, Action};
+use crate::ui::keyboard::labels;
 use egui::{Response, Ui};
 
 pub(super) struct Tip<'a> {
@@ -35,7 +34,7 @@ impl Tip<'_> {
         let Some(tip) = self.hover.or(labelled.then_some(self.label)) else {
             return response;
         };
-        let tooltip = |ui: &mut Ui| tooltip(ui, tip, keys);
+        let tooltip = |ui: &mut Ui| labels::tooltip(ui, tip, keys);
         // Keyboard focus shows the tooltip a pointer would, so an icon-only
         // button still says what it does.
         if focus::shows_tooltip(&response) {
@@ -43,20 +42,4 @@ impl Tip<'_> {
         }
         response.on_hover_ui(tooltip)
     }
-}
-
-/// `tip`, with the keys of `shortcut` after it.
-fn tooltip(ui: &mut Ui, tip: &str, shortcut: Option<&Shortcut>) {
-    let Some(shortcut) = shortcut else {
-        ui.label(tip);
-        return;
-    };
-    let mut keys_buf: KeysBuf = [0; 48];
-    let keys = labels::write_keys(&mut keys_buf, shortcut, labels::is_mac(ui.ctx()));
-    let mut buf = [0u8; 256];
-    ui.label(crate::i18n::fill(
-        &mut buf,
-        tr(KeymapKey::Hint),
-        &[&tip, &keys],
-    ));
 }

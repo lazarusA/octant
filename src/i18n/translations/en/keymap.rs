@@ -37,5 +37,12 @@ pub fn text(key: KeymapKey) -> &'static str {
         KeymapKey::ToggleProbe => "Read values with the arrow keys",
         KeymapKey::LeaveProbe => "Stop reading values",
         KeymapKey::ShowShortcuts => "Show keyboard shortcuts",
+        KeymapKey::ToggleHero => "Show the landing screen, or the plot again",
+        KeymapKey::LeaveHero => "Back to the plot",
+        KeymapKey::ScopeHero => "On the landing screen",
+        KeymapKey::PlotTypePicker => "Choose the plot type",
+        KeymapKey::PlotStaged => "Plot the selected variable",
+        KeymapKey::PickerTitle => "Plot Type",
+        KeymapKey::PickerHint => "Press 1-6, or move with the arrows and press Enter",
     }
 }

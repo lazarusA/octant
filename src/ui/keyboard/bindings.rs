@@ -31,6 +31,15 @@ const fn playback(action: Action, key: Key) -> Shortcut {
     }
 }
 
+const fn free(action: Action, key: Key) -> Shortcut {
+    Shortcut {
+        action,
+        keys: Keys::One(key),
+        mods: Modifiers::NONE,
+        scope: Scope::Free,
+    }
+}
+
 const CMD_SHIFT: Modifiers = Modifiers::COMMAND.plus(Modifiers::SHIFT);
 
 pub const TABLE: &[Shortcut] = &[
@@ -57,6 +66,7 @@ pub const TABLE: &[Shortcut] = &[
         Modifiers::COMMAND,
     ),
     global(Action::SearchVariables, Key::K, Modifiers::COMMAND),
+    global(Action::PlotStaged, Key::Enter, Modifiers::COMMAND),
     Shortcut {
         action: Action::ClosePanel,
         keys: Keys::One(Key::Escape),
@@ -95,10 +105,13 @@ pub const TABLE: &[Shortcut] = &[
     playback(Action::FirstStep, Key::Home),
     playback(Action::LastStep, Key::End),
     playback(Action::ToggleLoop, Key::L),
+    free(Action::ShowShortcuts, Key::Questionmark),
+    free(Action::ToggleHero, Key::H),
+    free(Action::PlotTypePicker, Key::P),
     Shortcut {
-        action: Action::ShowShortcuts,
-        keys: Keys::One(Key::Questionmark),
+        action: Action::LeaveHero,
+        keys: Keys::One(Key::Escape),
         mods: Modifiers::NONE,
-        scope: Scope::Free,
+        scope: Scope::Hero,
     },
 ];

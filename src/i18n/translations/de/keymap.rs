@@ -39,5 +39,12 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ToggleProbe => "Werte mit den Pfeiltasten ablesen",
         KeymapKey::LeaveProbe => "Ablesen beenden",
         KeymapKey::ShowShortcuts => "Tastenkürzel anzeigen",
+        KeymapKey::ToggleHero => "Startseite oder wieder die Darstellung zeigen",
+        KeymapKey::LeaveHero => "Zurück zur Darstellung",
+        KeymapKey::ScopeHero => "Auf der Startseite",
+        KeymapKey::PlotTypePicker => "Darstellungsart wählen",
+        KeymapKey::PlotStaged => "Gewählte Variable darstellen",
+        KeymapKey::PickerTitle => "Darstellungsart",
+        KeymapKey::PickerHint => "1-6 drücken oder mit den Pfeiltasten wählen und Enter drücken",
     })
 }

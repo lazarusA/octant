@@ -49,9 +49,7 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
         ctx.request_repaint();
     }
 
-    let is_hero_active = (app.layers.base.data.matrix.is_none()
-        && app.layers.base.data.volume.is_none())
-        || app.layout.show_hero;
+    let is_hero_active = app.hero_shown();
 
     // When no dataset is plotted or hero landing view is active, render the clean hero page
     if is_hero_active {

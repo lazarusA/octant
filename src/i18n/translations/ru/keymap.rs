@@ -41,5 +41,12 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ToggleProbe => "Считывать значения стрелками",
         KeymapKey::LeaveProbe => "Прекратить считывание",
         KeymapKey::ShowShortcuts => "Показать сочетания клавиш",
+        KeymapKey::ToggleHero => "Показать начальный экран или снова график",
+        KeymapKey::LeaveHero => "Вернуться к графику",
+        KeymapKey::ScopeHero => "На начальном экране",
+        KeymapKey::PlotTypePicker => "Выбрать тип графика",
+        KeymapKey::PlotStaged => "Построить выбранную переменную",
+        KeymapKey::PickerTitle => "Тип графика",
+        KeymapKey::PickerHint => "Нажмите 1-6 или выберите стрелками и нажмите Enter",
     })
 }

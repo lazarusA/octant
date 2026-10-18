@@ -37,5 +37,12 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ToggleProbe => "Ler valores com as setas",
         KeymapKey::LeaveProbe => "Parar de ler valores",
         KeymapKey::ShowShortcuts => "Mostrar atalhos de teclado",
+        KeymapKey::ToggleHero => "Mostrar a tela inicial, ou de novo o gráfico",
+        KeymapKey::LeaveHero => "Voltar ao gráfico",
+        KeymapKey::ScopeHero => "Na tela inicial",
+        KeymapKey::PlotTypePicker => "Escolher o tipo de gráfico",
+        KeymapKey::PlotStaged => "Plotar a variável selecionada",
+        KeymapKey::PickerTitle => "Tipo de gráfico",
+        KeymapKey::PickerHint => "Pressione 1-6, ou mova-se com as setas e pressione Enter",
     })
 }

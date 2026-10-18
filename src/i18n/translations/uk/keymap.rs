@@ -39,5 +39,12 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ToggleProbe => "Зчитувати значення стрілками",
         KeymapKey::LeaveProbe => "Припинити зчитування",
         KeymapKey::ShowShortcuts => "Показати сполучення клавіш",
+        KeymapKey::ToggleHero => "Показати початковий екран або знову графік",
+        KeymapKey::LeaveHero => "Повернутися до графіка",
+        KeymapKey::ScopeHero => "На початковому екрані",
+        KeymapKey::PlotTypePicker => "Вибрати тип графіка",
+        KeymapKey::PlotStaged => "Побудувати вибрану змінну",
+        KeymapKey::PickerTitle => "Тип графіка",
+        KeymapKey::PickerHint => "Натисніть 1-6 або виберіть стрілками й натисніть Enter",
     })
 }

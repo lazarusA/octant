@@ -37,5 +37,12 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ToggleProbe => "Les verdier med piltastene",
         KeymapKey::LeaveProbe => "Slutt å lese verdier",
         KeymapKey::ShowShortcuts => "Vis hurtigtaster",
+        KeymapKey::ToggleHero => "Vis startskjermen, eller plottet igjen",
+        KeymapKey::LeaveHero => "Tilbake til plottet",
+        KeymapKey::ScopeHero => "På startskjermen",
+        KeymapKey::PlotTypePicker => "Velg plottype",
+        KeymapKey::PlotStaged => "Plott den valgte variabelen",
+        KeymapKey::PickerTitle => "Plottype",
+        KeymapKey::PickerHint => "Trykk 1-6, eller flytt med piltastene og trykk Enter",
     })
 }

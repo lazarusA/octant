@@ -37,5 +37,12 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ToggleProbe => "화살표 키로 값 읽기",
         KeymapKey::LeaveProbe => "값 읽기 중지",
         KeymapKey::ShowShortcuts => "키보드 단축키 보기",
+        KeymapKey::ToggleHero => "시작 화면 또는 다시 플롯 보기",
+        KeymapKey::LeaveHero => "플롯으로 돌아가기",
+        KeymapKey::ScopeHero => "시작 화면에서",
+        KeymapKey::PlotTypePicker => "플롯 종류 선택",
+        KeymapKey::PlotStaged => "선택한 변수 플롯",
+        KeymapKey::PickerTitle => "플롯 종류",
+        KeymapKey::PickerHint => "1-6을 누르거나 화살표로 이동한 뒤 Enter",
     })
 }

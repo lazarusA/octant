@@ -1,6 +1,7 @@
 //! Opening and closing the floating panels, by their toolbar buttons, close
 //! buttons or shortcuts alike: keyboard focus enters a panel opened by keys
-//! and returns to what opened it when it closes.
+//! and returns to what opened it when it closes. Also the landing screen
+//! shown in the plot's place.
 
 use super::OctantApp;
 use crate::ui::keyboard::regions::{self, Region};
@@ -28,6 +29,23 @@ impl OctantApp {
             self.revert_selected_state_to_plotted();
         }
         windows::return_to_opener(ctx, panel.area_id());
+    }
+
+    /// Whether a plot has data to draw.
+    pub fn has_plot(&self) -> bool {
+        let data = &self.layers.base.data;
+        data.matrix.is_some() || data.volume.is_some()
+    }
+
+    /// Whether the landing screen fills the canvas: asked for, or nothing
+    /// is plotted yet.
+    pub fn hero_shown(&self) -> bool {
+        self.layout.show_hero || !self.has_plot()
+    }
+
+    /// Shows the landing screen, or the plot again.
+    pub fn toggle_hero(&mut self) {
+        self.layout.show_hero = !self.layout.show_hero;
     }
 
     pub fn toggle_panel(&mut self, ctx: &egui::Context, panel: Panel) {

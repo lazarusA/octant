@@ -37,5 +37,12 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ToggleProbe => "Leer valores con las flechas",
         KeymapKey::LeaveProbe => "Dejar de leer valores",
         KeymapKey::ShowShortcuts => "Mostrar atajos de teclado",
+        KeymapKey::ToggleHero => "Mostrar la pantalla de inicio, o de nuevo el gráfico",
+        KeymapKey::LeaveHero => "Volver al gráfico",
+        KeymapKey::ScopeHero => "En la pantalla de inicio",
+        KeymapKey::PlotTypePicker => "Elegir el tipo de gráfico",
+        KeymapKey::PlotStaged => "Graficar la variable seleccionada",
+        KeymapKey::PickerTitle => "Tipo de gráfico",
+        KeymapKey::PickerHint => "Pulse 1-6, o muévase con las flechas y pulse Enter",
     })
 }

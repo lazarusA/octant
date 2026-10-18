@@ -4,7 +4,8 @@ use super::layout::TopBarItem;
 use crate::app::OctantApp;
 use crate::i18n::{CommonKey, tr};
 use crate::ui::icons::{Icon, TOOLBAR_ITEM_HEIGHT, ToolbarButton};
-use crate::ui::keyboard::keymap::Action;
+use crate::ui::keyboard::keymap::{self, Action};
+use crate::ui::keyboard::labels;
 use crate::ui::panel_layout::Panel;
 use crate::ui::toolbar::roving::{BarNav, Stop};
 use crate::ui::toolbar::{ItemWidths, SEPARATOR_WIDTH};
@@ -85,9 +86,12 @@ fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool, nav: &mut B
     let icon_resp =
         crate::ui::hero::draw_octant_widget(ui, TOOLBAR_ITEM_HEIGHT, [-1.0, -1.0, -1.0], 0.0, 1.0)
             .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text(tr(CommonKey::ToggleHeroHover));
+            .on_hover_ui(|ui| {
+                let keys = keymap::shortcut_of(Action::ToggleHero);
+                labels::tooltip(ui, tr(CommonKey::ToggleHeroHover), keys);
+            });
     if icon_resp.clicked() {
-        app.layout.show_hero = !app.layout.show_hero;
+        app.toggle_hero();
     }
     if icon_resp.secondary_clicked() {
         app.layout.show_about_window = !app.layout.show_about_window;

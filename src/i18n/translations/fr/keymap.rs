@@ -41,5 +41,12 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ToggleProbe => "Lire les valeurs avec les flèches",
         KeymapKey::LeaveProbe => "Arrêter la lecture des valeurs",
         KeymapKey::ShowShortcuts => "Afficher les raccourcis clavier",
+        KeymapKey::ToggleHero => "Afficher l'écran d'accueil, ou de nouveau le graphique",
+        KeymapKey::LeaveHero => "Revenir au graphique",
+        KeymapKey::ScopeHero => "Sur l'écran d'accueil",
+        KeymapKey::PlotTypePicker => "Choisir le type de graphique",
+        KeymapKey::PlotStaged => "Tracer la variable sélectionnée",
+        KeymapKey::PickerTitle => "Type de graphique",
+        KeymapKey::PickerHint => "Appuyez sur 1-6, ou déplacez-vous avec les flèches puis Entrée",
     })
 }

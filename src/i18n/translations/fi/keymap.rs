@@ -37,5 +37,12 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ToggleProbe => "Lue arvoja nuolinäppäimillä",
         KeymapKey::LeaveProbe => "Lopeta arvojen luku",
         KeymapKey::ShowShortcuts => "Näytä pikanäppäimet",
+        KeymapKey::ToggleHero => "Näytä aloitusnäkymä tai taas kuvaaja",
+        KeymapKey::LeaveHero => "Takaisin kuvaajaan",
+        KeymapKey::ScopeHero => "Aloitusnäkymässä",
+        KeymapKey::PlotTypePicker => "Valitse kuvaajan tyyppi",
+        KeymapKey::PlotStaged => "Piirrä valittu muuttuja",
+        KeymapKey::PickerTitle => "Kuvaajan tyyppi",
+        KeymapKey::PickerHint => "Paina 1-6 tai siirry nuolilla ja paina Enter",
     })
 }

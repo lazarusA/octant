@@ -33,6 +33,10 @@ pub fn describe(action: Action) -> K {
         Action::LastStep => K::LastStep,
         Action::ToggleLoop => K::ToggleLoop,
         Action::ShowShortcuts => K::ShowShortcuts,
+        Action::ToggleHero => K::ToggleHero,
+        Action::LeaveHero => K::LeaveHero,
+        Action::PlotTypePicker => K::PlotTypePicker,
+        Action::PlotStaged => K::PlotStaged,
         Action::Canvas(CanvasAction::Move) => K::Move,
         Action::Canvas(CanvasAction::MoveAlt) => K::MoveAlt,
         Action::Canvas(CanvasAction::ZoomIn) => K::ZoomIn,
@@ -44,9 +48,10 @@ pub fn describe(action: Action) -> K {
 }
 
 /// Every scope, in the order the shortcut list shows them.
-pub const SCOPES: [Scope; 5] = [
+pub const SCOPES: [Scope; 6] = [
     Scope::Global,
     Scope::Free,
+    Scope::Hero,
     Scope::Canvas,
     Scope::Playback,
     Scope::Panel,
@@ -57,6 +62,7 @@ pub fn scope_title(scope: Scope) -> K {
         Scope::Global => K::ScopeGlobal,
         Scope::Panel => K::ScopePanel,
         Scope::Free => K::ScopeFree,
+        Scope::Hero => K::ScopeHero,
         Scope::Canvas => K::ScopeCanvas,
         Scope::Playback => K::ScopePlayback,
     }
@@ -117,4 +123,16 @@ pub fn write_keys<'a>(buf: &'a mut KeysBuf, shortcut: &Shortcut, mac: bool) -> &
 /// Whether modifier names should read as on macOS.
 pub fn is_mac(ctx: &egui::Context) -> bool {
     ctx.os() == egui::os::OperatingSystem::Mac
+}
+
+/// A tooltip's `tip`, with the keys of `shortcut` after it.
+pub fn tooltip(ui: &mut egui::Ui, tip: &str, shortcut: Option<&Shortcut>) {
+    let Some(shortcut) = shortcut else {
+        ui.label(tip);
+        return;
+    };
+    let mut keys_buf: KeysBuf = [0; 48];
+    let keys = write_keys(&mut keys_buf, shortcut, is_mac(ui.ctx()));
+    let mut buf = [0u8; 256];
+    ui.label(crate::i18n::fill(&mut buf, tr(K::Hint), &[&tip, &keys]));
 }

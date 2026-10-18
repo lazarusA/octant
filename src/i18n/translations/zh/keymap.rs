@@ -37,5 +37,12 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::ToggleProbe => "用方向键读取数值",
         KeymapKey::LeaveProbe => "停止读取数值",
         KeymapKey::ShowShortcuts => "显示键盘快捷键",
+        KeymapKey::ToggleHero => "显示起始页，或重新显示绘图",
+        KeymapKey::LeaveHero => "返回绘图",
+        KeymapKey::ScopeHero => "在起始页",
+        KeymapKey::PlotTypePicker => "选择绘图类型",
+        KeymapKey::PlotStaged => "绘制所选变量",
+        KeymapKey::PickerTitle => "绘图类型",
+        KeymapKey::PickerHint => "按 1-6，或用方向键移动后按 Enter",
     })
 }

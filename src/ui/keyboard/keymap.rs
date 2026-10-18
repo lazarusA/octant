@@ -26,6 +26,14 @@ pub enum Action {
     LastStep,
     ToggleLoop,
     ShowShortcuts,
+    /// Shows the landing screen, or the plot again.
+    ToggleHero,
+    /// Leaves the landing screen for the plot.
+    LeaveHero,
+    /// Opens the centered plot type picker.
+    PlotTypePicker,
+    /// Plots the staged variable, as the Dimensions panel's Plot Data.
+    PlotStaged,
     /// Run by the canvas as it draws, knowing the plot's geometry.
     Canvas(CanvasAction),
 }
@@ -56,6 +64,9 @@ pub enum Scope {
     /// Single keys while nothing or the canvas holds focus and no popup or
     /// modal window is open.
     Free,
+    /// Escape on the landing screen while a plot waits behind it, once no
+    /// widget kept Escape for itself.
+    Hero,
     /// [`Scope::Free`] keys on a shown plot.
     Canvas,
     /// Canvas keys of a plot with an animated dimension.
