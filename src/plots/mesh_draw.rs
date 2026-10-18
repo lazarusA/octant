@@ -62,9 +62,7 @@ impl eframe::egui_wgpu::CallbackTrait for Mesh3DCallback {
         callback_resources: &mut eframe::egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         super::colormap_atlas::prepare(device, queue, callback_resources);
-        let mut params = self.params;
-        params.aspect_ratio = super::common::compute_aspect_ratio(&self.rect);
-        self.renderer.update_uniforms(queue, &params);
+        self.renderer.update_uniforms(queue, &self.params);
         if self.transparency == Transparency::Oit
             && let Some(atlas) = super::colormap_atlas::bind_group(callback_resources)
         {

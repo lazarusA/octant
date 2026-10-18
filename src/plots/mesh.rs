@@ -70,10 +70,7 @@ impl Mesh3DRenderer {
         let num_instances = (width * height) as u32;
 
         let initial_uniforms = Mesh3DUniforms {
-            rotation_y: 0.0,
-            rotation_x: 0.0,
-            aspect_ratio: 1.0,
-            zoom: 2.5,
+            camera: super::camera::OrbitCamera::default().uniform(),
             displacement_strength: 0.5,
             mode: 0,
             width: width as u32,
@@ -185,10 +182,7 @@ impl Mesh3DRenderer {
 
     pub fn update_uniforms(&self, queue: &wgpu::Queue, params: &Mesh3DUniformParams) {
         let uniforms = Mesh3DUniforms {
-            rotation_y: params.rotation_y,
-            rotation_x: params.rotation_x,
-            aspect_ratio: params.aspect_ratio.max(0.1),
-            zoom: params.zoom,
+            camera: params.camera,
             displacement_strength: params.displacement_strength,
             mode: params.mode,
             width: self.width as u32,

@@ -1,8 +1,5 @@
 struct Coastline3DUniforms {
-    rotation_y: f32,
-    rotation_x: f32,
-    aspect_ratio: f32,
-    zoom: f32,
+    camera: Camera,
     displacement_strength: f32,
     plot_kind: u32,
     plot_mode: u32,
@@ -172,7 +169,6 @@ fn vs_main(
     }
 
     var world_pos: vec3<f32>;
-    var min_dist: f32 = 0.1;
     var data_aspect = max(f32(max(coastline_uniforms.width, 1u)) / f32(max(coastline_uniforms.height, 1u)), 0.1);
     if (coastline_uniforms.coord_mode == 4u || coastline_uniforms.coord_mode == 5u) {
         data_aspect = 2.0;
@@ -180,7 +176,6 @@ fn vs_main(
 
     if (coastline_uniforms.plot_kind == 1u) {
         // --- Sphere Mode ---
-        min_dist = 1.1;
         var radius = 1.002;
         if (coastline_uniforms.plot_mode > 0u && in_bounds) {
             let dr = radial_height(value);
@@ -192,7 +187,6 @@ fn vs_main(
         world_pos = lon_lat_to_cartesian(radius, cur_lon, cur_lat);
     } else {
         // --- Surface / Block Mode ---
-        min_dist = 0.1;
         let normalized_x = uv_x;
         let normalized_y = (coastline_uniforms.lat_bounds.y - cur_lat) / lat_span;
         let world_x = -data_aspect + normalized_x * 2.0 * data_aspect;
@@ -207,8 +201,7 @@ fn vs_main(
         world_pos = vec3<f32>(world_x, height + 0.003, world_z);
     }
 
-    let rotated = rotate_camera_yx(world_pos, coastline_uniforms.rotation_y, coastline_uniforms.rotation_x);
-    var proj = project_perspective(rotated, coastline_uniforms.aspect_ratio, coastline_uniforms.zoom, 1.6, min_dist);
+    var proj = camera_project(coastline_uniforms.camera, camera_view(coastline_uniforms.camera, world_pos));
 
     // Compute screen space normal from endpoints for line width
     if (coastline_uniforms.line_width > 1.0) {
@@ -228,8 +221,7 @@ fn vs_main(
             let other_z = -1.0 + other_norm_y * 2.0;
             other_world_pos = vec3<f32>(other_x, 0.003, other_z);
         }
-        let other_rotated = rotate_camera_yx(other_world_pos, coastline_uniforms.rotation_y, coastline_uniforms.rotation_x);
-        let other_proj = project_perspective(other_rotated, coastline_uniforms.aspect_ratio, coastline_uniforms.zoom, 1.6, min_dist);
+        let other_proj = camera_project(coastline_uniforms.camera, camera_view(coastline_uniforms.camera, other_world_pos));
 
         let delta = (other_proj.xy / max(other_proj.w, 1e-4)) - (proj.xy / max(proj.w, 1e-4));
         let len = length(delta);

@@ -58,18 +58,24 @@ pub fn calculate_3d_depth(total_len: usize, width: u32, height: u32) -> u32 {
     (total_len as u32 / (width.max(1) * height.max(1))).max(1)
 }
 
-/// Applies cursor-centered zoom scaling and relative panning offset.
+/// Zoom factor of `scroll` points of smoothed mouse wheel scrolling.
+#[inline]
+pub fn scroll_zoom_factor(scroll: f32) -> f32 {
+    (1.0 + scroll * 0.002).clamp(0.8, 1.25)
+}
+
+/// Zooms by `zoom_factor` (above 1 magnifies) about `mouse_pos`, keeping
+/// the point under it in place.
 #[inline]
 pub fn apply_zoom_pan_at_point(
     old_zoom: f32,
     old_pan: eframe::egui::Vec2,
     mouse_pos: eframe::egui::Pos2,
     center: eframe::egui::Pos2,
-    scroll: f32,
+    zoom_factor: f32,
     min_zoom: f32,
     max_zoom: f32,
 ) -> (f32, eframe::egui::Vec2) {
-    let zoom_factor = (1.0 + scroll * 0.002).clamp(0.8, 1.25);
     let new_zoom = (old_zoom * zoom_factor).clamp(min_zoom, max_zoom);
     let zoom_ratio = new_zoom / old_zoom;
     let new_pan = old_pan * zoom_ratio + (mouse_pos - center) * (1.0 - zoom_ratio);
@@ -233,7 +239,7 @@ mod tests {
         let center = eframe::egui::pos2(500.0, 500.0);
         let mouse = eframe::egui::pos2(500.0, 500.0);
         let (zoom, pan) =
-            apply_zoom_pan_at_point(1.0, eframe::egui::Vec2::ZERO, mouse, center, 0.0, 0.1, 50.0);
+            apply_zoom_pan_at_point(1.0, eframe::egui::Vec2::ZERO, mouse, center, 1.0, 0.1, 50.0);
         assert_eq!(zoom, 1.0);
         assert_eq!(pan, eframe::egui::Vec2::ZERO);
     }

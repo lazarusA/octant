@@ -46,17 +46,14 @@ impl PointCloudRenderer {
         let depth = super::common::calculate_3d_depth(initial_data_safe.len(), width, height);
 
         let initial_uniforms = PointCloudUniforms {
-            rotation_y: 0.0,
-            rotation_x: 0.0,
+            camera: super::camera::OrbitCamera::default().uniform(),
             aspect_x: 1.0,
             aspect_y: 1.0,
             aspect_z: 1.0,
-            zoom: 2.5,
             point_size: 0.02,
             width: width.max(1),
             height: height.max(1),
             depth,
-            screen_aspect: 1.0,
             shift_x: 0,
             shift_y: 0,
             shift_z: 0,
@@ -190,17 +187,14 @@ impl PointCloudRenderer {
         let depth =
             super::common::calculate_3d_depth(instance_cnt as usize, params.width, params.height);
         let uniforms = PointCloudUniforms {
-            rotation_y: params.rot_y,
-            rotation_x: params.rot_x,
+            camera: params.camera,
             aspect_x: params.aspect_x,
             aspect_y: params.aspect_y,
             aspect_z: params.aspect_z,
-            zoom: params.zoom,
             point_size: params.point_size,
             width: params.width.max(1),
             height: params.height.max(1),
             depth,
-            screen_aspect: params.screen_aspect,
             shift_x: params.shift_x,
             shift_y: params.shift_y,
             shift_z: params.shift_z,

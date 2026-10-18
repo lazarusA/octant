@@ -1,3 +1,6 @@
+pub mod camera;
+#[cfg(test)]
+mod camera_tests;
 pub mod coastline;
 pub mod colormap_atlas;
 pub mod common;

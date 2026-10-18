@@ -45,7 +45,10 @@ fn fs_opaque(in: VertexOutput) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_oit(in: VertexOutput) -> OitOutput {
-    return oit_accumulate(shade(in), in.position.z);
+    var cam: Camera;
+    cam.near = 0.01;
+    cam.far = 50.0;
+    return oit_accumulate(shade(in), in.position.z, cam);
 }
 "#;
 

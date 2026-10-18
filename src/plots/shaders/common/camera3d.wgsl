@@ -1,70 +1,44 @@
-// Shared 3D camera projection, transformation, and lighting routines for Octant WGSL shaders
+// Shared 3D camera of Octant's WGSL shaders, built on the CPU by
+// `src/plots/camera.rs` `OrbitCamera::uniform`.
 
-/// Rigid 3D rotation of a position around Y and X camera axes.
-fn rotate_camera_yx(pos: vec3<f32>, rot_y: f32, rot_x: f32) -> vec3<f32> {
-    let cy = cos(rot_y);
-    let sy = sin(rot_y);
-    let cx = cos(rot_x);
-    let sx = sin(rot_x);
-
-    // Y-axis rotation
-    let pos_y = vec3<f32>(
-        cy * pos.x + sy * pos.z,
-        pos.y,
-        -sy * pos.x + cy * pos.z
-    );
-
-    // X-axis rotation
-    return vec3<f32>(
-        pos_y.x,
-        cx * pos_y.y - sx * pos_y.z,
-        sx * pos_y.y + cx * pos_y.z
-    );
-}
-
-/// Rigid 3D rotation of a normal vector around Y and X camera axes.
-fn rotate_normal_yx(norm: vec3<f32>, rot_y: f32, rot_x: f32) -> vec3<f32> {
-    let cy = cos(rot_y);
-    let sy = sin(rot_y);
-    let cx = cos(rot_x);
-    let sx = sin(rot_x);
-
-    let norm_y = vec3<f32>(
-        cy * norm.x + sy * norm.z,
-        norm.y,
-        -sy * norm.x + cy * norm.z
-    );
-
-    return normalize(vec3<f32>(
-        norm_y.x,
-        cx * norm_y.y - sx * norm_y.z,
-        sx * norm_y.y + cx * norm_y.z
-    ));
-}
-
-// Near and far planes of the 3D plot projections (`project_perspective`,
-// `point_cloud.wgsl`); `oit_accumulate` inverts depth with them.
-const CAMERA_Z_NEAR: f32 = 0.01;
-const CAMERA_Z_FAR: f32 = 50.0;
-
-/// Perspective projection transformation and linear depth calculation.
-fn project_perspective(
-    pos_rot: vec3<f32>,
-    aspect_ratio: f32,
-    zoom: f32,
+// Mirrors `CameraUniform`: view space has the camera at the origin looking
+// down -z.
+struct Camera {
+    // Object to view space.
+    view: mat4x4<f32>,
+    // The camera's position in object space.
+    eye: vec3<f32>,
     fov_scale: f32,
-    min_dist: f32,
-) -> vec4<f32> {
-    let cam_dist = clamp(zoom, min_dist, 10.0);
-    let cam_z = pos_rot.z - cam_dist;
-    let dist_positive = max(-cam_z, 0.001);
+    // Screen width over height.
+    aspect: f32,
+    near: f32,
+    far: f32,
+    _pad: f32,
+};
 
-    let proj_x = (pos_rot.x * fov_scale) / aspect_ratio;
-    let proj_y = pos_rot.y * fov_scale;
+/// Object space position in view space.
+fn camera_view(cam: Camera, pos: vec3<f32>) -> vec3<f32> {
+    return (cam.view * vec4<f32>(pos, 1.0)).xyz;
+}
 
-    let z_near = CAMERA_Z_NEAR;
-    let z_far = CAMERA_Z_FAR;
-    let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
+/// Object space direction in view space.
+fn camera_view_normal(cam: Camera, norm: vec3<f32>) -> vec3<f32> {
+    return normalize((cam.view * vec4<f32>(norm, 0.0)).xyz);
+}
 
-    return vec4<f32>(proj_x, proj_y, proj_z, dist_positive);
+/// View space direction in object space.
+fn camera_to_object_dir(cam: Camera, v: vec3<f32>) -> vec3<f32> {
+    let rot = mat3x3<f32>(cam.view[0].xyz, cam.view[1].xyz, cam.view[2].xyz);
+    return transpose(rot) * v;
+}
+
+/// Perspective projection of a view space position, with depth growing
+/// linearly in 1/distance between the camera's near and far planes
+/// (`oit_accumulate` inverts it).
+fn camera_project(cam: Camera, view_pos: vec3<f32>) -> vec4<f32> {
+    let dist = max(-view_pos.z, 1e-5);
+    let proj_x = (view_pos.x * cam.fov_scale) / cam.aspect;
+    let proj_y = view_pos.y * cam.fov_scale;
+    let proj_z = (cam.far / (cam.far - cam.near)) * dist - (cam.far * cam.near / (cam.far - cam.near));
+    return vec4<f32>(proj_x, proj_y, proj_z, dist);
 }

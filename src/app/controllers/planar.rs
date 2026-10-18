@@ -45,19 +45,19 @@ impl PlotController for HeatmapController {
         nav.heatmap_pan += delta;
     }
 
-    fn handle_scroll(
+    fn handle_zoom(
         &self,
         nav: &mut NavigationState,
-        scroll: f32,
-        mouse_pos: egui::Pos2,
-        center: egui::Pos2,
+        factor: f32,
+        anchor: egui::Pos2,
+        rect: egui::Rect,
     ) {
         let (zoom, pan) = apply_zoom_pan_at_point(
             nav.heatmap_zoom,
             nav.heatmap_pan,
-            mouse_pos,
-            center,
-            scroll,
+            anchor,
+            rect.center(),
+            factor,
             self.min_zoom(),
             50.0,
         );
@@ -83,19 +83,19 @@ impl PlotController for LineController {
         nav.line_pan += delta;
     }
 
-    fn handle_scroll(
+    fn handle_zoom(
         &self,
         nav: &mut NavigationState,
-        scroll: f32,
-        mouse_pos: egui::Pos2,
-        center: egui::Pos2,
+        factor: f32,
+        anchor: egui::Pos2,
+        rect: egui::Rect,
     ) {
         let (zoom, pan) = apply_zoom_pan_at_point(
             nav.line_zoom,
             nav.line_pan,
-            mouse_pos,
-            center,
-            scroll,
+            anchor,
+            rect.center(),
+            factor,
             self.min_zoom(),
             50.0,
         );

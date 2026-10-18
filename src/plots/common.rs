@@ -104,10 +104,7 @@ impl MeshVertex3D {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Mesh3DUniforms {
-    pub rotation_y: f32,
-    pub rotation_x: f32,
-    pub aspect_ratio: f32,
-    pub zoom: f32,
+    pub camera: super::camera::CameraUniform,
     pub displacement_strength: f32,
     pub mode: u32,
     pub width: u32,
@@ -126,10 +123,7 @@ pub struct Mesh3DUniforms {
 #[derive(Copy, Clone, Debug)]
 pub struct Mesh3DUniformParams {
     pub color: PlotColorParams,
-    pub rotation_y: f32,
-    pub rotation_x: f32,
-    pub aspect_ratio: f32,
-    pub zoom: f32,
+    pub camera: super::camera::CameraUniform,
     pub displacement_strength: f32,
     pub mode: u32,
     pub coord_mode: u32,

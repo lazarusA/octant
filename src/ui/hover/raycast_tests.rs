@@ -79,6 +79,35 @@ fn surface_hover_picks_every_cell_from_above() {
     }
 }
 
+/// Panned to a corner and zoomed in, the hover still picks the cells drawn
+/// under the cursor.
+#[test]
+fn surface_hover_follows_the_panned_camera() {
+    let m = matrix(12, 8, CoordinateGrid::GlobalRegular, |x, y| {
+        ((x * 37 + y * 61) % 101) as f32
+    });
+    let mut app = app(1.2, 0.4);
+    app.plot_configs.mesh.surface_displacement = 0.2;
+    app.nav.orbit_target = [-1.0, 0.0, -0.6];
+    app.nav.sphere_zoom = 0.8;
+    let camera = Camera3D::from_app(&app, rect());
+    let mut seen = 0;
+    for py in 0..m.height {
+        for px in 0..m.width {
+            let on_screen = surface_target_pos(&app, &m, &camera, px, py)
+                .is_some_and(|pos| rect().shrink(4.0).contains(pos));
+            if on_screen {
+                seen += 1;
+                assert_eq!(surface_round_trip(&app, &m, px, py), Some((px, py)));
+            }
+        }
+    }
+    assert!(
+        (4..m.width * m.height / 2).contains(&seen),
+        "{seen} cells shown"
+    );
+}
+
 #[test]
 fn surface_hover_picks_the_plateau_in_front_not_the_ground_behind() {
     // A plateau seen at a shallow angle covers the cells behind it; the old

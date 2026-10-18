@@ -195,7 +195,7 @@ pub fn raycast_sphere(
     camera: &Camera3D,
     hover_pos: Pos2,
 ) -> Option<(f32, f32, Option<(f32, f32)>)> {
-    let (_, world_ray) = camera.cast_ray(hover_pos);
+    let world_ray = camera.cast_ray(hover_pos);
     let (px, py) = SphereField::new(app, matrix).hit(&world_ray)?;
     let (w, h) = (matrix.width, matrix.height);
     let (nx, ny) = matrix.grid.cell_center_norm(px, py, w, h);

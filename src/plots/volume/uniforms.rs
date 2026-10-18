@@ -1,6 +1,7 @@
 //! Uniform block of the volume raymarcher and the per-frame parameters it is
 //! built from (zero-allocation `Copy` structs).
 
+use crate::plots::camera::CameraUniform;
 use crate::plots::common::PlotColorParams;
 use bytemuck::{Pod, Zeroable};
 
@@ -8,6 +9,7 @@ use bytemuck::{Pod, Zeroable};
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct VolumeUniforms {
+    pub camera: CameraUniform,
     pub clip_planes: [[f32; 4]; 8],
     pub light_color: [f32; 3],
     pub num_clip_planes: u32,
@@ -27,16 +29,12 @@ pub struct VolumeUniforms {
     pub has_invalid: u32,
     /// Non-zero when the value texture holds RGB composite colors.
     pub composite: u32,
-    pub rotation_y: f32,
-    pub rotation_x: f32,
     pub aspect_x: f32,
     pub aspect_y: f32,
     pub aspect_z: f32,
-    pub zoom: f32,
     pub width: u32,
     pub height: u32,
     pub depth: u32,
-    pub screen_aspect: f32,
     pub shift_x: u32,
     pub shift_y: u32,
     pub shift_z: u32,
@@ -49,12 +47,10 @@ pub struct VolumeUniforms {
 #[derive(Copy, Clone, Debug)]
 pub struct VolumeUniformParams {
     pub color: PlotColorParams,
-    pub rot_y: f32,
-    pub rot_x: f32,
+    pub camera: CameraUniform,
     pub aspect_x: f32,
     pub aspect_y: f32,
     pub aspect_z: f32,
-    pub zoom: f32,
     pub opacity_scale: f32,
     /// Samples per voxel crossed by each ray.
     pub quality: f32,
@@ -62,7 +58,6 @@ pub struct VolumeUniformParams {
     pub isovalue: f32,
     pub isorange: f32,
     pub attenuation: f32,
-    pub screen_aspect: f32,
     pub shift_x: u32,
     pub shift_y: u32,
     pub shift_z: u32,
@@ -83,6 +78,7 @@ impl VolumeUniformParams {
     pub fn to_uniforms(&self, state: VolumeState) -> VolumeUniforms {
         let [width, height, depth] = state.dims;
         VolumeUniforms {
+            camera: self.camera,
             clip_planes: [[0.0; 4]; 8],
             light_color: [1.0, 1.0, 1.0],
             num_clip_planes: 0,
@@ -99,16 +95,12 @@ impl VolumeUniformParams {
             attenuation: self.attenuation,
             has_invalid: u32::from(state.has_invalid),
             composite: u32::from(state.composite),
-            rotation_y: self.rot_y,
-            rotation_x: self.rot_x,
             aspect_x: self.aspect_x,
             aspect_y: self.aspect_y,
             aspect_z: self.aspect_z,
-            zoom: self.zoom,
             width,
             height,
             depth,
-            screen_aspect: self.screen_aspect,
             shift_x: self.shift_x,
             shift_y: self.shift_y,
             shift_z: self.shift_z,

@@ -58,14 +58,14 @@ fn build_ray(p1: vec3<f32>, p2: vec3<f32>, face: vec3<f32>, frag: vec2<f32>) -> 
     let step = segment / f32(count);
     let view = normalize(-segment * world_scale());
     let entry_normal = select(face, view, dot(face, face) < 0.5);
-    let light = normalize(camera_to_object(HEADLIGHT_CAMERA));
+    let light = normalize(camera_to_object_dir(uniforms.camera, HEADLIGHT_CAMERA));
     return Ray(p1 + pixel_jitter(frag) * step, step, count, length(step * world_scale()), p1, entry_normal, view, light);
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // Same camera distance as `vs_main`, so rays pass through the rasterized box.
-    let eye_rot = camera_to_object(vec3<f32>(0.0, 0.0, camera_distance()));
+    // Same camera as `vs_main`, so rays pass through the rasterized box.
+    let eye_rot = uniforms.camera.eye;
 
     let scale_vec = max(vec3<f32>(uniforms.aspect_x, uniforms.aspect_y, uniforms.aspect_z), vec3<f32>(0.001));
     let eye_unit = vec3<f32>(0.5) + eye_rot / scale_vec;

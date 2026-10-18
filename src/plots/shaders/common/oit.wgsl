@@ -20,15 +20,15 @@ fn oit_opaque(color: vec4<f32>) -> vec4<f32> {
 
 // Translucent pass: premultiplied color times a depth weight, summed into
 // `accum`; alpha into `reveal`, which blends as dst * (1 - alpha). `frag_z` is
-// the fragment depth of the 3D projections (`CAMERA_Z_NEAR`, `CAMERA_Z_FAR`).
+// the fragment depth of `camera_project` with `cam`'s planes.
 // The weight is capped at 300 so the `Rgba16Float` sum (max 65504) holds
 // hundreds of translucent layers right in front of the camera.
-fn oit_accumulate(color: vec4<f32>, frag_z: f32) -> OitOutput {
+fn oit_accumulate(color: vec4<f32>, frag_z: f32, cam: Camera) -> OitOutput {
     if (color.a >= OIT_OPAQUE_ALPHA) {
         discard;
     }
     // View distance, inverted from the depth of the 3D projections.
-    let dist = CAMERA_Z_FAR * CAMERA_Z_NEAR / (CAMERA_Z_FAR - frag_z * (CAMERA_Z_FAR - CAMERA_Z_NEAR));
+    let dist = cam.far * cam.near / (cam.far - frag_z * (cam.far - cam.near));
     let weight = color.a * clamp(0.03 / (1e-5 + pow(dist / 10.0, 4.0)), 1e-2, 3e2);
     var out: OitOutput;
     out.accum = vec4<f32>(color.rgb * color.a, color.a) * weight;

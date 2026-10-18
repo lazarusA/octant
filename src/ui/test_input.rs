@@ -97,6 +97,49 @@ impl Harness {
         self.frame(Vec::new(), run);
     }
 
+    /// Two fingers side by side about `center`, `from` apart, spreading to
+    /// `to` apart while their center moves by `shift`, over ten frames, the
+    /// way a touch screen reports them: the first finger also drives the
+    /// pointer.
+    pub fn pinch(
+        &mut self,
+        center: Pos2,
+        (from, to): (f32, f32),
+        shift: Vec2,
+        run: &mut impl FnMut(&mut Ui),
+    ) {
+        let fingers = |t: f32| {
+            let half = Vec2::X * (from + (to - from) * t) / 2.0;
+            let mid = center + shift * t;
+            [mid - half, mid + half]
+        };
+        let touches = |t: f32, phase| {
+            let [a, b] = fingers(t);
+            [(0, a), (1, b)].map(|(id, pos)| Event::Touch {
+                device_id: egui::TouchDeviceId(0),
+                id: egui::TouchId(id),
+                phase,
+                pos,
+                force: None,
+            })
+        };
+        let first = fingers(0.0)[0];
+        let mut down = touches(0.0, egui::TouchPhase::Start).to_vec();
+        down.extend([Event::PointerMoved(first), primary(first, true)]);
+        self.frame(down, run);
+        for step in 1..=10 {
+            let t = step as f32 / 10.0;
+            let mut moved = touches(t, egui::TouchPhase::Move).to_vec();
+            moved.push(Event::PointerMoved(fingers(t)[0]));
+            self.frame(moved, run);
+        }
+        let last = fingers(1.0)[0];
+        let mut up = touches(1.0, egui::TouchPhase::End).to_vec();
+        up.extend([primary(last, false), Event::PointerGone]);
+        self.frame(up, run);
+        self.frame(Vec::new(), run);
+    }
+
     /// Presses at `from`, moves by `delta` over ten frames and releases.
     pub fn drag(&mut self, from: Pos2, delta: Vec2, run: &mut impl FnMut(&mut Ui)) {
         self.pointer(from, None, run);

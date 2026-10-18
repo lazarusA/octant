@@ -16,6 +16,7 @@
 // =================================================================================================
 
 struct Uniforms {
+    camera: Camera,
     clip_planes: array<vec4<f32>, 8>,
     light_color: vec3<f32>,
     num_clip_planes: u32,
@@ -32,16 +33,12 @@ struct Uniforms {
     attenuation: f32,
     has_invalid: u32,
     composite: u32,
-    rotation_y: f32,
-    rotation_x: f32,
     aspect_x: f32,
     aspect_y: f32,
     aspect_z: f32,
-    zoom: f32,
     width: u32,
     height: u32,
     depth: u32,
-    screen_aspect: f32,
     shift_x: u32,
     shift_y: u32,
     shift_z: u32,
@@ -93,21 +90,6 @@ const CUBE_INDICES = array<u32, 36>(
     4u, 5u, 1u, 4u, 1u, 0u, // Bottom
 );
 
-fn camera_distance() -> f32 {
-    return clamp(uniforms.zoom, 0.1, 10.0);
-}
-
-// Camera-space vector (x right, y up, z toward the viewer) in object space:
-// the inverse of `vs_main`'s rotation (about Y, then X).
-fn camera_to_object(v: vec3<f32>) -> vec3<f32> {
-    let cy = cos(-uniforms.rotation_y);
-    let sy = sin(-uniforms.rotation_y);
-    let cx = cos(-uniforms.rotation_x);
-    let sx = sin(-uniforms.rotation_x);
-    let x_rot = vec3<f32>(v.x, cx * v.y - sx * v.z, sx * v.y + cx * v.z);
-    return vec3<f32>(cy * x_rot.x + sy * x_rot.z, x_rot.y, -sy * x_rot.x + cy * x_rot.z);
-}
-
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var out: VertexOutput;
@@ -118,26 +100,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     // Centered object position [-0.5, 0.5] scaled by aspect ratio
     let pos_3d = position * 0.5 * vec3<f32>(uniforms.aspect_x, uniforms.aspect_y, uniforms.aspect_z);
 
-    // 3D Camera rotation around Y and X axes
-    let cy = cos(uniforms.rotation_y);
-    let sy = sin(uniforms.rotation_y);
-    let cx = cos(uniforms.rotation_x);
-    let sx = sin(uniforms.rotation_x);
-    let pos_y_rot = vec3<f32>(cy * pos_3d.x + sy * pos_3d.z, pos_3d.y, -sy * pos_3d.x + cy * pos_3d.z);
-    let pos_rot = vec3<f32>(pos_y_rot.x, cx * pos_y_rot.y - sx * pos_y_rot.z, sx * pos_y_rot.y + cx * pos_y_rot.z);
-
     out.frag_vert = pos_3d;
-
-    let dist_positive = max(camera_distance() - pos_rot.z, 0.001);
-    let fov_scale = 1.6;
-    let screen_asp = max(uniforms.screen_aspect, 0.1);
-    let proj_x = (pos_rot.x * fov_scale) / screen_asp;
-    let proj_y = pos_rot.y * fov_scale;
-
-    let z_near = 0.01;
-    let z_far = 50.0;
-    let proj_z = (z_far / (z_far - z_near)) * dist_positive - (z_far * z_near / (z_far - z_near));
-
-    out.position = vec4<f32>(proj_x, proj_y, proj_z, dist_positive);
+    out.position = camera_project(uniforms.camera, camera_view(uniforms.camera, pos_3d));
     return out;
 }
