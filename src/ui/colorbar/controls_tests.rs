@@ -182,3 +182,53 @@ fn the_close_button_in_the_corner_closes_the_color_window() {
     h.click(close, &mut run(&mut app));
     assert!(!color_menu::is_open(&h.ctx, LayerId::BASE));
 }
+
+#[test]
+fn a_tap_reveals_the_controls_so_a_second_tap_opens_the_color_window() {
+    let mut app = OctantApp::default();
+    let mut h = harness(&mut app);
+    let cog = controls::cog_rect(panel(&h));
+    // On a touch screen the first tap only reveals the controls.
+    h.tap(cog.center(), &mut run(&mut app));
+    assert!(!color_menu::is_open(&h.ctx, LayerId::BASE));
+    h.tap(cog.center(), &mut run(&mut app));
+    assert!(color_menu::is_open(&h.ctx, LayerId::BASE));
+}
+
+#[test]
+fn a_tap_elsewhere_hides_the_revealed_controls() {
+    let mut app = OctantApp::default();
+    let mut h = harness(&mut app);
+    h.tap(panel(&h).center(), &mut run(&mut app));
+    let revealed = h.settle(1, &mut run(&mut app));
+    assert!(circles(&revealed) >= 6, "the grip shows after a tap");
+    h.tap(pos2(5.0, 5.0), &mut run(&mut app));
+    let hidden = h.settle(1, &mut run(&mut app));
+    assert_eq!(circles(&hidden), 0);
+}
+
+#[test]
+fn hovering_the_bar_outlines_it() {
+    let mut app = OctantApp::default();
+    let mut h = Harness::new(SCREEN);
+    // Past the panel's fade-in, so its strokes are painted.
+    let shapes = h.settle(30, &mut run(&mut app));
+    let bar = bar(&shapes, panel(&h));
+    let stroke = h
+        .ctx
+        .style_of(h.ctx.theme())
+        .visuals
+        .widgets
+        .hovered
+        .fg_stroke;
+    let outlined = |shapes: &[ClippedShape]| {
+        shapes.iter().any(|c| match &c.shape {
+            egui::Shape::Rect(r) => r.stroke == stroke && r.rect.contains_rect(bar),
+            _ => false,
+        })
+    };
+    let away = h.pointer(pos2(5.0, 5.0), None, &mut run(&mut app));
+    assert!(!outlined(&away));
+    let over = h.pointer(bar.center(), None, &mut run(&mut app));
+    assert!(outlined(&over));
+}

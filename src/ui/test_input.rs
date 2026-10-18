@@ -1,8 +1,8 @@
 //! Headless egui frames for UI tests: a context with its own clock (so
-//! double-clicks and fades follow the frames), pointer moves, clicks and
-//! drags, and the areas' rects. Each call takes the frame's UI as a closure;
-//! build it per call (`&mut run(&mut app)`) so the app stays free between
-//! frames.
+//! double-clicks and fades follow the frames), pointer moves, clicks,
+//! drags and touch taps, and the areas' rects. Each call takes the frame's
+//! UI as a closure; build it per call (`&mut run(&mut app)`) so the app
+//! stays free between frames.
 
 use egui::epaint::ClippedShape;
 use egui::{Event, Id, PointerButton, Pos2, RawInput, Rect, Ui, Vec2};
@@ -61,14 +61,7 @@ impl Harness {
         run: &mut impl FnMut(&mut Ui),
     ) -> Vec<ClippedShape> {
         let mut events = vec![Event::PointerMoved(pos)];
-        if let Some(pressed) = pressed {
-            events.push(Event::PointerButton {
-                pos,
-                button: PointerButton::Primary,
-                pressed,
-                modifiers: Default::default(),
-            });
-        }
+        events.extend(pressed.map(|pressed| primary(pos, pressed)));
         self.frame(events, run)
     }
 
@@ -77,6 +70,31 @@ impl Harness {
         self.pointer(pos, None, run);
         self.pointer(pos, Some(true), run);
         self.pointer(pos, Some(false), run);
+    }
+
+    /// A finger's tap at `pos`, the way a touch screen reports it: no hover
+    /// before the touch, and the pointer gone once the finger lifts.
+    pub fn tap(&mut self, pos: Pos2, run: &mut impl FnMut(&mut Ui)) {
+        let touch = |phase| Event::Touch {
+            device_id: egui::TouchDeviceId(0),
+            id: egui::TouchId(0),
+            phase,
+            pos,
+            force: None,
+        };
+        let down = vec![
+            touch(egui::TouchPhase::Start),
+            Event::PointerMoved(pos),
+            primary(pos, true),
+        ];
+        self.frame(down, run);
+        let up = vec![
+            touch(egui::TouchPhase::End),
+            primary(pos, false),
+            Event::PointerGone,
+        ];
+        self.frame(up, run);
+        self.frame(Vec::new(), run);
     }
 
     /// Presses at `from`, moves by `delta` over ten frames and releases.
@@ -100,5 +118,15 @@ impl Harness {
     /// The id of the topmost area under `pos`.
     pub fn top_at(&self, pos: Pos2) -> Option<Id> {
         self.ctx.layer_id_at(pos).map(|layer| layer.id)
+    }
+}
+
+/// The primary button pressed or released at `pos`.
+fn primary(pos: Pos2, pressed: bool) -> Event {
+    Event::PointerButton {
+        pos,
+        button: PointerButton::Primary,
+        pressed,
+        modifiers: Default::default(),
     }
 }
