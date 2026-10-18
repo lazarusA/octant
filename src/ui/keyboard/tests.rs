@@ -90,11 +90,14 @@ fn rings_show_only_after_keys() {
 
 #[test]
 fn up_and_down_move_between_list_items() {
-    use super::list_nav::ListNav;
+    use super::list_nav::{Above, ListNav};
     let mut h = harness();
+    let mut query = String::new();
     let mut run = |ui: &mut Ui| {
-        let mut nav = ListNav::new(ui.ctx());
-        for i in 0..3 {
+        let field = Rect::from_min_size(pos2(0.0, 0.0), vec2(80.0, 20.0));
+        let search = ui.put(field, egui::TextEdit::singleline(&mut query));
+        let mut nav = ListNav::new(ui.ctx(), Some(Above::of(&search)));
+        for i in 1..4 {
             let rect = Rect::from_min_size(pos2(0.0, 30.0 * i as f32), vec2(80.0, 20.0));
             nav.item(&ui.put(rect, egui::Button::new("item")));
         }
@@ -105,18 +108,23 @@ fn up_and_down_move_between_list_items() {
         h.press(key, Modifiers::NONE, &mut run)
             .map(|f| f.rect.top())
     };
-    let tops = [
+    let keys = [
         Key::Tab,
+        Key::ArrowDown,
         Key::ArrowDown,
         Key::ArrowDown,
         Key::ArrowDown,
         Key::ArrowUp,
         Key::Home,
         Key::End,
+        Key::Home,
+        Key::ArrowUp,
     ];
-    let tops = tops.map(&mut top_after);
-    // Down stays on the last item; Home and End go to the ends.
-    assert_eq!(tops, [0.0, 30.0, 60.0, 60.0, 30.0, 0.0, 60.0].map(Some));
+    let tops = keys.map(&mut top_after);
+    // Down from the search field enters the list and stays on its last item;
+    // Home and End go to its ends, Up on the first item back to the field.
+    let want = [0.0, 30.0, 60.0, 90.0, 90.0, 60.0, 30.0, 90.0, 30.0, 0.0];
+    assert_eq!(tops, want.map(Some));
 }
 
 #[test]

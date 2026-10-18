@@ -1,8 +1,9 @@
 //! The plot type picker, opened by `P`: a semi-transparent strip in the
 //! middle of the screen, the plot types as icon tiles in a row, each named
 //! (with why it cannot be picked, when it cannot) by its tooltip on hover
-//! and under keyboard focus. A number key picks the type of its tile, the
-//! arrows move between the pickable tiles and Enter picks the focused one.
+//! and under keyboard focus. A number key picks the type of its tile, Left,
+//! Right, Home and End move between the pickable tiles and Enter picks the
+//! focused one.
 //! Picking closes it, as do Escape and a click outside.
 
 use super::options::{PlotOption, blocked_text, plot_options};
@@ -22,6 +23,8 @@ const GAP: f32 = 6.0;
 pub(super) const WIDTH: f32 = TILE * 6.0 + GAP * 5.0;
 /// Opacity of the picker's fill, so the plot shows through.
 const FILL_ALPHA: f32 = 0.8;
+/// The keys moving focus along the row.
+const ROW_KEYS: [Key; 4] = [Key::ArrowLeft, Key::ArrowRight, Key::Home, Key::End];
 /// The keys picking each tile, in `options::ORDER`.
 const DIGITS: [Key; 6] = [
     Key::Num1,
@@ -91,26 +94,33 @@ fn digit_pick(ctx: &egui::Context, options: &[PlotOption; 6]) -> Option<PlotType
         .map(|o| o.plot_type)
 }
 
-/// The tiles, the arrows moving focus between the pickable ones; the type
+/// The tiles, `ROW_KEYS` moving focus between the pickable ones; the type
 /// a tile's click (or Enter) picked.
 fn tiles(ui: &mut Ui, options: &[PlotOption; 6], current: PlotType) -> Option<PlotType> {
-    let (mut picked, mut arrow) = (None, None);
+    let (mut picked, mut pressed) = (None, None);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = GAP;
         for (index, option) in options.iter().enumerate() {
             let response = tile(ui, index, *option, option.plot_type == current);
-            arrow = arrow.or(focus::arrow_on(&response).map(|d| (index, d.x + d.y)));
+            if response.has_focus() {
+                focus::claim_arrows_only(ui.ctx(), response.id);
+                pressed = focus::pressed(ui.ctx(), ROW_KEYS).map(|key| (index, key));
+            }
             if response.clicked() {
                 picked = Some(option.plot_type);
             }
         }
     });
+    // Blocked tiles take no focus, so the moves skip them.
     let pickable = |&i: &usize| options[i].blocked.is_none();
-    let next = match arrow {
-        Some((at, step)) if step > 0.0 => (at + 1..options.len()).find(pickable),
-        Some((at, step)) if step < 0.0 => (0..at).rev().find(pickable),
+    let len = options.len();
+    let next = pressed.and_then(|(at, key)| match key {
+        Key::ArrowLeft => (0..at).rev().find(pickable),
+        Key::ArrowRight => (at + 1..len).find(pickable),
+        Key::Home => (0..len).find(pickable),
+        Key::End => (0..len).rev().find(pickable),
         _ => None,
-    };
+    });
     if let Some(next) = next {
         focus::request(ui.ctx(), tile_id(next));
     }
@@ -152,8 +162,7 @@ fn tile(ui: &mut Ui, index: usize, option: PlotOption, selected: bool) -> Respon
     let small = TextStyle::Small.resolve(ui.style());
     ui.painter()
         .text(corner, Align2::RIGHT_BOTTOM, digit, small, weak);
-    focus::paint_ring(ui, &response, radius);
-    focus::tooltip_ui(response, |ui| tooltip(ui, option))
+    focus::ring_and_tooltip(ui, response, radius, |ui| tooltip(ui, option))
 }
 
 /// A tile's tooltip: the type's name, and why it cannot be picked.

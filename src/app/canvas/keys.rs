@@ -57,19 +57,14 @@ pub fn handle_canvas_keys(
             None => response.surrender_focus(),
         }
     }
-    let controller = controller_for(plot_type);
     let mut moved = false;
     for (action, alt) in [(CanvasAction::Move, false), (CanvasAction::MoveAlt, true)] {
         if let Some(direction) = take(action) {
-            moved |= arrow(
-                app,
-                ctx,
-                direction,
-                alt,
-                (rect, plot_type, probe_at.is_some()),
-            );
+            let probing = probe_at.is_some();
+            moved |= arrow(app, ctx, direction, alt, rect, plot_type, probing);
         }
     }
+    let controller = controller_for(plot_type);
     let zooms = [
         (CanvasAction::ZoomIn, ZOOM),
         (CanvasAction::ZoomOut, 1.0 / ZOOM),
@@ -97,7 +92,9 @@ fn arrow(
     ctx: &egui::Context,
     direction: Vec2,
     alt: bool,
-    (rect, plot_type, probing): (Rect, PlotType, bool),
+    rect: Rect,
+    plot_type: PlotType,
+    probing: bool,
 ) -> bool {
     let controller = controller_for(plot_type);
     if app.show_crop_overlay {

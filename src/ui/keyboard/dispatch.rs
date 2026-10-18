@@ -23,9 +23,9 @@ impl Gate {
     /// `plot_shown`: a plot fills the canvas (the landing screen is not up).
     pub fn new(app: &OctantApp, ctx: &Context, plot_shown: bool) -> Self {
         let focused = ctx.memory(|m| m.focused());
-        let panel = focus::escaped_layer(ctx)
-            .and_then(|layer| Panel::ALL.into_iter().find(|p| p.area_id() == layer.id));
-        let unblocked = !egui::Popup::is_any_open(ctx) && !modal_open(app);
+        let panel = focus::escaped_area(ctx)
+            .and_then(|area| Panel::ALL.into_iter().find(|p| p.area_id() == area));
+        let unblocked = !egui::Popup::is_any_open(ctx) && !modal_open(ctx);
         let free = unblocked && !ctx.text_edit_focused();
         let idle = focused.is_none_or(|id| id == crate::app::canvas::canvas_id());
         let canvas = free && idle && plot_shown;
@@ -57,15 +57,10 @@ impl Gate {
     }
 }
 
-/// A window that holds focus until it closes.
-fn modal_open(app: &OctantApp) -> bool {
-    let layout = &app.layout;
-    layout.show_catalog_window
-        || layout.show_about_window
-        || layout.show_icon_gallery_window
-        || layout.show_shortcuts
-        || layout.show_plot_picker
-        || app.show_export_modal
+/// Whether a modal window (one keeping focus until it closes, `windows::trap`)
+/// was open last frame.
+fn modal_open(ctx: &Context) -> bool {
+    ctx.memory(|m| m.top_modal_layer()).is_some()
 }
 
 /// Tracks the keyboard, then runs every shortcut pressed this frame whose
@@ -127,7 +122,7 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
             }
         }
         // Regions hold focus outside modal windows only.
-        Action::NextRegion | Action::PreviousRegion | Action::FocusTopBar if modal_open(app) => {}
+        Action::NextRegion | Action::PreviousRegion | Action::FocusTopBar if modal_open(ctx) => {}
         Action::NextRegion => regions::cycle(ctx, true),
         Action::PreviousRegion => regions::cycle(ctx, false),
         Action::FocusTopBar => regions::enter(ctx, regions::Region::TopBar),

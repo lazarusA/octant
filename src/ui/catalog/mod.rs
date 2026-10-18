@@ -68,12 +68,12 @@ pub fn show_catalog_window(app: &mut OctantApp, ctx: &egui::Context) {
                     render_header(ui, total_count, &mut should_close);
                     ui.add_space(8.0);
 
-                    render_search_and_filters(app, ui, is_mobile, total_count, opened);
+                    let search = render_search_and_filters(app, ui, is_mobile, total_count, opened);
                     ui.add_space(8.0);
                     ui.separator();
                     ui.add_space(4.0);
 
-                    render_entries_list(app, ui, is_mobile, &mut should_close);
+                    render_entries_list(app, ui, is_mobile, &mut should_close, search);
                 });
         });
 

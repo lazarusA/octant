@@ -1,7 +1,6 @@
 //! Opening and closing the floating panels, by their toolbar buttons, close
 //! buttons or shortcuts alike: keyboard focus enters a panel opened by keys
-//! and returns to what opened it when it closes. Also the landing screen
-//! shown in the plot's place.
+//! and returns to what opened it when it closes.
 
 use super::OctantApp;
 use crate::ui::keyboard::regions::{self, Region};
@@ -31,31 +30,13 @@ impl OctantApp {
         windows::return_to_opener(ctx, panel.area_id());
     }
 
-    /// Whether a plot has data to draw.
-    pub fn has_plot(&self) -> bool {
-        let data = &self.layers.base.data;
-        data.matrix.is_some() || data.volume.is_some()
-    }
-
-    /// Whether the landing screen fills the canvas: asked for, or nothing
-    /// is plotted yet.
-    pub fn hero_shown(&self) -> bool {
-        self.layout.show_hero || !self.has_plot()
-    }
-
-    /// Shows the landing screen, or the plot again.
-    pub fn toggle_hero(&mut self) {
-        self.layout.show_hero = !self.layout.show_hero;
-    }
-
     /// Takes keyboard focus to `panel`: opens it (focus entering it), moves
     /// focus into it when it is open, and closes it when focus already is.
     pub fn go_to_panel(&mut self, ctx: &egui::Context, panel: Panel) {
         if !self.layout.panel_shown(panel) {
             return self.set_panel_open(ctx, panel, true);
         }
-        let layer = egui::LayerId::new(egui::Order::Foreground, panel.area_id());
-        if focus::in_layer(ctx, layer) {
+        if focus::in_area(ctx, panel.area_id()) {
             return self.set_panel_open(ctx, panel, false);
         }
         windows::remember_opener(ctx, panel.area_id());

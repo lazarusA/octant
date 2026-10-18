@@ -85,8 +85,7 @@ pub(super) fn item_widths(item: TopBarItem, app: &OctantApp, ui: &egui::Ui) -> I
 fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool, nav: &mut BarNav) {
     let logo =
         crate::ui::hero::draw_octant_widget(ui, TOOLBAR_ITEM_HEIGHT, [-1.0, -1.0, -1.0], 0.0, 1.0);
-    focus::paint_ring(ui, &logo, 4.0);
-    let icon_resp = focus::tooltip_ui(logo, |ui| {
+    let icon_resp = focus::ring_and_tooltip(ui, logo, 4.0, |ui| {
         let keys = keymap::shortcut_of(Action::ToggleHero);
         labels::tooltip(ui, tr(CommonKey::ToggleHeroHover), keys);
     })
@@ -101,8 +100,7 @@ fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool, nav: &mut B
 
     if !compact {
         let label = ui.add(egui::Label::new(brand_label_text()).sense(egui::Sense::click()));
-        focus::paint_ring(ui, &label, 4.0);
-        let label_resp = focus::tooltip_ui(label, |ui| {
+        let label_resp = focus::ring_and_tooltip(ui, label, 4.0, |ui| {
             ui.label(tr(CommonKey::AboutOctantHover));
         })
         .on_hover_cursor(egui::CursorIcon::PointingHand);

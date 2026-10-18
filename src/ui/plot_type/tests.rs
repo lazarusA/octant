@@ -1,5 +1,6 @@
 //! Plot types offered for a variable, and the centered picker by keyboard:
-//! a number key picks, the arrows and Enter pick, Escape leaves it alone.
+//! a number key picks, Left, Right, Home, End and Enter pick, Escape leaves
+//! it alone.
 
 use super::options::{Blocked, ORDER, plot_options};
 use super::picker::show_plot_type_picker;
@@ -62,9 +63,12 @@ fn arrows_and_enter_pick_and_escape_changes_nothing() {
     assert!(!app.layout.show_plot_picker);
     assert_eq!(app.selected.plot_type, PlotType::Heatmap);
 
-    // Focus starts on the current type; Right moves to the next tile.
+    // Focus starts on the current type; End and Home go to the ends, Down
+    // does nothing in the row, Right moves to the next tile.
     press(&mut h, &mut app, Key::P);
-    press(&mut h, &mut app, Key::ArrowRight);
+    for key in [Key::End, Key::Home, Key::ArrowDown, Key::ArrowRight] {
+        press(&mut h, &mut app, key);
+    }
     press(&mut h, &mut app, Key::Enter);
     assert_eq!(app.selected.plot_type, PlotType::Line);
     assert!(!app.layout.show_plot_picker);

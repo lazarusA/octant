@@ -17,7 +17,8 @@ use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::UiIconExt;
-use crate::ui::keyboard::{focus, windows};
+use crate::ui::keyboard::list_nav::Above;
+use crate::ui::keyboard::windows;
 use crate::utils::colormap::registry;
 
 /// Persistent (per-session) picker UI state.
@@ -35,8 +36,6 @@ pub struct PickerState {
     pub focused_row: Option<u32>,
     /// Rows the list drew last frame.
     pub drawn_rows: std::ops::Range<usize>,
-    /// Focus the first row on the next frame (Down in the search field).
-    pub enter_list: bool,
     /// Focus the search field on the next frame (the picker just opened).
     pub focus_search: bool,
 }
@@ -126,13 +125,10 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
         tr(K::SearchHint),
         None,
     );
-    let picker = &mut app.colormaps.picker;
-    if std::mem::take(&mut picker.focus_search) {
+    if std::mem::take(&mut app.colormaps.picker.focus_search) {
         search.request_focus();
     }
-    if search.has_focus() && focus::pressed(ui.ctx(), [egui::Key::ArrowDown]).is_some() {
-        picker.enter_list = true;
-    }
+    let above = Above::of(&search);
     filters::show(ui, &mut app.colormaps.picker.filter);
     ui.add_space(2.0);
     let used_above = ui.cursor().min.y - top;
@@ -141,7 +137,7 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
     let spacing = ui.spacing().item_spacing.y;
     let list_height =
         (max_height - used_above - spacing - below).clamp(list::MIN_HEIGHT, list::MAX_HEIGHT);
-    list::show(app, ui, list_height);
+    list::show(app, ui, list_height, above);
 
     let below_start = ui.cursor().min.y;
     ui.separator();

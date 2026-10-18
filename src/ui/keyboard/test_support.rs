@@ -1,6 +1,6 @@
-//! The whole window for keyboard tests: drawn in the app's order over a
-//! plotted, animated heatmap, with a stand-in for the canvas (painting it
-//! needs a GPU).
+//! The whole window for keyboard tests: drawn by the app's own
+//! `show_chrome` over a plotted, animated heatmap, with a stand-in for the
+//! canvas (painting it needs a GPU).
 
 use super::regions::{self, Region};
 use super::{dispatch, focus};
@@ -17,14 +17,7 @@ pub(super) fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
     |ui| {
         let ctx = ui.ctx().clone();
         dispatch(app, &ctx, true);
-        crate::ui::top_bar::show_top_bar(app, ui);
-        crate::ui::bottom_bar::show_bottom_bar(app, ui);
-        let canvas = ui.available_rect_before_wrap();
-        crate::ui::dataset::show_dataset_window(app, &ctx, canvas);
-        crate::ui::variables_overlay::show_variables_overlay(app, &ctx, canvas);
-        crate::ui::settings::show_settings_window(app, &ctx, canvas);
-        crate::ui::variables_panel::show_variable_controls(app, &ctx, canvas);
-        crate::ui::colorbar::show_colorbar_overlay(app, &ctx, canvas);
+        let canvas = app.show_chrome(ui, true);
         let id = crate::app::canvas::canvas_id();
         let response = ui.interact(canvas, id, egui::Sense::drag());
         regions::register(&ctx, Region::Canvas, id, response.layer_id, canvas);

@@ -69,7 +69,7 @@ pub fn show(
         layer,
         panel,
     );
-    let focused = focus::in_layer(ctx, layer);
+    let focused = focus::in_area(ctx, layer.id);
     let shown = dragging || color_open || focused || touch_revealed(ui, id, panel);
     if app.pending_export.is_some() || !(shown || ui.rect_contains_pointer(panel)) {
         return;

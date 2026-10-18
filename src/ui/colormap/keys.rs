@@ -1,9 +1,10 @@
 //! The colormap list by keyboard: Down from the search field enters it,
 //! Up, Down, Home and End move between rows, scrolling the virtualized list
-//! to rows it does not draw; the focused row previews like a hovered one and
-//! Enter picks it.
+//! to rows it does not draw, and Up on the first row returns to the search
+//! field; the focused row previews like a hovered one and Enter picks it.
 
 use crate::ui::keyboard::focus;
+use crate::ui::keyboard::list_nav::Above;
 use egui::{Context, Id, Key, ScrollArea};
 use std::ops::Range;
 
@@ -26,16 +27,18 @@ pub struct Rows<'a> {
 
 impl Rows<'_> {
     /// Focuses the row the keys move to this frame (from the row of
-    /// `focused`, the colormap focused last frame, or the first row when
-    /// `enter`), scrolling `area` to it when it was not drawn.
+    /// `focused`, the colormap focused last frame, or the first row when Down
+    /// was pressed in the search field `above`), scrolling `area` to it when
+    /// it was not drawn.
     pub fn follow_keys(
         &self,
         ctx: &Context,
         area: ScrollArea,
         focused: Option<u32>,
-        enter: bool,
+        above: Above,
     ) -> ScrollArea {
-        let Some(index) = target(ctx, self.ids, focused).or(enter.then_some(0)) else {
+        let enter = above.enter.then_some(0);
+        let Some(index) = target(ctx, self.ids, focused, above.id).or(enter) else {
             return area;
         };
         if let Some(&id) = self.ids.get(index) {
@@ -49,8 +52,9 @@ impl Rows<'_> {
 }
 
 /// The index of `ids` keyboard focus moves to this frame from the row of
-/// `focused` (the colormap focused last frame), while that row keeps focus.
-fn target(ctx: &Context, ids: &[u32], focused: Option<u32>) -> Option<usize> {
+/// `focused` (the colormap focused last frame), while that row keeps focus;
+/// Up on the first row focuses the search field `search` instead.
+fn target(ctx: &Context, ids: &[u32], focused: Option<u32>, search: Id) -> Option<usize> {
     let colormap = focused?;
     let id = row_id(colormap);
     if ctx.memory(|m| m.focused()) != Some(id) {
@@ -60,14 +64,11 @@ fn target(ctx: &Context, ids: &[u32], focused: Option<u32>) -> Option<usize> {
     let keys = [Key::ArrowUp, Key::ArrowDown, Key::Home, Key::End];
     let key = focus::pressed(ctx, keys)?;
     let at = ids.iter().position(|&i| i == colormap)?;
-    let last = ids.len().checked_sub(1)?;
-    match key {
-        Key::ArrowUp => at.checked_sub(1),
-        Key::ArrowDown => (at < last).then_some(at + 1),
-        Key::Home => Some(0),
-        Key::End => Some(last),
-        _ => None,
+    let next = focus::step_index(key, at, ids.len());
+    if next.is_none() && key == Key::ArrowUp {
+        focus::request(ctx, search);
     }
+    next
 }
 
 /// The scroll offset bringing row `index` (rows `step` apart, `view` tall

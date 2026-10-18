@@ -62,9 +62,9 @@ impl Region {
     }
 }
 
-/// Parts one region may span (the colorbars: the base layer's and four
+/// Parts one region may span (the colorbars: the base layer's and the
 /// overlays').
-const PARTS: usize = 5;
+const PARTS: usize = crate::app::overlays::MAX_OVERLAYS + 1;
 
 /// A region as drawn: where focus enters it, and the areas it covers.
 #[derive(Clone, Copy, Default)]

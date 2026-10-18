@@ -23,6 +23,7 @@ pub fn remember_opener(ctx: &Context, key: Id) {
 
 /// Focuses the widget that opened `key` again, while the keyboard is in use.
 pub fn return_to_opener(ctx: &Context, key: Id) {
+    // `remove_temp` needs `Default`, which `Id` is not.
     let opener = ctx.data_mut(|d| {
         let opener = d.get_temp::<Id>(opener_id(key));
         d.remove::<Id>(opener_id(key));

@@ -77,7 +77,7 @@ pub(super) fn show(
             });
         });
     // Hiding the colorbar closes its window too, as does Escape in it.
-    let escaped = focus::escaped_layer(ctx).is_some_and(|l| l.id == area_id(id));
+    let escaped = focus::escaped_area(ctx) == Some(area_id(id));
     if close || escaped || app.layers.get(id).is_some_and(|l| !l.colorbar.shown) {
         set_open(ctx, id, false);
     }

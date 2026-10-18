@@ -6,6 +6,7 @@
 //! the app runs, so the panel Escape closes is read from it. Focus across
 //! windows opening and closing is `windows`'.
 
+use super::keymap::key_press;
 use egui::{Context, Event, EventFilter, FocusDirection, Id, Key, LayerId, Rect, Response, Ui};
 
 /// While focused, the widget owns every arrow key and Escape; Tab still moves
@@ -67,16 +68,26 @@ fn claim(ctx: &Context, id: Id, filter: EventFilter) {
 /// Cmd+Down never count as a plain Down.
 pub fn pressed<const N: usize>(ctx: &Context, keys: [Key; N]) -> Option<Key> {
     ctx.input(|i| {
-        i.events.iter().find_map(|e| match e {
-            Event::Key {
-                key,
-                pressed: true,
-                modifiers,
-                ..
-            } if modifiers.is_none() && keys.contains(key) => Some(*key),
-            _ => None,
-        })
+        i.events
+            .iter()
+            .filter_map(key_press)
+            .find(|(key, modifiers)| modifiers.is_none() && keys.contains(key))
+            .map(|(key, _)| key)
     })
+}
+
+/// The item a list key moves to from item `at` of `len`: Up or Left the
+/// previous, Down or Right the next, Home the first, End the last; `None`
+/// past either end and for other keys.
+pub fn step_index(key: Key, at: usize, len: usize) -> Option<usize> {
+    let last = len.checked_sub(1)?;
+    match key {
+        Key::ArrowUp | Key::ArrowLeft => at.checked_sub(1),
+        Key::ArrowDown | Key::ArrowRight => (at < last).then_some(at + 1),
+        Key::Home => Some(0),
+        Key::End => Some(last),
+        _ => None,
+    }
 }
 
 /// The arrow pressed this frame without modifiers, as a direction (y down).
@@ -154,6 +165,18 @@ pub fn tooltip_ui(response: Response, add_contents: impl Fn(&mut Ui)) -> Respons
     response.on_hover_ui(add_contents)
 }
 
+/// [`paint_ring`] and [`tooltip_ui`] together: a custom widget that shows
+/// keyboard focus and says what it is on hover and under keyboard focus.
+pub fn ring_and_tooltip(
+    ui: &Ui,
+    response: Response,
+    radius: impl Into<egui::CornerRadius>,
+    add_contents: impl Fn(&mut Ui),
+) -> Response {
+    paint_ring(ui, &response, radius);
+    tooltip_ui(response, add_contents)
+}
+
 /// Keyboard focus outline drawn inside `response`'s rect while it holds
 /// keyboard focus, shared by every custom widget so focus looks the same
 /// everywhere.
@@ -171,19 +194,20 @@ fn focused_response(ctx: &Context) -> Option<Response> {
     ctx.read_response(focused)
 }
 
-/// Whether the widget holding focus is drawn in `layer`.
-pub fn in_layer(ctx: &Context, layer: LayerId) -> bool {
-    focused_response(ctx).is_some_and(|r| r.layer_id == layer)
+/// Whether the widget holding focus is drawn in the area (`egui::Area`,
+/// window) `area`.
+pub fn in_area(ctx: &Context, area: Id) -> bool {
+    focused_response(ctx).is_some_and(|r| r.layer_id.id == area)
 }
 
-/// The layer Escape took focus from this frame: egui drops focus on Escape
+/// The area Escape took focus from this frame: egui drops focus on Escape
 /// before the app runs, unless the widget keeps Escape for itself. `None`
 /// while a popup is open, as Escape closes the popup.
-pub fn escaped_layer(ctx: &Context) -> Option<LayerId> {
+pub fn escaped_area(ctx: &Context) -> Option<Id> {
     let escaped = ctx.input(|i| i.key_pressed(Key::Escape))
         && ctx.memory(|m| m.focused()).is_none()
         && !egui::Popup::is_any_open(ctx);
-    escaped.then(|| last(ctx).map(|l| l.layer)).flatten()
+    escaped.then(|| last(ctx).map(|l| l.layer.id)).flatten()
 }
 
 /// The widget focused when a frame ended: where it was drawn.

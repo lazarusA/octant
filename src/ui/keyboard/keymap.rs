@@ -64,7 +64,7 @@ pub enum Scope {
     /// Modifier shortcuts and function keys: always, also while typing.
     Global,
     /// Escape in a floating panel, once the widget focused there let it go
-    /// and no popup took it (`focus::escaped_layer`).
+    /// and no popup took it (`focus::escaped_area`).
     Panel,
     /// Single keys while no text field takes the keys and no popup or
     /// modal window is open, wherever focus is.
@@ -146,20 +146,29 @@ fn modifiers_match(key: Key, pressed: Modifiers, wanted: Modifiers) -> bool {
     pressed.matches_exact(wanted)
 }
 
+/// A key press's key and modifiers (key repeat included); `None` for every
+/// other event.
+pub(super) fn key_press(event: &Event) -> Option<(Key, Modifiers)> {
+    match event {
+        Event::Key {
+            key,
+            pressed: true,
+            modifiers,
+            ..
+        } => Some((*key, *modifiers)),
+        _ => None,
+    }
+}
+
 /// Takes the first press of `shortcut` from this frame's input (key repeat
 /// included), so no widget reads it after; the arrow's direction, or zero.
 pub fn take(ctx: &Context, shortcut: &Shortcut) -> Option<Vec2> {
     ctx.input_mut(|i| {
-        let (at, direction) = i.events.iter().enumerate().find_map(|(at, e)| match e {
-            Event::Key {
-                key,
-                pressed: true,
-                modifiers,
-                ..
-            } if modifiers_match(*key, *modifiers, shortcut.mods) => {
-                shortcut.keys.direction(*key).map(|d| (at, d))
-            }
-            _ => None,
+        let (at, direction) = i.events.iter().enumerate().find_map(|(at, e)| {
+            let (key, modifiers) = key_press(e)?;
+            modifiers_match(key, modifiers, shortcut.mods)
+                .then(|| shortcut.keys.direction(key).map(|d| (at, d)))
+                .flatten()
         })?;
         i.events.remove(at);
         Some(direction)
@@ -168,11 +177,7 @@ pub fn take(ctx: &Context, shortcut: &Shortcut) -> Option<Vec2> {
 
 /// Whether a key was pressed this frame: shortcuts are looked up only then.
 pub fn any_pressed(ctx: &Context) -> bool {
-    ctx.input(|i| {
-        i.events
-            .iter()
-            .any(|e| matches!(e, Event::Key { pressed: true, .. }))
-    })
+    ctx.input(|i| i.events.iter().any(|e| key_press(e).is_some()))
 }
 
 /// Takes the first press of any shortcut for `action` whose scope `allows`.

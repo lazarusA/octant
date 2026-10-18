@@ -51,7 +51,9 @@ impl BarNav {
         if !response.sense.is_focusable() {
             return;
         }
-        if let Some(free) = self.items.iter_mut().find(|i| i.is_none()) {
+        let free = self.items.iter_mut().find(|i| i.is_none());
+        debug_assert!(free.is_some(), "a bar holds at most {MAX} focusable items");
+        if let Some(free) = free {
             *free = Some(Item {
                 id: response.id,
                 left: response.rect.left(),

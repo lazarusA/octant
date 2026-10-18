@@ -61,8 +61,9 @@ fn shown_at(app: &OctantApp, i: usize) -> Option<LayerId> {
 /// its colormap picker.
 pub fn focus_next(app: &OctantApp, ctx: &egui::Context) {
     let mut shown = (0..=app.layers.overlays().len()).filter_map(|i| shown_at(app, i));
-    let layer = |id| egui::LayerId::new(egui::Order::Middle, area_id(id));
-    let current = shown.clone().position(|id| focus::in_layer(ctx, layer(id)));
+    let current = shown
+        .clone()
+        .position(|id| focus::in_area(ctx, area_id(id)));
     let next = match current {
         Some(at) => shown.cycle().nth(at + 1),
         None => shown.next(),

@@ -7,6 +7,7 @@ use super::{keys, label};
 use crate::app::OctantApp;
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::keyboard::focus;
+use crate::ui::keyboard::list_nav::Above;
 use crate::utils::colormap::registry;
 use egui::{Rect, Sense, vec2};
 
@@ -23,9 +24,10 @@ const PAD_LEFT: f32 = 4.0;
 const PAD_RIGHT: f32 = 6.0;
 const GAP: f32 = 8.0;
 
-pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
+/// The list, at most `max_height` tall, under the search field `above`.
+pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32, above: Above) {
     let style = (app.picker_style().colormap, app.picker_style().reversed);
-    let Some(picked) = rows(&mut app.colormaps.picker, ui, max_height, style) else {
+    let Some(picked) = rows(&mut app.colormaps.picker, ui, (max_height, above), style) else {
         return;
     };
     // A row focused by keyboard previews as a hovered one.
@@ -50,12 +52,13 @@ struct Picked {
     clicked: Option<u32>,
 }
 
-/// The matching rows, the active colormap's (`active`, drawn `reversed`)
-/// marked; `None` when nothing matches.
+/// The matching rows, at most `max_height` tall under the search field
+/// `above`, the active colormap's (`active`, drawn `reversed`) marked;
+/// `None` when nothing matches.
 fn rows(
     picker: &mut super::PickerState,
     ui: &mut egui::Ui,
-    max_height: f32,
+    (max_height, above): (f32, Above),
     (active, reversed): (u32, bool),
 ) -> Option<Picked> {
     let super::PickerState {
@@ -64,7 +67,6 @@ fn rows(
         swatches,
         focused_row,
         drawn_rows,
-        enter_list,
         ..
     } = picker;
     let ids = cache.ids(filter);
@@ -83,7 +85,7 @@ fn rows(
         step,
         view: max_height,
     };
-    let area = keyed.follow_keys(ui.ctx(), area, *focused_row, std::mem::take(enter_list));
+    let area = keyed.follow_keys(ui.ctx(), area, *focused_row, above);
 
     let (mut hovered, mut clicked) = (None, None);
     *focused_row = None;

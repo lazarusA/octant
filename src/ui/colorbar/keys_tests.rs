@@ -1,5 +1,6 @@
 //! A colorbar by keyboard: focus on its bar reveals its controls, and Enter
-//! opens the colormap picker, whose list the arrows walk and Enter picks.
+//! opens the colormap picker, whose list the arrows walk (Up on its first
+//! row back to the search field) and Enter picks.
 
 use super::controls_tests::{circles, harness, run};
 use crate::app::OctantApp;
@@ -28,6 +29,13 @@ fn keyboard_focus_on_the_bar_reveals_the_controls_and_picks_a_colormap() {
     press(&mut h, &mut app, Key::ArrowDown);
     press(&mut h, &mut app, Key::ArrowDown);
     let picked = app.colormaps.picker.focused_row.expect("a row is focused");
+    // Up on the first row returns to the search field, Down comes back.
+    press(&mut h, &mut app, Key::ArrowUp);
+    press(&mut h, &mut app, Key::ArrowUp);
+    assert_eq!(app.colormaps.picker.focused_row, None, "the search field");
+    press(&mut h, &mut app, Key::ArrowDown);
+    press(&mut h, &mut app, Key::ArrowDown);
+    assert_eq!(app.colormaps.picker.focused_row, Some(picked));
     press(&mut h, &mut app, Key::Enter);
     assert_eq!(app.layers.base.color.colormap, picked);
 }

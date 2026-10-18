@@ -5,17 +5,19 @@ use crate::catalog::{
 };
 use crate::i18n::{DatasetKey, tr};
 use crate::ui::icons::UiIconExt;
+use crate::ui::keyboard::list_nav::Above;
 use crate::utils::stack_str;
 
-/// The search field (focused once the catalog `opened`) and category chips.
+/// The search field (focused once the catalog `opened`) and category chips;
+/// the search field, leading into the list.
 pub fn render_search_and_filters(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
     is_mobile: bool,
     total_count: usize,
     opened: bool,
-) {
-    search_field(app, ui, opened);
+) -> Above {
+    let search = search_field(app, ui, opened);
     ui.add_space(4.0);
     let spacing = if is_mobile {
         egui::vec2(4.0, 4.0)
@@ -52,10 +54,11 @@ pub fn render_search_and_filters(
             ui.selectable_value(&mut app.layout.catalog_category_filter, filter, label);
         }
     });
+    search
 }
 
 /// The catalog's search field, focused once the catalog `opened`.
-fn search_field(app: &mut OctantApp, ui: &mut egui::Ui, opened: bool) {
+fn search_field(app: &mut OctantApp, ui: &mut egui::Ui, opened: bool) -> Above {
     let search = ui.search_field_response(
         &mut app.layout.catalog_search_query,
         tr(DatasetKey::CatalogSearchHint),
@@ -64,4 +67,5 @@ fn search_field(app: &mut OctantApp, ui: &mut egui::Ui, opened: bool) {
     if opened {
         search.request_focus();
     }
+    Above::of(&search)
 }
