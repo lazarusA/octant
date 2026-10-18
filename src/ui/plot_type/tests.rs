@@ -37,8 +37,7 @@ fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
 }
 
 fn press(h: &mut Harness, app: &mut OctantApp, key: Key) {
-    h.key(key, Modifiers::NONE, &mut run(app));
-    h.settle(2, &mut run(app));
+    h.press(key, Modifiers::NONE, &mut run(app));
 }
 
 #[test]
@@ -84,22 +83,16 @@ fn a_click_outside_closes_the_picker() {
 
 #[test]
 fn the_picker_keeps_its_width_in_every_language() {
-    use crate::i18n::Language;
-    use crate::ui::panel_width_tests::{SLACK, area_width_of};
-    let frame = egui::Frame::window(&egui::Style::default())
-        .total_margin()
-        .sum()
-        .x;
-    let limit = super::picker::WIDTH + frame + SLACK;
-    let mut wide = Vec::new();
-    for &lang in Language::ALL {
+    let make_app = || {
         let mut app = plotted(PlotType::Heatmap);
         app.layout.show_plot_picker = true;
-        let mut run = |ui: &mut Ui| show_plot_type_picker(&mut app, ui.ctx());
-        let width = area_width_of(lang, egui::Id::unique("plot_type_picker"), &[], &mut run);
-        if width > limit {
-            wide.push((lang, width));
-        }
-    }
-    assert!(wide.is_empty(), "wider than {limit}: {wide:?}");
+        app
+    };
+    let width = super::picker::WIDTH;
+    crate::ui::panel_width_tests::assert_window_width(
+        "plot_type_picker",
+        width,
+        make_app,
+        show_plot_type_picker,
+    );
 }

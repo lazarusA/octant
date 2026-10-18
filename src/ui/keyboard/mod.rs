@@ -17,10 +17,10 @@ pub mod keymap;
 pub mod labels;
 pub mod list_nav;
 #[cfg(test)]
-mod panel_tests;
-#[cfg(test)]
 mod playback_tests;
 pub mod regions;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

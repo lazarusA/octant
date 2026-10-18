@@ -4,6 +4,7 @@
 //! frame's UI as a closure; build it per call (`&mut run(&mut app)`) so the
 //! app stays free between frames.
 
+use crate::ui::keyboard::focus::{self, LastFocus};
 use egui::epaint::ClippedShape;
 use egui::{Event, Id, Key, Modifiers, PointerButton, Pos2, RawInput, Rect, TouchPhase, Ui, Vec2};
 
@@ -80,6 +81,24 @@ impl Harness {
             modifiers,
         };
         self.frame(vec![press], run)
+    }
+
+    /// Presses `key` with `modifiers`, lets focus settle over two more
+    /// frames, and says where focus ended up.
+    pub fn press(
+        &mut self,
+        key: Key,
+        modifiers: Modifiers,
+        run: &mut impl FnMut(&mut Ui),
+    ) -> Option<LastFocus> {
+        self.key(key, modifiers, run);
+        self.settle(2, run);
+        focus::last(&self.ctx)
+    }
+
+    /// Whether focus was in the area `id` when the last frame ended.
+    pub fn focus_in(&self, id: Id) -> bool {
+        focus::last(&self.ctx).is_some_and(|f| f.layer.id == id)
     }
 
     /// Hovers `pos`, then presses and releases there.

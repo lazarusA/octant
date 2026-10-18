@@ -3,53 +3,27 @@
 //! in visual order, Escape in each panel returns focus to its toolbar
 //! button, and single keys stay out of text fields.
 
+use super::focus;
 use super::regions::Region;
-use super::{dispatch, focus, regions};
-use crate::app::OctantApp;
+use super::test_support::{press, run, window};
 use crate::app::layers::LayerId;
-use crate::plots::PlotType;
 use crate::ui::panel_layout::Panel;
-use crate::ui::panel_width_tests::plotted;
 use crate::ui::test_input::Harness;
-use egui::{Id, Key, Modifiers, Rect, Ui, pos2};
+use egui::{Id, Key, Modifiers};
 
-pub(super) const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1600.0, 1000.0));
+const NONE: Modifiers = Modifiers::NONE;
 
-/// One frame drawn in the app's order, with a stand-in for the canvas
-/// (painting it needs a GPU).
-pub(super) fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
-    |ui| {
-        let ctx = ui.ctx().clone();
-        dispatch(app, &ctx, true);
-        crate::ui::top_bar::show_top_bar(app, ui);
-        crate::ui::bottom_bar::show_bottom_bar(app, ui);
-        let canvas = ui.available_rect_before_wrap();
-        crate::ui::dataset::show_dataset_window(app, &ctx, canvas);
-        crate::ui::variables_overlay::show_variables_overlay(app, &ctx, canvas);
-        crate::ui::settings::show_settings_window(app, &ctx, canvas);
-        crate::ui::variables_panel::show_variable_controls(app, &ctx, canvas);
-        crate::ui::colorbar::show_colorbar_overlay(app, &ctx, canvas);
-        let id = crate::app::canvas::canvas_id();
-        let response = ui.interact(canvas, id, egui::Sense::drag());
-        regions::register(&ctx, Region::Canvas, id, response.layer_id, canvas);
-        focus::end_frame(&ctx);
-    }
-}
-
-/// A plotted heatmap of `t2m`, animated along its time steps.
-pub(super) fn app(panels_open: bool) -> OctantApp {
-    let mut app = plotted(PlotType::Heatmap);
-    for panel in Panel::ALL {
-        *app.layout.panel_shown_mut(panel) = panels_open;
-    }
-    app
-}
-
-fn press(h: &mut Harness, app: &mut OctantApp, key: Key, modifiers: Modifiers) -> focus::LastFocus {
-    h.key(key, modifiers, &mut run(app));
-    h.settle(2, &mut run(app));
-    focus::last(&h.ctx).expect("a widget holds focus")
-}
+/// Every region, in visual order.
+const RING: [Region; 8] = [
+    Region::TopBar,
+    Region::Dataset,
+    Region::Variables,
+    Region::Settings,
+    Region::Dimensions,
+    Region::Canvas,
+    Region::Colorbars,
+    Region::BottomBar,
+];
 
 /// Which region the focused widget sits in.
 fn region_of(h: &Harness, f: focus::LastFocus) -> Region {
@@ -67,15 +41,12 @@ fn region_of(h: &Harness, f: focus::LastFocus) -> Region {
 
 #[test]
 fn tab_walks_every_area_and_wraps() {
-    let mut app = app(true);
-    let mut h = Harness::new(SCREEN);
-    h.settle(4, &mut run(&mut app));
-    let first = press(&mut h, &mut app, Key::Tab, Modifiers::NONE);
+    let (mut app, mut h) = window(true);
+    let first = press(&mut h, &mut app, Key::Tab, NONE).expect("a first stop");
     let mut regions = vec![region_of(&h, first)];
-    let mut top_bar_stops = 1;
-    let mut wrapped = false;
-    for _ in 0..600 {
-        let at = press(&mut h, &mut app, Key::Tab, Modifiers::NONE);
+    let (mut top_bar_stops, mut wrapped) = (1, false);
+    for _ in 0..200 {
+        let at = press(&mut h, &mut app, Key::Tab, NONE).expect("a stop");
         if at.id == first.id {
             wrapped = true;
             break;
@@ -87,59 +58,36 @@ fn tab_walks_every_area_and_wraps() {
         }
     }
     assert!(wrapped, "Tab comes back around");
-    for region in [
-        Region::TopBar,
-        Region::Dataset,
-        Region::Variables,
-        Region::Settings,
-        Region::Dimensions,
-        Region::Canvas,
-        Region::Colorbars,
-        Region::BottomBar,
-    ] {
-        assert!(
-            regions.contains(&region),
-            "Tab reaches {region:?}: {regions:?}"
-        );
-    }
+    assert!(
+        RING.iter().all(|r| regions.contains(r)),
+        "Tab reaches every region: {regions:?}"
+    );
     assert!(top_bar_stops >= 10, "every top-bar item: {top_bar_stops}");
 }
 
 #[test]
 fn f6_visits_the_regions_in_visual_order() {
-    let mut app = app(true);
-    let mut h = Harness::new(SCREEN);
-    h.settle(4, &mut run(&mut app));
-    // Visual order, top to bottom; F6 starts after the region holding
-    // focus (the Variables panel focuses its search when it opens).
-    let ring = [
-        Region::TopBar,
-        Region::Dataset,
-        Region::Variables,
-        Region::Settings,
-        Region::Dimensions,
-        Region::Canvas,
-        Region::Colorbars,
-        Region::BottomBar,
-    ];
-    let visited: Vec<Region> = (0..ring.len() + 1)
-        .map(|_| {
-            let at = press(&mut h, &mut app, Key::F6, Modifiers::NONE);
-            region_of(&h, at)
-        })
-        .collect();
-    let start = ring
+    let (mut app, mut h) = window(true);
+    // F6 starts after the region holding focus (the Variables panel focuses
+    // its search when it opens), then follows the ring.
+    let mut f6 = |mods| {
+        let at = press(&mut h, &mut app, Key::F6, mods).expect("a region");
+        region_of(&h, at)
+    };
+    let visited: Vec<Region> = (0..=RING.len()).map(|_| f6(NONE)).collect();
+    let start = RING
         .iter()
         .position(|&r| r == visited[0])
         .expect("a region");
     let expected: Vec<Region> = (0..visited.len())
-        .map(|i| ring[(start + i) % ring.len()])
+        .map(|i| RING[(start + i) % RING.len()])
         .collect();
     assert_eq!(visited, expected);
-    // Back from the last region visited, one before it in the ring.
-    let before = expected[expected.len() - 2];
-    let back = press(&mut h, &mut app, Key::F6, Modifiers::SHIFT);
-    assert_eq!(region_of(&h, back), before, "Shift+F6 goes back");
+    assert_eq!(
+        f6(Modifiers::SHIFT),
+        expected[expected.len() - 2],
+        "Shift+F6 goes back"
+    );
 }
 
 #[test]
@@ -152,44 +100,51 @@ fn escape_in_each_panel_returns_to_its_button() {
         (Panel::Settings, 6),
     ];
     for (panel, place) in buttons {
-        let mut app = app(false);
-        let mut h = Harness::new(SCREEN);
-        h.settle(4, &mut run(&mut app));
-        press(&mut h, &mut app, Key::F10, Modifiers::NONE);
-        let mut button = press(&mut h, &mut app, Key::Home, Modifiers::NONE);
+        let (mut app, mut h) = window(false);
+        press(&mut h, &mut app, Key::F10, NONE);
+        let mut button = press(&mut h, &mut app, Key::Home, NONE);
         for _ in 0..place {
-            button = press(&mut h, &mut app, Key::ArrowRight, Modifiers::NONE);
+            button = press(&mut h, &mut app, Key::ArrowRight, NONE);
         }
-        let inside = press(&mut h, &mut app, Key::Enter, Modifiers::NONE);
-        assert!(app.layout.panel_shown(panel), "{panel:?} opens");
-        assert_eq!(inside.layer.id, panel.area_id(), "focus enters {panel:?}");
-        let back = press(&mut h, &mut app, Key::Escape, Modifiers::NONE);
+        press(&mut h, &mut app, Key::Enter, NONE);
+        assert!(
+            h.focus_in(panel.area_id()),
+            "Enter opens {panel:?} with focus inside"
+        );
+        let back = press(&mut h, &mut app, Key::Escape, NONE);
         assert!(!app.layout.panel_shown(panel), "Escape closes {panel:?}");
-        assert_eq!(back.id, button.id, "focus returns from {panel:?}");
+        assert_eq!(
+            back.map(|f| f.id),
+            button.map(|f| f.id),
+            "focus returns from {panel:?}"
+        );
     }
 }
 
 #[test]
 fn single_keys_stay_out_of_text_fields() {
-    let mut app = app(false);
-    let mut h = Harness::new(SCREEN);
-    h.settle(4, &mut run(&mut app));
+    let (mut app, mut h) = window(false);
     // Cmd+K opens the variable search and focuses its field.
     press(&mut h, &mut app, Key::K, Modifiers::COMMAND);
-    for (key, text) in [(Key::C, "c"), (Key::Space, " "), (Key::L, "l")] {
-        let typed = vec![
-            egui::Event::Key {
-                key,
-                physical_key: None,
-                pressed: true,
-                repeat: false,
-                modifiers: Modifiers::NONE,
-            },
-            egui::Event::Text(text.into()),
-        ];
-        h.frame(typed, &mut run(&mut app));
+    for (key, text) in [
+        (Key::C, "c"),
+        (Key::Space, " "),
+        (Key::D, "d"),
+        (Key::S, "s"),
+    ] {
+        let typed = egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: NONE,
+        };
+        h.frame(
+            vec![typed, egui::Event::Text(text.into())],
+            &mut run(&mut app),
+        );
     }
-    assert_eq!(app.layout.variable_search, "c l");
-    assert!(!app.show_crop_overlay);
-    assert!(!app.playback.is_playing);
+    assert_eq!(app.layout.variable_search, "c ds");
+    assert!(!app.show_crop_overlay && !app.playback.is_playing);
+    assert!(!app.layout.show_dataset_panel && !app.layout.show_settings_panel);
 }

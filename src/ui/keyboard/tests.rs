@@ -3,7 +3,6 @@
 
 use super::focus;
 use super::keymap::{Action, Keys, Shortcut, TABLE, take};
-use super::regions::{self, Region};
 use crate::ui::test_input::Harness;
 use egui::{Key, Modifiers, Pos2, Rect, Ui, Vec2, pos2, vec2};
 
@@ -89,43 +88,6 @@ fn rings_show_only_after_keys() {
     assert!(!focus::visible(&h.ctx));
 }
 
-/// Three buttons standing for the regions, top to bottom; F6 handled as the
-/// dispatcher does, before anything draws.
-fn regions_frame(ui: &mut Ui, jump: Option<bool>) {
-    regions::begin_frame(ui.ctx());
-    if let Some(forward) = jump {
-        regions::cycle(ui.ctx(), forward);
-    }
-    for (i, region) in [Region::TopBar, Region::Canvas, Region::BottomBar]
-        .into_iter()
-        .enumerate()
-    {
-        let rect = Rect::from_min_size(pos2(0.0, 40.0 * i as f32), vec2(100.0, 30.0));
-        let button = ui.put(rect, egui::Button::new("x"));
-        regions::register(ui.ctx(), region, button.id, button.layer_id, rect);
-    }
-    focus::end_frame(ui.ctx());
-}
-
-#[test]
-fn f6_cycles_regions_in_visual_order() {
-    let mut h = harness();
-    h.settle(2, &mut |ui| regions_frame(ui, None));
-    let mut visited = Vec::new();
-    for _ in 0..4 {
-        h.frame(Vec::new(), &mut |ui| regions_frame(ui, Some(true)));
-        h.settle(1, &mut |ui| regions_frame(ui, None));
-        let last = focus::last(&h.ctx).expect("a region is focused");
-        visited.push(last.rect.top());
-    }
-    assert_eq!(visited, [0.0, 40.0, 80.0, 0.0], "wraps after the last");
-
-    h.frame(Vec::new(), &mut |ui| regions_frame(ui, Some(false)));
-    h.settle(1, &mut |ui| regions_frame(ui, None));
-    let last = focus::last(&h.ctx).expect("a region is focused");
-    assert_eq!(last.rect.top(), 80.0, "Shift+F6 goes back");
-}
-
 #[test]
 fn up_and_down_move_between_list_items() {
     use super::list_nav::ListNav;
@@ -140,13 +102,34 @@ fn up_and_down_move_between_list_items() {
         focus::end_frame(ui.ctx());
     };
     let mut top_after = |key| {
-        h.key(key, Modifiers::NONE, &mut run);
-        h.settle(1, &mut run);
-        focus::last(&h.ctx).expect("an item is focused").rect.top()
+        h.press(key, Modifiers::NONE, &mut run)
+            .map(|f| f.rect.top())
     };
-    assert_eq!(top_after(Key::Tab), 0.0);
-    assert_eq!(top_after(Key::ArrowDown), 30.0);
-    assert_eq!(top_after(Key::ArrowDown), 60.0);
-    assert_eq!(top_after(Key::ArrowDown), 60.0, "stays on the last item");
-    assert_eq!(top_after(Key::ArrowUp), 30.0);
+    let tops = [
+        Key::Tab,
+        Key::ArrowDown,
+        Key::ArrowDown,
+        Key::ArrowDown,
+        Key::ArrowUp,
+        Key::Home,
+        Key::End,
+    ];
+    let tops = tops.map(&mut top_after);
+    // Down stays on the last item; Home and End go to the ends.
+    assert_eq!(tops, [0.0, 30.0, 60.0, 60.0, 30.0, 0.0, 60.0].map(Some));
+}
+
+#[test]
+fn every_shortcut_is_bound_once() {
+    for (i, a) in TABLE.iter().enumerate() {
+        let clash = TABLE[i + 1..]
+            .iter()
+            .find(|b| (b.keys, b.mods, b.scope) == (a.keys, a.mods, a.scope));
+        assert!(
+            clash.is_none(),
+            "{:?} and {:?} share their keys",
+            a.action,
+            clash.map(|b| b.action)
+        );
+    }
 }

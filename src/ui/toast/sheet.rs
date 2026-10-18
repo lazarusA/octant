@@ -8,7 +8,7 @@ use egui::{Rect, pos2, vec2};
 
 use super::model::{Notice, Severity, ToastAction};
 use super::queue::Toasts;
-use crate::ui::test_render::{rasterize, sheet_dir, tessellate_pass, themes, to_image};
+use crate::ui::test_render::theme_sheet;
 
 const SIZE: egui::Vec2 = vec2(420.0, 360.0);
 const PPP: f32 = 2.0;
@@ -40,19 +40,9 @@ fn sample() -> Toasts {
 #[test]
 #[ignore = "writes review images to target/icon_sheets"]
 fn toast_contact_sheet() {
-    let (w, h) = ((SIZE.x * PPP) as usize, (SIZE.y * PPP) as usize);
-    let mut sheet = image::RgbaImage::new(w as u32, 2 * h as u32);
-    for (row, visuals) in themes().iter().enumerate() {
-        let (prims, atlas) = tessellate_pass(SIZE, PPP, visuals, |ctx| {
-            let mut toasts = sample();
-            let canvas = Rect::from_min_size(pos2(0.0, 0.0), SIZE);
-            super::paint::show(ctx, &mut toasts, canvas, web_time::Instant::now());
-        });
-        let buf = rasterize(&prims, &atlas, PPP, w, h, visuals.panel_fill);
-        let strip = to_image(&buf, w, (0, 0), (w as u32, h as u32), 1);
-        image::imageops::replace(&mut sheet, &strip, 0, (row * h) as i64);
-    }
-    sheet
-        .save(sheet_dir().join("toasts.png"))
-        .expect("save sheet");
+    theme_sheet("toasts.png", SIZE, PPP, |ctx| {
+        let mut toasts = sample();
+        let canvas = Rect::from_min_size(pos2(0.0, 0.0), SIZE);
+        super::paint::show(ctx, &mut toasts, canvas, web_time::Instant::now());
+    });
 }

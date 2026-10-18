@@ -128,12 +128,8 @@ fn arrows_move_focus_between_wells() {
         focus::end_frame(ui.ctx());
     };
     let mut press = |key| {
-        h.key(key, Modifiers::NONE, &mut run);
-        h.settle(1, &mut run);
-        focus::last(&h.ctx)
-            .expect("a well is focused")
-            .rect
-            .center()
+        let at = h.press(key, Modifiers::NONE, &mut run);
+        at.expect("a well is focused").rect.center()
     };
     let a1 = press(Key::Tab);
     let a3 = press(Key::ArrowRight);

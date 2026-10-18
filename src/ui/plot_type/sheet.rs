@@ -5,7 +5,7 @@
 use super::picker::show_plot_type_picker;
 use crate::plots::PlotType;
 use crate::ui::panel_width_tests::plotted;
-use crate::ui::test_render::{rasterize, sheet_dir, tessellate_pass, themes, to_image};
+use crate::ui::test_render::theme_sheet;
 use egui::epaint::Mesh;
 use egui::{Color32, LayerId, Rect, Shape, pos2, vec2};
 
@@ -37,20 +37,10 @@ fn backdrop(ctx: &egui::Context) {
 #[test]
 #[ignore = "writes review images to target/icon_sheets"]
 fn plot_type_picker_sheet() {
-    let (w, h) = ((SIZE.x * PPP) as usize, (SIZE.y * PPP) as usize);
-    let mut sheet = image::RgbaImage::new(w as u32, 2 * h as u32);
-    for (row, visuals) in themes().iter().enumerate() {
-        let (prims, atlas) = tessellate_pass(SIZE, PPP, visuals, |ctx| {
-            backdrop(ctx);
-            let mut app = plotted(PlotType::Heatmap);
-            app.layout.show_plot_picker = true;
-            show_plot_type_picker(&mut app, ctx);
-        });
-        let buf = rasterize(&prims, &atlas, PPP, w, h, visuals.panel_fill);
-        let strip = to_image(&buf, w, (0, 0), (w as u32, h as u32), 1);
-        image::imageops::replace(&mut sheet, &strip, 0, (row * h) as i64);
-    }
-    sheet
-        .save(sheet_dir().join("plot_type_picker.png"))
-        .expect("save sheet");
+    theme_sheet("plot_type_picker.png", SIZE, PPP, |ctx| {
+        backdrop(ctx);
+        let mut app = plotted(PlotType::Heatmap);
+        app.layout.show_plot_picker = true;
+        show_plot_type_picker(&mut app, ctx);
+    });
 }

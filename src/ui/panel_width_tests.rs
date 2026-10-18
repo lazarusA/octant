@@ -108,6 +108,30 @@ pub(super) fn area_width_of(
     })
 }
 
+/// Asserts that the window `id`, drawn by `show` over the app `make_app`
+/// builds, keeps its `content_width` (plus a window frame's margins) in
+/// every language.
+pub(super) fn assert_window_width(
+    id: &str,
+    content_width: f32,
+    make_app: impl Fn() -> OctantApp,
+    show: fn(&mut OctantApp, &egui::Context),
+) {
+    let frame = egui::Frame::window(&egui::Style::default())
+        .total_margin()
+        .sum()
+        .x;
+    let limit = content_width + frame + SLACK;
+    let wide: Vec<_> = (Language::ALL.iter())
+        .filter_map(|&lang| {
+            let mut app = make_app();
+            let width = area_width(lang, id, &[], &mut |ui: &mut Ui| show(&mut app, ui.ctx()));
+            (width > limit).then_some((lang, width))
+        })
+        .collect();
+    assert!(wide.is_empty(), "{id} wider than {limit}: {wide:?}");
+}
+
 /// Horizontal margins of the popup frame both panels draw in.
 pub(super) fn frame_margins() -> f32 {
     egui::Frame::popup(&egui::Style::default())

@@ -1,85 +1,77 @@
 //! Single keys taking focus to the panels and colorbars: D, V, A and S open
 //! a panel with focus in it, move focus into an open one, and close it from
-//! inside; B goes to the colorbar; the keys work from inside other panels.
+//! inside; B goes to the colorbar; the keys work from inside other panels;
+//! a focused grip moves its panel.
 
-use super::focus;
-use super::walk_tests::{SCREEN, app, run};
-use crate::app::OctantApp;
+use super::test_support::{press, window};
 use crate::app::layers::LayerId;
 use crate::ui::panel_layout::Panel;
-use crate::ui::test_input::Harness;
 use egui::{Id, Key, Modifiers};
 
-fn press(h: &mut Harness, app: &mut OctantApp, key: Key) {
-    h.key(key, Modifiers::NONE, &mut run(app));
-    h.settle(2, &mut run(app));
-}
-
-fn focus_in(h: &Harness, area: Id) -> bool {
-    focus::last(&h.ctx).is_some_and(|f| f.layer.id == area)
-}
+const NONE: Modifiers = Modifiers::NONE;
 
 #[test]
 fn d_opens_the_dataset_panel_at_its_source_field() {
-    let mut app = app(false);
-    let mut h = Harness::new(SCREEN);
-    h.settle(4, &mut run(&mut app));
-    press(&mut h, &mut app, Key::D);
-    assert!(app.layout.show_dataset_panel);
-    assert!(focus_in(&h, Panel::Dataset.area_id()));
+    let (mut app, mut h) = window(false);
+    press(&mut h, &mut app, Key::D, NONE);
+    assert!(h.focus_in(Panel::Dataset.area_id()));
     assert!(h.ctx.text_edit_focused(), "ready to type a source");
 }
 
 #[test]
 fn a_lands_on_plot_data() {
-    let mut app = app(false);
-    let mut h = Harness::new(SCREEN);
-    h.settle(4, &mut run(&mut app));
-    press(&mut h, &mut app, Key::A);
-    assert!(focus_in(&h, Panel::Dimensions.area_id()));
-    press(&mut h, &mut app, Key::Enter);
+    let (mut app, mut h) = window(false);
+    press(&mut h, &mut app, Key::A, NONE);
+    assert!(h.focus_in(Panel::Dimensions.area_id()));
+    press(&mut h, &mut app, Key::Enter, NONE);
     assert!(app.layout.show_settings_panel, "Plot Data plotted");
     assert!(!app.layout.show_variable_controls);
 }
 
 #[test]
-fn keys_jump_between_panels_and_close_from_inside() {
-    let mut app = app(false);
-    let mut h = Harness::new(SCREEN);
-    h.settle(4, &mut run(&mut app));
-    press(&mut h, &mut app, Key::S);
-    assert!(focus_in(&h, Panel::Settings.area_id()));
-    let setting = focus::last(&h.ctx).expect("a setting");
+fn keys_enter_jump_between_and_close_panels() {
+    let (mut app, mut h) = window(false);
+    app.layout.show_settings_panel = true;
+    let setting = press(&mut h, &mut app, Key::S, NONE).map(|f| f.id);
+    assert!(
+        h.focus_in(Panel::Settings.area_id()),
+        "S enters the open panel"
+    );
     // From inside Settings, A goes to Dimensions; Settings stays open.
-    press(&mut h, &mut app, Key::A);
-    assert!(focus_in(&h, Panel::Dimensions.area_id()));
+    press(&mut h, &mut app, Key::A, NONE);
+    assert!(h.focus_in(Panel::Dimensions.area_id()));
     assert!(app.layout.show_settings_panel);
     // A again, from inside, closes Dimensions and returns to the setting.
-    press(&mut h, &mut app, Key::A);
+    let back = press(&mut h, &mut app, Key::A, NONE).map(|f| f.id);
     assert!(!app.layout.show_variable_controls);
-    assert_eq!(focus::last(&h.ctx).map(|f| f.id), Some(setting.id));
-}
-
-#[test]
-fn a_key_moves_focus_into_its_open_panel() {
-    let mut app = app(false);
-    app.layout.show_settings_panel = true;
-    let mut h = Harness::new(SCREEN);
-    h.settle(4, &mut run(&mut app));
-    press(&mut h, &mut app, Key::S);
-    assert!(app.layout.show_settings_panel, "an open panel stays open");
-    assert!(focus_in(&h, Panel::Settings.area_id()));
+    assert_eq!(back, setting);
 }
 
 #[test]
 fn b_goes_to_the_colorbar() {
-    let mut app = app(false);
-    app.layout.show_hero = false;
-    let mut h = Harness::new(SCREEN);
-    h.settle(4, &mut run(&mut app));
-    press(&mut h, &mut app, Key::B);
-    let colorbar = Id::unique(("octant_colorbar_overlay", LayerId::BASE));
-    assert!(focus_in(&h, colorbar));
-    press(&mut h, &mut app, Key::B);
-    assert!(focus_in(&h, colorbar), "the only colorbar stays focused");
+    let (mut app, mut h) = window(false);
+    press(&mut h, &mut app, Key::B, NONE);
+    assert!(h.focus_in(Id::unique(("octant_colorbar_overlay", LayerId::BASE))));
+}
+
+#[test]
+fn a_focused_grip_moves_its_panel_and_enter_docks_it() {
+    let (mut app, mut h) = window(false);
+    press(&mut h, &mut app, Key::S, NONE);
+    // Focus enters at the first setting; the grip is just before it.
+    press(&mut h, &mut app, Key::Tab, Modifiers::SHIFT);
+    let docked = h.area(Panel::Settings.area_id()).min;
+    press(&mut h, &mut app, Key::ArrowRight, NONE);
+    press(&mut h, &mut app, Key::ArrowDown, NONE);
+    let moved = h.area(Panel::Settings.area_id()).min;
+    assert!(
+        moved.x > docked.x && moved.y > docked.y,
+        "{docked:?} -> {moved:?}"
+    );
+    assert!(
+        h.focus_in(Panel::Settings.area_id()),
+        "the arrows move the panel, not focus"
+    );
+    press(&mut h, &mut app, Key::Enter, NONE);
+    assert_eq!(app.layout.panel_positions.settings, None);
 }

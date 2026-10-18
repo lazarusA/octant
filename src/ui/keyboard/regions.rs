@@ -172,9 +172,11 @@ pub fn cycle(ctx: &Context, forward: bool) {
     }
 }
 
-/// Focuses `region`'s entry, when it was drawn last frame.
+/// Focuses `region`'s entry, now when it was drawn last frame, else once
+/// it draws.
 pub fn enter(ctx: &Context, region: Region) {
-    if let Some(entry) = drawn(ctx)[region as usize].entry {
-        entry.focus(ctx);
+    match drawn(ctx)[region as usize].entry {
+        Some(entry) => entry.focus(ctx),
+        None => enter_when_drawn(ctx, region),
     }
 }

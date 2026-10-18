@@ -53,8 +53,9 @@ mod keys {
         for _ in 0..20 {
             h.key(Key::ArrowLeft, Modifiers::NONE, &mut run(&mut color));
         }
+        // Each press moves alpha by one hundredth of its range.
         assert!(
-            color[3] < 0.85,
+            (color[3] - 0.8).abs() < 1e-3,
             "the alpha strip took the arrows: {color:?}"
         );
         h.key(Key::Escape, Modifiers::NONE, &mut run(&mut color));

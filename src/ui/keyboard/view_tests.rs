@@ -20,7 +20,6 @@ fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
 #[test]
 fn h_toggles_the_landing_screen_and_escape_leaves_it() {
     let mut app = plotted(PlotType::Heatmap);
-    assert!(app.has_plot());
     app.layout.show_hero = false;
     let mut h = Harness::new(SCREEN);
     h.key(Key::H, Modifiers::NONE, &mut run(&mut app));

@@ -1,15 +1,15 @@
 //! The shortcut list: `?` opens it and Escape closes it, its keys read per
 //! platform, and it keeps its width in every language.
 
-use super::keymap::{Action, CanvasAction, TABLE, shortcut_of};
+use super::keymap::{Action, CanvasAction, shortcut_of};
 use super::labels::{KeysBuf, write_keys};
 use super::{dispatch, help};
 use crate::app::OctantApp;
 use crate::i18n::{Language, with_language};
 use crate::ui::panel_layout::Panel;
-use crate::ui::panel_width_tests::{SLACK, area_width_of};
+use crate::ui::panel_width_tests::assert_window_width;
 use crate::ui::test_input::Harness;
-use egui::{Id, Key, Modifiers, Rect, Ui, pos2};
+use egui::{Key, Modifiers, Rect, Ui, pos2};
 
 fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
     |ui| {
@@ -51,37 +51,16 @@ fn keys_read_with_each_platforms_modifier_names() {
 }
 
 #[test]
-fn every_shortcut_is_listed_once() {
-    for (i, a) in TABLE.iter().enumerate() {
-        for b in &TABLE[i + 1..] {
-            let same_keys = a.keys == b.keys && a.mods == b.mods;
-            assert!(
-                !(same_keys && a.scope == b.scope),
-                "{:?} and {:?} share their keys",
-                a.action,
-                b.action
-            );
-        }
-    }
-}
-
-#[test]
 fn the_list_keeps_its_width_in_every_language() {
-    let frame = egui::Frame::window(&egui::Style::default())
-        .total_margin()
-        .sum()
-        .x;
-    let limit = help::WIDTH + frame + SLACK;
-    let mut wide = Vec::new();
-    for &lang in Language::ALL {
+    let make_app = || {
         let mut app = OctantApp::default();
         app.layout.show_shortcuts = true;
-        let mut run = |ui: &mut Ui| help::show(&mut app, ui.ctx());
-        let id = Id::unique("keyboard_shortcuts_window");
-        let width = area_width_of(lang, id, &[], &mut run);
-        if width > limit {
-            wide.push((lang, width));
-        }
-    }
-    assert!(wide.is_empty(), "wider than {limit}: {wide:?}");
+        app
+    };
+    assert_window_width(
+        "keyboard_shortcuts_window",
+        help::WIDTH,
+        make_app,
+        help::show,
+    );
 }

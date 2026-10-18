@@ -31,69 +31,66 @@ mod keys {
         }
     }
 
-    fn focused_left(h: &Harness) -> f32 {
-        focus::last(&h.ctx)
-            .expect("a widget is focused")
-            .rect
-            .left()
+    /// The bar drawn and settled, with `F10` pressed to enter it.
+    fn entered() -> (OctantApp, Harness) {
+        let mut app = OctantApp::default();
+        let mut h = Harness::new(SCREEN);
+        h.settle(2, &mut run(&mut app));
+        press(&mut h, &mut app, Key::F10);
+        (app, h)
     }
 
-    fn press(h: &mut Harness, app: &mut OctantApp, key: Key) {
-        h.key(key, Modifiers::NONE, &mut run(app));
-        h.settle(1, &mut run(app));
+    /// Presses `key`; the left edge of the widget focused then.
+    fn press(h: &mut Harness, app: &mut OctantApp, key: Key) -> Option<f32> {
+        h.press(key, Modifiers::NONE, &mut run(app))
+            .map(|f| f.rect.left())
     }
 
     #[test]
     fn arrows_walk_the_bar_in_visual_order() {
-        let mut app = OctantApp::default();
-        let mut h = Harness::new(SCREEN);
-        h.settle(2, &mut run(&mut app));
-        press(&mut h, &mut app, Key::F10);
-        let mut lefts = vec![focused_left(&h)];
-        loop {
-            press(&mut h, &mut app, Key::ArrowRight);
-            let left = focused_left(&h);
-            if left == *lefts.last().expect("started") {
+        let (mut app, mut h) = entered();
+        let mut lefts = vec![focus::last(&h.ctx).map(|f| f.rect.left())];
+        for _ in 0..20 {
+            let left = press(&mut h, &mut app, Key::ArrowRight);
+            if lefts.last() == Some(&left) {
                 break;
             }
             lefts.push(left);
         }
-        assert!(lefts.len() >= 8, "every item is reached: {lefts:?}");
+        assert!(
+            (8..20).contains(&lefts.len()),
+            "every item is reached once: {lefts:?}"
+        );
         assert!(lefts.windows(2).all(|w| w[0] < w[1]), "{lefts:?}");
-
-        press(&mut h, &mut app, Key::Home);
-        assert_eq!(focused_left(&h), lefts[0]);
-        press(&mut h, &mut app, Key::End);
-        assert_eq!(focused_left(&h), *lefts.last().expect("items"));
-        press(&mut h, &mut app, Key::ArrowLeft);
-        assert_eq!(focused_left(&h), lefts[lefts.len() - 2]);
+        let [first, .., before_last, last] = lefts[..] else {
+            panic!("a bar of items");
+        };
+        assert_eq!(press(&mut h, &mut app, Key::Home), first);
+        assert_eq!(press(&mut h, &mut app, Key::End), last);
+        assert_eq!(press(&mut h, &mut app, Key::ArrowLeft), before_last);
     }
 
     #[test]
     fn down_opens_a_menu_and_enters_it() {
-        let mut app = OctantApp::default();
-        let mut h = Harness::new(SCREEN);
-        h.settle(2, &mut run(&mut app));
-        press(&mut h, &mut app, Key::F10);
+        let (mut app, mut h) = entered();
         // The language menu sits left of the theme toggle, the last item.
         press(&mut h, &mut app, Key::End);
         press(&mut h, &mut app, Key::ArrowLeft);
         let button = focus::last(&h.ctx).expect("the language button");
-        press(&mut h, &mut app, Key::ArrowDown);
-        h.settle(1, &mut run(&mut app));
+        let inside = h.press(Key::ArrowDown, Modifiers::NONE, &mut run(&mut app));
         assert!(egui::Popup::is_any_open(&h.ctx));
-        let inside = focus::last(&h.ctx).expect("focus moved into the menu");
-        assert_ne!(inside.layer, button.layer, "focus is in the popup");
+        assert_ne!(
+            inside.map(|f| f.layer),
+            Some(button.layer),
+            "focus is in the popup"
+        );
     }
 
     #[test]
     fn escape_leaves_the_bar() {
-        let mut app = OctantApp::default();
-        let mut h = Harness::new(SCREEN);
-        h.settle(2, &mut run(&mut app));
-        press(&mut h, &mut app, Key::F10);
+        // A bar item keeps Escape from egui; the bar lets focus go itself.
+        let (mut app, mut h) = entered();
         assert!(focus::last(&h.ctx).is_some());
-        press(&mut h, &mut app, Key::Escape);
-        assert_eq!(focus::last(&h.ctx), None);
+        assert_eq!(press(&mut h, &mut app, Key::Escape), None);
     }
 }

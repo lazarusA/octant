@@ -119,26 +119,27 @@ fn arrows_walk_the_buttons_up_to_the_timeline() {
     }
     let mut app = regions_app(&["north", "south", "east"]);
     let mut h = Harness::new(Rect::from_min_max(pos2(0.0, 0.0), pos2(1400.0, 300.0)));
-    let focused = |h: &Harness| focus::last(&h.ctx).expect("a widget is focused").rect;
     h.settle(2, &mut run(&mut app));
+    let mut press = |key| {
+        let at = h.press(key, Modifiers::NONE, &mut run(&mut app));
+        at.expect("a widget is focused").rect
+    };
     // F6 from nowhere enters the first region drawn: this bar.
-    h.key(Key::F6, Modifiers::NONE, &mut run(&mut app));
-    h.settle(1, &mut run(&mut app));
-    let mut rects = vec![focused(&h)];
-    for _ in 0..8 {
-        h.key(Key::ArrowRight, Modifiers::NONE, &mut run(&mut app));
-        h.settle(1, &mut run(&mut app));
-        rects.push(focused(&h));
-    }
+    let mut rects = vec![press(Key::F6)];
+    rects.extend((0..8).map(|_| press(Key::ArrowRight)));
+    // The buttons step right up to the timeline, whose arrows then move it.
+    let slider = rects
+        .iter()
+        .position(|r| r.width() > 100.0)
+        .expect("the timeline");
     assert!(
-        rects.windows(2).take(6).all(|w| w[0].left() < w[1].left()),
+        rects[..=slider]
+            .windows(2)
+            .all(|w| w[0].left() < w[1].left()),
         "{rects:?}"
     );
-    let slider = rects.last().expect("walked");
-    assert!(slider.width() > 100.0, "stops on the timeline: {slider:?}");
-    assert_eq!(
-        rects[rects.len() - 2],
-        *slider,
-        "whose arrows move it instead"
+    assert!(
+        rects[slider..].iter().all(|r| *r == rects[slider]),
+        "{rects:?}"
     );
 }

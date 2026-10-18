@@ -20,8 +20,7 @@ fn keyboard_focus_on_the_bar_reveals_the_controls_and_picks_a_colormap() {
     assert!(circles(&shapes) >= 6, "focus in the panel shows the grip");
 
     let press = |h: &mut Harness, app: &mut OctantApp, key| {
-        h.key(key, Modifiers::NONE, &mut run(app));
-        h.settle(2, &mut run(app));
+        h.press(key, Modifiers::NONE, &mut run(app));
     };
     press(&mut h, &mut app, Key::Enter);
     assert!(egui::Popup::is_any_open(&h.ctx), "Enter opens the picker");
