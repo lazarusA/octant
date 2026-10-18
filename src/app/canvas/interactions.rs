@@ -26,16 +26,7 @@ pub fn handle_canvas_interactions(
         ui.ctx().request_repaint();
     }
 
-    let (touch, zoom, scroll, shift) = ui.input(|i| {
-        (
-            i.multi_touch(),
-            i.zoom_delta(),
-            i.smooth_scroll_delta.y,
-            i.modifiers.shift,
-        )
-    });
-
-    if let Some(touch) = touch {
+    if let Some(touch) = ui.input(|i| i.multi_touch()) {
         // The first finger also drives the pointer: its drag is part of the
         // gesture, never an orbit or pan of its own.
         let on_canvas = canvas_rect.contains(touch.start_pos)
@@ -52,13 +43,7 @@ pub fn handle_canvas_interactions(
             ui.ctx().request_repaint();
         }
     } else {
-        pointer_interactions(
-            app,
-            controller,
-            response,
-            canvas_rect,
-            (zoom, scroll, shift),
-        );
+        pointer_interactions(app, controller, response, canvas_rect);
     }
 
     if app.nav.view_interacting {
@@ -74,15 +59,16 @@ pub fn handle_canvas_interactions(
     }
 }
 
-/// One pointer's drags, wheel scrolling and trackpad zoom (`input`: zoom
-/// factor, scroll points, Shift held).
+/// One pointer's drags, wheel scrolling and trackpad zoom.
 fn pointer_interactions(
     app: &mut OctantApp,
     controller: &dyn PlotController,
     response: &egui::Response,
     canvas_rect: egui::Rect,
-    (zoom, scroll, shift): (f32, f32, bool),
 ) {
+    let (zoom, scroll, shift) = response
+        .ctx
+        .input(|i| (i.zoom_delta(), i.smooth_scroll_delta.y, i.modifiers.shift));
     let nav = &mut app.nav;
     if response.dragged() {
         nav.view_interacting = true;

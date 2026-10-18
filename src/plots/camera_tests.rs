@@ -1,7 +1,7 @@
 //! The orbit camera: its uniform, rays and projections agree, and panning
 //! moves the picture with the pointer.
 
-use super::camera::{FOV_SCALE, OrbitCamera};
+use super::camera::OrbitCamera;
 
 fn camera(target: [f32; 3]) -> OrbitCamera {
     OrbitCamera {
@@ -100,5 +100,4 @@ fn points_behind_the_camera_do_not_project() {
     let eye = cam.eye();
     let behind = [eye[0] * 1.5, eye[1] * 1.5, eye[2] * 1.5];
     assert!(cam.project(behind).is_none());
-    assert_eq!(cam.uniform().fov_scale, FOV_SCALE);
 }

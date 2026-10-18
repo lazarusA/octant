@@ -32,7 +32,7 @@ impl Default for NavigationState {
             sphere_rotation_y: 0.0,
             sphere_rotation_x: 0.25,
             sphere_auto_rotate: false,
-            sphere_zoom: 2.5,
+            sphere_zoom: camera::DEFAULT_DISTANCE,
             orbit_target: [0.0; 3],
             view_interacting: false,
         }
@@ -53,7 +53,7 @@ impl NavigationState {
     pub fn reset_3d_camera(&mut self) {
         self.sphere_rotation_x = 0.25;
         self.sphere_rotation_y = 0.0;
-        self.sphere_zoom = 2.5;
+        self.sphere_zoom = camera::DEFAULT_DISTANCE;
         self.orbit_target = [0.0; 3];
     }
 

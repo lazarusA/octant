@@ -13,6 +13,8 @@ use bytemuck::{Pod, Zeroable};
 
 /// Perspective scale: clip coordinate per view unit at unit distance.
 pub const FOV_SCALE: f32 = 1.6;
+/// The distance a 3D plot opens and resets to.
+pub const DEFAULT_DISTANCE: f32 = 2.5;
 /// Farthest the camera may move from its target.
 pub const MAX_DISTANCE: f32 = 8.0;
 /// Far plane; the scene stays within a few units of the origin.
@@ -63,7 +65,7 @@ impl Default for OrbitCamera {
         Self {
             rotation_x: 0.25,
             rotation_y: 0.0,
-            distance: 2.5,
+            distance: DEFAULT_DISTANCE,
             target: [0.0; 3],
             aspect: 1.0,
         }

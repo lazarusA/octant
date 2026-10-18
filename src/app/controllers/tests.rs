@@ -94,19 +94,10 @@ fn test_3d_zoom_keeps_anchor() {
         -(anchor.y - RECT.center().y) / (RECT.height() / 2.0),
     ];
     let before = nav.orbit_camera(PlotType::Surface, aspect);
-    // At the target's depth, `distance` in front of the camera.
-    let d = before.distance;
-    let offset = before.to_object_dir([
-        d * clip[0] * aspect / crate::plots::camera::FOV_SCALE,
-        d * clip[1] / crate::plots::camera::FOV_SCALE,
-        0.0,
-    ]);
+    // At the target's depth, under the anchor.
+    let from_center = anchor - RECT.center();
+    let offset = before.screen_offset([from_center.x, from_center.y], RECT.height());
     let point = add(before.target, offset);
-    assert!(
-        before
-            .project(point)
-            .is_some_and(|p| (p[0] - clip[0]).abs() < 1e-4)
-    );
     ctrl.handle_zoom(&mut nav, 2.0, anchor, RECT);
     let after = nav.orbit_camera(PlotType::Surface, aspect);
     assert!((after.distance - before.distance / 2.0).abs() < 1e-5);

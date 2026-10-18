@@ -3,13 +3,13 @@
 use super::traits::PlotController;
 use crate::app::state::NavigationState;
 use crate::plots::PlotType;
-use crate::plots::camera::{FOV_SCALE, MAX_DISTANCE, OrbitCamera, TARGET_LIMIT};
+use crate::plots::camera::{DEFAULT_DISTANCE, MAX_DISTANCE, OrbitCamera, TARGET_LIMIT};
 
 /// Radians turned per screen point dragged, at the default view.
 const TURN_SPEED: f32 = 0.008;
 /// The sphere's default height above its unit globe, where dragging turns
 /// it at `TURN_SPEED`.
-const SPHERE_HEIGHT: f32 = 1.5;
+const SPHERE_HEIGHT: f32 = DEFAULT_DISTANCE - 1.0;
 
 /// Controller for 3D orbiting camera plots (Surface, Sphere, Volume, PointCloud).
 ///
@@ -38,21 +38,19 @@ impl Orbit3DController {
         nav.orbit_camera(self.plot_type, aspect)
     }
 
+    /// The camera's distance, within this plot's limits.
+    fn distance(&self, nav: &NavigationState) -> f32 {
+        nav.sphere_zoom.clamp(self.min_zoom(), MAX_DISTANCE)
+    }
+
     /// Radians turned per screen point: slower as the sphere's camera comes
     /// closer to the globe, so what is under the pointer keeps up with it.
     fn turn_speed(&self, nav: &NavigationState) -> f32 {
         if self.is_sphere() {
-            let height = nav.sphere_zoom.clamp(self.min_zoom(), MAX_DISTANCE) - 1.0;
-            TURN_SPEED * (height / SPHERE_HEIGHT).min(1.0)
+            TURN_SPEED * ((self.distance(nav) - 1.0) / SPHERE_HEIGHT).min(1.0)
         } else {
             TURN_SPEED
         }
-    }
-
-    /// The sphere's zoom: the height above the globe divided by `factor`.
-    fn zoom_sphere(&self, nav: &mut NavigationState, factor: f32) {
-        let height = nav.sphere_zoom.clamp(self.min_zoom(), MAX_DISTANCE) - 1.0;
-        nav.sphere_zoom = (1.0 + height / factor).clamp(self.min_zoom(), MAX_DISTANCE);
     }
 }
 
@@ -98,20 +96,17 @@ impl PlotController for Orbit3DController {
             return;
         }
         if self.is_sphere() {
-            self.zoom_sphere(nav, factor);
+            // The height above the globe, divided by `factor`.
+            let height = (self.distance(nav) - 1.0) / factor;
+            nav.sphere_zoom = (1.0 + height).clamp(self.min_zoom(), MAX_DISTANCE);
             return;
         }
         let camera = self.camera(nav, rect);
         let distance = (camera.distance / factor).clamp(self.min_zoom(), MAX_DISTANCE);
         // The point under `anchor` at the target's depth stays under it: the
         // target moves toward it as the camera closes in.
-        let clip_x = (anchor.x - rect.center().x) / (0.5 * rect.width().max(1.0));
-        let clip_y = -(anchor.y - rect.center().y) / (0.5 * rect.height().max(1.0));
-        let under = camera.to_object_dir([
-            camera.distance * clip_x * camera.aspect / FOV_SCALE,
-            camera.distance * clip_y / FOV_SCALE,
-            0.0,
-        ]);
+        let from_center = anchor - rect.center();
+        let under = camera.screen_offset([from_center.x, from_center.y], rect.height());
         let moved = 1.0 - distance / camera.distance;
         for (t, u) in nav.orbit_target.iter_mut().zip(under) {
             *t = (*t + u * moved).clamp(-TARGET_LIMIT, TARGET_LIMIT);

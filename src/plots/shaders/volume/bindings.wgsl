@@ -90,11 +90,6 @@ const CUBE_INDICES = array<u32, 36>(
     4u, 5u, 1u, 4u, 1u, 0u, // Bottom
 );
 
-// Camera-space vector (x right, y up, z toward the viewer) in object space.
-fn camera_to_object(v: vec3<f32>) -> vec3<f32> {
-    return camera_to_object_dir(uniforms.camera, v);
-}
-
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var out: VertexOutput;
