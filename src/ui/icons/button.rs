@@ -2,12 +2,15 @@
 //!
 //! Unlike [`UiIconExt::icon_button`](super::UiIconExt::icon_button), a
 //! [`ToolbarButton`] has a fixed height and a larger glyph, and can collapse to
-//! an icon-only square whose label moves into the hover tooltip. It has no
-//! background at rest; a frame appears only on hover, press or focus, and a
-//! muted grey fill marks a button whose popup or panel is open.
+//! an icon-only square whose label moves into the hover tooltip (shown too
+//! while it holds keyboard focus, and given to screen readers). It has no
+//! background at rest; a frame appears only on hover or press, the shared
+//! focus ring under keyboard focus, and a muted grey fill marks a button
+//! whose popup or panel is open.
 
 use super::Icon;
 use super::style::{ICON_GAP, IconSize, IconTone};
+use crate::ui::keyboard::focus;
 use egui::{Galley, Rect, Response, Sense, TextStyle, Ui, Widget, WidgetText, pos2, vec2};
 use std::sync::Arc;
 
@@ -28,7 +31,8 @@ pub struct ToolbarButton<'a> {
     hover: Option<&'a str>,
     active: bool,
     owns_popup: bool,
-    toggled: bool,
+    /// `Some` for an on/off switch: whether it is on.
+    switch: Option<bool>,
     icon_size: IconSize,
     sense: Sense,
 }
@@ -42,7 +46,7 @@ impl<'a> ToolbarButton<'a> {
             hover: None,
             active: false,
             owns_popup: false,
-            toggled: false,
+            switch: None,
             icon_size: IconSize::Md,
             sense: Sense::click(),
         }
@@ -76,7 +80,7 @@ impl<'a> ToolbarButton<'a> {
     /// Make this an on/off switch. While on, it shows an `Accent` tinted fill
     /// and icon that stay visible under hover, so the state is always readable.
     pub fn toggled(mut self, on: bool) -> Self {
-        self.toggled = on;
+        self.switch = Some(on);
         self
     }
 
@@ -123,13 +127,12 @@ impl<'a> ToolbarButton<'a> {
     }
 
     /// Background: an on-switch keeps its accent fill (outlined while
-    /// hovered); otherwise the hover / press / focus frame, else the open-state
-    /// fill.
+    /// hovered); otherwise the hover / press frame, else the open-state fill;
+    /// then the keyboard focus ring.
     fn paint_frame(&self, ui: &Ui, rect: Rect, response: &Response) {
         let visuals = ui.style().interact(response);
-        let interacting =
-            response.hovered() || response.is_pointer_button_down_on() || response.has_focus();
-        if self.toggled {
+        let interacting = response.hovered() || response.is_pointer_button_down_on();
+        if self.is_on() {
             let stroke = if interacting {
                 visuals.bg_stroke
             } else {
@@ -158,6 +161,11 @@ impl<'a> ToolbarButton<'a> {
                 ui.visuals().widgets.inactive.weak_bg_fill,
             );
         }
+        focus::paint_ring(ui, response, visuals.corner_radius);
+    }
+
+    fn is_on(&self) -> bool {
+        self.switch == Some(true)
     }
 
     fn is_active(&self, ui: &Ui, response: &Response) -> bool {
@@ -175,7 +183,7 @@ impl Widget for ToolbarButton<'_> {
         if ui.is_rect_visible(rect) {
             self.paint_frame(ui, rect, &response);
 
-            let color = if self.toggled {
+            let color = if self.is_on() {
                 IconTone::Accent.color(ui.visuals())
             } else {
                 ui.style().interact(&response).text_color()
@@ -195,10 +203,23 @@ impl Widget for ToolbarButton<'_> {
             }
         }
 
-        match self.hover {
-            Some(text) => response.on_hover_text(text),
-            None if self.compact => response.on_hover_text(self.label),
-            None => response,
+        let name = if self.label.is_empty() {
+            self.hover.unwrap_or_default()
+        } else {
+            self.label
+        };
+        response.widget_info(|| match self.switch {
+            Some(on) => egui::WidgetInfo::selected(egui::Role::Button, true, on, name),
+            None => egui::WidgetInfo::labeled(egui::Role::Button, true, name),
+        });
+        let Some(tip) = self.hover.or(self.compact.then_some(self.label)) else {
+            return response;
+        };
+        // Keyboard focus shows the tooltip a pointer would, so an icon-only
+        // button still says what it does.
+        if response.has_focus() && !response.hovered() && focus::visible(ui.ctx()) {
+            response.show_tooltip_text(tip);
         }
+        response.on_hover_text(tip)
     }
 }

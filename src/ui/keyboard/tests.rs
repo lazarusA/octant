@@ -102,7 +102,7 @@ fn regions_frame(ui: &mut Ui, jump: Option<bool>) {
     {
         let rect = Rect::from_min_size(pos2(0.0, 40.0 * i as f32), vec2(100.0, 30.0));
         let button = ui.put(rect, egui::Button::new("x"));
-        regions::register(region, &button, rect);
+        regions::register(ui.ctx(), region, button.id, button.layer_id, rect);
     }
     focus::end_frame(ui.ctx());
 }

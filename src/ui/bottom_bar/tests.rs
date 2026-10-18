@@ -103,3 +103,42 @@ fn the_play_button_shows_buffering_progress_while_it_waits() {
         assert_eq!(label, "Buffering 12/45");
     });
 }
+
+#[test]
+fn arrows_walk_the_buttons_up_to_the_timeline() {
+    use crate::ui::keyboard::{self, focus};
+    use crate::ui::test_input::Harness;
+    use egui::{Key, Modifiers, Rect, pos2};
+
+    fn run(app: &mut OctantApp) -> impl FnMut(&mut egui::Ui) + '_ {
+        |ui| {
+            keyboard::dispatch(app, ui.ctx(), true);
+            super::show_bottom_bar(app, ui);
+            focus::end_frame(ui.ctx());
+        }
+    }
+    let mut app = regions_app(&["north", "south", "east"]);
+    let mut h = Harness::new(Rect::from_min_max(pos2(0.0, 0.0), pos2(1400.0, 300.0)));
+    let focused = |h: &Harness| focus::last(&h.ctx).expect("a widget is focused").rect;
+    h.settle(2, &mut run(&mut app));
+    // F6 from nowhere enters the first region drawn: this bar.
+    h.key(Key::F6, Modifiers::NONE, &mut run(&mut app));
+    h.settle(1, &mut run(&mut app));
+    let mut rects = vec![focused(&h)];
+    for _ in 0..8 {
+        h.key(Key::ArrowRight, Modifiers::NONE, &mut run(&mut app));
+        h.settle(1, &mut run(&mut app));
+        rects.push(focused(&h));
+    }
+    assert!(
+        rects.windows(2).take(6).all(|w| w[0].left() < w[1].left()),
+        "{rects:?}"
+    );
+    let slider = rects.last().expect("walked");
+    assert!(slider.width() > 100.0, "stops on the timeline: {slider:?}");
+    assert_eq!(
+        rects[rects.len() - 2],
+        *slider,
+        "whose arrows move it instead"
+    );
+}

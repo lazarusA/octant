@@ -8,6 +8,7 @@ use crate::app::OctantApp;
 use crate::i18n::{CommonKey, PlaybackKey as K, tr};
 use crate::ui::icons::{Icon, ToolbarButton};
 use crate::ui::number_input::LocalizedInput;
+use crate::ui::toolbar::roving::{BarNav, Stop};
 use crate::ui::toolbar::{BarItem, ItemWidths, SEPARATOR_WIDTH};
 use crate::utils::stack_str;
 
@@ -112,13 +113,15 @@ pub(super) fn item_widths(item: Item, app: &OctantApp, tl: &Timeline, ui: &egui:
     }
 }
 
-/// Draw `item` in full or compact mode and run its action when clicked.
+/// Draw `item` in full or compact mode and run its action when clicked; a
+/// button joins `nav`.
 pub(super) fn show_item(
     item: Item,
     compact: bool,
     app: &mut OctantApp,
     tl: &Timeline,
     ui: &mut egui::Ui,
+    nav: &mut BarNav,
 ) {
     if compact && item.hides_when_compact() {
         return;
@@ -134,6 +137,11 @@ pub(super) fn show_item(
         match button(item, app, label, compact) {
             Some(btn) => {
                 let response = ui.add(btn);
+                let stop = match item {
+                    Item::Fps => Stop::menu(&response),
+                    _ => Stop::Button,
+                };
+                nav.push(&response, stop);
                 on_click(item, &response, app, tl);
             }
             None => labels::show(item, compact, tl, app, ui),

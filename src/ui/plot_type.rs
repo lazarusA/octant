@@ -17,7 +17,12 @@ pub fn plot_type_icon(plot_type: PlotType) -> Icon {
     }
 }
 
-pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
+/// The plot type button and its popup; the button's response.
+pub fn show_plot_type_menu(
+    app: &mut OctantApp,
+    ui: &mut egui::Ui,
+    compact: bool,
+) -> egui::Response {
     let current_icon = plot_type_icon(app.selected.plot_type);
     let current_label = app.selected.plot_type.display_name();
     let button_response = ui.add(
@@ -30,6 +35,7 @@ pub fn show_plot_type_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool
         .show(|ui| {
             render_plot_type_contents(app, ui);
         });
+    button_response
 }
 
 fn render_plot_type_contents(app: &mut OctantApp, ui: &mut egui::Ui) {

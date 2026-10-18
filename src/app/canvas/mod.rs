@@ -59,7 +59,13 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
     }
 
     let response = ui.interact(canvas_rect, canvas_id(), egui::Sense::drag());
-    regions::register(regions::Region::Canvas, &response, canvas_rect);
+    regions::register(
+        &ctx,
+        regions::Region::Canvas,
+        response.id,
+        response.layer_id,
+        canvas_rect,
+    );
 
     let canvas_bg = ui.style().visuals.panel_fill;
     ui.painter().rect_filled(canvas_rect, 0.0, canvas_bg);

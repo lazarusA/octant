@@ -4,6 +4,7 @@ use super::layout::TopBarItem;
 use crate::app::OctantApp;
 use crate::i18n::{CommonKey, tr};
 use crate::ui::icons::{Icon, TOOLBAR_ITEM_HEIGHT, ToolbarButton};
+use crate::ui::toolbar::roving::{BarNav, Stop};
 use crate::ui::toolbar::{ItemWidths, SEPARATOR_WIDTH};
 use crate::ui::{cache, plot_type};
 
@@ -78,7 +79,7 @@ pub(super) fn item_widths(item: TopBarItem, app: &OctantApp, ui: &egui::Ui) -> I
 
 /// Octant logo (toggles the hero view) and, unless compact, the brand label
 /// (opens About). Right-clicking the logo also opens About.
-fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
+fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool, nav: &mut BarNav) {
     let icon_resp =
         crate::ui::hero::draw_octant_widget(ui, TOOLBAR_ITEM_HEIGHT, [-1.0, -1.0, -1.0], 0.0, 1.0)
             .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -89,6 +90,7 @@ fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
     if icon_resp.secondary_clicked() {
         app.layout.show_about_window = !app.layout.show_about_window;
     }
+    nav.push(&icon_resp, Stop::Button);
 
     if !compact {
         let label_resp = ui
@@ -98,48 +100,67 @@ fn show_brand(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
         if label_resp.clicked() {
             app.layout.show_about_window = !app.layout.show_about_window;
         }
+        nav.push(&label_resp, Stop::Button);
     }
     ui.separator();
 }
 
-/// Draw a button-like item in full or icon-only mode.
-pub(super) fn show_item(item: TopBarItem, compact: bool, app: &mut OctantApp, ui: &mut egui::Ui) {
-    match item {
-        TopBarItem::Brand => show_brand(app, ui, compact),
+/// Draw a button-like item in full or icon-only mode, adding its focusable
+/// widgets to `nav`.
+pub(super) fn show_item(
+    item: TopBarItem,
+    compact: bool,
+    app: &mut OctantApp,
+    ui: &mut egui::Ui,
+    nav: &mut BarNav,
+) {
+    let (response, stop) = match item {
+        TopBarItem::Brand => return show_brand(app, ui, compact, nav),
         // Drawn by `show_contents`, which owns the fetch progress snapshot.
-        TopBarItem::Status => {}
+        TopBarItem::Status => return,
         TopBarItem::Dataset => {
-            if ui.add(button(Icon::Dataset, item, app, compact)).clicked() {
+            let response = ui.add(button(Icon::Dataset, item, app, compact));
+            if response.clicked() {
                 app.layout.show_dataset_panel = !app.layout.show_dataset_panel;
             }
+            (response, Stop::Button)
         }
         TopBarItem::Variables => {
-            if ui
-                .add(button(Icon::Variables, item, app, compact))
-                .clicked()
-            {
+            let response = ui.add(button(Icon::Variables, item, app, compact));
+            if response.clicked() {
                 app.layout.show_variables_overlay = !app.layout.show_variables_overlay;
                 revert_if_panels_closed(app);
             }
+            (response, Stop::Button)
         }
         TopBarItem::Dimensions => {
             let btn = button(Icon::Dimensions, item, app, compact)
                 .hover(tr(CommonKey::ToggleVariableControlsHover));
-            if ui.add(btn).clicked() {
+            let response = ui.add(btn);
+            if response.clicked() {
                 app.layout.show_variable_controls = !app.layout.show_variable_controls;
                 revert_if_panels_closed(app);
             }
+            (response, Stop::Button)
         }
-        TopBarItem::PlotType => plot_type::show_plot_type_menu(app, ui, compact),
+        TopBarItem::PlotType => menu(plot_type::show_plot_type_menu(app, ui, compact)),
         TopBarItem::Settings => {
-            if ui.add(button(Icon::Settings, item, app, compact)).clicked() {
+            let response = ui.add(button(Icon::Settings, item, app, compact));
+            if response.clicked() {
                 app.layout.show_settings_panel = !app.layout.show_settings_panel;
             }
+            (response, Stop::Button)
         }
-        TopBarItem::Cache => cache::show_cache_menu(app, ui, compact),
-        TopBarItem::Language => crate::ui::language_picker::show_language_menu(ui, compact),
-        TopBarItem::Theme => show_theme_toggle(app, ui, compact),
-    }
+        TopBarItem::Cache => menu(cache::show_cache_menu(app, ui, compact)),
+        TopBarItem::Language => menu(crate::ui::language_picker::show_language_menu(ui, compact)),
+        TopBarItem::Theme => (show_theme_toggle(app, ui, compact), Stop::Button),
+    };
+    nav.push(&response, stop);
+}
+
+fn menu(response: egui::Response) -> (egui::Response, Stop) {
+    let stop = Stop::menu(&response);
+    (response, stop)
 }
 
 fn button(icon: Icon, item: TopBarItem, app: &OctantApp, compact: bool) -> ToolbarButton<'static> {
@@ -165,7 +186,7 @@ fn revert_if_panels_closed(app: &mut OctantApp) {
     }
 }
 
-fn show_theme_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
+fn show_theme_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) -> egui::Response {
     let dark = is_dark(app);
     let (icon, text) = theme_icon_label(app);
     let hover = if dark {
@@ -174,7 +195,8 @@ fn show_theme_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
         tr(CommonKey::SwitchToDarkHover)
     };
     let btn = ToolbarButton::new(icon, text).compact(compact).hover(hover);
-    if ui.add(btn).clicked() {
+    let response = ui.add(btn);
+    if response.clicked() {
         app.layout.theme_preference = if dark {
             egui::ThemePreference::Light
         } else {
@@ -182,4 +204,5 @@ fn show_theme_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
         };
         ui.ctx().set_theme(app.layout.theme_preference);
     }
+    response
 }

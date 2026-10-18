@@ -5,7 +5,7 @@
 //! jump reads what the last frame registered.
 
 use super::focus;
-use egui::{Context, Id, LayerId, Rect, Response};
+use egui::{Context, Id, LayerId, Rect};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Region {
@@ -56,14 +56,14 @@ pub fn begin_frame(ctx: &Context) {
     });
 }
 
-/// Records that `region` drew over `area` of `entry`'s layer this frame;
-/// its first registered `entry` is where focus enters it.
-pub fn register(region: Region, entry: &Response, area: Rect) {
-    entry.ctx.data_mut(|d| {
+/// Records that `region` drew over `area` of `layer` this frame; its first
+/// registered `entry` is where focus enters it.
+pub fn register(ctx: &Context, region: Region, entry: Id, layer: LayerId, area: Rect) {
+    ctx.data_mut(|d| {
         let slot = &mut d.get_temp_mut_or_default::<Regions>(regions_id()).drawing[region as usize];
-        slot.entry.get_or_insert(entry.id);
+        slot.entry.get_or_insert(entry);
         if let Some(free) = slot.parts.iter_mut().find(|p| p.is_none()) {
-            *free = Some((entry.layer_id, area));
+            *free = Some((layer, area));
         }
     });
 }

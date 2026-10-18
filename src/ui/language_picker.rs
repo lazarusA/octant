@@ -4,7 +4,8 @@ use crate::i18n::{CommonKey, Language, tr};
 use crate::ui::icons::{Icon, IconSize, ToolbarButton, UiIconExt};
 use crate::utils::stack_str;
 
-pub fn show_language_menu(ui: &mut egui::Ui, compact: bool) {
+/// The language button and its menu; the button's response.
+pub fn show_language_menu(ui: &mut egui::Ui, compact: bool) -> egui::Response {
     let current_lang = crate::i18n::language();
     let button_response = ui.add(
         ToolbarButton::new(Icon::Language, current_lang.code())
@@ -34,4 +35,5 @@ pub fn show_language_menu(ui: &mut egui::Ui, compact: bool) {
             }
         }
     });
+    button_response
 }

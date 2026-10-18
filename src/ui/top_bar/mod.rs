@@ -8,7 +8,9 @@ mod tests;
 
 use super::status::{self, FetchProgress};
 use crate::app::OctantApp;
+use crate::ui::keyboard::regions::Region;
 use crate::ui::toolbar::ItemWidths;
+use crate::ui::toolbar::roving::{BarNav, Stop};
 use layout::{ITEM_COUNT, LEFT_ITEMS, TopBarItem};
 
 /// Minimum empty space kept between the left and right item groups.
@@ -48,28 +50,29 @@ fn show_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
     let compact = layout::compute_compact(&widths, ui.available_width() - GROUP_GAP);
 
-    items::show_item(TopBarItem::Brand, compact.get(TopBarItem::Brand), app, ui);
+    let mut nav = BarNav::default();
+    let show = |item, app: &mut OctantApp, ui: &mut egui::Ui, nav: &mut BarNav| {
+        items::show_item(item, compact.get(item), app, ui, nav);
+    };
+    show(TopBarItem::Brand, app, ui, &mut nav);
     for item in LEFT_ITEMS {
-        items::show_item(item, compact.get(item), app, ui);
+        show(item, app, ui, &mut nav);
     }
 
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        items::show_item(TopBarItem::Theme, compact.get(TopBarItem::Theme), app, ui);
+        show(TopBarItem::Theme, app, ui, &mut nav);
         ui.separator();
-        items::show_item(
-            TopBarItem::Language,
-            compact.get(TopBarItem::Language),
-            app,
-            ui,
-        );
+        show(TopBarItem::Language, app, ui, &mut nav);
         ui.separator();
-        items::show_item(TopBarItem::Cache, compact.get(TopBarItem::Cache), app, ui);
+        show(TopBarItem::Cache, app, ui, &mut nav);
 
         if let Some(progress) = progress {
             ui.separator();
-            status::show_status_bar(app, ui, progress, compact.get(TopBarItem::Status));
+            let abort = status::show_status_bar(app, ui, progress, compact.get(TopBarItem::Status));
+            nav.push(&abort, Stop::Button);
         }
     });
+    nav.finish(ui, Region::TopBar);
 }
 
 fn status_widths(ui: &egui::Ui, progress: Option<FetchProgress>, spacing: f32) -> ItemWidths {
