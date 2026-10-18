@@ -18,6 +18,23 @@ pub enum Action {
     NextRegion,
     PreviousRegion,
     FocusTopBar,
+    /// Run by the canvas as it draws, knowing the plot's geometry.
+    Canvas(CanvasAction),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CanvasAction {
+    /// Pans a 2D plot or orbits a 3D one; moves the probe or the crop box.
+    Move,
+    /// Pans further (2D) or pans (3D); moves the probe further or resizes
+    /// the crop box.
+    MoveAlt,
+    ZoomIn,
+    ZoomOut,
+    ResetView,
+    ToggleProbe,
+    /// Stops the probe, else lets the canvas go.
+    LeaveProbe,
 }
 
 /// Where a shortcut works.
@@ -105,6 +122,28 @@ pub const TABLE: &[Shortcut] = &[
     global(Action::PreviousRegion, Key::F6, Modifiers::SHIFT),
     global(Action::FocusTopBar, Key::F10, Modifiers::NONE),
     canvas(Action::ToggleCrop, Keys::One(Key::C)),
+    canvas(Action::Canvas(CanvasAction::Move), Keys::Arrows),
+    Shortcut {
+        mods: Modifiers::SHIFT,
+        ..canvas(Action::Canvas(CanvasAction::MoveAlt), Keys::Arrows)
+    },
+    canvas(
+        Action::Canvas(CanvasAction::ZoomIn),
+        Keys::Either(Key::Plus, Key::Equals),
+    ),
+    canvas(Action::Canvas(CanvasAction::ZoomOut), Keys::One(Key::Minus)),
+    canvas(
+        Action::Canvas(CanvasAction::ResetView),
+        Keys::One(Key::Num0),
+    ),
+    canvas(
+        Action::Canvas(CanvasAction::ToggleProbe),
+        Keys::One(Key::Enter),
+    ),
+    canvas(
+        Action::Canvas(CanvasAction::LeaveProbe),
+        Keys::One(Key::Escape),
+    ),
 ];
 
 /// An arrow key's direction on screen (y down).
@@ -167,4 +206,12 @@ pub fn take(ctx: &Context, shortcut: &Shortcut) -> Option<Vec2> {
         i.events.remove(at);
         Some(direction)
     })
+}
+
+/// Takes the first press of any shortcut for `action` whose scope `allows`.
+pub fn take_action(ctx: &Context, action: Action, allows: impl Fn(Scope) -> bool) -> Option<Vec2> {
+    TABLE
+        .iter()
+        .filter(|s| s.action == action && allows(s.scope))
+        .find_map(|s| take(ctx, s))
 }

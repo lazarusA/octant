@@ -63,7 +63,9 @@ pub fn dispatch(app: &mut OctantApp, ctx: &Context, plot_shown: bool) {
     focus::begin_frame(ctx);
     regions::begin_frame(ctx);
     let gate = Gate::new(app, ctx, plot_shown);
-    for shortcut in TABLE.iter().filter(|s| gate.allows(s.scope)) {
+    let here =
+        |s: &&keymap::Shortcut| gate.allows(s.scope) && !matches!(s.action, Action::Canvas(_));
+    for shortcut in TABLE.iter().filter(here) {
         if keymap::take(ctx, shortcut).is_some() {
             run(app, ctx, gate, shortcut.action);
         }
@@ -90,5 +92,7 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
         Action::NextRegion => regions::cycle(ctx, true),
         Action::PreviousRegion => regions::cycle(ctx, false),
         Action::FocusTopBar => regions::enter(ctx, regions::Region::TopBar),
+        // Left for the canvas (`app::canvas::keys`), never taken here.
+        Action::Canvas(_) => {}
     }
 }

@@ -4,6 +4,9 @@ mod axes;
 mod interactions;
 #[cfg(test)]
 mod interactions_tests;
+mod keys;
+#[cfg(test)]
+mod keys_tests;
 mod overlays;
 mod viewport;
 
@@ -74,6 +77,7 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
 
     // Handle Zoom, Pan, Orbit, and Reset interactions
     handle_canvas_interactions(app, ui, &response, canvas_rect, canvas_plot_type);
+    keys::handle_canvas_keys(app, ui, &response, canvas_rect, canvas_plot_type);
 
     // Compute screen-space transformed plot rect and GPU pan/zoom uniforms
     let uniforms = compute_viewport_uniforms(app, canvas_rect, canvas_plot_type);

@@ -1,6 +1,7 @@
 //! Interactive Region of Interest (ROI) crop overlay and guide lines.
 
 pub mod handles;
+pub mod keys;
 pub mod toolbar;
 
 pub use toolbar::CropOverlayAction;
