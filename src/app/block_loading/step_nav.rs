@@ -25,6 +25,17 @@ impl OctantApp {
         }
     }
 
+    /// Requests the first step along the animated dimension.
+    pub fn step_first(&mut self) {
+        self.request_step_or_load(0);
+    }
+
+    /// Requests the last step along the animated dimension.
+    pub fn step_last(&mut self) {
+        let last = self.animated_dim_extent().saturating_sub(1);
+        self.request_step_or_load(last);
+    }
+
     /// One playback step, called by the frame timer: moves to the next step
     /// when its block is resident, and keeps the lookahead chunks queued.
     /// While another variable is only selected, or a new plot's block is still

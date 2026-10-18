@@ -13,6 +13,7 @@ pub struct Gate {
     /// The panel Escape closes.
     panel: Option<Panel>,
     canvas: bool,
+    playback: bool,
 }
 
 impl Gate {
@@ -33,9 +34,11 @@ impl Gate {
         let free = focused.is_none_or(|id| id == crate::app::canvas::canvas_id())
             && no_popup
             && !modal_open(app);
+        let canvas = free && plot_shown;
         Self {
             panel,
-            canvas: free && plot_shown,
+            canvas,
+            playback: canvas && app.has_animated_dimension(),
         }
     }
 
@@ -44,6 +47,7 @@ impl Gate {
             Scope::Global => true,
             Scope::Panel => self.panel.is_some(),
             Scope::Canvas => self.canvas,
+            Scope::Playback => self.playback,
         }
     }
 }
@@ -87,6 +91,12 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
                 app.set_panel_open(ctx, panel, false);
             }
         }
+        Action::PlayPause => app.toggle_playback(),
+        Action::StepPrev => app.step_prev(),
+        Action::StepNext => app.step_next(),
+        Action::FirstStep => app.step_first(),
+        Action::LastStep => app.step_last(),
+        Action::ToggleLoop => app.playback.loop_playback = !app.playback.loop_playback,
         // Regions hold focus outside modal windows only.
         Action::NextRegion | Action::PreviousRegion | Action::FocusTopBar if modal_open(app) => {}
         Action::NextRegion => regions::cycle(ctx, true),

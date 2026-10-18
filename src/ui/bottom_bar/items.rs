@@ -142,14 +142,14 @@ pub(super) fn show_item(
                     _ => Stop::Button,
                 };
                 nav.push(&response, stop);
-                on_click(item, &response, app, tl);
+                on_click(item, &response, app);
             }
             None => labels::show(item, compact, tl, app, ui),
         }
     });
 }
 
-fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Timeline) {
+fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp) {
     if item == Item::Fps {
         egui::Popup::from_toggle_button_response(response)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
@@ -174,10 +174,10 @@ fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Tim
         return;
     }
     match item {
-        Item::First => app.request_step_or_load(0),
+        Item::First => app.step_first(),
         Item::Prev => app.step_prev(),
         Item::Next => app.step_next(),
-        Item::Last => app.request_step_or_load(tl.last_step),
+        Item::Last => app.step_last(),
         Item::PlayPause => app.toggle_playback(),
         Item::Loop => app.playback.loop_playback = !app.playback.loop_playback,
         Item::Crop => app.show_crop_overlay = !app.show_crop_overlay,

@@ -18,6 +18,12 @@ pub enum Action {
     NextRegion,
     PreviousRegion,
     FocusTopBar,
+    PlayPause,
+    StepPrev,
+    StepNext,
+    FirstStep,
+    LastStep,
+    ToggleLoop,
     /// Run by the canvas as it draws, knowing the plot's geometry.
     Canvas(CanvasAction),
 }
@@ -48,6 +54,8 @@ pub enum Scope {
     /// Single keys on a shown plot: only while nothing or the canvas holds
     /// focus and no popup or modal window is open.
     Canvas,
+    /// Canvas keys of a plot with an animated dimension.
+    Playback,
 }
 
 /// The keys a shortcut answers to.
@@ -83,6 +91,15 @@ const fn canvas(action: Action, keys: Keys) -> Shortcut {
         keys,
         mods: Modifiers::NONE,
         scope: Scope::Canvas,
+    }
+}
+
+const fn playback(action: Action, key: Key) -> Shortcut {
+    Shortcut {
+        action,
+        keys: Keys::One(key),
+        mods: Modifiers::NONE,
+        scope: Scope::Playback,
     }
 }
 
@@ -144,6 +161,12 @@ pub const TABLE: &[Shortcut] = &[
         Action::Canvas(CanvasAction::LeaveProbe),
         Keys::One(Key::Escape),
     ),
+    playback(Action::PlayPause, Key::Space),
+    playback(Action::StepPrev, Key::Comma),
+    playback(Action::StepNext, Key::Period),
+    playback(Action::FirstStep, Key::Home),
+    playback(Action::LastStep, Key::End),
+    playback(Action::ToggleLoop, Key::L),
 ];
 
 /// An arrow key's direction on screen (y down).

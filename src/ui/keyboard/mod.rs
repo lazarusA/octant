@@ -8,6 +8,8 @@ pub mod focus;
 pub mod keymap;
 #[cfg(test)]
 mod panel_tests;
+#[cfg(test)]
+mod playback_tests;
 pub mod regions;
 #[cfg(test)]
 mod tests;
