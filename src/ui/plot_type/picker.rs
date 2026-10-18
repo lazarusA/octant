@@ -1,9 +1,9 @@
 //! The plot type picker, opened by `P`: a semi-transparent strip in the
-//! middle of the screen, the plot types as icon tiles in a row under the
-//! name of the one hovered (else focused, else current). A number key picks
-//! the type of its tile, the arrows move between the pickable tiles and
-//! Enter picks the focused one; a type that cannot be picked shows why under
-//! its name. Picking closes it, as do Escape and a click outside.
+//! middle of the screen, the plot types as icon tiles in a row, each named
+//! (with why it cannot be picked, when it cannot) by its tooltip on hover
+//! and under keyboard focus. A number key picks the type of its tile, the
+//! arrows move between the pickable tiles and Enter picks the focused one.
+//! Picking closes it, as do Escape and a click outside.
 
 use super::options::{PlotOption, blocked_text, plot_options};
 use super::plot_type_icon;
@@ -12,9 +12,7 @@ use crate::plots::PlotType;
 use crate::ui::icons::IconSize;
 use crate::ui::keyboard::{focus, windows};
 use crate::utils::stack_str;
-use egui::text::{LayoutJob, TextWrapping};
-use egui::{Align2, Color32, FontId, Galley, Id, Key, Rect, Response, Sense, TextStyle, Ui, vec2};
-use std::sync::Arc;
+use egui::{Align2, Id, Key, Rect, Response, Sense, TextStyle, Ui, vec2};
 
 /// Side of a tile.
 const TILE: f32 = 52.0;
@@ -90,58 +88,39 @@ fn digit_pick(ctx: &egui::Context, options: &[PlotOption; 6]) -> Option<PlotType
         .map(|o| o.plot_type)
 }
 
-/// The name of the type shown above its row of tiles; the type a tile's
-/// click (or Enter) picked.
+/// The row of tiles, focus starting on the `current` type once the picker
+/// `opened`; the type a tile's click (or Enter) picked.
 fn contents(
     ui: &mut Ui,
     options: &[PlotOption; 6],
     current: PlotType,
     opened: bool,
 ) -> Option<PlotType> {
-    let body = TextStyle::Body.resolve(ui.style());
-    let small = TextStyle::Small.resolve(ui.style());
-    let label_h = ui.fonts_mut(|f| f.row_height(&body) + f.row_height(&small));
-    let (_, label) = ui.allocate_space(vec2(WIDTH, label_h));
-    let current_index = options.iter().position(|o| o.plot_type == current);
-    let start = current_index
-        .filter(|&i| options[i].blocked.is_none())
+    let start = options
+        .iter()
+        .position(|o| o.plot_type == current && o.blocked.is_none())
         .or_else(|| options.iter().position(|o| o.blocked.is_none()));
     if let Some(index) = start.filter(|_| opened) {
         focus::request(ui.ctx(), tile_id(index));
     }
-    let row = tiles(ui, options, current);
-    if let Some(shown) = row.hovered.or(row.focused).or(current_index) {
-        paint_label(ui, label, options[shown], (body, small));
-    }
-    row.picked
+    tiles(ui, options, current)
 }
 
-/// What the row of tiles reported this frame.
-struct Row {
-    hovered: Option<usize>,
-    focused: Option<usize>,
-    picked: Option<PlotType>,
-}
-
-/// The tiles, and the arrows moving focus between the pickable ones.
-fn tiles(ui: &mut Ui, options: &[PlotOption; 6], current: PlotType) -> Row {
-    let mut row = Row {
-        hovered: None,
-        focused: None,
-        picked: None,
-    };
+/// The tiles, and the arrows moving focus between the pickable ones; the
+/// type a tile's click (or Enter) picked.
+fn tiles(ui: &mut Ui, options: &[PlotOption; 6], current: PlotType) -> Option<PlotType> {
+    let (mut focused, mut picked) = (None, None);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = GAP;
         for (index, option) in options.iter().enumerate() {
             let response = tile(ui, index, *option, option.plot_type == current);
-            row.hovered = row.hovered.or(response.hovered().then_some(index));
-            row.focused = row.focused.or(response.has_focus().then_some(index));
+            focused = focused.or(response.has_focus().then_some(index));
             if response.clicked() {
-                row.picked = Some(option.plot_type);
+                picked = Some(option.plot_type);
             }
         }
     });
-    if let Some(at) = row.focused {
+    if let Some(at) = focused {
         focus::claim_arrows(ui.ctx(), tile_id(at));
         let step = focus::pressed_arrow(ui.ctx()).map(|d| d.x + d.y);
         let pickable = |&i: &usize| options[i].blocked.is_none();
@@ -154,11 +133,13 @@ fn tiles(ui: &mut Ui, options: &[PlotOption; 6], current: PlotType) -> Row {
             focus::request(ui.ctx(), tile_id(next));
         }
     }
-    row
+    picked
 }
 
 /// Tile `index`: its type's icon and number key, `selected` for the current
-/// type; only pickable types take clicks and focus.
+/// type, its name (and why it cannot be picked) as its tooltip, shown on
+/// hover and under keyboard focus; only pickable types take clicks and
+/// focus.
 fn tile(ui: &mut Ui, index: usize, option: PlotOption, selected: bool) -> Response {
     let (_, rect) = ui.allocate_space(vec2(TILE, TILE));
     let pickable = option.blocked.is_none();
@@ -191,36 +172,22 @@ fn tile(ui: &mut Ui, index: usize, option: PlotOption, selected: bool) -> Respon
     ui.painter()
         .text(corner, Align2::RIGHT_BOTTOM, digit, small, weak);
     focus::paint_ring(ui, &response, radius);
-    response
+    let tip = |ui: &mut Ui| tooltip(ui, option);
+    if focus::shows_tooltip(&response) {
+        response.show_tooltip_ui(tip);
+    }
+    response.on_hover_ui(tip)
 }
 
-/// `option`'s name centered at the top of `rect`, and why it cannot be
-/// picked beneath it when it cannot.
-fn paint_label(ui: &Ui, rect: Rect, option: PlotOption, (body, small): (FontId, FontId)) {
-    let visuals = ui.visuals();
-    let painter = ui.painter();
-    let centered =
-        |galley: &Arc<Galley>, y: f32| egui::pos2(rect.center().x - galley.size().x / 2.0, y);
-    let name = line(ui, option.plot_type.display_name(), body, rect.width());
-    let Some(blocked) = option.blocked else {
-        painter.galley(
-            centered(&name, rect.top()),
-            name,
-            visuals.strong_text_color(),
+/// A tile's tooltip: the type's name, and why it cannot be picked.
+fn tooltip(ui: &mut Ui, option: PlotOption) {
+    ui.label(egui::RichText::new(option.plot_type.display_name()).strong());
+    if let Some(blocked) = option.blocked {
+        let mut buf = [0; 256];
+        ui.label(
+            egui::RichText::new(blocked_text(&mut buf, blocked))
+                .small()
+                .weak(),
         );
-        return;
-    };
-    let mut buf = [0; 256];
-    let reason = line(ui, blocked_text(&mut buf, blocked), small, rect.width());
-    let weak = visuals.weak_text_color();
-    let below = rect.top() + name.size().y;
-    painter.galley(centered(&name, rect.top()), name, weak);
-    painter.galley(centered(&reason, below), reason, weak);
-}
-
-/// `text` on one line in `font`, cut with an ellipsis past `width`.
-fn line(ui: &Ui, text: &str, font: FontId, width: f32) -> Arc<Galley> {
-    let mut job = LayoutJob::simple_singleline(text.to_owned(), font, Color32::PLACEHOLDER);
-    job.wrap = TextWrapping::truncate_at_width(width);
-    ui.painter().layout_job(job)
+    }
 }
