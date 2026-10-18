@@ -232,3 +232,29 @@ fn hovering_the_bar_outlines_it() {
     let over = h.pointer(bar.center(), None, &mut run(&mut app));
     assert!(outlined(&over));
 }
+
+#[test]
+fn keyboard_focus_on_the_bar_reveals_the_controls_and_picks_a_colormap() {
+    use crate::ui::keyboard::focus;
+    use egui::{Key, Modifiers};
+
+    let mut app = OctantApp::default();
+    let mut h = harness(&mut app);
+    h.pointer(pos2(5.0, 5.0), None, &mut run(&mut app));
+    focus::request(&h.ctx, super::bar_id(LayerId::BASE));
+    let shapes = h.settle(2, &mut run(&mut app));
+    assert!(circles(&shapes) >= 6, "focus in the panel shows the grip");
+
+    let press = |h: &mut Harness, app: &mut OctantApp, key| {
+        h.key(key, Modifiers::NONE, &mut run(app));
+        h.settle(2, &mut run(app));
+    };
+    press(&mut h, &mut app, Key::Enter);
+    assert!(egui::Popup::is_any_open(&h.ctx), "Enter opens the picker");
+    // The search field has focus: Down enters the list, Down moves on.
+    press(&mut h, &mut app, Key::ArrowDown);
+    press(&mut h, &mut app, Key::ArrowDown);
+    let picked = app.colormaps.picker.focused_row.expect("a row is focused");
+    press(&mut h, &mut app, Key::Enter);
+    assert_eq!(app.layers.base.color.colormap, picked);
+}

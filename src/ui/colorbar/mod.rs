@@ -59,6 +59,12 @@ pub fn can_show(app: &OctantApp, id: LayerId) -> bool {
         .is_some_and(|l| !l.composite.enabled && l.labels().is_none() && !custom_line)
 }
 
+/// The bar of layer `id`'s colorbar: a click opens its colormap picker, and
+/// keyboard focus enters the colorbar there.
+fn bar_id(id: LayerId) -> egui::Id {
+    egui::Id::unique(salt("colorbar_bar", id))
+}
+
 /// Egui id salt of layer `id`'s colorbar widgets.
 fn salt(what: &'static str, id: LayerId) -> (&'static str, LayerId) {
     (what, id)

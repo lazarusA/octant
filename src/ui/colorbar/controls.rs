@@ -1,8 +1,9 @@
 //! A colorbar panel's controls: the cog opening its Color window in the
 //! top-left corner, the drag grip and orientation flip in the top-right one;
 //! shown while the pointer is over the panel (or the grip is held, the
-//! Color window is open, or a touch on the panel revealed them), and never
-//! during export.
+//! Color window is open, keyboard focus is in the panel, or a touch on the
+//! panel revealed them), and never during export. The panel registers as
+//! part of the keyboard's colorbars region, entered at its bar.
 
 use super::color_menu;
 use crate::app::OctantApp;
@@ -10,6 +11,7 @@ use crate::app::layers::LayerId;
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::drag_grip;
 use crate::ui::icons::{Icon, IconSize, ToolbarButton};
+use crate::ui::keyboard::{focus, regions};
 use egui::{Align2, Rect, Vec2};
 
 /// Glyph size of the controls.
@@ -59,7 +61,16 @@ pub fn show(
     let dragging_key = egui::Id::unique(super::salt("colorbar_dragging", id));
     let dragging = ui.data(|d| d.get_temp::<bool>(dragging_key).unwrap_or(false));
     let color_open = color_menu::is_open(ui.ctx(), id);
-    let shown = dragging || color_open || touch_revealed(ui, id, panel);
+    let (ctx, layer) = (ui.ctx(), ui.layer_id());
+    regions::register(
+        ctx,
+        regions::Region::Colorbars,
+        super::bar_id(id),
+        layer,
+        panel,
+    );
+    let focused = focus::in_layer(ctx, layer);
+    let shown = dragging || color_open || focused || touch_revealed(ui, id, panel);
     if app.pending_export.is_some() || !(shown || ui.rect_contains_pointer(panel)) {
         return;
     }

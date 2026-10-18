@@ -3,6 +3,7 @@ use crate::app::{OctantApp, StoreKind};
 use crate::catalog::get_catalog_entries;
 use crate::i18n::{DatasetKey, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
+use crate::ui::keyboard::list_nav::ListNav;
 
 pub fn render_entries_list(
     app: &mut OctantApp,
@@ -44,17 +45,21 @@ pub fn render_entries_list(
 
     let mut to_load: Option<(&str, StoreKind)> = None;
 
+    let mut nav = ListNav::new(ui.ctx());
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
         .show(ui, |ui| {
             for entry in entries.iter().copied().filter(is_match) {
                 let trimmed_url = entry.store.trim();
-                if render_entry_card(ui, entry, trimmed_url, is_mobile) {
+                let load = render_entry_card(ui, entry, trimmed_url, is_mobile);
+                nav.item(&load);
+                if load.clicked() {
                     to_load = Some((trimmed_url, entry.store_kind));
                 }
                 ui.add_space(6.0);
             }
         });
+    nav.finish(ui.ctx());
 
     if let Some((url, kind)) = to_load {
         app.submit_or_activate_source(url, Some(kind));

@@ -17,11 +17,12 @@ pub enum Region {
     Settings,
     Dimensions,
     Canvas,
+    Colorbars,
     BottomBar,
 }
 
 /// Regions, in the order the variants are declared: visual order.
-const COUNT: usize = 7;
+const COUNT: usize = 8;
 
 impl Region {
     pub fn of(panel: Panel) -> Self {

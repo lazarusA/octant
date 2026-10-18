@@ -6,6 +6,7 @@
 pub mod dispatch;
 pub mod focus;
 pub mod keymap;
+pub mod list_nav;
 #[cfg(test)]
 mod panel_tests;
 #[cfg(test)]

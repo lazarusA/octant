@@ -125,3 +125,28 @@ fn f6_cycles_regions_in_visual_order() {
     let last = focus::last(&h.ctx).expect("a region is focused");
     assert_eq!(last.rect.top(), 80.0, "Shift+F6 goes back");
 }
+
+#[test]
+fn up_and_down_move_between_list_items() {
+    use super::list_nav::ListNav;
+    let mut h = harness();
+    let mut run = |ui: &mut Ui| {
+        let mut nav = ListNav::new(ui.ctx());
+        for i in 0..3 {
+            let rect = Rect::from_min_size(pos2(0.0, 30.0 * i as f32), vec2(80.0, 20.0));
+            nav.item(&ui.put(rect, egui::Button::new("item")));
+        }
+        nav.finish(ui.ctx());
+        focus::end_frame(ui.ctx());
+    };
+    let mut top_after = |key| {
+        h.key(key, Modifiers::NONE, &mut run);
+        h.settle(1, &mut run);
+        focus::last(&h.ctx).expect("an item is focused").rect.top()
+    };
+    assert_eq!(top_after(Key::Tab), 0.0);
+    assert_eq!(top_after(Key::ArrowDown), 30.0);
+    assert_eq!(top_after(Key::ArrowDown), 60.0);
+    assert_eq!(top_after(Key::ArrowDown), 60.0, "stays on the last item");
+    assert_eq!(top_after(Key::ArrowUp), 30.0);
+}

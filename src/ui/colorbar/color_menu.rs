@@ -1,7 +1,7 @@
 //! A colorbar's Color window, opened by the cog in its top-left corner:
 //! the layer's Color menu (label, range, scale, NaN and clip colors,
 //! opacity and alpha curve) and its Show Colorbar checkbox beside the
-//! panel, until the cog or its close button (top-right) closes it. A
+//! panel, until the cog, its close button (top-right) or Escape closes it. A
 //! floating area rather than an egui popup, so the scale select and color
 //! pickers inside it do not close it.
 
@@ -9,6 +9,7 @@ use crate::app::OctantApp;
 use crate::app::layers::{BarOrientation, LayerId};
 use crate::i18n::{ColormapKey, SettingsKey as K, tr};
 use crate::ui::icons::{IconSize, ToolbarButton, UiIconExt};
+use crate::ui::keyboard::focus;
 use crate::ui::panel_layout::{GAP, PANEL_W};
 use egui::{Align2, Rect, Vec2};
 
@@ -43,7 +44,10 @@ pub(super) fn show(
     (panel, orientation): (Rect, BarOrientation),
     canvas: Rect,
 ) {
-    if app.pending_export.is_some() || !is_open(ctx, id) {
+    let open = is_open(ctx, id);
+    // Focus returns to the cog once the window closes.
+    focus::follow_window(ctx, area_id(id), open);
+    if app.pending_export.is_some() || !open {
         return;
     }
     let (pivot, point, room) = placement(panel, orientation, canvas);
@@ -72,8 +76,9 @@ pub(super) fn show(
                 close = close_button(ui, top);
             });
         });
-    // Hiding the colorbar closes its window too.
-    if close || app.layers.get(id).is_some_and(|l| !l.colorbar.shown) {
+    // Hiding the colorbar closes its window too, as does Escape in it.
+    let escaped = focus::escaped_layer(ctx).is_some_and(|l| l.id == area_id(id));
+    if close || escaped || app.layers.get(id).is_some_and(|l| !l.colorbar.shown) {
         set_open(ctx, id, false);
     }
 }

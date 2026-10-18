@@ -10,6 +10,8 @@ use fields::{acquisition_select, field_list};
 
 use crate::app::OctantApp;
 use crate::app::PlateState;
+use crate::ui::keyboard::{focus, keymap};
+use egui::Key;
 
 /// Width of the row names column.
 const ROW_NAME_W: f32 = 18.0;
@@ -69,7 +71,8 @@ impl Grid {
     }
 }
 
-/// The wells on their grid; a click picks one.
+/// The wells on their grid; a click (or Enter) picks one, and the arrow
+/// keys move keyboard focus to the next well along a row or column.
 fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
     let layout = &plate.plate;
     let (rows, columns) = (layout.rows.len(), layout.columns.len());
@@ -83,17 +86,20 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
     grid_names(ui, &grid, layout);
     let opened_well = plate.opened.as_ref().map(|(well, _)| *well);
     let painter = ui.painter_at(rect);
+    let well_id = |i: usize| ui.scope_id().with(("plate_well", i));
     let mut action = None;
+    let mut focused = None;
     for (i, well) in layout.wells.iter().enumerate() {
         if well.row >= rows || well.column >= columns {
             continue;
         }
         let r = grid.cell(well.row, well.column).shrink(1.0);
-        let response = ui.interact(
-            r,
-            ui.scope_id().with(("plate_well", i)),
-            egui::Sense::click(),
-        );
+        let response = ui.interact(r, well_id(i), egui::Sense::click());
+        if response.has_focus() {
+            focused = Some(i);
+            focus::claim_arrows(ui.ctx(), response.id);
+        }
+        focus::paint_ring(ui, &response, 2.0);
         let visuals = ui.visuals();
         let fill = if plate.well == Some(i) {
             visuals.selection.bg_fill
@@ -111,7 +117,47 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
         }
         response.on_hover_text(well.path.as_str());
     }
+    let arrows = [
+        Key::ArrowLeft,
+        Key::ArrowRight,
+        Key::ArrowUp,
+        Key::ArrowDown,
+    ];
+    let step = focus::pressed(ui.ctx(), arrows).and_then(keymap::arrow_direction);
+    if let Some(next) = focused
+        .zip(step)
+        .and_then(|(at, d)| neighbor(layout, at, d))
+    {
+        focus::request(ui.ctx(), well_id(next));
+    }
     action
+}
+
+/// The well next to well `at` in `direction` along its row or column: the
+/// nearest one there, as plates may leave wells out.
+fn neighbor(
+    layout: &crate::data::ome::OmePlate,
+    at: usize,
+    direction: egui::Vec2,
+) -> Option<usize> {
+    let from = layout.wells.get(at)?;
+    let along = |row: usize, column: usize| {
+        let (dr, dc) = (
+            row as f32 - from.row as f32,
+            column as f32 - from.column as f32,
+        );
+        let ahead = if direction.x != 0.0 {
+            dr == 0.0 && dc * direction.x > 0.0
+        } else {
+            dc == 0.0 && dr * direction.y > 0.0
+        };
+        ahead.then_some((dr.abs() + dc.abs()) as usize)
+    };
+    let wells = layout.wells.iter().enumerate();
+    wells
+        .filter_map(|(i, w)| along(w.row, w.column).map(|d| (d, i)))
+        .min()
+        .map(|(_, i)| i)
 }
 
 /// The column names above the grid and the row names left of it, every few

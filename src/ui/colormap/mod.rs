@@ -4,6 +4,7 @@
 
 pub mod editor;
 pub mod filters;
+pub mod keys;
 pub mod label;
 pub mod list;
 pub mod search;
@@ -16,6 +17,7 @@ use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::UiIconExt;
+use crate::ui::keyboard::focus;
 use crate::utils::colormap::registry;
 
 /// Persistent (per-session) picker UI state.
@@ -29,6 +31,14 @@ pub struct PickerState {
     pub below_list_height: f32,
     /// Row hovered last frame; `preview_colormap` itself resets every frame.
     pub last_hovered: Option<u32>,
+    /// Row holding keyboard focus last frame.
+    pub focused_row: Option<u32>,
+    /// Rows the list drew last frame.
+    pub drawn_rows: std::ops::Range<usize>,
+    /// Focus the first row on the next frame (Down in the search field).
+    pub enter_list: bool,
+    /// Focus the search field on the next frame (the picker just opened).
+    pub focus_search: bool,
 }
 
 const POPUP_WIDTH: f32 = 300.0;
@@ -44,7 +54,15 @@ const ACTIVE_SWATCH_WIDTH: f32 = 120.0;
 pub fn show_picker_popup(app: &mut OctantApp, anchor: &egui::Response, id: LayerId) {
     if anchor.clicked() {
         app.colormaps.target = Some(id);
+        app.colormaps.picker.focus_search = true;
     }
+    // Focus returns to the bar once the picker closes.
+    let popup_id = egui::Popup::default_response_id(anchor);
+    focus::follow_window(
+        &anchor.ctx,
+        popup_id,
+        egui::Popup::is_id_open(&anchor.ctx, popup_id),
+    );
     // The side follows the bar, not the content: egui otherwise re-picks it
     // every frame from the content size, so expanding the editor would jump
     // the panel. The height is capped to the room on that side and scrolls.
@@ -103,11 +121,18 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
     }
     ui.separator();
 
-    ui.search_field(
+    let search = ui.search_field_response(
         &mut app.colormaps.picker.filter.query,
         tr(K::SearchHint),
         None,
     );
+    let picker = &mut app.colormaps.picker;
+    if std::mem::take(&mut picker.focus_search) {
+        search.request_focus();
+    }
+    if search.has_focus() && focus::pressed(ui.ctx(), [egui::Key::ArrowDown]).is_some() {
+        picker.enter_list = true;
+    }
     filters::show(ui, &mut app.colormaps.picker.filter);
     ui.add_space(2.0);
     let used_above = ui.cursor().min.y - top;

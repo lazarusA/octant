@@ -1,10 +1,12 @@
 //! Virtualized colormap list: one clickable row (swatch, elided name) per match;
-//! the full name, family, kind and license show on hover.
+//! the full name, family, kind and license show on hover. The keyboard moves
+//! between rows (`keys`).
 
-use super::label;
 use super::swatch::SwatchAtlas;
+use super::{keys, label};
 use crate::app::OctantApp;
 use crate::i18n::{ColormapKey as K, tr};
+use crate::ui::keyboard::focus;
 use crate::utils::colormap::registry;
 use egui::{Rect, Sense, vec2};
 
@@ -28,6 +30,9 @@ pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
         filter,
         cache,
         swatches,
+        focused_row,
+        drawn_rows,
+        enter_list,
         ..
     } = &mut app.colormaps.picker;
     let ids = cache.ids(filter);
@@ -36,26 +41,46 @@ pub fn show(app: &mut OctantApp, ui: &mut egui::Ui, max_height: f32) {
         return;
     }
 
-    let mut hovered = None;
-    let mut clicked = None;
-    egui::ScrollArea::vertical()
+    let ctx = ui.ctx().clone();
+    let target =
+        keys::target(&ctx, ids, *focused_row).or_else(|| std::mem::take(enter_list).then_some(0));
+    let mut area = egui::ScrollArea::vertical()
         .id_salt(("colormap_list", 0))
         .max_height(max_height)
-        .auto_shrink([false, true])
-        .show_rows(ui, ROW_HEIGHT, ids.len(), |ui, range| {
-            for &id in ids.get(range).unwrap_or_default() {
-                let response = row(ui, swatches, id, id == active, reversed);
-                if response.hovered() {
-                    hovered = Some(id);
-                }
-                if response.clicked() {
-                    clicked = Some(id);
-                }
-            }
-        });
+        .auto_shrink([false, true]);
+    if let Some(index) = target {
+        let step = ROW_HEIGHT + ui.spacing().item_spacing.y;
+        if let Some(offset) = keys::offset_showing(index, step, max_height, drawn_rows) {
+            area = area.vertical_scroll_offset(offset);
+        }
+        if let Some(&id) = ids.get(index) {
+            focus::request(&ctx, keys::row_id(id));
+        }
+    }
 
-    if hovered.is_some() {
-        app.preview_colormap = hovered;
+    let mut hovered = None;
+    let mut clicked = None;
+    *focused_row = None;
+    area.show_rows(ui, ROW_HEIGHT, ids.len(), |ui, range| {
+        *drawn_rows = range.clone();
+        for &id in ids.get(range).unwrap_or_default() {
+            let response = row(ui, swatches, id, id == active, reversed);
+            if response.hovered() {
+                hovered = Some(id);
+            }
+            if response.has_focus() {
+                *focused_row = Some(id);
+            }
+            if response.clicked() {
+                clicked = Some(id);
+            }
+        }
+    });
+
+    // A row focused by keyboard previews as a hovered one.
+    let keyboard = focused_row.filter(|_| focus::visible(&ctx));
+    if let Some(shown) = hovered.or(keyboard) {
+        app.preview_colormap = Some(shown);
     }
     // Repaint only when the hovered row changes, not every frame it stays hovered.
     if hovered != app.colormaps.picker.last_hovered {
@@ -74,8 +99,8 @@ fn row(
     selected: bool,
     reversed: bool,
 ) -> egui::Response {
-    let (rect, response) =
-        ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::click());
+    let (_, rect) = ui.allocate_space(vec2(ui.available_width(), ROW_HEIGHT));
+    let response = ui.interact(rect, keys::row_id(id), Sense::click());
     if !ui.is_rect_visible(rect) {
         return response;
     }
@@ -83,6 +108,7 @@ fn row(
     if selected || response.hovered() {
         ui.painter().rect_filled(rect, 3.0, visuals.weak_bg_fill);
     }
+    focus::paint_ring(ui, &response, 3.0);
     let content = (rect.width() - PAD_LEFT - PAD_RIGHT - GAP).max(0.0);
     let swatch = Rect::from_min_size(
         rect.left_center() + vec2(PAD_LEFT, -6.0),

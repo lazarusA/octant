@@ -20,19 +20,10 @@ impl Gate {
     /// `plot_shown`: a plot fills the canvas (the landing screen is not up).
     pub fn new(app: &OctantApp, ctx: &Context, plot_shown: bool) -> Self {
         let focused = ctx.memory(|m| m.focused());
-        let no_popup = !egui::Popup::is_any_open(ctx);
-        // egui dropped focus on Escape before the app ran; a widget that
-        // keeps Escape for itself (a tree row) keeps focus instead.
-        let panel = (focused.is_none() && no_popup)
-            .then(|| focus::last(ctx))
-            .flatten()
-            .and_then(|last| {
-                Panel::ALL
-                    .into_iter()
-                    .find(|p| p.area_id() == last.layer.id)
-            });
+        let panel = focus::escaped_layer(ctx)
+            .and_then(|layer| Panel::ALL.into_iter().find(|p| p.area_id() == layer.id));
         let free = focused.is_none_or(|id| id == crate::app::canvas::canvas_id())
-            && no_popup
+            && !egui::Popup::is_any_open(ctx)
             && !modal_open(app);
         let canvas = free && plot_shown;
         Self {

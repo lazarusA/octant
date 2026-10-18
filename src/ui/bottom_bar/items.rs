@@ -144,7 +144,11 @@ pub(super) fn show_item(
                 nav.push(&response, stop);
                 on_click(item, &response, app);
             }
-            None => labels::show(item, compact, tl, app, ui),
+            None => {
+                if let Some(date) = labels::show(item, compact, tl, app, ui) {
+                    nav.push(&date, Stop::Button);
+                }
+            }
         }
     });
 }

@@ -124,6 +124,12 @@ pub fn advance_next_frame(ctx: &Context) {
     ctx.request_repaint();
 }
 
+/// Whether `response` should show its tooltip for keyboard focus: focused
+/// by keys and not hovered (the pointer shows it then).
+pub fn shows_tooltip(response: &Response) -> bool {
+    response.has_focus() && !response.hovered() && visible(&response.ctx)
+}
+
 /// Keyboard focus outline drawn inside `response`'s rect while it holds
 /// keyboard focus, shared by every custom widget so focus looks the same
 /// everywhere.
@@ -163,6 +169,53 @@ pub fn return_to_opener(ctx: &Context, key: Id) {
     }
 }
 
+/// Call every frame with whether the window `key` is open: remembers what
+/// held keyboard focus as it opened and focuses that again once it closes.
+/// Whether it opened this frame.
+pub fn follow_window(ctx: &Context, key: Id, open: bool) -> bool {
+    let flag = key.with("keyboard_window_open");
+    let was = ctx.data_mut(|d| std::mem::replace(d.get_temp_mut_or_default::<bool>(flag), open));
+    match (was, open) {
+        (false, true) => remember_opener(ctx, key),
+        (true, false) => return_to_opener(ctx, key),
+        _ => {}
+    }
+    open && !was
+}
+
+/// Keeps keyboard focus in the modal window drawn in `ui` (and the popups
+/// above it); once it `opened`, Tab enters it from the start.
+pub fn trap(ui: &Ui, opened: bool) {
+    let layer = ui.layer_id();
+    ui.ctx().memory_mut(|m| {
+        m.set_modal_layer(layer);
+        if let Some(id) = m.focused().filter(|_| opened) {
+            m.surrender_focus(id);
+        }
+    });
+}
+
+/// The response of the widget holding focus, as last drawn.
+fn focused_response(ctx: &Context) -> Option<Response> {
+    let focused = ctx.memory(|m| m.focused())?;
+    ctx.read_response(focused)
+}
+
+/// Whether the widget holding focus is drawn in `layer`.
+pub fn in_layer(ctx: &Context, layer: LayerId) -> bool {
+    focused_response(ctx).is_some_and(|r| r.layer_id == layer)
+}
+
+/// The layer Escape took focus from this frame: egui drops focus on Escape
+/// before the app runs, unless the widget keeps Escape for itself. `None`
+/// while a popup is open, as Escape closes the popup.
+pub fn escaped_layer(ctx: &Context) -> Option<LayerId> {
+    let escaped = ctx.input(|i| i.key_pressed(Key::Escape))
+        && ctx.memory(|m| m.focused()).is_none()
+        && !egui::Popup::is_any_open(ctx);
+    escaped.then(|| last(ctx).map(|l| l.layer)).flatten()
+}
+
 /// The widget focused when a frame ended: where it was drawn.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LastFocus {
@@ -174,14 +227,11 @@ pub struct LastFocus {
 /// Call once per frame after every widget: keeps where focus is for the next
 /// frame, read before egui's Escape handling is undone.
 pub fn end_frame(ctx: &Context) {
-    let focused = ctx.memory(|m| m.focused());
-    let last = focused
-        .and_then(|id| ctx.read_response(id))
-        .map(|r| LastFocus {
-            id: r.id,
-            layer: r.layer_id,
-            rect: r.rect,
-        });
+    let last = focused_response(ctx).map(|r| LastFocus {
+        id: r.id,
+        layer: r.layer_id,
+        rect: r.rect,
+    });
     ctx.data_mut(|d| match last {
         Some(last) => {
             d.insert_temp(last_id(), last);

@@ -155,22 +155,22 @@ fn bar_row(
     axis: BarAxis,
     response: egui::Response,
 ) {
-    let bar_id = egui::Id::unique(super::salt("colorbar_bar", id));
     let bar = ui
-        .interact(axis.rect, bar_id, egui::Sense::click())
+        .interact(axis.rect, super::bar_id(id), egui::Sense::click())
         .on_hover_cursor(egui::CursorIcon::PointingHand);
     // Before the bar paints, so a colormap hovered in the picker previews
     // on it this frame.
     crate::ui::colormap::show_picker_popup(app, &bar, id);
     let on_bar = bar.hovered();
+    let outlined = on_bar || (bar.has_focus() && crate::ui::keyboard::focus::visible(ui.ctx()));
     let hovered = if on_bar { bar } else { response };
     if id == LayerId::BASE && app.line_series_colored() {
         series_bar_row(app, ui, axis, hovered);
-        outline(ui, axis, on_bar);
+        axis.outline(ui, outlined);
         return;
     }
     let hover = paint_bar(app, ui, id, axis, hovered.hover_pos());
-    outline(ui, axis, on_bar);
+    axis.outline(ui, outlined);
     let Some(layer) = app.layers.get_mut(id) else {
         return;
     };
@@ -179,15 +179,6 @@ fn bar_row(
     draw_end_range_inputs(ui, axis, color);
     if let Some(value) = hover {
         value_tooltip(hovered, value, on_bar);
-    }
-}
-
-/// Outlines the bar on `axis` while it is hovered (`on`), as clickable.
-fn outline(ui: &egui::Ui, axis: BarAxis, on: bool) {
-    if on {
-        let stroke = ui.visuals().widgets.hovered.fg_stroke;
-        ui.painter()
-            .rect_stroke(axis.rect, 2.0, stroke, egui::StrokeKind::Outside);
     }
 }
 

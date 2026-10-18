@@ -49,7 +49,7 @@ pub enum Scope {
     /// Modifier shortcuts and function keys: always, also while typing.
     Global,
     /// Escape in a floating panel, once the widget focused there let it go
-    /// and no popup took it.
+    /// and no popup took it (`focus::escaped_layer`).
     Panel,
     /// Single keys on a shown plot: only while nothing or the canvas holds
     /// focus and no popup or modal window is open.

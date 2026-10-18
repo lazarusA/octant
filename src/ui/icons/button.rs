@@ -217,7 +217,7 @@ impl Widget for ToolbarButton<'_> {
         };
         // Keyboard focus shows the tooltip a pointer would, so an icon-only
         // button still says what it does.
-        if response.has_focus() && !response.hovered() && focus::visible(ui.ctx()) {
+        if focus::shows_tooltip(&response) {
             response.show_tooltip_text(tip);
         }
         response.on_hover_text(tip)
