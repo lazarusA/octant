@@ -37,6 +37,8 @@ mod geometry_tests;
 mod tests;
 mod tile;
 mod want;
+#[cfg(test)]
+mod zoom_tests;
 
 use crate::app::OctantApp;
 use crate::app::pipeline::paint_layer::CanvasView;

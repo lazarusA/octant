@@ -3,10 +3,17 @@
 use crate::plots::PlotType;
 use crate::plots::camera::{self, OrbitCamera};
 
+/// How far 2D plots zoom in: 50 screen pixels per plotted cell at most.
+pub const MAX_ZOOM: f32 = 50.0;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct NavigationState {
     pub heatmap_zoom: f32,
     pub heatmap_pan: egui::Vec2,
+    /// How far the heatmap may zoom in: farther over a coarse level of a
+    /// multiscale variable, so its finest level can fill the screen
+    /// (`OctantApp::heatmap_max_zoom`, set every frame by `render_canvas`).
+    pub heatmap_max_zoom: f32,
     pub line_zoom: f32,
     pub line_pan: egui::Vec2,
     pub sphere_rotation_y: f32,
@@ -27,6 +34,7 @@ impl Default for NavigationState {
         Self {
             heatmap_zoom: 1.0,
             heatmap_pan: egui::Vec2::ZERO,
+            heatmap_max_zoom: MAX_ZOOM,
             line_zoom: 1.0,
             line_pan: egui::Vec2::ZERO,
             sphere_rotation_y: 0.0,

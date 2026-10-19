@@ -33,6 +33,7 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
     if px.x >= 1.0 && px.y >= 1.0 {
         app.layout.canvas_px = [px.x.round() as u32, px.y.round() as u32];
     }
+    app.nav.heatmap_max_zoom = app.heatmap_max_zoom();
 
     // Check screenshot / export requests requiring the canvas rect
     if let Some(ref mut req) = app.pending_export

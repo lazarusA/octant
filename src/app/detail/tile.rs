@@ -228,7 +228,13 @@ impl OctantApp {
                 self.block_cache.put(key.clone(), block.clone());
                 self.show_detail(pending, block);
             }
-            Err(e) => log::warn!("Detail tile of '{}' failed: {e}", key.variable_name),
+            Err(e) => {
+                log::warn!("Detail tile of '{}' failed: {e}", key.variable_name);
+                // Decide again once the view rests, rather than only after it moves.
+                if let Some(layer) = self.layers.get_mut(id) {
+                    layer.data.detail.view = None;
+                }
+            }
         }
         true
     }
