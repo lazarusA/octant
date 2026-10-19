@@ -7,8 +7,10 @@ use std::sync::Arc;
 use super::{DetailTile, MARGIN, PendingDetail, TilePlan, Want};
 use crate::app::OctantApp;
 use crate::app::block_loading::block_axes;
+use crate::app::block_loading::projection_2d::PlaneWindow;
 use crate::app::layers::LayerId;
 use crate::app::multiscale::to_level;
+use crate::data::slicing::CompositeProbe;
 use crate::data::{BlockCacheKey, BlockRequest, MatrixData, OctantBlock};
 use crate::plots::HeatmapRenderer;
 
@@ -38,6 +40,7 @@ impl OctantApp {
             origin,
             end,
             matrix: None,
+            probe: None,
             context: want.context,
             cover,
             uv: [u0, v0, u1, v1],
@@ -82,7 +85,7 @@ impl OctantApp {
     /// Slices `block` into `pending`'s tile and draws it; nothing when the
     /// block runs in another orientation than the plot.
     pub(super) fn show_detail(&mut self, pending: PendingDetail, block: &OctantBlock) {
-        let Some(matrix) = self.slice_tile(&pending, block) else {
+        let Some((matrix, probe)) = self.slice_tile(&pending, block) else {
             log::debug!("Detail tile of '{}' skipped", block.variable_name);
             return;
         };
@@ -111,13 +114,20 @@ impl OctantApp {
             layer.renderers.detail = Some(renderer);
         }
         tile.matrix = Some(Arc::new(matrix));
+        tile.probe = probe;
         layer.data.detail.tile = Some(tile);
     }
 
-    /// `block` sliced into `pending`'s tile like a plotted block; `None` when
-    /// it runs in another orientation than its layer's plot.
-    fn slice_tile(&self, pending: &PendingDetail, block: &OctantBlock) -> Option<MatrixData> {
-        let flips = &self.layers.get(pending.layer)?.data.flipped_dims;
+    /// `block` sliced into `pending`'s tile like a plotted block (a composite
+    /// with its plot's stretch, and the window behind it); `None` when it runs
+    /// in another orientation than its layer's plot.
+    fn slice_tile(
+        &self,
+        pending: &PendingDetail,
+        block: &OctantBlock,
+    ) -> Option<(MatrixData, Option<CompositeProbe>)> {
+        let layer = self.layers.get(pending.layer)?;
+        let flips = &layer.data.flipped_dims;
         let same_flips = flips.len() == block.flipped_dims.len()
             && block.flipped_dims.iter().all(|f| flips.contains(f));
         if !same_flips || block.dimension_names != pending.dims {
@@ -135,16 +145,30 @@ impl OctantApp {
         );
         let (_, local_x) = block_axes::dim_bounds(block, dims, bx, ranges);
         let (_, local_y) = block_axes::dim_bounds(block, dims, by, ranges);
-        block.slice_2d_with_ranges(
-            bx,
-            by,
-            block.oriented_range(bx, local_x),
-            block.oriented_range(by, local_y),
-            &fixed,
+        let window = PlaneWindow {
+            x_dim: bx,
+            y_dim: by,
+            x_range: block.oriented_range(bx, local_x),
+            y_range: block.oriented_range(by, local_y),
+            fixed: &fixed,
+        };
+        if layer.composite.enabled {
+            let stretch = layer.data.composite_stretch.clone().unwrap_or_default();
+            if let Some(c) = self.slice_composite(pending.layer, block, &window, stretch) {
+                return Some((c.matrix, Some(c.probe)));
+            }
+        }
+        let matrix = block.slice_2d_with_ranges(
+            window.x_dim,
+            window.y_dim,
+            window.x_range,
+            window.y_range,
+            window.fixed,
             self.layer_animated_dim_extent(pending.layer),
             &block.variable_name,
             false,
-        )
+        )?;
+        Some((matrix, None))
     }
 
     /// Reads the coordinates of the tile's level variable `idx` in the

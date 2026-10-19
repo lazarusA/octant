@@ -26,6 +26,8 @@
 //! an overlay's tile under the pointer (`ui/hover/overlays.rs`).
 
 #[cfg(test)]
+mod composite_tests;
+#[cfg(test)]
 mod fetch_tests;
 mod follow;
 #[cfg(test)]
@@ -78,6 +80,14 @@ impl DetailState {
         *self = Self::default();
     }
 
+    /// Drops the tile shown, to be decided again once the view rests: its
+    /// layer's composite stretched its channels anew.
+    pub(crate) fn discard_tile(&mut self) {
+        self.tile = None;
+        self.view = None;
+        self.follows = None;
+    }
+
     /// Drops the tile being fetched or waiting for a worker.
     fn drop_request(&mut self) {
         self.pending = None;
@@ -99,6 +109,8 @@ pub struct DetailTile {
     pub end: [u64; 2],
     /// The tile's values, kept for the hover once it is shown.
     pub matrix: Option<std::sync::Arc<crate::data::MatrixData>>,
+    /// A composite tile's block window, for the hover's channel values.
+    pub probe: Option<crate::data::slicing::CompositeProbe>,
     /// The plot it belongs to (`OctantApp::detail_context`).
     pub context: u64,
     /// Level-0 positions it covers along x and y.

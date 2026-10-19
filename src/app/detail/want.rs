@@ -89,7 +89,7 @@ impl OctantApp {
 
     /// The plot a tile belongs to, when the base layer can have one: a
     /// heatmap at rest reading a level of a multiscale variable chosen by
-    /// Auto, on a regular grid, without composite.
+    /// Auto, on a regular grid.
     pub(super) fn detail_context(&self, plot_type: PlotType) -> Option<u64> {
         let base = &self.layers.base;
         let plotted = base.selection();
@@ -99,11 +99,10 @@ impl OctantApp {
         let readable = plot_type == PlotType::Heatmap
             && regular
             && !self.playback.is_playing
-            && !base.composite.enabled
             && plotted.level == LevelChoice::Auto
             && plotted.variable_info()?.multiscale.is_some();
         let step = self.playback.current_timestep;
-        readable.then(|| plot_hash(plotted, step, &base.data.flipped_dims))
+        readable.then(|| plot_hash(plotted, step, &base.data.flipped_dims, &base.composite))
     }
 
     /// Drops what no longer belongs to the plot (`context`, `None` when the
@@ -164,12 +163,13 @@ fn level0_window(
         .collect()
 }
 
-/// What a plotted selection shows at `step` with `flips`: a tile is kept
-/// while it stays the same.
+/// What a plotted selection shows at `step` with `flips` and `composite`: a
+/// tile is kept while it stays the same.
 pub(super) fn plot_hash(
     sel: &crate::app::layers::VariableSelection,
     step: usize,
     flips: &[String],
+    composite: &crate::app::layers::CompositeStyle,
 ) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     sel.metadata_generation.hash(&mut h);
@@ -178,5 +178,6 @@ pub(super) fn plot_hash(
     sel.dim_indices.hash(&mut h);
     step.hash(&mut h);
     flips.hash(&mut h);
+    composite.hash_into(&mut h);
     h.finish()
 }

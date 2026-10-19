@@ -81,9 +81,19 @@ fn inverted_channels_light_up_where_data_is_low() {
     cfg.window = Some((0.0, 10.0));
     cfg.display.inverted = true;
     let configs = [cfg, ChannelColorConfig::new(1, String::new(), [0, 0, 0])];
-    let m =
-        slice_multichannel_composite_nd(&ramp(), 0, 2, 1, (0, 2), (0, 1), &[0, 0, 0], &configs, 1)
-            .expect("composite");
+    let m = slice_multichannel_composite_nd(
+        &ramp(),
+        0,
+        2,
+        1,
+        (0, 2),
+        (0, 1),
+        &[0, 0, 0],
+        &configs,
+        1,
+        &mut Default::default(),
+    )
+    .expect("composite");
     assert_eq!(unpack_rgb(m.values[0]), (255.0, 255.0, 255.0));
     assert_eq!(unpack_rgb(m.values[1]), (0.0, 0.0, 0.0));
 }

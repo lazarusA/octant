@@ -36,6 +36,7 @@ pub fn slice_multichannel_volume_composite_nd(
         fixed_indices,
         channel_configs,
         len,
+        &mut super::stretch::CompositeStretch::default(),
         |fixed, cfg| {
             let (x, y, z) = (x_range, y_range, z_range);
             let data =

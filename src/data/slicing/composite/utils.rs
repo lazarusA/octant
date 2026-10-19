@@ -1,5 +1,6 @@
 //! Utility functions for color space conversion, normalization, and bit packing.
 
+use super::stretch::CompositeStretch;
 use super::types::ChannelColorConfig;
 
 /// Normalization scale and offset computation for diverse numeric ranges.
@@ -118,13 +119,16 @@ fn visible_channel_configs(
 /// The packed tints of `block`'s visible channels (along `c_dim`, from
 /// `configs`) blended over `len` cells, NaN everywhere when none is visible.
 /// `read` reads one channel's `len` values, given `fixed_indices` pointing
-/// at it and its config; `None` when no channel could be read.
+/// at it and its config; `None` when no channel could be read. Channels
+/// without a window are stretched as `stretch` records (else over their
+/// values, recorded).
 pub fn blend_channels<V: AsRef<[f32]>>(
     block: &crate::data::octant_block::OctantBlock,
     c_dim: usize,
     fixed_indices: &[usize],
     configs: &[ChannelColorConfig],
     len: usize,
+    stretch: &mut CompositeStretch,
     mut read: impl FnMut(&[usize], &ChannelColorConfig) -> Option<V>,
 ) -> Option<Vec<f32>> {
     let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
@@ -141,7 +145,7 @@ pub fn blend_channels<V: AsRef<[f32]>>(
             *slot = local_c;
         }
         if let Some(values) = read(&fixed, cfg) {
-            acc.add(values.as_ref(), cfg);
+            acc.add(values.as_ref(), cfg, stretch);
         }
     }
     acc.finish()
@@ -166,9 +170,10 @@ impl ChannelAccumulator {
 
     /// Adds one channel's values, normalized by its window and display curve
     /// and tinted by its color.
-    fn add(&mut self, values: &[f32], cfg: &ChannelColorConfig) {
+    fn add(&mut self, values: &[f32], cfg: &ChannelColorConfig, stretch: &mut CompositeStretch) {
         self.loaded = true;
-        let (scale, offset, is_i8) = compute_channel_normalization(values, cfg.window, 1.0);
+        let s = stretch.channel(cfg.index, values, cfg.window, 1.0);
+        let (scale, offset, is_i8) = (s.scale, s.offset, s.is_i8);
         let curve = cfg.display.curve();
         let tint = cfg.color_rgb.map(f32::from);
         for ((raw, rgb), valid) in values.iter().zip(&mut self.rgb).zip(&mut self.valid) {

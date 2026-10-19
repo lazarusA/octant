@@ -27,7 +27,18 @@ fn ink_block(cmyk: bool) -> OctantBlock {
 
 fn nd(block: &OctantBlock) -> Vec<f32> {
     let channels = [Some(0), Some(1), Some(2)];
-    let matrix = slice_rgb_composite_nd(block, 0, 2, 1, (0, 3), (0, 2), &[0, 0, 0], channels, 1);
+    let matrix = slice_rgb_composite_nd(
+        block,
+        0,
+        2,
+        1,
+        (0, 3),
+        (0, 2),
+        &[0, 0, 0],
+        channels,
+        1,
+        &mut Default::default(),
+    );
     matrix.expect("composite").values.to_vec()
 }
 
@@ -47,7 +58,18 @@ fn nd_composite_converts_cmyk_inks() {
 fn nd_cmyk_composite_reads_only_the_requested_window() {
     let block = ink_block(true);
     let channels = [Some(0), Some(1), Some(2)];
-    let window = slice_rgb_composite_nd(&block, 0, 2, 1, (1, 3), (1, 2), &[0, 0, 0], channels, 1);
+    let window = slice_rgb_composite_nd(
+        &block,
+        0,
+        2,
+        1,
+        (1, 3),
+        (1, 2),
+        &[0, 0, 0],
+        channels,
+        1,
+        &mut Default::default(),
+    );
     let window = window.expect("windowed composite");
     assert_eq!((window.width, window.height), (2, 1));
 

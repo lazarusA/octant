@@ -5,7 +5,8 @@ use crate::data::octant_block::OctantBlock;
 
 use super::cmyk::{blend_cmyk_planes, is_cmyk_block, slice_cmyk_composite};
 use super::probe::local_channel;
-use super::utils::{compute_channel_normalization, normalize_channel_value, pack_rgb};
+use super::stretch::CompositeStretch;
+use super::utils::{normalize_channel_value, pack_rgb};
 
 /// Slice an `OctantBlock` into a 24-bit TrueColor composite `MatrixData`.
 pub fn slice_rgb_composite(
@@ -25,6 +26,7 @@ pub fn slice_rgb_composite(
     if is_cmyk_block(block, 0) {
         slice_cmyk_composite(block, width, height, plane_size, anim_extent)
     } else {
+        let mut stretch = CompositeStretch::default();
         let opt_channels = [Some(channels[0]), Some(channels[1]), Some(channels[2])];
         let x_dim = block.shape.len() - 1;
         let y_dim = block.shape.len() - 2;
@@ -41,11 +43,14 @@ pub fn slice_rgb_composite(
             &fixed,
             opt_channels,
             anim_extent,
+            &mut stretch,
         )
     }
 }
 
-/// Slices an N-dimensional `OctantBlock` with a channel dimension into TrueColor RGB `MatrixData`.
+/// Slices an N-dimensional `OctantBlock` with a channel dimension into TrueColor RGB `MatrixData`,
+/// each channel (or CMYK's inks together) stretched as `stretch` records, the others over
+/// their values and recorded there.
 #[allow(clippy::too_many_arguments)]
 pub fn slice_rgb_composite_nd(
     block: &OctantBlock,
@@ -57,6 +62,7 @@ pub fn slice_rgb_composite_nd(
     fixed_indices: &[usize],
     channels: [Option<usize>; 3],
     anim_extent: usize,
+    stretch: &mut CompositeStretch,
 ) -> Option<MatrixData> {
     let num_channels = *block.shape.get(c_dim)?;
     if block.shape.len() < 2 || (num_channels < 2 && channels.iter().all(Option::is_none)) {
@@ -89,11 +95,19 @@ pub fn slice_rgb_composite_nd(
         let ink = |k: usize| plane(Some(c_start + k));
         let (c, m, y, k) = (ink(0)?, ink(1)?, ink(2)?, ink(3)?);
         let planes = [c.as_slice(), &m, &y, &k];
-        return blend_cmyk_planes(planes, width, height, &block.variable_name, anim_extent);
+        return blend_cmyk_planes(
+            planes,
+            width,
+            height,
+            &block.variable_name,
+            anim_extent,
+            stretch,
+        );
     }
 
     let name = format!("{} (RGB Composite)", block.variable_name);
-    rgb_matrix(channels.map(plane), (width, height), name, anim_extent)
+    let planes = channels.map(|ch| Some((ch?, plane(ch)?)));
+    rgb_matrix(planes, (width, height), name, anim_extent, stretch)
 }
 
 /// `range` along `dim` clamped into the block, keeping at least one index.
@@ -103,16 +117,18 @@ fn clamp_window(block: &OctantBlock, dim: usize, (start, end): (usize, usize)) -
     (start.min(end.saturating_sub(1)), end)
 }
 
-/// The packed RGB matrix of three normalized channel planes (`None` channels stay dark).
+/// The packed RGB matrix of three channels' planes, stretched as `stretch` says (`None`
+/// channels stay dark).
 fn rgb_matrix(
-    [r_plane, g_plane, b_plane]: [Option<Vec<f32>>; 3],
+    [r_plane, g_plane, b_plane]: [Option<(usize, Vec<f32>)>; 3],
     (width, height): (usize, usize),
     name: String,
     anim_extent: usize,
+    stretch: &mut CompositeStretch,
 ) -> Option<MatrixData> {
-    let (r_p, r_scale, r_off, r_i8) = norm_plane_info(r_plane);
-    let (g_p, g_scale, g_off, g_i8) = norm_plane_info(g_plane);
-    let (b_p, b_scale, b_off, b_i8) = norm_plane_info(b_plane);
+    let (r_p, r_scale, r_off, r_i8) = norm_plane_info(r_plane, stretch);
+    let (g_p, g_scale, g_off, g_i8) = norm_plane_info(g_plane, stretch);
+    let (b_p, b_scale, b_off, b_i8) = norm_plane_info(b_plane, stretch);
     let values = blend_rgb_pixels(
         width.checked_mul(height)?,
         (r_p.as_deref(), r_scale, r_off, r_i8),
@@ -163,12 +179,16 @@ fn extract_channel_plane(
     Some(mdata.values)
 }
 
-fn norm_plane_info(plane_opt: Option<Vec<f32>>) -> (Option<Vec<f32>>, f32, f32, bool) {
-    if let Some(ref p) = plane_opt {
-        let (scale, offset, is_i8) = compute_channel_normalization(p, None, 255.0);
-        (plane_opt, scale, offset, is_i8)
-    } else {
-        (None, 1.0, 0.0, false)
+fn norm_plane_info(
+    plane: Option<(usize, Vec<f32>)>,
+    stretch: &mut CompositeStretch,
+) -> (Option<Vec<f32>>, f32, f32, bool) {
+    match plane {
+        Some((channel, p)) => {
+            let s = stretch.channel(channel, &p, None, 255.0);
+            (Some(p), s.scale, s.offset, s.is_i8)
+        }
+        None => (None, 1.0, 0.0, false),
     }
 }
 

@@ -119,7 +119,10 @@ fn show_sample(
     let base = &app.layers.base;
     let composite = match base.labels() {
         Some(_) => None,
-        None => composite::composite_rows(app, ctx, meta, var, units, pixel, &mut fields),
+        None => {
+            let tile = detail::tile_probe(app, hit.norm_x, hit.norm_y);
+            composite::composite_rows(app, ctx, meta, var, units, pixel, tile, &mut fields)
+        }
     };
     if plot_type == PlotType::Line {
         draw_line_guidelines_and_reticle(app, ctx, ui, rect, px, raw_val);

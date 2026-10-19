@@ -162,9 +162,19 @@ pub fn composite_fields(
     app: &OctantApp,
     labels: &CompositeLabels,
     units: &str,
-    (px, py): (usize, usize),
+    pixel: (usize, usize),
 ) -> Vec<HoverField> {
     let probe = app.layers.base.data.composite_probe.as_ref();
+    probe_fields(probe, labels, units, pixel)
+}
+
+/// [`composite_fields`] read from `probe` (the plot's or a detail tile's).
+fn probe_fields(
+    probe: Option<&CompositeProbe>,
+    labels: &CompositeLabels,
+    units: &str,
+    (px, py): (usize, usize),
+) -> Vec<HoverField> {
     let raw = |band: usize| probe.and_then(|p| p.sample(band, px, py));
     labels
         .channels
@@ -223,7 +233,9 @@ fn write_raw(out: &mut String, raw: Option<f32>, units: &str) {
 }
 
 /// The composite's name, after prepending one row per channel (its band and raw value at
-/// `pixel`) to `entries` for flat 2D composites; `None` without a composite.
+/// `pixel`, or where a detail tile is drawn at `tile`'s cell of its window) to `entries`
+/// for flat 2D composites; `None` without a composite.
+#[allow(clippy::too_many_arguments)]
 pub fn composite_rows(
     app: &OctantApp,
     ctx: &egui::Context,
@@ -231,16 +243,21 @@ pub fn composite_rows(
     var: Option<&VariableInfo>,
     units: &str,
     pixel: Option<(usize, usize)>,
+    tile: Option<(&CompositeProbe, (usize, usize))>,
     entries: &mut Vec<HoverField>,
 ) -> Option<CompositeKind> {
     if !app.layers.base.composite.enabled {
         return None;
     }
     let labels = composite_labels(app, ctx, meta, var);
-    if let Some(pixel) = pixel
-        && app.layers.base.data.composite_probe.is_some()
-    {
-        entries.splice(0..0, composite_fields(app, &labels, units, pixel));
+    let base = app.layers.base.data.composite_probe.as_ref();
+    let at = match (pixel, tile) {
+        (Some(_), Some((probe, cell))) => Some((probe, cell)),
+        (Some(pixel), None) => base.map(|p| (p, pixel)),
+        (None, _) => None,
+    };
+    if let Some((probe, cell)) = at {
+        entries.splice(0..0, probe_fields(Some(probe), &labels, units, cell));
     }
     Some(labels.kind)
 }

@@ -97,6 +97,7 @@ fn test_multichannel_additive_composite() {
         &[0, 0, 0],
         &configs,
         1,
+        &mut Default::default(),
     )
     .expect("multichannel composite should succeed");
 
@@ -291,6 +292,7 @@ fn test_multichannel_composite_with_offset_channels() {
         &[0, 0, 0],
         &configs,
         1,
+        &mut Default::default(),
     )
     .expect("multichannel composite with offset channels should succeed");
 
@@ -400,9 +402,19 @@ fn test_multichannel_composite_none_selected() {
         display: Default::default(),
     }];
 
-    let composite =
-        slice_multichannel_composite_nd(&block, 0, 1, 0, (0, 2), (0, 2), &[0, 0], &configs, 1)
-            .expect("multichannel composite with none selected should return NAN plane");
+    let composite = slice_multichannel_composite_nd(
+        &block,
+        0,
+        1,
+        0,
+        (0, 2),
+        (0, 2),
+        &[0, 0],
+        &configs,
+        1,
+        &mut Default::default(),
+    )
+    .expect("multichannel composite with none selected should return NAN plane");
 
     assert_eq!(composite.width, 2);
     assert_eq!(composite.height, 2);
