@@ -44,7 +44,7 @@ impl OctantApp {
             layer.load.block_key = Some(req.cache_key());
             layer.load.pending_target_step = Some(step);
         }
-        self.block_prefetcher.request(req, &self.block_cache);
+        self.block_prefetcher.request_now(req, &self.block_cache);
     }
 
     /// Shows `target_step` when the base layer holds it (loading the animated
