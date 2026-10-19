@@ -56,13 +56,16 @@ impl BlockPrefetcher {
         }
     }
 
-    /// Schedules one request.
+    /// Schedules one request, unless every worker is busy.
     pub fn request(&mut self, request: BlockRequest, cache: &BlockCache) -> bool {
+        self.active_worker_threads < self.max_concurrent_threads && self.request_now(request, cache)
+    }
+
+    /// Schedules one request even when every worker is busy: the block a view
+    /// waits for never queues behind lookahead prefetches.
+    pub fn request_now(&mut self, request: BlockRequest, cache: &BlockCache) -> bool {
         let key = request.cache_key();
-        if cache.contains(&key)
-            || self.pending.contains_key(&key)
-            || self.active_worker_threads >= self.max_concurrent_threads
-        {
+        if cache.contains(&key) || self.pending.contains_key(&key) {
             return false;
         }
 

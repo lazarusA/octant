@@ -158,7 +158,7 @@ fn test_prefetcher_active_bytes_retire_on_drain() {
         }
     }
 
-    let mut prefetcher = BlockPrefetcher::new();
+    let mut prefetcher = BlockPrefetcher::with_max_concurrent_threads(1);
     let cache = BlockCache::new(1024 * 1024);
     let source = DataSource::new("dummy", DataSourceKind::Procedural, "dummy", "dummy");
     let (release_tx, pause_rx) = mpsc::channel();
@@ -170,7 +170,7 @@ fn test_prefetcher_active_bytes_retire_on_drain() {
     );
 
     let slice_1 = SliceRequest::new("temperature", vec![DimensionSelection::range(0, 10)]);
-    let req_1 = crate::data::BlockRequest::new(store_handle, slice_1);
+    let req_1 = crate::data::BlockRequest::new(store_handle.clone(), slice_1);
 
     assert!(prefetcher.request(req_1, &cache));
     assert_eq!(prefetcher.pending_count(), 1);
@@ -182,13 +182,20 @@ fn test_prefetcher_active_bytes_retire_on_drain() {
     assert!(results.is_empty());
     assert_eq!(prefetcher.total_bytes(), 40);
 
+    // The only worker is busy: the lookahead waits, a view's block does not
+    let slice_2 = SliceRequest::new("temperature", vec![DimensionSelection::range(10, 20)]);
+    let req_2 = || crate::data::BlockRequest::new(store_handle.clone(), slice_2.clone());
+    assert!(!prefetcher.request(req_2(), &cache));
+    assert!(prefetcher.request_now(req_2(), &cache));
+
     // Abort clears all pending and resets active bytes
     prefetcher.abort();
     assert_eq!(prefetcher.pending_count(), 0);
     assert_eq!(prefetcher.total_bytes(), 0);
     assert_eq!(prefetcher.completed_bytes(), 0);
 
-    // Release worker thread so it terminates cleanly
+    // Release worker threads so they terminate cleanly
+    let _ = release_tx.send(());
     let _ = release_tx.send(());
 }
 

@@ -97,7 +97,7 @@ impl OctantApp {
             layer_request.var.name
         );
         self.block_prefetcher
-            .request(block_request, &self.block_cache);
+            .request_now(block_request, &self.block_cache);
     }
 
     /// Shows layer `id`'s latest request (`load.slice_request`, at `step`)
