@@ -48,6 +48,16 @@ impl Default for NavigationState {
 }
 
 impl NavigationState {
+    /// Sets how far the heatmap may zoom in, zooming out about the canvas
+    /// center to `max` when it is past it.
+    pub fn limit_heatmap_zoom(&mut self, max: f32) {
+        self.heatmap_max_zoom = max;
+        if self.heatmap_zoom > max {
+            self.heatmap_pan *= max / self.heatmap_zoom;
+            self.heatmap_zoom = max;
+        }
+    }
+
     pub fn reset_heatmap(&mut self) {
         self.heatmap_zoom = 1.0;
         self.heatmap_pan = egui::Vec2::ZERO;

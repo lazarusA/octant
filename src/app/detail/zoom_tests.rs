@@ -1,5 +1,5 @@
-//! How far a heatmap zooms in over a coarse level, and a failed tile fetch
-//! asked again while the view rests.
+//! How far a heatmap zooms in over a coarse level (and back within a lower
+//! limit), and a failed tile fetch asked again once while the view rests.
 
 use super::tests::{frame_at, plotted, tile_level};
 use super::want::max_zoom_over;
@@ -67,4 +67,40 @@ fn a_failed_tile_is_asked_again_while_the_view_rests() {
         std::thread::yield_now();
     }
     assert_eq!(tile_level(&app), Some(0));
+}
+
+#[test]
+fn a_tile_that_keeps_failing_is_asked_again_once() {
+    let mut state = super::DetailState::default();
+    let key = super::ViewKey {
+        pan: [0.0; 2],
+        zoom: 4.0,
+        aspect: [1.0; 2],
+        px: [20, 20],
+        context: 1,
+    };
+    state.view = Some(key);
+    state.retry_failed();
+    assert_eq!(state.view, None, "asked again");
+    state.view = Some(key);
+    state.retry_failed();
+    assert_eq!(state.view, Some(key), "not a second time");
+}
+
+#[test]
+fn a_lower_limit_zooms_out_about_the_center() {
+    let mut nav = crate::app::state::NavigationState {
+        heatmap_zoom: 2000.0,
+        heatmap_pan: egui::vec2(400.0, -80.0),
+        ..Default::default()
+    };
+    nav.limit_heatmap_zoom(MAX_ZOOM);
+    assert_eq!(nav.heatmap_zoom, MAX_ZOOM);
+    assert_eq!(
+        nav.heatmap_pan,
+        egui::vec2(10.0, -2.0),
+        "the same point centered"
+    );
+    nav.limit_heatmap_zoom(4096.0);
+    assert_eq!(nav.heatmap_zoom, MAX_ZOOM, "a higher limit leaves the view");
 }

@@ -50,7 +50,7 @@ impl OctantApp {
             && block.shape.len() >= 2
             && block.shape.get(c_dim).copied().unwrap_or(0) >= 1;
         let sliced = composite
-            .then(|| self.slice_composite(id, block, &window, CompositeStretch::default()))
+            .then(|| self.slice_composite(id, block, c_dim, &window, CompositeStretch::default()))
             .flatten();
         let Some(layer) = self.layers.get_mut(id) else {
             return;
@@ -86,17 +86,17 @@ impl OctantApp {
         }
     }
 
-    /// `window` of `block` as layer `id`'s composite, its channels stretched as
-    /// `stretch` records (else over their values, recorded); `None` when the
-    /// block holds no composite.
+    /// `window` of `block` as layer `id`'s composite over channel dimension
+    /// `c_dim`, its channels stretched as `stretch` records (else over their
+    /// values, recorded); `None` when the block holds no composite.
     pub(crate) fn slice_composite(
         &self,
         id: LayerId,
         block: &OctantBlock,
+        c_dim: usize,
         window: &PlaneWindow,
         mut stretch: CompositeStretch,
     ) -> Option<SlicedComposite> {
-        let c_dim = self.layer_channel_dim(id).unwrap_or(0);
         let anim_extent = self.layer_animated_dim_extent(id);
         let style = &self.layers.get(id)?.composite;
         let PlaneWindow {

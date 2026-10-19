@@ -33,6 +33,8 @@ pub struct GeoTiffBlockStore {
     pub(crate) tiff: TIFF,
     pub(crate) metadata: DatasetMetadata,
     pub(crate) decoder_registry: Arc<DecoderRegistry>,
+    /// Each IFD's band transforms (`BandScales::of_ifds`).
+    pub(crate) scales: Vec<BandScales>,
 }
 
 impl GeoTiffBlockStore {
@@ -126,12 +128,14 @@ impl GeoTiffBlockStore {
         let tiff = TIFF::new(ifds, meta_reader.endianness());
         let metadata = inspect_tiff(&tiff, name);
         let decoder_registry = Arc::new(create_decoder_registry());
+        let scales = BandScales::of_ifds(tiff.ifds());
         Ok(Self {
             uri: name.into(),
             reader,
             tiff,
             metadata,
             decoder_registry,
+            scales,
         })
     }
 
@@ -152,7 +156,7 @@ impl GeoTiffBlockStore {
         Some((
             ifds.get(idx)?,
             GeoSpatialBounds::of_ifd_in(ifds, idx)?,
-            BandScales::of_ifd_in(ifds, idx),
+            self.scales.get(idx).cloned().unwrap_or_default(),
         ))
     }
 }

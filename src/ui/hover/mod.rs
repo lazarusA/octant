@@ -4,6 +4,7 @@ pub mod camera;
 pub mod card;
 pub mod composite;
 mod composite_bands;
+mod composite_rows;
 pub mod detail;
 pub mod enrich;
 pub mod entries;

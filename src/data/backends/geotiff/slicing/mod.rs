@@ -24,7 +24,7 @@ use request::{palette_channel, parse_slice_request};
 
 /// Fetch and decode an `OctantBlock` from an IFD (whose bounds are
 /// `geo_bounds`, `GeoSpatialBounds::of_ifd_in`, and band transforms `scales`,
-/// `BandScales::of_ifd_in`) for a given `SliceRequest`.
+/// `BandScales::of_ifds`) for a given `SliceRequest`.
 #[allow(clippy::too_many_arguments)]
 pub async fn fetch_geotiff_block(
     ifd: &ImageFileDirectory,
@@ -110,8 +110,8 @@ pub async fn fetch_geotiff_block(
         )
         .await?;
         for (values, &band) in buffer.chunks_mut(plane_len).zip(&target_bands) {
-            if let Some(s) = scales.band(band) {
-                s.apply(values);
+            if let Some(c) = scales.band(band) {
+                c.transform_slice_in_place(values);
             }
         }
     }

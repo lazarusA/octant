@@ -1,9 +1,10 @@
 //! Band scale and offset from GDAL metadata, applied to fetched blocks.
 
 use super::bands::parse_gdal_metadata;
-use super::scale::{BandScale, BandScales};
+use super::scale::BandScales;
 use super::store::GeoTiffBlockStore;
 use super::test_utils::SyntheticTiffBuilder;
+use crate::data::DataCalibration;
 use crate::data::blocks::BlockStore;
 use crate::data::slice_request::SliceRequest;
 
@@ -22,17 +23,14 @@ fn scale_and_offset_are_read_per_band() {
   <Item name="SCALE" sample="3" role="scale">1</Item>
 </GDALMetadata>"#;
     let scales = BandScales::from_items(&parse_gdal_metadata(xml), 4);
+    let calibration = |scale_factor, add_offset| DataCalibration {
+        scale_factor,
+        add_offset,
+        ..Default::default()
+    };
     assert_eq!(scales.band(0), None);
-    let two = BandScale {
-        scale: 2.0,
-        offset: -5.0,
-    };
-    assert_eq!(scales.band(1), Some(two));
-    let shifted = BandScale {
-        scale: 1.0,
-        offset: 10.0,
-    };
-    assert_eq!(scales.band(2), Some(shifted));
+    assert_eq!(scales.band(1), Some(&calibration(Some(2.0), Some(-5.0))));
+    assert_eq!(scales.band(2), Some(&calibration(None, Some(10.0))));
     assert_eq!(scales.band(3), None, "the identity is no transform");
     assert_eq!(scales.band(9), None);
 }
@@ -47,19 +45,6 @@ fn metadata_without_transforms_or_with_bad_values_has_none() {
         BandScales::from_items(&parse_gdal_metadata(bad), 2),
         BandScales::default()
     );
-}
-
-#[test]
-fn applying_keeps_missing_values_missing() {
-    let s = BandScale {
-        scale: 0.5,
-        offset: 1.0,
-    };
-    let mut values = [2.0, f32::NAN, -4.0];
-    s.apply(&mut values);
-    assert_eq!(values[0], 2.0);
-    assert!(values[1].is_nan());
-    assert_eq!(values[2], -1.0);
 }
 
 #[test]

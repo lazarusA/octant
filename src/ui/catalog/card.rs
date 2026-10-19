@@ -27,7 +27,7 @@ pub fn render_entry_card(
                 ui.icon_toned(badge_icon, IconSize::Xs, badge_tone);
                 let color = badge_tone.color(ui.visuals());
                 ui.label(egui::RichText::new(badge).strong().small().color(color));
-                if entry.desktop_only() {
+                if cfg!(target_arch = "wasm32") && entry.desktop_only() {
                     desktop_only_chip(ui);
                 }
                 let size = if is_mobile { 13.5 } else { 14.0 };
@@ -68,7 +68,7 @@ fn load_button(ui: &mut egui::Ui, entry: &CatalogEntry, key: DatasetKey) -> egui
     }
 }
 
-/// The "[Desktop only]" chip of entries whose servers the browser cannot read.
+/// The browser's "[Desktop only]" chip of entries whose servers it cannot read.
 fn desktop_only_chip(ui: &mut egui::Ui) {
     let tone = IconTone::Warning;
     ui.icon_toned(Icon::Lock, IconSize::Xs, tone);

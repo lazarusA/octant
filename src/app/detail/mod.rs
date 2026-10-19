@@ -27,6 +27,7 @@
 
 #[cfg(test)]
 mod composite_tests;
+mod fetch;
 #[cfg(test)]
 mod fetch_tests;
 mod follow;
@@ -68,6 +69,8 @@ pub struct DetailState {
     refused: Option<TilePlan>,
     /// The view last decided for.
     view: Option<ViewKey>,
+    /// The view whose tile fetch failed and was asked again once.
+    failed: Option<ViewKey>,
     /// The latest view and the egui time it first showed.
     seen: Option<(ViewKey, f64)>,
     /// An overlay's: the base tile and overlay selection last followed

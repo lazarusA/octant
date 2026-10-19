@@ -1,62 +1,32 @@
 //! Per-band scale and offset from the GDAL metadata tag (`<Item role="scale">`,
-//! `<Item role="offset">`), which turn stored integers into physical values:
-//! `value = stored * scale + offset`. Blocks hold the physical values; the
-//! band's `SCALE` and `OFFSET` attributes (`bands::add_gdal_attributes`) say
-//! how they were stored.
+//! `<Item role="offset">`), which turn stored integers into physical values
+//! through the backends' shared `DataCalibration`. Blocks hold the physical
+//! values; the band's `SCALE` and `OFFSET` attributes
+//! (`bands::add_gdal_attributes`) say how they were stored.
 
 use async_tiff::ImageFileDirectory;
 
 use super::bands::{GdalItem, parse_gdal_metadata};
+use crate::data::DataCalibration;
 
-/// One band's linear transform; never the identity.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct BandScale {
-    pub scale: f64,
-    pub offset: f64,
-}
-
-impl BandScale {
-    /// Band `sample`'s transform among `items`, or `None` when it has none
-    /// (or the identity).
-    fn of(items: &[GdalItem], sample: usize) -> Option<Self> {
-        let value = |role: &str| {
-            items
-                .iter()
-                .find(|it| it.sample == Some(sample) && it.role.as_deref() == Some(role))
-                .and_then(|it| it.value.trim().parse::<f64>().ok())
-                .filter(|v| v.is_finite())
-        };
-        let scale = value("scale").filter(|&s| s != 0.0).unwrap_or(1.0);
-        let offset = value("offset").unwrap_or(0.0);
-        (scale != 1.0 || offset != 0.0).then_some(Self { scale, offset })
-    }
-
-    /// Applies the transform in place; missing values (NaN) stay missing.
-    pub fn apply(&self, values: &mut [f32]) {
-        let (s, o) = (self.scale as f32, self.offset as f32);
-        for v in values.iter_mut() {
-            *v = *v * s + o;
-        }
-    }
-}
-
-/// The transforms of an IFD's bands, by band index.
+/// The transforms of an IFD's bands, by band index (empty without any).
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct BandScales(Vec<Option<BandScale>>);
+pub struct BandScales(Vec<Option<DataCalibration>>);
 
 impl BandScales {
-    /// The transforms of IFD `idx` of `ifds`: its own, else, for an overview
-    /// of IFD 0 (GDAL writes the metadata tag on the full image only), IFD 0's.
-    pub fn of_ifd_in(ifds: &[ImageFileDirectory], idx: usize) -> Self {
-        let own = ifds.get(idx).map(Self::from_ifd).unwrap_or_default();
-        if idx == 0 || !own.is_empty() {
-            return own;
-        }
-        if crate::data::multiscale::geotiff::is_overview_of(ifds, idx) {
-            ifds.first().map(Self::from_ifd).unwrap_or_default()
-        } else {
-            own
-        }
+    /// The transforms of every IFD: its own, else, for an overview of IFD 0
+    /// (GDAL writes the metadata tag on the full image only), IFD 0's.
+    pub fn of_ifds(ifds: &[ImageFileDirectory]) -> Vec<Self> {
+        let own: Vec<Self> = ifds.iter().map(Self::from_ifd).collect();
+        let pick = |i: usize| {
+            let inherit = i > 0
+                && own.get(i).is_some_and(|s| s.0.is_empty())
+                && crate::data::multiscale::geotiff::is_overview_of(ifds, i);
+            own.get(if inherit { 0 } else { i })
+                .cloned()
+                .unwrap_or_default()
+        };
+        (0..ifds.len()).map(pick).collect()
     }
 
     fn from_ifd(ifd: &ImageFileDirectory) -> Self {
@@ -69,7 +39,7 @@ impl BandScales {
 
     /// The transforms of `samples` bands among `items`.
     pub fn from_items(items: &[GdalItem], samples: usize) -> Self {
-        let scales: Vec<_> = (0..samples).map(|b| BandScale::of(items, b)).collect();
+        let scales: Vec<_> = (0..samples).map(|b| band(items, b)).collect();
         Self(if scales.iter().any(Option::is_some) {
             scales
         } else {
@@ -77,12 +47,27 @@ impl BandScales {
         })
     }
 
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
     /// Band `band`'s transform.
-    pub fn band(&self, band: usize) -> Option<BandScale> {
-        self.0.get(band).copied().flatten()
+    pub fn band(&self, band: usize) -> Option<&DataCalibration> {
+        self.0.get(band)?.as_ref()
     }
+}
+
+/// Band `sample`'s scale and offset among `items`; `None` without either
+/// (identity values count as none).
+fn band(items: &[GdalItem], sample: usize) -> Option<DataCalibration> {
+    let value = |role: &str| {
+        items
+            .iter()
+            .find(|it| it.sample == Some(sample) && it.role.as_deref() == Some(role))
+            .and_then(|it| it.value.trim().parse::<f64>().ok())
+            .filter(|v| v.is_finite())
+    };
+    let scale_factor = value("scale").filter(|&s| s != 0.0 && s != 1.0);
+    let add_offset = value("offset").filter(|&o| o != 0.0);
+    (scale_factor.is_some() || add_offset.is_some()).then_some(DataCalibration {
+        scale_factor,
+        add_offset,
+        ..Default::default()
+    })
 }

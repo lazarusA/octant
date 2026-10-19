@@ -86,12 +86,8 @@ pub static GEOTIFF_DESKTOP_CATALOG: &[CatalogEntry] = &[
 
 impl CatalogEntry {
     /// Whether only the desktop app can open this entry (it is one of
-    /// `GEOTIFF_DESKTOP_CATALOG`'s), found by its key in a set built once,
-    /// since every card asks each frame.
+    /// `GEOTIFF_DESKTOP_CATALOG`'s).
     pub fn desktop_only(&self) -> bool {
-        static KEYS: std::sync::OnceLock<std::collections::HashSet<&'static str>> =
-            std::sync::OnceLock::new();
-        KEYS.get_or_init(|| GEOTIFF_DESKTOP_CATALOG.iter().map(|e| e.key).collect())
-            .contains(self.key)
+        GEOTIFF_DESKTOP_CATALOG.iter().any(|e| e.key == self.key)
     }
 }
