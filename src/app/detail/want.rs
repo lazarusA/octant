@@ -10,6 +10,7 @@ use super::geometry::{Axis, pixels_over};
 use crate::app::OctantApp;
 use crate::app::layers::LevelChoice;
 use crate::app::pipeline::paint_layer::CanvasView;
+use crate::app::state::navigation::MAX_ZOOM;
 use crate::data::multiscale::fit_level;
 use crate::plots::PlotType;
 
@@ -56,6 +57,28 @@ impl OctantApp {
         })
     }
 
+    /// How far the heatmap may zoom in: over a level of a multiscale variable
+    /// read by Auto (which detail tiles replace with finer ones), until each
+    /// level-0 cell spans `PIXELS_PER_CELL` screen pixels (the plotted level
+    /// has about a pixel per cell when the whole window shows), never less
+    /// than [`MAX_ZOOM`].
+    pub(crate) fn heatmap_max_zoom(&self) -> f32 {
+        let plotted = self.plotted();
+        let factor = plotted
+            .variable_info()
+            .filter(|_| plotted.level == LevelChoice::Auto)
+            .and_then(|var| {
+                let r = var.multiscale.as_ref()?;
+                let (Some(x), Some(y), _) = var.resolve_spatial_dim_indices(&plotted.dim_config)
+                else {
+                    return None;
+                };
+                let level = r.info()?;
+                Some(level.factor.get(x)?.max(*level.factor.get(y)?))
+            });
+        max_zoom_over(factor.unwrap_or(1.0))
+    }
+
     /// Whether `layer`'s tile fetch was lost (aborted: neither pending nor
     /// cached).
     pub(super) fn fetch_lost(&self, layer: &crate::app::layers::Layer) -> bool {
@@ -66,7 +89,7 @@ impl OctantApp {
 
     /// The plot a tile belongs to, when the base layer can have one: a
     /// heatmap at rest reading a level of a multiscale variable chosen by
-    /// Auto, on a regular grid, without composite.
+    /// Auto, on a regular grid.
     pub(super) fn detail_context(&self, plot_type: PlotType) -> Option<u64> {
         let base = &self.layers.base;
         let plotted = base.selection();
@@ -76,11 +99,10 @@ impl OctantApp {
         let readable = plot_type == PlotType::Heatmap
             && regular
             && !self.playback.is_playing
-            && !base.composite.enabled
             && plotted.level == LevelChoice::Auto
             && plotted.variable_info()?.multiscale.is_some();
         let step = self.playback.current_timestep;
-        readable.then(|| plot_hash(plotted, step, &base.data.flipped_dims))
+        readable.then(|| plot_hash(plotted, step, &base.data.flipped_dims, &base.composite))
     }
 
     /// Drops what no longer belongs to the plot (`context`, `None` when the
@@ -105,6 +127,15 @@ impl OctantApp {
         }
         lost
     }
+}
+
+/// Screen pixels a level-0 cell spans at the deepest zoom.
+const PIXELS_PER_CELL: f64 = 4.0;
+
+/// How far the heatmap may zoom in over a level `factor` times coarser than
+/// level 0 (f32 keeps the pan within a pixel up to about 10^4).
+pub(super) fn max_zoom_over(factor: f64) -> f32 {
+    ((factor * PIXELS_PER_CELL) as f32).clamp(MAX_ZOOM, 1e4)
 }
 
 /// The level-0 window the view shows: the `visible` positions along the x
@@ -132,12 +163,13 @@ fn level0_window(
         .collect()
 }
 
-/// What a plotted selection shows at `step` with `flips`: a tile is kept
-/// while it stays the same.
+/// What a plotted selection shows at `step` with `flips` and `composite`: a
+/// tile is kept while it stays the same.
 pub(super) fn plot_hash(
     sel: &crate::app::layers::VariableSelection,
     step: usize,
     flips: &[String],
+    composite: &crate::app::layers::CompositeStyle,
 ) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     sel.metadata_generation.hash(&mut h);
@@ -146,5 +178,6 @@ pub(super) fn plot_hash(
     sel.dim_indices.hash(&mut h);
     step.hash(&mut h);
     flips.hash(&mut h);
+    composite.hash_into(&mut h);
     h.finish()
 }

@@ -133,5 +133,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Не удалось прочитать поля лунки. Нажмите, чтобы повторить"
         }
         DatasetKey::CategoryMicroscopy => "Микроскопия",
+        DatasetKey::CategorySoil => "Почва",
+        DatasetKey::BadgeDesktopOnly => "Только для ПК",
+        DatasetKey::DesktopOnlyHint => {
+            "Этот сервер не разрешает доступ из браузера. Откройте его в настольном приложении Octant."
+        }
     })
 }

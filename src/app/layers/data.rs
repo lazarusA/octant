@@ -15,6 +15,9 @@ pub struct LayerData {
     pub volume_allocations: u64,
     /// Block window behind the plotted 2D composite, for raw per-channel hover values.
     pub composite_probe: Option<crate::data::slicing::CompositeProbe>,
+    /// How the plotted 2D composite stretched its channels, which its detail
+    /// tiles reuse.
+    pub composite_stretch: Option<crate::data::slicing::CompositeStretch>,
     /// Dimensions the plotted data runs opposite to storage order along
     /// (`OctantBlock::flipped_dims`), so the hover can map screen indices back.
     pub flipped_dims: Vec<String>,

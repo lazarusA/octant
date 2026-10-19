@@ -2,7 +2,27 @@
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::data::MatrixData;
 use crate::data::octant_block::OctantBlock;
+use crate::data::slicing::{CompositeProbe, CompositeStretch};
+
+/// The plane of a block a 2D slice reads: its x and y dimensions, their local
+/// (oriented) ranges and the indices fixing the others.
+pub(crate) struct PlaneWindow<'a> {
+    pub x_dim: usize,
+    pub y_dim: usize,
+    pub x_range: (usize, usize),
+    pub y_range: (usize, usize),
+    pub fixed: &'a [usize],
+}
+
+/// A 2D composite: its packed colors, the block window behind them and how
+/// its channels were stretched.
+pub(crate) struct SlicedComposite {
+    pub matrix: MatrixData,
+    pub probe: CompositeProbe,
+    pub stretch: CompositeStretch,
+}
 
 impl OctantApp {
     /// Projects a 2D scalar or composite block hyperslab onto layer `id`'s 2D render pipeline.
@@ -19,28 +39,34 @@ impl OctantApp {
         compute_bounds: bool,
         c_dim: usize,
     ) {
+        let window = PlaneWindow {
+            x_dim,
+            y_dim,
+            x_range,
+            y_range,
+            fixed: fixed_indices,
+        };
+        let composite = self.layers.get(id).is_some_and(|l| l.composite.enabled)
+            && block.shape.len() >= 2
+            && block.shape.get(c_dim).copied().unwrap_or(0) >= 1;
+        let sliced = composite
+            .then(|| self.slice_composite(id, block, c_dim, &window, CompositeStretch::default()))
+            .flatten();
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
         layer.data.flipped_dims.clone_from(&block.flipped_dims);
         layer.data.composite_probe = None;
-        let mdata_opt = if layer.composite.enabled
-            && block.shape.len() >= 2
-            && block.shape.get(c_dim).copied().unwrap_or(0) >= 1
-        {
-            self.slice_2d_composite_data(
-                id,
-                block,
-                c_dim,
-                x_dim,
-                y_dim,
-                x_range,
-                y_range,
-                fixed_indices,
-            )
-        } else {
-            None
-        };
+        let before = layer.data.composite_stretch.take();
+        let mdata_opt = sliced.map(|c| {
+            // Tiles stretched otherwise would show seams.
+            if before.as_ref() != Some(&c.stretch) {
+                layer.data.detail.discard_tile();
+            }
+            layer.data.composite_probe = Some(c.probe);
+            layer.data.composite_stretch = Some(c.stretch);
+            c.matrix
+        });
 
         let mdata_opt = mdata_opt.or_else(|| {
             block.slice_2d_with_ranges(
@@ -60,24 +86,27 @@ impl OctantApp {
         }
     }
 
-    /// Slices the composite and, when it succeeds, records the block window behind it for
-    /// the hover's raw channel values.
-    #[allow(clippy::too_many_arguments)]
-    fn slice_2d_composite_data(
-        &mut self,
+    /// `window` of `block` as layer `id`'s composite over channel dimension
+    /// `c_dim`, its channels stretched as `stretch` records (else over their
+    /// values, recorded); `None` when the block holds no composite.
+    pub(crate) fn slice_composite(
+        &self,
         id: LayerId,
         block: &OctantBlock,
         c_dim: usize,
-        x_dim: usize,
-        y_dim: usize,
-        x_range: (usize, usize),
-        y_range: (usize, usize),
-        fixed_indices: &[usize],
-    ) -> Option<crate::data::MatrixData> {
-        let is_geotiff = self.layer_is_geotiff(id);
+        window: &PlaneWindow,
+        mut stretch: CompositeStretch,
+    ) -> Option<SlicedComposite> {
         let anim_extent = self.layer_animated_dim_extent(id);
-        let layer = self.layers.get_mut(id)?;
-        let matrix = if !is_geotiff && !layer.composite.channel_configs.is_empty() {
+        let style = &self.layers.get(id)?.composite;
+        let PlaneWindow {
+            x_dim,
+            y_dim,
+            x_range,
+            y_range,
+            fixed,
+        } = *window;
+        let matrix = if !self.layer_is_geotiff(id) && !style.channel_configs.is_empty() {
             crate::data::slicing::slice_multichannel_composite_nd(
                 block,
                 c_dim,
@@ -85,12 +114,12 @@ impl OctantApp {
                 y_dim,
                 x_range,
                 y_range,
-                fixed_indices,
-                &layer.composite.channel_configs,
+                fixed,
+                &style.channel_configs,
                 anim_extent,
+                &mut stretch,
             )
         } else {
-            let opt_channels = layer.composite.rgb_channels.map(Some);
             crate::data::slicing::slice_rgb_composite_nd(
                 block,
                 c_dim,
@@ -98,20 +127,17 @@ impl OctantApp {
                 y_dim,
                 x_range,
                 y_range,
-                fixed_indices,
-                opt_channels,
+                fixed,
+                style.rgb_channels.map(Some),
                 anim_extent,
+                &mut stretch,
             )
         }?;
-        layer.data.composite_probe = Some(crate::data::slicing::CompositeProbe::new(
-            block,
-            c_dim,
-            x_dim,
-            y_dim,
-            x_range,
-            y_range,
-            fixed_indices,
-        ));
-        Some(matrix)
+        let probe = CompositeProbe::new(block, c_dim, x_dim, y_dim, x_range, y_range, fixed);
+        Some(SlicedComposite {
+            matrix,
+            probe,
+            stretch,
+        })
     }
 }

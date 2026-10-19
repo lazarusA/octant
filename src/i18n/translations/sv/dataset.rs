@@ -131,5 +131,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Kunde inte läsa brunnens fält. Klicka för att försöka igen"
         }
         DatasetKey::CategoryMicroscopy => "Mikroskopi",
+        DatasetKey::CategorySoil => "Mark",
+        DatasetKey::BadgeDesktopOnly => "Endast skrivbord",
+        DatasetKey::DesktopOnlyHint => {
+            "Den här servern tillåter inte åtkomst från webbläsaren. Öppna den i Octants skrivbordsapp."
+        }
     })
 }

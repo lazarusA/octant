@@ -143,5 +143,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Impossible de lire les champs du puits. Cliquez pour réessayer"
         }
         DatasetKey::CategoryMicroscopy => "Microscopie",
+        DatasetKey::CategorySoil => "Sol",
+        DatasetKey::BadgeDesktopOnly => "Bureau uniquement",
+        DatasetKey::DesktopOnlyHint => {
+            "Ce serveur n'autorise pas l'accès depuis le navigateur. Ouvrez-le dans l'application de bureau Octant."
+        }
     })
 }

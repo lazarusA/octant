@@ -133,5 +133,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Kuopan kenttiä ei voitu lukea. Yritä uudelleen napsauttamalla"
         }
         DatasetKey::CategoryMicroscopy => "Mikroskopia",
+        DatasetKey::CategorySoil => "Maaperä",
+        DatasetKey::BadgeDesktopOnly => "Vain työpöytä",
+        DatasetKey::DesktopOnlyHint => {
+            "Tämä palvelin ei salli selaimen käyttöä. Avaa se Octantin työpöytäsovelluksessa."
+        }
     })
 }

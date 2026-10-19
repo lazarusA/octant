@@ -135,5 +135,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlateNoFields => "이 획득에는 시야가 없습니다",
         DatasetKey::PlateWellUnreadable => "웰의 시야를 읽을 수 없습니다. 클릭하여 다시 시도",
         DatasetKey::CategoryMicroscopy => "현미경 이미지",
+        DatasetKey::CategorySoil => "토양",
+        DatasetKey::BadgeDesktopOnly => "데스크톱 전용",
+        DatasetKey::DesktopOnlyHint => {
+            "이 서버는 브라우저 접근을 허용하지 않습니다. Octant 데스크톱 앱에서 여세요."
+        }
     })
 }

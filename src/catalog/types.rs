@@ -17,6 +17,8 @@ pub enum CatalogCategoryFilter {
     Zarr,
     Icechunk,
     GeoTiff,
+    /// Soil property maps (Cloud-Optimized GeoTIFFs).
+    Soil,
     /// Bioimaging OME-Zarr datasets.
     Microscopy,
     Procedural,

@@ -3,10 +3,11 @@
 use super::{CatalogCategoryFilter, get_catalog_entries, total_entries};
 use crate::app::StoreKind;
 
-const CATEGORIES: [CatalogCategoryFilter; 5] = [
+const CATEGORIES: [CatalogCategoryFilter; 6] = [
     CatalogCategoryFilter::Zarr,
     CatalogCategoryFilter::Icechunk,
     CatalogCategoryFilter::GeoTiff,
+    CatalogCategoryFilter::Soil,
     CatalogCategoryFilter::Microscopy,
     CatalogCategoryFilter::Procedural,
 ];
@@ -54,6 +55,41 @@ fn only_microscopy_entries_are_ome() {
         let ome = category == CatalogCategoryFilter::Microscopy;
         for e in get_catalog_entries(category) {
             assert_eq!(e.is_ome(), ome, "{}", e.key);
+        }
+    }
+}
+
+#[test]
+fn soil_entries_are_remote_geotiffs() {
+    let entries = get_catalog_entries(CatalogCategoryFilter::Soil);
+    assert!(!entries.is_empty());
+    for e in entries {
+        assert_eq!(e.store_kind, StoreKind::RemoteGeoTiff, "{}", e.key);
+        assert!(e.store.starts_with("https://"), "{}", e.key);
+        assert_eq!(
+            crate::utils::infer_store_kind_from_target(e.store).ok(),
+            Some(StoreKind::RemoteGeoTiff),
+            "{} opens as GeoTIFF",
+            e.key
+        );
+    }
+}
+
+#[test]
+fn only_listed_geotiffs_are_desktop_only() {
+    let geotiff = get_catalog_entries(CatalogCategoryFilter::GeoTiff);
+    for e in &geotiff {
+        let listed = super::GEOTIFF_DESKTOP_CATALOG
+            .iter()
+            .any(|d| d.key == e.key);
+        assert_eq!(e.desktop_only(), listed, "{}", e.key);
+    }
+    assert!(geotiff.iter().any(|e| e.desktop_only()));
+    for &category in &CATEGORIES {
+        if category != CatalogCategoryFilter::GeoTiff {
+            for e in get_catalog_entries(category) {
+                assert!(!e.desktop_only(), "{}", e.key);
+            }
         }
     }
 }

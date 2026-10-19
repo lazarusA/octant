@@ -133,5 +133,8 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlateNoFields => "此采集中没有视野",
         DatasetKey::PlateWellUnreadable => "无法读取孔的视野。点击重试",
         DatasetKey::CategoryMicroscopy => "显微成像",
+        DatasetKey::CategorySoil => "土壤",
+        DatasetKey::BadgeDesktopOnly => "仅限桌面版",
+        DatasetKey::DesktopOnlyHint => "此服务器不允许浏览器访问。请在 Octant 桌面版中打开。",
     })
 }

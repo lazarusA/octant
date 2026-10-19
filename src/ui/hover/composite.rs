@@ -9,7 +9,8 @@ use crate::data::slicing::CompositeProbe;
 use crate::data::{DatasetMetadata, VariableInfo};
 use crate::i18n::{HoverKey, PlotKey, filled, tr};
 use crate::ui::hover::composite_bands::{BandNames, is_non_visible, visible_color};
-use crate::ui::hover::field::HoverField;
+
+pub use super::composite_rows::{composite_fields, composite_rows};
 
 /// A band combination, named the way GIS tools name them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -156,31 +157,6 @@ pub fn build_labels(
     }
 }
 
-/// One row per composite channel at composite pixel `(px, py)`: `R  NIR 0.312` for band
-/// mappings, `DAPI  1234` for overlays.
-pub fn composite_fields(
-    app: &OctantApp,
-    labels: &CompositeLabels,
-    units: &str,
-    (px, py): (usize, usize),
-) -> Vec<HoverField> {
-    let probe = app.layers.base.data.composite_probe.as_ref();
-    let raw = |band: usize| probe.and_then(|p| p.sample(band, px, py));
-    labels
-        .channels
-        .iter()
-        .map(|c| {
-            let mut value = String::with_capacity(32);
-            if let Some(name) = &c.band_name {
-                value.push_str(name);
-                value.push(' ');
-            }
-            write_raw(&mut value, raw(c.band), units);
-            HoverField::new(Arc::clone(&c.label), value)
-        })
-        .collect()
-}
-
 /// Mirrors the projection's choice between the tinted overlay and the RGB band mapping.
 fn is_overlay(app: &OctantApp) -> bool {
     !app.is_geotiff() && !app.layers.base.composite.channel_configs.is_empty()
@@ -206,41 +182,4 @@ fn rgb_bands(app: &OctantApp) -> [usize; 3] {
             .map_or(band, |p: &CompositeProbe| p.resolve_channel(band))
     };
     app.layers.base.composite.rgb_channels.map(resolve)
-}
-
-/// Appends a channel's raw value (with `units`), or "No data", to `out`.
-fn write_raw(out: &mut String, raw: Option<f32>, units: &str) {
-    let Some(value) = raw else {
-        out.push_str(tr(HoverKey::NoData));
-        return;
-    };
-    let mut buf = [0u8; 32];
-    out.push_str(crate::ui::hover::card::HoverValue::from_raw(value, None).format(&mut buf));
-    if !units.is_empty() && !value.is_nan() {
-        out.push(' ');
-        out.push_str(units);
-    }
-}
-
-/// The composite's name, after prepending one row per channel (its band and raw value at
-/// `pixel`) to `entries` for flat 2D composites; `None` without a composite.
-pub fn composite_rows(
-    app: &OctantApp,
-    ctx: &egui::Context,
-    meta: Option<&DatasetMetadata>,
-    var: Option<&VariableInfo>,
-    units: &str,
-    pixel: Option<(usize, usize)>,
-    entries: &mut Vec<HoverField>,
-) -> Option<CompositeKind> {
-    if !app.layers.base.composite.enabled {
-        return None;
-    }
-    let labels = composite_labels(app, ctx, meta, var);
-    if let Some(pixel) = pixel
-        && app.layers.base.data.composite_probe.is_some()
-    {
-        entries.splice(0..0, composite_fields(app, &labels, units, pixel));
-    }
-    Some(labels.kind)
 }

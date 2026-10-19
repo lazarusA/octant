@@ -7,9 +7,11 @@ use std::sync::Arc;
 use super::{DetailTile, MARGIN, PendingDetail, TilePlan, Want};
 use crate::app::OctantApp;
 use crate::app::block_loading::block_axes;
+use crate::app::block_loading::projection_2d::PlaneWindow;
 use crate::app::layers::LayerId;
 use crate::app::multiscale::to_level;
-use crate::data::{BlockCacheKey, BlockRequest, MatrixData, OctantBlock};
+use crate::data::slicing::CompositeProbe;
+use crate::data::{BlockCacheKey, MatrixData, OctantBlock};
 use crate::plots::HeatmapRenderer;
 
 impl OctantApp {
@@ -38,6 +40,7 @@ impl OctantApp {
             origin,
             end,
             matrix: None,
+            probe: None,
             context: want.context,
             cover,
             uv: [u0, v0, u1, v1],
@@ -82,7 +85,7 @@ impl OctantApp {
     /// Slices `block` into `pending`'s tile and draws it; nothing when the
     /// block runs in another orientation than the plot.
     pub(super) fn show_detail(&mut self, pending: PendingDetail, block: &OctantBlock) {
-        let Some(matrix) = self.slice_tile(&pending, block) else {
+        let Some((matrix, probe)) = self.slice_tile(&pending, block) else {
             log::debug!("Detail tile of '{}' skipped", block.variable_name);
             return;
         };
@@ -111,13 +114,20 @@ impl OctantApp {
             layer.renderers.detail = Some(renderer);
         }
         tile.matrix = Some(Arc::new(matrix));
+        tile.probe = probe;
         layer.data.detail.tile = Some(tile);
     }
 
-    /// `block` sliced into `pending`'s tile like a plotted block; `None` when
-    /// it runs in another orientation than its layer's plot.
-    fn slice_tile(&self, pending: &PendingDetail, block: &OctantBlock) -> Option<MatrixData> {
-        let flips = &self.layers.get(pending.layer)?.data.flipped_dims;
+    /// `block` sliced into `pending`'s tile like a plotted block (a composite
+    /// with its plot's stretch, and the window behind it); `None` when it runs
+    /// in another orientation than its layer's plot.
+    fn slice_tile(
+        &self,
+        pending: &PendingDetail,
+        block: &OctantBlock,
+    ) -> Option<(MatrixData, Option<CompositeProbe>)> {
+        let layer = self.layers.get(pending.layer)?;
+        let flips = &layer.data.flipped_dims;
         let same_flips = flips.len() == block.flipped_dims.len()
             && block.flipped_dims.iter().all(|f| flips.contains(f));
         if !same_flips || block.dimension_names != pending.dims {
@@ -135,16 +145,31 @@ impl OctantApp {
         );
         let (_, local_x) = block_axes::dim_bounds(block, dims, bx, ranges);
         let (_, local_y) = block_axes::dim_bounds(block, dims, by, ranges);
-        block.slice_2d_with_ranges(
-            bx,
-            by,
-            block.oriented_range(bx, local_x),
-            block.oriented_range(by, local_y),
-            &fixed,
+        let window = PlaneWindow {
+            x_dim: bx,
+            y_dim: by,
+            x_range: block.oriented_range(bx, local_x),
+            y_range: block.oriented_range(by, local_y),
+            fixed: &fixed,
+        };
+        if layer.composite.enabled {
+            let stretch = layer.data.composite_stretch.clone().unwrap_or_default();
+            let c_dim = self.layer_channel_dim(pending.layer).unwrap_or(0);
+            if let Some(c) = self.slice_composite(pending.layer, block, c_dim, &window, stretch) {
+                return Some((c.matrix, Some(c.probe)));
+            }
+        }
+        let matrix = block.slice_2d_with_ranges(
+            window.x_dim,
+            window.y_dim,
+            window.x_range,
+            window.y_range,
+            window.fixed,
             self.layer_animated_dim_extent(pending.layer),
             &block.variable_name,
             false,
-        )
+        )?;
+        Some((matrix, None))
     }
 
     /// Reads the coordinates of the tile's level variable `idx` in the
@@ -153,83 +178,5 @@ impl OctantApp {
         if let Some((source_id, store, var)) = self.coordinate_request(self.plotted(), idx) {
             self.coordinate_loader.request(&source_id, store, var);
         }
-    }
-
-    /// Asks for `want`'s tile: shown at once from the block cache, else
-    /// fetched and shown when it arrives (`accept_detail_block`).
-    pub(super) fn request_detail(&mut self, want: &Want) {
-        if let Some(plan) = self.plan_detail(want) {
-            self.request_tile(plan);
-        }
-    }
-
-    /// Shows a planned tile at once from the block cache, else fetches it.
-    pub(super) fn request_tile(&mut self, plan: TilePlan) {
-        let (pending, slice, handle) = plan;
-        if let Some(block) = self.block_cache.get(&pending.key) {
-            self.show_detail(pending, &block);
-            return;
-        }
-        let request = BlockRequest::new(handle.clone(), slice.clone());
-        // Taken, or already fetched for another request (a layer's block).
-        let taken = self.block_prefetcher.request(request, &self.block_cache)
-            || self.block_prefetcher.is_pending(&pending.key);
-        let Some(layer) = self.layers.get_mut(pending.layer) else {
-            return;
-        };
-        let state = &mut layer.data.detail;
-        state.drop_request();
-        if taken {
-            state.pending = Some(pending);
-        } else {
-            state.refused = Some((pending, slice, handle));
-        }
-    }
-
-    /// Asks again for the tiles refused while every worker was busy; called
-    /// once fetches complete.
-    pub(crate) fn retry_refused_details(&mut self) {
-        let plans: Vec<TilePlan> = self
-            .layers
-            .iter_mut()
-            .filter_map(|l| l.data.detail.refused.take())
-            .collect();
-        for plan in plans {
-            self.request_tile(plan);
-        }
-    }
-
-    /// Takes a fetch result when it is the pending tile's (shown and cached,
-    /// or dropped with a log when the fetch failed); whether it was.
-    pub(crate) fn take_detail_result(
-        &mut self,
-        key: &BlockCacheKey,
-        result: &Result<crate::data::OctantBlock, String>,
-    ) -> bool {
-        let waiting = |l: &crate::app::layers::Layer| {
-            l.data
-                .detail
-                .pending
-                .as_ref()
-                .is_some_and(|p| &p.key == key)
-        };
-        let Some(id) = self.layers.iter().find(|l| waiting(l)).map(|l| l.id()) else {
-            return false;
-        };
-        let Some(pending) = self
-            .layers
-            .get_mut(id)
-            .and_then(|l| l.data.detail.pending.take())
-        else {
-            return false;
-        };
-        match result {
-            Ok(block) => {
-                self.block_cache.put(key.clone(), block.clone());
-                self.show_detail(pending, block);
-            }
-            Err(e) => log::warn!("Detail tile of '{}' failed: {e}", key.variable_name),
-        }
-        true
     }
 }

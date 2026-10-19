@@ -26,6 +26,9 @@
 //! an overlay's tile under the pointer (`ui/hover/overlays.rs`).
 
 #[cfg(test)]
+mod composite_tests;
+mod fetch;
+#[cfg(test)]
 mod fetch_tests;
 mod follow;
 #[cfg(test)]
@@ -37,6 +40,8 @@ mod geometry_tests;
 mod tests;
 mod tile;
 mod want;
+#[cfg(test)]
+mod zoom_tests;
 
 use crate::app::OctantApp;
 use crate::app::pipeline::paint_layer::CanvasView;
@@ -64,6 +69,8 @@ pub struct DetailState {
     refused: Option<TilePlan>,
     /// The view last decided for.
     view: Option<ViewKey>,
+    /// The view whose tile fetch failed and was asked again once.
+    failed: Option<ViewKey>,
     /// The latest view and the egui time it first showed.
     seen: Option<(ViewKey, f64)>,
     /// An overlay's: the base tile and overlay selection last followed
@@ -74,6 +81,14 @@ pub struct DetailState {
 impl DetailState {
     pub fn clear(&mut self) {
         *self = Self::default();
+    }
+
+    /// Drops the tile shown, to be decided again once the view rests: its
+    /// layer's composite stretched its channels anew.
+    pub(crate) fn discard_tile(&mut self) {
+        self.tile = None;
+        self.view = None;
+        self.follows = None;
     }
 
     /// Drops the tile being fetched or waiting for a worker.
@@ -97,6 +112,8 @@ pub struct DetailTile {
     pub end: [u64; 2],
     /// The tile's values, kept for the hover once it is shown.
     pub matrix: Option<std::sync::Arc<crate::data::MatrixData>>,
+    /// A composite tile's block window, for the hover's channel values.
+    pub probe: Option<crate::data::slicing::CompositeProbe>,
     /// The plot it belongs to (`OctantApp::detail_context`).
     pub context: u64,
     /// Level-0 positions it covers along x and y.

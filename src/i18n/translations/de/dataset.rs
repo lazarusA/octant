@@ -143,5 +143,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Felder des Wells konnten nicht gelesen werden. Klicken, um es erneut zu versuchen"
         }
         DatasetKey::CategoryMicroscopy => "Mikroskopie",
+        DatasetKey::CategorySoil => "Boden",
+        DatasetKey::BadgeDesktopOnly => "Nur Desktop",
+        DatasetKey::DesktopOnlyHint => {
+            "Dieser Server erlaubt keinen Zugriff aus dem Browser. Öffnen Sie ihn in der Octant-Desktop-App."
+        }
     })
 }

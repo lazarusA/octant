@@ -3,10 +3,13 @@
 use crate::data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 
+use super::stretch::CompositeStretch;
 use super::types::ChannelColorConfig;
 use super::utils::blend_channels;
 
-/// Slices an N-dimensional `OctantBlock` with unique per-channel color tints additively.
+/// Slices an N-dimensional `OctantBlock` with unique per-channel color tints additively,
+/// channels without a window stretched as `stretch` records (else over their values,
+/// recorded).
 #[allow(clippy::too_many_arguments)]
 pub fn slice_multichannel_composite_nd(
     block: &OctantBlock,
@@ -18,6 +21,7 @@ pub fn slice_multichannel_composite_nd(
     fixed_indices: &[usize],
     channel_configs: &[ChannelColorConfig],
     anim_extent: usize,
+    stretch: &mut CompositeStretch,
 ) -> Option<MatrixData> {
     if block.shape.len() < 2 || c_dim >= block.shape.len() {
         return None;
@@ -30,6 +34,7 @@ pub fn slice_multichannel_composite_nd(
         fixed_indices,
         channel_configs,
         width.checked_mul(height)?,
+        stretch,
         |fixed, cfg| {
             let data = block
                 .slice_2d_with_ranges(x_dim, y_dim, x_range, y_range, fixed, 1, &cfg.name, true)?;

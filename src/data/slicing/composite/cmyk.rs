@@ -3,6 +3,7 @@
 use crate::data::MatrixData;
 use crate::data::octant_block::OctantBlock;
 
+use super::stretch::{CompositeStretch, Stretch};
 use super::utils::{compute_normalization_scale, linear_to_srgb, pack_rgb};
 
 /// Whether attributes, read through `get`, tag CMYK inks: a `photometric` or `color_space`
@@ -34,18 +35,28 @@ pub fn slice_cmyk_composite(
     }
     let plane = |k: usize| &block.values[k * plane_size..(k + 1) * plane_size];
     let planes = [plane(0), plane(1), plane(2), plane(3)];
-    blend_cmyk_planes(planes, width, height, &block.variable_name, anim_extent)
+    let mut stretch = CompositeStretch::default();
+    blend_cmyk_planes(
+        planes,
+        width,
+        height,
+        &block.variable_name,
+        anim_extent,
+        &mut stretch,
+    )
 }
 
-/// Converts four `width * height` C, M, Y, K planes into a TrueColor RGB `MatrixData`.
+/// Converts four `width * height` C, M, Y, K planes into a TrueColor RGB `MatrixData`, the
+/// inks stretched as `stretch` records (else over their values, recorded).
 pub fn blend_cmyk_planes(
     inks: [&[f32]; 4],
     width: usize,
     height: usize,
     variable_name: &str,
     anim_extent: usize,
+    stretch: &mut CompositeStretch,
 ) -> Option<MatrixData> {
-    let values = blend_cmyk(inks, width.checked_mul(height)?)?;
+    let values = blend_cmyk_stretched(inks, width.checked_mul(height)?, stretch)?;
     Some(MatrixData::new(
         width,
         height,
@@ -59,20 +70,40 @@ pub fn blend_cmyk_planes(
 
 /// Packs the first `len` samples of the C, M, Y, K inks into TrueColor RGB, normalizing
 /// all inks by their shared range; `None` when an ink is shorter than `len`.
-pub fn blend_cmyk([c, m, y, k]: [&[f32]; 4], len: usize) -> Option<Vec<f32>> {
+pub fn blend_cmyk(inks: [&[f32]; 4], len: usize) -> Option<Vec<f32>> {
+    blend_cmyk_stretched(inks, len, &mut CompositeStretch::default())
+}
+
+/// The inks' shared stretch over their values.
+fn ink_stretch(inks: [&[f32]; 4]) -> Stretch {
+    let (g_min, g_max) = inks.iter().fold((f32::MAX, f32::MIN), |(lo, hi), ink| {
+        let (min, max) = crate::utils::compute_finite_min_max(ink);
+        (lo.min(min), hi.max(max))
+    });
+    let is_i8 = (-128.0..0.0).contains(&g_min) && g_max <= 127.0;
+    let (scale, offset) = compute_normalization_scale(g_min, g_max, is_i8, 1.0);
+    Stretch {
+        scale,
+        offset,
+        is_i8,
+    }
+}
+
+/// [`blend_cmyk`] with the inks stretched as `stretch` records (else over their values,
+/// recorded).
+fn blend_cmyk_stretched(
+    [c, m, y, k]: [&[f32]; 4],
+    len: usize,
+    stretch: &mut CompositeStretch,
+) -> Option<Vec<f32>> {
     if [c, m, y, k].iter().any(|p| p.len() < len) {
         return None;
     }
-    let (c_min, c_max) = crate::utils::compute_finite_min_max(c);
-    let (m_min, m_max) = crate::utils::compute_finite_min_max(m);
-    let (y_min, y_max) = crate::utils::compute_finite_min_max(y);
-    let (k_min, k_max) = crate::utils::compute_finite_min_max(k);
-
-    let g_min = c_min.min(m_min).min(y_min).min(k_min);
-    let g_max = c_max.max(m_max).max(y_max).max(k_max);
-    let is_i8_cmyk = (-128.0..0.0).contains(&g_min) && g_max <= 127.0;
-
-    let (scale, offset) = compute_normalization_scale(g_min, g_max, is_i8_cmyk, 1.0);
+    let Stretch {
+        scale,
+        offset,
+        is_i8: is_i8_cmyk,
+    } = stretch.inks(|| ink_stretch([c, m, y, k]));
     let mut values = Vec::with_capacity(len);
 
     for i in 0..len {

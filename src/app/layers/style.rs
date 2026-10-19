@@ -209,6 +209,26 @@ pub struct CompositeStyle {
     pub channel_configs: Vec<crate::data::slicing::ChannelColorConfig>,
 }
 
+impl CompositeStyle {
+    /// Feeds what the composite draws (on or off, its bands or channels, their
+    /// tints, windows and curves) to `h`, so a tile of it is told apart from
+    /// one drawn before the composite changed.
+    pub fn hash_into(&self, h: &mut impl std::hash::Hasher) {
+        use std::hash::Hash;
+        self.enabled.hash(h);
+        if !self.enabled {
+            return;
+        }
+        self.rgb_channels.hash(h);
+        let bits = |w: Option<(f32, f32)>| w.map(|(a, b)| (a.to_bits(), b.to_bits()));
+        for c in &self.channel_configs {
+            (c.index, c.color_rgb, c.visible, bits(c.window)).hash(h);
+            let d = &c.display;
+            (bits(d.range), d.inverted, d.family, d.coefficient.to_bits()).hash(h);
+        }
+    }
+}
+
 impl Default for CompositeStyle {
     fn default() -> Self {
         Self {

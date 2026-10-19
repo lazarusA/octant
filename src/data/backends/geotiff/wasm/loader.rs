@@ -26,7 +26,7 @@ pub async fn load_one_geotiff_wasm_with_progress(
         guard.as_ref().map(|s| {
             (
                 s.resolve_ifd(&request.slice.variable)
-                    .map(|(ifd, bounds)| (ifd.clone(), bounds)),
+                    .map(|(ifd, bounds, scales)| (ifd.clone(), bounds, scales)),
                 s.tiff.endianness(),
                 s.reader.clone(),
                 s.decoder_registry.clone(),
@@ -50,7 +50,7 @@ pub async fn load_one_geotiff_wasm_with_progress(
                 .map_err(|e| e.to_string())?;
             let resolved = geo_store
                 .resolve_ifd(&request.slice.variable)
-                .map(|(ifd, bounds)| (ifd.clone(), bounds))
+                .map(|(ifd, bounds, scales)| (ifd.clone(), bounds, scales))
                 .ok_or_else(|| {
                     format!("Variable '{}' not found in GeoTIFF", request.slice.variable)
                 })?;
@@ -62,11 +62,12 @@ pub async fn load_one_geotiff_wasm_with_progress(
             (resolved, endianness, r, dec)
         }
     };
-    let (ifd, bounds) = resolved;
+    let (ifd, bounds, scales) = resolved;
 
     super::super::slicing::fetch_geotiff_block(
         &ifd,
         &bounds,
+        &scales,
         endianness,
         &request.slice,
         reader.as_ref(),

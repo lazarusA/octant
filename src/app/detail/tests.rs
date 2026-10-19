@@ -10,9 +10,18 @@ use crate::plots::PlotType;
 
 /// `t2m` plotted on a 20 px canvas: level 2 (16 x 16 of the 64 x 64 level 0).
 pub(super) fn plotted() -> OctantApp {
+    plotted_with(|_, _| {})
+}
+
+/// [`plotted`] with the selection (and app) adjusted by `adjust` first.
+pub(super) fn plotted_with(
+    adjust: impl FnOnce(&mut OctantApp, &mut crate::app::layers::VariableSelection),
+) -> OctantApp {
     let (mut app, meta) = pyramid_app();
     app.layout.canvas_px = [20, 20];
-    app.selected = selection_of(&mut app, &meta, "0/t2m");
+    let mut sel = selection_of(&mut app, &meta, "0/t2m");
+    adjust(&mut app, &mut sel);
+    app.selected = sel;
     app.plot_selection();
     poll_until(&mut app, |app| app.layers.base.data.matrix.is_some());
     app

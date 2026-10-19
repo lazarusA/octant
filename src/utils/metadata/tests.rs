@@ -226,6 +226,7 @@ fn test_open_synthetic_5ch_ome_zarr() {
         &[0, 0, 0],
         &configs,
         1,
+        &mut Default::default(),
     );
 
     assert!(mc_composite.is_some());

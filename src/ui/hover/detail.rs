@@ -65,6 +65,18 @@ pub fn detail_cell(app: &OctantApp, norm_x: f32, norm_y: f32) -> Option<DetailCe
     })
 }
 
+/// The base layer's composite tile window under `(norm_x, norm_y)` on the
+/// plotted quad, and the tile cell there, for the channels' raw values.
+pub fn tile_probe(
+    app: &OctantApp,
+    norm_x: f32,
+    norm_y: f32,
+) -> Option<(&crate::data::slicing::CompositeProbe, (usize, usize))> {
+    let tile = app.layers.base.data.detail.tile.as_ref()?;
+    let probe = tile.probe.as_ref()?;
+    Some((probe, tile_reading(tile, norm_x, norm_y)?.cell))
+}
+
 /// A detail tile's reading under a point.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TileReading {

@@ -61,6 +61,7 @@ impl OctantApp {
         };
         // Raw channel readouts only exist for 2D composites.
         layer.data.composite_probe = None;
+        layer.data.composite_stretch = None;
         layer.data.flipped_dims.clone_from(&block.flipped_dims);
 
         // Slices read the block in its oriented (flipped) order.

@@ -59,7 +59,7 @@ impl PlotController for HeatmapController {
             rect.center(),
             factor,
             self.min_zoom(),
-            50.0,
+            nav.heatmap_max_zoom,
         );
         nav.heatmap_zoom = zoom;
         nav.heatmap_pan = pan;
@@ -97,7 +97,7 @@ impl PlotController for LineController {
             rect.center(),
             factor,
             self.min_zoom(),
-            50.0,
+            crate::app::state::navigation::MAX_ZOOM,
         );
         nav.line_zoom = zoom;
         nav.line_pan = pan;

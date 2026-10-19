@@ -1,7 +1,7 @@
 use crate::app::OctantApp;
 use crate::catalog::{
-    CatalogCategoryFilter as F, GEOTIFF_CATALOG, ICECHUNK_CATALOG, MICROSCOPY_CATALOG,
-    PROCEDURAL_CATALOG, ZARR_CATALOG,
+    CatalogCategoryFilter as F, ICECHUNK_CATALOG, MICROSCOPY_CATALOG, PROCEDURAL_CATALOG,
+    SOIL_CATALOG, ZARR_CATALOG, geotiff_count,
 };
 use crate::i18n::{DatasetKey, tr};
 use crate::ui::icons::UiIconExt;
@@ -29,7 +29,8 @@ pub fn render_search_and_filters(
         (F::All, tr(DatasetKey::CategoryAll), total_count),
         (F::Zarr, "Zarr", ZARR_CATALOG.len()),
         (F::Icechunk, "Icechunk", ICECHUNK_CATALOG.len()),
-        (F::GeoTiff, "GeoTIFF / COG", GEOTIFF_CATALOG.len()),
+        (F::GeoTiff, "GeoTIFF / COG", geotiff_count()),
+        (F::Soil, tr(DatasetKey::CategorySoil), SOIL_CATALOG.len()),
         (
             F::Microscopy,
             tr(DatasetKey::CategoryMicroscopy),

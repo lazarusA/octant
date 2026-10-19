@@ -135,5 +135,10 @@ pub fn text(key: DatasetKey) -> &'static str {
         DatasetKey::PlateNoFields => "No fields in this acquisition",
         DatasetKey::PlateWellUnreadable => "Couldn't read the well's fields. Click to try again",
         DatasetKey::CategoryMicroscopy => "Microscopy",
+        DatasetKey::CategorySoil => "Soil",
+        DatasetKey::BadgeDesktopOnly => "Desktop only",
+        DatasetKey::DesktopOnlyHint => {
+            "This server does not allow browser access. Open it in the Octant desktop app."
+        }
     }
 }

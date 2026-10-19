@@ -68,6 +68,7 @@ impl OctantApp {
             layer.selection(),
             self.layer_step(id),
             &layer.data.flipped_dims,
+            &layer.composite,
         ))
     }
 
@@ -103,6 +104,7 @@ impl OctantApp {
             var_idx: idx,
             dims,
             matrix: None,
+            probe: None,
             context,
             ..base.clone()
         };
