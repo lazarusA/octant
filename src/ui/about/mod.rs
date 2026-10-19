@@ -37,14 +37,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     }
 
     let storage_id = egui::Id::unique(("about_window", "active_tab"));
-    let mut active_tab: AboutTab = ctx
-        .data(|d| d.get_temp(storage_id))
-        .unwrap_or(AboutTab::About);
-    if app.layout.show_icon_gallery_window {
-        active_tab = AboutTab::Icons;
-        app.layout.show_icon_gallery_window = false;
-    }
-
+    let mut active_tab = shown_tab(app, ctx, storage_id);
     let (default_size, min_size, max_size) = window_sizes(active_tab, ctx.viewport_rect().size());
     let title = match active_tab {
         AboutTab::About => tr(AboutKey::WindowTitle),
@@ -76,6 +69,16 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     let dismissed = rect.is_some_and(|r| windows::dismissed(ctx, r));
     app.layout.show_about_window = open && !shortcuts && !dismissed;
     app.layout.show_shortcuts |= shortcuts;
+}
+
+/// The tab to show: the icons when the icon gallery asked for the window,
+/// else the tab shown last (kept under `storage_id`).
+fn shown_tab(app: &mut OctantApp, ctx: &egui::Context, storage_id: egui::Id) -> AboutTab {
+    if std::mem::take(&mut app.layout.show_icon_gallery_window) {
+        return AboutTab::Icons;
+    }
+    ctx.data(|d| d.get_temp(storage_id))
+        .unwrap_or(AboutTab::About)
 }
 
 /// Default, minimum and maximum window size. Both tabs share one width so

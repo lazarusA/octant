@@ -12,7 +12,7 @@ use crate::ui::hover::probe;
 use crate::ui::keyboard::dispatch::Gate;
 use crate::ui::keyboard::focus;
 use crate::ui::keyboard::keymap::{self, Action, CanvasAction, Scope};
-use egui::{Rect, Vec2};
+use egui::{Pos2, Rect, Vec2};
 
 /// Points one arrow press pans a plot or orbits a 3D one.
 const STEP: f32 = 40.0;
@@ -64,14 +64,29 @@ pub fn handle_canvas_keys(
             moved |= arrow(app, ctx, direction, alt, rect, plot_type, probing);
         }
     }
+    let anchor = probe_at.unwrap_or_else(|| rect.center());
+    moved |= zoom_keys(app, take, anchor, rect, plot_type);
+    app.nav.view_interacting |= moved;
+    ctx.request_repaint();
+}
+
+/// `+` and `-` zoom about `anchor` on the canvas at `rect` showing
+/// `plot_type`, `0` resets the view; whether the view moved.
+fn zoom_keys(
+    app: &mut OctantApp,
+    take: impl Fn(CanvasAction) -> Option<Vec2>,
+    anchor: Pos2,
+    rect: Rect,
+    plot_type: PlotType,
+) -> bool {
     let controller = controller_for(plot_type);
+    let mut moved = false;
     let zooms = [
         (CanvasAction::ZoomIn, ZOOM),
         (CanvasAction::ZoomOut, 1.0 / ZOOM),
     ];
     for (action, factor) in zooms {
         if take(action).is_some() {
-            let anchor = probe_at.unwrap_or_else(|| rect.center());
             controller.handle_zoom(&mut app.nav, factor, anchor, rect);
             moved = true;
         }
@@ -80,8 +95,7 @@ pub fn handle_canvas_keys(
         controller.reset_view(&mut app.nav);
         moved = true;
     }
-    app.nav.view_interacting |= moved;
-    ctx.request_repaint();
+    moved
 }
 
 /// An arrow press (`alt` with Shift) in `direction` on the canvas at `rect`
