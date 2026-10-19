@@ -4,6 +4,7 @@ use crate::catalog::get_catalog_entries;
 use crate::i18n::{DatasetKey, tr};
 use crate::ui::icons::{Icon, IconSize, IconTone, UiIconExt};
 use crate::ui::keyboard::list_nav::{Above, ListNav};
+use crate::ui::toast::Severity;
 
 /// The matching entries' cards, under the search field `above`.
 pub fn render_entries_list(
@@ -46,6 +47,7 @@ pub fn render_entries_list(
     }
 
     let mut to_load: Option<(&str, StoreKind)> = None;
+    let mut refused = false;
 
     let mut nav = ListNav::new(ui.ctx(), Some(above));
     egui::ScrollArea::vertical()
@@ -56,13 +58,25 @@ pub fn render_entries_list(
                 let load = render_entry_card(ui, entry, trimmed_url, is_mobile);
                 nav.item(&load);
                 if load.clicked() {
-                    to_load = Some((trimmed_url, entry.store_kind));
+                    // The browser cannot read servers without CORS headers.
+                    if cfg!(target_arch = "wasm32") && entry.desktop_only() {
+                        refused = true;
+                    } else {
+                        to_load = Some((trimmed_url, entry.store_kind));
+                    }
                 }
                 ui.add_space(6.0);
             }
         });
     nav.finish(ui.ctx());
 
+    if refused {
+        app.notify(
+            Severity::Warning,
+            tr(DatasetKey::BadgeDesktopOnly),
+            tr(DatasetKey::DesktopOnlyHint),
+        );
+    }
     if let Some((url, kind)) = to_load {
         app.submit_or_activate_source(url, Some(kind));
         *should_close = true;

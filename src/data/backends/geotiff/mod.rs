@@ -21,6 +21,8 @@ mod bands_tests;
 mod ifd_check_tests;
 #[cfg(test)]
 mod ifd_parity_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod network_tests;
 #[cfg(test)]
 pub mod test_utils;
 #[cfg(test)]

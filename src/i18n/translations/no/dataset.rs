@@ -139,5 +139,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlateNoFields => "Ingen felt i dette opptaket",
         DatasetKey::PlateWellUnreadable => "Kunne ikke lese brønnens felt. Klikk for å prøve igjen",
         DatasetKey::CategoryMicroscopy => "Mikroskopi",
+        DatasetKey::CategorySoil => "Jord",
+        DatasetKey::BadgeDesktopOnly => "Kun skrivebord",
+        DatasetKey::DesktopOnlyHint => {
+            "Denne serveren tillater ikke tilgang fra nettleseren. Åpne den i Octant-skrivebordsappen."
+        }
     })
 }

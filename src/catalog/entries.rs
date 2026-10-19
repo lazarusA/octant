@@ -1,24 +1,7 @@
-//! Built-in static catalog definitions for GeoTIFF, Zarr, Icechunk, and Procedural datasets.
+//! Built-in static catalog definitions for Zarr, Icechunk, and Procedural datasets.
 
 use super::types::CatalogEntry;
 use crate::app::StoreKind;
-
-pub static GEOTIFF_CATALOG: &[CatalogEntry] = &[
-    CatalogEntry {
-        key: "sentinel-2-tci",
-        label: "Sentinel-2 L2A True Color (TCI)",
-        subtitle: "Cloud-Optimized GeoTIFF 10m RGB surface reflectance on AWS S3",
-        store: "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/36/Q/WD/2020/7/S2A_36QWD_20200701_0_L2A/TCI.tif",
-        store_kind: StoreKind::RemoteGeoTiff,
-    },
-    CatalogEntry {
-        key: "sentinel-2-b04",
-        label: "Sentinel-2 L2A Red (B04)",
-        subtitle: "Cloud-Optimized GeoTIFF 10m Red Band on AWS S3",
-        store: "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/36/Q/WD/2020/7/S2A_36QWD_20200701_0_L2A/B04.tif",
-        store_kind: StoreKind::RemoteGeoTiff,
-    },
-];
 
 pub static ZARR_CATALOG: &[CatalogEntry] = &[
     CatalogEntry {

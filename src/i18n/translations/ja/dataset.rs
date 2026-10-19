@@ -137,5 +137,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
         DatasetKey::PlateNoFields => "この撮像には視野がありません",
         DatasetKey::PlateWellUnreadable => "ウェルの視野を読み込めませんでした。クリックして再試行",
         DatasetKey::CategoryMicroscopy => "顕微鏡画像",
+        DatasetKey::CategorySoil => "土壌",
+        DatasetKey::BadgeDesktopOnly => "デスクトップ版のみ",
+        DatasetKey::DesktopOnlyHint => {
+            "このサーバーはブラウザからのアクセスを許可していません。Octant のデスクトップ版で開いてください。"
+        }
     })
 }

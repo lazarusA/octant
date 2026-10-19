@@ -139,5 +139,10 @@ pub fn text(key: DatasetKey) -> Option<&'static str> {
             "Tidak dapat membaca bidang pandang sumur. Klik untuk mencoba lagi"
         }
         DatasetKey::CategoryMicroscopy => "Mikroskopi",
+        DatasetKey::CategorySoil => "Tanah",
+        DatasetKey::BadgeDesktopOnly => "Hanya desktop",
+        DatasetKey::DesktopOnlyHint => {
+            "Server ini tidak mengizinkan akses dari peramban. Buka di aplikasi desktop Octant."
+        }
     })
 }
