@@ -5,6 +5,7 @@
 //! crisp scientific icons.
 
 pub mod button;
+mod button_tip;
 mod canvas;
 mod ext;
 mod files;

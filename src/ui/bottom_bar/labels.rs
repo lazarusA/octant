@@ -6,6 +6,7 @@ use super::timeline::{Timeline, dim_name};
 use crate::app::OctantApp;
 use crate::i18n::{PlaybackKey as K, fill, tr};
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
+use crate::ui::keyboard::focus;
 use crate::utils::stack_str;
 
 /// Stack buffer for badge labels.
@@ -60,24 +61,34 @@ pub(super) fn widths(item: Item, tl: &Timeline, ui: &egui::Ui) -> (f32, f32) {
 }
 
 /// Draw a text item. The date (icon, plus the current value unless compact)
-/// carries the timeline details popover.
-pub(super) fn show(item: Item, compact: bool, tl: &Timeline, app: &OctantApp, ui: &mut egui::Ui) {
+/// carries the timeline details popover, shown on hover or keyboard focus;
+/// its response.
+pub(super) fn show(
+    item: Item,
+    compact: bool,
+    tl: &Timeline,
+    app: &OctantApp,
+    ui: &mut egui::Ui,
+) -> Option<egui::Response> {
     let mut buf: LabelBuf = [0; LABEL_BUF_LEN];
     let label = rich(item, text(&mut buf, item, tl));
     if item != Item::DateInfo {
         ui.label(label);
-        return;
+        return None;
     }
-    ui.horizontal(|ui| {
+    let drawn = ui.horizontal(|ui| {
         ui.icon(Icon::Hourglass, IconSize::Xs);
         if !compact {
             // Pad to the reserved width so neighbours never shift.
             let used = ui.label(label).rect.width();
             ui.add_space((date_value_width(ui, tl) - used).max(0.0));
         }
-    })
-    .response
-    .on_hover_ui(|ui| timeline_details(ui, tl, app));
+    });
+    let sense = egui::Sense::focusable_noninteractive();
+    let date = ui.interact(drawn.response.rect, ui.scope_id().with("date_info"), sense);
+    Some(focus::ring_and_tooltip(ui, date, 2.0, |ui| {
+        timeline_details(ui, tl, app)
+    }))
 }
 
 /// Popover body; formatted only while it is shown.

@@ -67,24 +67,34 @@ pub fn handle_crop_interaction(
                     crop_box.v_max += norm_dy;
                 }
 
-                if let Some(target_ratio) = crop_box.aspect.ratio() {
-                    let cur_w = (crop_box.u_max - crop_box.u_min) * canvas_rect.width();
-                    let target_h = (cur_w / target_ratio) / canvas_rect.height();
-                    let center_v = (crop_box.v_min + crop_box.v_max) * 0.5;
-                    crop_box.v_min = (center_v - target_h * 0.5).max(0.0);
-                    crop_box.v_max = (center_v + target_h * 0.5).min(1.0);
-                }
+                fit_aspect(crop_box, canvas_rect);
             } else if box_rect.contains(p) {
-                let w = crop_box.u_max - crop_box.u_min;
-                let h = crop_box.v_max - crop_box.v_min;
-
-                crop_box.u_min = (crop_box.u_min + norm_dx).clamp(0.0, 1.0 - w);
-                crop_box.u_max = crop_box.u_min + w;
-                crop_box.v_min = (crop_box.v_min + norm_dy).clamp(0.0, 1.0 - h);
-                crop_box.v_max = crop_box.v_min + h;
+                shift_box(crop_box, norm_dx, norm_dy);
             }
         }
     }
+}
+
+/// Fits the box's height to its aspect preset (if any) about its center,
+/// on a canvas of `canvas_rect`'s size.
+pub(super) fn fit_aspect(crop_box: &mut RoiCropBox, canvas_rect: Rect) {
+    if let Some(target_ratio) = crop_box.aspect.ratio() {
+        let cur_w = (crop_box.u_max - crop_box.u_min) * canvas_rect.width();
+        let target_h = (cur_w / target_ratio) / canvas_rect.height();
+        let center_v = (crop_box.v_min + crop_box.v_max) * 0.5;
+        crop_box.v_min = (center_v - target_h * 0.5).max(0.0);
+        crop_box.v_max = (center_v + target_h * 0.5).min(1.0);
+    }
+}
+
+/// Moves the box by canvas fractions, kept whole inside the canvas.
+pub(super) fn shift_box(crop_box: &mut RoiCropBox, du: f32, dv: f32) {
+    let w = crop_box.u_max - crop_box.u_min;
+    let h = crop_box.v_max - crop_box.v_min;
+    crop_box.u_min = (crop_box.u_min + du).clamp(0.0, 1.0 - w);
+    crop_box.u_max = crop_box.u_min + w;
+    crop_box.v_min = (crop_box.v_min + dv).clamp(0.0, 1.0 - h);
+    crop_box.v_max = crop_box.v_min + h;
 }
 
 pub fn draw_crop_handles(

@@ -10,7 +10,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::NextStep => "下一时间步",
         PlaybackKey::LastStep => "最后时间步",
         PlaybackKey::Crop => "裁剪",
-        PlaybackKey::CropHover => "裁剪辅助线 (C)",
+        PlaybackKey::CropHover => "裁剪辅助线",
         PlaybackKey::PlaybackSpeed => "播放速度",
         PlaybackKey::PlaybackBuffer => "播放前缓冲",
         PlaybackKey::Buffering => "缓冲中 {}/{}",

@@ -4,6 +4,9 @@ mod axes;
 mod interactions;
 #[cfg(test)]
 mod interactions_tests;
+mod keys;
+#[cfg(test)]
+mod keys_tests;
 mod overlays;
 mod viewport;
 
@@ -15,6 +18,13 @@ pub use viewport::ViewportUniforms;
 pub use viewport::compute_viewport_uniforms;
 
 use crate::app::OctantApp;
+use crate::ui::keyboard::{focus, regions};
+
+/// The canvas's widget id: keyboard shortcuts on the plot work while it (or
+/// nothing) holds focus.
+pub fn canvas_id() -> egui::Id {
+    egui::Id::unique("octant_canvas")
+}
 
 /// Renders the central plotting canvas or the hero landing view when inactive.
 pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::Rect) {
@@ -39,19 +49,26 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
         ctx.request_repaint();
     }
 
-    let is_hero_active = (app.layers.base.data.matrix.is_none()
-        && app.layers.base.data.volume.is_none())
-        || app.layout.show_hero;
+    let is_hero_active = app.hero_shown();
 
     // When no dataset is plotted or hero landing view is active, render the clean hero page
     if is_hero_active {
         let canvas_bg = ui.visuals().panel_fill;
         ui.painter().rect_filled(canvas_rect, 0.0, canvas_bg);
         crate::ui::hero::show_hero_landing(app, ui);
+        // No plot to probe until it shows again.
+        crate::ui::hover::probe::stop(&ctx);
         return;
     }
 
-    let response = ui.allocate_rect(canvas_rect, egui::Sense::drag());
+    let response = ui.interact(canvas_rect, canvas_id(), egui::Sense::drag());
+    regions::register(
+        &ctx,
+        regions::Region::Canvas,
+        response.id,
+        response.layer_id,
+        canvas_rect,
+    );
 
     let canvas_bg = ui.style().visuals.panel_fill;
     ui.painter().rect_filled(canvas_rect, 0.0, canvas_bg);
@@ -60,6 +77,7 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
 
     // Handle Zoom, Pan, Orbit, and Reset interactions
     handle_canvas_interactions(app, ui, &response, canvas_rect, canvas_plot_type);
+    keys::handle_canvas_keys(app, ui, &response, canvas_rect, canvas_plot_type);
 
     // Compute screen-space transformed plot rect and GPU pan/zoom uniforms
     let uniforms = compute_viewport_uniforms(app, canvas_rect, canvas_plot_type);
@@ -91,6 +109,7 @@ pub fn render_canvas(app: &mut OctantApp, ui: &mut egui::Ui, canvas_rect: egui::
     // Render high-performance Hover Pixel Info Tooltip & Canvas Reticle (suppressed during export capture)
     if app.pending_export.is_none() {
         crate::ui::hover_tooltip::show_hover_tooltip(app, &ctx, ui, &response, canvas_rect);
+        focus::paint_ring(ui, &response, 0.0);
     }
 
     // Render interactive ROI crop box, capture flash, and drag cue

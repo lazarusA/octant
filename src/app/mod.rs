@@ -22,6 +22,7 @@ mod export_lifecycle;
 mod floating;
 #[cfg(test)]
 mod floating_tests;
+mod landing;
 pub mod layers;
 pub(crate) mod multiscale;
 #[cfg(test)]
@@ -37,6 +38,7 @@ mod overlay_state_tests;
 pub mod overlays;
 #[cfg(test)]
 mod overlays_tests;
+mod panels;
 mod pipeline;
 #[cfg(test)]
 mod pyramid_tests;

@@ -1,5 +1,7 @@
 //! egui layout, panel toggles, theme, and modal window states.
 
+use crate::ui::panel_layout::Panel;
+
 #[derive(Clone, Debug)]
 pub struct UiLayoutState {
     pub show_dataset_panel: bool,
@@ -32,6 +34,10 @@ pub struct UiLayoutState {
     pub show_catalog_window: bool,
     pub show_about_window: bool,
     pub show_icon_gallery_window: bool,
+    /// The keyboard shortcut list.
+    pub show_shortcuts: bool,
+    /// The centered plot type picker.
+    pub show_plot_picker: bool,
     pub catalog_search_query: String,
     pub catalog_category_filter: crate::catalog::CatalogCategoryFilter,
 }
@@ -62,6 +68,8 @@ impl Default for UiLayoutState {
             show_catalog_window: false,
             show_about_window: false,
             show_icon_gallery_window: false,
+            show_shortcuts: false,
+            show_plot_picker: false,
             catalog_search_query: String::new(),
             catalog_category_filter: crate::catalog::CatalogCategoryFilter::All,
         }
@@ -69,6 +77,25 @@ impl Default for UiLayoutState {
 }
 
 impl UiLayoutState {
+    /// Whether `panel` is open.
+    pub fn panel_shown(&self, panel: Panel) -> bool {
+        match panel {
+            Panel::Dataset => self.show_dataset_panel,
+            Panel::Variables => self.show_variables_overlay,
+            Panel::Settings => self.show_settings_panel,
+            Panel::Dimensions => self.show_variable_controls,
+        }
+    }
+
+    pub(crate) fn panel_shown_mut(&mut self, panel: Panel) -> &mut bool {
+        match panel {
+            Panel::Dataset => &mut self.show_dataset_panel,
+            Panel::Variables => &mut self.show_variables_overlay,
+            Panel::Settings => &mut self.show_settings_panel,
+            Panel::Dimensions => &mut self.show_variable_controls,
+        }
+    }
+
     /// Opens the Settings panel and closes Dataset, Variables, Controls, and Catalog.
     pub fn open_only_settings_panel(&mut self) {
         self.show_settings_panel = true;
@@ -78,6 +105,8 @@ impl UiLayoutState {
         self.show_catalog_window = false;
         self.show_about_window = false;
         self.show_icon_gallery_window = false;
+        self.show_shortcuts = false;
+        self.show_plot_picker = false;
     }
 }
 

@@ -67,5 +67,11 @@ fn the_catalog_backdrop_covers_colorbars() {
     h.click(at, &mut with_catalog(&mut app));
     app.layout.show_catalog_window = true;
     h.settle(3, &mut with_catalog(&mut app));
-    assert_eq!(h.top_at(at), Some(Id::unique("catalog_modal_backdrop")));
+    // The modal dialog takes every hit, so compare stacking order instead.
+    let order = h
+        .ctx
+        .memory(|m| m.layer_ids().map(|l| l.id).collect::<Vec<_>>());
+    let index = |id| order.iter().position(|&l| l == id);
+    let backdrop = index(Id::unique("catalog_modal_backdrop"));
+    assert!(backdrop > index(colorbar_id()), "{order:?}");
 }

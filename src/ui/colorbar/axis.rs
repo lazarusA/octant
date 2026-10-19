@@ -81,4 +81,14 @@ impl BarAxis {
         };
         t.clamp(0.0, 1.0)
     }
+
+    /// Outlines the bar while it is hovered or keyboard-focused (`on`), as
+    /// clickable.
+    pub fn outline(&self, ui: &egui::Ui, on: bool) {
+        if on {
+            let stroke = ui.visuals().widgets.hovered.fg_stroke;
+            ui.painter()
+                .rect_stroke(self.rect, 2.0, stroke, egui::StrokeKind::Outside);
+        }
+    }
 }

@@ -14,12 +14,12 @@ use egui::{Rect, Ui, Vec2, pos2};
 const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1200.0, 900.0));
 
 /// One frame of `app`'s colorbars.
-fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
+pub(super) fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {
     |ui| show_colorbar_overlay(app, ui.ctx(), SCREEN)
 }
 
 /// A harness that has laid the colorbar out over a few frames.
-fn harness(app: &mut OctantApp) -> Harness {
+pub(super) fn harness(app: &mut OctantApp) -> Harness {
     let mut h = Harness::new(SCREEN);
     h.settle(3, &mut run(app));
     h
@@ -31,7 +31,7 @@ fn panel(h: &Harness) -> Rect {
 }
 
 /// How many circles `shapes` holds (the grip's dots).
-fn circles(shapes: &[ClippedShape]) -> usize {
+pub(super) fn circles(shapes: &[ClippedShape]) -> usize {
     shapes
         .iter()
         .filter(|c| matches!(c.shape, egui::Shape::Circle(_)))

@@ -111,32 +111,9 @@ impl eframe::App for OctantApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
 
-        let is_hero_active = (self.layers.base.data.matrix.is_none()
-            && self.layers.base.data.volume.is_none())
-            || self.layout.show_hero;
+        let is_hero_active = self.hero_shown();
 
-        // Keyboard Shortcuts for Figure Export & Crop Tool
-        if ui.input_mut(|i| {
-            i.consume_key(egui::Modifiers::COMMAND, egui::Key::S)
-                || i.consume_key(egui::Modifiers::CTRL, egui::Key::S)
-        }) {
-            self.quick_save_canvas();
-        }
-
-        if ui.input_mut(|i| {
-            i.consume_key(
-                egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
-                egui::Key::S,
-            ) || i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::S)
-        }) {
-            self.show_export_modal = true;
-        }
-
-        if !ctx.egui_wants_keyboard_input()
-            && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::C))
-        {
-            self.show_crop_overlay = !self.show_crop_overlay;
-        }
+        crate::ui::keyboard::dispatch(self, &ctx, !is_hero_active);
 
         // Process in-flight export / screenshot requests
         self.process_pending_export();
@@ -167,24 +144,12 @@ impl eframe::App for OctantApp {
             }
         }
 
-        // 3. Render panels (each consumes space from the remaining area)
-        crate::ui::top_bar::show_top_bar(self, ui);
-
-        if !is_hero_active && self.has_animated_dimension() {
-            crate::ui::bottom_bar::show_bottom_bar(self, ui);
-        }
-
-        crate::ui::catalog::show_catalog_window(self, &ctx);
-        crate::ui::about::show_about_window(self, &ctx);
-        crate::ui::about::show_icon_gallery_window(self, &ctx);
-        crate::ui::export_modal::show_export_modal(self, &ctx);
-
-        // Overlays anchor relative to the remaining canvas rect
-        let canvas_rect = ui.available_rect_before_wrap();
-        self.show_floating_panels(&ctx, canvas_rect, !is_hero_active);
+        // 3. Bars, modal windows and floating panels around the canvas
+        let canvas_rect = self.show_chrome(ui, !is_hero_active);
         crate::ui::toast::show_toasts(self, &ctx, canvas_rect);
 
         // 4. Drawing Canvas Area with Aspect Data Ratio
         super::canvas::render_canvas(self, ui, canvas_rect);
+        crate::ui::keyboard::focus::end_frame(&ctx);
     }
 }

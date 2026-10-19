@@ -14,6 +14,8 @@ mod controls;
 #[cfg(test)]
 mod controls_tests;
 pub mod handles;
+#[cfg(test)]
+mod keys_tests;
 mod layout;
 #[cfg(test)]
 mod layout_tests;
@@ -30,23 +32,50 @@ pub use ticks::{ColorbarTick, format_scientific_tick, generate_colorbar_ticks};
 
 use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::ui::keyboard::focus;
 
 /// Shows a colorbar on `canvas` for the base layer and each drawn overlay
 /// that has one (`can_show`) and has not hidden it.
 pub fn show_colorbar_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas: egui::Rect) {
     for i in 0..=app.layers.overlays().len() {
-        let layer = match i {
-            0 => Some(&app.layers.base),
-            n => app.layers.overlays().get(n - 1),
-        };
-        let Some(id) = layer
-            .filter(|l| l.is_drawn() && l.colorbar.shown && can_show(app, l.id()))
-            .map(|l| l.id())
-        else {
-            continue;
-        };
-        panel::show(app, ctx, id, canvas);
+        if let Some(id) = shown_at(app, i) {
+            panel::show(app, ctx, id, canvas);
+        }
     }
+}
+
+/// The layer at stack position `i` (0 the base layer, then the overlays),
+/// when its colorbar shows.
+fn shown_at(app: &OctantApp, i: usize) -> Option<LayerId> {
+    let layer = match i {
+        0 => Some(&app.layers.base),
+        n => app.layers.overlays().get(n - 1),
+    };
+    layer
+        .filter(|l| l.is_drawn() && l.colorbar.shown && can_show(app, l.id()))
+        .map(|l| l.id())
+}
+
+/// Moves keyboard focus to the bar of the colorbar after the one holding
+/// focus, from elsewhere the base layer's: its controls show, Enter opens
+/// its colormap picker.
+pub fn focus_next(app: &OctantApp, ctx: &egui::Context) {
+    let mut shown = (0..=app.layers.overlays().len()).filter_map(|i| shown_at(app, i));
+    let current = shown
+        .clone()
+        .position(|id| focus::in_area(ctx, area_id(id)));
+    let next = match current {
+        Some(at) => shown.cycle().nth(at + 1),
+        None => shown.next(),
+    };
+    if let Some(id) = next {
+        focus::request(ctx, bar_id(id));
+    }
+}
+
+/// Layer `id`'s colorbar panel area.
+fn area_id(id: LayerId) -> egui::Id {
+    egui::Id::unique(salt("octant_colorbar_overlay", id))
 }
 
 /// Whether layer `id` has a colorbar at all: RGB composites and label
@@ -57,6 +86,12 @@ pub fn can_show(app: &OctantApp, id: LayerId) -> bool {
     app.layers
         .get(id)
         .is_some_and(|l| !l.composite.enabled && l.labels().is_none() && !custom_line)
+}
+
+/// The bar of layer `id`'s colorbar: a click opens its colormap picker, and
+/// keyboard focus enters the colorbar there.
+fn bar_id(id: LayerId) -> egui::Id {
+    egui::Id::unique(salt("colorbar_bar", id))
 }
 
 /// Egui id salt of layer `id`'s colorbar widgets.

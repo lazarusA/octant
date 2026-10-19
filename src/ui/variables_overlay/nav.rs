@@ -8,7 +8,7 @@ use super::rows::{Row, visible_rows};
 use super::stack::stack_state;
 use super::tree::VariableTreeContext;
 use crate::data::VariableTreeGroup;
-use crate::ui::key_focus;
+use crate::ui::keyboard::focus as key_focus;
 use egui::collapsing_header::CollapsingState;
 use egui::{Context, Id, Key, Modifiers};
 
@@ -116,11 +116,7 @@ fn apply_key(ctx: &Context, rows: &[Row<'_>], at: usize, key: Key, search: bool,
     let to_search = || key_focus::request(ctx, search_id);
 
     match key {
-        Key::ArrowDown if at + 1 < rows.len() => focus(at + 1),
-        Key::ArrowUp if at > 0 => focus(at - 1),
-        Key::ArrowUp | Key::Escape => to_search(),
-        Key::Home => focus(0),
-        Key::End => focus(rows.len() - 1),
+        Key::Escape => to_search(),
         Key::ArrowRight => match row.open {
             Some(false) => set_open(ctx, row.key, search, true),
             Some(true) if rows.get(at + 1).is_some_and(|r| r.parent == Some(at)) => focus(at + 1),
@@ -131,7 +127,12 @@ fn apply_key(ctx: &Context, rows: &[Row<'_>], at: usize, key: Key, search: bool,
             (_, Some(parent)) => focus(parent),
             _ => {}
         },
-        _ => {}
+        // Up, Down, Home and End; Up on the first row returns to the field.
+        _ => match key_focus::step_index(key, at, rows.len()) {
+            Some(i) => focus(i),
+            None if key == Key::ArrowUp => to_search(),
+            None => {}
+        },
     }
 }
 

@@ -1,0 +1,49 @@
+use crate::i18n::keys::KeymapKey;
+
+pub fn text(key: KeymapKey) -> Option<&'static str> {
+    Some(match key {
+        KeymapKey::Title => "Tastenkürzel",
+        KeymapKey::CloseHover => "Tastenkürzel schließen (Esc)",
+        KeymapKey::ScopeGlobal => "Überall",
+        KeymapKey::ScopePanel => "In einem Bedienfeld",
+        KeymapKey::ScopeFree => "Außerhalb von Textfeldern",
+        KeymapKey::ScopeCanvas => "Auf der Darstellung",
+        KeymapKey::ScopePlayback => "Wiedergabe",
+        KeymapKey::Arrows => "Pfeiltasten",
+        KeymapKey::Hint => "{} ({})",
+        KeymapKey::QuickSave => "Abbildung speichern",
+        KeymapKey::ExportDialog => "Abbildung mit Einstellungen exportieren",
+        KeymapKey::ToggleCrop => "Zuschnitt ein-/ausblenden",
+        KeymapKey::GoToDataset => "Zum Datensatz-Bedienfeld",
+        KeymapKey::GoToVariables => "Zum Variablen-Bedienfeld",
+        KeymapKey::GoToDimensions => "Zum Dimensionen-Bedienfeld",
+        KeymapKey::GoToSettings => "Zu den Einstellungen",
+        KeymapKey::SearchVariables => "Variablen suchen",
+        KeymapKey::ClosePanel => "Bedienfeld schließen",
+        KeymapKey::NextRegion => "Zum nächsten Bereich",
+        KeymapKey::PreviousRegion => "Zum vorherigen Bereich",
+        KeymapKey::FocusTopBar => "Zur oberen Leiste",
+        KeymapKey::PlayPause => "Abspielen oder anhalten",
+        KeymapKey::StepPrev => "Vorheriger Schritt",
+        KeymapKey::StepNext => "Nächster Schritt",
+        KeymapKey::FirstStep => "Erster Schritt",
+        KeymapKey::LastStep => "Letzter Schritt",
+        KeymapKey::ToggleLoop => "Schleife ein/aus",
+        KeymapKey::Move => {
+            "Darstellung verschieben (2D) oder drehen (3D); Sonde oder Zuschnitt bewegen"
+        }
+        KeymapKey::MoveAlt => "Weiter verschieben (2D) oder verschieben (3D); Zuschnitt skalieren",
+        KeymapKey::ZoomIn => "Vergrößern",
+        KeymapKey::ZoomOut => "Verkleinern",
+        KeymapKey::ResetView => "Ansicht zurücksetzen",
+        KeymapKey::ToggleProbe => "Werte mit den Pfeiltasten ablesen",
+        KeymapKey::LeaveProbe => "Ablesen beenden",
+        KeymapKey::ShowShortcuts => "Tastenkürzel anzeigen",
+        KeymapKey::ToggleHero => "Startseite oder wieder die Darstellung zeigen",
+        KeymapKey::LeaveHero => "Zurück zur Darstellung",
+        KeymapKey::ScopeHero => "Auf der Startseite",
+        KeymapKey::PlotTypePicker => "Darstellungsart wählen",
+        KeymapKey::PlotStaged => "Gewählte Variable darstellen",
+        KeymapKey::GoToColorbar => "Zur nächsten Farbskala",
+    })
+}

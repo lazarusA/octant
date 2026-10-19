@@ -26,7 +26,7 @@ mod tests;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 pub use keys::{
-    AboutKey, ColormapKey, CommonKey, DatasetKey, ExportKey, HoverKey, Key, NoticesKey,
+    AboutKey, ColormapKey, CommonKey, DatasetKey, ExportKey, HoverKey, Key, KeymapKey, NoticesKey,
     PlaybackKey, PlotKey, PlotOptionsKey, SettingsKey, VariablesKey,
 };
 pub use lang::Language;

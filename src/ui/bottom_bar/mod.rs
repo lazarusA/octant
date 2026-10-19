@@ -12,8 +12,10 @@ mod timeline;
 
 use crate::app::OctantApp;
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
+use crate::ui::keyboard::regions::{self, Region};
 use crate::ui::number_input::LocalizedInput;
 use crate::ui::toolbar::ItemWidths;
+use crate::ui::toolbar::roving::{BarNav, Stop};
 use layout::{ITEM_COUNT, LEFT_ITEMS, RIGHT_ITEMS, SLIDER_MIN_W};
 use timeline::Timeline;
 
@@ -61,7 +63,8 @@ fn show_collapsed_strip(ui: &mut egui::Ui) -> bool {
         )
         .on_hover_cursor(egui::CursorIcon::PointingHand);
 
-    let text_color = if resp.hovered() {
+    crate::ui::keyboard::focus::paint_ring(ui, &resp, 0.0);
+    let text_color = if resp.hovered() || resp.has_focus() {
         ui.visuals().strong_text_color()
     } else {
         ui.visuals().text_color()
@@ -78,6 +81,13 @@ fn show_collapsed_strip(ui: &mut egui::Ui) -> bool {
         });
     });
 
+    regions::register(
+        ui.ctx(),
+        Region::BottomBar,
+        resp.id,
+        ui.layer_id(),
+        ui.max_rect(),
+    );
     resp.clicked() || (resp.dragged() && resp.drag_delta().y < -1.0)
 }
 
@@ -93,8 +103,9 @@ fn show_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
     }
     let compact = layout::compute_compact(&widths, ui.available_width() - SLIDER_MIN_W - spacing);
 
+    let mut nav = BarNav::default();
     for item in LEFT_ITEMS {
-        items::show_item(item, compact.get(item), app, &tl, ui);
+        items::show_item(item, compact.get(item), app, &tl, ui, &mut nav);
     }
 
     let right_w: f32 = RIGHT_ITEMS
@@ -104,15 +115,22 @@ fn show_contents(app: &mut OctantApp, ui: &mut egui::Ui) {
             if compact.get(item) { w.compact } else { w.full }
         })
         .sum();
-    show_slider(app, &tl, ui, right_w + spacing);
+    let slider = show_slider(app, &tl, ui, right_w + spacing);
+    nav.push(&slider, Stop::Slider);
 
     for item in RIGHT_ITEMS {
-        items::show_item(item, compact.get(item), app, &tl, ui);
+        items::show_item(item, compact.get(item), app, &tl, ui, &mut nav);
     }
+    nav.finish(ui, Region::BottomBar);
 }
 
-/// Timeline slider filling the row except `reserve_right`.
-fn show_slider(app: &mut OctantApp, tl: &Timeline, ui: &mut egui::Ui, reserve_right: f32) {
+/// Timeline slider filling the row except `reserve_right`; its response.
+fn show_slider(
+    app: &mut OctantApp,
+    tl: &Timeline,
+    ui: &mut egui::Ui,
+    reserve_right: f32,
+) -> egui::Response {
     ui.spacing_mut().slider_width = (ui.available_width() - reserve_right).max(SLIDER_MIN_W);
     let mut step = app.playback.current_timestep;
     let slider = egui::Slider::new(&mut step, 0..=tl.last_step)
@@ -120,10 +138,9 @@ fn show_slider(app: &mut OctantApp, tl: &Timeline, ui: &mut egui::Ui, reserve_ri
         .show_value(false)
         .trailing_fill(true);
     // Fixed id so badges hiding before the slider never break a drag.
-    let changed = ui
-        .push_id("bottom_bar_slider", |ui| ui.add(slider).changed())
-        .inner;
-    if changed {
+    let response = ui.push_id("bottom_bar_slider", |ui| ui.add(slider)).inner;
+    if response.changed() {
         app.request_step_or_load(step);
     }
+    response
 }

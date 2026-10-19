@@ -14,8 +14,9 @@ pub mod types;
 pub use types::AboutTab;
 
 use crate::app::OctantApp;
-use crate::i18n::{AboutKey, CommonKey, tr};
+use crate::i18n::{AboutKey, CommonKey, KeymapKey, tr};
 use crate::ui::icons::UiIconExt;
+use crate::ui::keyboard::windows;
 use icons::show_icons_tab;
 use overview::show_overview_tab;
 
@@ -29,19 +30,14 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     if app.layout.show_icon_gallery_window {
         app.layout.show_about_window = true;
     }
+    let key = egui::Id::unique("about_window");
+    let opened = windows::follow_window(ctx, key, app.layout.show_about_window);
     if !app.layout.show_about_window {
         return;
     }
 
     let storage_id = egui::Id::unique(("about_window", "active_tab"));
-    let mut active_tab: AboutTab = ctx
-        .data(|d| d.get_temp(storage_id))
-        .unwrap_or(AboutTab::About);
-    if app.layout.show_icon_gallery_window {
-        active_tab = AboutTab::Icons;
-        app.layout.show_icon_gallery_window = false;
-    }
-
+    let mut active_tab = shown_tab(app, ctx, storage_id);
     let (default_size, min_size, max_size) = window_sizes(active_tab, ctx.viewport_rect().size());
     let title = match active_tab {
         AboutTab::About => tr(AboutKey::WindowTitle),
@@ -49,6 +45,7 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
     };
 
     let mut open = true;
+    let mut shortcuts = false;
     let response = egui::Window::new(title)
         .title_bar(false)
         .default_size(default_size)
@@ -59,14 +56,29 @@ pub fn show_about_window(app: &mut OctantApp, ctx: &egui::Context) {
         .order(egui::Order::Foreground)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
+            windows::trap(ui, opened);
             egui::Frame::default()
                 .inner_margin(egui::Margin::symmetric(14, 8))
-                .show(ui, |ui| open = window_body(ui, &mut active_tab));
+                .show(ui, |ui| {
+                    open = window_body(ui, &mut active_tab, &mut shortcuts)
+                });
         });
 
     ctx.data_mut(|d| d.insert_temp(storage_id, active_tab));
     let rect = response.map(|r| r.response.rect);
-    app.layout.show_about_window = open && !dismissed(ctx, rect);
+    let dismissed = rect.is_some_and(|r| windows::dismissed(ctx, r));
+    app.layout.show_about_window = open && !shortcuts && !dismissed;
+    app.layout.show_shortcuts |= shortcuts;
+}
+
+/// The tab to show: the icons when the icon gallery asked for the window,
+/// else the tab shown last (kept under `storage_id`).
+fn shown_tab(app: &mut OctantApp, ctx: &egui::Context, storage_id: egui::Id) -> AboutTab {
+    if std::mem::take(&mut app.layout.show_icon_gallery_window) {
+        return AboutTab::Icons;
+    }
+    ctx.data(|d| d.get_temp(storage_id))
+        .unwrap_or(AboutTab::About)
 }
 
 /// Default, minimum and maximum window size. Both tabs share one width so
@@ -84,9 +96,10 @@ fn window_sizes(tab: AboutTab, screen: egui::Vec2) -> (egui::Vec2, egui::Vec2, e
     )
 }
 
-/// Tab bar, active tab content and footer. Returns `false` once the close
-/// button is clicked.
-fn window_body(ui: &mut egui::Ui, active_tab: &mut AboutTab) -> bool {
+/// Tab bar, active tab content and footer, whose link sets `shortcuts` to
+/// open the keyboard shortcut list. Returns `false` once the close button is
+/// clicked.
+fn window_body(ui: &mut egui::Ui, active_tab: &mut AboutTab, shortcuts: &mut bool) -> bool {
     let mut open = true;
     ui.horizontal(|ui| {
         let mut label_buf = [0; 64];
@@ -117,20 +130,11 @@ fn window_body(ui: &mut egui::Ui, active_tab: &mut AboutTab) -> bool {
     ui.add_space(6.0);
     ui.separator();
     ui.add_space(4.0);
-    ui.small(tr(AboutKey::Licensed));
+    ui.horizontal_wrapped(|ui| {
+        ui.small(tr(AboutKey::Licensed));
+        *shortcuts = ui.link(tr(KeymapKey::Title)).clicked();
+    });
     open
-}
-
-/// True when Escape is pressed or the primary button goes down outside the
-/// window `rect`.
-fn dismissed(ctx: &egui::Context, rect: Option<egui::Rect>) -> bool {
-    ctx.input(|i| {
-        let clicked_outside = i.pointer.primary_pressed()
-            && rect
-                .zip(i.pointer.interact_pos())
-                .is_some_and(|(r, pos)| !r.contains(pos));
-        i.key_pressed(egui::Key::Escape) || clicked_outside
-    })
 }
 
 pub fn show_icon_gallery_window(app: &mut OctantApp, ctx: &egui::Context) {

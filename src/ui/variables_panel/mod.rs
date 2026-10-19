@@ -16,9 +16,10 @@ pub use info::show_variable_info;
 use crate::app::OctantApp;
 use crate::app::layers::LevelChoice;
 use crate::i18n::{VariablesKey, fill, tr};
-use crate::ui::drag_grip::GripAction;
 use crate::ui::flow_row;
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt, icon_button_width};
+use crate::ui::keyboard::keymap::{self, Action};
+use crate::ui::keyboard::{focus, labels};
 use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
 
@@ -40,38 +41,41 @@ pub fn show_variable_controls(app: &mut OctantApp, ctx: &egui::Context, canvas_r
     let room = canvas_rect.right() - origin.x - 24.0;
     let panel_w = PANEL_MAX_W.min(room).max(PANEL_MIN_W);
 
-    let mut grip = GripAction::None;
-    let area_resp = egui::Area::new(egui::Id::unique("octant_variables_panel"))
+    let mut header = PanelHeader::default();
+    let area_resp = egui::Area::new(Panel::Dimensions.area_id())
         .fixed_pos(origin)
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.set_width(panel_w);
-                grip = show_panel(app, ui);
+                header = show_panel(app, ui);
             });
         });
-    let rect = area_resp.response.rect;
-    panel_layout::apply_grip(app, Panel::Dimensions, grip, rect, canvas_rect);
+    panel_layout::finish(
+        app,
+        Panel::Dimensions,
+        header,
+        &area_resp.response,
+        canvas_rect,
+    );
 }
 
 /// The staged variable's header, Plot Data row and dimension sliders; what
-/// the header's grip asked for.
-fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> GripAction {
+/// the header's buttons asked for.
+fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> PanelHeader {
     let Some(var_info) = app.selected.variable_info().cloned() else {
         ui.label(tr(VariablesKey::NoVariableSelected));
-        return GripAction::None;
+        return PanelHeader::default();
     };
-    let header = header_row(ui, &var_info);
-    if header.close {
-        app.layout.show_variable_controls = false;
-        if !app.layout.show_variables_overlay {
-            app.revert_selected_state_to_plotted();
-        }
-    }
+    let mut header = header_row(ui, &var_info);
     level_note(app, ui, &var_info);
-    if plot_row(app, ui) {
-        app.plot_from_panel();
+    // Keyboard focus enters the panel at Plot Data.
+    if let Some(plot) = plot_row(app, ui) {
+        header.entry = Some(plot.id.into());
+        if plot.clicked() {
+            app.plot_from_panel();
+        }
     }
 
     ui.add_space(4.0);
@@ -82,7 +86,7 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> GripAction {
         .show(ui, |ui| {
             show_dimension_sliders(app, ui, &var_info);
         });
-    header.grip
+    header
 }
 
 /// The level a multiscale variable reads, under its header: the plotted
@@ -146,8 +150,9 @@ fn header_row(ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) -> PanelH
 /// (highlighted while on; disabled with the reason while the staged variable
 /// can't be overlaid), then "Plot Data", which adds the variable as an
 /// overlay while the toggle is on; stacked, Plot Data below, when the two
-/// don't fit side by side. Whether Plot Data was clicked.
-fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
+/// don't fit side by side. Plot Data's response, its tooltip naming its
+/// shortcut.
+fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> Option<egui::Response> {
     let unavailable = app.overlay_unavailable_for(app.selected.variable_idx);
     if unavailable.is_some() {
         app.layout.plot_as_overlay = false;
@@ -163,7 +168,7 @@ fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
     let widths = flow_row::cached_widths(ui, "plot_row", (plot_text, overlay_text), |ui| {
         [icon_button_width(ui, plot_text), toggle(false).width(ui)]
     });
-    let mut plot = false;
+    let mut plot = None;
     flow_row::right_aligned(ui, &widths, |ui, item| {
         if item == 0 {
             let hover = if app.layout.plot_as_overlay {
@@ -171,10 +176,11 @@ fn plot_row(app: &mut OctantApp, ui: &mut egui::Ui) -> bool {
             } else {
                 tr(VariablesKey::PlotDataHover)
             };
-            plot = ui
-                .outlined_icon_button(plot_icon, plot_text, IconTone::Default)
-                .on_hover_text(hover)
-                .clicked();
+            let keys = keymap::shortcut_of(Action::PlotStaged);
+            let button = ui.outlined_icon_button(plot_icon, plot_text, IconTone::Default);
+            plot = Some(focus::tooltip_ui(button, |ui| {
+                labels::tooltip(ui, hover, keys)
+            }));
             return;
         }
         let response = ui.add_enabled(unavailable.is_none(), toggle(app.layout.plot_as_overlay));

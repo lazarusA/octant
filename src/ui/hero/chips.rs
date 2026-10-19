@@ -4,7 +4,7 @@ use super::chip_nav::{self, chip_id};
 use super::style::{BODY_FONT, GUTTER, SMALL_FONT, gap};
 use crate::app::OctantApp;
 use crate::i18n::{DatasetKey, fill, tr};
-use crate::ui::key_focus;
+use crate::ui::keyboard::focus as key_focus;
 use egui::Galley;
 use std::sync::Arc;
 
@@ -184,9 +184,7 @@ fn render_chip(
         } else {
             galley
         };
-        if focused {
-            key_focus::paint_focus_ring(ui, rect, radius);
-        }
+        key_focus::paint_ring(ui, &response, radius);
         let text_pos = rect.center() - galley.size() * 0.5;
         ui.painter()
             .galley(text_pos, galley, ui.visuals().text_color());

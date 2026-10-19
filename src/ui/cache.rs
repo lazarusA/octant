@@ -6,7 +6,8 @@ use crate::{
     utils::stack_str,
 };
 
-pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
+/// The cache button and its menu; the button's response.
+pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) -> egui::Response {
     let button_response = ui.add(
         ToolbarButton::new(Icon::Cache, tr(CommonKey::Cache))
             .compact(compact)
@@ -231,4 +232,5 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) {
             ui.close();
         }
     });
+    button_response
 }

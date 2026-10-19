@@ -3,12 +3,16 @@
 
 use crate::ui::drag_grip::{self, GripAction};
 use crate::ui::icons::{Icon, IconSize, UiIconExt};
+use crate::ui::keyboard::regions::Entry;
 
 /// What a panel header's buttons asked for this frame.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PanelHeader {
     pub close: bool,
     pub grip: GripAction,
+    /// Where keyboard focus enters the panel: its grip, unless the panel
+    /// names another widget.
+    pub entry: Option<Entry>,
 }
 
 impl Default for PanelHeader {
@@ -16,7 +20,19 @@ impl Default for PanelHeader {
         Self {
             close: false,
             grip: GripAction::None,
+            entry: None,
         }
+    }
+}
+
+impl PanelHeader {
+    /// Keyboard focus enters the panel at the first control of its body,
+    /// drawn right after the header's grip.
+    pub fn entering_body(mut self) -> Self {
+        if let Some(Entry::At(grip)) = self.entry {
+            self.entry = Some(Entry::After(grip));
+        }
+        self
     }
 }
 
@@ -37,5 +53,6 @@ pub fn buttons(ui: &mut egui::Ui, close_hover: &str) -> PanelHeader {
     PanelHeader {
         close,
         grip: drag_grip::action(&grip),
+        entry: Some(Entry::At(grip.id)),
     }
 }

@@ -1,0 +1,49 @@
+use crate::i18n::keys::KeymapKey;
+
+pub fn text(key: KeymapKey) -> Option<&'static str> {
+    Some(match key {
+        KeymapKey::Title => "Сполучення клавіш",
+        KeymapKey::CloseHover => "Закрити сполучення клавіш (Esc)",
+        KeymapKey::ScopeGlobal => "Будь-де",
+        KeymapKey::ScopePanel => "На панелі",
+        KeymapKey::ScopeFree => "Поза текстовими полями",
+        KeymapKey::ScopeCanvas => "На графіку",
+        KeymapKey::ScopePlayback => "Відтворення",
+        KeymapKey::Arrows => "Стрілки",
+        KeymapKey::Hint => "{} ({})",
+        KeymapKey::QuickSave => "Зберегти рисунок",
+        KeymapKey::ExportDialog => "Експортувати рисунок із налаштуваннями",
+        KeymapKey::ToggleCrop => "Показати/сховати рамку обрізання",
+        KeymapKey::GoToDataset => "Перейти до панелі набору даних",
+        KeymapKey::GoToVariables => "Перейти до панелі змінних",
+        KeymapKey::GoToDimensions => "Перейти до панелі вимірів",
+        KeymapKey::GoToSettings => "Перейти до налаштувань",
+        KeymapKey::SearchVariables => "Шукати змінні",
+        KeymapKey::ClosePanel => "Закрити панель",
+        KeymapKey::NextRegion => "Перейти до наступної області",
+        KeymapKey::PreviousRegion => "Перейти до попередньої області",
+        KeymapKey::FocusTopBar => "Перейти до верхньої панелі",
+        KeymapKey::PlayPause => "Відтворити або призупинити",
+        KeymapKey::StepPrev => "Попередній крок",
+        KeymapKey::StepNext => "Наступний крок",
+        KeymapKey::FirstStep => "Перший крок",
+        KeymapKey::LastStep => "Останній крок",
+        KeymapKey::ToggleLoop => "Увімкнути/вимкнути повтор",
+        KeymapKey::Move => {
+            "Зсунути (2D) або повернути (3D) графік; перемістити зонд або рамку обрізання"
+        }
+        KeymapKey::MoveAlt => "Зсунути далі (2D) або зсунути (3D); змінити розмір рамки обрізання",
+        KeymapKey::ZoomIn => "Наблизити",
+        KeymapKey::ZoomOut => "Віддалити",
+        KeymapKey::ResetView => "Скинути вигляд",
+        KeymapKey::ToggleProbe => "Зчитувати значення стрілками",
+        KeymapKey::LeaveProbe => "Припинити зчитування",
+        KeymapKey::ShowShortcuts => "Показати сполучення клавіш",
+        KeymapKey::ToggleHero => "Показати початковий екран або знову графік",
+        KeymapKey::LeaveHero => "Повернутися до графіка",
+        KeymapKey::ScopeHero => "На початковому екрані",
+        KeymapKey::PlotTypePicker => "Вибрати тип графіка",
+        KeymapKey::PlotStaged => "Побудувати вибрану змінну",
+        KeymapKey::GoToColorbar => "Перейти до наступної кольорової шкали",
+    })
+}

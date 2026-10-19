@@ -103,3 +103,43 @@ fn the_play_button_shows_buffering_progress_while_it_waits() {
         assert_eq!(label, "Buffering 12/45");
     });
 }
+
+#[test]
+fn arrows_walk_the_buttons_up_to_the_timeline() {
+    use crate::ui::keyboard::{self, focus};
+    use crate::ui::test_input::Harness;
+    use egui::{Key, Modifiers, Rect, pos2};
+
+    fn run(app: &mut OctantApp) -> impl FnMut(&mut egui::Ui) + '_ {
+        |ui| {
+            keyboard::dispatch(app, ui.ctx(), true);
+            super::show_bottom_bar(app, ui);
+            focus::end_frame(ui.ctx());
+        }
+    }
+    let mut app = regions_app(&["north", "south", "east"]);
+    let mut h = Harness::new(Rect::from_min_max(pos2(0.0, 0.0), pos2(1400.0, 300.0)));
+    h.settle(2, &mut run(&mut app));
+    let mut press = |key| {
+        let at = h.press(key, Modifiers::NONE, &mut run(&mut app));
+        at.expect("a widget is focused").rect
+    };
+    // F6 from nowhere enters the first region drawn: this bar.
+    let mut rects = vec![press(Key::F6)];
+    rects.extend((0..8).map(|_| press(Key::ArrowRight)));
+    // The buttons step right up to the timeline, whose arrows then move it.
+    let slider = rects
+        .iter()
+        .position(|r| r.width() > 100.0)
+        .expect("the timeline");
+    assert!(
+        rects[..=slider]
+            .windows(2)
+            .all(|w| w[0].left() < w[1].left()),
+        "{rects:?}"
+    );
+    assert!(
+        rects[slider..].iter().all(|r| *r == rects[slider]),
+        "{rects:?}"
+    );
+}

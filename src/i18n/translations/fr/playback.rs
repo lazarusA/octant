@@ -10,7 +10,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::NextStep => "Pas suivant",
         PlaybackKey::LastStep => "Dernier pas",
         PlaybackKey::Crop => "Recadrer",
-        PlaybackKey::CropHover => "Lignes de recadrage (C)",
+        PlaybackKey::CropHover => "Lignes de recadrage",
         PlaybackKey::PlaybackSpeed => "Vitesse de lecture",
         PlaybackKey::PlaybackBuffer => "Mise en mémoire tampon avant lecture",
         PlaybackKey::Buffering => "Mise en mémoire tampon {}/{}",

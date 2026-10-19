@@ -10,6 +10,7 @@ use fields::{acquisition_select, field_list};
 
 use crate::app::OctantApp;
 use crate::app::PlateState;
+use crate::ui::keyboard::focus;
 
 /// Width of the row names column.
 const ROW_NAME_W: f32 = 18.0;
@@ -69,7 +70,8 @@ impl Grid {
     }
 }
 
-/// The wells on their grid; a click picks one.
+/// The wells on their grid; a click (or Enter) picks one, and the arrow
+/// keys move keyboard focus to the next well along a row or column.
 fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
     let layout = &plate.plate;
     let (rows, columns) = (layout.rows.len(), layout.columns.len());
@@ -81,37 +83,85 @@ fn well_grid(ui: &mut egui::Ui, plate: &PlateState) -> Option<PlateAction> {
     let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
     let grid = Grid { rect, side };
     grid_names(ui, &grid, layout);
-    let opened_well = plate.opened.as_ref().map(|(well, _)| *well);
     let painter = ui.painter_at(rect);
-    let mut action = None;
+    let well_id = |i: usize| ui.scope_id().with(("plate_well", i));
+    let (mut action, mut arrow) = (None, None);
     for (i, well) in layout.wells.iter().enumerate() {
         if well.row >= rows || well.column >= columns {
             continue;
         }
-        let r = grid.cell(well.row, well.column).shrink(1.0);
-        let response = ui.interact(
-            r,
-            ui.scope_id().with(("plate_well", i)),
-            egui::Sense::click(),
-        );
-        let visuals = ui.visuals();
-        let fill = if plate.well == Some(i) {
-            visuals.selection.bg_fill
-        } else if response.hovered() {
-            visuals.widgets.hovered.bg_fill
-        } else {
-            visuals.widgets.inactive.bg_fill
-        };
-        painter.rect_filled(r, 2.0, fill);
-        if opened_well == Some(i) {
-            painter.rect_stroke(r, 2.0, visuals.selection.stroke, egui::StrokeKind::Inside);
-        }
+        let cell = grid.cell(well.row, well.column).shrink(1.0);
+        let response = ui.interact(cell, well_id(i), egui::Sense::click());
+        paint_well(ui, &painter, plate, i, &response);
+        arrow = arrow.or(focus::arrow_on(&response).map(|d| (i, d)));
         if response.clicked() {
             action = Some(PlateAction::PickWell(i));
         }
-        response.on_hover_text(well.path.as_str());
+        focus::tooltip_ui(response, |ui| {
+            ui.label(well.path.as_str());
+        });
+    }
+    if let Some(next) = arrow.and_then(|(at, d)| neighbor(layout, at, d)) {
+        focus::request(ui.ctx(), well_id(next));
     }
     action
+}
+
+/// Well `i`'s cell: picked, hovered or plain fill, the opened well's
+/// outline and the keyboard focus ring.
+fn paint_well(
+    ui: &egui::Ui,
+    painter: &egui::Painter,
+    plate: &PlateState,
+    i: usize,
+    response: &egui::Response,
+) {
+    let visuals = ui.visuals();
+    let fill = if plate.well == Some(i) {
+        visuals.selection.bg_fill
+    } else if response.hovered() {
+        visuals.widgets.hovered.bg_fill
+    } else {
+        visuals.widgets.inactive.bg_fill
+    };
+    let cell = response.rect;
+    painter.rect_filled(cell, 2.0, fill);
+    if plate.opened.as_ref().is_some_and(|(well, _)| *well == i) {
+        painter.rect_stroke(
+            cell,
+            2.0,
+            visuals.selection.stroke,
+            egui::StrokeKind::Inside,
+        );
+    }
+    focus::paint_ring(ui, response, 2.0);
+}
+
+/// The well next to well `at` in `direction` along its row or column: the
+/// nearest one there, as plates may leave wells out.
+fn neighbor(
+    layout: &crate::data::ome::OmePlate,
+    at: usize,
+    direction: egui::Vec2,
+) -> Option<usize> {
+    let from = layout.wells.get(at)?;
+    let along = |row: usize, column: usize| {
+        let (dr, dc) = (
+            row as f32 - from.row as f32,
+            column as f32 - from.column as f32,
+        );
+        let ahead = if direction.x != 0.0 {
+            dr == 0.0 && dc * direction.x > 0.0
+        } else {
+            dc == 0.0 && dr * direction.y > 0.0
+        };
+        ahead.then_some((dr.abs() + dc.abs()) as usize)
+    };
+    let wells = layout.wells.iter().enumerate();
+    wells
+        .filter_map(|(i, w)| along(w.row, w.column).map(|d| (d, i)))
+        .min()
+        .map(|(_, i)| i)
 }
 
 /// The column names above the grid and the row names left of it, every few

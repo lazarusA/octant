@@ -19,12 +19,13 @@ mod stack_tests;
 #[cfg(test)]
 mod tests;
 
+pub use focus::focus_search;
 pub use search::SearchCache;
 
 use crate::app::OctantApp;
 use crate::i18n::{CommonKey, VariablesKey, tr};
 use crate::ui::icons::{Icon, UiIconExt};
-use crate::ui::key_focus;
+use crate::ui::keyboard::focus as key_focus;
 use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
 use nav::SearchJump;
@@ -50,7 +51,7 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
     app.layout.variables_overlay_width = width;
 
     let mut header = None;
-    let area_resp = egui::Area::new(egui::Id::unique("octant_variables_area"))
+    let area_resp = egui::Area::new(Panel::Variables.area_id())
         .fixed_pos(origin)
         .constrain_to(canvas_rect)
         .order(egui::Order::Foreground)
@@ -60,19 +61,22 @@ pub fn show_variables_overlay(app: &mut OctantApp, ctx: &egui::Context, canvas_r
                 header = show_panel(ui, app, list_height, canvas_rect);
             });
         });
-    let rect = area_resp.response.rect;
-    app.layout.variables_overlay_width = rect.width();
+    app.layout.variables_overlay_width = area_resp.response.rect.width();
     if let Some(header) = header {
-        panel_layout::apply_grip(app, Panel::Variables, header.grip, rect, canvas_rect);
-        if header.close {
-            close(app);
-        }
+        panel_layout::finish(
+            app,
+            Panel::Variables,
+            header,
+            &area_resp.response,
+            canvas_rect,
+        );
     }
 }
 
 /// Collapsible "Variables" header with the search field and list (at most
 /// `list_height` tall, shorter rather than past the bottom of `canvas`);
-/// returns what the header's close button and grip asked for.
+/// returns what the header's close button and grip asked for, keyboard
+/// focus entering at the search field.
 fn show_panel(
     ui: &mut egui::Ui,
     app: &mut OctantApp,
@@ -99,6 +103,9 @@ fn show_panel(
             if focus::take_open_focus(ui.ctx()) {
                 search.request_focus();
             }
+            if let Some(header) = &mut header {
+                header.entry = Some(search.id.into());
+            }
             let jump = search_jump(ui, &search);
             let max_height = list_height
                 .min(panel_layout::room_below(ui, canvas))
@@ -110,15 +117,6 @@ fn show_panel(
                 .show(ui, |ui| body::show_list(ui, app, search.id, jump));
         });
     header
-}
-
-/// Hide the overlay; with the controls panel also closed, drop the unplotted
-/// selection.
-fn close(app: &mut OctantApp) {
-    app.layout.show_variables_overlay = false;
-    if !app.layout.show_variable_controls {
-        app.revert_selected_state_to_plotted();
-    }
 }
 
 /// Down in the search field moves to the first row; Enter (which ends the

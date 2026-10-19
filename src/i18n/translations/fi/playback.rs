@@ -10,7 +10,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::NextStep => "Seuraava askel",
         PlaybackKey::LastStep => "Viimeinen askel",
         PlaybackKey::Crop => "Rajaa",
-        PlaybackKey::CropHover => "Rajauksen apuviivat (C)",
+        PlaybackKey::CropHover => "Rajauksen apuviivat",
         PlaybackKey::PlaybackSpeed => "Toistonopeus",
         PlaybackKey::PlaybackBuffer => "Puskurointi ennen toistoa",
         PlaybackKey::Buffering => "Puskuroidaan {}/{}",

@@ -1,7 +1,9 @@
 //! Width-driven collapse shared by the top and bottom bars: items drop their
 //! labels (or, for data-only items, disappear) in a fixed priority order until
-//! the bar fits, instead of moving into an overflow menu.
+//! the bar fits, instead of moving into an overflow menu. `roving` moves
+//! keyboard focus along a bar.
 
+pub mod roving;
 #[cfg(test)]
 mod tests;
 

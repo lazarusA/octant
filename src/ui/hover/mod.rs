@@ -17,6 +17,7 @@ mod hit_cache;
 pub mod labels;
 mod march;
 pub mod overlays;
+pub mod probe;
 pub mod raycast_sphere;
 pub mod raycast_surface;
 pub mod raycast_volume;
@@ -59,7 +60,8 @@ use card::{Anchoring, HoverCard, LayerValue};
 use egui::{Color32, Pos2, Rect};
 use entries::{resolve_cell_value_and_dim_entries, resolve_variable_units};
 
-/// Renders the hover card and its leader line for the hovered data point.
+/// Renders the hover card and its leader line for the hovered data point, or
+/// the keyboard probe's while it is on.
 pub fn show_hover_tooltip(
     app: &OctantApp,
     ctx: &egui::Context,
@@ -67,7 +69,8 @@ pub fn show_hover_tooltip(
     response: &egui::Response,
     rect: Rect,
 ) {
-    let Some(hover_pos) = response.hover_pos().filter(|_| app.layout.show_hover_card) else {
+    let pointer = probe::position(ctx).or_else(|| response.hover_pos());
+    let Some(hover_pos) = pointer.filter(|_| app.layout.show_hover_card) else {
         return;
     };
     let matrix = (app.layers.base.data.matrix.as_ref())

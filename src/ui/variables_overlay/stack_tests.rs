@@ -10,7 +10,7 @@ use super::tree::{VariableTreeContext, render_tree_group};
 use crate::app::layers::LevelChoice;
 use crate::data::multiscale::{Multiscale, ScaleLevel, link};
 use crate::data::{VariableInfo, VariableTreeGroup};
-use crate::ui::key_focus;
+use crate::ui::keyboard::focus as key_focus;
 
 /// `lat` and the three levels of `t2m` (64, 32 and 16 cells a side).
 fn fixture() -> (Vec<VariableInfo>, VariableTreeGroup) {

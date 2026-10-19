@@ -4,6 +4,7 @@
 
 pub mod editor;
 pub mod filters;
+pub mod keys;
 pub mod label;
 pub mod list;
 pub mod search;
@@ -16,6 +17,8 @@ use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::UiIconExt;
+use crate::ui::keyboard::list_nav::Above;
+use crate::ui::keyboard::windows;
 use crate::utils::colormap::registry;
 
 /// Persistent (per-session) picker UI state.
@@ -29,6 +32,12 @@ pub struct PickerState {
     pub below_list_height: f32,
     /// Row hovered last frame; `preview_colormap` itself resets every frame.
     pub last_hovered: Option<u32>,
+    /// Row holding keyboard focus last frame.
+    pub focused_row: Option<u32>,
+    /// Rows the list drew last frame.
+    pub drawn_rows: std::ops::Range<usize>,
+    /// Focus the search field on the next frame (the picker just opened).
+    pub focus_search: bool,
 }
 
 const POPUP_WIDTH: f32 = 300.0;
@@ -44,7 +53,15 @@ const ACTIVE_SWATCH_WIDTH: f32 = 120.0;
 pub fn show_picker_popup(app: &mut OctantApp, anchor: &egui::Response, id: LayerId) {
     if anchor.clicked() {
         app.colormaps.target = Some(id);
+        app.colormaps.picker.focus_search = true;
     }
+    // Focus returns to the bar once the picker closes.
+    let popup_id = egui::Popup::default_response_id(anchor);
+    windows::follow_window(
+        &anchor.ctx,
+        popup_id,
+        egui::Popup::is_id_open(&anchor.ctx, popup_id),
+    );
     // The side follows the bar, not the content: egui otherwise re-picks it
     // every frame from the content size, so expanding the editor would jump
     // the panel. The height is capped to the room on that side and scrolls.
@@ -103,11 +120,15 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
     }
     ui.separator();
 
-    ui.search_field(
+    let search = ui.search_field_response(
         &mut app.colormaps.picker.filter.query,
         tr(K::SearchHint),
         None,
     );
+    if std::mem::take(&mut app.colormaps.picker.focus_search) {
+        search.request_focus();
+    }
+    let above = Above::of(&search);
     filters::show(ui, &mut app.colormaps.picker.filter);
     ui.add_space(2.0);
     let used_above = ui.cursor().min.y - top;
@@ -116,7 +137,7 @@ fn render_colormap_contents(app: &mut OctantApp, ui: &mut egui::Ui, max_height: 
     let spacing = ui.spacing().item_spacing.y;
     let list_height =
         (max_height - used_above - spacing - below).clamp(list::MIN_HEIGHT, list::MAX_HEIGHT);
-    list::show(app, ui, list_height);
+    list::show(app, ui, list_height, above);
 
     let below_start = ui.cursor().min.y;
     ui.separator();

@@ -10,7 +10,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::NextStep => "Neste steg",
         PlaybackKey::LastStep => "Siste steg",
         PlaybackKey::Crop => "Beskjær",
-        PlaybackKey::CropHover => "Hjelpelinjer for beskjæring (C)",
+        PlaybackKey::CropHover => "Hjelpelinjer for beskjæring",
         PlaybackKey::PlaybackSpeed => "Avspillingshastighet",
         PlaybackKey::PlaybackBuffer => "Buffer før avspilling",
         PlaybackKey::Buffering => "Bufrer {}/{}",

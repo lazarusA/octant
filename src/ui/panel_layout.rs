@@ -6,7 +6,9 @@
 
 use crate::app::OctantApp;
 use crate::ui::drag_grip::{self, GripAction};
-use egui::{Pos2, Rect, Vec2};
+use crate::ui::keyboard::regions::{self, Region};
+use crate::ui::panel_header::PanelHeader;
+use egui::{Id, Pos2, Rect, Response, Vec2};
 
 /// Content width of the Dataset and Settings panels; rows stack (`flow_row`)
 /// rather than widen them.
@@ -21,6 +23,25 @@ pub enum Panel {
     Variables,
     Settings,
     Dimensions,
+}
+
+impl Panel {
+    /// The id of the panel's `egui::Area`, and so of its layer.
+    pub fn area_id(self) -> Id {
+        Id::unique(match self {
+            Panel::Dataset => "octant_dataset_area",
+            Panel::Variables => "octant_variables_area",
+            Panel::Settings => "octant_settings_area",
+            Panel::Dimensions => "octant_variables_panel",
+        })
+    }
+
+    pub const ALL: [Panel; 4] = [
+        Panel::Dataset,
+        Panel::Variables,
+        Panel::Settings,
+        Panel::Dimensions,
+    ];
 }
 
 /// Each panel's dragged top-left corner as a canvas fraction; `None` while
@@ -104,7 +125,32 @@ pub fn room_below(ui: &egui::Ui, canvas: Rect) -> f32 {
 }
 
 /// Applies `panel`'s grip `action`, its area at `rect` on `canvas`.
-pub fn apply_grip(app: &mut OctantApp, panel: Panel, action: GripAction, rect: Rect, canvas: Rect) {
+fn apply_grip(app: &mut OctantApp, panel: Panel, action: GripAction, rect: Rect, canvas: Rect) {
     let pos = app.layout.panel_positions.get_mut(panel);
     *pos = drag_grip::apply(*pos, action, rect.min, canvas);
+}
+
+/// After `panel` drew as `area` on `canvas`: applies what its `header`'s
+/// grip asked, registers it as a keyboard region entered at the header's
+/// `entry`, and closes it when its close button was clicked.
+pub fn finish(
+    app: &mut OctantApp,
+    panel: Panel,
+    header: PanelHeader,
+    area: &Response,
+    canvas: Rect,
+) {
+    apply_grip(app, panel, header.grip, area.rect, canvas);
+    if let Some(entry) = header.entry {
+        regions::register(
+            &area.ctx,
+            Region::of(panel),
+            entry,
+            area.layer_id,
+            Rect::EVERYTHING,
+        );
+    }
+    if header.close {
+        app.set_panel_open(&area.ctx, panel, false);
+    }
 }

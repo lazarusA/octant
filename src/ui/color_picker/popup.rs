@@ -1,9 +1,11 @@
 //! Streamlined color picker popup with RGB channel edits, 2D SV area, and Hue/Alpha bars.
 
+use super::planes;
 use crate::i18n::{ColormapKey as K, tr};
 use crate::ui::icons::{Icon, UiIconExt};
+use crate::ui::keyboard::windows;
 use crate::ui::number_input::LocalizedInput;
-use egui::{Color32, Pos2, Rect, Shape, Stroke, Vec2, ecolor::Hsva};
+use egui::{Color32, Pos2, Rect, Vec2, ecolor::Hsva};
 
 /// Color space selection for RGB channel displays (Byte 0-255 vs Float 0-1)
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -21,12 +23,25 @@ pub(crate) fn show_clean_color_picker_popup(
     popup_area_id: egui::Id,
     anchor_pos: Pos2,
 ) {
-    let mut is_open = ui
+    let was_open = ui
         .data(|d| d.get_temp::<bool>(popup_open_id))
         .unwrap_or(false);
+    // One popup at a time: another opening (a select) closes the picker.
+    let ctx = ui.ctx();
+    let other_popup =
+        || egui::Popup::is_any_open(ctx) && !egui::Popup::is_id_open(ctx, popup_area_id);
+    let mut is_open = was_open && !other_popup();
+    if was_open && !is_open {
+        ui.data_mut(|d| d.insert_temp(popup_open_id, false));
+    }
+    // Focus returns to the swatch once the popup closes.
+    windows::follow_window(ui.ctx(), popup_area_id, is_open);
     if !is_open {
         return;
     }
+    // Known to egui as its open popup, so Escape and the canvas keys leave
+    // the panels behind it alone.
+    egui::Popup::open_id(ui.ctx(), popup_area_id);
 
     let screen_rect = ui
         .input(|i| i.raw.screen_rect)
@@ -102,106 +117,10 @@ pub(crate) fn show_clean_color_picker_popup(
                 // RGB Numeric Inputs
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 4.0;
-                    match gamma_space {
-                        ColorGammaSpace::Byte => {
-                            let mut r = (color_rgba[0] * 255.0).round() as u8;
-                            let mut g = (color_rgba[1] * 255.0).round() as u8;
-                            let mut b = (color_rgba[2] * 255.0).round() as u8;
-                            let mut a = (color_rgba[3] * 255.0).round() as u8;
-                            let mut rgb_changed = false;
-
-                            ui.label(
-                                egui::RichText::new("R")
-                                    .small()
-                                    .strong()
-                                    .color(Color32::from_rgb(255, 100, 100)),
-                            );
-                            rgb_changed |= ui.add(byte_drag(&mut r)).changed();
-                            ui.label(
-                                egui::RichText::new("G")
-                                    .small()
-                                    .strong()
-                                    .color(Color32::from_rgb(100, 255, 100)),
-                            );
-                            rgb_changed |= ui.add(byte_drag(&mut g)).changed();
-                            ui.label(
-                                egui::RichText::new("B")
-                                    .small()
-                                    .strong()
-                                    .color(Color32::from_rgb(100, 150, 255)),
-                            );
-                            rgb_changed |= ui.add(byte_drag(&mut b)).changed();
-                            ui.label(
-                                egui::RichText::new("A")
-                                    .small()
-                                    .strong()
-                                    .color(Color32::from_gray(180)),
-                            );
-                            rgb_changed |= ui.add(byte_drag(&mut a)).changed();
-
-                            if rgb_changed {
-                                *color_rgba = [
-                                    r as f32 / 255.0,
-                                    g as f32 / 255.0,
-                                    b as f32 / 255.0,
-                                    a as f32 / 255.0,
-                                ];
-                                hsva = Hsva::from_rgba_unmultiplied(
-                                    color_rgba[0],
-                                    color_rgba[1],
-                                    color_rgba[2],
-                                    color_rgba[3],
-                                );
-                                changed = true;
-                            }
-                        }
-                        ColorGammaSpace::Float => {
-                            let mut r = color_rgba[0];
-                            let mut g = color_rgba[1];
-                            let mut b = color_rgba[2];
-                            let mut a = color_rgba[3];
-                            let mut rgb_changed = false;
-
-                            ui.label(
-                                egui::RichText::new("R")
-                                    .small()
-                                    .strong()
-                                    .color(Color32::from_rgb(255, 100, 100)),
-                            );
-                            rgb_changed |= ui.add(unit_drag(&mut r)).changed();
-                            ui.label(
-                                egui::RichText::new("G")
-                                    .small()
-                                    .strong()
-                                    .color(Color32::from_rgb(100, 255, 100)),
-                            );
-                            rgb_changed |= ui.add(unit_drag(&mut g)).changed();
-                            ui.label(
-                                egui::RichText::new("B")
-                                    .small()
-                                    .strong()
-                                    .color(Color32::from_rgb(100, 150, 255)),
-                            );
-                            rgb_changed |= ui.add(unit_drag(&mut b)).changed();
-                            ui.label(
-                                egui::RichText::new("A")
-                                    .small()
-                                    .strong()
-                                    .color(Color32::from_gray(180)),
-                            );
-                            rgb_changed |= ui.add(unit_drag(&mut a)).changed();
-
-                            if rgb_changed {
-                                *color_rgba = [r, g, b, a];
-                                hsva = Hsva::from_rgba_unmultiplied(
-                                    color_rgba[0],
-                                    color_rgba[1],
-                                    color_rgba[2],
-                                    color_rgba[3],
-                                );
-                                changed = true;
-                            }
-                        }
+                    if channel_inputs(ui, gamma_space, color_rgba) {
+                        let [r, g, b, a] = *color_rgba;
+                        hsva = Hsva::from_rgba_unmultiplied(r, g, b, a);
+                        changed = true;
                     }
                 });
 
@@ -209,183 +128,13 @@ pub(crate) fn show_clean_color_picker_popup(
 
                 // 2. MIDDLE SECTION: 2D Saturation / Value Color Area
                 let available_w = ui.available_width();
-                let sv_size = Vec2::new(available_w, 165.0);
-                let (sv_rect, sv_resp) = ui.allocate_exact_size(sv_size, egui::Sense::drag());
-
-                if (sv_resp.dragged() || sv_resp.clicked())
-                    && let Some(pos) = ui.input(|i| i.pointer.interact_pos())
-                {
-                    hsva.s = ((pos.x - sv_rect.min.x) / sv_rect.width()).clamp(0.0_f32, 1.0_f32);
-                    hsva.v = (1.0_f32 - (pos.y - sv_rect.min.y) / sv_rect.height())
-                        .clamp(0.0_f32, 1.0_f32);
-                    changed = true;
-                }
-
-                let mut sv_mesh = egui::Mesh::default();
-                let c_tl = Color32::WHITE;
-                let c_tr = Color32::from(Hsva::new(hsva.h, 1.0, 1.0, 1.0));
-                let c_bl = Color32::BLACK;
-                let c_br = Color32::BLACK;
-
-                sv_mesh.colored_vertex(sv_rect.left_top(), c_tl);
-                sv_mesh.colored_vertex(sv_rect.right_top(), c_tr);
-                sv_mesh.colored_vertex(sv_rect.right_bottom(), c_br);
-                sv_mesh.colored_vertex(sv_rect.left_bottom(), c_bl);
-                sv_mesh.add_triangle(0, 1, 2);
-                sv_mesh.add_triangle(0, 2, 3);
-                ui.painter().add(Shape::mesh(sv_mesh));
-
-                ui.painter().rect_stroke(
-                    sv_rect,
-                    2.0,
-                    egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
-                    egui::StrokeKind::Inside,
-                );
-
-                let cursor_pos = Pos2::new(
-                    sv_rect.min.x + hsva.s * sv_rect.width(),
-                    sv_rect.min.y + (1.0 - hsva.v) * sv_rect.height(),
-                );
-                ui.painter().circle(
-                    cursor_pos,
-                    5.0,
-                    Color32::TRANSPARENT,
-                    Stroke::new(2.0, Color32::WHITE),
-                );
-                ui.painter().circle(
-                    cursor_pos,
-                    6.0,
-                    Color32::TRANSPARENT,
-                    Stroke::new(1.0, Color32::BLACK),
-                );
-
+                changed |= planes::sv_plane(ui, &mut hsva, available_w);
                 ui.add_space(5.0);
 
                 // 3. BOTTOM SECTION: Hue Spectrum Bar & Alpha Bar
-                let hue_size = Vec2::new(available_w, 15.0);
-                let (hue_rect, hue_resp) = ui.allocate_exact_size(hue_size, egui::Sense::drag());
-
-                if (hue_resp.dragged() || hue_resp.clicked())
-                    && let Some(pos) = ui.input(|i| i.pointer.interact_pos())
-                {
-                    hsva.h = ((pos.x - hue_rect.min.x) / hue_rect.width()).clamp(0.0_f32, 1.0_f32);
-                    changed = true;
-                }
-
-                let num_segments = 6;
-                let mut hue_mesh = egui::Mesh::default();
-                for i in 0..num_segments {
-                    let h0 = i as f32 / num_segments as f32;
-                    let h1 = (i + 1) as f32 / num_segments as f32;
-                    let x0 = hue_rect.min.x + h0 * hue_rect.width();
-                    let x1 = hue_rect.min.x + h1 * hue_rect.width();
-                    let r = Rect::from_min_max(
-                        Pos2::new(x0, hue_rect.min.y),
-                        Pos2::new(x1, hue_rect.max.y),
-                    );
-
-                    let c0 = Color32::from(Hsva::new(h0, 1.0, 1.0, 1.0));
-                    let c1 = Color32::from(Hsva::new(h1, 1.0, 1.0, 1.0));
-
-                    let idx = hue_mesh.vertices.len() as u32;
-                    hue_mesh.colored_vertex(r.left_top(), c0);
-                    hue_mesh.colored_vertex(r.right_top(), c1);
-                    hue_mesh.colored_vertex(r.right_bottom(), c1);
-                    hue_mesh.colored_vertex(r.left_bottom(), c0);
-                    hue_mesh.add_triangle(idx, idx + 1, idx + 2);
-                    hue_mesh.add_triangle(idx, idx + 2, idx + 3);
-                }
-                ui.painter().add(Shape::mesh(hue_mesh));
-
-                ui.painter().rect_stroke(
-                    hue_rect,
-                    2.0,
-                    egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
-                    egui::StrokeKind::Inside,
-                );
-
-                let hue_cursor_x = hue_rect.min.x + hsva.h * hue_rect.width();
-                let hue_cursor_rect = Rect::from_center_size(
-                    Pos2::new(hue_cursor_x, hue_rect.center().y),
-                    Vec2::new(5.0, hue_rect.height() + 4.0),
-                );
-                ui.painter().rect(
-                    hue_cursor_rect,
-                    2.0,
-                    Color32::WHITE,
-                    Stroke::new(1.0, Color32::BLACK),
-                    egui::StrokeKind::Middle,
-                );
-
+                changed |= planes::hue_strip(ui, &mut hsva, available_w);
                 ui.add_space(4.0);
-
-                let alpha_size = Vec2::new(available_w, 15.0);
-                let (alpha_rect, alpha_resp) =
-                    ui.allocate_exact_size(alpha_size, egui::Sense::drag());
-
-                if (alpha_resp.dragged() || alpha_resp.clicked())
-                    && let Some(pos) = ui.input(|i| i.pointer.interact_pos())
-                {
-                    hsva.a =
-                        ((pos.x - alpha_rect.min.x) / alpha_rect.width()).clamp(0.0_f32, 1.0_f32);
-                    changed = true;
-                }
-
-                let grid_size = 5.0;
-                let mut check_x = alpha_rect.min.x;
-                while check_x < alpha_rect.max.x {
-                    let mut check_y = alpha_rect.min.y;
-                    let col = ((check_x - alpha_rect.min.x) / grid_size) as usize;
-                    while check_y < alpha_rect.max.y {
-                        let row = ((check_y - alpha_rect.min.y) / grid_size) as usize;
-                        let c = if (row + col).is_multiple_of(2) {
-                            Color32::from_gray(180)
-                        } else {
-                            Color32::from_gray(240)
-                        };
-                        let r = Rect::from_min_max(
-                            Pos2::new(check_x, check_y),
-                            Pos2::new(
-                                (check_x + grid_size).min(alpha_rect.max.x),
-                                (check_y + grid_size).min(alpha_rect.max.y),
-                            ),
-                        );
-                        ui.painter().rect_filled(r, 0.0, c);
-                        check_y += grid_size;
-                    }
-                    check_x += grid_size;
-                }
-
-                let mut alpha_mesh = egui::Mesh::default();
-                let c_trans = Color32::from(Hsva::new(hsva.h, hsva.s, hsva.v, 0.0));
-                let c_opaque = Color32::from(Hsva::new(hsva.h, hsva.s, hsva.v, 1.0));
-                alpha_mesh.colored_vertex(alpha_rect.left_top(), c_trans);
-                alpha_mesh.colored_vertex(alpha_rect.right_top(), c_opaque);
-                alpha_mesh.colored_vertex(alpha_rect.right_bottom(), c_opaque);
-                alpha_mesh.colored_vertex(alpha_rect.left_bottom(), c_trans);
-                alpha_mesh.add_triangle(0, 1, 2);
-                alpha_mesh.add_triangle(0, 2, 3);
-                ui.painter().add(Shape::mesh(alpha_mesh));
-
-                ui.painter().rect_stroke(
-                    alpha_rect,
-                    2.0,
-                    egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
-                    egui::StrokeKind::Inside,
-                );
-
-                let alpha_cursor_x = alpha_rect.min.x + hsva.a * alpha_rect.width();
-                let alpha_cursor_rect = Rect::from_center_size(
-                    Pos2::new(alpha_cursor_x, alpha_rect.center().y),
-                    Vec2::new(5.0, alpha_rect.height() + 4.0),
-                );
-                ui.painter().rect(
-                    alpha_cursor_rect,
-                    2.0,
-                    Color32::WHITE,
-                    Stroke::new(1.0, Color32::BLACK),
-                    egui::StrokeKind::Middle,
-                );
+                changed |= planes::alpha_strip(ui, &mut hsva, available_w);
 
                 if changed {
                     let rgba_unmult = egui::ecolor::Rgba::from(hsva).to_rgba_unmultiplied();
@@ -393,10 +142,7 @@ pub(crate) fn show_clean_color_picker_popup(
                 }
             });
 
-            if ui.input(|i| i.pointer.any_pressed())
-                && let Some(pos) = ui.input(|i| i.pointer.interact_pos())
-                && !frame_resp.response.rect.contains(pos)
-            {
+            if windows::popup_dismissed(ui.ctx(), frame_resp.response.rect) {
                 is_open = false;
             }
         });
@@ -406,6 +152,35 @@ pub(crate) fn show_clean_color_picker_popup(
         d.insert_temp(hsva_id, hsva);
         d.insert_temp(gamma_space_id, gamma_space);
     });
+}
+
+/// The R, G, B and A labels in their colors.
+const CHANNELS: [(&str, Color32); 4] = [
+    ("R", Color32::from_rgb(255, 100, 100)),
+    ("G", Color32::from_rgb(100, 255, 100)),
+    ("B", Color32::from_rgb(100, 150, 255)),
+    ("A", Color32::from_gray(180)),
+];
+
+/// A numeric input per channel of `rgba`, in bytes or fractions by
+/// `space`; whether one changed.
+fn channel_inputs(ui: &mut egui::Ui, space: ColorGammaSpace, rgba: &mut [f32; 4]) -> bool {
+    let mut changed = false;
+    for (channel, (name, color)) in rgba.iter_mut().zip(CHANNELS) {
+        ui.label(egui::RichText::new(name).small().strong().color(color));
+        changed |= match space {
+            ColorGammaSpace::Byte => {
+                let mut byte = (*channel * 255.0).round() as u8;
+                let edited = ui.add(byte_drag(&mut byte)).changed();
+                if edited {
+                    *channel = f32::from(byte) / 255.0;
+                }
+                edited
+            }
+            ColorGammaSpace::Float => ui.add(unit_drag(channel)).changed(),
+        };
+    }
+    changed
 }
 
 /// A 0-255 channel input, reading typed numbers in the UI language.

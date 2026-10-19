@@ -76,18 +76,22 @@ fn abort_button(compact: bool) -> ToolbarButton<'static> {
         .hover(tr(CommonKey::AbortHover))
 }
 
+/// The abort button, spinner and progress label; the abort button's response.
 pub fn show_status_bar(
     app: &mut OctantApp,
     ui: &mut egui::Ui,
     progress: FetchProgress,
     compact: bool,
-) {
+) -> egui::Response {
     ui.horizontal(|ui| {
-        if ui.add(abort_button(compact)).clicked() {
+        let abort = ui.add(abort_button(compact));
+        if abort.clicked() {
             app.abort_current_fetch();
         }
         ui.add(egui::Spinner::new().size(SPINNER_SIZE));
         let mut buf: LabelBuf = [0; 160];
         ui.label(rich_label(ui, progress.label(&mut buf, compact)));
-    });
+        abort
+    })
+    .inner
 }

@@ -7,7 +7,9 @@ use super::timeline::Timeline;
 use crate::app::OctantApp;
 use crate::i18n::{CommonKey, PlaybackKey as K, tr};
 use crate::ui::icons::{Icon, ToolbarButton};
+use crate::ui::keyboard::keymap::Action;
 use crate::ui::number_input::LocalizedInput;
+use crate::ui::toolbar::roving::{BarNav, Stop};
 use crate::ui::toolbar::{BarItem, ItemWidths, SEPARATOR_WIDTH};
 use crate::utils::stack_str;
 
@@ -32,24 +34,35 @@ fn button<'a>(
     label: &'a str,
     compact: bool,
 ) -> Option<ToolbarButton<'a>> {
-    let icon_only = |icon, label| Some(ToolbarButton::new(icon, label).compact(true));
+    let icon_only = |icon, label, action| {
+        Some(
+            ToolbarButton::new(icon, label)
+                .compact(true)
+                .shortcut(action),
+        )
+    };
     let labelled = |icon, label| Some(ToolbarButton::new(icon, label).compact(compact));
+    let play = |icon, label| labelled(icon, label).map(|b| b.shortcut(Action::PlayPause));
     match item {
-        Item::First => icon_only(Icon::SeekStart, tr(K::FirstStep)),
-        Item::Prev => icon_only(Icon::StepBackward, tr(K::PreviousStep)),
-        Item::Next => icon_only(Icon::StepForward, tr(K::NextStep)),
-        Item::Last => icon_only(Icon::SeekEnd, tr(K::LastStep)),
+        Item::First => icon_only(Icon::SeekStart, tr(K::FirstStep), Action::FirstStep),
+        Item::Prev => icon_only(Icon::StepBackward, tr(K::PreviousStep), Action::StepPrev),
+        Item::Next => icon_only(Icon::StepForward, tr(K::NextStep), Action::StepNext),
+        Item::Last => icon_only(Icon::SeekEnd, tr(K::LastStep), Action::LastStep),
         // Waiting for the buffer: its progress, and a click still pauses.
         Item::PlayPause if is_buffering(app) => {
-            labelled(Icon::Hourglass, label).map(|b| b.hover(tr(K::Pause)))
+            play(Icon::Hourglass, label).map(|b| b.hover(tr(K::Pause)))
         }
-        Item::PlayPause if app.playback.is_playing => labelled(Icon::Pause, tr(K::Pause)),
-        Item::PlayPause => labelled(Icon::Play, tr(K::Play)),
-        Item::Loop => {
-            labelled(Icon::Loop, tr(K::Loop)).map(|b| b.toggled(app.playback.loop_playback))
-        }
-        Item::Crop => labelled(Icon::Scissors, tr(K::Crop))
-            .map(|b| b.toggled(app.show_crop_overlay).hover(tr(K::CropHover))),
+        Item::PlayPause if app.playback.is_playing => play(Icon::Pause, tr(K::Pause)),
+        Item::PlayPause => play(Icon::Play, tr(K::Play)),
+        Item::Loop => labelled(Icon::Loop, tr(K::Loop)).map(|b| {
+            b.toggled(app.playback.loop_playback)
+                .shortcut(Action::ToggleLoop)
+        }),
+        Item::Crop => labelled(Icon::Scissors, tr(K::Crop)).map(|b| {
+            b.toggled(app.show_crop_overlay)
+                .hover(tr(K::CropHover))
+                .shortcut(Action::ToggleCrop)
+        }),
         // Collapsed, the FPS value itself becomes the tooltip.
         Item::Fps => labelled(Icon::Gauge, label).map(|b| {
             let b = b.owns_popup();
@@ -112,13 +125,15 @@ pub(super) fn item_widths(item: Item, app: &OctantApp, tl: &Timeline, ui: &egui:
     }
 }
 
-/// Draw `item` in full or compact mode and run its action when clicked.
+/// Draw `item` in full or compact mode and run its action when clicked; a
+/// button joins `nav`.
 pub(super) fn show_item(
     item: Item,
     compact: bool,
     app: &mut OctantApp,
     tl: &Timeline,
     ui: &mut egui::Ui,
+    nav: &mut BarNav,
 ) {
     if compact && item.hides_when_compact() {
         return;
@@ -134,14 +149,23 @@ pub(super) fn show_item(
         match button(item, app, label, compact) {
             Some(btn) => {
                 let response = ui.add(btn);
-                on_click(item, &response, app, tl);
+                let stop = match item {
+                    Item::Fps => Stop::menu(&response),
+                    _ => Stop::Button,
+                };
+                nav.push(&response, stop);
+                on_click(item, &response, app);
             }
-            None => labels::show(item, compact, tl, app, ui),
+            None => {
+                if let Some(date) = labels::show(item, compact, tl, app, ui) {
+                    nav.push(&date, Stop::Button);
+                }
+            }
         }
     });
 }
 
-fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Timeline) {
+fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp) {
     if item == Item::Fps {
         egui::Popup::from_toggle_button_response(response)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
@@ -166,10 +190,10 @@ fn on_click(item: Item, response: &egui::Response, app: &mut OctantApp, tl: &Tim
         return;
     }
     match item {
-        Item::First => app.request_step_or_load(0),
+        Item::First => app.step_first(),
         Item::Prev => app.step_prev(),
         Item::Next => app.step_next(),
-        Item::Last => app.request_step_or_load(tl.last_step),
+        Item::Last => app.step_last(),
         Item::PlayPause => app.toggle_playback(),
         Item::Loop => app.playback.loop_playback = !app.playback.loop_playback,
         Item::Crop => app.show_crop_overlay = !app.show_crop_overlay,

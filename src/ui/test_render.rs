@@ -174,3 +174,17 @@ pub fn sheet_dir() -> PathBuf {
 pub fn themes() -> [Visuals; 2] {
     [crate::ui::theme::dark_visuals(), Visuals::light()]
 }
+
+/// Writes the review sheet `name`: `draw` rendered at `size` points (`ppp`
+/// pixels each) in each theme, dark on top, light below.
+pub fn theme_sheet(name: &str, size: Vec2, ppp: f32, draw: impl Fn(&Context)) {
+    let (w, h) = ((size.x * ppp) as usize, (size.y * ppp) as usize);
+    let mut sheet = RgbaImage::new(w as u32, 2 * h as u32);
+    for (row, visuals) in themes().iter().enumerate() {
+        let (prims, atlas) = tessellate_pass(size, ppp, visuals, &draw);
+        let buf = rasterize(&prims, &atlas, ppp, w, h, visuals.panel_fill);
+        let strip = to_image(&buf, w, (0, 0), (w as u32, h as u32), 1);
+        image::imageops::replace(&mut sheet, &strip, 0, (row * h) as i64);
+    }
+    sheet.save(sheet_dir().join(name)).expect("save sheet");
+}

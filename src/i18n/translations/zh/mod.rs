@@ -6,6 +6,7 @@ mod common;
 mod dataset;
 mod export;
 mod hover;
+mod keymap;
 mod notices;
 mod playback;
 mod plot;
@@ -27,6 +28,7 @@ pub fn text(key: Key) -> Option<&'static str> {
         Key::Colormap(key) => colormap::text(key),
         Key::Export(key) => export::text(key),
         Key::Hover(key) => hover::text(key),
+        Key::Keymap(key) => keymap::text(key),
         Key::About(key) => about::text(key),
         Key::Notices(key) => notices::text(key),
     }

@@ -93,3 +93,50 @@ fn clearing_the_datasets_closes_the_plate() {
     app.clear_all_datasets();
     assert!(app.plate.is_none());
 }
+
+#[test]
+fn arrows_move_focus_between_wells() {
+    use crate::data::ome::plate::PlateWell;
+    use crate::ui::keyboard::focus;
+    use crate::ui::test_input::Harness;
+    use egui::{Key, Modifiers, Rect, pos2};
+
+    let well = |path: &str, row, column| PlateWell {
+        path: path.into(),
+        row,
+        column,
+    };
+    // A2 is left out: Right from A1 skips to A3.
+    let layout = OmePlate {
+        rows: vec!["A".into(), "B".into()],
+        columns: vec!["1".into(), "2".into(), "3".into()],
+        wells: vec![well("A/1", 0, 0), well("A/3", 0, 2), well("B/1", 1, 0)],
+        ..Default::default()
+    };
+    let plate = PlateState::new(
+        "https://x/plate.zarr",
+        StoreKind::RemoteZarr,
+        Arc::new(layout),
+    );
+    let mut app = OctantApp {
+        plate: Some(plate),
+        ..Default::default()
+    };
+    let mut h = Harness::new(Rect::from_min_max(pos2(0.0, 0.0), pos2(300.0, 300.0)));
+    let mut run = |ui: &mut egui::Ui| {
+        super::show_plate_browser(&mut app, ui);
+        focus::end_frame(ui.ctx());
+    };
+    let mut press = |key| {
+        let at = h.press(key, Modifiers::NONE, &mut run);
+        at.expect("a well is focused").rect.center()
+    };
+    let a1 = press(Key::Tab);
+    let a3 = press(Key::ArrowRight);
+    assert!(a3.x > a1.x && (a3.y - a1.y).abs() < 1.0, "{a1:?} -> {a3:?}");
+    let back = press(Key::ArrowLeft);
+    let b1 = press(Key::ArrowDown);
+    assert_eq!(back, a1);
+    assert!(b1.y > a1.y && (b1.x - a1.x).abs() < 1.0);
+    assert_eq!(press(Key::ArrowRight), b1, "no well right of B1");
+}

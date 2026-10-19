@@ -7,7 +7,7 @@ use super::search_jump;
 use super::tree::{VariableTreeContext, render_tree_group};
 use crate::data::{VariableInfo, VariableTreeGroup};
 use crate::ui::icons::{Icon, UiIconExt};
-use crate::ui::key_focus;
+use crate::ui::keyboard::focus as key_focus;
 use egui::collapsing_header::CollapsingState;
 use egui::{Event, Id, Key, Modifiers, PointerButton, Pos2, RawInput, pos2};
 

@@ -3,7 +3,7 @@
 //! them, Up or Escape returns to the field, Enter/Space loads the sample.
 
 use super::focus::intake_id;
-use crate::ui::key_focus;
+use crate::ui::keyboard::focus as key_focus;
 use egui::{Context, Id, Key, Response};
 
 /// Stable id of sample chip `i`, so focus can move to it by index.
@@ -40,12 +40,13 @@ pub fn handle_keys(ctx: &Context, count: usize) {
     };
     let focus = |id: Id| key_focus::request(ctx, id);
     match key {
-        Key::ArrowLeft if at > 0 => focus(chip_id(at - 1)),
-        Key::ArrowRight if at + 1 < count => focus(chip_id(at + 1)),
-        Key::Home => focus(chip_id(0)),
-        Key::End => focus(chip_id(count - 1)),
         // Through `key_focus` so egui's own spatial Up can't move focus past the field.
         Key::ArrowUp | Key::Escape => focus(intake_id()),
-        _ => {}
+        // Left, Right, Home and End.
+        _ => {
+            if let Some(i) = key_focus::step_index(key, at, count) {
+                focus(chip_id(i));
+            }
+        }
     }
 }

@@ -62,14 +62,14 @@ impl<'a> ShapeColorPicker<'a> {
     /// Displays the color picker widget at a specified pre-calculated `Rect`.
     pub fn show_at(self, ui: &mut egui::Ui, rect: Rect) -> egui::Response {
         let resp = ui.interact(rect, self.id_salt.with("btn"), egui::Sense::click());
-        let resp = if let Some(tip) = self.tooltip {
-            resp.on_hover_text(tip)
-        } else {
-            resp
+        let resp = match self.tooltip {
+            Some(tip) => resp.on_hover_text(tip),
+            None => resp,
         };
 
         let style = ui.style();
-        let stroke = if resp.hovered() {
+        let keyboard_focus = crate::ui::keyboard::focus::keyboard_focused(&resp);
+        let stroke = if resp.hovered() || keyboard_focus {
             egui::Stroke::new(1.5_f32, style.visuals.widgets.active.fg_stroke.color)
         } else {
             egui::Stroke::new(
