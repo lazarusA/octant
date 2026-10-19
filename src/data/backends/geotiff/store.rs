@@ -17,6 +17,7 @@ use super::coords::GeoSpatialBounds;
 use super::decode::create_decoder_registry;
 use super::inspect::inspect_tiff;
 use super::reader::{MemoryTiffReader, create_async_reader};
+use super::scale::BandScales;
 use super::slicing::fetch_geotiff_block;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -134,17 +135,25 @@ impl GeoTiffBlockStore {
         })
     }
 
-    /// The IFD variable `var` reads and its bounds.
+    /// The IFD variable `var` reads, its bounds and its bands' transforms.
     pub(crate) fn resolve_ifd(
         &self,
         var: &str,
-    ) -> Option<(&async_tiff::ImageFileDirectory, GeoSpatialBounds)> {
+    ) -> Option<(
+        &async_tiff::ImageFileDirectory,
+        GeoSpatialBounds,
+        BandScales,
+    )> {
         let idx = match var.strip_prefix("overview_") {
             Some(rest) => rest.split('/').next()?.parse::<usize>().ok()?,
             None => 0,
         };
         let ifds = self.tiff.ifds();
-        Some((ifds.get(idx)?, GeoSpatialBounds::of_ifd_in(ifds, idx)?))
+        Some((
+            ifds.get(idx)?,
+            GeoSpatialBounds::of_ifd_in(ifds, idx)?,
+            BandScales::of_ifd_in(ifds, idx),
+        ))
     }
 }
 
@@ -169,7 +178,7 @@ impl BlockStore for GeoTiffBlockStore {
         req: &SliceRequest,
         _on_progress: ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
-        let (ifd, bounds) = self
+        let (ifd, bounds, scales) = self
             .resolve_ifd(&req.variable)
             .ok_or_else(|| format!("Variable '{}' not found in TIFF", req.variable))?;
         #[cfg(not(target_arch = "wasm32"))]
@@ -179,6 +188,7 @@ impl BlockStore for GeoTiffBlockStore {
                 fetch_geotiff_block(
                     ifd,
                     &bounds,
+                    &scales,
                     self.tiff.endianness(),
                     req,
                     self.reader.as_ref(),
@@ -193,6 +203,7 @@ impl BlockStore for GeoTiffBlockStore {
                 fetch_geotiff_block(
                     ifd,
                     &bounds,
+                    &scales,
                     self.tiff.endianness(),
                     req,
                     self.reader.as_ref(),

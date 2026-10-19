@@ -18,14 +18,18 @@ use crate::data::slice_request::SliceRequest;
 use super::blit::ReadWindow;
 use super::coords::GeoSpatialBounds;
 use super::palette::apply_colormap_into;
+use super::scale::BandScales;
 use region::read_region;
 use request::{palette_channel, parse_slice_request};
 
 /// Fetch and decode an `OctantBlock` from an IFD (whose bounds are
-/// `geo_bounds`, `GeoSpatialBounds::of_ifd_in`) for a given `SliceRequest`.
+/// `geo_bounds`, `GeoSpatialBounds::of_ifd_in`, and band transforms `scales`,
+/// `BandScales::of_ifd_in`) for a given `SliceRequest`.
+#[allow(clippy::too_many_arguments)]
 pub async fn fetch_geotiff_block(
     ifd: &ImageFileDirectory,
     geo_bounds: &GeoSpatialBounds,
+    scales: &BandScales,
     endianness: Endianness,
     request: &SliceRequest,
     reader: &dyn AsyncFileReader,
@@ -105,6 +109,11 @@ pub async fn fetch_geotiff_block(
             &mut band_slices,
         )
         .await?;
+        for (values, &band) in buffer.chunks_mut(plane_len).zip(&target_bands) {
+            if let Some(s) = scales.band(band) {
+                s.apply(values);
+            }
+        }
     }
 
     let (out_shape, out_dims, origin) = if is_single_band {

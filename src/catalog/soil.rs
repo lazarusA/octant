@@ -1,8 +1,9 @@
 //! Soil property maps as Cloud-Optimized GeoTIFFs: ISRIC SoilGrids 2.0
 //! (CC-BY 4.0) and OpenLandMap-soildb (2025, CC-BY 4.0), whose servers allow
 //! cross-origin requests, plus OpenLandMap's earlier soil classes (CC-BY-SA
-//! 4.0). Values are as stored: SoilGrids keeps pH times 10 and organic carbon
-//! in dg/kg, OpenLandMap-soildb records its scale in GDAL metadata.
+//! 4.0). OpenLandMap-soildb records its scale in GDAL metadata, so it reads as
+//! physical values (`geotiff/scale.rs`); SoilGrids records none and reads as
+//! stored: pH times 10, organic carbon in dg/kg.
 
 use super::types::CatalogEntry;
 use crate::app::StoreKind;
@@ -42,7 +43,7 @@ pub static SOIL_CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
         key: "olm-soildb-soc-120m",
         label: "OpenLandMap-soildb Organic Carbon Density 0-30 cm",
-        subtitle: "Global 120 m, 2020-2022, mg/cm3 times 10, 8 overviews (2025 release, CC-BY 4.0)",
+        subtitle: "Global 120 m, 2020-2022, in mg/cm3, 8 overviews (2025 release, CC-BY 4.0)",
         store: soildb!(
             "global_soil_props_v20250204_mosaics/oc_iso.10694.1995.mg.cm3_m_120m_b0cm..30cm_20200101_20221231_g_epsg.4326_v20250204.tif"
         ),
@@ -51,7 +52,7 @@ pub static SOIL_CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
         key: "olm-soildb-ph-120m",
         label: "OpenLandMap-soildb pH (H2O) 0-30 cm",
-        subtitle: "Global 120 m, 2020-2022, pH times 10 (2025 release, CC-BY 4.0)",
+        subtitle: "Global 120 m, 2020-2022 (2025 release, CC-BY 4.0)",
         store: soildb!(
             "global_soil_props_v20250204_mosaics/ph.h2o_iso.10390.2021.index_m_120m_b0cm..30cm_20200101_20221231_g_epsg.4326_v20250204.tif"
         ),

@@ -51,7 +51,7 @@ pub static GEOTIFF_CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
         key: "olm-dtm-30m",
         label: "Ensemble Digital Terrain Model 30 m",
-        subtitle: "Global bare-earth elevation in decimeters, 10th percentile of the ensemble (OpenLandMap)",
+        subtitle: "Global bare-earth elevation in meters, 10th percentile of the ensemble (OpenLandMap)",
         store: olm!(
             "dtm.bareearth_ensemble_p10_30m_s_20180101_20181231_go_epsg.4326_v20230211.tif"
         ),

@@ -63,3 +63,41 @@ fn geotiff_catalog_entries_open() {
     }
     assert!(failures.is_empty(), "{failures:#?}");
 }
+
+/// OpenLandMap-soildb stores pH times 10 with a GDAL scale of 0.1; blocks of
+/// its coarsest overview (which carries no metadata of its own) hold pH.
+#[test]
+#[ignore = "reads remote stores"]
+fn scaled_geotiff_reads_physical_values() {
+    let entry = crate::catalog::SOIL_CATALOG
+        .iter()
+        .find(|e| e.key == "olm-soildb-ph-120m")
+        .expect("pH entry");
+    let store = super::store::GeoTiffBlockStore::open(entry.store).expect("open");
+    let meta = store.inspect().expect("inspect");
+    let coarsest = meta
+        .variables
+        .iter()
+        .filter(|v| v.name.starts_with("overview_"))
+        .min_by_key(|v| v.shape.iter().product::<u64>())
+        .expect("an overview");
+    let shape: Vec<usize> = coarsest.shape.iter().map(|&n| n as usize).collect();
+    let request = crate::data::slice_request::SliceRequest::full_range(&coarsest.name, &shape);
+    let block = store.fetch_block(&request).expect("fetch");
+    let valid: Vec<f32> = block
+        .values
+        .iter()
+        .copied()
+        .filter(|v| v.is_finite())
+        .collect();
+    let (lo, hi) = valid
+        .iter()
+        .fold((f32::MAX, f32::MIN), |(lo, hi), &v| (lo.min(v), hi.max(v)));
+    eprintln!(
+        "{}: {} valid values in {lo}..{hi}",
+        coarsest.name,
+        valid.len()
+    );
+    assert!(!valid.is_empty());
+    assert!(lo >= 2.0 && hi <= 12.0, "pH, not pH times 10: {lo}..{hi}");
+}
