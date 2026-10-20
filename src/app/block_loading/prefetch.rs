@@ -179,8 +179,11 @@ impl OctantApp {
         let current = self.layer_step(id) / cs;
         let last_step = full_extent.saturating_sub(1);
         let max_chunk = last_step / cs;
+        // A ring volume's window runs on into the first steps, looping or not.
+        let ring = self.has_ring(id);
         if self.playback.is_playing {
-            return playing_chunks(current, max_chunk, budget, self.playback.loop_playback);
+            let wraps = self.playback.loop_playback || ring;
+            return playing_chunks(current, max_chunk, budget, wraps);
         }
         let (start, end) = shown
             .dim_ranges
@@ -188,7 +191,15 @@ impl OctantApp {
             .copied()
             .unwrap_or((0, last_step));
         let range = (start.min(last_step) / cs, end.min(last_step) / cs);
-        paused_chunks(current, range, max_chunk, budget)
+        let mut chunks = self.ring_chunks(id, cs);
+        let window = chunks.len();
+        for c in paused_chunks(current, range, max_chunk, budget) {
+            if !chunks.contains(&c) {
+                chunks.push(c);
+            }
+        }
+        chunks.truncate(budget.max(window));
+        chunks
     }
 
     /// Dispatches candidate prefetch requests up to the dynamic concurrency limit.

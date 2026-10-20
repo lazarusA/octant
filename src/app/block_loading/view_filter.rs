@@ -35,7 +35,6 @@ impl OctantApp {
         axes: [(usize, (usize, usize)); 3],
     ) -> bool {
         let step = self.layer_step(id);
-        let ring = self.ring_steps(id);
         let span = |dim: usize| {
             let origin = block.origin.get(dim).copied().unwrap_or(0);
             (origin, block.shape.get(dim).copied().unwrap_or(1))
@@ -55,9 +54,7 @@ impl OctantApp {
                 if Some(dim) == anim_dim && anim_is_spatial {
                     overlaps(origin, len, req)
                         || (origin..origin + len).contains(&step)
-                        || ring.as_ref().is_some_and(|w| {
-                            overlaps(origin, len, (w.start, w.end.saturating_sub(1)))
-                        })
+                        || self.ring_overlaps(id, origin..origin + len) == Some(true)
                 } else {
                     overlaps(origin, len, req)
                 }
@@ -141,7 +138,7 @@ impl OctantApp {
         anim_dim: Option<usize>,
         since: u64,
     ) {
-        if self.ring_steps(id).is_some() {
+        if self.has_ring(id) {
             self.fill_ring(id, (source_id, var_name), selections, anim_dim);
             return;
         }

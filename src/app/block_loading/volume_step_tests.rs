@@ -12,11 +12,11 @@ use crate::app::{OctantApp, StoreKind};
 use crate::plots::PlotType;
 
 const STEPS: usize = 8;
-/// Steps the volume shows: the selected time range `0..=3`.
-const DEPTH: usize = 4;
+/// Steps the volume shows: the selected time range `0..=2`.
+const DEPTH: usize = 3;
 
 /// `pr(time, lat, lon)` (8x5x4, four steps per chunk) plotted as a volume of
-/// four steps.
+/// three steps.
 fn volume_app() -> OctantApp {
     let store = Arc::new(MemoryStore::new());
     write_array(
@@ -57,14 +57,38 @@ fn held_step(app: &OctantApp, slot: usize) -> Option<usize> {
     Some(min as usize / 20)
 }
 
-/// Asserts that the ring shows steps `start..start + DEPTH`, empty past the end.
+/// Asserts that the ring shows the steps from `start` on, around the series:
+/// each plane from the shader's first one on holds its step, and records it.
 fn assert_window(app: &OctantApp, start: usize) {
-    for t in start..start + DEPTH {
-        let expected = (t < STEPS).then_some(t);
+    let front = app.ring_shift(LayerId::BASE).unwrap_or(0) as usize;
+    for k in 0..DEPTH {
+        let (slot, step) = ((front + k) % DEPTH, (start + k) % STEPS);
         assert_eq!(
-            held_step(app, t % DEPTH),
-            expected,
-            "step {start}: plane of {t}"
+            held_step(app, slot),
+            Some(step),
+            "step {start}: position {k}"
+        );
+        assert_eq!(app.ring_plane_step(LayerId::BASE, slot), Some(step));
+    }
+}
+
+/// Plays `steps` steps, each once the window's last plane is loaded, and
+/// asserts each shows the window from its step and uploads one plane.
+fn play(app: &mut OctantApp, steps: usize) {
+    app.playback.is_playing = true;
+    for _ in 0..steps {
+        let next = (app.playback.current_timestep + 1) % STEPS;
+        let back = (next + DEPTH - 1) % STEPS;
+        poll_until(app, |a| a.layer_step_resident(LayerId::BASE, back));
+        app.layers.base.renderers.volume_dirty = None;
+        app.advance_playback(web_time::Instant::now());
+        assert_eq!(app.playback.current_timestep, next);
+        assert_window(app, next);
+        let dirty = app.layers.base.renderers.volume_dirty.clone();
+        assert_eq!(
+            dirty.map(|z| z.len()),
+            Some(1),
+            "step {next} uploads the one plane it gained"
         );
     }
 }
@@ -79,32 +103,30 @@ fn each_step_writes_only_the_plane_the_window_gains() {
         Some(DEPTH)
     );
     assert_window(&app, 0);
+    // To the last step without looping: the window runs on into the first
+    // steps.
+    app.playback.loop_playback = false;
+    play(&mut app, STEPS - 1);
+    assert_window(&app, STEPS - 1);
+}
 
-    app.playback.is_playing = true;
-    for step in 1..STEPS {
-        let back = (step + DEPTH - 1).min(STEPS - 1);
-        poll_until(&mut app, |a| a.layer_step_resident(LayerId::BASE, back));
-        app.layers.base.renderers.volume_dirty = None;
-        app.advance_playback(web_time::Instant::now());
-        assert_eq!(app.playback.current_timestep, step);
-        assert_window(&app, step);
-        let dirty = app.layers.base.renderers.volume_dirty.clone();
-        assert_eq!(
-            dirty.map(|z| z.len()),
-            Some(1),
-            "step {step} uploads the one plane it gained"
-        );
-    }
+#[test]
+fn looping_turns_the_ring_by_one_plane() {
+    let mut app = volume_app();
+    app.playback.loop_playback = true;
+    // Past the last step and around again (8 steps is not a multiple of the
+    // window's 3, so a ring laid out by step would be rewritten at the loop).
+    play(&mut app, 2 * STEPS + 1);
 }
 
 #[test]
 fn playback_waits_for_the_window_s_last_plane() {
     let mut app = volume_app();
     assert_eq!(app.ring_lead(LayerId::BASE), DEPTH - 1);
-    // Step 1 needs step 4, the second chunk's first, which is resident once
+    // Step 2 needs step 4, the second chunk's first, which is resident once
     // the first image settled; drop it.
     app.block_cache.clear();
     app.playback.is_playing = true;
     app.playback.buffer_secs = 0.0;
-    assert!(!app.may_show(1), "step 4 is not loaded");
+    assert!(!app.may_show(2), "step 4 is not loaded");
 }

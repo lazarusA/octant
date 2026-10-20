@@ -42,11 +42,13 @@ pub struct LayerData {
 
 /// The steps held by a volume whose Z axis is the animated one: a ring
 /// buffer the step turns (`get_volume_shifts`), plane `slot` holding
-/// `steps[slot]`, for volume allocation `allocation`.
+/// `steps[slot]`, for volume allocation `allocation`; `anchor` is the last
+/// written window's (first step, its plane), from which the next window turns.
 #[derive(Default)]
 pub struct RingPlanes {
     pub allocation: u64,
     pub steps: Vec<Option<usize>>,
+    pub anchor: Option<(usize, usize)>,
 }
 
 impl LayerData {

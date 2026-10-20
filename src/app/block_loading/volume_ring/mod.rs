@@ -1,9 +1,9 @@
 //! A volume whose Z axis is the animated one (time, lat, lon) shows the
-//! window of `depth` steps from the current one: a ring buffer the step turns
-//! (`get_volume_shifts` reads `ring_shift`), step `t` in plane
-//! `(t - range start) % depth`. Each step writes only the planes the window
-//! gained, from whichever resident block holds them, so playback never
-//! replaces the whole volume at once.
+//! window of `depth` steps from the current one, counted around the series
+//! (after the last step come the first ones, looping or not): a ring buffer
+//! the step turns by one plane (`get_volume_shifts` reads `ring_shift`), so
+//! each step writes only the plane the window gained, from whichever resident
+//! block holds it, and playback never replaces the whole volume at once.
 
 use std::ops::Range;
 
@@ -13,41 +13,10 @@ use crate::data::DimensionSelection;
 use crate::data::octant_block::OctantBlock;
 use crate::plots::PlotType;
 
-/// A layer's ring window: steps `start..start + depth`, the selected range
-/// starting at `origin`, the variable `extent` steps long.
-#[derive(Clone, Copy)]
-struct Window {
-    start: usize,
-    origin: usize,
-    extent: usize,
-    depth: usize,
-}
+mod window;
 
-impl Window {
-    fn steps(self) -> Range<usize> {
-        self.start..self.start + self.depth
-    }
-
-    /// The plane step `t` (at least `origin`) goes in: the one place the ring
-    /// order is decided, for the writes and the shader's turn alike.
-    fn slot(self, t: usize) -> usize {
-        (t - self.origin) % self.depth
-    }
-
-    /// What plane `slot(t)` holds once settled: step `t`, or nothing past the
-    /// variable's end.
-    fn expected(self, t: usize) -> Option<usize> {
-        (t < self.extent).then_some(t)
-    }
-}
-
-/// A plane a block holds that the ring lacks: its block-local stored index
-/// along Z, the ring plane it goes in and its step.
-pub(super) struct RingPlane {
-    pub local: usize,
-    pub slot: usize,
-    pub step: usize,
-}
+pub(super) use window::RingPlane;
+use window::{Window, front_plane};
 
 impl OctantApp {
     /// Whether layer `id` is a volume or point cloud animated along its Z axis.
@@ -69,26 +38,69 @@ impl OctantApp {
         if !self.animates_along_z(id) {
             return None;
         }
-        let dim = self.layer_animated_dim(id)?;
-        let depth = self.layers.get(id)?.data.volume.as_ref()?.depth.max(1);
-        let origin = self.layer_dim_ranges(id).get(dim).map_or(0, |r| r.0);
+        let layer = self.layers.get(id)?;
+        let depth = layer.data.volume.as_ref()?.depth.max(1);
+        let extent = self.layer_animated_dim_extent(id).max(1);
+        let start = self.layer_step(id) % extent;
+        let ring = &layer.data.ring;
+        let anchor = ring.anchor.filter(|_| ring.steps.len() == depth);
         Some(Window {
-            // Before the range the shift stays 0.
-            start: self.layer_step(id).max(origin),
-            origin,
-            extent: self.layer_animated_dim_extent(id),
+            start,
+            extent,
             depth,
+            front: front_plane(anchor, start, extent, depth),
         })
     }
 
-    /// The steps layer `id`'s ring volume shows, `None` for other layers.
-    pub(super) fn ring_steps(&self, id: LayerId) -> Option<Range<usize>> {
-        self.ring_window(id).map(Window::steps)
+    /// Whether layer `id` is a ring volume.
+    pub(super) fn has_ring(&self, id: LayerId) -> bool {
+        self.ring_window(id).is_some()
+    }
+
+    /// Whether layer `id`'s ring window shows a step in `steps`, `None` for
+    /// other layers.
+    pub(super) fn ring_overlaps(&self, id: LayerId, steps: Range<usize>) -> Option<bool> {
+        let w = self.ring_window(id)?;
+        let [a, b] = w.step_ranges();
+        Some(
+            [a, b]
+                .iter()
+                .any(|r| r.start < steps.end && steps.start < r.end),
+        )
+    }
+
+    /// The chunks of `cs` steps layer `id`'s ring window reads, front first.
+    pub(super) fn ring_chunks(&self, id: LayerId, cs: usize) -> Vec<usize> {
+        let Some(w) = self.ring_window(id) else {
+            return Vec::new();
+        };
+        let cs = cs.max(1);
+        let mut chunks: Vec<usize> = w
+            .step_ranges()
+            .iter()
+            .filter(|r| !r.is_empty())
+            .flat_map(|r| r.start / cs..=(r.end - 1) / cs)
+            .collect();
+        chunks.dedup();
+        chunks
     }
 
     /// The plane the shader shows first: the current step's.
     pub(crate) fn ring_shift(&self, id: LayerId) -> Option<u32> {
-        self.ring_window(id).map(|w| w.slot(w.start) as u32)
+        self.ring_window(id).map(|w| w.front as u32)
+    }
+
+    /// The step plane `slot` of layer `id`'s ring holds, for the hover.
+    pub(crate) fn ring_plane_step(&self, id: LayerId, slot: usize) -> Option<usize> {
+        self.ring_window(id)?;
+        self.layers
+            .get(id)?
+            .data
+            .ring
+            .steps
+            .get(slot)
+            .copied()
+            .flatten()
     }
 
     /// Steps past the shown one layer `id` must hold to show it: the rest of
@@ -97,8 +109,9 @@ impl OctantApp {
         self.ring_window(id).map_or(0, |w| w.depth - 1)
     }
 
-    /// Starts layer `id`'s ring record afresh after a new volume.
-    fn reset_ring(&mut self, id: LayerId, w: Window) {
+    /// Starts layer `id`'s ring record afresh after a new volume, and anchors
+    /// it at window `w`, which the writes that follow fill.
+    fn anchor_ring(&mut self, id: LayerId, w: Window) {
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
@@ -107,19 +120,26 @@ impl OctantApp {
             ring.allocation = layer.data.volume_allocations;
             ring.steps = vec![None; w.depth];
         }
+        ring.anchor = Some((w.start, w.front));
     }
 
-    /// The steps of layer `id`'s ring window it does not hold yet.
-    pub(super) fn ring_missing_steps(&self, id: LayerId) -> Vec<usize> {
-        let (Some(w), Some(layer)) = (self.ring_window(id), self.layers.get(id)) else {
+    /// The (plane, step) pairs of layer `id`'s ring window the ring lacks.
+    fn ring_gaps(&self, id: LayerId, w: Window) -> Vec<(usize, usize)> {
+        let Some(layer) = self.layers.get(id) else {
             return Vec::new();
         };
         let ring = &layer.data.ring;
         let fresh = ring.allocation == layer.data.volume_allocations;
-        w.steps()
-            .filter(|&t| t < w.extent)
-            .filter(|&t| !fresh || ring.steps.get(w.slot(t)).copied().flatten() != Some(t))
+        w.planes()
+            .filter(|&(slot, step)| !fresh || ring.steps.get(slot).copied().flatten() != Some(step))
             .collect()
+    }
+
+    /// The steps of layer `id`'s ring window it does not hold yet.
+    pub(super) fn ring_missing_steps(&self, id: LayerId) -> Vec<usize> {
+        self.ring_window(id).map_or_else(Vec::new, |w| {
+            self.ring_gaps(id, w).into_iter().map(|(_, t)| t).collect()
+        })
     }
 
     /// The planes of layer `id`'s ring window that `block` holds and the ring
@@ -133,20 +153,16 @@ impl OctantApp {
         let Some(w) = self.ring_window(id) else {
             return Vec::new();
         };
-        self.reset_ring(id, w);
-        let Some(layer) = self.layers.get(id) else {
-            return Vec::new();
-        };
+        self.anchor_ring(id, w);
         let origin = block.origin.get(z_dim).copied().unwrap_or(0);
         let held = origin..origin + block.shape.get(z_dim).copied().unwrap_or(0);
-        let steps = &layer.data.ring.steps;
-        w.steps()
-            .filter(|&t| t < w.extent && held.contains(&t))
-            .filter(|&t| steps.get(w.slot(t)).copied().flatten() != Some(t))
-            .map(|t| RingPlane {
-                local: t - origin,
-                slot: w.slot(t),
-                step: t,
+        self.ring_gaps(id, w)
+            .into_iter()
+            .filter(|(_, step)| held.contains(step))
+            .map(|(slot, step)| RingPlane {
+                local: step - origin,
+                slot,
+                step,
             })
             .collect()
     }
@@ -162,7 +178,7 @@ impl OctantApp {
 
     /// Writes the planes layer `id`'s ring window lacks from the resident
     /// blocks holding them, one block per run of missing steps, then empties
-    /// the planes still holding another step.
+    /// the planes still holding another step (not loaded yet).
     pub(super) fn fill_ring(
         &mut self,
         id: LayerId,
@@ -190,13 +206,12 @@ impl OctantApp {
     }
 
     /// Empties the planes of layer `id`'s ring window still holding another
-    /// step (not loaded yet, or past the variable's end), so the window never
-    /// shows old steps wrapped around.
+    /// step, so the window never shows a step out of place.
     fn empty_stale_ring_planes(&mut self, id: LayerId) {
         let Some(w) = self.ring_window(id) else {
             return;
         };
-        self.reset_ring(id, w);
+        self.anchor_ring(id, w);
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
@@ -204,12 +219,11 @@ impl OctantApp {
             return;
         };
         let mut emptied = false;
-        for t in w.steps() {
-            let slot = w.slot(t);
+        for (slot, step) in w.planes() {
             let Some(held) = layer.data.ring.steps.get_mut(slot) else {
                 continue;
             };
-            if held.is_some() && *held != w.expected(t) {
+            if held.is_some_and(|h| h != step) {
                 *held = None;
                 let range = volume.plane_range(slot, 1);
                 if let Some(plane) = volume.values.get_mut(range) {
