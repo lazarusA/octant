@@ -67,6 +67,7 @@ pub fn show_variable_info(ui: &mut Ui, var_info: &VariableInfo) {
         format_args!("{}", crate::i18n::number::Num(format_args!("{size_mb:.2}"))),
     );
     detail(ui, VariablesKey::InfoSize, &[&size]);
+    crs_line(ui, var_info);
 
     if !var_info.attributes.is_empty() {
         egui::CollapsingHeader::new(tr(VariablesKey::InfoAttributes))
@@ -77,5 +78,35 @@ pub fn show_variable_info(ui: &mut Ui, var_info: &VariableInfo) {
                     ui.small(format!("{k}: {v}"));
                 }
             });
+    }
+}
+
+/// The variable's CRS: its name (a WKT's or GeoTIFF citation, else its EPSG
+/// code), its EPSG code beside a name, and its unit once resolved.
+fn crs_line(ui: &mut Ui, var_info: &VariableInfo) {
+    use crate::data::crs::{CrsRef, Resolution, named, resolve};
+    let Some(crs) = &var_info.crs else {
+        return;
+    };
+    let mut code_buf = [0; 24];
+    let code = match crs {
+        CrsRef::Epsg(code) => stack_str(&mut code_buf, format_args!("EPSG:{code}")),
+        CrsRef::Geographic => "lon/lat",
+        CrsRef::Wkt(_) => "WKT",
+    };
+    let mut buf = [0; 256];
+    let text = match (named(var_info), crs) {
+        (Some(name), CrsRef::Epsg(_)) => stack_str(&mut buf, format_args!("{name} ({code})")),
+        (Some(name), _) => name,
+        (None, _) => code,
+    };
+    let mut line = [0; 288];
+    match resolve(crs) {
+        Resolution::Ready(r) => {
+            let text = stack_str(&mut line, format_args!("{text}, {}", r.unit));
+            detail(ui, VariablesKey::InfoCrs, &[&text]);
+        }
+        Resolution::Pending => detail(ui, VariablesKey::InfoCrs, &[&text]),
+        Resolution::Unsupported(_) => detail(ui, VariablesKey::InfoCrsUnsupported, &[&text]),
     }
 }

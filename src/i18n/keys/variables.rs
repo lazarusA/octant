@@ -34,6 +34,8 @@ crate::i18n::keys::define_keys! {
     InfoTime,
     InfoResolution,
     InfoSize,
+    InfoCrs,
+    InfoCrsUnsupported,
     InfoAttributes,
     // Dimension sliders
     Download,

@@ -121,6 +121,7 @@ fn test_3d_time_lat_lon_defaults_and_plot_switch() {
         attributes: Default::default(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     });
     app.load_new_metadata(meta);

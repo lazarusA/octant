@@ -39,6 +39,8 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoTime => "Час: {} -> {}",
         VariablesKey::InfoResolution => "Роздільність: {}",
         VariablesKey::InfoSize => "Розмір: {} MB",
+        VariablesKey::InfoCrs => "СК: {}",
+        VariablesKey::InfoCrsUnsupported => "СК: {} (не підтримується)",
         VariablesKey::InfoAttributes => "Атрибути (.zattrs)",
         VariablesKey::Download => "Завантаження",
         VariablesKey::DownloadCells => "{} (комірок: {})",

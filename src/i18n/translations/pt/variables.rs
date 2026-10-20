@@ -39,6 +39,8 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoTime => "Tempo: {} -> {}",
         VariablesKey::InfoResolution => "Resolução: {}",
         VariablesKey::InfoSize => "Tamanho: {} MB",
+        VariablesKey::InfoCrs => "SRC: {}",
+        VariablesKey::InfoCrsUnsupported => "SRC: {} (não suportado)",
         VariablesKey::InfoAttributes => "Atributos (.zattrs)",
         VariablesKey::Download => "Download",
         VariablesKey::DownloadCells => "{} ({} células)",

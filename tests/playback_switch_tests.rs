@@ -305,6 +305,7 @@ fn plotted_variable_stays_visible_while_inspecting_and_exploring_another_dataset
         attributes: Default::default(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     });
     meta2.variables.push(octant::data::VariableInfo {
@@ -322,6 +323,7 @@ fn plotted_variable_stays_visible_while_inspecting_and_exploring_another_dataset
         attributes: Default::default(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     });
 

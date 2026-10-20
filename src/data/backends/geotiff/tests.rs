@@ -221,3 +221,28 @@ fn test_wasm_geotiff_store_behavior() {
             || inspect_err.to_string().contains("Failed to load")
     );
 }
+
+/// A GeoTIFF's GeoKeys name its CRS by EPSG code (ProjectedCSTypeGeoKey).
+#[test]
+fn geo_keys_name_the_crs_by_epsg_code() {
+    let raw: Vec<u8> = (0..100).map(|i| i as u8).collect();
+    let tiff_bytes = SyntheticTiffBuilder::new(10, 10)
+        .striped_data(&raw, 10)
+        .geo_keys(
+            [10.0, 10.0, 0.0],
+            [0.0, 0.0, 0.0, 500_000.0, 1_900_000.0, 0.0],
+            &[1, 1, 0, 2, 1024, 0, 1, 1, 3072, 0, 1, 32636],
+            None,
+        )
+        .build();
+    let mut meta = open_store_from_bytes("utm.tif", tiff_bytes)
+        .inspect()
+        .expect("inspect");
+    crate::data::crs::assign(&mut meta);
+    let band = meta
+        .variables
+        .iter()
+        .find(|v| v.name == "band_1")
+        .expect("band_1");
+    assert_eq!(band.crs, Some(crate::data::crs::CrsRef::Epsg(32636)));
+}

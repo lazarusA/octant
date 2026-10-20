@@ -117,6 +117,7 @@ pub fn variable_info_from_node_metadata_with_parent_attributes(
                 attributes: cf_attrs.attributes,
                 ome: None,
                 multiscale: None,
+                crs: None,
             })
         }
         _ => None,

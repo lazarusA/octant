@@ -37,6 +37,8 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoTime => "Tid: {} -> {}",
         VariablesKey::InfoResolution => "Oppløsning: {}",
         VariablesKey::InfoSize => "Størrelse: {} MB",
+        VariablesKey::InfoCrs => "Koordinatsystem: {}",
+        VariablesKey::InfoCrsUnsupported => "Koordinatsystem: {} (støttes ikke)",
         VariablesKey::InfoAttributes => "Attributter (.zattrs)",
         VariablesKey::Download => "Nedlasting",
         VariablesKey::DownloadCells => "{} ({} celler)",

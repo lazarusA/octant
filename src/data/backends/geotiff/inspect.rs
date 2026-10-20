@@ -141,6 +141,7 @@ fn add_raster_variable(
         attributes: info.attributes.clone(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     });
 }
@@ -178,6 +179,7 @@ fn add_band_variables(
             attributes: band_attributes,
             ome: None,
             multiscale: None,
+            crs: None,
             shard_shape: None,
         });
     }

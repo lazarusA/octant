@@ -186,3 +186,28 @@ fn test_netcdf_1d_variable_loading() {
 
     let _ = std::fs::remove_file(test_file);
 }
+
+/// A CF `grid_mapping` names a scalar mapping variable whose `crs_wkt` is
+/// the data's CRS.
+#[test]
+fn cf_grid_mappings_name_the_crs() {
+    use super::test_support::{TempNc, inspect, netcdf_lock};
+    let _lock = netcdf_lock();
+    let nc = TempNc::new("grid_mapping");
+    let wkt = r#"PROJCS["WGS 84 / UTM zone 36N",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",33],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1]]"#;
+    let mut meta = inspect(&nc, |f| {
+        f.add_dimension("y", 2).expect("y");
+        f.add_dimension("x", 3).expect("x");
+        let mut crs = f.add_variable::<i32>("crs", &[]).expect("crs");
+        crs.put_attribute("grid_mapping_name", "transverse_mercator")
+            .expect("name");
+        crs.put_attribute("crs_wkt", wkt).expect("wkt");
+        let mut data = f.add_variable::<f32>("t", &["y", "x"]).expect("t");
+        data.put_values(&[0.0f32; 6], ..).expect("values");
+        data.put_attribute("grid_mapping", "crs")
+            .expect("grid_mapping");
+    });
+    crate::data::crs::assign(&mut meta);
+    let t = meta.variables.iter().find(|v| v.name == "t").expect("t");
+    assert_eq!(t.crs, Some(crate::data::crs::CrsRef::Wkt(wkt.into())));
+}

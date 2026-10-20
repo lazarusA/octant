@@ -37,6 +37,8 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoTime => "시간: {} -> {}",
         VariablesKey::InfoResolution => "해상도: {}",
         VariablesKey::InfoSize => "크기: {} MB",
+        VariablesKey::InfoCrs => "좌표계: {}",
+        VariablesKey::InfoCrsUnsupported => "좌표계: {} (지원되지 않음)",
         VariablesKey::InfoAttributes => "속성 (.zattrs)",
         VariablesKey::Download => "다운로드",
         VariablesKey::DownloadCells => "{} (셀 {}개)",

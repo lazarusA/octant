@@ -68,6 +68,7 @@ pub fn collect_group_variables(
             attributes,
             ome: None,
             multiscale: None,
+            crs: None,
             shard_shape: None,
         });
     }
@@ -140,6 +141,7 @@ pub fn inspect_netcdf_file(file_path: &str) -> Result<DatasetMetadata, BlockStor
             attributes,
             ome: None,
             multiscale: None,
+            crs: None,
             shard_shape: None,
         });
     }
@@ -150,6 +152,13 @@ pub fn inspect_netcdf_file(file_path: &str) -> Result<DatasetMetadata, BlockStor
             collect_group_variables(&sub, &sub_name, &global_attrs, &mut variables);
         }
     }
+
+    // CF grid mappings are scalar variables of the file itself.
+    let mappings: HashMap<String, HashMap<String, String>> = (variables.iter())
+        .filter(|v| v.attributes.contains_key("grid_mapping_name"))
+        .map(|v| (v.name.clone(), v.attributes.clone()))
+        .collect();
+    crate::data::crs::attach_grid_mappings(&mut variables, |path| mappings.get(path).cloned());
 
     let dimension_coordinates = extract_dimension_coordinates(&file, &variables);
 

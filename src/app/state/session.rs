@@ -20,6 +20,9 @@ impl OctantApp {
         crate::ui::fonts::FontEngine::init(&cc.egui_ctx);
         crate::ui::number_input::install(&cc.egui_ctx);
         crate::ui::theme::install(&cc.egui_ctx);
+        // A CRS definition fetched on the web repaints the frame waiting for it.
+        let ctx = cc.egui_ctx.clone();
+        crate::data::crs::set_wake(move || ctx.request_repaint());
         app.load_colormap_prefs(cc.storage);
 
         #[cfg(not(target_arch = "wasm32"))]

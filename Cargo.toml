@@ -52,6 +52,8 @@ quick-xml = "0.41"
 icechunk-format = { version = "2.1.2", default-features = false }
 icechunk-types = { version = "2.1.2", default-features = false }
 colorgrad = { version = "0.9", default-features = false, features = ["std", "named-colors"] }
+# Coordinate reference systems: proj strings (`data/crs/`).
+proj4rs = { version = "0.2.1", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.53", features = ["full"] }
@@ -74,6 +76,10 @@ zarrs_icechunk = "0.5"
 icechunk = "2.1.2"
 object_store = { version = "0.14", features = ["http", "aws", "azure", "gcp"] }
 async-tiff = { version = "0.4.0", features = ["object_store", "reqwest", "tokio"] }
+# EPSG codes to proj strings on the desktop; the web fetches them on first use.
+crs-definitions = { version = "0.6", default-features = false, features = ["proj4"] }
+# WKT without an EPSG code to proj strings; its wasm build exports a `main`.
+proj4wkt = "0.1.1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"

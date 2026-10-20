@@ -6,6 +6,7 @@ pub mod blocks;
 pub mod calibration;
 pub mod codecs;
 pub mod coordinates;
+pub mod crs;
 pub mod dataset;
 pub mod metadata;
 pub mod multiscale;
