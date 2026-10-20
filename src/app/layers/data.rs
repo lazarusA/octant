@@ -13,6 +13,11 @@ pub struct LayerData {
     /// Counts volume resets (new selections), so cache hits know when the
     /// other resident blocks must be projected again.
     pub volume_allocations: u64,
+    /// The volume allocation and block origin last written into `volume`, so
+    /// playback steps over that same block skip writing it again.
+    pub last_volume_block: Option<(u64, Vec<usize>)>,
+    /// Which step each Z plane of `volume` holds while Z is the animated axis.
+    pub ring: RingPlanes,
     /// Block window behind the plotted 2D composite, for raw per-channel hover values.
     pub composite_probe: Option<crate::data::slicing::CompositeProbe>,
     /// How the plotted 2D composite stretched its channels, which its detail
@@ -33,6 +38,17 @@ pub struct LayerData {
     pub volume_version: u64,
     /// The finer level's tile drawn over a multiscale heatmap (base layer).
     pub detail: crate::app::detail::DetailState,
+}
+
+/// The steps held by a volume whose Z axis is the animated one: a ring
+/// buffer the step turns (`get_volume_shifts`), plane `slot` holding
+/// `steps[slot]`, for volume allocation `allocation`; `anchor` is the last
+/// written window's (first step, its plane), from which the next window turns.
+#[derive(Default)]
+pub struct RingPlanes {
+    pub allocation: u64,
+    pub steps: Vec<Option<usize>>,
+    pub anchor: Option<(usize, usize)>,
 }
 
 impl LayerData {

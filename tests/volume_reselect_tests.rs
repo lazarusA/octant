@@ -38,8 +38,34 @@ fn set_range(app: &mut OctantApp, dim: usize, range: (usize, usize)) {
     app.selected.dim_config[dim].range = range;
 }
 
-/// Checks the volume against the analytic field for `ranges` (z, y, x) at `t`.
+/// Checks the volume against the analytic field for `ranges` (z, y, x) at `t`,
+/// plane `z` holding depth `z0 + z`.
 fn assert_volume_matches(app: &OctantApp, t: usize, ranges: [(usize, usize); 3], label: &str) {
+    let z0 = ranges[0].0;
+    assert_volume_planes(app, t, ranges, &|z| z0 + z, label);
+}
+
+/// Checks a volume animated along its depth axis: a ring of the window of
+/// depths from the current step on, counted around the axis, the shader's
+/// first plane holding the current one (`get_volume_shifts`).
+fn assert_ring_matches(app: &OctantApp, ranges: [(usize, usize); 3], label: &str) {
+    let depth = app.layers.base.data.volume.as_ref().map_or(1, |v| v.depth);
+    let front = app.get_volume_shifts().2 as usize;
+    let step = app.playback.current_timestep;
+    // Plane `z` is window position `(z - front) mod depth`.
+    let depth_at = move |z: usize| (step + (z + depth - front) % depth) % N;
+    assert_volume_planes(app, 0, ranges, &depth_at, label);
+}
+
+/// Checks the volume against the analytic field over the y and x `ranges` at
+/// `t`, plane `z` holding depth `depth_at(z)`; `ranges[0]` sizes the depth.
+fn assert_volume_planes(
+    app: &OctantApp,
+    t: usize,
+    ranges: [(usize, usize); 3],
+    depth_at: &dyn Fn(usize) -> usize,
+    label: &str,
+) {
     let vdata = app.layers.base.data.volume.as_ref().expect("volume data");
     let [(z0, z1), (y0, y1), (x0, x1)] = ranges;
     let (nz, ny, nx) = (z1 - z0 + 1, y1 - y0 + 1, x1 - x0 + 1);
@@ -58,8 +84,17 @@ fn assert_volume_matches(app: &OctantApp, t: usize, ranges: [(usize, usize); 3],
     for z in 0..nz {
         for y in 0..ny {
             for x in 0..nx {
-                let expected =
-                    octant::data::eval_known_truth_4d(t, NT, z0 + z, N, y0 + y, N, x0 + x, N, None);
+                let expected = octant::data::eval_known_truth_4d(
+                    t,
+                    NT,
+                    depth_at(z),
+                    N,
+                    y0 + y,
+                    N,
+                    x0 + x,
+                    N,
+                    None,
+                );
                 let got = vdata.values[z * nx * ny + y * nx + x];
                 assert!(
                     (got - expected).abs() < 1e-5,
@@ -166,17 +201,17 @@ fn depth_animated_volume_replot_smaller_then_larger() {
     let mut app = new_depth_animated_app(8);
 
     press_plot(&mut app);
-    assert_volume_matches(&app, 0, [(0, 31), (0, 31), (0, 31)], "first plot");
+    assert_ring_matches(&app, [(0, 31), (0, 31), (0, 31)], "first plot");
 
     set_range(&mut app, 1, (4, 20));
     set_range(&mut app, 2, (8, 23));
     press_plot(&mut app);
-    assert_volume_matches(&app, 0, [(4, 20), (8, 23), (0, 31)], "smaller plot");
+    assert_ring_matches(&app, [(4, 20), (8, 23), (0, 31)], "smaller plot");
 
     set_range(&mut app, 1, (0, 31));
     set_range(&mut app, 2, (0, 31));
     press_plot(&mut app);
-    assert_volume_matches(&app, 0, [(0, 31), (0, 31), (0, 31)], "larger plot");
+    assert_ring_matches(&app, [(0, 31), (0, 31), (0, 31)], "larger plot");
 }
 
 #[test]
@@ -184,31 +219,32 @@ fn depth_animated_volume_replot_changing_only_the_animated_range() {
     let mut app = new_depth_animated_app(8);
 
     press_plot(&mut app);
-    assert_volume_matches(&app, 0, [(0, 31), (0, 31), (0, 31)], "first plot");
+    assert_ring_matches(&app, [(0, 31), (0, 31), (0, 31)], "first plot");
 
     // Only the animated Z range changes: the cached Z blocks still match.
     set_range(&mut app, 1, (4, 20));
     press_plot(&mut app);
-    assert_volume_matches(&app, 0, [(4, 20), (0, 31), (0, 31)], "smaller Z");
+    assert_ring_matches(&app, [(4, 20), (0, 31), (0, 31)], "smaller Z");
 
     // A Z range that excludes the current step's block.
     set_range(&mut app, 1, (16, 31));
     press_plot(&mut app);
-    assert_volume_matches(&app, 0, [(16, 31), (0, 31), (0, 31)], "Z past the step");
+    assert_ring_matches(&app, [(16, 31), (0, 31), (0, 31)], "Z past the step");
 
     set_range(&mut app, 1, (0, 31));
     press_plot(&mut app);
-    assert_volume_matches(&app, 0, [(0, 31), (0, 31), (0, 31)], "larger Z");
+    assert_ring_matches(&app, [(0, 31), (0, 31), (0, 31)], "larger Z");
 }
 
 #[test]
 fn depth_animated_volume_plot_with_step_past_the_range() {
-    // The step stays where playback left it, past the newly chosen Z range.
+    // The step stays where playback left it, past the newly chosen Z range;
+    // Plot clamps it into the range and the window starts there.
     let mut app = new_depth_animated_app(8);
     app.playback.current_timestep = 20;
     set_range(&mut app, 1, (0, 15));
     press_plot(&mut app);
-    assert_volume_matches(&app, 0, [(0, 15), (0, 31), (0, 31)], "step past range");
+    assert_ring_matches(&app, [(0, 15), (0, 31), (0, 31)], "step past range");
 }
 
 /// What the playback timer does each frame (`src/app/ui.rs`): advance the step
@@ -249,6 +285,6 @@ fn depth_animated_volume_playback_keeps_the_full_volume() {
             app.playback.current_timestep, t,
             "playback must reach step {t}"
         );
-        assert_volume_matches(&app, 0, [(0, 31), (0, 31), (0, 31)], "depth playback");
+        assert_ring_matches(&app, [(0, 31), (0, 31), (0, 31)], "depth playback");
     }
 }

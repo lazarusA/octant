@@ -86,11 +86,13 @@ impl OctantApp {
         };
         let capacity = requests
             .iter()
-            .filter_map(|(_, r)| {
+            .filter_map(|(id, r)| {
                 let dim = r.anim_dim?;
                 let cs = (r.var.chunk_shape.get(dim).copied().unwrap_or(1) as usize).max(1);
                 let bytes = estimate_chunk_bytes(&r.request, dim, cs);
-                Some((self.playing_lookahead_chunks(cs, bytes) - 1) * cs)
+                let lead = self.ring_lead(*id);
+                let held = (self.playing_lookahead_chunks(cs, bytes, lead) - 1) * cs;
+                Some(held.saturating_sub(lead))
             })
             .min()
             .unwrap_or(usize::MAX);
@@ -109,7 +111,8 @@ impl OctantApp {
         let mut k = 0;
         while k < limit {
             let shared = (next + k) % total;
-            let step = self.layer_step_at(id, shared);
+            // A ring volume shows a step once its window's last plane is held.
+            let step = self.ring_back_step(id, self.layer_step_at(id, shared));
             let selections = &r.request.selections;
             let until = self.block_cache.covered_until(
                 &r.source_id,

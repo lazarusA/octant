@@ -52,7 +52,9 @@ impl OctantApp {
             .all(|&(dim, req)| {
                 let (origin, len) = span(dim);
                 if Some(dim) == anim_dim && anim_is_spatial {
-                    overlaps(origin, len, req) || (origin..origin + len).contains(&step)
+                    overlaps(origin, len, req)
+                        || (origin..origin + len).contains(&step)
+                        || self.ring_overlaps(id, origin..origin + len) == Some(true)
                 } else {
                     overlaps(origin, len, req)
                 }
@@ -125,7 +127,8 @@ impl OctantApp {
     /// was reset (`volume_allocations` moved past `since`, a new selection): a
     /// volume can be built from several resident blocks (along an animated
     /// spatial axis), and a cache hit only delivers the one covering the
-    /// current step. Playback steps keep the volume and skip this.
+    /// current step. Playback steps keep the volume and skip this, but for a
+    /// ring volume, which fills only the planes its window lacks.
     pub(crate) fn project_cached_volume_blocks(
         &mut self,
         id: LayerId,
@@ -135,6 +138,10 @@ impl OctantApp {
         anim_dim: Option<usize>,
         since: u64,
     ) {
+        if self.has_ring(id) {
+            self.fill_ring(id, (source_id, var_name), selections, anim_dim);
+            return;
+        }
         let Some(layer) = self.layers.get(id) else {
             return;
         };

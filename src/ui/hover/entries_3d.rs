@@ -87,8 +87,12 @@ pub(crate) fn resolve_3d_dim_entries(
                 used_dims.insert(zi);
             }
             let (origin_z, full_z_len) = get_dimension_origin_and_full_len(app, Some(v), z_dim);
-            let z_offset = stored_offset(app, &dim_z_name, data_z, sampler.depth);
-            let global_z = (origin_z + z_offset).min(full_z_len.saturating_sub(1));
+            // A ring volume (time as Z) knows the step each plane holds.
+            let ring_step = app.ring_plane_step(crate::app::layers::LayerId::BASE, data_z);
+            let global_z = ring_step.unwrap_or_else(|| {
+                let z_offset = stored_offset(app, &dim_z_name, data_z, sampler.depth);
+                (origin_z + z_offset).min(full_z_len.saturating_sub(1))
+            });
 
             let loc_z = format_dimension_coord(
                 meta,

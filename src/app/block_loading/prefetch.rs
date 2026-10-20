@@ -101,7 +101,7 @@ impl OctantApp {
         );
         let cs = window_step.max(1);
         let (max_concurrent, budget) =
-            self.prefetch_pacing(cs, estimate_chunk_bytes(base_req, anim_dim, cs));
+            self.prefetch_pacing(id, cs, estimate_chunk_bytes(base_req, anim_dim, cs));
         let chunk_indices = self.collect_lookahead_chunks(id, anim_dim, cs, full_extent, budget);
         let params = PrefetchDispatchParams {
             cs,
@@ -120,11 +120,11 @@ impl OctantApp {
     /// the animated layers sharing the cache), else the paused range's.
     /// Foreground requests (each layer's shown block) never take the
     /// lookahead's workers.
-    fn prefetch_pacing(&self, cs: usize, chunk_bytes: usize) -> (usize, usize) {
+    fn prefetch_pacing(&self, id: LayerId, cs: usize, chunk_bytes: usize) -> (usize, usize) {
         let max_concurrent =
             adaptive_concurrency(chunk_bytes, self.prefetch_threads) + self.foreground_requests();
         let budget = if self.playback.is_playing {
-            self.playing_lookahead_chunks(cs, chunk_bytes)
+            self.playing_lookahead_chunks(cs, chunk_bytes, self.ring_lead(id))
         } else {
             range_budget(chunk_bytes, self.block_cache.max_bytes())
         };
@@ -134,9 +134,15 @@ impl OctantApp {
     /// Chunks of `cs` steps (`chunk_bytes` each) one layer queues while
     /// playing, the current one included: it and the buffer's steps after it
     /// (the buffer counts from the next step) at least, within the layer's
-    /// share of the cache. The buffer waits for no more than this holds.
-    pub(crate) fn playing_lookahead_chunks(&self, cs: usize, chunk_bytes: usize) -> usize {
-        let window = self.block_window_size.max(self.buffer_target_steps() + cs);
+    /// share of the cache, and `lead` more for a ring volume's window. The
+    /// buffer waits for no more than this holds.
+    pub(crate) fn playing_lookahead_chunks(
+        &self,
+        cs: usize,
+        chunk_bytes: usize,
+        lead: usize,
+    ) -> usize {
+        let window = self.block_window_size.max(self.buffer_target_steps() + cs) + lead;
         let share = self.block_cache.max_bytes() / self.animated_layer_count();
         playing_lookahead(window, cs, chunk_bytes, share)
     }
@@ -173,8 +179,11 @@ impl OctantApp {
         let current = self.layer_step(id) / cs;
         let last_step = full_extent.saturating_sub(1);
         let max_chunk = last_step / cs;
+        // A ring volume's window runs on into the first steps, looping or not.
+        let ring = self.has_ring(id);
         if self.playback.is_playing {
-            return playing_chunks(current, max_chunk, budget, self.playback.loop_playback);
+            let wraps = self.playback.loop_playback || ring;
+            return playing_chunks(current, max_chunk, budget, wraps);
         }
         let (start, end) = shown
             .dim_ranges
@@ -182,7 +191,15 @@ impl OctantApp {
             .copied()
             .unwrap_or((0, last_step));
         let range = (start.min(last_step) / cs, end.min(last_step) / cs);
-        paused_chunks(current, range, max_chunk, budget)
+        let mut chunks = self.ring_chunks(id, cs);
+        let window = chunks.len();
+        for c in paused_chunks(current, range, max_chunk, budget) {
+            if !chunks.contains(&c) {
+                chunks.push(c);
+            }
+        }
+        chunks.truncate(budget.max(window));
+        chunks
     }
 
     /// Dispatches candidate prefetch requests up to the dynamic concurrency limit.

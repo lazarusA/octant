@@ -245,3 +245,74 @@ fn prefetch_network_era5_two_layer_playback() {
         play(&mut app, id, buffer_secs);
     }
 }
+
+const CMIP6_PR: &str = "https://storage.googleapis.com/cmip6/CMIP6/HighResMIP/EC-Earth-Consortium/EC-Earth3P-HR/highresSST-present/r1i1p1f1/Amon/pr/gr/v20170811";
+
+#[test]
+#[ignore = "reads remote stores"]
+fn prefetch_network_cmip6_pr_volume_playback() {
+    for plot_type in [PlotType::Volume, PlotType::PointCloud] {
+        let (mut app, meta) = open_remote(CMIP6_PR, StoreKind::RemoteZarr);
+        let idx = meta
+            .variables
+            .iter()
+            .position(|v| v.name.trim_matches('/') == "pr")
+            .expect("pr");
+        let var = meta.variables[idx].clone();
+        app.selected.variable_idx = idx;
+        app.selected.plot_type = plot_type;
+        crate::ui::variables_panel::init_variable_dimension_defaults(&mut app, &var);
+        eprintln!(
+            "{plot_type:?}: animated {:?} spatial {:?} ranges {:?}",
+            app.selected.animated_dim, app.selected.spatial_dims, app.selected.dim_ranges
+        );
+        let started = Instant::now();
+        app.plot_selection();
+        let mut cpu = Duration::ZERO;
+        let deadline = Instant::now() + Duration::from_secs(120);
+        while app.layers.base.data.volume.is_none() && app.layers.base.data.matrix.is_none() {
+            assert!(Instant::now() < deadline, "first block never arrived");
+            let t = Instant::now();
+            app.poll_block_prefetch_results();
+            app.poll_coordinate_results();
+            cpu += t.elapsed();
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        eprintln!(
+            "first image {:?} (cpu in polls {:?})",
+            started.elapsed(),
+            cpu
+        );
+        app.playback.playback_fps = 15.0;
+        app.playback.buffer_secs = 0.0;
+        app.toggle_playback();
+        let frame = Duration::from_secs_f32(1.0 / 15.0);
+        let started = Instant::now();
+        let (mut adv, mut poll, mut worst) = (Duration::ZERO, Duration::ZERO, Duration::ZERO);
+        let mut last = app.playback.current_timestep;
+        while started.elapsed() < Duration::from_secs(40) {
+            let now = Instant::now();
+            if now.duration_since(app.playback.last_step_time) >= frame {
+                app.advance_playback(now);
+                let d = now.elapsed();
+                adv += d;
+                worst = worst.max(d);
+            }
+            let t = Instant::now();
+            app.poll_block_prefetch_results();
+            let d = t.elapsed();
+            poll += d;
+            worst = worst.max(d);
+            if app.playback.current_timestep != last {
+                last = app.playback.current_timestep;
+                eprintln!("  step {last} at {:.2?}", started.elapsed());
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        eprintln!(
+            "{plot_type:?}: step {last} in 40 s; cpu advance {adv:?}, poll {poll:?}, worst tick {worst:?}; {} blocks cached, {} pending",
+            app.block_cache.cached_count(),
+            app.block_prefetcher.pending_count()
+        );
+    }
+}
