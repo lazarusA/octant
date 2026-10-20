@@ -82,7 +82,10 @@ impl OctantApp {
                 (local_step % width, 0, 0)
             }
             crate::app::SpatialRole::Y => (0, local_step % height, 0),
-            crate::app::SpatialRole::Z => (0, 0, local_step % depth),
+            crate::app::SpatialRole::Z => {
+                let ring = self.ring_shift(crate::app::layers::LayerId::BASE);
+                (0, 0, ring.unwrap_or(local_step % depth))
+            }
             crate::app::SpatialRole::None => (0, 0, 0),
         }
     }

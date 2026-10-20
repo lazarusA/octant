@@ -1,6 +1,7 @@
 //! 3D volumetric data and composite subvolume progressive projection routines.
 
 use super::projection_hash::{compute_composite_hash, compute_target_dims};
+use super::volume_ring::RingPlane;
 use crate::app::OctantApp;
 use crate::app::layers::{Layer, LayerId};
 use crate::data::VolumeData;
@@ -74,13 +75,11 @@ impl OctantApp {
         if is_3d_spatial_anim && unchanged && !ring {
             return;
         }
-        let planes: Vec<((usize, usize), Option<usize>)> = if ring {
-            self.ring_planes_to_write(id, block, z_dim)
-                .into_iter()
-                .map(|(local, step)| ((local, local + 1), Some(step)))
-                .collect()
+        let planes: Vec<Option<RingPlane>> = if ring {
+            let planes = self.ring_planes_to_write(id, block, z_dim);
+            planes.into_iter().map(Some).collect()
         } else {
-            vec![(local_z_range, None)]
+            vec![None]
         };
         if planes.is_empty() {
             return;
@@ -93,97 +92,24 @@ impl OctantApp {
         layer.data.composite_stretch = None;
         layer.data.flipped_dims.clone_from(&block.flipped_dims);
 
-        for (local_z_range, step) in planes {
-            self.write_volume_slab(
+        for plane in planes {
+            let local_z = plane
+                .as_ref()
+                .map_or(local_z_range, |p| (p.local, p.local + 1));
+            let written = self.write_volume_slab(
                 id,
                 block,
                 (x_dim, y_dim, z_dim, c_dim),
                 (req_x, req_y, req_z),
-                (local_x_range, local_y_range, local_z_range),
+                (local_x_range, local_y_range, local_z),
                 fixed_indices,
                 compute_bounds,
                 &target_desc,
+                plane.as_ref().map(|p| p.slot),
             );
-            if let Some(step) = step {
-                self.record_ring_plane(id, step);
+            if written && let Some(p) = plane {
+                self.record_ring_plane(id, p.slot, p.step);
             }
-        }
-    }
-
-    /// Slices `block` over the local ranges and writes it into layer `id`'s volume.
-    #[allow(clippy::too_many_arguments)]
-    fn write_volume_slab(
-        &mut self,
-        id: LayerId,
-        block: &OctantBlock,
-        (x_dim, y_dim, z_dim, c_dim): (usize, usize, usize, usize),
-        (req_x, req_y, req_z): ((usize, usize), (usize, usize), (usize, usize)),
-        (local_x_range, local_y_range, local_z_range): (
-            (usize, usize),
-            (usize, usize),
-            (usize, usize),
-        ),
-        fixed_indices: &[usize],
-        compute_bounds: bool,
-        target_desc: &str,
-    ) {
-        let composite = self.layers.get(id).is_some_and(|l| l.composite.enabled);
-        // Slices read the block in its oriented (flipped) order.
-        let oriented = (
-            block.oriented_range(x_dim, local_x_range),
-            block.oriented_range(y_dim, local_y_range),
-            block.oriented_range(z_dim, local_z_range),
-        );
-        let slab_opt = if composite
-            && block.shape.len() >= 3
-            && block.shape.get(c_dim).copied().unwrap_or(0) >= 1
-        {
-            self.slice_3d_composite_volume(
-                id,
-                block,
-                c_dim,
-                x_dim,
-                y_dim,
-                z_dim,
-                oriented.0,
-                oriented.1,
-                oriented.2,
-                fixed_indices,
-                target_desc,
-            )
-        } else {
-            None
-        };
-
-        let slab_opt = slab_opt.or_else(|| {
-            block.volume_with_ranges(
-                x_dim,
-                y_dim,
-                z_dim,
-                oriented.0,
-                oriented.1,
-                oriented.2,
-                fixed_indices,
-                target_desc,
-                compute_bounds,
-            )
-        });
-
-        if let Some(slab) = slab_opt {
-            self.commit_volume_slab(
-                id,
-                block,
-                x_dim,
-                y_dim,
-                z_dim,
-                req_x.0,
-                req_y.0,
-                req_z,
-                local_x_range.0,
-                local_y_range.0,
-                local_z_range.0,
-                slab,
-            );
         }
     }
 
@@ -237,7 +163,7 @@ impl OctantApp {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn slice_3d_composite_volume(
+    pub(super) fn slice_3d_composite_volume(
         &self,
         id: LayerId,
         block: &OctantBlock,

@@ -39,7 +39,7 @@ fn volume_app() -> OctantApp {
     app.selected.dim_ranges[0] = (0, DEPTH - 1);
     app.plot_selection();
     poll_until(&mut app, |a| {
-        a.layers.base.data.volume.is_some() && !a.ring_missing(LayerId::BASE)
+        a.layers.base.data.volume.is_some() && a.ring_missing_steps(LayerId::BASE).is_empty()
     });
     app
 }
