@@ -27,7 +27,6 @@ crate::i18n::keys::define_keys! {
     DisabledItem,
     UnsupportedForGrid,
     DisabledAggregation,
-    Requires3D,
     DisabledGpuLimit,
     // Layers
     ScalarField,

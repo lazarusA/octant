@@ -108,7 +108,7 @@ impl OctantApp {
             return;
         };
         let is_vol_allowed =
-            crate::ui::variables_panel::is_volume_allowed(staged, layer.data.volume.as_ref());
+            crate::ui::variables_panel::is_volume_allowed(self, staged, layer.data.volume.as_ref());
         let is_3d_type = matches!(staged.plot_type, PlotType::Volume | PlotType::PointCloud);
 
         if !is_vol_allowed

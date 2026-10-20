@@ -28,7 +28,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::DisabledItem => "{} ({})",
         PlotKey::UnsupportedForGrid => "Ei tuettu ruudukkotyypille {}",
         PlotKey::DisabledAggregation => "Pois käytöstä: 2D-aggregointi on päällä",
-        PlotKey::Requires3D => "Vaatii 3D-datan",
         PlotKey::DisabledGpuLimit => "Pois käytöstä: {} MB > {} MB:n GPU-raja",
         PlotKey::ScalarField => "Skalaarikenttä",
         PlotKey::LabelsHeatmapOnly => "Tunnistekuvat piirretään vain lämpökarttaan",

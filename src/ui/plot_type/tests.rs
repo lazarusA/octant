@@ -2,7 +2,7 @@
 //! a number key picks, Left, Right, Home, End and Enter pick, Escape leaves
 //! it alone.
 
-use super::options::{Blocked, ORDER, plot_options};
+use super::options::{ORDER, plot_options};
 use super::picker::show_plot_type_picker;
 use crate::app::OctantApp;
 use crate::plots::PlotType;
@@ -14,7 +14,7 @@ use egui::{Key, Modifiers, Rect, Ui, pos2};
 const SCREEN: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1200.0, 900.0));
 
 #[test]
-fn without_a_3d_variable_volumes_are_blocked() {
+fn without_a_3d_variable_volumes_are_offered() {
     let mut app = OctantApp::default();
     let options = plot_options(&mut app);
     assert_eq!(options.map(|o| o.plot_type), ORDER);
@@ -26,8 +26,9 @@ fn without_a_3d_variable_volumes_are_blocked() {
     };
     assert_eq!(blocked(PlotType::Heatmap), None);
     assert_eq!(blocked(PlotType::Line), None);
-    assert_eq!(blocked(PlotType::Volume), Some(Blocked::Requires3D));
-    assert_eq!(blocked(PlotType::PointCloud), Some(Blocked::Requires3D));
+    // A 2D variable draws as a one-slice volume or point cloud.
+    assert_eq!(blocked(PlotType::Volume), None);
+    assert_eq!(blocked(PlotType::PointCloud), None);
 }
 
 fn run(app: &mut OctantApp) -> impl FnMut(&mut Ui) + '_ {

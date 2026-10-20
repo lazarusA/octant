@@ -16,12 +16,14 @@ pub use info::show_variable_info;
 use crate::app::OctantApp;
 use crate::app::layers::LevelChoice;
 use crate::i18n::{VariablesKey, fill, tr};
-use crate::ui::flow_row;
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt, icon_button_width};
 use crate::ui::keyboard::keymap::{self, Action};
 use crate::ui::keyboard::{focus, labels};
 use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
+use crate::ui::{flow_row, temp_cache};
+use crate::utils::{ByteSize, stack_str};
+use dimension_slider::variable_bytes;
 
 /// Width of the Dimensions panel's content; every dimension box fills it.
 const PANEL_MAX_W: f32 = 340.0;
@@ -90,36 +92,65 @@ fn show_panel(app: &mut OctantApp, ui: &mut egui::Ui) -> PanelHeader {
 }
 
 /// The level a multiscale variable reads, under its header: the plotted
-/// level of the plotted level count (and whether Auto chose it), or the
-/// staged choice before it is plotted.
+/// level while the staged choice is plotted, else the level the staged
+/// choice reads (whether Auto chose it, of the level count).
 fn level_note(app: &OctantApp, ui: &mut egui::Ui, var_info: &crate::data::VariableInfo) {
-    if var_info.stack_base().is_none() {
+    let Some(base) = var_info.stack_base() else {
         return;
-    }
+    };
     let choice = app.selected.level;
-    // The plotted level, while the staged choice is the one plotted.
-    let shown = (!app.is_exploring_unplotted_variable() && app.plotted().level == choice)
-        .then(|| app.plotted().variable_info()?.multiscale.as_ref())
+    let plotted = (!app.is_exploring_unplotted_variable() && app.plotted().level == choice)
+        .then(|| app.plotted().variable_info())
         .flatten();
+    let read = plotted.or_else(|| app.read_window(&app.selected).map(|(v, _)| v));
+    let level = read.and_then(|v| Some(v.multiscale.as_ref()?.level));
     let mut buf = [0; 128];
-    let text = match (shown, choice) {
-        (Some(r), LevelChoice::Auto) => fill(
+    let text = match (level, choice) {
+        (Some(l), LevelChoice::Auto) => fill(
             &mut buf,
             tr(VariablesKey::AutoLevelOf),
-            &[&r.level, &r.set.len()],
+            &[&l, &base.set.len()],
         ),
-        (Some(r), LevelChoice::Pinned(_)) => fill(
-            &mut buf,
-            tr(VariablesKey::LevelOf),
-            &[&r.level, &r.set.len()],
-        ),
+        (Some(l), LevelChoice::Pinned(_)) => {
+            fill(&mut buf, tr(VariablesKey::LevelOf), &[&l, &base.set.len()])
+        }
         (None, LevelChoice::Auto) => tr(VariablesKey::LevelAuto),
         (None, LevelChoice::Pinned(level)) => fill(&mut buf, tr(VariablesKey::LevelN), &[&level]),
     };
     ui.horizontal(|ui| {
         ui.icon_toned(Icon::Layers, IconSize::Xs, IconTone::Muted);
         ui.label(egui::RichText::new(text).small().weak());
+        level_sizes(app, ui, &base.set, read);
     });
+}
+
+/// The size of the level read (`read`) in the accent color, then of every
+/// level of `set` in another, counted as the Download line counts them.
+fn level_sizes(
+    app: &OctantApp,
+    ui: &mut egui::Ui,
+    set: &crate::data::multiscale::Multiscale,
+    read: Option<&crate::data::VariableInfo>,
+) {
+    if let Some(v) = read {
+        let mut buf = [0; 32];
+        let text = stack_str(&mut buf, format_args!("{}", ByteSize(variable_bytes(v))));
+        let color = IconTone::Accent.color(ui.visuals());
+        ui.label(egui::RichText::new(text).small().color(color));
+    }
+    let key = (app.selected.metadata_generation, app.selected.variable_idx);
+    let id = ui.make_persistent_id("level_note_all_bytes");
+    let all = temp_cache::cached(ui.ctx(), id, key, || {
+        let vars = (app.selected.metadata.as_ref()).map_or(&[][..], |m| &m.variables);
+        (set.levels.iter())
+            .filter_map(|l| vars.iter().find(|v| v.name == l.path))
+            .map(variable_bytes)
+            .sum::<u64>()
+    });
+    let mut buf = [0; 32];
+    let text = stack_str(&mut buf, format_args!("/ {}", ByteSize(all)));
+    let color = IconTone::Info.color(ui.visuals());
+    ui.label(egui::RichText::new(text).small().color(color));
 }
 
 /// The header's first row: the variable's name, expanding to its details,

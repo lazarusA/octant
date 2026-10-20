@@ -18,6 +18,8 @@ pub mod plate;
 pub mod playback;
 pub mod plot_configs;
 pub mod plot_type;
+#[cfg(test)]
+mod plot_type_tests;
 pub mod session;
 pub mod store_kind;
 pub mod ui_layout;

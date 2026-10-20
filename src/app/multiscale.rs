@@ -16,7 +16,7 @@ use crate::data::multiscale::{fit_level, pinned_level};
 use crate::data::{DatasetMetadata, VariableInfo};
 
 /// The index of variable `path` in `meta`.
-fn variable_index(meta: &DatasetMetadata, path: &str) -> Option<usize> {
+pub(super) fn variable_index(meta: &DatasetMetadata, path: &str) -> Option<usize> {
     meta.variables.iter().position(|v| v.name == path)
 }
 
@@ -93,18 +93,26 @@ pub(crate) fn at_level(selection: &VariableSelection, level: usize) -> Option<Va
     let idx = variable_index(meta, &set.level(level)?.path)?;
     let mut moved = selection.clone();
     moved.variable_idx = idx;
-    let range = |d: usize, (s, e): (usize, usize)| {
-        let r = set.to_level(level, d, s.min(e) as u64..s.max(e) as u64 + 1);
-        r.map_or((s, e), |r| {
-            (r.start as usize, r.end.saturating_sub(1) as usize)
-        })
-    };
+    let range = |d: usize, r: (usize, usize)| level_range(&set, level, d, r);
     let index = |d: usize, i: usize| {
         set.level_index(level, d, i as u64)
             .map_or(i, |i| i as usize)
     };
     map_dims(&mut moved, range, index);
     Some(moved)
+}
+
+/// Inclusive level-0 range `(s, e)` of dimension `d` on `level`'s cells.
+pub(super) fn level_range(
+    set: &crate::data::multiscale::Multiscale,
+    level: usize,
+    d: usize,
+    (s, e): (usize, usize),
+) -> (usize, usize) {
+    let r = set.to_level(level, d, s.min(e) as u64..s.max(e) as u64 + 1);
+    r.map_or((s, e), |r| {
+        (r.start as usize, r.end.saturating_sub(1) as usize)
+    })
 }
 
 /// `selection` (of a level other than 0) moved back onto its stack's level

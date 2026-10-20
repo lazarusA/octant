@@ -26,7 +26,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::DisabledItem => "{} ({})",
         PlotKey::UnsupportedForGrid => "{} グリッドには非対応",
         PlotKey::DisabledAggregation => "無効: 2D集約がオンです",
-        PlotKey::Requires3D => "3Dデータが必要です",
         PlotKey::DisabledGpuLimit => "無効: {} MB > GPU上限 {} MB",
         PlotKey::ScalarField => "スカラー場",
         PlotKey::LabelsHeatmapOnly => "ラベル画像はヒートマップにのみ描画されます",

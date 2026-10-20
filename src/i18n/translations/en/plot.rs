@@ -26,7 +26,6 @@ pub fn text(key: PlotKey) -> &'static str {
         PlotKey::DisabledItem => "{} ({})",
         PlotKey::UnsupportedForGrid => "Unsupported for {} grid",
         PlotKey::DisabledAggregation => "Disabled: 2D Aggregation is on",
-        PlotKey::Requires3D => "Requires 3D Data",
         PlotKey::DisabledGpuLimit => "Disabled: {} MB > {} MB GPU limit",
         PlotKey::ScalarField => "Scalar Field",
         PlotKey::LabelsHeatmapOnly => "Label images draw only on the heatmap",

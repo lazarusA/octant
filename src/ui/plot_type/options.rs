@@ -31,7 +31,6 @@ pub enum Blocked {
     Unsupported(&'static str),
     /// 2D aggregation (resampling) is on.
     Aggregation,
-    Requires3D,
     /// Its data, in MB, is past the GPU limit.
     GpuLimit(f64),
 }
@@ -46,7 +45,6 @@ pub struct PlotOption {
 /// What decides the plot types of the variable shown.
 struct Facts {
     label_image: bool,
-    has_3d: bool,
     volume_mb: f64,
     volume_fits: bool,
     surface_mb: f64,
@@ -77,7 +75,6 @@ impl Facts {
         };
         Self {
             label_image: var.is_some_and(crate::data::VariableInfo::is_label_image),
-            has_3d,
             volume_mb: megabytes(volume),
             volume_fits: volume <= crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS,
             surface_mb: megabytes(surface),
@@ -100,8 +97,6 @@ impl Facts {
             return None;
         } else if self.aggregated {
             Blocked::Aggregation
-        } else if volumetric && !self.has_3d {
-            Blocked::Requires3D
         } else if volumetric && !self.volume_fits {
             Blocked::GpuLimit(self.volume_mb)
         } else if surface && !self.surface_fits {
@@ -185,7 +180,6 @@ pub fn blocked_text(buf: &mut [u8; 256], blocked: Blocked) -> &str {
         Blocked::LabelsOnly => tr(PlotKey::LabelsHeatmapOnly),
         Blocked::Unsupported(grid) => fill(buf, tr(PlotKey::UnsupportedForGrid), &[&grid]),
         Blocked::Aggregation => tr(PlotKey::DisabledAggregation),
-        Blocked::Requires3D => tr(PlotKey::Requires3D),
         Blocked::GpuLimit(mb) => {
             let mut mb_buf = [0; 24];
             let mb = stack_str(&mut mb_buf, format_args!("{mb:.0}"));

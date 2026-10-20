@@ -138,9 +138,14 @@ impl OctantApp {
             .matrix
             .as_ref()
             .map(|m| {
+                let mode = match sphere {
+                    true => m.grid.sphere_coord_mode(),
+                    false => m.grid.render_coord_mode(),
+                };
                 (
-                    m.grid.render_coord_mode(),
-                    !m.grid.is_global(),
+                    mode,
+                    // Projected grids drawn around the whole globe need none.
+                    !m.grid.is_global() && mode == m.grid.render_coord_mode(),
                     m.grid.lon_bounds_rad(),
                     m.grid.lat_bounds_rad(),
                 )

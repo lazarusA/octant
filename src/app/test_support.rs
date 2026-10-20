@@ -26,6 +26,19 @@ pub(crate) fn write_array(
     shape: &[u64],
     chunks: &[u64],
 ) {
+    write_array_with(store, name, dims, shape, chunks, true);
+}
+
+/// `write_array`, its values left out (chunks read as the fill value) unless
+/// `values`.
+fn write_array_with(
+    store: &Arc<MemoryStore>,
+    name: &str,
+    dims: &[&str],
+    shape: &[u64],
+    chunks: &[u64],
+    values: bool,
+) {
     let f32_dt = DataType::from_metadata(&MetadataV3::new("float32")).expect("float32");
     let mut builder = ArrayBuilder::new(
         shape.to_vec(),
@@ -38,6 +51,9 @@ pub(crate) fn write_array(
         .build(store.clone(), &format!("/{name}"))
         .expect("build");
     array.store_metadata().expect("metadata");
+    if !values {
+        return;
+    }
     let len = shape.iter().product::<u64>() as usize;
     let values: Vec<f32> = (0..len).map(|i| i as f32).collect();
     let all = ArraySubset::new_with_shape(shape.to_vec());
@@ -162,6 +178,18 @@ fn put_json(store: &MemoryStore, key: &str, value: serde_json::Value) {
 /// A GeoZarr pyramid: `t2m` and `sst(time, lat, lon)` at 3x64x64 (level 0),
 /// 3x32x32 and 3x16x16, each level a child group of the root's layout.
 pub(crate) fn pyramid_app() -> (OctantApp, DatasetMetadata) {
+    pyramid_of(64, true)
+}
+
+/// `pyramid_app` at 3x8192x8192 (level 0, past one GPU storage buffer),
+/// 3x4096x4096 and 3x2048x2048, metadata only.
+pub(crate) fn big_pyramid_app() -> (OctantApp, DatasetMetadata) {
+    pyramid_of(8192, false)
+}
+
+/// The pyramid of `pyramid_app` with level 0 `n` x `n`, its values written
+/// when `values`.
+fn pyramid_of(size: u64, values: bool) -> (OctantApp, DatasetMetadata) {
     let store = Arc::new(MemoryStore::new());
     let layout: Vec<_> = (0..3)
         .map(|l| match l {
@@ -180,16 +208,11 @@ pub(crate) fn pyramid_app() -> (OctantApp, DatasetMetadata) {
     );
     for l in 0..3u64 {
         put_json(&store, &format!("{l}/zarr.json"), group(json!({})));
-        let n = 64 >> l;
+        let n = size >> l;
         for name in ["t2m", "sst"] {
             let path = format!("{l}/{name}");
-            write_array(
-                &store,
-                &path,
-                &["time", "lat", "lon"],
-                &[3, n, n],
-                &[1, n, n],
-            );
+            let dims = ["time", "lat", "lon"];
+            write_array_with(&store, &path, &dims, &[3, n, n], &[1, n, n], values);
         }
     }
     let mut app = OctantApp::default();

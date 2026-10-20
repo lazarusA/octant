@@ -4,7 +4,7 @@
 use crate::app::OctantApp;
 use crate::app::layers::{LayerId, LevelChoice};
 use crate::app::multiscale::{at_base, at_level, same_variable};
-use crate::app::test_support::{poll_until, pyramid_app, selection_of};
+use crate::app::test_support::{big_pyramid_app, poll_until, pyramid_app, selection_of};
 use crate::data::DatasetMetadata;
 use crate::plots::PlotType;
 
@@ -70,10 +70,50 @@ fn a_pinned_level_is_read_as_chosen() {
 }
 
 #[test]
-fn other_plot_types_read_level_0_when_it_fits() {
+fn three_d_plot_types_read_the_coarsest_level() {
+    let (mut app, meta) = pyramid_app();
+    stage(&mut app, &meta, "0/t2m", 500);
+    for plot_type in [
+        PlotType::Surface,
+        PlotType::Sphere,
+        PlotType::Volume,
+        PlotType::PointCloud,
+    ] {
+        app.selected.plot_type = plot_type;
+        app.selected.level = LevelChoice::Auto;
+        assert_eq!(app.selection_level(&app.selected), Some(2), "{plot_type:?}");
+        app.selected.level = LevelChoice::Pinned(0);
+        assert_eq!(app.selection_level(&app.selected), Some(0), "{plot_type:?}");
+    }
+}
+
+#[test]
+fn sizes_and_gpu_limits_are_measured_on_the_level_read() {
+    use crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS;
+    use crate::ui::variables_panel::{calculate_selected_volume_elements, is_volume_allowed};
+    let (mut app, meta) = big_pyramid_app();
+    stage(&mut app, &meta, "0/t2m", 500);
+    app.selected.plot_type = PlotType::Volume;
+    assert_eq!(app.selection_level(&app.selected), Some(2));
+    let (read, ranges) = app.read_window(&app.selected).expect("window");
+    assert_eq!(read.name.trim_matches('/'), "2/t2m");
+    assert_eq!(ranges[1..], [(0, 2047), (0, 2047)]);
+    assert_eq!(app.selected.dim_ranges[1..], [(0, 8191), (0, 8191)]);
+    assert!(calculate_selected_volume_elements(&app) <= MAX_GPU_STORAGE_BUFFER_ELEMENTS);
+    assert!(is_volume_allowed(&app, &app.selected, None));
+    let options = crate::ui::plot_type::options::plot_options(&mut app);
+    assert!(options.iter().all(|o| o.blocked.is_none()), "{options:?}");
+    // Level 0 is past the limit: pinned, a coarser level within it is read.
+    app.selected.level = LevelChoice::Pinned(0);
+    assert_eq!(app.selection_level(&app.selected), Some(1));
+    assert!(is_volume_allowed(&app, &app.selected, None));
+}
+
+#[test]
+fn line_plots_read_level_0_when_it_fits() {
     let (mut app, meta) = pyramid_app();
     stage(&mut app, &meta, "0/t2m", 20);
-    app.selected.plot_type = PlotType::Surface;
+    app.selected.plot_type = PlotType::Line;
     assert_eq!(app.selection_level(&app.selected), Some(0));
 }
 
