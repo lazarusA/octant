@@ -59,6 +59,18 @@ impl OctantApp {
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
+        // Steps along a spatial animated axis only rotate the ring buffer: the
+        // block written last is still in place, so nothing to slice or upload.
+        let unchanged = layer
+            .data
+            .last_volume_block
+            .as_ref()
+            .is_some_and(|(alloc, origin)| {
+                *alloc == layer.data.volume_allocations && *origin == block.origin
+            });
+        if is_3d_spatial_anim && unchanged {
+            return;
+        }
         // Raw channel readouts only exist for 2D composites.
         layer.data.composite_probe = None;
         layer.data.composite_stretch = None;

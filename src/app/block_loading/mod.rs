@@ -29,4 +29,6 @@ pub mod staging;
 pub mod step_nav;
 pub mod view_filter;
 pub mod volume_slab;
+#[cfg(test)]
+mod volume_step_tests;
 pub mod volume_upload;

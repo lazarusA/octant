@@ -6,6 +6,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crate::app::layers::LayerId;
 use crate::app::test_support::{make_resident, memory_app, selection_of};
 use crate::app::{OctantApp, StoreKind};
 use crate::data::backends::ProceduralBlockStore;
@@ -161,6 +162,41 @@ fn a_fast_store_plays_without_buffering_once_started() {
     let log = play_to_end(&mut app);
     let episodes = log.windows(2).filter(|w| w[1].1 && !w[0].1).count();
     assert_eq!(episodes, 0, "no stall after the start: {log:?}");
+}
+
+#[test]
+fn without_a_buffer_each_step_shows_as_it_arrives() {
+    // Guards playback without a buffer: every tick that finds the next step
+    // loaded shows it, one step at a time, never waiting for later steps.
+    let mut app = slow_app(Duration::from_millis(60));
+    app.playback.playback_fps = 50.0;
+    app.playback.buffer_secs = 0.0;
+    app.playback.loop_playback = false;
+    app.toggle_playback();
+    let frame = Duration::from_secs_f32(1.0 / app.playback.playback_fps);
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let mut shown = vec![app.playback.current_timestep];
+    while app.playback.is_playing {
+        assert!(Instant::now() < deadline, "playback never reached the end");
+        let now = Instant::now();
+        if now.duration_since(app.playback.last_step_time) >= frame {
+            let next = app.playback.current_timestep + 1;
+            let ready = next < NT && app.layer_step_resident(LayerId::BASE, next);
+            app.advance_playback(now);
+            if ready {
+                assert_eq!(
+                    app.playback.current_timestep, next,
+                    "step {next} was loaded but playback waited"
+                );
+            }
+        }
+        app.poll_block_prefetch_results();
+        if shown.last() != Some(&app.playback.current_timestep) {
+            shown.push(app.playback.current_timestep);
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert_eq!(shown, (0..NT).collect::<Vec<_>>(), "every step, in order");
 }
 
 /// `t2m` plotted from resident blocks with `sst` overlaid, its blocks not

@@ -13,6 +13,9 @@ pub struct LayerData {
     /// Counts volume resets (new selections), so cache hits know when the
     /// other resident blocks must be projected again.
     pub volume_allocations: u64,
+    /// The volume allocation and block origin last written into `volume`, so
+    /// playback steps over that same block skip writing it again.
+    pub last_volume_block: Option<(u64, Vec<usize>)>,
     /// Block window behind the plotted 2D composite, for raw per-channel hover values.
     pub composite_probe: Option<crate::data::slicing::CompositeProbe>,
     /// How the plotted 2D composite stretched its channels, which its detail

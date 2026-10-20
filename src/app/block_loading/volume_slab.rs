@@ -54,6 +54,8 @@ impl OctantApp {
 
             bounds_opt = Some((vdata.min_val, vdata.max_val));
             layer.data.touch_volume();
+            layer.data.last_volume_block =
+                Some((layer.data.volume_allocations, block.origin.clone()));
         }
         // Uploaded before the next paint, to the renderer on screen only.
         layer
