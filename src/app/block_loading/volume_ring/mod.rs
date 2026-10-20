@@ -8,7 +8,7 @@
 use std::ops::Range;
 
 use crate::app::layers::LayerId;
-use crate::app::{OctantApp, SpatialRole};
+use crate::app::{DimConfig, OctantApp, SpatialRole};
 use crate::data::DimensionSelection;
 use crate::data::octant_block::OctantBlock;
 use crate::plots::PlotType;
@@ -19,31 +19,37 @@ pub(super) use window::RingPlane;
 use window::{Window, front_plane};
 
 impl OctantApp {
-    /// Whether layer `id` is a volume or point cloud animated along its Z axis.
-    pub(crate) fn animates_along_z(&self, id: LayerId) -> bool {
-        let Some(dim) = self.layer_animated_dim(id) else {
-            return false;
-        };
+    /// Layer `id`'s animated dimension when it is the Z axis of a volume or
+    /// point cloud, found as the projection finds it (`apply_block_projection`).
+    fn ring_dim(&self, id: LayerId) -> Option<usize> {
+        let configs = self.layer_dim_config(id);
+        let dim = self
+            .layer_animated_dim(id)
+            .or_else(|| DimConfig::animated_dim(configs))?;
         let is_3d = self.layer_selections(id).is_some_and(|(_, staged)| {
             matches!(staged.plot_type, PlotType::Volume | PlotType::PointCloud)
         });
-        is_3d
-            && self
-                .layer_dim_config(id)
-                .get(dim)
-                .is_some_and(|c| c.spatial == SpatialRole::Z)
+        let is_z = configs
+            .get(dim)
+            .is_some_and(|c| c.spatial == SpatialRole::Z);
+        (is_3d && is_z).then_some(dim)
+    }
+
+    /// Whether layer `id` is a volume or point cloud animated along its Z axis.
+    pub(crate) fn animates_along_z(&self, id: LayerId) -> bool {
+        self.ring_dim(id).is_some()
     }
 
     fn ring_window(&self, id: LayerId) -> Option<Window> {
-        if !self.animates_along_z(id) {
-            return None;
-        }
+        let dim = self.ring_dim(id)?;
         let layer = self.layers.get(id)?;
         let depth = layer.data.volume.as_ref()?.depth.max(1);
-        let extent = self.layer_animated_dim_extent(id).max(1);
+        let length = self.layer_variable_info(id)?.shape.get(dim).copied();
+        let extent = (length.unwrap_or(1) as usize).max(1);
         let start = self.layer_step(id) % extent;
         let ring = &layer.data.ring;
-        let anchor = ring.anchor.filter(|_| ring.steps.len() == depth);
+        let fresh = ring.allocation != layer.data.volume_allocations || ring.steps.len() != depth;
+        let anchor = ring.anchor.filter(|_| !fresh);
         Some(Window {
             start,
             extent,
@@ -107,6 +113,13 @@ impl OctantApp {
     /// its ring window.
     pub(crate) fn ring_lead(&self, id: LayerId) -> usize {
         self.ring_window(id).map_or(0, |w| w.depth - 1)
+    }
+
+    /// The last step of the window layer `id`'s ring would show from `step`,
+    /// counted around the series; `step` itself for other layers.
+    pub(crate) fn ring_back_step(&self, id: LayerId, step: usize) -> usize {
+        self.ring_window(id)
+            .map_or(step, |w| (step + w.depth - 1) % w.extent)
     }
 
     /// Starts layer `id`'s ring record afresh after a new volume, and anchors

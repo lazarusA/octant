@@ -108,14 +108,11 @@ impl OctantApp {
         (next, total): (usize, usize),
         limit: usize,
     ) -> usize {
-        // A ring volume shows a step once the window's last plane (counted
-        // around the series) is held too.
-        let lead = self.ring_lead(id);
-        let extent = self.layer_animated_dim_extent(id).max(1);
         let mut k = 0;
         while k < limit {
             let shared = (next + k) % total;
-            let step = (self.layer_step_at(id, shared) + lead) % extent;
+            // A ring volume shows a step once its window's last plane is held.
+            let step = self.ring_back_step(id, self.layer_step_at(id, shared));
             let selections = &r.request.selections;
             let until = self.block_cache.covered_until(
                 &r.source_id,
