@@ -150,11 +150,10 @@ fn ready(crs: &CrsRef) -> Arc<super::Crs> {
 fn epsg_and_wkt_resolve_to_proj_strings() {
     let utm = ready(&CrsRef::Epsg(32636));
     assert!(!utm.geographic);
-    assert!(utm.proj4.contains("+proj=utm"), "{}", utm.proj4);
     assert_eq!(utm.unit, "m");
     assert!(ready(&CrsRef::Epsg(4326)).geographic);
     assert!(ready(&CrsRef::Geographic).geographic);
-    assert!(ready(&CrsRef::Epsg(3413)).proj4.contains("+proj=stere"));
+    assert!(!ready(&CrsRef::Epsg(3413)).geographic);
     // WKT without an EPSG code: through `proj4wkt` (desktop only).
     let custom = UTM36N_WKT1.replace(r#",AUTHORITY["EPSG","32636"]]"#, "]");
     for wkt in [custom.as_str(), UTM36N_WKT2] {

@@ -4,14 +4,15 @@
 //! on the web (fetched once per code, the frame woken when it arrives).
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
+#[cfg(target_arch = "wasm32")]
+use std::sync::OnceLock;
+use std::sync::{Arc, Mutex};
 
 use super::CrsRef;
 
 /// A CRS `proj4rs` understands.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Crs {
-    pub proj4: Arc<str>,
     /// Longitude/latitude in degrees (`+proj=longlat`).
     pub geographic: bool,
     /// The unit of its x/y (`m`, `us-ft`, ...; `degrees` when geographic).
@@ -28,9 +29,11 @@ pub enum Resolution {
 }
 
 static CACHE: Mutex<Option<HashMap<CrsRef, Resolution>>> = Mutex::new(None);
+#[cfg(target_arch = "wasm32")]
 static WAKE: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
 
 /// What wakes the UI when a fetched definition arrives (a repaint).
+#[cfg(target_arch = "wasm32")]
 pub fn set_wake(wake: impl Fn() + Send + Sync + 'static) {
     let _ = WAKE.set(Box::new(wake));
 }
@@ -55,6 +58,10 @@ fn cached(crs: &CrsRef) -> Option<Resolution> {
 }
 
 fn store(crs: CrsRef, resolution: Resolution) {
+    // Once per CRS: the cache answers every later ask.
+    if let Resolution::Unsupported(reason) = &resolution {
+        log::warn!("CRS {crs:?} not supported: {reason}");
+    }
     let mut cache = CACHE.lock().unwrap_or_else(|p| p.into_inner());
     cache.get_or_insert_default().insert(crs, resolution);
 }
@@ -63,7 +70,6 @@ fn store(crs: CrsRef, resolution: Resolution) {
 fn from_proj4(proj4: &str) -> Resolution {
     match proj4rs::proj::Proj::from_proj_string(proj4) {
         Ok(proj) => Resolution::Ready(Arc::new(Crs {
-            proj4: proj4.into(),
             geographic: proj.is_latlong(),
             unit: if proj.is_latlong() {
                 "degrees"

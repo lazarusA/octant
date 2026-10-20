@@ -16,7 +16,9 @@ mod tests;
 #[cfg(test)]
 mod zarr_tests;
 
-pub use resolve::{Crs, Resolution, resolve, set_wake};
+#[cfg(target_arch = "wasm32")]
+pub use resolve::set_wake;
+pub use resolve::{Crs, Resolution, resolve};
 
 use std::collections::HashMap;
 use std::sync::Arc;
