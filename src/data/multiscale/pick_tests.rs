@@ -50,6 +50,19 @@ fn whole_dimensions_exclude_levels_downsampling_them() {
 }
 
 #[test]
+fn coarsest_reads_the_coarsest_level_not_excluded() {
+    let s = stack();
+    let coarsest = |time| ResolutionDemand {
+        dims: vec![time, DimDemand::Coarsest, DimDemand::Coarsest],
+        max_elements: None,
+    };
+    assert_eq!(fit_level(&s, &WHOLE, &coarsest(DimDemand::Full)), 2);
+    assert_eq!(fit_level(&s, &WHOLE, &coarsest(DimDemand::Any)), 3);
+    // A pinned level is read as chosen.
+    assert_eq!(pinned_level(&s, 0, &WHOLE, &coarsest(DimDemand::Full)), 0);
+}
+
+#[test]
 fn the_cell_budget_coarsens() {
     let s = stack();
     let budget = Some(4 * 32 * 32);

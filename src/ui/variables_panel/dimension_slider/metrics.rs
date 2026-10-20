@@ -37,14 +37,16 @@ pub fn calculate_download_sizes(
     )
 }
 
-/// Calculates the total 3D volume elements from active dimensions.
+/// The 3D volume elements the staged selection reads (on its plot's level)
+/// over its active dimensions.
 pub fn calculate_selected_volume_elements(app: &OctantApp) -> usize {
-    selection_volume_elements(&app.selected)
+    selection_volume_elements(app, &app.selected)
 }
 
-/// The 3D volume elements `selection` reads over its active dimensions.
-fn selection_volume_elements(selection: &VariableSelection) -> usize {
-    let Some(var_info) = selection.variable_info() else {
+/// The 3D volume elements `selection` reads, on the level its plot reads,
+/// over its active dimensions.
+fn selection_volume_elements(app: &OctantApp, selection: &VariableSelection) -> usize {
+    let Some((var_info, ranges)) = app.read_window(selection) else {
         return 0;
     };
 
@@ -60,19 +62,13 @@ fn selection_volume_elements(selection: &VariableSelection) -> usize {
         })
         .collect();
 
-    crate::utils::math::calculate_volume_elements(
-        &var_info.shape,
-        &active_dims,
-        &selection.dim_ranges,
-    )
+    crate::utils::math::calculate_volume_elements(&var_info.shape, &active_dims, &ranges)
 }
 
-/// Calculates the total 2D plane elements for spatial X and Y dimensions.
+/// The spatial X and Y plane elements the staged selection reads, on its
+/// plot's level.
 pub fn calculate_selected_2d_elements(app: &OctantApp) -> usize {
-    let Some(metadata) = &app.selected.metadata else {
-        return 0;
-    };
-    let Some(var_info) = metadata.variables.get(app.selected.variable_idx) else {
+    let Some((var_info, ranges)) = app.read_window(&app.selected) else {
         return 0;
     };
 
@@ -84,22 +80,21 @@ pub fn calculate_selected_2d_elements(app: &OctantApp) -> usize {
         &app.selected.dim_config,
     );
 
-    crate::utils::math::calculate_2d_elements(
-        &var_info.shape,
-        x_dim,
-        y_dim,
-        &app.selected.dim_ranges,
-    )
+    crate::utils::math::calculate_2d_elements(&var_info.shape, x_dim, y_dim, &ranges)
 }
 
 /// Checks if 3D Volume / Point Cloud rendering is allowed under GPU storage limits.
 pub fn is_volume_allowed_for_selection(app: &OctantApp) -> bool {
-    is_volume_allowed(&app.selected, app.layers.base.data.volume.as_ref())
+    is_volume_allowed(app, &app.selected, app.layers.base.data.volume.as_ref())
 }
 
 /// Whether `selection` can draw as a volume or point cloud next to a layer's
-/// current `volume`, within GPU storage limits.
-pub fn is_volume_allowed(selection: &VariableSelection, volume: Option<&VolumeData>) -> bool {
+/// current `volume`, within GPU storage limits, on the level its plot reads.
+pub fn is_volume_allowed(
+    app: &OctantApp,
+    selection: &VariableSelection,
+    volume: Option<&VolumeData>,
+) -> bool {
     // Discrete global grids (HEALPix) do not support 3D Volume or PointCloud raycasting
     if selection
         .dim_config
@@ -108,7 +103,7 @@ pub fn is_volume_allowed(selection: &VariableSelection, volume: Option<&VolumeDa
     {
         return false;
     }
-    let elements = selection_volume_elements(selection);
+    let elements = selection_volume_elements(app, selection);
     if elements == 0 && selection.metadata.is_some() {
         return false;
     }

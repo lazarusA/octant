@@ -16,6 +16,8 @@ pub enum DimDemand {
     /// At most this many cells over the window (screen pixels): finer levels
     /// draw more cells than the plot shows.
     Pixels(u32),
+    /// As few cells as possible: the coarsest level not excluded.
+    Coarsest,
 }
 
 /// What a plot needs from a stack: one demand per dimension, and at most
@@ -47,7 +49,7 @@ enum Fit {
 }
 
 /// How `level` fits `demand` over `window`; `pixels` false ignores the
-/// `Pixels` demands (a pinned level keeps only the budget).
+/// `Pixels` and `Coarsest` demands (a pinned level keeps only the budget).
 fn fit(
     set: &Multiscale,
     level: usize,
@@ -76,7 +78,8 @@ fn fit(
         match *want {
             DimDemand::Full if !full => return Fit::Excluded,
             DimDemand::Pixels(px) if pixels => fits &= cells <= u64::from(px.max(1)),
-            DimDemand::Full | DimDemand::Any | DimDemand::Pixels(_) => {}
+            DimDemand::Coarsest if pixels => fits = false,
+            DimDemand::Full | DimDemand::Any | DimDemand::Pixels(_) | DimDemand::Coarsest => {}
         }
     }
     if demand.max_elements.is_some_and(|max| elements > max) {

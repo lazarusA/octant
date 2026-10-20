@@ -235,3 +235,18 @@ fn test_fallback_spatial_coords_slicing() {
     assert_eq!(grid.render_coord_mode(), 1);
     assert!(!grid.is_global());
 }
+
+#[test]
+fn projected_regional_grids_wrap_the_whole_sphere() {
+    let regional = |lon_bounds, lat_bounds| CoordinateGrid::RegionalRegular {
+        lon_bounds,
+        lat_bounds,
+    };
+    // Degrees keep their place on the globe.
+    let geo = regional((10.0, 20.0), (40.0, 50.0));
+    assert_eq!(geo.sphere_coord_mode(), 1);
+    // UTM metres (a Sentinel-2 tile) are no angles: drawn as a global grid.
+    let utm = regional((500_060.0, 609_700.0), (1_790_300.0, 1_899_940.0));
+    assert_eq!(utm.render_coord_mode(), 1);
+    assert_eq!(utm.sphere_coord_mode(), 0);
+}

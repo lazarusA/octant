@@ -26,17 +26,22 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
         super::defaults::init_variable_dimension_defaults(app, var_info);
     }
 
+    // Sizes of what the plot reads: its level of a multiscale variable.
+    let (read_info, read_ranges) = app.read_window(&app.selected).unwrap_or((
+        var_info,
+        std::borrow::Cow::Borrowed(&app.selected.dim_ranges),
+    ));
     let (requested_bytes, total_bytes) =
-        calculate_download_sizes(var_info, &app.selected.dim_config, &app.selected.dim_ranges);
+        calculate_download_sizes(read_info, &app.selected.dim_config, &read_ranges);
 
     let requested_cells: u64 = if rank > 0 {
-        var_info
+        read_info
             .shape
             .iter()
             .enumerate()
             .map(|(i, &s)| {
                 if app.selected.dim_config.get(i).is_some_and(|c| c.active) {
-                    if let Some(&(start, end)) = app.selected.dim_ranges.get(i) {
+                    if let Some(&(start, end)) = read_ranges.get(i) {
                         (end.saturating_sub(start) + 1).min(s as usize) as u64
                     } else {
                         s

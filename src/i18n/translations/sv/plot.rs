@@ -26,7 +26,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::DisabledItem => "{} ({})",
         PlotKey::UnsupportedForGrid => "Stöds inte för {}-rutnät",
         PlotKey::DisabledAggregation => "Avaktiverad: 2D-aggregering är på",
-        PlotKey::Requires3D => "Kräver 3D-data",
         PlotKey::DisabledGpuLimit => "Avaktiverad: {} MB > GPU-gränsen {} MB",
         PlotKey::ScalarField => "Skalärfält",
         PlotKey::LabelsHeatmapOnly => "Etikettbilder ritas bara på värmekartan",

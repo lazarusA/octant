@@ -134,6 +134,8 @@ fn show_sample(
         resolve_target_screen_pos(app, matrix, camera, sampler, &transform, px, py, point);
     if plot_type == PlotType::Heatmap && point.is_none() {
         target = detail_overrides(app, hit, &transform, target, &mut fields);
+    } else if let Some(level) = detail::level_field(app, None) {
+        fields.push(level);
     }
     let swatch = || resolve_hover_color(app, raw_val, py);
     let (value, swatch, units) = labels::layer_reading(base, raw_val, composite, units, swatch);

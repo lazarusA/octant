@@ -1,7 +1,10 @@
 //! 3D Orbit camera plot controller.
 
 use super::traits::PlotController;
+use crate::app::DimConfig;
 use crate::app::state::NavigationState;
+use crate::data::VariableInfo;
+use crate::data::multiscale::{DimDemand, ResolutionDemand};
 use crate::plots::PlotType;
 use crate::plots::camera::{DEFAULT_DISTANCE, MAX_DISTANCE, OrbitCamera, TARGET_LIMIT};
 
@@ -57,6 +60,25 @@ impl Orbit3DController {
 impl PlotController for Orbit3DController {
     fn plot_type(&self) -> PlotType {
         self.plot_type
+    }
+
+    /// The coarsest level along x, y and z (3D plots do not pick levels by
+    /// view yet), other dimensions whole, within one GPU buffer.
+    fn resolution_demand(
+        &self,
+        var: &VariableInfo,
+        dim_config: &[DimConfig],
+        _canvas_px: [u32; 2],
+    ) -> ResolutionDemand {
+        let mut demand = ResolutionDemand::finest(var.shape.len());
+        let (x, y, z) = var.resolve_spatial_dim_indices(dim_config);
+        for d in [x, y, z].into_iter().flatten() {
+            if let Some(slot) = demand.dims.get_mut(d) {
+                *slot = DimDemand::Coarsest;
+            }
+        }
+        demand.max_elements = Some(crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS as u64);
+        demand
     }
 
     fn reset_view(&self, nav: &mut NavigationState) {

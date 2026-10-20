@@ -59,6 +59,19 @@ impl CoordinateGrid {
         self.shader_coord_mode()
     }
 
+    /// The coordinate mode the sphere draws with: regional regular grids
+    /// whose bounds are no degrees (projected coordinates, in metres) wrap
+    /// the whole globe as global ones do instead of a sliver past the poles.
+    pub fn sphere_coord_mode(&self) -> u32 {
+        let (lon, lat) = (self.lon_bounds_deg(), self.lat_bounds_deg());
+        let degrees = [lon.0, lon.1].iter().all(|v| (-360.0..=360.0).contains(v))
+            && [lat.0, lat.1].iter().all(|v| (-90.0..=90.0).contains(v));
+        match self.render_coord_mode() {
+            1 if !degrees => 0,
+            mode => mode,
+        }
+    }
+
     #[inline]
     pub fn is_healpix(&self) -> bool {
         matches!(self, Self::Healpix { .. })

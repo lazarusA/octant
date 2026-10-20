@@ -1,6 +1,7 @@
 //! Visualization plot type transitions and dimension layout adaptation.
 
-use crate::app::{AnimationRole, OctantApp, SpatialRole};
+use crate::app::state::dataset_activation::channel_dim;
+use crate::app::{AnimationRole, OctantApp, SpatialRole, VariableSelection};
 use crate::plots::PlotType;
 
 impl OctantApp {
@@ -32,22 +33,10 @@ impl OctantApp {
     }
 
     fn switch_from_3d_to_2d(&mut self) {
-        let channel_dim = if self.layers.base.composite.enabled {
-            self.channel_dim_index()
-        } else {
-            None
-        };
-        let max_ch = channel_dim
-            .and_then(|ch| {
-                self.plotted_variable_info()
-                    .or_else(|| self.selected_variable_info())
-                    .and_then(|v| v.shape.get(ch))
-                    .map(|&s| (s as usize).saturating_sub(1))
-            })
-            .unwrap_or(0);
-
-        adapt_sel_to_2d(&mut self.selected, channel_dim, max_ch);
-        adapt_sel_to_2d(self.layers.base.selection_mut(), channel_dim, max_ch);
+        // Each selection by its own variable: the staged one may be another.
+        let composite = self.layers.base.composite.enabled;
+        adapt_sel_to_2d(&mut self.selected, composite);
+        adapt_sel_to_2d(self.layers.base.selection_mut(), composite);
         self.layers.base.selection_mut().plot_type = self.selected.plot_type;
 
         let cur_var = self.plotted_variable_info();
@@ -68,55 +57,10 @@ impl OctantApp {
     }
 
     fn switch_from_2d_to_3d(&mut self) {
-        let channel_dim = if self.layers.base.composite.enabled {
-            self.channel_dim_index()
-        } else {
-            None
-        };
-        let fallback_anim = if self.selected.dim_config.len() >= 3 {
-            self.selected
-                .animated_dim
-                .filter(|&d| Some(d) != channel_dim)
-        } else {
-            None
-        };
-        let z_idx_opt = self
-            .selected
-            .dim_config
-            .iter()
-            .enumerate()
-            .position(|(i, c)| {
-                c.spatial == SpatialRole::Z
-                    && c.animation != AnimationRole::Animated
-                    && Some(i) != channel_dim
-            })
-            .or_else(|| {
-                self.selected
-                    .dim_config
-                    .iter()
-                    .enumerate()
-                    .position(|(i, c)| {
-                        c.spatial == SpatialRole::None
-                            && c.animation != AnimationRole::Animated
-                            && Some(i) != channel_dim
-                    })
-            })
-            .or(fallback_anim);
-        if let Some(z_idx) = z_idx_opt {
-            let max_z = if self.selected.dim_config[z_idx].animation != AnimationRole::Animated {
-                let max = self
-                    .plotted_variable_info()
-                    .or_else(|| self.selected_variable_info())
-                    .and_then(|v| v.shape.get(z_idx))
-                    .map(|&s| (s as usize).saturating_sub(1))
-                    .unwrap_or(0);
-                Some(max)
-            } else {
-                None
-            };
-            adapt_sel_to_3d(&mut self.selected, z_idx, max_z);
-            adapt_sel_to_3d(self.layers.base.selection_mut(), z_idx, max_z);
-        }
+        // Each selection by its own variable: the staged one may be another.
+        let composite = self.layers.base.composite.enabled;
+        adapt_sel_to_3d(&mut self.selected, composite);
+        adapt_sel_to_3d(self.layers.base.selection_mut(), composite);
         self.layers.base.selection_mut().plot_type = self.selected.plot_type;
 
         let cur_var = self.plotted_variable_info();
@@ -137,11 +81,21 @@ impl OctantApp {
     }
 }
 
-fn adapt_sel_to_2d(
-    sel: &mut crate::app::VariableSelection,
-    channel_dim: Option<usize>,
-    max_ch: usize,
-) {
+/// The channel dimension of `sel`'s variable while composites are on, and
+/// its last index.
+fn channel_of(sel: &VariableSelection, composite: bool) -> Option<(usize, usize)> {
+    let var = sel.variable_info().filter(|_| composite)?;
+    let ch = channel_dim(var)?;
+    let last = var
+        .shape
+        .get(ch)
+        .map_or(0, |&s| (s as usize).saturating_sub(1));
+    Some((ch, last))
+}
+
+fn adapt_sel_to_2d(sel: &mut VariableSelection, composite: bool) {
+    let channel = channel_of(sel, composite);
+    let channel_dim = channel.map(|(ch, _)| ch);
     for (z_idx, c) in sel.dim_config.iter_mut().enumerate() {
         if c.spatial == SpatialRole::Z {
             c.spatial = SpatialRole::None;
@@ -157,7 +111,7 @@ fn adapt_sel_to_2d(
             }
         }
     }
-    if let Some(ch_idx) = channel_dim {
+    if let Some((ch_idx, max_ch)) = channel {
         if let Some(c) = sel.dim_config.get_mut(ch_idx) {
             c.range = (0, max_ch);
             c.active = true;
@@ -169,7 +123,38 @@ fn adapt_sel_to_2d(
     sel.spatial_dims = crate::app::DimConfig::spatial_dims(&sel.dim_config);
 }
 
-fn adapt_sel_to_3d(sel: &mut crate::app::VariableSelection, z_idx: usize, max_z: Option<usize>) {
+/// The dimension `sel` stacks along Z in 3D: an explicit Z, else the first
+/// free one, else (3D and up) its animated one; never the channel.
+fn z_dim_of(sel: &VariableSelection, channel_dim: Option<usize>) -> Option<usize> {
+    let free = |role: SpatialRole| {
+        (sel.dim_config.iter().enumerate()).position(|(i, c)| {
+            c.spatial == role && c.animation != AnimationRole::Animated && Some(i) != channel_dim
+        })
+    };
+    let fallback_anim = (sel.dim_config.len() >= 3)
+        .then_some(sel.animated_dim)
+        .flatten()
+        .filter(|&d| Some(d) != channel_dim);
+    free(SpatialRole::Z)
+        .or_else(|| free(SpatialRole::None))
+        .or(fallback_anim)
+}
+
+fn adapt_sel_to_3d(sel: &mut VariableSelection, composite: bool) {
+    let channel_dim = channel_of(sel, composite).map(|(ch, _)| ch);
+    let Some(z_idx) = z_dim_of(sel, channel_dim) else {
+        sel.spatial_dims = crate::app::DimConfig::spatial_dims(&sel.dim_config);
+        return;
+    };
+    let animated = sel
+        .dim_config
+        .get(z_idx)
+        .is_some_and(|c| c.animation == AnimationRole::Animated);
+    let max_z = (!animated).then(|| {
+        sel.variable_info()
+            .and_then(|v| v.shape.get(z_idx))
+            .map_or(0, |&s| (s as usize).saturating_sub(1))
+    });
     if let Some(c) = sel.dim_config.get_mut(z_idx) {
         c.spatial = SpatialRole::Z;
         c.active = true;

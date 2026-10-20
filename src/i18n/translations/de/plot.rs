@@ -26,7 +26,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::DisabledItem => "{} ({})",
         PlotKey::UnsupportedForGrid => "Nicht unterstützt für {}-Gitter",
         PlotKey::DisabledAggregation => "Deaktiviert: 2D-Aggregation ist aktiv",
-        PlotKey::Requires3D => "Erfordert 3D-Daten",
         PlotKey::DisabledGpuLimit => "Deaktiviert: {} MB > {} MB GPU-Limit",
         PlotKey::ScalarField => "Skalarfeld",
         PlotKey::LabelsHeatmapOnly => "Label-Bilder werden nur auf der Heatmap gezeichnet",

@@ -35,7 +35,7 @@ impl<'a> SphereField<'a> {
     fn cell_coords(&self, lon: f32, lat: f32) -> Option<(f32, f32, bool)> {
         let grid = &self.matrix.grid;
         let (w, h) = (self.matrix.width as f32, self.matrix.height as f32);
-        match grid.render_coord_mode() {
+        match grid.sphere_coord_mode() {
             0 => Some(((lon + PI) / (2.0 * PI) * w, (0.5 - lat / PI) * h, true)),
             1 => {
                 let [lon_min, lon_max] = grid.lon_bounds_rad();
@@ -121,7 +121,7 @@ impl<'a> SphereField<'a> {
             self.matrix.width.max(1) as f32,
             self.matrix.height.max(1) as f32,
         );
-        if grid.render_coord_mode() == 1 {
+        if grid.sphere_coord_mode() == 1 {
             let [lon_min, lon_max] = grid.lon_bounds_rad();
             let [lat_min, lat_max] = grid.lat_bounds_rad();
             let dx = (lon_max - lon_min).abs() / (w - 1.0).max(1.0);

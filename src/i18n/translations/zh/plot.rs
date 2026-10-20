@@ -26,7 +26,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::DisabledItem => "{}（{}）",
         PlotKey::UnsupportedForGrid => "不支持 {} 网格",
         PlotKey::DisabledAggregation => "已禁用：2D 聚合已开启",
-        PlotKey::Requires3D => "需要 3D 数据",
         PlotKey::DisabledGpuLimit => "已禁用：{} MB > {} MB GPU 上限",
         PlotKey::ScalarField => "标量场",
         PlotKey::LabelsHeatmapOnly => "标签图像仅在热图上绘制",

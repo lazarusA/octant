@@ -28,7 +28,6 @@ pub fn text(key: PlotKey) -> Option<&'static str> {
         PlotKey::DisabledItem => "{} ({})",
         PlotKey::UnsupportedForGrid => "Tidak didukung untuk grid {}",
         PlotKey::DisabledAggregation => "Nonaktif: Agregasi 2D aktif",
-        PlotKey::Requires3D => "Memerlukan Data 3D",
         PlotKey::DisabledGpuLimit => "Nonaktif: {} MB > batas GPU {} MB",
         PlotKey::ScalarField => "Medan Skalar",
         PlotKey::LabelsHeatmapOnly => "Gambar label hanya digambar pada peta panas",
