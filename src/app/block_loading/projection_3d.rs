@@ -59,7 +59,7 @@ impl OctantApp {
         let Some(layer) = self.layers.get_mut(id) else {
             return;
         };
-        // Steps along a spatial animated axis only rotate the ring buffer: the
+        // Steps along an animated X or Y axis only rotate the ring buffer: the
         // block written last is still in place, so nothing to slice or upload.
         let unchanged = layer
             .data
@@ -68,14 +68,66 @@ impl OctantApp {
             .is_some_and(|(alloc, origin)| {
                 *alloc == layer.data.volume_allocations && *origin == block.origin
             });
-        if is_3d_spatial_anim && unchanged {
+        // Along an animated Z axis only the planes the window gained are
+        // written (`volume_ring`); a flipped Z keeps whole blocks.
+        let ring = z_dim < block.rank() && !block.is_flipped(z_dim) && self.animates_along_z(id);
+        if is_3d_spatial_anim && unchanged && !ring {
             return;
         }
+        let planes: Vec<((usize, usize), Option<usize>)> = if ring {
+            self.ring_planes_to_write(id, block, z_dim)
+                .into_iter()
+                .map(|(local, step)| ((local, local + 1), Some(step)))
+                .collect()
+        } else {
+            vec![(local_z_range, None)]
+        };
+        if planes.is_empty() {
+            return;
+        }
+        let Some(layer) = self.layers.get_mut(id) else {
+            return;
+        };
         // Raw channel readouts only exist for 2D composites.
         layer.data.composite_probe = None;
         layer.data.composite_stretch = None;
         layer.data.flipped_dims.clone_from(&block.flipped_dims);
 
+        for (local_z_range, step) in planes {
+            self.write_volume_slab(
+                id,
+                block,
+                (x_dim, y_dim, z_dim, c_dim),
+                (req_x, req_y, req_z),
+                (local_x_range, local_y_range, local_z_range),
+                fixed_indices,
+                compute_bounds,
+                &target_desc,
+            );
+            if let Some(step) = step {
+                self.record_ring_plane(id, step);
+            }
+        }
+    }
+
+    /// Slices `block` over the local ranges and writes it into layer `id`'s volume.
+    #[allow(clippy::too_many_arguments)]
+    fn write_volume_slab(
+        &mut self,
+        id: LayerId,
+        block: &OctantBlock,
+        (x_dim, y_dim, z_dim, c_dim): (usize, usize, usize, usize),
+        (req_x, req_y, req_z): ((usize, usize), (usize, usize), (usize, usize)),
+        (local_x_range, local_y_range, local_z_range): (
+            (usize, usize),
+            (usize, usize),
+            (usize, usize),
+        ),
+        fixed_indices: &[usize],
+        compute_bounds: bool,
+        target_desc: &str,
+    ) {
+        let composite = self.layers.get(id).is_some_and(|l| l.composite.enabled);
         // Slices read the block in its oriented (flipped) order.
         let oriented = (
             block.oriented_range(x_dim, local_x_range),
@@ -97,7 +149,7 @@ impl OctantApp {
                 oriented.1,
                 oriented.2,
                 fixed_indices,
-                &target_desc,
+                target_desc,
             )
         } else {
             None
@@ -112,7 +164,7 @@ impl OctantApp {
                 oriented.1,
                 oriented.2,
                 fixed_indices,
-                &target_desc,
+                target_desc,
                 compute_bounds,
             )
         });

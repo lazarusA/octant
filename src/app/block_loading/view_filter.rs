@@ -35,6 +35,7 @@ impl OctantApp {
         axes: [(usize, (usize, usize)); 3],
     ) -> bool {
         let step = self.layer_step(id);
+        let ring = self.animates_along_z(id);
         let span = |dim: usize| {
             let origin = block.origin.get(dim).copied().unwrap_or(0);
             (origin, block.shape.get(dim).copied().unwrap_or(1))
@@ -52,7 +53,11 @@ impl OctantApp {
             .all(|&(dim, req)| {
                 let (origin, len) = span(dim);
                 if Some(dim) == anim_dim && anim_is_spatial {
-                    overlaps(origin, len, req) || (origin..origin + len).contains(&step)
+                    // A ring volume shows the requested length from the step on.
+                    let window = (step, step + req.1.saturating_sub(req.0));
+                    overlaps(origin, len, req)
+                        || (origin..origin + len).contains(&step)
+                        || (ring && overlaps(origin, len, window))
                 } else {
                     overlaps(origin, len, req)
                 }
@@ -138,7 +143,7 @@ impl OctantApp {
         let Some(layer) = self.layers.get(id) else {
             return;
         };
-        if layer.data.volume_allocations == since {
+        if layer.data.volume_allocations == since && !self.ring_missing(id) {
             return;
         }
         let is_volume = self.layer_selections(id).is_some_and(|(_, staged)| {
@@ -153,5 +158,6 @@ impl OctantApp {
         for block in &blocks {
             self.apply_block_projection(id, block);
         }
+        self.empty_stale_ring_planes(id);
     }
 }
