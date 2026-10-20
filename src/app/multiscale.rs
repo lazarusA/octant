@@ -8,7 +8,6 @@
 //! `at_base` moves it back. Dimensions a level keeps whole (time, channel)
 //! keep their indices, so playback steps are the same on every level.
 
-use std::borrow::Cow;
 use std::ops::Range;
 
 use crate::app::layers::{LevelChoice, VariableSelection};
@@ -16,12 +15,8 @@ use crate::app::{DimConfig, OctantApp};
 use crate::data::multiscale::{fit_level, pinned_level};
 use crate::data::{DatasetMetadata, VariableInfo};
 
-/// The variable a selection reads and its inclusive ranges on that
-/// variable's cells (`OctantApp::read_window`).
-pub(crate) type ReadWindow<'a> = (&'a VariableInfo, Cow<'a, [(usize, usize)]>);
-
 /// The index of variable `path` in `meta`.
-fn variable_index(meta: &DatasetMetadata, path: &str) -> Option<usize> {
+pub(super) fn variable_index(meta: &DatasetMetadata, path: &str) -> Option<usize> {
     meta.variables.iter().position(|v| v.name == path)
 }
 
@@ -108,7 +103,7 @@ pub(crate) fn at_level(selection: &VariableSelection, level: usize) -> Option<Va
 }
 
 /// Inclusive level-0 range `(s, e)` of dimension `d` on `level`'s cells.
-fn level_range(
+pub(super) fn level_range(
     set: &crate::data::multiscale::Multiscale,
     level: usize,
     d: usize,
@@ -222,36 +217,6 @@ impl OctantApp {
             variable_index(selection.metadata.as_ref()?, &set.level(l)?.path)
         });
         idx.unwrap_or(selection.variable_idx)
-    }
-
-    /// What `selection` reads, for its sizes and GPU limits: the variable of
-    /// the level its plot reads and its ranges on that level's cells (its
-    /// own variable and ranges unless it is a stack's level 0). The UI stays
-    /// on level 0; nothing but the ranges is copied.
-    pub(crate) fn read_window<'a>(
-        &self,
-        selection: &'a VariableSelection,
-    ) -> Option<ReadWindow<'a>> {
-        let var = selection.variable_info()?;
-        let own = Some((var, Cow::Borrowed(selection.dim_ranges.as_slice())));
-        let Some(level) = self.selection_level(selection).filter(|&l| l > 0) else {
-            return own;
-        };
-        let (Some(set), Some(meta)) = (var.stack_base().map(|b| &b.set), &selection.metadata)
-        else {
-            return own;
-        };
-        let read = set
-            .level(level)
-            .and_then(|l| variable_index(meta, &l.path))
-            .and_then(|i| meta.variables.get(i));
-        let Some(read) = read else {
-            return own;
-        };
-        let ranges = (selection.dim_ranges.iter().enumerate())
-            .map(|(d, &r)| level_range(set, level, d, r))
-            .collect();
-        Some((read, Cow::Owned(ranges)))
     }
 
     /// `selection` moved onto the level it reads; `None` when it reads its

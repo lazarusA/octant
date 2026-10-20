@@ -27,6 +27,7 @@ pub mod layers;
 pub(crate) mod multiscale;
 #[cfg(test)]
 mod multiscale_tests;
+pub(crate) mod multiscale_window;
 #[cfg(test)]
 mod ome_display_tests;
 #[cfg(test)]

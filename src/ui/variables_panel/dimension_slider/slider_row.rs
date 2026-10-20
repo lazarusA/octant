@@ -11,9 +11,7 @@ use std::fmt::Display;
 
 use super::coord_label::show_coord_label;
 use super::double_slider::double_slider_with_inputs;
-use super::metrics::{
-    calculate_download_sizes, calculate_selected_2d_elements, calculate_selected_volume_elements,
-};
+use super::metrics::{calculate_download_sizes, window_2d_elements, window_volume_elements};
 use super::role_row::{DimName, role_row};
 use super::roles::apply_role_change;
 use crate::ui::flow_row::{self, VALUE_BOX_W};
@@ -27,34 +25,13 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
     }
 
     // Sizes of what the plot reads: its level of a multiscale variable.
-    let (read_info, read_ranges) = app.read_window(&app.selected).unwrap_or((
+    let window = app.read_window(&app.selected).unwrap_or((
         var_info,
         std::borrow::Cow::Borrowed(&app.selected.dim_ranges),
     ));
-    let (requested_bytes, total_bytes) =
-        calculate_download_sizes(read_info, &app.selected.dim_config, &read_ranges);
-
-    let requested_cells: u64 = if rank > 0 {
-        read_info
-            .shape
-            .iter()
-            .enumerate()
-            .map(|(i, &s)| {
-                if app.selected.dim_config.get(i).is_some_and(|c| c.active) {
-                    if let Some(&(start, end)) = read_ranges.get(i) {
-                        (end.saturating_sub(start) + 1).min(s as usize) as u64
-                    } else {
-                        s
-                    }
-                } else {
-                    1
-                }
-            })
-            .try_fold(1u64, |acc, x| acc.checked_mul(x))
-            .unwrap_or(u64::MAX)
-    } else {
-        1
-    };
+    let (read_info, read_ranges) = (window.0, &window.1);
+    let (requested_cells, requested_bytes, total_bytes) =
+        calculate_download_sizes(read_info, &app.selected.dim_config, read_ranges);
 
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new(tr(K::Download)).strong());
@@ -69,7 +46,7 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
     });
     ui.add_space(4.0);
 
-    let total_2d_elements = calculate_selected_2d_elements(app);
+    let total_2d_elements = window_2d_elements(&app.selected, &window);
     let large_2d = if total_2d_elements > crate::plots::limits::max_storage_elements() {
         Some((Icon::Bolt, IconTone::Info, K::LargeSelectionPyramid))
     } else if total_2d_elements > crate::plots::common::MAX_2D_SURFACE_ELEMENTS {
@@ -84,7 +61,7 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
         banner(ui, icon, tone, key, &[&cells, &data_mb]);
     }
 
-    let total_vol_elements = calculate_selected_volume_elements(app);
+    let total_vol_elements = window_volume_elements(&app.selected, &window);
     if total_vol_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
         let mut buf = [0; 24];
         let vol_mb = megabytes(&mut buf, total_vol_elements);

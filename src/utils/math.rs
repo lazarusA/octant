@@ -126,14 +126,16 @@ pub fn calculate_max_animated_steps(
     (max_allowed, requested, spatial_elements_per_step)
 }
 
-/// Calculates requested download bytes and total file size for a variable.
+/// The cells and bytes a download requests over the dimensions `is_active`
+/// says are read (their `selected_ranges`, the others one index), and the
+/// variable's total bytes (`file_size` when known).
 pub fn calculate_download_sizes(
     shape: &[u64],
     file_size: u64,
     dtype_bytes: u64,
-    active_dims: &[bool],
+    is_active: impl Fn(usize) -> bool,
     selected_ranges: &[(usize, usize)],
-) -> (u64, u64) {
+) -> (u64, u64, u64) {
     let total_elements: u64 = shape
         .iter()
         .copied()
@@ -149,7 +151,7 @@ pub fn calculate_download_sizes(
     let mut requested_elements: u64 = 1;
     for (i, &size) in shape.iter().enumerate() {
         let dim_size = size as usize;
-        if active_dims.get(i).copied().unwrap_or(false) {
+        if is_active(i) {
             let span = if let Some(&(start, end)) = selected_ranges.get(i) {
                 (end.saturating_sub(start) + 1).min(dim_size)
             } else {
@@ -160,20 +162,19 @@ pub fn calculate_download_sizes(
     }
     let requested_bytes = requested_elements.saturating_mul(dtype_bytes);
 
-    (requested_bytes, total_bytes)
+    (requested_elements, requested_bytes, total_bytes)
 }
 
 /// Calculates the total 3D volume elements from active dimensions.
 pub fn calculate_volume_elements(
     shape: &[u64],
-    active_dims: &[bool],
+    is_active: impl Fn(usize) -> bool,
     selected_ranges: &[(usize, usize)],
 ) -> usize {
     let mut total_elements = 1usize;
     let mut counted = 0;
     for (i, &size) in shape.iter().enumerate() {
-        let is_active = active_dims.get(i).copied().unwrap_or(false);
-        if is_active {
+        if is_active(i) {
             let (start, end) = selected_ranges
                 .get(i)
                 .copied()
@@ -293,10 +294,9 @@ mod tests {
     #[test]
     fn test_calculate_volume_and_2d_elements() {
         let shape = vec![10, 32, 64];
-        let active = vec![true, true, true];
         let ranges = vec![(0, 9), (0, 31), (0, 63)];
         assert_eq!(
-            calculate_volume_elements(&shape, &active, &ranges),
+            calculate_volume_elements(&shape, |_| true, &ranges),
             10 * 32 * 64
         );
         assert_eq!(calculate_2d_elements(&shape, 2, 1, &ranges), 64 * 32);

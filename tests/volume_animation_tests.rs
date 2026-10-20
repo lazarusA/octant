@@ -464,7 +464,10 @@ fn test_format_byte_size_and_calculate_download_sizes() {
 
     // Requesting 10 time steps out of 100 (full spatial)
     let selected_ranges = vec![(0, 9), (0, 999), (0, 999)];
-    let (requested, total) = calculate_download_sizes(&var_info, &dim_config, &selected_ranges);
+    let (cells, requested, total) =
+        calculate_download_sizes(&var_info, &dim_config, &selected_ranges);
+
+    assert_eq!(cells, 10 * 1000 * 1000);
 
     assert_eq!(requested, 10 * 1000 * 1000 * 4); // 40 MB
     assert_eq!(total, 100 * 1000 * 1000 * 4); // 400 MB

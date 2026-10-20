@@ -16,13 +16,14 @@ pub use info::show_variable_info;
 use crate::app::OctantApp;
 use crate::app::layers::LevelChoice;
 use crate::i18n::{VariablesKey, fill, tr};
-use crate::ui::flow_row;
 use crate::ui::icons::{Icon, IconSize, IconTone, ToolbarButton, UiIconExt, icon_button_width};
 use crate::ui::keyboard::keymap::{self, Action};
 use crate::ui::keyboard::{focus, labels};
 use crate::ui::panel_header::{self, PanelHeader};
 use crate::ui::panel_layout::{self, Panel};
+use crate::ui::{flow_row, temp_cache};
 use crate::utils::{ByteSize, stack_str};
+use dimension_slider::variable_bytes;
 
 /// Width of the Dimensions panel's content; every dimension box fills it.
 const PANEL_MAX_W: f32 = 340.0;
@@ -119,22 +120,37 @@ fn level_note(app: &OctantApp, ui: &mut egui::Ui, var_info: &crate::data::Variab
     ui.horizontal(|ui| {
         ui.icon_toned(Icon::Layers, IconSize::Xs, IconTone::Muted);
         ui.label(egui::RichText::new(text).small().weak());
-        // The level's size in the accent color, then every level's in another
-        // (uncompressed: a GeoTIFF band's file size is the whole file's).
-        let size =
-            |shape: &[u64]| crate::utils::calculate_variable_size_bytes(shape, &var_info.data_type);
-        if let Some(v) = read {
-            let mut buf = [0; 32];
-            let text = stack_str(&mut buf, format_args!("{}", ByteSize(size(&v.shape))));
-            let color = IconTone::Accent.color(ui.visuals());
-            ui.label(egui::RichText::new(text).small().color(color));
-        }
-        let all: u64 = base.set.levels.iter().map(|l| size(&l.shape)).sum();
-        let mut buf = [0; 32];
-        let text = stack_str(&mut buf, format_args!("/ {}", ByteSize(all)));
-        let color = IconTone::Info.color(ui.visuals());
-        ui.label(egui::RichText::new(text).small().color(color));
+        level_sizes(app, ui, &base.set, read);
     });
+}
+
+/// The size of the level read (`read`) in the accent color, then of every
+/// level of `set` in another, counted as the Download line counts them.
+fn level_sizes(
+    app: &OctantApp,
+    ui: &mut egui::Ui,
+    set: &crate::data::multiscale::Multiscale,
+    read: Option<&crate::data::VariableInfo>,
+) {
+    if let Some(v) = read {
+        let mut buf = [0; 32];
+        let text = stack_str(&mut buf, format_args!("{}", ByteSize(variable_bytes(v))));
+        let color = IconTone::Accent.color(ui.visuals());
+        ui.label(egui::RichText::new(text).small().color(color));
+    }
+    let key = (app.selected.metadata_generation, app.selected.variable_idx);
+    let id = ui.make_persistent_id("level_note_all_bytes");
+    let all = temp_cache::cached(ui.ctx(), id, key, || {
+        let vars = (app.selected.metadata.as_ref()).map_or(&[][..], |m| &m.variables);
+        (set.levels.iter())
+            .filter_map(|l| vars.iter().find(|v| v.name == l.path))
+            .map(variable_bytes)
+            .sum::<u64>()
+    });
+    let mut buf = [0; 32];
+    let text = stack_str(&mut buf, format_args!("/ {}", ByteSize(all)));
+    let color = IconTone::Info.color(ui.visuals());
+    ui.label(egui::RichText::new(text).small().color(color));
 }
 
 /// The header's first row: the variable's name, expanding to its details,

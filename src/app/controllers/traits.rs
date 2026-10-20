@@ -78,15 +78,7 @@ pub trait PlotController: Send + Sync {
         dim_config: &[DimConfig],
         _canvas_px: [u32; 2],
     ) -> ResolutionDemand {
-        let mut demand = ResolutionDemand::finest(var.shape.len());
-        let (x, y, z) = var.resolve_spatial_dim_indices(dim_config);
-        for d in [x, y, z].into_iter().flatten() {
-            if let Some(slot) = demand.dims.get_mut(d) {
-                *slot = DimDemand::Any;
-            }
-        }
-        demand.max_elements = Some(crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS as u64);
-        demand
+        spatial_demand(var, dim_config, DimDemand::Any)
     }
 
     /// Minimum zoom level allowed for this plot type (in 3D, the closest
@@ -98,4 +90,22 @@ pub trait PlotController: Send + Sync {
             0.1
         }
     }
+}
+
+/// `want` along `var`'s x, y and z, its other dimensions whole, within one
+/// GPU storage buffer.
+pub(super) fn spatial_demand(
+    var: &VariableInfo,
+    dim_config: &[DimConfig],
+    want: DimDemand,
+) -> ResolutionDemand {
+    let mut demand = ResolutionDemand::finest(var.shape.len());
+    let (x, y, z) = var.resolve_spatial_dim_indices(dim_config);
+    for d in [x, y, z].into_iter().flatten() {
+        if let Some(slot) = demand.dims.get_mut(d) {
+            *slot = want;
+        }
+    }
+    demand.max_elements = Some(crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS as u64);
+    demand
 }

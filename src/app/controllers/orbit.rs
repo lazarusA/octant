@@ -70,15 +70,7 @@ impl PlotController for Orbit3DController {
         dim_config: &[DimConfig],
         _canvas_px: [u32; 2],
     ) -> ResolutionDemand {
-        let mut demand = ResolutionDemand::finest(var.shape.len());
-        let (x, y, z) = var.resolve_spatial_dim_indices(dim_config);
-        for d in [x, y, z].into_iter().flatten() {
-            if let Some(slot) = demand.dims.get_mut(d) {
-                *slot = DimDemand::Coarsest;
-            }
-        }
-        demand.max_elements = Some(crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS as u64);
-        demand
+        super::traits::spatial_demand(var, dim_config, DimDemand::Coarsest)
     }
 
     fn reset_view(&self, nav: &mut NavigationState) {
