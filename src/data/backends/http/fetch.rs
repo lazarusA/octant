@@ -69,34 +69,33 @@ pub(crate) async fn send(
         .map_err(|_| "Failed to cast fetch response".to_string())
 }
 
+/// The bytes of `resp`'s body.
+#[cfg(target_arch = "wasm32")]
+async fn body(resp: web_sys::Response) -> Result<Vec<u8>, String> {
+    let buffer = resp
+        .array_buffer()
+        .map_err(|e| format!("Failed to read array buffer: {e:?}"))?;
+    let buffer = wasm_bindgen_futures::JsFuture::from(buffer)
+        .await
+        .map_err(|e| format!("Failed to resolve array buffer: {e:?}"))?;
+    Ok(js_sys::Uint8Array::new(&buffer).to_vec())
+}
+
 /// Fetches raw bytes from a remote URL using browser `window.fetch()`.
 #[cfg(target_arch = "wasm32")]
 pub async fn fetch_url_bytes(url: &str) -> Result<Vec<u8>, String> {
-    use wasm_bindgen_futures::JsFuture;
-
     let resp = send(url, &web_sys::RequestInit::new()).await?;
 
     if !resp.ok() {
         return Err(format!("HTTP {} fetching '{}'", resp.status(), url));
     }
 
-    let array_buffer_prom = resp
-        .array_buffer()
-        .map_err(|e| format!("Failed to read array buffer: {e:?}"))?;
-
-    let array_buffer_val = JsFuture::from(array_buffer_prom)
-        .await
-        .map_err(|e| format!("Failed to resolve array buffer: {e:?}"))?;
-
-    let uint8_array = js_sys::Uint8Array::new(&array_buffer_val);
-    Ok(uint8_array.to_vec())
+    body(resp).await
 }
 
 /// Fetches a specific byte range from a remote URL using HTTP Range headers.
 #[cfg(target_arch = "wasm32")]
 pub async fn fetch_url_byte_range(url: &str, offset: u64, length: u64) -> Result<Vec<u8>, String> {
-    use wasm_bindgen_futures::JsFuture;
-
     let headers =
         web_sys::Headers::new().map_err(|e| format!("Failed to create headers: {e:?}"))?;
     let end = offset.saturating_add(length).saturating_sub(1);
@@ -114,16 +113,7 @@ pub async fn fetch_url_byte_range(url: &str, offset: u64, length: u64) -> Result
         return Err(format!("HTTP {status} fetching byte range from '{url}'"));
     }
 
-    let array_buffer_prom = resp
-        .array_buffer()
-        .map_err(|e| format!("Failed to read array buffer: {e:?}"))?;
-
-    let array_buffer_val = JsFuture::from(array_buffer_prom)
-        .await
-        .map_err(|e| format!("Failed to resolve array buffer: {e:?}"))?;
-
-    let uint8_array = js_sys::Uint8Array::new(&array_buffer_val);
-    let bytes = uint8_array.to_vec();
+    let bytes = body(resp).await?;
     if status == 200 && (bytes.len() as u64) > length {
         let start = offset as usize;
         let slice_end = (offset + length) as usize;

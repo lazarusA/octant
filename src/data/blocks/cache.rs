@@ -175,8 +175,7 @@ impl BlockCache {
         self.evict();
     }
 
-    /// Drops the least recently used blocks until the cache fits, but never
-    /// the last one: a block larger than the cache stays until the next.
+    /// Drops least recently used blocks until the cache fits, never the last.
     fn evict(&mut self) {
         while self.current_bytes > self.max_bytes && self.access_order.len() > 1 {
             let Some(key) = self.access_order.pop_front() else {

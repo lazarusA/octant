@@ -6,6 +6,9 @@ pub mod key;
 pub mod loader;
 pub mod memory_budget;
 pub mod prefetch;
+mod prefetch_task;
+#[cfg(test)]
+mod prefetch_tests;
 pub mod request;
 pub mod store;
 pub mod summary;

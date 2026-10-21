@@ -12,14 +12,13 @@ use std::time::Duration;
 use web_time::Instant;
 
 use super::cache::{BlockCache, BlockCacheKey};
-#[cfg(not(target_arch = "wasm32"))]
 use super::loader::BlockLoader;
+use super::prefetch_task::Task;
 use super::request::BlockRequest;
 use crate::data::{octant_block::OctantBlock, slice_request::DimensionSelection};
 
-/// How long the lookahead leaves a failed block before asking again: a
-/// block that keeps failing is asked every few seconds, never in a loop,
-/// and playback recovers once the network does.
+/// How long the lookahead leaves a failed block: asked every few seconds,
+/// never in a loop, so playback recovers once the network does.
 const RETRY_AFTER: Duration = Duration::from_secs(5);
 
 pub struct PrefetchResult {
@@ -91,78 +90,38 @@ impl BlockPrefetcher {
             .fetch_add(estimated_bytes, Ordering::Relaxed);
         self.active_worker_threads.fetch_add(1, Ordering::Relaxed);
 
-        let (tx, completed, aborted, active) = (
-            self.tx.clone(),
-            self.completed_bytes.clone(),
-            self.aborted.clone(),
-            self.active_worker_threads.clone(),
-        );
+        let task = Task {
+            key,
+            tx: self.tx.clone(),
+            completed: self.completed_bytes.clone(),
+            aborted: self.aborted.clone(),
+            active: self.active_worker_threads.clone(),
+        };
 
         #[cfg(not(target_arch = "wasm32"))]
         crate::utils::executor::TaskExecutor::spawn_background(move || {
-            // Aborted while queued: nobody reads the result.
-            if aborted.load(Ordering::Relaxed) {
-                active.fetch_sub(1, Ordering::Relaxed);
+            if task.cancelled() {
                 return;
             }
-            let mut on_progress = |chunk_bytes: u64| {
-                if !aborted.load(Ordering::Relaxed) {
-                    completed.fetch_add(chunk_bytes, Ordering::Relaxed);
-                }
-            };
+            let mut on_progress = |bytes| task.progress(bytes);
             let result = crate::utils::executor::catch_panic(|| {
                 BlockLoader::load_one_with_progress(&request, Some(&mut on_progress))
                     .map_err(|error| error.to_string())
             });
-            active.fetch_sub(1, Ordering::Relaxed);
-            let _ = tx.send(PrefetchResult { key, result });
+            task.finish(result);
         });
 
         #[cfg(target_arch = "wasm32")]
-        {
-            wasm_bindgen_futures::spawn_local(async move {
-                if aborted.load(Ordering::Relaxed) {
-                    active.fetch_sub(1, Ordering::Relaxed);
-                    return;
-                }
-                let mut on_progress = |chunk_bytes: u64| {
-                    if !aborted.load(Ordering::Relaxed) {
-                        completed.fetch_add(chunk_bytes, Ordering::Relaxed);
-                    }
-                };
-                let result = match request.store.source().kind {
-                    crate::data::DataSourceKind::RemoteIcechunk
-                    | crate::data::DataSourceKind::LocalIcechunk => {
-                        crate::data::backends::icechunk::wasm::load_one_icechunk_wasm_with_progress(
-                            &request,
-                            Some(&mut on_progress),
-                        )
-                        .await
-                    }
-                    crate::data::DataSourceKind::RemoteGeoTiff
-                    | crate::data::DataSourceKind::LocalGeoTiff => {
-                        crate::data::backends::geotiff::wasm::load_one_geotiff_wasm_with_progress(
-                            &request,
-                            Some(&mut on_progress),
-                        )
-                        .await
-                    }
-                    crate::data::DataSourceKind::Procedural => request
-                        .store
-                        .fetch_with_progress(&request.slice, Some(&mut on_progress)),
-                    _ => {
-                        crate::data::backends::zarr::load_one_wasm_with_progress(
-                            &request,
-                            Some(&mut on_progress),
-                        )
-                        .await
-                    }
-                }
+        wasm_bindgen_futures::spawn_local(async move {
+            if task.cancelled() {
+                return;
+            }
+            let mut on_progress = |bytes| task.progress(bytes);
+            let result = BlockLoader::load_one_wasm(&request, Some(&mut on_progress))
+                .await
                 .map_err(|error| error.to_string());
-                active.fetch_sub(1, Ordering::Relaxed);
-                let _ = tx.send(PrefetchResult { key, result });
-            });
-        }
+            task.finish(result);
+        });
 
         true
     }

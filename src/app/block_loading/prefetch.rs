@@ -238,16 +238,10 @@ impl OctantApp {
                 SliceRequest::new(params.base_req.variable.clone(), selections),
             );
 
-            let key = req.cache_key();
-            // A block that keeps failing is asked every few seconds, not in a loop.
-            if self.block_prefetcher.failed_recently(&key) {
-                continue;
-            }
-            if !self.block_cache.contains(&key)
-                && !self.block_prefetcher.request(req, &self.block_cache)
-                && self.block_prefetcher.active_worker_threads() >= params.max_concurrent
-            {
-                break;
+            // A failed block is asked again every few seconds, not in a loop;
+            // full workers stop the loop at its top.
+            if !self.block_prefetcher.failed_recently(&req.cache_key()) {
+                self.block_prefetcher.request(req, &self.block_cache);
             }
         }
     }
