@@ -135,9 +135,18 @@ impl BytesToBytesCodecTraits for BluscCodec {
     fn decode<'a>(
         &self,
         value: ArrayBytesRaw<'a>,
-        _decoded_representation: &BytesRepresentation,
+        decoded_representation: &BytesRepresentation,
         _options: &CodecOptions,
     ) -> Result<ArrayBytesRaw<'a>, CodecError> {
+        // Blosc allocates the size its header claims before decoding: never
+        // more than the chunk's own size.
+        let (claimed, _, _) = blusc::api::blosc2_cbuffer_sizes(&value);
+        let cap = super::capped::cap_for(decoded_representation);
+        if claimed > cap {
+            return Err(CodecError::Other(format!(
+                "Blosc chunk claims {claimed} bytes, more than its {cap}"
+            )));
+        }
         let decompressed = blusc::convenience::blosc2_decompress(&value)
             .map_err(|e| CodecError::Other(format!("Blusc decompression failed: {e}")))?;
 
