@@ -16,6 +16,7 @@ impl OctantApp {
         self.playback.buffering = self.playback.is_playing;
         self.playback.buffer_progress = (0, 0);
         if self.playback.is_playing {
+            self.block_prefetcher.clear_failed();
             self.prefetch_animated_ranges();
         }
     }

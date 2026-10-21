@@ -7,19 +7,9 @@
 /// it is absent ([`super::is_not_found`]).
 #[cfg(target_arch = "wasm32")]
 pub async fn fetch_url_size(url: &str) -> Result<u64, String> {
-    use wasm_bindgen::JsCast;
-    use wasm_bindgen_futures::JsFuture;
-
-    let window = web_sys::window().ok_or_else(|| "No global window object found".to_string())?;
     let init = web_sys::RequestInit::new();
     init.set_method("HEAD");
-    let request = web_sys::Request::new_with_str_and_init(url, &init)
-        .map_err(|e| format!("Failed to build request: {e:?}"))?;
-    let resp: web_sys::Response = JsFuture::from(window.fetch_with_request(&request))
-        .await
-        .map_err(|e| format!("Network fetch failed for '{url}': {e:?}"))?
-        .dyn_into()
-        .map_err(|_| "Failed to cast fetch response".to_string())?;
+    let resp = super::fetch::send(url, &init).await?;
     if !resp.ok() {
         return Err(format!(
             "HTTP {} fetching the size of '{url}'",
