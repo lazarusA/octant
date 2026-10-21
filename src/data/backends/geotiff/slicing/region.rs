@@ -90,9 +90,7 @@ pub async fn read_region(
         win,
     };
 
-    let chunks_per_band = tiles_x
-        .checked_mul(tiles_y)
-        .ok_or("TIFF chunk grid too large")?;
+    let grid = (tiles_x, tiles_y);
     for ty in ty0..=ty1 {
         let orig_y = ty * th;
         let buf_h = if is_tiled {
@@ -104,11 +102,7 @@ pub async fn read_region(
             let (orig_x, buf_w) = (tx * tw, tw);
             if is_planar {
                 for (i, &band) in target_bands.iter().enumerate() {
-                    let idx = band
-                        .checked_mul(chunks_per_band)
-                        .ok_or("TIFF chunk index too large")?
-                        + ty * tiles_x
-                        + tx;
+                    let idx = chunk_index(band, (tx, ty), grid).ok_or(TOO_LARGE)?;
                     if let Some(out_slice) = out_slices.get_mut(i) {
                         decode_and_blit_tile(
                             &ctx,
@@ -123,7 +117,7 @@ pub async fn read_region(
                     }
                 }
             } else {
-                let idx = ty * tiles_x + tx;
+                let idx = chunk_index(0, (tx, ty), grid).ok_or(TOO_LARGE)?;
                 decode_and_blit_tile(
                     &ctx,
                     idx,
@@ -138,6 +132,23 @@ pub async fn read_region(
         }
     }
     Ok(())
+}
+
+const TOO_LARGE: &str = "TIFF chunk index too large";
+
+/// Index of chunk `(tx, ty)` of `band` in a `(tiles_x, tiles_y)` grid per
+/// band (planar files store the bands' grids one after another); `None`
+/// when a corrupt header's grid overflows.
+fn chunk_index(
+    band: usize,
+    (tx, ty): (usize, usize),
+    (tiles_x, tiles_y): (usize, usize),
+) -> Option<usize> {
+    let in_band = ty.checked_mul(tiles_x)?.checked_add(tx)?;
+    tiles_x
+        .checked_mul(tiles_y)?
+        .checked_mul(band)?
+        .checked_add(in_band)
 }
 
 async fn decode_and_blit_tile(
