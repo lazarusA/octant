@@ -150,3 +150,24 @@ fn a_huge_tag_count_fails_with_an_error() {
     };
     assert!(err.contains("claims 1099511627776 tags"), "{err}");
 }
+
+/// A sparse COG (GDAL's `SPARSE_OK`): a tile with byte count 0 holds no
+/// data. The block reads, that tile missing (NaN), the others intact.
+#[test]
+fn a_sparse_tile_reads_as_missing() {
+    use crate::data::blocks::BlockStore;
+    use crate::data::slice_request::SliceRequest;
+
+    let mut builder = SyntheticTiffBuilder::new(32, 32).tiled(16, 16, &[7; 256 * 4], 4);
+    builder.add_long_vec(325, &[256, 0, 256, 256]);
+    let store = open("sparse.tif", builder.build()).expect("a sparse COG opens");
+    let meta = store.inspect().expect("inspect");
+    let var = &meta.variables[0];
+    let shape: Vec<usize> = var.shape.iter().map(|&n| n as usize).collect();
+    let block = store
+        .fetch_block(&SliceRequest::full_range(&var.name, &shape))
+        .expect("a block over a sparse tile reads");
+    let missing = block.values.iter().filter(|v| v.is_nan()).count();
+    assert_eq!(missing, 16 * 16, "exactly the sparse tile is missing");
+    assert!(block.values.iter().all(|&v| v.is_nan() || v == 7.0));
+}
