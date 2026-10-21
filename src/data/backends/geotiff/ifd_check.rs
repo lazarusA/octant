@@ -1,8 +1,9 @@
 //! Reads a TIFF's IFDs, rejecting with an error the tags `async-tiff` would
 //! panic on (`ImageFileDirectory::from_tags` expects them): missing required
 //! tags, photometric interpretations it does not know (e.g. SGI LogL/LogLuv),
-//! non-rational resolutions and malformed GeoKey directories. Unsupported
-//! TIFFs then fail gracefully, on desktop and in the browser alike.
+//! non-rational resolutions, chunk offset and byte count tables of different
+//! lengths, and malformed GeoKey directories. Unsupported or corrupt TIFFs
+//! then fail gracefully, on desktop and in the browser alike.
 
 use std::collections::{HashMap, HashSet};
 
@@ -38,6 +39,11 @@ pub(crate) async fn read_checked_ifds<F: MetadataFetch>(
             .await
             .map_err(|e| e.to_string())?;
         let count = tag_count(fetch, offset, bigtiff, endianness).await?;
+        // Tag ids are 16 bits: more entries than that is a corrupt header,
+        // never memory to reserve.
+        if count > u64::from(u16::MAX) {
+            return Err(format!("corrupt TIFF: IFD claims {count} tags"));
+        }
         let mut tags = HashMap::with_capacity(count as usize);
         for idx in 0..count {
             let (tag, value) = reader
@@ -61,10 +67,10 @@ async fn tag_count<F: MetadataFetch>(
     endianness: Endianness,
 ) -> Result<u64, String> {
     let width = if bigtiff { 8 } else { 2 };
-    let bytes = fetch
-        .fetch(offset..offset + width)
-        .await
-        .map_err(|e| e.to_string())?;
+    let end = offset
+        .checked_add(width)
+        .ok_or_else(|| format!("corrupt TIFF: IFD offset {offset}"))?;
+    let bytes = fetch.fetch(offset..end).await.map_err(|e| e.to_string())?;
     let bytes = bytes.as_ref();
     let little = matches!(endianness, Endianness::LittleEndian);
     let count = match (bigtiff, bytes) {
@@ -120,7 +126,33 @@ pub(crate) fn check_tags(tags: &HashMap<Tag, TagValue>) -> Result<(), String> {
             return Err(format!("unsupported TIFF: {name} is not a rational"));
         }
     }
+    check_chunk_tables(tags)?;
     check_geo_keys(tags)
+}
+
+/// Each chunk's offset needs its byte count: tile or strip tables of
+/// different lengths would index past the shorter one.
+fn check_chunk_tables(tags: &HashMap<Tag, TagValue>) -> Result<(), String> {
+    let len = |tag| {
+        tags.get(&tag).map(|v| match v {
+            TagValue::List(values) => values.len(),
+            _ => 1,
+        })
+    };
+    for (offsets, counts, name) in [
+        (Tag::TileOffsets, Tag::TileByteCounts, "tile"),
+        (Tag::StripOffsets, Tag::StripByteCounts, "strip"),
+    ] {
+        if let Some(n) = len(offsets)
+            && len(counts) != Some(n)
+        {
+            return Err(format!(
+                "corrupt TIFF: {n} {name} offsets but {} byte counts",
+                len(counts).unwrap_or(0)
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Human name of a photometric interpretation `async-tiff` cannot read.

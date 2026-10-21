@@ -117,3 +117,36 @@ fn well_formed_geo_keys_pass_and_unknown_keys_are_skipped() {
     tags.insert(Tag::GeoAsciiParams, TagValue::Ascii("WGS84|".into()));
     assert_eq!(check_tags(&tags), Ok(()));
 }
+
+#[test]
+fn chunk_tables_of_different_lengths_fail_with_an_error() {
+    let list = |n: u32| TagValue::List((0..n).map(TagValue::Unsigned).collect());
+    let mut tags = minimal();
+    tags.insert(Tag::TileOffsets, list(4));
+    tags.insert(Tag::TileByteCounts, list(2));
+    let err = check_tags(&tags).expect_err("4 offsets, 2 byte counts");
+    assert!(err.contains("4 tile offsets but 2 byte counts"), "{err}");
+
+    tags.remove(&Tag::TileByteCounts);
+    assert!(check_tags(&tags).is_err(), "offsets without byte counts");
+
+    tags.insert(Tag::TileByteCounts, list(4));
+    assert_eq!(check_tags(&tags), Ok(()));
+}
+
+/// A BigTIFF whose first IFD claims 2^40 tags: an error, not 2^40 entries'
+/// memory reserved (which aborts the process).
+#[test]
+fn a_huge_tag_count_fails_with_an_error() {
+    let mut bytes = b"II".to_vec();
+    bytes.extend(43u16.to_le_bytes()); // BigTIFF
+    bytes.extend(8u16.to_le_bytes()); // offset size
+    bytes.extend(0u16.to_le_bytes());
+    bytes.extend(16u64.to_le_bytes()); // first IFD
+    bytes.extend((1u64 << 40).to_le_bytes()); // its tag count
+    bytes.resize(64, 0);
+    let Err(err) = open("huge.tif", bytes) else {
+        panic!("a header claiming 2^40 tags must not open");
+    };
+    assert!(err.contains("claims 1099511627776 tags"), "{err}");
+}
