@@ -3,7 +3,7 @@
 //! buffer, never skips a step, and plays a whole buffer before stalling
 //! again; a drawn overlay holds playback until it has the step too.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::app::layers::LayerId;
@@ -18,10 +18,13 @@ use crate::plots::PlotType;
 const NT: usize = 20;
 const TARGET: &str = "procedural://volume4d";
 
-/// The procedural store, each fetch taking `delay` like a slow network.
+/// The procedural store, each fetch taking `delay` like a slow network;
+/// with `failed`, fetches of steps past the first fail, their first step
+/// recorded.
 struct SlowStore {
     inner: ProceduralBlockStore,
     delay: Duration,
+    failed: Option<Arc<Mutex<Vec<usize>>>>,
 }
 
 impl BlockStore for SlowStore {
@@ -43,6 +46,11 @@ impl BlockStore for SlowStore {
         on_progress: ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         std::thread::sleep(self.delay);
+        let start = request.selections.first().map_or(0, |s| s.bounds().0);
+        if let Some(failed) = self.failed.as_ref().filter(|_| start > 0) {
+            failed.lock().unwrap_or_else(|p| p.into_inner()).push(start);
+            return Err("HTTP 403 Forbidden".into());
+        }
         self.inner.fetch_block_with_progress(request, on_progress)
     }
 }
@@ -50,12 +58,24 @@ impl BlockStore for SlowStore {
 /// A heatmap of the procedural 4D variable over a store whose fetches take
 /// `delay`, its first step shown, one lookahead worker.
 fn slow_app(delay: Duration) -> OctantApp {
+    store_app(delay, None)
+}
+
+/// [`slow_app`] over a store that may fail (`SlowStore::failed`).
+fn store_app(delay: Duration, failed: Option<Arc<Mutex<Vec<usize>>>>) -> OctantApp {
     let inner = ProceduralBlockStore::open(TARGET).expect("open procedural store");
     let meta = inner.inspect().expect("inspect");
     let kind = StoreKind::ProceduralVolume4D;
     let source_id = StoreKind::make_source_id(kind, TARGET);
     let source = DataSource::new(&source_id, kind.to_data_source_kind(), TARGET, "Store");
-    let handle = StoreHandle::new(source.clone(), Arc::new(SlowStore { inner, delay }));
+    let handle = StoreHandle::new(
+        source.clone(),
+        Arc::new(SlowStore {
+            inner,
+            delay,
+            failed,
+        }),
+    );
     let mut app = OctantApp::default();
     app.dataset_manager
         .add(Dataset::new(&source_id, source, handle));
@@ -243,4 +263,31 @@ fn an_overlay_whose_fetch_failed_no_longer_holds_playback() {
     }
     app.advance_playback(Instant::now());
     assert_eq!(app.playback.current_timestep, 1, "the base plays on");
+}
+
+#[test]
+fn a_failing_chunk_is_not_fetched_after_every_download() {
+    let failed = Arc::new(Mutex::new(Vec::new()));
+    let mut app = store_app(Duration::from_millis(2), Some(failed.clone()));
+    // The paused lookahead asks for the chunks past the first; each fails,
+    // and each finished download runs the lookahead again.
+    app.prefetch_animated_ranges();
+    let deadline = Instant::now() + Duration::from_millis(500);
+    while Instant::now() < deadline {
+        app.poll_block_prefetch_results();
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    let mut starts = failed.lock().unwrap_or_else(|p| p.into_inner()).clone();
+    assert!(
+        !starts.is_empty(),
+        "the lookahead asked for no failing chunk"
+    );
+    let asked = starts.len();
+    starts.sort_unstable();
+    starts.dedup();
+    assert_eq!(
+        asked,
+        starts.len(),
+        "a failing chunk was asked again at once"
+    );
 }
