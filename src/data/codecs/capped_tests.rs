@@ -5,7 +5,7 @@ use zarrs::array::BytesRepresentation;
 use zarrs_codec::{BytesToBytesCodecTraits, CodecOptions};
 
 use super::blusc_plugin::BluscCodec;
-use super::capped::{MAX_DECODED_BYTES, cap_for, read_capped};
+use super::capped::{MAX_DECODED_BYTES, UP_FRONT_BYTES, cap_for, read_capped, reserve_for};
 use super::zstd_plugin::RuzstdCodec;
 
 /// 10 000 bytes that compress well.
@@ -16,8 +16,8 @@ fn data() -> Vec<u8> {
 #[test]
 fn a_capped_read_fails_past_its_cap() {
     let bytes = [1u8; 100];
-    assert_eq!(read_capped(&bytes[..], 100).expect("at the cap"), bytes);
-    assert!(read_capped(&bytes[..], 99).is_err());
+    assert_eq!(read_capped(&bytes[..], 100, 0).expect("at the cap"), bytes);
+    assert!(read_capped(&bytes[..], 99, 0).is_err());
 }
 
 #[test]
@@ -27,6 +27,12 @@ fn caps_follow_the_declared_size() {
     assert_eq!(
         cap_for(&BytesRepresentation::UnboundedSize),
         MAX_DECODED_BYTES
+    );
+    // A fixed size is reserved whole; anything else starts small.
+    assert_eq!(reserve_for(&BytesRepresentation::FixedSize(1000)), 1000);
+    assert_eq!(
+        reserve_for(&BytesRepresentation::BoundedSize(1000)),
+        UP_FRONT_BYTES
     );
     // Metadata claiming a huge chunk caps at the limit, not at its claim.
     assert_eq!(

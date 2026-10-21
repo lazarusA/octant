@@ -143,9 +143,12 @@ impl BytesToBytesCodecTraits for RuzstdCodec {
         })?;
         // Never more than the chunk's own size: a small chunk expanding to
         // gigabytes would run the page out of memory.
-        let out =
-            super::capped::read_capped(decoder, super::capped::cap_for(decoded_representation))
-                .map_err(|e| CodecError::Other(format!("Ruzstd decompression failed: {e}")))?;
+        let (cap, reserve) = (
+            super::capped::cap_for(decoded_representation),
+            super::capped::reserve_for(decoded_representation),
+        );
+        let out = super::capped::read_capped(decoder, cap, reserve)
+            .map_err(|e| CodecError::Other(format!("Ruzstd decompression failed: {e}")))?;
         Ok(out.into())
     }
 

@@ -18,7 +18,7 @@ pub mod store;
 #[cfg(test)]
 mod tests;
 
-pub use header::{decompress_icechunk_file, decompress_payload, try_decompress_zstd};
+pub use header::decompress_icechunk_file;
 pub use inspect::inspect_wasm_remote_icechunk;
 pub use loader::load_one_icechunk_wasm_with_progress;
 pub use store::{ArrayManifestInfo, WasmIcechunkBlockStore};

@@ -9,10 +9,13 @@ use zarrs::array::BytesRepresentation;
 /// memory ends at 4 GiB).
 pub const MAX_DECODED_BYTES: usize = 512 << 20;
 
+/// What a read of unknown size reserves up front.
+pub const UP_FRONT_BYTES: usize = 16 << 20;
+
 /// Reads `reader` to its end, failing once more than `cap` bytes arrive;
-/// reserves at most 16 MiB up front.
-pub fn read_capped(reader: impl Read, cap: usize) -> std::io::Result<Vec<u8>> {
-    let mut out = Vec::with_capacity(cap.min(16 << 20));
+/// reserves `reserve` bytes (at most `cap`) up front.
+pub fn read_capped(reader: impl Read, cap: usize, reserve: usize) -> std::io::Result<Vec<u8>> {
+    let mut out = Vec::with_capacity(reserve.min(cap));
     reader
         .take(u64::try_from(cap).unwrap_or(u64::MAX).saturating_add(1))
         .read_to_end(&mut out)?;
@@ -32,5 +35,14 @@ pub fn cap_for(rep: &BytesRepresentation) -> usize {
             usize::try_from(*n).map_or(MAX_DECODED_BYTES, |n| n.min(MAX_DECODED_BYTES))
         }
         BytesRepresentation::UnboundedSize => MAX_DECODED_BYTES,
+    }
+}
+
+/// What a chunk declared as `rep` reserves up front: all of a fixed size,
+/// which it fills exactly (no copies while it grows), else [`UP_FRONT_BYTES`].
+pub fn reserve_for(rep: &BytesRepresentation) -> usize {
+    match rep {
+        BytesRepresentation::FixedSize(_) => cap_for(rep),
+        _ => UP_FRONT_BYTES,
     }
 }

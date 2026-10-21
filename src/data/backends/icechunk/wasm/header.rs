@@ -8,10 +8,10 @@ use icechunk_format::format_constants::{
 use crate::data::blocks::BlockStoreError;
 
 /// Attempts Zstandard decompression on raw byte slices using `ruzstd`.
-pub fn try_decompress_zstd(data: &[u8]) -> Option<Vec<u8>> {
+fn try_decompress_zstd(data: &[u8]) -> Option<Vec<u8>> {
+    use crate::data::codecs::capped::{MAX_DECODED_BYTES, UP_FRONT_BYTES, read_capped};
     let decoder = ruzstd::decoding::StreamingDecoder::new(data).ok()?;
-    let cap = crate::data::codecs::capped::MAX_DECODED_BYTES;
-    crate::data::codecs::capped::read_capped(decoder, cap).ok()
+    read_capped(decoder, MAX_DECODED_BYTES, UP_FRONT_BYTES).ok()
 }
 
 /// Decompresses an Icechunk binary file, respecting the 39-byte header and spec version.
@@ -42,9 +42,4 @@ pub fn decompress_icechunk_file(data: &[u8]) -> Result<(SpecVersionBin, Vec<u8>)
 
     // 3. Fall back to raw payload if uncompressed
     Ok((SpecVersionBin::V1, data.to_vec()))
-}
-
-/// Decompresses raw Icechunk payloads (FlatBuffers or Zstandard).
-pub fn decompress_payload(data: &[u8]) -> Result<Vec<u8>, BlockStoreError> {
-    decompress_icechunk_file(data).map(|(_, bytes)| bytes)
 }
