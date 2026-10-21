@@ -43,6 +43,9 @@ fn test_hex_color_parsing() {
     assert_eq!(parse_hex_color("  #00FF00  "), Some([0, 255, 0]));
     assert_eq!(parse_hex_color("invalid"), None);
     assert_eq!(parse_hex_color("12345"), None);
+    // OMERO colours come from remote metadata: non-ASCII is no colour.
+    assert_eq!(parse_hex_color("aéb12"), None);
+    assert_eq!(parse_hex_color("ééé"), None);
     assert_eq!(DEFAULT_CHANNEL_COLORS.len(), 8);
 }
 
