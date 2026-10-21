@@ -3,77 +3,16 @@
 //! buffer, never skips a step, and plays a whole buffer before stalling
 //! again; a drawn overlay holds playback until it has the step too.
 
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crate::app::OctantApp;
 use crate::app::layers::LayerId;
 use crate::app::test_support::{make_resident, memory_app, selection_of};
-use crate::app::{OctantApp, StoreKind};
-use crate::data::backends::ProceduralBlockStore;
-use crate::data::blocks::{BlockStore, BlockStoreError, ProgressCallback};
-use crate::data::octant_block::OctantBlock;
-use crate::data::{DataSource, Dataset, SliceRequest, StoreHandle};
-use crate::plots::PlotType;
+use crate::data::SliceRequest;
+
+use super::slow_store::slow_app;
 
 const NT: usize = 20;
-const TARGET: &str = "procedural://volume4d";
-
-/// The procedural store, each fetch taking `delay` like a slow network.
-struct SlowStore {
-    inner: ProceduralBlockStore,
-    delay: Duration,
-}
-
-impl BlockStore for SlowStore {
-    fn backend_name(&self) -> &str {
-        "slow"
-    }
-
-    fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
-        self.inner.variables()
-    }
-
-    fn inspect(&self) -> Result<crate::data::DatasetMetadata, BlockStoreError> {
-        self.inner.inspect()
-    }
-
-    fn fetch_block_with_progress(
-        &self,
-        request: &SliceRequest,
-        on_progress: ProgressCallback,
-    ) -> Result<OctantBlock, BlockStoreError> {
-        std::thread::sleep(self.delay);
-        self.inner.fetch_block_with_progress(request, on_progress)
-    }
-}
-
-/// A heatmap of the procedural 4D variable over a store whose fetches take
-/// `delay`, its first step shown, one lookahead worker.
-fn slow_app(delay: Duration) -> OctantApp {
-    let inner = ProceduralBlockStore::open(TARGET).expect("open procedural store");
-    let meta = inner.inspect().expect("inspect");
-    let kind = StoreKind::ProceduralVolume4D;
-    let source_id = StoreKind::make_source_id(kind, TARGET);
-    let source = DataSource::new(&source_id, kind.to_data_source_kind(), TARGET, "Store");
-    let handle = StoreHandle::new(source.clone(), Arc::new(SlowStore { inner, delay }));
-    let mut app = OctantApp::default();
-    app.dataset_manager
-        .add(Dataset::new(&source_id, source, handle));
-    app.selected.store_kind = kind;
-    app.selected.store_target = TARGET.to_string();
-    app.load_new_metadata(meta);
-    app.layout.show_hero = false;
-    app.selected.plot_type = PlotType::Heatmap;
-    app.prefetch_threads = 1;
-    app.plot_selection();
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while app.layers.base.data.matrix.is_none() {
-        assert!(Instant::now() < deadline, "the first block never arrived");
-        app.poll_block_prefetch_results();
-        std::thread::sleep(Duration::from_millis(1));
-    }
-    app
-}
 
 /// Plays to the last step as the frame timer does, recording each change of
 /// the shown step or of buffering.

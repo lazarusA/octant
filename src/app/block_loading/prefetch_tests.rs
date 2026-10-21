@@ -9,6 +9,10 @@ use crate::app::{OctantApp, SpatialRole, StoreKind};
 use crate::data::BlockStore;
 use crate::data::backends::ProceduralBlockStore;
 use crate::plots::PlotType;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+use super::slow_store::store_app;
 
 const NT: usize = 20;
 /// Bytes of one heatmap block (one step: the 32^3 depth, lat, lon slab).
@@ -113,5 +117,32 @@ fn a_pending_foreground_block_leaves_the_lookahead_a_worker() {
         app.block_prefetcher.pending_count(),
         2,
         "one lookahead chunk beside the shown block"
+    );
+}
+
+#[test]
+fn a_failing_chunk_is_not_fetched_after_every_download() {
+    let failed = Arc::new(Mutex::new(Vec::new()));
+    let mut app = store_app(Duration::from_millis(2), Some(failed.clone()));
+    // The paused lookahead asks for the chunks past the first; each fails,
+    // and each finished download runs the lookahead again.
+    app.prefetch_animated_ranges();
+    let deadline = Instant::now() + Duration::from_millis(500);
+    while Instant::now() < deadline {
+        app.poll_block_prefetch_results();
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    let mut starts = failed.lock().unwrap_or_else(|p| p.into_inner()).clone();
+    assert!(
+        !starts.is_empty(),
+        "the lookahead asked for no failing chunk"
+    );
+    let asked = starts.len();
+    starts.sort_unstable();
+    starts.dedup();
+    assert_eq!(
+        asked,
+        starts.len(),
+        "a failing chunk was asked again at once"
     );
 }

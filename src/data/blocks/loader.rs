@@ -54,6 +54,29 @@ impl BlockLoader {
             .fetch_with_progress(&request.slice, on_progress)
     }
 
+    /// The browser's [`load_one_with_progress`](Self::load_one_with_progress):
+    /// each format's async loader fetches the block's chunks, then decodes them.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn load_one_wasm(
+        request: &BlockRequest,
+        on_progress: super::store::ProgressCallback<'_>,
+    ) -> Result<OctantBlock, BlockStoreError> {
+        use crate::data::DataSourceKind as Kind;
+        use crate::data::backends::{geotiff, icechunk, zarr};
+        match request.store.source().kind {
+            Kind::RemoteIcechunk | Kind::LocalIcechunk => {
+                icechunk::wasm::load_one_icechunk_wasm_with_progress(request, on_progress).await
+            }
+            Kind::RemoteGeoTiff | Kind::LocalGeoTiff => {
+                geotiff::wasm::load_one_geotiff_wasm_with_progress(request, on_progress).await
+            }
+            Kind::Procedural => request
+                .store
+                .fetch_with_progress(&request.slice, on_progress),
+            _ => zarr::load_one_wasm_with_progress(request, on_progress).await,
+        }
+    }
+
     /// Loads every request in a batch.
     pub fn load_batch(batch: &BlockRequestBatch) -> BlockBatchOutcome {
         let mut grouped: HashMap<String, Vec<&BlockRequest>> = HashMap::new();

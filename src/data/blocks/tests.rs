@@ -5,7 +5,7 @@ use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::{DimensionSelection, SliceRequest};
 use std::collections::HashMap as StdHashMap;
 
-fn test_block(origin0: usize) -> OctantBlock {
+pub(super) fn test_block(origin0: usize) -> OctantBlock {
     let shape = vec![2, 3, 4];
     let values: Vec<f32> = (0..24).map(|v| v as f32).collect();
 
@@ -131,75 +131,6 @@ fn test_block_cache_summary_and_clearing() {
 }
 
 #[test]
-fn test_prefetcher_active_bytes_retire_on_drain() {
-    use crate::data::blocks::{BlockPrefetcher, BlockStore, BlockStoreError, ProgressCallback};
-    use crate::data::{DataSource, DataSourceKind, StoreHandle};
-    use std::sync::{Arc, Mutex, mpsc};
-
-    struct DummyStore {
-        pause_rx: Mutex<mpsc::Receiver<()>>,
-    }
-    impl BlockStore for DummyStore {
-        fn backend_name(&self) -> &str {
-            "dummy"
-        }
-        fn variables(&self) -> Result<Vec<String>, BlockStoreError> {
-            Ok(vec!["temperature".into()])
-        }
-        fn fetch_block_with_progress(
-            &self,
-            _request: &SliceRequest,
-            _on_progress: ProgressCallback,
-        ) -> Result<OctantBlock, BlockStoreError> {
-            if let Ok(rx) = self.pause_rx.lock() {
-                let _ = rx.recv();
-            }
-            Ok(test_block(0))
-        }
-    }
-
-    let mut prefetcher = BlockPrefetcher::with_max_concurrent_threads(1);
-    let cache = BlockCache::new(1024 * 1024);
-    let source = DataSource::new("dummy", DataSourceKind::Procedural, "dummy", "dummy");
-    let (release_tx, pause_rx) = mpsc::channel();
-    let store_handle = StoreHandle::new(
-        source,
-        Arc::new(DummyStore {
-            pause_rx: Mutex::new(pause_rx),
-        }),
-    );
-
-    let slice_1 = SliceRequest::new("temperature", vec![DimensionSelection::range(0, 10)]);
-    let req_1 = crate::data::BlockRequest::new(store_handle.clone(), slice_1);
-
-    assert!(prefetcher.request(req_1, &cache));
-    assert_eq!(prefetcher.pending_count(), 1);
-    assert_eq!(prefetcher.total_bytes(), 40); // 10 elements * 4 bytes
-    assert_eq!(prefetcher.pending_bytes(), 40);
-
-    // Draining while worker is still paused guarantees results is empty and pending remains
-    let results = prefetcher.poll();
-    assert!(results.is_empty());
-    assert_eq!(prefetcher.total_bytes(), 40);
-
-    // The only worker is busy: the lookahead waits, a view's block does not
-    let slice_2 = SliceRequest::new("temperature", vec![DimensionSelection::range(10, 20)]);
-    let req_2 = || crate::data::BlockRequest::new(store_handle.clone(), slice_2.clone());
-    assert!(!prefetcher.request(req_2(), &cache));
-    assert!(prefetcher.request_now(req_2(), &cache));
-
-    // Abort clears all pending and resets active bytes
-    prefetcher.abort();
-    assert_eq!(prefetcher.pending_count(), 0);
-    assert_eq!(prefetcher.total_bytes(), 0);
-    assert_eq!(prefetcher.completed_bytes(), 0);
-
-    // Release worker threads so they terminate cleanly
-    let _ = release_tx.send(());
-    let _ = release_tx.send(());
-}
-
-#[test]
 fn removing_a_source_drops_only_its_blocks() {
     let mut cache = BlockCache::new(1024 * 1024);
     cache.put(test_key("closed", "temperature", 0), test_block(0));
@@ -211,4 +142,17 @@ fn removing_a_source_drops_only_its_blocks() {
     assert_eq!(cache.cached_count(), 1);
     assert!(cache.contains(&kept));
     assert_eq!(cache.current_bytes(), one_block);
+}
+
+#[test]
+fn a_block_larger_than_the_cache_stays_resident() {
+    // 96 bytes per block, more than the whole cache.
+    let mut cache = BlockCache::new(64);
+    let old = test_key("dataset-1", "temperature", 0);
+    let big = test_key("dataset-1", "temperature", 2);
+    cache.put(old.clone(), test_block(0));
+    cache.put(big.clone(), test_block(2));
+    assert!(!cache.contains(&old));
+    assert!(cache.contains(&big));
+    assert_eq!(cache.cached_count(), 1);
 }

@@ -6,14 +6,20 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
+use std::time::Duration;
+use web_time::Instant;
 
 use super::cache::{BlockCache, BlockCacheKey};
-#[cfg(not(target_arch = "wasm32"))]
 use super::loader::BlockLoader;
+use super::prefetch_task::Task;
 use super::request::BlockRequest;
 use crate::data::{octant_block::OctantBlock, slice_request::DimensionSelection};
+
+/// How long the lookahead leaves a failed block: asked every few seconds,
+/// never in a loop, so playback recovers once the network does.
+const RETRY_AFTER: Duration = Duration::from_secs(5);
 
 pub struct PrefetchResult {
     pub key: BlockCacheKey,
@@ -24,7 +30,13 @@ pub struct BlockPrefetcher {
     tx: SyncSender<PrefetchResult>,
     rx: Receiver<PrefetchResult>,
     pending: HashMap<BlockCacheKey, u64>,
-    active_worker_threads: usize,
+    /// Blocks whose last fetch failed, and when: the lookahead skips them
+    /// for `retry_after` (`failed_recently`), or until Play, Plot, Abort.
+    failed: HashMap<BlockCacheKey, Instant>,
+    pub(super) retry_after: Duration,
+    /// Workers still running, aborted ones included: each task releases its
+    /// own slot, so an abort never lets new fetches pile onto old ones.
+    active_worker_threads: Arc<AtomicUsize>,
     max_concurrent_threads: usize,
     completed_bytes: Arc<AtomicU64>,
     total_bytes: Arc<AtomicU64>,
@@ -48,7 +60,9 @@ impl BlockPrefetcher {
             tx,
             rx,
             pending: HashMap::new(),
-            active_worker_threads: 0,
+            failed: HashMap::new(),
+            retry_after: RETRY_AFTER,
+            active_worker_threads: Arc::new(AtomicUsize::new(0)),
             max_concurrent_threads: max_concurrent_threads.clamp(1, 64),
             completed_bytes: Arc::new(AtomicU64::new(0)),
             total_bytes: Arc::new(AtomicU64::new(0)),
@@ -58,7 +72,8 @@ impl BlockPrefetcher {
 
     /// Schedules one request, unless every worker is busy.
     pub fn request(&mut self, request: BlockRequest, cache: &BlockCache) -> bool {
-        self.active_worker_threads < self.max_concurrent_threads && self.request_now(request, cache)
+        self.active_worker_threads() < self.max_concurrent_threads
+            && self.request_now(request, cache)
     }
 
     /// Schedules one request even when every worker is busy: the block a view
@@ -73,68 +88,40 @@ impl BlockPrefetcher {
         self.pending.insert(key.clone(), estimated_bytes);
         self.total_bytes
             .fetch_add(estimated_bytes, Ordering::Relaxed);
-        self.active_worker_threads += 1;
+        self.active_worker_threads.fetch_add(1, Ordering::Relaxed);
 
-        let (tx, completed, aborted) = (
-            self.tx.clone(),
-            self.completed_bytes.clone(),
-            self.aborted.clone(),
-        );
+        let task = Task {
+            key,
+            tx: self.tx.clone(),
+            completed: self.completed_bytes.clone(),
+            aborted: self.aborted.clone(),
+            active: self.active_worker_threads.clone(),
+        };
 
         #[cfg(not(target_arch = "wasm32"))]
         crate::utils::executor::TaskExecutor::spawn_background(move || {
-            let mut on_progress = |chunk_bytes: u64| {
-                if !aborted.load(Ordering::Relaxed) {
-                    completed.fetch_add(chunk_bytes, Ordering::Relaxed);
-                }
-            };
+            if task.cancelled() {
+                return;
+            }
+            let mut on_progress = |bytes| task.progress(bytes);
             let result = crate::utils::executor::catch_panic(|| {
                 BlockLoader::load_one_with_progress(&request, Some(&mut on_progress))
                     .map_err(|error| error.to_string())
             });
-            let _ = tx.send(PrefetchResult { key, result });
+            task.finish(result);
         });
 
         #[cfg(target_arch = "wasm32")]
-        {
-            wasm_bindgen_futures::spawn_local(async move {
-                let mut on_progress = |chunk_bytes: u64| {
-                    if !aborted.load(Ordering::Relaxed) {
-                        completed.fetch_add(chunk_bytes, Ordering::Relaxed);
-                    }
-                };
-                let result = match request.store.source().kind {
-                    crate::data::DataSourceKind::RemoteIcechunk
-                    | crate::data::DataSourceKind::LocalIcechunk => {
-                        crate::data::backends::icechunk::wasm::load_one_icechunk_wasm_with_progress(
-                            &request,
-                            Some(&mut on_progress),
-                        )
-                        .await
-                    }
-                    crate::data::DataSourceKind::RemoteGeoTiff
-                    | crate::data::DataSourceKind::LocalGeoTiff => {
-                        crate::data::backends::geotiff::wasm::load_one_geotiff_wasm_with_progress(
-                            &request,
-                            Some(&mut on_progress),
-                        )
-                        .await
-                    }
-                    crate::data::DataSourceKind::Procedural => request
-                        .store
-                        .fetch_with_progress(&request.slice, Some(&mut on_progress)),
-                    _ => {
-                        crate::data::backends::zarr::load_one_wasm_with_progress(
-                            &request,
-                            Some(&mut on_progress),
-                        )
-                        .await
-                    }
-                }
+        wasm_bindgen_futures::spawn_local(async move {
+            if task.cancelled() {
+                return;
+            }
+            let mut on_progress = |bytes| task.progress(bytes);
+            let result = BlockLoader::load_one_wasm(&request, Some(&mut on_progress))
+                .await
                 .map_err(|error| error.to_string());
-                let _ = tx.send(PrefetchResult { key, result });
-            });
-        }
+            task.finish(result);
+        });
 
         true
     }
@@ -142,7 +129,13 @@ impl BlockPrefetcher {
     pub fn poll(&mut self) -> Vec<PrefetchResult> {
         let mut results = Vec::new();
         while let Ok(result) = self.rx.try_recv() {
-            self.active_worker_threads = self.active_worker_threads.saturating_sub(1);
+            if result.result.is_err() {
+                let retry_after = self.retry_after;
+                self.failed.retain(|_, at| at.elapsed() < retry_after);
+                self.failed.insert(result.key.clone(), Instant::now());
+            } else {
+                self.failed.remove(&result.key);
+            }
             if let Some(est) = self.pending.remove(&result.key) {
                 let _ = self
                     .total_bytes
@@ -184,7 +177,19 @@ impl BlockPrefetcher {
     }
 
     pub fn active_worker_threads(&self) -> usize {
-        self.active_worker_threads
+        self.active_worker_threads.load(Ordering::Relaxed)
+    }
+
+    /// Whether `key`'s last fetch failed less than `retry_after` ago.
+    pub fn failed_recently(&self, key: &BlockCacheKey) -> bool {
+        self.failed
+            .get(key)
+            .is_some_and(|at| at.elapsed() < self.retry_after)
+    }
+
+    /// Lets the lookahead try the blocks that failed again.
+    pub fn clear_failed(&mut self) {
+        self.failed.clear();
     }
 
     pub fn max_concurrent_threads(&self) -> usize {
@@ -229,7 +234,8 @@ impl BlockPrefetcher {
         })
     }
 
-    /// Cancels all currently queued/in-flight prefetch requests.
+    /// Drops every pending request: queued ones never start, running ones
+    /// finish unread, holding their worker slots until then.
     pub fn abort(&mut self) {
         self.aborted.store(true, Ordering::Relaxed);
         self.aborted = Arc::new(AtomicBool::new(false));
@@ -238,6 +244,6 @@ impl BlockPrefetcher {
         self.pending.clear();
         self.completed_bytes.store(0, Ordering::Relaxed);
         self.total_bytes.store(0, Ordering::Relaxed);
-        self.active_worker_threads = 0;
+        self.failed.clear();
     }
 }
