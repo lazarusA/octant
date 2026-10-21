@@ -6,6 +6,14 @@ use crate::{
     utils::stack_str,
 };
 
+/// The cache slider's top. In the browser `usize` is 32 bits, so 4096 MB in
+/// bytes wraps to 0 and nothing stays cached; wasm memory ends at 4 GiB anyway.
+const MAX_CACHE_MB: usize = if cfg!(target_arch = "wasm32") {
+    2048
+} else {
+    8192
+};
+
 /// The cache button and its menu; the button's response.
 pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) -> egui::Response {
     let button_response = ui.add(
@@ -196,13 +204,13 @@ pub fn show_cache_menu(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) ->
         );
         let old_mb = app.max_cache_mb;
         ui.add(
-            egui::Slider::new(&mut app.max_cache_mb, 256..=8192)
+            egui::Slider::new(&mut app.max_cache_mb, 256..=MAX_CACHE_MB)
                 .localized()
                 .suffix(tr(DatasetKey::CacheLimitSuffix)),
         );
         if old_mb != app.max_cache_mb {
             app.block_cache
-                .set_max_bytes(app.max_cache_mb * 1024 * 1024);
+                .set_max_bytes(app.max_cache_mb.saturating_mul(1024 * 1024));
         }
 
         ui.add(
