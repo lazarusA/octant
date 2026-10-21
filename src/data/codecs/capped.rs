@@ -1,7 +1,7 @@
 //! Decompression with a size limit: a small chunk or file must never expand
 //! to gigabytes and run the page out of memory.
 
-use std::io::Read;
+use std::io::{Read, Write};
 
 use zarrs::array::BytesRepresentation;
 
@@ -20,11 +20,14 @@ pub fn read_capped(reader: impl Read, cap: usize, reserve: usize) -> std::io::Re
         .take(u64::try_from(cap).unwrap_or(u64::MAX).saturating_add(1))
         .read_to_end(&mut out)?;
     if out.len() > cap {
-        return Err(std::io::Error::other(format!(
-            "decoded data exceeds {cap} bytes"
-        )));
+        return Err(exceeded(cap));
     }
     Ok(out)
+}
+
+/// The error of a decoder whose output passed `cap` bytes.
+pub fn exceeded(cap: usize) -> std::io::Error {
+    std::io::Error::other(format!("decoded data exceeds {cap} bytes"))
 }
 
 /// The most a chunk declared as `rep` may decode to: its own size when the
@@ -44,5 +47,39 @@ pub fn reserve_for(rep: &BytesRepresentation) -> usize {
     match rep {
         BytesRepresentation::FixedSize(_) => cap_for(rep),
         _ => UP_FRONT_BYTES,
+    }
+}
+
+/// A writer for decoders that push their output (LZW), failing once more
+/// than `cap` bytes arrive.
+pub struct CappedWriter {
+    out: Vec<u8>,
+    cap: usize,
+}
+
+impl CappedWriter {
+    pub fn new(cap: usize, reserve: usize) -> Self {
+        Self {
+            out: Vec::with_capacity(reserve.min(cap)),
+            cap,
+        }
+    }
+
+    pub fn into_inner(self) -> Vec<u8> {
+        self.out
+    }
+}
+
+impl Write for CappedWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if self.out.len().saturating_add(buf.len()) > self.cap {
+            return Err(exceeded(self.cap));
+        }
+        self.out.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
