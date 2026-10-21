@@ -44,6 +44,8 @@ bytes = "1.12"
 async-trait = "0.1"
 half = "2.4"
 weezl = "0.2"
+# Capped GeoTIFF Zstd tiles (the version async-tiff already builds on every target).
+zstd = "0.14"
 # OME-Zarr (NGFF) metadata: images, labels, plates and bioformats2raw series.
 ome_zarr_metadata = { version = "0.3.1", default-features = false }
 # Series names from `OME/METADATA.ome.xml` (same version object_store uses).

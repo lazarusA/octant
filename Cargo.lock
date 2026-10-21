@@ -4769,6 +4769,7 @@ dependencies = [
  "zarrs_metadata",
  "zarrs_object_store",
  "zarrs_plugin",
+ "zstd 0.14.0",
 ]
 
 [[package]]
