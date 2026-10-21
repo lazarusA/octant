@@ -1,7 +1,6 @@
 //! Pure Rust Zstd codec plugin for `zarrs` WebAssembly data decoding using `ruzstd`.
 
 use std::borrow::Cow;
-use std::io::Read;
 use std::sync::{Arc, OnceLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use zarrs::array::{ArrayBytesRaw, BytesRepresentation, CodecError};
 use zarrs::metadata::Configuration;
@@ -139,18 +138,14 @@ impl BytesToBytesCodecTraits for RuzstdCodec {
         decoded_representation: &BytesRepresentation,
         _options: &CodecOptions,
     ) -> Result<ArrayBytesRaw<'a>, CodecError> {
-        let mut decoder = ruzstd::decoding::StreamingDecoder::new(&value[..]).map_err(|e| {
+        let decoder = ruzstd::decoding::StreamingDecoder::new(&value[..]).map_err(|e| {
             CodecError::Other(format!("Ruzstd streaming decoder init failed: {e:?}"))
         })?;
-        let mut out = match decoded_representation {
-            BytesRepresentation::FixedSize(size) => Vec::with_capacity(*size as usize),
-            BytesRepresentation::BoundedSize(size) => Vec::with_capacity(*size as usize),
-            BytesRepresentation::UnboundedSize => Vec::new(),
-        };
-        decoder
-            .read_to_end(&mut out)
-            .map_err(|e| CodecError::Other(format!("Ruzstd decompression failed: {e:?}")))?;
-
+        // Never more than the chunk's own size: a small chunk expanding to
+        // gigabytes would run the page out of memory.
+        let out =
+            super::capped::read_capped(decoder, super::capped::cap_for(decoded_representation))
+                .map_err(|e| CodecError::Other(format!("Ruzstd decompression failed: {e}")))?;
         Ok(out.into())
     }
 

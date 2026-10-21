@@ -1,6 +1,9 @@
 //! Codec pipeline normalization, plugins, and abstractions for Zarr datasets.
 
 pub mod blusc_plugin;
+pub mod capped;
+#[cfg(test)]
+mod capped_tests;
 pub mod normalize;
 #[cfg(test)]
 mod pipeline_tests;
