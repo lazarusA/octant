@@ -64,6 +64,7 @@ fn setup_rgb_app() -> OctantApp {
         attributes: Default::default(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     });
 

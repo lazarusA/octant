@@ -42,7 +42,9 @@ impl StoreHandle {
     }
 
     pub fn inspect(&self) -> Result<DatasetMetadata, BlockStoreError> {
-        self.backend.inspect()
+        let mut meta = self.backend.inspect()?;
+        crate::data::crs::assign(&mut meta);
+        Ok(meta)
     }
 
     /// The coordinates of `variable`'s dimensions; see `BlockStore::variable_coordinates`.

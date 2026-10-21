@@ -47,6 +47,7 @@ pub async fn inspect_wasm_remote_zarr(url: &str) -> Result<DatasetMetadata, Stri
     if !variables.is_empty() {
         let reader = crate::data::ome::MetaReader::direct(store.memory_store.clone());
         crate::data::multiscale::geozarr::link_pyramids(&reader, &mut variables);
+        crate::data::crs::attach_zarr_grid_mappings(&reader, &mut variables);
         return Ok(store.finalize_metadata(variables, None, clean_url).await);
     }
 

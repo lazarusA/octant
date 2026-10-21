@@ -94,6 +94,7 @@ impl GenericZarrBlockStore {
             crate::utils::extract_store_variables_consolidated(self.storage.clone(), url)
                 .map_err(|e| e.to_string())?;
         crate::data::multiscale::geozarr::link_pyramids_in(self.storage.clone(), &mut vars);
+        crate::data::crs::attach_zarr_grid_mappings_in(self.storage.clone(), &mut vars);
         Ok((vars, None))
     }
 

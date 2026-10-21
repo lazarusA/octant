@@ -161,3 +161,20 @@ fn coastlines_are_not_drawn_over_an_ome_image() {
     geo.show_coastlines = true;
     assert!(geo.draws_coastlines(crate::plots::PlotType::Heatmap));
 }
+
+/// Coastlines are lon/lat: drawn over a geographic CRS, never over projected
+/// metres (where they would land in the wrong place).
+#[test]
+fn coastlines_follow_the_crs() {
+    use crate::data::crs::CrsRef;
+    let (mut app, meta) = crate::app::test_support::memory_app();
+    app.selected = crate::app::test_support::selection_of(&mut app, &meta, "elev");
+    app.show_coastlines = true;
+    for (crs, drawn) in [(CrsRef::Epsg(32636), false), (CrsRef::Epsg(4326), true)] {
+        let idx = app.selected.variable_idx;
+        let staged = app.selected.metadata.as_mut().expect("metadata");
+        staged.variables[idx].crs = Some(crs.clone());
+        let heatmap = crate::plots::PlotType::Heatmap;
+        assert_eq!(app.draws_coastlines(heatmap), drawn, "{crs:?}");
+    }
+}

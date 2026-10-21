@@ -26,6 +26,7 @@ fn era5_like(time_chunk: u64) -> OctantApp {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     };
     let mut app = OctantApp::default();

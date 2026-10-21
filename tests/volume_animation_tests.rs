@@ -21,6 +21,7 @@ fn test_init_dimension_defaults_2d_dataset() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     };
 
@@ -57,6 +58,7 @@ fn test_init_dimension_defaults_3d_dataset() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     };
 
@@ -101,6 +103,7 @@ fn test_init_dimension_defaults_4d_dataset() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     };
 
@@ -340,6 +343,7 @@ fn test_calculate_max_animated_steps_small_and_large_datasets() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     };
 
@@ -393,6 +397,7 @@ fn test_calculate_max_animated_steps_small_and_large_datasets() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     };
     let large_ranges = vec![(0, 499), (0, 2047), (0, 2047)];
@@ -438,6 +443,7 @@ fn test_format_byte_size_and_calculate_download_sizes() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     };
 
@@ -496,6 +502,7 @@ fn test_selected_volume_elements_and_limit() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     };
     app.selected.metadata = Some(DatasetMetadata {
@@ -980,6 +987,7 @@ fn test_2d_and_3d_selected_elements_and_limits() {
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     };
 

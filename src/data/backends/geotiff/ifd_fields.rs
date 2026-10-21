@@ -59,6 +59,10 @@ pub(super) fn extract_ifd_attributes(ifd: &ImageFileDirectory) -> HashMap<String
         }
     }
     if let Some(geo) = ifd.geo_key_directory() {
+        // Projected, else geographic; read by `data::crs::discover`.
+        if let Some(code) = geo.epsg_code() {
+            attrs.insert("proj:code".into(), format!("EPSG:{code}"));
+        }
         if let Some(ref cit) = geo.citation {
             attrs.insert("crs_citation".into(), cit.clone());
         }

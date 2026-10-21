@@ -33,6 +33,8 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoTime => "时间：{} -> {}",
         VariablesKey::InfoResolution => "分辨率：{}",
         VariablesKey::InfoSize => "大小：{} MB",
+        VariablesKey::InfoCrs => "坐标参考系：{}",
+        VariablesKey::InfoCrsUnsupported => "坐标参考系：{}（不支持）",
         VariablesKey::InfoAttributes => "属性 (.zattrs)",
         VariablesKey::Download => "下载",
         VariablesKey::DownloadCells => "{}（{} 个单元格）",

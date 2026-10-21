@@ -89,6 +89,11 @@ impl OctantApp {
                         }
                     }
                     .await;
+                // The web inspects stores directly, not through `StoreHandle::inspect`.
+                let res = res.map(|(mut meta, handle)| {
+                    crate::data::crs::assign(&mut meta);
+                    (meta, handle)
+                });
 
                 let _ = tx.send(res);
             });

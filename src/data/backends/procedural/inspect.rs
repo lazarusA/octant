@@ -35,6 +35,7 @@ fn make_var(
         attributes: HashMap::new(),
         ome: None,
         multiscale: None,
+        crs: None,
         shard_shape: None,
     }
 }

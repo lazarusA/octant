@@ -28,6 +28,8 @@ pub struct VariableInfo {
     /// The multiscale stack and level this variable is, when its format
     /// groups it with other resolutions of the same data.
     pub multiscale: Option<crate::data::multiscale::LevelRef>,
+    /// The CRS of its x/y coordinates (`data::crs::assign`).
+    pub crs: Option<crate::data::crs::CrsRef>,
 }
 
 impl VariableInfo {

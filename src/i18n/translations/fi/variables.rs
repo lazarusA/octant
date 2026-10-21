@@ -37,6 +37,8 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoTime => "Aika: {} -> {}",
         VariablesKey::InfoResolution => "Resoluutio: {}",
         VariablesKey::InfoSize => "Koko: {} MB",
+        VariablesKey::InfoCrs => "Koordinaattijärjestelmä: {}",
+        VariablesKey::InfoCrsUnsupported => "Koordinaattijärjestelmä: {} (ei tuettu)",
         VariablesKey::InfoAttributes => "Attribuutit (.zattrs)",
         VariablesKey::Download => "Lataus",
         VariablesKey::DownloadCells => "{} ({} solua)",

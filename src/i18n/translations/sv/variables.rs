@@ -39,6 +39,8 @@ pub fn text(key: VariablesKey) -> Option<&'static str> {
         VariablesKey::InfoTime => "Tid: {} -> {}",
         VariablesKey::InfoResolution => "Upplösning: {}",
         VariablesKey::InfoSize => "Storlek: {} MB",
+        VariablesKey::InfoCrs => "Koordinatsystem: {}",
+        VariablesKey::InfoCrsUnsupported => "Koordinatsystem: {} (stöds inte)",
         VariablesKey::InfoAttributes => "Attribut (.zattrs)",
         VariablesKey::Download => "Nedladdning",
         VariablesKey::DownloadCells => "{} ({} celler)",

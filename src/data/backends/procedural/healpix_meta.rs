@@ -29,6 +29,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             attributes: global_attrs.clone(),
             ome: None,
             multiscale: None,
+            crs: None,
             shard_shape: None,
         },
         VariableInfo {
@@ -46,6 +47,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             attributes: global_attrs.clone(),
             ome: None,
             multiscale: None,
+            crs: None,
             shard_shape: None,
         },
         VariableInfo {
@@ -63,6 +65,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             attributes: global_attrs.clone(),
             ome: None,
             multiscale: None,
+            crs: None,
             shard_shape: None,
         },
         VariableInfo {
@@ -80,6 +83,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             attributes: global_attrs.clone(),
             ome: None,
             multiscale: None,
+            crs: None,
             shard_shape: None,
         },
         VariableInfo {
@@ -97,6 +101,7 @@ pub fn build_healpix_metadata() -> DatasetMetadata {
             attributes: global_attrs,
             ome: None,
             multiscale: None,
+            crs: None,
             shard_shape: None,
         },
     ];

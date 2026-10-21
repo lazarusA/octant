@@ -156,7 +156,15 @@ impl OctantApp {
     /// Whether the plot may be geographic: not an OME-Zarr image and no
     /// channel overlay. Decides whether coastlines are offered and drawn.
     pub fn plot_is_geographic(&self) -> bool {
-        !self.is_ome_dataset() && self.layers.base.composite.channel_configs.is_empty()
+        // A CRS that is not (yet) known to be lon/lat: projected metres.
+        let projected = (self.layer_variable_info(LayerId::BASE))
+            .and_then(|v| v.crs.as_ref())
+            .is_some_and(|c| {
+                !matches!(crate::data::crs::resolve(c), crate::data::crs::Resolution::Ready(r) if r.geographic)
+            });
+        !projected
+            && !self.is_ome_dataset()
+            && self.layers.base.composite.channel_configs.is_empty()
     }
 
     /// Whether coastlines are drawn over a `plot_type` plot: switched on, a

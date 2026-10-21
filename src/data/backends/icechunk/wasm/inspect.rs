@@ -142,6 +142,7 @@ pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, 
                         attributes: HashMap::new(),
                         ome: None,
                         multiscale: None,
+                        crs: None,
                         shard_shape: None,
                     });
                 }
@@ -153,6 +154,9 @@ pub async fn inspect_wasm_remote_icechunk(url: &str) -> Result<DatasetMetadata, 
     // Every node's `zarr.json` is in memory: GeoZarr pyramids read their groups' layouts.
     let reader = crate::data::ome::MetaReader::direct(store.inner.memory_store.clone());
     crate::data::multiscale::geozarr::link_pyramids(&reader, &mut variables);
+    crate::data::crs::attach_zarr_grid_mappings(&reader, &mut variables);
+    // Its variables come from their arrays alone: groups' CRS keys are not inherited.
+    crate::data::crs::inherit_zarr_group_crs(&reader, &mut variables);
 
     *store
         .array_manifests

@@ -45,7 +45,7 @@ pub fn extract_store_variables(
         .map(|g| {
             g.attributes()
                 .iter()
-                .map(|(k, v)| (k.clone(), v.to_string()))
+                .map(|(k, v)| (k.clone(), super::cf::attr_string(v)))
                 .collect()
         })
         .unwrap_or_default();
@@ -228,6 +228,7 @@ pub fn discover_arrays_via_http_metadata(base_url: &str) -> Vec<VariableInfo> {
                         attributes: cf_attrs.attributes,
                         ome: None,
                         multiscale: None,
+                        crs: None,
                         shard_shape: None,
                     });
                 }

@@ -1728,6 +1728,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
+name = "crs-definitions"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed764c927c2a19ec1cb85deb88e93560872c04653b0e9e63fbdf6a8edf968bcb"
+
+[[package]]
 name = "crunchy"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4718,6 +4724,7 @@ dependencies = [
  "console_error_panic_hook",
  "console_log",
  "crc32fast",
+ "crs-definitions",
  "eframe",
  "egui",
  "egui_system_font_provider",
@@ -4738,6 +4745,8 @@ dependencies = [
  "netcdf",
  "object_store",
  "ome_zarr_metadata",
+ "proj4rs",
+ "proj4wkt",
  "quick-xml",
  "rayon",
  "reqwest",
@@ -5310,6 +5319,33 @@ name = "profiling"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
+
+[[package]]
+name = "proj4rs"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0841627768f16ea6d37fe491695bde62d7b10a8e1a2ae2cf0c878580c16e2b3"
+dependencies = [
+ "console_log",
+ "js-sys",
+ "thiserror 2.0.21",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "proj4wkt"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "098a0cc36b6bfd623f7a34354be6f6bd7ac3621e96ccaf2cf08720f28868203d"
+dependencies = [
+ "console_log",
+ "js-sys",
+ "nom",
+ "thiserror 1.0.69",
+ "wasm-bindgen",
+ "web-sys",
+]
 
 [[package]]
 name = "pxfm"
