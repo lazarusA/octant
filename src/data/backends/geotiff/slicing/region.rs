@@ -160,9 +160,14 @@ async fn decode_and_blit_tile(
     target_bands: &[usize],
     out_slices: &mut [&mut [f32]],
 ) -> Result<(), BlockStoreError> {
+    // A sparse tile (byte count 0, GDAL's SPARSE_OK) holds no data: it stays
+    // missing (NaN), never a zero-byte request.
     let (Some(&offset), Some(&count)) = (ctx.offsets.get(idx), ctx.byte_counts.get(idx)) else {
         return Ok(());
     };
+    if count == 0 {
+        return Ok(());
+    }
     let end = offset
         .checked_add(count)
         .ok_or("TIFF chunk byte range overflows")?;
