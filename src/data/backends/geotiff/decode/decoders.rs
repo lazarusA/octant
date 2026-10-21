@@ -1,11 +1,13 @@
-//! Pure-Rust decoder implementations for TIFF compression formats.
+//! TIFF tile decoders, each capped at `MAX_DECODED_BYTES`.
 
 use async_tiff::decoder::Decoder;
 use async_tiff::error::{AsyncTiffError, AsyncTiffResult};
 use async_tiff::tags::PhotometricInterpretation;
 use bytes::Bytes;
 
-use crate::data::codecs::capped::{CappedWriter, MAX_DECODED_BYTES, UP_FRONT_BYTES, read_capped};
+use crate::data::codecs::capped::{
+    CappedWriter, MAX_DECODED_BYTES, UP_FRONT_BYTES, exceeded, read_capped,
+};
 
 /// A decoder whose output never exceeds [`MAX_DECODED_BYTES`]: a small tile
 /// must not expand to gigabytes and run the page out of memory.
@@ -40,7 +42,7 @@ capped_decoder!(
 capped_decoder!(DeflateDecoder, deflate);
 capped_decoder!(ZstdDecoder, zstd);
 
-fn too_large(e: impl std::fmt::Display) -> AsyncTiffError {
+fn tile_error(e: impl std::fmt::Display) -> AsyncTiffError {
     AsyncTiffError::General(format!("TIFF tile: {e}"))
 }
 
@@ -57,7 +59,7 @@ pub(super) fn packbits(input: &[u8], cap: usize) -> AsyncTiffResult<Vec<u8>> {
             _ => n.unsigned_abs() as usize + 1,
         };
         if out.len() + count > cap {
-            return Err(too_large(format!("decoded data exceeds {cap} bytes")));
+            return Err(tile_error(exceeded(cap)));
         }
         if n >= 0 {
             let run = input
@@ -99,12 +101,13 @@ pub(super) fn lzw(input: &[u8], cap: usize) -> AsyncTiffResult<Vec<u8>> {
 }
 
 pub(super) fn deflate(input: &[u8], cap: usize) -> AsyncTiffResult<Vec<u8>> {
-    read_capped(flate2::read::ZlibDecoder::new(input), cap, UP_FRONT_BYTES).map_err(too_large)
+    read_capped(flate2::read::ZlibDecoder::new(input), cap, UP_FRONT_BYTES).map_err(tile_error)
 }
 
 pub(super) fn zstd(input: &[u8], cap: usize) -> AsyncTiffResult<Vec<u8>> {
-    let decoder = zstd::Decoder::new(input).map_err(too_large)?;
-    read_capped(decoder, cap, UP_FRONT_BYTES).map_err(too_large)
+    // The input is already in memory: no BufReader of its own.
+    let decoder = zstd::Decoder::with_buffer(input).map_err(tile_error)?;
+    read_capped(decoder, cap, UP_FRONT_BYTES).map_err(tile_error)
 }
 
 #[derive(Debug, Clone)]

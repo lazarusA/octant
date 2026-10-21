@@ -20,11 +20,14 @@ pub fn read_capped(reader: impl Read, cap: usize, reserve: usize) -> std::io::Re
         .take(u64::try_from(cap).unwrap_or(u64::MAX).saturating_add(1))
         .read_to_end(&mut out)?;
     if out.len() > cap {
-        return Err(std::io::Error::other(format!(
-            "decoded data exceeds {cap} bytes"
-        )));
+        return Err(exceeded(cap));
     }
     Ok(out)
+}
+
+/// The error of a decoder whose output passed `cap` bytes.
+pub fn exceeded(cap: usize) -> std::io::Error {
+    std::io::Error::other(format!("decoded data exceeds {cap} bytes"))
 }
 
 /// The most a chunk declared as `rep` may decode to: its own size when the
@@ -70,10 +73,7 @@ impl CappedWriter {
 impl Write for CappedWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         if self.out.len().saturating_add(buf.len()) > self.cap {
-            return Err(std::io::Error::other(format!(
-                "decoded data exceeds {} bytes",
-                self.cap
-            )));
+            return Err(exceeded(self.cap));
         }
         self.out.extend_from_slice(buf);
         Ok(buf.len())
