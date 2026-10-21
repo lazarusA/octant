@@ -90,7 +90,9 @@ pub async fn read_region(
         win,
     };
 
-    let chunks_per_band = tiles_x * tiles_y;
+    let chunks_per_band = tiles_x
+        .checked_mul(tiles_y)
+        .ok_or("TIFF chunk grid too large")?;
     for ty in ty0..=ty1 {
         let orig_y = ty * th;
         let buf_h = if is_tiled {
@@ -102,7 +104,11 @@ pub async fn read_region(
             let (orig_x, buf_w) = (tx * tw, tw);
             if is_planar {
                 for (i, &band) in target_bands.iter().enumerate() {
-                    let idx = band * chunks_per_band + ty * tiles_x + tx;
+                    let idx = band
+                        .checked_mul(chunks_per_band)
+                        .ok_or("TIFF chunk index too large")?
+                        + ty * tiles_x
+                        + tx;
                     if let Some(out_slice) = out_slices.get_mut(i) {
                         decode_and_blit_tile(
                             &ctx,
@@ -143,12 +149,15 @@ async fn decode_and_blit_tile(
     target_bands: &[usize],
     out_slices: &mut [&mut [f32]],
 ) -> Result<(), BlockStoreError> {
-    if idx >= ctx.offsets.len() {
+    let (Some(&offset), Some(&count)) = (ctx.offsets.get(idx), ctx.byte_counts.get(idx)) else {
         return Ok(());
-    }
+    };
+    let end = offset
+        .checked_add(count)
+        .ok_or("TIFF chunk byte range overflows")?;
     let raw = ctx
         .reader
-        .get_bytes(ctx.offsets[idx]..ctx.offsets[idx] + ctx.byte_counts[idx])
+        .get_bytes(offset..end)
         .await
         .map_err(|e| e.to_string())?;
     let decomp = ctx

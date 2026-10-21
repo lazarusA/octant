@@ -44,7 +44,9 @@ macro_rules! unpred_diff {
     ($T:ident, $row:expr, $samples:expr) => {{
         let sz = std::mem::size_of::<$T>();
         let step = $samples * sz;
-        for i in (step..$row.len()).step_by(sz) {
+        // A truncated row's partial last sample is left as it is.
+        let whole = $row.len() - $row.len() % sz;
+        for i in (step..whole).step_by(sz) {
             let prev =
                 $T::from_ne_bytes($row[i - step..i - step + sz].try_into().unwrap_or_default());
             let sum = $T::from_ne_bytes($row[i..i + sz].try_into().unwrap_or_default())
@@ -62,7 +64,7 @@ fn unpredict_horizontal(
     width: usize,
 ) -> Result<(), String> {
     let bytes_per_sample = (bits as usize).div_ceil(8);
-    let row_stride = width * samples * bytes_per_sample;
+    let row_stride = width.saturating_mul(samples * bytes_per_sample);
     if row_stride == 0 {
         return Ok(());
     }
@@ -89,7 +91,7 @@ fn unpredict_float(
     width: usize,
 ) -> Result<Vec<u8>, String> {
     let bps = (bits as usize) / 8;
-    let row_stride = width * samples * bps;
+    let row_stride = width.saturating_mul(samples * bps);
     if row_stride == 0 {
         return Ok(input);
     }

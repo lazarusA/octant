@@ -2,6 +2,8 @@
 
 pub mod decoders;
 pub mod predictors;
+#[cfg(test)]
+mod predictors_tests;
 
 use async_tiff::decoder::DecoderRegistry;
 use async_tiff::tags::Compression;

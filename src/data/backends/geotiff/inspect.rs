@@ -132,7 +132,11 @@ fn add_raster_variable(
         shape: vec![num_bands, info.height, info.width],
         dimension_names: vec!["band".into(), "y".into(), "x".into()],
         chunk_shape: vec![1, info.chunk_shape[0], info.chunk_shape[1]],
-        file_size: info.width * info.height * num_bands * 4,
+        file_size: info
+            .width
+            .saturating_mul(info.height)
+            .saturating_mul(num_bands)
+            .saturating_mul(4),
         units: None,
         long_name: Some(long_name.into()),
         time_coverage_start: None,
@@ -170,7 +174,7 @@ fn add_band_variables(
             shape: vec![info.height, info.width],
             dimension_names: vec!["y".into(), "x".into()],
             chunk_shape: info.chunk_shape.clone(),
-            file_size: info.width * info.height * 4,
+            file_size: info.width.saturating_mul(info.height).saturating_mul(4),
             units: None,
             long_name: Some(band_long_name),
             time_coverage_start: None,
