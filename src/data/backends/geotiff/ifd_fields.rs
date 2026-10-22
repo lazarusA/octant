@@ -85,12 +85,16 @@ pub(super) fn extract_ifd_attributes(ifd: &ImageFileDirectory) -> HashMap<String
         _ => {}
     }
     // An RGBA raster opens in color (`composite::opens_in_color`).
-    let last_extra = ifd.extra_samples().and_then(|e| e.last());
-    if matches!(
-        last_extra,
-        Some(ExtraSamples::AssociatedAlpha | ExtraSamples::UnassociatedAlpha)
-    ) {
+    if alpha_last(ifd) {
         attrs.insert("alpha_band".into(), "last".into());
     }
     attrs
+}
+
+/// Whether the IFD's last sample is alpha (associated or not).
+fn alpha_last(ifd: &ImageFileDirectory) -> bool {
+    matches!(
+        ifd.extra_samples().and_then(|e| e.last()),
+        Some(ExtraSamples::AssociatedAlpha | ExtraSamples::UnassociatedAlpha)
+    )
 }
