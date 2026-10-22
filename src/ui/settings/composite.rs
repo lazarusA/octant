@@ -87,11 +87,12 @@ fn toggle_text(has_mc: bool, is_cmyk: bool) -> (K, K) {
     }
 }
 
-/// Layer `id`'s selected band range, or every band without a band dimension.
+/// Layer `id`'s selected band range, or every band without a band dimension
+/// and for overlays, which have no band slider (`fit_overlay_channels`).
 pub(super) fn get_selected_channel_range(app: &OctantApp, id: LayerId) -> (usize, usize) {
     match app.layer_channel_dim(id) {
-        Some(c_idx) => app.layer_dim_range(id, c_idx),
-        None => (0, usize::MAX),
+        Some(c_idx) if id == LayerId::BASE => app.layer_dim_range(id, c_idx),
+        _ => (0, usize::MAX),
     }
 }
 
@@ -99,12 +100,16 @@ pub(super) fn get_selected_channel_range(app: &OctantApp, id: LayerId) -> (usize
 /// channel with its display settings behind a chevron; reloads the layer
 /// when a channel settles on a change.
 fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
+    let (start, end) = get_selected_channel_range(app, id);
     let Some(layer) = app.layers.get_mut(id) else {
         return;
     };
     // The 2D composite's channel values, for auto contrast.
     let probe = layer.data.composite_probe.as_ref();
-    let configs = &mut layer.composite.channel_configs;
+    // Configs are indexed by channel; only the selected range is listed.
+    let all = &mut layer.composite.channel_configs;
+    let end = end.saturating_add(1).min(all.len());
+    let configs = &mut all[start.min(end)..end];
     let mut changed = channel_buttons(ui, configs, probe);
     egui::ScrollArea::vertical()
         .max_height(180.0)

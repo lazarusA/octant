@@ -57,12 +57,12 @@ fn default_time_point_and_plane_are_selected() {
     assert_eq!(app.playback.current_timestep, 7);
     assert_eq!(app.selected.dim_indices[2], 3);
     assert_eq!(app.selected.dim_ranges[2], (3, 3));
-    // A colour image keeps every channel.
-    assert_eq!(app.selected.dim_ranges[1], (0, 1));
+    // A colour image opens on its first active channel.
+    assert_eq!(app.selected.dim_ranges[1], (1, 1));
 }
 
 #[test]
-fn colour_images_overlay_their_channels_with_omero_settings() {
+fn colour_images_keep_omero_settings_with_one_channel_ticked() {
     let var = image("color");
     let mut app = defaults_for(&var);
     crate::ui::variables_panel::dimension_slider::init_layer_composite_defaults(
@@ -71,7 +71,7 @@ fn colour_images_overlay_their_channels_with_omero_settings() {
         &var,
     );
     let composite = &app.layers.base.composite;
-    assert!(composite.enabled);
+    assert!(!composite.enabled);
     let on = &composite.channel_configs[1];
     assert_eq!(
         (on.name.as_str(), on.color_rgb, on.visible),

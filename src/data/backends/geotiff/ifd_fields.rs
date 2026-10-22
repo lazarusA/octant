@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use async_tiff::ImageFileDirectory;
-use async_tiff::tags::{PhotometricInterpretation, SampleFormat};
+use async_tiff::tags::{ExtraSamples, PhotometricInterpretation, SampleFormat};
 
 pub(super) fn extract_data_type_name(ifd: &ImageFileDirectory) -> String {
     let fmt = ifd
@@ -83,6 +83,14 @@ pub(super) fn extract_ifd_attributes(ifd: &ImageFileDirectory) -> HashMap<String
             attrs.insert("photometric".into(), "palette".into());
         }
         _ => {}
+    }
+    // An RGBA raster opens in color (`composite::opens_in_color`).
+    let last_extra = ifd.extra_samples().and_then(|e| e.last());
+    if matches!(
+        last_extra,
+        Some(ExtraSamples::AssociatedAlpha | ExtraSamples::UnassociatedAlpha)
+    ) {
+        attrs.insert("alpha_band".into(), "last".into());
     }
     attrs
 }

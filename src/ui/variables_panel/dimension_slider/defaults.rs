@@ -3,7 +3,7 @@
 use super::defaults_clamp::clamp_2d_selection_to_gpu_limits;
 use super::defaults_dggs::assign_dggs_roles;
 use super::defaults_spatial::assign_euclidean_roles;
-use crate::app::{AnimationRole, DimConfig, OctantApp, SpatialRole};
+use crate::app::{AnimationRole, DimConfig, OctantApp, SpatialRole, StoreKind};
 use crate::data::VariableInfo;
 
 /// Initializes default dimension roles (spatial X, Y, Z and animation) for a selected variable.
@@ -41,6 +41,7 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
         assign_euclidean_roles(app, var_info);
     }
 
+    pin_channel(app, var_info);
     apply_omero_defaults(app, var_info);
     finalize_active_configs(app, var_info, rank);
     if var_info.stack_base().is_some() {
@@ -154,6 +155,32 @@ fn apply_omero_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
             app.playback.current_timestep = dt;
         }
     }
+}
+
+/// A channel dimension opens on one channel, the first OMERO active one else
+/// 0, unless the variable opens in color (`composite::opens_in_color`).
+fn pin_channel(app: &mut OctantApp, var_info: &VariableInfo) {
+    let Some(c) = var_info.channel_axis() else {
+        return;
+    };
+    let is_tiff = matches!(
+        app.selected.store_kind,
+        StoreKind::LocalGeoTiff | StoreKind::RemoteGeoTiff
+    );
+    let spatial = app
+        .selected
+        .dim_config
+        .get(c)
+        .is_some_and(|cfg| cfg.spatial != SpatialRole::None);
+    if spatial || super::composite::opens_in_color(var_info, is_tiff) {
+        return;
+    }
+    let first_active = var_info
+        .ome
+        .as_ref()
+        .and_then(|o| o.image.channels.iter().position(|ch| ch.active))
+        .unwrap_or(0);
+    pin_dim(app, var_info, c, first_active);
 }
 
 /// Pins dimension `dim` of the selection to index `k`, clamped into its size.
