@@ -15,7 +15,6 @@ pub mod stack_str;
 pub mod units;
 
 pub use path::{expand_tilde, expand_tilde_str, infer_store_kind_from_target};
-pub use remote::{ParsedStorageUrl, parse_remote_storage_url};
 pub use stack_str::stack_str;
 
 // Format-agnostic & domain re-exports
