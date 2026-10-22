@@ -91,7 +91,7 @@ fn parse_s3_or_vcc_scheme(s3_path: &str) -> Result<ParsedStorageUrl, Box<dyn Err
     Ok(ParsedStorageUrl {
         bucket,
         prefix,
-        region: Some("us-east-1".to_string()),
+        region: None,
         endpoint_url: None,
         force_path_style: false,
     })
@@ -102,12 +102,13 @@ fn parse_aws_virtual_hosted(
     path_parts: &[&str],
     delimiter: &str,
 ) -> Result<ParsedStorageUrl, Box<dyn Error + Send + Sync>> {
-    let sub_parts: Vec<&str> = host
-        .trim_end_matches(".amazonaws.com")
-        .split(delimiter)
-        .collect();
-    let bucket = sub_parts.first().unwrap_or(&host).to_string();
-    let region = sub_parts.get(1).map(|r| r.to_string());
+    let base = host.trim_end_matches(".amazonaws.com");
+    // `bucket.s3.amazonaws.com` names no region: no `.s3.` is left after the trim.
+    let base = base.strip_suffix(".s3").unwrap_or(base);
+    let (bucket, region) = base
+        .split_once(delimiter)
+        .map_or((base, None), |(b, r)| (b, Some(r.to_string())));
+    let bucket = bucket.to_string();
     let prefix = if path_parts.is_empty() {
         None
     } else {

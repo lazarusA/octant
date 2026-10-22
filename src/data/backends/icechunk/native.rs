@@ -11,7 +11,8 @@ use crate::data::slice_request::SliceRequest;
 use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
 use crate::utils::executor::{TokioBlockOn, get_shared_tokio_rt};
 use crate::utils::remote::{
-    build_icechunk_s3_options, parse_remote_storage_url, register_standard_virtual_chunk_containers,
+    build_icechunk_s3_options, discover_bucket_region, parse_remote_storage_url,
+    register_standard_virtual_chunk_containers,
 };
 use zarrs::storage::ReadableWritableListableStorage;
 use zarrs::storage::storage_adapter::async_to_sync::AsyncToSyncStorageAdapter;
@@ -41,7 +42,11 @@ pub fn build_sync_icechunk_store(
                 let storage = icechunk::new_local_filesystem_storage(&expanded).await?;
                 (storage, None, HashMap::new())
             } else {
-                let parsed = parse_remote_storage_url(location)?;
+                let mut parsed = parse_remote_storage_url(location)?;
+                // A wrong region gets `301 Moved Permanently`, which object_store does not follow.
+                if parsed.region.is_none() && parsed.endpoint_url.is_none() {
+                    parsed.region = discover_bucket_region(&parsed.bucket).await;
+                }
                 let config = build_icechunk_s3_options(&parsed, true);
 
                 let mut repo_config = icechunk::config::RepositoryConfig::default();

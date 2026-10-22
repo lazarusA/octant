@@ -4,7 +4,9 @@ pub mod icechunk;
 pub mod url;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use icechunk::{build_icechunk_s3_options, register_standard_virtual_chunk_containers};
+pub use icechunk::{
+    build_icechunk_s3_options, discover_bucket_region, register_standard_virtual_chunk_containers,
+};
 pub use url::{ParsedStorageUrl, parse_remote_storage_url, s3_to_https};
 
 #[cfg(test)]
@@ -50,6 +52,15 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_aws_virtual_hosted_url_without_region() {
+        let url = "https://tessera-embeddings.s3.amazonaws.com/v1.1/dclimate.icechunk/";
+        let parsed = parse_remote_storage_url(url).expect("Should parse AWS virtual hosted url");
+        assert_eq!(parsed.bucket, "tessera-embeddings");
+        assert_eq!(parsed.prefix, Some("v1.1/dclimate.icechunk".to_string()));
+        assert_eq!(parsed.region, None);
+    }
+
+    #[test]
     fn test_parse_source_coop_url() {
         let url = "https://data.source.coop/eeholmes/chlaz/icechunk";
         let parsed = parse_remote_storage_url(url).expect("Should parse Source Coop url");
@@ -68,5 +79,23 @@ mod tests {
         let parsed = parse_remote_storage_url(url).expect("Should parse s3 uri");
         assert_eq!(parsed.bucket, "my-bucket");
         assert_eq!(parsed.prefix, Some("dataset.zarr".to_string()));
+        assert_eq!(parsed.region, None);
+    }
+
+    /// `cargo test --lib icechunk_outside_us_east_1_opens -- --ignored`: the
+    /// TESSERA store lives in us-west-2, and neither URL names the region.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    #[ignore = "network"]
+    fn icechunk_outside_us_east_1_opens() {
+        use crate::data::blocks::BlockStore;
+        for url in [
+            "https://tessera-embeddings.s3.amazonaws.com/v1.1/dclimate.icechunk/",
+            "s3://tessera-embeddings/v1.1/dclimate.icechunk/",
+        ] {
+            let store = crate::data::backends::IcechunkBlockStore::open(url).expect(url);
+            let vars = store.variables().expect(url);
+            assert!(vars.iter().any(|v| v.ends_with("embeddings")), "{url}");
+        }
     }
 }
