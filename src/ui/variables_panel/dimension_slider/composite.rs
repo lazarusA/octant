@@ -10,12 +10,16 @@ pub fn init_composite_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
 }
 
 /// Initializes layer `id`'s composite for `var_info`: channel configs for a
-/// channel dimension with only the selected channel ticked, the composite on
-/// only for a GeoTIFF that opens in color ([`opens_in_color`]).
+/// channel dimension, the composite on for a variable that opens in color
+/// ([`opens_in_color`]), with OMERO's active channels ticked, else off with
+/// only the selected channel ticked.
 pub fn init_layer_composite_defaults(app: &mut OctantApp, id: LayerId, var_info: &VariableInfo) {
     let is_tiff = app.layer_is_geotiff(id);
+    let in_color = opens_in_color(var_info, is_tiff);
     let channel = var_info.channel_axis();
-    let ticked = channel.map(|c| app.layer_dim_range(id, c).0);
+    let ticked = channel
+        .filter(|_| !in_color)
+        .map(|c| app.layer_dim_range(id, c).0);
     let configs = if is_tiff {
         Vec::new()
     } else {
@@ -30,17 +34,21 @@ pub fn init_layer_composite_defaults(app: &mut OctantApp, id: LayerId, var_info:
     };
     let composite = &mut layer.composite;
     composite.rgb_channels = [0, 1, 2];
-    composite.enabled = opens_in_color(var_info, is_tiff);
+    composite.enabled = in_color;
     composite.channel_configs = configs;
 }
 
-/// Whether a GeoTIFF raster opens as a color composite: 3 bands (RGB), 4
-/// whose last is alpha, or CMYK inks. Every other variable opens on one band.
+/// Whether a variable opens as a color composite: a GeoTIFF raster of 3 bands
+/// (RGB), 4 whose last is alpha, or CMYK inks; an OME-Zarr image of 2+
+/// channels that is not greyscale (its active channels mixed within the
+/// channel range). Every other variable opens on one band.
 pub(crate) fn opens_in_color(var_info: &VariableInfo, is_tiff: bool) -> bool {
+    if !is_tiff {
+        return ome_in_color(var_info);
+    }
     let attr = |key: &str| var_info.attributes.get(key).map(String::as_str);
     let bands = var_info.shape.first().copied().unwrap_or(0);
-    is_tiff
-        && var_info.shape.len() >= 3
+    var_info.shape.len() >= 3
         && match bands {
             3 => true,
             4 if attr("alpha_band") == Some("last") => true,
@@ -48,8 +56,19 @@ pub(crate) fn opens_in_color(var_info: &VariableInfo, is_tiff: bool) -> bool {
         }
 }
 
+/// Whether an OME-Zarr image mixes its channels: 2+ of them, not greyscale.
+fn ome_in_color(var_info: &VariableInfo) -> bool {
+    let channels = var_info.channel_axis().and_then(|c| var_info.shape.get(c));
+    var_info
+        .ome
+        .as_ref()
+        .is_some_and(|o| o.image.greyscale_channel().is_none())
+        && channels.is_some_and(|&n| n >= 2)
+}
+
 /// One config per channel, from the OME-Zarr `omero` channels when there are
-/// any, else default colors; only channel `ticked` is visible.
+/// any, else default colors; only channel `ticked` is visible, or without one
+/// OMERO's active channels.
 fn extract_channel_configs(
     var_info: &VariableInfo,
     num_ch: usize,
@@ -68,7 +87,7 @@ fn extract_channel_configs(
                     index: i,
                     name: ch.label.clone(),
                     color_rgb: ch.color,
-                    visible: true,
+                    visible: ch.active,
                     window: ch.window.map(|w| (w.start, w.end)),
                     display: crate::data::slicing::ChannelDisplay {
                         range: ch.window.map(|w| (w.min, w.max)),
@@ -84,7 +103,9 @@ fn extract_channel_configs(
                         [i % crate::data::slicing::DEFAULT_CHANNEL_COLORS.len()],
                 ),
             };
-            cfg.visible = Some(i) == ticked;
+            if let Some(t) = ticked {
+                cfg.visible = i == t;
+            }
             cfg
         })
         .collect()

@@ -57,12 +57,12 @@ fn default_time_point_and_plane_are_selected() {
     assert_eq!(app.playback.current_timestep, 7);
     assert_eq!(app.selected.dim_indices[2], 3);
     assert_eq!(app.selected.dim_ranges[2], (3, 3));
-    // A colour image opens on its first active channel.
-    assert_eq!(app.selected.dim_ranges[1], (1, 1));
+    // A colour image keeps every channel.
+    assert_eq!(app.selected.dim_ranges[1], (0, 1));
 }
 
 #[test]
-fn colour_images_keep_omero_settings_with_one_channel_ticked() {
+fn colour_images_overlay_their_channels_with_omero_settings() {
     let var = image("color");
     let mut app = defaults_for(&var);
     crate::ui::variables_panel::dimension_slider::init_layer_composite_defaults(
@@ -71,7 +71,7 @@ fn colour_images_keep_omero_settings_with_one_channel_ticked() {
         &var,
     );
     let composite = &app.layers.base.composite;
-    assert!(!composite.enabled);
+    assert!(composite.enabled);
     let on = &composite.channel_configs[1];
     assert_eq!(
         (on.name.as_str(), on.color_rgb, on.visible),
@@ -136,4 +136,42 @@ fn greyscale_window_follows_the_shown_channel() {
     // Played across channels, the step is the channel shown.
     app.layers.base.selection_mut().animated_dim = Some(1);
     assert_eq!(apply(&mut app, 1), (10.0, 900.0, true, true));
+}
+
+#[test]
+fn colour_overlays_open_on_their_active_channels() {
+    use crate::app::layers::{Source, overlay_selection};
+    let var = image("color");
+    let plane = VariableInfo {
+        name: "plane".into(),
+        dimension_names: vec!["y".into(), "x".into()],
+        shape: vec![8, 8],
+        ..Default::default()
+    };
+    let mut app = OctantApp::default();
+    let mut dataset = app.selected.clone();
+    dataset.metadata = Some(crate::data::DatasetMetadata {
+        variables: vec![plane, var.clone()],
+        ..Default::default()
+    });
+    // A base without a channel axis, so the overlay's channels follow its composite.
+    let mut base = dataset.clone();
+    base.variable_idx = 0;
+    *app.layers.base.selection_mut() = base.clone();
+    let selection = overlay_selection(&base, &dataset, 1).expect("overlay selection");
+    let id = app.layers.push(Source::for_selection(selection));
+    crate::ui::variables_panel::init_layer_composite_defaults(&mut app, id, &var);
+    app.fit_overlay_channels(id);
+
+    let overlay = app.layers.get(id).expect("overlay");
+    assert!(overlay.composite.enabled);
+    let ticked: Vec<usize> = overlay
+        .composite
+        .channel_configs
+        .iter()
+        .filter(|c| c.visible)
+        .map(|c| c.index)
+        .collect();
+    assert_eq!(ticked, [1], "OMERO's active channel, not channel 0");
+    assert_eq!(overlay.selection().dim_ranges[1], (1, 1));
 }

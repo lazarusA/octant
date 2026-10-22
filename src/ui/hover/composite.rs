@@ -5,7 +5,9 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
 use crate::app::OctantApp;
+use crate::app::layers::LayerId;
 use crate::data::slicing::CompositeProbe;
+use crate::data::slicing::composite::drawn_channels;
 use crate::data::{DatasetMetadata, VariableInfo};
 use crate::i18n::{HoverKey, PlotKey, filled, tr};
 use crate::ui::hover::composite_bands::{BandNames, is_non_visible, visible_color};
@@ -92,6 +94,7 @@ pub fn composite_labels(
     var.map(|v| (&v.name, &v.shape, &v.dimension_names))
         .hash(&mut hasher);
     (is_overlay(app), cmyk_bands(app), rgb_bands(app)).hash(&mut hasher);
+    channel_window(app).hash(&mut hasher);
     crate::i18n::language().hash(&mut hasher);
     for c in &app.layers.base.composite.channel_configs {
         (c.index, &c.name, c.visible).hash(&mut hasher);
@@ -108,22 +111,18 @@ pub fn composite_labels(
     labels
 }
 
-/// The composite's name and channels: visible overlay channels, the C, M, Y, K inks, or the
-/// bands drawn as R, G and B.
+/// The composite's name and channels: the overlay channels drawn in the channel range, the
+/// C, M, Y, K inks, or the bands drawn as R, G and B.
 pub fn build_labels(
     app: &OctantApp,
     meta: Option<&DatasetMetadata>,
     var: Option<&VariableInfo>,
 ) -> CompositeLabels {
     if is_overlay(app) {
-        let channels = app
-            .layers
-            .base
-            .composite
-            .channel_configs
-            .iter()
-            .filter(|c| c.visible);
-        let channels = channels.map(|c| CompositeChannel {
+        let (start, count) = channel_window(app);
+        let configs = &app.layers.base.composite.channel_configs;
+        let channels = drawn_channels(configs, start, count);
+        let channels = channels.into_iter().map(|(c, _)| CompositeChannel {
             label: match c.name.trim() {
                 "" => filled(tr(HoverKey::ChannelN), &[&(c.index + 1)]).into(),
                 name => name.into(),
@@ -155,6 +154,16 @@ pub fn build_labels(
             }
         }
     }
+}
+
+/// The base layer's channel window, `(start, count)`; every channel without a channel
+/// dimension.
+fn channel_window(app: &OctantApp) -> (usize, usize) {
+    app.layer_channel_dim(LayerId::BASE)
+        .map_or((0, usize::MAX), |c| {
+            let (lo, hi) = app.layer_dim_range(LayerId::BASE, c);
+            (lo, hi.saturating_sub(lo).saturating_add(1))
+        })
 }
 
 /// Mirrors the projection's choice between the tinted overlay and the RGB band mapping.
