@@ -3,7 +3,7 @@
 use super::defaults_clamp::clamp_2d_selection_to_gpu_limits;
 use super::defaults_dggs::assign_dggs_roles;
 use super::defaults_spatial::assign_euclidean_roles;
-use crate::app::{AnimationRole, DimConfig, OctantApp, SpatialRole, StoreKind};
+use crate::app::{AnimationRole, DimConfig, OctantApp, SpatialRole};
 use crate::data::VariableInfo;
 
 /// Initializes default dimension roles (spatial X, Y, Z and animation) for a selected variable.
@@ -163,10 +163,7 @@ fn pin_channel(app: &mut OctantApp, var_info: &VariableInfo) {
     let Some(c) = var_info.channel_axis() else {
         return;
     };
-    let is_tiff = matches!(
-        app.selected.store_kind,
-        StoreKind::LocalGeoTiff | StoreKind::RemoteGeoTiff
-    );
+    let is_tiff = app.selected.store_kind.is_geotiff();
     let spatial = app
         .selected
         .dim_config

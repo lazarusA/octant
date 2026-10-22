@@ -37,8 +37,9 @@ pub fn overlay_selection(
 
 /// Gives `overlay`'s dimensions the `base` window in place: roles, ranges
 /// and indices of the base's dimension of the same name (clamped to the
-/// overlay's sizes); the others keep their index and range (0 when new; a
-/// channel range follows the composite, `fit_overlay_channels`), with no role.
+/// overlay's sizes); its channel axis (whose range follows its composite,
+/// `fit_overlay_channels`) and the others keep their index and range (0 when
+/// new), with no role.
 /// Whether the window moved:
 /// other roles, ranges or fixed indices (the animated index alone, a playback
 /// step, does not count). Allocates only when the roles change.
@@ -53,6 +54,7 @@ pub fn follow_base_window(base: &VariableSelection, overlay: &mut VariableSelect
         return false;
     };
     let rank = var.shape.len();
+    let channel = var.channel_axis();
     let mut changed = overlay.dim_config.len() != rank;
     overlay.dim_config.resize(rank, DimConfig::default());
     overlay.dim_indices.resize(rank, 0);
@@ -62,8 +64,10 @@ pub fn follow_base_window(base: &VariableSelection, overlay: &mut VariableSelect
             .shape
             .get(i)
             .map_or(0, |&n| (n as usize).saturating_sub(1));
-        // Dimensions the base lacks keep their own index and range, no role.
-        let (config, index, range) = base_dim(base, base_var, name, last).unwrap_or((
+        // The overlay's channel axis and dimensions the base lacks keep their
+        // own index and range, no role.
+        let shared = (channel != Some(i)).then(|| base_dim(base, base_var, name, last));
+        let (config, index, range) = shared.flatten().unwrap_or((
             DimConfig::default(),
             overlay.dim_indices[i].min(last),
             (

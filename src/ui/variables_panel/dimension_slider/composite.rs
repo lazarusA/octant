@@ -39,18 +39,12 @@ pub fn init_layer_composite_defaults(app: &mut OctantApp, id: LayerId, var_info:
 pub(crate) fn opens_in_color(var_info: &VariableInfo, is_tiff: bool) -> bool {
     let attr = |key: &str| var_info.attributes.get(key).map(String::as_str);
     let bands = var_info.shape.first().copied().unwrap_or(0);
-    let cmyk = || {
-        crate::data::slicing::composite::cmyk::is_cmyk_attrs(|key| match key {
-            "long_name" => var_info.long_name.as_deref(),
-            _ => attr(key),
-        })
-    };
     is_tiff
         && var_info.shape.len() >= 3
         && match bands {
             3 => true,
             4 if attr("alpha_band") == Some("last") => true,
-            _ => bands >= 4 && cmyk(),
+            _ => bands >= 4 && crate::data::slicing::composite::cmyk::is_cmyk_var(var_info),
         }
 }
 

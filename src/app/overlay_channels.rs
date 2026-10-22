@@ -12,22 +12,12 @@ impl OctantApp {
         if id == LayerId::BASE {
             return;
         }
-        // A named or OME channel axis only, never the dimension-0 fallback
-        // (`layer_channel_dim`), and not one the base has: that follows the base.
-        let base_has = |name: &str| {
-            self.plotted_variable_info().is_some_and(|b| {
-                b.dimension_names
-                    .iter()
-                    .any(|n| n.eq_ignore_ascii_case(name))
-            })
-        };
         let Some(var) = self.layer_variable_info(id) else {
             return;
         };
-        let Some(c) = var
-            .channel_axis()
-            .filter(|&c| !var.dimension_names.get(c).is_some_and(|n| base_has(n)))
-        else {
+        // A named or OME channel axis only, never `layer_channel_dim`'s
+        // dimension-0 fallback; `follow_base_window` leaves it to us.
+        let Some(c) = var.channel_axis() else {
             return;
         };
         let last = var

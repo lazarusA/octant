@@ -129,3 +129,16 @@ fn an_overlay_without_a_band_dimension_keeps_the_base_time_window() {
     // `time` is dimension 0, where `layer_channel_dim` falls back to.
     assert_eq!(overlay.selection().dim_ranges[0], (0, 2));
 }
+
+#[test]
+fn an_overlay_keeps_its_bands_over_a_banded_base() {
+    let (mut app, meta) = memory_app();
+    let base = selection_of(&mut app, &meta, "rgb");
+    assert_eq!(base.dim_ranges[0], (0, 0), "the base opens on one band");
+    let mut overlay = base.clone();
+    overlay.dim_ranges[0] = (0, 2);
+    crate::app::layers::follow_base_window(&base, &mut overlay);
+    assert_eq!(overlay.dim_ranges[0], (0, 2), "its composite's bands");
+    let moved = crate::app::layers::follow_base_window(&base, &mut overlay);
+    assert!(!moved, "a later sync leaves it alone, so nothing reloads");
+}
