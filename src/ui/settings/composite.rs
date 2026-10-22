@@ -87,11 +87,12 @@ fn toggle_text(has_mc: bool, is_cmyk: bool) -> (K, K) {
     }
 }
 
-/// Layer `id`'s selected band range, or every band without a band dimension
-/// and for overlays, which have no band slider (`fit_overlay_channels`).
+/// Layer `id`'s selected band range (an overlay's shared band follows the
+/// base's slider), or every band without a band dimension and for an overlay
+/// whose bands follow its composite (`overlay_own_channel`).
 pub(super) fn get_selected_channel_range(app: &OctantApp, id: LayerId) -> (usize, usize) {
     match app.layer_channel_dim(id) {
-        Some(c_idx) if id == LayerId::BASE => app.layer_dim_range(id, c_idx),
+        Some(c_idx) if app.overlay_own_channel(id).is_none() => app.layer_dim_range(id, c_idx),
         _ => (0, usize::MAX),
     }
 }

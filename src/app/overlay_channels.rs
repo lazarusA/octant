@@ -1,23 +1,35 @@
 //! An overlay's channel range: overlays have no band slider, so the bands
-//! they read follow their composite.
+//! they read follow their composite, unless the base shares their band
+//! dimension, whose slider then picks them for both.
 
 use crate::app::OctantApp;
-use crate::app::layers::LayerId;
+use crate::app::layers::{LayerId, dim_named};
 
 impl OctantApp {
+    /// Overlay `id`'s channel axis when it sets its own range: a named or OME
+    /// channel axis (never `layer_channel_dim`'s dimension-0 fallback) that
+    /// the base lacks. A shared one follows the base's slider like any
+    /// dimension (`follow_base_window`).
+    pub(crate) fn overlay_own_channel(&self, id: LayerId) -> Option<usize> {
+        if id == LayerId::BASE {
+            return None;
+        }
+        let var = self.layer_variable_info(id)?;
+        let c = var.channel_axis()?;
+        let name = var.dimension_names.get(c)?;
+        let shared = self
+            .plotted_variable_info()
+            .is_some_and(|base| dim_named(base, name).is_some());
+        (!shared).then_some(c)
+    }
+
     /// Sets overlay `id`'s channel range to the bands its composite draws
     /// (CMYK's inks, the ticked channels or the R/G/B bands), or to its one
-    /// band while the composite is off. The base layer's follows its slider.
+    /// band while the composite is off, when it owns that axis
+    /// (`overlay_own_channel`).
     pub(crate) fn fit_overlay_channels(&mut self, id: LayerId) {
-        if id == LayerId::BASE {
-            return;
-        }
-        let Some(var) = self.layer_variable_info(id) else {
-            return;
-        };
-        // A named or OME channel axis only, never `layer_channel_dim`'s
-        // dimension-0 fallback; `follow_base_window` leaves it to us.
-        let Some(c) = var.channel_axis() else {
+        let (Some(c), Some(var)) = (self.overlay_own_channel(id), self.layer_variable_info(id))
+        else {
             return;
         };
         let last = var

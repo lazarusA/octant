@@ -131,14 +131,34 @@ fn an_overlay_without_a_band_dimension_keeps_the_base_time_window() {
 }
 
 #[test]
-fn an_overlay_keeps_its_bands_over_a_banded_base() {
+fn a_band_shared_with_the_base_follows_its_slider() {
     let (mut app, meta) = memory_app();
-    let base = selection_of(&mut app, &meta, "rgb");
-    assert_eq!(base.dim_ranges[0], (0, 0), "the base opens on one band");
-    let mut overlay = base.clone();
-    overlay.dim_ranges[0] = (0, 2);
-    crate::app::layers::follow_base_window(&base, &mut overlay);
-    assert_eq!(overlay.dim_ranges[0], (0, 2), "its composite's bands");
-    let moved = crate::app::layers::follow_base_window(&base, &mut overlay);
-    assert!(!moved, "a later sync leaves it alone, so nothing reloads");
+    make_resident(&mut app, &SliceRequest::full_range("rgb", &[3, 5, 4]));
+    let mut base = selection_of(&mut app, &meta, "rgb");
+    base.dim_ranges[0] = (1, 2);
+    base.dim_config[0].range = (1, 2);
+    *app.layers.base.selection_mut() = base.clone();
+    app.selected = base;
+    app.load_selected_variable_block();
+
+    // The same arrays in another store, overlaid on the plotted `rgb`.
+    let other = crate::app::test_support::add_memory_dataset(&mut app, "memory://other");
+    let mut staged = selection_of(&mut app, &other, "rgb");
+    staged.store_target = "memory://other".into();
+    app.selected = staged;
+    let id = app.add_overlay(index_of(&other, "rgb")).expect("overlay");
+    assert_eq!(app.overlay_own_channel(id), None, "the base has `band`");
+
+    // Ticked channels outside the base's bands don't widen them.
+    if let Some(layer) = app.layers.get_mut(id) {
+        layer.composite.enabled = true;
+        layer
+            .composite
+            .channel_configs
+            .iter_mut()
+            .for_each(|c| c.visible = true);
+    }
+    app.fit_overlay_channels(id);
+    let overlay = app.layers.get(id).expect("overlay");
+    assert_eq!(overlay.selection().dim_ranges[0], (1, 2));
 }
