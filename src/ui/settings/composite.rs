@@ -87,21 +87,11 @@ fn toggle_text(has_mc: bool, is_cmyk: bool) -> (K, K) {
     }
 }
 
-/// Layer `id`'s selected band range (an overlay's shared band follows the
-/// base's slider), or every band without a band dimension and for an overlay
-/// whose bands follow its composite (`overlay_own_channel`).
-pub(super) fn get_selected_channel_range(app: &OctantApp, id: LayerId) -> (usize, usize) {
-    match app.layer_channel_dim(id) {
-        Some(c_idx) if app.overlay_own_channel(id).is_none() => app.layer_dim_range(id, c_idx),
-        _ => (0, usize::MAX),
-    }
-}
-
 /// Layer `id`'s multi-channel overlay: the channel buttons, then one row per
 /// channel with its display settings behind a chevron; reloads the layer
 /// when a channel settles on a change.
 fn show_multichannel_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
-    let (start, end) = get_selected_channel_range(app, id);
+    let (start, end) = app.layer_channel_range(id);
     let Some(layer) = app.layers.get_mut(id) else {
         return;
     };

@@ -23,6 +23,16 @@ impl OctantApp {
         (!shared).then_some(c)
     }
 
+    /// Layer `id`'s selected channel range (an overlay's shared band follows
+    /// the base's slider), or every channel without a channel dimension and
+    /// for an overlay whose channels follow its composite.
+    pub(crate) fn layer_channel_range(&self, id: LayerId) -> (usize, usize) {
+        match self.layer_channel_dim(id) {
+            Some(c) if self.overlay_own_channel(id).is_none() => self.layer_dim_range(id, c),
+            _ => (0, usize::MAX),
+        }
+    }
+
     /// Sets overlay `id`'s channel range to the bands its composite draws
     /// (CMYK's inks, the ticked channels or the R/G/B bands), or to its one
     /// band while the composite is off, when it owns that axis

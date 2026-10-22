@@ -21,7 +21,7 @@ const RGB_CHANNELS: [(&str, egui::Color32, &str); 3] = [
 /// width, otherwise stacked, one channel per row.
 pub(super) fn show_standard_rgb_controls(app: &mut OctantApp, ui: &mut egui::Ui, id: LayerId) {
     let num_b = app.layer_num_bands(id);
-    let (c_start, c_end) = super::composite::get_selected_channel_range(app, id);
+    let (c_start, c_end) = app.layer_channel_range(id);
     let min_b = c_start.min(num_b.saturating_sub(1));
     let max_b = c_end.min(num_b.saturating_sub(1)).max(min_b);
 

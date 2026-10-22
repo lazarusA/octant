@@ -159,11 +159,8 @@ pub fn build_labels(
 /// The base layer's channel window, `(start, count)`; every channel without a channel
 /// dimension.
 fn channel_window(app: &OctantApp) -> (usize, usize) {
-    app.layer_channel_dim(LayerId::BASE)
-        .map_or((0, usize::MAX), |c| {
-            let (lo, hi) = app.layer_dim_range(LayerId::BASE, c);
-            (lo, hi.saturating_sub(lo).saturating_add(1))
-        })
+    let (lo, hi) = app.layer_channel_range(LayerId::BASE);
+    (lo, hi.saturating_sub(lo).saturating_add(1))
 }
 
 /// Mirrors the projection's choice between the tinted overlay and the RGB band mapping.

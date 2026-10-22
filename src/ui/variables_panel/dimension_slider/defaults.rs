@@ -127,12 +127,6 @@ fn apply_omero_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
         return;
     };
     let image = &ome.image;
-    if let (Some(k), Some(c)) = (
-        image.greyscale_channel(),
-        image.axis_of_kind(crate::data::ome::AxisKind::Channel),
-    ) {
-        pin_dim(app, var_info, c, k);
-    }
     if let (Some(dz), Some(z)) = (image.default_z, image.z_axis()) {
         pin_dim(app, var_info, z, dz);
     }
