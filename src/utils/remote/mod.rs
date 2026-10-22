@@ -1,12 +1,14 @@
 //! Remote storage URL parsing, S3 configuration, and virtual chunk container helpers.
 
 pub mod icechunk;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod s3;
 pub mod url;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use icechunk::{
-    build_icechunk_s3_options, discover_bucket_region, register_standard_virtual_chunk_containers,
-};
+pub use icechunk::{build_icechunk_s3_options, register_standard_virtual_chunk_containers};
+#[cfg(not(target_arch = "wasm32"))]
+pub use s3::{discover_bucket_region, s3_as_https};
 pub use url::{ParsedStorageUrl, parse_remote_storage_url, s3_to_https};
 
 #[cfg(test)]

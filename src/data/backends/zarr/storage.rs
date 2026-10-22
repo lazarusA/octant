@@ -21,7 +21,7 @@ use zarrs_object_store::AsyncObjectStore;
 pub fn build_sync_store(
     url: &str,
 ) -> Result<ReadableWritableListableStorage, Box<dyn Error + Send + Sync>> {
-    let clean_url = url.trim_end_matches('/');
+    let clean_url = &crate::utils::remote::s3_as_https(url.trim_end_matches('/'));
 
     let options = ClientOptions::new()
         .with_allow_http(true)

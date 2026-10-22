@@ -2,12 +2,12 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use zarrs::array::ArraySubset;
 use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
 use zarrs::storage::ReadableWritableListableStorage;
 
 use super::block_coords::{BlockWindow, block_coordinates};
-use super::slice::{ChunkReader, retrieve_array_subset_as_f32};
+use super::quantization::Quantization;
+use super::slice::{ChunkReader, retrieve_array_subset_as_f32, window_subset};
 use super::storage::ZarrArrayHandle;
 use crate::data::blocks::{BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
@@ -20,7 +20,7 @@ use crate::utils::metadata::attr_string;
 use zarrs::array::ArrayShardedReadableExtCache;
 
 /// The clamped `(origin, shape)` window of every dimension selected by `request`.
-fn selection_window(
+pub(super) fn selection_window(
     request: &SliceRequest,
     shape: &[u64],
 ) -> Result<(Vec<usize>, Vec<usize>), BlockStoreError> {
@@ -101,19 +101,14 @@ pub(super) fn inherited_attributes(
 /// The values of the window `origin..origin + shape` of `array`, through
 /// `reader`; label ids kept bit-exact when `labels` (see
 /// `retrieve_array_subset_as_label_bits`).
-fn read_window(
+pub(super) fn read_window(
     array: &ZarrArrayHandle,
     reader: ChunkReader<'_>,
     variable: &str,
     (origin, shape): (&[usize], &[usize]),
     labels: bool,
 ) -> Result<Vec<f32>, BlockStoreError> {
-    let ranges: Vec<_> = origin
-        .iter()
-        .zip(shape)
-        .map(|(&start, &len)| start as u64..(start + len) as u64)
-        .collect();
-    let subset = ArraySubset::new_with_ranges(&ranges);
+    let subset = window_subset(origin, shape);
     log::debug!(
         "[ZarrBlock] Fetching '{variable}' subset {:?} (elements = {})",
         subset.to_ranges(),
@@ -156,24 +151,30 @@ pub(super) struct ArrayCachedState {
     pub attributes: Arc<HashMap<String, String>>,
     /// Set for OME-Zarr level arrays, whose blocks keep their stored order.
     pub ome: Option<LevelArray>,
+    /// Set for quantised embedding arrays, whose codes become values.
+    pub quantization: Option<Quantization>,
 }
 
-/// Fetches an arbitrary-rank hyperslab from an already-opened `ZarrArrayHandle` through a chunk cache.
+/// Fetches a hyperslab of an opened array through its chunk cache, scaled by `scales` when quantised.
 pub(super) fn fetch_block_from_cached_array(
     cached: &ArrayCachedState,
+    scales: Option<&ArrayCachedState>,
     store: &ReadableWritableListableStorage,
     store_url: &str,
     request: &SliceRequest,
     mut on_progress: ProgressCallback,
 ) -> Result<OctantBlock, BlockStoreError> {
     let (origin, block_shape) = selection_window(request, cached.array.shape())?;
-    let raw_values = read_window(
+    let mut raw_values = read_window(
         &cached.array,
         cached.reader.chunk_reader(),
         &request.variable,
         (&origin, &block_shape),
         cached.ome.as_ref().is_some_and(|l| l.labels),
     )?;
+    if let Some(q) = &cached.quantization {
+        q.apply(scales, (&origin, &block_shape), &mut raw_values)?;
+    }
     if let Some(ref mut cb) = on_progress {
         cb((raw_values.len() * std::mem::size_of::<f32>()) as u64);
     }

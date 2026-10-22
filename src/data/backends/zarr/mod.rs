@@ -11,6 +11,11 @@ mod coords_numeric_tests;
 mod coords_tests;
 pub mod generic;
 mod open_arrays;
+mod quantization;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod quantization_network_tests;
+#[cfg(test)]
+mod quantization_tests;
 mod reader;
 #[cfg(test)]
 mod sharding_tests;
