@@ -3,8 +3,8 @@
 
 use serde_json::json;
 
-use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::app::{OctantApp, SpatialRole};
 use crate::data::VariableInfo;
 use crate::data::ome::ChannelFamily;
 use crate::data::ome::test_support::Fixture;
@@ -100,6 +100,35 @@ fn greyscale_images_show_their_first_active_channel() {
     assert!(!composite.enabled);
     assert_eq!(composite.channel_configs.len(), 2);
     assert!(crate::utils::colormap::registry::find("classic:gray").is_some());
+}
+
+#[test]
+fn a_channel_axis_named_otherwise_is_still_pinned_never_spatial() {
+    // A `(ch, y, x)` greyscale image: no z axis takes the Z role first.
+    let axes = json!([
+        { "name": "ch", "type": "channel" },
+        { "name": "y", "type": "space", "unit": "micrometer" },
+        { "name": "x", "type": "space", "unit": "micrometer" }
+    ]);
+    let attrs = json!({
+        "multiscales": [{ "version": "0.4", "axes": axes, "datasets": [{ "path": "0",
+            "coordinateTransformations": [{ "type": "scale", "scale": [1.0, 0.25, 0.25] }] }] }],
+        "omero": {
+            "rdefs": { "model": "greyscale" },
+            "channels": [
+                { "label": "off", "color": "FF0000", "active": false },
+                { "label": "on", "color": "00FF00", "active": true }
+            ]
+        }
+    });
+    let found = Fixture::default()
+        .v2_group("", attrs)
+        .v2_array("0", &[2, 8, 8])
+        .discover()
+        .expect("ome");
+    let app = defaults_for(&found.variables[0]);
+    assert_eq!(app.selected.dim_config[0].spatial, SpatialRole::None);
+    assert_eq!(app.selected.dim_ranges[0], (1, 1));
 }
 
 #[test]

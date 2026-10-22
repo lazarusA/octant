@@ -10,6 +10,11 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
     let mut y_assigned = false;
     let mut z_assigned = false;
     let mut anim_assigned = false;
+    // Named like a channel, or the OME channel axis whatever its name.
+    let channel_axis = var_info.channel_axis();
+    let is_channel = |i: usize, name: &str| {
+        Some(i) == channel_axis || crate::data::coordinates::naming::is_channel_dim_name(name)
+    };
 
     // 1. Explicit naming recognition
     for i in 0..rank {
@@ -46,7 +51,7 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
             .get(i)
             .map(|s| s.as_str())
             .unwrap_or("");
-        if crate::data::coordinates::naming::is_channel_dim_name(dim_name) {
+        if is_channel(i, dim_name) {
             continue;
         }
         if app.selected.dim_config[i].spatial == SpatialRole::None
@@ -73,7 +78,7 @@ pub fn assign_euclidean_roles(app: &mut OctantApp, var_info: &VariableInfo) {
                 .get(i)
                 .map(|s| s.as_str())
                 .unwrap_or("");
-            if crate::data::coordinates::naming::is_channel_dim_name(dim_name) {
+            if is_channel(i, dim_name) {
                 continue;
             }
             if app.selected.dim_config[i].spatial == SpatialRole::None {
