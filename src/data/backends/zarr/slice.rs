@@ -88,6 +88,16 @@ fn decode_other<R: SubsetRetriever>(
     }
 }
 
+/// The window `origin..origin + shape` as an array subset.
+pub(super) fn window_subset(origin: &[usize], shape: &[usize]) -> ArraySubset {
+    let ranges: Vec<_> = origin
+        .iter()
+        .zip(shape)
+        .map(|(&start, &len)| start as u64..(start + len) as u64)
+        .collect();
+    ArraySubset::new_with_ranges(&ranges)
+}
+
 /// Dtype-conversion and calibration helper for reading array subsets as f32 through `reader`.
 pub fn retrieve_array_subset_as_f32<TStorage: ?Sized + ReadableStorageTraits + 'static>(
     array: &Array<TStorage>,

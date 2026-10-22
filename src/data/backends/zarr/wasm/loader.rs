@@ -216,6 +216,15 @@ pub async fn load_one_wasm_with_progress(
         }
     };
 
+    // A quantised embedding block multiplies by its scale array's window.
+    let _scales = match store.generic_store.scale_window(&request.slice) {
+        Some((path, subset)) => Some(
+            store
+                .preload_chunks_for_subset(&path, &subset, None)
+                .await?,
+        ),
+        None => None,
+    };
     let _coords = store.preload_block_coordinates(&request.slice).await;
 
     // Now decode the slice synchronously from in-memory chunks

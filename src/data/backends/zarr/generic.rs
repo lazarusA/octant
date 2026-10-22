@@ -5,16 +5,18 @@ use std::sync::{Arc, OnceLock};
 
 use super::block::{
     ArrayCachedState, ArrayReader, fetch_block_from_cached_array, inherited_attributes,
+    selection_window,
 };
 use super::open_arrays::{OpenArrays, chunk_cache_bytes};
+use super::quantization::{self, PixelScale, Quantization};
 use super::storage::{open_raw_array, root_consolidated};
 use crate::data::backends::coord_bounds::fetch_all_dimension_coordinates_for_variables;
 use crate::data::blocks::{BlockResult, BlockStore, BlockStoreError, ProgressCallback};
 use crate::data::octant_block::OctantBlock;
 use crate::data::slice_request::SliceRequest;
 use crate::data::{CoordValues, DatasetMetadata, VariableInfo};
-use zarrs::array::ArrayShardedReadableExtCache;
 use zarrs::array::chunk_cache::ChunkCacheDecodedLruSizeLimit;
+use zarrs::array::{ArrayShardedReadableExtCache, ArraySubset};
 use zarrs::metadata_ext::group::consolidated_metadata::ConsolidatedMetadataMetadata;
 use zarrs::storage::ReadableWritableListableStorage;
 
@@ -98,6 +100,31 @@ impl GenericZarrBlockStore {
         Ok((vars, None))
     }
 
+    /// The per-pixel scale of embedding array `name` (of `shape`), opened.
+    fn pixel_scale(
+        &self,
+        name: &str,
+        shape: &[u64],
+        attributes: &HashMap<String, String>,
+    ) -> Option<PixelScale> {
+        let path = quantization::scale_path(attributes, name, shape)?;
+        let scales = self
+            .get_or_open_array(&path)
+            .inspect_err(|e| log::warn!("[Zarr] '{name}' keeps its quantised values: {e}"))
+            .ok()?;
+        let dim = quantization::embedding_dim(attributes, shape, scales.array.shape())?;
+        Some(PixelScale { path, dim })
+    }
+
+    /// The scale array and window a block for `request` multiplies by, for
+    /// the browser to fetch alongside the block's chunks.
+    pub fn scale_window(&self, request: &SliceRequest) -> Option<(String, ArraySubset)> {
+        let cached = self.get_or_open_array(&request.variable).ok()?;
+        let q = cached.quantization.as_ref()?.scale_array()?;
+        let (origin, shape) = selection_window(request, cached.array.shape()).ok()?;
+        Some((q.path.clone(), q.subset(&origin, &shape)))
+    }
+
     fn open(&self, name: &str) -> Result<(Arc<ArrayCachedState>, u64), BlockStoreError> {
         let raw_array = open_raw_array(&self.storage, name, self.consolidated())?;
         let sharded = zarrs::array::ArrayShardedExt::is_sharded(&raw_array);
@@ -109,6 +136,10 @@ impl GenericZarrBlockStore {
         };
         let reader = crate::data::ome::MetaReader::direct(self.storage.clone());
         let attributes = inherited_attributes(&raw_array, &reader, name);
+        let quantization = self
+            .pixel_scale(name, raw_array.shape(), &attributes)
+            .map(Quantization::PerPixel)
+            .or_else(|| quantization::value_quantization(&attributes, raw_array.shape()));
         let ome = crate::data::ome::level::level_array(
             &reader,
             name,
@@ -127,6 +158,7 @@ impl GenericZarrBlockStore {
             array,
             attributes: Arc::new(attributes),
             ome,
+            quantization,
         };
         Ok((Arc::new(cached), cache_bytes))
     }
@@ -184,8 +216,15 @@ impl BlockStore for GenericZarrBlockStore {
         on_progress: ProgressCallback,
     ) -> Result<OctantBlock, BlockStoreError> {
         let cached = self.get_or_open_array(&request.variable)?;
+        let scales = cached
+            .quantization
+            .as_ref()
+            .and_then(Quantization::scale_array)
+            .map(|q| self.get_or_open_array(&q.path))
+            .transpose()?;
         fetch_block_from_cached_array(
             &cached,
+            scales.as_deref(),
             &self.storage,
             &self.source_url,
             request,

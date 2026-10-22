@@ -25,20 +25,6 @@ pub fn build_icechunk_s3_options(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-/// The AWS region of `bucket`, from the `x-amz-bucket-region` header S3 sends
-/// any anonymous request, or `None` when the bucket does not answer.
-pub async fn discover_bucket_region(bucket: &str) -> Option<String> {
-    let url = format!("https://{bucket}.s3.amazonaws.com/");
-    let resp = crate::data::backends::http::get_http_client()
-        .head(&url)
-        .send()
-        .await
-        .ok()?;
-    let region = resp.headers().get("x-amz-bucket-region")?.to_str().ok()?;
-    Some(region.to_string())
-}
-
-#[cfg(not(target_arch = "wasm32"))]
 /// Registers standard open-data and virtual chunk container prefixes in the Icechunk repository configuration.
 pub fn register_standard_virtual_chunk_containers(
     repo_config: &mut icechunk::config::RepositoryConfig,
