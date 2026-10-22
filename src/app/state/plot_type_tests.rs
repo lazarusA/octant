@@ -18,6 +18,23 @@ fn leaving_3d_keeps_a_staged_2d_variable_whole() {
     let staged = app.selected.dim_ranges.clone();
     app.switch_plot_type(PlotType::Surface);
     assert_eq!(app.selected.dim_ranges, staged);
-    // The plotted composite keeps every band.
+    // The volume stacked the bands along Z, all of them; they stay.
     assert_eq!(app.plotted().dim_ranges[0], (0, 2));
+}
+
+/// A composite through 3D and back keeps its selected bands, never all of them.
+#[test]
+fn a_composite_keeps_its_bands_through_3d() {
+    let (mut app, meta) = memory_app();
+    let mut rgb = selection_of(&mut app, &meta, "rgb");
+    rgb.dim_ranges[0] = (0, 1);
+    rgb.dim_config[0].range = (0, 1);
+    *app.layers.base.selection_mut() = rgb.clone();
+    app.selected = rgb;
+    app.layers.base.composite.enabled = true;
+
+    app.switch_plot_type(PlotType::Volume);
+    app.switch_plot_type(PlotType::Heatmap);
+    assert_eq!(app.selected.dim_ranges[0], (0, 1));
+    assert_eq!(app.plotted().dim_ranges[0], (0, 1));
 }
