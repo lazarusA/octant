@@ -182,15 +182,15 @@ pub(super) fn dequantise(values: &mut [f32], scales: &[f32], shape: &[usize], di
     let Some(&len) = shape.get(dim) else {
         return;
     };
-    let inner = shape[dim + 1..]
+    let Some(inner) = shape[dim + 1..]
         .iter()
-        .try_fold(1usize, |n, &d| n.checked_mul(d));
-    let Some((inner, step)) = inner.and_then(|i| Some((i, len.checked_mul(i)?))) else {
+        .try_fold(1usize, |n, &d| n.checked_mul(d))
+    else {
         return;
     };
-    if step == 0 {
+    let Some(step) = len.checked_mul(inner).filter(|&s| s > 0) else {
         return;
-    }
+    };
     for (block, row) in values.chunks_mut(step).zip(scales.chunks(inner)) {
         for along in block.chunks_mut(inner) {
             for (v, &s) in along.iter_mut().zip(row) {
