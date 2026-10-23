@@ -101,6 +101,13 @@ impl VoiceBar {
     /// Feeds the samples recorded since the last frame to the disk and the
     /// provider, and takes the provider's text.
     fn update(&mut self, ctx: &egui::Context) {
+        // A refused microphone (the web's prompt): stop listening and drop
+        // the provider so no model downloads for audio that never comes.
+        if self.listening.as_ref().is_some_and(|l| l.capture.failed()) {
+            self.listening = None;
+            self.stt = None;
+            self.pulsar.reset();
+        }
         if let Some(stt) = &mut self.stt {
             let mut gave_up = false;
             while let Some(event) = stt.poll() {

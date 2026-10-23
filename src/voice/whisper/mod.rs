@@ -151,7 +151,7 @@ impl Whisper {
             }
             let logits = logits.broadcast_add(&self.suppress)?;
             let next = logits.argmax(0)?.to_scalar::<u32>()?;
-            if next == eot || ids.len() >= max_tokens {
+            if next == eot {
                 break;
             }
             sum_logprob += log_softmax(&logits, 0)?

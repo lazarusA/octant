@@ -110,9 +110,9 @@ fn fetch(
     cancelled: &dyn Fn() -> bool,
     mut progress: impl FnMut(usize),
 ) -> Result<(), String> {
-    // No overall timeout: the largest model takes minutes on a slow line.
+    // The blocking timeout (30 s by default) bounds each read, not the whole
+    // download, so a stalled connection fails instead of hanging.
     let client = reqwest::blocking::Client::builder()
-        .timeout(None)
         .connect_timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;

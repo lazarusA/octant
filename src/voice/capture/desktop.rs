@@ -38,6 +38,11 @@ impl Capture {
         self.rate
     }
 
+    /// The microphone will never open; the desktop knows at `start`.
+    pub fn failed(&self) -> bool {
+        false
+    }
+
     /// Moves the samples recorded since the last call into `out`.
     pub fn drain(&self, out: &mut Vec<f32>) {
         if let Ok(mut pending) = self.samples.lock() {

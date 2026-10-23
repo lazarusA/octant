@@ -20,6 +20,8 @@ struct Shared {
     samples: RefCell<Vec<f32>>,
     rate: Cell<u32>,
     stopped: Cell<bool>,
+    /// The browser refused the microphone or it failed to open.
+    failed: Cell<bool>,
     live: RefCell<Option<Live>>,
 }
 
@@ -53,6 +55,7 @@ impl Capture {
                 .await
                 .and_then(|stream| connect(&pending, stream.unchecked_into()));
             if let Err(e) = opened {
+                pending.failed.set(true);
                 crate::ui::toast::report(
                     crate::ui::toast::Severity::Error,
                     crate::i18n::tr(crate::i18n::PlaybackKey::VoiceMicError),
@@ -66,6 +69,11 @@ impl Capture {
     /// Samples per second; 0 until the microphone opens.
     pub fn sample_rate(&self) -> u32 {
         self.shared.rate.get()
+    }
+
+    /// The microphone will never open (refused or failed; already reported).
+    pub fn failed(&self) -> bool {
+        self.shared.failed.get()
     }
 
     /// Moves the samples recorded since the last call into `out`.
