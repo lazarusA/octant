@@ -105,8 +105,23 @@ fn connect(shared: &Rc<Shared>, stream: MediaStream) -> Result<(), JsValue> {
         stop_tracks(&stream);
         return Ok(());
     }
+    match graph(shared, &stream) {
+        Ok(live) => {
+            *shared.live.borrow_mut() = Some(live);
+            Ok(())
+        }
+        Err(e) => {
+            // A graph that failed halfway must not leave the microphone on.
+            stop_tracks(&stream);
+            Err(e)
+        }
+    }
+}
+
+/// The audio graph copying `stream`'s samples into `shared`.
+fn graph(shared: &Rc<Shared>, stream: &MediaStream) -> Result<Live, JsValue> {
     let context = AudioContext::new()?;
-    let source = context.create_media_stream_source(&stream)?;
+    let source = context.create_media_stream_source(stream)?;
     let processor = context
         .create_script_processor_with_buffer_size_and_number_of_input_channels_and_number_of_output_channels(
             BLOCK, 1, 1,
@@ -124,9 +139,13 @@ fn connect(shared: &Rc<Shared>, stream: MediaStream) -> Result<(), JsValue> {
             }
         });
     processor.set_onaudioprocess(Some(on_audio.as_ref().unchecked_ref()));
+    source.connect_with_audio_node(&processor)?;
+    // The processor only runs while connected; its output stays silent.
+    processor.connect_with_audio_node(&context.destination())?;
     // The browser ends the track when the microphone is unplugged or its
     // permission revoked (never for our own `stop`): reported, and the voice
-    // bar stops listening.
+    // bar stops listening. Set last, after everything that can fail, so a
+    // track never keeps a dropped handler.
     let sink = Rc::downgrade(shared);
     let on_ended = Closure::<dyn FnMut()>::new(move || {
         let Some(shared) = sink.upgrade() else { return };
@@ -143,19 +162,15 @@ fn connect(shared: &Rc<Shared>, stream: MediaStream) -> Result<(), JsValue> {
             track.set_onended(Some(on_ended.as_ref().unchecked_ref()));
         }
     }
-    source.connect_with_audio_node(&processor)?;
-    // The processor only runs while connected; its output stays silent.
-    processor.connect_with_audio_node(&context.destination())?;
     shared.rate.set(context.sample_rate() as u32);
-    *shared.live.borrow_mut() = Some(Live {
+    Ok(Live {
         context,
-        stream,
+        stream: stream.clone(),
         _source: source,
         processor,
         _on_audio: on_audio,
         _on_ended: on_ended,
-    });
-    Ok(())
+    })
 }
 
 fn stop_tracks(stream: &MediaStream) {

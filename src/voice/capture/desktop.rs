@@ -1,11 +1,15 @@
+use cpal::ErrorKind;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SampleFormat, SizedSample, StreamConfig};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub struct Capture {
     _stream: cpal::Stream,
     samples: Arc<Mutex<Vec<f32>>>,
     rate: u32,
+    /// The stream broke for good (the microphone unplugged).
+    failed: Arc<AtomicBool>,
 }
 
 impl Capture {
@@ -17,11 +21,12 @@ impl Capture {
         let supported = device.default_input_config().map_err(|e| e.to_string())?;
         let config = supported.config();
         let samples = Arc::new(Mutex::new(Vec::new()));
+        let failed = Arc::new(AtomicBool::new(false));
         let stream = match supported.sample_format() {
-            SampleFormat::F32 => build::<f32>(&device, config, &samples),
-            SampleFormat::I16 => build::<i16>(&device, config, &samples),
-            SampleFormat::I32 => build::<i32>(&device, config, &samples),
-            SampleFormat::U16 => build::<u16>(&device, config, &samples),
+            SampleFormat::F32 => build::<f32>(&device, config, &samples, &failed),
+            SampleFormat::I16 => build::<i16>(&device, config, &samples, &failed),
+            SampleFormat::I32 => build::<i32>(&device, config, &samples, &failed),
+            SampleFormat::U16 => build::<u16>(&device, config, &samples, &failed),
             other => return Err(format!("unsupported sample format {other}")),
         }
         .map_err(|e| e.to_string())?;
@@ -30,6 +35,7 @@ impl Capture {
             _stream: stream,
             samples,
             rate: config.sample_rate,
+            failed,
         })
     }
 
@@ -38,9 +44,9 @@ impl Capture {
         self.rate
     }
 
-    /// The microphone will never open; the desktop knows at `start`.
+    /// The stream broke for good; already reported.
     pub fn failed(&self) -> bool {
-        false
+        self.failed.load(Ordering::Relaxed)
     }
 
     /// Moves the samples recorded since the last call into `out`.
@@ -56,6 +62,7 @@ fn build<T>(
     device: &cpal::Device,
     config: StreamConfig,
     samples: &Arc<Mutex<Vec<f32>>>,
+    failed: &Arc<AtomicBool>,
 ) -> Result<cpal::Stream, cpal::Error>
 where
     T: SizedSample,
@@ -63,6 +70,7 @@ where
 {
     let channels = usize::from(config.channels.max(1));
     let samples = Arc::clone(samples);
+    let failed = Arc::clone(failed);
     device.build_input_stream(
         config,
         move |data: &[T], _: &cpal::InputCallbackInfo| {
@@ -73,12 +81,24 @@ where
                 super::keep_recent(&mut pending, mono);
             }
         },
-        |err| {
-            crate::ui::toast::report(
-                crate::ui::toast::Severity::Warning,
-                crate::i18n::tr(crate::i18n::PlaybackKey::VoiceMicError),
-                err.to_string(),
+        move |err| {
+            // Glitches (overruns, a rerouted device) keep the stream going.
+            let fatal = matches!(
+                err.kind(),
+                ErrorKind::DeviceNotAvailable
+                    | ErrorKind::StreamInvalidated
+                    | ErrorKind::HostUnavailable
+                    | ErrorKind::PermissionDenied
             );
+            if !fatal {
+                log::warn!("microphone stream: {err}");
+            } else if !failed.swap(true, Ordering::Relaxed) {
+                crate::ui::toast::report(
+                    crate::ui::toast::Severity::Warning,
+                    crate::i18n::tr(crate::i18n::PlaybackKey::VoiceMicError),
+                    err.to_string(),
+                );
+            }
         },
         None,
     )
