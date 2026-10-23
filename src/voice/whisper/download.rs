@@ -21,11 +21,18 @@ pub(super) fn ensure(
     progress: &dyn Fn(f32),
     cancelled: &dyn Fn() -> bool,
 ) -> Result<PathBuf, String> {
-    let _one_at_a_time = DOWNLOADING.lock().unwrap_or_else(|p| p.into_inner());
     let dir = eframe::storage_dir("Octant")
         .ok_or("no data folder")?
         .join("models/whisper")
         .join(size.name());
+    // A model on disk never waits for another one downloading.
+    if models::files(size)
+        .iter()
+        .all(|(f, _)| dir.join(f).exists())
+    {
+        return Ok(dir);
+    }
+    let _one_at_a_time = DOWNLOADING.lock().unwrap_or_else(|p| p.into_inner());
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let total = models::weights_bytes(size) as f32;
     for (file, sha) in models::files(size) {
@@ -119,5 +126,36 @@ fn write_verified(
         Ok(())
     } else {
         Err(format!("checksum {got}, expected {sha256}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_verified;
+    use sha2::{Digest, Sha256};
+    use std::io::Cursor;
+
+    #[test]
+    fn only_a_matching_download_is_accepted() {
+        let dir = std::env::temp_dir().join(format!("octant-verify-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let part = dir.join("model.part");
+        let body = b"weights".to_vec();
+        let sha: String = Sha256::digest(&body)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        let (mut seen, never) = (0, &|| false);
+        let ok = write_verified(&mut Cursor::new(&body), &part, &sha, never, &mut |n| {
+            seen += n
+        });
+        assert_eq!((ok, seen), (Ok(()), body.len()));
+        assert_eq!(std::fs::read(&part).expect("written"), body);
+        let wrong = "0".repeat(64);
+        let err = write_verified(&mut Cursor::new(&body), &part, &wrong, never, &mut |_| {});
+        assert!(err.is_err_and(|e| e.contains("checksum")));
+        let stopped = write_verified(&mut Cursor::new(&body), &part, &sha, &|| true, &mut |_| {});
+        assert!(stopped.is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

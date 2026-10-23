@@ -89,7 +89,9 @@ impl VoiceBar {
                     resampled: Vec::new(),
                     silent: Some(0),
                 });
-                self.stt = stt::open(self.provider);
+                if self.stt.is_none() {
+                    self.stt = stt::open(self.provider);
+                }
                 self.transcript.clear();
             }
             Err(e) => report(Severity::Error, tr(PlaybackKey::VoiceMicError), e),
@@ -100,10 +102,15 @@ impl VoiceBar {
     /// provider, and takes the provider's text.
     fn update(&mut self, ctx: &egui::Context) {
         if let Some(stt) = &mut self.stt {
+            let mut gave_up = false;
             while let Some(event) = stt.poll() {
-                self.transcript.apply(event);
+                gave_up |= self.transcript.apply(event);
             }
-            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+            if gave_up {
+                self.stt = None;
+            } else {
+                ctx.request_repaint_after(std::time::Duration::from_millis(100));
+            }
         }
         let Some(l) = &mut self.listening else {
             return;

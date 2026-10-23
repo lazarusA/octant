@@ -44,7 +44,9 @@ impl Transcript {
         self.jumps += 1;
     }
 
-    pub(super) fn apply(&mut self, event: SttEvent) {
+    /// Takes `event`; true when the provider failed while getting ready, so
+    /// it has stopped and listening again needs a new one.
+    pub(super) fn apply(&mut self, event: SttEvent) -> bool {
         match event {
             SttEvent::Preparing(done) => self.preparing = Some(done),
             SttEvent::Ready => self.preparing = None,
@@ -61,10 +63,11 @@ impl Transcript {
                 }
             }
             SttEvent::Failed(e) => {
-                self.preparing = None;
                 report(Severity::Error, tr(PlaybackKey::VoiceSttFailed), e);
+                return self.preparing.take().is_some();
             }
         }
+        false
     }
 
     /// Draws the text in `rect`; while there is none, the provider getting

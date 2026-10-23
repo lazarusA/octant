@@ -34,7 +34,7 @@ pub async fn fetch(
         return Err(format!("{url}: HTTP {}", response.status()));
     }
     let total = models::weights_bytes(size) as f32;
-    let body = read(&response, |done| {
+    let mut body = read(&response, |done| {
         if file == models::WEIGHTS {
             progress(done as f32 / total);
         }
@@ -47,8 +47,7 @@ pub async fn fetch(
     if got != sha256 {
         return Err(format!("{url}: checksum {got}, expected {sha256}"));
     }
-    let mut copy = body.clone();
-    let stored = Response::new_with_opt_u8_array(Some(&mut copy)).map_err(text)?;
+    let stored = Response::new_with_opt_u8_array(Some(&mut body)).map_err(text)?;
     wait(cache.put_with_str(&url, &stored)).await?;
     Ok(body)
 }
