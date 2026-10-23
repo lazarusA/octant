@@ -1,26 +1,30 @@
 //! OpenAI's Whisper on candle: the model from `candle-transformers`, our
-//! own mel filters (`mel.rs`), vocabulary (`tokens.rs`) and greedy decoding
-//! in the utterance's own language, detected each time. Runs on the Apple
-//! GPU when there is one, else the CPU.
+//! own log-mel (`mel.rs`), vocabulary (`tokens.rs`) and greedy decoding in
+//! the utterance's own language, detected each time. Loaded from the bytes
+//! of its files (`models.rs`): on the desktop from its data folder, on the
+//! Apple GPU when there is one; in the browser's voice worker on the CPU.
 
+#[cfg(not(target_arch = "wasm32"))]
 mod download;
 mod mel;
+pub mod models;
+mod network;
 mod tokens;
 
-pub use download::megabytes;
+pub use models::megabytes;
 
-use crate::voice::stt::{Prep, SttEvent, WhisperSize, WindowModel};
+use crate::voice::stt::WindowModel;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::voice::stt::{Prep, SttEvent, WhisperSize};
 use candle_core::{Device, IndexOp, Tensor};
-use candle_nn::VarBuilder;
 use candle_nn::ops::log_softmax;
 use candle_transformers::models::whisper::{self as m, Config};
-use std::path::Path;
 use tokens::Tokens;
 
 pub struct Whisper {
-    model: m::model::Whisper,
+    model: network::Network,
     tokens: Tokens,
-    filters: Vec<f32>,
+    mel: mel::Mel,
     /// `-inf` for tokens never written: the config's and every special
     /// token but the end of text.
     suppress: Tensor,
@@ -30,18 +34,25 @@ pub struct Whisper {
 /// Downloads `size` if needed and loads it; what [`crate::voice::stt`]
 /// runs on the provider's thread. Once tiny (the default) is ready, base is
 /// downloaded in the background for computers that run it well.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn prepare(size: WhisperSize, prep: &Prep) -> Result<Whisper, String> {
     prep.report(SttEvent::Preparing(Some(0.0)));
     let progress = |done| prep.report(SttEvent::Preparing(Some(done)));
     let dir = download::ensure(size, &progress, &|| prep.cancelled())?;
     prep.report(SttEvent::Preparing(None));
-    let model = Whisper::load(&dir)?;
+    let read = |file: &str| std::fs::read(dir.join(file)).map_err(|e| format!("{file}: {e}"));
+    let model = Whisper::from_bytes(
+        &read("config.json")?,
+        &read("tokenizer.json")?,
+        read(models::WEIGHTS)?,
+    )?;
     if size == WhisperSize::Tiny {
         download::prefetch(WhisperSize::Base);
     }
     Ok(model)
 }
 
+/// The Apple GPU when there is one, else the CPU.
 fn device() -> Device {
     #[cfg(target_os = "macos")]
     if let Ok(metal) = Device::new_metal(0) {
@@ -51,15 +62,23 @@ fn device() -> Device {
 }
 
 impl Whisper {
-    fn load(dir: &Path) -> Result<Self, String> {
-        let read = |file: &str| std::fs::read(dir.join(file)).map_err(|e| format!("{file}: {e}"));
-        let config: Config =
-            serde_json::from_slice(&read("config.json")?).map_err(|e| e.to_string())?;
-        let tokens = Tokens::parse(&read("tokenizer.json")?)?;
+    /// The model from the bytes of its `config.json`, `tokenizer.json` and
+    /// weights.
+    pub fn from_bytes(config: &[u8], tokenizer: &[u8], weights: Vec<u8>) -> Result<Self, String> {
         let device = device();
-        let vb =
-            VarBuilder::from_buffered_safetensors(read("model.safetensors")?, m::DTYPE, &device)
-                .map_err(|e| e.to_string())?;
+        let quantize = device.is_cpu();
+        Self::build(config, tokenizer, weights, device, quantize)
+    }
+
+    fn build(
+        config: &[u8],
+        tokenizer: &[u8],
+        weights: Vec<u8>,
+        device: Device,
+        quantize: bool,
+    ) -> Result<Self, String> {
+        let config: Config = serde_json::from_slice(config).map_err(|e| e.to_string())?;
+        let tokens = Tokens::parse(tokenizer)?;
         let suppress: Vec<f32> = (0..config.vocab_size as u32)
             .map(|id| {
                 if id > tokens.eot || config.suppress_tokens.contains(&id) {
@@ -70,12 +89,14 @@ impl Whisper {
             })
             .collect();
         let suppress = Tensor::new(suppress.as_slice(), &device).map_err(|e| e.to_string())?;
-        let filters = mel::filters(config.num_mel_bins);
-        let model = m::model::Whisper::load(&vb, config).map_err(|e| e.to_string())?;
+        // The log-mel is quicker on the CPU than as many small GPU calls.
+        let mel = mel::Mel::new(config.num_mel_bins, &Device::Cpu).map_err(|e| e.to_string())?;
+        let model = network::Network::load_as(config, weights, &device, quantize)
+            .map_err(|e| e.to_string())?;
         Ok(Self {
             model,
             tokens,
-            filters,
+            mel,
             suppress,
             device,
         })
@@ -89,11 +110,10 @@ impl Whisper {
         first: bool,
     ) -> candle_core::Result<(Tensor, Tensor)> {
         let input = Tensor::new(ids, &self.device)?.unsqueeze(0)?;
-        let ys = self.model.decoder.forward(&input, features, first)?;
+        let ys = self.model.decode(&input, features, first)?;
         let (_, len, _) = ys.dims3()?;
         let last = self
             .model
-            .decoder
             .final_linear(&ys.i((..1, len - 1..))?)?
             .i(0)?
             .i(0)?;
@@ -111,25 +131,27 @@ impl Whisper {
     }
 
     fn run(&mut self, audio: &[f32]) -> candle_core::Result<String> {
-        let mel = mel::input(&self.model.config, &self.filters, audio, &self.device)?;
-        let features = self.model.encoder.forward(&mel, true)?;
+        let features = self
+            .model
+            .encode(&self.mel.input(audio)?.to_device(&self.device)?)?;
         let language = self.detect_language(&features)?;
         let t = &self.tokens;
         let mut ids = vec![t.sot, language, t.transcribe, t.no_timestamps];
         let (prompt, eot, no_speech_token) = (ids.len(), t.eot, t.no_speech);
         let (mut sum_logprob, mut no_speech) = (0.0f64, 0.0f64);
-        for i in 0..self.model.config.max_target_positions / 2 {
+        let max_tokens = self.model.config().max_target_positions;
+        for i in 0..max_tokens / 2 {
             let (ys, logits) = self.next_logits(&ids, &features, i == 0)?;
             if i == 0 {
                 // The chance of no speech is read where the text would start.
-                let first = self.model.decoder.final_linear(&ys.i(..1)?)?.i(0)?.i(0)?;
+                let first = self.model.final_linear(&ys.i(..1)?)?.i(0)?.i(0)?;
                 no_speech = candle_nn::ops::softmax(&first, 0)?
                     .i(no_speech_token as usize)?
                     .to_scalar::<f32>()? as f64;
             }
             let logits = logits.broadcast_add(&self.suppress)?;
             let next = logits.argmax(0)?.to_scalar::<u32>()?;
-            if next == eot || ids.len() >= self.model.config.max_target_positions {
+            if next == eot || ids.len() >= max_tokens {
                 break;
             }
             sum_logprob += log_softmax(&logits, 0)?

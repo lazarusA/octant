@@ -122,4 +122,6 @@ jobs:
       - name: Install brotli
         run: sudo apt-get update && sudo apt-get install -y brotli
       - name: Check wasm size budget
-        run: scripts/check_wasm_size.sh dist .github/wasm-size-budget
+        run: |
+          scripts/check_wasm_size.sh dist .github/wasm-size-budget
+          scripts/check_wasm_size.sh dist .github/wasm-size-budget-voice-worker voice_worker_bg.wasm

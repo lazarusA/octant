@@ -1,28 +1,15 @@
-//! [`Windowed`]: a [`WindowModel`] on its own thread, given utterances cut by
-//! the [`Segmenter`]. The model is made on that thread first (a download, a
+//! [`Windowed`]: a [`WindowModel`] in a [`Session`] on its own thread. The
+//! model is made on that thread first (a download, a
 //! load), reporting through [`Prep`]; of the audio heard meanwhile only the
 //! last [`READY_TAIL`] samples are kept, so a quick load loses no first
-//! words and a long download transcribes nothing stale. Audio
-//! that arrives while the model works is gathered first, so a slow model
-//! skips stale partials instead of falling behind.
+//! words and a long download transcribes nothing stale. Audio that arrives
+//! while the model works is taken before a partial text is made.
 
-use super::segment::{Segmenter, Step};
-use super::{SpeechToText, SttEvent};
+use super::session::{Input as Msg, READY_TAIL, Session};
+use super::{SpeechToText, SttEvent, WindowModel};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
-
-const READY_TAIL: usize = super::SAMPLE_RATE as usize * 2;
-
-/// A model that transcribes a stretch of [`super::SAMPLE_RATE`] mono audio.
-pub trait WindowModel: Send + 'static {
-    fn transcribe(&mut self, audio: &[f32]) -> Result<String, String>;
-}
-
-enum Msg {
-    Audio(Vec<f32>),
-    Finish,
-}
 
 /// What making a model may report, and whether to give up.
 pub struct Prep {
@@ -111,51 +98,17 @@ impl SpeechToText for Windowed {
 
 /// Transcribes `heard` (audio from before the model was ready), then what
 /// arrives in `inbox` until the provider is dropped.
-fn run(
-    mut model: impl WindowModel,
-    heard: Vec<f32>,
-    inbox: &Receiver<Msg>,
-    outbox: &Sender<SttEvent>,
-) {
-    let mut seg = Segmenter::default();
-    let send = |result: Result<String, String>, event: fn(String) -> SttEvent| {
-        let event = match result {
-            Ok(text) if text.trim().is_empty() => return,
-            Ok(text) => event(text.trim().to_string()),
-            Err(e) => SttEvent::Failed(e),
-        };
+fn run(model: impl WindowModel, heard: Vec<f32>, inbox: &Receiver<Msg>, outbox: &Sender<SttEvent>) {
+    let mut session = Session::new(model);
+    let mut emit = |event| {
         let _ = outbox.send(event);
     };
     let mut next = (!heard.is_empty()).then_some(Msg::Audio(heard));
     while let Some(first) = next.take().or_else(|| inbox.recv().ok()) {
-        let mut partial = false;
         for msg in std::iter::once(first).chain(inbox.try_iter()) {
-            let finals = match msg {
-                Msg::Audio(samples) => {
-                    let mut rest = samples.as_slice();
-                    let mut finals = Vec::new();
-                    while !rest.is_empty() {
-                        let (step, used) = seg.feed(rest);
-                        rest = &rest[used..];
-                        match step {
-                            Step::Final => finals.push(seg.take()),
-                            Step::Partial => partial = true,
-                            Step::Wait => {}
-                        }
-                    }
-                    finals
-                }
-                Msg::Finish if seg.finish() == Step::Final => vec![seg.take()],
-                Msg::Finish => Vec::new(),
-            };
-            for audio in finals {
-                partial = false;
-                send(model.transcribe(&audio), SttEvent::Final);
-            }
+            session.take(msg, &mut emit);
         }
-        if partial {
-            send(model.transcribe(seg.audio()), SttEvent::Partial);
-        }
+        session.partial(&mut emit);
     }
 }
 

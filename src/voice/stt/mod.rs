@@ -4,14 +4,19 @@
 //! a time implement [`WindowModel`] and run inside [`Windowed`], which cuts
 //! the audio into utterances and asks for live partial text.
 
-// Threads: desktop only until the web runs models in a worker.
-#[cfg(not(target_arch = "wasm32"))]
 mod segment;
+mod session;
+pub mod wire;
+// Threads: the browser runs its model in the voice worker instead.
 #[cfg(not(target_arch = "wasm32"))]
 mod window;
+#[cfg(target_arch = "wasm32")]
+mod worker;
+
+pub use session::{Input, READY_TAIL, Session};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use window::{Prep, WindowModel, Windowed};
+pub use window::{Prep, Windowed};
 
 /// Samples per second every provider is given (mono).
 pub const SAMPLE_RATE: u32 = 16_000;
@@ -29,6 +34,12 @@ pub enum SttEvent {
     Ready,
     /// Transcription failed; the message says why.
     Failed(String),
+}
+
+/// A model that transcribes a stretch of [`SAMPLE_RATE`] mono audio, run
+/// by [`Windowed`] on the desktop and by the voice worker in the browser.
+pub trait WindowModel {
+    fn transcribe(&mut self, audio: &[f32]) -> Result<String, String>;
 }
 
 pub trait SpeechToText {
@@ -66,6 +77,13 @@ pub enum WhisperSize {
 impl WhisperSize {
     pub const ALL: [Self; 4] = [Self::Tiny, Self::Base, Self::Small, Self::Turbo];
 
+    /// The models offered here: in the browser only those small enough to
+    /// download and run on one CPU thread.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub const OFFERED: &[Self] = &Self::ALL;
+    #[cfg(target_arch = "wasm32")]
+    pub const OFFERED: &[Self] = &[Self::Tiny, Self::Base];
+
     pub fn name(self) -> &'static str {
         match self {
             Self::Tiny => "tiny",
@@ -90,8 +108,15 @@ fn whisper(size: WhisperSize) -> Option<Box<dyn SpeechToText>> {
     })))
 }
 
-/// The browser has no threads to run Whisper on until it runs in a worker.
+/// The browser runs Whisper in its voice worker.
 #[cfg(target_arch = "wasm32")]
-fn whisper(_: WhisperSize) -> Option<Box<dyn SpeechToText>> {
-    None
+fn whisper(size: WhisperSize) -> Option<Box<dyn SpeechToText>> {
+    match worker::WorkerStt::start(size) {
+        Ok(stt) => Some(Box::new(stt)),
+        Err(e) => {
+            let title = crate::i18n::tr(crate::i18n::PlaybackKey::VoiceSttFailed);
+            crate::ui::toast::report(crate::ui::toast::Severity::Error, title, e);
+            None
+        }
+    }
 }

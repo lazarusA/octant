@@ -50,3 +50,38 @@ fn whisper_transcribes_speech() {
     }
     assert!(text.contains("ask not what your country"), "{text}");
 }
+
+/// `cargo test --lib whisper_cpu_speed -- --ignored --nocapture`:
+/// tiny (already downloaded by `whisper_transcribes`) on the CPU, full
+/// precision against quantized, over the sample.
+#[test]
+#[ignore = "needs Whisper tiny in the data folder"]
+fn whisper_cpu_speed() {
+    use crate::voice::stt::WindowModel;
+    let dir = eframe::storage_dir("Octant")
+        .expect("data folder")
+        .join("models/whisper/tiny");
+    let read = |f: &str| std::fs::read(dir.join(f)).expect("model file");
+    let audio = jfk();
+    // The whole sample, and its first 3.5 s ("And so my fellow Americans").
+    let clips = [&audio[..], &audio[..56_000]];
+    for quantize in [false, true] {
+        let mut w = super::Whisper::build(
+            &read("config.json"),
+            &read("tokenizer.json"),
+            read(super::models::WEIGHTS),
+            candle_core::Device::Cpu,
+            quantize,
+        )
+        .expect("model");
+        for clip in clips {
+            let started = Instant::now();
+            let text = w.transcribe(clip).expect("text");
+            let secs = clip.len() as f32 / 16_000.0;
+            println!(
+                "quantized {quantize}: {secs:.1} s of speech in {:?}: {text}",
+                started.elapsed()
+            );
+        }
+    }
+}

@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 # Fails when the web build's brotli-compressed wasm exceeds the size budget.
 #
-# Usage: scripts/check_wasm_size.sh [dist dir] [budget file]
-# Defaults: dist/ and .github/wasm-size-budget (one line: a byte count).
+# Usage: scripts/check_wasm_size.sh [dist dir] [budget file] [wasm name]
+# Defaults: dist/, .github/wasm-size-budget (one line: a byte count) and the
+# app's `octant-*_bg.wasm`; the voice worker's is `voice_worker_bg.wasm`.
 # Raise the budget only in a dedicated commit that says why the size grew.
 set -euo pipefail
 
 dist="${1:-dist}"
 budget_file="${2:-.github/wasm-size-budget}"
+name="${3:-octant-*_bg.wasm}"
 
 shopt -s nullglob
-wasm_files=("$dist"/*_bg.wasm)
+wasm_files=("$dist"/$name)
 if [ "${#wasm_files[@]}" -ne 1 ]; then
-    echo "error: expected one *_bg.wasm in $dist, found ${#wasm_files[@]}" >&2
+    echo "error: expected one $name in $dist, found ${#wasm_files[@]}" >&2
     exit 2
 fi
 wasm="${wasm_files[0]}"
@@ -43,7 +45,7 @@ EOF
 )"
 echo "$report"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-    { echo "### Web build size"; echo; echo "$report"; } >> "$GITHUB_STEP_SUMMARY"
+    { echo "### Web build size: $(basename "$wasm")"; echo; echo "$report"; } >> "$GITHUB_STEP_SUMMARY"
 fi
 
 if [ "$br" -gt "$budget" ]; then

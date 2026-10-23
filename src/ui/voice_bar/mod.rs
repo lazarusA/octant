@@ -190,7 +190,6 @@ fn show_contents(voice: &mut VoiceBar, ui: &mut egui::Ui) {
             voice.toggle();
         }
         nav.push(&close, Stop::Button);
-        #[cfg(not(target_arch = "wasm32"))]
         nav.push(&model_menu(voice, ui), Stop::Button);
         let rect = ui.available_rect_before_wrap();
         voice.transcript.show(ui, rect, state);
@@ -199,7 +198,6 @@ fn show_contents(voice: &mut VoiceBar, ui: &mut egui::Ui) {
 }
 
 /// The Whisper model select; a new choice takes over while listening.
-#[cfg(not(target_arch = "wasm32"))]
 fn model_menu(voice: &mut VoiceBar, ui: &mut egui::Ui) -> egui::Response {
     use crate::voice::stt::WhisperSize;
     let Provider::Whisper(current) = voice.provider;
@@ -207,7 +205,7 @@ fn model_menu(voice: &mut VoiceBar, ui: &mut egui::Ui) -> egui::Response {
     let response = egui::ComboBox::from_id_salt("voice_model")
         .selected_text(current.name())
         .show_ui(ui, |ui| {
-            for size in WhisperSize::ALL {
+            for &size in WhisperSize::OFFERED {
                 let mut buf = [0u8; 64];
                 let mb = crate::voice::whisper::megabytes(size);
                 let label = crate::i18n::fill(
