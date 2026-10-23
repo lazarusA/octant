@@ -1,9 +1,10 @@
 //! The voice bar: drawn in the playback bar's place while open (the top
-//! bar's Voice button), with the microphone toggle, its live spectrogram and
-//! the listening state. It reads nothing from the app; speech to text and
+//! bar's Voice button), with the microphone toggle, a disk pulsing with its
+//! frequencies and the listening state; the room left is for the live
+//! transcript. It reads nothing from the app; speech to text and
 //! the action layer come later (`VOICE_PLAN.md`).
 
-mod spectrogram;
+mod pulsar;
 #[cfg(test)]
 mod tests;
 
@@ -14,11 +15,9 @@ use crate::ui::toast::{Severity, report};
 use crate::ui::toolbar::roving::{BarNav, Stop};
 use crate::voice::Capture;
 use crate::voice::spectrum::Spectrum;
-use spectrogram::Spectrogram;
+use pulsar::Pulsar;
 
 const BAR_HEIGHT: f32 = 42.0;
-/// The spectrogram's widest; it takes at most half of a narrow bar.
-const SPECTROGRAM_W: f32 = 400.0;
 
 /// Whether the bar is open and, while it listens, the microphone. Session
 /// only: the microphone never opens by itself on launch.
@@ -26,7 +25,7 @@ const SPECTROGRAM_W: f32 = 400.0;
 pub struct VoiceBar {
     open: bool,
     listening: Option<Listening>,
-    spectrogram: Spectrogram,
+    pulsar: Pulsar,
 }
 
 struct Listening {
@@ -51,11 +50,16 @@ impl VoiceBar {
     pub fn toggle(&mut self) {
         if self.open {
             self.open = false;
-            self.listening = None;
+            self.stop();
         } else {
             self.open = true;
             self.listen();
         }
+    }
+
+    fn stop(&mut self) {
+        self.listening = None;
+        self.pulsar.reset();
     }
 
     fn listen(&mut self) {
@@ -98,8 +102,7 @@ impl VoiceBar {
             l.spectrum = Some(Spectrum::new(rate));
         }
         if let Some(spectrum) = &mut l.spectrum {
-            let spectrogram = &mut self.spectrogram;
-            spectrum.push(&l.samples, |column| spectrogram.push(ctx, column));
+            spectrum.push(&l.samples, |column| self.pulsar.push(column));
         }
         ctx.request_repaint();
     }
@@ -130,16 +133,16 @@ fn show_contents(voice: &mut VoiceBar, ui: &mut egui::Ui) {
     );
     if mic.clicked() {
         if listening {
-            voice.listening = None;
+            voice.stop();
         } else {
             voice.listen();
         }
     }
     nav.push(&mic, Stop::Button);
 
-    let height = ui.available_height() - 8.0;
-    let width = SPECTROGRAM_W.min(ui.available_width() * 0.5);
-    voice.spectrogram.show(ui, egui::vec2(width, height));
+    voice
+        .pulsar
+        .show(ui, ui.available_height() - 4.0, listening);
 
     let state = tr(if listening {
         PlaybackKey::VoiceListening
