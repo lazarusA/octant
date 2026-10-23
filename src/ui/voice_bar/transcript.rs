@@ -1,5 +1,7 @@
 //! The words heard: the final texts of past utterances, then the partial
-//! text of the one under way, muted. One line, which once too long glides
+//! text of the one under way. Only the newest words are in full color; older
+//! ones ease to the muted grey and the oldest further toward the background.
+//! One line, which once too long glides
 //! left as words come (and back as a partial is revised shorter) so the
 //! newest stay in view, the oldest fading out at the left edge.
 
@@ -11,6 +13,12 @@ use crate::voice::stt::SttEvent;
 const KEEP_CHARS: usize = 400;
 /// Seconds the line takes to glide to a new place.
 const GLIDE: f32 = 0.35;
+/// Words, counted from the newest, kept in full color, and over how many
+/// more the older ones fade to the faintest grey.
+const FRESH_WORDS: usize = 6;
+const FADING_WORDS: usize = 18;
+/// How far the oldest words go from the muted text color to the background.
+const OLDEST: f32 = 0.55;
 /// Width of the fade at the left edge.
 const FADE: f32 = 56.0;
 /// Strips the fade is drawn in, eased between.
@@ -62,32 +70,10 @@ impl Transcript {
     /// Draws the text in `rect`; while there is none, the provider getting
     /// ready, else `placeholder`.
     pub(super) fn show(&self, ui: &egui::Ui, rect: egui::Rect, placeholder: &str) {
-        let visuals = ui.visuals();
-        let font = egui::TextStyle::Body.resolve(ui.style());
-        let weak = visuals.weak_text_color();
-        let mut job = egui::text::LayoutJob::default();
-        let format = |color| egui::TextFormat::simple(font.clone(), color);
         let mut buf = [0u8; 128];
-        if self.finals.is_empty() && self.partial.is_empty() {
-            let note = match self.preparing {
-                Some(Some(done)) => {
-                    let percent = (done * 100.0).round() as u32;
-                    crate::i18n::fill(&mut buf, tr(PlaybackKey::VoiceDownloading), &[&percent])
-                }
-                Some(None) => tr(PlaybackKey::VoiceLoading),
-                None => placeholder,
-            };
-            job.append(note, 0.0, format(weak));
-        } else {
-            job.append(&self.finals, 0.0, format(visuals.strong_text_color()));
-            let gap = if self.finals.is_empty() {
-                0.0
-            } else {
-                font.size * 0.3
-            };
-            job.append(&self.partial, gap, format(weak));
-        }
-        let galley = ui.painter().layout_job(job);
+        let galley = ui
+            .painter()
+            .layout_job(self.line(ui, placeholder, &mut buf));
         let overflow = (galley.size().x - rect.width()).max(0.0);
         let id = ui.scope_id().with(("voice_transcript", self.jumps));
         let scroll = ui.ctx().animate_value_with_time(id, overflow, GLIDE);
@@ -96,13 +82,68 @@ impl Transcript {
             rect.center().y - galley.size().y * 0.5,
         );
         let painter = ui.painter().with_clip_rect(rect);
-        painter.galley(pos, galley, weak);
+        painter.galley(pos, galley, ui.visuals().weak_text_color());
         if scroll > 0.5 {
             // Fade in as the line starts to scroll, not all at once.
             let width = FADE.min(scroll).min(rect.width() * 0.5);
-            fade_left(&painter, rect, width, visuals.panel_fill);
+            fade_left(&painter, rect, width, ui.visuals().panel_fill);
         }
     }
+
+    /// The line to draw: the words colored by age, or a note while there are
+    /// none (formatted into `buf`).
+    fn line(&self, ui: &egui::Ui, placeholder: &str, buf: &mut [u8]) -> egui::text::LayoutJob {
+        let visuals = ui.visuals();
+        let font = egui::TextStyle::Body.resolve(ui.style());
+        let weak = visuals.weak_text_color();
+        let format = |color| egui::TextFormat::simple(font.clone(), color);
+        let mut job = egui::text::LayoutJob::default();
+        if self.finals.is_empty() && self.partial.is_empty() {
+            let note = match self.preparing {
+                Some(Some(done)) => {
+                    let percent = (done * 100.0).round() as u32;
+                    crate::i18n::fill(buf, tr(PlaybackKey::VoiceDownloading), &[&percent])
+                }
+                Some(None) => tr(PlaybackKey::VoiceLoading),
+                None => placeholder,
+            };
+            job.append(note, 0.0, format(weak));
+            return job;
+        }
+        let (strong, faint) = (
+            visuals.strong_text_color(),
+            weak.lerp_to_gamma(visuals.panel_fill, OLDEST),
+        );
+        let finals = self.finals.split_inclusive(' ').count();
+        let words = || {
+            self.finals
+                .split_inclusive(' ')
+                .chain(self.partial.split_inclusive(' '))
+        };
+        let count = words().count();
+        for (i, word) in words().enumerate() {
+            let t = fading(count - 1 - i);
+            let color = if t < 0.5 {
+                strong.lerp_to_gamma(weak, t * 2.0)
+            } else {
+                weak.lerp_to_gamma(faint, t * 2.0 - 1.0)
+            };
+            // The partial text follows the last final text after a space.
+            let gap = if i == finals && finals > 0 {
+                font.size * 0.3
+            } else {
+                0.0
+            };
+            job.append(word, gap, format(color));
+        }
+        job
+    }
+}
+
+/// How far a word `age` words before the newest has faded: 0 in full
+/// color, 1 at the faintest.
+fn fading(age: usize) -> f32 {
+    (age.saturating_sub(FRESH_WORDS) as f32 / FADING_WORDS as f32).min(1.0)
 }
 
 /// Covers the left `width` of `rect` with `ground`, opaque at the edge and
@@ -138,6 +179,15 @@ mod tests {
         t.apply(SttEvent::Final("as a volume".into()));
         assert_eq!(t.finals, "plot the temperature as a volume");
         assert!(t.partial.is_empty());
+    }
+
+    #[test]
+    fn only_the_newest_words_are_in_full_color() {
+        assert_eq!(fading(0), 0.0);
+        assert_eq!(fading(FRESH_WORDS - 1), 0.0);
+        assert!(fading(FRESH_WORDS + 1) > 0.0 && fading(FRESH_WORDS + 1) < 1.0);
+        assert_eq!(fading(FRESH_WORDS + FADING_WORDS), 1.0);
+        assert_eq!(fading(1000), 1.0);
     }
 
     #[test]

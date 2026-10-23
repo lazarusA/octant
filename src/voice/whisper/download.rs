@@ -140,34 +140,46 @@ fn fetch(
         .and_then(reqwest::blocking::Response::error_for_status)
         .map_err(|e| e.to_string())?;
     let part = dest.with_extension("part");
-    let result = (|| {
-        let mut file = std::fs::File::create(&part).map_err(|e| e.to_string())?;
-        let mut hasher = Sha256::new();
-        let mut buf = vec![0u8; 1 << 16];
-        loop {
-            if cancelled() {
-                return Err("cancelled".to_string());
-            }
-            let n = body.read(&mut buf).map_err(|e| e.to_string())?;
-            if n == 0 {
-                break;
-            }
-            file.write_all(&buf[..n]).map_err(|e| e.to_string())?;
-            hasher.update(&buf[..n]);
-            progress(n);
-        }
-        let got: String = hasher
-            .finalize()
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
-        if got != sha256 {
-            return Err(format!("{url}: checksum {got}, expected {sha256}"));
-        }
-        std::fs::rename(&part, dest).map_err(|e| e.to_string())
-    })();
+    let result = write_verified(&mut body, &part, sha256, cancelled, &mut progress)
+        .map_err(|e| format!("{url}: {e}"))
+        .and_then(|()| std::fs::rename(&part, dest).map_err(|e| e.to_string()));
     if result.is_err() {
         let _ = std::fs::remove_file(&part);
     }
     result
+}
+
+/// Copies `body` into `part`, checking its SHA-256 against `sha256`.
+fn write_verified(
+    body: &mut impl Read,
+    part: &Path,
+    sha256: &str,
+    cancelled: &dyn Fn() -> bool,
+    progress: &mut impl FnMut(usize),
+) -> Result<(), String> {
+    let mut file = std::fs::File::create(part).map_err(|e| e.to_string())?;
+    let mut hasher = Sha256::new();
+    let mut buf = vec![0u8; 1 << 16];
+    loop {
+        if cancelled() {
+            return Err("cancelled".to_string());
+        }
+        let n = body.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        file.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+        hasher.update(&buf[..n]);
+        progress(n);
+    }
+    let got: String = hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    if got == sha256 {
+        Ok(())
+    } else {
+        Err(format!("checksum {got}, expected {sha256}"))
+    }
 }
