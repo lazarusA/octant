@@ -34,6 +34,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceSilentHint => {
             "システムのプライバシー設定で、Octant を起動したアプリにマイクへのアクセスを許可し、そのアプリを再起動してください。"
         }
+        PlaybackKey::VoiceSttFailed => "文字起こしに失敗しました",
         PlaybackKey::VoiceCloseHover => "音声入力を閉じる",
     })
 }

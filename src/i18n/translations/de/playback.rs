@@ -34,6 +34,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceSilentHint => {
             "Erlauben Sie der App, die Octant gestartet hat, in den Datenschutzeinstellungen des Systems den Mikrofonzugriff und starten Sie sie neu."
         }
+        PlaybackKey::VoiceSttFailed => "Transkription fehlgeschlagen",
         PlaybackKey::VoiceCloseHover => "Spracheingabe schließen",
     })
 }

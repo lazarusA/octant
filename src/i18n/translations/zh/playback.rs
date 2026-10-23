@@ -32,6 +32,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceSilentHint => {
             "请在系统隐私设置中允许启动 Octant 的应用访问麦克风，然后重新启动该应用。"
         }
+        PlaybackKey::VoiceSttFailed => "转写失败",
         PlaybackKey::VoiceCloseHover => "关闭语音输入",
     })
 }

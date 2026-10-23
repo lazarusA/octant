@@ -33,6 +33,7 @@ crate::i18n::keys::define_keys! {
     VoiceMicError,
     VoiceSilent,
     VoiceSilentHint,
+    VoiceSttFailed,
     VoiceCloseHover,
     }
 }

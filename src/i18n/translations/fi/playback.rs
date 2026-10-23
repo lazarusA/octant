@@ -34,6 +34,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceSilentHint => {
             "Salli mikrofonin käyttö Octantin käynnistäneelle sovellukselle järjestelmän tietosuoja-asetuksissa ja käynnistä se uudelleen."
         }
+        PlaybackKey::VoiceSttFailed => "Litterointi epäonnistui",
         PlaybackKey::VoiceCloseHover => "Sulje puhesyöte",
     })
 }

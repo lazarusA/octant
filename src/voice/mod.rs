@@ -1,7 +1,10 @@
-//! Voice input: the microphone and its spectrogram. Speech to text and the
-//! action layer come later (`VOICE_PLAN.md`).
+//! Voice input: the microphone, its spectrum, and speech to text behind a
+//! provider-independent interface (`stt`). Providers and the action layer
+//! come next (`VOICE_PLAN.md`).
 
 mod capture;
+pub mod resample;
 pub mod spectrum;
+pub mod stt;
 
 pub use capture::Capture;

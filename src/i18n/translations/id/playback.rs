@@ -34,6 +34,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceSilentHint => {
             "Izinkan akses mikrofon untuk aplikasi yang menjalankan Octant di pengaturan privasi sistem, lalu mulai ulang aplikasi itu."
         }
+        PlaybackKey::VoiceSttFailed => "Transkripsi gagal",
         PlaybackKey::VoiceCloseHover => "Tutup input suara",
     })
 }

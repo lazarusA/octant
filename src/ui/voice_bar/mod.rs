@@ -1,12 +1,13 @@
 //! The voice bar: drawn in the playback bar's place while open (the top
 //! bar's Voice button), with the microphone toggle, a disk pulsing with its
-//! frequencies and the listening state; the room left is for the live
-//! transcript. It reads nothing from the app; speech to text and
-//! the action layer come later (`VOICE_PLAN.md`).
+//! frequencies and the live transcript (or the listening state) from the
+//! chosen speech to text provider (`voice::stt`). It reads nothing from the
+//! app; the action layer comes later (`VOICE_PLAN.md`).
 
 mod pulsar;
 #[cfg(test)]
 mod tests;
+mod transcript;
 
 use crate::i18n::{PlaybackKey, tr};
 use crate::ui::icons::{Icon, ToolbarButton, UiIconExt};
@@ -14,8 +15,11 @@ use crate::ui::keyboard::regions::Region;
 use crate::ui::toast::{Severity, report};
 use crate::ui::toolbar::roving::{BarNav, Stop};
 use crate::voice::Capture;
+use crate::voice::resample::Resampler;
 use crate::voice::spectrum::Spectrum;
+use crate::voice::stt::{self, SpeechToText};
 use pulsar::Pulsar;
+use transcript::Transcript;
 
 const BAR_HEIGHT: f32 = 42.0;
 
@@ -26,13 +30,19 @@ pub struct VoiceBar {
     open: bool,
     listening: Option<Listening>,
     pulsar: Pulsar,
+    /// Kept after the microphone stops, until the bar closes, so the last
+    /// utterance's final text still arrives.
+    stt: Option<Box<dyn SpeechToText>>,
+    transcript: Transcript,
 }
 
 struct Listening {
     capture: Capture,
     /// Made once the microphone's sample rate is known.
     spectrum: Option<Spectrum>,
+    resampler: Option<Resampler>,
     samples: Vec<f32>,
+    resampled: Vec<f32>,
     /// Exact zeros heard so far, until a sound or the warning ends the check.
     silent: Option<usize>,
 }
@@ -51,6 +61,7 @@ impl VoiceBar {
         if self.open {
             self.open = false;
             self.stop();
+            self.stt = None;
         } else {
             self.open = true;
             self.listen();
@@ -58,7 +69,11 @@ impl VoiceBar {
     }
 
     fn stop(&mut self) {
-        self.listening = None;
+        if self.listening.take().is_some()
+            && let Some(stt) = &mut self.stt
+        {
+            stt.finish();
+        }
         self.pulsar.reset();
     }
 
@@ -68,16 +83,27 @@ impl VoiceBar {
                 self.listening = Some(Listening {
                     capture,
                     spectrum: None,
+                    resampler: None,
                     samples: Vec::new(),
+                    resampled: Vec::new(),
                     silent: Some(0),
                 });
+                self.stt = stt::open();
+                self.transcript.clear();
             }
             Err(e) => report(Severity::Error, tr(PlaybackKey::VoiceMicError), e),
         }
     }
 
-    /// Turns the samples recorded since the last frame into columns.
+    /// Feeds the samples recorded since the last frame to the disk and the
+    /// provider, and takes the provider's text.
     fn update(&mut self, ctx: &egui::Context) {
+        if let Some(stt) = &mut self.stt {
+            while let Some(event) = stt.poll() {
+                self.transcript.apply(event);
+            }
+            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        }
         let Some(l) = &mut self.listening else {
             return;
         };
@@ -103,6 +129,14 @@ impl VoiceBar {
         }
         if let Some(spectrum) = &mut l.spectrum {
             spectrum.push(&l.samples, |column| self.pulsar.push(column));
+        }
+        if let Some(stt) = &mut self.stt
+            && rate > 0
+        {
+            let resampler = l.resampler.get_or_insert_with(|| Resampler::new(rate));
+            l.resampled.clear();
+            resampler.push(&l.samples, &mut l.resampled);
+            stt.push(&l.resampled);
         }
         ctx.request_repaint();
     }
@@ -149,14 +183,14 @@ fn show_contents(voice: &mut VoiceBar, ui: &mut egui::Ui) {
     } else {
         PlaybackKey::VoiceMicOff
     });
-    ui.label(egui::RichText::new(state).color(ui.visuals().weak_text_color()));
-
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         let close = ui.close_button(tr(PlaybackKey::VoiceCloseHover));
         if close.clicked() {
             voice.toggle();
         }
         nav.push(&close, Stop::Button);
+        let rect = ui.available_rect_before_wrap();
+        voice.transcript.show(ui, rect, state);
     });
     nav.finish(ui, Region::BottomBar);
 }

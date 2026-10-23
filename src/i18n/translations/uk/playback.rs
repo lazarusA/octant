@@ -34,6 +34,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceSilentHint => {
             "Дозвольте доступ до мікрофона застосунку, що запустив Octant, у налаштуваннях конфіденційності системи та перезапустіть його."
         }
+        PlaybackKey::VoiceSttFailed => "Не вдалося розпізнати мовлення",
         PlaybackKey::VoiceCloseHover => "Закрити голосове введення",
     })
 }
