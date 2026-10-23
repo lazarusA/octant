@@ -73,7 +73,13 @@ where
                 super::keep_recent(&mut pending, mono);
             }
         },
-        |err| log::warn!("microphone stream: {err}"),
+        |err| {
+            crate::ui::toast::report(
+                crate::ui::toast::Severity::Warning,
+                crate::i18n::tr(crate::i18n::PlaybackKey::VoiceMicError),
+                err.to_string(),
+            );
+        },
         None,
     )
 }
