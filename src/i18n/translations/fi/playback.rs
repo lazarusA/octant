@@ -25,5 +25,20 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::TimelineRange => "Väli: {} -> {}",
         PlaybackKey::TimelineStepSize => "Askelkoko: {}",
         PlaybackKey::DefaultStepSize => "Askel: 1",
+        PlaybackKey::VoiceListen => "Aloita kuuntelu",
+        PlaybackKey::VoiceStop => "Lopeta kuuntelu",
+        PlaybackKey::VoiceListening => "Kuunnellaan...",
+        PlaybackKey::VoiceMicOff => "Mikrofoni pois",
+        PlaybackKey::VoiceMicError => "Mikrofoni ei käytettävissä",
+        PlaybackKey::VoiceSilent => "Mikrofoni lähettää vain hiljaisuutta",
+        PlaybackKey::VoiceSilentHint => {
+            "Salli mikrofonin käyttö Octantin käynnistäneelle sovellukselle järjestelmän tietosuoja-asetuksissa ja käynnistä se uudelleen."
+        }
+        PlaybackKey::VoiceSttFailed => "Litterointi epäonnistui",
+        PlaybackKey::VoiceDownloading => "Ladataan puhemallia: {}%",
+        PlaybackKey::VoiceLoading => "Avataan puhemallia...",
+        PlaybackKey::VoiceModelHover => "Puheentunnistusmalli",
+        PlaybackKey::VoiceModelSize => "{} ({} Mt)",
+        PlaybackKey::VoiceCloseHover => "Sulje puhesyöte",
     })
 }

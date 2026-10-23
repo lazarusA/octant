@@ -25,5 +25,20 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::TimelineRange => "Plage : {} -> {}",
         PlaybackKey::TimelineStepSize => "Taille du pas : {}",
         PlaybackKey::DefaultStepSize => "Pas : 1",
+        PlaybackKey::VoiceListen => "Commencer l'écoute",
+        PlaybackKey::VoiceStop => "Arrêter l'écoute",
+        PlaybackKey::VoiceListening => "Écoute...",
+        PlaybackKey::VoiceMicOff => "Microphone coupé",
+        PlaybackKey::VoiceMicError => "Microphone indisponible",
+        PlaybackKey::VoiceSilent => "Le microphone n'envoie que du silence",
+        PlaybackKey::VoiceSilentHint => {
+            "Autorisez l'accès au microphone pour l'application qui a lancé Octant dans les réglages de confidentialité du système, puis relancez-la."
+        }
+        PlaybackKey::VoiceSttFailed => "La transcription a échoué",
+        PlaybackKey::VoiceDownloading => "Téléchargement du modèle vocal : {} %",
+        PlaybackKey::VoiceLoading => "Chargement du modèle vocal...",
+        PlaybackKey::VoiceModelHover => "Modèle de reconnaissance vocale",
+        PlaybackKey::VoiceModelSize => "{} ({} Mo)",
+        PlaybackKey::VoiceCloseHover => "Fermer la saisie vocale",
     })
 }

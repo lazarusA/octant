@@ -26,5 +26,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::FetchingProgress => "Haetaan {} / {} ({}%)",
         CommonKey::Abort => "Keskeytä",
         CommonKey::AbortHover => "Keskeytä käynnissä oleva tiedonsiirto",
+        CommonKey::Voice => "Ääni",
+        CommonKey::VoiceHover => "Puhesyöte: mikrofoni ja spektrogrammi",
     })
 }

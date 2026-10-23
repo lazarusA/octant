@@ -25,5 +25,20 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::TimelineRange => "Bereich: {} -> {}",
         PlaybackKey::TimelineStepSize => "Schrittweite: {}",
         PlaybackKey::DefaultStepSize => "Schritt: 1",
+        PlaybackKey::VoiceListen => "Zuhören starten",
+        PlaybackKey::VoiceStop => "Zuhören beenden",
+        PlaybackKey::VoiceListening => "Hört zu...",
+        PlaybackKey::VoiceMicOff => "Mikrofon aus",
+        PlaybackKey::VoiceMicError => "Mikrofon nicht verfügbar",
+        PlaybackKey::VoiceSilent => "Das Mikrofon liefert nur Stille",
+        PlaybackKey::VoiceSilentHint => {
+            "Erlauben Sie der App, die Octant gestartet hat, in den Datenschutzeinstellungen des Systems den Mikrofonzugriff und starten Sie sie neu."
+        }
+        PlaybackKey::VoiceSttFailed => "Transkription fehlgeschlagen",
+        PlaybackKey::VoiceDownloading => "Sprachmodell wird heruntergeladen: {}%",
+        PlaybackKey::VoiceLoading => "Sprachmodell wird geladen...",
+        PlaybackKey::VoiceModelHover => "Modell für Spracherkennung",
+        PlaybackKey::VoiceModelSize => "{} ({} MB)",
+        PlaybackKey::VoiceCloseHover => "Spracheingabe schließen",
     })
 }

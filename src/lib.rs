@@ -8,3 +8,4 @@ pub mod i18n;
 pub mod plots;
 pub mod ui;
 pub mod utils;
+pub mod voice;

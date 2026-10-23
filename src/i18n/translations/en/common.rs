@@ -26,5 +26,7 @@ pub fn text(key: CommonKey) -> &'static str {
         CommonKey::FetchingProgress => "Fetching {} / {} ({}%)",
         CommonKey::Abort => "Abort",
         CommonKey::AbortHover => "Interrupt and abort ongoing data transfer",
+        CommonKey::Voice => "Voice",
+        CommonKey::VoiceHover => "Voice input: microphone and spectrogram",
     }
 }

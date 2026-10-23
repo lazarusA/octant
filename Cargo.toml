@@ -56,6 +56,12 @@ icechunk-types = { version = "2.1.2", default-features = false }
 colorgrad = { version = "0.9", default-features = false, features = ["std", "named-colors"] }
 # Coordinate reference systems: proj strings (`data/crs/`).
 proj4rs = { version = "0.2.1", default-features = false }
+# Speech to text: Whisper on candle (`voice/whisper/`), on the desktop and in
+# the browser's voice worker; `sha2` checks the model downloads.
+candle-core = "0.11"
+candle-nn = "0.11"
+candle-transformers = "0.11"
+sha2 = "0.11"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.53", features = ["full"] }
@@ -82,6 +88,13 @@ async-tiff = { version = "0.4.0", features = ["object_store", "reqwest", "tokio"
 crs-definitions = { version = "0.6", default-features = false, features = ["proj4"] }
 # WKT without an EPSG code to proj strings; its wasm build exports a `main`.
 proj4wkt = "0.1.1"
+cpal = "0.18"
+
+# Whisper on the Apple GPU.
+[target.'cfg(target_os = "macos")'.dependencies]
+candle-core = { version = "0.11", features = ["metal"] }
+candle-nn = { version = "0.11", features = ["metal"] }
+candle-transformers = { version = "0.11", features = ["metal"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
@@ -90,7 +103,7 @@ console_error_panic_hook = "0.1"
 console_log = "1.1"
 uuid = { version = "1", features = ["v4", "js"] }
 zarrs = { version = "0.23", default-features = false, features = ["ndarray", "crc32c", "gzip", "zlib", "sharding", "transpose", "async", "bitround", "pcodec"] }
-web-sys = { version = "0.3", features = ["Window", "Document", "Element", "Node", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Response", "Request", "RequestInit", "Headers", "RequestMode", "AbortController", "AbortSignal"] }
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "Node", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Response", "Request", "RequestInit", "Headers", "RequestMode", "AbortController", "AbortSignal", "Navigator", "MediaDevices", "MediaStream", "MediaStreamTrack", "MediaStreamConstraints", "AudioContext", "BaseAudioContext", "AudioNode", "AudioDestinationNode", "MediaStreamAudioSourceNode", "ScriptProcessorNode", "AudioProcessingEvent", "AudioBuffer", "DedicatedWorkerGlobalScope", "WorkerGlobalScope", "MessageEvent", "Worker", "ErrorEvent", "Cache", "CacheStorage", "ReadableStream", "ReadableStreamDefaultReader"] }
 js-sys = "0.3"
 sys-locale = { version = "0.3", features = ["js"] }
 blusc = "0.0.6"
@@ -100,6 +113,10 @@ async-tiff = { version = "0.4.0", default-features = false }
 [features]
 # Build tools that regenerate bundled assets (never needed to build Octant).
 font-tools = ["dep:allsorts"]
+
+[[bin]]
+name = "voice_worker"
+path = "src/bin/voice_worker/main.rs"
 
 [[bin]]
 name = "subset_fonts"
@@ -113,6 +130,24 @@ skrifa = "0.44"
 
 [patch.crates-io]
 blusc = { git = "https://github.com/lazarusA/blusc", branch = "la/fix_linker" }
+# candle-core = { git = "https://github.com/lazarusA/candle.git", branch = "la/simd_wasm_fix" }
+# candle-nn = { git = "https://github.com/lazarusA/candle.git", branch = "la/simd_wasm_fix" }
+# candle-transformers = { git = "https://github.com/lazarusA/candle.git", branch = "la/simd_wasm_fix" }
+
+# Unoptimized candle is far too slow to transcribe live, so debug builds
+# (`cargo run`) optimize it and the matrix kernels it runs on.
+[profile.dev.package.candle-core]
+opt-level = 3
+[profile.dev.package.candle-nn]
+opt-level = 3
+[profile.dev.package.candle-transformers]
+opt-level = 3
+[profile.dev.package.gemm]
+opt-level = 3
+[profile.dev.package.gemm-common]
+opt-level = 3
+[profile.dev.package.gemm-f32]
+opt-level = 3
 
 # Shipped builds (desktop and `trunk build --release`): full speed (opt-level 3),
 # optimized across crates, without symbols. Debug builds and tests are unaffected.

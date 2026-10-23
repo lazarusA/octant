@@ -30,5 +30,8 @@ crate::i18n::keys::define_keys! {
     FetchingProgress,
     Abort,
     AbortHover,
+    // Voice input toggle
+    Voice,
+    VoiceHover,
     }
 }

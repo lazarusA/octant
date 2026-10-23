@@ -25,5 +25,20 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::TimelineRange => "Intervall: {} -> {}",
         PlaybackKey::TimelineStepSize => "Stegstorlek: {}",
         PlaybackKey::DefaultStepSize => "Steg: 1",
+        PlaybackKey::VoiceListen => "Börja lyssna",
+        PlaybackKey::VoiceStop => "Sluta lyssna",
+        PlaybackKey::VoiceListening => "Lyssnar...",
+        PlaybackKey::VoiceMicOff => "Mikrofon av",
+        PlaybackKey::VoiceMicError => "Mikrofon otillgänglig",
+        PlaybackKey::VoiceSilent => "Mikrofonen skickar bara tystnad",
+        PlaybackKey::VoiceSilentHint => {
+            "Ge appen som startade Octant åtkomst till mikrofonen i systemets integritetsinställningar och starta om den."
+        }
+        PlaybackKey::VoiceSttFailed => "Transkriberingen misslyckades",
+        PlaybackKey::VoiceDownloading => "Laddar ner talmodellen: {} %",
+        PlaybackKey::VoiceLoading => "Läser in talmodellen...",
+        PlaybackKey::VoiceModelHover => "Modell för taligenkänning",
+        PlaybackKey::VoiceModelSize => "{} ({} MB)",
+        PlaybackKey::VoiceCloseHover => "Stäng röstinmatning",
     })
 }

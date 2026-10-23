@@ -23,5 +23,20 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::TimelineRange => "范围：{} -> {}",
         PlaybackKey::TimelineStepSize => "步长：{}",
         PlaybackKey::DefaultStepSize => "步长：1",
+        PlaybackKey::VoiceListen => "开始收听",
+        PlaybackKey::VoiceStop => "停止收听",
+        PlaybackKey::VoiceListening => "正在收听...",
+        PlaybackKey::VoiceMicOff => "麦克风已关闭",
+        PlaybackKey::VoiceMicError => "麦克风不可用",
+        PlaybackKey::VoiceSilent => "麦克风只传来静音",
+        PlaybackKey::VoiceSilentHint => {
+            "请在系统隐私设置中允许启动 Octant 的应用访问麦克风，然后重新启动该应用。"
+        }
+        PlaybackKey::VoiceSttFailed => "转写失败",
+        PlaybackKey::VoiceDownloading => "正在下载语音模型：{}%",
+        PlaybackKey::VoiceLoading => "正在加载语音模型...",
+        PlaybackKey::VoiceModelHover => "语音转文字模型",
+        PlaybackKey::VoiceModelSize => "{}（{} MB）",
+        PlaybackKey::VoiceCloseHover => "关闭语音输入",
     })
 }

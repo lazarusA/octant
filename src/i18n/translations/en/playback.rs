@@ -25,5 +25,20 @@ pub fn text(key: PlaybackKey) -> &'static str {
         PlaybackKey::TimelineRange => "Range: {} -> {}",
         PlaybackKey::TimelineStepSize => "Step Size: {}",
         PlaybackKey::DefaultStepSize => "Step: 1",
+        PlaybackKey::VoiceListen => "Start listening",
+        PlaybackKey::VoiceStop => "Stop listening",
+        PlaybackKey::VoiceListening => "Listening...",
+        PlaybackKey::VoiceMicOff => "Microphone off",
+        PlaybackKey::VoiceMicError => "Microphone unavailable",
+        PlaybackKey::VoiceSilent => "The microphone sends only silence",
+        PlaybackKey::VoiceSilentHint => {
+            "Allow microphone access for the app that started Octant in the system's privacy settings, then restart it."
+        }
+        PlaybackKey::VoiceSttFailed => "Transcription failed",
+        PlaybackKey::VoiceDownloading => "Downloading the speech model: {}%",
+        PlaybackKey::VoiceLoading => "Loading the speech model...",
+        PlaybackKey::VoiceModelHover => "Speech to text model",
+        PlaybackKey::VoiceModelSize => "{} ({} MB)",
+        PlaybackKey::VoiceCloseHover => "Close voice input",
     }
 }

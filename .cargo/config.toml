@@ -1,2 +1,3 @@
 [target.wasm32-unknown-unknown]
 rustflags = ["-C", "link-arg=--allow-multiple-definition"]
+# rustflags = ["-C", "link-arg=--allow-multiple-definition", "-C", "target-feature=+simd128"]
