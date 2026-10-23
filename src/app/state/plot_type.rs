@@ -81,21 +81,13 @@ impl OctantApp {
     }
 }
 
-/// The channel dimension of `sel`'s variable while composites are on, and
-/// its last index.
-fn channel_of(sel: &VariableSelection, composite: bool) -> Option<(usize, usize)> {
-    let var = sel.variable_info().filter(|_| composite)?;
-    let ch = channel_dim(var)?;
-    let last = var
-        .shape
-        .get(ch)
-        .map_or(0, |&s| (s as usize).saturating_sub(1));
-    Some((ch, last))
+/// The channel dimension of `sel`'s variable while composites are on.
+fn channel_of(sel: &VariableSelection, composite: bool) -> Option<usize> {
+    channel_dim(sel.variable_info().filter(|_| composite)?)
 }
 
 fn adapt_sel_to_2d(sel: &mut VariableSelection, composite: bool) {
-    let channel = channel_of(sel, composite);
-    let channel_dim = channel.map(|(ch, _)| ch);
+    let channel_dim = channel_of(sel, composite);
     for (z_idx, c) in sel.dim_config.iter_mut().enumerate() {
         if c.spatial == SpatialRole::Z {
             c.spatial = SpatialRole::None;
@@ -111,14 +103,9 @@ fn adapt_sel_to_2d(sel: &mut VariableSelection, composite: bool) {
             }
         }
     }
-    if let Some((ch_idx, max_ch)) = channel {
-        if let Some(c) = sel.dim_config.get_mut(ch_idx) {
-            c.range = (0, max_ch);
-            c.active = true;
-        }
-        if let Some(r) = sel.dim_ranges.get_mut(ch_idx) {
-            *r = (0, max_ch);
-        }
+    // A composite's channels keep their selected range.
+    if let Some(c) = channel_dim.and_then(|ch| sel.dim_config.get_mut(ch)) {
+        c.active = true;
     }
     sel.spatial_dims = crate::app::DimConfig::spatial_dims(&sel.dim_config);
 }
@@ -140,32 +127,13 @@ fn z_dim_of(sel: &VariableSelection, channel_dim: Option<usize>) -> Option<usize
         .or(fallback_anim)
 }
 
+/// Gives `sel`'s stacking dimension (`z_dim_of`) the Z role, keeping its
+/// selected range: one plane draws a one-slice volume until it is widened.
 fn adapt_sel_to_3d(sel: &mut VariableSelection, composite: bool) {
-    let channel_dim = channel_of(sel, composite).map(|(ch, _)| ch);
-    let Some(z_idx) = z_dim_of(sel, channel_dim) else {
-        sel.spatial_dims = crate::app::DimConfig::spatial_dims(&sel.dim_config);
-        return;
-    };
-    let animated = sel
-        .dim_config
-        .get(z_idx)
-        .is_some_and(|c| c.animation == AnimationRole::Animated);
-    let max_z = (!animated).then(|| {
-        sel.variable_info()
-            .and_then(|v| v.shape.get(z_idx))
-            .map_or(0, |&s| (s as usize).saturating_sub(1))
-    });
-    if let Some(c) = sel.dim_config.get_mut(z_idx) {
+    let channel_dim = channel_of(sel, composite);
+    if let Some(c) = z_dim_of(sel, channel_dim).and_then(|z| sel.dim_config.get_mut(z)) {
         c.spatial = SpatialRole::Z;
         c.active = true;
-    }
-    if let Some(max) = max_z {
-        if let Some(c) = sel.dim_config.get_mut(z_idx) {
-            c.range = (0, max);
-        }
-        if let Some(r) = sel.dim_ranges.get_mut(z_idx) {
-            *r = (0, max);
-        }
     }
     sel.spatial_dims = crate::app::DimConfig::spatial_dims(&sel.dim_config);
 }

@@ -384,7 +384,7 @@ fn test_multichannel_volume_with_offset_channels() {
 }
 
 #[test]
-fn test_multichannel_composite_none_selected() {
+fn test_multichannel_composite_none_selected_draws_the_first_channel() {
     let values: Arc<[f32]> = Arc::from(vec![1.0, 2.0, 3.0, 4.0]);
     let block = OctantBlock::new(
         "test_none".to_string(),
@@ -417,15 +417,15 @@ fn test_multichannel_composite_none_selected() {
         1,
         &mut Default::default(),
     )
-    .expect("multichannel composite with none selected should return NAN plane");
+    .expect("multichannel composite with none selected draws its first channel");
 
     assert_eq!(composite.width, 2);
     assert_eq!(composite.height, 2);
-    assert!(composite.values.iter().all(|v| v.is_nan()));
+    assert!(composite.values.iter().all(|v| v.is_finite()));
 }
 
 #[test]
-fn test_multichannel_volume_none_selected() {
+fn test_multichannel_volume_none_selected_draws_the_first_channel() {
     let values: Arc<[f32]> = Arc::from(vec![1.0, 2.0, 3.0, 4.0]);
     let block = OctantBlock::new(
         "test_none_vol".to_string(),
@@ -459,12 +459,12 @@ fn test_multichannel_volume_none_selected() {
         &configs,
         "test_none_vol",
     )
-    .expect("volume composite with none selected should return NAN volume");
+    .expect("volume composite with none selected draws its first channel");
 
     assert_eq!(vdata.width, 2);
     assert_eq!(vdata.height, 2);
     assert_eq!(vdata.depth, 1);
-    assert!(vdata.values.iter().all(|v| v.is_nan()));
+    assert!(vdata.values.iter().all(|v| v.is_finite()));
 }
 
 #[test]
@@ -572,4 +572,25 @@ fn test_rgb_volume_composite_geotiff_3band_distinct_colors() {
             "Green and Blue must differ, got g={g}, b={b}"
         );
     }
+}
+
+#[test]
+fn drawn_channels_are_the_ticked_ones_in_the_window_else_its_first() {
+    use super::utils::drawn_channels;
+    let mut configs: Vec<_> = (0..4)
+        .map(|i| ChannelColorConfig::new(i, String::new(), [255, 255, 255]))
+        .collect();
+    configs[1].visible = false;
+    let drawn = |start, count, configs: &[ChannelColorConfig]| -> Vec<(usize, usize)> {
+        drawn_channels(configs, start, count)
+            .into_iter()
+            .map(|(c, local)| (c.index, local))
+            .collect()
+    };
+    // Ticked channels outside the window are left out, not clamped into it.
+    assert_eq!(drawn(1, 2, &configs), [(2, 1)]);
+    // No ticked channel in the window: its first one.
+    assert_eq!(drawn(1, 1, &configs), [(1, 0)]);
+    // An empty window draws nothing.
+    assert!(drawn(1, 0, &configs).is_empty());
 }

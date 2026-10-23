@@ -110,11 +110,13 @@ fn sizes_and_gpu_limits_are_measured_on_the_level_read() {
 }
 
 #[test]
-fn line_plots_read_level_0_when_it_fits() {
+fn line_plots_read_the_level_a_volume_reads() {
     let (mut app, meta) = pyramid_app();
     stage(&mut app, &meta, "0/t2m", 20);
     app.selected.plot_type = PlotType::Line;
-    assert_eq!(app.selection_level(&app.selected), Some(0));
+    let volume = app.selection_level_as(&app.selected, PlotType::Volume);
+    assert!(volume.is_some_and(|l| l > 0), "{volume:?}");
+    assert_eq!(app.selection_level(&app.selected), volume);
 }
 
 #[test]

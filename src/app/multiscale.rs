@@ -197,10 +197,22 @@ impl OctantApp {
     /// the one its plot type asks for on the current canvas, or the pinned
     /// one within the memory budget.
     pub(crate) fn selection_level(&self, selection: &VariableSelection) -> Option<usize> {
+        self.selection_level_as(selection, selection.plot_type)
+    }
+
+    /// [`Self::selection_level`] as plot type `plot_type` would read it.
+    pub(crate) fn selection_level_as(
+        &self,
+        selection: &VariableSelection,
+        plot_type: crate::plots::PlotType,
+    ) -> Option<usize> {
         let var = selection.variable_info()?;
         let set = &var.stack_base()?.set;
-        let demand = crate::app::controllers::controller_for(selection.plot_type)
-            .resolution_demand(var, &selection.dim_config, self.layout.canvas_px);
+        let demand = crate::app::controllers::controller_for(plot_type).resolution_demand(
+            var,
+            &selection.dim_config,
+            self.layout.canvas_px,
+        );
         let window = window(selection, &var.shape);
         Some(match selection.level {
             LevelChoice::Auto => fit_level(set, &window, &demand),

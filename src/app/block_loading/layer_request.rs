@@ -40,39 +40,30 @@ impl OctantApp {
         if id == LayerId::BASE
             && let Some(level) = self.resolve_level(staged)
         {
-            return self.selection_request(id, &level, level.variable_info()?);
+            return Some(self.selection_request(&level, level.variable_info()?));
         }
-        self.selection_request(id, staged, staged.variable_info()?)
+        Some(self.selection_request(staged, staged.variable_info()?))
     }
 
     /// The request of layer `id`'s shown selection (what it plots now); its
     /// variable falls back to the staged one until the layer's first plot.
     pub(crate) fn shown_layer_request(&self, id: LayerId) -> Option<LayerRequest> {
         let (shown, _) = self.layer_selections(id)?;
-        self.selection_request(id, shown, self.layer_variable_info(id)?)
+        Some(self.selection_request(shown, self.layer_variable_info(id)?))
     }
 
-    /// `selection`'s request of `var` for layer `id`, reading the channel
-    /// dimension whole while the layer's composite is on.
-    fn selection_request(
-        &self,
-        id: LayerId,
-        selection: &VariableSelection,
-        var: &VariableInfo,
-    ) -> Option<LayerRequest> {
+    /// `selection`'s request of `var`.
+    fn selection_request(&self, selection: &VariableSelection, var: &VariableInfo) -> LayerRequest {
         let var = var.clone();
-        let composite = self.layers.get(id)?.composite.enabled;
-        let composite_dim =
-            crate::app::state::dataset_activation::channel_dim(&var).filter(|_| composite);
-        let request = selection.slice_request(&var.name, &var.shape, composite_dim);
-        Some(LayerRequest {
+        let request = selection.slice_request(&var.name, &var.shape);
+        LayerRequest {
             source_id: self.selection_source_id(selection),
             store_kind: selection.store_kind,
             store_target: selection.store_target.clone(),
             anim_dim: selection.animated_dim,
             var,
             request,
-        })
+        }
     }
 
     /// The open store `request` reads from (opening it when needed); `None`

@@ -15,6 +15,8 @@
 mod actions;
 mod block_loading;
 pub mod canvas;
+#[cfg(test)]
+mod composite_defaults_tests;
 pub mod controllers;
 mod data_loading;
 pub(crate) mod detail;
@@ -32,6 +34,9 @@ pub(crate) mod multiscale_window;
 mod ome_display_tests;
 #[cfg(test)]
 mod ome_labels_tests;
+#[cfg(test)]
+mod ome_volume_tests;
+mod overlay_channels;
 #[cfg(test)]
 mod overlay_composite_tests;
 #[cfg(test)]

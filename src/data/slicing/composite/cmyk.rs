@@ -1,7 +1,7 @@
 //! CMYK 4-channel composite slicing to 24-bit TrueColor `MatrixData`.
 
-use crate::data::MatrixData;
 use crate::data::octant_block::OctantBlock;
+use crate::data::{MatrixData, VariableInfo};
 
 use super::stretch::{CompositeStretch, Stretch};
 use super::utils::{compute_normalization_scale, linear_to_srgb, pack_rgb};
@@ -16,9 +16,19 @@ pub fn is_cmyk_attrs<'a>(get: impl Fn(&str) -> Option<&'a str>) -> bool {
         || get("long_name").is_some_and(|l| l.contains("CMYK"))
 }
 
-/// Whether `block` holds CMYK inks along its channel dimension `c_dim`.
+/// Whether variable `var` holds CMYK inks, by its attributes and `long_name`.
+pub fn is_cmyk_var(var: &VariableInfo) -> bool {
+    is_cmyk_attrs(|key| match key {
+        "long_name" => var.long_name.as_deref(),
+        _ => var.attributes.get(key).map(String::as_str),
+    })
+}
+
+/// Whether `block` holds CMYK inks, bands 0-3, along its channel dimension
+/// `c_dim`; a block of other bands is composed as RGB.
 pub fn is_cmyk_block(block: &OctantBlock, c_dim: usize) -> bool {
-    block.shape.get(c_dim).is_some_and(|&n| n >= 4)
+    block.origin.get(c_dim).copied().unwrap_or(0) == 0
+        && block.shape.get(c_dim).is_some_and(|&n| n >= 4)
         && is_cmyk_attrs(|key| block.attributes.get(key).map(String::as_str))
 }
 

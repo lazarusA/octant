@@ -3,8 +3,8 @@
 
 use serde_json::json;
 
-use crate::app::OctantApp;
 use crate::app::layers::LayerId;
+use crate::app::{OctantApp, SpatialRole};
 use crate::data::VariableInfo;
 use crate::data::ome::ChannelFamily;
 use crate::data::ome::test_support::Fixture;
@@ -103,6 +103,35 @@ fn greyscale_images_show_their_first_active_channel() {
 }
 
 #[test]
+fn a_channel_axis_named_otherwise_takes_z_and_is_still_pinned() {
+    // A `(ch, y, x)` greyscale image: `ch` is no channel name, so Z.
+    let axes = json!([
+        { "name": "ch", "type": "channel" },
+        { "name": "y", "type": "space", "unit": "micrometer" },
+        { "name": "x", "type": "space", "unit": "micrometer" }
+    ]);
+    let attrs = json!({
+        "multiscales": [{ "version": "0.4", "axes": axes, "datasets": [{ "path": "0",
+            "coordinateTransformations": [{ "type": "scale", "scale": [1.0, 0.25, 0.25] }] }] }],
+        "omero": {
+            "rdefs": { "model": "greyscale" },
+            "channels": [
+                { "label": "off", "color": "FF0000", "active": false },
+                { "label": "on", "color": "00FF00", "active": true }
+            ]
+        }
+    });
+    let found = Fixture::default()
+        .v2_group("", attrs)
+        .v2_array("0", &[2, 8, 8])
+        .discover()
+        .expect("ome");
+    let app = defaults_for(&found.variables[0]);
+    assert_eq!(app.selected.dim_config[0].spatial, SpatialRole::Z);
+    assert_eq!(app.selected.dim_ranges[0], (1, 1));
+}
+
+#[test]
 fn physical_units_reach_the_dimensions() {
     let var = image("color");
     assert_eq!(var.dimension_unit("x"), Some("µm"));
@@ -136,4 +165,42 @@ fn greyscale_window_follows_the_shown_channel() {
     // Played across channels, the step is the channel shown.
     app.layers.base.selection_mut().animated_dim = Some(1);
     assert_eq!(apply(&mut app, 1), (10.0, 900.0, true, true));
+}
+
+#[test]
+fn colour_overlays_open_on_their_active_channels() {
+    use crate::app::layers::{Source, overlay_selection};
+    let var = image("color");
+    let plane = VariableInfo {
+        name: "plane".into(),
+        dimension_names: vec!["y".into(), "x".into()],
+        shape: vec![8, 8],
+        ..Default::default()
+    };
+    let mut app = OctantApp::default();
+    let mut dataset = app.selected.clone();
+    dataset.metadata = Some(crate::data::DatasetMetadata {
+        variables: vec![plane, var.clone()],
+        ..Default::default()
+    });
+    // A base without a channel axis, so the overlay's channels follow its composite.
+    let mut base = dataset.clone();
+    base.variable_idx = 0;
+    *app.layers.base.selection_mut() = base.clone();
+    let selection = overlay_selection(&base, &dataset, 1).expect("overlay selection");
+    let id = app.layers.push(Source::for_selection(selection));
+    crate::ui::variables_panel::init_layer_composite_defaults(&mut app, id, &var);
+    app.fit_overlay_channels(id);
+
+    let overlay = app.layers.get(id).expect("overlay");
+    assert!(overlay.composite.enabled);
+    let ticked: Vec<usize> = overlay
+        .composite
+        .channel_configs
+        .iter()
+        .filter(|c| c.visible)
+        .map(|c| c.index)
+        .collect();
+    assert_eq!(ticked, [1], "OMERO's active channel, not channel 0");
+    assert_eq!(overlay.selection().dim_ranges[1], (1, 1));
 }

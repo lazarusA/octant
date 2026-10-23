@@ -11,7 +11,9 @@ use std::fmt::Display;
 
 use super::coord_label::show_coord_label;
 use super::double_slider::double_slider_with_inputs;
-use super::metrics::{calculate_download_sizes, window_2d_elements, window_volume_elements};
+use super::metrics::{
+    calculate_download_sizes, calculate_selected_volume_elements, window_2d_elements,
+};
 use super::role_row::{DimName, role_row};
 use super::roles::apply_role_change;
 use crate::ui::flow_row::{self, VALUE_BOX_W};
@@ -61,7 +63,8 @@ pub fn show_dimension_sliders(app: &mut OctantApp, ui: &mut Ui, var_info: &Varia
         banner(ui, icon, tone, key, &[&cells, &data_mb]);
     }
 
-    let total_vol_elements = window_volume_elements(&app.selected, &window);
+    // On the level a volume reads, as the plot type options measure it.
+    let total_vol_elements = calculate_selected_volume_elements(app);
     if total_vol_elements > crate::plots::common::MAX_GPU_STORAGE_BUFFER_ELEMENTS {
         let mut buf = [0; 24];
         let vol_mb = megabytes(&mut buf, total_vol_elements);

@@ -5,7 +5,7 @@ use super::test_utils::SyntheticTiffBuilder;
 use crate::data::blocks::BlockStore;
 use crate::data::slice_request::SliceRequest;
 
-fn open_store_from_bytes(name: &str, bytes: Vec<u8>) -> GeoTiffBlockStore {
+pub(super) fn open_store_from_bytes(name: &str, bytes: Vec<u8>) -> GeoTiffBlockStore {
     let rt = crate::utils::executor::get_shared_tokio_rt();
     rt.block_on(async move { GeoTiffBlockStore::from_bytes(name, bytes).await })
         .expect("open from bytes")

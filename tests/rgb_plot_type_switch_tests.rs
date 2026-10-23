@@ -70,6 +70,10 @@ fn setup_rgb_app() -> OctantApp {
 
     app.load_new_metadata(meta);
     app.layout.show_hero = false;
+    // A Zarr band dimension opens on one band; the composite reads the bands
+    // the slider selects, never widened for it.
+    app.selected.dim_ranges[0] = (0, 2);
+    app.selected.dim_config[0].range = (0, 2);
     app.layers.base.composite.enabled = true;
     app.layers.base.composite.rgb_channels = [0, 1, 2];
     app

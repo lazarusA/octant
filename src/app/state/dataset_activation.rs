@@ -138,13 +138,8 @@ impl OctantApp {
 
     /// Whether layer `id`'s variable holds CMYK inks.
     pub fn layer_is_cmyk(&self, id: LayerId) -> bool {
-        let Some(var) = self.layer_variable_info(id) else {
-            return false;
-        };
-        crate::data::slicing::composite::cmyk::is_cmyk_attrs(|key| match key {
-            "long_name" => var.long_name.as_deref(),
-            _ => var.attributes.get(key).map(String::as_str),
-        })
+        self.layer_variable_info(id)
+            .is_some_and(crate::data::slicing::composite::cmyk::is_cmyk_var)
     }
 
     /// Whether the plotted variable is an OME-Zarr image (bioimaging, never geographic).
@@ -188,10 +183,7 @@ impl OctantApp {
         } else {
             staged
         };
-        matches!(
-            selection.store_kind,
-            StoreKind::LocalGeoTiff | StoreKind::RemoteGeoTiff
-        )
+        selection.store_kind.is_geotiff()
     }
 
     /// The plotted `(start, end)` selection of dimension `dim_idx`.

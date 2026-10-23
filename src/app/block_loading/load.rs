@@ -54,6 +54,7 @@ impl OctantApp {
     /// clamps the current step into its animated extent; other layers clamp
     /// only their own step (`layer_step`).
     pub fn load_layer_block(&mut self, id: LayerId) {
+        self.fit_overlay_channels(id);
         self.request_layer_coordinates(id);
         let Some((_, staged)) = self.layer_selections(id) else {
             return;

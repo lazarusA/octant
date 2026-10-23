@@ -41,6 +41,7 @@ pub fn init_variable_dimension_defaults(app: &mut OctantApp, var_info: &Variable
         assign_euclidean_roles(app, var_info);
     }
 
+    pin_channel(app, var_info);
     apply_omero_defaults(app, var_info);
     finalize_active_configs(app, var_info, rank);
     if var_info.stack_base().is_some() {
@@ -126,12 +127,6 @@ fn apply_omero_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
         return;
     };
     let image = &ome.image;
-    if let (Some(k), Some(c)) = (
-        image.greyscale_channel(),
-        image.axis_of_kind(crate::data::ome::AxisKind::Channel),
-    ) {
-        pin_dim(app, var_info, c, k);
-    }
     if let (Some(dz), Some(z)) = (image.default_z, image.z_axis()) {
         pin_dim(app, var_info, z, dz);
     }
@@ -153,6 +148,41 @@ fn apply_omero_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
         if app.selected.animated_dim == Some(t) {
             app.playback.current_timestep = dt;
         }
+    }
+}
+
+/// A channel dimension opens on OMERO's first active channel within its
+/// range, else the range's first, unless the variable opens in color
+/// (`composite::opens_in_color`): pinned there without a role or as Z (one
+/// plane), started there when animated, left alone as a plot axis.
+fn pin_channel(app: &mut OctantApp, var_info: &VariableInfo) {
+    let Some(c) = var_info.channel_axis() else {
+        return;
+    };
+    let is_tiff = app.selected.store_kind.is_geotiff();
+    let Some(&cfg) = app.selected.dim_config.get(c) else {
+        return;
+    };
+    let plot_axis = matches!(
+        cfg.spatial,
+        SpatialRole::X | SpatialRole::Y | SpatialRole::Grid
+    );
+    if plot_axis || super::composite::opens_in_color(var_info, is_tiff) {
+        return;
+    }
+    let (lo, hi) = app.selected.dim_ranges.get(c).copied().unwrap_or((0, 0));
+    let active = |i: &usize| {
+        let channels = var_info.ome.as_ref().map(|o| o.image.channels.as_slice());
+        channels
+            .and_then(|ch| ch.get(*i))
+            .is_some_and(|ch| ch.active)
+    };
+    let k = (lo.min(hi)..=hi.max(lo)).find(active).unwrap_or(lo.min(hi));
+    if cfg.animation != AnimationRole::Animated {
+        pin_dim(app, var_info, c, k);
+    } else if let Some(i) = app.selected.dim_indices.get_mut(c) {
+        *i = k;
+        app.playback.current_timestep = k;
     }
 }
 

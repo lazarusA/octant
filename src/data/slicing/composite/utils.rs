@@ -94,30 +94,35 @@ pub fn unpack_rgb(packed: f32) -> (f32, f32, f32) {
     )
 }
 
-/// Filters and sorts visible channel configurations overlapping `[c_start, c_start + num_channels)`.
-fn visible_channel_configs(
+/// The channels drawn from `configs` in the channel window `[c_start, c_start + num_channels)`,
+/// with their local index, in channel order: the ticked ones, else the window's first.
+pub fn drawn_channels(
     configs: &[ChannelColorConfig],
     c_start: usize,
     num_channels: usize,
 ) -> Vec<(&ChannelColorConfig, usize)> {
-    let mut visible: Vec<_> = configs
+    let local = |c: &ChannelColorConfig| c.index.checked_sub(c_start).filter(|&l| l < num_channels);
+    let mut drawn: Vec<_> = configs
         .iter()
         .filter(|c| c.visible)
-        .filter_map(|c| {
-            let local_c = c.index.checked_sub(c_start)?;
-            if local_c < num_channels {
-                Some((c, local_c))
-            } else {
-                None
-            }
-        })
+        .filter_map(|c| Some((c, local(c)?)))
         .collect();
-    visible.sort_by_key(|(c, _)| c.index);
-    visible
+    if drawn.is_empty() {
+        // No ticked channel in the window: its first one, as with the composite off.
+        drawn.extend(
+            configs
+                .iter()
+                .find(|c| c.index == c_start && num_channels > 0)
+                .map(|c| (c, 0)),
+        );
+    }
+    drawn.sort_by_key(|(c, _)| c.index);
+    drawn
 }
 
-/// The packed tints of `block`'s visible channels (along `c_dim`, from
-/// `configs`) blended over `len` cells, NaN everywhere when none is visible.
+/// The packed tints of `block`'s drawn channels (along `c_dim`, from `configs`,
+/// [`drawn_channels`]) blended over `len` cells, NaN everywhere when the block
+/// holds none.
 /// `read` reads one channel's `len` values, given `fixed_indices` pointing
 /// at it and its config; `None` when no channel could be read. Channels
 /// without a window are stretched as `stretch` records (else over their
@@ -133,7 +138,7 @@ pub fn blend_channels<V: AsRef<[f32]>>(
 ) -> Option<Vec<f32>> {
     let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
     let num_channels = block.shape.get(c_dim).copied().unwrap_or(0);
-    let visible = visible_channel_configs(configs, c_start, num_channels);
+    let visible = drawn_channels(configs, c_start, num_channels);
     if visible.is_empty() {
         return Some(vec![f32::NAN; len]);
     }

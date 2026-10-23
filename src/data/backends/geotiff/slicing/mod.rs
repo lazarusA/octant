@@ -20,7 +20,7 @@ use super::coords::GeoSpatialBounds;
 use super::palette::apply_colormap_into;
 use super::scale::BandScales;
 use region::read_region;
-use request::{palette_channel, parse_slice_request};
+use request::{band_window, palette_channel, parse_slice_request};
 
 /// Fetch and decode an `OctantBlock` from an IFD (whose bounds are
 /// `geo_bounds`, `GeoSpatialBounds::of_ifd_in`, and band transforms `scales`,
@@ -60,11 +60,13 @@ pub async fn fetch_geotiff_block(
             } else {
                 ifd.samples_per_pixel() as usize
             };
-            ((0..total).collect(), false)
+            let (start, end) = band_window(request, total);
+            ((start..end).collect(), false)
         }
     };
 
     let total_bands = target_bands.len();
+    let band_origin = target_bands.first().copied().unwrap_or(0);
     let total_samples = total_bands
         .checked_mul(plane_len)
         .ok_or_else(|| BlockStoreError::from("Total sample buffer size overflow"))?;
@@ -87,9 +89,8 @@ pub async fn fetch_geotiff_block(
             let ch = palette_channel(&request.variable).unwrap_or(0);
             apply_colormap_into(&idx_buf, cmap, bits, ch, &mut buffer);
         } else {
-            for ch in 0..total_bands {
-                let (start, end) = (ch * plane_len, (ch + 1) * plane_len);
-                apply_colormap_into(&idx_buf, cmap, bits, ch, &mut buffer[start..end]);
+            for (values, &ch) in buffer.chunks_mut(plane_len).zip(&target_bands) {
+                apply_colormap_into(&idx_buf, cmap, bits, ch, values);
             }
         }
     } else {
@@ -126,7 +127,7 @@ pub async fn fetch_geotiff_block(
         (
             vec![total_bands, out_h, out_w],
             vec!["band".into(), "y".into(), "x".into()],
-            vec![0, parsed.row_start, parsed.col_start],
+            vec![band_origin, parsed.row_start, parsed.col_start],
         )
     };
 

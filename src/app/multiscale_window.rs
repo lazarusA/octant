@@ -22,9 +22,22 @@ impl OctantApp {
         &self,
         selection: &'a VariableSelection,
     ) -> Option<ReadWindow<'a>> {
+        self.read_window_as(selection, selection.plot_type)
+    }
+
+    /// [`Self::read_window`] as plot type `plot_type` would read it, for the
+    /// sizes of plot types not picked yet.
+    pub(crate) fn read_window_as<'a>(
+        &self,
+        selection: &'a VariableSelection,
+        plot_type: crate::plots::PlotType,
+    ) -> Option<ReadWindow<'a>> {
         let var = selection.variable_info()?;
         let own = Some((var, Cow::Borrowed(selection.dim_ranges.as_slice())));
-        let Some(level) = self.selection_level(selection).filter(|&l| l > 0) else {
+        let Some(level) = self
+            .selection_level_as(selection, plot_type)
+            .filter(|&l| l > 0)
+        else {
             return own;
         };
         let (Some(set), Some(meta)) = (var.stack_base().map(|b| &b.set), &selection.metadata)

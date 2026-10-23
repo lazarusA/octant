@@ -173,7 +173,7 @@ fn same_dataset(a: &VariableSelection, b: &VariableSelection) -> bool {
 }
 
 /// The dimension of `var` named `name` (ASCII case-insensitive).
-pub(super) fn dim_named(var: &VariableInfo, name: &str) -> Option<usize> {
+pub(crate) fn dim_named(var: &VariableInfo, name: &str) -> Option<usize> {
     var.dimension_names
         .iter()
         .position(|n| n.eq_ignore_ascii_case(name))

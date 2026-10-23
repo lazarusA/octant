@@ -17,6 +17,8 @@ pub mod wasm;
 #[cfg(test)]
 mod axes_tests;
 #[cfg(test)]
+mod band_window_tests;
+#[cfg(test)]
 mod bands_tests;
 #[cfg(test)]
 mod ifd_check_tests;

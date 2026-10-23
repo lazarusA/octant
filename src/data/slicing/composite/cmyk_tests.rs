@@ -134,3 +134,13 @@ fn either_tag_marks_cmyk_inks() {
     std::sync::Arc::make_mut(&mut block.attributes).insert("color_space".into(), "cmyk".into());
     assert!(is_cmyk_block(&block, 0));
 }
+
+#[test]
+fn a_block_without_bands_0_to_3_is_not_cmyk() {
+    use super::cmyk::is_cmyk_block;
+    let mut block = ink_block(true);
+    assert!(is_cmyk_block(&block, 0));
+    // Bands 1-4 of a CMYK + alpha raster: K and alpha are no C and M.
+    block.origin[0] = 1;
+    assert!(!is_cmyk_block(&block, 0));
+}

@@ -8,7 +8,8 @@ use crate::i18n::{PlotKey, fill, tr};
 use crate::plots::PlotType;
 use crate::plots::common::{MAX_2D_SURFACE_ELEMENTS, MAX_GPU_STORAGE_BUFFER_BYTES};
 use crate::ui::variables_panel::{
-    calculate_selected_2d_elements, calculate_selected_volume_elements,
+    calculate_selected_2d_elements, calculate_selected_surface_elements,
+    calculate_selected_volume_elements,
 };
 use crate::utils::stack_str;
 
@@ -60,19 +61,25 @@ impl Facts {
             .selected_variable_info()
             .or_else(|| app.plotted_variable_info());
         let has_3d = var.is_some_and(|v| v.shape.len() >= 3 || v.dimension_names.len() >= 3);
+        // 3D types read their own level of a multiscale variable: measured
+        // there, and never aggregated like the heatmap.
         let volume = var.map_or(0, |_| calculate_selected_volume_elements(app));
-        let surface = calculate_selected_2d_elements(app);
+        let surface = calculate_selected_surface_elements(app);
+        let multiscale = var.is_some_and(|v| v.stack_base().is_some());
         let discrete = app
             .selected
             .dim_config
             .iter()
             .any(|c| c.spatial == SpatialRole::Grid);
         let (supported, grid_name) = supported_plots(app, discrete);
-        let aggregated = if app.is_exploring_unplotted_variable() {
-            !has_3d && surface > crate::plots::limits::max_storage_elements()
-        } else {
-            app.base_resampled()
-        };
+        let aggregated = !multiscale
+            && if app.is_exploring_unplotted_variable() {
+                !has_3d
+                    && calculate_selected_2d_elements(app)
+                        > crate::plots::limits::max_storage_elements()
+            } else {
+                app.base_resampled()
+            };
         Self {
             label_image: var.is_some_and(crate::data::VariableInfo::is_label_image),
             volume_mb: megabytes(volume),

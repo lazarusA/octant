@@ -67,7 +67,7 @@ fn a_dimension_without_a_range_reads_index_0_not_all_of_it() {
         dim_ranges: vec![(1, 2)],
         ..Default::default()
     };
-    let request = selection.slice_request("t2m", &[5, 750_000], None);
+    let request = selection.slice_request("t2m", &[5, 750_000]);
     assert_eq!(
         request.selections,
         [

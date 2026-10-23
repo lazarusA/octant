@@ -14,6 +14,11 @@ pub enum StoreKind {
 }
 
 impl StoreKind {
+    /// Whether this kind reads GeoTIFF files.
+    pub fn is_geotiff(self) -> bool {
+        matches!(self, StoreKind::LocalGeoTiff | StoreKind::RemoteGeoTiff)
+    }
+
     pub fn to_data_source_kind(self) -> crate::data::DataSourceKind {
         match self {
             StoreKind::RemoteZarr => crate::data::DataSourceKind::RemoteZarr,

@@ -21,6 +21,7 @@ mod style;
 mod style_tests;
 mod window;
 
+pub(crate) use alignment::dim_named;
 pub use alignment::{Alignment, classify};
 pub use colorbar::{BarOrientation, ColorbarPlacement, Slot};
 pub use data::LayerData;

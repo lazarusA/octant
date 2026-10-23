@@ -8,7 +8,7 @@ use crate::plots::PlotType;
 
 /// The selection of variable `var_idx` of `dataset` (a staged selection) that
 /// reads the `base` layer's window: dimensions named like the base's take its
-/// roles, ranges and indices (clamped to the variable), others one index.
+/// roles, ranges and indices (clamped to the variable), others index 0.
 pub fn overlay_selection(
     base: &VariableSelection,
     dataset: &VariableSelection,
@@ -37,7 +37,9 @@ pub fn overlay_selection(
 
 /// Gives `overlay`'s dimensions the `base` window in place: roles, ranges
 /// and indices of the base's dimension of the same name (clamped to the
-/// overlay's sizes), one index 0 for the others. Whether the window moved:
+/// overlay's sizes); the others keep their index and range (0 when new; a
+/// channel range follows the composite, `fit_overlay_channels`), with no role.
+/// Whether the window moved:
 /// other roles, ranges or fixed indices (the animated index alone, a playback
 /// step, does not count). Allocates only when the roles change.
 pub fn follow_base_window(base: &VariableSelection, overlay: &mut VariableSelection) -> bool {
@@ -60,7 +62,15 @@ pub fn follow_base_window(base: &VariableSelection, overlay: &mut VariableSelect
             .shape
             .get(i)
             .map_or(0, |&n| (n as usize).saturating_sub(1));
-        let (config, index, range) = base_dim(base, base_var, name, last);
+        // Dimensions the base lacks keep their own index and range, no role.
+        let (config, index, range) = base_dim(base, base_var, name, last).unwrap_or((
+            DimConfig::default(),
+            overlay.dim_indices[i].min(last),
+            (
+                overlay.dim_ranges[i].0.min(last),
+                overlay.dim_ranges[i].1.min(last),
+            ),
+        ));
         let old = (
             overlay.dim_config[i],
             overlay.dim_indices[i],
@@ -81,17 +91,15 @@ pub fn follow_base_window(base: &VariableSelection, overlay: &mut VariableSelect
 }
 
 /// The role, index and range the overlay's dimension `name` (of last index
-/// `last`) takes from the base's dimension of that name, clamped to it; one
-/// index 0 when the base has none.
+/// `last`) takes from the base's dimension of that name, clamped to it;
+/// `None` when the base has none.
 fn base_dim(
     base: &VariableSelection,
     base_var: &crate::data::VariableInfo,
     name: &str,
     last: usize,
-) -> (DimConfig, usize, (usize, usize)) {
-    let Some(b) = dim_named(base_var, name) else {
-        return (DimConfig::default(), 0, (0, 0));
-    };
+) -> Option<(DimConfig, usize, (usize, usize))> {
+    let b = dim_named(base_var, name)?;
     let clamp = |(s, e): (usize, usize)| (s.min(last), e.min(last));
     let config = base
         .dim_config
@@ -103,5 +111,5 @@ fn base_dim(
         });
     let index = base.dim_indices.get(b).map_or(0, |&n| n.min(last));
     let range = base.dim_ranges.get(b).map_or((0, 0), |&r| clamp(r));
-    (config, index, range)
+    Some((config, index, range))
 }

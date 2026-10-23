@@ -89,10 +89,9 @@ pub fn slice_rgb_composite_nd(
         )
     };
 
-    // CMYK inks always map C, M, Y, K to the block's first four channels.
+    // CMYK inks are bands 0-3 (C, M, Y, K), which `is_cmyk_block` checks the block holds.
     if is_cmyk_block(block, c_dim) {
-        let c_start = block.origin.get(c_dim).copied().unwrap_or(0);
-        let ink = |k: usize| plane(Some(c_start + k));
+        let ink = |k: usize| plane(Some(k));
         let (c, m, y, k) = (ink(0)?, ink(1)?, ink(2)?, ink(3)?);
         let planes = [c.as_slice(), &m, &y, &k];
         return blend_cmyk_planes(

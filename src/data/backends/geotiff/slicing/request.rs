@@ -73,6 +73,18 @@ pub fn parse_slice_request(request: &SliceRequest, ifd: &ImageFileDirectory) -> 
     }
 }
 
+/// The bands `[start, end)` a multi-band request of `total` bands reads: its
+/// first selection when it selects bands, rows and columns, else every band;
+/// at least one band.
+pub fn band_window(request: &SliceRequest, total: usize) -> (usize, usize) {
+    let (start, end) = match request.selections.as_slice() {
+        [band, _, _] => band.bounds(),
+        _ => (0, total),
+    };
+    let start = start.min(total.saturating_sub(1));
+    (start, end.clamp(start + 1, total.max(start + 1)))
+}
+
 /// Identify the RGB channel index (0 = Red, 1 = Green, 2 = Blue) from a variable name.
 pub fn palette_channel(var: &str) -> Option<usize> {
     let clean = var.rsplit('/').next().unwrap_or(var).trim();

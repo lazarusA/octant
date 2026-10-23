@@ -65,7 +65,7 @@ impl OctantApp {
             *sel.dim_ranges.get_mut(a)? = (step, step);
             *sel.dim_indices.get_mut(a)? = step;
         }
-        let slice = sel.slice_request(&var.name, &var.shape, None);
+        let slice = sel.slice_request(&var.name, &var.shape);
         let source_id = self.selection_source_id(&sel);
         let handle = self.resolve_store_handle(&source_id, &sel.store_target, sel.store_kind)?;
         let pending = PendingDetail {

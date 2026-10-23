@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use async_tiff::ImageFileDirectory;
-use async_tiff::tags::{PhotometricInterpretation, SampleFormat};
+use async_tiff::tags::{ExtraSamples, PhotometricInterpretation, SampleFormat};
 
 pub(super) fn extract_data_type_name(ifd: &ImageFileDirectory) -> String {
     let fmt = ifd
@@ -84,5 +84,17 @@ pub(super) fn extract_ifd_attributes(ifd: &ImageFileDirectory) -> HashMap<String
         }
         _ => {}
     }
+    // An RGBA raster opens in color (`composite::opens_in_color`).
+    if alpha_last(ifd) {
+        attrs.insert("alpha_band".into(), "last".into());
+    }
     attrs
+}
+
+/// Whether the IFD's last sample is alpha (associated or not).
+fn alpha_last(ifd: &ImageFileDirectory) -> bool {
+    matches!(
+        ifd.extra_samples().and_then(|e| e.last()),
+        Some(ExtraSamples::AssociatedAlpha | ExtraSamples::UnassociatedAlpha)
+    )
 }

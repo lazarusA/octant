@@ -43,16 +43,16 @@ pub fn calculate_selected_volume_elements(app: &OctantApp) -> usize {
     selection_volume_elements(app, &app.selected)
 }
 
-/// The 3D volume elements `selection` reads, on the level its plot reads,
-/// over its active dimensions.
+/// The 3D volume elements `selection` reads, on the level a volume or point
+/// cloud reads (whatever its plot is now), over its active dimensions.
 fn selection_volume_elements(app: &OctantApp, selection: &VariableSelection) -> usize {
-    app.read_window(selection)
+    app.read_window_as(selection, crate::plots::PlotType::Volume)
         .map_or(0, |w| window_volume_elements(selection, &w))
 }
 
 /// The 3D volume elements `selection` reads over `window`
 /// (`OctantApp::read_window`), over its active dimensions.
-pub fn window_volume_elements(selection: &VariableSelection, window: &ReadWindow) -> usize {
+fn window_volume_elements(selection: &VariableSelection, window: &ReadWindow) -> usize {
     let (var_info, ranges) = window;
     let is_active = |i: usize| {
         selection.dim_config.get(i).is_some_and(|c| c.active)
@@ -66,6 +66,13 @@ pub fn window_volume_elements(selection: &VariableSelection, window: &ReadWindow
 /// plot's level.
 pub fn calculate_selected_2d_elements(app: &OctantApp) -> usize {
     app.read_window(&app.selected)
+        .map_or(0, |w| window_2d_elements(&app.selected, &w))
+}
+
+/// The spatial X and Y plane elements the staged selection reads as a
+/// surface or sphere (on the level those read, whatever its plot is now).
+pub fn calculate_selected_surface_elements(app: &OctantApp) -> usize {
+    app.read_window_as(&app.selected, crate::plots::PlotType::Surface)
         .map_or(0, |w| window_2d_elements(&app.selected, &w))
 }
 
@@ -88,11 +95,6 @@ pub fn variable_bytes(var: &VariableInfo) -> u64 {
         0 => crate::utils::calculate_variable_size_bytes(&var.shape, &var.data_type),
         size => size,
     }
-}
-
-/// Checks if 3D Volume / Point Cloud rendering is allowed under GPU storage limits.
-pub fn is_volume_allowed_for_selection(app: &OctantApp) -> bool {
-    is_volume_allowed(app, &app.selected, app.layers.base.data.volume.as_ref())
 }
 
 /// Whether `selection` can draw as a volume or point cloud next to a layer's

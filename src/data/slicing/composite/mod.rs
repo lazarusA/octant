@@ -26,7 +26,7 @@ pub use rgb::{slice_rgb_composite, slice_rgb_composite_nd};
 pub use stretch::{CompositeStretch, Stretch};
 pub use types::{ChannelColorConfig, ChannelDisplay, DEFAULT_CHANNEL_COLORS, parse_hex_color};
 pub use utils::{
-    compute_channel_normalization, compute_normalization_scale, linear_to_srgb,
+    compute_channel_normalization, compute_normalization_scale, drawn_channels, linear_to_srgb,
     normalize_channel_value, pack_rgb, unpack_rgb,
 };
 pub use volume_multichannel::slice_multichannel_volume_composite_nd;
