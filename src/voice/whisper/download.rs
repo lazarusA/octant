@@ -13,8 +13,10 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 static DOWNLOADING: Mutex<()> = Mutex::new(());
-/// Chosen models downloading or waiting to: the background one gives way.
-static FOREGROUND: AtomicUsize = AtomicUsize::new(0);
+/// Chosen downloads under way or waiting, per model: the background one
+/// gives way to another model's (one of its own waits for it instead).
+static FOREGROUND: [AtomicUsize; WhisperSize::ALL.len()] =
+    [const { AtomicUsize::new(0) }; WhisperSize::ALL.len()];
 
 /// The folder holding the model's files, downloading those missing, with
 /// the share of the weights done; `cancelled` stops it.
@@ -28,22 +30,27 @@ pub(super) fn ensure(
     if on_disk(size, &dir) {
         return Ok(dir);
     }
-    FOREGROUND.fetch_add(1, Ordering::SeqCst);
+    let chosen = &FOREGROUND[size as usize];
+    chosen.fetch_add(1, Ordering::SeqCst);
     let result = download(size, &dir, progress, cancelled);
-    FOREGROUND.fetch_sub(1, Ordering::SeqCst);
+    chosen.fetch_sub(1, Ordering::SeqCst);
     result.map(|()| dir)
 }
 
 /// Downloads `size` quietly on its own thread, once per session, so
-/// choosing it later starts at once; a chosen model downloading stops it
-/// (until the next session), and a failure is only logged.
+/// choosing it later starts at once; another model chosen to download stops
+/// it (until the next session), and a failure is only logged.
 pub(super) fn prefetch(size: WhisperSize) {
     static STARTED: AtomicBool = AtomicBool::new(false);
     if STARTED.swap(true, Ordering::Relaxed) {
         return;
     }
     std::thread::spawn(move || {
-        let chosen = || FOREGROUND.load(Ordering::SeqCst) > 0;
+        let chosen = || {
+            WhisperSize::ALL
+                .iter()
+                .any(|&s| s != size && FOREGROUND[s as usize].load(Ordering::SeqCst) > 0)
+        };
         let result = folder(size).and_then(|dir| {
             if on_disk(size, &dir) {
                 return Ok(());
