@@ -84,3 +84,8 @@ pub fn url(size: WhisperSize, file: &str) -> String {
         s.repo, s.revision
     )
 }
+
+/// A SHA-256 digest as the lowercase hex the specs above are written in.
+pub fn hex(digest: &[u8]) -> String {
+    digest.iter().map(|b| format!("{b:02x}")).collect()
+}

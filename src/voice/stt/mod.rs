@@ -79,12 +79,12 @@ pub enum WhisperSize {
 impl WhisperSize {
     pub const ALL: [Self; 4] = [Self::Tiny, Self::Base, Self::Small, Self::Turbo];
 
-    /// The models offered here: in the browser only those small enough to
-    /// download and run on one CPU thread.
+    /// The models offered here: in the browser only tiny, as base already
+    /// takes about 20 s per utterance on one CPU thread and near 1 GB to load.
     #[cfg(not(target_arch = "wasm32"))]
     pub const OFFERED: &[Self] = &Self::ALL;
     #[cfg(target_arch = "wasm32")]
-    pub const OFFERED: &[Self] = &[Self::Tiny, Self::Base];
+    pub const OFFERED: &[Self] = &[Self::Tiny];
 
     pub fn name(self) -> &'static str {
         match self {

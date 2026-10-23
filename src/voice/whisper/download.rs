@@ -10,9 +10,11 @@ use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 static DOWNLOADING: Mutex<()> = Mutex::new(());
+/// Chosen models downloading or waiting to: the background one gives way.
+static FOREGROUND: AtomicUsize = AtomicUsize::new(0);
 
 /// The folder holding the model's files, downloading those missing, with
 /// the share of the weights done; `cancelled` stops it.
@@ -21,19 +23,61 @@ pub(super) fn ensure(
     progress: &dyn Fn(f32),
     cancelled: &dyn Fn() -> bool,
 ) -> Result<PathBuf, String> {
-    let dir = eframe::storage_dir("Octant")
-        .ok_or("no data folder")?
-        .join("models/whisper")
-        .join(size.name());
+    let dir = folder(size)?;
     // A model on disk never waits for another one downloading.
-    if models::files(size)
-        .iter()
-        .all(|(f, _)| dir.join(f).exists())
-    {
+    if on_disk(size, &dir) {
         return Ok(dir);
     }
+    FOREGROUND.fetch_add(1, Ordering::SeqCst);
+    let result = download(size, &dir, progress, cancelled);
+    FOREGROUND.fetch_sub(1, Ordering::SeqCst);
+    result.map(|()| dir)
+}
+
+/// Downloads `size` quietly on its own thread, once per session, so
+/// choosing it later starts at once; a chosen model downloading stops it
+/// (until the next session), and a failure is only logged.
+pub(super) fn prefetch(size: WhisperSize) {
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    if STARTED.swap(true, Ordering::Relaxed) {
+        return;
+    }
+    std::thread::spawn(move || {
+        let chosen = || FOREGROUND.load(Ordering::SeqCst) > 0;
+        let result = folder(size).and_then(|dir| {
+            if on_disk(size, &dir) {
+                return Ok(());
+            }
+            download(size, &dir, &|_| {}, &chosen)
+        });
+        if let Err(e) = result {
+            log::warn!("Whisper {} in the background: {e}", size.name());
+        }
+    });
+}
+
+fn folder(size: WhisperSize) -> Result<PathBuf, String> {
+    Ok(eframe::storage_dir("Octant")
+        .ok_or("no data folder")?
+        .join("models/whisper")
+        .join(size.name()))
+}
+
+fn on_disk(size: WhisperSize, dir: &Path) -> bool {
+    models::files(size)
+        .iter()
+        .all(|(f, _)| dir.join(f).exists())
+}
+
+/// Downloads the files of `size` missing from `dir`, one download at a time.
+fn download(
+    size: WhisperSize,
+    dir: &Path,
+    progress: &dyn Fn(f32),
+    cancelled: &dyn Fn() -> bool,
+) -> Result<(), String> {
     let _one_at_a_time = DOWNLOADING.lock().unwrap_or_else(|p| p.into_inner());
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let total = models::weights_bytes(size) as f32;
     for (file, sha) in models::files(size) {
         let dest = dir.join(file);
@@ -49,21 +93,7 @@ pub(super) fn ensure(
             }
         })?;
     }
-    Ok(dir)
-}
-
-/// Downloads `size` quietly on its own thread, once per session, so
-/// choosing it later starts at once; a failure is only logged.
-pub(super) fn prefetch(size: WhisperSize) {
-    static STARTED: AtomicBool = AtomicBool::new(false);
-    if STARTED.swap(true, Ordering::Relaxed) {
-        return;
-    }
-    std::thread::spawn(move || {
-        if let Err(e) = ensure(size, &|_| {}, &|| false) {
-            log::warn!("Whisper {} in the background: {e}", size.name());
-        }
-    });
+    Ok(())
 }
 
 fn fetch(
@@ -117,11 +147,7 @@ fn write_verified(
         hasher.update(&buf[..n]);
         progress(n);
     }
-    let got: String = hasher
-        .finalize()
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
+    let got = models::hex(&hasher.finalize());
     if got == sha256 {
         Ok(())
     } else {
@@ -141,10 +167,7 @@ mod tests {
         std::fs::create_dir_all(&dir).expect("temp dir");
         let part = dir.join("model.part");
         let body = b"weights".to_vec();
-        let sha: String = Sha256::digest(&body)
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
+        let sha = super::models::hex(&Sha256::digest(&body));
         let (mut seen, never) = (0, &|| false);
         let ok = write_verified(&mut Cursor::new(&body), &part, &sha, never, &mut |n| {
             seen += n

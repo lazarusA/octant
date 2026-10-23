@@ -1,3 +1,4 @@
+use crate::voice::js_text;
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 use wasm_bindgen::JsCast;
@@ -134,12 +135,4 @@ fn stop_tracks(stream: &MediaStream) {
             track.stop();
         }
     }
-}
-
-fn js_text(value: JsValue) -> String {
-    value
-        .dyn_ref::<js_sys::Error>()
-        .map(|e| String::from(e.message()))
-        .or_else(|| value.as_string())
-        .unwrap_or_else(|| format!("{value:?}"))
 }

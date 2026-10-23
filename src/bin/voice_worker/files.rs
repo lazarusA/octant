@@ -4,6 +4,7 @@
 //! only then cached, so the cache holds whole, checked files.
 
 use js_sys::{Reflect, Uint8Array};
+use octant::voice::js_text;
 use octant::voice::stt::WhisperSize;
 use octant::voice::whisper::models;
 use sha2::{Digest, Sha256};
@@ -23,7 +24,7 @@ pub async fn fetch(
 ) -> Result<Vec<u8>, String> {
     let url = models::url(size, file);
     let scope: WorkerGlobalScope = js_sys::global().unchecked_into();
-    let caches = scope.caches().map_err(text)?;
+    let caches = scope.caches().map_err(js_text)?;
     let cache: Cache = wait(caches.open(CACHE)).await?.unchecked_into();
     let cached = wait(cache.match_with_str(&url)).await?;
     if let Some(response) = cached.dyn_ref::<Response>() {
@@ -40,14 +41,11 @@ pub async fn fetch(
         }
     })
     .await?;
-    let got: String = Sha256::digest(&body)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
+    let got = models::hex(&Sha256::digest(&body));
     if got != sha256 {
         return Err(format!("{url}: checksum {got}, expected {sha256}"));
     }
-    let stored = Response::new_with_opt_u8_array(Some(&mut body)).map_err(text)?;
+    let stored = Response::new_with_opt_u8_array(Some(&mut body)).map_err(js_text)?;
     wait(cache.put_with_str(&url, &stored)).await?;
     Ok(body)
 }
@@ -62,12 +60,12 @@ async fn read(response: &Response, progress: impl Fn(usize)) -> Result<Vec<u8>, 
     let mut body = Vec::new();
     loop {
         let chunk = wait(reader.read()).await?;
-        let done = Reflect::get(&chunk, &"done".into()).map_err(text)?;
+        let done = Reflect::get(&chunk, &"done".into()).map_err(js_text)?;
         if done.as_bool() == Some(true) {
             return Ok(body);
         }
         let value: Uint8Array = Reflect::get(&chunk, &"value".into())
-            .map_err(text)?
+            .map_err(js_text)?
             .unchecked_into();
         body.extend(value.to_vec());
         progress(body.len());
@@ -75,18 +73,10 @@ async fn read(response: &Response, progress: impl Fn(usize)) -> Result<Vec<u8>, 
 }
 
 async fn bytes(response: &Response) -> Result<Vec<u8>, String> {
-    let buffer = wait(response.array_buffer().map_err(text)?).await?;
+    let buffer = wait(response.array_buffer().map_err(js_text)?).await?;
     Ok(Uint8Array::new(&buffer).to_vec())
 }
 
 async fn wait(promise: js_sys::Promise) -> Result<JsValue, String> {
-    JsFuture::from(promise).await.map_err(text)
-}
-
-fn text(value: JsValue) -> String {
-    value
-        .dyn_ref::<js_sys::Error>()
-        .map(|e| String::from(e.message()))
-        .or_else(|| value.as_string())
-        .unwrap_or_else(|| format!("{value:?}"))
+    JsFuture::from(promise).await.map_err(js_text)
 }

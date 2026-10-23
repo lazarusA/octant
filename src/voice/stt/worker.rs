@@ -3,8 +3,10 @@
 //! when it drops, which also stops a download under way. Audio goes to the
 //! worker as transferred `Float32Array`s, commands and events as text
 //! ([`super::wire`]); the model is asked for once the worker says hello.
+//! Until then the worker has no handler and would drop what it is sent, so
+//! audio and stops wait in a [`Tail`].
 
-use super::{SpeechToText, SttEvent, WhisperSize, wire};
+use super::{Input, SpeechToText, SttEvent, Tail, WhisperSize, wire};
 use js_sys::{Array, Float32Array};
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -19,6 +21,8 @@ const SCRIPT: &str = "voice_worker_loader.js";
 pub struct WorkerStt {
     worker: Worker,
     events: Rc<RefCell<VecDeque<SttEvent>>>,
+    /// What is sent before the worker says hello; `None` after.
+    early: Rc<RefCell<Option<Tail>>>,
     _on_message: Closure<dyn FnMut(MessageEvent)>,
     _on_error: Closure<dyn FnMut(ErrorEvent)>,
 }
@@ -29,6 +33,8 @@ impl WorkerStt {
         let worker = Worker::new(SCRIPT).map_err(|e| format!("{e:?}"))?;
         let events = Rc::new(RefCell::new(VecDeque::new()));
         let inbox = Rc::clone(&events);
+        let early = Rc::new(RefCell::new(Some(Tail::default())));
+        let held = Rc::clone(&early);
         let to_worker = worker.clone();
         let on_message = Closure::<dyn FnMut(MessageEvent)>::new(move |e: MessageEvent| {
             let Some(message) = e.data().as_string() else {
@@ -36,6 +42,12 @@ impl WorkerStt {
             };
             if message == wire::HELLO {
                 let _ = to_worker.post_message(&JsValue::from_str(&wire::load(size)));
+                let early = held.try_borrow_mut().ok().and_then(|mut t| t.take());
+                if let Some(mut tail) = early {
+                    for input in tail.take() {
+                        post(&to_worker, &input);
+                    }
+                }
             } else if let (Some(event), Ok(mut queue)) =
                 (wire::decode(&message), inbox.try_borrow_mut())
             {
@@ -56,25 +68,42 @@ impl WorkerStt {
         Ok(Self {
             worker,
             events,
+            early,
             _on_message: on_message,
             _on_error: on_error,
         })
     }
 }
 
+impl WorkerStt {
+    fn send(&mut self, input: Input) {
+        match self.early.try_borrow_mut().as_deref_mut() {
+            Ok(Some(tail)) => tail.push(input),
+            _ => post(&self.worker, &input),
+        }
+    }
+}
+
+/// Sends `input` to the worker, audio as a transferred `Float32Array`.
+fn post(worker: &Worker, input: &Input) {
+    let _ = match input {
+        Input::Audio(samples) => {
+            let audio = Float32Array::from(samples.as_slice());
+            worker.post_message_with_transfer(&audio, &Array::of1(&audio.buffer()))
+        }
+        Input::Finish => worker.post_message(&JsValue::from_str(wire::FINISH)),
+    };
+}
+
 impl SpeechToText for WorkerStt {
     fn push(&mut self, samples: &[f32]) {
-        if samples.is_empty() {
-            return;
+        if !samples.is_empty() {
+            self.send(Input::Audio(samples.to_vec()));
         }
-        let audio = Float32Array::from(samples);
-        let _ = self
-            .worker
-            .post_message_with_transfer(&audio, &Array::of1(&audio.buffer()));
     }
 
     fn finish(&mut self) {
-        let _ = self.worker.post_message(&JsValue::from_str(wire::FINISH));
+        self.send(Input::Finish);
     }
 
     fn poll(&mut self) -> Option<SttEvent> {
