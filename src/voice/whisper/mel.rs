@@ -2,7 +2,7 @@
 //! every 160 samples, the power of each frequency bin, the Slaney-style mel
 //! filter bank (as librosa builds it, which OpenAI's `mel_filters.npz`
 //! holds), log10, then Whisper's clamp to 8 below the maximum. Done as candle
-//! matrix products on the model's device, not with candle's `pcm_to_mel`,
+//! matrix products on the CPU, not with candle's `pcm_to_mel`,
 //! which always starts threads (the browser has none) and doubles the power
 //! of the middle bins as whisper.cpp does. Only the frames that hold audio
 //! are transformed; the rest of the 30 s window is silence.

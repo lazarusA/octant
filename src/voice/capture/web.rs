@@ -142,10 +142,24 @@ fn graph(shared: &Rc<Shared>, stream: &MediaStream) -> Result<Live, JsValue> {
     source.connect_with_audio_node(&processor)?;
     // The processor only runs while connected; its output stays silent.
     processor.connect_with_audio_node(&context.destination())?;
-    // The browser ends the track when the microphone is unplugged or its
-    // permission revoked (never for our own `stop`): reported, and the voice
-    // bar stops listening. Set last, after everything that can fail, so a
-    // track never keeps a dropped handler.
+    // Set last, after everything that can fail, so a track never keeps a
+    // dropped handler.
+    let on_ended = watch_ended(shared, stream);
+    shared.rate.set(context.sample_rate() as u32);
+    Ok(Live {
+        context,
+        stream: stream.clone(),
+        _source: source,
+        processor,
+        _on_audio: on_audio,
+        _on_ended: on_ended,
+    })
+}
+
+/// Marks `shared` failed, reported once, when the browser ends one of
+/// `stream`'s tracks: the microphone unplugged or its permission revoked
+/// (never for our own `stop`), so the voice bar stops listening.
+fn watch_ended(shared: &Rc<Shared>, stream: &MediaStream) -> Closure<dyn FnMut()> {
     let sink = Rc::downgrade(shared);
     let on_ended = Closure::<dyn FnMut()>::new(move || {
         let Some(shared) = sink.upgrade() else { return };
@@ -162,15 +176,7 @@ fn graph(shared: &Rc<Shared>, stream: &MediaStream) -> Result<Live, JsValue> {
             track.set_onended(Some(on_ended.as_ref().unchecked_ref()));
         }
     }
-    shared.rate.set(context.sample_rate() as u32);
-    Ok(Live {
-        context,
-        stream: stream.clone(),
-        _source: source,
-        processor,
-        _on_audio: on_audio,
-        _on_ended: on_ended,
-    })
+    on_ended
 }
 
 fn stop_tracks(stream: &MediaStream) {
