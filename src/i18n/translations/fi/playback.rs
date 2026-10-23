@@ -35,6 +35,10 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
             "Salli mikrofonin käyttö Octantin käynnistäneelle sovellukselle järjestelmän tietosuoja-asetuksissa ja käynnistä se uudelleen."
         }
         PlaybackKey::VoiceSttFailed => "Litterointi epäonnistui",
+        PlaybackKey::VoiceDownloading => "Ladataan puhemallia: {}%",
+        PlaybackKey::VoiceLoading => "Avataan puhemallia...",
+        PlaybackKey::VoiceModelHover => "Puheentunnistusmalli",
+        PlaybackKey::VoiceModelSize => "{} ({} Mt)",
         PlaybackKey::VoiceCloseHover => "Sulje puhesyöte",
     })
 }

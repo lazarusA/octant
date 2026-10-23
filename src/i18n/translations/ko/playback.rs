@@ -35,6 +35,10 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
             "시스템 개인정보 보호 설정에서 Octant를 실행한 앱의 마이크 접근을 허용한 뒤 그 앱을 다시 시작하세요."
         }
         PlaybackKey::VoiceSttFailed => "받아쓰기에 실패했습니다",
+        PlaybackKey::VoiceDownloading => "음성 모델 다운로드 중: {}%",
+        PlaybackKey::VoiceLoading => "음성 모델 불러오는 중...",
+        PlaybackKey::VoiceModelHover => "음성 인식 모델",
+        PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "음성 입력 닫기",
     })
 }

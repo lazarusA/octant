@@ -35,6 +35,10 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
             "Izinkan akses mikrofon untuk aplikasi yang menjalankan Octant di pengaturan privasi sistem, lalu mulai ulang aplikasi itu."
         }
         PlaybackKey::VoiceSttFailed => "Transkripsi gagal",
+        PlaybackKey::VoiceDownloading => "Mengunduh model suara: {}%",
+        PlaybackKey::VoiceLoading => "Memuat model suara...",
+        PlaybackKey::VoiceModelHover => "Model ucapan ke teks",
+        PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Tutup input suara",
     })
 }

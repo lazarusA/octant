@@ -35,6 +35,10 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
             "Ge appen som startade Octant åtkomst till mikrofonen i systemets integritetsinställningar och starta om den."
         }
         PlaybackKey::VoiceSttFailed => "Transkriberingen misslyckades",
+        PlaybackKey::VoiceDownloading => "Laddar ner talmodellen: {} %",
+        PlaybackKey::VoiceLoading => "Läser in talmodellen...",
+        PlaybackKey::VoiceModelHover => "Modell för taligenkänning",
+        PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Stäng röstinmatning",
     })
 }

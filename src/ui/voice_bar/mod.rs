@@ -17,7 +17,7 @@ use crate::ui::toolbar::roving::{BarNav, Stop};
 use crate::voice::Capture;
 use crate::voice::resample::Resampler;
 use crate::voice::spectrum::Spectrum;
-use crate::voice::stt::{self, SpeechToText};
+use crate::voice::stt::{self, Provider, SpeechToText};
 use pulsar::Pulsar;
 use transcript::Transcript;
 
@@ -33,6 +33,7 @@ pub struct VoiceBar {
     /// Kept after the microphone stops, until the bar closes, so the last
     /// utterance's final text still arrives.
     stt: Option<Box<dyn SpeechToText>>,
+    provider: Provider,
     transcript: Transcript,
 }
 
@@ -88,7 +89,7 @@ impl VoiceBar {
                     resampled: Vec::new(),
                     silent: Some(0),
                 });
-                self.stt = stt::open();
+                self.stt = stt::open(self.provider);
                 self.transcript.clear();
             }
             Err(e) => report(Severity::Error, tr(PlaybackKey::VoiceMicError), e),
@@ -189,8 +190,44 @@ fn show_contents(voice: &mut VoiceBar, ui: &mut egui::Ui) {
             voice.toggle();
         }
         nav.push(&close, Stop::Button);
+        #[cfg(not(target_arch = "wasm32"))]
+        nav.push(&model_menu(voice, ui), Stop::Button);
         let rect = ui.available_rect_before_wrap();
         voice.transcript.show(ui, rect, state);
     });
     nav.finish(ui, Region::BottomBar);
+}
+
+/// The Whisper model select; a new choice takes over while listening.
+#[cfg(not(target_arch = "wasm32"))]
+fn model_menu(voice: &mut VoiceBar, ui: &mut egui::Ui) -> egui::Response {
+    use crate::voice::stt::WhisperSize;
+    let Provider::Whisper(current) = voice.provider;
+    let mut chosen = current;
+    let response = egui::ComboBox::from_id_salt("voice_model")
+        .selected_text(current.name())
+        .show_ui(ui, |ui| {
+            for size in WhisperSize::ALL {
+                let mut buf = [0u8; 64];
+                let mb = crate::voice::whisper::megabytes(size);
+                let label = crate::i18n::fill(
+                    &mut buf,
+                    tr(PlaybackKey::VoiceModelSize),
+                    &[&size.name(), &mb],
+                );
+                ui.selectable_value(&mut chosen, size, label);
+            }
+        })
+        .response
+        .on_hover_text(tr(PlaybackKey::VoiceModelHover));
+    if chosen != current {
+        voice.provider = Provider::Whisper(chosen);
+        voice.stt = if voice.is_listening() {
+            stt::open(voice.provider)
+        } else {
+            None
+        };
+        voice.transcript.clear();
+    }
+    response
 }

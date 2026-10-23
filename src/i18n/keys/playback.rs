@@ -34,6 +34,10 @@ crate::i18n::keys::define_keys! {
     VoiceSilent,
     VoiceSilentHint,
     VoiceSttFailed,
+    VoiceDownloading,
+    VoiceLoading,
+    VoiceModelHover,
+    VoiceModelSize,
     VoiceCloseHover,
     }
 }

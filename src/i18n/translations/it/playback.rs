@@ -35,6 +35,10 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
             "Consenti l'accesso al microfono all'app che ha avviato Octant nelle impostazioni di privacy del sistema, poi riavviala."
         }
         PlaybackKey::VoiceSttFailed => "Trascrizione non riuscita",
+        PlaybackKey::VoiceDownloading => "Download del modello vocale: {}%",
+        PlaybackKey::VoiceLoading => "Caricamento del modello vocale...",
+        PlaybackKey::VoiceModelHover => "Modello di riconoscimento vocale",
+        PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Chiudi input vocale",
     })
 }

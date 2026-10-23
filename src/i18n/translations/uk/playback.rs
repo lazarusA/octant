@@ -35,6 +35,10 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
             "Дозвольте доступ до мікрофона застосунку, що запустив Octant, у налаштуваннях конфіденційності системи та перезапустіть його."
         }
         PlaybackKey::VoiceSttFailed => "Не вдалося розпізнати мовлення",
+        PlaybackKey::VoiceDownloading => "Завантаження мовної моделі: {}%",
+        PlaybackKey::VoiceLoading => "Відкриття мовної моделі...",
+        PlaybackKey::VoiceModelHover => "Модель розпізнавання мовлення",
+        PlaybackKey::VoiceModelSize => "{} ({} МБ)",
         PlaybackKey::VoiceCloseHover => "Закрити голосове введення",
     })
 }

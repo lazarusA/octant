@@ -35,6 +35,10 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
             "Permita el acceso al micrófono a la aplicación que inició Octant en la configuración de privacidad del sistema y reiníciela."
         }
         PlaybackKey::VoiceSttFailed => "La transcripción falló",
+        PlaybackKey::VoiceDownloading => "Descargando el modelo de voz: {}%",
+        PlaybackKey::VoiceLoading => "Cargando el modelo de voz...",
+        PlaybackKey::VoiceModelHover => "Modelo de voz a texto",
+        PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Cerrar entrada de voz",
     })
 }

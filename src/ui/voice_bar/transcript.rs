@@ -13,16 +13,22 @@ const KEEP_CHARS: usize = 400;
 pub(super) struct Transcript {
     finals: String,
     partial: String,
+    /// While the provider gets ready: the download's share done, or `None`
+    /// while loading.
+    preparing: Option<Option<f32>>,
 }
 
 impl Transcript {
     pub(super) fn clear(&mut self) {
         self.finals.clear();
         self.partial.clear();
+        self.preparing = None;
     }
 
     pub(super) fn apply(&mut self, event: SttEvent) {
         match event {
+            SttEvent::Preparing(done) => self.preparing = Some(done),
+            SttEvent::Ready => self.preparing = None,
             SttEvent::Partial(text) => self.partial = text,
             SttEvent::Final(text) => {
                 if !self.finals.is_empty() {
@@ -34,19 +40,32 @@ impl Transcript {
                     self.finals.drain(..=cut);
                 }
             }
-            SttEvent::Failed(e) => report(Severity::Error, tr(PlaybackKey::VoiceSttFailed), e),
+            SttEvent::Failed(e) => {
+                self.preparing = None;
+                report(Severity::Error, tr(PlaybackKey::VoiceSttFailed), e);
+            }
         }
     }
 
-    /// Draws the text in `rect`, or `placeholder` while there is none.
+    /// Draws the text in `rect`; while there is none, the provider getting
+    /// ready, else `placeholder`.
     pub(super) fn show(&self, ui: &egui::Ui, rect: egui::Rect, placeholder: &str) {
         let visuals = ui.visuals();
         let font = egui::TextStyle::Body.resolve(ui.style());
         let weak = visuals.weak_text_color();
         let mut job = egui::text::LayoutJob::default();
         let format = |color| egui::TextFormat::simple(font.clone(), color);
+        let mut buf = [0u8; 128];
         if self.finals.is_empty() && self.partial.is_empty() {
-            job.append(placeholder, 0.0, format(weak));
+            let note = match self.preparing {
+                Some(Some(done)) => {
+                    let percent = (done * 100.0).round() as u32;
+                    crate::i18n::fill(&mut buf, tr(PlaybackKey::VoiceDownloading), &[&percent])
+                }
+                Some(None) => tr(PlaybackKey::VoiceLoading),
+                None => placeholder,
+            };
+            job.append(note, 0.0, format(weak));
         } else {
             job.append(&self.finals, 0.0, format(visuals.strong_text_color()));
             let gap = if self.finals.is_empty() {

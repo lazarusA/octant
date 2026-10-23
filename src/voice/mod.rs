@@ -6,5 +6,7 @@ mod capture;
 pub mod resample;
 pub mod spectrum;
 pub mod stt;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod whisper;
 
 pub use capture::Capture;

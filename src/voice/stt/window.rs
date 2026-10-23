@@ -1,9 +1,13 @@
 //! [`Windowed`]: a [`WindowModel`] on its own thread, given utterances cut by
-//! the [`Segmenter`]. Audio that arrives while the model works is gathered
-//! first, so a slow model skips stale partials instead of falling behind.
+//! the [`Segmenter`]. The model is made on that thread first (a download, a
+//! load), reporting through [`Prep`]; audio heard meanwhile is dropped. Audio
+//! that arrives while the model works is gathered first, so a slow model
+//! skips stale partials instead of falling behind.
 
 use super::segment::{Segmenter, Step};
 use super::{SpeechToText, SttEvent};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 
 /// A model that transcribes a stretch of [`super::SAMPLE_RATE`] mono audio.
@@ -16,18 +20,64 @@ enum Msg {
     Finish,
 }
 
-/// Dropping it stops the thread once the model returns.
+/// What making a model may report, and whether to give up.
+pub struct Prep {
+    events: Sender<SttEvent>,
+    cancel: Arc<AtomicBool>,
+}
+
+impl Prep {
+    pub fn report(&self, event: SttEvent) {
+        let _ = self.events.send(event);
+    }
+
+    /// The provider was dropped: stop making the model.
+    pub fn cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Relaxed)
+    }
+}
+
+/// Dropping it cancels the model's making, or stops the thread once the
+/// model returns.
 pub struct Windowed {
     to_worker: Sender<Msg>,
     events: Receiver<SttEvent>,
+    cancel: Arc<AtomicBool>,
 }
 
 impl Windowed {
-    pub fn new(model: impl WindowModel) -> Self {
+    /// Makes the model with `make` on a new thread, then transcribes; a
+    /// failure to make it is reported unless cancelled.
+    pub fn spawn<M: WindowModel>(
+        make: impl FnOnce(&Prep) -> Result<M, String> + Send + 'static,
+    ) -> Self {
         let (to_worker, inbox) = mpsc::channel();
         let (outbox, events) = mpsc::channel();
-        std::thread::spawn(move || run(model, &inbox, &outbox));
-        Self { to_worker, events }
+        let cancel = Arc::new(AtomicBool::new(false));
+        let prep = Prep {
+            events: outbox.clone(),
+            cancel: Arc::clone(&cancel),
+        };
+        std::thread::spawn(move || match make(&prep) {
+            Ok(model) => {
+                prep.report(SttEvent::Ready);
+                inbox.try_iter().for_each(drop);
+                run(model, &inbox, &outbox);
+            }
+            Err(e) if !prep.cancelled() => prep.report(SttEvent::Failed(e)),
+            Err(_) => {}
+        });
+        Self {
+            to_worker,
+            events,
+            cancel,
+        }
+    }
+}
+
+impl Drop for Windowed {
+    fn drop(&mut self) {
+        self.cancel.store(true, Ordering::Relaxed);
     }
 }
 
@@ -122,7 +172,7 @@ mod tests {
 
     #[test]
     fn speech_then_a_pause_comes_back_as_partials_and_a_final() {
-        let mut stt = Windowed::new(Seconds);
+        let mut stt = Windowed::spawn(|_| Ok(Seconds));
         let second = SAMPLE_RATE as usize;
         stt.push(&vec![0.3; second * 2]);
         stt.push(&vec![0.0; second]);
@@ -133,7 +183,7 @@ mod tests {
 
     #[test]
     fn finishing_ends_the_utterance() {
-        let mut stt = Windowed::new(Seconds);
+        let mut stt = Windowed::spawn(|_| Ok(Seconds));
         stt.push(&vec![0.3; SAMPLE_RATE as usize]);
         stt.finish();
         let events = events_until_final(&mut stt);
