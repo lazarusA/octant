@@ -37,11 +37,16 @@ pub(super) struct Transcript {
 }
 
 impl Transcript {
+    /// Clears the text; the provider's state stays, as the provider does.
     pub(super) fn clear(&mut self) {
         self.finals.clear();
         self.partial.clear();
-        self.preparing = None;
         self.jumps += 1;
+    }
+
+    /// The provider was dropped: nothing gets ready any more.
+    pub(super) fn provider_dropped(&mut self) {
+        self.preparing = None;
     }
 
     pub(super) fn is_preparing(&self) -> bool {

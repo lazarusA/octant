@@ -42,3 +42,28 @@ fn a_provider_that_fails_to_get_ready_is_dropped() {
     voice.update(&ctx);
     assert!(voice.stt.is_some());
 }
+
+#[test]
+fn listening_again_keeps_the_loading_state_and_dropping_forgets_it() {
+    use crate::voice::stt::SttEvent::{Failed, Preparing};
+    let ctx = egui::Context::default();
+    let mut voice = VoiceBar {
+        stt: Some(Box::new(Replay([Preparing(None)].into()))),
+        ..VoiceBar::default()
+    };
+    voice.update(&ctx);
+    // Listening again clears the text only: still loading, and a failure
+    // while loading still drops the provider.
+    voice.transcript.clear();
+    assert!(voice.transcript.is_preparing());
+    voice.stt = Some(Box::new(Replay([Failed("no memory".into())].into())));
+    voice.update(&ctx);
+    assert!(voice.stt.is_none());
+    // A provider dropped while it got ready (the microphone refused) leaves
+    // no download showing.
+    voice.stt = Some(Box::new(Replay([Preparing(Some(0.03))].into())));
+    voice.update(&ctx);
+    assert!(voice.transcript.is_preparing());
+    voice.release();
+    assert!(!voice.transcript.is_preparing());
+}

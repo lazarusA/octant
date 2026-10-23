@@ -85,8 +85,14 @@ impl VoiceBar {
     /// Stops the microphone and drops the provider.
     fn release(&mut self) {
         self.listening = None;
-        self.stt = None;
+        self.set_provider(None);
         self.pulsar.reset();
+    }
+
+    /// Replaces the provider; what the old one was getting ready is forgotten.
+    fn set_provider(&mut self, stt: Option<Box<dyn SpeechToText>>) {
+        self.stt = stt;
+        self.transcript.provider_dropped();
     }
 
     fn listen(&mut self) {
@@ -94,7 +100,7 @@ impl VoiceBar {
             Ok(capture) => {
                 self.listening = Some(Listening::new(capture));
                 if self.stt.is_none() {
-                    self.stt = stt::open(self.provider);
+                    self.set_provider(stt::open(self.provider));
                 }
                 self.transcript.clear();
             }
@@ -155,7 +161,7 @@ impl VoiceBar {
             gave_up |= self.transcript.apply(event);
         }
         if gave_up {
-            self.stt = None;
+            self.set_provider(None);
             return;
         }
         if was_preparing && !self.transcript.is_preparing() {
