@@ -130,6 +130,9 @@ skrifa = "0.44"
 
 [patch.crates-io]
 blusc = { git = "https://github.com/lazarusA/blusc", branch = "la/fix_linker" }
+# candle-core = { git = "https://github.com/lazarusA/candle.git", branch = "la/simd_wasm_fix" }
+# candle-nn = { git = "https://github.com/lazarusA/candle.git", branch = "la/simd_wasm_fix" }
+# candle-transformers = { git = "https://github.com/lazarusA/candle.git", branch = "la/simd_wasm_fix" }
 
 # Unoptimized candle is far too slow to transcribe live, so debug builds
 # (`cargo run`) optimize it and the matrix kernels it runs on.
