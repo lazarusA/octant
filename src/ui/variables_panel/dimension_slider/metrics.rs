@@ -52,7 +52,7 @@ fn selection_volume_elements(app: &OctantApp, selection: &VariableSelection) -> 
 
 /// The 3D volume elements `selection` reads over `window`
 /// (`OctantApp::read_window`), over its active dimensions.
-pub fn window_volume_elements(selection: &VariableSelection, window: &ReadWindow) -> usize {
+fn window_volume_elements(selection: &VariableSelection, window: &ReadWindow) -> usize {
     let (var_info, ranges) = window;
     let is_active = |i: usize| {
         selection.dim_config.get(i).is_some_and(|c| c.active)
