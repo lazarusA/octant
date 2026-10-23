@@ -1,11 +1,13 @@
 //! [`Windowed`]: a [`WindowModel`] in a [`Session`] on its own thread. The
 //! model is made on that thread first (a download, a
-//! load), reporting through [`Prep`]; of the audio heard meanwhile only the
-//! last [`READY_TAIL`] samples are kept, so a quick load loses no first
-//! words and a long download transcribes nothing stale. Audio that arrives
-//! while the model works is taken before a partial text is made.
+//! load), reporting through [`Prep`]; what is heard meanwhile is kept here
+//! as a [`Tail`] (its last seconds and stops), so a quick load loses no
+//! first words and a long download neither piles up audio nor transcribes
+//! anything stale. Audio that arrives while the model works is taken before
+//! a partial text is made.
 
-use super::session::{Input as Msg, READY_TAIL, Session};
+use super::session::{Input as Msg, Session};
+use super::tail::Tail;
 use super::{SpeechToText, SttEvent, WindowModel};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -34,6 +36,8 @@ pub struct Windowed {
     to_worker: Sender<Msg>,
     events: Receiver<SttEvent>,
     cancel: Arc<AtomicBool>,
+    /// What was heard before the model said it is ready; `None` after.
+    tail: Option<Tail>,
 }
 
 impl Windowed {
@@ -52,16 +56,7 @@ impl Windowed {
         std::thread::spawn(move || match make(&prep) {
             Ok(model) => {
                 prep.report(SttEvent::Ready);
-                let mut heard: Vec<f32> = inbox
-                    .try_iter()
-                    .filter_map(|msg| match msg {
-                        Msg::Audio(samples) => Some(samples),
-                        Msg::Finish => None,
-                    })
-                    .flatten()
-                    .collect();
-                heard.drain(..heard.len().saturating_sub(READY_TAIL));
-                run(model, heard, &inbox, &outbox);
+                run(model, &inbox, &outbox);
             }
             Err(e) if !prep.cancelled() => prep.report(SttEvent::Failed(e)),
             Err(_) => {}
@@ -70,6 +65,16 @@ impl Windowed {
             to_worker,
             events,
             cancel,
+            tail: Some(Tail::default()),
+        }
+    }
+
+    fn send(&mut self, msg: Msg) {
+        match &mut self.tail {
+            Some(tail) => tail.push(msg),
+            None => {
+                let _ = self.to_worker.send(msg);
+            }
         }
     }
 }
@@ -83,28 +88,34 @@ impl Drop for Windowed {
 impl SpeechToText for Windowed {
     fn push(&mut self, samples: &[f32]) {
         if !samples.is_empty() {
-            let _ = self.to_worker.send(Msg::Audio(samples.to_vec()));
+            self.send(Msg::Audio(samples.to_vec()));
         }
     }
 
     fn finish(&mut self) {
-        let _ = self.to_worker.send(Msg::Finish);
+        self.send(Msg::Finish);
     }
 
     fn poll(&mut self) -> Option<SttEvent> {
-        self.events.try_recv().ok()
+        let event = self.events.try_recv().ok();
+        if event == Some(SttEvent::Ready)
+            && let Some(mut tail) = self.tail.take()
+        {
+            for msg in tail.take() {
+                let _ = self.to_worker.send(msg);
+            }
+        }
+        event
     }
 }
 
-/// Transcribes `heard` (audio from before the model was ready), then what
-/// arrives in `inbox` until the provider is dropped.
-fn run(model: impl WindowModel, heard: Vec<f32>, inbox: &Receiver<Msg>, outbox: &Sender<SttEvent>) {
+/// Transcribes what arrives in `inbox` until the provider is dropped.
+fn run(model: impl WindowModel, inbox: &Receiver<Msg>, outbox: &Sender<SttEvent>) {
     let mut session = Session::new(model);
     let mut emit = |event| {
         let _ = outbox.send(event);
     };
-    let mut next = (!heard.is_empty()).then_some(Msg::Audio(heard));
-    while let Some(first) = next.take().or_else(|| inbox.recv().ok()) {
+    while let Ok(first) = inbox.recv() {
         for msg in std::iter::once(first).chain(inbox.try_iter()) {
             session.take(msg, &mut emit);
         }
@@ -145,8 +156,7 @@ mod tests {
             Ok(Seconds)
         });
         stt.push(&vec![0.3; SAMPLE_RATE as usize * 5]);
-        stt.finish();
-        std::thread::sleep(Duration::from_millis(400));
+        // Stopped before ready: the stop still ends the utterance.
         stt.finish();
         let events = events_until_final(&mut stt);
         assert_eq!(events.last(), Some(&SttEvent::Final("2.0".into())));

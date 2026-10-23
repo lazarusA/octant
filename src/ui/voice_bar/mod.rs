@@ -227,11 +227,10 @@ fn model_menu(voice: &mut VoiceBar, ui: &mut egui::Ui) -> egui::Response {
         .on_hover_text(tr(PlaybackKey::VoiceModelHover));
     if chosen != current {
         voice.provider = Provider::Whisper(chosen);
-        voice.stt = if voice.is_listening() {
-            stt::open(voice.provider)
-        } else {
-            None
-        };
+        voice.stt = voice
+            .is_listening()
+            .then(|| stt::open(voice.provider))
+            .flatten();
         voice.transcript.clear();
     }
     response

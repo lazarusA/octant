@@ -15,11 +15,6 @@ use web_time::{Duration, Instant};
 /// The longest a transcription may take for partial texts to keep coming.
 pub const LIVE_BUDGET: Duration = Duration::from_secs(1);
 
-/// Samples of the audio heard while a model loads that are kept for it
-/// (2 s): a quick load loses no first words, a long download transcribes
-/// nothing stale.
-pub const READY_TAIL: usize = super::SAMPLE_RATE as usize * 2;
-
 pub enum Input {
     Audio(Vec<f32>),
     /// The speaker stopped.

@@ -1,10 +1,11 @@
-//! The worker's state and messages: audio before the model is ready keeps
-//! its last [`READY_TAIL`] samples; afterwards it goes to a [`Session`],
+//! The worker's state and messages: what arrives before the model is ready
+//! is kept as a [`Tail`] (its last seconds and stops); afterwards it goes to
+//! a [`Session`],
 //! whose partial text runs once the messages waiting have been taken (a
 //! zero-delay timer), so a slow model skips stale partials.
 
 use js_sys::Float32Array;
-use octant::voice::stt::{Input, READY_TAIL, Session, SttEvent, WhisperSize, wire};
+use octant::voice::stt::{Input, Session, SttEvent, Tail, WhisperSize, wire};
 use octant::voice::whisper::{Whisper, models};
 use std::cell::RefCell;
 use wasm_bindgen::JsCast;
@@ -14,8 +15,8 @@ use web_sys::{DedicatedWorkerGlobalScope, MessageEvent};
 #[derive(Default)]
 struct State {
     session: Option<Session<Whisper>>,
-    /// Audio heard while the model loads.
-    heard: Vec<f32>,
+    /// What arrives while the model loads.
+    tail: Tail,
     partial_scheduled: bool,
 }
 
@@ -54,12 +55,7 @@ fn receive(data: &JsValue) {
 fn take(input: Input) {
     STATE.with_borrow_mut(|state| match (&mut state.session, input) {
         (Some(session), input) => session.take(input, &mut emit),
-        (None, Input::Audio(samples)) => {
-            state.heard.extend(samples);
-            let excess = state.heard.len().saturating_sub(READY_TAIL);
-            state.heard.drain(..excess);
-        }
-        (None, Input::Finish) => {}
+        (None, input) => state.tail.push(input),
     });
     schedule_partial();
 }
@@ -96,13 +92,13 @@ async fn try_load(size: WhisperSize) -> Result<(), String> {
     let weights = crate::files::fetch(size, weights, &progress).await?;
     emit(SttEvent::Preparing(None));
     let whisper = Whisper::from_bytes(&config, &tokenizer, weights)?;
-    let heard = STATE.with_borrow_mut(|state| {
+    let tail: Vec<Input> = STATE.with_borrow_mut(|state| {
         state.session = Some(Session::finals_first(whisper));
-        std::mem::take(&mut state.heard)
+        state.tail.take().collect()
     });
     emit(SttEvent::Ready);
-    if !heard.is_empty() {
-        take(Input::Audio(heard));
+    for input in tail {
+        take(input);
     }
     Ok(())
 }

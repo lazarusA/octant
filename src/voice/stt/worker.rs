@@ -45,6 +45,9 @@ impl WorkerStt {
         let inbox = Rc::clone(&events);
         let on_error = Closure::<dyn FnMut(ErrorEvent)>::new(move |e: ErrorEvent| {
             if let Ok(mut queue) = inbox.try_borrow_mut() {
+                // A worker error ends the worker: reported as a failure while
+                // getting ready, so the voice bar drops it and starts afresh.
+                queue.push_back(SttEvent::Preparing(None));
                 queue.push_back(SttEvent::Failed(e.message()));
             }
         });

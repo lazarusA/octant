@@ -6,6 +6,7 @@
 
 mod segment;
 mod session;
+mod tail;
 pub mod wire;
 // Threads: the browser runs its model in the voice worker instead.
 #[cfg(not(target_arch = "wasm32"))]
@@ -13,7 +14,8 @@ mod window;
 #[cfg(target_arch = "wasm32")]
 mod worker;
 
-pub use session::{Input, READY_TAIL, Session};
+pub use session::{Input, Session};
+pub use tail::Tail;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use window::{Prep, Windowed};
