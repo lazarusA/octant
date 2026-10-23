@@ -1,4 +1,4 @@
-//! Tool and status icons: scissors, padlocks, bolt and hourglass.
+//! Tool and status icons: scissors, padlocks, bolt, hourglass and microphone.
 //! Single-glyph marks (check, cross, warning, ...) live in `marks.rs`.
 
 use super::canvas::{IconCanvas, Shade, Weight};
@@ -142,4 +142,15 @@ fn draw_sand(c: &IconCanvas) {
         at(19.0, -1.0),
     ];
     c.fill(&pile, sand);
+}
+
+/// Microphone: capsule, the cradle under it, stem and foot (12x18 keyline).
+pub fn draw_microphone(c: &IconCanvas) {
+    let s = c.stroke(Weight::Base);
+    c.rrect((9.0, 3.0), (15.0, 14.0), 3.0, c.body(), s);
+    c.curve(c.arc((12.0, 11.0), (6.0, 6.0), 0.0, PI), s);
+    c.line((12.0, 17.0), (12.0, 21.0), s);
+    if !c.compact() {
+        c.line((8.5, 21.0), (15.5, 21.0), s);
+    }
 }

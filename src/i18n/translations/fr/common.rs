@@ -30,5 +30,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::FetchingProgress => "Récupération {} / {} ({}%)",
         CommonKey::Abort => "Interrompre",
         CommonKey::AbortHover => "Interrompre et annuler le transfert de données en cours",
+        CommonKey::Voice => "Voix",
+        CommonKey::VoiceHover => "Saisie vocale : microphone et spectrogramme",
     })
 }

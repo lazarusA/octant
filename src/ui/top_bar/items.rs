@@ -24,6 +24,7 @@ fn label(item: TopBarItem, app: &OctantApp) -> &'static str {
         TopBarItem::Settings => tr(CommonKey::Settings),
         TopBarItem::Status => "",
         TopBarItem::Cache => tr(CommonKey::Cache),
+        TopBarItem::Voice => tr(CommonKey::Voice),
         TopBarItem::Language => crate::i18n::language().code(),
         TopBarItem::Theme => theme_icon_label(app).1,
     }
@@ -65,7 +66,7 @@ pub(super) fn item_widths(item: TopBarItem, app: &OctantApp, ui: &egui::Ui) -> I
     }
 
     let trailing = match item {
-        TopBarItem::Cache => spacing + separator,
+        TopBarItem::Cache | TopBarItem::Voice => spacing + separator,
         _ => spacing,
     };
     // Width depends only on label and mode, so any glyph measures the same.
@@ -137,6 +138,7 @@ pub(super) fn show_item(
             panel_button(Panel::Settings, Icon::Settings, item, app, ui, compact)
         }
         TopBarItem::Cache => menu(cache::show_cache_menu(app, ui, compact)),
+        TopBarItem::Voice => (show_voice_toggle(app, ui, compact), Stop::Button),
         TopBarItem::Language => menu(crate::ui::language_picker::show_language_menu(ui, compact)),
         TopBarItem::Theme => (show_theme_toggle(app, ui, compact), Stop::Button),
     };
@@ -169,6 +171,19 @@ fn panel_button(
         app.toggle_panel(ui.ctx(), panel);
     }
     (response, Stop::Button)
+}
+
+/// Opens the voice bar listening, or closes it.
+fn show_voice_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) -> egui::Response {
+    let btn = ToolbarButton::new(Icon::Microphone, tr(CommonKey::Voice))
+        .compact(compact)
+        .active(app.voice.is_open())
+        .hover(tr(CommonKey::VoiceHover));
+    let response = ui.add(btn);
+    if response.clicked() {
+        app.voice.toggle();
+    }
+    response
 }
 
 fn show_theme_toggle(app: &mut OctantApp, ui: &mut egui::Ui, compact: bool) -> egui::Response {

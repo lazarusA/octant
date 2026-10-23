@@ -25,5 +25,15 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::TimelineRange => "Діапазон: {} -> {}",
         PlaybackKey::TimelineStepSize => "Розмір кроку: {}",
         PlaybackKey::DefaultStepSize => "Крок: 1",
+        PlaybackKey::VoiceListen => "Почати слухати",
+        PlaybackKey::VoiceStop => "Припинити слухати",
+        PlaybackKey::VoiceListening => "Слухаю...",
+        PlaybackKey::VoiceMicOff => "Мікрофон вимкнено",
+        PlaybackKey::VoiceMicError => "Мікрофон недоступний",
+        PlaybackKey::VoiceSilent => "Мікрофон передає лише тишу",
+        PlaybackKey::VoiceSilentHint => {
+            "Дозвольте доступ до мікрофона застосунку, що запустив Octant, у налаштуваннях конфіденційності системи та перезапустіть його."
+        }
+        PlaybackKey::VoiceCloseHover => "Закрити голосове введення",
     })
 }

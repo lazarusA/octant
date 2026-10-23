@@ -28,5 +28,7 @@ pub fn text(key: CommonKey) -> Option<&'static str> {
         CommonKey::FetchingProgress => "Descargando {} / {} ({}%)",
         CommonKey::Abort => "Abortar",
         CommonKey::AbortHover => "Interrumpir y abortar la transferencia de datos en curso",
+        CommonKey::Voice => "Voz",
+        CommonKey::VoiceHover => "Entrada de voz: micrófono y espectrograma",
     })
 }

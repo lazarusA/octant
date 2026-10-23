@@ -58,6 +58,8 @@ pub struct OctantApp {
     pub export_flash_timer: Option<web_time::Instant>,
     /// Warnings, errors and results shown over the canvas.
     pub toasts: crate::ui::toast::Toasts,
+    /// The voice bar and, while it listens, the microphone.
+    pub voice: crate::ui::voice_bar::VoiceBar,
 
     // Coastline Overlay
     /// Whether to render the coastline overlay on geographic plot types.

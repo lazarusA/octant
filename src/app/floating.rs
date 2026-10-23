@@ -5,14 +5,17 @@
 use super::OctantApp;
 
 impl OctantApp {
-    /// Draws the top bar, the bottom bar (on a plot with an animated
-    /// dimension; `plot_shown`: no landing screen), the modal windows, then
+    /// Draws the top bar, the voice bar while open, else the bottom bar (on
+    /// a plot with an animated dimension; `plot_shown`: no landing screen),
+    /// the modal windows, then
     /// the floating panels over what is left; the canvas rect.
     pub(crate) fn show_chrome(&mut self, ui: &mut egui::Ui, plot_shown: bool) -> egui::Rect {
         let ctx = ui.ctx().clone();
         // The bars consume space from the remaining area.
         crate::ui::top_bar::show_top_bar(self, ui);
-        if plot_shown && self.has_animated_dimension() {
+        if self.voice.is_open() {
+            crate::ui::voice_bar::show_voice_bar(&mut self.voice, ui);
+        } else if plot_shown && self.has_animated_dimension() {
             crate::ui::bottom_bar::show_bottom_bar(self, ui);
         }
         crate::ui::catalog::show_catalog_window(self, &ctx);

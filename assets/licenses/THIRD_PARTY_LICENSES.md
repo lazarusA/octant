@@ -13,8 +13,8 @@ Libraries (Boost Software License 1.0).
 
 ## Overview
 
-- MIT License (586)
-- Apache License 2.0 (57)
+- MIT License (595)
+- Apache License 2.0 (58)
 - ISC License (24)
 - BSD 3-Clause "New" or "Revised" License (20)
 - Unicode License v3 (19)
@@ -942,6 +942,7 @@ Used by:
 
 Used by:
 - codespan-reporting 0.13.1 (https://github.com/brendanzab/codespan)
+- cpal 0.18.2 (https://github.com/RustAudio/cpal)
 - self_cell 1.3.0 (https://github.com/Voultapher/self_cell)
 
 ```text
@@ -4752,6 +4753,7 @@ THE SOFTWARE.
 ## MIT License
 
 Used by:
+- coreaudio-rs 0.14.2 (https://github.com/RustAudio/coreaudio-rs.git)
 - either 1.18.0 (https://github.com/rayon-rs/either)
 - itertools 0.14.0 (https://github.com/rust-itertools/itertools)
 - itertools 0.15.0 (https://github.com/rust-itertools/itertools)
@@ -7280,6 +7282,40 @@ DEALINGS IN THE SOFTWARE.
 ## MIT License
 
 Used by:
+- mach2 0.6.0 (https://github.com/JohnTitor/mach2)
+
+```text
+Copyright (c) 2019 Nick Fitzgerald, 2021 Yuki Okushi
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
 - tracing-attributes 0.1.31 (https://github.com/tokio-rs/tracing)
 - tracing-core 0.1.36 (https://github.com/tokio-rs/tracing)
 - tracing-error 0.2.1 (https://github.com/tokio-rs/tracing)
@@ -9266,6 +9302,36 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## MIT License
 
 Used by:
+- alsa 0.11.0 (https://github.com/diwic/alsa-rs)
+
+```text
+MIT License
+
+Copyright (c) 2015-2021 David Henningsson, and other contributors.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
 - lru 0.16.4 (https://github.com/jeromefroe/lru-rs.git)
 - lru 0.18.5 (https://github.com/jeromefroe/lru-rs.git)
 
@@ -9516,6 +9582,36 @@ Used by:
 MIT License
 
 Copyright (c) 2018 Sam Rijs, Alex Crichton and contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+## MIT License
+
+Used by:
+- alsa-sys 0.4.0 (https://github.com/diwic/alsa-sys)
+
+```text
+MIT License
+
+Copyright (c) 2018 diwic
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -10093,6 +10189,8 @@ Used by:
 - block2 0.6.2 (https://github.com/madsmtm/objc2)
 - chrono 0.4.45 (https://github.com/chronotope/chrono)
 - crc32c 0.6.8 (https://github.com/zowens/crc32c)
+- dasp_sample 0.11.0 (https://github.com/rustaudio/sample.git)
+- dispatch2 0.3.1 (https://github.com/madsmtm/objc2)
 - dispatch 0.2.0 (http://github.com/SSheldon/rust-dispatch)
 - dpi 0.1.2 (https://github.com/rust-windowing/winit)
 - ecolor 0.37.0 (https://github.com/emilk/egui)
@@ -10110,6 +10208,9 @@ Used by:
 - objc-sys 0.3.5 (https://github.com/madsmtm/objc2)
 - objc2-app-kit 0.2.2 (https://github.com/madsmtm/objc2)
 - objc2-app-kit 0.3.2 (https://github.com/madsmtm/objc2)
+- objc2-audio-toolbox 0.3.2 (https://github.com/madsmtm/objc2)
+- objc2-core-audio-types 0.3.2 (https://github.com/madsmtm/objc2)
+- objc2-core-audio 0.3.2 (https://github.com/madsmtm/objc2)
 - objc2-core-foundation 0.3.2 (https://github.com/madsmtm/objc2)
 - objc2-core-graphics 0.3.2 (https://github.com/madsmtm/objc2)
 - objc2-core-text 0.3.2 (https://github.com/madsmtm/objc2)

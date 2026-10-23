@@ -48,5 +48,6 @@ pub mod toolbar;
 pub mod top_bar;
 pub mod variables_overlay;
 pub mod variables_panel;
+pub mod voice_bar;
 
 pub use variables_overlay::show_variables_overlay;

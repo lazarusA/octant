@@ -25,5 +25,14 @@ crate::i18n::keys::define_keys! {
     TimelineRange,
     TimelineStepSize,
     DefaultStepSize,
+    // Voice bar
+    VoiceListen,
+    VoiceStop,
+    VoiceListening,
+    VoiceMicOff,
+    VoiceMicError,
+    VoiceSilent,
+    VoiceSilentHint,
+    VoiceCloseHover,
     }
 }

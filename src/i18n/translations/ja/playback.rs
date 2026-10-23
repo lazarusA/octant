@@ -25,5 +25,15 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::TimelineRange => "範囲: {} -> {}",
         PlaybackKey::TimelineStepSize => "ステップ幅: {}",
         PlaybackKey::DefaultStepSize => "ステップ幅: 1",
+        PlaybackKey::VoiceListen => "聞き取りを開始",
+        PlaybackKey::VoiceStop => "聞き取りを停止",
+        PlaybackKey::VoiceListening => "聞き取り中...",
+        PlaybackKey::VoiceMicOff => "マイク オフ",
+        PlaybackKey::VoiceMicError => "マイクを使用できません",
+        PlaybackKey::VoiceSilent => "マイクから無音しか届きません",
+        PlaybackKey::VoiceSilentHint => {
+            "システムのプライバシー設定で、Octant を起動したアプリにマイクへのアクセスを許可し、そのアプリを再起動してください。"
+        }
+        PlaybackKey::VoiceCloseHover => "音声入力を閉じる",
     })
 }

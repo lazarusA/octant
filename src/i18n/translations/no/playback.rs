@@ -25,5 +25,15 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::TimelineRange => "Område: {} -> {}",
         PlaybackKey::TimelineStepSize => "Stegstørrelse: {}",
         PlaybackKey::DefaultStepSize => "Steg: 1",
+        PlaybackKey::VoiceListen => "Start lytting",
+        PlaybackKey::VoiceStop => "Stopp lytting",
+        PlaybackKey::VoiceListening => "Lytter...",
+        PlaybackKey::VoiceMicOff => "Mikrofon av",
+        PlaybackKey::VoiceMicError => "Mikrofon utilgjengelig",
+        PlaybackKey::VoiceSilent => "Mikrofonen sender bare stillhet",
+        PlaybackKey::VoiceSilentHint => {
+            "Gi appen som startet Octant tilgang til mikrofonen i systemets personverninnstillinger, og start den på nytt."
+        }
+        PlaybackKey::VoiceCloseHover => "Lukk taleinndata",
     })
 }
