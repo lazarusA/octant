@@ -482,9 +482,7 @@ fn test_format_byte_size_and_calculate_download_sizes() {
 #[test]
 fn test_selected_volume_elements_and_limit() {
     use octant::data::DatasetMetadata;
-    use octant::ui::variables_panel::{
-        calculate_selected_volume_elements, is_volume_allowed_for_selection,
-    };
+    use octant::ui::variables_panel::{calculate_selected_volume_elements, is_volume_allowed};
 
     let mut app = OctantApp::default();
     let var_info = VariableInfo {
@@ -538,13 +536,13 @@ fn test_selected_volume_elements_and_limit() {
     // 50 * 1000 * 1000 = 50,000,000 floats (200 MB) > 33,554,432 (128 MB)
     let elements = calculate_selected_volume_elements(&app);
     assert_eq!(elements, 50_000_000);
-    assert!(!is_volume_allowed_for_selection(&app));
+    assert!(!is_volume_allowed(&app, &app.selected, None));
 
     // Reducing Z range to 10 slices: 10 * 1000 * 1000 = 10,000,000 floats (40 MB) <= 128 MB
     app.selected.dim_ranges[0] = (0, 9);
     let elements_small = calculate_selected_volume_elements(&app);
     assert_eq!(elements_small, 10_000_000);
-    assert!(is_volume_allowed_for_selection(&app));
+    assert!(is_volume_allowed(&app, &app.selected, None));
 }
 
 #[test]

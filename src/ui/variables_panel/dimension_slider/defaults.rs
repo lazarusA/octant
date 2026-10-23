@@ -151,27 +151,39 @@ fn apply_omero_defaults(app: &mut OctantApp, var_info: &VariableInfo) {
     }
 }
 
-/// A channel dimension opens on one channel, the first OMERO active one else
-/// 0, unless the variable opens in color (`composite::opens_in_color`).
+/// A channel dimension opens on OMERO's first active channel within its
+/// range, else the range's first, unless the variable opens in color
+/// (`composite::opens_in_color`): pinned there without a role or as Z (one
+/// plane), started there when animated, left alone as a plot axis.
 fn pin_channel(app: &mut OctantApp, var_info: &VariableInfo) {
     let Some(c) = var_info.channel_axis() else {
         return;
     };
     let is_tiff = app.selected.store_kind.is_geotiff();
-    let spatial = app
-        .selected
-        .dim_config
-        .get(c)
-        .is_some_and(|cfg| cfg.spatial != SpatialRole::None);
-    if spatial || super::composite::opens_in_color(var_info, is_tiff) {
+    let Some(&cfg) = app.selected.dim_config.get(c) else {
+        return;
+    };
+    let plot_axis = matches!(
+        cfg.spatial,
+        SpatialRole::X | SpatialRole::Y | SpatialRole::Grid
+    );
+    if plot_axis || super::composite::opens_in_color(var_info, is_tiff) {
         return;
     }
-    let first_active = var_info
-        .ome
-        .as_ref()
-        .and_then(|o| o.image.channels.iter().position(|ch| ch.active))
-        .unwrap_or(0);
-    pin_dim(app, var_info, c, first_active);
+    let (lo, hi) = app.selected.dim_ranges.get(c).copied().unwrap_or((0, 0));
+    let active = |i: &usize| {
+        let channels = var_info.ome.as_ref().map(|o| o.image.channels.as_slice());
+        channels
+            .and_then(|ch| ch.get(*i))
+            .is_some_and(|ch| ch.active)
+    };
+    let k = (lo.min(hi)..=hi.max(lo)).find(active).unwrap_or(lo.min(hi));
+    if cfg.animation != AnimationRole::Animated {
+        pin_dim(app, var_info, c, k);
+    } else if let Some(i) = app.selected.dim_indices.get_mut(c) {
+        *i = k;
+        app.playback.current_timestep = k;
+    }
 }
 
 /// Pins dimension `dim` of the selection to index `k`, clamped into its size.

@@ -103,8 +103,8 @@ fn greyscale_images_show_their_first_active_channel() {
 }
 
 #[test]
-fn a_channel_axis_named_otherwise_is_still_pinned_never_spatial() {
-    // A `(ch, y, x)` greyscale image: no z axis takes the Z role first.
+fn a_channel_axis_named_otherwise_takes_z_and_is_still_pinned() {
+    // A `(ch, y, x)` greyscale image: `ch` is no channel name, so Z.
     let axes = json!([
         { "name": "ch", "type": "channel" },
         { "name": "y", "type": "space", "unit": "micrometer" },
@@ -127,7 +127,7 @@ fn a_channel_axis_named_otherwise_is_still_pinned_never_spatial() {
         .discover()
         .expect("ome");
     let app = defaults_for(&found.variables[0]);
-    assert_eq!(app.selected.dim_config[0].spatial, SpatialRole::None);
+    assert_eq!(app.selected.dim_config[0].spatial, SpatialRole::Z);
     assert_eq!(app.selected.dim_ranges[0], (1, 1));
 }
 

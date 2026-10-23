@@ -9,6 +9,9 @@ use crate::plots::PlotType;
 fn leaving_3d_keeps_a_staged_2d_variable_whole() {
     let (mut app, meta) = memory_app();
     app.selected = selection_of(&mut app, &meta, "rgb");
+    // Entering 3D keeps the band range: stack all three along Z.
+    app.selected.dim_ranges[0] = (0, 2);
+    app.selected.dim_config[0].range = (0, 2);
     app.switch_plot_type(PlotType::Volume);
     app.plot_selection();
     poll_until(&mut app, |app| app.layers.base.data.volume.is_some());

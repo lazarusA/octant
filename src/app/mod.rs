@@ -34,6 +34,8 @@ pub(crate) mod multiscale_window;
 mod ome_display_tests;
 #[cfg(test)]
 mod ome_labels_tests;
+#[cfg(test)]
+mod ome_volume_tests;
 mod overlay_channels;
 #[cfg(test)]
 mod overlay_composite_tests;

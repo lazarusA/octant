@@ -127,32 +127,13 @@ fn z_dim_of(sel: &VariableSelection, channel_dim: Option<usize>) -> Option<usize
         .or(fallback_anim)
 }
 
+/// Gives `sel`'s stacking dimension (`z_dim_of`) the Z role, keeping its
+/// selected range: one plane draws a one-slice volume until it is widened.
 fn adapt_sel_to_3d(sel: &mut VariableSelection, composite: bool) {
     let channel_dim = channel_of(sel, composite);
-    let Some(z_idx) = z_dim_of(sel, channel_dim) else {
-        sel.spatial_dims = crate::app::DimConfig::spatial_dims(&sel.dim_config);
-        return;
-    };
-    let animated = sel
-        .dim_config
-        .get(z_idx)
-        .is_some_and(|c| c.animation == AnimationRole::Animated);
-    let max_z = (!animated).then(|| {
-        sel.variable_info()
-            .and_then(|v| v.shape.get(z_idx))
-            .map_or(0, |&s| (s as usize).saturating_sub(1))
-    });
-    if let Some(c) = sel.dim_config.get_mut(z_idx) {
+    if let Some(c) = z_dim_of(sel, channel_dim).and_then(|z| sel.dim_config.get_mut(z)) {
         c.spatial = SpatialRole::Z;
         c.active = true;
-    }
-    if let Some(max) = max_z {
-        if let Some(c) = sel.dim_config.get_mut(z_idx) {
-            c.range = (0, max);
-        }
-        if let Some(r) = sel.dim_ranges.get_mut(z_idx) {
-            *r = (0, max);
-        }
     }
     sel.spatial_dims = crate::app::DimConfig::spatial_dims(&sel.dim_config);
 }

@@ -63,14 +63,29 @@ impl PlotController for Orbit3DController {
     }
 
     /// The coarsest level along x, y and z (3D plots do not pick levels by
-    /// view yet), other dimensions whole, within one GPU buffer.
+    /// view yet), other dimensions whole, within one GPU buffer. Volumes and
+    /// point clouds also stack any other window wider than one index (not
+    /// animated, not the channel axis), the Z a 2D selection takes in 3D, so
+    /// its size is measured on the level the volume will read.
     fn resolution_demand(
         &self,
         var: &VariableInfo,
         dim_config: &[DimConfig],
         _canvas_px: [u32; 2],
     ) -> ResolutionDemand {
-        super::traits::spatial_demand(var, dim_config, DimDemand::Coarsest)
+        let mut demand = super::traits::spatial_demand(var, dim_config, DimDemand::Coarsest);
+        if matches!(self.plot_type, PlotType::Volume | PlotType::PointCloud) {
+            let channel = var.channel_axis();
+            for (d, c) in dim_config.iter().enumerate() {
+                let stacked = c.range.0 != c.range.1
+                    && c.animation != crate::app::AnimationRole::Animated
+                    && Some(d) != channel;
+                if let Some(slot) = demand.dims.get_mut(d).filter(|_| stacked) {
+                    *slot = DimDemand::Coarsest;
+                }
+            }
+        }
+        demand
     }
 
     fn reset_view(&self, nav: &mut NavigationState) {
