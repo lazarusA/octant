@@ -32,6 +32,7 @@ struct Live {
     _source: MediaStreamAudioSourceNode,
     processor: ScriptProcessorNode,
     _on_audio: Closure<dyn FnMut(AudioProcessingEvent)>,
+    _on_ended: Closure<dyn FnMut()>,
 }
 
 impl Capture {
@@ -123,6 +124,25 @@ fn connect(shared: &Rc<Shared>, stream: MediaStream) -> Result<(), JsValue> {
             }
         });
     processor.set_onaudioprocess(Some(on_audio.as_ref().unchecked_ref()));
+    // The browser ends the track when the microphone is unplugged or its
+    // permission revoked (never for our own `stop`): reported, and the voice
+    // bar stops listening.
+    let sink = Rc::downgrade(shared);
+    let on_ended = Closure::<dyn FnMut()>::new(move || {
+        let Some(shared) = sink.upgrade() else { return };
+        if !shared.failed.replace(true) {
+            crate::ui::toast::report(
+                crate::ui::toast::Severity::Warning,
+                crate::i18n::tr(crate::i18n::PlaybackKey::VoiceMicError),
+                crate::i18n::tr(crate::i18n::PlaybackKey::VoiceMicOff),
+            );
+        }
+    });
+    for track in stream.get_audio_tracks().iter() {
+        if let Ok(track) = track.dyn_into::<web_sys::MediaStreamTrack>() {
+            track.set_onended(Some(on_ended.as_ref().unchecked_ref()));
+        }
+    }
     source.connect_with_audio_node(&processor)?;
     // The processor only runs while connected; its output stays silent.
     processor.connect_with_audio_node(&context.destination())?;
@@ -133,6 +153,7 @@ fn connect(shared: &Rc<Shared>, stream: MediaStream) -> Result<(), JsValue> {
         _source: source,
         processor,
         _on_audio: on_audio,
+        _on_ended: on_ended,
     });
     Ok(())
 }
