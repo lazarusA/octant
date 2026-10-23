@@ -56,8 +56,8 @@ impl Default for Provider {
 /// Whisper's models, smallest first; larger ones are slower and more exact.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum WhisperSize {
-    Tiny,
     #[default]
+    Tiny,
     Base,
     Small,
     Turbo,

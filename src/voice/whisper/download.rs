@@ -2,11 +2,17 @@
 //! commit and checked by SHA-256, downloaded once into the app's data folder
 //! (`<storage>/models/whisper/<name>/`). A file is written as `.part` and
 //! renamed only once its hash matches, so a file present is a whole one.
+//! One download runs at a time, so a background one and a chosen one never
+//! write the same file.
 
-use crate::voice::stt::{Prep, SttEvent, WhisperSize};
+use crate::voice::stt::WhisperSize;
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static DOWNLOADING: Mutex<()> = Mutex::new(());
 
 struct Spec {
     repo: &'static str,
@@ -62,8 +68,14 @@ pub fn megabytes(size: WhisperSize) -> u64 {
     spec(size).weights_bytes / 1_000_000
 }
 
-/// The folder holding the model's files, downloading those missing.
-pub(super) fn ensure(size: WhisperSize, prep: &Prep) -> Result<PathBuf, String> {
+/// The folder holding the model's files, downloading those missing, with
+/// the share of the weights done; `cancelled` stops it.
+pub(super) fn ensure(
+    size: WhisperSize,
+    progress: &dyn Fn(f32),
+    cancelled: &dyn Fn() -> bool,
+) -> Result<PathBuf, String> {
+    let _one_at_a_time = DOWNLOADING.lock().unwrap_or_else(|p| p.into_inner());
     let dir = eframe::storage_dir("Octant")
         .ok_or("no data folder")?
         .join("models/whisper")
@@ -85,21 +97,35 @@ pub(super) fn ensure(size: WhisperSize, prep: &Prep) -> Result<PathBuf, String> 
             s.repo, s.revision
         );
         let mut done = 0u64;
-        fetch(&url, &dest, sha, prep, |n| {
+        fetch(&url, &dest, sha, cancelled, |n| {
             done += n as u64;
             if file == "model.safetensors" {
-                prep.report(SttEvent::Preparing(Some(done as f32 / total)));
+                progress(done as f32 / total);
             }
         })?;
     }
     Ok(dir)
 }
 
+/// Downloads `size` quietly on its own thread, once per session, so
+/// choosing it later starts at once; a failure is only logged.
+pub(super) fn prefetch(size: WhisperSize) {
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    if STARTED.swap(true, Ordering::Relaxed) {
+        return;
+    }
+    std::thread::spawn(move || {
+        if let Err(e) = ensure(size, &|_| {}, &|| false) {
+            log::warn!("Whisper {} in the background: {e}", size.name());
+        }
+    });
+}
+
 fn fetch(
     url: &str,
     dest: &Path,
     sha256: &str,
-    prep: &Prep,
+    cancelled: &dyn Fn() -> bool,
     mut progress: impl FnMut(usize),
 ) -> Result<(), String> {
     // No overall timeout: the largest model takes minutes on a slow line.
@@ -119,7 +145,7 @@ fn fetch(
         let mut hasher = Sha256::new();
         let mut buf = vec![0u8; 1 << 16];
         loop {
-            if prep.cancelled() {
+            if cancelled() {
                 return Err("cancelled".to_string());
             }
             let n = body.read(&mut buf).map_err(|e| e.to_string())?;

@@ -1,6 +1,7 @@
 //! The words heard: the final texts of past utterances, then the partial
-//! text of the one under way, muted. One line, which once too long ends at
-//! the right edge so the newest words stay in view.
+//! text of the one under way, muted. One line, which once too long glides
+//! left as words come (and back as a partial is revised shorter) so the
+//! newest stay in view, the oldest fading out at the left edge.
 
 use crate::i18n::{PlaybackKey, tr};
 use crate::ui::toast::{Severity, report};
@@ -8,6 +9,12 @@ use crate::voice::stt::SttEvent;
 
 /// Characters of final text kept.
 const KEEP_CHARS: usize = 400;
+/// Seconds the line takes to glide to a new place.
+const GLIDE: f32 = 0.35;
+/// Width of the fade at the left edge.
+const FADE: f32 = 56.0;
+/// Strips the fade is drawn in, eased between.
+const FADE_STEPS: usize = 8;
 
 #[derive(Default)]
 pub(super) struct Transcript {
@@ -16,6 +23,9 @@ pub(super) struct Transcript {
     /// While the provider gets ready: the download's share done, or `None`
     /// while loading.
     preparing: Option<Option<f32>>,
+    /// Bumped when the text is cut or cleared, so the line takes its new
+    /// place at once instead of gliding there.
+    jumps: u32,
 }
 
 impl Transcript {
@@ -23,6 +33,7 @@ impl Transcript {
         self.finals.clear();
         self.partial.clear();
         self.preparing = None;
+        self.jumps += 1;
     }
 
     pub(super) fn apply(&mut self, event: SttEvent) {
@@ -38,6 +49,7 @@ impl Transcript {
                 self.partial.clear();
                 if let Some((cut, _)) = self.finals.char_indices().rev().nth(KEEP_CHARS) {
                     self.finals.drain(..=cut);
+                    self.jumps += 1;
                 }
             }
             SttEvent::Failed(e) => {
@@ -76,15 +88,40 @@ impl Transcript {
             job.append(&self.partial, gap, format(weak));
         }
         let galley = ui.painter().layout_job(job);
-        let width = galley.size().x;
-        let x = if width > rect.width() {
-            rect.right() - width
-        } else {
-            rect.left()
-        };
-        let pos = egui::pos2(x, rect.center().y - galley.size().y * 0.5);
-        ui.painter().with_clip_rect(rect).galley(pos, galley, weak);
+        let overflow = (galley.size().x - rect.width()).max(0.0);
+        let id = ui.scope_id().with(("voice_transcript", self.jumps));
+        let scroll = ui.ctx().animate_value_with_time(id, overflow, GLIDE);
+        let pos = egui::pos2(
+            rect.left() - scroll,
+            rect.center().y - galley.size().y * 0.5,
+        );
+        let painter = ui.painter().with_clip_rect(rect);
+        painter.galley(pos, galley, weak);
+        if scroll > 0.5 {
+            // Fade in as the line starts to scroll, not all at once.
+            let width = FADE.min(scroll).min(rect.width() * 0.5);
+            fade_left(&painter, rect, width, visuals.panel_fill);
+        }
     }
+}
+
+/// Covers the left `width` of `rect` with `ground`, opaque at the edge and
+/// clear on the inside, eased so the text fades out without a visible line.
+fn fade_left(painter: &egui::Painter, rect: egui::Rect, width: f32, ground: egui::Color32) {
+    let mut mesh = egui::Mesh::default();
+    for i in 0..=FADE_STEPS {
+        let t = i as f32 / FADE_STEPS as f32;
+        let x = rect.left() + width * t;
+        let cover = ground.gamma_multiply(1.0 - t * t * (3.0 - 2.0 * t));
+        mesh.colored_vertex(egui::pos2(x, rect.top()), cover);
+        mesh.colored_vertex(egui::pos2(x, rect.bottom()), cover);
+    }
+    for i in 0..FADE_STEPS as u32 {
+        let k = i * 2;
+        mesh.add_triangle(k, k + 1, k + 2);
+        mesh.add_triangle(k + 1, k + 3, k + 2);
+    }
+    painter.add(mesh);
 }
 
 #[cfg(test)]

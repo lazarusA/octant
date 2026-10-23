@@ -28,12 +28,18 @@ pub struct Whisper {
 }
 
 /// Downloads `size` if needed and loads it; what [`crate::voice::stt`]
-/// runs on the provider's thread.
+/// runs on the provider's thread. Once tiny (the default) is ready, base is
+/// downloaded in the background for computers that run it well.
 pub fn prepare(size: WhisperSize, prep: &Prep) -> Result<Whisper, String> {
     prep.report(SttEvent::Preparing(Some(0.0)));
-    let dir = download::ensure(size, prep)?;
+    let progress = |done| prep.report(SttEvent::Preparing(Some(done)));
+    let dir = download::ensure(size, &progress, &|| prep.cancelled())?;
     prep.report(SttEvent::Preparing(None));
-    Whisper::load(&dir).map_err(|e| e.to_string())
+    let model = Whisper::load(&dir)?;
+    if size == WhisperSize::Tiny {
+        download::prefetch(WhisperSize::Base);
+    }
+    Ok(model)
 }
 
 fn device() -> Device {
