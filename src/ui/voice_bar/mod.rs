@@ -4,6 +4,8 @@
 //! chosen speech to text provider (`voice::stt`). It reads nothing from the
 //! app; the action layer comes later (`VOICE_PLAN.md`).
 
+mod listening;
+mod model_menu;
 mod pulsar;
 #[cfg(test)]
 mod tests;
@@ -18,6 +20,8 @@ use crate::voice::Capture;
 use crate::voice::resample::Resampler;
 use crate::voice::spectrum::Spectrum;
 use crate::voice::stt::{self, Provider, SpeechToText};
+use listening::Listening;
+use model_menu::model_menu;
 use pulsar::Pulsar;
 use transcript::Transcript;
 
@@ -44,17 +48,6 @@ pub struct VoiceBar {
     transcript: Transcript,
     /// Until when (egui time) the provider is polled for a last final text.
     final_until: f64,
-}
-
-struct Listening {
-    capture: Capture,
-    /// Made once the microphone's sample rate is known.
-    spectrum: Option<Spectrum>,
-    resampler: Option<Resampler>,
-    samples: Vec<f32>,
-    resampled: Vec<f32>,
-    /// Exact zeros heard so far, until a sound or the warning ends the check.
-    silent: Option<usize>,
 }
 
 impl VoiceBar {
@@ -99,14 +92,7 @@ impl VoiceBar {
     fn listen(&mut self) {
         match Capture::start() {
             Ok(capture) => {
-                self.listening = Some(Listening {
-                    capture,
-                    spectrum: None,
-                    resampler: None,
-                    samples: Vec::new(),
-                    resampled: Vec::new(),
-                    silent: Some(0),
-                });
+                self.listening = Some(Listening::new(capture));
                 if self.stt.is_none() {
                     self.stt = stt::open(self.provider);
                 }
@@ -182,27 +168,6 @@ impl VoiceBar {
     }
 }
 
-impl Listening {
-    /// Warns once when the first second at `rate` is exact zeros.
-    fn check_silence(&mut self, rate: u32) {
-        let Some(silent) = &mut self.silent else {
-            return;
-        };
-        *silent += self.samples.len();
-        if self.samples.iter().any(|&s| s != 0.0) {
-            self.silent = None;
-        } else if rate > 0 && *silent >= rate as usize {
-            // A microphone without permission (macOS) records exact zeros.
-            report(
-                Severity::Warning,
-                tr(PlaybackKey::VoiceSilent),
-                tr(PlaybackKey::VoiceSilentHint),
-            );
-            self.silent = None;
-        }
-    }
-}
-
 pub fn show_voice_bar(voice: &mut VoiceBar, ui: &mut egui::Ui) {
     egui::Panel::bottom("octant_voice_bar")
         .exact_size(BAR_HEIGHT)
@@ -255,36 +220,4 @@ fn show_contents(voice: &mut VoiceBar, ui: &mut egui::Ui) {
         voice.transcript.show(ui, rect, state);
     });
     nav.finish(ui, Region::BottomBar);
-}
-
-/// The Whisper model select; a new choice takes over while listening.
-fn model_menu(voice: &mut VoiceBar, ui: &mut egui::Ui) -> egui::Response {
-    use crate::voice::stt::WhisperSize;
-    let Provider::Whisper(current) = voice.provider;
-    let mut chosen = current;
-    let response = egui::ComboBox::from_id_salt("voice_model")
-        .selected_text(current.name())
-        .show_ui(ui, |ui| {
-            for &size in WhisperSize::OFFERED {
-                let mut buf = [0u8; 64];
-                let mb = crate::voice::whisper::megabytes(size);
-                let label = crate::i18n::fill(
-                    &mut buf,
-                    tr(PlaybackKey::VoiceModelSize),
-                    &[&size.name(), &mb],
-                );
-                ui.selectable_value(&mut chosen, size, label);
-            }
-        })
-        .response
-        .on_hover_text(tr(PlaybackKey::VoiceModelHover));
-    if chosen != current {
-        voice.provider = Provider::Whisper(chosen);
-        voice.stt = voice
-            .is_listening()
-            .then(|| stt::open(voice.provider))
-            .flatten();
-        voice.transcript.clear();
-    }
-    response
 }
