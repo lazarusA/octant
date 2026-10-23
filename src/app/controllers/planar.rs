@@ -74,6 +74,17 @@ impl PlotController for LineController {
         PlotType::Line
     }
 
+    /// The level a volume reads: a line through a multiscale stack downloads
+    /// no more than the volume of the same window.
+    fn resolution_demand(
+        &self,
+        var: &VariableInfo,
+        dim_config: &[DimConfig],
+        canvas_px: [u32; 2],
+    ) -> ResolutionDemand {
+        super::controller_for(PlotType::Volume).resolution_demand(var, dim_config, canvas_px)
+    }
+
     fn reset_view(&self, nav: &mut NavigationState) {
         nav.line_zoom = 1.0;
         nav.line_pan = egui::Vec2::ZERO;

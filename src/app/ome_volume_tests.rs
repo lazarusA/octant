@@ -70,6 +70,18 @@ fn a_volume_keeps_its_z_range_and_reads_a_level_that_fits() {
     app.switch_plot_type(PlotType::Volume);
     assert_eq!(app.selected.dim_ranges[1], (10, 10), "z is not widened");
     assert_eq!(app.selection_level(&app.selected), Some(2), "the coarsest");
+    // Lines read the volume's level too, even where level 0 fits a buffer.
+    app.selected.dim_ranges[1] = (0, 3);
+    app.selected.dim_config[1].range = (0, 3);
+    app.selected.plot_type = PlotType::Line;
+    assert_eq!(
+        app.selection_level(&app.selected),
+        Some(2),
+        "lines as volumes"
+    );
+    app.selected.plot_type = PlotType::Volume;
+    app.selected.dim_ranges[1] = (10, 10);
+    app.selected.dim_config[1].range = (10, 10);
 
     // The whole z stack: too big at the heatmap's level 0, fits at level 2.
     app.switch_plot_type(PlotType::Heatmap);
