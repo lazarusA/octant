@@ -103,7 +103,7 @@ console_error_panic_hook = "0.1"
 console_log = "1.1"
 uuid = { version = "1", features = ["v4", "js"] }
 zarrs = { version = "0.23", default-features = false, features = ["ndarray", "crc32c", "gzip", "zlib", "sharding", "transpose", "async", "bitround", "pcodec"] }
-web-sys = { version = "0.3", features = ["Window", "Document", "Element", "Node", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Response", "Request", "RequestInit", "Headers", "RequestMode", "AbortController", "AbortSignal", "Navigator", "MediaDevices", "MediaStream", "MediaStreamTrack", "MediaStreamConstraints", "AudioContext", "BaseAudioContext", "AudioNode", "AudioDestinationNode", "MediaStreamAudioSourceNode", "ScriptProcessorNode", "AudioProcessingEvent", "AudioBuffer", "DedicatedWorkerGlobalScope", "WorkerGlobalScope", "MessageEvent", "Worker", "WorkerOptions", "WorkerType", "ErrorEvent", "Cache", "CacheStorage", "ReadableStream", "ReadableStreamDefaultReader"] }
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "Node", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Response", "Request", "RequestInit", "Headers", "RequestMode", "AbortController", "AbortSignal", "Navigator", "MediaDevices", "MediaStream", "MediaStreamTrack", "MediaStreamConstraints", "AudioContext", "BaseAudioContext", "AudioNode", "AudioDestinationNode", "MediaStreamAudioSourceNode", "ScriptProcessorNode", "AudioProcessingEvent", "AudioBuffer", "DedicatedWorkerGlobalScope", "WorkerGlobalScope", "MessageEvent", "Worker", "ErrorEvent", "Cache", "CacheStorage", "ReadableStream", "ReadableStreamDefaultReader"] }
 js-sys = "0.3"
 sys-locale = { version = "0.3", features = ["js"] }
 blusc = "0.0.6"

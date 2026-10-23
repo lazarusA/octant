@@ -24,7 +24,7 @@ impl Network {
         quantize: bool,
     ) -> Result<Self> {
         if quantize {
-            let vb = quantized(&weights, device)?;
+            let vb = quantized(weights, device)?;
             return Ok(Self::Quantized(quantized_model::Whisper::load(
                 &vb, config,
             )?));
@@ -69,8 +69,10 @@ impl Network {
 }
 
 /// `weights` quantized, as a quantized model reads them.
-fn quantized(weights: &[u8], device: &Device) -> Result<QuantizedVarBuilder> {
-    let tensors = candle_core::safetensors::load_buffer(weights, &Device::Cpu)?;
+fn quantized(weights: Vec<u8>, device: &Device) -> Result<QuantizedVarBuilder> {
+    let tensors = candle_core::safetensors::load_buffer(&weights, &Device::Cpu)?;
+    // The tensors hold their own copy: free the file before quantizing.
+    drop(weights);
     let mut quantized = Vec::with_capacity(tensors.len());
     for (name, tensor) in tensors {
         let blocks = tensor.rank() >= 2 && tensor.dims().last().is_some_and(|d| d % 32 == 0);

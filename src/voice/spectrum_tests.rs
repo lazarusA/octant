@@ -5,7 +5,8 @@ fn fft_matches_a_direct_transform() {
     let n = 16;
     let signal: Vec<f32> = (0..n).map(|i| ((i * 7 % 5) as f32) - 2.0).collect();
     let (mut re, mut im) = (signal.clone(), vec![0.0; n]);
-    fft(&mut re, &mut im);
+    let twiddles = twiddles(re.len());
+    fft(&mut re, &mut im, &twiddles);
     for k in 0..n {
         let (mut dr, mut di) = (0.0, 0.0);
         for (t, &x) in signal.iter().enumerate() {

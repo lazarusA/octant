@@ -22,6 +22,13 @@ use pulsar::Pulsar;
 use transcript::Transcript;
 
 const BAR_HEIGHT: f32 = 42.0;
+/// Seconds the provider is still polled after the microphone stops (or the
+/// model it waited for gets ready), for the last final text.
+// shortcut: a fixed wait; a provider saying it has nothing left would end it
+// sooner, worth it if the idle repaints show up.
+const FINAL_WAIT: f64 = 30.0;
+/// How often the provider is polled while nothing else repaints.
+const POLL_EVERY: std::time::Duration = std::time::Duration::from_millis(100);
 
 /// Whether the bar is open and, while it listens, the microphone. Session
 /// only: the microphone never opens by itself on launch.
@@ -35,6 +42,8 @@ pub struct VoiceBar {
     stt: Option<Box<dyn SpeechToText>>,
     provider: Provider,
     transcript: Transcript,
+    /// Until when (egui time) the provider is polled for a last final text.
+    final_until: f64,
 }
 
 struct Listening {
@@ -61,20 +70,29 @@ impl VoiceBar {
     pub fn toggle(&mut self) {
         if self.open {
             self.open = false;
-            self.stop();
-            self.stt = None;
+            self.release();
         } else {
             self.open = true;
             self.listen();
         }
     }
 
-    fn stop(&mut self) {
+    /// Stops the microphone at `now`; the utterance under way still ends
+    /// with its final text.
+    fn stop(&mut self, now: f64) {
         if self.listening.take().is_some()
             && let Some(stt) = &mut self.stt
         {
             stt.finish();
+            self.final_until = now + FINAL_WAIT;
         }
+        self.pulsar.reset();
+    }
+
+    /// Stops the microphone and drops the provider.
+    fn release(&mut self) {
+        self.listening = None;
+        self.stt = None;
         self.pulsar.reset();
     }
 
@@ -101,44 +119,27 @@ impl VoiceBar {
     /// Feeds the samples recorded since the last frame to the disk and the
     /// provider, and takes the provider's text.
     fn update(&mut self, ctx: &egui::Context) {
-        // A refused microphone (the web's prompt): stop listening and drop
-        // the provider so no model downloads for audio that never comes.
-        if self.listening.as_ref().is_some_and(|l| l.capture.failed()) {
-            self.listening = None;
-            self.stt = None;
-            self.pulsar.reset();
-        }
-        if let Some(stt) = &mut self.stt {
-            let mut gave_up = false;
-            while let Some(event) = stt.poll() {
-                gave_up |= self.transcript.apply(event);
-            }
-            if gave_up {
-                self.stt = None;
+        let now = ctx.input(|i| i.time);
+        if let Some(l) = &self.listening
+            && l.capture.failed()
+        {
+            if l.capture.sample_rate() > 0 {
+                // A microphone that stopped after it opened.
+                self.stop(now);
             } else {
-                ctx.request_repaint_after(std::time::Duration::from_millis(100));
+                // Refused (the web's prompt): no model downloads for audio
+                // that never comes.
+                self.release();
             }
         }
+        self.poll(ctx, now);
         let Some(l) = &mut self.listening else {
             return;
         };
         l.samples.clear();
         l.capture.drain(&mut l.samples);
         let rate = l.capture.sample_rate();
-        if let Some(silent) = &mut l.silent {
-            *silent += l.samples.len();
-            if l.samples.iter().any(|&s| s != 0.0) {
-                l.silent = None;
-            } else if rate > 0 && *silent >= rate as usize {
-                // A microphone without permission (macOS) records exact zeros.
-                report(
-                    Severity::Warning,
-                    tr(PlaybackKey::VoiceSilent),
-                    tr(PlaybackKey::VoiceSilentHint),
-                );
-                l.silent = None;
-            }
-        }
+        l.check_silence(rate);
         if l.spectrum.is_none() && rate > 0 {
             l.spectrum = Some(Spectrum::new(rate));
         }
@@ -154,6 +155,51 @@ impl VoiceBar {
             stt.push(&l.resampled);
         }
         ctx.request_repaint();
+    }
+
+    /// Takes the provider's events, polling again soon while it gets ready
+    /// or a final text may still come.
+    fn poll(&mut self, ctx: &egui::Context, now: f64) {
+        let Some(stt) = &mut self.stt else {
+            return;
+        };
+        let was_preparing = self.transcript.is_preparing();
+        let mut gave_up = false;
+        while let Some(event) = stt.poll() {
+            gave_up |= self.transcript.apply(event);
+        }
+        if gave_up {
+            self.stt = None;
+            return;
+        }
+        if was_preparing && !self.transcript.is_preparing() {
+            // The audio held while it loaded is transcribed now.
+            self.final_until = now + FINAL_WAIT;
+        }
+        if self.transcript.is_preparing() || now < self.final_until {
+            ctx.request_repaint_after(POLL_EVERY);
+        }
+    }
+}
+
+impl Listening {
+    /// Warns once when the first second at `rate` is exact zeros.
+    fn check_silence(&mut self, rate: u32) {
+        let Some(silent) = &mut self.silent else {
+            return;
+        };
+        *silent += self.samples.len();
+        if self.samples.iter().any(|&s| s != 0.0) {
+            self.silent = None;
+        } else if rate > 0 && *silent >= rate as usize {
+            // A microphone without permission (macOS) records exact zeros.
+            report(
+                Severity::Warning,
+                tr(PlaybackKey::VoiceSilent),
+                tr(PlaybackKey::VoiceSilentHint),
+            );
+            self.silent = None;
+        }
     }
 }
 
@@ -182,7 +228,7 @@ fn show_contents(voice: &mut VoiceBar, ui: &mut egui::Ui) {
     );
     if mic.clicked() {
         if listening {
-            voice.stop();
+            voice.stop(ui.input(|i| i.time));
         } else {
             voice.listen();
         }

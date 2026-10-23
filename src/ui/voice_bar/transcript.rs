@@ -44,6 +44,10 @@ impl Transcript {
         self.jumps += 1;
     }
 
+    pub(super) fn is_preparing(&self) -> bool {
+        self.preparing.is_some()
+    }
+
     /// Takes `event`; true when the provider failed while getting ready, so
     /// it has stopped and listening again needs a new one.
     pub(super) fn apply(&mut self, event: SttEvent) -> bool {

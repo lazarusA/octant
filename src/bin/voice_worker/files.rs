@@ -34,10 +34,16 @@ pub async fn fetch(
     if !response.ok() {
         return Err(format!("{url}: HTTP {}", response.status()));
     }
-    let total = models::weights_bytes(size) as f32;
-    let mut body = read(&response, |done| {
-        if file == models::WEIGHTS {
-            progress(done as f32 / total);
+    let weights = file == models::WEIGHTS;
+    let capacity = if weights {
+        models::weights_bytes(size) as usize
+    } else {
+        0
+    };
+    let mut share = models::weights_progress(size, progress);
+    let mut body = read(&response, capacity, |done| {
+        if weights {
+            share(done as u64);
         }
     })
     .await?;
@@ -50,14 +56,19 @@ pub async fn fetch(
     Ok(body)
 }
 
-/// The body of `response` read as it arrives, telling `progress` the bytes
-/// so far.
-async fn read(response: &Response, progress: impl Fn(usize)) -> Result<Vec<u8>, String> {
+/// The body of `response` read as it arrives into room for `capacity` bytes
+/// (the expected size, so a large body is never regrown), telling
+/// `progress` the bytes so far.
+async fn read(
+    response: &Response,
+    capacity: usize,
+    mut progress: impl FnMut(usize),
+) -> Result<Vec<u8>, String> {
     let Some(stream) = response.body() else {
         return bytes(response).await;
     };
     let reader: ReadableStreamDefaultReader = stream.get_reader().unchecked_into();
-    let mut body = Vec::new();
+    let mut body = Vec::with_capacity(capacity);
     loop {
         let chunk = wait(reader.read()).await?;
         let done = Reflect::get(&chunk, &"done".into()).map_err(js_text)?;
@@ -67,7 +78,9 @@ async fn read(response: &Response, progress: impl Fn(usize)) -> Result<Vec<u8>, 
         let value: Uint8Array = Reflect::get(&chunk, &"value".into())
             .map_err(js_text)?
             .unchecked_into();
-        body.extend(value.to_vec());
+        let start = body.len();
+        body.resize(start + value.length() as usize, 0);
+        value.copy_to(&mut body[start..]);
         progress(body.len());
     }
 }

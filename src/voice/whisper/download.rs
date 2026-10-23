@@ -85,7 +85,7 @@ fn download(
 ) -> Result<(), String> {
     let _one_at_a_time = DOWNLOADING.lock().unwrap_or_else(|p| p.into_inner());
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let total = models::weights_bytes(size) as f32;
+    let mut share = models::weights_progress(size, progress);
     for (file, sha) in models::files(size) {
         let dest = dir.join(file);
         if dest.exists() {
@@ -96,7 +96,7 @@ fn download(
         fetch(&url, &dest, sha, cancelled, |n| {
             done += n as u64;
             if file == WEIGHTS {
-                progress(done as f32 / total);
+                share(done);
             }
         })?;
     }

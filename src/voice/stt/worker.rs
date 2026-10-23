@@ -75,35 +75,39 @@ impl WorkerStt {
     }
 }
 
-impl WorkerStt {
-    fn send(&mut self, input: Input) {
-        match self.early.try_borrow_mut().as_deref_mut() {
-            Ok(Some(tail)) => tail.push(input),
-            _ => post(&self.worker, &input),
+/// Sends `input` to the worker.
+fn post(worker: &Worker, input: &Input) {
+    match input {
+        Input::Audio(samples) => post_audio(worker, samples),
+        Input::Finish => {
+            let _ = worker.post_message(&JsValue::from_str(wire::FINISH));
         }
     }
 }
 
-/// Sends `input` to the worker, audio as a transferred `Float32Array`.
-fn post(worker: &Worker, input: &Input) {
-    let _ = match input {
-        Input::Audio(samples) => {
-            let audio = Float32Array::from(samples.as_slice());
-            worker.post_message_with_transfer(&audio, &Array::of1(&audio.buffer()))
-        }
-        Input::Finish => worker.post_message(&JsValue::from_str(wire::FINISH)),
-    };
+/// Sends `samples` to the worker as a transferred `Float32Array`.
+fn post_audio(worker: &Worker, samples: &[f32]) {
+    let audio = Float32Array::from(samples);
+    let _ = worker.post_message_with_transfer(&audio, &Array::of1(&audio.buffer()));
 }
 
 impl SpeechToText for WorkerStt {
     fn push(&mut self, samples: &[f32]) {
-        if !samples.is_empty() {
-            self.send(Input::Audio(samples.to_vec()));
+        if samples.is_empty() {
+            return;
+        }
+        match self.early.try_borrow_mut().as_deref_mut() {
+            Ok(Some(tail)) => tail.push(Input::Audio(samples.to_vec())),
+            // Copied once, straight into the array the worker takes.
+            _ => post_audio(&self.worker, samples),
         }
     }
 
     fn finish(&mut self) {
-        self.send(Input::Finish);
+        match self.early.try_borrow_mut().as_deref_mut() {
+            Ok(Some(tail)) => tail.push(Input::Finish),
+            _ => post(&self.worker, &Input::Finish),
+        }
     }
 
     fn poll(&mut self) -> Option<SttEvent> {

@@ -7,7 +7,7 @@ use std::f32::consts::PI;
 /// Mel bands per column, lowest first.
 pub const BANDS: usize = 64;
 /// Columns per second (one every 10 ms).
-pub const COLUMNS_PER_SECOND: u32 = 100;
+const COLUMNS_PER_SECOND: u32 = 100;
 
 const FFT: usize = 1024;
 const LOW_HZ: f32 = 50.0;
@@ -21,6 +21,7 @@ pub struct Spectrum {
     window: Vec<f32>,
     /// Per band: the first FFT bin it reads and the weights from there on.
     filters: Vec<(usize, Vec<f32>)>,
+    twiddles: Vec<(f32, f32)>,
     pending: Vec<f32>,
     re: Vec<f32>,
     im: Vec<f32>,
@@ -35,6 +36,7 @@ impl Spectrum {
             hop: (rate / COLUMNS_PER_SECOND).max(1) as usize,
             window,
             filters: mel_filters(rate as f32),
+            twiddles: twiddles(FFT),
             pending: Vec::with_capacity(FFT * 2),
             re: vec![0.0; FFT],
             im: vec![0.0; FFT],
@@ -59,7 +61,7 @@ impl Spectrum {
             self.re[i] = s * w;
             self.im[i] = 0.0;
         }
-        fft(&mut self.re, &mut self.im);
+        fft(&mut self.re, &mut self.im, &self.twiddles);
         // A full-scale sine under a Hann window peaks at FFT/4.
         let norm = (FFT as f32 / 4.0).powi(2);
         let mut bands = [0.0; BANDS];
@@ -116,8 +118,15 @@ fn mel_filters(rate: f32) -> Vec<(usize, Vec<f32>)> {
         .collect()
 }
 
-/// In-place radix-2 FFT; `re.len()` must be a power of two.
-fn fft(re: &mut [f32], im: &mut [f32]) {
+/// The `(sin, cos)` of `-2πk/n` for the first half of an `n`-point FFT.
+fn twiddles(n: usize) -> Vec<(f32, f32)> {
+    (0..n / 2)
+        .map(|k| (-2.0 * PI * k as f32 / n as f32).sin_cos())
+        .collect()
+}
+
+/// In-place radix-2 FFT with [`twiddles`] of `re.len()`, a power of two.
+fn fft(re: &mut [f32], im: &mut [f32], twiddles: &[(f32, f32)]) {
     let n = re.len();
     let mut j = 0;
     for i in 1..n {
@@ -134,10 +143,10 @@ fn fft(re: &mut [f32], im: &mut [f32]) {
     }
     let mut len = 2;
     while len <= n {
-        let angle = -2.0 * PI / len as f32;
+        let stride = n / len;
         for start in (0..n).step_by(len) {
             for k in 0..len / 2 {
-                let (s, c) = (angle * k as f32).sin_cos();
+                let (s, c) = twiddles[k * stride];
                 let (a, b) = (start + k, start + k + len / 2);
                 let (tr, ti) = (re[b] * c - im[b] * s, re[b] * s + im[b] * c);
                 re[b] = re[a] - tr;

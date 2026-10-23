@@ -66,6 +66,20 @@ pub fn weights_bytes(size: WhisperSize) -> u64 {
     spec(size).weights_bytes
 }
 
+/// Gives `report` the share of `size`'s weights `done` bytes make, once per
+/// whole percent, so a download sends a hundred events, not one per chunk.
+pub fn weights_progress(size: WhisperSize, report: &dyn Fn(f32)) -> impl FnMut(u64) + '_ {
+    let total = weights_bytes(size).max(1);
+    let mut shown = None;
+    move |done| {
+        let percent = done * 100 / total;
+        if shown != Some(percent) {
+            shown = Some(percent);
+            report(done as f32 / total as f32);
+        }
+    }
+}
+
 /// The model's files with their SHA-256, the weights last.
 pub fn files(size: WhisperSize) -> [(&'static str, &'static str); 3] {
     let s = spec(size);
@@ -88,4 +102,27 @@ pub fn url(size: WhisperSize, file: &str) -> String {
 /// A SHA-256 digest as the lowercase hex the specs above are written in.
 pub fn hex(digest: &[u8]) -> String {
     digest.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+
+    #[test]
+    fn progress_is_reported_once_per_percent() {
+        let shares = RefCell::new(Vec::new());
+        let report = |share| shares.borrow_mut().push(share);
+        let total = weights_bytes(WhisperSize::Tiny);
+        {
+            let mut share = weights_progress(WhisperSize::Tiny, &report);
+            for done in (0..=total).step_by(1 << 16) {
+                share(done);
+            }
+            share(total);
+        }
+        let shares = shares.into_inner();
+        assert_eq!(shares.len(), 101);
+        assert_eq!(shares.last(), Some(&1.0));
+    }
 }

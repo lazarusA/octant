@@ -62,6 +62,7 @@ pub(super) struct Mel {
     sin: Tensor,
     /// The filter bank transposed, `(BINS, n_mels)`.
     filters: Tensor,
+    hann: Vec<f32>,
 }
 
 impl Mel {
@@ -82,6 +83,9 @@ impl Mel {
             filters: Tensor::from_vec(filters(n_mels), (n_mels, BINS), device)?
                 .t()?
                 .contiguous()?,
+            hann: (0..m::N_FFT)
+                .map(|n| 0.5 - 0.5 * (std::f32::consts::TAU * n as f32 / m::N_FFT as f32).cos())
+                .collect(),
         })
     }
 
@@ -115,15 +119,12 @@ impl Mel {
     /// `log10` of the mel power of the first `frames` frames of `audio`:
     /// `(frames, n_mels)`.
     fn heard(&self, audio: &[f32], frames: usize) -> candle_core::Result<Tensor> {
-        let hann =
-            |n: usize| 0.5 - 0.5 * (std::f32::consts::TAU * n as f32 / m::N_FFT as f32).cos();
         let windowed: Vec<f32> = (0..frames)
             .flat_map(|i| {
-                (0..m::N_FFT).map(move |n| {
-                    audio
-                        .get(i * m::HOP_LENGTH + n)
-                        .map_or(0.0, |&s| s * hann(n))
-                })
+                self.hann
+                    .iter()
+                    .enumerate()
+                    .map(move |(n, w)| audio.get(i * m::HOP_LENGTH + n).map_or(0.0, |&s| s * w))
             })
             .collect();
         let x = Tensor::from_vec(windowed, (frames, m::N_FFT), self.cos.device())?;
