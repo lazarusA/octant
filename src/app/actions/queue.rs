@@ -39,9 +39,9 @@ pub struct CommandQueue {
     pub(super) vocab: Option<(VocabKey, Vocabulary)>,
 }
 
-/// What a vocabulary was built from: the active dataset's metadata, the
-/// open datasets, the open plate's wells and the colormaps.
-pub(super) type VocabKey = (u64, usize, usize, u64);
+/// What a vocabulary was built from: the active dataset (its store and
+/// metadata), the open datasets, the open plate's wells and the colormaps.
+pub(super) type VocabKey = (String, u64, usize, usize, u64);
 
 impl CommandQueue {
     pub(super) fn retrying(&self) -> bool {

@@ -83,6 +83,15 @@ fn addresses_touching_cjk_text_and_windows_paths_are_kept_whole() {
         ),
         [open("https://x/Data.zarr"), action(AppAction::Play)]
     );
+    // A full stop after the address still ends the command.
+    assert_eq!(
+        parse(
+            "打开https://x/Data.zarr。播放",
+            &vocab,
+            Language::ChineseSimp
+        ),
+        [open("https://x/Data.zarr"), action(AppAction::Play)]
+    );
     // A folder's own CJK name stays.
     assert_eq!(
         parse("打开 /数据/温度数据", &vocab, Language::ChineseSimp),

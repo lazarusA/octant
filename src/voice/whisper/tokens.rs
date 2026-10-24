@@ -123,6 +123,19 @@ fn byte_decoder() -> HashMap<char, u8> {
         .collect()
 }
 
+/// How many of a names list's `tokens` to keep: all within `keep`, else at
+/// most `keep`, cut before the last `comma` among them so no name is cut
+/// in two (or at `keep` when none is).
+pub(super) fn whole_names(tokens: &[u32], keep: usize, comma: Option<u32>) -> usize {
+    if tokens.len() <= keep {
+        return tokens.len();
+    }
+    tokens[..=keep]
+        .iter()
+        .rposition(|&t| Some(t) == comma)
+        .unwrap_or(keep)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,5 +186,18 @@ mod tests {
         assert_eq!(t.encode("Hello world"), [0, 1]);
         assert_eq!(t.decode(&t.encode("Hello world")), "Hello world");
         assert_eq!(t.start_of_prev, 12);
+    }
+
+    #[test]
+    fn a_long_prompt_keeps_its_first_whole_names() {
+        const COMMA: u32 = 9;
+        // " t2m, sst, lat": names of 3, 1 and 2 tokens.
+        let tokens = [1, 2, 3, COMMA, 4, COMMA, 5, 6];
+        assert_eq!(whole_names(&tokens, 8, Some(COMMA)), 8);
+        assert_eq!(whole_names(&tokens, 6, Some(COMMA)), 5);
+        assert_eq!(whole_names(&tokens, 5, Some(COMMA)), 5);
+        assert_eq!(whole_names(&tokens, 4, Some(COMMA)), 3);
+        assert_eq!(whole_names(&tokens, 2, Some(COMMA)), 2);
+        assert_eq!(whole_names(&tokens, 4, None), 4);
     }
 }

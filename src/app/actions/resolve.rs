@@ -213,7 +213,10 @@ impl crate::app::OctantApp {
     /// one of them changed.
     pub fn vocabulary(&mut self) -> &Vocabulary {
         let wells = self.plate.as_ref().map_or(0, |p| p.plate.wells.len());
+        // The store too: generations can repeat once a staged selection
+        // takes back the plotted one's.
         let key = (
+            self.selected.store_target.clone(),
             self.selected.metadata_generation,
             self.dataset_manager.len(),
             wells,

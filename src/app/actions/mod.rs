@@ -32,6 +32,8 @@ mod plate;
 mod prompt;
 mod queue;
 pub mod resolve;
+#[cfg(test)]
+mod retry_tests;
 pub mod schema;
 #[cfg(test)]
 mod schema_tests;

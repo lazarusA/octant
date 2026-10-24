@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use super::{Done, Failure};
+use super::{AppAction, Done, Failure, NameKind};
 use crate::app::test_support::{TARGET, make_resident, memory_app};
 use crate::app::{OctantApp, PlateState, StoreKind};
 use crate::data::SliceRequest;
@@ -160,7 +160,22 @@ fn a_field_waits_for_its_well_to_be_read() {
         plate: Some(plate),
         ..Default::default()
     };
-    // Without a well picked, the answer asks for one.
+    // No dataset open asks for one; another dataset than a plate finds no
+    // well; a plate's field without a well picked asks for a well.
+    let mut no_plate = OctantApp::default();
+    let well = AppAction::OpenPlateWell {
+        well: Some("B3".into()),
+        field: Some(1),
+    };
+    assert_eq!(no_plate.dispatch(well.clone()), Err(Failure::NoDataset));
+    no_plate.selected.metadata = Some(Default::default());
+    assert!(matches!(
+        no_plate.dispatch(well),
+        Err(Failure::NotFound {
+            kind: NameKind::Well,
+            ..
+        })
+    ));
     assert_eq!(
         app.run_utterance("field 1"),
         vec![Err(Failure::NoWellPicked)]

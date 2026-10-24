@@ -201,14 +201,8 @@ impl WindowModel for Whisper {
         }
         let mut tokens = self.tokens.encode(&format!(" {prompt}"));
         let keep = PROMPT_TOKENS.min(self.model.config().max_target_positions / 2 - 1);
-        if tokens.len() > keep {
-            let comma = self.tokens.encode(",").first().copied();
-            let cut = tokens[..=keep]
-                .iter()
-                .rposition(|&t| Some(t) == comma)
-                .unwrap_or(keep);
-            tokens.truncate(cut);
-        }
+        let comma = self.tokens.encode(",").first().copied();
+        tokens.truncate(tokens::whole_names(&tokens, keep, comma));
         self.prompt = tokens;
     }
 }

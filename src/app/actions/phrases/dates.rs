@@ -26,7 +26,7 @@ pub(super) fn dates(
         matches!(part, Part::Year(_)) && segment.text[r.end..].starts_with(YEAR_MARKERS)
     });
     let mut groups = group_parts(parts, year_first);
-    lend_years(&mut groups, year_first);
+    lend_parts(&mut groups, year_first);
     out.extend(groups.iter().filter_map(|g| iso(g)));
     out.sort_by_key(|(_, span)| span.start);
     out
@@ -58,23 +58,33 @@ fn group_parts(parts: Group, year_first: bool) -> Vec<Group> {
 }
 
 /// Each group without a year takes the next group's (the previous one's,
-/// year first).
-fn lend_years(groups: &mut [Group], year_first: bool) {
-    let year_of = |g: &Group| g.iter().find(|(_, p)| matches!(p, Part::Year(_))).cloned();
+/// year first), and a day said without a month that group's month too
+/// ("2020年1月15日到20日").
+fn lend_parts(groups: &mut [Group], year_first: bool) {
+    let has = |g: &Group, f: fn(&Part) -> bool| g.iter().any(|(_, p)| f(p));
+    let is_year = |p: &Part| matches!(p, Part::Year(_));
+    let is_month = |p: &Part| matches!(p, Part::Month(_));
     for i in 0..groups.len() {
-        if year_of(&groups[i]).is_some() {
+        if has(&groups[i], is_year) {
             continue;
         }
         let lender = if year_first {
-            groups[..i].iter().rev().find_map(year_of)
+            groups[..i].iter().rev().find(|g| has(g, is_year))
         } else {
-            groups[i + 1..].iter().find_map(year_of)
+            groups[i + 1..].iter().find(|g| has(g, is_year))
         };
-        if let Some((_, year)) = lender {
-            // The span stays the group's own: the year was said for both.
-            let at = groups[i].last().map_or(0..0, |(r, _)| r.end..r.end);
-            groups[i].push((at, year));
-        }
+        let Some(lender) = lender else {
+            continue;
+        };
+        let lacks_month = !has(&groups[i], is_month);
+        let lent: Vec<Part> = lender
+            .iter()
+            .map(|(_, p)| *p)
+            .filter(|p| is_year(p) || (lacks_month && is_month(p)))
+            .collect();
+        // The span stays the group's own: what is lent was said for both.
+        let at = groups[i].last().map_or(0..0, |(r, _)| r.end..r.end);
+        groups[i].extend(lent.into_iter().map(|p| (at.clone(), p)));
     }
 }
 

@@ -178,6 +178,12 @@ fn dates_of_a_range_share_the_year_said_once() {
             "2020-01",
             "2020-03",
         ),
+        (
+            Language::ChineseSimp,
+            "时间 2020年1月15日到20日",
+            "2020-01-15",
+            "2020-01-20",
+        ),
     ];
     for (lang, said, a, b) in cases {
         let parsed = parse(said, &vocab, lang);

@@ -43,7 +43,8 @@ pub(super) fn split(utterance: &str, phrases: &Phrases) -> (Vec<Segment>, usize)
     let mut pieces = Vec::new();
     for (i, c) in utterance.char_indices() {
         if ends_command(c, &utterance[start..i], &utterance[i + c.len_utf8()..])
-            && !in_address(utterance, i)
+            // CJK punctuation always ends one: addresses are ASCII.
+            && !(c.is_ascii() && in_address(utterance, i))
         {
             pieces.push(&utterance[start..i]);
             start = i + c.len_utf8();

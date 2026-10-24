@@ -29,8 +29,16 @@ impl OctantApp {
     /// Picks well `well` (the picked one without), and opens its field
     /// number `field` when given.
     pub(super) fn open_plate_well(&mut self, well: Option<&str>, field: Option<usize>) -> Outcome {
-        // No plate open: a plate is a dataset to open first.
-        let plate = self.plate.as_mut().ok_or(Failure::NoDataset)?;
+        let no_plate = match well {
+            _ if self.selected.metadata.is_none() => Failure::NoDataset,
+            Some(name) => Failure::NotFound {
+                kind: NameKind::Well,
+                text: name.to_string(),
+                closest: Vec::new(),
+            },
+            None => Failure::NoWellPicked,
+        };
+        let plate = self.plate.as_mut().ok_or(no_plate)?;
         let index = match well {
             Some(name) => {
                 let names = well_names(&plate.plate);
