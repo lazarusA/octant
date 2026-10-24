@@ -77,14 +77,37 @@ fn lend_parts(groups: &mut [Group], year_first: bool) {
             continue;
         };
         let lacks_month = !has(&groups[i], is_month);
+        let shift = new_year_shift(month_of(&groups[i]), month_of(lender), year_first);
         let lent: Vec<Part> = lender
             .iter()
-            .map(|(_, p)| *p)
+            .map(|(_, p)| match *p {
+                Part::Year(y) => Part::Year(y.saturating_add_signed(shift)),
+                p => p,
+            })
             .filter(|p| is_year(p) || (lacks_month && is_month(p)))
             .collect();
         // The span stays the group's own: what is lent was said for both.
         let at = groups[i].last().map_or(0..0, |(r, _)| r.end..r.end);
         groups[i].extend(lent.into_iter().map(|p| (at.clone(), p)));
+    }
+}
+
+fn month_of(group: &Group) -> Option<u32> {
+    group.iter().find_map(|(_, p)| match p {
+        Part::Month(m) => Some(*m),
+        _ => None,
+    })
+}
+
+/// The years between a date said without one, of month `own`, and the
+/// date it borrows its year from, of month `lender`: a range crossing New
+/// Year ("December to February 2020" starts in 2019; year first, "2020年12月
+/// 30日到1月2日" ends in 2021).
+fn new_year_shift(own: Option<u32>, lender: Option<u32>, year_first: bool) -> i32 {
+    match (own, lender) {
+        (Some(own), Some(lender)) if !year_first && own > lender => -1,
+        (Some(own), Some(lender)) if year_first && own < lender => 1,
+        _ => 0,
     }
 }
 

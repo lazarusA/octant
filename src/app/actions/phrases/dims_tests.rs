@@ -184,6 +184,24 @@ fn dates_of_a_range_share_the_year_said_once() {
             "2020-01-15",
             "2020-01-20",
         ),
+        (
+            Language::English,
+            "time December to February 2020",
+            "2019-12",
+            "2020-02",
+        ),
+        (
+            Language::English,
+            "time 30 December to 2 January 2021",
+            "2020-12-30",
+            "2021-01-02",
+        ),
+        (
+            Language::ChineseSimp,
+            "时间 2020年12月30日到1月2日",
+            "2020-12-30",
+            "2021-01-02",
+        ),
     ];
     for (lang, said, a, b) in cases {
         let parsed = parse(said, &vocab, lang);
