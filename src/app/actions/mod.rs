@@ -27,6 +27,7 @@ mod open_tests;
 mod outcome;
 mod phrases;
 mod plate;
+mod prompt;
 mod queue;
 pub mod resolve;
 pub mod source_names;

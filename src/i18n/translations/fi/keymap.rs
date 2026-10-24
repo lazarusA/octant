@@ -41,6 +41,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::LeaveHero => "Takaisin kuvaajaan",
         KeymapKey::ScopeHero => "Aloitusnäkymässä",
         KeymapKey::PlotTypePicker => "Valitse kuvaajan tyyppi",
+        KeymapKey::TypeCommand => "Kirjoita äänikomento",
         KeymapKey::PlotStaged => "Piirrä valittu muuttuja",
         KeymapKey::GoToColorbar => "Siirry seuraavaan väriasteikkoon",
     })

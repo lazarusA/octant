@@ -41,6 +41,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::LeaveHero => "플롯으로 돌아가기",
         KeymapKey::ScopeHero => "시작 화면에서",
         KeymapKey::PlotTypePicker => "플롯 종류 선택",
+        KeymapKey::TypeCommand => "음성 명령 입력",
         KeymapKey::PlotStaged => "선택한 변수 플롯",
         KeymapKey::GoToColorbar => "다음 컬러바로 이동",
     })

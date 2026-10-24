@@ -41,6 +41,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::LeaveHero => "プロットに戻る",
         KeymapKey::ScopeHero => "スタート画面で",
         KeymapKey::PlotTypePicker => "プロットの種類を選ぶ",
+        KeymapKey::TypeCommand => "音声コマンドを入力",
         KeymapKey::PlotStaged => "選んだ変数をプロット",
         KeymapKey::GoToColorbar => "次のカラーバーへ移動",
     })

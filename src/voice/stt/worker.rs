@@ -82,6 +82,9 @@ fn post(worker: &Worker, input: &Input) {
         Input::Finish => {
             let _ = worker.post_message(&JsValue::from_str(wire::FINISH));
         }
+        Input::Prompt(text) => {
+            let _ = worker.post_message(&JsValue::from_str(&wire::prompt(text)));
+        }
     }
 }
 
@@ -89,6 +92,16 @@ fn post(worker: &Worker, input: &Input) {
 fn post_audio(worker: &Worker, samples: &[f32]) {
     let audio = Float32Array::from(samples);
     let _ = worker.post_message_with_transfer(&audio, &Array::of1(&audio.buffer()));
+}
+
+impl WorkerStt {
+    /// Sends `input`, or keeps it until the worker listens.
+    fn send(&self, input: Input) {
+        match self.early.try_borrow_mut().as_deref_mut() {
+            Ok(Some(tail)) => tail.push(input),
+            _ => post(&self.worker, &input),
+        }
+    }
 }
 
 impl SpeechToText for WorkerStt {
@@ -104,10 +117,11 @@ impl SpeechToText for WorkerStt {
     }
 
     fn finish(&mut self) {
-        match self.early.try_borrow_mut().as_deref_mut() {
-            Ok(Some(tail)) => tail.push(Input::Finish),
-            _ => post(&self.worker, &Input::Finish),
-        }
+        self.send(Input::Finish);
+    }
+
+    fn set_prompt(&mut self, prompt: &str) {
+        self.send(Input::Prompt(prompt.to_string()));
     }
 
     fn poll(&mut self) -> Option<SttEvent> {

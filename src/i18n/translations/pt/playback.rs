@@ -40,6 +40,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Modelo de fala para texto",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Fechar entrada de voz",
+        PlaybackKey::VoiceTypeHint => "Digite um comando",
         PlaybackKey::VoiceDidOpen => "Abrindo {}",
         PlaybackKey::VoiceNoSource => "Nenhum conjunto de dados corresponde a '{}'",
         PlaybackKey::VoiceDidSelect => "{} selecionado",

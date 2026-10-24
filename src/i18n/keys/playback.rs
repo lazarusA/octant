@@ -39,6 +39,7 @@ crate::i18n::keys::define_keys! {
     VoiceModelHover,
     VoiceModelSize,
     VoiceCloseHover,
+    VoiceTypeHint,
     VoiceDidOpen,
     VoiceNoSource,
     VoiceDidSelect,

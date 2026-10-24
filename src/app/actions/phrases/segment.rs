@@ -152,6 +152,9 @@ fn plain_action(n: &Named, verb: Verb, segment: &Segment, layer: Option<&str>) -
 /// catalog when named alone, else the leftover words as what was meant.
 fn choose(n: &Named, verb: Verb, segment: &Segment) -> Parsed {
     let opens = verb == Verb::Open;
+    if let Some(address) = n.address.as_deref().filter(|_| opens) {
+        return open(address);
+    }
     match (&n.source, &n.variable) {
         (Some(s), None) => open(s),
         (Some(s), Some(_)) if opens => open(s),

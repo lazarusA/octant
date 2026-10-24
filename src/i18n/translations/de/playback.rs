@@ -40,6 +40,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Modell für Spracherkennung",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "Spracheingabe schließen",
+        PlaybackKey::VoiceTypeHint => "Befehl eingeben",
         PlaybackKey::VoiceDidOpen => "{} wird geöffnet",
         PlaybackKey::VoiceNoSource => "Kein Datensatz passt zu '{}'",
         PlaybackKey::VoiceDidSelect => "{} ausgewählt",

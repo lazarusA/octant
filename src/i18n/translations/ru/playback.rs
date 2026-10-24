@@ -40,6 +40,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "Модель распознавания речи",
         PlaybackKey::VoiceModelSize => "{} ({} МБ)",
         PlaybackKey::VoiceCloseHover => "Закрыть голосовой ввод",
+        PlaybackKey::VoiceTypeHint => "Введите команду",
         PlaybackKey::VoiceDidOpen => "Открытие {}",
         PlaybackKey::VoiceNoSource => "Ни один набор данных не соответствует '{}'",
         PlaybackKey::VoiceDidSelect => "Выбрано {}",

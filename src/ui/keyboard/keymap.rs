@@ -37,6 +37,8 @@ pub enum Action {
     LeaveHero,
     /// Opens the centered plot type picker.
     PlotTypePicker,
+    /// Opens the voice bar with its command field focused.
+    TypeCommand,
     /// Plots the staged variable, as the Dimensions panel's Plot Data.
     PlotStaged,
     /// Run by the canvas as it draws, knowing the plot's geometry.

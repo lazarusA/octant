@@ -41,6 +41,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::LeaveHero => "Kembali ke plot",
         KeymapKey::ScopeHero => "Di layar awal",
         KeymapKey::PlotTypePicker => "Pilih jenis plot",
+        KeymapKey::TypeCommand => "Ketik perintah suara",
         KeymapKey::PlotStaged => "Plot variabel yang dipilih",
         KeymapKey::GoToColorbar => "Ke bilah warna berikutnya",
     })

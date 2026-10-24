@@ -17,16 +17,44 @@ pub(super) fn is_cjk(c: char) -> bool {
         | '\u{F900}'..='\u{FAFF}')
 }
 
-/// Lowercase, full-width forms (`ｔ２ｍ`, the ideographic space) as ASCII.
+/// Whether `text` is an address rather than a name (a URL or a path).
+pub(super) fn is_address(text: &str) -> bool {
+    let text = text.trim();
+    text.contains("://") || text.starts_with('/') || text.starts_with('~')
+}
+
+/// Lowercase, full-width forms (`ｔ２ｍ`, the ideographic space) as ASCII;
+/// addresses (`https://x/Data.zarr`) kept as written, whose case matters.
 pub(super) fn normalize(text: &str) -> String {
-    text.chars()
-        .map(|c| match c {
+    let mut out = String::with_capacity(text.len());
+    for piece in text.split_inclusive(char::is_whitespace) {
+        if is_address(piece) {
+            out.push_str(piece);
+            continue;
+        }
+        let chars = piece.chars().map(|c| match c {
             '\u{FF01}'..='\u{FF5E}' => char::from_u32(c as u32 - 0xFEE0).unwrap_or(c),
             '\u{3000}' => ' ',
             _ => c,
-        })
-        .flat_map(char::to_lowercase)
-        .collect()
+        });
+        out.extend(chars.flat_map(char::to_lowercase));
+    }
+    out
+}
+
+/// The first address in normalized `text` (its trailing punctuation left
+/// out) and where it is.
+pub(super) fn address_in(text: &str) -> Option<(String, Range<usize>)> {
+    let mut start = 0;
+    for piece in text.split_inclusive(char::is_whitespace) {
+        let word = piece.trim().trim_end_matches(['.', ',', ';']);
+        let at = start + (piece.len() - piece.trim_start().len());
+        start += piece.len();
+        if !word.is_empty() && is_address(word) {
+            return Some((word.to_string(), at..at + word.len()));
+        }
+    }
+    None
 }
 
 /// The word spans of normalized `text`: runs of letters and digits, a CJK

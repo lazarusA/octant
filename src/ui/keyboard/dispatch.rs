@@ -110,6 +110,10 @@ fn run(app: &mut OctantApp, ctx: &Context, gate: Gate, action: Action) {
         Action::ShowShortcuts => app.layout.show_shortcuts = true,
         Action::ToggleHero => app.toggle_hero(),
         Action::LeaveHero => app.layout.show_hero = false,
+        Action::TypeCommand => {
+            app.voice.open_for_typing();
+            focus::request(ctx, crate::ui::voice_bar::field_id());
+        }
         Action::PlotTypePicker => {
             let shown = app
                 .selected_variable_info()

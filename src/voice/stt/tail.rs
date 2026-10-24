@@ -14,10 +14,16 @@ const READY_TAIL: usize = super::SAMPLE_RATE as usize * 2;
 pub struct Tail {
     inputs: std::collections::VecDeque<Input>,
     samples: usize,
+    /// The last prompt, given first.
+    prompt: Option<String>,
 }
 
 impl Tail {
     pub fn push(&mut self, input: Input) {
+        let input = match input {
+            Input::Prompt(prompt) => return self.prompt = Some(prompt),
+            input => input,
+        };
         if let Input::Audio(samples) = &input {
             self.samples += samples.len();
         }
@@ -33,7 +39,7 @@ impl Tail {
                     self.samples -= samples.len();
                     self.inputs.pop_front();
                 }
-                Some(Input::Finish) => {
+                Some(Input::Finish | Input::Prompt(_)) => {
                     self.inputs.pop_front();
                 }
                 None => break,
@@ -45,10 +51,12 @@ impl Tail {
         }
     }
 
-    /// The inputs kept, oldest first, leaving the tail empty.
+    /// The inputs kept, the prompt first, then oldest first, leaving the
+    /// tail empty.
     pub fn take(&mut self) -> impl Iterator<Item = Input> {
         self.samples = 0;
-        std::mem::take(&mut self.inputs).into_iter()
+        let prompt = self.prompt.take().map(Input::Prompt);
+        prompt.into_iter().chain(std::mem::take(&mut self.inputs))
     }
 }
 

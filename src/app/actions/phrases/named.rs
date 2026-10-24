@@ -8,7 +8,7 @@ use super::layer_words::{LayerWords, layer_words};
 use super::{Phrases, Verb, verbs_in, word_of};
 use crate::app::actions::AppAction;
 use crate::app::actions::resolve::Vocabulary;
-use crate::app::actions::text::{Segment, overlaps};
+use crate::app::actions::text::{Segment, address_in, overlaps};
 
 /// A verb and where it was said.
 type SaidVerb = (Range<usize>, Verb);
@@ -61,6 +61,8 @@ pub(super) struct Named {
     pub dims: Vec<AppAction>,
     /// What it says of layers, the export and a plate.
     pub layers: LayerWords,
+    /// An address typed as written (`https://x/Data.zarr`).
+    pub address: Option<String>,
     /// The words left over: a name not found, or filler.
     pub rest: String,
 }
@@ -69,6 +71,8 @@ pub(super) fn named(segment: &Segment, phrases: &Phrases, vocab: &Vocabulary) ->
     let (found, plot_span) = verbs_and_plot_type(segment, phrases, vocab);
     let mut taken = spans(&found);
     let query = segment.rest(&taken);
+    let (address, at) = address_in(&segment.text).unzip();
+    taken.extend(at);
     let verbs: Vec<Verb> = found.into_iter().map(|(_, v)| v).collect();
     let take = |span: Option<Range<usize>>, taken: &mut Vec<Range<usize>>| {
         let text = span.as_ref().map(|r| segment.text[r.clone()].to_string());
@@ -103,5 +107,6 @@ pub(super) fn named(segment: &Segment, phrases: &Phrases, vocab: &Vocabulary) ->
         query,
         dims,
         layers,
+        address,
     }
 }

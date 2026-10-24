@@ -24,6 +24,8 @@ mod layer_words;
 mod layers_tests;
 mod named;
 mod no;
+#[cfg(test)]
+mod open_tests;
 mod pt;
 mod ru;
 mod segment;
@@ -210,11 +212,7 @@ fn verbs_in(phrases: &Phrases, segment: &Segment) -> Vec<(Range<usize>, Verb)> {
 }
 
 /// Where one of `words` is said outside `taken`.
-fn word_of(
-    segment: &Segment,
-    words: &[&str],
-    taken: &[Range<usize>],
-) -> Option<Range<usize>> {
+fn word_of(segment: &Segment, words: &[&str], taken: &[Range<usize>]) -> Option<Range<usize>> {
     words
         .iter()
         .filter_map(|w| segment.find(&Name::new(w)))

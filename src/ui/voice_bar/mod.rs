@@ -1,11 +1,14 @@
 //! The voice bar: drawn in the playback bar's place while open (the top
 //! bar's Voice button), with the microphone toggle, a disk pulsing with its
 //! frequencies and the live transcript (or the listening state) from the
-//! chosen speech to text provider (`voice::stt`). It reads nothing from the
-//! app: each final utterance is handed out (`take_utterances`) for the app
-//! to run as commands (`app::actions`), and what the last one did is shown
-//! beside the transcript (`set_last_action`).
+//! chosen speech to text provider (`voice::stt`), and a field to type
+//! commands in. It reads nothing from the app: each final utterance, said
+//! or typed, is handed out (`take_utterances`) for the app to run as
+//! commands (`app::actions`), what the last one did is shown beside the
+//! transcript (`set_last_action`), and the app gives it the names the
+//! speech model is prompted with (`follow_prompt`).
 
+mod commands;
 mod listening;
 mod model_menu;
 mod pulsar;
@@ -22,6 +25,7 @@ use crate::voice::Capture;
 use crate::voice::resample::Resampler;
 use crate::voice::spectrum::Spectrum;
 use crate::voice::stt::{self, Provider, SpeechToText};
+pub use commands::field_id;
 use listening::Listening;
 use model_menu::model_menu;
 use pulsar::Pulsar;
@@ -50,8 +54,14 @@ pub struct VoiceBar {
     transcript: Transcript,
     /// Until when (egui time) the provider is polled for a last final text.
     final_until: f64,
-    /// Final utterances not yet run as commands.
+    /// Utterances (said or typed) not yet run as commands.
     utterances: Vec<String>,
+    /// The typed command field's text.
+    typed: String,
+    /// Names given to the speech model, and the metadata generation they
+    /// were listed for.
+    prompt: String,
+    prompt_key: Option<u64>,
 }
 
 impl VoiceBar {
@@ -61,16 +71,6 @@ impl VoiceBar {
 
     pub fn is_listening(&self) -> bool {
         self.listening.is_some()
-    }
-
-    /// The final utterances heard since the last call.
-    pub fn take_utterances(&mut self) -> Vec<String> {
-        std::mem::take(&mut self.utterances)
-    }
-
-    /// What the last command did, in the UI language.
-    pub fn set_last_action(&mut self, text: String) {
-        self.transcript.action = text;
     }
 
     /// Opens the bar listening, or closes it and releases the microphone.
@@ -107,6 +107,7 @@ impl VoiceBar {
     fn set_provider(&mut self, stt: Option<Box<dyn SpeechToText>>) {
         self.stt = stt;
         self.transcript.provider_dropped();
+        self.give_prompt();
     }
 
     fn listen(&mut self) {
@@ -226,6 +227,7 @@ fn show_contents(voice: &mut VoiceBar, ui: &mut egui::Ui) {
     voice
         .pulsar
         .show(ui, ui.available_height() - 4.0, listening);
+    voice.command_field(ui);
 
     let state = tr(if listening {
         PlaybackKey::VoiceListening

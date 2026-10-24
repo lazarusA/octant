@@ -40,6 +40,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceModelHover => "音声認識モデル",
         PlaybackKey::VoiceModelSize => "{} ({} MB)",
         PlaybackKey::VoiceCloseHover => "音声入力を閉じる",
+        PlaybackKey::VoiceTypeHint => "コマンドを入力",
         PlaybackKey::VoiceDidOpen => "{} を開いています",
         PlaybackKey::VoiceNoSource => "「{}」に一致するデータセットはありません",
         PlaybackKey::VoiceDidSelect => "{} を選択しました",

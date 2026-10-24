@@ -3,14 +3,9 @@
 
 use super::resolve::Resolution;
 use super::source_names::SourceRef;
+use super::text::is_address;
 use super::{Done, Failure, NameKind, Outcome, resolved};
 use crate::app::OctantApp;
-
-/// Whether `text` is an address rather than a name (a URL or a path).
-fn is_address(text: &str) -> bool {
-    let text = text.trim();
-    text.contains("://") || text.starts_with('/') || text.starts_with('~')
-}
 
 impl OctantApp {
     pub(super) fn open_by_name(&mut self, name: &str) -> Outcome {

@@ -19,6 +19,8 @@ pub enum Input {
     Audio(Vec<f32>),
     /// The speaker stopped.
     Finish,
+    /// Names the speaker may say (`WindowModel::set_prompt`).
+    Prompt(String),
 }
 
 pub struct Session<M> {
@@ -70,6 +72,7 @@ impl<M: WindowModel> Session<M> {
             }
             Input::Finish if self.seg.finish() == Step::Final => self.finish_utterance(emit),
             Input::Finish => {}
+            Input::Prompt(prompt) => self.model.set_prompt(&prompt),
         }
     }
 

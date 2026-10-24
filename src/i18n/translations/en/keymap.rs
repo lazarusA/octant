@@ -41,6 +41,7 @@ pub fn text(key: KeymapKey) -> &'static str {
         KeymapKey::LeaveHero => "Back to the plot",
         KeymapKey::ScopeHero => "On the landing screen",
         KeymapKey::PlotTypePicker => "Choose the plot type",
+        KeymapKey::TypeCommand => "Type a voice command",
         KeymapKey::PlotStaged => "Plot the selected variable",
         KeymapKey::GoToColorbar => "Go to the next colorbar",
     }

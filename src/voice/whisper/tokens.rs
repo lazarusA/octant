@@ -1,8 +1,11 @@
-//! Whisper's vocabulary from its `tokenizer.json`, read only to turn tokens
-//! back into text and to find the special tokens: GPT-2 byte-level BPE,
-//! where each character of a token stands for one byte.
+//! Whisper's vocabulary from its `tokenizer.json`: tokens back into text,
+//! text into tokens (`bpe.rs`, for the prompt), and the special tokens:
+//! GPT-2 byte-level BPE, where each character of a token stands for one
+//! byte.
 
 use std::collections::HashMap;
+
+use super::bpe::{Bpe, Merge};
 
 #[derive(serde::Deserialize)]
 struct File {
@@ -13,6 +16,8 @@ struct File {
 #[derive(serde::Deserialize)]
 struct Model {
     vocab: HashMap<String, u32>,
+    #[serde(default)]
+    merges: Vec<Merge>,
 }
 
 #[derive(serde::Deserialize)]
@@ -31,12 +36,19 @@ pub(super) struct Tokens {
     pub(super) no_speech: u32,
     /// Language tokens: every id between `sot` and `translate`.
     pub(super) languages: std::ops::Range<u32>,
+    /// Opens the text before what is transcribed (a prompt).
+    pub(super) start_of_prev: u32,
+    bpe: Bpe,
 }
 
 impl Tokens {
     pub(super) fn parse(json: &[u8]) -> Result<Self, String> {
         let file: File = serde_json::from_slice(json).map_err(|e| e.to_string())?;
         let byte_of = byte_decoder();
+        let mut chars = ['\0'; 256];
+        for (&c, &b) in &byte_of {
+            chars[b as usize] = c;
+        }
         let len = file
             .model
             .vocab
@@ -69,8 +81,15 @@ impl Tokens {
             no_timestamps: id("<|notimestamps|>")?,
             no_speech: id("<|nospeech|>").or_else(|_| id("<|nocaptions|>"))?,
             languages: sot + 1..id("<|translate|>")?,
+            start_of_prev: id("<|startofprev|>")?,
+            bpe: Bpe::new(file.model.merges, file.model.vocab, chars),
             bytes,
         })
+    }
+
+    /// The tokens of `text`.
+    pub(super) fn encode(&self, text: &str) -> Vec<u32> {
+        self.bpe.encode(text)
     }
 
     /// The text of `ids`, skipping special tokens.
@@ -110,7 +129,12 @@ mod tests {
 
     fn tiny() -> Tokens {
         let json = r#"{
-            "model": {"vocab": {"Hello": 0, "Ġworld": 1, "Ã©": 2, "Ċ": 3}},
+            "model": {
+                "vocab": {"Hello": 0, "Ġworld": 1, "Ã©": 2, "Ċ": 3, "H": 13, "e": 14, "l": 15, "o": 16,
+                    "He": 17, "ll": 18, "Hell": 19, "Ġ": 20, "w": 21, "r": 22, "d": 23, "Ġw": 24, "or": 25,
+                    "Ġwor": 26, "ld": 27},
+                "merges": ["H e", "l l", "He ll", "Hell o", "Ġ w", "o r", "Ġw or", "l d", ["Ġwor", "ld"]]
+            },
             "added_tokens": [
                 {"id": 4, "content": "<|endoftext|>"},
                 {"id": 5, "content": "<|startoftranscript|>"},
@@ -119,7 +143,8 @@ mod tests {
                 {"id": 8, "content": "<|translate|>"},
                 {"id": 9, "content": "<|transcribe|>"},
                 {"id": 10, "content": "<|nospeech|>"},
-                {"id": 11, "content": "<|notimestamps|>"}
+                {"id": 11, "content": "<|notimestamps|>"},
+                {"id": 12, "content": "<|startofprev|>"}
             ]
         }"#;
         Tokens::parse(json.as_bytes()).expect("vocabulary")
@@ -140,5 +165,13 @@ mod tests {
             (5, 4, 9, 11, 10)
         );
         assert_eq!(t.languages, 6..8);
+    }
+
+    #[test]
+    fn text_is_encoded_by_ranked_merges() {
+        let t = tiny();
+        assert_eq!(t.encode("Hello world"), [0, 1]);
+        assert_eq!(t.decode(&t.encode("Hello world")), "Hello world");
+        assert_eq!(t.start_of_prev, 12);
     }
 }

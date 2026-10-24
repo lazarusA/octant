@@ -43,6 +43,7 @@ pub fn text(key: KeymapKey) -> Option<&'static str> {
         KeymapKey::LeaveHero => "Zurück zur Darstellung",
         KeymapKey::ScopeHero => "Auf der Startseite",
         KeymapKey::PlotTypePicker => "Darstellungsart wählen",
+        KeymapKey::TypeCommand => "Sprachbefehl eingeben",
         KeymapKey::PlotStaged => "Gewählte Variable darstellen",
         KeymapKey::GoToColorbar => "Zur nächsten Farbskala",
     })

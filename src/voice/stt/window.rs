@@ -96,6 +96,10 @@ impl SpeechToText for Windowed {
         self.send(Msg::Finish);
     }
 
+    fn set_prompt(&mut self, prompt: &str) {
+        self.send(Msg::Prompt(prompt.to_string()));
+    }
+
     fn poll(&mut self) -> Option<SttEvent> {
         let event = self.events.try_recv().ok();
         if event == Some(SttEvent::Ready)

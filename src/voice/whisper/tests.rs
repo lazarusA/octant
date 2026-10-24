@@ -85,3 +85,37 @@ fn whisper_cpu_speed() {
         }
     }
 }
+
+/// `cargo test --lib whisper_prompt -- --ignored --nocapture`: with tiny in
+/// the data folder, prompts round-trip through the real vocabulary and a
+/// prompted transcription still hears the sample.
+#[test]
+#[ignore = "needs Whisper tiny in the data folder"]
+fn whisper_prompt_encodes_and_transcribes() {
+    use crate::voice::stt::WindowModel;
+    let dir = eframe::storage_dir("Octant")
+        .expect("data folder")
+        .join("models/whisper/tiny");
+    let read = |f: &str| std::fs::read(dir.join(f)).expect("model file");
+    let tokens = super::tokens::Tokens::parse(&read("tokenizer.json")).expect("vocabulary");
+    for text in [
+        " t2m, sst, valid_time, lat, lon",
+        " 气温, Breite, широта",
+        " ask not",
+    ] {
+        let ids = tokens.encode(text);
+        assert_eq!(tokens.decode(&ids), text.trim(), "{ids:?}");
+    }
+    // GPT-2's own pieces: " the" is one token.
+    assert_eq!(tokens.encode(" the").len(), 1);
+    let mut w = super::Whisper::from_bytes(
+        &read("config.json"),
+        &read("tokenizer.json"),
+        read(super::models::WEIGHTS),
+    )
+    .expect("model");
+    w.set_prompt("t2m, sst, country, Americans");
+    let text = w.transcribe(&jfk()).expect("text").to_lowercase();
+    println!("prompted: {text}");
+    assert!(text.contains("ask not what your country"), "{text}");
+}
