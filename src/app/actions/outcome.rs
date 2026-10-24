@@ -12,6 +12,20 @@ pub enum Done {
     Opening(String),
     CatalogOpened,
     Selected(String),
+    OverlayAdded(String),
+    LayerShown {
+        layer: String,
+        visible: bool,
+    },
+    OverlayRemoved(String),
+    ColorRange {
+        layer: String,
+        min: f32,
+        max: f32,
+    },
+    /// The export dialog opened on this format.
+    ExportOpened(String),
+    WellPicked(String),
     /// A dataset or group: its name, its variables counted, the first
     /// entries (groups, then variables).
     DatasetShown {
@@ -69,6 +83,9 @@ pub enum Done {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NameKind {
     Source,
+    Layer,
+    Format,
+    Well,
     Group,
     Dimension,
     Variable,
@@ -99,13 +116,16 @@ pub enum Failure {
     NotUnderstood(String),
     /// The app refused and said why (a desktop-only catalog entry).
     Refused,
+    /// No overlay can be added: why.
+    OverlayUnavailable(String),
     /// No coordinate of `dim` matches `value`.
     NoValue {
         dim: String,
         value: String,
     },
-    /// The coordinates are being read: the command waits for them.
-    CoordinatesPending,
+    /// What it needs is being read (coordinates, a plate's wells): the
+    /// command waits for it.
+    Reading,
 }
 
 pub type Outcome = Result<Done, Failure>;

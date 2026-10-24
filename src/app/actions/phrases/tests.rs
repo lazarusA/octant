@@ -146,7 +146,8 @@ fn spoken_forms_of_names_are_found() {
     assert_eq!(
         parse("色图 viridis", &vocab, Language::ChineseSimp),
         [action(AppAction::SetColormap {
-            name: "viridis".into()
+            name: "viridis".into(),
+            layer: None,
         })]
     );
 }

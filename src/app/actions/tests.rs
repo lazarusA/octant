@@ -50,6 +50,27 @@ fn actions_round_trip_through_json() {
         AppAction::Step { by: -2 },
         AppAction::SetColormap {
             name: "viridis".into(),
+            layer: Some("sst".into()),
+        },
+        AppAction::AddOverlay,
+        AppAction::SetLayerVisible {
+            layer: "sst".into(),
+            visible: false,
+        },
+        AppAction::RemoveOverlay {
+            layer: "sst".into(),
+        },
+        AppAction::SetColorRange {
+            min: 250.0,
+            max: 300.0,
+            layer: None,
+        },
+        AppAction::Export {
+            format: Some("pdf".into()),
+        },
+        AppAction::OpenPlateWell {
+            well: Some("B3".into()),
+            field: Some(2),
         },
         AppAction::ResetView,
     ];

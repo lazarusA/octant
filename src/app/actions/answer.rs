@@ -2,20 +2,15 @@
 //! was as a notice. Names from the dataset or the user stay as they are.
 
 use super::{DimRole, Done, Failure, NameKind};
-use crate::i18n::{DatasetKey, KeymapKey, PlaybackKey, VariablesKey, filled, tr};
+use crate::i18n::{
+    DatasetKey, ExportKey, KeymapKey, PlaybackKey, PlotKey, VariablesKey, filled, tr,
+};
 use crate::ui::toast::{Notice, Severity};
 
 pub(super) fn done_text(done: &Done) -> String {
     match done {
         Done::Opening(name) => filled(tr(PlaybackKey::VoiceDidOpen), &[name]),
         Done::CatalogOpened => tr(DatasetKey::CatalogTitle).to_string(),
-        Done::DimSet { dim, value } => filled(tr(PlaybackKey::VoiceDidSetDim), &[dim, value]),
-        Done::RangeSet { dim, from, to } => {
-            filled(tr(PlaybackKey::VoiceDidSetRange), &[dim, from, to])
-        }
-        Done::RoleSet { dim, role } => {
-            filled(tr(PlaybackKey::VoiceDidSetDim), &[dim, &role_name(*role)])
-        }
         Done::DatasetShown {
             name, variables, ..
         } => filled(tr(PlaybackKey::VoiceDatasetSummary), &[name, variables]),
@@ -36,6 +31,15 @@ pub(super) fn done_text(done: &Done) -> String {
             tr(PlaybackKey::VoiceViewSummary),
             &[variable, &plot_type.display_name()],
         ),
+        Done::DimSet { .. }
+        | Done::RangeSet { .. }
+        | Done::RoleSet { .. }
+        | Done::OverlayAdded(_)
+        | Done::LayerShown { .. }
+        | Done::OverlayRemoved(_)
+        | Done::ColorRange { .. }
+        | Done::ExportOpened(_)
+        | Done::WellPicked(_) => layer_line(done),
         Done::Selected(name) => filled(tr(PlaybackKey::VoiceDidSelect), &[name]),
         Done::Plotted {
             variable,
@@ -50,6 +54,41 @@ pub(super) fn done_text(done: &Done) -> String {
         Done::Stepped(_) => tr(PlaybackKey::NextStep).to_string(),
         Done::Colormap(key) => filled(tr(PlaybackKey::VoiceDidColormap), &[key]),
         Done::ViewReset => tr(KeymapKey::ResetView).to_string(),
+    }
+}
+
+/// The line of what an action set: a dimension, a layer, the export
+/// dialog, a plate's well (empty for other outcomes).
+fn layer_line(done: &Done) -> String {
+    let number = |v: &f32| crate::i18n::number::localize_string(v.to_string());
+    match done {
+        Done::DimSet { dim, value } => filled(tr(PlaybackKey::VoiceDidSetDim), &[dim, value]),
+        Done::RangeSet { dim, from, to } => {
+            filled(tr(PlaybackKey::VoiceDidSetRange), &[dim, from, to])
+        }
+        Done::RoleSet { dim, role } => {
+            filled(tr(PlaybackKey::VoiceDidSetDim), &[dim, &role_name(*role)])
+        }
+        Done::OverlayAdded(name) => filled(tr(PlaybackKey::VoiceOverlayAdded), &[name]),
+        Done::LayerShown { layer, visible } => {
+            let key = if *visible {
+                PlaybackKey::VoiceLayerShown
+            } else {
+                PlaybackKey::VoiceLayerHidden
+            };
+            filled(tr(key), &[layer])
+        }
+        Done::OverlayRemoved(name) => filled(tr(PlaybackKey::VoiceOverlayRemoved), &[name]),
+        Done::ColorRange { layer, min, max } => filled(
+            tr(PlaybackKey::VoiceColorRange),
+            &[layer, &number(min), &number(max)],
+        ),
+        Done::ExportOpened(format) => filled(
+            tr(PlaybackKey::VoiceDidSetDim),
+            &[&tr(ExportKey::DialogTitle), format],
+        ),
+        Done::WellPicked(well) => filled(tr(PlaybackKey::VoiceWellPicked), &[well]),
+        _ => String::new(),
     }
 }
 
@@ -99,7 +138,10 @@ pub(super) fn done_detail(done: &Done) -> Option<String> {
 /// The notice of `failure`; none when the app already gave one.
 pub(super) fn failure_notice(failure: &Failure) -> Option<Notice> {
     let (title, detail) = match failure {
-        Failure::Refused | Failure::CoordinatesPending => return None,
+        Failure::Refused | Failure::Reading => return None,
+        Failure::OverlayUnavailable(reason) => {
+            (tr(PlotKey::OverlayCantAdd).to_string(), reason.clone())
+        }
         Failure::NoValue { dim, value } => (
             filled(tr(PlaybackKey::VoiceNoValue), &[dim, value]),
             String::new(),
@@ -110,15 +152,8 @@ pub(super) fn failure_notice(failure: &Failure) -> Option<Notice> {
             text,
             closest,
         } => {
-            let key = match kind {
-                NameKind::Source => PlaybackKey::VoiceNoSource,
-                NameKind::Group => PlaybackKey::VoiceNoGroup,
-                NameKind::Dimension => PlaybackKey::VoiceNoDimension,
-                NameKind::Variable => PlaybackKey::VoiceNoVariable,
-                NameKind::PlotType => PlaybackKey::VoiceNoPlotType,
-                NameKind::Colormap => PlaybackKey::VoiceNoColormap,
-            };
-            (filled(tr(key), &[text]), did_you_mean(closest))
+            let title = filled(tr(not_found_key(*kind)), &[text]);
+            (title, did_you_mean(closest))
         }
         Failure::Ambiguous { text, matches, .. } => (
             filled(tr(PlaybackKey::VoiceAmbiguous), &[text]),
@@ -141,6 +176,21 @@ pub(super) fn failure_notice(failure: &Failure) -> Option<Notice> {
         ),
     };
     Some(Notice::new(Severity::Warning, title, detail))
+}
+
+/// The template saying no name of `kind` matches.
+fn not_found_key(kind: NameKind) -> PlaybackKey {
+    match kind {
+        NameKind::Source => PlaybackKey::VoiceNoSource,
+        NameKind::Layer => PlaybackKey::VoiceNoLayer,
+        NameKind::Format => PlaybackKey::VoiceNoFormat,
+        NameKind::Well => PlaybackKey::VoiceNoWell,
+        NameKind::Group => PlaybackKey::VoiceNoGroup,
+        NameKind::Dimension => PlaybackKey::VoiceNoDimension,
+        NameKind::Variable => PlaybackKey::VoiceNoVariable,
+        NameKind::PlotType => PlaybackKey::VoiceNoPlotType,
+        NameKind::Colormap => PlaybackKey::VoiceNoColormap,
+    }
 }
 
 fn did_you_mean(names: &[String]) -> String {

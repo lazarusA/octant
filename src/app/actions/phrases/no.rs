@@ -5,6 +5,11 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Hide, &["skjul"]),
+        (Reveal, &["vis igjen"]),
+        (Remove, &["fjern", "slett"]),
+        (Range, &["område", "fargeområde", "grenser"]),
+        (Export, &["eksporter", "lagre bildet"]),
         (Describe, &["beskriv", "hva er", "informasjon", "info"]),
         (Search, &["søk", "finn", "let etter"]),
         (List, &["list opp", "hvilke variabler"]),
@@ -43,6 +48,9 @@ pub(super) static PHRASES: Phrases = Phrases {
         &["nivå", "dybde", "høyde"],
     ],
     dataset: &["datasett", "data"],
+    overlay: &["overlegg", "oppå", "som lag"],
+    well: &["brønn"],
+    field: &["felt"],
     catalog: &["katalog", "katalogen"],
     then: &["deretter", "og så", "så"],
 };

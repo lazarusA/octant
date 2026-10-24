@@ -4,6 +4,7 @@
 
 use std::ops::Range;
 
+use super::layer_words::{LayerWords, layer_words};
 use super::{Phrases, Verb, verbs_in, word_of};
 use crate::app::actions::AppAction;
 use crate::app::actions::resolve::Vocabulary;
@@ -58,6 +59,8 @@ pub(super) struct Named {
     pub query: String,
     /// What it says of dimensions (`dims::dim_actions`).
     pub dims: Vec<AppAction>,
+    /// What it says of layers, the export and a plate.
+    pub layers: LayerWords,
     /// The words left over: a name not found, or filler.
     pub rest: String,
 }
@@ -80,6 +83,7 @@ pub(super) fn named(segment: &Segment, phrases: &Phrases, vocab: &Vocabulary) ->
     };
     let catalog = take(word_of(segment, phrases.catalog, &taken), &mut taken).is_some();
     let dataset = take(word_of(segment, phrases.dataset, &taken), &mut taken).is_some();
+    let layers = layer_words(segment, phrases, vocab, &verbs, &mut taken);
     let dims = super::dims::dim_actions(segment, phrases, vocab, &verbs, &mut taken);
     // A variable and a dataset may share a name; the verb decides.
     let names_from = taken.clone();
@@ -98,5 +102,6 @@ pub(super) fn named(segment: &Segment, phrases: &Phrases, vocab: &Vocabulary) ->
         group,
         query,
         dims,
+        layers,
     }
 }

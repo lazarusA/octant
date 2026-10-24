@@ -204,13 +204,14 @@ pub(super) fn numbers(segment: &Segment, taken: &[Range<usize>]) -> Vec<(String,
     while i < bytes.len() {
         let negative = bytes[i] == b'-' && bytes.get(i + 1).is_some_and(u8::is_ascii_digit);
         let starts = bytes[i].is_ascii_digit() || negative;
-        let alone_before = i == 0
-            || !text[..i]
-                .chars()
-                .next_back()
-                .is_some_and(char::is_alphanumeric);
+        // `i` is on a character boundary: it only ever moves by characters
+        // or over ASCII digits.
+        let alone_before = !text[..i]
+            .chars()
+            .next_back()
+            .is_some_and(char::is_alphanumeric);
         if !(starts && alone_before) {
-            i += 1;
+            i += text[i..].chars().next().map_or(1, char::len_utf8);
             continue;
         }
         let start = i;

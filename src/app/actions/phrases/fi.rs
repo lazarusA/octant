@@ -5,6 +5,11 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Hide, &["piilota"]),
+        (Reveal, &["näytä uudelleen"]),
+        (Remove, &["poista"]),
+        (Range, &["väli", "väriväli", "rajat"]),
+        (Export, &["vie", "tallenna kuva"]),
         (Describe, &["kuvaile", "mikä on", "tiedot"]),
         (Search, &["etsi", "hae"]),
         (List, &["luettele", "mitkä muuttujat"]),
@@ -43,6 +48,9 @@ pub(super) static PHRASES: Phrases = Phrases {
         &["taso", "syvyys", "korkeus"],
     ],
     dataset: &["aineisto", "data"],
+    overlay: &["päällekkäin", "päälle", "tasona"],
+    well: &["kuoppa"],
+    field: &["kenttä"],
     catalog: &["luettelo", "katalogi"],
     then: &["sitten", "sen jälkeen", "ja sitten"],
 };

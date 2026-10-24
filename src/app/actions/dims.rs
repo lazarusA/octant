@@ -84,7 +84,7 @@ impl OctantApp {
         }
         self.request_variable_coordinates(self.selected.variable_idx);
         if self.coordinate_loader.pending_count() > 0 {
-            return Err(Failure::CoordinatesPending);
+            return Err(Failure::Reading);
         }
         Ok(None)
     }

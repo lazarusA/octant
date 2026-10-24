@@ -35,6 +35,8 @@ pub(super) fn parse_segment(
     };
     let at = out.iter().position(starts_plot).unwrap_or(out.len());
     out.splice(at..at, n.dims.into_iter().map(Parsed::Action));
+    // A field opens before what is done with its data.
+    out.splice(0..0, n.layers.plate.map(Parsed::Action));
     out
 }
 
@@ -52,7 +54,7 @@ fn names_alone(n: &Named, segment: &Segment) -> Vec<Parsed> {
         (Some(v), None, _) => out.push(select(v)),
         (None, None, Some(source)) => out.push(open(source)),
         (None, None, None) if n.catalog => out.push(action(AppAction::OpenCatalog)),
-        (None, None, None) if !n.dims.is_empty() => {}
+        (None, None, None) if !n.dims.is_empty() || n.layers.plate.is_some() => {}
         (None, None, None) => out.push(not_understood(segment)),
     }
     out
@@ -64,49 +66,85 @@ fn verb_actions(n: &Named, segment: &Segment, vocab: &Vocabulary) -> Vec<Parsed>
     let mut out = Vec::new();
     let mut selected = false;
     let mut last = None;
+    // A variable a command names without choosing it is the layer it
+    // colors ("colormap viridis for sst").
+    let chooses = n
+        .verbs
+        .iter()
+        .any(|v| matches!(v, Verb::Plot | Verb::Select | Verb::Open));
+    let layer = n.variable.clone().filter(|_| !chooses);
     for &verb in &n.verbs {
         if last.replace(verb) == Some(verb) {
             continue;
         }
         let parsed = match verb {
             Verb::Open | Verb::Select => {
-                if selected && n.variable.is_some() {
+                // A well and field said are what is opened.
+                if (selected && n.variable.is_some()) || n.layers.plate.is_some() {
                     continue;
                 }
                 selected = true;
                 choose(n, verb, segment)
             }
-            Verb::Search if n.query.is_empty() => not_understood(segment),
-            Verb::Search => action(AppAction::Search {
-                text: n.query.clone(),
-            }),
-            Verb::Describe => action(describe(n)),
-            Verb::List => action(AppAction::DescribeDataset {
-                group: n.group.clone(),
-            }),
-            Verb::Goto if n.dims.is_empty() => not_understood(segment),
-            Verb::Goto => continue,
             Verb::Plot if n.catalog && n.variable.is_none() => action(AppAction::OpenCatalog),
             Verb::Plot => {
                 if !selected && let Some(v) = plot_target(n, vocab) {
                     out.push(select(&v));
                     selected = true;
                 }
-                plot(n.plot_type.as_deref())
+                if n.layers.overlay {
+                    action(AppAction::AddOverlay)
+                } else {
+                    plot(n.plot_type.as_deref())
+                }
             }
-            Verb::Play => action(AppAction::Play),
-            Verb::Pause => action(AppAction::Pause),
-            Verb::Next => action(AppAction::Step { by: 1 }),
-            Verb::Previous => action(AppAction::Step { by: -1 }),
-            Verb::ResetView => action(AppAction::ResetView),
-            Verb::Colormap => match or_rest(n, &n.colormap) {
-                Some(name) => action(AppAction::SetColormap { name }),
-                None => not_understood(segment),
-            },
+            Verb::Goto if !n.dims.is_empty() => continue,
+            _ => plain_action(n, verb, segment, layer.as_deref()),
         };
         out.push(parsed);
     }
     out
+}
+
+/// The action of a verb that needs no other verb's: asking, layers,
+/// colors, export, playback.
+fn plain_action(n: &Named, verb: Verb, segment: &Segment, layer: Option<&str>) -> Parsed {
+    match verb {
+        Verb::Search if n.query.is_empty() => not_understood(segment),
+        Verb::Search => action(AppAction::Search {
+            text: n.query.clone(),
+        }),
+        Verb::Describe => action(describe(n)),
+        Verb::List => action(AppAction::DescribeDataset {
+            group: n.group.clone(),
+        }),
+        Verb::Goto if n.dims.is_empty() => not_understood(segment),
+        Verb::Hide | Verb::Reveal | Verb::Remove => layer_action(n, verb, segment),
+        Verb::Range => match n.layers.range {
+            Some((min, max)) => action(AppAction::SetColorRange {
+                min,
+                max,
+                layer: layer.map(str::to_string),
+            }),
+            None => not_understood(segment),
+        },
+        Verb::Export => action(AppAction::Export {
+            format: n.layers.format.clone(),
+        }),
+        Verb::Play => action(AppAction::Play),
+        Verb::Pause => action(AppAction::Pause),
+        Verb::Next => action(AppAction::Step { by: 1 }),
+        Verb::Previous => action(AppAction::Step { by: -1 }),
+        Verb::ResetView => action(AppAction::ResetView),
+        Verb::Colormap => match or_rest(n, &n.colormap) {
+            Some(name) => action(AppAction::SetColormap {
+                name,
+                layer: layer.map(str::to_string),
+            }),
+            None => not_understood(segment),
+        },
+        Verb::Open | Verb::Select | Verb::Plot | Verb::Goto => not_understood(segment),
+    }
 }
 
 /// "open" or "select": a dataset for "open" (a variable when only one is
@@ -190,4 +228,19 @@ fn describe(n: &Named) -> AppAction {
         (None, None) if n.dataset => AppAction::DescribeDataset { group: None },
         (None, None) => AppAction::DescribeView,
     }
+}
+
+/// "hide", "show again" or "remove" the layer of the variable named (or the
+/// leftover words).
+fn layer_action(n: &Named, verb: Verb, segment: &Segment) -> Parsed {
+    let Some(layer) = or_rest(n, &n.variable) else {
+        return not_understood(segment);
+    };
+    action(match verb {
+        Verb::Remove => AppAction::RemoveOverlay { layer },
+        _ => AppAction::SetLayerVisible {
+            layer,
+            visible: verb == Verb::Reveal,
+        },
+    })
 }

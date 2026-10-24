@@ -19,12 +19,16 @@ mod id;
 mod it;
 mod ja;
 mod ko;
+mod layer_words;
+#[cfg(test)]
+mod layers_tests;
 mod named;
 mod no;
 mod pt;
 mod ru;
 mod segment;
 mod sv;
+mod table;
 #[cfg(test)]
 mod tests;
 mod uk;
@@ -37,9 +41,10 @@ use super::AppAction;
 use super::resolve::Vocabulary;
 use super::text::{Name, Segment, overlaps};
 use crate::i18n::Language;
+use table::{AXES, Phrases, table};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Verb {
+enum Verb {
     Open,
     /// Moves a dimension to a value said with it.
     Goto,
@@ -49,6 +54,16 @@ pub(super) enum Verb {
     Search,
     /// Lists what the dataset (or a group) holds.
     List,
+    /// Hides a layer.
+    Hide,
+    /// Shows a hidden layer again.
+    Reveal,
+    /// Removes an overlay.
+    Remove,
+    /// A layer's color range, with two numbers.
+    Range,
+    /// Opens the export dialog.
+    Export,
     Select,
     Plot,
     Play,
@@ -57,46 +72,6 @@ pub(super) enum Verb {
     Previous,
     Colormap,
     ResetView,
-}
-
-/// A language's phrasings of each verb, the catalog's name, and the words
-/// that end one command and start the next ("then").
-pub(super) struct Phrases {
-    pub verbs: &'static [(Verb, &'static [&'static str])],
-    /// Each month's names as said (with a day, alone, abbreviated),
-    /// January first.
-    pub months: [&'static [&'static str]; 12],
-    /// The words for the time, latitude, longitude and level axes, read as
-    /// `AXES`.
-    pub axes: [&'static [&'static str]; 4],
-    /// The words for the dataset itself ("describe the dataset").
-    pub dataset: &'static [&'static str],
-    /// The dataset catalog's name.
-    pub catalog: &'static [&'static str],
-    pub then: &'static [&'static str],
-}
-
-/// The axes as dimension actions name them (`dims::by_role` reads them).
-pub(super) const AXES: [&str; 4] = ["time", "latitude", "longitude", "level"];
-
-pub(super) fn table(lang: Language) -> &'static Phrases {
-    match lang {
-        Language::English => &en::PHRASES,
-        Language::Spanish => &es::PHRASES,
-        Language::French => &fr::PHRASES,
-        Language::German => &de::PHRASES,
-        Language::Portuguese => &pt::PHRASES,
-        Language::Italian => &it::PHRASES,
-        Language::Indonesian => &id::PHRASES,
-        Language::Swedish => &sv::PHRASES,
-        Language::Norwegian => &no::PHRASES,
-        Language::Finnish => &fi::PHRASES,
-        Language::Ukrainian => &uk::PHRASES,
-        Language::Russian => &ru::PHRASES,
-        Language::ChineseSimp => &zh::PHRASES,
-        Language::Japanese => &ja::PHRASES,
-        Language::Korean => &ko::PHRASES,
-    }
 }
 
 /// One command of an utterance: an action, or text no table understood.
@@ -217,7 +192,7 @@ fn earliest(segment: &Segment, names: &[Name]) -> Option<Range<usize>> {
 
 /// The verbs in `segment` in order, overlapping phrasings ("next", "next
 /// step") read once as the longest.
-pub(super) fn verbs_in(phrases: &Phrases, segment: &Segment) -> Vec<(Range<usize>, Verb)> {
+fn verbs_in(phrases: &Phrases, segment: &Segment) -> Vec<(Range<usize>, Verb)> {
     let mut found: Vec<(Range<usize>, Verb)> = phrases
         .verbs
         .iter()
@@ -235,7 +210,7 @@ pub(super) fn verbs_in(phrases: &Phrases, segment: &Segment) -> Vec<(Range<usize
 }
 
 /// Where one of `words` is said outside `taken`.
-pub(super) fn word_of(
+fn word_of(
     segment: &Segment,
     words: &[&str],
     taken: &[Range<usize>],

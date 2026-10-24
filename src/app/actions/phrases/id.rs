@@ -5,6 +5,11 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Hide, &["sembunyikan"]),
+        (Reveal, &["tampilkan lagi"]),
+        (Remove, &["hapus", "buang"]),
+        (Range, &["rentang", "rentang warna", "batas"]),
+        (Export, &["ekspor", "simpan gambar"]),
         (
             Describe,
             &["jelaskan", "deskripsikan", "apa itu", "informasi"],
@@ -69,6 +74,9 @@ pub(super) static PHRASES: Phrases = Phrases {
         &["tingkat", "kedalaman", "ketinggian"],
     ],
     dataset: &["dataset", "data"],
+    overlay: &["lapisan", "di atas", "sebagai lapisan"],
+    well: &["sumur"],
+    field: &["bidang"],
     catalog: &["katalog"],
     then: &["lalu", "kemudian", "setelah itu"],
 };

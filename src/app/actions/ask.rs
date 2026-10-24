@@ -124,7 +124,7 @@ impl OctantApp {
         if unread {
             self.request_variable_coordinates(idx);
             if self.coordinate_loader.pending_count() > 0 {
-                return Err(Failure::CoordinatesPending);
+                return Err(Failure::Reading);
             }
         }
         let meta = self.selected.metadata.as_ref().ok_or(Failure::NoDataset)?;

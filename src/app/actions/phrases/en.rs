@@ -5,6 +5,14 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Hide, &["hide"]),
+        (Reveal, &["unhide", "show again", "show layer"]),
+        (Remove, &["remove", "delete"]),
+        (Range, &["range", "color range", "colour range", "limits"]),
+        (
+            Export,
+            &["export", "save image", "save the image", "save as"],
+        ),
         (
             Describe,
             &[
@@ -69,6 +77,9 @@ pub(super) static PHRASES: Phrases = Phrases {
         &["level", "depth", "height"],
     ],
     dataset: &["dataset", "data set", "data"],
+    overlay: &["overlay", "as an overlay", "on top", "as a layer"],
+    well: &["well"],
+    field: &["field"],
     catalog: &["catalog", "catalogue"],
     then: &["then", "and then", "after that"],
 };

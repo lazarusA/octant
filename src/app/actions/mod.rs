@@ -18,11 +18,15 @@ mod coord_match;
 mod dims;
 #[cfg(test)]
 mod dims_tests;
+mod layers;
+#[cfg(test)]
+mod layers_tests;
 mod open;
 #[cfg(test)]
 mod open_tests;
 mod outcome;
 mod phrases;
+mod plate;
 mod queue;
 pub mod resolve;
 pub mod source_names;
@@ -34,7 +38,6 @@ mod text;
 use serde::{Deserialize, Serialize};
 
 use super::OctantApp;
-use crate::app::layers::LayerId;
 use outcome::resolved;
 pub use outcome::{Done, Failure, NameKind, Outcome};
 pub use queue::CommandQueue;
@@ -103,9 +106,45 @@ pub enum AppAction {
     Step {
         by: i32,
     },
-    /// The plot's colormap, by name or `family:name` key.
+    /// Adds the staged variable as an overlay of the plotted heatmap (Plot
+    /// Data with Add Overlay on).
+    AddOverlay,
+    /// Shows or hides a layer, named by its variable.
+    SetLayerVisible {
+        layer: String,
+        visible: bool,
+    },
+    /// Removes an overlay, named by its variable.
+    RemoveOverlay {
+        layer: String,
+    },
+    /// A layer's colormap (the base layer's without `layer`), by name or
+    /// `family:name` key.
     SetColormap {
         name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        layer: Option<String>,
+    },
+    /// A layer's color range, locked as the colorbar's inputs lock it.
+    SetColorRange {
+        min: f32,
+        max: f32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        layer: Option<String>,
+    },
+    /// Opens the export dialog (on `format`: png, jpeg, webp, svg, pdf),
+    /// whose own button exports.
+    Export {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        format: Option<String>,
+    },
+    /// Picks a well of the open plate (the picked one without `well`) and
+    /// opens its field number `field` (1-based, as its button shows).
+    OpenPlateWell {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        well: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        field: Option<usize>,
     },
     ResetView,
 }
@@ -139,31 +178,20 @@ impl OctantApp {
             AppAction::SetDim { dim, value } => self.set_dim(dim.as_deref(), &value),
             AppAction::SetRange { dim, from, to } => self.set_dim_range(dim.as_deref(), &from, &to),
             AppAction::SetRole { dim, role } => self.set_dim_role(&dim, role),
-            AppAction::Play | AppAction::Pause => {
-                let play = action == AppAction::Play;
-                self.base_animates()?;
-                if self.playback.is_playing != play {
-                    self.toggle_playback();
-                }
-                Ok(if play { Done::Playing } else { Done::Paused })
+            AppAction::Play => self.play(true),
+            AppAction::Pause => self.play(false),
+            AppAction::Step { by } => self.step_by(by),
+            AppAction::AddOverlay => self.add_staged_overlay(),
+            AppAction::SetLayerVisible { layer, visible } => self.show_layer(&layer, visible),
+            AppAction::RemoveOverlay { layer } => self.remove_layer(&layer),
+            AppAction::SetColorRange { min, max, layer } => {
+                self.set_color_range(layer.as_deref(), min, max)
             }
-            AppAction::Step { by } => {
-                self.base_animates()?;
-                for _ in 0..by.unsigned_abs() {
-                    if by > 0 {
-                        self.step_next()
-                    } else {
-                        self.step_prev()
-                    }
-                }
-                Ok(Done::Stepped(by))
+            AppAction::Export { format } => self.open_export(format.as_deref()),
+            AppAction::OpenPlateWell { well, field } => {
+                self.open_plate_well(well.as_deref(), field)
             }
-            AppAction::SetColormap { name } => {
-                let id = resolved(self.vocabulary().colormap(&name), NameKind::Colormap, &name)?;
-                crate::ui::colormap::select_layer_colormap(self, LayerId::BASE, id);
-                let key = crate::utils::colormap::registry::key_of(id);
-                Ok(Done::Colormap(key))
-            }
+            AppAction::SetColormap { name, layer } => self.set_colormap(&name, layer.as_deref()),
             AppAction::ResetView => {
                 let plot_type = self.effective_canvas_plot_type();
                 crate::app::controllers::controller_for(plot_type).reset_view(&mut self.nav);

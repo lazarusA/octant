@@ -6,6 +6,11 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Hide, &["隐藏"]),
+        (Reveal, &["取消隐藏", "重新显示"]),
+        (Remove, &["删除", "移除"]),
+        (Range, &["范围", "颜色范围"]),
+        (Export, &["导出", "保存图片"]),
         (Describe, &["描述", "介绍", "是什么", "信息"]),
         (Search, &["搜索", "查找"]),
         (List, &["列出", "有哪些变量"]),
@@ -41,6 +46,9 @@ pub(super) static PHRASES: Phrases = Phrases {
         &["层", "深度", "高度"],
     ],
     dataset: &["数据集", "数据"],
+    overlay: &["叠加", "作为图层"],
+    well: &["孔"],
+    field: &["视野"],
     catalog: &["目录"],
     then: &["然后", "接着", "之后"],
 };

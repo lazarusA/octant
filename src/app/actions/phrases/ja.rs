@@ -8,6 +8,11 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Hide, &["非表示", "隠して"]),
+        (Reveal, &["再表示"]),
+        (Remove, &["削除", "消して"]),
+        (Range, &["範囲", "カラー範囲"]),
+        (Export, &["エクスポート", "画像を保存"]),
         (Describe, &["説明", "とは", "情報"]),
         (Search, &["検索", "探して", "探す"]),
         (List, &["一覧", "変数は"]),
@@ -55,6 +60,9 @@ pub(super) static PHRASES: Phrases = Phrases {
         &["レベル", "深さ", "高さ"],
     ],
     dataset: &["データセット", "データ"],
+    overlay: &["オーバーレイ", "重ねて", "レイヤーとして"],
+    well: &["ウェル"],
+    field: &["視野"],
     catalog: &["カタログ"],
     then: &["それから", "その後", "次に"],
 };

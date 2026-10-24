@@ -57,6 +57,8 @@ pub struct Vocabulary {
     dims: Vec<Candidate<()>>,
     /// Every group holding the dataset's variables.
     groups: Vec<Candidate<()>>,
+    /// The wells of the open plate.
+    wells: Vec<Candidate<()>>,
 }
 
 impl Vocabulary {
@@ -70,6 +72,7 @@ impl Vocabulary {
             sources: source_candidates(open),
             dims: meta.map(dim_candidates).unwrap_or_default(),
             groups: meta.map(group_candidates).unwrap_or_default(),
+            wells: Vec::new(),
         }
     }
 
@@ -97,6 +100,23 @@ impl Vocabulary {
 
     pub(super) fn find_plot_type(&self, s: &Segment, taken: &[std::ops::Range<usize>]) -> Found {
         find(&self.plot_types, s, taken)
+    }
+
+    /// The open plate's wells, by name (`B3`).
+    pub fn with_wells(mut self, names: &[String]) -> Self {
+        self.wells = names
+            .iter()
+            .map(|name| Candidate {
+                value: (),
+                shown: name.clone(),
+                names: vec![(0, Name::new(name))],
+            })
+            .collect();
+        self
+    }
+
+    pub(super) fn find_well(&self, s: &Segment, taken: &[std::ops::Range<usize>]) -> Found {
+        find(&self.wells, s, taken)
     }
 
     pub(super) fn find_group(&self, s: &Segment, taken: &[std::ops::Range<usize>]) -> Found {
@@ -198,6 +218,11 @@ impl crate::app::OctantApp {
             .iter()
             .filter_map(|d| Some((d.source.uri.clone(), d.metadata.as_ref()?.name.clone())))
             .collect();
+        let wells = self
+            .plate
+            .as_ref()
+            .map(|p| super::plate::well_names(&p.plate));
         Vocabulary::new(self.selected.metadata.as_ref(), &open)
+            .with_wells(&wells.unwrap_or_default())
     }
 }

@@ -2,8 +2,8 @@
 //! against the app as it is when its turn comes, so the commands after
 //! "open" wait until the dataset has loaded and find its names; a dataset
 //! that fails to load drops them (its failure is already a toast), as does
-//! any action that fails. An action waiting for coordinates being read
-//! stays first until they arrive. New utterances queue after those waiting.
+//! any action that fails. An action waiting for something being read
+//! (coordinates, a plate's wells) stays first until it arrives. New utterances queue after those waiting.
 
 use std::collections::VecDeque;
 
@@ -27,8 +27,8 @@ pub struct CommandQueue {
     waiting: VecDeque<Item>,
     /// The store a command opened, until it settles.
     opening: Option<String>,
-    /// Whether the first action waits for coordinates being read.
-    reading_coordinates: bool,
+    /// Whether the first action waits for something being read.
+    reading: bool,
 }
 
 impl CommandQueue {
@@ -39,7 +39,7 @@ impl CommandQueue {
     fn clear(&mut self) {
         self.waiting.clear();
         self.opening = None;
-        self.reading_coordinates = false;
+        self.reading = false;
     }
 }
 
@@ -57,7 +57,7 @@ impl OctantApp {
     /// waits for a dataset or coordinates still loading.
     pub fn resume_commands(&mut self) -> Vec<Outcome> {
         let mut outcomes = Vec::new();
-        while self.opened_dataset_settled() && self.coordinates_settled() {
+        while self.opened_dataset_settled() && self.reads_settled() {
             let action = match self.commands.waiting.pop_front() {
                 None => break,
                 Some(Item::Read(Parsed::Action(action))) => action,
@@ -76,10 +76,10 @@ impl OctantApp {
                 }
             };
             match self.dispatch(action.clone()) {
-                Err(Failure::CoordinatesPending) => {
+                Err(Failure::Reading) => {
                     let waiting = Item::Read(Parsed::Action(action));
                     self.commands.waiting.push_front(waiting);
-                    self.commands.reading_coordinates = true;
+                    self.commands.reading = true;
                 }
                 Err(failure) => {
                     outcomes.push(Err(failure));
@@ -92,11 +92,13 @@ impl OctantApp {
         outcomes
     }
 
-    /// Whether no coordinates an action waits for are still being read.
-    fn coordinates_settled(&mut self) -> bool {
-        let reading =
-            self.commands.reading_coordinates && self.coordinate_loader.pending_count() > 0;
-        self.commands.reading_coordinates = reading;
+    /// Whether nothing an action waits for (coordinates, a plate's wells) is
+    /// still being read.
+    fn reads_settled(&mut self) -> bool {
+        let busy = self.coordinate_loader.pending_count() > 0
+            || self.plate.as_ref().is_some_and(|p| p.loading());
+        let reading = self.commands.reading && busy;
+        self.commands.reading = reading;
         !reading
     }
 
