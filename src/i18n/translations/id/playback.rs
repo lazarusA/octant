@@ -65,7 +65,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoValue => "Tidak ada nilai {} yang cocok dengan '{}'",
         PlaybackKey::VoiceDidPlot => "{} diplot sebagai {}",
         PlaybackKey::VoiceDidColormap => "Peta warna {}",
-        PlaybackKey::VoiceNotUnderstood => "Perintah tidak dipahami",
+        PlaybackKey::VoiceNotUnderstood => "Perintah tidak dipahami: {}",
         PlaybackKey::VoiceNoDataset => "Buka set data terlebih dahulu",
         PlaybackKey::VoiceNoVariable => "Tidak ada variabel yang cocok dengan '{}'",
         PlaybackKey::VoiceNoPlotType => "Tidak ada jenis plot yang cocok dengan '{}'",

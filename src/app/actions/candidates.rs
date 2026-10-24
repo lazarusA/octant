@@ -92,8 +92,8 @@ pub(super) fn plot_type_candidates() -> Vec<Candidate<PlotType>> {
         .collect()
 }
 
-/// Colormaps by name and by `family:name` key. Maps of one name in several
-/// families are one choice, the registry's first.
+/// Colormaps by name and by `family:name` key. A name several families
+/// share names the registry's first; the others go by their keys alone.
 pub(super) fn colormap_candidates() -> Vec<Candidate<u32>> {
     let mut out: Vec<Candidate<u32>> = Vec::new();
     let mut seen = std::collections::HashSet::new();
@@ -103,13 +103,14 @@ pub(super) fn colormap_candidates() -> Vec<Candidate<u32>> {
             continue;
         };
         let name = Name::new(&name);
-        if !seen.insert(name.compact.clone()) {
-            continue;
+        let mut names = vec![(1, Name::new(&key))];
+        if seen.insert(name.compact.clone()) {
+            names.insert(0, (0, name));
         }
         out.push(Candidate {
             value: id,
             shown: key.clone(),
-            names: vec![(0, name), (1, Name::new(&key))],
+            names,
         });
     }
     out

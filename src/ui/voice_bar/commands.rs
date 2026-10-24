@@ -40,11 +40,9 @@ impl VoiceBar {
         }
     }
 
-    /// Gives the provider the prompt, if there is one.
+    /// Gives the provider the prompt; an empty one clears the last.
     pub(super) fn give_prompt(&mut self) {
-        if let Some(stt) = &mut self.stt
-            && !self.prompt.is_empty()
-        {
+        if let Some(stt) = &mut self.stt {
             stt.set_prompt(&self.prompt);
         }
     }

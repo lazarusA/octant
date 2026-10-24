@@ -56,15 +56,26 @@ fn month_spans(
     found
 }
 
-/// The date parts said outside `taken`, in order: month names, years
-/// (1000-2999) and days (1-31 at most a word from a month name, or before
-/// a day marker).
+/// Whether a number is said at most two words from month name `m` ("15 de
+/// enero de 2020"), so the "may" of "may I see sst in 2020" is no month.
+fn by_number(segment: &Segment, m: &Range<usize>) -> bool {
+    let (words, text) = (&segment.words, &segment.text);
+    let month = |k: usize| words.get(k).is_some_and(|w| overlaps(m, w));
+    (0..words.len()).filter(|&j| !month(j)).any(|j| {
+        number_word(&text[words[j].clone()]).is_some() && (j.saturating_sub(2)..=j + 2).any(month)
+    })
+}
+
+/// The date parts said outside `taken`, in order: month names beside a
+/// number, years (1000-2999) and days (1-31 at most a word from a month
+/// name, or before a day marker).
 fn parts(
     segment: &Segment,
     months: &[&[&str]; 12],
     taken: &[Range<usize>],
 ) -> Vec<(Range<usize>, Part)> {
     let mut found = month_spans(segment, months, taken);
+    found.retain(|(m, _)| by_number(segment, m));
     let words = &segment.words;
     let month_word = |k: usize| {
         words

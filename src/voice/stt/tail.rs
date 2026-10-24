@@ -39,7 +39,8 @@ impl Tail {
                     self.samples -= samples.len();
                     self.inputs.pop_front();
                 }
-                Some(Input::Finish | Input::Prompt(_)) => {
+                // A stop: prompts never wait here.
+                Some(_) => {
                     self.inputs.pop_front();
                 }
                 None => break,

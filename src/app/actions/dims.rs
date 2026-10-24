@@ -54,7 +54,13 @@ impl OctantApp {
 
     /// The index `value` names along dimension `i`, once its coordinates
     /// are read.
-    fn index_for(&mut self, var: &VariableInfo, i: usize, value: &str) -> Result<usize, Failure> {
+    fn index_for(
+        &mut self,
+        var: &VariableInfo,
+        i: usize,
+        value: &str,
+        last: bool,
+    ) -> Result<usize, Failure> {
         let name = var.dimension_names.get(i).cloned().unwrap_or_default();
         let coords = self.dim_coordinates(var, &name)?;
         let meta = self.selected.metadata.as_ref().ok_or(Failure::NoDataset)?;
@@ -65,7 +71,7 @@ impl OctantApp {
             name: &name,
             len: var.shape.get(i).copied().unwrap_or(0) as usize,
         };
-        index_of(&dim, coords.as_ref(), value).ok_or(Failure::NoValue {
+        index_of(&dim, coords.as_ref(), value, last).ok_or(Failure::NoValue {
             dim: name.clone(),
             value: value.to_string(),
         })
@@ -119,7 +125,7 @@ impl OctantApp {
     pub(super) fn set_dim(&mut self, dim: Option<&str>, value: &str) -> Outcome {
         let var = self.staged_variable()?;
         let i = self.dim_of(&var, dim)?;
-        let index = self.index_for(&var, i, value)?;
+        let index = self.index_for(&var, i, value, false)?;
         let name = var.dimension_names.get(i).cloned().unwrap_or_default();
         if self.selected.dim_config[i].animation == AnimationRole::Animated {
             self.go_to_step(index);
@@ -134,7 +140,10 @@ impl OctantApp {
     pub(super) fn set_dim_range(&mut self, dim: Option<&str>, from: &str, to: &str) -> Outcome {
         let var = self.staged_variable()?;
         let i = self.dim_of(&var, dim)?;
-        let (a, b) = (self.index_for(&var, i, from)?, self.index_for(&var, i, to)?);
+        let (a, b) = (
+            self.index_for(&var, i, from, false)?,
+            self.index_for(&var, i, to, true)?,
+        );
         let range = (a.min(b), a.max(b));
         self.selected.dim_config[i].active = true;
         if self.selected.dim_config[i].animation == AnimationRole::Animated {

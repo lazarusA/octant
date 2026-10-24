@@ -47,7 +47,7 @@ pub(super) fn run(app: &mut OctantApp, utterance: &str) -> Vec<super::Outcome> {
     outcomes
 }
 
-fn dim_index(app: &OctantApp, name: &str) -> usize {
+pub(super) fn dim_index(app: &OctantApp, name: &str) -> usize {
     let var = app.selected_variable_info().expect("staged");
     var.dimension_names
         .iter()

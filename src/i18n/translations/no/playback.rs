@@ -65,7 +65,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoValue => "Ingen verdi av {} samsvarer med '{}'",
         PlaybackKey::VoiceDidPlot => "{} tegnet som {}",
         PlaybackKey::VoiceDidColormap => "Fargeskala {}",
-        PlaybackKey::VoiceNotUnderstood => "Kommandoen ble ikke forstått",
+        PlaybackKey::VoiceNotUnderstood => "Kommandoen ble ikke forstått: {}",
         PlaybackKey::VoiceNoDataset => "Åpne et datasett først",
         PlaybackKey::VoiceNoVariable => "Ingen variabel samsvarer med '{}'",
         PlaybackKey::VoiceNoPlotType => "Ingen plottype samsvarer med '{}'",

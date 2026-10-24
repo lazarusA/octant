@@ -4,8 +4,9 @@
 
 use crate::data::DatasetMetadata;
 
-/// The longest prompt built; the model keeps fewer tokens anyway.
-const MAX_CHARS: usize = 600;
+/// The longest prompt built, about 50 tokens of names: the model reads the
+/// prompt again for every token it writes, so a longer one slows it down.
+const MAX_CHARS: usize = 160;
 
 /// The active dataset's variable and dimension names, comma separated.
 pub(crate) fn speech_prompt(meta: Option<&DatasetMetadata>) -> String {

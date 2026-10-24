@@ -117,3 +117,23 @@ fn dimensions_are_set_before_the_variable_is_plotted() {
         ]
     );
 }
+
+#[test]
+fn a_comma_before_the_year_and_years_among_numbers_stay_values() {
+    let vocab = vocab();
+    let said = |text| parse(text, &vocab, Language::English);
+    assert_eq!(said("go to January 15, 2020"), [set(None, "2020-01-15")]);
+    assert_eq!(
+        said("level 500 to 1000"),
+        [Parsed::Action(AppAction::SetRange {
+            dim: Some("level".into()),
+            from: "500".into(),
+            to: "1000".into(),
+        })]
+    );
+    // A year said with time stays a date, whatever number follows it.
+    assert_eq!(said("time 2020 level 500"), [set(Some("time"), "2020")]);
+    assert_eq!(said("go to 2020 at 850 hpa"), [set(None, "2020")]);
+    // "may" far from a number is no month.
+    assert!(said("may I see sst in 2020").contains(&set(None, "2020")));
+}

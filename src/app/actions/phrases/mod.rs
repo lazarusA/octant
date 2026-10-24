@@ -84,23 +84,33 @@ pub(super) enum Parsed {
 }
 
 /// The commands in `utterance`, each with the language it is read in: the
-/// first language whose verbs it holds (`first`, then the others); without
+/// language whose verbs and "then" words cover most of it (`first` on a
+/// tie, as languages share words: Spanish and Portuguese `abre`); without
 /// any verb, `first`, its names read alone.
 pub(super) fn commands(utterance: &str, first: Language) -> Vec<(Language, Segment)> {
     let others = Language::ALL.iter().copied().filter(|&l| l != first);
-    let lang = std::iter::once(first)
-        .chain(others)
-        .find(|&lang| {
-            let phrases = table(lang);
-            split(utterance, phrases)
-                .iter()
-                .any(|s| !verbs_in(phrases, s).is_empty())
-        })
-        .unwrap_or(first);
-    split(utterance, table(lang))
-        .into_iter()
-        .map(|s| (lang, s))
-        .collect()
+    let mut best: Option<(usize, Language, Vec<Segment>)> = None;
+    for lang in std::iter::once(first).chain(others) {
+        let phrases = table(lang);
+        let (segments, then) = split(utterance, phrases);
+        let verbs: usize = segments
+            .iter()
+            .flat_map(|s| verbs_in(phrases, s))
+            .map(|(r, _)| r.len())
+            .sum();
+        if verbs > 0
+            && best
+                .as_ref()
+                .is_none_or(|(score, ..)| verbs + then > *score)
+        {
+            best = Some((verbs + then, lang, segments));
+        }
+    }
+    let (lang, segments) = match best {
+        Some((_, lang, segments)) => (lang, segments),
+        None => (first, split(utterance, table(first)).0),
+    };
+    segments.into_iter().map(|s| (lang, s)).collect()
 }
 
 /// One command's actions, its names looked up in `vocab`.
@@ -117,10 +127,11 @@ pub(super) fn parse(utterance: &str, vocab: &Vocabulary, first: Language) -> Vec
         .collect()
 }
 
-/// Sentence punctuation that ends a command, `before` being the text before
-/// it: a full stop or comma only before a space or the end (`45.5` and
-/// `45,5` stay whole), and no full stop after a day ("15. Januar").
-fn ends_command(c: char, before: &str, next: Option<char>) -> bool {
+/// Sentence punctuation that ends a command, `before` and `after` being the
+/// text around it: a full stop or comma only before a space or the end
+/// (`45.5` and `45,5` stay whole), no comma before a number ("January 15,
+/// 2020") and no full stop after a day ("15. Januar").
+fn ends_command(c: char, before: &str, after: &str) -> bool {
     let digits = before.bytes().rev().take_while(u8::is_ascii_digit).count();
     let after_day = c == '.' && (1..=2).contains(&digits) && {
         let rest = &before[..before.len() - digits];
@@ -136,20 +147,22 @@ fn ends_command(c: char, before: &str, next: Option<char>) -> bool {
             | '\u{FF01}'
             | '\u{FF1F}'
             | '\u{FF1B}'
-    ) || (matches!(c, '.' | ',') && next.is_none_or(char::is_whitespace));
-    ends && !after_day
+    ) || (matches!(c, '.' | ',')
+        && after.chars().next().is_none_or(char::is_whitespace));
+    let before_number = c == ',' && after.trim_start().starts_with(|d: char| d.is_ascii_digit());
+    ends && !after_day && !before_number
 }
 
 /// `utterance` cut at sentence punctuation and the language's "then" words
-/// into commands holding words.
-fn split(utterance: &str, phrases: &Phrases) -> Vec<Segment> {
+/// into commands holding words, with the bytes those words took.
+fn split(utterance: &str, phrases: &Phrases) -> (Vec<Segment>, usize) {
     let then: Vec<Name> = phrases.then.iter().map(|p| Name::new(p)).collect();
     let mut out = Vec::new();
-    let mut chars = utterance.char_indices().peekable();
+    let mut then_bytes = 0;
     let mut start = 0;
     let mut pieces = Vec::new();
-    while let Some((i, c)) = chars.next() {
-        if ends_command(c, &utterance[start..i], chars.peek().map(|&(_, n)| n)) {
+    for (i, c) in utterance.char_indices() {
+        if ends_command(c, &utterance[start..i], &utterance[i + c.len_utf8()..]) {
             pieces.push(&utterance[start..i]);
             start = i + c.len_utf8();
         }
@@ -158,13 +171,14 @@ fn split(utterance: &str, phrases: &Phrases) -> Vec<Segment> {
     for piece in pieces {
         let mut segment = Segment::new(piece);
         while let Some(span) = earliest(&segment, &then) {
+            then_bytes += span.len();
             out.push(Segment::new(&segment.text[..span.start]));
             segment = Segment::new(&segment.text[span.end..]);
         }
         cut_after_open(phrases, segment, &mut out);
     }
     out.retain(|s| !s.words.is_empty());
-    out
+    (out, then_bytes)
 }
 
 /// `segment` cut where a verb follows "open": what comes after waits for

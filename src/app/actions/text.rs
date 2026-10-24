@@ -17,10 +17,12 @@ pub(super) fn is_cjk(c: char) -> bool {
         | '\u{F900}'..='\u{FAFF}')
 }
 
-/// Whether `text` is an address rather than a name (a URL or a path).
+/// Whether `text` is an address rather than a name (a URL or a path,
+/// `C:\Data` too).
 pub(super) fn is_address(text: &str) -> bool {
     let text = text.trim();
-    text.contains("://") || text.starts_with('/') || text.starts_with('~')
+    let drive = matches!(text.as_bytes(), [d, b':', b'\\' | b'/', ..] if d.is_ascii_alphabetic());
+    text.contains("://") || text.starts_with('/') || text.starts_with('~') || drive
 }
 
 /// Lowercase, full-width forms (`ｔ２ｍ`, the ideographic space) as ASCII;
@@ -28,7 +30,7 @@ pub(super) fn is_address(text: &str) -> bool {
 pub(super) fn normalize(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for piece in text.split_inclusive(char::is_whitespace) {
-        if is_address(piece) {
+        if is_address(piece.trim_start_matches(is_cjk)) {
             out.push_str(piece);
             continue;
         }
@@ -42,13 +44,25 @@ pub(super) fn normalize(text: &str) -> String {
     out
 }
 
-/// The first address in normalized `text` (its trailing punctuation left
-/// out) and where it is.
+/// The first address in normalized `text` (its trailing punctuation and
+/// the CJK words touching it, `打开https://x/a.zarr然后播放`, left out) and
+/// where it is.
 pub(super) fn address_in(text: &str) -> Option<(String, Range<usize>)> {
     let mut start = 0;
     for piece in text.split_inclusive(char::is_whitespace) {
-        let word = piece.trim().trim_end_matches(['.', ',', ';']);
-        let at = start + (piece.len() - piece.trim_start().len());
+        let word = piece.trim_start();
+        let lead = piece.len() - word.trim_start_matches(is_cjk).len();
+        let word = word.trim_start_matches(is_cjk).trim_end();
+        // CJK after a file name is the next word (`a.zarr然后播放`); after a
+        // slash, the name itself (`/数据/温度数据`).
+        let cut = word.trim_end_matches(is_cjk);
+        let word = if cut.ends_with(|c: char| c.is_ascii_alphanumeric()) {
+            cut
+        } else {
+            word
+        };
+        let word = word.trim_end_matches(['.', ',', ';']);
+        let at = start + lead;
         start += piece.len();
         if !word.is_empty() && is_address(word) {
             return Some((word.to_string(), at..at + word.len()));

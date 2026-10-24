@@ -6,6 +6,7 @@ use std::ops::Range;
 
 use super::values::{dates, numbers};
 use super::{AXES, Phrases, Verb, word_of};
+use crate::app::actions::axes::Axis;
 use crate::app::actions::resolve::Vocabulary;
 use crate::app::actions::text::{Segment, overlaps};
 use crate::app::actions::{AppAction, DimRole};
@@ -57,8 +58,18 @@ pub(super) fn dim_actions(
     let mut around = taken.clone();
     around.extend(dim.as_ref().map(|(_, span)| span.clone()));
     let mut values = dates(segment, &phrases.months, &around);
-    if values.is_empty() && (dim.is_some() || verbs.contains(&Verb::Goto)) {
-        values = numbers(segment, &around);
+    // Years said for another dimension than time are numbers ("level 500 to
+    // 1000"); for time they stay dates ("time 2020 level 500").
+    let time = dim
+        .as_ref()
+        .is_none_or(|(n, _)| Axis::of_word(n) == Some(Axis::Time));
+    let bare_years = values.iter().all(|(v, _)| !v.contains('-'));
+    if (values.is_empty() || bare_years && !time) && (dim.is_some() || verbs.contains(&Verb::Goto))
+    {
+        let said = numbers(segment, &around);
+        if !said.is_empty() {
+            values = said;
+        }
     }
     let role = dim.as_ref().and_then(|_| role_letter(segment, &around));
     let name = dim.as_ref().map(|(n, _)| n.clone());

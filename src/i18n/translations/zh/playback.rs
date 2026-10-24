@@ -63,7 +63,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoValue => "{} 中没有与「{}」匹配的值",
         PlaybackKey::VoiceDidPlot => "已将 {} 绘制为{}",
         PlaybackKey::VoiceDidColormap => "色图 {}",
-        PlaybackKey::VoiceNotUnderstood => "未能理解该命令",
+        PlaybackKey::VoiceNotUnderstood => "未能理解该命令：{}",
         PlaybackKey::VoiceNoDataset => "请先打开数据集",
         PlaybackKey::VoiceNoVariable => "没有与「{}」匹配的变量",
         PlaybackKey::VoiceNoPlotType => "没有与「{}」匹配的图表类型",

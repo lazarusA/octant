@@ -220,3 +220,29 @@ fn text_not_understood_is_said_in_the_bar_not_as_a_toast() {
     assert!(super::answer::failure_notice(&failure).is_none());
     assert!(super::answer::not_understood_line("good morning").ends_with("good morning"));
 }
+
+#[test]
+fn steps_move_by_the_count_asked_even_before_they_load() {
+    let (mut app, meta) = memory_app();
+    make_resident(&mut app, &SliceRequest::full_range("sst", &[1, 5, 4]));
+    app.selected.store_target = TARGET.to_string();
+    app.selected.store_kind = StoreKind::RemoteZarr;
+    app.load_new_metadata(meta);
+    app.run_utterance("plot sst");
+    let stepped = app.dispatch(AppAction::Step { by: 2 });
+    assert_eq!(stepped, Ok(Done::Stepped(2)));
+    crate::app::test_support::poll_until(&mut app, |app| app.playback.current_timestep == 2);
+    let far = AppAction::Step { by: -2_000_000_000 };
+    app.dispatch(far)
+        .expect("one step around the series, however far");
+}
+
+#[test]
+fn every_family_s_key_names_its_colormap() {
+    use crate::utils::colormap::registry;
+    let vocab = Vocabulary::new(None, &[]);
+    for id in 0..registry::len() as u32 {
+        let key = registry::key_of(id);
+        assert_eq!(vocab.colormap(&key), Resolution::Resolved(id), "{key}");
+    }
+}

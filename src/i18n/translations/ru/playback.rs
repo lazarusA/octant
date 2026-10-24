@@ -65,7 +65,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoValue => "Ни одно значение {} не соответствует '{}'",
         PlaybackKey::VoiceDidPlot => "{} построено как {}",
         PlaybackKey::VoiceDidColormap => "Цветовая карта {}",
-        PlaybackKey::VoiceNotUnderstood => "Команда не распознана",
+        PlaybackKey::VoiceNotUnderstood => "Команда не распознана: {}",
         PlaybackKey::VoiceNoDataset => "Сначала откройте набор данных",
         PlaybackKey::VoiceNoVariable => "Ни одна переменная не соответствует '{}'",
         PlaybackKey::VoiceNoPlotType => "Ни один тип графика не соответствует '{}'",

@@ -65,7 +65,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoValue => "{}에 '{}'와(과) 일치하는 값이 없습니다",
         PlaybackKey::VoiceDidPlot => "{}을(를) {}(으)로 표시함",
         PlaybackKey::VoiceDidColormap => "컬러맵 {}",
-        PlaybackKey::VoiceNotUnderstood => "명령을 이해하지 못했습니다",
+        PlaybackKey::VoiceNotUnderstood => "명령을 이해하지 못했습니다: {}",
         PlaybackKey::VoiceNoDataset => "먼저 데이터셋을 여세요",
         PlaybackKey::VoiceNoVariable => "'{}'와(과) 일치하는 변수가 없습니다",
         PlaybackKey::VoiceNoPlotType => "'{}'와(과) 일치하는 플롯 유형이 없습니다",

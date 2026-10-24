@@ -22,6 +22,9 @@ use candle_nn::ops::log_softmax;
 use candle_transformers::models::whisper::{self as m, Config};
 use tokens::Tokens;
 
+/// The most prompt tokens kept before the text.
+const PROMPT_TOKENS: usize = 64;
+
 pub struct Whisper {
     model: network::Network,
     tokens: Tokens,
@@ -183,11 +186,18 @@ impl WindowModel for Whisper {
         self.run(audio).map_err(|e| e.to_string())
     }
 
-    /// Keeps the prompt's last tokens that fit before the text, as OpenAI's
-    /// `transcribe` does (half the decoder's positions, less one).
+    /// Keeps the prompt's last tokens, as OpenAI's `transcribe` does, but at
+    /// most `PROMPT_TOKENS`: candle's decoder caches no self-attention, so
+    /// every token written reads the whole prompt again (600 characters of
+    /// names made tiny 2.2x slower). An empty prompt clears it.
     fn set_prompt(&mut self, prompt: &str) {
-        let tokens = self.tokens.encode(&format!(" {}", prompt.trim()));
-        let keep = self.model.config().max_target_positions / 2 - 1;
+        let prompt = prompt.trim();
+        if prompt.is_empty() {
+            self.prompt.clear();
+            return;
+        }
+        let tokens = self.tokens.encode(&format!(" {prompt}"));
+        let keep = PROMPT_TOKENS.min(self.model.config().max_target_positions / 2 - 1);
         self.prompt = tokens[tokens.len().saturating_sub(keep)..].to_vec();
     }
 }

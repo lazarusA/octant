@@ -69,15 +69,14 @@ impl OctantApp {
         Ok(if play { Done::Playing } else { Done::Paused })
     }
 
-    /// Moves the plot `by` steps, as the playback bar's step buttons do.
+    /// Moves the plot `by` steps around the series, as the playback bar's
+    /// step buttons do one at a time.
     pub(super) fn step_by(&mut self, by: i32) -> Outcome {
         self.base_animates()?;
-        for _ in 0..by.unsigned_abs() {
-            if by > 0 {
-                self.step_next();
-            } else {
-                self.step_prev();
-            }
+        let steps = self.animated_dim_extent() as i64;
+        if steps > 0 {
+            let at = self.playback.current_timestep as i64;
+            self.request_step_or_load((at + i64::from(by)).rem_euclid(steps) as usize);
         }
         Ok(Done::Stepped(by))
     }

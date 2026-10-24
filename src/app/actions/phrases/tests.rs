@@ -204,3 +204,17 @@ fn a_named_dataset_or_variable_alone_opens_or_selects() {
         [action(AppAction::OpenCatalog)]
     );
 }
+
+#[test]
+fn the_language_covering_most_of_the_utterance_reads_it() {
+    let vocab = vocab();
+    let play = action(AppAction::Play);
+    for (lang, said) in [
+        (Language::English, "abre sst depois reproduz"),
+        (Language::English, "sstを描画してそれから再生して"),
+        (Language::Russian, "покажи sst потім відтвори"),
+    ] {
+        let parsed = parse(said, &vocab, lang);
+        assert_eq!(parsed.last(), Some(&play), "{said}: {parsed:?}");
+    }
+}

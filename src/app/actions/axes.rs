@@ -80,7 +80,8 @@ fn of_cf(coord: &VariableInfo) -> Option<Axis> {
 }
 
 /// What dimension `i` of `var` is, `config` being the role the selection
-/// gives it.
+/// gives it, read only when nothing else says (a `dim_0` on the y axis), as
+/// a time dimension may be drawn on y.
 pub(super) fn axis_of(
     meta: &DatasetMetadata,
     var: &VariableInfo,
@@ -99,11 +100,12 @@ pub(super) fn axis_of(
     if ome.is_some_and(|a| a.kind == AxisKind::Time) {
         return Some(Axis::Time);
     }
-    let by_role = config.and_then(|c| match c.spatial {
-        SpatialRole::Y => Some(Axis::Latitude),
-        SpatialRole::X => Some(Axis::Longitude),
-        SpatialRole::Z => Some(Axis::Level),
-        _ => None,
-    });
-    by_role.or_else(|| Axis::of_word(name))
+    Axis::of_word(name).or_else(|| {
+        config.and_then(|c| match c.spatial {
+            SpatialRole::Y => Some(Axis::Latitude),
+            SpatialRole::X => Some(Axis::Longitude),
+            SpatialRole::Z => Some(Axis::Level),
+            _ => None,
+        })
+    })
 }

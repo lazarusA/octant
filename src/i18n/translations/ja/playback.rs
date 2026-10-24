@@ -65,7 +65,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoValue => "{} に「{}」に一致する値はありません",
         PlaybackKey::VoiceDidPlot => "{} を{}で表示しました",
         PlaybackKey::VoiceDidColormap => "カラーマップ {}",
-        PlaybackKey::VoiceNotUnderstood => "コマンドを理解できませんでした",
+        PlaybackKey::VoiceNotUnderstood => "コマンドを理解できませんでした：{}",
         PlaybackKey::VoiceNoDataset => "先にデータセットを開いてください",
         PlaybackKey::VoiceNoVariable => "「{}」に一致する変数はありません",
         PlaybackKey::VoiceNoPlotType => "「{}」に一致するプロットの種類はありません",

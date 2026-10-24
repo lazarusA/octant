@@ -192,7 +192,7 @@ fn not_found_key(kind: NameKind) -> PlaybackKey {
 
 /// The bar's line for text no command was read in.
 pub(super) fn not_understood_line(text: &str) -> String {
-    format!("{}: {text}", tr(PlaybackKey::VoiceNotUnderstood))
+    filled(tr(PlaybackKey::VoiceNotUnderstood), &[&text])
 }
 
 fn did_you_mean(names: &[String]) -> String {

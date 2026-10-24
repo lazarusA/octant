@@ -62,3 +62,34 @@ fn words_inside_an_address_are_no_commands() {
         [action(AppAction::OpenSource { source: url.into() })]
     );
 }
+
+#[test]
+fn addresses_touching_cjk_text_and_windows_paths_are_kept_whole() {
+    let vocab = vocab();
+    let open = |source: &str| {
+        action(AppAction::OpenSource {
+            source: source.into(),
+        })
+    };
+    assert_eq!(
+        parse("打开https://x/Data.zarr", &vocab, Language::ChineseSimp),
+        [open("https://x/Data.zarr")]
+    );
+    assert_eq!(
+        parse(
+            "打开 https://x/Data.zarr然后播放",
+            &vocab,
+            Language::ChineseSimp
+        ),
+        [open("https://x/Data.zarr"), action(AppAction::Play)]
+    );
+    // A folder's own CJK name stays.
+    assert_eq!(
+        parse("打开 /数据/温度数据", &vocab, Language::ChineseSimp),
+        [open("/数据/温度数据")]
+    );
+    assert_eq!(
+        parse("open C:\\Data\\x.nc", &vocab, Language::English),
+        [open("C:\\Data\\x.nc")]
+    );
+}

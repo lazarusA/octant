@@ -65,7 +65,7 @@ pub fn text(key: PlaybackKey) -> &'static str {
         PlaybackKey::VoiceNoValue => "No value of {} matches '{}'",
         PlaybackKey::VoiceDidPlot => "Plotted {} as {}",
         PlaybackKey::VoiceDidColormap => "Colormap {}",
-        PlaybackKey::VoiceNotUnderstood => "Command not understood",
+        PlaybackKey::VoiceNotUnderstood => "Command not understood: {}",
         PlaybackKey::VoiceNoDataset => "Open a dataset first",
         PlaybackKey::VoiceNoVariable => "No variable matches '{}'",
         PlaybackKey::VoiceNoPlotType => "No plot type matches '{}'",

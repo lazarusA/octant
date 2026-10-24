@@ -15,6 +15,8 @@ mod ask_tests;
 mod axes;
 mod candidates;
 mod coord_match;
+#[cfg(test)]
+mod dates_tests;
 mod dims;
 #[cfg(test)]
 mod dims_tests;
