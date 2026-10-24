@@ -13,6 +13,10 @@ impl OctantApp {
         let ctx = ui.ctx().clone();
         // The bars consume space from the remaining area.
         crate::ui::top_bar::show_top_bar(self, ui);
+        if !self.voice.is_open() {
+            // What waited for the bar runs never: it would meet another state.
+            self.commands.clear();
+        }
         if self.voice.is_open() {
             crate::ui::voice_bar::show_voice_bar(&mut self.voice, ui);
             self.run_voice_commands(&ctx);

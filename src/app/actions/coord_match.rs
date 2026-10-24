@@ -37,8 +37,13 @@ pub(super) fn index_of(dim: &Dim, coords: Option<&CoordValues>, value: &str) -> 
         let position: usize = value.trim().parse().ok()?;
         return (1..=dim.len).contains(&position).then(|| position - 1);
     };
+    let context = dim.context(0);
     if let Some(target) = iso_hours(value)
-        && let Some(idx) = nearest(dim.len, |i| date_hours(dim, coords, i), target as f64)
+        && let Some(idx) = nearest(
+            dim.len,
+            |i| date_hours(&context, dim.len, coords, i),
+            target as f64,
+        )
     {
         return Some(idx);
     }
@@ -60,12 +65,13 @@ fn nearest(len: usize, key: impl Fn(usize) -> Option<f64>, target: f64) -> Optio
         .map(|(i, _)| i)
 }
 
-/// Hours since 1970 of coordinate `i` when it is a date.
-fn date_hours(dim: &Dim, coords: &CoordValues, i: usize) -> Option<f64> {
+/// Hours since 1970 of coordinate `i` when it is a date; `context` (the
+/// dimension's units and start date, the same for every index) reads it.
+fn date_hours(context: &DimContext, len: usize, coords: &CoordValues, i: usize) -> Option<f64> {
     if let Some(CoordValue::Label(label)) = coords.get(i) {
         return iso_hours(label).map(|h| h as f64);
     }
-    let date = dim.context(i).date(coords.number_for(i, dim.len)?)?;
+    let date = context.date(coords.number_for(i, len)?)?;
     let days = days_from_civil(date.year as i64, date.month as u32, date.day as u32);
     Some((days * 24 + date.hour.unwrap_or(0) as i64) as f64)
 }

@@ -213,3 +213,10 @@ fn unknown_text_is_not_understood() {
         vec![Err(Failure::NotUnderstood("good morning".into()))]
     );
 }
+
+#[test]
+fn text_not_understood_is_said_in_the_bar_not_as_a_toast() {
+    let failure = Failure::NotUnderstood("good morning".into());
+    assert!(super::answer::failure_notice(&failure).is_none());
+    assert!(super::answer::not_understood_line("good morning").ends_with("good morning"));
+}

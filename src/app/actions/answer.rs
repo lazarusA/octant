@@ -2,9 +2,7 @@
 //! was as a notice. Names from the dataset or the user stay as they are.
 
 use super::{DimRole, Done, Failure, NameKind};
-use crate::i18n::{
-    DatasetKey, ExportKey, KeymapKey, PlaybackKey, PlotKey, VariablesKey, filled, tr,
-};
+use crate::i18n::{DatasetKey, ExportKey, KeymapKey, PlaybackKey, PlotKey, filled, tr};
 use crate::ui::toast::{Notice, Severity};
 
 pub(super) fn done_text(done: &Done) -> String {
@@ -170,10 +168,9 @@ pub(super) fn failure_notice(failure: &Failure) -> Option<Notice> {
             tr(PlaybackKey::VoiceNothingToAnimate).to_string(),
             String::new(),
         ),
-        Failure::NotUnderstood(text) => (
-            tr(PlaybackKey::VoiceNotUnderstood).to_string(),
-            text.clone(),
-        ),
+        // Said in the bar (`not_understood_line`): speech not meant as a
+        // command would fill the toasts.
+        Failure::NotUnderstood(_) => return None,
     };
     Some(Notice::new(Severity::Warning, title, detail))
 }
@@ -193,6 +190,11 @@ fn not_found_key(kind: NameKind) -> PlaybackKey {
     }
 }
 
+/// The bar's line for text no command was read in.
+pub(super) fn not_understood_line(text: &str) -> String {
+    format!("{}: {text}", tr(PlaybackKey::VoiceNotUnderstood))
+}
+
 fn did_you_mean(names: &[String]) -> String {
     if names.is_empty() {
         return String::new();
@@ -202,11 +204,13 @@ fn did_you_mean(names: &[String]) -> String {
 
 /// A role as the Dimensions panel's selects name it.
 fn role_name(role: DimRole) -> &'static str {
+    use crate::app::{AnimationRole, SpatialRole};
+    use crate::ui::variables_panel::dimension_slider::{anim_name, spatial_name};
     match role {
-        DimRole::X => "X",
-        DimRole::Y => "Y",
-        DimRole::Z => "Z",
-        DimRole::Animate => tr(VariablesKey::RoleAnimated),
-        DimRole::None => tr(VariablesKey::RoleNone),
+        DimRole::X => spatial_name(SpatialRole::X),
+        DimRole::Y => spatial_name(SpatialRole::Y),
+        DimRole::Z => spatial_name(SpatialRole::Z),
+        DimRole::Animate => anim_name(AnimationRole::Animated),
+        DimRole::None => anim_name(AnimationRole::None),
     }
 }

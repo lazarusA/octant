@@ -9,16 +9,16 @@ use super::{Phrases, Verb, word_of};
 use crate::app::actions::AppAction;
 use crate::app::actions::resolve::Vocabulary;
 use crate::app::actions::text::Segment;
+use crate::export::ExportFormat;
 
-/// Export formats, said alike in every language; `jpg` is JPEG.
-const FORMATS: [(&str, &str); 6] = [
-    ("png", "png"),
-    ("jpeg", "jpeg"),
-    ("jpg", "jpeg"),
-    ("webp", "webp"),
-    ("svg", "svg"),
-    ("pdf", "pdf"),
-];
+/// Export formats as said, alike in every language: each one's extension
+/// (what `Export` takes), and `jpeg` for JPEG's `jpg`.
+fn said_formats() -> impl Iterator<Item = (&'static str, &'static str)> {
+    let extensions = ExportFormat::ALL
+        .iter()
+        .map(|f| (f.extension(), f.extension()));
+    extensions.chain([("jpeg", ExportFormat::Jpeg.extension())])
+}
 
 pub(super) struct LayerWords {
     /// Whether a plot is said to be an overlay.
@@ -42,7 +42,7 @@ pub(super) fn layer_words(
     let overlay_word = word_of(segment, phrases.overlay, taken);
     let overlay = overlay_word.is_some();
     taken.extend(overlay_word);
-    let format = FORMATS.iter().find_map(|(word, format)| {
+    let format = said_formats().find_map(|(word, format)| {
         let span = word_of(segment, &[word], taken)?;
         taken.push(span);
         Some(format.to_string())

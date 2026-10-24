@@ -36,7 +36,8 @@ impl CommandQueue {
         self.opening = Some(store.to_string());
     }
 
-    fn clear(&mut self) {
+    /// Drops every command waiting (the voice bar closed).
+    pub(crate) fn clear(&mut self) {
         self.waiting.clear();
         self.opening = None;
         self.reading = false;
@@ -131,6 +132,10 @@ impl OctantApp {
         for outcome in outcomes {
             match outcome {
                 Ok(done) => self.show_done(ctx, &done),
+                Err(Failure::NotUnderstood(text)) => {
+                    self.voice
+                        .set_last_action(answer::not_understood_line(&text));
+                }
                 Err(failure) => {
                     if let Some(notice) = answer::failure_notice(&failure) {
                         self.push_notice(notice);

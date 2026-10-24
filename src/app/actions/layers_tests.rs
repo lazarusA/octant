@@ -115,3 +115,74 @@ fn a_well_is_picked_by_its_name() {
     assert_eq!(outcomes, vec![Ok(Done::WellPicked("B2".into()))]);
     assert_eq!(app.plate.as_ref().and_then(|p| p.well), Some(1));
 }
+
+#[test]
+fn plot_plots_even_with_the_add_overlay_toggle_on() {
+    let mut app = plotted_app();
+    app.layout.plot_as_overlay = true;
+    let outcomes = app.run_utterance("plot sst");
+    assert!(
+        matches!(outcomes.last(), Some(Ok(Done::Plotted { .. }))),
+        "{outcomes:?}"
+    );
+    assert!(app.layers.overlays().is_empty(), "plotted, not overlaid");
+}
+
+#[test]
+fn jpeg_is_said_either_way() {
+    let mut app = plotted_app();
+    app.run_utterance("export as jpeg");
+    assert_eq!(app.export_settings.format, ExportFormat::Jpeg);
+}
+
+#[test]
+fn a_field_waits_for_its_well_to_be_read() {
+    use crate::app::state::plate::WellFields;
+    use crate::data::ome::OmeWell;
+    use crate::data::ome::plate::WellField;
+    let layout = OmePlate {
+        rows: vec!["A".into()],
+        columns: vec!["1".into()],
+        wells: vec![PlateWell {
+            path: "A/1".into(),
+            row: 0,
+            column: 0,
+        }],
+        ..Default::default()
+    };
+    let mut plate = PlateState::new(
+        "https://x/plate.zarr",
+        StoreKind::RemoteZarr,
+        Arc::new(layout),
+    );
+    plate.set_well_fields("A/1", WellFields::Loading);
+    let mut app = OctantApp {
+        plate: Some(plate),
+        ..Default::default()
+    };
+    // Without a well picked, the answer names the missing well.
+    assert!(matches!(
+        app.run_utterance("field 1").as_slice(),
+        [Err(Failure::NotFound { .. })]
+    ));
+    assert_eq!(
+        app.run_utterance("well A1 field 1"),
+        vec![],
+        "waits for the well's fields"
+    );
+    let field = WellField {
+        path: "0".into(),
+        acquisition: None,
+    };
+    let ready = WellFields::Ready(Arc::new(OmeWell {
+        fields: vec![field],
+    }));
+    if let Some(plate) = &mut app.plate {
+        plate.set_well_fields("A/1", ready);
+    }
+    let outcomes = app.resume_commands();
+    assert!(
+        matches!(outcomes.as_slice(), [Ok(Done::Opening(_))]),
+        "{outcomes:?}"
+    );
+}

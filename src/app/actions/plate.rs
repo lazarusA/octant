@@ -29,14 +29,19 @@ impl OctantApp {
     /// Picks well `well` (the picked one without), and opens its field
     /// number `field` when given.
     pub(super) fn open_plate_well(&mut self, well: Option<&str>, field: Option<usize>) -> Outcome {
-        let plate = self.plate.as_mut().ok_or(Failure::NoDataset)?;
+        let no_well = || Failure::NotFound {
+            kind: NameKind::Well,
+            text: well.unwrap_or_default().to_string(),
+            closest: Vec::new(),
+        };
+        let plate = self.plate.as_mut().ok_or_else(no_well)?;
         let index = match well {
             Some(name) => {
                 let names = well_names(&plate.plate);
                 let names: Vec<&str> = names.iter().map(String::as_str).collect();
                 resolved(among(&names, name), NameKind::Well, name)?
             }
-            None => plate.well.ok_or(Failure::NoDataset)?,
+            None => plate.well.ok_or_else(no_well)?,
         };
         plate.well = Some(index);
         let name = well_name(&plate.plate, index);

@@ -41,7 +41,7 @@ use std::ops::Range;
 
 use super::AppAction;
 use super::resolve::Vocabulary;
-use super::text::{Name, Segment, overlaps};
+use super::text::{Name, Segment, address_in, overlaps};
 use crate::i18n::Language;
 use table::{AXES, Phrases, table};
 
@@ -186,20 +186,25 @@ fn cut_after_open(phrases: &Phrases, segment: Segment, out: &mut Vec<Segment>) {
 
 /// The first of `names` in `segment`, the longest where several start alike.
 fn earliest(segment: &Segment, names: &[Name]) -> Option<Range<usize>> {
+    let address = address_in(&segment.text).map(|(_, span)| span);
     names
         .iter()
         .filter_map(|n| segment.find(n))
+        .filter(|r| !address.as_ref().is_some_and(|a| overlaps(a, r)))
         .min_by_key(|r| (r.start, std::cmp::Reverse(r.end)))
 }
 
 /// The verbs in `segment` in order, overlapping phrasings ("next", "next
-/// step") read once as the longest.
+/// step") read once as the longest; words of an address
+/// (`https://x/play/a.zarr`) are no verbs.
 fn verbs_in(phrases: &Phrases, segment: &Segment) -> Vec<(Range<usize>, Verb)> {
+    let address = address_in(&segment.text).map(|(_, span)| span);
     let mut found: Vec<(Range<usize>, Verb)> = phrases
         .verbs
         .iter()
         .flat_map(|(verb, says)| says.iter().map(move |p| (verb, p)))
         .filter_map(|(verb, p)| segment.find(&Name::new(p)).map(|r| (r, *verb)))
+        .filter(|(r, _)| !address.as_ref().is_some_and(|a| overlaps(a, r)))
         .collect();
     found.sort_by_key(|(r, _)| (r.start, std::cmp::Reverse(r.end)));
     let mut kept: Vec<(Range<usize>, Verb)> = Vec::new();

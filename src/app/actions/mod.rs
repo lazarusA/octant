@@ -136,7 +136,8 @@ pub enum AppAction {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         layer: Option<String>,
     },
-    /// Opens the export dialog (on `format`: png, jpeg, webp, svg, pdf),
+    /// Opens the export dialog (on `format`, an extension: png, jpg, webp,
+    /// svg, pdf),
     /// whose own button exports.
     Export {
         #[serde(default, skip_serializing_if = "Option::is_none")]

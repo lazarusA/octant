@@ -52,3 +52,13 @@ fn typed_addresses_open_as_written() {
         ]
     );
 }
+
+#[test]
+fn words_inside_an_address_are_no_commands() {
+    let vocab = vocab();
+    let url = "https://data.example/play/then/Show.zarr";
+    assert_eq!(
+        parse(&format!("open {url}"), &vocab, Language::English),
+        [action(AppAction::OpenSource { source: url.into() })]
+    );
+}

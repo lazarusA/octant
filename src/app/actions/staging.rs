@@ -37,6 +37,8 @@ impl OctantApp {
             }
             self.switch_plot_type(plot_type);
         }
+        // Plot Data, never its Add Overlay (that is `AddOverlay`).
+        self.layout.plot_as_overlay = false;
         self.plot_from_panel();
         Ok(Done::Plotted {
             variable: self.staged_name(),
