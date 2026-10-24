@@ -3,7 +3,8 @@
 //! nothing here knows its format.
 
 use super::candidates::{
-    colormap_candidates, dim_candidates, plot_type_candidates, variable_candidates,
+    colormap_candidates, dim_candidates, group_candidates, plot_type_candidates,
+    variable_candidates,
 };
 use super::source_names::{SourceRef, source_candidates};
 use super::text::{Name, Segment, unlikeness};
@@ -54,6 +55,8 @@ pub struct Vocabulary {
     sources: Vec<Candidate<SourceRef>>,
     /// Every dimension name of the dataset's variables.
     dims: Vec<Candidate<()>>,
+    /// Every group holding the dataset's variables.
+    groups: Vec<Candidate<()>>,
 }
 
 impl Vocabulary {
@@ -66,6 +69,7 @@ impl Vocabulary {
             colormaps: colormap_candidates(),
             sources: source_candidates(open),
             dims: meta.map(dim_candidates).unwrap_or_default(),
+            groups: meta.map(group_candidates).unwrap_or_default(),
         }
     }
 
@@ -93,6 +97,10 @@ impl Vocabulary {
 
     pub(super) fn find_plot_type(&self, s: &Segment, taken: &[std::ops::Range<usize>]) -> Found {
         find(&self.plot_types, s, taken)
+    }
+
+    pub(super) fn find_group(&self, s: &Segment, taken: &[std::ops::Range<usize>]) -> Found {
+        find(&self.groups, s, taken)
     }
 
     pub(super) fn find_dim(&self, s: &Segment, taken: &[std::ops::Range<usize>]) -> Found {

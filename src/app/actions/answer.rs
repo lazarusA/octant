@@ -16,6 +16,26 @@ pub(super) fn done_text(done: &Done) -> String {
         Done::RoleSet { dim, role } => {
             filled(tr(PlaybackKey::VoiceDidSetDim), &[dim, &role_name(*role)])
         }
+        Done::DatasetShown {
+            name, variables, ..
+        } => filled(tr(PlaybackKey::VoiceDatasetSummary), &[name, variables]),
+        Done::Searching { text, matches } => {
+            filled(tr(PlaybackKey::VoiceSearching), &[text, matches])
+        }
+        Done::VariableShown {
+            name,
+            long_name,
+            units,
+            ..
+        } => variable_line(name, long_name.as_deref(), units.as_deref()),
+        Done::ViewShown {
+            variable,
+            plot_type,
+            ..
+        } => filled(
+            tr(PlaybackKey::VoiceViewSummary),
+            &[variable, &plot_type.display_name()],
+        ),
         Done::Selected(name) => filled(tr(PlaybackKey::VoiceDidSelect), &[name]),
         Done::Plotted {
             variable,
@@ -31,6 +51,49 @@ pub(super) fn done_text(done: &Done) -> String {
         Done::Colormap(key) => filled(tr(PlaybackKey::VoiceDidColormap), &[key]),
         Done::ViewReset => tr(KeymapKey::ResetView).to_string(),
     }
+}
+
+/// A variable as `name - long name [units]`, the parts it has.
+fn variable_line(name: &str, long_name: Option<&str>, units: Option<&str>) -> String {
+    let long = long_name.map(|l| format!(" - {l}")).unwrap_or_default();
+    let units = units.map(|u| format!(" [{u}]")).unwrap_or_default();
+    format!("{name}{long}{units}")
+}
+
+/// What an answer shows beyond its line: a dataset's entries, a
+/// variable's dimensions, the plot's step, colormap, overlays and the
+/// variable staged, one per line.
+pub(super) fn done_detail(done: &Done) -> Option<String> {
+    let lines: Vec<String> = match done {
+        Done::DatasetShown { entries, .. } => vec![entries.join(", ")],
+        Done::VariableShown { dims, .. } => dims
+            .iter()
+            .map(|d| match d.size {
+                0 | 1 => format!("{}: {}", d.name, d.first),
+                n => format!("{} ({n}): {} - {}", d.name, d.first, d.last),
+            })
+            .collect(),
+        Done::ViewShown {
+            step,
+            colormap,
+            overlays,
+            staged,
+            ..
+        } => {
+            let step = step
+                .iter()
+                .map(|(dim, value)| filled(tr(PlaybackKey::VoiceDidSetDim), &[dim, value]));
+            let colormap = std::iter::once(filled(tr(PlaybackKey::VoiceDidColormap), &[colormap]));
+            let overlays =
+                (*overlays > 0).then(|| filled(tr(PlaybackKey::VoiceOverlayCount), &[overlays]));
+            let staged = staged
+                .iter()
+                .map(|s| filled(tr(PlaybackKey::VoiceStaged), &[s]));
+            step.chain(colormap).chain(overlays).chain(staged).collect()
+        }
+        _ => return None,
+    };
+    Some(lines.join("\n"))
 }
 
 /// The notice of `failure`; none when the app already gave one.
@@ -49,6 +112,7 @@ pub(super) fn failure_notice(failure: &Failure) -> Option<Notice> {
         } => {
             let key = match kind {
                 NameKind::Source => PlaybackKey::VoiceNoSource,
+                NameKind::Group => PlaybackKey::VoiceNoGroup,
                 NameKind::Dimension => PlaybackKey::VoiceNoDimension,
                 NameKind::Variable => PlaybackKey::VoiceNoVariable,
                 NameKind::PlotType => PlaybackKey::VoiceNoPlotType,

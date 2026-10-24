@@ -5,6 +5,12 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (
+            Describe,
+            &["jelaskan", "deskripsikan", "apa itu", "informasi"],
+        ),
+        (Search, &["cari", "temukan"]),
+        (List, &["daftar", "variabel apa"]),
         (Goto, &["pergi ke", "lompat ke", "atur"]),
         (Open, &["buka", "membuka", "muat", "beralih ke"]),
         (Select, &["pilih", "memilih"]),
@@ -62,6 +68,7 @@ pub(super) static PHRASES: Phrases = Phrases {
         &["bujur"],
         &["tingkat", "kedalaman", "ketinggian"],
     ],
+    dataset: &["dataset", "data"],
     catalog: &["katalog"],
     then: &["lalu", "kemudian", "setelah itu"],
 };

@@ -2,79 +2,11 @@
 //! it holds (a plot type, a colormap after a colormap verb, the catalog,
 //! dimensions and values, a variable, a dataset to open).
 
-use std::ops::Range;
-
-use super::{Parsed, Phrases, Verb, catalog_word, verbs_in};
+use super::named::{Named, named};
+use super::{Parsed, Phrases, Verb};
 use crate::app::actions::AppAction;
 use crate::app::actions::resolve::{Resolution, Vocabulary};
-use crate::app::actions::text::{Segment, overlaps};
-
-fn spans(found: &[(Range<usize>, Verb)]) -> Vec<Range<usize>> {
-    found.iter().map(|(r, _)| r.clone()).collect()
-}
-
-/// What one command names.
-struct Named {
-    verbs: Vec<Verb>,
-    colormap: Option<String>,
-    plot_type: Option<String>,
-    variable: Option<String>,
-    /// A dataset to open: a landing sample, catalog entry or open dataset.
-    source: Option<String>,
-    /// Whether it names the dataset catalog.
-    catalog: bool,
-    /// What it says of dimensions (`dims::dim_actions`).
-    dims: Vec<AppAction>,
-    /// The words left over: a name not found, or filler.
-    rest: String,
-}
-
-fn named(segment: &Segment, phrases: &Phrases, vocab: &Vocabulary) -> Named {
-    let mut found = verbs_in(phrases, segment);
-    // A verb and a plot type name overlapping ("color map" and "map", 画
-    // and 热力图): the longer is meant.
-    let mut plot_span = vocab.find_plot_type(segment, &[]);
-    if let Some(p) = &plot_span {
-        let overlapping = |r: &Range<usize>| overlaps(r, p);
-        if found
-            .iter()
-            .any(|(r, _)| overlapping(r) && r.len() >= p.len())
-        {
-            plot_span = vocab.find_plot_type(segment, &spans(&found));
-        } else {
-            found.retain(|(r, _)| !overlapping(r));
-        }
-    }
-    let mut taken = spans(&found);
-    let verbs: Vec<Verb> = found.into_iter().map(|(_, v)| v).collect();
-    let take = |span: Option<Range<usize>>, taken: &mut Vec<Range<usize>>| {
-        let text = span.as_ref().map(|r| segment.text[r.clone()].to_string());
-        taken.extend(span);
-        text
-    };
-    let plot_type = take(plot_span, &mut taken);
-    let colormap = if verbs.contains(&Verb::Colormap) {
-        take(vocab.find_colormap(segment, &taken), &mut taken)
-    } else {
-        None
-    };
-    let catalog = take(catalog_word(segment, phrases, &taken), &mut taken).is_some();
-    let dims = super::dims::dim_actions(segment, phrases, vocab, &verbs, &mut taken);
-    // A variable and a dataset may share a name; the verb decides.
-    let names_from = taken.clone();
-    let variable = take(vocab.find_variable(segment, &names_from), &mut taken);
-    let source = take(vocab.find_source(segment, &names_from), &mut taken);
-    Named {
-        rest: segment.rest(&taken),
-        verbs,
-        colormap,
-        plot_type,
-        variable,
-        source,
-        catalog,
-        dims,
-    }
-}
+use crate::app::actions::text::Segment;
 
 /// The actions of one command.
 pub(super) fn parse_segment(
@@ -144,6 +76,14 @@ fn verb_actions(n: &Named, segment: &Segment, vocab: &Vocabulary) -> Vec<Parsed>
                 selected = true;
                 choose(n, verb, segment)
             }
+            Verb::Search if n.query.is_empty() => not_understood(segment),
+            Verb::Search => action(AppAction::Search {
+                text: n.query.clone(),
+            }),
+            Verb::Describe => action(describe(n)),
+            Verb::List => action(AppAction::DescribeDataset {
+                group: n.group.clone(),
+            }),
             Verb::Goto if n.dims.is_empty() => not_understood(segment),
             Verb::Goto => continue,
             Verb::Plot if n.catalog && n.variable.is_none() => action(AppAction::OpenCatalog),
@@ -235,4 +175,19 @@ fn plot(plot_type: Option<&str>) -> Parsed {
     action(AppAction::Plot {
         plot_type: plot_type.map(str::to_string),
     })
+}
+
+/// What "describe" asks about: a variable named, a group, the dataset, else
+/// the plot.
+fn describe(n: &Named) -> AppAction {
+    match (&n.variable, &n.group) {
+        (Some(path), _) => AppAction::DescribeVariable {
+            path: Some(path.clone()),
+        },
+        (None, Some(group)) => AppAction::DescribeDataset {
+            group: Some(group.clone()),
+        },
+        (None, None) if n.dataset => AppAction::DescribeDataset { group: None },
+        (None, None) => AppAction::DescribeView,
+    }
 }

@@ -8,8 +8,12 @@ use crate::app::test_support::memory_app;
 use crate::i18n::{Language, PlotKey, translate};
 use crate::plots::PlotType;
 
-const VERBS: [Verb; 9] = [
+const VERBS: [Verb; 13] = [
     Verb::Open,
+    Verb::Goto,
+    Verb::Describe,
+    Verb::Search,
+    Verb::List,
     Verb::Select,
     Verb::Plot,
     Verb::Play,
@@ -20,13 +24,13 @@ const VERBS: [Verb; 9] = [
     Verb::ResetView,
 ];
 
-fn vocab() -> Vocabulary {
+pub(super) fn vocab() -> Vocabulary {
     let (_, meta) = memory_app();
     Vocabulary::new(Some(&meta), &[])
 }
 
 /// `lang`'s first phrasing of `verb`.
-fn say(lang: Language, verb: Verb) -> &'static str {
+pub(super) fn say(lang: Language, verb: Verb) -> &'static str {
     let (_, says) = table(lang)
         .verbs
         .iter()
@@ -39,7 +43,7 @@ fn select(path: &str) -> Parsed {
     Parsed::Action(AppAction::SelectVariable { path: path.into() })
 }
 
-fn action(action: AppAction) -> Parsed {
+pub(super) fn action(action: AppAction) -> Parsed {
     Parsed::Action(action)
 }
 

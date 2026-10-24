@@ -5,9 +5,9 @@
 use std::ops::Range;
 
 use super::values::{dates, numbers};
-use super::{AXES, Phrases, Verb};
+use super::{AXES, Phrases, Verb, word_of};
 use crate::app::actions::resolve::Vocabulary;
-use crate::app::actions::text::{Name, Segment, overlaps};
+use crate::app::actions::text::{Segment, overlaps};
 use crate::app::actions::{AppAction, DimRole};
 
 /// Role letters said with a dimension ("lat as y"), the same in every
@@ -26,12 +26,8 @@ fn named_dim(
     if let Some(span) = vocab.find_dim(segment, taken) {
         return Some((segment.text[span.clone()].to_string(), span));
     }
-    let free = |r: &Range<usize>| !taken.iter().any(|t| overlaps(t, r));
     phrases.axes.iter().zip(AXES).find_map(|(words, axis)| {
-        let span = words
-            .iter()
-            .filter_map(|w| segment.find(&Name::new(w)))
-            .find(free)?;
+        let span = word_of(segment, words, taken)?;
         Some((axis.to_string(), span))
     })
 }

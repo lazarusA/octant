@@ -3,7 +3,7 @@
 
 use super::resolve::Candidate;
 use super::text::Name;
-use crate::data::DatasetMetadata;
+use crate::data::{DatasetMetadata, VariableInfo};
 use crate::i18n::{Language, PlotKey, translate};
 use crate::plots::PlotType;
 use crate::utils::colormap::registry;
@@ -106,6 +106,30 @@ pub(super) fn colormap_candidates() -> Vec<Candidate<u32>> {
             shown: key.clone(),
             names: vec![(0, name), (1, Name::new(&key))],
         });
+    }
+    out
+}
+
+/// The groups holding the dataset's variables (every level of each path),
+/// each once, by path and by its last name.
+pub(super) fn group_candidates(meta: &DatasetMetadata) -> Vec<Candidate<()>> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for path in meta.variables.iter().filter_map(VariableInfo::group_path) {
+        let mut end = 0;
+        for part in path.split('/') {
+            end += part.len();
+            let prefix = &path[..end];
+            end += 1;
+            if part.is_empty() || !seen.insert(prefix) {
+                continue;
+            }
+            out.push(Candidate {
+                value: (),
+                shown: prefix.to_string(),
+                names: vec![(0, Name::new(prefix)), (1, Name::new(part))],
+            });
+        }
     }
     out
 }

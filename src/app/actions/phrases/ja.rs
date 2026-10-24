@@ -8,6 +8,9 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Describe, &["説明", "とは", "情報"]),
+        (Search, &["検索", "探して", "探す"]),
+        (List, &["一覧", "変数は"]),
         (Goto, &["移動", "ジャンプ", "設定"]),
         (
             Open,
@@ -51,6 +54,7 @@ pub(super) static PHRASES: Phrases = Phrases {
         &["経度"],
         &["レベル", "深さ", "高さ"],
     ],
+    dataset: &["データセット", "データ"],
     catalog: &["カタログ"],
     then: &["それから", "その後", "次に"],
 };

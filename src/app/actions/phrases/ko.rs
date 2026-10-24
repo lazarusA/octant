@@ -6,6 +6,9 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Describe, &["설명", "뭐야", "정보"]),
+        (Search, &["검색", "찾아"]),
+        (List, &["목록", "어떤 변수"]),
         (Goto, &["이동", "설정"]),
         (Open, &["열어", "열기", "불러와", "로드"]),
         (Select, &["선택"]),
@@ -40,6 +43,7 @@ pub(super) static PHRASES: Phrases = Phrases {
         &["경도"],
         &["레벨", "깊이", "높이"],
     ],
+    dataset: &["데이터셋", "데이터"],
     catalog: &["카탈로그"],
     then: &["그다음", "그 다음", "그리고"],
 };

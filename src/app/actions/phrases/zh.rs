@@ -6,6 +6,9 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Describe, &["描述", "介绍", "是什么", "信息"]),
+        (Search, &["搜索", "查找"]),
+        (List, &["列出", "有哪些变量"]),
         (Goto, &["跳到", "转到", "设为"]),
         (Open, &["打开", "加载", "切换到"]),
         (Select, &["选择", "选中"]),
@@ -37,6 +40,7 @@ pub(super) static PHRASES: Phrases = Phrases {
         &["经度"],
         &["层", "深度", "高度"],
     ],
+    dataset: &["数据集", "数据"],
     catalog: &["目录"],
     then: &["然后", "接着", "之后"],
 };

@@ -5,6 +5,9 @@ use super::Verb::*;
 
 pub(super) static PHRASES: Phrases = Phrases {
     verbs: &[
+        (Describe, &["beskriv", "hva er", "informasjon", "info"]),
+        (Search, &["søk", "finn", "let etter"]),
+        (List, &["list opp", "hvilke variabler"]),
         (Goto, &["gå til", "hopp til", "sett"]),
         (Open, &["åpne", "last inn", "bytt til"]),
         (Select, &["velg", "marker"]),
@@ -39,6 +42,7 @@ pub(super) static PHRASES: Phrases = Phrases {
         &["lengdegrad"],
         &["nivå", "dybde", "høyde"],
     ],
+    dataset: &["datasett", "data"],
     catalog: &["katalog", "katalogen"],
     then: &["deretter", "og så", "så"],
 };

@@ -5,6 +5,8 @@
 //! utterance in the language spoken, which may not be the UI's: the UI
 //! language's table is tried first, then the others.
 
+#[cfg(test)]
+mod ask_tests;
 mod de;
 mod dims;
 #[cfg(test)]
@@ -17,6 +19,7 @@ mod id;
 mod it;
 mod ja;
 mod ko;
+mod named;
 mod no;
 mod pt;
 mod ru;
@@ -40,6 +43,12 @@ pub(super) enum Verb {
     Open,
     /// Moves a dimension to a value said with it.
     Goto,
+    /// Asks what a variable, the plot or the dataset is.
+    Describe,
+    /// Searches the variables.
+    Search,
+    /// Lists what the dataset (or a group) holds.
+    List,
     Select,
     Plot,
     Play,
@@ -60,6 +69,8 @@ pub(super) struct Phrases {
     /// The words for the time, latitude, longitude and level axes, read as
     /// `AXES`.
     pub axes: [&'static [&'static str]; 4],
+    /// The words for the dataset itself ("describe the dataset").
+    pub dataset: &'static [&'static str],
     /// The dataset catalog's name.
     pub catalog: &'static [&'static str],
     pub then: &'static [&'static str],
@@ -223,14 +234,13 @@ pub(super) fn verbs_in(phrases: &Phrases, segment: &Segment) -> Vec<(Range<usize
     kept
 }
 
-/// Where the catalog is named outside `taken`.
-pub(super) fn catalog_word(
+/// Where one of `words` is said outside `taken`.
+pub(super) fn word_of(
     segment: &Segment,
-    phrases: &Phrases,
+    words: &[&str],
     taken: &[Range<usize>],
 ) -> Option<Range<usize>> {
-    phrases
-        .catalog
+    words
         .iter()
         .filter_map(|w| segment.find(&Name::new(w)))
         .find(|s| !taken.iter().any(|t| overlaps(t, s)))

@@ -10,9 +10,11 @@ use std::collections::VecDeque;
 use super::answer;
 use super::phrases::{self, Parsed};
 use super::text::Segment;
-use super::{Failure, Outcome};
+use super::{Done, Failure, Outcome};
 use crate::app::OctantApp;
 use crate::i18n::Language;
+use crate::ui::panel_layout::Panel;
+use crate::ui::toast::Severity;
 
 /// A command not yet read, or what it was read into, not yet run.
 enum Item {
@@ -113,16 +115,17 @@ impl OctantApp {
     }
 
     /// Runs the voice bar's finished utterances and the commands waiting on
-    /// a dataset: what they did is shown in the bar, why one failed as a
-    /// toast.
-    pub(crate) fn run_voice_commands(&mut self) {
+    /// a dataset: what they did is shown in the bar (with an answer's
+    /// detail as a toast, and the Variables panel opened for what the
+    /// dataset holds), why one failed as a toast.
+    pub(crate) fn run_voice_commands(&mut self, ctx: &egui::Context) {
         let mut outcomes = self.resume_commands();
         for utterance in self.voice.take_utterances() {
             outcomes.extend(self.run_utterance(&utterance));
         }
         for outcome in outcomes {
             match outcome {
-                Ok(done) => self.voice.set_last_action(answer::done_text(&done)),
+                Ok(done) => self.show_done(ctx, &done),
                 Err(failure) => {
                     if let Some(notice) = answer::failure_notice(&failure) {
                         self.push_notice(notice);
@@ -130,5 +133,16 @@ impl OctantApp {
                 }
             }
         }
+    }
+
+    fn show_done(&mut self, ctx: &egui::Context, done: &Done) {
+        let line = answer::done_text(done);
+        if let Some(detail) = answer::done_detail(done) {
+            self.notify(Severity::Info, &line, detail);
+        }
+        if matches!(done, Done::DatasetShown { .. } | Done::Searching { .. }) {
+            self.set_panel_open(ctx, Panel::Variables, true);
+        }
+        self.voice.set_last_action(line);
     }
 }

@@ -9,6 +9,9 @@
 //! `dispatch` calls the methods the UI calls, never copies of them.
 
 mod answer;
+mod ask;
+#[cfg(test)]
+mod ask_tests;
 mod axes;
 mod candidates;
 mod coord_match;
@@ -18,6 +21,7 @@ mod dims_tests;
 mod open;
 #[cfg(test)]
 mod open_tests;
+mod outcome;
 mod phrases;
 mod queue;
 pub mod resolve;
@@ -31,9 +35,9 @@ use serde::{Deserialize, Serialize};
 
 use super::OctantApp;
 use crate::app::layers::LayerId;
-use crate::plots::PlotType;
+use outcome::resolved;
+pub use outcome::{Done, Failure, NameKind, Outcome};
 pub use queue::CommandQueue;
-use resolve::Resolution;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
@@ -50,6 +54,23 @@ pub enum AppAction {
     },
     /// Shows the dataset catalog.
     OpenCatalog,
+    /// What the active dataset (or its group `group`) holds.
+    DescribeDataset {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        group: Option<String>,
+    },
+    /// Searches the active dataset's variables (the Variables panel's search).
+    Search {
+        text: String,
+    },
+    /// What a variable is (the staged one without `path`): its long name,
+    /// units and dimensions with their coordinate ranges.
+    DescribeVariable {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        path: Option<String>,
+    },
+    /// What is plotted (what the dataset holds when nothing is).
+    DescribeView,
     /// Plots the staged selection (Plot Data), as `plot_type` when given.
     Plot {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -100,99 +121,6 @@ pub enum DimRole {
     None,
 }
 
-/// What an action did.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Done {
-    Opening(String),
-    CatalogOpened,
-    Selected(String),
-    /// A dimension and the coordinate it moved to, as the hover writes it.
-    DimSet {
-        dim: String,
-        value: String,
-    },
-    RangeSet {
-        dim: String,
-        from: String,
-        to: String,
-    },
-    RoleSet {
-        dim: String,
-        role: DimRole,
-    },
-    Plotted {
-        variable: String,
-        plot_type: PlotType,
-    },
-    Playing,
-    Paused,
-    Stepped(i32),
-    Colormap(String),
-    ViewReset,
-}
-
-/// What a name named.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NameKind {
-    Source,
-    Dimension,
-    Variable,
-    PlotType,
-    Colormap,
-}
-
-/// Why an action did nothing.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Failure {
-    NoDataset,
-    NotFound {
-        kind: NameKind,
-        text: String,
-        closest: Vec<String>,
-    },
-    Ambiguous {
-        kind: NameKind,
-        text: String,
-        matches: Vec<String>,
-    },
-    /// The staged variable cannot be drawn as this plot type.
-    Blocked {
-        plot_type: PlotType,
-        reason: String,
-    },
-    NothingToAnimate,
-    NotUnderstood(String),
-    /// The app refused and said why (a desktop-only catalog entry).
-    Refused,
-    /// No coordinate of `dim` matches `value`.
-    NoValue {
-        dim: String,
-        value: String,
-    },
-    /// The coordinates are being read: the command waits for them.
-    CoordinatesPending,
-}
-
-pub type Outcome = Result<Done, Failure>;
-
-/// `resolution` of `text` as a value or the failure it answers.
-fn resolved<T>(resolution: Resolution<T>, kind: NameKind, text: &str) -> Result<T, Failure> {
-    let text = text.to_string();
-    match resolution {
-        Resolution::Resolved(value) => Ok(value),
-        Resolution::Ambiguous(matches) => Err(Failure::Ambiguous {
-            kind,
-            text,
-            matches,
-        }),
-        Resolution::NotFound(closest) => Err(Failure::NotFound {
-            kind,
-            text,
-            closest,
-        }),
-    }
-}
-
 impl OctantApp {
     /// Runs `action` against the app as it is now.
     pub fn dispatch(&mut self, action: AppAction) -> Outcome {
@@ -202,6 +130,10 @@ impl OctantApp {
                 self.open_sample(crate::app::sources::CATALOG_SAMPLE);
                 Ok(Done::CatalogOpened)
             }
+            AppAction::DescribeDataset { group } => self.describe_dataset(group.as_deref()),
+            AppAction::Search { text } => self.search_variables(&text),
+            AppAction::DescribeVariable { path } => self.describe_variable(path.as_deref()),
+            AppAction::DescribeView => self.describe_view(),
             AppAction::SelectVariable { path } => self.select_by_name(&path),
             AppAction::Plot { plot_type } => self.plot_as(plot_type.as_deref()),
             AppAction::SetDim { dim, value } => self.set_dim(dim.as_deref(), &value),

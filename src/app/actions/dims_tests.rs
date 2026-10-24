@@ -31,7 +31,7 @@ fn dims_app() -> OctantApp {
 }
 
 /// Runs `utterance`, letting the coordinates it waits for arrive.
-fn run(app: &mut OctantApp, utterance: &str) -> Vec<super::Outcome> {
+pub(super) fn run(app: &mut OctantApp, utterance: &str) -> Vec<super::Outcome> {
     let mut outcomes = app.run_utterance(utterance);
     let deadline = web_time::Instant::now() + std::time::Duration::from_secs(10);
     while app.coordinate_loader.pending_count() > 0 {
