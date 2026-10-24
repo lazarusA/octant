@@ -51,6 +51,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoLayer => "没有与「{}」匹配的图层",
         PlaybackKey::VoiceNoFormat => "没有与「{}」匹配的导出格式",
         PlaybackKey::VoiceNoWell => "没有与「{}」匹配的孔",
+        PlaybackKey::VoiceNoWellPicked => "请先选择一个孔",
         PlaybackKey::VoiceDatasetSummary => "{}（{} 个变量）",
         PlaybackKey::VoiceSearching => "搜索「{}」：{} 个变量",
         PlaybackKey::VoiceViewSummary => "{}，{}",

@@ -53,6 +53,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoLayer => "Tidak ada lapisan yang cocok dengan '{}'",
         PlaybackKey::VoiceNoFormat => "Tidak ada format ekspor yang cocok dengan '{}'",
         PlaybackKey::VoiceNoWell => "Tidak ada sumur yang cocok dengan '{}'",
+        PlaybackKey::VoiceNoWellPicked => "Pilih sumur terlebih dahulu",
         PlaybackKey::VoiceDatasetSummary => "{} ({} variabel)",
         PlaybackKey::VoiceSearching => "Pencarian '{}': {} variabel",
         PlaybackKey::VoiceViewSummary => "{} sebagai {}",

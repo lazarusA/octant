@@ -7,19 +7,27 @@ use super::coord_match::{Dim, index_of};
 use super::resolve::{Resolution, among};
 use super::{DimRole, Done, Failure, NameKind, Outcome, resolved};
 use crate::app::{AnimationRole, OctantApp, SpatialRole};
-use crate::data::{CoordValues, VariableInfo};
+use crate::data::VariableInfo;
 
 impl OctantApp {
-    /// The staged variable, its dimension settings in place.
-    fn staged_variable(&mut self) -> Result<VariableInfo, Failure> {
-        let var = self
-            .selected_variable_info()
-            .cloned()
-            .ok_or(Failure::NoDataset)?;
+    /// Puts the staged variable's dimension settings in place.
+    fn init_staged_dims(&mut self) -> Result<(), Failure> {
+        let var = self.selected_variable_info().ok_or(Failure::NoDataset)?;
         if self.selected.dim_config.len() != var.shape.len() {
+            let var = var.clone();
             crate::ui::variables_panel::init_variable_dimension_defaults(self, &var);
         }
-        Ok(var)
+        Ok(())
+    }
+
+    /// The staged variable's dimension `dim` names (its time dimension
+    /// without one), and its name.
+    fn staged_dim(&mut self, dim: Option<&str>) -> Result<(usize, String), Failure> {
+        self.init_staged_dims()?;
+        let var = self.selected_variable_info().ok_or(Failure::NoDataset)?;
+        let i = self.dim_of(var, dim)?;
+        let name = var.dimension_names.get(i).cloned().unwrap_or_default();
+        Ok((i, name))
     }
 
     /// The dimension of `var` `dim` names, by name or role word; without
@@ -52,70 +60,63 @@ impl OctantApp {
             .or(animated.filter(|_| axis == Axis::Time))
     }
 
-    /// The index `value` names along dimension `i`, once its coordinates
-    /// are read.
-    fn index_for(
-        &mut self,
-        var: &VariableInfo,
-        i: usize,
-        value: &str,
-        last: bool,
-    ) -> Result<usize, Failure> {
-        let name = var.dimension_names.get(i).cloned().unwrap_or_default();
-        let coords = self.dim_coordinates(var, &name)?;
+    /// The staged dimension `i` as the hover resolves it.
+    fn staged_dim_info(&self, i: usize) -> Result<Dim<'_>, Failure> {
         let meta = self.selected.metadata.as_ref().ok_or(Failure::NoDataset)?;
-        let dim = Dim {
+        let var = self.selected.variable_info().ok_or(Failure::NoDataset)?;
+        Ok(Dim {
             meta,
             var,
             store: &self.selected.store_target,
-            name: &name,
+            name: var.dimension_names.get(i).map_or("", String::as_str),
             len: var.shape.get(i).copied().unwrap_or(0) as usize,
-        };
-        index_of(&dim, coords.as_ref(), value, last).ok_or(Failure::NoValue {
-            dim: name.clone(),
+        })
+    }
+
+    /// The index `value` names along staged dimension `i`, once its
+    /// coordinates are read (`await_coordinates`).
+    fn index_for(&self, i: usize, value: &str, last: bool) -> Result<usize, Failure> {
+        let dim = self.staged_dim_info(i)?;
+        let coords = dim.meta.get_dim_coords(Some(&dim.var.name), dim.name);
+        index_of(&dim, coords, value, last).ok_or_else(|| Failure::NoValue {
+            dim: dim.name.to_string(),
             value: value.to_string(),
         })
     }
 
-    /// Dimension `name`'s coordinates; while they are read, the command
-    /// waits.
-    fn dim_coordinates(
-        &mut self,
-        var: &VariableInfo,
-        name: &str,
-    ) -> Result<Option<CoordValues>, Failure> {
-        let meta = self.selected.metadata.as_ref().ok_or(Failure::NoDataset)?;
-        if let Some(coords) = meta.get_dim_coords(Some(&var.name), name) {
-            return Ok(Some(coords.clone()));
+    /// Waits for the staged dimension `i`'s coordinates: asks for them and
+    /// fails with `Reading` while they are read. A command asked again once
+    /// they settled (`CommandQueue::retrying`) never asks twice: a read that
+    /// failed leaves the dimension's positions.
+    fn await_coordinates(&mut self, i: usize) -> Result<(), Failure> {
+        let dim = self.staged_dim_info(i)?;
+        if dim
+            .meta
+            .get_dim_coords(Some(&dim.var.name), dim.name)
+            .is_some()
+            || self.commands.retrying()
+        {
+            return Ok(());
         }
         self.request_variable_coordinates(self.selected.variable_idx);
         if self.coordinate_loader.pending_count() > 0 {
             return Err(Failure::Reading);
         }
-        Ok(None)
+        Ok(())
     }
 
-    /// The coordinate at `idx` of dimension `i`, as the hover writes it.
-    fn coord_text(&self, var: &VariableInfo, i: usize, idx: usize) -> String {
-        let Some(meta) = self.selected.metadata.as_ref() else {
-            return idx.to_string();
-        };
-        let name = var.dimension_names.get(i).map_or("", String::as_str);
-        let len = var.shape.get(i).copied().unwrap_or(0) as usize;
-        let store = &self.selected.store_target;
-        Dim {
-            meta,
-            var,
-            store,
-            name,
-            len,
-        }
-        .text(idx)
+    /// The coordinate at `idx` of staged dimension `i`, as the hover writes it.
+    fn coord_text(&self, i: usize, idx: usize) -> String {
+        self.staged_dim_info(i)
+            .map_or_else(|_| idx.to_string(), |dim| dim.text(idx))
     }
 
-    /// The plot's step (`request_step_or_load`, as the playback bar).
+    /// The step of the staged animated dimension: the plot's when it shows
+    /// the staged variable (`request_step_or_load`, as the playback bar),
+    /// else only the step the Dimensions panel's slider shows, as dragging
+    /// it does.
     fn go_to_step(&mut self, step: usize) {
-        if self.plotted().metadata.is_some() {
+        if self.plotted().metadata.is_some() && !self.is_exploring_unplotted_variable() {
             self.request_step_or_load(step);
         } else {
             self.playback.current_timestep = step;
@@ -123,26 +124,25 @@ impl OctantApp {
     }
 
     pub(super) fn set_dim(&mut self, dim: Option<&str>, value: &str) -> Outcome {
-        let var = self.staged_variable()?;
-        let i = self.dim_of(&var, dim)?;
-        let index = self.index_for(&var, i, value, false)?;
-        let name = var.dimension_names.get(i).cloned().unwrap_or_default();
+        let (i, name) = self.staged_dim(dim)?;
+        self.await_coordinates(i)?;
+        let index = self.index_for(i, value, false)?;
         if self.selected.dim_config[i].animation == AnimationRole::Animated {
             self.go_to_step(index);
         } else {
             // A range shown (a plot axis) narrows to that one value.
             self.selected.set_index(i, index);
         }
-        let value = self.coord_text(&var, i, index);
+        let value = self.coord_text(i, index);
         Ok(Done::DimSet { dim: name, value })
     }
 
     pub(super) fn set_dim_range(&mut self, dim: Option<&str>, from: &str, to: &str) -> Outcome {
-        let var = self.staged_variable()?;
-        let i = self.dim_of(&var, dim)?;
+        let (i, name) = self.staged_dim(dim)?;
+        self.await_coordinates(i)?;
         let (a, b) = (
-            self.index_for(&var, i, from, false)?,
-            self.index_for(&var, i, to, true)?,
+            self.index_for(i, from, false)?,
+            self.index_for(i, to, true)?,
         );
         let range = (a.min(b), a.max(b));
         self.selected.dim_config[i].active = true;
@@ -154,15 +154,14 @@ impl OctantApp {
             self.selected.set_range(i, range, range.0);
         }
         Ok(Done::RangeSet {
-            dim: var.dimension_names.get(i).cloned().unwrap_or_default(),
-            from: self.coord_text(&var, i, range.0),
-            to: self.coord_text(&var, i, range.1),
+            dim: name,
+            from: self.coord_text(i, range.0),
+            to: self.coord_text(i, range.1),
         })
     }
 
     pub(super) fn set_dim_role(&mut self, dim: &str, role: DimRole) -> Outcome {
-        let var = self.staged_variable()?;
-        let i = self.dim_of(&var, Some(dim))?;
+        let (i, dim) = self.staged_dim(Some(dim))?;
         let config = self.selected.dim_config[i];
         let (spatial, anim) = match role {
             DimRole::X => (SpatialRole::X, config.animation),
@@ -172,7 +171,6 @@ impl OctantApp {
             DimRole::None => (SpatialRole::None, AnimationRole::None),
         };
         crate::ui::variables_panel::dimension_slider::apply_role_change(i, spatial, anim, self);
-        let dim = var.dimension_names.get(i).cloned().unwrap_or_default();
         Ok(Done::RoleSet { dim, role })
     }
 }

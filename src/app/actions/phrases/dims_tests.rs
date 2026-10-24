@@ -137,3 +137,53 @@ fn a_comma_before_the_year_and_years_among_numbers_stay_values() {
     // "may" far from a number is no month.
     assert!(said("may I see sst in 2020").contains(&set(None, "2020")));
 }
+
+#[test]
+fn a_year_inside_a_name_is_no_date() {
+    let vocab = vocab();
+    let parsed = parse("plot z_1000", &vocab, Language::English);
+    let moves = |p: &Parsed| matches!(p, Parsed::Action(AppAction::SetDim { .. }));
+    assert!(!parsed.iter().any(moves), "{parsed:?}");
+}
+
+#[test]
+fn spanish_y_joins_two_values() {
+    let vocab = vocab();
+    let parsed = parse("latitud 30 y 60", &vocab, Language::Spanish);
+    let [Parsed::Action(AppAction::SetRange { from, to, .. })] = parsed.as_slice() else {
+        panic!("{parsed:?}");
+    };
+    assert_eq!((from.as_str(), to.as_str()), ("30", "60"));
+}
+
+#[test]
+fn dates_of_a_range_share_the_year_said_once() {
+    let vocab = vocab();
+    let cases = [
+        (
+            Language::English,
+            "time 15 January to 20 February 2020",
+            "2020-01-15",
+            "2020-02-20",
+        ),
+        (
+            Language::English,
+            "time from January to March 2020",
+            "2020-01",
+            "2020-03",
+        ),
+        (
+            Language::ChineseSimp,
+            "时间 2020年1月到3月",
+            "2020-01",
+            "2020-03",
+        ),
+    ];
+    for (lang, said, a, b) in cases {
+        let parsed = parse(said, &vocab, lang);
+        let [Parsed::Action(AppAction::SetRange { from, to, .. })] = parsed.as_slice() else {
+            panic!("{lang:?} '{said}': {parsed:?}");
+        };
+        assert_eq!((from.as_str(), to.as_str()), (a, b), "{lang:?} '{said}'");
+    }
+}

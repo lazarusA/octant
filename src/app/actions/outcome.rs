@@ -113,6 +113,8 @@ pub enum Failure {
         reason: String,
     },
     NothingToAnimate,
+    /// A field asked without a well named or picked.
+    NoWellPicked,
     NotUnderstood(String),
     /// The app refused and said why (a desktop-only catalog entry).
     Refused,

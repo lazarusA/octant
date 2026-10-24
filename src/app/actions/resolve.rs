@@ -47,7 +47,8 @@ pub(super) fn among(names: &[&str], text: &str) -> Resolution<usize> {
     resolve(&candidates, text)
 }
 
-/// What names a command can find: built once per utterance.
+/// What names a command can find, kept until what it was built from
+/// changes (`OctantApp::vocabulary`).
 pub struct Vocabulary {
     variables: Vec<Candidate<usize>>,
     plot_types: Vec<Candidate<PlotType>>,
@@ -142,12 +143,9 @@ pub(super) type Found = Option<std::ops::Range<usize>>;
 fn find<T>(candidates: &[Candidate<T>], s: &Segment, taken: &[std::ops::Range<usize>]) -> Found {
     let mut best: Found = None;
     for (_, name) in candidates.iter().flat_map(|c| &c.names) {
-        let Some(span) = s.find(name) else {
+        let Some(span) = s.find(name, taken) else {
             continue;
         };
-        if taken.iter().any(|t| super::text::overlaps(t, &span)) {
-            continue;
-        }
         if best.as_ref().is_none_or(|b| span.len() > b.len()) {
             best = Some(span);
         }
@@ -211,8 +209,24 @@ fn closest<T>(candidates: &[Candidate<T>], text: &str) -> Vec<String> {
 
 impl crate::app::OctantApp {
     /// What the names of actions can find right now: the active dataset's
-    /// names and the datasets that can be opened.
-    pub fn vocabulary(&self) -> Vocabulary {
+    /// names and the datasets that can be opened; built again only when
+    /// one of them changed.
+    pub fn vocabulary(&mut self) -> &Vocabulary {
+        let wells = self.plate.as_ref().map_or(0, |p| p.plate.wells.len());
+        let key = (
+            self.selected.metadata_generation,
+            self.dataset_manager.len(),
+            wells,
+            crate::utils::colormap::registry::generation(),
+        );
+        let kept = match self.commands.vocab.take() {
+            Some((k, vocab)) if k == key => vocab,
+            _ => self.build_vocabulary(),
+        };
+        &self.commands.vocab.insert((key, kept)).1
+    }
+
+    fn build_vocabulary(&self) -> Vocabulary {
         let open: Vec<(String, String)> = self
             .dataset_manager
             .iter()

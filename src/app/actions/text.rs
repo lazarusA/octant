@@ -3,18 +3,22 @@
 //! "sea surface temperature" is `sea_surface_temperature`), and names in
 //! scripts written without spaces (Chinese, Japanese, Korean) as substrings.
 
+use std::collections::HashMap;
 use std::ops::Range;
+use std::sync::{Mutex, OnceLock};
+
+use crate::i18n::number::halfwidth;
+use crate::ui::fonts::{Script, script_of};
 
 /// Han, kana and Hangul: written without spaces between words.
 pub(super) fn is_cjk(c: char) -> bool {
-    matches!(c,
-        '\u{1100}'..='\u{11FF}'
-        | '\u{3040}'..='\u{30FF}'
-        | '\u{3130}'..='\u{318F}'
-        | '\u{3400}'..='\u{4DBF}'
-        | '\u{4E00}'..='\u{9FFF}'
-        | '\u{AC00}'..='\u{D7AF}'
-        | '\u{F900}'..='\u{FAFF}')
+    script_of(c).is_some_and(|s| s != Script::Other)
+}
+
+/// Whether `c` joins the characters around it into one name (`z_1000`,
+/// `t2m`): a number touching it is part of a name, not a value.
+pub(super) fn joins(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
 }
 
 /// Whether `text` is an address rather than a name (a URL or a path,
@@ -34,12 +38,7 @@ pub(super) fn normalize(text: &str) -> String {
             out.push_str(piece);
             continue;
         }
-        let chars = piece.chars().map(|c| match c {
-            '\u{FF01}'..='\u{FF5E}' => char::from_u32(c as u32 - 0xFEE0).unwrap_or(c),
-            '\u{3000}' => ' ',
-            _ => c,
-        });
-        out.extend(chars.flat_map(char::to_lowercase));
+        out.extend(piece.chars().map(halfwidth).flat_map(char::to_lowercase));
     }
     out
 }
@@ -61,7 +60,7 @@ pub(super) fn address_in(text: &str) -> Option<(String, Range<usize>)> {
         } else {
             word
         };
-        let word = word.trim_end_matches(['.', ',', ';']);
+        let word = word.trim_end_matches(['.', ',', ';', '?', '!']);
         let at = start + lead;
         start += piece.len();
         if !word.is_empty() && is_address(word) {
@@ -112,12 +111,25 @@ impl Name {
     }
 }
 
+/// A phrase of a language's table prepared once for the session: the
+/// tables are fixed, so each phrase is normalized only the first time.
+pub(super) fn phrase(text: &'static str) -> &'static Name {
+    static PREPARED: OnceLock<Mutex<HashMap<&'static str, &'static Name>>> = OnceLock::new();
+    let prepared = PREPARED.get_or_init(Default::default);
+    let mut prepared = prepared.lock().unwrap_or_else(|p| p.into_inner());
+    // Leaked once per phrase of the fixed tables: bounded, kept anyway.
+    prepared
+        .entry(text)
+        .or_insert_with(|| Box::leak(Box::new(Name::new(text))))
+}
+
 /// The words of normalized `text` joined.
 pub(super) fn compact(norm: &str) -> String {
     word_spans(norm).into_iter().map(|r| &norm[r]).collect()
 }
 
 /// A normalized utterance (or one command of it) and its words.
+#[derive(Clone)]
 pub(super) struct Segment {
     pub text: String,
     pub words: Vec<Range<usize>>,
@@ -130,26 +142,34 @@ impl Segment {
         Self { text, words }
     }
 
-    /// Where `name` occurs: a substring when it holds CJK, else a run of
-    /// whole words that joined equal its words joined.
-    pub fn find(&self, name: &Name) -> Option<Range<usize>> {
+    /// Where `name` first occurs outside `taken`: a substring when it holds
+    /// CJK, else a run of whole words that joined equal its words joined.
+    pub fn find(&self, name: &Name, taken: &[Range<usize>]) -> Option<Range<usize>> {
+        let free = |r: &Range<usize>| !taken.iter().any(|t| overlaps(t, r));
         if name.compact.is_empty() {
             return None;
         }
         if name.cjk {
-            let at = self.text.find(&name.norm)?;
-            return Some(at..at + name.norm.len());
+            return self
+                .text
+                .match_indices(&name.norm)
+                .map(|(at, _)| at..at + name.norm.len())
+                .find(free);
         }
         for (i, first) in self.words.iter().enumerate() {
-            let mut joined = String::new();
+            let mut rest = name.compact.as_str();
             for word in &self.words[i..] {
-                joined.push_str(&self.text[word.clone()]);
-                if joined == name.compact {
-                    return Some(first.start..word.end);
-                }
-                if !name.compact.starts_with(&joined) {
+                let Some(after) = rest.strip_prefix(&self.text[word.clone()]) else {
+                    break;
+                };
+                if after.is_empty() {
+                    let span = first.start..word.end;
+                    if free(&span) {
+                        return Some(span);
+                    }
                     break;
                 }
+                rest = after;
             }
         }
         None
@@ -172,10 +192,10 @@ pub(super) fn overlaps(a: &Range<usize>, b: &Range<usize>) -> bool {
     a.start < b.end && b.start < a.end
 }
 
-/// Edits between `a` and `b`, by character.
-pub(super) fn edit_distance(a: &str, b: &str) -> usize {
-    let b: Vec<char> = b.chars().collect();
-    let mut row: Vec<usize> = (0..=b.len()).collect();
+/// Edits between `a` and `b`, by character, in `row` (reused between calls).
+fn edit_distance(a: &str, b: &[char], row: &mut Vec<usize>) -> usize {
+    row.clear();
+    row.extend(0..=b.len());
     for (i, ca) in a.chars().enumerate() {
         let mut diagonal = row[0];
         row[0] = i + 1;
@@ -193,13 +213,15 @@ pub(super) fn edit_distance(a: &str, b: &str) -> usize {
 /// How unlike `heard` (compact) is to `name` (compact), 0 the same, 1
 /// nothing alike; the best of every run of `heard`'s words.
 pub(super) fn unlikeness(heard: &Segment, name: &str) -> f32 {
+    let chars: Vec<char> = name.chars().collect();
+    let (mut joined, mut row) = (String::new(), Vec::new());
     let mut best = 1.0f32;
     for i in 0..heard.words.len() {
-        let mut joined = String::new();
+        joined.clear();
         for word in &heard.words[i..] {
             joined.push_str(&heard.text[word.clone()]);
-            let longest = joined.chars().count().max(name.chars().count()).max(1);
-            best = best.min(edit_distance(&joined, name) as f32 / longest as f32);
+            let longest = joined.chars().count().max(chars.len()).max(1);
+            best = best.min(edit_distance(&joined, &chars, &mut row) as f32 / longest as f32);
             if joined.len() > name.len() * 2 {
                 break;
             }

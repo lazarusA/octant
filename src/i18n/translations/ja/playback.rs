@@ -53,6 +53,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoLayer => "「{}」に一致するレイヤーはありません",
         PlaybackKey::VoiceNoFormat => "「{}」に一致するエクスポート形式はありません",
         PlaybackKey::VoiceNoWell => "「{}」に一致するウェルはありません",
+        PlaybackKey::VoiceNoWellPicked => "先にウェルを選んでください",
         PlaybackKey::VoiceDatasetSummary => "{}（{} 個の変数）",
         PlaybackKey::VoiceSearching => "「{}」の検索：{} 個の変数",
         PlaybackKey::VoiceViewSummary => "{}（{}）",

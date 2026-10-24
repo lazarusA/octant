@@ -53,6 +53,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoLayer => "Ingen lag samsvarer med '{}'",
         PlaybackKey::VoiceNoFormat => "Ingen eksportformat samsvarer med '{}'",
         PlaybackKey::VoiceNoWell => "Ingen brønn samsvarer med '{}'",
+        PlaybackKey::VoiceNoWellPicked => "Velg en brønn først",
         PlaybackKey::VoiceDatasetSummary => "{} ({} variabler)",
         PlaybackKey::VoiceSearching => "Søk '{}': {} variabler",
         PlaybackKey::VoiceViewSummary => "{} som {}",

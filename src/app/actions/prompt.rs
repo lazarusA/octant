@@ -4,9 +4,10 @@
 
 use crate::data::DatasetMetadata;
 
-/// The longest prompt built, about 50 tokens of names: the model reads the
-/// prompt again for every token it writes, so a longer one slows it down.
-const MAX_CHARS: usize = 160;
+/// The longest prompt built, a bound on the text encoded: the speech model
+/// keeps only its first tokens, whole names (`PROMPT_TOKENS` in
+/// `voice::whisper`), as the prompt is read again for every token written.
+const MAX_CHARS: usize = 400;
 
 /// The active dataset's variable and dimension names, comma separated.
 pub(crate) fn speech_prompt(meta: Option<&DatasetMetadata>) -> String {
@@ -17,11 +18,7 @@ pub(crate) fn speech_prompt(meta: Option<&DatasetMetadata>) -> String {
     let variables = meta.variables.iter().filter(|v| !v.is_coarser_level());
     let names = variables
         .map(|v| v.display_name())
-        .chain(
-            meta.variables
-                .iter()
-                .flat_map(|v| v.dimension_names.iter().map(String::as_str)),
-        )
+        .chain(dimension_names(meta))
         .filter(|name| seen.insert(*name));
     let mut prompt = String::new();
     for name in names {
@@ -34,6 +31,15 @@ pub(crate) fn speech_prompt(meta: Option<&DatasetMetadata>) -> String {
         prompt.push_str(name);
     }
     prompt
+}
+
+/// Every dimension name of `meta`'s variables, each once, in order.
+pub(super) fn dimension_names(meta: &DatasetMetadata) -> impl Iterator<Item = &str> {
+    let mut seen = std::collections::HashSet::new();
+    meta.variables
+        .iter()
+        .flat_map(|v| v.dimension_names.iter().map(String::as_str))
+        .filter(move |name| seen.insert(*name))
 }
 
 #[cfg(test)]

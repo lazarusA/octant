@@ -52,6 +52,7 @@ crate::i18n::keys::define_keys! {
     VoiceNoLayer,
     VoiceNoFormat,
     VoiceNoWell,
+    VoiceNoWellPicked,
     VoiceDatasetSummary,
     VoiceSearching,
     VoiceViewSummary,

@@ -35,7 +35,17 @@ impl OctantApp {
                     crate::ui::plot_type::options::blocked_text(&mut buf, blocked).to_string();
                 return Err(Failure::Blocked { plot_type, reason });
             }
+            let switching = plot_type != self.selected.plot_type;
             self.switch_plot_type(plot_type);
+            // The plot switched loads its block itself, as the plot type
+            // picker does: plotting the same selection again would fetch it
+            // twice.
+            if switching && self.staged_is_plotted() {
+                return Ok(Done::Plotted {
+                    variable: self.staged_name(),
+                    plot_type: self.selected.plot_type,
+                });
+            }
         }
         // Plot Data, never its Add Overlay (that is `AddOverlay`).
         self.layout.plot_as_overlay = false;
@@ -44,6 +54,16 @@ impl OctantApp {
             variable: self.staged_name(),
             plot_type: self.selected.plot_type,
         })
+    }
+
+    /// Whether the plot shows the staged selection as it is staged.
+    fn staged_is_plotted(&self) -> bool {
+        let (staged, plotted) = (&self.selected, self.plotted());
+        plotted.metadata.is_some()
+            && !self.is_exploring_unplotted_variable()
+            && staged.dim_config == plotted.dim_config
+            && staged.dim_ranges == plotted.dim_ranges
+            && staged.dim_indices == plotted.dim_indices
     }
 
     pub(super) fn staged_name(&self) -> String {
@@ -73,11 +93,7 @@ impl OctantApp {
     /// step buttons do one at a time.
     pub(super) fn step_by(&mut self, by: i32) -> Outcome {
         self.base_animates()?;
-        let steps = self.animated_dim_extent() as i64;
-        if steps > 0 {
-            let at = self.playback.current_timestep as i64;
-            self.request_step_or_load((at + i64::from(by)).rem_euclid(steps) as usize);
-        }
+        self.step_around(i64::from(by));
         Ok(Done::Stepped(by))
     }
 

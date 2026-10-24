@@ -53,6 +53,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoLayer => "Nenhuma camada corresponde a '{}'",
         PlaybackKey::VoiceNoFormat => "Nenhum formato de exportação corresponde a '{}'",
         PlaybackKey::VoiceNoWell => "Nenhum poço corresponde a '{}'",
+        PlaybackKey::VoiceNoWellPicked => "Escolha um poço primeiro",
         PlaybackKey::VoiceDatasetSummary => "{} ({} variáveis)",
         PlaybackKey::VoiceSearching => "Pesquisa '{}': {} variáveis",
         PlaybackKey::VoiceViewSummary => "{} como {}",

@@ -168,6 +168,10 @@ pub(super) fn failure_notice(failure: &Failure) -> Option<Notice> {
             tr(PlaybackKey::VoiceNothingToAnimate).to_string(),
             String::new(),
         ),
+        Failure::NoWellPicked => (
+            tr(PlaybackKey::VoiceNoWellPicked).to_string(),
+            String::new(),
+        ),
         // Said in the bar (`not_understood_line`): speech not meant as a
         // command would fill the toasts.
         Failure::NotUnderstood(_) => return None,

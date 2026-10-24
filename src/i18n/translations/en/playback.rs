@@ -53,6 +53,7 @@ pub fn text(key: PlaybackKey) -> &'static str {
         PlaybackKey::VoiceNoLayer => "No layer matches '{}'",
         PlaybackKey::VoiceNoFormat => "No export format matches '{}'",
         PlaybackKey::VoiceNoWell => "No well matches '{}'",
+        PlaybackKey::VoiceNoWellPicked => "Pick a well first",
         PlaybackKey::VoiceDatasetSummary => "{} ({} variables)",
         PlaybackKey::VoiceSearching => "Search '{}': {} variables",
         PlaybackKey::VoiceViewSummary => "{} as {}",

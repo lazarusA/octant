@@ -53,6 +53,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoLayer => "'{}'와(과) 일치하는 레이어가 없습니다",
         PlaybackKey::VoiceNoFormat => "'{}'와(과) 일치하는 내보내기 형식이 없습니다",
         PlaybackKey::VoiceNoWell => "'{}'와(과) 일치하는 웰이 없습니다",
+        PlaybackKey::VoiceNoWellPicked => "먼저 웰을 선택하세요",
         PlaybackKey::VoiceDatasetSummary => "{} (변수 {}개)",
         PlaybackKey::VoiceSearching => "'{}' 검색: 변수 {}개",
         PlaybackKey::VoiceViewSummary => "{} ({})",

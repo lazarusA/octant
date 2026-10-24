@@ -7,6 +7,7 @@
 
 #[cfg(test)]
 mod ask_tests;
+mod dates;
 mod de;
 mod dims;
 #[cfg(test)]
@@ -29,6 +30,7 @@ mod open_tests;
 mod pt;
 mod ru;
 mod segment;
+mod split;
 mod sv;
 mod table;
 #[cfg(test)]
@@ -41,8 +43,9 @@ use std::ops::Range;
 
 use super::AppAction;
 use super::resolve::Vocabulary;
-use super::text::{Name, Segment, address_in, overlaps};
+use super::text::{Segment, address_in, phrase};
 use crate::i18n::Language;
+use split::split;
 use table::{AXES, Phrases, table};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,9 +93,14 @@ pub(super) enum Parsed {
 pub(super) fn commands(utterance: &str, first: Language) -> Vec<(Language, Segment)> {
     let others = Language::ALL.iter().copied().filter(|&l| l != first);
     let mut best: Option<(usize, Language, Vec<Segment>)> = None;
+    let mut first_segments = None;
     for lang in std::iter::once(first).chain(others) {
         let phrases = table(lang);
         let (segments, then) = split(utterance, phrases);
+        if lang == first {
+            // Kept for an utterance without verbs (its names read alone).
+            first_segments = Some(segments.clone());
+        }
         let verbs: usize = segments
             .iter()
             .flat_map(|s| verbs_in(phrases, s))
@@ -108,7 +116,7 @@ pub(super) fn commands(utterance: &str, first: Language) -> Vec<(Language, Segme
     }
     let (lang, segments) = match best {
         Some((_, lang, segments)) => (lang, segments),
-        None => (first, split(utterance, table(first)).0),
+        None => (first, first_segments.unwrap_or_default()),
     };
     segments.into_iter().map(|s| (lang, s)).collect()
 }
@@ -127,103 +135,24 @@ pub(super) fn parse(utterance: &str, vocab: &Vocabulary, first: Language) -> Vec
         .collect()
 }
 
-/// Sentence punctuation that ends a command, `before` and `after` being the
-/// text around it: a full stop or comma only before a space or the end
-/// (`45.5` and `45,5` stay whole), no comma before a number ("January 15,
-/// 2020") and no full stop after a day ("15. Januar").
-fn ends_command(c: char, before: &str, after: &str) -> bool {
-    let digits = before.bytes().rev().take_while(u8::is_ascii_digit).count();
-    let after_day = c == '.' && (1..=2).contains(&digits) && {
-        let rest = &before[..before.len() - digits];
-        !rest.chars().next_back().is_some_and(char::is_alphanumeric)
-    };
-    let ends = matches!(
-        c,
-        ';' | '!'
-            | '?'
-            | '\u{3001}'
-            | '\u{3002}'
-            | '\u{FF0C}'
-            | '\u{FF01}'
-            | '\u{FF1F}'
-            | '\u{FF1B}'
-    ) || (matches!(c, '.' | ',')
-        && after.chars().next().is_none_or(char::is_whitespace));
-    let before_number = c == ',' && after.trim_start().starts_with(|d: char| d.is_ascii_digit());
-    ends && !after_day && !before_number
-}
-
-/// `utterance` cut at sentence punctuation and the language's "then" words
-/// into commands holding words, with the bytes those words took.
-fn split(utterance: &str, phrases: &Phrases) -> (Vec<Segment>, usize) {
-    let then: Vec<Name> = phrases.then.iter().map(|p| Name::new(p)).collect();
-    let mut out = Vec::new();
-    let mut then_bytes = 0;
-    let mut start = 0;
-    let mut pieces = Vec::new();
-    for (i, c) in utterance.char_indices() {
-        if ends_command(c, &utterance[start..i], &utterance[i + c.len_utf8()..]) {
-            pieces.push(&utterance[start..i]);
-            start = i + c.len_utf8();
-        }
-    }
-    pieces.push(&utterance[start..]);
-    for piece in pieces {
-        let mut segment = Segment::new(piece);
-        while let Some(span) = earliest(&segment, &then) {
-            then_bytes += span.len();
-            out.push(Segment::new(&segment.text[..span.start]));
-            segment = Segment::new(&segment.text[span.end..]);
-        }
-        cut_after_open(phrases, segment, &mut out);
-    }
-    out.retain(|s| !s.words.is_empty());
-    (out, then_bytes)
-}
-
-/// `segment` cut where a verb follows "open": what comes after waits for
-/// the dataset, its names unknown until it loads.
-fn cut_after_open(phrases: &Phrases, segment: Segment, out: &mut Vec<Segment>) {
-    let verbs = verbs_in(phrases, &segment);
-    let after_open = verbs
-        .windows(2)
-        .find(|pair| pair[0].1 == Verb::Open)
-        .map(|pair| pair[1].0.start);
-    match after_open {
-        Some(cut) => {
-            out.push(Segment::new(&segment.text[..cut]));
-            cut_after_open(phrases, Segment::new(&segment.text[cut..]), out);
-        }
-        None => out.push(segment),
-    }
-}
-
-/// The first of `names` in `segment`, the longest where several start alike.
-fn earliest(segment: &Segment, names: &[Name]) -> Option<Range<usize>> {
-    let address = address_in(&segment.text).map(|(_, span)| span);
-    names
-        .iter()
-        .filter_map(|n| segment.find(n))
-        .filter(|r| !address.as_ref().is_some_and(|a| overlaps(a, r)))
-        .min_by_key(|r| (r.start, std::cmp::Reverse(r.end)))
-}
-
 /// The verbs in `segment` in order, overlapping phrasings ("next", "next
 /// step") read once as the longest; words of an address
 /// (`https://x/play/a.zarr`) are no verbs.
 fn verbs_in(phrases: &Phrases, segment: &Segment) -> Vec<(Range<usize>, Verb)> {
-    let address = address_in(&segment.text).map(|(_, span)| span);
+    let address: Vec<Range<usize>> = address_in(&segment.text)
+        .map(|(_, span)| span)
+        .into_iter()
+        .collect();
     let mut found: Vec<(Range<usize>, Verb)> = phrases
         .verbs
         .iter()
         .flat_map(|(verb, says)| says.iter().map(move |p| (verb, p)))
-        .filter_map(|(verb, p)| segment.find(&Name::new(p)).map(|r| (r, *verb)))
-        .filter(|(r, _)| !address.as_ref().is_some_and(|a| overlaps(a, r)))
+        .filter_map(|(verb, p)| segment.find(phrase(p), &address).map(|r| (r, *verb)))
         .collect();
     found.sort_by_key(|(r, _)| (r.start, std::cmp::Reverse(r.end)));
     let mut kept: Vec<(Range<usize>, Verb)> = Vec::new();
     for (r, verb) in found {
-        if !kept.iter().any(|(k, _)| overlaps(k, &r)) {
+        if !kept.iter().any(|(k, _)| super::text::overlaps(k, &r)) {
             kept.push((r, verb));
         }
     }
@@ -231,9 +160,10 @@ fn verbs_in(phrases: &Phrases, segment: &Segment) -> Vec<(Range<usize>, Verb)> {
 }
 
 /// Where one of `words` is said outside `taken`.
-fn word_of(segment: &Segment, words: &[&str], taken: &[Range<usize>]) -> Option<Range<usize>> {
-    words
-        .iter()
-        .filter_map(|w| segment.find(&Name::new(w)))
-        .find(|s| !taken.iter().any(|t| overlaps(t, s)))
+fn word_of(
+    segment: &Segment,
+    words: &[&'static str],
+    taken: &[Range<usize>],
+) -> Option<Range<usize>> {
+    words.iter().find_map(|w| segment.find(phrase(w), taken))
 }

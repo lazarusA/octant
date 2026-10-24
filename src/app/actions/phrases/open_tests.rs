@@ -93,3 +93,16 @@ fn addresses_touching_cjk_text_and_windows_paths_are_kept_whole() {
         [open("C:\\Data\\x.nc")]
     );
 }
+
+#[test]
+fn a_query_string_stays_in_its_address() {
+    let vocab = vocab();
+    let url = "https://data.example/a.zarr?X-Amz-Signature=AbC;x=1";
+    assert_eq!(
+        parse(&format!("open {url} then plot"), &vocab, Language::English),
+        [
+            action(AppAction::OpenSource { source: url.into() }),
+            action(AppAction::Plot { plot_type: None }),
+        ]
+    );
+}

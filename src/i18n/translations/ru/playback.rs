@@ -53,6 +53,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoLayer => "Ни один слой не соответствует '{}'",
         PlaybackKey::VoiceNoFormat => "Ни один формат экспорта не соответствует '{}'",
         PlaybackKey::VoiceNoWell => "Ни одна лунка не соответствует '{}'",
+        PlaybackKey::VoiceNoWellPicked => "Сначала выберите лунку",
         PlaybackKey::VoiceDatasetSummary => "{} ({} переменных)",
         PlaybackKey::VoiceSearching => "Поиск '{}': {} переменных",
         PlaybackKey::VoiceViewSummary => "{} как {}",

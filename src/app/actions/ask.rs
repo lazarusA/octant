@@ -3,6 +3,8 @@
 //! a variable is with its coordinate ranges, what is plotted. Answers are
 //! data; the front ends word and show them (`answer.rs`).
 
+use std::borrow::Cow;
+
 use super::coord_match::Dim;
 use super::resolve::{Resolution, among};
 use super::{Done, Failure, NameKind, Outcome, resolved};
@@ -68,10 +70,13 @@ fn summaries(meta: &DatasetMetadata, var: &VariableInfo, store: &str) -> Vec<Dim
 }
 
 impl OctantApp {
-    fn variable_tree(&self, meta: &DatasetMetadata) -> VariableTreeGroup {
-        self.cached_variable_tree
-            .clone()
-            .unwrap_or_else(|| VariableTreeGroup::build_tree_from_variables(&meta.variables))
+    /// The Variables panel's tree of the active dataset, built as it builds
+    /// it when not cached.
+    fn variable_tree<'a>(&'a self, meta: &DatasetMetadata) -> Cow<'a, VariableTreeGroup> {
+        match &self.cached_variable_tree {
+            Some(tree) => Cow::Borrowed(tree),
+            None => Cow::Owned(meta.build_variable_tree()),
+        }
     }
 
     pub(super) fn describe_dataset(&self, group: Option<&str>) -> Outcome {
@@ -111,28 +116,33 @@ impl OctantApp {
     }
 
     pub(super) fn describe_variable(&mut self, path: Option<&str>) -> Outcome {
-        let meta = self.selected.metadata.as_ref().ok_or(Failure::NoDataset)?;
+        if self.selected.metadata.is_none() {
+            return Err(Failure::NoDataset);
+        }
         let idx = match path {
             Some(path) => resolved(self.vocabulary().variable(path), NameKind::Variable, path)?,
             None => self.selected.variable_idx,
         };
-        let var = meta.variables.get(idx).cloned().ok_or(Failure::NoDataset)?;
+        let meta = self.selected.metadata.as_ref().ok_or(Failure::NoDataset)?;
+        let var = meta.variables.get(idx).ok_or(Failure::NoDataset)?;
         let unread = var
             .dimension_names
             .iter()
             .any(|d| meta.get_dim_coords(Some(&var.name), d).is_none());
-        if unread {
+        // Asked again once the read settled, it answers with what arrived.
+        if unread && !self.commands.retrying() {
             self.request_variable_coordinates(idx);
             if self.coordinate_loader.pending_count() > 0 {
                 return Err(Failure::Reading);
             }
         }
         let meta = self.selected.metadata.as_ref().ok_or(Failure::NoDataset)?;
+        let var = meta.variables.get(idx).ok_or(Failure::NoDataset)?;
         Ok(Done::VariableShown {
             name: var.display_name().to_string(),
             long_name: var.long_name.clone(),
             units: var.units.clone(),
-            dims: summaries(meta, &var, &self.selected.store_target),
+            dims: summaries(meta, var, &self.selected.store_target),
         })
     }
 

@@ -53,6 +53,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoLayer => "Inget lager matchar '{}'",
         PlaybackKey::VoiceNoFormat => "Inget exportformat matchar '{}'",
         PlaybackKey::VoiceNoWell => "Ingen brunn matchar '{}'",
+        PlaybackKey::VoiceNoWellPicked => "Välj en brunn först",
         PlaybackKey::VoiceDatasetSummary => "{} ({} variabler)",
         PlaybackKey::VoiceSearching => "Sökning '{}': {} variabler",
         PlaybackKey::VoiceViewSummary => "{} som {}",

@@ -158,7 +158,9 @@ impl Whisper {
             let (ys, logits) = self.next_logits(&ids, &features, i == 0)?;
             if i == 0 {
                 // The chance of no speech is read at the start of transcript.
-                let first = self.model.final_linear(&ys.i(..1)?)?.i(0)?.i(sot_at)?;
+                // Only that row is projected onto the vocabulary, not the prompt's.
+                let row = ys.i((..1, sot_at..sot_at + 1))?;
+                let first = self.model.final_linear(&row)?.i(0)?.i(0)?;
                 no_speech = candle_nn::ops::softmax(&first, 0)?
                     .i(no_speech_token as usize)?
                     .to_scalar::<f32>()? as f64;
@@ -186,19 +188,28 @@ impl WindowModel for Whisper {
         self.run(audio).map_err(|e| e.to_string())
     }
 
-    /// Keeps the prompt's last tokens, as OpenAI's `transcribe` does, but at
-    /// most `PROMPT_TOKENS`: candle's decoder caches no self-attention, so
-    /// every token written reads the whole prompt again (600 characters of
-    /// names made tiny 2.2x slower). An empty prompt clears it.
+    /// Keeps the prompt's first tokens, at most `PROMPT_TOKENS`, cut after
+    /// the last whole comma-separated name (the prompt lists names, the
+    /// first the most wanted): candle's decoder caches no self-attention,
+    /// so every token written reads the whole prompt again (600 characters
+    /// of names made tiny 2.2x slower). An empty prompt clears it.
     fn set_prompt(&mut self, prompt: &str) {
         let prompt = prompt.trim();
         if prompt.is_empty() {
             self.prompt.clear();
             return;
         }
-        let tokens = self.tokens.encode(&format!(" {prompt}"));
+        let mut tokens = self.tokens.encode(&format!(" {prompt}"));
         let keep = PROMPT_TOKENS.min(self.model.config().max_target_positions / 2 - 1);
-        self.prompt = tokens[tokens.len().saturating_sub(keep)..].to_vec();
+        if tokens.len() > keep {
+            let comma = self.tokens.encode(",").first().copied();
+            let cut = tokens[..=keep]
+                .iter()
+                .rposition(|&t| Some(t) == comma)
+                .unwrap_or(keep);
+            tokens.truncate(cut);
+        }
+        self.prompt = tokens;
     }
 }
 

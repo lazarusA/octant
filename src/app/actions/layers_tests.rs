@@ -160,11 +160,11 @@ fn a_field_waits_for_its_well_to_be_read() {
         plate: Some(plate),
         ..Default::default()
     };
-    // Without a well picked, the answer names the missing well.
-    assert!(matches!(
-        app.run_utterance("field 1").as_slice(),
-        [Err(Failure::NotFound { .. })]
-    ));
+    // Without a well picked, the answer asks for one.
+    assert_eq!(
+        app.run_utterance("field 1"),
+        vec![Err(Failure::NoWellPicked)]
+    );
     assert_eq!(
         app.run_utterance("well A1 field 1"),
         vec![],

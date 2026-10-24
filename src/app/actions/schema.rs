@@ -103,21 +103,34 @@ fn tool_of(mut variant: Value, defs: &Value, names: &Names) -> Option<Tool> {
     })
 }
 
+/// How deep definitions may refer to definitions: the actions' arguments
+/// nest one level; a definition referring to itself stops here.
+const MAX_REF_DEPTH: usize = 8;
+
 /// Replaces every `{"$ref": "#/$defs/X"}` in `value` by `X`'s definition.
 fn inline_refs(value: &mut Value, defs: &Value) {
+    inline_refs_within(value, defs, MAX_REF_DEPTH);
+}
+
+fn inline_refs_within(value: &mut Value, defs: &Value, depth: usize) {
     match value {
         Value::Object(map) => {
             let target = map
                 .get("$ref")
                 .and_then(Value::as_str)
                 .and_then(|r| r.strip_prefix("#/$defs/"));
-            if let Some(def) = target.and_then(|t| defs.get(t)) {
+            if let Some(def) = target.and_then(|t| defs.get(t))
+                && depth > 0
+            {
                 *value = def.clone();
-                return inline_refs(value, defs);
+                return inline_refs_within(value, defs, depth - 1);
             }
-            map.values_mut().for_each(|v| inline_refs(v, defs));
+            map.values_mut()
+                .for_each(|v| inline_refs_within(v, defs, depth));
         }
-        Value::Array(items) => items.iter_mut().for_each(|v| inline_refs(v, defs)),
+        Value::Array(items) => items
+            .iter_mut()
+            .for_each(|v| inline_refs_within(v, defs, depth)),
         _ => {}
     }
 }
@@ -143,16 +156,11 @@ impl crate::app::OctantApp {
             .iter()
             .flat_map(|m| &m.variables)
             .filter(|v| !v.is_coarser_level());
-        let mut dimensions: Vec<String> = Vec::new();
-        for dim in meta
-            .iter()
-            .flat_map(|m| &m.variables)
-            .flat_map(|v| &v.dimension_names)
-        {
-            if !dimensions.contains(dim) {
-                dimensions.push(dim.clone());
-            }
-        }
+        let dimensions = meta
+            .into_iter()
+            .flat_map(super::prompt::dimension_names)
+            .map(str::to_string)
+            .collect();
         let names = Names {
             variables: variables
                 .map(|v| v.name.trim_matches('/').to_string())
@@ -162,6 +170,8 @@ impl crate::app::OctantApp {
                 .layers
                 .iter()
                 .map(|l| super::layers::layer_name(self, l.id()))
+                // The base layer before anything is plotted has no name.
+                .filter(|name| !name.is_empty())
                 .collect(),
             plot_types: super::candidates::plot_type_ids()
                 .map(str::to_string)

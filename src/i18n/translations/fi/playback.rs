@@ -53,6 +53,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoLayer => "Mikään taso ei vastaa kohdetta '{}'",
         PlaybackKey::VoiceNoFormat => "Mikään vientimuoto ei vastaa kohdetta '{}'",
         PlaybackKey::VoiceNoWell => "Mikään kuoppa ei vastaa kohdetta '{}'",
+        PlaybackKey::VoiceNoWellPicked => "Valitse ensin kuoppa",
         PlaybackKey::VoiceDatasetSummary => "{} ({} muuttujaa)",
         PlaybackKey::VoiceSearching => "Haku '{}': {} muuttujaa",
         PlaybackKey::VoiceViewSummary => "{} muodossa {}",

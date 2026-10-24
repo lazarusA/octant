@@ -25,7 +25,7 @@ pub(super) struct Phrases {
     pub then: &'static [&'static str],
 }
 
-/// The axes as dimension actions name them (`dims::by_role` reads them).
+/// The axes as dimension actions name them (`actions::dims` `by_axis` reads them).
 pub(super) const AXES: [&str; 4] = ["time", "latitude", "longitude", "level"];
 
 pub(super) fn table(lang: Language) -> &'static Phrases {

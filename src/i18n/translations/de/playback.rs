@@ -53,6 +53,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoLayer => "Keine Ebene passt zu '{}'",
         PlaybackKey::VoiceNoFormat => "Kein Exportformat passt zu '{}'",
         PlaybackKey::VoiceNoWell => "Kein Well passt zu '{}'",
+        PlaybackKey::VoiceNoWellPicked => "Wähle zuerst ein Well",
         PlaybackKey::VoiceDatasetSummary => "{} ({} Variablen)",
         PlaybackKey::VoiceSearching => "Suche '{}': {} Variablen",
         PlaybackKey::VoiceViewSummary => "{} als {}",

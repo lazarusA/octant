@@ -9,17 +9,20 @@ use std::collections::VecDeque;
 
 use super::answer;
 use super::phrases::{self, Parsed};
+use super::resolve::Vocabulary;
 use super::text::Segment;
-use super::{Done, Failure, Outcome};
+use super::{AppAction, Done, Failure, Outcome};
 use crate::app::OctantApp;
 use crate::i18n::Language;
 use crate::ui::panel_layout::Panel;
 use crate::ui::toast::Severity;
 
-/// A command not yet read, or what it was read into, not yet run.
+/// A command not yet read, or what it was read into, not yet run, or an
+/// action that waited for a read and runs again now that it settled.
 enum Item {
     Command(Language, Segment),
     Read(Parsed),
+    Retry(AppAction),
 }
 
 #[derive(Default)]
@@ -29,9 +32,22 @@ pub struct CommandQueue {
     opening: Option<String>,
     /// Whether the first action waits for something being read.
     reading: bool,
+    /// Whether the action running waited for a read: it asks for nothing
+    /// again, so a read that failed never loops.
+    retrying: bool,
+    /// The names commands find, and what they were read from.
+    pub(super) vocab: Option<(VocabKey, Vocabulary)>,
 }
 
+/// What a vocabulary was built from: the active dataset's metadata, the
+/// open datasets, the open plate's wells and the colormaps.
+pub(super) type VocabKey = (u64, usize, usize, u64);
+
 impl CommandQueue {
+    pub(super) fn retrying(&self) -> bool {
+        self.retrying
+    }
+
     pub(super) fn await_dataset(&mut self, store: &str) {
         self.opening = Some(store.to_string());
     }
@@ -59,27 +75,29 @@ impl OctantApp {
     pub fn resume_commands(&mut self) -> Vec<Outcome> {
         let mut outcomes = Vec::new();
         while self.opened_dataset_settled() && self.reads_settled() {
-            let action = match self.commands.waiting.pop_front() {
+            let (action, retry) = match self.commands.waiting.pop_front() {
                 None => break,
-                Some(Item::Read(Parsed::Action(action))) => action,
+                Some(Item::Read(Parsed::Action(action))) => (action, false),
+                Some(Item::Retry(action)) => (action, true),
                 Some(Item::Read(Parsed::NotUnderstood(text))) => {
                     outcomes.push(Err(Failure::NotUnderstood(text)));
                     self.commands.clear();
                     break;
                 }
                 Some(Item::Command(lang, segment)) => {
-                    let vocab = self.vocabulary();
-                    let parsed = phrases::parse_command(lang, &segment, &vocab);
+                    let parsed = phrases::parse_command(lang, &segment, self.vocabulary());
                     for read in parsed.into_iter().rev() {
                         self.commands.waiting.push_front(Item::Read(read));
                     }
                     continue;
                 }
             };
-            match self.dispatch(action.clone()) {
+            self.commands.retrying = retry;
+            let outcome = self.dispatch(action.clone());
+            self.commands.retrying = false;
+            match outcome {
                 Err(Failure::Reading) => {
-                    let waiting = Item::Read(Parsed::Action(action));
-                    self.commands.waiting.push_front(waiting);
+                    self.commands.waiting.push_front(Item::Retry(action));
                     self.commands.reading = true;
                 }
                 Err(failure) => {

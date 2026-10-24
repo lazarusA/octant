@@ -53,6 +53,7 @@ pub fn text(key: PlaybackKey) -> Option<&'static str> {
         PlaybackKey::VoiceNoLayer => "Aucun calque ne correspond à '{}'",
         PlaybackKey::VoiceNoFormat => "Aucun format d'export ne correspond à '{}'",
         PlaybackKey::VoiceNoWell => "Aucun puits ne correspond à '{}'",
+        PlaybackKey::VoiceNoWellPicked => "Choisissez d'abord un puits",
         PlaybackKey::VoiceDatasetSummary => "{} ({} variables)",
         PlaybackKey::VoiceSearching => "Recherche '{}' : {} variables",
         PlaybackKey::VoiceViewSummary => "{} en {}",

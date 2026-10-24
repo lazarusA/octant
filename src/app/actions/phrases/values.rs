@@ -1,19 +1,18 @@
-//! Values said in a command: dates in any language's form (`2020-01-15`,
-//! "15 January 2020", "15 de enero de 2020", `2020年1月15日`) written as
-//! ISO (`2020`, `2020-01`, `2020-01-15`), and numbers (`45.5`, `45,5`,
-//! `-30`), each with where it was said.
+//! Values said in a command: the parts of dates in any language's form
+//! (years, month names, days; `dates.rs` joins them into ISO dates) and
+//! numbers (`45.5`, `45,5`, `-30`), each with where it was said.
 
 use std::ops::Range;
 
-use crate::app::actions::text::{Segment, is_cjk, overlaps};
+use crate::app::actions::text::{Segment, is_cjk, joins, overlaps};
 
 /// Markers following a day in Chinese, Japanese and Korean dates.
 const DAY_MARKERS: [&str; 2] = ["日", "일"];
 /// Markers of the year-first order of Chinese, Japanese and Korean dates.
-const YEAR_MARKERS: [char; 2] = ['年', '년'];
+pub(super) const YEAR_MARKERS: [char; 2] = ['年', '년'];
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum Part {
+pub(super) enum Part {
     Year(u32),
     Month(u32),
     Day(u32),
@@ -66,16 +65,41 @@ fn by_number(segment: &Segment, m: &Range<usize>) -> bool {
     })
 }
 
+/// The month names beside a number, or (through them) at most two words
+/// from another kept month ("January to March 2020").
+fn kept_months(segment: &Segment, months: &mut Vec<(Range<usize>, Part)>) {
+    let word_at = |r: &Range<usize>| segment.words.iter().position(|w| overlaps(r, w));
+    let mut kept: Vec<bool> = months.iter().map(|(m, _)| by_number(segment, m)).collect();
+    while let Some(i) = (0..months.len()).find(|&i| {
+        !kept[i]
+            && (0..months.len()).any(|j| {
+                let (a, b) = (word_at(&months[i].0), word_at(&months[j].0));
+                kept[j] && a.zip(b).is_some_and(|(a, b)| a.abs_diff(b) <= 2)
+            })
+    }) {
+        kept[i] = true;
+    }
+    let mut keep = kept.into_iter();
+    months.retain(|_| keep.next().unwrap_or(false));
+}
+
+/// Whether the word at `r` stands alone: no `_` joins it to another, so
+/// the 1000 of `z_1000` is part of a name (words already split `t2m` from
+/// `2020年`).
+fn alone(text: &str, r: &Range<usize>) -> bool {
+    !text[..r.start].ends_with('_') && !text[r.end..].starts_with('_')
+}
+
 /// The date parts said outside `taken`, in order: month names beside a
 /// number, years (1000-2999) and days (1-31 at most a word from a month
 /// name, or before a day marker).
-fn parts(
+pub(super) fn parts(
     segment: &Segment,
     months: &[&[&str]; 12],
     taken: &[Range<usize>],
 ) -> Vec<(Range<usize>, Part)> {
     let mut found = month_spans(segment, months, taken);
-    found.retain(|(m, _)| by_number(segment, m));
+    kept_months(segment, &mut found);
     let words = &segment.words;
     let month_word = |k: usize| {
         words
@@ -87,7 +111,7 @@ fn parts(
         let Some(n) = number_word(&segment.text[word.clone()]) else {
             continue;
         };
-        if taken.iter().any(|t| overlaps(t, word)) || month_word(k) {
+        if taken.iter().any(|t| overlaps(t, word)) || month_word(k) || !alone(&segment.text, word) {
             continue;
         }
         let marked = words
@@ -105,106 +129,6 @@ fn parts(
     found
 }
 
-/// The dates said outside `taken`, as ISO text with their spans. A year
-/// takes the month and day said before it ("15 January 2020"), or after it
-/// in the year-first order of Chinese, Japanese and Korean.
-pub(super) fn dates(
-    segment: &Segment,
-    months: &[&[&str]; 12],
-    taken: &[Range<usize>],
-) -> Vec<(String, Range<usize>)> {
-    let mut out = iso_dates(segment, taken);
-    let mut taken = taken.to_vec();
-    taken.extend(out.iter().map(|(_, span)| span.clone()));
-    let parts = parts(segment, months, &taken);
-    let year_first = segment.text.contains(YEAR_MARKERS);
-    let mut group: Vec<(Range<usize>, Part)> = Vec::new();
-    let mut flush = |group: &mut Vec<(Range<usize>, Part)>| {
-        if let Some(date) = iso(group) {
-            out.push(date);
-        }
-        group.clear();
-    };
-    for part in parts {
-        let is_year = matches!(part.1, Part::Year(_));
-        if year_first && is_year {
-            flush(&mut group);
-        }
-        group.push(part);
-        if !year_first && is_year {
-            flush(&mut group);
-        }
-    }
-    flush(&mut group);
-    out.sort_by_key(|(_, span)| span.start);
-    out
-}
-
-/// Dates written as ISO (`2020-01-15`, `2020-01`, `2020/01/15`) outside
-/// `taken`.
-fn iso_dates(segment: &Segment, taken: &[Range<usize>]) -> Vec<(String, Range<usize>)> {
-    let text = &segment.text;
-    let mut out = Vec::new();
-    for (start, _) in text.char_indices() {
-        let alone = !text[..start]
-            .chars()
-            .next_back()
-            .is_some_and(char::is_alphanumeric);
-        if !alone
-            || out
-                .iter()
-                .any(|(_, r): &(String, Range<usize>)| r.contains(&start))
-        {
-            continue;
-        }
-        let mut fields = Vec::new();
-        let mut end = start;
-        for (k, width) in [(0, 4..=4), (1, 1..=2), (2, 1..=2)] {
-            let from = if k == 0 {
-                end
-            } else if matches!(text.as_bytes().get(end), Some(b'-' | b'/')) {
-                end + 1
-            } else {
-                break;
-            };
-            let digits = text[from..].bytes().take_while(u8::is_ascii_digit).count();
-            if !width.contains(&digits) {
-                break;
-            }
-            fields.push(&text[from..from + digits]);
-            end = from + digits;
-        }
-        let alone_after = !text[end..]
-            .chars()
-            .next()
-            .is_some_and(char::is_alphanumeric);
-        let span = start..end;
-        if fields.len() >= 2 && alone_after && !taken.iter().any(|t| overlaps(t, &span)) {
-            out.push((fields.join("-"), span));
-        }
-    }
-    out
-}
-
-/// A group of date parts holding a year as ISO text, with its span.
-fn iso(group: &[(Range<usize>, Part)]) -> Option<(String, Range<usize>)> {
-    let (mut year, mut month, mut day) = (None, None, None);
-    for (_, part) in group {
-        match *part {
-            Part::Year(y) => year = Some(y),
-            Part::Month(m) => month = Some(m),
-            Part::Day(d) => day = Some(d),
-        }
-    }
-    let span = group.first()?.0.start..group.last()?.0.end;
-    let text = match (year?, month, day) {
-        (y, Some(m), Some(d)) => format!("{y:04}-{m:02}-{d:02}"),
-        (y, Some(m), None) => format!("{y:04}-{m:02}"),
-        (y, None, _) => format!("{y:04}"),
-    };
-    Some((text, span))
-}
-
 /// The numbers said outside `taken`, standing alone (not the 2 of `t2m`),
 /// with a point or comma as decimal separator.
 pub(super) fn numbers(segment: &Segment, taken: &[Range<usize>]) -> Vec<(String, Range<usize>)> {
@@ -217,10 +141,7 @@ pub(super) fn numbers(segment: &Segment, taken: &[Range<usize>]) -> Vec<(String,
         let starts = bytes[i].is_ascii_digit() || negative;
         // `i` is on a character boundary: it only ever moves by characters
         // or over ASCII digits.
-        let alone_before = !text[..i]
-            .chars()
-            .next_back()
-            .is_some_and(char::is_alphanumeric);
+        let alone_before = !text[..i].chars().next_back().is_some_and(joins);
         if !(starts && alone_before) {
             i += text[i..].chars().next().map_or(1, char::len_utf8);
             continue;
@@ -239,7 +160,7 @@ pub(super) fn numbers(segment: &Segment, taken: &[Range<usize>]) -> Vec<(String,
             i += 1;
             digits(&mut i);
         }
-        let alone_after = !text[i..].chars().next().is_some_and(char::is_alphanumeric);
+        let alone_after = !text[i..].chars().next().is_some_and(joins);
         let span = start..i;
         if alone_after && !taken.iter().any(|t| overlaps(t, &span)) {
             out.push((text[span.clone()].replace(',', "."), span));

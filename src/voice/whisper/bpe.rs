@@ -1,8 +1,9 @@
-//! Text to Whisper's tokens: GPT-2 byte-level BPE. The text is cut as
+//! Text to Whisper's tokens: GPT-2 byte-level BPE. The text is cut much as
 //! GPT-2's pre-tokenizer cuts it (letters, digits or other symbols, each
-//! run with the space before it), each piece written in the printable
-//! characters that stand for its bytes, then its characters merged pair by
-//! pair in the order `tokenizer.json` ranks the merges.
+//! run with the space before it; without its English contractions, and a
+//! run of spaces kept whole, which names never hold), each piece's bytes
+//! read as the tokens of the printable characters standing for them, then
+//! merged pair by pair in the order `tokenizer.json` ranks the merges.
 
 use std::collections::HashMap;
 
@@ -15,11 +16,14 @@ pub(super) enum Merge {
     Pair(String, String),
 }
 
+/// A byte with no token of its own (none in Whisper's vocabularies).
+const NO_TOKEN: u32 = u32::MAX;
+
 pub(super) struct Bpe {
-    ranks: HashMap<(String, String), usize>,
-    ids: HashMap<String, u32>,
-    /// The printable character standing for each byte.
-    chars: [char; 256],
+    /// Each ranked pair of tokens: its rank and the token it merges into.
+    ranks: HashMap<(u32, u32), (usize, u32)>,
+    /// The token of the printable character standing for each byte.
+    byte_tokens: [u32; 256],
 }
 
 impl Bpe {
@@ -33,40 +37,40 @@ impl Bpe {
                 Merge::Pair(a, b) => Some((a, b)),
             })
             .enumerate()
-            .map(|(rank, pair)| (pair, rank))
+            .filter_map(|(rank, (a, b))| {
+                let merged = ids.get(&format!("{a}{b}"))?;
+                Some(((*ids.get(&a)?, *ids.get(&b)?), (rank, *merged)))
+            })
             .collect();
-        Self { ranks, ids, chars }
+        let byte_tokens = chars.map(|c| ids.get(&c.to_string()).copied().unwrap_or(NO_TOKEN));
+        Self { ranks, byte_tokens }
     }
 
-    /// The tokens of `text`; pieces with no token are left out.
+    /// The tokens of `text`; bytes with no token are left out.
     pub(super) fn encode(&self, text: &str) -> Vec<u32> {
         pieces(text)
             .flat_map(|piece| self.merge(piece))
-            .filter_map(|symbol| self.ids.get(&symbol).copied())
+            .filter(|&t| t != NO_TOKEN)
             .collect()
     }
 
-    /// `piece`'s symbols once every ranked pair has merged, lowest rank first.
-    fn merge(&self, piece: &str) -> Vec<String> {
-        let mut symbols: Vec<String> = piece
+    /// `piece`'s tokens once every ranked pair has merged, lowest rank first.
+    fn merge(&self, piece: &str) -> Vec<u32> {
+        let mut symbols: Vec<u32> = piece
             .bytes()
-            .map(|b| self.chars[b as usize].to_string())
+            .map(|b| self.byte_tokens[b as usize])
             .collect();
         loop {
             let best = symbols
                 .windows(2)
                 .enumerate()
-                .filter_map(|(i, w)| {
-                    self.ranks
-                        .get(&(w[0].clone(), w[1].clone()))
-                        .map(|&r| (r, i))
-                })
+                .filter_map(|(i, w)| self.ranks.get(&(w[0], w[1])).map(|&(r, t)| (r, i, t)))
                 .min();
-            let Some((_, i)) = best else {
+            let Some((_, i, merged)) = best else {
                 return symbols;
             };
-            let next = symbols.remove(i + 1);
-            symbols[i].push_str(&next);
+            symbols[i] = merged;
+            symbols.remove(i + 1);
         }
     }
 }

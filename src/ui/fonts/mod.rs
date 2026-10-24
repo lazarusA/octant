@@ -33,7 +33,7 @@ mod web;
 mod web_slices;
 
 pub use cjk::CjkFont;
-pub use scan::Scripts;
+pub use scan::{Script, Scripts, script_of};
 
 use dataset_text::DatasetText;
 
