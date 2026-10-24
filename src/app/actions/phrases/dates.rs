@@ -5,6 +5,7 @@
 
 use std::ops::Range;
 
+use super::Phrases;
 use super::values::{Part, YEAR_MARKERS, parts};
 use crate::app::actions::text::{Segment, joins, overlaps};
 
@@ -12,16 +13,16 @@ use crate::app::actions::text::{Segment, joins, overlaps};
 /// takes the month and day said before it ("15 January 2020"), or after it
 /// in the year-first order of Chinese, Japanese and Korean; a date said
 /// without one takes the year of the date beside it ("15 January to 20
-/// February 2020", "2020年1月到3月").
+/// February 2020", "January 15, 2020 to February 20", "2020年1月到3月").
 pub(super) fn dates(
     segment: &Segment,
-    months: &[&[&str]; 12],
+    phrases: &Phrases,
     taken: &[Range<usize>],
 ) -> Vec<(String, Range<usize>)> {
     let mut out = iso_dates(segment, taken);
     let mut taken = taken.to_vec();
     taken.extend(out.iter().map(|(_, span)| span.clone()));
-    let parts = parts(segment, months, &taken);
+    let parts = parts(segment, &phrases.months, phrases.until, &taken);
     let year_first = parts.iter().any(|(r, part)| {
         matches!(part, Part::Year(_)) && segment.text[r.end..].starts_with(YEAR_MARKERS)
     });
@@ -57,38 +58,53 @@ fn group_parts(parts: Group, year_first: bool) -> Vec<Group> {
     groups
 }
 
-/// Each group without a year takes the next group's (the previous one's,
-/// year first), and a day said without a month that group's month too
-/// ("2020年1月15日到20日").
+/// Each group without a year takes the nearest group's, the next one's
+/// first (the previous one's first, year first), and a day said without a
+/// month that of the nearest group with one ("January 15 to 20, 2020",
+/// "2020年1月15日到20日").
 fn lend_parts(groups: &mut [Group], year_first: bool) {
-    let has = |g: &Group, f: fn(&Part) -> bool| g.iter().any(|(_, p)| f(p));
     let is_year = |p: &Part| matches!(p, Part::Year(_));
     let is_month = |p: &Part| matches!(p, Part::Month(_));
+    let is_day = |p: &Part| matches!(p, Part::Day(_));
     for i in 0..groups.len() {
-        if has(&groups[i], is_year) {
-            continue;
+        let has = |f: fn(&Part) -> bool| groups[i].iter().any(|(_, p)| f(p));
+        let (lacks_year, lacks_month) = (!has(is_year), has(is_day) && !has(is_month));
+        let mut lent = Vec::new();
+        let lender = nearest(groups, i, year_first, is_year)
+            // A year said alone before a date is no range's end ("2020
+            // January 15"), unless year first.
+            .filter(|(g, earlier)| year_first || !earlier || month_of(g).is_some());
+        if lacks_year && let Some((lender, earlier)) = lender {
+            let shift = new_year_shift(month_of(&groups[i]), month_of(lender), earlier);
+            lent.extend(lender.iter().filter_map(|(_, p)| match *p {
+                Part::Year(y) => Some(Part::Year(y.saturating_add_signed(shift))),
+                _ => None,
+            }));
         }
-        let lender = if year_first {
-            groups[..i].iter().rev().find(|g| has(g, is_year))
-        } else {
-            groups[i + 1..].iter().find(|g| has(g, is_year))
-        };
-        let Some(lender) = lender else {
-            continue;
-        };
-        let lacks_month = !has(&groups[i], is_month);
-        let shift = new_year_shift(month_of(&groups[i]), month_of(lender), year_first);
-        let lent: Vec<Part> = lender
-            .iter()
-            .map(|(_, p)| match *p {
-                Part::Year(y) => Part::Year(y.saturating_add_signed(shift)),
-                p => p,
-            })
-            .filter(|p| is_year(p) || (lacks_month && is_month(p)))
-            .collect();
+        if lacks_month && let Some((lender, _)) = nearest(groups, i, year_first, is_month) {
+            lent.extend(month_of(lender).map(Part::Month));
+        }
         // The span stays the group's own: what is lent was said for both.
         let at = groups[i].last().map_or(0..0, |(r, _)| r.end..r.end);
         groups[i].extend(lent.into_iter().map(|p| (at.clone(), p)));
+    }
+}
+
+/// The group nearest group `i` holding a part `f` accepts, the later ones
+/// first (the earlier ones, year first), and whether it comes before `i`.
+fn nearest(
+    groups: &[Group],
+    i: usize,
+    year_first: bool,
+    f: fn(&Part) -> bool,
+) -> Option<(&Group, bool)> {
+    let holds = |g: &&Group| g.iter().any(|(_, p)| f(p));
+    let earlier = || groups[..i].iter().rev().find(holds).map(|g| (g, true));
+    let later = || groups[i + 1..].iter().find(holds).map(|g| (g, false));
+    if year_first {
+        earlier().or_else(later)
+    } else {
+        later().or_else(earlier)
     }
 }
 
@@ -100,13 +116,14 @@ fn month_of(group: &Group) -> Option<u32> {
 }
 
 /// The years between a date said without one, of month `own`, and the
-/// date it borrows its year from, of month `lender`: a range crossing New
-/// Year ("December to February 2020" starts in 2019; year first, "2020年12月
-/// 30日到1月2日" ends in 2021).
-fn new_year_shift(own: Option<u32>, lender: Option<u32>, year_first: bool) -> i32 {
+/// date it borrows its year from, of month `lender`, said before it when
+/// `earlier`: a range crossing New Year ("December to February 2020"
+/// starts in 2019; "December 2020 to February", "2020年12月30日到1月2日"
+/// end in 2021).
+fn new_year_shift(own: Option<u32>, lender: Option<u32>, earlier: bool) -> i32 {
     match (own, lender) {
-        (Some(own), Some(lender)) if !year_first && own > lender => -1,
-        (Some(own), Some(lender)) if year_first && own < lender => 1,
+        (Some(own), Some(lender)) if !earlier && own > lender => -1,
+        (Some(own), Some(lender)) if earlier && own < lender => 1,
         _ => 0,
     }
 }
@@ -142,13 +159,41 @@ fn iso_dates(segment: &Segment, taken: &[Range<usize>]) -> Vec<(String, Range<us
             fields.push(&text[from..from + digits]);
             end = from + digits;
         }
+        let mut iso = fields.join("-");
+        if fields.len() == 3
+            && let Some((hour, to)) = hour_after(text, end)
+        {
+            iso.push_str(&format!("T{hour:02}:00"));
+            end = to;
+        }
         let alone_after = !text[end..].chars().next().is_some_and(joins);
         let span = start..end;
         if fields.len() >= 2 && alone_after && !taken.iter().any(|t| overlaps(t, &span)) {
-            out.push((fields.join("-"), span));
+            out.push((iso, span));
         }
     }
     out
+}
+
+/// The hour of a time of day written after an ISO day at `end` (`T12:00`,
+/// `t12` once lowercased, ` 12:00`), and where it ends.
+fn hour_after(text: &str, end: usize) -> Option<(u32, usize)> {
+    let sep = text[end..]
+        .chars()
+        .next()
+        .filter(|c| matches!(c, 't' | 'T' | ' '))?;
+    let from = end + sep.len_utf8();
+    let count = |at: usize| text[at..].bytes().take_while(u8::is_ascii_digit).count();
+    let digits = count(from);
+    let hour: u32 = text[from..from + digits.min(2)].parse().ok()?;
+    let mut to = from + digits;
+    let minutes = text[to..].starts_with(':') && count(to + 1) == 2;
+    if minutes {
+        to += 3;
+    }
+    // A space alone is no time: "2020-03-15 12" may be two values.
+    let valid = (1..=2).contains(&digits) && hour < 24 && (minutes || sep != ' ');
+    valid.then_some((hour, to))
 }
 
 /// A group of date parts holding a year as ISO text, with its span.

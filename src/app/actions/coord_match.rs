@@ -41,6 +41,11 @@ pub(super) fn index_of(
     last: bool,
 ) -> Option<usize> {
     let Some(coords) = coords else {
+        // On a time axis a date is no position: "2020" is a year, not the
+        // 2020th step.
+        if dim.context(0).is_time() && iso_span(value).is_some() {
+            return None;
+        }
         let position: usize = value.trim().parse().ok()?;
         return (1..=dim.len).contains(&position).then(|| position - 1);
     };

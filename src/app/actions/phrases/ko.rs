@@ -54,4 +54,5 @@ pub(super) static PHRASES: Phrases = Phrases {
     field: &["필드"],
     catalog: &["카탈로그"],
     then: &["그다음", "그 다음", "그리고"],
+    until: &[],
 };

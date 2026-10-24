@@ -77,6 +77,11 @@ impl<'a> DimContext<'a> {
         }
     }
 
+    /// Whether this dimension is time, by its name or CF units.
+    pub(crate) fn is_time(&self) -> bool {
+        self.is_time
+    }
+
     /// The date a coordinate value of this dimension stands for, if any.
     pub(crate) fn date(&self, val: f64) -> Option<Date> {
         coordinate_date(val, self.units, self.time_start, self.is_time)

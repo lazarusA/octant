@@ -69,4 +69,5 @@ pub(super) static PHRASES: Phrases = Phrases {
     field: &["поле"],
     catalog: &["каталог"],
     then: &["потом", "затем", "а потом"],
+    until: &["по", "до", "и"],
 };

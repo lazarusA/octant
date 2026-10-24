@@ -5,8 +5,8 @@ use std::sync::Arc;
 use serde_json::json;
 use zarrs::storage::store::MemoryStore;
 
-use super::Done;
 use super::dims_tests::{dim_index, run};
+use super::{Done, Failure};
 use crate::app::test_support::{TARGET, register_store, write_array, write_coordinate};
 use crate::app::{OctantApp, StoreKind};
 
@@ -16,6 +16,11 @@ fn timed_app(target: &str, time: &[f32], units: &str) -> OctantApp {
     let n = time.len() as u64;
     write_array(&store, "tas", &["time", "lat"], &[n, 5], &[1, 5]);
     write_coordinate(&store, "time", time, json!({ "units": units }));
+    open_tas(store, target)
+}
+
+/// `tas` of `store`, whose `lat` this writes, staged.
+fn open_tas(store: Arc<MemoryStore>, target: &str) -> OctantApp {
     write_coordinate(&store, "lat", &[10.0, 20.0, 30.0, 40.0, 50.0], json!({}));
     let mut app = OctantApp::default();
     let meta = register_store(&mut app, store, target);
@@ -87,4 +92,21 @@ fn a_number_matches_text_labels() {
     };
     let labels = CoordValues::Labels(["10", "11", "12"].map(String::from).to_vec().into());
     assert_eq!(index_of(&dim, Some(&labels), "11", false), Some(1));
+}
+
+#[test]
+fn a_year_is_no_position_on_a_time_axis_without_coordinates() {
+    let store = Arc::new(MemoryStore::new());
+    write_array(&store, "tas", &["time", "lat"], &[2100, 5], &[100, 5]);
+    let mut app = open_tas(store, "memory://uncoordinated");
+    let outcomes = run(&mut app, "time 2020");
+    assert!(
+        matches!(outcomes.as_slice(), [Err(Failure::NoValue { .. })]),
+        "{outcomes:?}"
+    );
+    assert!(matches!(
+        run(&mut app, "time 5").as_slice(),
+        [Ok(Done::DimSet { .. })]
+    ));
+    assert_eq!(time_step(&app), 4);
 }

@@ -51,4 +51,5 @@ pub(super) static PHRASES: Phrases = Phrases {
     field: &["视野"],
     catalog: &["目录"],
     then: &["然后", "接着", "之后"],
+    until: &[],
 };

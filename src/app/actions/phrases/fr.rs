@@ -94,4 +94,5 @@ pub(super) static PHRASES: Phrases = Phrases {
     field: &["champ"],
     catalog: &["catalogue"],
     then: &["puis", "ensuite", "et puis"],
+    until: &["à", "au", "et"],
 };

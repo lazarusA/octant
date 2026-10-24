@@ -53,4 +53,5 @@ pub(super) static PHRASES: Phrases = Phrases {
     field: &["kenttä"],
     catalog: &["luettelo", "katalogi"],
     then: &["sitten", "sen jälkeen", "ja sitten"],
+    until: &["ja"],
 };

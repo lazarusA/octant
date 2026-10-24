@@ -53,6 +53,11 @@ impl OctantApp {
             return Ok(Done::WellPicked(name));
         };
         let path = plate.plate.wells[index].path.clone();
+        // A read that failed earlier is read again, as clicking the well's
+        // note does; failing again, its toast says so.
+        if !self.commands.retrying() {
+            plate.retry_well(&path);
+        }
         let fields = match plate.well_fields(&path) {
             WellFields::Ready(fields) => std::sync::Arc::clone(fields),
             WellFields::Loading => return Err(Failure::Reading),

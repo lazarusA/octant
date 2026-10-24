@@ -79,4 +79,5 @@ pub(super) static PHRASES: Phrases = Phrases {
     field: &["bidang"],
     catalog: &["katalog"],
     then: &["lalu", "kemudian", "setelah itu"],
+    until: &["sampai", "hingga", "dan"],
 };

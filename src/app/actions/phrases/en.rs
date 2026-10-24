@@ -82,4 +82,5 @@ pub(super) static PHRASES: Phrases = Phrases {
     field: &["field"],
     catalog: &["catalog", "catalogue"],
     then: &["then", "and then", "after that"],
+    until: &["to", "until", "till", "through", "and"],
 };

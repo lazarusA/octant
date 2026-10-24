@@ -115,3 +115,17 @@ fn a_query_string_stays_in_its_address() {
         ]
     );
 }
+
+#[test]
+fn punctuation_after_a_wide_space_ends_the_command() {
+    let vocab = vocab();
+    // A no-break space before `?` (French) and an ideographic space.
+    for (said, lang) in [
+        ("ouvre le catalogue\u{a0}?", Language::French),
+        ("カタログを開く\u{3000}.", Language::Japanese),
+        ("open the catalog\u{202f}!", Language::English),
+    ] {
+        let parsed = parse(said, &vocab, lang);
+        assert_eq!(parsed, [action(AppAction::OpenCatalog)], "{said}");
+    }
+}

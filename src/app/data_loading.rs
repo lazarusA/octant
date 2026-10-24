@@ -133,9 +133,17 @@ impl OctantApp {
         let Some(rx) = &self.metadata_rx else {
             return;
         };
-        let Ok(result) = rx.try_recv() else {
-            ctx.request_repaint_after(std::time::Duration::from_millis(50));
-            return;
+        let result = match rx.try_recv() {
+            Ok(result) => result,
+            Err(std::sync::mpsc::TryRecvError::Empty) => {
+                ctx.request_repaint_after(std::time::Duration::from_millis(50));
+                return;
+            }
+            // The inspection ended without a result (it panicked): a failure,
+            // so the landing screen and queued commands stop waiting.
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                Err(self.selected.store_target.clone())
+            }
         };
         self.metadata_rx = None;
         self.is_loading = false;

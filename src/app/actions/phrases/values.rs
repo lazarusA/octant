@@ -92,10 +92,11 @@ fn alone(text: &str, r: &Range<usize>) -> bool {
 
 /// The date parts said outside `taken`, in order: month names beside a
 /// number, years (1000-2999) and days (1-31 at most a word from a month
-/// name, or before a day marker).
+/// name, before a day marker, or across one of `until` from such a day).
 pub(super) fn parts(
     segment: &Segment,
     months: &[&[&str]; 12],
+    until: &[&str],
     taken: &[Range<usize>],
 ) -> Vec<(Range<usize>, Part)> {
     let mut found = month_spans(segment, months, taken);
@@ -106,7 +107,7 @@ pub(super) fn parts(
             .get(k)
             .is_some_and(|w| found.iter().any(|(m, _)| overlaps(m, w)))
     };
-    let mut numbers = Vec::new();
+    let (mut numbers, mut loose) = (Vec::new(), Vec::new());
     for (k, word) in words.iter().enumerate() {
         let Some(n) = number_word(&segment.text[word.clone()]) else {
             continue;
@@ -122,11 +123,44 @@ pub(super) fn parts(
             numbers.push((word.clone(), Part::Year(n)));
         } else if (1..=31).contains(&n) && (marked || by_month) {
             numbers.push((word.clone(), Part::Day(n)));
+        } else if (1..=31).contains(&n) {
+            loose.push((k, n));
         }
     }
+    days_across(segment, until, &loose, &mut numbers);
     found.extend(numbers);
     found.sort_by_key(|(r, _)| r.start);
     found
+}
+
+/// The `loose` numbers (word index, value) said across one of `until`
+/// from a day in `found` ("January 15 to 20", "15 to 20 January"), which
+/// are days too though no month name stands beside them.
+fn days_across(
+    segment: &Segment,
+    until: &[&str],
+    loose: &[(usize, u32)],
+    found: &mut Vec<(Range<usize>, Part)>,
+) {
+    let words = &segment.words;
+    let between = |k: usize| {
+        words
+            .get(k)
+            .is_some_and(|w| until.contains(&&segment.text[w.clone()]))
+    };
+    for &(k, n) in loose {
+        let before = k.checked_sub(2).filter(|_| between(k - 1));
+        let after = between(k + 1).then_some(k + 2);
+        let day = |d: usize| {
+            let at = words.get(d);
+            found
+                .iter()
+                .any(|(r, p)| Some(r) == at && matches!(p, Part::Day(_)))
+        };
+        if before.into_iter().chain(after).any(day) {
+            found.push((words[k].clone(), Part::Day(n)));
+        }
+    }
 }
 
 /// The numbers said outside `taken`, standing alone (not the 2 of `t2m`),

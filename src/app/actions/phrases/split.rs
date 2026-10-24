@@ -67,7 +67,12 @@ pub(super) fn split(utterance: &str, phrases: &Phrases) -> (Vec<Segment>, usize)
 /// Whether byte `i` of `text` is inside an address (the `?` of a query
 /// string), which punctuation never cuts.
 fn in_address(text: &str, i: usize) -> bool {
-    let start = text[..i].rfind(char::is_whitespace).map_or(0, |w| w + 1);
+    // The word's own length: the whitespace before it may be wider than a
+    // byte (a no-break or ideographic space).
+    let start = i - text[..i]
+        .split(char::is_whitespace)
+        .next_back()
+        .map_or(0, str::len);
     let end = text[i..]
         .find(char::is_whitespace)
         .map_or(text.len(), |w| i + w);

@@ -103,7 +103,7 @@ fn said_values(
     verbs: &[Verb],
     around: &[Range<usize>],
 ) -> Vec<(String, Range<usize>)> {
-    let values = dates(segment, &phrases.months, around);
+    let values = dates(segment, phrases, around);
     let time = dim.is_none_or(|(n, _)| Axis::of_word(n) == Some(Axis::Time));
     let bare_years = values.iter().all(|(v, _)| !v.contains('-'));
     if (values.is_empty() || bare_years && !time) && (dim.is_some() || verbs.contains(&Verb::Goto))

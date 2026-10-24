@@ -23,6 +23,10 @@ pub(super) struct Phrases {
     /// The dataset catalog's name.
     pub catalog: &'static [&'static str],
     pub then: &'static [&'static str],
+    /// The words between the two ends of a range of days ("15 to 20
+    /// January"); none in Chinese, Japanese and Korean, whose days are
+    /// marked.
+    pub until: &'static [&'static str],
 }
 
 /// The axes as dimension actions name them (`actions::dims` `by_axis` reads them).

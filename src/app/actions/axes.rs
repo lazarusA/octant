@@ -1,8 +1,8 @@
 //! What a dimension is (time, latitude, longitude or a vertical level),
 //! whatever the provider named it (`valid_time`, `rlat`, `nav_lon`,
 //! `dim_1`): its coordinate's CF attributes (`axis`, `standard_name`,
-//! `units`, `positive`), else its OME-Zarr axis type, else the role the
-//! selection gives it, and only then its name.
+//! `units`, `positive`), else its OME-Zarr axis type, else its name, and
+//! only then the role the selection gives it.
 
 use crate::app::{DimConfig, SpatialRole};
 use crate::data::coordinates::naming::{

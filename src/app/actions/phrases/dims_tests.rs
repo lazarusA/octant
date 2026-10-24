@@ -202,6 +202,36 @@ fn dates_of_a_range_share_the_year_said_once() {
             "2020-12-30",
             "2021-01-02",
         ),
+        (
+            Language::English,
+            "time January 15, 2020 to February 20",
+            "2020-01-15",
+            "2020-02-20",
+        ),
+        (
+            Language::English,
+            "time December 2020 to February",
+            "2020-12",
+            "2021-02",
+        ),
+        (
+            Language::English,
+            "time January 15 to 20, 2020",
+            "2020-01-15",
+            "2020-01-20",
+        ),
+        (
+            Language::English,
+            "time 15 to 20 January 2020",
+            "2020-01-15",
+            "2020-01-20",
+        ),
+        (
+            Language::Spanish,
+            "tiempo del 15 al 20 de enero de 2020",
+            "2020-01-15",
+            "2020-01-20",
+        ),
     ];
     for (lang, said, a, b) in cases {
         let parsed = parse(said, &vocab, lang);
@@ -210,4 +240,25 @@ fn dates_of_a_range_share_the_year_said_once() {
         };
         assert_eq!((from.as_str(), to.as_str()), (a, b), "{lang:?} '{said}'");
     }
+}
+
+#[test]
+fn a_time_of_day_stays_with_its_date() {
+    let vocab = vocab();
+    for said in [
+        "time 2020-03-15T12:00",
+        "time 2020-03-15 12:00",
+        "time 2020-03-15t12",
+    ] {
+        let parsed = parse(said, &vocab, Language::English);
+        assert_eq!(parsed, [set(Some("time"), "2020-03-15T12:00")], "{said}");
+    }
+}
+
+#[test]
+fn a_year_said_first_and_a_stray_number_make_no_range() {
+    let vocab = vocab();
+    let parsed = parse("time 2020 January 15 level 3", &vocab, Language::English);
+    let range = |p: &Parsed| matches!(p, Parsed::Action(AppAction::SetRange { .. }));
+    assert!(!parsed.iter().any(range), "{parsed:?}");
 }

@@ -135,11 +135,8 @@ fn jpeg_is_said_either_way() {
     assert_eq!(app.export_settings.format, ExportFormat::Jpeg);
 }
 
-#[test]
-fn a_field_waits_for_its_well_to_be_read() {
-    use crate::app::state::plate::WellFields;
-    use crate::data::ome::OmeWell;
-    use crate::data::ome::plate::WellField;
+/// An app browsing a plate of one well, `A/1`, whose fields are `fields`.
+fn one_well_plate(fields: crate::app::state::plate::WellFields) -> OctantApp {
     let layout = OmePlate {
         rows: vec!["A".into()],
         columns: vec!["1".into()],
@@ -155,11 +152,31 @@ fn a_field_waits_for_its_well_to_be_read() {
         StoreKind::RemoteZarr,
         Arc::new(layout),
     );
-    plate.set_well_fields("A/1", WellFields::Loading);
-    let mut app = OctantApp {
+    plate.set_well_fields("A/1", fields);
+    OctantApp {
         plate: Some(plate),
         ..Default::default()
-    };
+    }
+}
+
+#[test]
+fn a_well_whose_read_failed_is_read_again_once() {
+    use crate::app::state::plate::WellFields;
+    let mut app = one_well_plate(WellFields::Failed);
+    assert_eq!(app.run_utterance("well A1 field 1"), vec![], "read again");
+    let plate = app.plate.as_mut().expect("plate");
+    assert_eq!(plate.well_fields("A/1"), &WellFields::Loading);
+    // Failing again, its toast says so: the command stops.
+    plate.set_well_fields("A/1", WellFields::Failed);
+    assert_eq!(app.resume_commands(), vec![Err(Failure::Refused)]);
+}
+
+#[test]
+fn a_field_waits_for_its_well_to_be_read() {
+    use crate::app::state::plate::WellFields;
+    use crate::data::ome::OmeWell;
+    use crate::data::ome::plate::WellField;
+    let mut app = one_well_plate(WellFields::Loading);
     // No dataset open asks for one; another dataset than a plate finds no
     // well; a plate's field without a well picked asks for a well.
     let mut no_plate = OctantApp::default();
