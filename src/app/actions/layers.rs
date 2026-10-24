@@ -10,7 +10,7 @@ use crate::app::layers::LayerId;
 use crate::export::ExportFormat;
 
 /// A layer's name: its variable as listed.
-fn layer_name(app: &OctantApp, id: LayerId) -> String {
+pub(super) fn layer_name(app: &OctantApp, id: LayerId) -> String {
     let layer = app.layers.get(id);
     let var = layer.and_then(|l| l.selection().variable_info());
     var.map(|v| v.display_name().to_string())

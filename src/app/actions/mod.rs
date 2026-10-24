@@ -30,6 +30,9 @@ mod plate;
 mod prompt;
 mod queue;
 pub mod resolve;
+pub mod schema;
+#[cfg(test)]
+mod schema_tests;
 pub mod source_names;
 mod staging;
 #[cfg(test)]
@@ -43,7 +46,7 @@ use outcome::resolved;
 pub use outcome::{Done, Failure, NameKind, Outcome};
 pub use queue::CommandQueue;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum AppAction {
     /// Stages a variable of the active dataset, as clicking it in the
@@ -151,7 +154,7 @@ pub enum AppAction {
 }
 
 /// A dimension's role: a plot axis, animated, or neither.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DimRole {
     X,

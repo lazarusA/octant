@@ -69,6 +69,11 @@ const PLOT_TYPES: [(PlotType, PlotKey, &[&str]); 6] = [
     ),
 ];
 
+/// Each plot type's English id, as tools name them.
+pub(super) fn plot_type_ids() -> impl Iterator<Item = &'static str> {
+    PLOT_TYPES.iter().map(|(_, _, ids)| ids[0])
+}
+
 /// Plot types by their English ids and their names in every language.
 pub(super) fn plot_type_candidates() -> Vec<Candidate<PlotType>> {
     PLOT_TYPES
